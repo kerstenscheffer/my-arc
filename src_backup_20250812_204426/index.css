@@ -1,0 +1,352 @@
+/* WORKAPP - Enhanced Global Styles (Without Tailwind imports) */
+
+:root {
+    /* Core Colors */
+    --bg-primary: #000;
+    --bg-secondary: rgba(0, 0, 0, 0.8);
+    --bg-tertiary: rgba(0, 0, 0, 0.6);
+    --accent-green: #09db09;
+    --accent-green-gradient: linear-gradient(135deg, #09db09 0%, #00ff88 100%);
+    --accent-green-soft: rgba(9, 219, 9, 0.1);
+    --accent-green-medium: rgba(9, 219, 9, 0.2);
+    
+    /* Text Colors */
+    --text-primary: #fff;
+    --text-secondary: #ccc;
+    --text-muted: #999;
+    --text-accent: #09db09;
+    
+    /* Borders */
+    --border-green: rgba(9, 219, 9, 0.3);
+    --border-subtle: rgba(9, 219, 9, 0.1);
+    --border-strong: #09db09;
+    
+    /* Shadows & Effects */
+    --shadow-green: 0 0 20px rgba(9, 219, 9, 0.2);
+    --shadow-green-strong: 0 0 30px rgba(9, 219, 9, 0.4);
+    --glow-green: 0 0 50px rgba(9, 219, 9, 0.3);
+    
+    /* Spacing */
+    --space-xs: 4px;
+    --space-sm: 8px;
+    --space-md: 12px;
+    --space-lg: 16px;
+    --space-xl: 24px;
+    --space-xxl: 32px;
+    
+    /* Border Radius */
+    --radius-sm: 4px;
+    --radius-md: 8px;
+    --radius-lg: 12px;
+    --radius-xl: 16px;
+}
+
+/* Reset & Base Styles */
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+    line-height: 1.6;
+}
+
+button {
+    background: none;
+    border: none;
+    color: inherit;
+    font: inherit;
+    cursor: pointer;
+}
+
+/* Basic Typography */
+h1, h2, h3, h4, h5, h6 {
+    font-weight: 600;
+    line-height: 1.2;
+}
+
+.text-sm { font-size: 0.875rem; }
+.text-xl { font-size: 1.25rem; }
+.text-2xl { font-size: 1.5rem; }
+.text-4xl { font-size: 2.25rem; }
+
+.font-bold { font-weight: 700; }
+.capitalize { text-transform: capitalize; }
+.text-center { text-align: center; }
+
+/* Layout Utilities */
+.flex { display: flex; }
+.items-center { align-items: center; }
+.justify-center { justify-content: center; }
+.flex-1 { flex: 1; }
+.space-y-4 > * + * { margin-top: 1rem; }
+.mb-2 { margin-bottom: 0.5rem; }
+.mb-4 { margin-bottom: 1rem; }
+
+/* WORKAPP Component Classes */
+.workapp-container {
+    min-height: 100vh;
+    background: var(--bg-primary);
+}
+
+.workapp-header {
+    background: var(--bg-secondary);
+    border-bottom: 1px solid var(--border-green);
+    padding: var(--space-lg) var(--space-xl);
+    box-shadow: var(--shadow-green);
+}
+
+.workapp-main {
+    padding: var(--space-xl);
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+/* Card System */
+.workapp-card {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-green);
+    border-radius: var(--radius-lg);
+    padding: var(--space-lg);
+    transition: all 0.3s ease;
+}
+
+.workapp-card:hover {
+    border-color: var(--border-strong);
+    box-shadow: var(--shadow-green);
+    transform: translateY(-1px);
+}
+
+.workapp-card-header {
+    border-bottom: 1px solid var(--border-subtle);
+    padding-bottom: var(--space-md);
+    margin-bottom: var(--space-lg);
+}
+
+.workapp-card-title {
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin: 0;
+}
+
+.workapp-card-subtitle {
+    color: var(--text-secondary);
+    font-size: 0.875rem;
+    margin: var(--space-xs) 0 0 0;
+}
+
+/* Button System */
+.workapp-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-sm);
+    padding: var(--space-sm) var(--space-lg);
+    border: none;
+    border-radius: var(--radius-md);
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    text-decoration: none;
+    font-size: 0.875rem;
+}
+
+.workapp-btn-primary {
+    background: var(--accent-green-gradient);
+    color: #000;
+}
+
+.workapp-btn-primary:hover {
+    transform: scale(1.02);
+    box-shadow: var(--shadow-green);
+}
+
+.workapp-btn-secondary {
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+    border: 1px solid var(--border-green);
+}
+
+.workapp-btn-secondary:hover {
+    border-color: var(--border-strong);
+    background: var(--accent-green-soft);
+}
+
+/* Navigation */
+.workapp-nav {
+    display: flex;
+    gap: var(--space-sm);
+    background: var(--bg-secondary);
+    padding: var(--space-sm);
+    border-radius: var(--radius-lg);
+    border: 1px solid var(--border-green);
+}
+
+.workapp-nav-item {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    padding: var(--space-sm) var(--space-md);
+    border-radius: var(--radius-md);
+    color: var(--text-secondary);
+    text-decoration: none;
+    transition: all 0.3s ease;
+    cursor: pointer;
+    border: 1px solid transparent;
+    background: transparent;
+}
+
+.workapp-nav-item:hover {
+    color: var(--text-accent);
+    background: var(--accent-green-soft);
+    border-color: var(--border-green);
+}
+
+.workapp-nav-item.active {
+    background: var(--accent-green-gradient);
+    color: #000;
+    border-color: var(--border-strong);
+}
+
+/* Dashboard Stats */
+.dashboard-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: var(--space-xl);
+    margin-top: var(--space-xl);
+}
+
+.dashboard-stat-card {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-green);
+    border-radius: var(--radius-lg);
+    padding: var(--space-xl);
+    text-align: center;
+    transition: all 0.3s ease;
+}
+
+.dashboard-stat-card:hover {
+    border-color: var(--border-strong);
+    box-shadow: var(--shadow-green);
+    transform: translateY(-2px);
+}
+
+.dashboard-stat-number {
+    font-size: 2rem;
+    font-weight: 700;
+    color: var(--text-accent);
+    display: block;
+}
+
+.dashboard-stat-label {
+    color: var(--text-secondary);
+    font-size: 0.875rem;
+    margin-top: var(--space-xs);
+}
+
+/* Badges */
+.workapp-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-xs);
+    padding: var(--space-xs) var(--space-sm);
+    border-radius: var(--radius-sm);
+    font-size: 0.75rem;
+    font-weight: 600;
+}
+
+.workapp-badge-success {
+    background: var(--accent-green-medium);
+    color: var(--text-accent);
+}
+
+.workapp-badge-info {
+    background: rgba(59, 130, 246, 0.2);
+    color: #3b82f6;
+}
+
+.workapp-badge-warning {
+    background: rgba(245, 158, 11, 0.2);
+    color: #f59e0b;
+}
+
+/* Loading States */
+.workapp-loading {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: var(--space-xl);
+    color: var(--text-muted);
+}
+
+.workapp-spinner {
+    width: 20px;
+    height: 20px;
+    border: 2px solid var(--border-green);
+    border-top: 2px solid var(--text-accent);
+    border-radius: 50%;
+    animation: workapp-spin 1s linear infinite;
+    margin-right: var(--space-sm);
+}
+
+@keyframes workapp-spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* Utility Classes */
+.workapp-flex {
+    display: flex;
+}
+
+.workapp-items-center {
+    align-items: center;
+}
+
+.workapp-justify-between {
+    justify-content: space-between;
+}
+
+.workapp-gap-md {
+    gap: var(--space-md);
+}
+
+.workapp-text-primary {
+    color: var(--text-primary);
+}
+
+.workapp-text-muted {
+    color: var(--text-muted);
+}
+
+.workapp-text-accent {
+    color: var(--text-accent);
+}
+
+.workapp-mb-lg {
+    margin-bottom: var(--space-lg);
+}
+
+.workapp-mt-lg {
+    margin-top: var(--space-lg);
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .workapp-main {
+        padding: var(--space-lg);
+    }
+    
+    .dashboard-grid {
+        grid-template-columns: 1fr;
+        gap: var(--space-lg);
+    }
+    
+    .workapp-nav {
+        flex-direction: column;
+    }
+}

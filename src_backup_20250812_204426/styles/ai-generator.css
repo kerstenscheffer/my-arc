@@ -1,0 +1,195 @@
+/* AI Generator Custom Styling */
+:root {
+  --bg-primary: #000;
+  --bg-secondary: rgba(0, 0, 0, 0.8);
+  --accent-green: #10b981;
+  --accent-green-gradient: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  --text-primary: #fff;
+  --text-secondary: #ccc;
+  --text-muted: #999;
+  --border-green: rgba(16, 185, 129, 0.3);
+  --border-subtle: rgba(16, 185, 129, 0.1);
+}
+
+.arc-card {
+  background: rgba(0, 0, 0, 0.9);
+  border: 1px solid var(--border-green);
+  border-radius: 12px;
+  transition: all 0.3s ease;
+}
+
+.arc-card:hover {
+  border-color: var(--accent-green);
+  box-shadow: 0 0 20px rgba(16, 185, 129, 0.2);
+}
+
+.arc-input {
+  background: rgba(0, 0, 0, 0.8);
+  border: 1px solid var(--border-green);
+  color: var(--text-primary);
+  border-radius: 8px;
+  transition: all 0.3s ease;
+}
+
+.arc-input:focus {
+  border-color: var(--accent-green);
+  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.1);
+  outline: none;
+}
+
+.arc-button {
+  background: var(--accent-green-gradient);
+  border: none;
+  border-radius: 8px;
+  color: #000;
+  font-weight: 600;
+  transition: all 0.3s ease;
+  transform: scale(1);
+}
+
+.arc-button:hover {
+  transform: scale(1.02);
+  box-shadow: 0 0 20px rgba(16, 185, 129, 0.3);
+}
+
+.arc-button:active {
+  transform: scale(0.98);
+}
+
+.arc-radio-card {
+  background: rgba(0, 0, 0, 0.7);
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  transition: all 0.3s ease;
+  cursor: pointer;
+}
+
+.arc-radio-card:hover {
+  border-color: var(--border-green);
+  background: rgba(0, 0, 0, 0.9);
+}
+
+.arc-radio-card.selected {
+  border-color: var(--accent-green);
+  background: rgba(16, 185, 129, 0.1);
+}
+
+.toast {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  background: var(--accent-green);
+  color: #000;
+  padding: 12px 20px;
+  border-radius: 8px;
+  font-weight: 600;
+  z-index: 1000;
+  transform: translateX(100%);
+  transition: transform 0.3s ease;
+}
+
+.toast.show {
+  transform: translateX(0);
+}
+
+.header-glow {
+  box-shadow: 0 0 50px rgba(16, 185, 129, 0.3);
+}
+
+.copy-button {
+  background: rgba(16, 185, 129, 0.2);
+  border: 1px solid var(--accent-green);
+  color: var(--accent-green);
+  border-radius: 6px;
+  padding: 4px 8px;
+  font-size: 12px;
+  font-weight: 500;
+  transition: all 0.2s ease;
+}
+
+.copy-button:hover {
+  background: var(--accent-green);
+  color: #000;
+}
+
+.exercise-item {
+  background: rgba(0, 0, 0, 0.6);
+  border: 1px solid var(--border-subtle);
+  border-radius: 6px;
+  padding: 12px;
+  margin-bottom: 8px;
+  transition: all 0.3s ease;
+  cursor: grab;
+}
+
+.exercise-item:hover {
+  border-color: var(--border-green);
+  background: rgba(16, 185, 129, 0.05);
+}
+
+.rating-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  background: rgba(16, 185, 129, 0.2);
+  color: var(--accent-green);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.rating-badge.strength {
+  background: rgba(59, 130, 246, 0.2);
+  color: #3b82f6;
+}
+
+.rating-badge.hypertrophy {
+  background: rgba(239, 68, 68, 0.2);
+  color: #ef4444;
+}
+
+.rating-badge.personal {
+  background: rgba(236, 72, 153, 0.2);
+  color: #ec4899;
+}
+
+/* Custom scrollbar */
+.exercise-list::-webkit-scrollbar {
+  width: 6px;
+}
+
+.exercise-list::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: 3px;
+}
+
+.exercise-list::-webkit-scrollbar-thumb {
+  background: var(--accent-green);
+  border-radius: 3px;
+}
+
+.exercise-list::-webkit-scrollbar-thumb:hover {
+  background: #059669;
+}
+
+/* Mobile responsive improvements */
+@media (max-width: 768px) {
+  .arc-card {
+    margin: 0 1rem;
+  }
+  
+  .exercise-item {
+    padding: 8px;
+  }
+  
+  .toast {
+    right: 10px;
+    left: 10px;
+    transform: translateY(-100%);
+  }
+  
+  .toast.show {
+    transform: translateY(0);
+  }
+}
