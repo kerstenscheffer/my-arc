@@ -46,22 +46,11 @@ export default async function handler(req, res) {
       }
 
       // Haal complete event details op van Calendly API
-      console.log('🔍 Fetching event details van:', eventUri);
-      
-      const eventResponse = await fetch(eventUri, {
-        headers: {
-          'Authorization': `Bearer ${process.env.VITE_CALENDLY_TOKEN}`,
-          'Content-Type': 'application/json'
-        }
-      });
+// Gebruik data direct uit webhook payload (geen API call nodig!)
+const scheduledEvent = payload.scheduled_event;
+console.log('📋 Using webhook payload data (no API call needed)');
 
-      if (!eventResponse.ok) {
-        console.error('❌ Calendly API error:', eventResponse.status);
-        throw new Error(`Calendly API error: ${eventResponse.status}`);
-      }
 
-      const eventDetails = await eventResponse.json();
-      const scheduledEvent = eventDetails.resource;
       
       console.log('📋 Event details:', {
         name: scheduledEvent.name,
@@ -76,7 +65,18 @@ export default async function handler(req, res) {
       
       const scheduledDate = scheduledEvent.start_time;
       const eventId = scheduledEvent.uri.split('/').pop();
-      
+// Extract call_id uit UTM parameters
+let targetCallId = null;
+if (payload.tracking?.utm_content) {
+  const match = payload.tracking.utm_content.match(/call_([a-f0-9-]+)/);
+  if (match) {
+    targetCallId = match[1];
+    console.log('🎯 Call ID gevonden in tracking:', targetCallId);
+  }
+}      
+
+
+
       // Vind de client op basis van email
       const clientEmail = payload.email;
       console.log('👤 Zoeken naar client met email:', clientEmail);
@@ -94,42 +94,56 @@ export default async function handler(req, res) {
         console.log('✅ Client gevonden:', client.name);
       }
 
-      // Check of er een open/pending call is voor deze client
-      // OF een call met hetzelfde Calendly event ID (duplicate check)
-      let callToUpdate = null;
-      
-      // Eerst checken voor duplicates
-      const { data: existingCall } = await supabase
-        .from('client_calls')
-        .select('*')
-        .eq('calendly_event_id', eventId)
-        .single();
-      
-      if (existingCall) {
-        console.log('⚠️ Call met dit Calendly event bestaat al:', existingCall.id);
-        return res.status(200).json({
-          success: true,
-          message: 'Call already exists',
-          call_id: existingCall.id
-        });
-      }
-      
-      // Dan checken voor pending calls om te updaten
-      if (client) {
-        const { data: pendingCalls } = await supabase
-          .from('client_calls')
-          .select('*')
-          .eq('client_id', client.id)
-          .in('status', ['pending', 'available'])
-          .order('call_number', { ascending: true })
-          .limit(1);
+// Als we een targetCallId hebben, gebruik die direct
+let callToUpdate = null;
 
-        if (pendingCalls && pendingCalls.length > 0) {
-          callToUpdate = pendingCalls[0];
-          console.log('📞 Gevonden call om te updaten:', callToUpdate.id);
-        }
-      }
+if (targetCallId) {
+  const { data: specificCall } = await supabase
+    .from('client_calls')
+    .select('*')
+    .eq('id', targetCallId)
+    .single();
+  
+  if (specificCall) {
+    callToUpdate = specificCall;
+    console.log('✅ Specifieke call gevonden via tracking:', targetCallId);
+  }
+}
 
+// Anders check voor duplicates en available calls
+if (!callToUpdate) {
+  // Check duplicates
+  const { data: existingCall } = await supabase
+    .from('client_calls')
+    .select('*')
+    .eq('calendly_event_id', eventId)
+    .single();
+  
+  if (existingCall) {
+    console.log('⚠️ Call bestaat al:', existingCall.id);
+    return res.status(200).json({
+      success: true,
+      message: 'Call already exists',
+      call_id: existingCall.id
+    });
+  }
+  
+  // Check available calls
+  if (client) {
+    const { data: pendingCalls } = await supabase
+      .from('client_calls')
+      .select('*')
+      .eq('client_id', client.id)
+      .in('status', ['pending', 'available'])
+      .order('call_number')
+      .limit(1);
+
+    if (pendingCalls && pendingCalls.length > 0) {
+      callToUpdate = pendingCalls[0];
+      console.log('📞 Available call gevonden:', callToUpdate.id);
+    }
+  }
+}
       // Update de call of maak een nieuwe aan
       if (callToUpdate) {
         // Update bestaande call
