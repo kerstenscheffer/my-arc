@@ -1,34 +1,50 @@
-export default async function handler(req, res) {
-  // Log voor debugging
-  console.log('Webhook called:', {
-    method: req.method,
-    headers: req.headers,
-    body: req.body
-  });
+// Vercel API Route
+export default function handler(req, res) {
+  // Enable CORS
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
-  // Accepteer alleen POST
+  // Handle OPTIONS request (preflight)
+  if (req.method === 'OPTIONS') {
+    return res.status(200).end();
+  }
+
+  // Only allow POST
   if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method not allowed' });
+    return res.status(405).json({ 
+      error: 'Method not allowed',
+      method: req.method 
+    });
   }
 
   try {
-    const event = req.body;
-    
-    // Voor nu, log en return success
-    console.log('Calendly event received:', event.event || 'unknown');
-    
-    return res.status(200).json({ 
+    // Log the incoming request
+    console.log('Webhook received:', {
+      body: req.body,
+      headers: req.headers
+    });
+
+    // Return success
+    return res.status(200).json({
       success: true,
       received: true,
-      message: 'Webhook received successfully',
-      event: event.event || 'test'
+      timestamp: new Date().toISOString(),
+      event: req.body?.event || 'unknown'
     });
-    
   } catch (error) {
     console.error('Webhook error:', error);
-    return res.status(500).json({ 
-      error: 'Internal server error',
-      message: error.message 
+    return res.status(500).json({
+      error: 'Internal server error'
     });
   }
 }
+
+// Export config for Vercel
+export const config = {
+  api: {
+    bodyParser: {
+      sizeLimit: '1mb',
+    },
+  },
+};
