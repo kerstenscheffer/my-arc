@@ -1,0 +1,797 @@
+import React, { useState, useEffect } from 'react';
+import { Calendar, Clock, Video, Lock, CheckCircle, ChevronRight, Plus, Bell, AlertCircle, X } from 'lucide-react';
+import CallPlanningService from './CallPlanningService';
+import CalendlyService from './CalendlyService';
+
+export default function ClientCalls({ db, clientInfo }) {
+  const [plans, setPlans] = useState([]);
+  const [calls, setCalls] = useState([]);
+  const [requests, setRequests] = useState([]);
+  const [notifications, setNotifications] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [selectedCall, setSelectedCall] = useState(null);
+  const [showBookingModal, setShowBookingModal] = useState(false);
+  const [showRequestModal, setShowRequestModal] = useState(false);
+  const [calendlyLoaded, setCalendlyLoaded] = useState(false);
+  const [, forceUpdate] = useState({});
+  const [requestData, setRequestData] = useState({
+    reason: '',
+    preferred_date: '',
+    preferred_time: '',
+    urgency: 'normal'
+  });
+
+  // Periodieke check voor updates (fallback)
+  useEffect(() => {
+    // Check elke 10 seconden voor updates als modal open is
+    if (showBookingModal && selectedCall) {
+      const checkInterval = setInterval(async () => {
+        console.log('🔄 Checking for call updates...');
+        
+        try {
+          const { createClient } = await import('@supabase/supabase-js');
+          const supabase = createClient(
+            import.meta.env.VITE_SUPABASE_URL || 'https://hdskzpaienzpetogwkhg.supabase.co',
+            import.meta.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0'
+          );
+          
+          // Check of de call status is veranderd
+          const { data: updatedCall } = await supabase
+            .from('client_calls')
+            .select('*')
+            .eq('id', selectedCall.id)
+            .single();
+          
+          if (updatedCall && updatedCall.status === 'scheduled' && updatedCall.scheduled_date) {
+            console.log('✅ Call is scheduled! Closing modal...');
+            
+            // Update local state
+            await loadCallData();
+            
+            // Sluit modal
+            setShowBookingModal(false);
+            setSelectedCall(null);
+            
+            // Success message
+            alert(`🎉 Call succesvol gepland!\n\n📅 ${new Date(updatedCall.scheduled_date).toLocaleDateString('nl-NL')}\n\nJe ontvangt een bevestiging per email.`);
+            
+            // Stop interval
+            clearInterval(checkInterval);
+          }
+        } catch (error) {
+          console.error('Check error:', error);
+        }
+      }, 10000); // Check elke 10 seconden
+      
+      // Cleanup
+      return () => clearInterval(checkInterval);
+    }
+  }, [showBookingModal, selectedCall]);
+  
+  // Auto-refresh voor scheduled calls zonder zoom link
+  useEffect(() => {
+    const interval = setInterval(async () => {
+      if (calls.some(c => c.status === 'scheduled' && !c.zoom_link)) {
+        console.log('Checking for updates...');
+        await loadCallData();
+      }
+    }, 30000);
+    
+    return () => clearInterval(interval);
+  }, [calls]);
+
+  // Load Calendly script en listen voor events
+  useEffect(() => {
+    if (showBookingModal && selectedCall) {
+      console.log('🎯 Setting up Calendly listener for call:', selectedCall.call_number);
+      
+      // Load Calendly script als nog niet geladen
+      if (!calendlyLoaded) {
+        const script = document.createElement('script');
+        script.src = 'https://assets.calendly.com/assets/external/widget.js';
+        script.async = true;
+        script.onload = () => {
+          setCalendlyLoaded(true);
+          console.log('✅ Calendly script loaded');
+        };
+        document.body.appendChild(script);
+      }
+
+      // Listen for ALL messages - debug mode
+      const handleMessage = (e) => {
+        // Log alle messages voor debugging
+        if (e.origin && e.origin.includes('calendly')) {
+          console.log('📨 Message from Calendly:', e.data);
+        }
+        
+        // Check verschillende event formats
+        if (e.origin === 'https://calendly.com') {
+          // Format 1: event in data.event
+          if (e.data.event === 'calendly.event_scheduled') {
+            console.log('✅ Event scheduled detected (format 1)!');
+            handleCalendlyScheduled(e.data.payload);
+          }
+          // Format 2: direct event type
+          else if (e.data.type === 'calendly.event_scheduled') {
+            console.log('✅ Event scheduled detected (format 2)!');
+            handleCalendlyScheduled(e.data);
+          }
+          // Format 3: calendly prefix
+          else if (e.data.calendly && e.data.calendly.event === 'event_scheduled') {
+            console.log('✅ Event scheduled detected (format 3)!');
+            handleCalendlyScheduled(e.data.calendly.payload || e.data);
+          }
+        }
+      };
+
+      window.addEventListener('message', handleMessage);
+      console.log('👂 Listening for Calendly events...');
+      
+      // Cleanup
+      return () => {
+        window.removeEventListener('message', handleMessage);
+        console.log('🔇 Stopped listening for Calendly events');
+      };
+    }
+  }, [showBookingModal, selectedCall, calendlyLoaded]);
+
+  const loadCallData = async () => {
+    try {
+      setLoading(true);
+      
+      console.log('🔍 Loading data for client:', clientInfo);
+      
+      const plansData = await CallPlanningService.getClientPlans(clientInfo.id);
+      console.log('📋 Plans loaded:', plansData);
+      setPlans(plansData || []);
+      
+      if (plansData && plansData.length > 0) {
+        const activePlan = plansData.find(p => p.status === 'active') || plansData[0];
+        
+        if (activePlan.client_calls) {
+          let callsData = activePlan.client_calls;
+          
+          // Voeg Calendly links toe van template items
+          if (activePlan.call_templates?.call_template_items) {
+            callsData = callsData.map(call => {
+              const templateItem = activePlan.call_templates.call_template_items.find(
+                item => item.call_number === call.call_number
+              );
+              
+              if (templateItem) {
+                return {
+                  ...call,
+                  calendly_link: call.calendly_link || templateItem.calendly_link,
+                  preparation_notes: call.preparation_notes || templateItem.preparation_notes
+                };
+              }
+              return call;
+            });
+          }
+          
+          // Update call statuses
+          callsData = callsData.map((call, index) => {
+            if (call.call_number === 1 && call.status === 'locked') {
+              return { ...call, status: 'available' };
+            }
+            
+            if (call.call_number > 1 && call.status === 'locked') {
+              const previousCall = callsData.find(c => c.call_number === call.call_number - 1);
+              if (previousCall && previousCall.status === 'completed') {
+                console.log(`Unlocking call #${call.call_number}`);
+                return { ...call, status: 'available' };
+              }
+            }
+            
+            return call;
+          });
+          
+          console.log('📞 Calls processed:', callsData.length);
+          setCalls(callsData);
+        }
+      }
+      
+      // Load requests en notifications
+      try {
+        if (CallPlanningService.getClientRequests) {
+          const requestsData = await CallPlanningService.getClientRequests(clientInfo.id);
+          setRequests(requestsData || []);
+        }
+      } catch (e) {
+        console.log('Requests not available');
+      }
+      
+      try {
+        if (CallPlanningService.getCallNotifications) {
+          const notificationsData = await CallPlanningService.getCallNotifications(clientInfo.id);
+          setNotifications(notificationsData?.filter(n => !n.read) || []);
+        }
+      } catch (e) {
+        console.log('Notifications not available');
+      }
+      
+    } catch (error) {
+      console.error('Error loading call data:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleCalendlyScheduled = async (payload) => {
+    console.log('✅ Calendly booking ontvangen:', payload);
+    
+    try {
+      // Extract de belangrijke data
+      const scheduledDate = payload.event.start_time;
+      const endDate = payload.event.end_time;
+      const inviteeName = payload.invitee.name;
+      const inviteeEmail = payload.invitee.email;
+      const eventUri = payload.event.uri;
+      
+      // Zoom link komt meestal later, maar check of het er is
+      const zoomLink = payload.event.location?.join_url || 
+                      payload.event.location?.location || '';
+      
+      console.log('📅 Updating call in database...');
+      
+      // Update via CallPlanningService
+      await CallPlanningService.scheduleCall(
+        selectedCall.id,
+        scheduledDate,
+        `Geboekt via Calendly door ${inviteeName}`
+      );
+      
+      // Direct update in database met alle Calendly info
+      const { createClient } = await import('@supabase/supabase-js');
+      const supabase = createClient(
+        import.meta.env.VITE_SUPABASE_URL || 'https://hdskzpaienzpetogwkhg.supabase.co',
+        import.meta.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0'
+      );
+      
+      const { data: updatedCall, error } = await supabase
+        .from('client_calls')
+        .update({
+          scheduled_date: scheduledDate,
+          status: 'scheduled',
+          zoom_link: zoomLink,
+          meeting_location: zoomLink || 'Zoom meeting - link volgt',
+          calendly_event_id: eventUri,
+          client_notes: `Gepland door: ${inviteeName} (${inviteeEmail})`,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', selectedCall.id)
+        .select()
+        .single();
+      
+      if (error) {
+        console.error('Database update error:', error);
+      } else {
+        console.log('✅ Call updated in database:', updatedCall);
+      }
+      
+      // Maak een notificatie voor de coach
+      try {
+        await supabase
+          .from('call_notifications')
+          .insert({
+            client_id: clientInfo.id,
+            call_id: selectedCall.id,
+            type: 'call_scheduled',
+            message: `${clientInfo.full_name || inviteeName} heeft Call #${selectedCall.call_number} gepland voor ${new Date(scheduledDate).toLocaleDateString('nl-NL')}`,
+            created_at: new Date().toISOString()
+          });
+      } catch (notifError) {
+        console.log('Could not create notification:', notifError);
+      }
+      
+      // Refresh de calls data
+      await loadCallData();
+      
+      // Sluit modal
+      setShowBookingModal(false);
+      setSelectedCall(null);
+      
+      // Success feedback
+      alert(`🎉 Call succesvol gepland!\n\n📅 ${new Date(scheduledDate).toLocaleDateString('nl-NL')} om ${new Date(scheduledDate).toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit' })}\n\nJe ontvangt een bevestiging per email.`);
+      
+      // Start een sync na 5 seconden voor Zoom link
+      setTimeout(async () => {
+        console.log('🔄 Checking for Zoom link update...');
+        await CalendlyService.syncWithDatabase(supabase);
+        await loadCallData();
+      }, 5000);
+      
+    } catch (error) {
+      console.error('Error processing booking:', error);
+      alert('Call is gepland! Refresh de pagina om de details te zien.');
+    }
+  };
+
+  const handleBookCall = (call) => {
+    console.log('Opening booking for call:', call);
+    
+    // Maak een kopie van de call met Calendly link
+    let callWithLink = { ...call };
+    
+    // Zoek Calendly link
+    if (!callWithLink.calendly_link) {
+      // Check in plans
+      if (plans.length > 0) {
+        const activePlan = plans.find(p => p.status === 'active') || plans[0];
+        if (activePlan?.call_templates?.call_template_items) {
+          const templateItem = activePlan.call_templates.call_template_items.find(
+            item => item.call_number === callWithLink.call_number
+          );
+          if (templateItem?.calendly_link) {
+            callWithLink.calendly_link = templateItem.calendly_link;
+            console.log('Found Calendly link from template:', templateItem.calendly_link);
+          }
+        }
+      }
+      
+      // Fallback links voor alle calls
+      const fallbackLinks = {
+        1: 'https://calendly.com/kerstenscheffer/kennismaking-doelstelling-call',
+        2: 'https://calendly.com/kerstenscheffer/persoonlijk-plan-pitch',
+        3: 'https://calendly.com/kerstenscheffer/reflectie-bijsturen',
+        4: 'https://calendly.com/kerstenscheffer/halfway-progressie-call',
+        5: 'https://calendly.com/kerstenscheffer/final-sprint-call',
+        6: 'https://calendly.com/kerstenscheffer/final-call'
+      };
+      
+      if (!callWithLink.calendly_link && fallbackLinks[callWithLink.call_number]) {
+        callWithLink.calendly_link = fallbackLinks[callWithLink.call_number];
+        console.log('Using fallback link for call', callWithLink.call_number);
+      }
+    }
+    
+    console.log('Setting state for call:', callWithLink);
+    
+    // Direct state update met force update
+    setSelectedCall(callWithLink);
+    setShowBookingModal(true);
+    forceUpdate({}); // Force re-render
+    
+    // Double check
+    setTimeout(() => {
+      if (!showBookingModal) {
+        console.log('Modal did not open, forcing update...');
+        setSelectedCall(callWithLink);
+        setShowBookingModal(true);
+        forceUpdate({});
+      }
+    }, 50);
+  };
+
+  const getCallStatus = (call, allCalls = []) => {
+    if (call.status === 'completed') return 'completed';
+    if (call.status === 'cancelled') return 'cancelled';
+    if (call.scheduled_date && call.status !== 'completed') return 'scheduled';
+    
+    if (call.call_number === 1) {
+      return call.status === 'available' || !call.status ? 'available' : call.status;
+    }
+    
+    if (allCalls && allCalls.length > 0) {
+      const previousCalls = allCalls.filter(c => c.call_number < call.call_number);
+      const allPreviousCompleted = previousCalls.every(c => 
+        c.status === 'completed' || c.status === 'voltooid'
+      );
+      
+      if (allPreviousCompleted) {
+        return 'available';
+      }
+    }
+    
+    if (call.status === 'available') return 'available';
+    return 'locked';
+  };
+
+  const getStatusIcon = (status) => {
+    switch(status) {
+      case 'completed': return <CheckCircle className="w-5 h-5 text-green-500" />;
+      case 'scheduled': return <Calendar className="w-5 h-5 text-blue-500" />;
+      case 'available': return <ChevronRight className="w-5 h-5 text-green-500" />;
+      default: return <Lock className="w-5 h-5 text-gray-500" />;
+    }
+  };
+
+  const getStatusColor = (status) => {
+    switch(status) {
+      case 'completed': return 'border-green-500 bg-green-500/10';
+      case 'scheduled': return 'border-blue-500 bg-blue-500/10';
+      case 'available': return 'border-green-500 bg-green-500/20 animate-pulse shadow-green-500/20 shadow-lg';
+      default: return 'border-gray-600 bg-gray-800/50';
+    }
+  };
+
+  const calculateProgress = () => {
+    const completed = calls.filter(c => c.status === 'completed' || c.status === 'voltooid').length;
+    return calls.length > 0 ? (completed / calls.length) * 100 : 0;
+  };
+
+  const submitCallRequest = async () => {
+    if (!requestData.reason) {
+      alert('Geef een reden op voor de extra call');
+      return;
+    }
+
+    try {
+      const activePlan = plans.find(p => p.status === 'active');
+      if (!activePlan) {
+        alert('Geen actief plan gevonden');
+        return;
+      }
+
+      await CallPlanningService.submitCallRequest(clientInfo.id, activePlan.id, requestData);
+      
+      await loadCallData();
+      setShowRequestModal(false);
+      setRequestData({ reason: '', preferred_date: '', preferred_time: '', urgency: 'normal' });
+    } catch (error) {
+      console.error('Error submitting call request:', error);
+      alert('Er ging iets mis bij het aanvragen van de bonus call');
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex justify-center items-center h-64">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-500"></div>
+      </div>
+    );
+  }
+
+  const activePlan = plans.find(p => p.status === 'active');
+
+  return (
+    <div className="p-4 space-y-6">
+      {/* Header */}
+      <div className="myarc-card p-6">
+        <div className="flex justify-between items-start mb-4">
+          <div>
+            <h2 className="text-2xl font-bold text-white mb-2">Mijn Coaching Calls</h2>
+            <p className="text-gray-400">
+              {activePlan ? `${activePlan.template?.name || 'Coaching Traject'}` : 'Geen actief plan'}
+            </p>
+          </div>
+          
+          <div className="flex gap-2">
+            {/* Test button */}
+            <button
+              onClick={() => {
+                console.log('TEST: Opening modal manually');
+                setShowBookingModal(true);
+                setSelectedCall(calls[2] || calls[0] || { call_number: 3, call_title: 'Test Call' });
+              }}
+              className="px-4 py-2 bg-purple-600 text-white rounded"
+            >
+              Test Modal
+            </button>
+            
+            {activePlan && (
+              <button
+                onClick={() => setShowRequestModal(true)}
+                className="myarc-btn flex items-center gap-2"
+              >
+                <Plus className="w-4 h-4" />
+                <span className="hidden sm:inline">Bonus Call</span>
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Progress Bar */}
+        {calls.length > 0 && (
+          <div className="space-y-2">
+            <div className="flex justify-between text-sm">
+              <span className="text-gray-400">Voortgang</span>
+              <span className="text-green-500 font-semibold">
+                {calls.filter(c => c.status === 'completed').length} / {calls.length} calls voltooid
+              </span>
+            </div>
+            <div className="w-full bg-gray-800 rounded-full h-3">
+              <div 
+                className="bg-gradient-to-r from-green-600 to-green-400 h-3 rounded-full transition-all duration-500"
+                style={{ width: `${calculateProgress()}%` }}
+              />
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Notifications */}
+      {notifications.length > 0 && (
+        <div className="myarc-card p-4 border-l-4 border-yellow-500">
+          <div className="flex items-start gap-3">
+            <Bell className="w-5 h-5 text-yellow-500 mt-0.5" />
+            <div className="flex-1">
+              <h3 className="font-semibold text-white mb-2">Nieuwe meldingen</h3>
+              <div className="space-y-2">
+                {notifications.map(notif => (
+                  <div key={notif.id} className="text-sm text-gray-300">
+                    {notif.message}
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Call Timeline */}
+      <div className="space-y-4">
+        <h3 className="text-lg font-semibold text-white">Call Timeline</h3>
+        
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          {calls.sort((a, b) => a.call_number - b.call_number).map((call, index) => {
+            const status = call.status || getCallStatus(call, calls);
+            const isClickable = status === 'available';
+            
+            return (
+              <div
+                key={call.id}
+                className={`myarc-card p-5 border-2 transition-all ${getStatusColor(status)} ${
+                  isClickable ? 'cursor-pointer hover:scale-[1.02] hover:shadow-lg' : 'opacity-75'
+                }`}
+                onClick={() => {
+                  if (status === 'available') {
+                    handleBookCall(call);
+                  }
+                }}
+              >
+                {/* Call Header */}
+                <div className="flex justify-between items-start mb-3">
+                  <div className="flex items-center gap-2">
+                    {getStatusIcon(status)}
+                    <span className="text-white font-semibold">
+                      Call #{call.call_number || index + 1}
+                    </span>
+                  </div>
+                  {call.week_number && (
+                    <span className="text-xs text-gray-500">Week {call.week_number}</span>
+                  )}
+                </div>
+
+                {/* Call Title */}
+                <h4 className="text-white font-medium mb-2">
+                  {call.call_title || `Coaching Call ${index + 1}`}
+                </h4>
+
+                {/* Call Description */}
+                {call.client_subject && (
+                  <p className="text-gray-400 text-sm mb-3 line-clamp-2">
+                    {call.client_subject}
+                  </p>
+                )}
+
+                {/* Status Info */}
+                <div className="mt-auto pt-3 border-t border-gray-700">
+                  {status === 'locked' && (
+                    <div className="flex items-center gap-2 text-gray-500 text-sm">
+                      <Lock className="w-4 h-4" />
+                      <span>Wordt beschikbaar na call #{index}</span>
+                    </div>
+                  )}
+                  
+                  {status === 'available' && (
+                    <div className="flex items-center gap-2 text-green-500 text-sm font-medium animate-pulse">
+                      <Calendar className="w-4 h-4" />
+                      <span>✨ Klik om te plannen</span>
+                    </div>
+                  )}
+                  
+                  {status === 'scheduled' && call.scheduled_date && (
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2 text-blue-400 text-sm">
+                        <Clock className="w-4 h-4" />
+                        <span>
+                          {new Date(call.scheduled_date).toLocaleDateString('nl-NL', {
+                            day: 'numeric',
+                            month: 'long',
+                            hour: '2-digit',
+                            minute: '2-digit'
+                          })}
+                        </span>
+                      </div>
+                      
+                      {call.zoom_link && (
+                        <a
+                          href={call.zoom_link}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex items-center gap-2 px-3 py-2 bg-blue-500/20 hover:bg-blue-500/30 border border-blue-500/50 rounded-lg text-blue-400 hover:text-blue-300 transition-all text-sm font-medium"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <Video className="w-4 h-4" />
+                          <span>Join Zoom Meeting</span>
+                        </a>
+                      )}
+                      
+                      {!call.zoom_link && (
+                        <div className="text-yellow-500 text-xs flex items-center gap-1">
+                          <AlertCircle className="w-3 h-3" />
+                          <span>Zoom link komt na Calendly sync</span>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                  
+                  {status === 'completed' && (
+                    <div className="flex items-center gap-2 text-green-500 text-sm">
+                      <CheckCircle className="w-4 h-4" />
+                      <span>Voltooid</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Booking Modal met Calendly Embed */}
+      {showBookingModal && selectedCall && (
+        <div 
+          className="fixed inset-0 flex items-center justify-center p-4"
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.9)',
+            zIndex: 9999,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center'
+          }}
+        >
+          <div 
+            className="rounded-xl w-full"
+            style={{
+              backgroundColor: '#1f2937',
+              border: '2px solid #10b981',
+              maxWidth: '900px',
+              maxHeight: '90vh',
+              overflow: 'hidden'
+            }}
+          >
+            {/* Modal Header */}
+            <div className="flex justify-between items-center p-6 border-b border-gray-800">
+              <div>
+                <h3 className="text-xl font-bold text-white">
+                  Plan Call #{selectedCall.call_number}
+                </h3>
+                <p className="text-gray-400 mt-1">
+                  {selectedCall.call_title}
+                </p>
+              </div>
+              <button
+                onClick={() => {
+                  setShowBookingModal(false);
+                  setSelectedCall(null);
+                }}
+                className="text-gray-400 hover:text-white transition-colors"
+              >
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-6">
+              {selectedCall.calendly_link ? (
+                <div>
+                  <div className="mb-4 p-4 bg-green-500/10 border border-green-500/30 rounded-lg">
+                    <p className="text-green-400">
+                      ✅ Selecteer een tijd die je past. Na het plannen ontvang je automatisch een bevestiging met Zoom link.
+                    </p>
+                  </div>
+                  
+                  {/* Manual Sync Button */}
+                  <div className="mb-4 flex justify-end">
+                    <button
+                      onClick={async () => {
+                        console.log('Manual sync triggered');
+                        
+                        try {
+                          // Refresh call data
+                          await loadCallData();
+                          
+                          // Success message
+                          alert('✅ Status gecheckt! Sluit deze modal en kijk of je call scheduled is.');
+                          setShowBookingModal(false);
+                          setSelectedCall(null);
+                        } catch (error) {
+                          console.error('Sync error:', error);
+                          alert('⏳ Kon status niet checken. Probeer opnieuw.');
+                        }
+                      }}
+                      className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
+                    >
+                      🔄 Check Booking Status
+                    </button>
+                  </div>
+                  
+                  {/* Calendly Embed */}
+                  <div 
+                    className="calendly-inline-widget rounded-lg overflow-hidden"
+                    data-url={`${selectedCall.calendly_link}?hide_landing_page_details=1&hide_gdpr_banner=1&background_color=111827&text_color=ffffff&primary_color=10b981`}
+                    style={{ 
+                      minWidth: '320px', 
+                      height: '630px',
+                      backgroundColor: '#1a1a1a'
+                    }}
+                  />
+                </div>
+              ) : (
+                <div className="text-center py-12">
+                  <AlertCircle className="w-16 h-16 text-yellow-500 mx-auto mb-4" />
+                  <p className="text-white text-lg mb-2">Calendly configuratie ontbreekt</p>
+                  <p className="text-gray-400">
+                    Neem contact op met je coach om deze call in te plannen.
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Bonus Call Request Modal */}
+      {showRequestModal && (
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50">
+          <div className="myarc-card p-6 max-w-md w-full">
+            <h3 className="text-xl font-bold text-white mb-4">
+              Bonus Call Aanvragen
+            </h3>
+            
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-400 mb-1">
+                  Reden voor extra call *
+                </label>
+                <textarea
+                  value={requestData.reason}
+                  onChange={(e) => setRequestData({...requestData, reason: e.target.value})}
+                  rows={4}
+                  className="w-full p-2 bg-gray-800 border border-gray-700 rounded text-white"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-400 mb-1">
+                  Urgentie
+                </label>
+                <select
+                  value={requestData.urgency}
+                  onChange={(e) => setRequestData({...requestData, urgency: e.target.value})}
+                  className="w-full p-2 bg-gray-800 border border-gray-700 rounded text-white"
+                >
+                  <option value="normal">Normaal</option>
+                  <option value="high">Hoog</option>
+                  <option value="urgent">Urgent</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="flex gap-3 mt-6">
+              <button
+                onClick={() => setShowRequestModal(false)}
+                className="flex-1 px-4 py-2 bg-gray-700 text-white rounded hover:bg-gray-600"
+              >
+                Annuleren
+              </button>
+              <button
+                onClick={submitCallRequest}
+                className="flex-1 myarc-btn"
+              >
+                Verstuur Aanvraag
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

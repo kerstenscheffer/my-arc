@@ -1,5 +1,6 @@
 
-import { getCurrentUser } from '../lib/supabase'
+import DatabaseService from '../services/DatabaseService'
+const db = DatabaseService
 import { saveWorkoutSchema } from '../lib/schemaDatabase'
 
 
@@ -1172,7 +1173,7 @@ export default function EnhancedAIWorkoutGenerator() {
 onClick={async () => {
   try {
     if (!currentSchema) { showToast('No schema', 'error'); return }
-    const user = await getCurrentUser()
+    const user = await db.getCurrentUser()
     if (!user) { showToast('Please log in', 'error'); return }
     await saveWorkoutSchema(currentSchema, user)
     showToast('Saved to database! 💾')

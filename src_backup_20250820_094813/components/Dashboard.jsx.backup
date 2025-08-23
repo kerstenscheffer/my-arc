@@ -1,0 +1,197 @@
+import Layout from './Layout'
+import { useState, useEffect } from 'react'
+import { getCurrentUser } from '../lib/supabase'
+import AIGenerator from './AIGenerator'
+import Goals from './Goals'
+export default function Dashboard() {
+  const [user, setUser] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [activeTab, setActiveTab] = useState('overview')
+
+  useEffect(() => {
+    loadData()
+  }, [])
+
+  const loadData = async () => {
+    try {
+      const currentUser = await getCurrentUser()
+      setUser(currentUser)
+    } catch (error) {
+      console.error('Error loading user:', error)
+    }
+    setLoading(false)
+  }
+
+  if (loading) {
+    return (
+      <div className="workapp-container workapp-flex items-center justify-center">
+        <div className="workapp-loading">
+          <div className="workapp-spinner"></div>
+          Loading...
+        </div>
+      </div>
+    )
+  }
+
+  if (!user) {
+    return (
+      <div className="workapp-container workapp-flex items-center justify-center">
+        <div className="workapp-card">
+          <h2 className="workapp-card-title">🚫 No user found</h2>
+          <p className="workapp-text-muted">Please check your authentication</p>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="workapp-container">
+      {/* Header */}
+      <header className="workapp-header">
+        <div className="workapp-flex workapp-items-center workapp-justify-between">
+          <div>
+            <h1 className="text-2xl font-bold workapp-text-accent">🏋️ WORKAPP</h1>
+            <p className="workapp-text-muted">Personal Trainer Dashboard</p>
+          </div>
+          <div className="workapp-flex workapp-items-center workapp-gap-md">
+            <span className="workapp-badge workapp-badge-success">
+              ✅ Connected
+            </span>
+            <div className="text-sm">
+              <div className="workapp-text-primary">{user.profile.email}</div>
+              <div className="workapp-text-muted capitalize">{user.profile.role}</div>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      {/* Navigation */}
+      <div className="workapp-main">
+        <nav className="workapp-nav workapp-mb-lg">
+          <button 
+            onClick={() => setActiveTab('overview')}
+            className={`workapp-nav-item ${activeTab === 'overview' ? 'active' : ''}`}
+          >
+            📊 Overview
+          </button>
+          <button 
+            onClick={() => setActiveTab('clients')}
+            className={`workapp-nav-item ${activeTab === 'clients' ? 'active' : ''}`}
+          >
+            👥 Clients
+          </button>
+          <button 
+            onClick={() => setActiveTab('plans')}
+            className={`workapp-nav-item ${activeTab === 'plans' ? 'active' : ''}`}
+          >
+            📋 Plans
+          </button>
+          <button 
+            onClick={() => setActiveTab('ai-generator')}
+            className={`workapp-nav-item ${activeTab === 'ai-generator' ? 'active' : ''}`}
+          >
+            🧠 AI Generator
+          </button>
+          <button 
+            onClick={() => setActiveTab('analytics')}
+            className={`workapp-nav-item ${activeTab === 'analytics' ? 'active' : ''}`}
+          >
+            📈 Analytics
+          </button> <button 
+  onClick={() => setActiveTab('goals')}
+  className={`workapp-nav-item ${activeTab === 'goals' ? 'active' : ''}`}
+>
+  🎯 Goals
+</button>
+        </nav>
+
+        {/* Tab Content */}
+        <div className="dashboard-content">
+          {activeTab === 'overview' && <OverviewTab user={user} />}
+          {activeTab === 'clients' && <ClientsTab />}
+          {activeTab === 'plans' && <PlansTab />}
+          {activeTab === 'ai-generator' && <AIGenerator />}
+          {activeTab === 'analytics' && <AnalyticsTab />}
+{activeTab === 'goals' && <Goals user={user} />}        </div>
+      </div>
+    </div>
+  )
+}
+
+// Overview Tab Component
+function OverviewTab({ user }) {
+  const stats = [
+    { label: 'Active Clients', value: '12', icon: '👥' },
+    { label: 'Workout Plans', value: '28', icon: '📋' },
+    { label: 'AI Generated', value: '8', icon: '🧠' },
+    { label: 'This Month', value: '156', icon: '📈' },
+  ]
+
+return (
+  <div className="myarc-animate-in">
+    <div className="myarc-flex myarc-items-center myarc-justify-between myarc-mb-xl">
+      <h2 className="myarc-card-title">Dashboard Overview</h2>
+      <button className="myarc-btn myarc-btn-primary">
+        ➕ New Client
+      </button>
+    </div>
+
+    {/* Stats Grid */}
+    <div className="myarc-grid myarc-grid-4 myarc-mb-xl">
+      <div className="myarc-card myarc-p-lg" style={{textAlign: 'center'}}>
+        <div style={{fontSize: 'var(--text-2xl)', marginBottom: 'var(--s-3)'}}>👥</div>
+        <div className="myarc-text-green" style={{fontSize: 'var(--text-xl)', fontWeight: 'bold'}}>12</div>
+        <div className="myarc-text-gray">Active Clients</div>
+      </div>
+      <div className="myarc-card myarc-p-lg" style={{textAlign: 'center'}}>
+        <div style={{fontSize: 'var(--text-2xl)', marginBottom: 'var(--s-3)'}}>📋</div>
+        <div className="myarc-text-green" style={{fontSize: 'var(--text-xl)', fontWeight: 'bold'}}>28</div>
+        <div className="myarc-text-gray">Workout Plans</div>
+      </div>
+      <div className="myarc-card myarc-p-lg" style={{textAlign: 'center'}}>
+        <div style={{fontSize: 'var(--text-2xl)', marginBottom: 'var(--s-3)'}}>🧠</div>
+        <div className="myarc-text-green" style={{fontSize: 'var(--text-xl)', fontWeight: 'bold'}}>8</div>
+        <div className="myarc-text-gray">AI Generated</div>
+      </div>
+      <div className="myarc-card myarc-p-lg" style={{textAlign: 'center'}}>
+        <div style={{fontSize: 'var(--text-2xl)', marginBottom: 'var(--s-3)'}}>📈</div>
+        <div className="myarc-text-green" style={{fontSize: 'var(--text-xl)', fontWeight: 'bold'}}>156</div>
+        <div className="myarc-text-gray">This Month</div>
+      </div>
+    </div>
+
+    {/* Recent Activity */}
+    <div className="myarc-card">
+      <div className="myarc-card-header">
+        <h3 className="myarc-card-title">Recent Activity</h3>
+        <p className="myarc-card-subtitle">Latest updates from your clients</p>
+      </div>
+      
+      <div className="myarc-flex myarc-flex-col myarc-gap-lg">
+        <div className="myarc-flex myarc-items-center myarc-gap-md">
+          <div className="myarc-btn myarc-btn-primary" style={{padding: 'var(--s-1) var(--s-3)', fontSize: 'var(--text-xs)'}}>New</div>
+          <div style={{flex: 1}}>
+            <div className="myarc-text-white">Sarah completed "Push Day A"</div>
+            <div className="myarc-text-gray" style={{fontSize: 'var(--text-sm)'}}>2 hours ago</div>
+          </div>
+        </div>
+        
+        <div className="myarc-flex myarc-items-center myarc-gap-md">
+          <div className="myarc-btn myarc-btn-secondary" style={{padding: 'var(--s-1) var(--s-3)', fontSize: 'var(--text-xs)'}}>AI</div>
+          <div style={{flex: 1}}>
+            <div className="myarc-text-white">Generated hypertrophy plan for Mike</div>
+            <div className="myarc-text-gray" style={{fontSize: 'var(--text-sm)'}}>4 hours ago</div>
+          </div>
+        </div>
+        
+        <div className="myarc-flex myarc-items-center myarc-gap-md">
+          <div className="myarc-btn myarc-btn-ghost" style={{padding: 'var(--s-1) var(--s-3)', fontSize: 'var(--text-xs)'}}>Update</div>
+          <div style={{flex: 1}}>
+            <div className="myarc-text-white">Emma requested plan modification</div>
+            <div className="myarc-text-gray" style={{fontSize: 'var(--text-sm)'}}>1 day ago</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+)

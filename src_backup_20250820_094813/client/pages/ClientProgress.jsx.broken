@@ -1,0 +1,1423 @@
+// src/client/pages/ClientProgress.jsx
+// MY ARC Client Progress - COMPLETE MET PROGRESS CHART 🔥
+import { useState, useEffect } from 'react'
+import { useLanguage } from '../../contexts/LanguageContext'
+import { getClientSchema } from '../../lib/supabase'
+import { 
+  logWorkoutProgress, 
+  getClientProgressByDate, 
+  getExerciseProgress,
+  getClientExercises,
+  getTodayDate,
+  getWeekDates,
+  formatSets,
+  getSuggestionText,
+  calculateMaxWeight
+} from '../../lib/progressDatabase'
+
+// ===== PROGRESS CHART COMPONENT =====
+const ProgressChart = ({ exerciseHistory }) => {
+  if (!exerciseHistory || exerciseHistory.length === 0) {
+    return (
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        height: '100%',
+        color: 'rgba(255,255,255,0.6)',
+        fontSize: '0.875rem'
+      }}>
+        📊 Nog geen data beschikbaar
+      </div>
+    )
+  }
+
+  // Sort by date and get max weight per workout
+  const sortedHistory = exerciseHistory
+    .map(workout => ({
+      date: new Date(workout.date),
+      maxWeight: Math.max(...workout.sets.map(set => set.weight || 0)),
+      workout: workout
+    }))
+    .sort((a, b) => a.date - b.date)
+
+  if (sortedHistory.length < 2) {
+    return (
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        height: '100%',
+        color: 'rgba(255,255,255,0.6)',
+        fontSize: '0.875rem'
+      }}>
+        📈 Meer data nodig voor grafiek
+      </div>
+    )
+  }
+
+  // Chart dimensions
+  const width = 280
+  const height = 120
+  const padding = { top: 10, right: 10, bottom: 25, left: 25 }
+  const chartWidth = width - padding.left - padding.right
+  const chartHeight = height - padding.top - padding.bottom
+
+  // Get min/max values for scaling
+  const weights = sortedHistory.map(d => d.maxWeight)
+  const minWeight = Math.min(...weights)
+  const maxWeight = Math.max(...weights)
+  const weightRange = maxWeight - minWeight || 1 // Prevent division by zero
+
+  // Create scales
+  const xScale = (index) => (index / (sortedHistory.length - 1)) * chartWidth
+  const yScale = (weight) => chartHeight - ((weight - minWeight) / weightRange) * chartHeight
+
+  // Generate path for line
+  const pathData = sortedHistory
+    .map((d, i) => `${i === 0 ? 'M' : 'L'} ${xScale(i)} ${yScale(d.maxWeight)}`)
+    .join(' ')
+
+  return (
+    <div style={{ position: 'relative', width: '100%', height: '100%' }}>
+      <svg 
+        width="100%" 
+        height="100%" 
+        viewBox={`0 0 ${width} ${height}`}
+        style={{ overflow: 'visible' }}
+      >
+        {/* Grid lines */}
+        {[0, 0.25, 0.5, 0.75, 1].map(percent => (
+          <line
+            key={`grid-y-${percent}`}
+            x1={padding.left}
+            y1={padding.top + percent * chartHeight}
+            x2={padding.left + chartWidth}
+            y2={padding.top + percent * chartHeight}
+            stroke="rgba(255,255,255,0.1)"
+            strokeWidth="0.5"
+          />
+        ))}
+
+        {/* Y-axis labels */}
+        {[0, 0.5, 1].map(percent => {
+          const weight = minWeight + percent * weightRange
+          return (
+            <text
+              key={`y-label-${percent}`}
+              x={padding.left - 5}
+              y={padding.top + (1 - percent) * chartHeight + 3}
+              fill="rgba(255,255,255,0.6)"
+              fontSize="10"
+              textAnchor="end"
+            >
+              {weight.toFixed(0)}kg
+            </text>
+          )
+        })}
+
+        {/* Progress line */}
+        <path
+          d={pathData}
+          fill="none"
+          stroke="#10b981"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          style={{
+            filter: 'drop-shadow(0 0 4px rgba(16, 185, 129, 0.4))'
+          }}
+          transform={`translate(${padding.left}, ${padding.top})`}
+        />
+
+        {/* Data points */}
+        {sortedHistory.map((d, i) => (
+          <g key={i}>
+            {/* Point circle */}
+            <circle
+              cx={padding.left + xScale(i)}
+              cy={padding.top + yScale(d.maxWeight)}
+              r="4"
+              fill="#10b981"
+              stroke="#fff"
+              strokeWidth="1.5"
+              style={{
+                filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.3))'
+              }}
+            />
+            
+            {/* Weight label on hover */}
+            <text
+              x={padding.left + xScale(i)}
+              y={padding.top + yScale(d.maxWeight) - 8}
+              fill="#10b981"
+              fontSize="9"
+              textAnchor="middle"
+              fontWeight="600"
+              style={{
+                opacity: i === sortedHistory.length - 1 ? 1 : 0
+              }}
+            >
+              {d.maxWeight}kg
+            </text>
+          </g>
+        ))}
+
+        {/* X-axis dates */}
+        {sortedHistory.map((d, i) => {
+          // Only show first and last date to avoid crowding
+          if (i !== 0 && i !== sortedHistory.length - 1) return null
+          
+          return (
+            <text
+              key={`x-label-${i}`}
+              x={padding.left + xScale(i)}
+              y={height - 5}
+              fill="rgba(255,255,255,0.6)"
+              fontSize="9"
+              textAnchor="middle"
+            >
+              {d.date.toLocaleDateString('nl-NL', { 
+                month: 'short', 
+                day: 'numeric' 
+              })}
+            </text>
+          )
+        })}
+      </svg>
+
+      {/* Progress indicator */}
+      <div style={{
+        position: 'absolute',
+        top: '5px',
+        right: '5px',
+        display: 'flex',
+        alignItems: 'center',
+        gap: '0.25rem',
+        fontSize: '0.75rem',
+        color: 'rgba(255,255,255,0.8)'
+      }}>
+        {sortedHistory.length > 1 && (
+          <>
+            <span style={{
+              color: sortedHistory[sortedHistory.length - 1].maxWeight > sortedHistory[0].maxWeight ? '#10b981' : '#ef4444'
+            }}>
+              {sortedHistory[sortedHistory.length - 1].maxWeight > sortedHistory[0].maxWeight ? '📈' : '📉'}
+            </span>
+            <span>
+              {((sortedHistory[sortedHistory.length - 1].maxWeight - sortedHistory[0].maxWeight) > 0 ? '+' : '')}
+              {(sortedHistory[sortedHistory.length - 1].maxWeight - sortedHistory[0].maxWeight).toFixed(1)}kg
+            </span>
+          </>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// ===== AI GENERATOR EXERCISE DATABASE INTEGRATION =====
+const AI_EXERCISE_DATABASE = {
+  chest: {
+    compound: [
+      { name: "Machine Chest Press", equipment: "machine", stretch: true, priority: 1, ratings: { strength: 5, hypertrophy: 5, personal: 5 } },
+      { name: "Incline Dumbbell Press", equipment: "dumbbells", stretch: true, priority: 2, ratings: { strength: 8, hypertrophy: 8, personal: 8 } },
+      { name: "Barbell Bench Press", equipment: "barbell", stretch: false, priority: 3, ratings: { strength: 10, hypertrophy: 8, personal: 10 } },
+      { name: "Weighted Dips", equipment: "bodyweight", stretch: true, priority: 4, ratings: { strength: 9, hypertrophy: 9, personal: 7 } },
+      { name: "Low-Incline Barbell Bench Press", equipment: "barbell", stretch: true, priority: 2, ratings: { strength: 9, hypertrophy: 9, personal: 9 } },
+      { name: "Flat Dumbbell Bench Press", equipment: "dumbbells", stretch: true, priority: 3, ratings: { strength: 8, hypertrophy: 8, personal: 8 } }
+    ],
+    isolation: [
+      { name: "Incline Cable Flies", equipment: "cables", stretch: true, priority: 1, ratings: { strength: 8, hypertrophy: 10, personal: 8 } },
+      { name: "Machine Pec Deck", equipment: "machine", stretch: true, priority: 2, ratings: { strength: 8, hypertrophy: 10, personal: 8 } },
+      { name: "Seated Cable Fly", equipment: "cables", stretch: true, priority: 2, ratings: { strength: 10, hypertrophy: 10, personal: 10 } },
+      { name: "Low-to-High Cable Fly", equipment: "cables", stretch: true, priority: 2, ratings: { strength: 8, hypertrophy: 10, personal: 10 } },
+      { name: "Dumbbell Flies", equipment: "dumbbells", stretch: true, priority: 3, ratings: { strength: 6, hypertrophy: 8, personal: 6 } }
+    ]
+  },
+  back: {
+    compound: [
+      { name: "Cable Lat Pulldown", equipment: "cables", stretch: true, priority: 1, ratings: { strength: 8, hypertrophy: 10, personal: 9 } },
+      { name: "Barbell Bent-Over Row", equipment: "barbell", stretch: false, priority: 2, ratings: { strength: 10, hypertrophy: 9, personal: 8 } },
+      { name: "Seated Cable Row", equipment: "cables", stretch: true, priority: 3, ratings: { strength: 8, hypertrophy: 9, personal: 9 } },
+      { name: "T-Bar Row", equipment: "machine", stretch: false, priority: 4, ratings: { strength: 9, hypertrophy: 9, personal: 7 } },
+      { name: "Pull-ups", equipment: "bodyweight", stretch: true, priority: 2, ratings: { strength: 9, hypertrophy: 8, personal: 8 } },
+      { name: "Chest-Supported Row", equipment: "machine", stretch: true, priority: 1, ratings: { strength: 8, hypertrophy: 9, personal: 9 } }
+    ],
+    isolation: [
+      { name: "Straight-Arm Pulldown", equipment: "cables", stretch: true, priority: 1, ratings: { strength: 6, hypertrophy: 8, personal: 8 } },
+      { name: "Cable Reverse Fly", equipment: "cables", stretch: true, priority: 2, ratings: { strength: 6, hypertrophy: 8, personal: 8 } },
+      { name: "Face Pulls", equipment: "cables", stretch: false, priority: 1, ratings: { strength: 7, hypertrophy: 7, personal: 9 } }
+    ]
+  },
+  legs: {
+    compound: [
+      { name: "Leg Press", equipment: "machine", stretch: true, priority: 1, ratings: { strength: 8, hypertrophy: 9, personal: 9 } },
+      { name: "Barbell Back Squat", equipment: "barbell", stretch: true, priority: 2, ratings: { strength: 10, hypertrophy: 9, personal: 8 } },
+      { name: "Bulgarian Split Squat", equipment: "dumbbells", stretch: true, priority: 3, ratings: { strength: 8, hypertrophy: 9, personal: 7 } },
+      { name: "Romanian Deadlift", equipment: "barbell", stretch: true, priority: 2, ratings: { strength: 10, hypertrophy: 10, personal: 9 } },
+      { name: "Walking Lunges", equipment: "dumbbells", stretch: true, priority: 4, ratings: { strength: 7, hypertrophy: 8, personal: 6 } }
+    ],
+    isolation: [
+      { name: "Leg Curl", equipment: "machine", stretch: true, priority: 1, ratings: { strength: 8, hypertrophy: 10, personal: 9 } },
+      { name: "Leg Extension", equipment: "machine", stretch: true, priority: 2, ratings: { strength: 6, hypertrophy: 8, personal: 8 } },
+      { name: "Calf Raises", equipment: "machine", stretch: true, priority: 3, ratings: { strength: 6, hypertrophy: 8, personal: 7 } }
+    ]
+  },
+  shoulders: {
+    compound: [
+      { name: "Seated Dumbbell Press", equipment: "dumbbells", stretch: false, priority: 1, ratings: { strength: 8, hypertrophy: 9, personal: 9 } },
+      { name: "Machine Shoulder Press", equipment: "machine", stretch: false, priority: 2, ratings: { strength: 7, hypertrophy: 8, personal: 9 } },
+      { name: "Standing Military Press", equipment: "barbell", stretch: false, priority: 3, ratings: { strength: 10, hypertrophy: 8, personal: 7 } }
+    ],
+    isolation: [
+      { name: "Lateral Raises", equipment: "dumbbells", stretch: false, priority: 1, ratings: { strength: 6, hypertrophy: 9, personal: 8 } },
+      { name: "Cable Lateral Raises", equipment: "cables", stretch: false, priority: 1, ratings: { strength: 7, hypertrophy: 10, personal: 9 } },
+      { name: "Rear Delt Flies", equipment: "dumbbells", stretch: true, priority: 2, ratings: { strength: 6, hypertrophy: 8, personal: 8 } }
+    ]
+  },
+  arms: {
+    compound: [
+      { name: "Close-Grip Bench Press", equipment: "barbell", stretch: true, priority: 1, ratings: { strength: 9, hypertrophy: 8, personal: 8 } },
+      { name: "Weighted Dips", equipment: "bodyweight", stretch: true, priority: 2, ratings: { strength: 9, hypertrophy: 9, personal: 7 } }
+    ],
+    isolation: [
+      { name: "Barbell Bicep Curls", equipment: "barbell", stretch: true, priority: 1, ratings: { strength: 8, hypertrophy: 9, personal: 8 } },
+      { name: "Tricep Pushdowns", equipment: "cables", stretch: true, priority: 1, ratings: { strength: 8, hypertrophy: 9, personal: 9 } },
+      { name: "Hammer Curls", equipment: "dumbbells", stretch: false, priority: 2, ratings: { strength: 7, hypertrophy: 8, personal: 8 } },
+      { name: "Overhead Tricep Extension", equipment: "dumbbells", stretch: true, priority: 2, ratings: { strength: 7, hypertrophy: 9, personal: 8 } }
+    ]
+  }
+}
+
+// Get all exercises from database
+const getAllExercises = () => {
+  const allExercises = []
+  Object.values(AI_EXERCISE_DATABASE).forEach(muscleGroup => {
+    Object.values(muscleGroup).forEach(exerciseType => {
+      exerciseType.forEach(exercise => {
+        allExercises.push(exercise.name)
+      })
+    })
+  })
+  return allExercises
+}
+
+export default function ClientProgress({ client, schema }) {
+  const { t, language } = useLanguage()
+  const isMobile = window.innerWidth <= 768
+  
+  // State management - ALL STATES DECLARED HERE
+  const [currentWeek, setCurrentWeek] = useState(0)
+  const [selectedDate, setSelectedDate] = useState(null)
+  const [weekDates, setWeekDates] = useState([])
+  const [weekProgress, setWeekProgress] = useState({})
+  const [showWorkoutModal, setShowWorkoutModal] = useState(false)
+  const [selectedExercise, setSelectedExercise] = useState('')
+  const [exerciseHistory, setExerciseHistory] = useState([])
+  const [clientExercises, setClientExercises] = useState([])
+  const [exercisesLoading, setExercisesLoading] = useState(true)
+  const [loading, setLoading] = useState(true)
+  
+  // Schema & planned workouts
+  const [clientSchema, setClientSchema] = useState(null)
+  const [plannedExercises, setPlannedExercises] = useState([])
+  
+  // Exercise search state
+  const [exerciseSearchTerm, setExerciseSearchTerm] = useState('')
+  const [showExerciseDropdown, setShowExerciseDropdown] = useState(false)
+  const [smartSuggestion, setSmartSuggestion] = useState(null)
+  
+  // Workout logging state
+  const [workoutForm, setWorkoutForm] = useState({
+    exerciseName: '',
+    sets: [{ reps: '', weight: '' }],
+    notes: '',
+    coachSuggestion: 'maintain_weight'
+  })
+
+  // Initialize week dates
+  useEffect(() => {
+    const today = new Date()
+    today.setDate(today.getDate() + (currentWeek * 7))
+    const dates = getWeekDates(today)
+    setWeekDates(dates)
+    loadWeekProgress(dates)
+  }, [currentWeek])
+
+  // Load client exercises and schema
+  useEffect(() => {
+    if (client) {
+      loadClientExercises()
+      loadClientSchema()
+    }
+  }, [client])
+
+  // Day navigation helpers
+  const getDayName = (dateString) => {
+    const date = new Date(dateString)
+    return ['Zo', 'Ma', 'Di', 'Wo', 'Do', 'Vr', 'Za'][date.getDay()]
+  }
+
+  const getDayNumber = (dateString) => {
+    return new Date(dateString).getDate()
+  }
+
+  const isToday = (dateString) => {
+    const today = new Date()
+    const date = new Date(dateString)
+    return date.toDateString() === today.toDateString()
+  }
+
+  // Load functions
+  const loadWeekProgress = async (dates) => {
+    if (!client?.id) return
+    
+    try {
+      const progressData = {}
+      for (const date of dates) {
+        const dayProgress = await getClientProgressByDate(client.id, date)
+        progressData[date] = dayProgress || []
+      }
+      setWeekProgress(progressData)
+    } catch (error) {
+      console.error('Error loading week progress:', error)
+    }
+  }
+
+  const loadClientExercises = async () => {
+    if (!client?.id) return
+    
+    setExercisesLoading(true)
+    try {
+      const exercises = await getClientExercises(client.id)
+      const allExercises = [...exercises, ...getAllExercises()]
+      const uniqueExercises = [...new Set(allExercises)]
+      setClientExercises(uniqueExercises)
+    } catch (error) {
+      console.error('Error loading exercises:', error)
+    } finally {
+      setExercisesLoading(false)
+    }
+  }
+
+  const loadClientSchema = async () => {
+    if (!client?.id) return
+    
+    try {
+      const schemaData = await getClientSchema(client.id)
+      setClientSchema(schemaData)
+      extractPlannedExercises(schemaData)
+    } catch (error) {
+      console.error('Error loading schema:', error)
+    }
+  }
+
+  const extractPlannedExercises = (schemaData) => {
+    if (!schemaData?.week_structure) return
+    
+    const exercises = []
+    Object.values(schemaData.week_structure).forEach(day => {
+      if (day.exercises) {
+        day.exercises.forEach(exercise => {
+          if (exercise.name && !exercises.includes(exercise.name)) {
+            exercises.push(exercise.name)
+          }
+        })
+      }
+    })
+    setPlannedExercises(exercises)
+  }
+
+  // Modal management
+  const openWorkoutModal = async (date) => {
+    setSelectedDate(date)
+    setShowWorkoutModal(true)
+    setWorkoutForm({
+      exerciseName: '',
+      sets: [{ reps: '', weight: '' }],
+      notes: '',
+      coachSuggestion: 'maintain_weight'
+    })
+    setExerciseHistory([])
+    setSelectedExercise('')
+    setSmartSuggestion(null)
+  }
+
+  const closeWorkoutModal = () => {
+    setShowWorkoutModal(false)
+    setSelectedDate(null)
+    setSelectedExercise('')
+    setExerciseHistory([])
+    setShowExerciseDropdown(false)
+    setExerciseSearchTerm('')
+    setSmartSuggestion(null)
+  }
+
+  // Exercise selection and history
+  const selectExercise = async (exerciseName) => {
+    setSelectedExercise(exerciseName)
+    setWorkoutForm(prev => ({ ...prev, exerciseName }))
+    setShowExerciseDropdown(false)
+    setExerciseSearchTerm(exerciseName)
+    
+    // Load exercise history
+    try {
+      const history = await getExerciseProgress(client.id, exerciseName)
+      setExerciseHistory(history)
+      
+      // Generate smart suggestion based on history
+      if (history.length > 0) {
+        const lastWorkout = history[0]
+        const suggestion = generateSmartSuggestion(lastWorkout)
+        setSmartSuggestion(suggestion)
+        
+        // Pre-fill form with last workout as baseline
+        setWorkoutForm(prev => ({
+          ...prev,
+          sets: lastWorkout.sets.map(set => ({ 
+            reps: set.reps?.toString() || '', 
+            weight: set.weight?.toString() || '' 
+          }))
+        }))
+      }
+    } catch (error) {
+      console.error('Error loading exercise history:', error)
+    }
+  }
+
+  // Smart suggestion generation
+  const generateSmartSuggestion = (lastWorkout) => {
+    if (!lastWorkout?.sets?.length) return null
+    
+    const lastMaxWeight = Math.max(...lastWorkout.sets.map(s => s.weight || 0))
+    const avgReps = lastWorkout.sets.reduce((acc, s) => acc + (s.reps || 0), 0) / lastWorkout.sets.length
+    
+    if (avgReps >= 12) {
+      return {
+        type: 'increase_weight',
+        message: `Geweldig! Je haalde ${avgReps.toFixed(0)} reps. Tijd voor meer gewicht! 💪`,
+        suggestion: `Probeer ${lastMaxWeight + 2.5}kg vandaag`
+      }
+    } else if (avgReps <= 6) {
+      return {
+        type: 'decrease_weight', 
+        message: `${avgReps.toFixed(0)} reps is zwaar genoeg. Laten we iets omlaag gaan.`,
+        suggestion: `Probeer ${Math.max(lastMaxWeight - 2.5, 0)}kg voor meer reps`
+      }
+    } else {
+      return {
+        type: 'maintain_weight',
+        message: `Perfect! ${avgReps.toFixed(0)} reps zit in de sweet spot.`,
+        suggestion: `Houd ${lastMaxWeight}kg aan en ga voor meer reps!`
+      }
+    }
+  }
+
+  // Form management
+  const updateSet = (index, field, value) => {
+    setWorkoutForm(prev => ({
+      ...prev,
+      sets: prev.sets.map((set, i) => 
+        i === index ? { ...set, [field]: value } : set
+      )
+    }))
+  }
+
+  const addSet = () => {
+    setWorkoutForm(prev => ({
+      ...prev,
+      sets: [...prev.sets, { reps: '', weight: '' }]
+    }))
+  }
+
+  const removeSet = (index) => {
+    if (workoutForm.sets.length > 1) {
+      setWorkoutForm(prev => ({
+        ...prev,
+        sets: prev.sets.filter((_, i) => i !== index)
+      }))
+    }
+  }
+
+  // Save workout
+  const saveWorkout = async () => {
+    if (!workoutForm.exerciseName || !selectedDate || !client?.id) {
+      alert('Vul alle verplichte velden in')
+      return
+    }
+
+    // Validate sets
+    const validSets = workoutForm.sets.filter(set => set.reps && set.weight)
+    if (validSets.length === 0) {
+      alert('Voeg minimaal 1 set toe met reps en gewicht')
+      return
+    }
+
+    try {
+      await logWorkoutProgress(
+        client.id,
+        selectedDate,
+        workoutForm.exerciseName,
+        validSets.map(set => ({
+          reps: parseInt(set.reps),
+          weight: parseFloat(set.weight)
+        })),
+        workoutForm.notes,
+        workoutForm.coachSuggestion
+      )
+
+      // Refresh data
+      await loadWeekProgress(weekDates)
+      closeWorkoutModal()
+      
+      alert('Workout opgeslagen! 💪')
+    } catch (error) {
+      console.error('Error saving workout:', error)
+      alert('Error bij opslaan. Probeer opnieuw.')
+    }
+  }
+
+  // Filter exercises for dropdown
+  const getFilteredExercises = () => {
+    if (!exerciseSearchTerm) return { planned: [], other: [] }
+    
+    const searchLower = exerciseSearchTerm.toLowerCase()
+    const planned = plannedExercises.filter(ex => 
+      ex.toLowerCase().includes(searchLower)
+    )
+    const other = clientExercises.filter(ex => 
+      ex.toLowerCase().includes(searchLower) && 
+      !plannedExercises.includes(ex)
+    )
+    
+    return { planned, other }
+  }
+
+  if (loading) {
+    return (
+      <div style={{
+        padding: isMobile ? '0.5rem' : '1rem',
+        display: 'flex',
+        justifyContent: 'center',
+        alignItems: 'center',
+        minHeight: '200px',
+        color: 'rgba(255,255,255,0.7)'
+      }}>
+        📊 Progressie data laden...
+      </div>
+    )
+  }
+
+  return (
+    <div style={{
+      padding: isMobile ? '0.5rem' : '1rem',
+      maxWidth: '100%',
+      overflow: 'hidden'
+    }}>
+      {/* Header */}
+      <div style={{
+        background: 'linear-gradient(135deg, #064e3b 0%, #0a5c42 100%)',
+        padding: isMobile ? '0.75rem' : '1rem',
+        borderRadius: '8px',
+        marginBottom: '1rem',
+        boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+        border: '1px solid #10b98133'
+      }}>
+        <h2 style={{
+          color: '#fff',
+          fontSize: isMobile ? '1.25rem' : '1.5rem',
+          fontWeight: '700',
+          margin: 0,
+          marginBottom: '0.5rem'
+        }}>
+          📊 {t('nav.progress')}
+        </h2>
+        <p style={{
+          color: 'rgba(255,255,255,0.8)',
+          fontSize: '0.875rem',
+          margin: 0
+        }}>
+          Track je workouts en zie je progressie over tijd
+        </p>
+      </div>
+
+      {/* Week Navigation */}
+      <div style={{
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: '1rem',
+        background: 'rgba(255,255,255,0.05)',
+        padding: '0.75rem',
+        borderRadius: '8px',
+        boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
+      }}>
+        <button
+          onClick={() => setCurrentWeek(prev => prev - 1)}
+          style={{
+            background: '#10b981',
+            color: '#fff',
+            border: 'none',
+            borderRadius: '6px',
+            padding: '0.5rem 0.75rem',
+            fontSize: '0.875rem',
+            cursor: 'pointer',
+            fontWeight: '600'
+          }}
+        >
+          ← Vorige
+        </button>
+        
+        <div style={{
+          color: '#fff',
+          fontSize: '0.875rem',
+          fontWeight: '600',
+          textAlign: 'center'
+        }}>
+          {currentWeek === 0 ? 'Deze Week' : 
+           currentWeek > 0 ? `${currentWeek} week${currentWeek > 1 ? 'en' : ''} verder` :
+           `${Math.abs(currentWeek)} week${Math.abs(currentWeek) > 1 ? 'en' : ''} terug`}
+        </div>
+        
+        <button
+          onClick={() => setCurrentWeek(prev => prev + 1)}
+          style={{
+            background: '#10b981',
+            color: '#fff',
+            border: 'none',
+            borderRadius: '6px',
+            padding: '0.5rem 0.75rem',
+            fontSize: '0.875rem',
+            cursor: 'pointer',
+            fontWeight: '600'
+          }}
+        >
+          Volgende →
+        </button>
+      </div>
+
+      {/* Week Grid */}
+      <div style={{
+        display: isMobile ? 'flex' : 'grid',
+        gridTemplateColumns: isMobile ? 'none' : 'repeat(7, 1fr)',
+        gap: isMobile ? '0.3rem' : '0.5rem',
+        overflowX: isMobile ? 'auto' : 'visible',
+        marginBottom: '1rem',
+        paddingBottom: isMobile ? '0.5rem' : '0'
+      }}>
+        {weekDates.map(date => {
+          const progressCount = weekProgress[date]?.length || 0
+          
+          return (
+            <div
+              key={date}
+              onClick={() => openWorkoutModal(date)}
+              style={{
+                minWidth: isMobile ? '120px' : 'auto',
+                background: 'linear-gradient(135deg, #064e3b 0%, #0a5c42 100%)',
+                padding: '0.75rem',
+                borderRadius: '8px',
+                cursor: 'pointer',
+                transition: 'all 0.2s ease',
+                border: isToday(date) ? '2px solid #10b981' : '1px solid #10b98133',
+                boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+                textAlign: 'center'
+              }}
+              onMouseEnter={(e) => {
+                e.target.style.transform = 'translateY(-2px)'
+                e.target.style.boxShadow = '0 4px 12px rgba(0,0,0,0.2)'
+              }}
+              onMouseLeave={(e) => {
+                e.target.style.transform = 'translateY(0)'
+                e.target.style.boxShadow = '0 1px 3px rgba(0,0,0,0.1)'
+              }}
+            >
+              <div style={{
+                color: '#fff',
+                fontSize: '0.75rem',
+                fontWeight: '600',
+                marginBottom: '0.25rem'
+              }}>
+                {getDayName(date)}
+              </div>
+              
+              <div style={{
+                color: '#fff',
+                fontSize: '1.25rem',
+                fontWeight: '700',
+                marginBottom: '0.5rem'
+              }}>
+                {getDayNumber(date)}
+              </div>
+              
+              <div style={{
+                color: progressCount > 0 ? '#10b981' : 'rgba(255,255,255,0.6)',
+                fontSize: '0.75rem',
+                fontWeight: '600'
+              }}>
+                {progressCount > 0 && (
+                  <div>
+                    ✅ {progressCount} workout{progressCount !== 1 ? 's' : ''}
+                  </div>
+                )}
+                {progressCount === 0 && (
+                  <div style={{
+                    color: 'rgba(255,255,255,0.6)',
+                    fontSize: '0.75rem'
+                  }}>
+                    + Toevoegen
+                  </div>
+                )}
+              </div>
+            </div>
+          )
+        })}
+      </div>
+
+      {/* Progress Overview */}
+      {Object.values(weekProgress).some(day => day.length > 0) && (
+        <div style={{
+          padding: '1rem',
+          background: 'rgba(255,255,255,0.05)',
+          borderRadius: '8px',
+          boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+          marginBottom: '1rem'
+        }}>
+          <h3 style={{
+            color: '#fff',
+            fontSize: '1.1rem',
+            fontWeight: '600',
+            marginBottom: '1rem'
+          }}>
+            📊 Week Overzicht
+          </h3>
+          
+          {weekDates.map(date => {
+            const dayProgress = weekProgress[date] || []
+            if (dayProgress.length === 0) return null
+            
+            return (
+              <div key={date} style={{ marginBottom: '0.75rem' }}>
+                <div style={{
+                  color: '#10b981',
+                  fontSize: '0.875rem',
+                  fontWeight: '600',
+                  marginBottom: '0.25rem'
+                }}>
+                  {getDayName(date)} {getDayNumber(date)}
+                </div>
+                {dayProgress.map((workout, idx) => (
+                  <div key={idx} style={{
+                    background: 'rgba(255,255,255,0.05)',
+                    padding: '0.5rem',
+                    borderRadius: '6px',
+                    marginBottom: '0.25rem',
+                    fontSize: '0.875rem',
+                    color: 'rgba(255,255,255,0.9)'
+                  }}>
+                    <strong>{workout.exercise_name}</strong>: {formatSets(workout.sets)}
+                    {workout.notes && (
+                      <div style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.7)', marginTop: '0.25rem' }}>
+                        📝 {workout.notes}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )
+          })}
+        </div>
+      )}
+
+      {/* Workout Modal */}
+      {showWorkoutModal && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(0,0,0,0.8)',
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          zIndex: 1000,
+          padding: '1rem'
+        }}>
+          <div style={{
+            background: '#1a1a1a',
+            borderRadius: '12px',
+            padding: '1.5rem',
+            maxWidth: '500px',
+            width: '100%',
+            maxHeight: '90vh',
+            overflowY: 'auto',
+            border: '1px solid #10b98133'
+          }}>
+            {/* Modal Header */}
+            <div style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              marginBottom: '1.5rem'
+            }}>
+              <h3 style={{
+                color: '#fff',
+                fontSize: '1.25rem',
+                fontWeight: '600',
+                margin: 0
+              }}>
+                💪 Log Workout
+              </h3>
+              
+              <button
+                onClick={closeWorkoutModal}
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  color: '#fff',
+                  fontSize: '1.5rem',
+                  cursor: 'pointer'
+                }}
+              >
+                ✕
+              </button>
+            </div>
+
+            <div style={{
+              color: '#10b981',
+              fontSize: '0.875rem',
+              fontWeight: '600',
+              marginBottom: '1rem'
+            }}>
+              📅 {new Date(selectedDate).toLocaleDateString('nl-NL', { 
+                weekday: 'long', 
+                year: 'numeric', 
+                month: 'long', 
+                day: 'numeric' 
+              })}
+            </div>
+
+            {/* Exercise Search */}
+            <div style={{ marginBottom: '1rem' }}>
+              <label style={{
+                display: 'block',
+                color: '#fff',
+                fontSize: '0.875rem',
+                fontWeight: '600',
+                marginBottom: '0.5rem'
+              }}>
+                🔍 Zoek & Selecteer Oefening * 
+                <span style={{ fontSize: '0.75rem', color: '#10b981' }}>
+                  (AI Database)
+                </span>
+              </label>
+              
+              <div className="exercise-search-container" style={{ position: 'relative' }}>
+                <input
+                  type="text"
+                  placeholder="Type om te zoeken naar oefeningen..."
+                  value={exerciseSearchTerm}
+                  onChange={(e) => setExerciseSearchTerm(e.target.value)}
+                  onFocus={() => setShowExerciseDropdown(true)}
+                  style={{
+                    width: '100%',
+                    padding: '0.75rem',
+                    background: '#2a2a2a',
+                    border: '1px solid #10b98133',
+                    borderRadius: '6px',
+                    color: '#fff',
+                    fontSize: '0.875rem'
+                  }}
+                />
+                
+                {showExerciseDropdown && (
+                  <div style={{
+                    position: 'absolute',
+                    top: '100%',
+                    left: 0,
+                    right: 0,
+                    background: '#2a2a2a',
+                    border: '1px solid #10b98133',
+                    borderRadius: '6px',
+                    marginTop: '0.25rem',
+                    maxHeight: '200px',
+                    overflowY: 'auto',
+                    zIndex: 1000
+                  }}>
+                    {exercisesLoading ? (
+                      <div style={{ padding: '0.75rem', color: 'rgba(255,255,255,0.6)' }}>
+                        Laden...
+                      </div>
+                    ) : (() => {
+                      const { planned, other } = getFilteredExercises()
+                      
+                      return (
+                        <>
+                          {/* Planned exercises */}
+                          {planned.length > 0 && (
+                            <>
+                              <div style={{
+                                padding: '0.5rem 0.75rem',
+                                background: 'rgba(16,185,129,0.1)',
+                                color: '#10b981',
+                                fontSize: '0.75rem',
+                                fontWeight: '600',
+                                borderBottom: '1px solid rgba(255,255,255,0.1)'
+                              }}>
+                                🎯 JOUW SCHEMA
+                              </div>
+                              {planned.map(exercise => (
+                                <div
+                                  key={exercise}
+                                  onClick={() => selectExercise(exercise)}
+                                  style={{
+                                    padding: '0.75rem',
+                                    cursor: 'pointer',
+                                    borderBottom: '1px solid rgba(255,255,255,0.1)',
+                                    color: '#10b981',
+                                    fontSize: '0.875rem',
+                                    fontWeight: '600'
+                                  }}
+                                  onMouseEnter={(e) => e.target.style.background = 'rgba(16,185,129,0.1)'}
+                                  onMouseLeave={(e) => e.target.style.background = 'transparent'}
+                                >
+                                  🎯 {exercise}
+                                </div>
+                              ))}
+                            </>
+                          )}
+                          
+                          {/* Other exercises */}
+                          {other.length > 0 && (
+                            <>
+                              {planned.length > 0 && (
+                                <div style={{
+                                  padding: '0.5rem 0.75rem',
+                                  background: 'rgba(255,255,255,0.05)',
+                                  color: 'rgba(255,255,255,0.7)',
+                                  fontSize: '0.75rem',
+                                  fontWeight: '600',
+                                  borderBottom: '1px solid rgba(255,255,255,0.1)'
+                                }}>
+                                  💪 ALLE OEFENINGEN
+                                </div>
+                              )}
+                              {other.map(exercise => (
+                                <div
+                                  key={exercise}
+                                  onClick={() => selectExercise(exercise)}
+                                  style={{
+                                    padding: '0.75rem',
+                                    cursor: 'pointer',
+                                    borderBottom: '1px solid rgba(255,255,255,0.1)',
+                                    color: 'rgba(255,255,255,0.9)',
+                                    fontSize: '0.875rem'
+                                  }}
+                                  onMouseEnter={(e) => e.target.style.background = 'rgba(255,255,255,0.1)'}
+                                  onMouseLeave={(e) => e.target.style.background = 'transparent'}
+                                >
+                                  💪 {exercise}
+                                </div>
+                              ))}
+                            </>
+                          )}
+                          
+                          {/* Add custom exercise option */}
+                          {exerciseSearchTerm && !clientExercises.includes(exerciseSearchTerm) && (
+                            <>
+                              {(planned.length > 0 || other.length > 0) && (
+                                <div style={{
+                                  padding: '0.5rem 0.75rem',
+                                  background: 'rgba(255,255,255,0.05)',
+                                  color: 'rgba(255,255,255,0.7)',
+                                  fontSize: '0.75rem',
+                                  fontWeight: '600',
+                                  borderBottom: '1px solid rgba(255,255,255,0.1)'
+                                }}>
+                                  ➕ NIEUWE OEFENING
+                                </div>
+                              )}
+                              <div
+                                onClick={() => selectExercise(exerciseSearchTerm)}
+                                style={{
+                                  padding: '0.75rem',
+                                  cursor: 'pointer',
+                                  borderBottom: '1px solid rgba(255,255,255,0.1)',
+                                  color: '#10b981',
+                                  fontSize: '0.875rem',
+                                  fontWeight: '600'
+                                }}
+                                onMouseEnter={(e) => e.target.style.background = 'rgba(16,185,129,0.1)'}
+                                onMouseLeave={(e) => e.target.style.background = 'transparent'}
+                              >
+                                ➕ Nieuwe oefening toevoegen: "{exerciseSearchTerm}"
+                              </div>
+                            </>
+                          )}
+                          
+                          {/* No results */}
+                          {planned.length === 0 && other.length === 0 && !exerciseSearchTerm && (
+                            <div style={{
+                              padding: '0.75rem',
+                              color: 'rgba(255,255,255,0.6)',
+                              fontSize: '0.875rem',
+                              textAlign: 'center'
+                            }}>
+                              Type om te zoeken naar oefeningen
+                            </div>
+                          )}
+                        </>
+                      )
+                    })()}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Selected Exercise Display */}
+            {selectedExercise && (
+              <div style={{
+                background: 'rgba(16, 185, 129, 0.1)',
+                padding: '0.75rem',
+                borderRadius: '6px',
+                marginBottom: '1rem',
+                border: '1px solid #10b98133'
+              }}>
+                <div style={{
+                  color: '#10b981',
+                  fontSize: '0.875rem',
+                  fontWeight: '600',
+                  marginBottom: '0.25rem'
+                }}>
+                  📋 Geselecteerde Oefening
+                </div>
+                <div style={{
+                  color: '#fff',
+                  fontSize: '1rem',
+                  fontWeight: '600'
+                }}>
+                  {selectedExercise}
+                </div>
+              </div>
+            )}
+
+            {/* Smart Suggestion */}
+            {smartSuggestion && (
+              <div style={{
+                background: 'rgba(16, 185, 129, 0.1)',
+                padding: '0.75rem',
+                borderRadius: '6px',
+                marginBottom: '1rem',
+                border: '1px solid #10b98133'
+              }}>
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  marginBottom: '0.5rem'
+                }}>
+                  <span style={{ fontSize: '1.25rem', marginRight: '0.5rem' }}>
+                    🤖
+                  </span>
+                  <span style={{
+                    color: '#fff',
+                    fontSize: '0.875rem',
+                    fontWeight: '600'
+                  }}>
+                    AI Advies
+                  </span>
+                </div>
+                <div style={{
+                  color: '#fff',
+                  fontSize: '0.875rem',
+                  lineHeight: '1.4',
+                  marginBottom: '0.5rem'
+                }}>
+                  {smartSuggestion.message}
+                </div>
+                <div style={{
+                  color: '#10b981',
+                  fontSize: '0.875rem',
+                  fontWeight: '600'
+                }}>
+                  💡 {smartSuggestion.suggestion}
+                </div>
+              </div>
+            )}
+
+            {/* Coach Suggestion */}
+            {exerciseHistory.length > 0 && exerciseHistory[0].coach_suggestion && (
+              <div style={{
+                background: 'rgba(255, 193, 7, 0.1)',
+                padding: '0.75rem',
+                borderRadius: '6px',
+                marginBottom: '1rem',
+                border: '1px solid rgba(255, 193, 7, 0.3)'
+              }}>
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  marginBottom: '0.5rem'
+                }}>
+                  <span style={{ fontSize: '1.25rem', marginRight: '0.5rem' }}>
+                    👨‍🏫
+                  </span>
+                  <span style={{
+                    color: '#fff',
+                    fontSize: '0.875rem',
+                    fontWeight: '600'
+                  }}>
+                    Coach Advies
+                  </span>
+                </div>
+                <div style={{
+                  color: '#fff',
+                  fontSize: '0.875rem',
+                  lineHeight: '1.4'
+                }}>
+                  💡 {getSuggestionText(exerciseHistory[0].coach_suggestion, language)}
+                </div>
+              </div>
+            )}
+
+            {/* Exercise History (simplified) - Only show if 1 workout or no graph */}
+            {exerciseHistory.length === 1 && !smartSuggestion && (
+              <div style={{
+                background: 'rgba(16, 185, 129, 0.1)',
+                padding: '0.75rem',
+                borderRadius: '6px',
+                marginBottom: '1rem'
+              }}>
+                <div style={{
+                  color: '#10b981',
+                  fontSize: '0.875rem',
+                  fontWeight: '600',
+                  marginBottom: '0.5rem'
+                }}>
+                  📈 Vorige Workout
+                </div>
+                <div style={{
+                  color: 'rgba(255,255,255,0.9)',
+                  fontSize: '0.875rem'
+                }}>
+                  {new Date(exerciseHistory[0].date).toLocaleDateString('nl-NL')}: {formatSets(exerciseHistory[0].sets)}
+                </div>
+              </div>
+            )}
+
+            {/* Progress Graph */}
+            {exerciseHistory.length > 1 && (
+              <div style={{
+                background: 'rgba(255,255,255,0.05)',
+                padding: '1rem',
+                borderRadius: '8px',
+                boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+                marginBottom: '1rem'
+              }}>
+                <h3 style={{
+                  color: '#fff',
+                  fontSize: '1rem',
+                  fontWeight: '600',
+                  marginBottom: '1rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem'
+                }}>
+                  📈 Progress Grafiek - {workoutForm.exerciseName}
+                </h3>
+                
+                <div style={{
+                  position: 'relative',
+                  height: '150px',
+                  background: '#1a1a1a',
+                  borderRadius: '6px',
+                  padding: '1rem',
+                  overflow: 'hidden'
+                }}>
+                  <ProgressChart exerciseHistory={exerciseHistory} />
+                </div>
+                
+                <div style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  marginTop: '0.5rem',
+                  fontSize: '0.75rem',
+                  color: 'rgba(255,255,255,0.6)'
+                }}>
+                  <span>📅 {exerciseHistory.length} workouts</span>
+                  <span>💪 Laatste: {Math.max(...exerciseHistory[0].sets.map(s => s.weight || 0))}kg</span>
+                </div>
+              </div>
+            )}
+
+            {/* Sets Input */}
+            <div style={{ marginBottom: '1rem' }}>
+              <label style={{
+                display: 'block',
+                color: '#fff',
+                fontSize: '0.875rem',
+                fontWeight: '600',
+                marginBottom: '0.5rem'
+              }}>
+                Sets & Gewicht *
+              </label>
+              
+              {workoutForm.sets.map((set, index) => (
+                <div key={index} style={{
+                  display: 'flex',
+                  gap: '0.5rem',
+                  marginBottom: '0.5rem',
+                  alignItems: 'center'
+                }}>
+                  <div style={{ flex: 1 }}>
+                    <input
+                      type="number"
+                      placeholder="Reps"
+                      value={set.reps}
+                      onChange={(e) => updateSet(index, 'reps', e.target.value)}
+                      style={{
+                        width: '100%',
+                        padding: '0.5rem',
+                        background: '#2a2a2a',
+                        border: '1px solid #10b98133',
+                        borderRadius: '6px',
+                        color: '#fff',
+                        fontSize: '0.875rem'
+                      }}
+                    />
+                  </div>
+                  
+                  <div style={{ flex: 1 }}>
+                    <input
+                      type="number"
+                      step="0.5"
+                      placeholder="KG"
+                      value={set.weight}
+                      onChange={(e) => updateSet(index, 'weight', e.target.value)}
+                      style={{
+                        width: '100%',
+                        padding: '0.5rem',
+                        background: '#2a2a2a',
+                        border: '1px solid #10b98133',
+                        borderRadius: '6px',
+                        color: '#fff',
+                        fontSize: '0.875rem'
+                      }}
+                    />
+                  </div>
+                  
+                  {workoutForm.sets.length > 1 && (
+                    <button
+                      onClick={() => removeSet(index)}
+                      style={{
+                        background: '#ef4444',
+                        color: '#fff',
+                        border: 'none',
+                        borderRadius: '6px',
+                        padding: '0.5rem',
+                        fontSize: '0.875rem',
+                        cursor: 'pointer',
+                        minWidth: '40px'
+                      }}
+                    >
+                      ✕
+                    </button>
+                  )}
+                </div>
+              ))}
+              
+              <button
+                onClick={addSet}
+                style={{
+                  background: 'rgba(16, 185, 129, 0.2)',
+                  color: '#10b981',
+                  border: '1px solid #10b98133',
+                  borderRadius: '6px',
+                  padding: '0.5rem 0.75rem',
+                  fontSize: '0.875rem',
+                  cursor: 'pointer',
+                  width: '100%',
+                  fontWeight: '600'
+                }}
+              >
+                ➕ Set Toevoegen
+              </button>
+            </div>
+
+            {/* Notes */}
+            <div style={{ marginBottom: '1.5rem' }}>
+              <label style={{
+                display: 'block',
+                color: '#fff',
+                fontSize: '0.875rem',
+                fontWeight: '600',
+                marginBottom: '0.5rem'
+              }}>
+                📝 Notities (optioneel)
+              </label>
+              
+              <textarea
+                placeholder="Hoe ging de workout? Notities voor volgende keer..."
+                value={workoutForm.notes}
+                onChange={(e) => setWorkoutForm(prev => ({ ...prev, notes: e.target.value }))}
+                style={{
+                  width: '100%',
+                  padding: '0.75rem',
+                  background: '#2a2a2a',
+                  border: '1px solid #10b98133',
+                  borderRadius: '6px',
+                  color: '#fff',
+                  fontSize: '0.875rem',
+                  minHeight: '80px',
+                  resize: 'vertical'
+                }}
+              />
+            </div>
+
+            {/* Action Buttons */}
+            <div style={{
+              display: 'flex',
+              gap: '0.75rem',
+              justifyContent: 'flex-end'
+            }}>
+              <button
+                onClick={closeWorkoutModal}
+                style={{
+                  background: 'rgba(255,255,255,0.1)',
+                  color: '#fff',
+                  border: '1px solid rgba(255,255,255,0.2)',
+                  borderRadius: '6px',
+                  padding: '0.75rem 1rem',
+                  fontSize: '0.875rem',
+                  cursor: 'pointer',
+                  fontWeight: '600'
+                }}
+              >
+                Annuleren
+              </button>
+              
+              <button
+                onClick={saveWorkout}
+                disabled={!workoutForm.exerciseName || !workoutForm.sets.some(s => s.reps && s.weight)}
+                style={{
+                  background: workoutForm.exerciseName && workoutForm.sets.some(s => s.reps && s.weight) 
+                    ? '#10b981' : 'rgba(16, 185, 129, 0.3)',
+                  color: '#fff',
+                  border: 'none',
+                  borderRadius: '6px',
+                  padding: '0.75rem 1.5rem',
+                  fontSize: '0.875rem',
+                  cursor: workoutForm.exerciseName && workoutForm.sets.some(s => s.reps && s.weight) 
+                    ? 'pointer' : 'not-allowed',
+                  fontWeight: '600'
+                }}
+              >
+                💪 Workout Opslaan
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}

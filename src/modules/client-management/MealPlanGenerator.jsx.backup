@@ -1,0 +1,929 @@
+import { useState, useEffect } from 'react'
+
+// ===== MEAL PLAN GENERATOR MET PREFERENCES =====
+export const MealPlanGenerator = ({ client, isOpen, onClose, db }) => {
+  const [loading, setLoading] = useState(false)
+  const [step, setStep] = useState(1) // 1: preferences, 2: targets, 3: template, 4: confirm
+  const [templates, setTemplates] = useState([])
+  const [selectedTemplate, setSelectedTemplate] = useState(null)
+  
+  // Client preferences
+  const [preferences, setPreferences] = useState({
+    // Dietary restrictions
+    dietary_type: 'regular', // regular, vegetarian, vegan, pescatarian, keto, paleo
+    allergies: [],
+    dislikes: [],
+    
+    // Meal preferences
+    meals_per_day: 3,
+    prep_time: 'moderate', // quick, moderate, extensive
+    cooking_skill: 'intermediate', // beginner, intermediate, advanced
+    
+    // Goals
+    primary_goal: 'maintenance', // weight_loss, muscle_gain, maintenance, performance
+    activity_level: 'moderate', // sedentary, light, moderate, very_active, extremely_active
+    
+    // Schedule
+    workout_time: 'morning', // morning, afternoon, evening
+    biggest_meal: 'lunch', // breakfast, lunch, dinner
+    
+    // Budget
+    budget: 'moderate' // budget, moderate, premium
+  })
+  
+  // Calculated targets
+  const [macroTargets, setMacroTargets] = useState({
+    calories: 2000,
+    protein: 150,
+    carbs: 200,
+    fat: 67,
+    fiber: 25,
+    water: 2500
+  })
+  
+  // Generated plan
+  const [generatedPlan, setGeneratedPlan] = useState(null)
+  
+  useEffect(() => {
+    if (isOpen) {
+      loadClientData()
+      loadTemplates()
+    }
+  }, [isOpen])
+  
+  const loadClientData = async () => {
+    try {
+      // Load existing client data
+      if (client) {
+        // Set preferences from client data
+        if (client.nutrition_info) {
+          setPreferences(prev => ({
+            ...prev,
+            ...client.nutrition_info
+          }))
+        }
+        
+        // Calculate initial macros based on client stats
+        const calculatedMacros = calculateMacros(client)
+        setMacroTargets(calculatedMacros)
+        
+        // Check if client already has a meal plan
+        const existingPlan = await db.getClientMealPlan(client.id)
+        if (existingPlan && existingPlan.targets) {
+          setMacroTargets({
+            calories: existingPlan.targets.kcal || 2000,
+            protein: existingPlan.targets.protein || 150,
+            carbs: existingPlan.targets.carbs || 200,
+            fat: existingPlan.targets.fat || 67,
+            fiber: 25,
+            water: 2500
+          })
+        }
+      }
+    } catch (error) {
+      console.error('Failed to load client data:', error)
+    }
+  }
+  
+  const loadTemplates = async () => {
+    try {
+      const data = await db.getMealPlanTemplates()
+      setTemplates(data || [])
+    } catch (error) {
+      console.error('Failed to load templates:', error)
+    }
+  }
+  
+  const calculateMacros = (clientData) => {
+    // Harris-Benedict Formula for BMR
+    let bmr = 0
+    const weight = clientData.current_weight || 70
+    const height = clientData.height || 170
+    const age = clientData.age || 30
+    const gender = clientData.gender || 'male'
+    
+    if (gender === 'male') {
+      bmr = 88.362 + (13.397 * weight) + (4.799 * height) - (5.677 * age)
+    } else {
+      bmr = 447.593 + (9.247 * weight) + (3.098 * height) - (4.330 * age)
+    }
+    
+    // Activity multiplier
+    const activityMultipliers = {
+      sedentary: 1.2,
+      light: 1.375,
+      moderate: 1.55,
+      very_active: 1.725,
+      extremely_active: 1.9
+    }
+    
+    const tdee = bmr * (activityMultipliers[preferences.activity_level] || 1.55)
+    
+    // Goal adjustments
+    let calories = tdee
+    if (preferences.primary_goal === 'weight_loss') {
+      calories = tdee - 500 // 500 cal deficit
+    } else if (preferences.primary_goal === 'muscle_gain') {
+      calories = tdee + 300 // 300 cal surplus
+    }
+    
+    // Macro split based on goal
+    let proteinRatio, carbRatio, fatRatio
+    
+    switch(preferences.primary_goal) {
+      case 'muscle_gain':
+        proteinRatio = 0.30 // 30% protein
+        carbRatio = 0.45    // 45% carbs
+        fatRatio = 0.25     // 25% fat
+        break
+      case 'weight_loss':
+        proteinRatio = 0.35 // 35% protein
+        carbRatio = 0.35    // 35% carbs
+        fatRatio = 0.30     // 30% fat
+        break
+      case 'performance':
+        proteinRatio = 0.25 // 25% protein
+        carbRatio = 0.50    // 50% carbs
+        fatRatio = 0.25     // 25% fat
+        break
+      default: // maintenance
+        proteinRatio = 0.30 // 30% protein
+        carbRatio = 0.40    // 40% carbs
+        fatRatio = 0.30     // 30% fat
+    }
+    
+    // Calculate grams
+    const protein = Math.round((calories * proteinRatio) / 4) // 4 cal per gram
+    const carbs = Math.round((calories * carbRatio) / 4)     // 4 cal per gram
+    const fat = Math.round((calories * fatRatio) / 9)         // 9 cal per gram
+    
+    return {
+      calories: Math.round(calories),
+      protein,
+      carbs,
+      fat,
+      fiber: gender === 'male' ? 38 : 25,
+      water: Math.round(weight * 35) // 35ml per kg body weight
+    }
+  }
+  
+  const generateMealPlan = async () => {
+    setLoading(true)
+    try {
+      // Create week structure based on preferences
+      const weekStructure = []
+      
+      for (let day = 1; day <= 7; day++) {
+        const dayMeals = []
+        const mealsPerDay = preferences.meals_per_day
+        
+        // Distribute calories across meals
+        let mealDistribution = []
+        if (mealsPerDay === 3) {
+          mealDistribution = [0.25, 0.40, 0.35] // Breakfast, Lunch, Dinner
+        } else if (mealsPerDay === 4) {
+          mealDistribution = [0.25, 0.35, 0.25, 0.15] // + Snack
+        } else if (mealsPerDay === 5) {
+          mealDistribution = [0.20, 0.15, 0.30, 0.20, 0.15] // + 2 Snacks
+        } else {
+          mealDistribution = [0.20, 0.15, 0.25, 0.15, 0.20, 0.05] // + 3 Snacks
+        }
+        
+        // Adjust based on biggest meal preference
+        if (preferences.biggest_meal === 'breakfast' && mealsPerDay >= 3) {
+          mealDistribution[0] += 0.10
+          mealDistribution[2] -= 0.10
+        } else if (preferences.biggest_meal === 'dinner' && mealsPerDay >= 3) {
+          mealDistribution[2] += 0.10
+          mealDistribution[0] -= 0.10
+        }
+        
+        // Create meals for the day
+        const mealNames = ['Breakfast', 'Snack 1', 'Lunch', 'Snack 2', 'Dinner', 'Snack 3']
+        const mealSlots = []
+        
+        if (mealsPerDay === 3) {
+          mealSlots.push(0, 2, 4) // Breakfast, Lunch, Dinner
+        } else if (mealsPerDay === 4) {
+          mealSlots.push(0, 2, 4, 3) // + Snack
+        } else if (mealsPerDay === 5) {
+          mealSlots.push(0, 1, 2, 4, 3) // + 2 Snacks
+        } else {
+          mealSlots.push(0, 1, 2, 3, 4, 5) // All meals
+        }
+        
+        mealSlots.forEach((slot, index) => {
+          const targetCals = Math.round(macroTargets.calories * mealDistribution[index])
+          
+          dayMeals.push({
+            slot: mealNames[slot],
+            meal_id: null, // Will be filled with actual meal selection
+            targetKcal: targetCals,
+            targetProtein: Math.round(macroTargets.protein * mealDistribution[index]),
+            targetCarbs: Math.round(macroTargets.carbs * mealDistribution[index]),
+            targetFat: Math.round(macroTargets.fat * mealDistribution[index])
+          })
+        })
+        
+        weekStructure.push({
+          day: `Day ${day}`,
+          dayName: ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][day - 1],
+          meals: dayMeals,
+          totalCalories: macroTargets.calories,
+          notes: ''
+        })
+      }
+      
+      // Create the plan object
+      const planData = {
+        title: selectedTemplate ? selectedTemplate.name : `Custom Plan - ${client.first_name}`,
+        template_id: selectedTemplate?.id || null,
+        targets: {
+          kcal: macroTargets.calories,
+          protein: macroTargets.protein,
+          carbs: macroTargets.carbs,
+          fat: macroTargets.fat,
+          fiber: macroTargets.fiber,
+          water: macroTargets.water
+        },
+        preferences: preferences,
+        meals_per_day: preferences.meals_per_day,
+        week_structure: weekStructure,
+        coach_notes: generateCoachNotes(),
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      }
+      
+      setGeneratedPlan(planData)
+      
+      // Move to confirmation step
+      setStep(4)
+      
+    } catch (error) {
+      console.error('Failed to generate meal plan:', error)
+      alert('❌ Failed to generate meal plan')
+    } finally {
+      setLoading(false)
+    }
+  }
+  
+  const generateCoachNotes = () => {
+    let notes = `Meal Plan for ${client.first_name} ${client.last_name}\n\n`
+    notes += `Goal: ${preferences.primary_goal.replace('_', ' ').toUpperCase()}\n`
+    notes += `Activity Level: ${preferences.activity_level.replace('_', ' ')}\n`
+    notes += `Dietary Type: ${preferences.dietary_type}\n`
+    notes += `Meals per Day: ${preferences.meals_per_day}\n\n`
+    
+    notes += `Daily Targets:\n`
+    notes += `- Calories: ${macroTargets.calories} kcal\n`
+    notes += `- Protein: ${macroTargets.protein}g\n`
+    notes += `- Carbs: ${macroTargets.carbs}g\n`
+    notes += `- Fat: ${macroTargets.fat}g\n`
+    notes += `- Fiber: ${macroTargets.fiber}g\n`
+    notes += `- Water: ${macroTargets.water}ml\n\n`
+    
+    if (preferences.workout_time) {
+      notes += `Workout Time: ${preferences.workout_time}\n`
+      notes += `Pre/Post workout nutrition has been considered.\n`
+    }
+    
+    return notes
+  }
+  
+  const saveMealPlan = async () => {
+    if (!generatedPlan) return
+    
+    setLoading(true)
+    try {
+      // Save to database
+      await db.saveMealPlan(client.id, generatedPlan)
+      
+      alert('✅ Meal plan created and assigned successfully!')
+      onClose(true)
+    } catch (error) {
+      console.error('Failed to save meal plan:', error)
+      alert('❌ Failed to save meal plan: ' + error.message)
+    } finally {
+      setLoading(false)
+    }
+  }
+  
+  if (!isOpen) return null
+  
+  const renderStep = () => {
+    switch(step) {
+      case 1:
+        return (
+          <div>
+            <h3 style={{ color: '#fff', marginBottom: 'var(--s-4)' }}>
+              Step 1: Dietary Preferences
+            </h3>
+            
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
+              gap: 'var(--s-3)'
+            }}>
+              <div>
+                <label style={{ color: 'var(--c-muted)', fontSize: 'var(--text-sm)', display: 'block', marginBottom: '8px' }}>
+                  Dietary Type
+                </label>
+                <select
+                  value={preferences.dietary_type}
+                  onChange={(e) => setPreferences({...preferences, dietary_type: e.target.value})}
+                  style={{
+                    width: '100%',
+                    padding: '10px',
+                    background: 'rgba(0,0,0,0.5)',
+                    border: '1px solid rgba(16, 185, 129, 0.3)',
+                    borderRadius: '8px',
+                    color: '#fff'
+                  }}
+                >
+                  <option value="regular">Regular</option>
+                  <option value="vegetarian">Vegetarian</option>
+                  <option value="vegan">Vegan</option>
+                  <option value="pescatarian">Pescatarian</option>
+                  <option value="keto">Keto</option>
+                  <option value="paleo">Paleo</option>
+                  <option value="mediterranean">Mediterranean</option>
+                </select>
+              </div>
+              
+              <div>
+                <label style={{ color: 'var(--c-muted)', fontSize: 'var(--text-sm)', display: 'block', marginBottom: '8px' }}>
+                  Primary Goal
+                </label>
+                <select
+                  value={preferences.primary_goal}
+                  onChange={(e) => {
+                    setPreferences({...preferences, primary_goal: e.target.value})
+                    // Recalculate macros
+                    setMacroTargets(calculateMacros(client))
+                  }}
+                  style={{
+                    width: '100%',
+                    padding: '10px',
+                    background: 'rgba(0,0,0,0.5)',
+                    border: '1px solid rgba(16, 185, 129, 0.3)',
+                    borderRadius: '8px',
+                    color: '#fff'
+                  }}
+                >
+                  <option value="weight_loss">Weight Loss</option>
+                  <option value="muscle_gain">Muscle Gain</option>
+                  <option value="maintenance">Maintenance</option>
+                  <option value="performance">Performance</option>
+                </select>
+              </div>
+              
+              <div>
+                <label style={{ color: 'var(--c-muted)', fontSize: 'var(--text-sm)', display: 'block', marginBottom: '8px' }}>
+                  Activity Level
+                </label>
+                <select
+                  value={preferences.activity_level}
+                  onChange={(e) => {
+                    setPreferences({...preferences, activity_level: e.target.value})
+                    // Recalculate macros
+                    setMacroTargets(calculateMacros(client))
+                  }}
+                  style={{
+                    width: '100%',
+                    padding: '10px',
+                    background: 'rgba(0,0,0,0.5)',
+                    border: '1px solid rgba(16, 185, 129, 0.3)',
+                    borderRadius: '8px',
+                    color: '#fff'
+                  }}
+                >
+                  <option value="sedentary">Sedentary (little/no exercise)</option>
+                  <option value="light">Light (1-3 days/week)</option>
+                  <option value="moderate">Moderate (3-5 days/week)</option>
+                  <option value="very_active">Very Active (6-7 days/week)</option>
+                  <option value="extremely_active">Extremely Active (2x per day)</option>
+                </select>
+              </div>
+              
+              <div>
+                <label style={{ color: 'var(--c-muted)', fontSize: 'var(--text-sm)', display: 'block', marginBottom: '8px' }}>
+                  Meals per Day
+                </label>
+                <select
+                  value={preferences.meals_per_day}
+                  onChange={(e) => setPreferences({...preferences, meals_per_day: parseInt(e.target.value)})}
+                  style={{
+                    width: '100%',
+                    padding: '10px',
+                    background: 'rgba(0,0,0,0.5)',
+                    border: '1px solid rgba(16, 185, 129, 0.3)',
+                    borderRadius: '8px',
+                    color: '#fff'
+                  }}
+                >
+                  <option value="3">3 Meals</option>
+                  <option value="4">4 Meals (3 + Snack)</option>
+                  <option value="5">5 Meals (3 + 2 Snacks)</option>
+                  <option value="6">6 Meals (3 + 3 Snacks)</option>
+                </select>
+              </div>
+              
+              <div>
+                <label style={{ color: 'var(--c-muted)', fontSize: 'var(--text-sm)', display: 'block', marginBottom: '8px' }}>
+                  Workout Time
+                </label>
+                <select
+                  value={preferences.workout_time}
+                  onChange={(e) => setPreferences({...preferences, workout_time: e.target.value})}
+                  style={{
+                    width: '100%',
+                    padding: '10px',
+                    background: 'rgba(0,0,0,0.5)',
+                    border: '1px solid rgba(16, 185, 129, 0.3)',
+                    borderRadius: '8px',
+                    color: '#fff'
+                  }}
+                >
+                  <option value="morning">Morning</option>
+                  <option value="afternoon">Afternoon</option>
+                  <option value="evening">Evening</option>
+                  <option value="varies">Varies</option>
+                </select>
+              </div>
+              
+              <div>
+                <label style={{ color: 'var(--c-muted)', fontSize: 'var(--text-sm)', display: 'block', marginBottom: '8px' }}>
+                  Biggest Meal
+                </label>
+                <select
+                  value={preferences.biggest_meal}
+                  onChange={(e) => setPreferences({...preferences, biggest_meal: e.target.value})}
+                  style={{
+                    width: '100%',
+                    padding: '10px',
+                    background: 'rgba(0,0,0,0.5)',
+                    border: '1px solid rgba(16, 185, 129, 0.3)',
+                    borderRadius: '8px',
+                    color: '#fff'
+                  }}
+                >
+                  <option value="breakfast">Breakfast</option>
+                  <option value="lunch">Lunch</option>
+                  <option value="dinner">Dinner</option>
+                </select>
+              </div>
+            </div>
+          </div>
+        )
+        
+      case 2:
+        return (
+          <div>
+            <h3 style={{ color: '#fff', marginBottom: 'var(--s-4)' }}>
+              Step 2: Macro Targets
+            </h3>
+            
+            <div style={{
+              background: 'rgba(16, 185, 129, 0.1)',
+              borderRadius: '12px',
+              padding: 'var(--s-4)',
+              marginBottom: 'var(--s-4)'
+            }}>
+              <p style={{ color: '#10b981', marginBottom: 'var(--s-3)' }}>
+                Calculated based on your stats and goals:
+              </p>
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))',
+                gap: 'var(--s-3)'
+              }}>
+                <div>
+                  <label style={{ color: 'var(--c-muted)', fontSize: 'var(--text-sm)', display: 'block', marginBottom: '8px' }}>
+                    Calories (kcal)
+                  </label>
+                  <input
+                    type="number"
+                    value={macroTargets.calories}
+                    onChange={(e) => setMacroTargets({...macroTargets, calories: parseInt(e.target.value) || 0})}
+                    style={{
+                      width: '100%',
+                      padding: '10px',
+                      background: 'rgba(0,0,0,0.5)',
+                      border: '1px solid rgba(16, 185, 129, 0.3)',
+                      borderRadius: '8px',
+                      color: '#fff'
+                    }}
+                  />
+                </div>
+                
+                <div>
+                  <label style={{ color: 'var(--c-muted)', fontSize: 'var(--text-sm)', display: 'block', marginBottom: '8px' }}>
+                    Protein (g)
+                  </label>
+                  <input
+                    type="number"
+                    value={macroTargets.protein}
+                    onChange={(e) => setMacroTargets({...macroTargets, protein: parseInt(e.target.value) || 0})}
+                    style={{
+                      width: '100%',
+                      padding: '10px',
+                      background: 'rgba(0,0,0,0.5)',
+                      border: '1px solid rgba(16, 185, 129, 0.3)',
+                      borderRadius: '8px',
+                      color: '#fff'
+                    }}
+                  />
+                </div>
+                
+                <div>
+                  <label style={{ color: 'var(--c-muted)', fontSize: 'var(--text-sm)', display: 'block', marginBottom: '8px' }}>
+                    Carbs (g)
+                  </label>
+                  <input
+                    type="number"
+                    value={macroTargets.carbs}
+                    onChange={(e) => setMacroTargets({...macroTargets, carbs: parseInt(e.target.value) || 0})}
+                    style={{
+                      width: '100%',
+                      padding: '10px',
+                      background: 'rgba(0,0,0,0.5)',
+                      border: '1px solid rgba(16, 185, 129, 0.3)',
+                      borderRadius: '8px',
+                      color: '#fff'
+                    }}
+                  />
+                </div>
+                
+                <div>
+                  <label style={{ color: 'var(--c-muted)', fontSize: 'var(--text-sm)', display: 'block', marginBottom: '8px' }}>
+                    Fat (g)
+                  </label>
+                  <input
+                    type="number"
+                    value={macroTargets.fat}
+                    onChange={(e) => setMacroTargets({...macroTargets, fat: parseInt(e.target.value) || 0})}
+                    style={{
+                      width: '100%',
+                      padding: '10px',
+                      background: 'rgba(0,0,0,0.5)',
+                      border: '1px solid rgba(16, 185, 129, 0.3)',
+                      borderRadius: '8px',
+                      color: '#fff'
+                    }}
+                  />
+                </div>
+              </div>
+              
+              <div style={{
+                marginTop: 'var(--s-4)',
+                padding: 'var(--s-3)',
+                background: 'rgba(0,0,0,0.3)',
+                borderRadius: '8px'
+              }}>
+                <p style={{ color: 'var(--c-muted)', fontSize: 'var(--text-sm)', marginBottom: 'var(--s-2)' }}>
+                  Macro Breakdown:
+                </p>
+                <div style={{ display: 'flex', gap: 'var(--s-4)', flexWrap: 'wrap' }}>
+                  <span style={{ color: '#fff' }}>
+                    Protein: {Math.round((macroTargets.protein * 4 / macroTargets.calories) * 100)}%
+                  </span>
+                  <span style={{ color: '#fff' }}>
+                    Carbs: {Math.round((macroTargets.carbs * 4 / macroTargets.calories) * 100)}%
+                  </span>
+                  <span style={{ color: '#fff' }}>
+                    Fat: {Math.round((macroTargets.fat * 9 / macroTargets.calories) * 100)}%
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+        )
+        
+      case 3:
+        return (
+          <div>
+            <h3 style={{ color: '#fff', marginBottom: 'var(--s-4)' }}>
+              Step 3: Select Template (Optional)
+            </h3>
+            
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
+              gap: 'var(--s-3)',
+              maxHeight: '400px',
+              overflowY: 'auto'
+            }}>
+              <div
+                onClick={() => setSelectedTemplate(null)}
+                style={{
+                  background: !selectedTemplate 
+                    ? 'linear-gradient(135deg, rgba(16, 185, 129, 0.2) 0%, rgba(16, 185, 129, 0.1) 100%)'
+                    : 'rgba(0,0,0,0.3)',
+                  border: `2px solid ${!selectedTemplate ? '#10b981' : 'transparent'}`,
+                  borderRadius: '12px',
+                  padding: 'var(--s-3)',
+                  cursor: 'pointer',
+                  textAlign: 'center'
+                }}
+              >
+                <p style={{ fontSize: '2rem', marginBottom: 'var(--s-2)' }}>✨</p>
+                <h4 style={{ color: '#fff', marginBottom: '8px' }}>
+                  Custom Plan
+                </h4>
+                <p style={{ color: 'var(--c-muted)', fontSize: 'var(--text-sm)' }}>
+                  Create from scratch
+                </p>
+              </div>
+              
+              {templates.slice(0, 11).map(template => {
+                const isSelected = selectedTemplate?.id === template.id
+                
+                return (
+                  <div
+                    key={template.id}
+                    onClick={() => setSelectedTemplate(template)}
+                    style={{
+                      background: isSelected 
+                        ? 'linear-gradient(135deg, rgba(16, 185, 129, 0.2) 0%, rgba(16, 185, 129, 0.1) 100%)'
+                        : 'rgba(0,0,0,0.3)',
+                      border: `2px solid ${isSelected ? '#10b981' : 'transparent'}`,
+                      borderRadius: '12px',
+                      padding: 'var(--s-3)',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    <h4 style={{ color: '#fff', marginBottom: '8px', fontSize: '0.9rem' }}>
+                      {template.name}
+                    </h4>
+                    <p style={{ color: 'var(--c-muted)', fontSize: 'var(--text-xs)' }}>
+                      {template.description || 'Meal plan template'}
+                    </p>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        )
+        
+      case 4:
+        return (
+          <div>
+            <h3 style={{ color: '#fff', marginBottom: 'var(--s-4)' }}>
+              Step 4: Review & Confirm
+            </h3>
+            
+            <div style={{
+              background: 'rgba(0,0,0,0.3)',
+              borderRadius: '12px',
+              padding: 'var(--s-4)'
+            }}>
+              <h4 style={{ color: '#10b981', marginBottom: 'var(--s-3)' }}>
+                Generated Meal Plan Summary
+              </h4>
+              
+              <div style={{ display: 'grid', gap: 'var(--s-3)' }}>
+                <div>
+                  <p style={{ color: 'var(--c-muted)', fontSize: 'var(--text-sm)' }}>Client</p>
+                  <p style={{ color: '#fff' }}>
+                    {client.first_name} {client.last_name}
+                  </p>
+                </div>
+                
+                <div>
+                  <p style={{ color: 'var(--c-muted)', fontSize: 'var(--text-sm)' }}>Plan Type</p>
+                  <p style={{ color: '#fff' }}>
+                    {selectedTemplate ? selectedTemplate.name : 'Custom Plan'}
+                  </p>
+                </div>
+                
+                <div>
+                  <p style={{ color: 'var(--c-muted)', fontSize: 'var(--text-sm)' }}>Daily Targets</p>
+                  <div style={{ display: 'flex', gap: 'var(--s-3)', flexWrap: 'wrap', marginTop: '8px' }}>
+                    <span style={{
+                      background: 'rgba(16, 185, 129, 0.2)',
+                      color: '#10b981',
+                      padding: '4px 12px',
+                      borderRadius: '20px',
+                      fontSize: 'var(--text-sm)'
+                    }}>
+                      {macroTargets.calories} kcal
+                    </span>
+                    <span style={{
+                      background: 'rgba(59, 130, 246, 0.2)',
+                      color: '#3b82f6',
+                      padding: '4px 12px',
+                      borderRadius: '20px',
+                      fontSize: 'var(--text-sm)'
+                    }}>
+                      {macroTargets.protein}g protein
+                    </span>
+                    <span style={{
+                      background: 'rgba(245, 158, 11, 0.2)',
+                      color: '#f59e0b',
+                      padding: '4px 12px',
+                      borderRadius: '20px',
+                      fontSize: 'var(--text-sm)'
+                    }}>
+                      {macroTargets.carbs}g carbs
+                    </span>
+                    <span style={{
+                      background: 'rgba(139, 92, 246, 0.2)',
+                      color: '#8b5cf6',
+                      padding: '4px 12px',
+                      borderRadius: '20px',
+                      fontSize: 'var(--text-sm)'
+                    }}>
+                      {macroTargets.fat}g fat
+                    </span>
+                  </div>
+                </div>
+                
+                <div>
+                  <p style={{ color: 'var(--c-muted)', fontSize: 'var(--text-sm)' }}>Preferences</p>
+                  <div style={{ display: 'flex', gap: 'var(--s-2)', flexWrap: 'wrap', marginTop: '8px' }}>
+                    <span style={{ color: '#fff', fontSize: 'var(--text-sm)' }}>
+                      • {preferences.dietary_type}
+                    </span>
+                    <span style={{ color: '#fff', fontSize: 'var(--text-sm)' }}>
+                      • {preferences.meals_per_day} meals/day
+                    </span>
+                    <span style={{ color: '#fff', fontSize: 'var(--text-sm)' }}>
+                      • {preferences.primary_goal.replace('_', ' ')}
+                    </span>
+                  </div>
+                </div>
+                
+                {generatedPlan && (
+                  <div style={{
+                    marginTop: 'var(--s-3)',
+                    padding: 'var(--s-3)',
+                    background: 'rgba(16, 185, 129, 0.1)',
+                    borderRadius: '8px',
+                    border: '1px solid rgba(16, 185, 129, 0.3)'
+                  }}>
+                    <p style={{ color: '#10b981', fontWeight: 'bold', marginBottom: 'var(--s-2)' }}>
+                      ✅ Plan Ready to Assign
+                    </p>
+                    <p style={{ color: 'var(--c-muted)', fontSize: 'var(--text-sm)' }}>
+                      {generatedPlan.week_structure.length} days configured with {preferences.meals_per_day} meals each
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )
+        
+      default:
+        return null
+    }
+  }
+  
+  return (
+    <div style={{
+      position: 'fixed',
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      background: 'rgba(0,0,0,0.8)',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      zIndex: 9999
+    }}>
+      <div style={{
+        background: 'linear-gradient(135deg, #1a1a1a 0%, #0f0f0f 100%)',
+        borderRadius: '16px',
+        border: '2px solid rgba(16, 185, 129, 0.3)',
+        width: '90%',
+        maxWidth: '900px',
+        maxHeight: '85vh',
+        overflow: 'hidden',
+        display: 'flex',
+        flexDirection: 'column'
+      }}>
+        {/* Header */}
+        <div style={{
+          padding: 'var(--s-5)',
+          borderBottom: '1px solid rgba(16, 185, 129, 0.2)',
+          background: 'linear-gradient(90deg, rgba(16, 185, 129, 0.1) 0%, transparent)'
+        }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div>
+              <h2 style={{ 
+                color: '#fff', 
+                fontSize: '1.5rem',
+                marginBottom: '8px'
+              }}>
+                🍽️ Generate Meal Plan
+              </h2>
+              <p style={{ color: 'var(--c-muted)' }}>
+                Creating personalized nutrition plan for {client.first_name} {client.last_name}
+              </p>
+            </div>
+            <button
+              onClick={() => onClose(false)}
+              style={{
+                background: 'transparent',
+                border: 'none',
+                color: '#fff',
+                fontSize: '1.5rem',
+                cursor: 'pointer'
+              }}
+            >
+              ✕
+            </button>
+          </div>
+          
+          {/* Progress Indicator */}
+          <div style={{
+            display: 'flex',
+            gap: 'var(--s-2)',
+            marginTop: 'var(--s-3)'
+          }}>
+            {[1, 2, 3, 4].map(s => (
+              <div
+                key={s}
+                style={{
+                  flex: 1,
+                  height: '4px',
+                  background: s <= step ? '#10b981' : 'rgba(16, 185, 129, 0.2)',
+                  borderRadius: '2px',
+                  transition: 'background 0.3s ease'
+                }}
+              />
+            ))}
+          </div>
+        </div>
+        
+        {/* Content */}
+        <div style={{
+          flex: 1,
+          overflow: 'auto',
+          padding: 'var(--s-5)'
+        }}>
+          {renderStep()}
+        </div>
+        
+        {/* Footer */}
+        <div style={{
+          padding: 'var(--s-5)',
+          borderTop: '1px solid rgba(16, 185, 129, 0.2)',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center'
+        }}>
+          <button
+            onClick={() => setStep(Math.max(1, step - 1))}
+            disabled={step === 1}
+            style={{
+              background: 'transparent',
+              border: '1px solid var(--c-border)',
+              color: step === 1 ? 'var(--c-muted)' : '#fff',
+              padding: '12px 24px',
+              borderRadius: '8px',
+              cursor: step === 1 ? 'not-allowed' : 'pointer',
+              opacity: step === 1 ? 0.5 : 1
+            }}
+          >
+            ← Previous
+          </button>
+          
+          <p style={{ color: 'var(--c-muted)', fontSize: 'var(--text-sm)' }}>
+            Step {step} of 4
+          </p>
+          
+          <button
+            onClick={() => {
+              if (step < 3) {
+                setStep(step + 1)
+              } else if (step === 3) {
+                generateMealPlan()
+              } else if (step === 4) {
+                saveMealPlan()
+              }
+            }}
+            disabled={loading}
+            style={{
+              background: 'linear-gradient(135deg, #10b981, #059669)',
+              border: 'none',
+              color: '#fff',
+              padding: '12px 24px',
+              borderRadius: '8px',
+              cursor: 'pointer',
+              fontWeight: 'bold'
+            }}
+          >
+            {loading ? 'Processing...' : 
+             step === 3 ? 'Generate Plan' :
+             step === 4 ? 'Save & Assign' : 
+             'Next →'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+export default MealPlanGenerator

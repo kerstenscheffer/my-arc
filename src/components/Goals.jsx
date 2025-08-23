@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { supabase } from '../lib/supabase';
+import DatabaseService from '../services/DatabaseService'
+const db = DatabaseService;
 
 const Goals = ({ user }) => {
   const [ideas, setIdeas] = useState([]);

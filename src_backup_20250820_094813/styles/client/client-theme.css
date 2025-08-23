@@ -1,0 +1,17 @@
+/* CLIENT DASHBOARD THEME */
+:root {
+  --client-primary: #10b981;
+  --client-bg: #0f0f0f;
+  --client-card: #1a1a1a;
+  --client-border: #374151;
+  --client-text: #ffffff;
+  --client-text-muted: #9ca3af;
+}
+
+.client-container { max-width: 1200px; margin: 0 auto; padding: 20px; }
+.client-card { background: var(--client-card); border: 1px solid var(--client-border); border-radius: 8px; padding: 20px; }
+.client-btn { background: var(--client-primary); color: white; padding: 12px 24px; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; }
+.client-btn:hover { background: #059669; }
+.client-grid-week { display: grid; grid-template-columns: repeat(7, 1fr); gap: 10px; }
+.client-day-card { background: var(--client-card); border: 1px solid var(--client-border); padding: 15px; border-radius: 6px; cursor: pointer; text-align: center; }
+.client-day-card:hover { border-color: var(--client-primary); }

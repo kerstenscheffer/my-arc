@@ -1,0 +1,1 @@
+console.log("🔍 RENDER CHECK:", {exerciseName: workoutForm.exerciseName, hasSuggestion: !!smartSuggestion, suggestion: smartSuggestion})

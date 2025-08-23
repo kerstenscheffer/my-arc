@@ -1,130 +1,373 @@
-import { useState } from 'react'
-import { supabase } from '../lib/supabase'
+// src/components/Login.jsx
+import { useState, useEffect } from 'react'
+import DatabaseService from '../services/DatabaseService'
+const db = DatabaseService
 
-export default function Login({ onLogin }) {
+const COACH_ACCESS_PASSWORD = 'MYARC2025'
+
+export default function Login() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [success, setSuccess] = useState('')
+  const [isCoachMode, setIsCoachMode] = useState(false)
+  const [coachPassword, setCoachPassword] = useState('')
+  const [coachPasswordError, setCoachPasswordError] = useState('')
+  const [showResetForm, setShowResetForm] = useState(false)
+  const [resetEmail, setResetEmail] = useState('')
+  const [resetLoading, setResetLoading] = useState(false)
+  const [resetError, setResetError] = useState('')
+  const [resetSuccess, setResetSuccess] = useState('')
 
-const handleLogin = async (e) => {
-  e.preventDefault()
-  setLoading(true)
-  setError('')
-  
-  console.log('🔥 DEBUG: Login attempt started')
-  console.log('🔥 DEBUG: Email:', email)
-  console.log('🔥 DEBUG: Password length:', password.length)
-  
-  try {
-    // STEP 1: Test database connection
-    console.log('🔥 DEBUG: Testing database connection...')
-    const { data: testData, error: testError } = await supabase
-      .from('users')
-      .select('email')
-      .limit(1)
-    
-    if (testError) {
-      console.log('❌ DEBUG: Database connection failed:', testError)
-      throw new Error('Database connection failed: ' + testError.message)
+  // Mobile detection
+  const isMobile = typeof window !== 'undefined' && window.innerWidth <= 768
+
+  // Check if coach mode is stored
+  useEffect(() => {
+    const storedMode = localStorage.getItem('isClientMode')
+    if (storedMode === 'false') {
+      setIsCoachMode(true)
     }
-    console.log('✅ DEBUG: Database connection OK')
+  }, [])
+
+  const handleLogin = async (e) => {
+    e.preventDefault()
+    setError('')
+    setSuccess('')
     
-    // STEP 2: Check if email exists in auth
-    console.log('🔥 DEBUG: Checking auth.users for email...')
-    const { data: authUsers, error: authError } = await supabase.auth.admin.listUsers()
-    if (!authError) {
-      const emailExists = authUsers.users.find(u => u.email === email.trim())
-      console.log('🔥 DEBUG: Email exists in auth.users:', !!emailExists)
-      if (emailExists) {
-        console.log('🔥 DEBUG: Auth user status:', emailExists.email_confirmed_at ? 'confirmed' : 'unconfirmed')
-      }
+    // If coach mode, verify coach password
+    if (isCoachMode && coachPassword !== COACH_ACCESS_PASSWORD) {
+      setCoachPasswordError('Invalid coach access password')
+      return
     }
     
-    // STEP 3: Attempt login
-    console.log('🔥 DEBUG: Attempting Supabase auth login...')
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email: email.trim(),
-      password: password
-    })
+    setLoading(true)
     
-    console.log('🔥 DEBUG: Auth response data:', data)
-    console.log('🔥 DEBUG: Auth response error:', error)
-    
-    if (error) {
-      console.log('❌ DEBUG: Auth login failed:', error.message)
-      throw error
+    try {
+      const { data, error } = await db.signIn(email, password)
+      
+      if (error) throw error
+      
+      // Store mode and reload to trigger App.jsx routing
+      localStorage.setItem('isClientMode', isCoachMode ? 'false' : 'true')
+      
+      setSuccess('Login successful! Redirecting...')
+      
+      // Force reload which will trigger App.jsx to check auth
+      setTimeout(() => {
+        window.location.href = '/'  // Go to root and let App.jsx handle routing
+      }, 1000)
+      
+    } catch (error) {
+      console.error('Login error:', error)
+      setError(error.message || 'Invalid email or password')
+    } finally {
+      setLoading(false)
     }
-    
-    if (data.user) {
-      console.log('✅ DEBUG: Auth login success, user ID:', data.user.id)
-      console.log('🔥 DEBUG: Calling onLogin()...')
-      onLogin()
-    } else {
-      throw new Error('No user returned from auth')
-    }
-    
-  } catch (error) {
-    console.error('❌ DEBUG: Final error:', error)
-    setError(`DEBUG: ${error.message}`)
-  } finally {
-    setLoading(false)
   }
-}
 
+  const handlePasswordReset = async (e) => {
+    e.preventDefault()
+    setResetError('')
+    setResetSuccess('')
+    setResetLoading(true)
+    
+    try {
+      const { data, error } = await db.resetPassword(resetEmail)
+      
+      if (error) throw error
+      
+      setResetSuccess('Password reset email sent! Check your inbox.')
+      setTimeout(() => {
+        setShowResetForm(false)
+        setResetEmail('')
+        setResetSuccess('')
+      }, 3000)
+      
+    } catch (error) {
+      console.error('Reset error:', error)
+      setResetError(error.message || 'Failed to send reset email')
+    } finally {
+      setResetLoading(false)
+    }
+  }
+
+  const toggleMode = () => {
+    setIsCoachMode(!isCoachMode)
+    setCoachPassword('')
+    setCoachPasswordError('')
+    setError('')
+  }
+
+  // Password Reset Form
+  if (showResetForm) {
+    return (
+      <div className="myarc-app" style={{
+        minHeight: '100vh',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: isMobile ? '1rem' : '2rem',
+        background: '#010802'
+      }}>
+        <div className="myarc-card" style={{
+          maxWidth: '450px',
+          width: '100%',
+          background: 'rgba(17, 17, 17, 0.95)',
+          backdropFilter: 'blur(20px)',
+          border: '1px solid rgba(16, 185, 129, 0.3)',
+          padding: isMobile ? '2rem 1.5rem' : '3rem',
+          position: 'relative',
+          zIndex: 10
+        }}>
+          <div style={{textAlign: 'center', marginBottom: '2rem'}}>
+            <h1 className="myarc-logo" style={{fontSize: isMobile ? '2.5rem' : '3rem'}}>
+              MY ARC
+            </h1>
+            <p style={{color: '#9ca3af', marginTop: '0.5rem', fontSize: isMobile ? '0.875rem' : '1rem'}}>
+              Password Reset
+            </p>
+          </div>
+
+          {resetError && (
+            <div style={{
+              background: 'rgba(239, 68, 68, 0.1)',
+              border: '1px solid rgba(239, 68, 68, 0.3)',
+              borderRadius: '8px',
+              padding: '1rem',
+              marginBottom: '1.5rem',
+              color: '#ef4444'
+            }}>
+              {resetError}
+            </div>
+          )}
+
+          {resetSuccess && (
+            <div style={{
+              background: 'rgba(16, 185, 129, 0.1)',
+              border: '1px solid rgba(16, 185, 129, 0.3)',
+              borderRadius: '8px',
+              padding: '1rem',
+              marginBottom: '1.5rem',
+              color: '#10b981'
+            }}>
+              {resetSuccess}
+            </div>
+          )}
+
+          <form onSubmit={handlePasswordReset}>
+            <div style={{marginBottom: '1.5rem'}}>
+              <label style={{display: 'block', marginBottom: '0.5rem', color: '#9ca3af', fontSize: '0.875rem'}}>
+                Email Address
+              </label>
+              <input
+                type="email"
+                value={resetEmail}
+                onChange={(e) => setResetEmail(e.target.value)}
+                required
+                className="myarc-input"
+                placeholder="Enter your email"
+                style={{width: '100%'}}
+              />
+            </div>
+
+            <button
+              type="submit"
+              disabled={resetLoading}
+              className="myarc-btn myarc-btn-primary"
+              style={{
+                width: '100%',
+                padding: '1rem',
+                fontSize: isMobile ? '1rem' : '1.125rem',
+                marginBottom: '1rem'
+              }}
+            >
+              {resetLoading ? 'Sending...' : 'Send Reset Email'}
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setShowResetForm(false)}
+              className="myarc-btn myarc-btn-ghost"
+              style={{width: '100%', padding: '1rem'}}
+            >
+              Back to Login
+            </button>
+          </form>
+        </div>
+      </div>
+    )
+  }
+
+  // Main Login Form
   return (
-    <div className="min-h-screen bg-black flex items-center justify-center">
-      <div className="bg-gray-900 p-8 rounded-lg shadow-xl w-96">
-        <h1 className="text-2xl font-bold text-green-500 mb-6 text-center">
-          🏋️ MY ARC LOGIN
-        </h1>
-        
-        <form onSubmit={handleLogin} className="space-y-4">
-          <input
-            type="email"
-            placeholder="Email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            className="w-full p-3 bg-gray-800 border border-gray-700 rounded text-white"
-            required
-          />
-          
-          <input
-            type="password" 
-            placeholder="Password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            className="w-full p-3 bg-gray-800 border border-gray-700 rounded text-white"
-            required
-          />
-          
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full bg-green-600 hover:bg-green-700 text-white p-3 rounded font-bold"
-          >
-            {loading ? 'Logging in...' : 'LOGIN'}
-          </button>
-        </form>
-        
+    <div className="myarc-app" style={{
+      minHeight: '100vh',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      padding: isMobile ? '1rem' : '2rem',
+      background: '#010802'
+    }}>
+      <div className="myarc-card" style={{
+        maxWidth: '450px',
+        width: '100%',
+        background: 'rgba(17, 17, 17, 0.95)',
+        backdropFilter: 'blur(20px)',
+        border: '1px solid rgba(16, 185, 129, 0.3)',
+        padding: isMobile ? '2rem 1.5rem' : '3rem',
+        position: 'relative',
+        zIndex: 10
+      }}>
+        <div style={{textAlign: 'center', marginBottom: '2rem'}}>
+          <h1 className="myarc-logo" style={{fontSize: isMobile ? '2.5rem' : '3rem'}}>
+            MY ARC
+          </h1>
+          <p style={{color: '#9ca3af', marginTop: '0.5rem', fontSize: isMobile ? '0.875rem' : '1rem'}}>
+            {isCoachMode ? 'Coach Dashboard Login' : 'Client Portal Login'}
+          </p>
+        </div>
+
         {error && (
-          <div className="mt-4 p-3 bg-red-900 border border-red-700 rounded text-red-200">
+          <div style={{
+            background: 'rgba(239, 68, 68, 0.1)',
+            border: '1px solid rgba(239, 68, 68, 0.3)',
+            borderRadius: '8px',
+            padding: '1rem',
+            marginBottom: '1.5rem',
+            color: '#ef4444'
+          }}>
             {error}
           </div>
         )}
 
-{/* CLIENT LOGIN BUTTON */}
-        <div className="mt-6 text-center">
-          <p className="text-gray-400 text-sm mb-2">Are you a client?</p>
+        {success && (
+          <div style={{
+            background: 'rgba(16, 185, 129, 0.1)',
+            border: '1px solid rgba(16, 185, 129, 0.3)',
+            borderRadius: '8px',
+            padding: '1rem',
+            marginBottom: '1.5rem',
+            color: '#10b981'
+          }}>
+            {success}
+          </div>
+        )}
+
+        <form onSubmit={handleLogin}>
+          <div style={{marginBottom: '1.5rem'}}>
+            <label style={{display: 'block', marginBottom: '0.5rem', color: '#9ca3af', fontSize: '0.875rem'}}>
+              Email Address
+            </label>
+            <input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+              className="myarc-input"
+              placeholder="Enter your email"
+              style={{width: '100%'}}
+              disabled={loading}
+            />
+          </div>
+
+          <div style={{marginBottom: '1.5rem'}}>
+            <label style={{display: 'block', marginBottom: '0.5rem', color: '#9ca3af', fontSize: '0.875rem'}}>
+              Password
+            </label>
+            <input
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+              className="myarc-input"
+              placeholder="Enter your password"
+              style={{width: '100%'}}
+              disabled={loading}
+            />
+          </div>
+
+          {isCoachMode && (
+            <div style={{marginBottom: '1.5rem'}}>
+              <label style={{display: 'block', marginBottom: '0.5rem', color: '#10b981', fontSize: '0.875rem'}}>
+                🔐 Coach Access Code
+              </label>
+              <input
+                type="password"
+                value={coachPassword}
+                onChange={(e) => {
+                  setCoachPassword(e.target.value)
+                  setCoachPasswordError('')
+                }}
+                required
+                className="myarc-input"
+                placeholder="Enter coach access code"
+                style={{
+                  width: '100%',
+                  borderColor: coachPasswordError ? '#ef4444' : undefined
+                }}
+                disabled={loading}
+              />
+              {coachPasswordError && (
+                <p style={{color: '#ef4444', fontSize: '0.75rem', marginTop: '0.25rem'}}>
+                  {coachPasswordError}
+                </p>
+              )}
+            </div>
+          )}
+
           <button
-            type="button"
-            onClick={() => window.location.href = '/client-login'}
-            className="text-green-500 hover:text-green-400 underline text-sm"
+            type="submit"
+            disabled={loading}
+            className="myarc-btn myarc-btn-primary"
+            style={{
+              width: '100%',
+              padding: '1rem',
+              fontSize: isMobile ? '1rem' : '1.125rem',
+              marginBottom: '1rem'
+            }}
           >
-            → Client Login
+            {loading ? 'Logging in...' : (isCoachMode ? '🚀 Access Coach Dashboard' : '💪 Enter Client Portal')}
+          </button>
+        </form>
+
+        <div style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          marginTop: '1.5rem',
+          paddingTop: '1.5rem',
+          borderTop: '1px solid rgba(16, 185, 129, 0.1)'
+        }}>
+          <button
+            onClick={toggleMode}
+            className="myarc-btn myarc-btn-ghost"
+            style={{padding: '0.5rem 1rem', fontSize: '0.875rem'}}
+          >
+            {isCoachMode ? '👤 Switch to Client' : '🏋️ Switch to Coach'}
+          </button>
+          
+          <button
+            onClick={() => setShowResetForm(true)}
+            className="myarc-btn myarc-btn-ghost"
+            style={{padding: '0.5rem 1rem', fontSize: '0.875rem'}}
+          >
+            Forgot Password?
           </button>
         </div>
 
+        <div style={{
+          textAlign: 'center',
+          marginTop: '2rem',
+          paddingTop: '1.5rem',
+          borderTop: '1px solid rgba(16, 185, 129, 0.1)',
+          color: '#6b7280',
+          fontSize: '0.75rem'
+        }}>
+          <p>MY ARC © 2025</p>
+          <p style={{marginTop: '0.25rem'}}>Premium Personal Training Software</p>
+        </div>
       </div>
     </div>
   )

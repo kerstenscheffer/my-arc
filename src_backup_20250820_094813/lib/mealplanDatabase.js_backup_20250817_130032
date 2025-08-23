@@ -1,0 +1,155 @@
+import { supabase } from './supabase'
+
+// ---- Types (JSDoc for DX)
+/** @typedef {{kcal:number, protein:number, carbs:number, fat:number}} Macro */
+
+// ===== Meals catalog =====
+export async function getMeals({ q = '', tags = [], limit = 50 } = {}) {
+  let query = supabase.from('meals').select('*').order('created_at', { ascending: false }).limit(limit)
+  if (q) query = query.ilike('name', `%${q}%`)
+  if (tags?.length) query = query.contains('tags', tags)
+  const { data, error } = await query
+  if (error) throw error
+  return data || []
+}
+
+export async function createMeal({ name, default_portion, kcal, protein, carbs, fat, tags = [] }) {
+  const { data: { user } } = await supabase.auth.getUser()
+  const payload = { name, default_portion, kcal, protein, carbs, fat, tags, created_by: user?.id || null }
+  const { data, error } = await supabase.from('meals').insert([payload]).select('*').single()
+  if (error) throw error
+  return data
+}
+
+// ===== Templates (reusable) =====
+export async function createMealPlanTemplate({ title, description = '', targets, week_structure }) {
+  const { data: { user } } = await supabase.auth.getUser()
+  const payload = { title, description, targets, week_structure, created_by: user?.id || null }
+  const { data, error } = await supabase.from('meal_plan_templates').insert([payload]).select('*').single()
+  if (error) throw error
+  return data
+}
+
+export async function listMealPlanTemplates() {
+  const { data, error } = await supabase
+    .from('meal_plan_templates')
+    .select('id, title, description, targets, created_at')
+    .order('created_at', { ascending: false })
+  if (error) throw error
+  return data || []
+}
+
+export async function getMealPlanTemplate(id) {
+  const { data, error } = await supabase.from('meal_plan_templates').select('*').eq('id', id).single()
+  if (error) throw error
+  return data
+}
+
+// ===== Client instances (assigned snapshots) =====
+export async function assignTemplateToClient({ template_id, client_id, start_date = null }) {
+  const tmpl = await getMealPlanTemplate(template_id)
+  const payload = {
+    client_id,
+    template_id,
+    title: tmpl.title,
+    targets: tmpl.targets,
+    week_structure: tmpl.week_structure,
+    start_date
+  }
+  const { data, error } = await supabase.from('client_meal_plans').insert([payload]).select('*').single()
+  if (error) throw error
+  return data
+}
+
+export async function getClientMealPlans(client_id) {
+  const { data, error } = await supabase
+    .from('client_meal_plans')
+    .select('id, title, targets, start_date, created_at')
+    .eq('client_id', client_id)
+    .order('created_at', { ascending: false })
+  if (error) throw error
+  return data || []
+}
+// Fetch many meals at once
+export async function fetchMealsByIds(ids = []){
+  if(!ids.length) return []
+  const { supabase } = await import('./supabase')
+  const { data, error } = await supabase
+    .from('meals')
+    .select('*')
+    .in('id', ids)
+  if(error) throw error
+  return data || []
+}
+
+// (Optional) Convenience getter for latest plan
+export async function getClientActiveMealPlan(client_id){
+  const plans = await getClientMealPlans(client_id)
+  return plans?.[0] || null
+}
+
+// === Added by Mealplan Viewer MVP ===
+export async function fetchMealsByIds(ids = []){
+  if(!ids.length) return []
+  const { supabase } = await import('./supabase')
+  const { data, error } = await supabase
+    .from('meals')
+    .select('*')
+    .in('id', ids)
+  if(error) throw error
+  return data || []
+}
+
+export async function getClientActiveMealPlan(client_id){
+  const plans = await getClientMealPlans(client_id)
+  return plans?.[0] || null
+}
+
+// === Added by Mealplan Viewer MVP ===
+export async function fetchMealsByIds(ids = []){
+  if(!ids.length) return []
+  const { supabase } = await import('./supabase')
+  const { data, error } = await supabase
+    .from('meals')
+    .select('*')
+    .in('id', ids)
+  if(error) throw error
+  return data || []
+}
+
+export async function getClientActiveMealPlan(client_id){
+  const plans = await getClientMealPlans(client_id)
+  return plans?.[0] || null
+}
+
+// === Added by Mealplan Viewer MVP ===
+export async function fetchMealsByIds(ids = []){
+  if(!ids.length) return []
+  const { supabase } = await import('./supabase')
+  const { data, error } = await supabase
+    .from('meals')
+    .select('*')
+    .in('id', ids)
+  if(error) throw error
+  return data || []
+}
+
+export async function getClientActiveMealPlan(client_id){
+  const plans = await getClientMealPlans(client_id)
+  return plans?.[0] || null
+}
+// === Added by Mealplan Viewer MVP ===
+export async function fetchMealsByIds(ids = []){
+  if(!ids.length) return []
+  const { supabase } = await import('./supabase')
+  const { data, error } = await supabase
+    .from('meals')
+    .select('*')
+    .in('id', ids)
+  if(error) throw error
+  return data || []
+}
+export async function getClientActiveMealPlan(client_id){
+  const plans = await getClientMealPlans(client_id)
+  return plans?.[0] || null
+}

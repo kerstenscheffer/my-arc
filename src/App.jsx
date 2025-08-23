@@ -1,3 +1,4 @@
+
 import ClientLogin from './components/ClientLogin'
 import AIGenerator from './components/AIGenerator'
 import Goals from './components/Goals'
@@ -5,13 +6,25 @@ import { useState, useEffect } from 'react'
 import Login from './components/Login'
 import ClientDashboard from './client/ClientDashboard'
 import Dashboard from './components/Dashboard'
-import { getCurrentUser } from './lib/supabase'
+import CoachHub from './coach/CoachHub'
+import DatabaseService from './services/DatabaseService'
+const db = DatabaseService
 import { LanguageProvider } from './contexts/LanguageContext'
+import ResetPassword from './auth/ResetPassword'
 
 function App() {
+  // 🔥 DIRECT CHECK - VOOR ALLES ANDERS!
+  if (window.location.pathname === '/reset-password') {
+    return (
+      <LanguageProvider>
+        <ResetPassword />
+      </LanguageProvider>
+    )
+  }
+
   // Check localStorage on init
   const storedMode = localStorage.getItem('isClientMode') === 'true'
-  
+
   const [user, setUser] = useState(null)
   const [loading, setLoading] = useState(true)
   const [isClientMode, setIsClientMode] = useState(storedMode)
@@ -27,7 +40,7 @@ function App() {
 
   const checkUser = async () => {
     try {
-      const currentUser = await getCurrentUser()
+      const currentUser = await db.getCurrentUser()
       setUser(currentUser)
     } catch (error) {
       console.log('Not authenticated')
@@ -47,6 +60,7 @@ function App() {
       </div>
     )
   }
+
 
   // Check URL for client login
   if (window.location.pathname === '/client-login') {
@@ -86,10 +100,11 @@ function App() {
   } else {
     return (
       <LanguageProvider>
-        <Dashboard onLogout={handleLogout} />
+<CoachHub onLogout={handleLogout} />
       </LanguageProvider>
     )
   }
 }
 
 export default App
+

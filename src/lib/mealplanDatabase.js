@@ -1,0 +1,545 @@
+// src/lib/mealplanDatabase.js — Clean & Complete Version
+import { supabase } from './supabase'
+
+// ===== MEALS CATALOG =====
+export async function getMeals({ q = '', tags = [], limit = 50 } = {}) {
+  let query = supabase
+    .from('meals')
+    .select('*')
+    .order('created_at', { ascending: false })
+    .limit(limit)
+
+  if (q) query = query.ilike('name', `%${q}%`)
+  if (tags?.length) query = query.contains('tags', tags)
+
+  const { data, error } = await query
+  if (error) throw error
+  return data || []
+}
+
+export async function listMealsNearCalories(targetKcal, window = 100, limit = 30) {
+  const { data, error } = await supabase
+    .from('meals')
+    .select('*')
+    .order('created_at', { ascending: false })
+    .limit(200)
+  
+  if (error) throw error
+
+  const low = Math.max(0, (targetKcal || 0) - window)
+  const high = (targetKcal || 0) + window
+  return (data || []).filter(m => m.kcal >= low && m.kcal <= high).slice(0, limit)
+}
+
+export async function createMeal({ name, default_portion, kcal, protein, carbs, fat, tags = [] }) {
+  const { data: { user } } = await supabase.auth.getUser()
+  const payload = { 
+    name, 
+    default_portion, 
+    kcal, 
+    protein, 
+    carbs, 
+    fat, 
+    tags, 
+    created_by: user?.id || null 
+  }
+  
+  const { data, error } = await supabase
+    .from('meals')
+    .insert([payload])
+    .select('*')
+    .single()
+  
+  if (error) throw error
+  return data
+}
+
+// ===== MEAL PLAN TEMPLATES =====
+export async function createMealPlanTemplate({ title, description = '', targets, week_structure }) {
+  const { data: { user } } = await supabase.auth.getUser()
+  const payload = { 
+    title, 
+    description, 
+    targets, 
+    week_structure, 
+    created_by: user?.id || null 
+  }
+  
+  const { data, error } = await supabase
+    .from('meal_plan_templates')
+    .insert([payload])
+    .select('*')
+    .single()
+  
+  if (error) throw error
+  return data
+}
+
+export async function listMealPlanTemplates() {
+  const { data, error } = await supabase
+    .from('meal_plan_templates')
+    .select('id, title, description, targets, created_at')
+    .order('created_at', { ascending: false })
+  
+  if (error) throw error
+  return data || []
+}
+
+export async function getMealPlanTemplate(id) {
+  const { data, error } = await supabase
+    .from('meal_plan_templates')
+    .select('*')
+    .eq('id', id)
+    .single()
+  
+  if (error) throw error
+  return data
+}
+
+// ===== CLIENT MEAL PLANS =====
+export async function assignTemplateToClient({ template_id, client_id, start_date = null }) {
+  const tmpl = await getMealPlanTemplate(template_id)
+  const payload = {
+    client_id,
+    template_id,
+    title: tmpl.title,
+    targets: tmpl.targets,
+    week_structure: tmpl.week_structure,
+    start_date
+  }
+  
+  const { data, error } = await supabase
+    .from('client_meal_plans')
+    .insert([payload])
+    .select('*')
+    .single()
+  
+  if (error) throw error
+  return data
+}
+
+export async function getClientMealPlans(client_id) {
+  const { data, error } = await supabase
+    .from('client_meal_plans')
+    .select('id, title, targets, start_date, created_at')
+    .eq('client_id', client_id)
+    .order('created_at', { ascending: false })
+  
+  if (error) throw error
+  return data || []
+}
+
+export async function getClientActiveMealPlan(client_id) {
+  const plans = await getClientMealPlans(client_id)
+  return plans?.[0] || null
+}
+
+// ===== SHARED HELPERS =====
+export async function fetchMealsByIds(ids = []) {
+  if (!ids.length) return []
+  
+  const { data, error } = await supabase
+    .from('meals')
+    .select('*')
+    .in('id', ids)
+  
+  if (error) throw error
+  return data || []
+}
+
+// ===== SMART MEAL PLAN GENERATION =====
+export async function getPlannerMealsPool({ 
+  allowedTags = [], 
+  bannedTags = [], 
+  bannedIngredients = [], 
+  kcalRange = {}, 
+  limit = 300 
+} = {}) {
+  let query = supabase
+    .from('meals')
+    .select('*')
+    .limit(limit)
+
+  // Filter by kcal range
+  if (kcalRange.min) query = query.gte('kcal', kcalRange.min)
+  if (kcalRange.max) query = query.lte('kcal', kcalRange.max)
+  
+  // Filter by tags
+  if (allowedTags.length) query = query.overlaps('tags', allowedTags)
+  if (bannedTags.length) query = query.not('tags', 'ov', bannedTags)
+
+  const { data, error } = await query
+  if (error) throw error
+  
+  return (data || []).filter(meal => {
+    // Additional filtering for banned ingredients
+    if (bannedIngredients.length && meal.ingredients) {
+      const hasBarredIngredient = bannedIngredients.some(banned => 
+        meal.ingredients.toLowerCase().includes(banned.toLowerCase())
+      )
+      if (hasBarredIngredient) return false
+    }
+    return true
+  })
+}
+
+export async function generateSmartPlanForClient({ 
+  client_id, 
+  plan_id, 
+  start_date,
+  dailyKcalTarget = 2000,
+  dailyMacroTargets = { protein: 150, carbs: 200, fat: 80 },
+  mealsPerDay = 4,
+  preferences = {},
+  allergies = []
+}) {
+  try {
+    console.log('🚀 Generating smart meal plan for client:', client_id)
+    
+    // Get meals pool
+    const mealsPool = await getPlannerMealsPool({
+      allowedTags: preferences.allowedTags || [],
+      bannedTags: [...(preferences.bannedTags || []), ...allergies],
+      bannedIngredients: preferences.bannedIngredients || [],
+      kcalRange: { min: 50, max: 800 },
+      limit: 600
+    })
+
+    if (!mealsPool.length) {
+      throw new Error('Geen meals gevonden met deze criteria')
+    }
+
+    console.log(`📊 Found ${mealsPool.length} meals in pool`)
+
+    // Categorize meals with better fallback logic
+    const mealsByCategory = {
+      breakfast: [],
+      lunch: [],
+      dinner: [],
+      snack: []
+    }
+    
+    mealsPool.forEach(meal => {
+      let category = meal.category
+      if (!category) {
+        // Better categorization logic
+        const name = meal.name.toLowerCase()
+        const tags = (meal.tags || []).map(t => t.toLowerCase())
+        
+        if (tags.includes('ontbijt') || tags.includes('breakfast') || 
+            /overnight|oats|yoghurt|yogurt|granola|muesli|ontbijt|ei|eggs/i.test(name)) {
+          category = 'breakfast'
+        } else if (tags.includes('lunch') || tags.includes('middageten') ||
+                   /salade|salad|bowl|wrap|sandwich|brood|bread|lunch/i.test(name)) {
+          category = 'lunch'
+        } else if (tags.includes('diner') || tags.includes('dinner') || tags.includes('avondeten') ||
+                   /curry|pasta|rijst|rice|stamppot|kip|chicken|beef|vis|fish|diner|dinner/i.test(name)) {
+          category = 'dinner'
+        } else {
+          category = 'snack'
+        }
+      }
+      
+      mealsByCategory[category].push(meal)
+    })
+
+    // Debug categorization
+    console.log(`📊 Meals by category:`)
+    console.log(`  Breakfast: ${mealsByCategory.breakfast.length} items`)
+    console.log(`  Lunch: ${mealsByCategory.lunch.length} items`) 
+    console.log(`  Dinner: ${mealsByCategory.dinner.length} items`)
+    console.log(`  Snack: ${mealsByCategory.snack.length} items`)
+    
+    // If any category is empty, redistribute from largest category
+    const categories = ['breakfast', 'lunch', 'dinner', 'snack']
+    categories.forEach(cat => {
+      if (mealsByCategory[cat].length === 0) {
+        console.log(`⚠️ ${cat} category is empty, redistributing meals...`)
+        // Find category with most meals and move some
+        const largest = categories.reduce((a, b) => 
+          mealsByCategory[a].length > mealsByCategory[b].length ? a : b
+        )
+        
+        // Move half of the largest category to the empty one
+        const moveCount = Math.floor(mealsByCategory[largest].length / 2)
+        if (moveCount > 0) {
+          const moved = mealsByCategory[largest].splice(0, moveCount)
+          mealsByCategory[cat].push(...moved)
+          console.log(`  Moved ${moveCount} meals from ${largest} to ${cat}`)
+        }
+      }
+    })
+
+    // Final category check
+    console.log(`📊 Final distribution:`)
+    console.log(`  Breakfast: ${mealsByCategory.breakfast.length} items`)
+    console.log(`  Lunch: ${mealsByCategory.lunch.length} items`)
+    console.log(`  Dinner: ${mealsByCategory.dinner.length} items`)
+    console.log(`  Snack: ${mealsByCategory.snack.length} items`)
+
+    // Meal distribution percentages
+    const mealDistribution = {
+      breakfast: 0.25,  // 25%
+      lunch: 0.30,      // 30%
+      dinner: 0.35,     // 35%
+      snack: 0.10       // 10%
+    }
+
+    // Generate 28 days
+    const weekStructure = []
+    const usedMealsTracker = new Map()
+    const MIN_DAYS_BETWEEN_REPEATS = 3
+    let totalMealsPlanned = 0
+    
+    for (let day = 0; day < 28; day++) {
+      const dayMeals = []
+      const dayDate = new Date(start_date)
+      dayDate.setDate(dayDate.getDate() + day)
+      
+      // Plan meals for this day
+      const mealSlots = mealsPerDay <= 3 ? 
+        ['breakfast', 'lunch', 'dinner'] :
+        mealsPerDay === 4 ?
+        ['breakfast', 'lunch', 'dinner', 'snack'] :
+        ['breakfast', 'snack', 'lunch', 'snack', 'dinner']
+      
+      mealSlots.forEach((slotCategory, slotIndex) => {
+        const targetKcal = dailyKcalTarget * (mealDistribution[slotCategory] || 0.10)
+        
+        // Get candidates for this slot with fallback
+        let candidates = mealsByCategory[slotCategory] || []
+        
+        // Fallback: if category is empty, use all meals
+        if (candidates.length === 0) {
+          console.log(`⚠️ No meals found for ${slotCategory}, using all available meals`)
+          candidates = mealsPool
+        }
+        
+        // If still no candidates, skip this slot
+        if (candidates.length === 0) {
+          console.log(`❌ No meals available for slot ${slotIndex + 1} (${slotCategory})`)
+          return
+        }
+        
+        // Score candidates based on preferences and variety
+        const scoredCandidates = candidates.map(meal => {
+          let score = 0
+          
+          // Preference bonus
+          if (preferences.preferred_meal_ids?.includes(meal.id)) {
+            score += 1000 // HUGE bonus for preferences
+          }
+          
+          // Calorie match bonus (more important now)
+          const calorieMatch = Math.abs((meal.kcal || 0) - targetKcal)
+          score += Math.max(0, 400 - calorieMatch) // Increased bonus for calorie match
+          
+          // Variety bonus (penalize recent usage)
+          const lastUsed = usedMealsTracker.get(meal.id)
+          if (lastUsed === undefined || (day - lastUsed) >= MIN_DAYS_BETWEEN_REPEATS) {
+            score += 100 // Variety bonus
+          } else {
+            score -= 50 // Reduced penalty so we still fill slots
+          }
+          
+          return { meal, score }
+        }).sort((a, b) => b.score - a.score)
+        
+        // Select best meal
+        const selected = scoredCandidates[0]?.meal
+        
+        if (selected) {
+          dayMeals.push({
+            slot: `${slotCategory}${slotIndex > 0 ? slotIndex : ''}`,
+            meal_id: selected.id,
+            portion: selected.default_portion || '1 portie',
+            meal_type: slotCategory,
+            targetKcal: Math.round(targetKcal)
+          })
+          
+          // Update tracker
+          usedMealsTracker.set(selected.id, day)
+          totalMealsPlanned++
+          
+          console.log(`✅ Day ${day + 1}, Slot ${slotIndex + 1} (${slotCategory}): ${selected.name} (${selected.kcal || 0} kcal, target: ${Math.round(targetKcal)})`)
+        } else {
+          console.log(`❌ Could not select meal for Day ${day + 1}, Slot ${slotIndex + 1} (${slotCategory})`)
+        }
+      })
+      
+      weekStructure.push({
+        day: `Day ${day + 1}`,
+        date: dayDate.toISOString().slice(0, 10),
+        meals: dayMeals
+      })
+    }
+
+    // Update plan in database
+    const { error } = await supabase
+      .from('client_meal_plans')
+      .update({ 
+        week_structure: weekStructure
+      })
+      .eq('id', plan_id)
+
+    if (error) {
+      console.error('Update error:', error)
+      throw error
+    }
+    
+    console.log(`🎉 Plan generated successfully! ${totalMealsPlanned} meals planned using ${usedMealsTracker.size} unique recipes`)
+    
+    // Return with diagnostics
+    return { 
+      weekStructure,
+      diagnostics: {
+        totalMealsPlanned,
+        uniqueMealsUsed: usedMealsTracker.size,
+        averageVarietyScore: Math.round((usedMealsTracker.size / mealsPool.length) * 100),
+        mealsPerDay,
+        preferenceHits: preferences?.preferred_meal_ids?.length || 0
+      }
+    }
+
+  } catch (error) {
+    console.error('❌ Smart plan generation failed:', error)
+    throw error
+  }
+}
+
+export async function regenerateDay({ client_id, plan_id, day_index, schedulerInput = {} }) {
+  console.log('🔄 Regenerating day', day_index, 'for client', client_id)
+  
+  // For now, generate a simple day structure
+  const dayMeals = [
+    { slot: 'breakfast', meal_id: 1, targetKcal: 400 },
+    { slot: 'lunch', meal_id: 2, targetKcal: 600 },
+    { slot: 'dinner', meal_id: 3, targetKcal: 700 },
+    { slot: 'snack1', meal_id: 4, targetKcal: 150 },
+    { slot: 'snack2', meal_id: 5, targetKcal: 150 }
+  ]
+
+  return {
+    day: {
+      dayLabel: `Day ${day_index + 1}`,
+      meals: dayMeals
+    }
+  }
+}
+
+export async function regenerateWeek({ client_id, plan_id, week_index, schedulerInput = {} }) {
+  console.log('🔄 Regenerating week', week_index, 'for client', client_id)
+  
+  const week = []
+  for (let dayOffset = 0; dayOffset < 7; dayOffset++) {
+    const dayIndex = week_index * 7 + dayOffset
+    const { day } = await regenerateDay({ client_id, plan_id, day_index, schedulerInput })
+    week.push(day)
+  }
+
+  return { week }
+}
+
+// ===== MEAL PLAN OVERRIDES (Optional) =====
+
+export async function getClientPlanWithOverrides(client_id) {
+  const plan = await getClientActiveMealPlan(client_id)
+  if (!plan) return { plan: null, mergedWeekStructure: [] }
+
+  try {
+    const { data: overrides, error } = await supabase
+      .from('client_meal_plan_overrides')
+      .select('day_index, slot, meal_id')
+      .eq('plan_id', plan.id)
+      .eq('client_id', client_id)
+    
+    if (error) {
+      console.warn('Override table not available:', error.message)
+      return { plan, mergedWeekStructure: plan.week_structure || [] }
+    }
+
+    // Merge overrides into base structure
+    const base = Array.isArray(plan.week_structure) ? [...plan.week_structure] : []
+    
+    overrides?.forEach(override => {
+      if (base[override.day_index]?.meals?.[override.slot]) {
+        base[override.day_index].meals[override.slot] = override.meal_id
+      }
+    })
+
+    return { plan, mergedWeekStructure: base }
+  } catch (err) {
+    console.warn('Override system not configured, using base plan')
+    return { plan, mergedWeekStructure: plan.week_structure || [] }
+  }
+}
+
+// === MEAL SWAPS / OVERRIDES ===
+
+/**
+ * Upsert 1 override voor (plan_id, client_id, day_index, slot) -> meal_id
+ * Vereist unieke index op (plan_id, client_id, day_index, slot).
+ */
+export async function saveClientMealSwap({ plan_id, client_id, day_index, slot, meal_id }) {
+  if (!plan_id || !client_id || day_index === undefined || slot === undefined || !meal_id) {
+    throw new Error('saveClientMealSwap: plan_id, client_id, day_index, slot, meal_id zijn verplicht')
+  }
+
+  const payload = {
+    plan_id,
+    client_id,
+    day_index: Number(day_index),
+    slot: String(slot),
+    meal_id,
+    updated_at: new Date().toISOString()
+  }
+
+  const { data, error } = await supabase
+    .from('client_meal_plan_overrides')
+    .upsert([payload], {
+      onConflict: 'plan_id,client_id,day_index,slot',
+      ignoreDuplicates: false
+    })
+    .select('*')
+    .single()
+
+  if (error) throw error
+  return data
+}
+
+/**
+ * Haal alle overrides op als map: key = `${day}:${slot}` -> value = meal_id
+ */
+export async function getClientMealSwapMap(plan_id, client_id) {
+  if (!plan_id || !client_id) throw new Error('getClientMealSwapMap: plan_id & client_id verplicht')
+
+  const { data, error } = await supabase
+    .from('client_meal_plan_overrides')
+    .select('day_index, slot, meal_id')
+    .eq('plan_id', plan_id)
+    .eq('client_id', client_id)
+
+  if (error) throw error
+
+  const map = {}
+  for (const r of (data || [])) map[`${r.day_index}:${r.slot}`] = r.meal_id
+  return map
+}
+
+/** Verwijder 1 override (reset naar origineel). */
+export async function clearClientMealSwap({ plan_id, client_id, day_index, slot }) {
+  if (!plan_id || !client_id || day_index === undefined || slot === undefined) {
+    throw new Error('clearClientMealSwap: plan_id, client_id, day_index, slot verplicht')
+  }
+
+  const { error } = await supabase
+    .from('client_meal_plan_overrides')
+    .delete()
+    .eq('plan_id', plan_id)
+    .eq('client_id', client_id)
+    .eq('day_index', Number(day_index))
+    .eq('slot', String(slot))
+
+  if (error) throw error
+  return true
+}

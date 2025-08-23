@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
-import { getCurrentUser } from '../lib/supabase'
+import DatabaseService from '../services/DatabaseService'
+const db = DatabaseService
 import { getUserWorkoutSchemas, convertDbSchemaToApp } from '../lib/schemaDatabase'
 
 export default function SchemaLibrary() {
@@ -15,7 +16,7 @@ export default function SchemaLibrary() {
     
     try {
       console.log('🔍 Getting current user...')
-      const currentUser = await getCurrentUser()
+      const currentUser = await db.getCurrentUser()
       console.log('✅ User found:', currentUser)
       setUser(currentUser)
       

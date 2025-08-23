@@ -1,0 +1,734 @@
+// src/coach/pages/CoachMealPlannerDashboard.jsx
+// Complete Coach Meal Planner Dashboard voor MY ARC
+// Integreert met bestaande components en database functies
+
+import { useState, useEffect, useMemo } from 'react'
+import { useLanguage } from '../../contexts/LanguageContext'
+import { getCurrentUser, getTrainerClients } from '../../lib/supabase'
+import {
+  getClientPlanWithOverrides,
+  generateSmartPlanForClient,
+  regenerateDay,
+  regenerateWeek,
+  assignTemplateToClient,
+  createMealPlanTemplate,
+  fetchMealsByIds,
+  getPlannerMealsPool
+} from '../../lib/mealplanDatabase'
+
+// Helper functions
+function formatDate(d) {
+  return d.toLocaleDateString('nl-NL', { weekday: 'short', day: '2-digit', month: '2-digit' })
+}
+
+function addDays(date, n) {
+  const x = new Date(date)
+  x.setDate(x.getDate() + n)
+  return x
+}
+
+function sumMacros(meals) {
+  return meals.reduce((acc, m) => ({
+    kcal: acc.kcal + (m?.kcal || 0),
+    protein: acc.protein + (m?.protein || 0),
+    carbs: acc.carbs + (m?.carbs || 0),
+    fat: acc.fat + (m?.fat || 0)
+  }), { kcal: 0, protein: 0, carbs: 0, fat: 0 })
+}
+
+export default function CoachMealPlannerDashboard() {
+  const { t } = useLanguage?.() || { t: (x) => x }
+  const [user, setUser] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
+  
+  // State
+  const [clients, setClients] = useState([])
+  const [selectedClient, setSelectedClient] = useState(null)
+  const [clientPlan, setClientPlan] = useState(null)
+  const [weekStructure, setWeekStructure] = useState([])
+  const [mealsMap, setMealsMap] = useState({})
+  const [activeWeek, setActiveWeek] = useState(0)
+  
+  // Modals
+  const [showGenerator, setShowGenerator] = useState(false)
+  const [showDayDetail, setShowDayDetail] = useState(null)
+  const [generating, setGenerating] = useState(false)
+  
+  // Generator settings
+  const [planSettings, setPlanSettings] = useState({
+    calories: 2000,
+    protein: 150,
+    carbs: 200,
+    fat: 67,
+    mealsPerDay: 4,
+    preferences: [],
+    allergies: []
+  })
+
+  // Load user and clients
+  useEffect(() => {
+    let mounted = true
+    ;(async () => {
+      try {
+        const currentUser = await getCurrentUser()
+        if (!mounted) return
+        
+        if (!currentUser) {
+          setError('Niet ingelogd')
+          setLoading(false)
+          return
+        }
+        
+        setUser(currentUser)
+        
+        // Load clients met meal plan status
+        const clientsData = await getClientsWithMealPlanStatus(currentUser.id)
+        if (!mounted) return
+        
+        setClients(clientsData)
+      } catch (e) {
+        console.error('Load error:', e)
+        if (mounted) setError(e.message || 'Laden mislukt')
+      } finally {
+        if (mounted) setLoading(false)
+      }
+    })()
+    
+    return () => { mounted = false }
+  }, [])
+
+  // Load client plan when selected
+  useEffect(() => {
+    if (!selectedClient) {
+      setClientPlan(null)
+      setWeekStructure([])
+      setMealsMap({})
+      return
+    }
+    
+    let mounted = true
+    ;(async () => {
+      try {
+        const { plan, mergedWeekStructure } = await getClientPlanWithOverrides(selectedClient.id)
+        if (!mounted) return
+        
+        setClientPlan(plan)
+        
+        // Pad to 28 days
+        const padded = [...(mergedWeekStructure || [])]
+        while (padded.length < 28) {
+          padded.push({ day: `Day ${padded.length + 1}`, meals: [] })
+        }
+        setWeekStructure(padded)
+        
+        // Load meals
+        const mealIds = padded.flatMap(d => 
+          (d?.meals || []).map(m => m.meal_id).filter(Boolean)
+        )
+        const uniqueIds = [...new Set(mealIds)]
+        
+        if (uniqueIds.length) {
+          const meals = await fetchMealsByIds(uniqueIds)
+          const map = Object.fromEntries(meals.map(m => [m.id, m]))
+          if (mounted) setMealsMap(map)
+        }
+        
+        // Set plan settings based on client data
+        if (plan) {
+          setPlanSettings(prev => ({
+            ...prev,
+            calories: plan.targets?.kcal || 2000,
+            protein: plan.targets?.protein || 150,
+            carbs: plan.targets?.carbs || 200,
+            fat: plan.targets?.fat || 67
+          }))
+        }
+      } catch (e) {
+        console.error('Load plan error:', e)
+      }
+    })()
+    
+    return () => { mounted = false }
+  }, [selectedClient])
+
+  // Generate smart plan
+  async function handleGenerateSmartPlan() {
+    if (!selectedClient || !clientPlan) return
+    
+    setGenerating(true)
+    try {
+      const result = await generateSmartPlanForClient({
+        client_id: selectedClient.id,
+        plan_id: clientPlan.id,
+        start_date: clientPlan.start_date || new Date().toISOString().slice(0, 10),
+        dailyKcalTarget: planSettings.calories,
+        dailyMacroTargets: {
+          protein: planSettings.protein,
+          carbs: planSettings.carbs,
+          fat: planSettings.fat
+        },
+        mealsPerDay: planSettings.mealsPerDay,
+        preferences: planSettings.preferences,
+        allergies: planSettings.allergies
+      })
+      
+      // Update local state
+      setWeekStructure(result.weekStructure)
+      
+      // Load nieuwe meals
+      const mealIds = result.weekStructure.flatMap(d => 
+        d.meals.map(m => m.meal_id).filter(Boolean)
+      )
+      const uniqueIds = [...new Set(mealIds)]
+      if (uniqueIds.length) {
+        const meals = await fetchMealsByIds(uniqueIds)
+        const map = Object.fromEntries(meals.map(m => [m.id, m]))
+        setMealsMap(map)
+      }
+      
+      setShowGenerator(false)
+      alert(`✅ Smart plan gegenereerd! ${result.diagnostics.totalMealsPlanned} maaltijden gepland met ${result.diagnostics.uniqueMealsUsed} unieke recepten.`)
+    } catch (e) {
+      console.error('Generate error:', e)
+      alert('❌ Genereren mislukt: ' + e.message)
+    } finally {
+      setGenerating(false)
+    }
+  }
+
+  // Regenerate day
+  async function handleRegenerateDay(dayIndex) {
+    if (!selectedClient || !clientPlan) return
+    
+    try {
+      const result = await regenerateDay({
+        client_id: selectedClient.id,
+        plan_id: clientPlan.id,
+        day_index: dayIndex,
+        currentStructure: weekStructure,
+        dailyKcalTarget: planSettings.calories,
+        mealsPerDay: planSettings.mealsPerDay
+      })
+      
+      // Update local state
+      const updated = [...weekStructure]
+      updated[dayIndex] = result.day
+      setWeekStructure(updated)
+      
+      // Load nieuwe meals
+      const mealIds = result.day.meals.map(m => m.meal_id).filter(Boolean)
+      if (mealIds.length) {
+        const meals = await fetchMealsByIds(mealIds)
+        meals.forEach(m => {
+          setMealsMap(prev => ({ ...prev, [m.id]: m }))
+        })
+      }
+      
+      alert(`✅ Dag ${dayIndex + 1} opnieuw gegenereerd!`)
+    } catch (e) {
+      console.error('Regenerate day error:', e)
+      alert('❌ Regenereren mislukt: ' + e.message)
+    }
+  }
+
+  // Regenerate week
+  async function handleRegenerateWeek() {
+    if (!selectedClient || !clientPlan) return
+    
+    try {
+      const result = await regenerateWeek({
+        client_id: selectedClient.id,
+        plan_id: clientPlan.id,
+        week_index: activeWeek,
+        currentStructure: weekStructure,
+        dailyKcalTarget: planSettings.calories,
+        dailyMacroTargets: {
+          protein: planSettings.protein,
+          carbs: planSettings.carbs,
+          fat: planSettings.fat
+        },
+        mealsPerDay: planSettings.mealsPerDay
+      })
+      
+      // Update local state
+      const updated = [...weekStructure]
+      const startIdx = activeWeek * 7
+      result.week.forEach((day, i) => {
+        updated[startIdx + i] = day
+      })
+      setWeekStructure(updated)
+      
+      // Load nieuwe meals
+      const mealIds = result.week.flatMap(d => 
+        d.meals.map(m => m.meal_id).filter(Boolean)
+      )
+      const uniqueIds = [...new Set(mealIds)]
+      if (uniqueIds.length) {
+        const meals = await fetchMealsByIds(uniqueIds)
+        const map = Object.fromEntries(meals.map(m => [m.id, m]))
+        setMealsMap(prev => ({ ...prev, ...map }))
+      }
+      
+      alert(`✅ Week ${activeWeek + 1} opnieuw gegenereerd!`)
+    } catch (e) {
+      console.error('Regenerate week error:', e)
+      alert('❌ Week regenereren mislukt: ' + e.message)
+    }
+  }
+
+  // Create new plan for client
+  async function handleCreateNewPlan() {
+    if (!selectedClient) return
+    
+    try {
+      // Create template first
+      const template = await createMealPlanTemplate({
+        title: `Meal Plan - ${selectedClient.first_name} ${selectedClient.last_name}`,
+        description: `Gegenereerd op ${new Date().toLocaleDateString()}`,
+        targets: {
+          kcal: planSettings.calories,
+          protein: planSettings.protein,
+          carbs: planSettings.carbs,
+          fat: planSettings.fat
+        },
+        week_structure: [] // Empty initially
+      })
+      
+      // Assign to client
+      const plan = await assignTemplateToClient({
+        template_id: template.id,
+        client_id: selectedClient.id,
+        start_date: new Date().toISOString().slice(0, 10)
+      })
+      
+      setClientPlan(plan)
+      alert('✅ Nieuw meal plan aangemaakt! Nu kun je een smart plan genereren.')
+    } catch (e) {
+      console.error('Create plan error:', e)
+      alert('❌ Plan aanmaken mislukt: ' + e.message)
+    }
+  }
+
+  // Views
+  const weeks = useMemo(() => {
+    const out = []
+    for (let w = 0; w < 4; w++) {
+      out.push(weekStructure.slice(w * 7, (w + 1) * 7))
+    }
+    return out
+  }, [weekStructure])
+
+  const currentWeek = weeks[activeWeek] || []
+  const startDate = clientPlan?.start_date ? new Date(clientPlan.start_date) : new Date()
+  const weekStart = addDays(startDate, activeWeek * 7)
+
+  if (loading) {
+    return (
+      <div className="myarc-container">
+        <div className="myarc-card">
+          <div className="myarc-card-header">
+            <h2 className="myarc-card-title">⚡ MY ARC Meal Planner - Coach Dashboard</h2>
+          </div>
+          <div className="myarc-p-md">
+            <p className="myarc-text-gray">Laden...</p>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="myarc-container">
+        <div className="myarc-card">
+          <div className="myarc-card-header">
+            <h2 className="myarc-card-title">⚡ MY ARC Meal Planner - Coach Dashboard</h2>
+          </div>
+          <div className="myarc-p-md">
+            <div className="myarc-alert myarc-alert-error">{error}</div>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="myarc-container">
+      {/* Header */}
+      <div className="myarc-card" style={{ marginBottom: '2rem', background: 'linear-gradient(135deg, #064e3b 0%, #0a5c42 100%)' }}>
+        <div className="myarc-card-header" style={{ border: 'none' }}>
+          <h1 className="myarc-card-title" style={{ color: '#fff', fontSize: '2rem' }}>
+            ⚡ MY ARC Meal Planner - Coach Dashboard
+          </h1>
+          <p style={{ color: '#d1fae5', marginTop: '0.5rem' }}>
+            Beheer meal plans voor al je clients
+          </p>
+        </div>
+      </div>
+
+      <div className="myarc-grid myarc-grid-cols-12 myarc-gap-lg">
+        {/* Sidebar - Client Selector */}
+        <aside className="myarc-col-span-12 md:myarc-col-span-3">
+          <div className="myarc-card">
+            <div className="myarc-card-header">
+              <h3 className="myarc-card-title">👥 Clients</h3>
+            </div>
+            <div className="myarc-p-md">
+              {clients.map(client => (
+                <div
+                  key={client.id}
+                  className={`myarc-p-sm myarc-mb-sm myarc-rounded ${
+                    selectedClient?.id === client.id
+                      ? 'myarc-bg-gradient-green myarc-text-white'
+                      : 'myarc-bg-card-2 myarc-hover-scale'
+                  }`}
+                  style={{ 
+                    cursor: 'pointer',
+                    border: selectedClient?.id === client.id ? 'none' : '1px solid #10b98133',
+                    background: selectedClient?.id === client.id 
+                      ? 'linear-gradient(135deg, #064e3b 0%, #0a5c42 100%)'
+                      : ''
+                  }}
+                  onClick={() => setSelectedClient(client)}
+                >
+                  <div style={{ fontWeight: 600 }}>
+                    {client.first_name} {client.last_name}
+                  </div>
+                  <div className="myarc-text-xs" style={{ 
+                    color: selectedClient?.id === client.id ? '#d1fae5' : '#6b7280',
+                    marginTop: '0.25rem'
+                  }}>
+                    {client.hasMealPlan ? '✅ Heeft plan' : '⚠️ Geen plan'}
+                  </div>
+                  {client.goals && (
+                    <div className="myarc-text-xs" style={{
+                      color: selectedClient?.id === client.id ? '#d1fae5' : '#6b7280'
+                    }}>
+                      Doel: {client.goals}
+                    </div>
+                  )}
+                </div>
+              ))}
+              
+              {!clients.length && (
+                <p className="myarc-text-gray">Geen clients gevonden</p>
+              )}
+            </div>
+          </div>
+
+          {/* Client Stats */}
+          {selectedClient && clientPlan && (
+            <div className="myarc-card myarc-mt-md">
+              <div className="myarc-card-header">
+                <h4 className="myarc-card-title">📊 Plan Info</h4>
+              </div>
+              <div className="myarc-p-md">
+                <div className="myarc-text-sm myarc-mb-xs">
+                  <strong>Start:</strong> {formatDate(new Date(clientPlan.start_date))}
+                </div>
+                <div className="myarc-text-sm myarc-mb-xs">
+                  <strong>Calorieën:</strong> {planSettings.calories} kcal
+                </div>
+                <div className="myarc-text-sm myarc-mb-xs">
+                  <strong>Macro's:</strong> P{planSettings.protein} C{planSettings.carbs} F{planSettings.fat}
+                </div>
+                <div className="myarc-text-sm">
+                  <strong>Maaltijden/dag:</strong> {planSettings.mealsPerDay}
+                </div>
+              </div>
+            </div>
+          )}
+        </aside>
+
+        {/* Main Content */}
+        <main className="myarc-col-span-12 md:myarc-col-span-9">
+          {!selectedClient ? (
+            <div className="myarc-card">
+              <div className="myarc-p-lg myarc-text-center">
+                <h3 className="myarc-card-title myarc-mb-md">👈 Selecteer een client</h3>
+                <p className="myarc-text-gray">Kies een client uit de lijst om hun meal plan te bekijken of aan te maken</p>
+              </div>
+            </div>
+          ) : !clientPlan ? (
+            <div className="myarc-card">
+              <div className="myarc-p-lg myarc-text-center">
+                <h3 className="myarc-card-title myarc-mb-md">
+                  {selectedClient.first_name} heeft nog geen meal plan
+                </h3>
+                <p className="myarc-text-gray myarc-mb-md">
+                  Maak een nieuw plan aan om te beginnen
+                </p>
+                <button 
+                  className="myarc-btn myarc-btn-primary"
+                  onClick={handleCreateNewPlan}
+                >
+                  ➕ Nieuw Meal Plan Aanmaken
+                </button>
+              </div>
+            </div>
+          ) : (
+            <>
+              {/* Action Buttons */}
+              <div className="myarc-card myarc-mb-md">
+                <div className="myarc-p-md">
+                  <div className="myarc-flex myarc-gap-sm myarc-flex-wrap">
+                    <button 
+                      className="myarc-btn myarc-btn-primary"
+                      onClick={() => setShowGenerator(true)}
+                    >
+                      ⚡ Genereer Smart Plan (4 weken)
+                    </button>
+                    <button 
+                      className="myarc-btn myarc-btn-secondary"
+                      onClick={handleRegenerateWeek}
+                    >
+                      🔄 Regenereer Week {activeWeek + 1}
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Week Tabs */}
+              <div className="myarc-flex myarc-gap-sm myarc-mb-md">
+                {[0, 1, 2, 3].map(w => (
+                  <button
+                    key={w}
+                    className={`myarc-btn ${activeWeek === w ? 'myarc-btn-primary' : 'myarc-btn-outline'}`}
+                    onClick={() => setActiveWeek(w)}
+                  >
+                    Week {w + 1}
+                  </button>
+                ))}
+              </div>
+
+              {/* Week Grid */}
+              <div className="myarc-grid myarc-grid-2 myarc-grid-lg-4 myarc-gap-md">
+                {currentWeek.map((day, i) => {
+                  const dayIndex = activeWeek * 7 + i
+                  const date = addDays(weekStart, i)
+                  const meals = (day?.meals || []).map(m => mealsMap[m.meal_id]).filter(Boolean)
+                  const totals = sumMacros(meals)
+                  
+                  return (
+                    <div key={i} className="myarc-card myarc-hover-scale">
+                      <div className="myarc-card-header">
+                        <div className="myarc-card-title">{formatDate(date)}</div>
+                        <div className="myarc-text-gray">{meals.length} maaltijden</div>
+                      </div>
+                      <div className="myarc-p-md">
+                        {meals.slice(0, 3).map((m, idx) => (
+                          <div key={idx} className="myarc-text-sm myarc-mb-xs" style={{ borderBottom: '1px solid #10b98133' }}>
+                            <div>{m.name}</div>
+                            <div className="myarc-text-xs myarc-text-gray">{m.kcal} kcal</div>
+                          </div>
+                        ))}
+                        {meals.length > 3 && (
+                          <div className="myarc-text-xs myarc-text-gray">+{meals.length - 3} meer...</div>
+                        )}
+                        
+                        <div className="myarc-text-xs myarc-mt-sm" style={{ fontWeight: 600 }}>
+                          ⚡ {totals.kcal} kcal
+                        </div>
+                        <div className="myarc-text-xs myarc-text-gray">
+                          P{totals.protein} C{totals.carbs} F{totals.fat}
+                        </div>
+                        
+                        <button
+                          className="myarc-btn myarc-btn-sm myarc-btn-outline myarc-mt-sm"
+                          style={{ width: '100%' }}
+                          onClick={() => handleRegenerateDay(dayIndex)}
+                        >
+                          🔄 Regenereer
+                        </button>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+
+              {/* Week Summary */}
+              <div className="myarc-card myarc-mt-md">
+                <div className="myarc-card-header">
+                  <h3 className="myarc-card-title">📊 Week {activeWeek + 1} Totalen</h3>
+                </div>
+                <div className="myarc-p-md">
+                  {(() => {
+                    const allMeals = currentWeek.flatMap(d => 
+                      (d?.meals || []).map(m => mealsMap[m.meal_id]).filter(Boolean)
+                    )
+                    const totals = sumMacros(allMeals)
+                    const dailyAvg = {
+                      kcal: Math.round(totals.kcal / 7),
+                      protein: Math.round(totals.protein / 7),
+                      carbs: Math.round(totals.carbs / 7),
+                      fat: Math.round(totals.fat / 7)
+                    }
+                    
+                    return (
+                      <div className="myarc-grid myarc-grid-2 myarc-gap-md">
+                        <div>
+                          <h4 className="myarc-text-green myarc-mb-sm">Week Totaal</h4>
+                          <div className="myarc-text-sm">⚡ {totals.kcal} kcal</div>
+                          <div className="myarc-text-sm">🥩 {totals.protein}g eiwit</div>
+                          <div className="myarc-text-sm">🍚 {totals.carbs}g koolhydraten</div>
+                          <div className="myarc-text-sm">🥑 {totals.fat}g vet</div>
+                        </div>
+                        <div>
+                          <h4 className="myarc-text-green myarc-mb-sm">Dagelijks Gemiddelde</h4>
+                          <div className="myarc-text-sm">⚡ {dailyAvg.kcal} kcal</div>
+                          <div className="myarc-text-sm">🥩 {dailyAvg.protein}g eiwit</div>
+                          <div className="myarc-text-sm">🍚 {dailyAvg.carbs}g koolhydraten</div>
+                          <div className="myarc-text-sm">🥑 {dailyAvg.fat}g vet</div>
+                        </div>
+                      </div>
+                    )
+                  })()}
+                </div>
+              </div>
+            </>
+          )}
+        </main>
+      </div>
+
+      {/* Generator Modal */}
+      {showGenerator && (
+        <div style={{
+          position: 'fixed',
+          inset: 0,
+          background: 'rgba(0,0,0,0.8)',
+          zIndex: 1000,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: '1rem'
+        }}>
+          <div className="myarc-card" style={{ maxWidth: '600px', width: '100%' }}>
+            <div className="myarc-card-header" style={{
+              background: 'linear-gradient(135deg, #064e3b 0%, #0a5c42 100%)'
+            }}>
+              <h3 className="myarc-card-title" style={{ color: '#fff' }}>
+                ⚡ Smart Plan Generator
+              </h3>
+            </div>
+            <div className="myarc-p-md">
+              <div className="myarc-mb-md">
+                <h4 className="myarc-text-green myarc-mb-sm">Dagelijkse Targets</h4>
+                <div className="myarc-grid myarc-grid-2 myarc-gap-sm">
+                  <div>
+                    <label className="myarc-text-sm myarc-text-gray">Calorieën</label>
+                    <input
+                      type="number"
+                      className="myarc-input"
+                      value={planSettings.calories}
+                      onChange={(e) => setPlanSettings(prev => ({
+                        ...prev,
+                        calories: parseInt(e.target.value) || 0
+                      }))}
+                    />
+                  </div>
+                  <div>
+                    <label className="myarc-text-sm myarc-text-gray">Eiwit (g)</label>
+                    <input
+                      type="number"
+                      className="myarc-input"
+                      value={planSettings.protein}
+                      onChange={(e) => setPlanSettings(prev => ({
+                        ...prev,
+                        protein: parseInt(e.target.value) || 0
+                      }))}
+                    />
+                  </div>
+                  <div>
+                    <label className="myarc-text-sm myarc-text-gray">Koolhydraten (g)</label>
+                    <input
+                      type="number"
+                      className="myarc-input"
+                      value={planSettings.carbs}
+                      onChange={(e) => setPlanSettings(prev => ({
+                        ...prev,
+                        carbs: parseInt(e.target.value) || 0
+                      }))}
+                    />
+                  </div>
+                  <div>
+                    <label className="myarc-text-sm myarc-text-gray">Vet (g)</label>
+                    <input
+                      type="number"
+                      className="myarc-input"
+                      value={planSettings.fat}
+                      onChange={(e) => setPlanSettings(prev => ({
+                        ...prev,
+                        fat: parseInt(e.target.value) || 0
+                      }))}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="myarc-mb-md">
+                <label className="myarc-text-sm myarc-text-gray">Maaltijden per dag</label>
+                <select
+                  className="myarc-input"
+                  value={planSettings.mealsPerDay}
+                  onChange={(e) => setPlanSettings(prev => ({
+                    ...prev,
+                    mealsPerDay: parseInt(e.target.value)
+                  }))}
+                >
+                  <option value="3">3 maaltijden</option>
+                  <option value="4">4 maaltijden</option>
+                  <option value="5">5 maaltijden</option>
+                  <option value="6">6 maaltijden</option>
+                </select>
+              </div>
+
+              <div className="myarc-mb-md">
+                <h4 className="myarc-text-green myarc-mb-sm">Voorkeuren</h4>
+                <div className="myarc-grid myarc-grid-3 myarc-gap-sm">
+                  {['Vegetarisch', 'High Protein', 'Low Carb', 'Gluten Free', 'Dairy Free', 'Meal Prep'].map(pref => (
+                    <button
+                      key={pref}
+                      className={`myarc-btn myarc-btn-sm ${
+                        planSettings.preferences.includes(pref) 
+                          ? 'myarc-btn-primary' 
+                          : 'myarc-btn-outline'
+                      }`}
+                      onClick={() => {
+                        setPlanSettings(prev => ({
+                          ...prev,
+                          preferences: prev.preferences.includes(pref)
+                            ? prev.preferences.filter(p => p !== pref)
+                            : [...prev.preferences, pref]
+                        }))
+                      }}
+                    >
+                      {pref}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="myarc-flex myarc-gap-sm myarc-justify-end">
+                <button
+                  className="myarc-btn myarc-btn-outline"
+                  onClick={() => setShowGenerator(false)}
+                  disabled={generating}
+                >
+                  Annuleer
+                </button>
+                <button
+                  className="myarc-btn myarc-btn-primary"
+                  onClick={handleGenerateSmartPlan}
+                  disabled={generating}
+                >
+                  {generating ? 'Genereren...' : '⚡ Genereer 4 Weken'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}

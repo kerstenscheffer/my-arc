@@ -1,0 +1,461 @@
+## Versions
+v22.18.0
+10.9.3
+
+## package.json (top)
+{
+  "name": "workapp",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "lint": "eslint .",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.55.0",
+    "react": "^19.1.1",
+    "react-dom": "^19.1.1"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.33.0",
+    "@tailwindcss/postcss": "^4.1.11",
+    "@types/react": "^19.1.10",
+    "@types/react-dom": "^19.1.7",
+    "@vitejs/plugin-react": "^5.0.0",
+    "autoprefixer": "^10.4.21",
+    "eslint": "^9.33.0",
+    "eslint-plugin-react-hooks": "^5.2.0",
+    "eslint-plugin-react-refresh": "^0.4.20",
+    "globals": "^16.3.0",
+    "postcss": "^8.5.6",
+    "tailwindcss": "^4.1.11",
+    "vite": "^7.1.2"
+  }
+}
+
+## src files (maxdepth 2)
+src/App.css
+src/App.jsx
+src/assets/react.svg
+src/client/ClientDashboard.jsx
+src/components/.AIGenerator.jsx.swn
+src/components/.AIGenerator.jsx.swo
+src/components/.AIGenerator.jsx.swp
+src/components/AIGenerator.jsx
+src/components/AIGenerator.jsx.WORKING_WITH_DATABASE
+src/components/AIGenerator.jsx.backup
+src/components/AIGenerator.jsx.test
+src/components/AIGenerator.jsx.working
+src/components/ClientLogin.jsx
+src/components/CoachMealPlanBuilder.jsx
+src/components/Dashboard.jsx
+src/components/Dashboard.jsx.backup
+src/components/Dashboard.jsx.backup_schema_test
+src/components/Dashboard_backup_20250814_175740.js
+src/components/Goals.jsx
+src/components/Goals.jsx.dirty
+src/components/Layout.jsx
+src/components/Login-backup.jsx
+src/components/Login.jsx
+src/components/SchemaLibrary.jsx
+src/components/TestComponent.jsx
+src/contexts/LanguageContext.jsx
+src/index.css
+src/index.css.backup
+src/lib/clients.js
+src/lib/intakeParsers.js
+src/lib/mealplanDatabase.js
+src/lib/mealplanDatabase.js.bak_20250815_140059
+src/lib/schemaDatabase.js
+src/lib/schemaDatabase.js.backup
+src/lib/supabase-ai-integration.js
+src/lib/supabase-backup.js
+src/lib/supabase-broken.js
+src/lib/supabase.js
+src/lib/supabase.js]]
+src/lib/supabase_backup_20250814_175740.js
+src/main.jsx
+src/styles/ai-generator.css
+src/styles/theme.css
+
+## mealplan grep
+src/contexts/LanguageContext.jsx:11:      mealplan: 'My Meal Plan',
+src/contexts/LanguageContext.jsx:165:      mealplan: 'Mijn Voedingsplan',
+src/contexts/LanguageContext.jsx:373:  mealplan: "https://kajabi-storefronts-production.kajabi-cdn.com/kajabi-storefronts-production/file-uploads/themes/2161909977/settings_images/6bbcb82-acf7-45d6-1e4e-627ff4061280_MIND_10_.png",
+src/components/Dashboard.jsx:1:import CoachMealPlanBuilder from './CoachMealPlanBuilder'
+src/components/Dashboard.jsx:45:     { id: 'mealplan-builder', label: 'Mealplan', icon: '🍽️' },
+src/components/Dashboard.jsx:157:{activeTab === 'mealplan-builder' && <CoachMealPlanBuilder />}
+src/components/mealplan/MealSwapModal.jsx:2:import { getMeals } from '../../lib/mealplanDatabase'
+src/components/mealplan/MealSwapModal.jsx:4:export default function MealSwapModal({ onClose, onPick }){
+src/components/mealplan/MealSwapModal.jsx:6:  const [meals, setMeals] = useState([])
+src/components/mealplan/MealSwapModal.jsx:9:  useEffect(()=>{ fetchMeals('') },[])
+src/components/mealplan/MealSwapModal.jsx:11:  async function fetchMeals(term){
+src/components/mealplan/MealSwapModal.jsx:13:    try{ setMeals(await getMeals({ q: term })) } finally { setLoading(false) }
+src/components/mealplan/MealSwapModal.jsx:24:          <input className="myarc-input myarc-flex-1" placeholder="Search meals..." value={q} onChange={e=>setQ(e.target.value)} />
+src/components/mealplan/MealSwapModal.jsx:25:          <button className="myarc-btn" onClick={()=>fetchMeals(q)}>Search</button>
+src/components/mealplan/MealSwapModal.jsx:30:          {!loading && meals.map(m => (
+src/components/mealplan/MealSwapModal.jsx:35:              macros: { kcal: m.kcal, protein: m.protein, carbs: m.carbs, fat: m.fat },
+src/components/mealplan/MealSwapModal.jsx:42:          {!loading && !meals.length && <div className="myarc-text-muted">No meals found</div>}
+src/components/mealplan/AssignToClientDialog.jsx:2:import { assignTemplateToClient } from '../../lib/mealplanDatabase'
+src/components/mealplan/MealPlannerGrid.jsx:1:export default function MealPlannerGrid({ days, onSlotClick }){
+src/components/mealplan/MealPlannerGrid.jsx:18:              {d.meals.map(({slot, item}) => (
+src/components/mealplan/MealPlannerGrid.jsx:21:                  <span className="myarc-text-white myarc-truncate" style={{textAlign:'left'}}>{item ? `${item.name} • ${item.macros?.kcal||0}kcal` : '— pick —'}</span>
+src/components/mealplan/MacroSummary.jsx:1:export default function MacroSummary({ days, targets }){
+src/components/mealplan/MacroSummary.jsx:3:    d.meals.forEach(({item}) => {
+src/components/mealplan/MacroSummary.jsx:5:      acc.kcal += item.macros?.kcal||0
+src/components/mealplan/MacroSummary.jsx:6:      acc.protein += item.macros?.protein||0
+src/components/mealplan/MacroSummary.jsx:7:      acc.carbs += item.macros?.carbs||0
+src/components/mealplan/MacroSummary.jsx:8:      acc.fat += item.macros?.fat||0
+src/components/mealplan/TemplateSidebar.jsx:2:import { listMealPlanTemplates } from '../../lib/mealplanDatabase'
+src/components/mealplan/TemplateSidebar.jsx:9:    try{ setTemplates(await listMealPlanTemplates()) } finally { setLoading(false) }
+src/components/CoachMealPlanBuilder.jsx:3:import MealPlannerGrid from './mealplan/MealPlannerGrid'
+src/components/CoachMealPlanBuilder.jsx:4:import MealSwapModal from './mealplan/MealSwapModal'
+src/components/CoachMealPlanBuilder.jsx:5:import MacroSummary from './mealplan/MacroSummary'
+src/components/CoachMealPlanBuilder.jsx:6:import TemplateSidebar from './mealplan/TemplateSidebar'
+src/components/CoachMealPlanBuilder.jsx:7:import AssignToClientDialog from './mealplan/AssignToClientDialog'
+src/components/CoachMealPlanBuilder.jsx:8:import { createMealPlanTemplate } from '../lib/mealplanDatabase'
+src/components/CoachMealPlanBuilder.jsx:16:    meals: SLOT_ORDER.map(slot => ({ slot, item: null }))
+src/components/CoachMealPlanBuilder.jsx:20:export default function CoachMealPlanBuilder(){
+src/components/CoachMealPlanBuilder.jsx:31:    days.forEach(d => d.meals.forEach(({item}) => {
+src/components/CoachMealPlanBuilder.jsx:33:      total.kcal += item.macros?.kcal || 0
+src/components/CoachMealPlanBuilder.jsx:34:      total.protein += item.macros?.protein || 0
+src/components/CoachMealPlanBuilder.jsx:35:      total.carbs += item.macros?.carbs || 0
+src/components/CoachMealPlanBuilder.jsx:36:      total.fat += item.macros?.fat || 0
+src/components/CoachMealPlanBuilder.jsx:46:        meals: d.meals.map(m => m.slot===slot ? { ...m, item: meal } : m)
+src/components/CoachMealPlanBuilder.jsx:60:        meals: d.meals.map(m => m.item ? ({ slot: m.slot, meal_id: m.item.meal_id }) : ({ slot: m.slot, meal_id: null }))
+src/components/CoachMealPlanBuilder.jsx:63:        title: `Mealplan – ${targets.kcal}kcal`,
+src/components/CoachMealPlanBuilder.jsx:64:        description: 'Auto‑generated template from CoachMealPlanBuilder',
+src/components/CoachMealPlanBuilder.jsx:68:      const saved = await createMealPlanTemplate(payload)
+src/components/CoachMealPlanBuilder.jsx:70:      alert('✅ Mealplan template saved!')
+src/components/CoachMealPlanBuilder.jsx:85:        total: d.meals.reduce((acc, {item})=>({
+src/components/CoachMealPlanBuilder.jsx:86:          kcal: acc.kcal + (item?.macros?.kcal||0),
+src/components/CoachMealPlanBuilder.jsx:87:          protein: acc.protein + (item?.macros?.protein||0),
+src/components/CoachMealPlanBuilder.jsx:88:          carbs: acc.carbs + (item?.macros?.carbs||0),
+src/components/CoachMealPlanBuilder.jsx:89:          fat: acc.fat + (item?.macros?.fat||0)
+src/components/CoachMealPlanBuilder.jsx:91:        meals: d.meals.map(({slot,item}) => ({
+src/components/CoachMealPlanBuilder.jsx:94:          kcal: item?.macros?.kcal || 0,
+src/components/CoachMealPlanBuilder.jsx:95:          protein: item?.macros?.protein || 0,
+src/components/CoachMealPlanBuilder.jsx:96:          carbs: item?.macros?.carbs || 0,
+src/components/CoachMealPlanBuilder.jsx:97:          fat: item?.macros?.fat || 0
+src/components/CoachMealPlanBuilder.jsx:117:              meals: d.meals.map(m=>({ slot: m.slot, item: null })) // items will fill as users pick meals
+src/components/CoachMealPlanBuilder.jsx:125:          <h1 className="myarc-text-green" style={{fontSize:'var(--text-2xl)', fontWeight:900}}>{t('mealplan.builder') || 'Mealplan Builder'}</h1>
+src/components/CoachMealPlanBuilder.jsx:138:          <MacroSummary days={days} targets={targets} />
+src/components/CoachMealPlanBuilder.jsx:140:          <MealPlannerGrid days={days} onSlotClick={handleOpenSwap} />
+src/components/CoachMealPlanBuilder.jsx:143:            <button onClick={handleSaveTemplate} className="myarc-btn myarc-btn-primary">💾 {t('mealplan.saveTemplate') || 'Save as template'}</button>
+src/components/CoachMealPlanBuilder.jsx:144:            <button onClick={()=>setShowAssign(true)} disabled={!lastSavedTemplate} className="myarc-btn myarc-btn-outline">📌 {t('mealplan.assignToClient') || 'Assign to client'}</button>
+src/components/CoachMealPlanBuilder.jsx:145:            <button onClick={copyMapping} className="myarc-btn">📋 {t('mealplan.copyMapping') || 'Copy mapping'}</button>
+src/components/CoachMealPlanBuilder.jsx:151:        <MealSwapModal onClose={()=>setShowSwap(false)} onPick={(meal)=>{
+src/lib/mealplanDatabase.js:1:// src/lib/mealplanDatabase.js — clean & deduped (v2)
+src/lib/mealplanDatabase.js:2:// Centralized DB helpers for Meal Plan Maker
+src/lib/mealplanDatabase.js:9:// MEALS CATALOG
+src/lib/mealplanDatabase.js:11:export async function getMeals({ q = '', tags = [], limit = 50 } = {}) {
+src/lib/mealplanDatabase.js:13:    .from('meals')
+src/lib/mealplanDatabase.js:39:    .from('meals')
+src/lib/mealplanDatabase.js:50:export async function createMealPlanTemplate({ title, description = '', targets, week_structure /*, video_url, notes, is_public */ }) {
+src/lib/mealplanDatabase.js:72:export async function listMealPlanTemplates() {
+src/lib/mealplanDatabase.js:81:export async function getMealPlanTemplate(id) {
+src/lib/mealplanDatabase.js:95:  const tmpl = await getMealPlanTemplate(template_id)
+src/lib/mealplanDatabase.js:117:export async function getClientMealPlans(client_id) {
+src/lib/mealplanDatabase.js:130:export async function fetchMealsByIds(ids = []) {
+src/lib/mealplanDatabase.js:133:    .from('meals')
+src/lib/mealplanDatabase.js:140:export async function getClientActiveMealPlan(client_id) {
+src/lib/mealplanDatabase.js:141:  const plans = await getClientMealPlans(client_id)
+src/lib/mealplanDatabase.js.bak_20250815_140059:6:// ===== Meals catalog =====
+src/lib/mealplanDatabase.js.bak_20250815_140059:7:export async function getMeals({ q = '', tags = [], limit = 50 } = {}) {
+src/lib/mealplanDatabase.js.bak_20250815_140059:8:  let query = supabase.from('meals').select('*').order('created_at', { ascending: false }).limit(limit)
+src/lib/mealplanDatabase.js.bak_20250815_140059:19:  const { data, error } = await supabase.from('meals').insert([payload]).select('*').single()
+src/lib/mealplanDatabase.js.bak_20250815_140059:25:export async function createMealPlanTemplate({ title, description = '', targets, week_structure }) {
+src/lib/mealplanDatabase.js.bak_20250815_140059:33:export async function listMealPlanTemplates() {
+src/lib/mealplanDatabase.js.bak_20250815_140059:42:export async function getMealPlanTemplate(id) {
+src/lib/mealplanDatabase.js.bak_20250815_140059:50:  const tmpl = await getMealPlanTemplate(template_id)
+src/lib/mealplanDatabase.js.bak_20250815_140059:64:export async function getClientMealPlans(client_id) {
+src/lib/mealplanDatabase.js.bak_20250815_140059:73:// Fetch many meals at once
+src/lib/mealplanDatabase.js.bak_20250815_140059:74:export async function fetchMealsByIds(ids = []){
+src/lib/mealplanDatabase.js.bak_20250815_140059:78:    .from('meals')
+src/lib/mealplanDatabase.js.bak_20250815_140059:86:export async function getClientActiveMealPlan(client_id){
+src/lib/mealplanDatabase.js.bak_20250815_140059:87:  const plans = await getClientMealPlans(client_id)
+src/lib/mealplanDatabase.js.bak_20250815_140059:91:// === Added by Mealplan Viewer MVP ===
+src/lib/mealplanDatabase.js.bak_20250815_140059:92:export async function fetchMealsByIds(ids = []){
+src/lib/mealplanDatabase.js.bak_20250815_140059:96:    .from('meals')
+src/lib/mealplanDatabase.js.bak_20250815_140059:103:export async function getClientActiveMealPlan(client_id){
+src/lib/mealplanDatabase.js.bak_20250815_140059:104:  const plans = await getClientMealPlans(client_id)
+src/lib/mealplanDatabase.js.bak_20250815_140059:108:// === Added by Mealplan Viewer MVP ===
+src/lib/mealplanDatabase.js.bak_20250815_140059:109:export async function fetchMealsByIds(ids = []){
+src/lib/mealplanDatabase.js.bak_20250815_140059:113:    .from('meals')
+src/lib/mealplanDatabase.js.bak_20250815_140059:120:export async function getClientActiveMealPlan(client_id){
+src/lib/mealplanDatabase.js.bak_20250815_140059:121:  const plans = await getClientMealPlans(client_id)
+src/lib/mealplanDatabase.js.bak_20250815_140059:125:// === Added by Mealplan Viewer MVP ===
+src/lib/mealplanDatabase.js.bak_20250815_140059:126:export async function fetchMealsByIds(ids = []){
+src/lib/mealplanDatabase.js.bak_20250815_140059:130:    .from('meals')
+src/lib/mealplanDatabase.js.bak_20250815_140059:137:export async function getClientActiveMealPlan(client_id){
+src/lib/mealplanDatabase.js.bak_20250815_140059:138:  const plans = await getClientMealPlans(client_id)
+src/lib/mealplanDatabase.js.bak_20250815_140059:141:// === Added by Mealplan Viewer MVP ===
+src/lib/mealplanDatabase.js.bak_20250815_140059:142:export async function fetchMealsByIds(ids = []){
+src/lib/mealplanDatabase.js.bak_20250815_140059:146:    .from('meals')
+src/lib/mealplanDatabase.js.bak_20250815_140059:152:export async function getClientActiveMealPlan(client_id){
+src/lib/mealplanDatabase.js.bak_20250815_140059:153:  const plans = await getClientMealPlans(client_id)
+src/client/ClientDashboard.jsx:4:import ClientMealPlan from './pages/ClientMealPlan'
+src/client/ClientDashboard.jsx:27:    { id: 'mealplan', label: t('nav.mealplan'), iconUrl: iconUrls.mealplan },
+src/client/ClientDashboard.jsx:370:            {currentView === 'mealplan' && <ClientMealPlan client={client} />}
+src/client/pages/ClientHome.jsx:82:          onClick={() => setCurrentView('mealplan')}
+src/client/pages/ClientHome.jsx:106:              src={iconUrls.mealplan}
+src/client/pages/ClientHome.jsx:107:              alt="Meal Plan"
+src/client/pages/ClientHome.jsx:121:            {t('nav.mealplan')}
+src/client/pages/ClientMealPlan.jsx.bak_20250815_135357:1:// src/client/pages/ClientMealPlan.jsx
+src/client/pages/ClientMealPlan.jsx.bak_20250815_135357:3:import { getClientMealPlans, fetchMealsByIds } from '../../lib/mealplanDatabase'
+src/client/pages/ClientMealPlan.jsx.bak_20250815_135357:24:export default function ClientMealPlan({ client }){
+src/client/pages/ClientMealPlan.jsx.bak_20250815_135357:28:  const [mealsMap, setMealsMap] = useState({})
+src/client/pages/ClientMealPlan.jsx.bak_20250815_135357:33:      // Get latest snapshot (getClientMealPlans already sorted desc)
+src/client/pages/ClientMealPlan.jsx.bak_20250815_135357:34:      const plans = await getClientMealPlans(client.id)
+src/client/pages/ClientMealPlan.jsx.bak_20250815_135357:41:        (latest.week_structure||[]).flatMap(d => (d.meals||[]).map(m => m.meal_id).filter(Boolean))
+src/client/pages/ClientMealPlan.jsx.bak_20250815_135357:44:        const meals = await fetchMealsByIds(ids)
+src/client/pages/ClientMealPlan.jsx.bak_20250815_135357:45:        const map = Object.fromEntries(meals.map(m => [m.id, m]))
+src/client/pages/ClientMealPlan.jsx.bak_20250815_135357:46:        setMealsMap(map)
+src/client/pages/ClientMealPlan.jsx.bak_20250815_135357:60:      for(const { meal_id } of (d.meals||[])){
+src/client/pages/ClientMealPlan.jsx.bak_20250815_135357:61:        const mi = meal_id && mealsMap[meal_id]
+src/client/pages/ClientMealPlan.jsx.bak_20250815_135357:70:  }, [plan, mealsMap])
+src/client/pages/ClientMealPlan.jsx.bak_20250815_135357:72:  if(loading) return <div className="myarc-card myarc-mt-md">Loading meal plan…</div>
+src/client/pages/ClientMealPlan.jsx.bak_20250815_135357:74:  if(!plan) return <div className="myarc-card myarc-mt-md">Geen meal plan toegewezen.</div>
+src/client/pages/ClientMealPlan.jsx.bak_20250815_135357:82:          🍽️ {plan.title || 'Meal Plan'}
+src/client/pages/ClientMealPlan.jsx.bak_20250815_135357:103:            const dayTotals = (day.meals||[]).reduce((acc, { meal_id })=>{
+src/client/pages/ClientMealPlan.jsx.bak_20250815_135357:104:              const mi = meal_id && mealsMap[meal_id]
+src/client/pages/ClientMealPlan.jsx.bak_20250815_135357:123:                  {(day.meals||[]).map((m, idx) => {
+src/client/pages/ClientMealPlan.jsx.bak_20250815_135357:124:                    const mi = m.meal_id && mealsMap[m.meal_id]
+src/client/pages/ClientMealPlan.jsx:1:// src/client/pages/ClientMealPlan.jsx
+src/client/pages/ClientMealPlan.jsx:3:import { getClientMealPlans, fetchMealsByIds } from '../../lib/mealplanDatabase'
+src/client/pages/ClientMealPlan.jsx:24:export default function ClientMealPlan({ client }){
+src/client/pages/ClientMealPlan.jsx:28:  const [mealsMap, setMealsMap] = useState({})
+src/client/pages/ClientMealPlan.jsx:33:      // Get latest snapshot (getClientMealPlans already sorted desc)
+src/client/pages/ClientMealPlan.jsx:34:      const plans = await getClientMealPlans(client.id)
+src/client/pages/ClientMealPlan.jsx:41:        (latest.week_structure||[]).flatMap(d => (d.meals||[]).map(m => m.meal_id).filter(Boolean))
+src/client/pages/ClientMealPlan.jsx:44:        const meals = await fetchMealsByIds(ids)
+src/client/pages/ClientMealPlan.jsx:45:        const map = Object.fromEntries(meals.map(m => [m.id, m]))
+src/client/pages/ClientMealPlan.jsx:46:        setMealsMap(map)
+src/client/pages/ClientMealPlan.jsx:60:      for(const { meal_id } of (d.meals||[])){
+src/client/pages/ClientMealPlan.jsx:61:        const mi = meal_id && mealsMap[meal_id]
+src/client/pages/ClientMealPlan.jsx:70:  }, [plan, mealsMap])
+src/client/pages/ClientMealPlan.jsx:72:  if(loading) return <div className="myarc-card myarc-mt-md">Loading meal plan…</div>
+src/client/pages/ClientMealPlan.jsx:74:  if(!plan) return <div className="myarc-card myarc-mt-md">Geen meal plan toegewezen.</div>
+src/client/pages/ClientMealPlan.jsx:82:          🍽️ {plan.title || 'Meal Plan'}
+src/client/pages/ClientMealPlan.jsx:103:            const dayTotals = (day.meals||[]).reduce((acc, { meal_id })=>{
+src/client/pages/ClientMealPlan.jsx:104:              const mi = meal_id && mealsMap[meal_id]
+src/client/pages/ClientMealPlan.jsx:123:                  {(day.meals||[]).map((m, idx) => {
+src/client/pages/ClientMealPlan.jsx:124:                    const mi = m.meal_id && mealsMap[m.meal_id]
+
+## supabase.js (head)
+import { createClient } from '@supabase/supabase-js'
+
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
+const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY
+
+if (!supabaseUrl || !supabaseKey) {
+  throw new Error('Supabase credentials missing!')
+}
+
+export const supabase = createClient(supabaseUrl, supabaseKey)
+
+// ===== AUTH FUNCTIONS =====
+
+export async function signIn(email, password) {
+  console.log('SignIn attempt with:', email)
+  const { data, error } = await supabase.auth.signInWithPassword({ email, password })
+  console.log('Auth response:', { data, error })
+  if (error) throw error
+  return data
+}
+
+export async function getCurrentUser() {
+  console.log('Getting current user...')
+  const { data: { user }, error } = await supabase.auth.getUser()
+  
+  if (error) throw error
+  if (!user) return null
+  
+  return { 
+    ...user, 
+    profile: { 
+      email: user.email, 
+      naam: user.email.split('@')[0]
+    } 
+  }
+}
+
+export async function signOut() {
+  console.log('Signing out...')
+  const { error } = await supabase.auth.signOut()
+  if (error) throw error
+  return true
+}
+
+// ===== CLIENT MANAGEMENT FUNCTIONS =====
+
+export async function createClientAccount(clientData, trainerId) {
+  try {
+    console.log('🔥 Creating client with auth:', clientData)
+
+    // STAP 1: Maak Supabase auth user
+    const tempPassword = `Welcome123!`
+    const { data: authResponse, error: signUpError } = await supabase.auth.signUp({
+      email: clientData.email,
+      password: tempPassword
+    })
+
+    if (signUpError) {
+      console.error('❌ Auth creation failed:', signUpError)
+      throw signUpError
+    }
+
+    console.log('✅ Auth user created')
+
+    // STAP 2: Maak client database record
+    const { data: clientRecord, error: clientError } = await supabase
+      .from('clients')
+      .insert([
+        {
+          trainer_id: trainerId,
+          first_name: clientData.firstName,
+          last_name: clientData.lastName,
+          email: clientData.email,
+          phone: clientData.phone || null,
+          goal: clientData.goal,
+          experience: clientData.experience,
+          status: 'active'
+        }
+      ])
+      .select()
+
+    if (clientError) {
+      console.error('❌ Client record failed:', clientError)
+      throw clientError
+    }
+
+    console.log('✅ Client created with login:', clientData.email, 'password:', tempPassword)
+    
+    return {
+      client: clientRecord[0],
+      loginCredentials: { email: clientData.email, password: tempPassword }
+    }
+
+  } catch (error) {
+    console.error('❌ Create client error:', error)
+    throw error
+  }
+}
+
+export async function getTrainerClients(trainerId) {
+  try {
+    const { data: clients, error } = await supabase
+      .from('clients')
+      .select('*')
+      .eq('trainer_id', trainerId)
+      .eq('status', 'active')
+      .order('created_at', { ascending: false })
+
+    if (error) throw error
+    return clients || []
+  } catch (error) {
+    console.error('❌ Get clients error:', error)
+    throw error
+  }
+}
+
+export async function removeClient(clientId) {
+  try {
+    const { data, error } = await supabase
+      .from('clients')
+      .update({ status: 'inactive' })
+      .eq('id', clientId)
+      .select()
+
+    if (error) throw error
+    console.log('✅ Client removed:', data)
+    return data
+  } catch (error) {
+    console.error('❌ Remove client error:', error)
+    throw error
+  }
+}
+
+// ===== SCHEMA FUNCTIONS =====
+
+export async function getAllSchemas() {
+  try {
+    const { data: schemas, error } = await supabase
+      .from('workout_schemas')
+      .select('id, name, description, primary_goal, days_per_week, split_name')
+      .order('name')
+
+    if (error) throw error
+    console.log('✅ Loaded schemas:', schemas?.length || 0)
+    return schemas || []
+  } catch (error) {
+    console.error('❌ Get schemas error:', error)
+    throw error
+  }
+}
+
+export async function assignSchemaToClient(clientId, schemaId) {
+  try {
+    const { data, error } = await supabase
+      .from('clients')
+      .update({ 
+        assigned_schema_id: schemaId
+      })
+      .eq('id', clientId)
+      .select()
+      .single()
+
+    if (error) throw error
+    console.log('✅ Schema assigned:', data)
+    return data
+  } catch (error) {
+    console.error('❌ Error assigning schema:', error)
+    throw error
+  }
+}
+
+export async function getClientSchema(clientId) {
+  try {
+    console.log('📋 Getting schema for client:', clientId)
+    
+    // First get the client to find schema ID
+    const { data: client, error: clientError } = await supabase
+      .from('clients')
+      .select('assigned_schema_id')
+      .eq('id', clientId)
+      .single()
+    
+    if (clientError) {
+      console.error('❌ Error getting client:', clientError)
+      return null
+    }
+    
+    if (!client?.assigned_schema_id) {
+      console.log('⚠️ Client has no assigned schema')
+      return null
+    }
+    
+    console.log('🔍 Loading schema with ID:', client.assigned_schema_id)
+    
+    // Then get the schema separately
+    const { data: schema, error: schemaError } = await supabase
+      .from('workout_schemas')
+      .select('*')
+      .eq('id', client.assigned_schema_id)
+      .single()
+
+## supabase exports
+14:export async function signIn(email, password) {
+22:export async function getCurrentUser() {
+38:export async function signOut() {
+47:export async function createClientAccount(clientData, trainerId) {
+100:export async function getTrainerClients(trainerId) {
+117:export async function removeClient(clientId) {
+136:export async function getAllSchemas() {
+152:export async function assignSchemaToClient(clientId, schemaId) {
+172:export async function getClientSchema(clientId) {
+216:export async function getClientWithSchema(clientId) {
+237:export async function getClientByEmail(email) {

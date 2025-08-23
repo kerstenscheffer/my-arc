@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { supabase } from '../lib/supabase'
+import DatabaseService from '../services/DatabaseService'
+const db = DatabaseService
 
 export default function ClientLogin({ onClientLogin }) {
   const [email, setEmail] = useState('')

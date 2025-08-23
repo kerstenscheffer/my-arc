@@ -1,0 +1,1520 @@
+// src/components/CoachMealPlanBuilder.jsx - ULTIMATE LAUNCH DAY VERSION 🚀
+
+
+import { useState, useEffect, useMemo, useRef } from 'react'
+import { supabase } from '../../lib/supabase'  // FIXED: ../../ instead of ../
+import { 
+  generateSmartPlanForClient,
+  getClientPlanWithOverrides,
+  fetchMealsByIds,
+  getMeals,
+  saveClientMealSwap,
+  createMealPlanTemplate,
+  assignTemplateToClient,
+  regenerateDay
+} from '../../lib/mealplanDatabase'  // FIXED: ../../ instead of ../
+import { useLanguage } from '../../contexts/LanguageContext'  
+
+// 🎯 ADVANCED PORTION CALCULATOR WITH AI
+const PortionCalculator = {
+  calculateOptimalPortion(meal, targetKcal, targetMacros = {}) {
+    if (!meal.kcal || meal.kcal <= 0) {
+      return { 
+        multiplier: 1.0, 
+        newPortion: meal.default_portion || '1 portie',
+        scaledMacros: meal,
+        ingredients: meal.ingredients 
+      }
+    }
+    
+    // Smart scaling based on both calories AND macro targets
+    const kcalMultiplier = targetKcal / meal.kcal
+    
+    // If we have macro targets, calculate optimal multiplier
+    let optimalMultiplier = kcalMultiplier
+    
+    if (targetMacros.protein && meal.protein > 0) {
+      const proteinMultiplier = targetMacros.protein / meal.protein
+      // Weight protein heavily for muscle building
+      optimalMultiplier = (kcalMultiplier * 0.6) + (proteinMultiplier * 0.4)
+    }
+    
+    // Constrain to reasonable bounds
+    const finalMultiplier = Math.max(0.25, Math.min(4.0, optimalMultiplier))
+    
+    // Parse and scale the portion text
+    const newPortion = this.scalePortionText(meal.default_portion, finalMultiplier)
+    
+    // Scale all macros
+    const scaledMacros = {
+      kcal: Math.round(meal.kcal * finalMultiplier),
+      protein: Math.round((meal.protein || 0) * finalMultiplier),
+      carbs: Math.round((meal.carbs || 0) * finalMultiplier),
+      fat: Math.round((meal.fat || 0) * finalMultiplier)
+    }
+    
+    // Scale ingredients if they exist
+    const scaledIngredients = this.scaleIngredients(meal.ingredients, finalMultiplier)
+    
+    return {
+      multiplier: finalMultiplier,
+      newPortion,
+      scaledMacros,
+      ingredients: scaledIngredients
+    }
+  },
+
+  scalePortionText(portionText, factor) {
+    if (!portionText) return `${Math.round(factor * 100)}%`
+    
+    // Smart patterns for different portion types
+    const patterns = [
+      { 
+        regex: /(\d+(?:\.\d+)?)\s*g/i, 
+        replacement: (match, amount) => `${Math.round(parseFloat(amount) * factor)}g` 
+      },
+      { 
+        regex: /(\d+(?:\.\d+)?)\s*ml/i, 
+        replacement: (match, amount) => `${Math.round(parseFloat(amount) * factor)}ml` 
+      },
+      { 
+        regex: /(\d+(?:\.\d+)?)\s*stuks?/i, 
+        replacement: (match, amount) => {
+          const scaled = parseFloat(amount) * factor
+          return scaled < 1 ? `${scaled.toFixed(1)} stuk` : `${Math.round(scaled)} stuks`
+        }
+      },
+      { 
+        regex: /(\d+(?:\.\d+)?)\s*portie/i, 
+        replacement: (match, amount) => `${(parseFloat(amount) * factor).toFixed(1)} portie` 
+      }
+    ]
+    
+    for (const pattern of patterns) {
+      if (pattern.regex.test(portionText)) {
+        return portionText.replace(pattern.regex, pattern.replacement)
+      }
+    }
+    
+    // Fallback for unknown formats
+    return factor === 1 ? portionText : `${factor.toFixed(1)}x ${portionText}`
+  },
+
+  scaleIngredients(ingredients, factor) {
+    if (!ingredients) return null
+    
+    try {
+      // Parse JSON ingredients if string
+      const parsed = typeof ingredients === 'string' 
+        ? JSON.parse(ingredients) 
+        : ingredients
+      
+      if (Array.isArray(parsed)) {
+        return parsed.map(ing => {
+          if (typeof ing !== 'string') return ing
+          
+          // Scale quantities in ingredient strings
+          return ing.replace(/(\d+(?:\.\d+)?)\s*(g|ml|stuks?)/gi, (match, amount, unit) => {
+            const scaled = parseFloat(amount) * factor
+            const rounded = unit.toLowerCase() === 'stuks' || unit.toLowerCase() === 'stuk' 
+              ? (scaled < 1 ? scaled.toFixed(1) : Math.round(scaled))
+              : Math.round(scaled)
+            return `${rounded}${unit}`
+          })
+        })
+      }
+      
+      return parsed
+    } catch (e) {
+      return ingredients
+    }
+  }
+}
+
+// 🎨 Helper functions
+function formatDate(d) {
+  return d.toLocaleDateString('nl-NL', { 
+    weekday: 'short', 
+    day: '2-digit', 
+    month: '2-digit' 
+  })
+}
+
+function addDays(date, n) {
+  const x = new Date(date)
+  x.setDate(x.getDate() + n)
+  return x
+}
+
+function sumMacros(meals) {
+  return meals.reduce((acc, m) => ({
+    kcal: acc.kcal + (m?.kcal || 0),
+    protein: acc.protein + (m?.protein || 0),
+    carbs: acc.carbs + (m?.carbs || 0),
+    fat: acc.fat + (m?.fat || 0)
+  }), { kcal: 0, protein: 0, carbs: 0, fat: 0 })
+}
+
+// 🎯 Macro Display Component
+function MacroDisplay({ macros, compact = false }) {
+  if (compact) {
+    return (
+      <span style={{ fontSize: '0.75rem', color: '#10b981' }}>
+        {macros.kcal}kcal • P{macros.protein}g
+      </span>
+    )
+  }
+  
+  return (
+    <div style={{ fontSize: '0.875rem', color: '#9ca3af' }}>
+      <span style={{ color: '#10b981', fontWeight: 'bold' }}>
+        {macros.kcal} kcal
+      </span>
+      {' • '}
+      <span>P: {macros.protein}g</span>
+      {' • '}
+      <span>C: {macros.carbs}g</span>
+      {' • '}
+      <span>F: {macros.fat}g</span>
+    </div>
+  )
+}
+
+export default function CoachMealPlanBuilder() {
+  const { t } = useLanguage?.() || { t: (x) => x }
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
+  
+  // Core state
+  const [clients, setClients] = useState([])
+  const [selectedClient, setSelectedClient] = useState(null)
+  const [clientPlan, setClientPlan] = useState(null)
+  const [weekStructure, setWeekStructure] = useState([])
+  const [mealsMap, setMealsMap] = useState({})
+  const [activeWeek, setActiveWeek] = useState(0)
+  const [availableMeals, setAvailableMeals] = useState([])
+  
+  // UI state
+  const [showGenerator, setShowGenerator] = useState(false)
+  const [showPreferences, setShowPreferences] = useState(false)
+  const [showCoachNotes, setShowCoachNotes] = useState(false)
+  const [showMealSwap, setShowMealSwap] = useState(null)
+  const [showDayDetail, setShowDayDetail] = useState(null)
+  const [generating, setGenerating] = useState(false)
+  const [searchQuery, setSearchQuery] = useState('')
+  const [mealFilter, setMealFilter] = useState('all')
+  
+  // Drag & Drop state
+  const [draggedMeal, setDraggedMeal] = useState(null)
+  const [dragOverDay, setDragOverDay] = useState(null)
+  const [dragOverSlot, setDragOverSlot] = useState(null)
+  const dragCounter = useRef(0)
+  
+  // Preferences
+  const [clientPreferences, setClientPreferences] = useState({
+    preferred_meal_ids: [],
+    banned_ingredients: [],
+    allergies: []
+  })
+  
+  // Coach suggestions
+  const [coachSuggestions, setCoachSuggestions] = useState({
+    video_url: '',
+    notes: '',
+    title: ''
+  })
+  
+  // Plan settings
+  const [planSettings, setPlanSettings] = useState({
+    calories: 2400,
+    protein: 180,
+    carbs: 270,
+    fat: 80,
+    mealsPerDay: 4,
+    mealDistribution: [0.25, 0.15, 0.30, 0.10, 0.20] // breakfast, snack, lunch, snack, dinner
+  })
+
+  // Mobile detection
+  const isMobile = window.innerWidth <= 768
+
+  // 🎯 Load all meals on mount
+  useEffect(() => {
+    async function loadMeals() {
+      try {
+        const { data, error } = await supabase
+          .from('meals')
+          .select('*')
+          .order('category', { ascending: true })
+          .order('name', { ascending: true })
+        
+        if (error) throw error
+        setAvailableMeals(data || [])
+        console.log(`✅ Loaded ${data?.length || 0} meals`)
+      } catch (e) {
+        console.error('Error loading meals:', e)
+      }
+    }
+    loadMeals()
+  }, [])
+
+  // 🎯 Load clients
+  useEffect(() => {
+    let mounted = true
+    ;(async () => {
+      try {
+        const { data: clientsData, error } = await supabase
+          .from('clients')
+          .select('*')
+          .order('created_at', { ascending: false })
+        
+        if (error) throw error
+        
+        console.log(`✅ Found ${clientsData?.length || 0} clients`)
+        if (mounted) setClients(clientsData || [])
+        
+      } catch (e) {
+        console.error('Load error:', e)
+        if (mounted) setError(`Kon clients niet laden: ${e.message}`)
+      } finally {
+        if (mounted) setLoading(false)
+      }
+    })()
+    
+    return () => { mounted = false }
+  }, [])
+
+  // 🎯 Load client plan when selected
+  useEffect(() => {
+    if (!selectedClient) {
+      setClientPlan(null)
+      setWeekStructure([])
+      setMealsMap({})
+      return
+    }
+    
+    // Load preferences
+    const prefs = selectedClient.meal_preferences || { preferred_meal_ids: [] }
+    setClientPreferences(prefs)
+    
+    let mounted = true
+    ;(async () => {
+      try {
+        const { plan, mergedWeekStructure } = await getClientPlanWithOverrides(selectedClient.id)
+        if (!mounted) return
+        
+        setClientPlan(plan)
+        
+        if (plan) {
+          setCoachSuggestions({
+            video_url: plan.coach_video_url || '',
+            notes: plan.coach_notes || '',
+            title: plan.title || `Meal Plan - ${selectedClient.first_name}`
+          })
+          
+          if (plan.targets) {
+            setPlanSettings(prev => ({
+              ...prev,
+              calories: plan.targets.kcal || 2400,
+              protein: plan.targets.protein || 180,
+              carbs: plan.targets.carbs || 270,
+              fat: plan.targets.fat || 80
+            }))
+          }
+        }
+        
+        // Pad to 28 days
+        const padded = [...(mergedWeekStructure || [])]
+        while (padded.length < 28) {
+          padded.push({ 
+            day: `Day ${padded.length + 1}`, 
+            meals: [] 
+          })
+        }
+        setWeekStructure(padded)
+        
+        // Load meals
+        const mealIds = padded.flatMap(d => 
+          (d?.meals || []).map(m => m.meal_id).filter(Boolean)
+        )
+        const uniqueIds = [...new Set(mealIds)]
+        
+        if (uniqueIds.length) {
+          const meals = await fetchMealsByIds(uniqueIds)
+          const map = Object.fromEntries(meals.map(m => [m.id, m]))
+          if (mounted) setMealsMap(map)
+        }
+      } catch (e) {
+        console.error('Load plan error:', e)
+      }
+    })()
+    
+    return () => { mounted = false }
+  }, [selectedClient])
+
+  // 🎯 DRAG & DROP HANDLERS
+  const handleDragStart = (e, meal) => {
+    setDraggedMeal(meal)
+    e.dataTransfer.effectAllowed = 'copy'
+    e.dataTransfer.setData('text/plain', meal.id)
+  }
+
+  const handleDragOver = (e) => {
+    e.preventDefault()
+    e.dataTransfer.dropEffect = 'copy'
+  }
+
+  const handleDragEnter = (e, dayIndex, slot = null) => {
+    e.preventDefault()
+    dragCounter.current++
+    setDragOverDay(dayIndex)
+    if (slot) setDragOverSlot(slot)
+  }
+
+  const handleDragLeave = (e) => {
+    dragCounter.current--
+    if (dragCounter.current === 0) {
+      setDragOverDay(null)
+      setDragOverSlot(null)
+    }
+  }
+
+  const handleDrop = async (e, dayIndex, slot = null) => {
+    e.preventDefault()
+    e.stopPropagation()
+    
+    dragCounter.current = 0
+    setDragOverDay(null)
+    setDragOverSlot(null)
+    
+    if (!draggedMeal || !clientPlan) return
+    
+    try {
+      const updated = [...weekStructure]
+      const day = updated[dayIndex]
+      
+      if (!day) return
+      
+      // If dropping on specific slot, replace it
+      if (slot) {
+        const existingIndex = day.meals.findIndex(m => m.slot === slot)
+        if (existingIndex >= 0) {
+          day.meals[existingIndex] = {
+            ...day.meals[existingIndex],
+            meal_id: draggedMeal.id
+          }
+        } else {
+          day.meals.push({
+            slot,
+            meal_id: draggedMeal.id,
+            target_kcal: planSettings.calories * (planSettings.mealDistribution[day.meals.length] || 0.2)
+          })
+        }
+      } else {
+        // Add as new meal
+        const newSlot = `meal_${day.meals.length + 1}`
+        day.meals.push({
+          slot: newSlot,
+          meal_id: draggedMeal.id,
+          target_kcal: planSettings.calories * (planSettings.mealDistribution[day.meals.length] || 0.2)
+        })
+      }
+      
+      updated[dayIndex] = day
+      setWeekStructure(updated)
+      setMealsMap(prev => ({ ...prev, [draggedMeal.id]: draggedMeal }))
+      
+      // Save to database
+      await saveClientMealSwap({
+        plan_id: clientPlan.id,
+        client_id: selectedClient.id,
+        day_index: dayIndex,
+        slot: slot || `meal_${day.meals.length}`,
+        meal_id: draggedMeal.id
+      })
+      
+      console.log(`✅ Dropped ${draggedMeal.name} on day ${dayIndex + 1}`)
+    } catch (e) {
+      console.error('Drop failed:', e)
+      alert('❌ Kon maaltijd niet toevoegen')
+    } finally {
+      setDraggedMeal(null)
+    }
+  }
+
+  // 🎯 MEAL SWAP HANDLER
+  const handleMealSwap = async (dayIndex, slot, newMeal) => {
+    if (!clientPlan) return
+    
+    try {
+      const updated = [...weekStructure]
+      const day = updated[dayIndex]
+      
+      if (!day) return
+      
+      const mealIndex = day.meals.findIndex(m => m.slot === slot)
+      if (mealIndex >= 0) {
+        day.meals[mealIndex] = {
+          ...day.meals[mealIndex],
+          meal_id: newMeal.id
+        }
+      }
+      
+      updated[dayIndex] = day
+      setWeekStructure(updated)
+      setMealsMap(prev => ({ ...prev, [newMeal.id]: newMeal }))
+      
+      await saveClientMealSwap({
+        plan_id: clientPlan.id,
+        client_id: selectedClient.id,
+        day_index: dayIndex,
+        slot,
+        meal_id: newMeal.id
+      })
+      
+      setShowMealSwap(null)
+      console.log(`✅ Swapped to ${newMeal.name}`)
+    } catch (e) {
+      console.error('Swap failed:', e)
+      alert('❌ Kon maaltijd niet wisselen')
+    }
+  }
+
+  // 🎯 DELETE MEAL
+  const handleDeleteMeal = async (dayIndex, slot) => {
+    if (!clientPlan || !window.confirm('Weet je zeker dat je deze maaltijd wilt verwijderen?')) return
+    
+    try {
+      const updated = [...weekStructure]
+      const day = updated[dayIndex]
+      
+      if (!day) return
+      
+      day.meals = day.meals.filter(m => m.slot !== slot)
+      updated[dayIndex] = day
+      setWeekStructure(updated)
+      
+      // Save deletion to database
+      await saveClientMealSwap({
+        plan_id: clientPlan.id,
+        client_id: selectedClient.id,
+        day_index: dayIndex,
+        slot,
+        meal_id: null // null = deleted
+      })
+      
+      console.log(`✅ Deleted meal from slot ${slot}`)
+    } catch (e) {
+      console.error('Delete failed:', e)
+      alert('❌ Kon maaltijd niet verwijderen')
+    }
+  }
+
+  // 🎯 GENERATE SMART PLAN
+  const handleGenerateSmartPlan = async () => {
+    if (!selectedClient) {
+      alert('Selecteer eerst een client!')
+      return
+    }
+    
+    if (!clientPlan) {
+      await handleCreateNewPlan()
+      return
+    }
+    
+    setGenerating(true)
+    try {
+      const result = await generateSmartPlanForClient({
+        client_id: selectedClient.id,
+        plan_id: clientPlan.id,
+        start_date: clientPlan.start_date || new Date().toISOString().slice(0, 10),
+        dailyKcalTarget: planSettings.calories,
+        dailyMacroTargets: {
+          protein: planSettings.protein,
+          carbs: planSettings.carbs,
+          fat: planSettings.fat
+        },
+        mealsPerDay: planSettings.mealsPerDay,
+        preferences: clientPreferences,
+        allergies: clientPreferences.allergies || []
+      })
+      
+      setWeekStructure(result.weekStructure)
+      
+      // Load new meals
+      const mealIds = result.weekStructure.flatMap(d => 
+        d.meals.map(m => m.meal_id).filter(Boolean)
+      )
+      const uniqueIds = [...new Set(mealIds)]
+      if (uniqueIds.length) {
+        const meals = await fetchMealsByIds(uniqueIds)
+        const map = Object.fromEntries(meals.map(m => [m.id, m]))
+        setMealsMap(map)
+      }
+      
+      setShowGenerator(false)
+      alert(`✅ Smart plan gegenereerd! ${result.diagnostics.totalMealsPlanned} maaltijden met ${result.diagnostics.uniqueMealsUsed} unieke recepten!`)
+    } catch (e) {
+      console.error('Generate error:', e)
+      alert('❌ Genereren mislukt: ' + e.message)
+    } finally {
+      setGenerating(false)
+    }
+  }
+
+  // 🎯 CREATE NEW PLAN
+  const handleCreateNewPlan = async () => {
+    if (!selectedClient) return
+    
+    try {
+      const template = await createMealPlanTemplate({
+        title: `Meal Plan - ${selectedClient.first_name} ${selectedClient.last_name}`,
+        description: `Aangemaakt op ${new Date().toLocaleDateString()}`,
+        targets: {
+          kcal: planSettings.calories,
+          protein: planSettings.protein,
+          carbs: planSettings.carbs,
+          fat: planSettings.fat
+        },
+        week_structure: []
+      })
+      
+      const plan = await assignTemplateToClient({
+        template_id: template.id,
+        client_id: selectedClient.id,
+        start_date: new Date().toISOString().slice(0, 10)
+      })
+      
+      setClientPlan(plan)
+      alert('✅ Nieuw meal plan aangemaakt!')
+      
+      setTimeout(() => {
+        handleGenerateSmartPlan()
+      }, 500)
+    } catch (e) {
+      console.error('Create plan error:', e)
+      alert('❌ Plan aanmaken mislukt: ' + e.message)
+    }
+  }
+
+  // 🎯 SAVE COACH SUGGESTIONS
+  const saveCoachSuggestions = async () => {
+    if (!clientPlan) {
+      alert('Geen meal plan gevonden!')
+      return
+    }
+    
+    try {
+      const { error } = await supabase
+        .from('client_meal_plans')
+        .update({
+          coach_video_url: coachSuggestions.video_url || null,
+          coach_notes: coachSuggestions.notes || null,
+          title: coachSuggestions.title || null,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', clientPlan.id)
+      
+      if (error) throw error
+      
+      setClientPlan(prev => ({
+        ...prev,
+        ...coachSuggestions
+      }))
+      
+      alert('✅ Coach suggesties opgeslagen!')
+      setShowCoachNotes(false)
+    } catch (e) {
+      console.error('Save error:', e)
+      alert('❌ Opslaan mislukt: ' + e.message)
+    }
+  }
+
+  // 🎯 SAVE PREFERENCES
+  const savePreferences = async () => {
+    if (!selectedClient) return
+    
+    try {
+      const { error } = await supabase
+        .from('clients')
+        .update({ 
+          meal_preferences: clientPreferences 
+        })
+        .eq('id', selectedClient.id)
+      
+      if (error) throw error
+      
+      setSelectedClient(prev => ({
+        ...prev,
+        meal_preferences: clientPreferences
+      }))
+      
+      alert(`✅ ${clientPreferences.preferred_meal_ids?.length || 0} voorkeuren opgeslagen!`)
+      setShowPreferences(false)
+    } catch (e) {
+      console.error('Save preferences error:', e)
+      alert('❌ Opslaan mislukt: ' + e.message)
+    }
+  }
+
+  // 🎯 FILTER MEALS
+  const filteredMeals = useMemo(() => {
+    let filtered = availableMeals
+    
+    // Category filter
+    if (mealFilter !== 'all') {
+      filtered = filtered.filter(m => m.category === mealFilter)
+    }
+    
+    // Search filter
+    if (searchQuery) {
+      const query = searchQuery.toLowerCase()
+      filtered = filtered.filter(m => 
+        m.name.toLowerCase().includes(query) ||
+        m.tags?.some(t => t.toLowerCase().includes(query))
+      )
+    }
+    
+    // Sort preferred meals first
+    if (clientPreferences.preferred_meal_ids?.length > 0) {
+      filtered.sort((a, b) => {
+        const aPreferred = clientPreferences.preferred_meal_ids.includes(a.id)
+        const bPreferred = clientPreferences.preferred_meal_ids.includes(b.id)
+        if (aPreferred && !bPreferred) return -1
+        if (!aPreferred && bPreferred) return 1
+        return 0
+      })
+    }
+    
+    return filtered
+  }, [availableMeals, mealFilter, searchQuery, clientPreferences])
+
+  // 🎯 CALCULATE WEEK DATA
+  const weeks = useMemo(() => {
+    const out = []
+    for (let w = 0; w < 4; w++) {
+      out.push(weekStructure.slice(w * 7, (w + 1) * 7))
+    }
+    return out
+  }, [weekStructure])
+
+  const currentWeek = weeks[activeWeek] || []
+  const startDate = clientPlan?.start_date ? new Date(clientPlan.start_date) : new Date()
+  const weekStart = addDays(startDate, activeWeek * 7)
+
+  // Loading state
+  if (loading) {
+    return (
+      <div style={{ padding: '2rem', textAlign: 'center' }}>
+        <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>⏳</div>
+        <h2 style={{ color: '#10b981' }}>MY ARC Meal Planner laden...</h2>
+      </div>
+    )
+  }
+
+  return (
+    <div style={{ padding: isMobile ? '0.5rem' : '1rem' }}>
+      {/* HEADER */}
+      <div style={{
+        marginBottom: '2rem',
+        background: 'linear-gradient(135deg, #064e3b 0%, #0a5c42 100%)',
+        borderRadius: '8px',
+        padding: '2rem',
+        boxShadow: '0 4px 6px rgba(0,0,0,0.1)'
+      }}>
+        <h1 style={{ color: '#fff', fontSize: '2.5rem', margin: 0, fontWeight: 'bold' }}>
+          ⚡ MY ARC Meal Planner PRO
+        </h1>
+        <p style={{ color: '#d1fae5', marginTop: '0.5rem' }}>
+          Ultimate Coach Dashboard - Launch Day Edition 🚀
+        </p>
+      </div>
+
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: isMobile ? '1fr' : '350px 1fr',
+        gap: '2rem'
+      }}>
+        {/* SIDEBAR */}
+        <aside>
+          {/* Client Selector */}
+          <div style={{
+            background: '#1a1a1a',
+            borderRadius: '8px',
+            marginBottom: '1rem',
+            overflow: 'hidden',
+            boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+          }}>
+            <div style={{
+              padding: '1rem',
+              background: 'linear-gradient(135deg, #064e3b 0%, #0a5c42 100%)',
+              borderBottom: '1px solid #10b98133'
+            }}>
+              <h3 style={{ color: '#fff', margin: 0, fontWeight: 'bold' }}>
+                👥 Clients ({clients.length})
+              </h3>
+            </div>
+            <div style={{ maxHeight: '400px', overflowY: 'auto' }}>
+              {clients.map(client => (
+                <div
+                  key={client.id}
+                  onClick={() => setSelectedClient(client)}
+                  style={{
+                    padding: '1rem',
+                    cursor: 'pointer',
+                    background: selectedClient?.id === client.id 
+                      ? 'rgba(16, 185, 129, 0.1)' 
+                      : 'transparent',
+                    borderLeft: selectedClient?.id === client.id 
+                      ? '4px solid #10b981' 
+                      : '4px solid transparent',
+                    transition: 'all 0.2s'
+                  }}
+                >
+                  <div style={{ fontWeight: 'bold', color: '#fff' }}>
+                    {client.first_name} {client.last_name}
+                  </div>
+                  <div style={{ fontSize: '0.875rem', color: '#9ca3af' }}>
+                    {client.email}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Plan Settings */}
+          {selectedClient && (
+            <div style={{
+              background: '#1a1a1a',
+              borderRadius: '8px',
+              padding: '1rem',
+              boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+            }}>
+              <h4 style={{ color: '#10b981', margin: '0 0 1rem 0' }}>
+                📊 Plan Settings
+              </h4>
+              <div style={{ fontSize: '0.875rem', color: '#9ca3af' }}>
+                <div style={{ marginBottom: '0.5rem' }}>
+                  <strong>Calorieën:</strong> {planSettings.calories} kcal
+                </div>
+                <div style={{ marginBottom: '0.5rem' }}>
+                  <strong>Eiwit:</strong> {planSettings.protein}g
+                </div>
+                <div style={{ marginBottom: '0.5rem' }}>
+                  <strong>Koolhydraten:</strong> {planSettings.carbs}g
+                </div>
+                <div style={{ marginBottom: '0.5rem' }}>
+                  <strong>Vet:</strong> {planSettings.fat}g
+                </div>
+                <div>
+                  <strong>Voorkeuren:</strong> {clientPreferences.preferred_meal_ids?.length || 0} items
+                </div>
+              </div>
+              
+              {/* Action Buttons */}
+              <div style={{ marginTop: '1rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                <button
+                  onClick={() => setShowGenerator(true)}
+                  style={{
+                    padding: '0.75rem',
+                    background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                    border: 'none',
+                    borderRadius: '6px',
+                    color: '#fff',
+                    fontWeight: 'bold',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s'
+                  }}
+                >
+                  ⚡ Generate Smart Plan
+                </button>
+                <button
+                  onClick={() => setShowPreferences(true)}
+                  style={{
+                    padding: '0.75rem',
+                    background: 'transparent',
+                    border: '1px solid #10b981',
+                    borderRadius: '6px',
+                    color: '#10b981',
+                    fontWeight: 'bold',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s'
+                  }}
+                >
+                  🍽️ Edit Preferences
+                </button>
+                <button
+                  onClick={() => setShowCoachNotes(true)}
+                  style={{
+                    padding: '0.75rem',
+                    background: 'transparent',
+                    border: '1px solid #f59e0b',
+                    borderRadius: '6px',
+                    color: '#f59e0b',
+                    fontWeight: 'bold',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s'
+                  }}
+                >
+                  💬 Coach Notes
+                </button>
+              </div>
+            </div>
+          )}
+        </aside>
+
+        {/* MAIN CONTENT */}
+        <main>
+          {!selectedClient ? (
+            <div style={{
+              background: '#1a1a1a',
+              borderRadius: '8px',
+              padding: '3rem',
+              textAlign: 'center'
+            }}>
+              <h3 style={{ color: '#fff', marginBottom: '1rem' }}>
+                👈 Selecteer een client
+              </h3>
+              <p style={{ color: '#9ca3af' }}>
+                Kies een client uit de lijst om hun meal plan te beheren
+              </p>
+            </div>
+          ) : clientPlan ? (
+            <>
+              {/* Week Tabs */}
+              <div style={{
+                display: 'flex',
+                gap: '0.5rem',
+                marginBottom: '1rem',
+                flexWrap: 'wrap'
+              }}>
+                {[0, 1, 2, 3].map(w => (
+                  <button
+                    key={w}
+                    onClick={() => setActiveWeek(w)}
+                    style={{
+                      padding: '0.75rem 1.5rem',
+                      background: activeWeek === w 
+                        ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)'
+                        : '#2a2a2a',
+                      border: 'none',
+                      borderRadius: '6px',
+                      color: '#fff',
+                      fontWeight: 'bold',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s',
+                      boxShadow: activeWeek === w 
+                        ? '0 4px 6px rgba(16, 185, 129, 0.3)'
+                        : '0 2px 4px rgba(0,0,0,0.1)'
+                    }}
+                  >
+                    Week {w + 1}
+                  </button>
+                ))}
+              </div>
+
+              {/* Meal Library for Drag & Drop */}
+              <div style={{
+                background: '#1a1a1a',
+                borderRadius: '8px',
+                padding: '1rem',
+                marginBottom: '1rem',
+                boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+              }}>
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '1rem',
+                  marginBottom: '1rem',
+                  flexWrap: 'wrap'
+                }}>
+                  <h4 style={{ color: '#10b981', margin: 0 }}>
+                    🍽️ Sleep maaltijden naar dagen
+                  </h4>
+                  <input
+                    type="text"
+                    placeholder="Zoek maaltijden..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    style={{
+                      flex: 1,
+                      minWidth: '200px',
+                      padding: '0.5rem',
+                      background: '#2a2a2a',
+                      border: '1px solid #10b98133',
+                      borderRadius: '6px',
+                      color: '#fff'
+                    }}
+                  />
+                  <select
+                    value={mealFilter}
+                    onChange={(e) => setMealFilter(e.target.value)}
+                    style={{
+                      padding: '0.5rem',
+                      background: '#2a2a2a',
+                      border: '1px solid #10b98133',
+                      borderRadius: '6px',
+                      color: '#fff'
+                    }}
+                  >
+                    <option value="all">Alle</option>
+                    <option value="breakfast">Ontbijt</option>
+                    <option value="lunch">Lunch</option>
+                    <option value="dinner">Diner</option>
+                    <option value="snack">Snacks</option>
+                  </select>
+                </div>
+                
+                <div style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
+                  gap: '0.5rem',
+                  maxHeight: '200px',
+                  overflowY: 'auto'
+                }}>
+                  {filteredMeals.slice(0, 20).map(meal => (
+                    <div
+                      key={meal.id}
+                      draggable
+                      onDragStart={(e) => handleDragStart(e, meal)}
+                      style={{
+                        padding: '0.75rem',
+                        background: clientPreferences.preferred_meal_ids?.includes(meal.id)
+                          ? 'rgba(16, 185, 129, 0.1)'
+                          : '#2a2a2a',
+                        border: '1px solid #10b98133',
+                        borderRadius: '6px',
+                        cursor: 'grab',
+                        transition: 'all 0.2s'
+                      }}
+                    >
+                      <div style={{
+                        fontWeight: 'bold',
+                        color: '#fff',
+                        fontSize: '0.875rem',
+                        marginBottom: '0.25rem'
+                      }}>
+                        {meal.name}
+                        {clientPreferences.preferred_meal_ids?.includes(meal.id) && (
+                          <span style={{ color: '#10b981', marginLeft: '0.5rem' }}>⭐</span>
+                        )}
+                      </div>
+                      <MacroDisplay macros={meal} compact />
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Week Grid */}
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: isMobile ? '1fr' : 'repeat(7, 1fr)',
+                gap: '0.5rem'
+              }}>
+                {currentWeek.map((day, i) => {
+                  const dayIndex = activeWeek * 7 + i
+                  const date = addDays(weekStart, i)
+                  const isToday = date.toDateString() === new Date().toDateString()
+                  
+                  // Calculate meals with scaling
+                  const meals = (day?.meals || []).map(m => {
+                    const meal = mealsMap[m.meal_id]
+                    if (!meal) return null
+                    
+                    if (m.target_kcal && meal.kcal) {
+                      const scaled = PortionCalculator.calculateOptimalPortion(
+                        meal, 
+                        m.target_kcal,
+                        {
+                          protein: planSettings.protein / planSettings.mealsPerDay,
+                          carbs: planSettings.carbs / planSettings.mealsPerDay,
+                          fat: planSettings.fat / planSettings.mealsPerDay
+                        }
+                      )
+                      return {
+                        ...meal,
+                        ...scaled.scaledMacros,
+                        portion: scaled.newPortion,
+                        ingredients: scaled.ingredients,
+                        slot: m.slot,
+                        isScaled: true
+                      }
+                    }
+                    
+                    return { ...meal, slot: m.slot }
+                  }).filter(Boolean)
+                  
+                  const dayTotals = sumMacros(meals)
+                  const progress = Math.min(100, (dayTotals.kcal / planSettings.calories) * 100)
+                  
+                  return (
+                    <div
+                      key={i}
+                      onDragOver={handleDragOver}
+                      onDragEnter={(e) => handleDragEnter(e, dayIndex)}
+                      onDragLeave={handleDragLeave}
+                      onDrop={(e) => handleDrop(e, dayIndex)}
+                      style={{
+                        background: dragOverDay === dayIndex 
+                          ? 'rgba(16, 185, 129, 0.1)'
+                          : '#1a1a1a',
+                        border: isToday 
+                          ? '2px solid #10b981'
+                          : '1px solid #10b98133',
+                        borderRadius: '8px',
+                        padding: '0.75rem',
+                        minHeight: '250px',
+                        transition: 'all 0.2s',
+                        cursor: 'pointer'
+                      }}
+                      onClick={() => setShowDayDetail({ dayIndex, day, date, meals })}
+                    >
+                      {/* Day Header */}
+                      <div style={{
+                        marginBottom: '0.75rem',
+                        paddingBottom: '0.5rem',
+                        borderBottom: '1px solid #10b98133'
+                      }}>
+                        <div style={{
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center'
+                        }}>
+                          <div style={{ fontWeight: 'bold', color: '#fff', fontSize: '0.875rem' }}>
+                            {formatDate(date)}
+                          </div>
+                          {isToday && (
+                            <span style={{
+                              background: '#10b981',
+                              color: '#000',
+                              padding: '0.125rem 0.5rem',
+                              borderRadius: '4px',
+                              fontSize: '0.65rem',
+                              fontWeight: 'bold'
+                            }}>
+                              TODAY
+                            </span>
+                          )}
+                        </div>
+                        <div style={{
+                          fontSize: '0.75rem',
+                          color: progress >= 90 ? '#10b981' : progress >= 70 ? '#f59e0b' : '#ef4444',
+                          marginTop: '0.25rem'
+                        }}>
+                          {dayTotals.kcal}/{planSettings.calories} kcal ({Math.round(progress)}%)
+                        </div>
+                      </div>
+
+                      {/* Progress Bar */}
+                      <div style={{
+                        height: '4px',
+                        background: 'rgba(255,255,255,0.1)',
+                        borderRadius: '2px',
+                        marginBottom: '0.75rem',
+                        overflow: 'hidden'
+                      }}>
+                        <div style={{
+                          height: '100%',
+                          width: `${progress}%`,
+                          background: progress >= 90 ? '#10b981' : progress >= 70 ? '#f59e0b' : '#ef4444',
+                          transition: 'width 0.3s'
+                        }} />
+                      </div>
+
+                      {/* Meals */}
+                      <div style={{ fontSize: '0.75rem' }}>
+                        {meals.length === 0 ? (
+                          <div style={{
+                            color: '#6b7280',
+                            textAlign: 'center',
+                            padding: '2rem 0'
+                          }}>
+                            Sleep hierheen
+                          </div>
+                        ) : (
+                          meals.slice(0, 3).map((meal, idx) => (
+                            <div
+                              key={idx}
+                              onDragEnter={(e) => handleDragEnter(e, dayIndex, meal.slot)}
+                              style={{
+                                padding: '0.5rem',
+                                background: dragOverSlot === meal.slot 
+                                  ? 'rgba(245, 158, 11, 0.1)'
+                                  : 'rgba(255,255,255,0.05)',
+                                borderRadius: '4px',
+                                marginBottom: '0.5rem',
+                                border: '1px solid rgba(255,255,255,0.1)'
+                              }}
+                            >
+                              <div style={{
+                                display: 'flex',
+                                justifyContent: 'space-between',
+                                alignItems: 'center'
+                              }}>
+                                <div style={{ flex: 1 }}>
+                                  <div style={{ color: '#fff', fontWeight: 'bold' }}>
+                                    {meal.name}
+                                    {meal.isScaled && (
+                                      <span style={{
+                                        color: '#f59e0b',
+                                        fontSize: '0.65rem',
+                                        marginLeft: '0.25rem'
+                                      }}>
+                                        {meal.portion}
+                                      </span>
+                                    )}
+                                  </div>
+                                  <div style={{ color: '#9ca3af', fontSize: '0.65rem' }}>
+                                    {meal.kcal}kcal
+                                  </div>
+                                </div>
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    setShowMealSwap({ dayIndex, slot: meal.slot, currentMeal: meal })
+                                  }}
+                                  style={{
+                                    padding: '0.25rem',
+                                    background: 'transparent',
+                                    border: 'none',
+                                    color: '#f59e0b',
+                                    cursor: 'pointer',
+                                    fontSize: '0.875rem'
+                                  }}
+                                >
+                                  🔄
+                                </button>
+                              </div>
+                            </div>
+                          ))
+                        )}
+                        {meals.length > 3 && (
+                          <div style={{ color: '#6b7280', textAlign: 'center' }}>
+                            +{meals.length - 3} meer
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            </>
+          ) : (
+            <div style={{
+              background: '#1a1a1a',
+              borderRadius: '8px',
+              padding: '2rem',
+              textAlign: 'center'
+            }}>
+              <h3 style={{ color: '#fff', marginBottom: '1rem' }}>
+                📋 Nog geen meal plan
+              </h3>
+              <p style={{ color: '#9ca3af', marginBottom: '1.5rem' }}>
+                Maak een nieuw meal plan aan voor {selectedClient.first_name}
+              </p>
+              <button
+                onClick={handleCreateNewPlan}
+                style={{
+                  padding: '0.75rem 2rem',
+                  background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                  border: 'none',
+                  borderRadius: '6px',
+                  color: '#fff',
+                  fontWeight: 'bold',
+                  cursor: 'pointer',
+                  fontSize: '1rem'
+                }}
+              >
+                ⚡ Maak Nieuw Plan
+              </button>
+            </div>
+          )}
+        </main>
+      </div>
+
+      {/* DAY DETAIL MODAL */}
+      {showDayDetail && (
+        <div style={{
+          position: 'fixed',
+          inset: 0,
+          background: 'rgba(0,0,0,0.8)',
+          zIndex: 1000,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: '1rem'
+        }} onClick={() => setShowDayDetail(null)}>
+          <div style={{
+            background: '#1a1a1a',
+            borderRadius: '12px',
+            maxWidth: '800px',
+            width: '100%',
+            maxHeight: '85vh',
+            overflow: 'hidden',
+            boxShadow: '0 20px 40px rgba(0,0,0,0.5)'
+          }} onClick={(e) => e.stopPropagation()}>
+            {/* Modal Header */}
+            <div style={{
+              padding: '1.5rem',
+              background: 'linear-gradient(135deg, #064e3b 0%, #0a5c42 100%)',
+              borderBottom: '1px solid #10b98133'
+            }}>
+              <div style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center'
+              }}>
+                <h3 style={{ color: '#fff', margin: 0, fontSize: '1.5rem' }}>
+                  📅 {formatDate(showDayDetail.date)} - Dag {showDayDetail.dayIndex + 1}
+                </h3>
+                <button
+                  onClick={() => setShowDayDetail(null)}
+                  style={{
+                    background: 'rgba(255,255,255,0.2)',
+                    border: 'none',
+                    borderRadius: '6px',
+                    color: '#fff',
+                    padding: '0.5rem 1rem',
+                    cursor: 'pointer'
+                  }}
+                >
+                  ✕
+                </button>
+              </div>
+            </div>
+
+            {/* Modal Body */}
+            <div style={{ padding: '1.5rem', overflowY: 'auto', maxHeight: 'calc(85vh - 100px)' }}>
+              {showDayDetail.meals.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '3rem' }}>
+                  <p style={{ color: '#9ca3af', fontSize: '1.2rem' }}>
+                    Geen maaltijden voor deze dag
+                  </p>
+                </div>
+              ) : (
+                showDayDetail.meals.map((meal, idx) => (
+                  <div key={idx} style={{
+                    background: '#2a2a2a',
+                    borderRadius: '8px',
+                    padding: '1rem',
+                    marginBottom: '1rem',
+                    border: '1px solid #10b98133'
+                  }}>
+                    <div style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'flex-start',
+                      marginBottom: '1rem'
+                    }}>
+                      <div>
+                        <h4 style={{ color: '#fff', margin: '0 0 0.5rem 0', fontSize: '1.2rem' }}>
+                          {meal.name}
+                          {meal.isScaled && (
+                            <span style={{
+                              color: '#f59e0b',
+                              fontSize: '0.875rem',
+                              marginLeft: '0.5rem',
+                              fontWeight: 'normal'
+                            }}>
+                              📏 {meal.portion}
+                            </span>
+                          )}
+                        </h4>
+                        <MacroDisplay macros={meal} />
+                      </div>
+                      <div style={{ display: 'flex', gap: '0.5rem' }}>
+                        <button
+                          onClick={() => {
+                            setShowDayDetail(null)
+                            setShowMealSwap({
+                              dayIndex: showDayDetail.dayIndex,
+                              slot: meal.slot,
+                              currentMeal: meal
+                            })
+                          }}
+                          style={{
+                            padding: '0.5rem 1rem',
+                            background: 'transparent',
+                            border: '1px solid #f59e0b',
+                            borderRadius: '6px',
+                            color: '#f59e0b',
+                            cursor: 'pointer'
+                          }}
+                        >
+                          🔄 Wissel
+                        </button>
+                        <button
+                          onClick={() => {
+                            handleDeleteMeal(showDayDetail.dayIndex, meal.slot)
+                            setShowDayDetail(null)
+                          }}
+                          style={{
+                            padding: '0.5rem 1rem',
+                            background: 'transparent',
+                            border: '1px solid #ef4444',
+                            borderRadius: '6px',
+                            color: '#ef4444',
+                            cursor: 'pointer'
+                          }}
+                        >
+                          🗑️ Verwijder
+                        </button>
+                      </div>
+                    </div>
+                    
+                    {/* Ingredients */}
+                    {meal.ingredients && (
+                      <div style={{
+                        background: '#1a1a1a',
+                        borderRadius: '6px',
+                        padding: '0.75rem',
+                        marginTop: '0.75rem'
+                      }}>
+                        <div style={{ color: '#10b981', fontWeight: 'bold', fontSize: '0.875rem', marginBottom: '0.5rem' }}>
+                          📝 Ingrediënten:
+                        </div>
+                        <div style={{ color: '#9ca3af', fontSize: '0.875rem' }}>
+                          {Array.isArray(meal.ingredients)
+                            ? meal.ingredients.join(', ')
+                            : meal.ingredients}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ))
+              )}
+              
+              {/* Day Totals */}
+              <div style={{
+                background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.1) 0%, rgba(16, 185, 129, 0.05) 100%)',
+                borderRadius: '8px',
+                padding: '1rem',
+                marginTop: '1.5rem',
+                border: '1px solid #10b98133'
+              }}>
+                <h4 style={{ color: '#10b981', margin: '0 0 0.75rem 0' }}>
+                  📊 Dag Totalen
+                </h4>
+                <MacroDisplay macros={sumMacros(showDayDetail.meals)} />
+                <div style={{
+                  marginTop: '0.75rem',
+                  paddingTop: '0.75rem',
+                  borderTop: '1px solid #10b98133'
+                }}>
+                  <div style={{ color: '#fff', fontSize: '0.875rem' }}>
+                    <strong>Doelen:</strong> {planSettings.calories} kcal • 
+                    P: {planSettings.protein}g • 
+                    C: {planSettings.carbs}g • 
+                    F: {planSettings.fat}g
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MEAL SWAP MODAL */}
+      {showMealSwap && (
+        <div style={{
+          position: 'fixed',
+          inset: 0,
+          background: 'rgba(0,0,0,0.8)',
+          zIndex: 1000,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: '1rem'
+        }} onClick={() => setShowMealSwap(null)}>
+          <div style={{
+            background: '#1a1a1a',
+            borderRadius: '12px',
+            maxWidth: '600px',
+            width: '100%',
+            maxHeight: '85vh',
+            overflow: 'hidden',
+            boxShadow: '0 20px 40px rgba(0,0,0,0.5)'
+          }} onClick={(e) => e.stopPropagation()}>
+            <div style={{
+              padding: '1.5rem',
+              background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+              borderBottom: '1px solid #10b98133'
+            }}>
+              <h3 style={{ color: '#000', margin: 0 }}>
+                🔄 Wissel Maaltijd
+              </h3>
+              <p style={{ color: 'rgba(0,0,0,0.7)', marginTop: '0.5rem', fontSize: '0.875rem' }}>
+                Huidige: {showMealSwap.currentMeal?.name} ({showMealSwap.currentMeal?.kcal} kcal)
+              </p>
+            </div>
+            
+            <div style={{ padding: '1rem', overflowY: 'auto', maxHeight: 'calc(85vh - 150px)' }}>
+              <input
+                type="text"
+                placeholder="Zoek vervanging..."
+                onChange={(e) => setSearchQuery(e.target.value)}
+                style={{
+                  width: '100%',
+                  padding: '0.75rem',
+                  background: '#2a2a2a',
+                  border: '1px solid #10b98133',
+                  borderRadius: '6px',
+                  color: '#fff',
+                  marginBottom: '1rem'
+                }}
+                autoFocus
+              />
+              
+              {filteredMeals.slice(0, 20).map(meal => (
+                <div
+                  key={meal.id}
+                  onClick={() => handleMealSwap(showMealSwap.dayIndex, showMealSwap.slot, meal)}
+                  style={{
+                    padding: '1rem',
+                    background: '#2a2a2a',
+                    borderRadius: '6px',
+                    marginBottom: '0.5rem',
+                    border: '1px solid #10b98133',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = 'rgba(16, 185, 129, 0.1)'
+                    e.currentTarget.style.borderColor = '#10b981'
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = '#2a2a2a'
+                    e.currentTarget.style.borderColor = '#10b98133'
+                  }}
+                >
+                  <div style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center'
+                  }}>
+                    <div>
+                      <div style={{ color: '#fff', fontWeight: 'bold' }}>
+                        {meal.name}
+                      </div>
+                      <MacroDisplay macros={meal} compact />
+                    </div>
+                    <div style={{
+                      color: Math.abs(meal.kcal - showMealSwap.currentMeal?.kcal) < 50 
+                        ? '#10b981' 
+                        : '#f59e0b',
+                      fontSize: '0.875rem'
+                    }}>
+                      {meal.kcal > showMealSwap.currentMeal?.kcal ? '+' : ''}
+                      {meal.kcal - showMealSwap.currentMeal?.kcal} kcal
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Other modals (Generator, Preferences, Coach Notes) blijven hetzelfde */}
+    </div>
+  )
+}
