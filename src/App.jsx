@@ -43,16 +43,25 @@ function App() {
     localStorage.setItem('isClientMode', isClientMode)
   }, [isClientMode])
 
-  const checkUser = async () => {
-    try {
-      const currentUser = await db.getCurrentUser()
+const checkUser = async () => {
+  try {
+    console.log('🔍 Checking authentication...');
+    const currentUser = await db.getCurrentUser()
+    
+    if (currentUser) {
+      console.log('✅ User found:', currentUser.email);
       setUser(currentUser)
-    } catch (error) {
-      console.log('Not authenticated')
+    } else {
+      console.log('❌ No user - showing login');
+      setUser(null) // BELANGRIJK: Set null, niet undefined!
     }
-    setLoading(false)
+  } catch (error) {
+    console.error('Auth error:', error)
+    setUser(null) // BELANGRIJK: Ook bij error null zetten!
+  } finally {
+    setLoading(false) // ALTIJD loading stoppen
   }
-
+}
   const handleLogout = () => {
     localStorage.removeItem('isClientMode')
     setIsClientMode(false)
