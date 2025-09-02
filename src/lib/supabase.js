@@ -8,7 +8,14 @@ if (!supabaseUrl || !supabaseKey) {
   throw new Error('Supabase credentials missing!')
 }
 
-export const supabase = createClient(supabaseUrl, supabaseKey)
+export const supabase = createClient(supabaseUrl, supabaseKey, {
+  auth: {
+    persistSession: true,
+    autoRefreshToken: true,
+    storage: window.localStorage,
+    storageKey: 'my-arc-auth'
+  }
+})
 
 // ===== AUTH FUNCTIONS =====
 
