@@ -13,7 +13,8 @@ export const supabase = createClient(supabaseUrl, supabaseKey, {
     persistSession: true,
     autoRefreshToken: true,
     storage: window.localStorage,
-    storageKey: 'my-arc-auth'
+    storageKey: 'my-arc-auth',
+    flowType: 'pkce'  // Voeg deze toe
   }
 })
 
