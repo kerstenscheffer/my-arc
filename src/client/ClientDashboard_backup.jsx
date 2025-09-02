@@ -1,3 +1,4 @@
+import useIsMobile from '../hooks/useIsMobile'
 import { useState, useEffect } from 'react'
 import DatabaseService from '../services/DatabaseService'
 const db = DatabaseService
@@ -21,7 +22,7 @@ export default function ClientDashboard() {
   
   // Use language context
   const { t, language, toggleLanguage } = useLanguage()
-  const isMobile = window.innerWidth <= 768
+  const isMobile = useIsMobile()
 
   // Navigation items with translations
   const navigationItems = [

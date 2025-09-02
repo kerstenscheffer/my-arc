@@ -1,0 +1,119 @@
+=== VIDEO WIDGET AUDIT ===
+
+1. FILES MET VIDEO CODE:
+src//contexts/LanguageContext.jsx
+src//coach/tabs/ClientBonusesTab.jsx
+src//coach/CoachHub.jsx
+src//coach/pages/CoachMealPlannerDashboard_backup_20250818_114132.jsx
+src//coach/pages/CoachMealPlannerDashboard_backup.jsx
+src//coach/pages/CoachMealPlannerDashboard.jsx
+src//components/clients/ClientDetailDialog.jsx
+src//modules/progress/ClientProgress.jsx
+src//modules/videos/CoachVideoTab.jsx
+src//modules/videos/PageVideoWidget.jsx
+src//modules/videos/ClientVideoWidget.jsx
+src//modules/videos/PageVideoWidget_BACKUP.jsx
+src//modules/workout/WorkoutPlan.jsx
+src//modules/client-management/MealPlanGenerator.jsx
+src//modules/client-management/modules/MealTrackingModule.jsx
+src//modules/client-management/modules/ContentModule.jsx
+src//modules/client-management/AssignmentModals.jsx
+src//client/pages/ClientMealPlan_backup_20250819_110104.jsx
+src//client/pages/ClientMealPlan_backup_20250819_131709.jsx
+src//client/pages/ClientHome.backup.jsx
+src//client/pages/ClientHome.jsx
+src//client/pages/ClientHome_backup.jsx
+src//client/pages/ClientMealPlan_BACKUP_20250822_091910.jsx
+src//client/pages/ClientMealPlan_backup_20250819_100242.jsx
+
+2. VIDEO FUNCTIONS:
+src//components/clients/ClientDetailDialog.jsx:  const [videos, setVideos] = useState([])
+src//components/clients/ClientDetailDialog.jsx:function AddVideo({ onAdd }){
+src//lib/mealplanDatabase.js.backup_20250815_172805:export async function createMealPlanTemplate({ title, description = '', targets, week_structure /*, video_url, notes, is_public */ }) {
+src//lib/supabase.js.backup2:export async function updateClientVideos(clientId, videoUrls) {
+src//lib/clients.js:export async function listClientVideos(client_id){
+src//lib/clients.js:export async function addClientVideo(client_id, { title, url, tags=[] }){
+src//lib/clients.js:export async function deleteClientVideo(id){
+src//lib/clients.js:  const { error } = await supabase.from('client_videos').delete().eq('id', id)
+src//modules/videos/VideoService.js:        const { data: anyVideos } = await supabase
+src//modules/videos/VideoService.js:    const videos = await this.getVideosForPage(clientId, pageContext, {}, db)
+src//modules/videos/VideoService.js:const videoService = new VideoService()
+src//modules/videos/CoachVideoTab.jsx:export default function CoachVideoTab({ clients = [], db }) {
+src//modules/videos/CoachVideoTab.jsx:  const [videos, setVideos] = useState([])
+src//modules/videos/CoachVideoTab.jsx:  const [selectedVideo, setSelectedVideo] = useState(null)
+src//modules/videos/CoachVideoTab.jsx:  const loadVideos = async () => {
+src//modules/videos/CoachVideoTab.jsx:      const data = await videoService.getCoachVideos(user.id)
+src//modules/videos/CoachVideoTab.jsx:  const filteredVideos = videos.filter(video => {
+src//modules/videos/CoachVideoTab.jsx:    const matchesCategory = selectedCategory === 'all' || video.category === selectedCategory
+src//modules/videos/CoachVideoTab.jsx:    const matchesSearch = video.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+src//modules/videos/CoachVideoTab.jsx:            const categoryConfig = getCategoryConfig(video.category)
+src//modules/videos/CoachVideoTab.jsx:            const videoId = videoService.extractYouTubeId(video.video_url)
+src//modules/videos/CoachVideoTab.jsx:            const result = await videoService.createVideo({
+src//modules/videos/CoachVideoTab.jsx:            const result = await videoService.assignVideo(
+src//modules/videos/CoachVideoTab.jsx:function VideoUploadModal({ onClose, onSave, categories }) {
+src//modules/videos/CoachVideoTab.jsx:function VideoAssignModal({ video, clients, clientsLoading, onClose, onAssign }) {
+src//modules/videos/PageVideoWidget.jsx:export default function PageVideoWidget({ 
+src//modules/videos/PageVideoWidget.jsx:  const [todaysVideo, setTodaysVideo] = useState(null)
+src//modules/videos/PageVideoWidget.jsx:  const [recentVideos, setRecentVideos] = useState([])
+src//modules/videos/PageVideoWidget.jsx:  const [currentVideo, setCurrentVideo] = useState(null)
+src//modules/videos/PageVideoWidget.jsx:  const loadVideos = useCallback(async () => {
+src//modules/videos/PageVideoWidget.jsx:      const videos = await videoService.getVideosForPage(client.id, pageContext, contextData, db)
+src//modules/videos/PageVideoWidget.jsx:      const todayVideo = await videoService.getTodaysVideo(client.id, pageContext, db)
+src//modules/videos/PageVideoWidget.jsx:      const cachedData = window.__pageVideoCache[cacheKey]
+src//modules/videos/PageVideoWidget.jsx:  const handleWatchVideo = async (assignment) => {
+src//modules/videos/PageVideoWidget.jsx:    const video = todaysVideo.video
+src//modules/videos/PageVideoWidget.jsx:    const categoryConfig = getCategoryConfig(video.category)
+src//modules/videos/PageVideoWidget.jsx:    const videoId = extractYouTubeId(video.video_url)
+src//modules/videos/PageVideoWidget.jsx:function VideoPlayerModal({ video, assignment, db, onClose, onComplete }) {
+src//modules/videos/PageVideoWidget.jsx:  const videoId = video.video_url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([^&\n?#]+)/)?.[1]
+src//modules/videos/ClientVideoWidget.jsx:export default function ClientVideoWidget({ client, db }) {
+src//modules/videos/ClientVideoWidget.jsx:  const [todaysVideo, setTodaysVideo] = useState(null)
+src//modules/videos/ClientVideoWidget.jsx:  const [recentVideos, setRecentVideos] = useState([])
+src//modules/videos/ClientVideoWidget.jsx:  const [currentVideo, setCurrentVideo] = useState(null)
+src//modules/videos/ClientVideoWidget.jsx:      const cachedData = window.__videoWidgetData[client.id]
+src//modules/videos/ClientVideoWidget.jsx:  const loadVideos = async () => {
+src//modules/videos/ClientVideoWidget.jsx:      const homeVideos = await videoService.getVideosForPage(client.id, 'home', {}, db)
+src//modules/videos/ClientVideoWidget.jsx:      const todayVideo = await videoService.getTodaysVideo(client.id, 'home', db)
+src//modules/videos/ClientVideoWidget.jsx:  const handleWatchVideo = async (assignment) => {
+src//modules/videos/ClientVideoWidget.jsx:    const video = todaysVideo.video
+src//modules/videos/ClientVideoWidget.jsx:    const categoryConfig = getCategoryConfig(video.category)
+src//modules/videos/ClientVideoWidget.jsx:    const videoId = extractYouTubeId(video.video_url)
+src//modules/videos/ClientVideoWidget.jsx:function VideoPlayerModal({ video, assignment, db, onClose, onComplete }) {
+src//modules/videos/ClientVideoWidget.jsx:  const videoId = video.video_url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([^&\n?#]+)/)?.[1]
+src//modules/videos/PageVideoWidget_BACKUP.jsx:export default function ClientVideoWidget({ client, db }) {
+src//modules/videos/PageVideoWidget_BACKUP.jsx:  const [todaysVideo, setTodaysVideo] = useState(null)
+src//modules/videos/PageVideoWidget_BACKUP.jsx:  const [recentVideos, setRecentVideos] = useState([])
+src//modules/videos/PageVideoWidget_BACKUP.jsx:  const [currentVideo, setCurrentVideo] = useState(null)
+src//modules/videos/PageVideoWidget_BACKUP.jsx:      const cachedData = window.__videoWidgetData[client.id]
+src//modules/videos/PageVideoWidget_BACKUP.jsx:  const loadVideos = async () => {
+src//modules/videos/PageVideoWidget_BACKUP.jsx:      const homeVideos = await videoService.getVideosForPage(client.id, 'home')
+src//modules/videos/PageVideoWidget_BACKUP.jsx:      const todayVideo = homeVideos.find(v => 
+src//modules/videos/PageVideoWidget_BACKUP.jsx:  const handleWatchVideo = async (assignment) => {
+src//modules/videos/PageVideoWidget_BACKUP.jsx:    const video = todaysVideo.video
+src//modules/videos/PageVideoWidget_BACKUP.jsx:    const categoryConfig = getCategoryConfig(video.category)
+src//modules/videos/PageVideoWidget_BACKUP.jsx:    const videoId = extractYouTubeId(video.video_url)
+src//modules/videos/PageVideoWidget_BACKUP.jsx:                const video = assignment.video
+src//modules/videos/PageVideoWidget_BACKUP.jsx:                const videoId = extractYouTubeId(video.video_url)
+src//modules/videos/PageVideoWidget_BACKUP.jsx:                const categoryConfig = getCategoryConfig(video.category)
+src//modules/videos/PageVideoWidget_BACKUP.jsx:function VideoPlayerModal({ video, assignment, onClose, onComplete }) {
+src//modules/videos/PageVideoWidget_BACKUP.jsx:  const videoId = video.video_url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([^&\n?#]+)/)?.[1]
+src//client/pages/ClientHome.backup.jsx:function getYouTubeVideoId(url) {
+src//client/pages/ClientHome.backup.jsx:  const [featuredVideo, setFeaturedVideo] = useState({
+src//client/pages/ClientHome.backup.jsx:  const [showVideo, setShowVideo] = useState(true)
+src//client/pages/ClientHome.backup.jsx:  const loadFeaturedVideo = async () => {
+src//client/pages/ClientHome.backup.jsx:      const { data: videos } = await supabase
+src//client/pages/ClientHome.backup.jsx:        const video = videos[0]
+src//client/pages/ClientHome.backup.jsx:  const videoId = featuredVideo ? getYouTubeVideoId(featuredVideo.url) : null
+src//client/pages/ClientHome_backup.jsx:function getYouTubeVideoId(url) {
+src//client/pages/ClientHome_backup.jsx:  const [featuredVideo, setFeaturedVideo] = useState({
+src//client/pages/ClientHome_backup.jsx:  const [showVideo, setShowVideo] = useState(true)
+src//client/pages/ClientHome_backup.jsx:  const loadFeaturedVideo = async () => {
+src//client/pages/ClientMealPlan.jsx.backup_20250816_154404:  const videoUrl = plan?.coach_video_url || 'https://cdn.coverr.co/videos/coverr-healthy-fresh-salad-6179/1080p.mp4'
+src//client/pages/ClientMealPlan_BACKUP_20250822_091910.jsx:function getYouTubeVideoId(url) {
+src//client/pages/ClientMealPlan_BACKUP_20250822_091910.jsx:  const [showVideo, setShowVideo] = useState(true)
+src//client/pages/ClientMealPlan_BACKUP_20250822_091910.jsx:  const videoId = getYouTubeVideoId(plan.coach_video_url)
+src//client/pages/ClientMealPlan_backup_20250819_100242.jsx:  const videoUrl = plan?.coach_video_url || 'https://cdn.coverr.co/videos/coverr-healthy-fresh-salad-6179/1080p.mp4'
+src//services/DatabaseService.js.backup:      const { data: video } = await this.supabase
+src//services/DatabaseService.js:      const { data: video } = await this.supabase
+
+3. VIDEO STATES:

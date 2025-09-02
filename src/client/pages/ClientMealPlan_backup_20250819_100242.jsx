@@ -1,3 +1,4 @@
+import useIsMobile from '../../hooks/useIsMobile'
 // src/client/pages/ClientMealPlan.jsx - SALE-READY PERFECT VERSION
 import { useState, useEffect, useRef, useMemo } from 'react'
 import { 
@@ -160,7 +161,7 @@ export default function ClientMealPlan({ client }) {
   const searchDebounce = useRef(null)
 
   // Mobile detection
-  const isMobile = window.innerWidth <= 768
+  const isMobile = useIsMobile()
 
   // 🎯 DAILY MACRO TARGETS with smart calculation
   const dailyTargets = useMemo(() => {

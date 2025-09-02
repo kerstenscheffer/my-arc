@@ -1,16 +1,17 @@
-
-import ClientLogin from './components/ClientLogin'
-import AIGenerator from './components/AIGenerator'
-import Goals from './components/Goals'
 import { useState, useEffect } from 'react'
 import Login from './components/Login'
+import ResetPassword from './components/ResetPassword'
+import AIGenerator from './components/AIGenerator'
+import Goals from './components/Goals'
 import ClientDashboard from './client/ClientDashboard'
 import Dashboard from './components/Dashboard'
 import CoachHub from './coach/CoachHub'
+import CoachHubV2 from './coach/CoachHubV2'
 import DatabaseService from './services/DatabaseService'
-const db = DatabaseService
 import { LanguageProvider } from './contexts/LanguageContext'
-import ResetPassword from './auth/ResetPassword'
+import PWAInstaller from './components/PWAInstaller'  // 🆕 PWA TOEVOEGEN
+
+const db = DatabaseService
 
 function App() {
   // 🔥 DIRECT CHECK - VOOR ALLES ANDERS!
@@ -18,12 +19,16 @@ function App() {
     return (
       <LanguageProvider>
         <ResetPassword />
+        <PWAInstaller />  {/* 🆕 PWA ook op reset page */}
       </LanguageProvider>
     )
   }
 
   // Check localStorage on init
   const storedMode = localStorage.getItem('isClientMode') === 'true'
+  
+  // 🚀 V2 TOGGLE - VERANDER DEZE OM TE TESTEN
+  const useV2CoachHub = false  // true = V2, false = oude versie
 
   const [user, setUser] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -61,17 +66,17 @@ function App() {
     )
   }
 
-
-  // Check URL for client login
+  // Check URL for client login - GEBRUIK GEWONE LOGIN
   if (window.location.pathname === '/client-login') {
     if (!user) {
       return (
         <LanguageProvider>
-          <ClientLogin onClientLogin={() => {
+          <Login onLogin={() => {
             setIsClientMode(true)
             localStorage.setItem('isClientMode', 'true')
             checkUser()
           }} />
+          <PWAInstaller />  {/* 🆕 PWA op login */}
         </LanguageProvider>
       )
     }
@@ -86,6 +91,7 @@ function App() {
           localStorage.setItem('isClientMode', 'false')
           checkUser()
         }} />
+        <PWAInstaller />  {/* 🆕 PWA op login */}
       </LanguageProvider>
     )
   }
@@ -95,16 +101,27 @@ function App() {
     return (
       <LanguageProvider>
         <ClientDashboard onLogout={handleLogout} />
+        <PWAInstaller />  {/* 🆕 PWA voor clients */}
       </LanguageProvider>
     )
   } else {
+    // 🎯 HIER IS DE V2 TOGGLE
     return (
       <LanguageProvider>
-<CoachHub onLogout={handleLogout} />
+        {useV2CoachHub ? (
+          <>
+            <CoachHubV2 onLogout={handleLogout} />
+            <PWAInstaller />  {/* 🆕 PWA voor coaches V2 */}
+          </>
+        ) : (
+          <>
+            <CoachHub onLogout={handleLogout} />
+            <PWAInstaller />  {/* 🆕 PWA voor coaches */}
+          </>
+        )}
       </LanguageProvider>
     )
   }
 }
 
 export default App
-

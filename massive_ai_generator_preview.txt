@@ -1,0 +1,200 @@
+
+import DatabaseService from '../services/DatabaseService'
+const db = DatabaseService
+import { saveWorkoutSchema } from '../lib/schemaDatabase'
+
+
+import { useState, useEffect, useRef } from 'react'
+
+// ===== SPECIFIC GOALS SYSTEM =====
+const SPECIFIC_GOALS = {
+  // Strength Specialization
+  bench_strength: {
+    name: "Bench Press Strength",
+    description: "Focus on increasing bench press 1RM",
+    priorityExercises: ["Barbell Bench Press", "Pause Barbell Bench Press", "Close-Grip Barbell Bench Press", "Incline Dumbbell Press", "Low-Incline Barbell Bench Press"],
+    volumeBonus: { chest: 4, triceps: 2 },
+    repRangeOverride: { compound: [3, 6], isolation: [6, 8] },
+    intensityMethods: ["pause_reps", "pin_press", "board_press"],
+    notes: "Extra volume on bench variations, pause work for strength"
+  },
+  squat_strength: {
+    name: "Squat Strength", 
+    description: "Focus on increasing squat 1RM",
+    priorityExercises: ["High-Bar Back Squat", "Front Squat", "Leg Press", "Bulgarian Split Squat", "Hack Squat"],
+    volumeBonus: { legs: 4 },
+    repRangeOverride: { compound: [3, 6], isolation: [6, 8] },
+    intensityMethods: ["pause_squats", "box_squats", "pin_squats"],
+    notes: "Heavy squat focus with accessory support"
+  },
+  deadlift_strength: {
+    name: "Deadlift Strength",
+    description: "Focus on increasing deadlift 1RM", 
+    priorityExercises: ["Romanian Deadlift", "Trap Bar Deadlift", "Barbell Bent-Over Row", "Single-Arm Dumbbell Row"],
+    volumeBonus: { back: 3, legs: 3 },
+    repRangeOverride: { compound: [3, 6], isolation: [6, 8] },
+    intensityMethods: ["deficit_pulls", "rack_pulls", "pause_deads"],
+    notes: "Heavy pulling patterns with posterior chain focus"
+  },
+  ohp_strength: {
+    name: "Overhead Press Strength",
+    description: "Focus on increasing overhead press 1RM",
+    priorityExercises: ["Standing Barbell Overhead Press (Strict Press)", "Seated Barbell Overhead Press", "Dumbbell Shoulder Press", "Z-Press", "Push Press"],
+    volumeBonus: { shoulders: 4, triceps: 2 },
+    repRangeOverride: { compound: [3, 6], isolation: [6, 8] },
+    intensityMethods: ["pin_press", "push_press", "pause_press"],
+    notes: "Heavy overhead pressing with strict form emphasis"
+  },
+  pullup_strength: {
+    name: "Pull-up Strength (10+ reps)",
+    description: "Build up to 10+ consecutive pull-ups",
+    priorityExercises: ["Weighted Pull-Ups", "Weighted Chin-Ups", "Lat Pulldown", "Inverted Row"],
+    volumeBonus: { back: 4, biceps: 2 },
+    repRangeOverride: { compound: [5, 8], isolation: [8, 12] },
+    intensityMethods: ["assisted_pullups", "negative_pullups", "cluster_sets"],
+    notes: "Progressive overload towards bodyweight mastery"
+  },
+
+  // Hypertrophy Specialization  
+  lat_width: {
+    name: "Lat Width Development",
+    description: "Maximize lat width for V-taper",
+    priorityExercises: ["Weighted Pull-Ups", "Lat Pulldown", "Cable Pullovers", "Single-Arm Lat Pulldown", "One-Arm Cable Pullover"],
+    volumeBonus: { back: 6 },
+    repRangeOverride: { compound: [8, 12], isolation: [12, 15] },
+    intensityMethods: ["myo_reps", "drop_sets", "stretch_pause"],
+    notes: "Width-focused pulling with stretch emphasis"
+  },
+  shoulder_width: {
+    name: "Shoulder Width (V-Shape)",
+    description: "Build massive lateral delts for shoulder width",
+    priorityExercises: ["Cable Lateral Raises", "Lean-Away Cable Lateral Raise", "Machine Lateral Raises", "Cuffed Cable Lateral Raise", "Lying Incline Lateral Raise"],
+    volumeBonus: { shoulders: 8 },
+    repRangeOverride: { compound: [8, 12], isolation: [12, 20] },
+    intensityMethods: ["myo_reps", "mechanical_drop_sets", "partial_reps"],
+    notes: "High volume lateral delt specialization"
+  },
+  tricep_size: {
+    name: "Tricep Mass",
+    description: "Maximize tricep size for arm development",
+    priorityExercises: ["Cable Overhead Triceps Extension", "Single-Arm Overhead Cable Extension", "Incline Skull Crushers", "Crossbody Cable Extension", "Dumbbell Overhead Extension"],
+    volumeBonus: { triceps: 6 },
+    repRangeOverride: { compound: [8, 12], isolation: [10, 15] },
+    intensityMethods: ["myo_reps", "drop_sets", "lengthened_partials"],
+    notes: "Overhead emphasis for long head development"
+  },
+  bicep_peaks: {
+    name: "Bicep Peaks", 
+    description: "Build impressive bicep peaks and size",
+    priorityExercises: ["Incline Dumbbell Curl", "Bayesian Cable Curl", "Preacher Curls", "Spider Curl", "Concentration Curl"],
+    volumeBonus: { biceps: 6 },
+    repRangeOverride: { compound: [8, 12], isolation: [10, 15] },
+    intensityMethods: ["myo_reps", "drop_sets", "21s"],
+    notes: "Stretch position curls for peak development"
+  },
+  glute_dev: {
+    name: "Glute Development",
+    description: "Build powerful, shapely glutes",
+    priorityExercises: ["Hip Thrust", "Romanian Deadlift", "Bulgarian Split Squat", "Cable Glute Kickback", "Hip Abduction Machine"],
+    volumeBonus: { legs: 6 },
+    repRangeOverride: { compound: [8, 12], isolation: [12, 15] },
+    intensityMethods: ["pause_reps", "1.5_reps", "pulse_reps"],
+    notes: "Hip-dominant movements with glute focus"
+  },
+  chest_thickness: {
+    name: "Chest Thickness",
+    description: "Build thick, powerful pecs",
+    priorityExercises: ["Incline Dumbbell Press", "Machine Chest Press", "Weighted Dips", "Incline Cable Flies", "Seated Cable Fly"],
+    volumeBonus: { chest: 6 },
+    repRangeOverride: { compound: [8, 12], isolation: [10, 15] },
+    intensityMethods: ["myo_reps", "drop_sets", "stretch_pause"],
+    notes: "Stretch-focused movements for thickness"
+  },
+  back_thickness: {
+    name: "Back Thickness",
+    description: "Build thick, dense back musculature", 
+    priorityExercises: ["T-Bar Row (Chest-Supported)", "Pendlay Row", "Machine Row", "Single-Arm Dumbbell Row", "Cable Row"],
+    volumeBonus: { back: 6 },
+    repRangeOverride: { compound: [8, 12], isolation: [10, 15] },
+    intensityMethods: ["pause_reps", "cluster_sets", "myo_reps"],
+    notes: "Rowing emphasis for back thickness"
+  },
+
+  // Skill & Performance
+  handstand_prog: {
+    name: "Handstand Progression",
+    description: "Build towards freestanding handstand",
+    priorityExercises: ["Overhead Press", "Dumbbell Shoulder Press", "Pike Push-Ups", "Weighted Push-Ups"],
+    volumeBonus: { shoulders: 4, triceps: 2 },
+    repRangeOverride: { compound: [5, 10], isolation: [8, 15] },
+    intensityMethods: ["wall_walks", "hollow_holds", "handstand_holds"],
+    notes: "Overhead strength for handstand development"
+  },
+  pistol_squat: {
+    name: "Pistol Squat Progression",
+    description: "Build single-leg squat strength",
+    priorityExercises: ["Bulgarian Split Squat", "Step-Up", "Single-Leg Leg Extension", "Walking Lunge"],
+    volumeBonus: { legs: 4 },
+    repRangeOverride: { compound: [6, 12], isolation: [8, 15] },
+    intensityMethods: ["assisted_pistols", "box_pistols", "negative_pistols"],
+    notes: "Unilateral leg strength development"
+  },
+  muscle_up: {
+    name: "Muscle-up Progression",
+    description: "Build towards muscle-up mastery",
+    priorityExercises: ["Weighted Pull-Ups", "Weighted Dips", "Lat Pulldown", "Triceps Pushdown"],
+    volumeBonus: { back: 3, triceps: 3 },
+    repRangeOverride: { compound: [5, 10], isolation: [8, 12] },
+    intensityMethods: ["kipping_practice", "transition_work", "band_assistance"],
+    notes: "Pull-up and dip strength for muscle-up transition"
+  }
+};
+
+// ===== AI SCHEMA GENERATOR CLASS =====
+class AISchemaGenerator {
+  constructor() {
+    this.exerciseDatabase = this.initializeExerciseDatabase()
+    this.volumeGuidelines = this.initializeVolumeGuidelines()
+    this.splitTemplates = this.initializeSplitTemplates()
+    this.specificGoals = SPECIFIC_GOALS
+  }
+
+  initializeExerciseDatabase() {
+    return {
+      chest: {
+        compound: [
+          { name: "Machine Chest Press", equipment: "machine", stretch: true, rom: "excellent", overload: "excellent", painFree: true, priority: 1, primary: "chest", ratings: { strength: 5, hypertrophy: 5, personal: 5 } },
+          { name: "Incline Dumbbell Press", equipment: "dumbbells", stretch: true, rom: "excellent", overload: "good", painFree: true, priority: 2, primary: "chest", ratings: { strength: 8, hypertrophy: 8, personal: 8 } },
+          { name: "Barbell Bench Press", equipment: "barbell", stretch: false, rom: "good", overload: "excellent", painFree: false, priority: 3, primary: "chest", ratings: { strength: 10, hypertrophy: 8, personal: 10 } },
+          { name: "Weighted Dips", equipment: "bodyweight", stretch: true, rom: "excellent", overload: "good", painFree: false, priority: 4, primary: "chest", ratings: { strength: 9, hypertrophy: 9, personal: 7 } },
+          { name: "Low-Incline Barbell Bench Press", equipment: "barbell", stretch: true, rom: "excellent", overload: "excellent", painFree: true, priority: 2, primary: "chest", ratings: { strength: 9, hypertrophy: 9, personal: 9 } },
+          { name: "Flat Dumbbell Bench Press", equipment: "dumbbells", stretch: true, rom: "excellent", overload: "good", painFree: true, priority: 3, primary: "chest", ratings: { strength: 8, hypertrophy: 8, personal: 8 } }
+        ],
+        isolation: [
+          { name: "Incline Cable Flies", equipment: "cables", stretch: true, rom: "excellent", overload: "excellent", painFree: true, priority: 1, primary: "chest", ratings: { strength: 8, hypertrophy: 10, personal: 8 } },
+          { name: "Machine Pec Deck", equipment: "machine", stretch: true, rom: "excellent", overload: "excellent", painFree: true, priority: 2, primary: "chest", ratings: { strength: 8, hypertrophy: 10, personal: 8 } },
+          { name: "Seated Cable Fly", equipment: "cables", stretch: true, rom: "excellent", overload: "excellent", painFree: true, priority: 2, primary: "chest", ratings: { strength: 10, hypertrophy: 10, personal: 10 } },
+          { name: "Low-to-High Cable Fly", equipment: "cables", stretch: true, rom: "excellent", overload: "excellent", painFree: true, priority: 2, primary: "chest", ratings: { strength: 8, hypertrophy: 10, personal: 10 } },
+          { name: "Dumbbell Flies", equipment: "dumbbells", stretch: true, rom: "excellent", overload: "good", painFree: true, priority: 3, primary: "chest", ratings: { strength: 5, hypertrophy: 7, personal: 7 } }
+        ]
+      },
+      back: {
+        compound: [
+          { name: "Lat Pulldown", equipment: "cables", stretch: true, rom: "excellent", overload: "excellent", painFree: true, priority: 1, primary: "back", ratings: { strength: 8, hypertrophy: 9, personal: 9 } },
+          { name: "Weighted Pull-Ups", equipment: "bodyweight", stretch: true, rom: "excellent", overload: "good", painFree: true, priority: 1, primary: "back", ratings: { strength: 10, hypertrophy: 10, personal: 10 } },
+          { name: "T-Bar Row (Chest-Supported)", equipment: "machine", stretch: true, rom: "excellent", overload: "excellent", painFree: true, priority: 2, primary: "back", ratings: { strength: 8, hypertrophy: 10, personal: 9 } },
+          { name: "Cable Row", equipment: "cables", stretch: true, rom: "excellent", overload: "excellent", painFree: true, priority: 3, primary: "back", ratings: { strength: 7, hypertrophy: 8, personal: 8 } },
+          { name: "Barbell Bent-Over Row", equipment: "barbell", stretch: true, rom: "excellent", overload: "excellent", painFree: false, priority: 3, primary: "back", ratings: { strength: 9, hypertrophy: 8, personal: 7 } },
+          { name: "Single-Arm Dumbbell Row", equipment: "dumbbells", stretch: true, rom: "excellent", overload: "good", painFree: true, priority: 4, primary: "back", ratings: { strength: 8, hypertrophy: 8, personal: 8 } }
+        ],
+        isolation: [
+          { name: "Cable Pullovers", equipment: "cables", stretch: true, rom: "excellent", overload: "excellent", painFree: true, priority: 1, primary: "back", ratings: { strength: 6, hypertrophy: 9, personal: 9 } },
+          { name: "Straight-Arm Pulldown (Rope)", equipment: "cables", stretch: true, rom: "excellent", overload: "excellent", painFree: true, priority: 1, primary: "back", ratings: { strength: 5, hypertrophy: 8, personal: 8 } },
+          { name: "Face Pulls", equipment: "cables", stretch: false, rom: "good", overload: "good", painFree: true, priority: 3, primary: "back", ratings: { strength: 5, hypertrophy: 7, personal: 7 } },
+          { name: "Single-Arm Lat Pulldown", equipment: "cables", stretch: true, rom: "excellent", overload: "excellent", painFree: true, priority: 2, primary: "back", ratings: { strength: 7, hypertrophy: 8, personal: 8 } }
+        ]
+      },
+      shoulders: {
+        compound: [
+          { name: "Machine Shoulder Press", equipment: "machine", stretch: false, rom: "good", overload: "excellent", painFree: true, priority: 1, primary: "shoulders", ratings: { strength: 8, hypertrophy: 8, personal: 8 } },
+          { name: "Dumbbell Shoulder Press", equipment: "dumbbells", stretch: false, rom: "excellent", overload: "good", painFree: true, priority: 2, primary: "shoulders", ratings: { strength: 8, hypertrophy: 8, personal: 8 } },

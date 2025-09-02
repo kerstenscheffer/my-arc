@@ -1,0 +1,100 @@
+// src/services/DatabaseService.js
+// 🔧 FIXED VERSION - Met correcte tabel namen en error handling
+
+import { supabase } from '../lib/supabase'
+import { extendDatabaseService } from './DatabaseServiceOptimized'
+import NotificationService from '../modules/notifications/NotificationService';
+
+
+
+
+
+
+class DatabaseServiceClass {
+  constructor() {
+    // Cache management
+    this.supabase = supabase
+    this.cache = new Map()
+    this.cacheTimeout = 5 * 60 * 1000 // 5 minutes
+    this.notifications = new NotificationService(this.supabase);  // GOED - gebruik this.supabase
+
+
+
+    // Event subscribers
+    this.subscribers = new Map()
+    
+    // Current user cache
+    this.currentUser = null
+    
+    console.log('🚀 DatabaseService initialized!')
+  }
+
+  // ===== CACHE MANAGEMENT =====
+  getCached(key) {
+    const cached = this.cache.get(key)
+    if (cached && Date.now() - cached.timestamp < this.cacheTimeout) {
+      return cached.data
+    }
+    return null
+  }
+
+  setCache(key, data) {
+    this.cache.set(key, {
+      data,
+      timestamp: Date.now()
+    })
+  }
+
+  clearCache(pattern = null) {
+    if (pattern) {
+      for (const key of this.cache.keys()) {
+        if (key.includes(pattern)) {
+          this.cache.delete(key)
+        }
+      }
+    } else {
+      this.cache.clear()
+    }
+  }
+
+  // ===== EVENT SYSTEM =====
+  subscribe(event, callback) {
+    if (!this.subscribers.has(event)) {
+      this.subscribers.set(event, [])
+    }
+    this.subscribers.get(event).push(callback)
+    
+    // Return unsubscribe function
+    return () => {
+      const callbacks = this.subscribers.get(event) || []
+      const index = callbacks.indexOf(callback)
+      if (index > -1) {
+        callbacks.splice(index, 1)
+      }
+    }
+  }
+
+  emit(event, data) {
+    const callbacks = this.subscribers.get(event) || []
+    callbacks.forEach(callback => callback(data))
+  }
+
+  // ===== AUTH METHODS =====
+  async getCurrentUser() {
+    try {
+      // Check cache first
+      if (this.currentUser) return this.currentUser
+      
+      const { data: { user }, error } = await supabase.auth.getUser()
+      if (error) throw error
+      
+      this.currentUser = user
+      return user
+    } catch (error) {
+      console.error('❌ Get current user failed:', error)
+      return null
+    }
+  }
+
+  async signIn(email, password) {
+    try {

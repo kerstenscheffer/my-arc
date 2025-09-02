@@ -1,3 +1,4 @@
+import useIsMobile from '../../hooks/useIsMobile'
 // src/client/pages/ClientRecipeLibrary.jsx
 // MY ARC CLIENT RECIPE LIBRARY - Complete recepten bibliotheek
 
@@ -88,7 +89,7 @@ export default function ClientRecipeLibrary({ client, onNavigate }) {
   const [selectedMeal, setSelectedMeal] = useState(null)
   const [favorites, setFavorites] = useState([])
   
-  const isMobile = window.innerWidth <= 768
+  const isMobile = useIsMobile()
 
   useEffect(() => {
     loadMeals()

@@ -1,3 +1,4 @@
+import useIsMobile from '../../hooks/useIsMobile'
 // src/client/pages/ClientMealPlan.jsx
 // 🚀 MY ARC CLIENT MEAL PLAN - ULTIMATE LAUNCH VERSION WITH ICONS!
 // Features: Coach video/notes, Week navigation, Progress tracking, Meal check-off, Smart scaling, URL Icons
@@ -168,7 +169,7 @@ export default function ClientMealPlan({ client }) {
   const [expandedDays, setExpandedDays] = useState({})
   const [todayProgress, setTodayProgress] = useState({ kcal: 0, protein: 0, carbs: 0, fat: 0 })
   
-  const isMobile = window.innerWidth <= 768
+  const isMobile = useIsMobile()
 
   // Load meal plan on mount
   useEffect(() => {

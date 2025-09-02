@@ -1,5 +1,5 @@
 // src/modules/client-management/modules/MealTrackingModule.jsx
-// Meal plan tracking en compliance module - Volledig operationeel met AI suggesties
+// Meal plan tracking en compliance module - Met Open Meal Planner button
 
 import { useState, useEffect, useMemo } from 'react'
 
@@ -541,17 +541,36 @@ export default function MealTrackingModule({ client, data, onAction, viewMode, d
         </p>
       </div>
       
-      {/* Quick Action */}
+      {/* UPDATED BUTTON - Opens Meal Planner instead of AI Suggestion */}
       <button
         className="myarc-btn myarc-btn-sm myarc-btn-primary"
-        onClick={() => onAction('sendMealTip', {})}
+        onClick={() => onAction('manageMeals')}
         style={{ 
           width: '100%',
-          background: 'linear-gradient(135deg, #3b82f6, #2563eb)',
-          border: 'none'
+          background: 'linear-gradient(135deg, #3b82f6, #10b981)',
+          border: 'none',
+          padding: '12px',
+          borderRadius: '8px',
+          color: '#fff',
+          cursor: 'pointer',
+          fontSize: '0.9rem',
+          fontWeight: 'bold',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: '8px',
+          transition: 'all 0.3s ease'
+        }}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.transform = 'translateY(-2px)'
+          e.currentTarget.style.boxShadow = '0 4px 12px rgba(59, 130, 246, 0.4)'
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.transform = 'translateY(0)'
+          e.currentTarget.style.boxShadow = 'none'
         }}
       >
-        💡 AI Suggestion
+        🚀 Open Meal Planner
       </button>
     </div>
   )

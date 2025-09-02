@@ -1,3 +1,4 @@
+import useIsMobile from '../../hooks/useIsMobile'
 // src/client/pages/ClientShoppingList.jsx
 // MY ARC CLIENT SHOPPING LIST - Slimme boodschappenlijst generator
 
@@ -63,7 +64,7 @@ export default function ClientShoppingList({ client, onNavigate }) {
   const [customItems, setCustomItems] = useState([])
   const [newItem, setNewItem] = useState('')
   
-  const isMobile = window.innerWidth <= 768
+  const isMobile = useIsMobile()
 
   useEffect(() => {
     loadMealPlan()

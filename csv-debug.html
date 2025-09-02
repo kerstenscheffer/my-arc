@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CSV Debug Tool</title>
+    <style>
+        body {
+            background: #111;
+            color: #fff;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            padding: 20px;
+            margin: 0;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        
+        h1 {
+            color: #10b981;
+            margin-bottom: 20px;
+        }
+        
+        .upload-zone {
+            border: 2px dashed #10b981;
+            border-radius: 12px;
+            padding: 40px;
+            text-align: center;
+            margin-bottom: 30px;
+            background: rgba(16, 185, 129, 0.05);
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        
+        .upload-zone:hover {
+            background: rgba(16, 185, 129, 0.1);
+        }
+        
+        .upload-zone.dragging {
+            background: rgba(16, 185, 129, 0.2);
+            border-color: #10b981;
+        }
+        
+        input[type="file"] {
+            display: none;
+        }
+        
+        .debug-section {
+            background: rgba(0, 0, 0, 0.5);
+            border: 1px solid #333;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        
+        .debug-section h2 {
+            color: #10b981;
+            font-size: 1.2rem;
+            margin-bottom: 15px;
+        }
+        
+        pre {
+            background: #000;
+            padding: 15px;
+            border-radius: 6px;
+            overflow-x: auto;
+            font-size: 0.9rem;
+            color: #10b981;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+        }
+        
+        th, td {
+            border: 1px solid #333;
+            padding: 8px;
+            text-align: left;
+        }
+        
+        th {
+            background: rgba(16, 185, 129, 0.2);
+            color: #10b981;
+        }
+        
+        td {
+            background: rgba(0, 0, 0, 0.3);
+            font-size: 0.85rem;
+        }
+        
+        .error {
+            color: #ef4444;
+            font-weight: bold;
+        }
+        
+        .success {
+            color: #10b981;
+            font-weight: bold;
+        }
+        
+        button {
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+            margin-right: 10px;
+            transition: transform 0.2s ease;
+        }
+        
+        button:hover {
+            transform: translateY(-2px);
+        }
+        
+        .sql-output {
+            background: #000;
+            border: 1px solid #10b981;
+            border-radius: 8px;
+            padding: 20px;
+            margin-top: 20px;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        
+        .sql-output pre {
+            margin: 0;
+            color: #ccc;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔍 CSV Debug Tool - Product Analyzer</h1>
+        
+        <div class="upload-zone" id="uploadZone">
+            <input type="file" id="fileInput" accept=".csv">
+            <h3>Sleep CSV hier of klik om te uploaden</h3>
+            <p>Dit tool onderzoekt exact wat er in je CSV staat</p>
+        </div>
+        
+        <div id="debugOutput"></div>
+    </div>
+    
+    <script>
+        const uploadZone = document.getElementById('uploadZone');
+        const fileInput = document.getElementById('fileInput');
+        const debugOutput = document.getElementById('debugOutput');
+        
+        // Upload handlers
+        uploadZone.onclick = () => fileInput.click();
+        
+        uploadZone.ondragover = (e) => {
+            e.preventDefault();
+            uploadZone.classList.add('dragging');
+        };
+        
+        uploadZone.ondragleave = () => {
+            uploadZone.classList.remove('dragging');
+        };
+        
+        uploadZone.ondrop = (e) => {
+            e.preventDefault();
+            uploadZone.classList.remove('dragging');
+            const file = e.dataTransfer.files[0];
+            if (file) processFile(file);
+        };
+        
+        fileInput.onchange = (e) => {
+            const file = e.target.files[0];
+            if (file) processFile(file);
+        };
+        
+        async function processFile(file) {
+            const text = await file.text();
+            analyzeCSV(text);
+        }
+        
+        function analyzeCSV(csvText) {
+            let output = '';
+            
+            // 1. Raw eerste regels
+            output += `
+                <div class="debug-section">
+                    <h2>📝 Raw Data (eerste 3 regels)</h2>
+                    <pre>${csvText.split('\n').slice(0, 3).join('\n')}</pre>
+                </div>
+            `;
+            
+            // 2. Detect delimiter
+            const firstLine = csvText.split('\n')[0];
+            const hasComma = firstLine.includes(',');
+            const hasPipe = firstLine.includes('|');
+            const hasSemicolon = firstLine.includes(';');
+            const hasTab = firstLine.includes('\t');
+            
+            let delimiter = ',';
+            if (hasPipe) delimiter = '|';
+            else if (hasSemicolon) delimiter = ';';
+            else if (hasTab) delimiter = '\t';
+            
+            output += `
+                <div class="debug-section">
+                    <h2>🔍 Delimiter Detection</h2>
+                    <p>Comma (,): ${hasComma ? '<span class="success">JA</span>' : '<span class="error">NEE</span>'}</p>
+                    <p>Pipe (|): ${hasPipe ? '<span class="success">JA</span>' : '<span class="error">NEE</span>'}</p>
+                    <p>Semicolon (;): ${hasSemicolon ? '<span class="success">JA</span>' : '<span class="error">NEE</span>'}</p>
+                    <p>Tab: ${hasTab ? '<span class="success">JA</span>' : '<span class="error">NEE</span>'}</p>
+                    <p><strong>Gekozen delimiter: "${delimiter}"</strong></p>
+                </div>
+            `;
+            
+            // 3. Parse headers
+            const headers = firstLine.split(delimiter).map(h => h.trim());
+            output += `
+                <div class="debug-section">
+                    <h2>📊 Headers Gevonden (${headers.length} kolommen)</h2>
+                    <pre>${JSON.stringify(headers, null, 2)}</pre>
+                </div>
+            `;
+            
+            // 4. Parse eerste product
+            const lines = csvText.split('\n').filter(l => l.trim());
+            if (lines.length > 1) {
+                const firstProductLine = lines[1];
+                const values = firstProductLine.split(delimiter).map(v => v.trim());
+                
+                const product = {};
+                headers.forEach((header, index) => {
+                    product[header] = values[index] || '';
+                });
+                
+                output += `
+                    <div class="debug-section">
+                        <h2>🥫 Eerste Product Geparsed</h2>
+                        <pre>${JSON.stringify(product, null, 2)}</pre>
+                    </div>
+                `;
+                
+                // 5. Generate SQL voor eerste product
+                const sql = generateTestSQL(product);
+                output += `
+                    <div class="debug-section">
+                        <h2>💾 Test SQL voor Eerste Product</h2>
+                        <div class="sql-output">
+                            <pre>${sql}</pre>
+                        </div>
+                    </div>
+                `;
+            }
+            
+            // 6. Statistieken
+            const products = [];
+            for (let i = 1; i < lines.length; i++) {
+                const values = lines[i].split(delimiter);
+                const product = {};
+                headers.forEach((header, index) => {
+                    product[header] = values[index] || '';
+                });
+                if (product.name || product.Name) {
+                    products.push(product);
+                }
+            }
+            
+            const categories = {};
+            products.forEach(p => {
+                const cat = p.category || p.Category || 'other';
+                categories[cat] = (categories[cat] || 0) + 1;
+            });
+            
+            output += `
+                <div class="debug-section">
+                    <h2>📈 Statistieken</h2>
+                    <p>Totaal producten: <strong>${products.length}</strong></p>
+                    <p>Categorieën gevonden:</p>
+                    <table>
+                        <tr><th>Categorie</th><th>Aantal</th></tr>
+                        ${Object.entries(categories).map(([cat, count]) => 
+                            `<tr><td>${cat}</td><td>${count}</td></tr>`
+                        ).join('')}
+                    </table>
+                </div>
+            `;
+            
+            // 7. Download volledige SQL
+            output += `
+                <div class="debug-section">
+                    <h2>🚀 Genereer Volledige SQL</h2>
+                    <button onclick="generateFullSQL('${delimiter}')">Genereer SQL voor alle ${products.length} producten</button>
+                </div>
+            `;
+            
+            debugOutput.innerHTML = output;
+            
+            // Store data globally voor download
+            window.csvData = csvText;
+            window.delimiter = delimiter;
+        }
+        
+        function generateTestSQL(product) {
+            const name = (product.name || product.Name || 'Unknown').replace(/'/g, "''");
+            const category = product.category || product.Category || 'other';
+            const brand = (product.brand || product.Brand || '').replace(/'/g, "''");
+            const unit = product.unit || product.Unit || 'gram';
+            const barcode = product.barcode || product.Barcode || '';
+            
+            // Simpele nutritionele schatting op basis van categorie
+            let nutrition = { kcal: 100, protein: 5, carbs: 15, fat: 3, fiber: 2 };
+            
+            if (category.toLowerCase().includes('vlees')) {
+                nutrition = { kcal: 200, protein: 25, carbs: 0, fat: 10, fiber: 0 };
+            } else if (category.toLowerCase().includes('groente')) {
+                nutrition = { kcal: 30, protein: 2, carbs: 6, fat: 0.3, fiber: 2 };
+            } else if (category.toLowerCase().includes('fruit')) {
+                nutrition = { kcal: 60, protein: 1, carbs: 15, fat: 0.3, fiber: 2 };
+            } else if (category.toLowerCase().includes('zuivel')) {
+                nutrition = { kcal: 60, protein: 3.5, carbs: 5, fat: 3, fiber: 0 };
+            }
+            
+            return `INSERT INTO ingredients (
+  name, category, per_100g_kcal, per_100g_protein, 
+  per_100g_carbs, per_100g_fat, per_100g_fiber,
+  default_unit, grams_per_unit, brand, barcode
+) VALUES (
+  '${name}', '${category}', ${nutrition.kcal}, ${nutrition.protein},
+  ${nutrition.carbs}, ${nutrition.fat}, ${nutrition.fiber},
+  '${unit}', 100, '${brand}', ${barcode ? `'${barcode}'` : 'NULL'}
+);`;
+        }
+        
+        window.generateFullSQL = function(delimiter) {
+            const lines = window.csvData.split('\n').filter(l => l.trim());
+            const headers = lines[0].split(delimiter).map(h => h.trim());
+            
+            let sql = '-- Generated SQL\n\n';
+            
+            for (let i = 1; i < lines.length; i++) {
+                const values = lines[i].split(delimiter);
+                const product = {};
+                headers.forEach((header, index) => {
+                    product[header] = values[index] || '';
+                });
+                
+                if (product.name || product.Name) {
+                    sql += generateTestSQL(product) + '\n\n';
+                }
+            }
+            
+            // Download SQL
+            const blob = new Blob([sql], { type: 'text/sql' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'ingredients.sql';
+            a.click();
+        };
+    </script>
+</body>
+</html>

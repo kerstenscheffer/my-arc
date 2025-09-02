@@ -1,3 +1,4 @@
+import useIsMobile from '../../hooks/useIsMobile'
 // src/coach/pages/CoachMealPlannerDashboard.jsx
 // 🚀 MY ARC COACH MEAL PLANNER - ULTIMATE FUSION VERSION WITH SAVE & LOAD!
 // Features: Drag & Drop, Portie scaling, Coach suggestions, Meal swap, Day detail, Video/Notes, SAVE TEMPLATES, LOAD TEMPLATES
@@ -233,7 +234,7 @@ export default function CoachMealPlannerDashboard({ db, clients: propsClients, c
     allergies: []
   })
 
-  const isMobile = window.innerWidth <= 768
+  const isMobile = useIsMobile()
 
 // Load all available meals on mount
 useEffect(() => {

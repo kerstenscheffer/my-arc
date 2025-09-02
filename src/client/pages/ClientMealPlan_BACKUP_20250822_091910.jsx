@@ -1,3 +1,4 @@
+import useIsMobile from '../../hooks/useIsMobile'
 // src/client/pages/ClientMealPlan.jsx
 // 🚀 MY ARC CLIENT MEAL PLAN - FINAL LAUNCH VERSION FIXED
 // Features: YouTube embed, Coach foto, Bug fixes, Bibliotheek/Boodschappen buttons
@@ -268,7 +269,7 @@ const [isSaving, setIsSaving] = useState(false)
 const [lastSaved, setLastSaved] = useState(null)
 const [autoSave, setAutoSave] = useState(true)
   
-  const isMobile = window.innerWidth <= 768
+  const isMobile = useIsMobile()
   // Load all meals for swap functionality
   useEffect(() => {
     loadAllMeals()

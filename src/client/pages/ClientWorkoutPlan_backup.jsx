@@ -1,3 +1,4 @@
+import useIsMobile from '../../hooks/useIsMobile'
 import { useState, useEffect } from 'react'
 import { useLanguage } from '../../contexts/LanguageContext'
 
@@ -35,7 +36,7 @@ export default function ClientWorkoutPlan({ client, schema }) {
   }, [schema])
 
   // Mobile detection
-  const isMobile = window.innerWidth <= 768
+  const isMobile = useIsMobile()
 
   // Exercise database (from AIGenerator)
   const exerciseDatabase = {

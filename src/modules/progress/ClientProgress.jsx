@@ -1,3 +1,4 @@
+import useIsMobile from '../../hooks/useIsMobile'
 // src/modules/progress/ClientProgress.jsx
 // MY ARC Client Progress - OPTIMIZED MODULE VERSION
 // Features: Lazy loading, Memoization, Virtual scrolling, Debouncing
@@ -130,7 +131,7 @@ const ProgressCard = React.memo(({ date, dayName, dayNumber, isToday, progressCo
 // Main Component
 export default function ClientProgress({ client }) {
   const { t, language } = useLanguage()
-  const isMobile = window.innerWidth <= 768
+  const isMobile = useIsMobile()
   
   // Core states
   const [loading, setLoading] = useState(true)

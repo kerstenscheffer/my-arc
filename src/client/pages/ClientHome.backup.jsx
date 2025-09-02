@@ -1,3 +1,4 @@
+import useIsMobile from '../../hooks/useIsMobile'
 // src/client/pages/ClientHome.jsx - FINAL LAUNCH VERSION
 // Features: Accountability Alerts, Video Player, Desktop Optimized, Progress Displays
 
@@ -278,7 +279,7 @@ function AccountabilityAlert({ alert, onDismiss, onAction }) {
 
 export default function ClientHome({ client, setCurrentView }) {
   const { t } = useLanguage()
-  const isMobile = window.innerWidth <= 768
+  const isMobile = useIsMobile()
   const isDesktop = window.innerWidth >= 1400
   
   // Safety check for client

@@ -1,3 +1,4 @@
+import useIsMobile from '../../hooks/useIsMobile'
 // src/client/pages/ClientHome.jsx - REFACTORED VERSION
 // ✅ Gebruikt DatabaseService voor ALLE data
 // ✅ Inclusief Notification System
@@ -139,7 +140,7 @@ const NotificationBanner = ({ notification, onDismiss, onAction }) => {
 
 export default function ClientHome({ client, setCurrentView }) {
   const { t } = useLanguage()
-  const isMobile = window.innerWidth <= 768
+  const isMobile = useIsMobile()
   const isDesktop = window.innerWidth >= 1400
   const db = DatabaseService // Use DatabaseService
   

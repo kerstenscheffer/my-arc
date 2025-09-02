@@ -1,237 +1,61 @@
+import useIsMobile from '../../hooks/useIsMobile'
 // src/client/pages/ClientMealPlan.jsx
-// ===== ULTIMATE CLIENT MEAL PLAN - MY ARC STYLE WITH ALL FEATURES =====
-// Laatste update: 22 Augustus 2025
-// Features: Meal Details, Swap Modal, Recipe Library, Shopping List, AI Suggestions
+// 🚀 MY ARC CLIENT MEAL PLAN - VOLLEDIG WERKEND
+// ✅ Custom meals per client
+// ✅ Meal detail popup
+// ✅ Shop link naar ClientShoppingList
+// ✅ Alle meals op tijdlijn
+// ✅ Save functionaliteit
 
-import { useState, useEffect, useMemo } from 'react'
-import { useLanguage } from '../../contexts/LanguageContext'
+import React, { useState, useEffect, useRef } from 'react'
 import { 
-  Sunrise, Sun, Moon, Apple, Utensils,
-  Flame, Dumbbell, Zap, Droplets,
+  Utensils, Flame, Dumbbell, Zap, Droplets,
   CheckCircle2, Camera, Plus, ChevronDown, ChevronUp,
   Calendar, TrendingUp, Activity, Heart,
   Clock, Target, Award, Sparkles,
   RefreshCw, ChevronLeft, ChevronRight,
-  Coffee, Pizza, Salad, Cookie,
-  Gauge, BatteryCharging, Brain,
+  Coffee, Sun, Moon, Apple,
   CheckSquare, Square, Edit3,
   Star, Info, AlertCircle,
-  FileText, Download, Share2,
-  BarChart3, PieChart, Timer,
-  ShoppingCart, BookOpen, X,
-  Search, Filter, Eye, Package,
-  ChefHat, Scale, Users, List
+  BarChart3, Timer, ShoppingCart,
+  X, Eye, ChefHat, Users,
+  Bell, ArrowRight, MoreVertical,
+  PlusCircle, MinusCircle, Settings,
+  Home, User, Cookie, History, Search, Filter,
+  Save, Upload, Trash2, Edit2, Package, BookOpen
 } from 'lucide-react'
 
-// ===== CUSTOM STYLES =====
-const customStyles = `
-  <style>
-    @keyframes pulse {
-      0%, 100% { opacity: 0.5; }
-      50% { opacity: 1; }
-    }
-    
-    @keyframes glow {
-      0%, 100% { box-shadow: 0 0 20px rgba(16, 185, 129, 0.4); }
-      50% { box-shadow: 0 0 30px rgba(16, 185, 129, 0.6); }
-    }
-    
-    @keyframes slideIn {
-      from { 
-        opacity: 0;
-        transform: translateY(20px);
-      }
-      to { 
-        opacity: 1;
-        transform: translateY(0);
-      }
-    }
-    
-    @keyframes slideInFromRight {
-      from { 
-        transform: translateX(100%);
-      }
-      to { 
-        transform: translateX(0);
-      }
-    }
-    
-    /* Custom scrollbar */
-    .myarc-meal-plan-container::-webkit-scrollbar {
-      width: 8px;
-      height: 8px;
-    }
-    
-    .myarc-meal-plan-container::-webkit-scrollbar-track {
-      background: #1a1a1a;
-      border-radius: 4px;
-    }
-    
-    .myarc-meal-plan-container::-webkit-scrollbar-thumb {
-      background: #10b981;
-      border-radius: 4px;
-    }
-    
-    .myarc-meal-plan-container::-webkit-scrollbar-thumb:hover {
-      background: #0ea572;
-    }
-    
-    /* Modal scrollbar */
-    .myarc-modal-content::-webkit-scrollbar {
-      width: 8px;
-    }
-    
-    .myarc-modal-content::-webkit-scrollbar-track {
-      background: #1a1a1a;
-      border-radius: 4px;
-    }
-    
-    .myarc-modal-content::-webkit-scrollbar-thumb {
-      background: #10b981;
-      border-radius: 4px;
-    }
-    
-    /* Enhanced card hover effects */
-    .myarc-day-card {
-      animation: slideIn 0.3s ease;
-    }
-    
-    .myarc-day-card:hover {
-      transform: translateY(-4px);
-      box-shadow: 0 10px 40px rgba(16, 185, 129, 0.2);
-    }
-    
-    .myarc-today-glow {
-      animation: glow 3s ease infinite;
-    }
-    
-    /* Button hover effects */
-    .myarc-btn-3d {
-      position: relative;
-      transform-style: preserve-3d;
-      transition: transform 0.2s;
-    }
-    
-    .myarc-btn-3d:hover {
-      transform: translateY(-2px);
-    }
-    
-    .myarc-btn-3d:active {
-      transform: translateY(0);
-    }
-    
-    /* Glass effect */
-    .myarc-glass {
-      background: rgba(0, 0, 0, 0.6);
-      backdrop-filter: blur(10px);
-      -webkit-backdrop-filter: blur(10px);
-    }
-    
-    /* Gradient text */
-    .myarc-gradient-text {
-      background: linear-gradient(135deg, #10b981 0%, #059669 100%);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      background-clip: text;
-    }
-    
-    /* Modal animation */
-    .myarc-modal {
-      animation: slideIn 0.3s ease;
-    }
-    
-    /* Floating buttons */
-    .myarc-floating-container {
-      position: fixed;
-      bottom: 2rem;
-      right: 2rem;
-      display: flex;
-      flex-direction: column;
-      gap: 1rem;
-      z-index: 100;
-    }
-    
-    @media (max-width: 768px) {
-      .myarc-floating-container {
-        bottom: 1rem;
-        right: 1rem;
-      }
-    }
-  </style>
-`
-
-// ===== HELPER FUNCTIONS =====
-function formatDate(date) {
-  return date.toLocaleDateString('nl-NL', { 
-    weekday: 'short', 
-    day: 'numeric', 
-    month: 'short' 
-  })
-}
-
-function addDays(date, days) {
-  const result = new Date(date)
-  result.setDate(result.getDate() + days)
-  return result
-}
-
-function getCurrentHour() {
-  return new Date().getHours() + (new Date().getMinutes() / 60)
-}
-
-function getMealTypeFromTime(hour) {
-  if (hour < 10) return 'breakfast'
-  if (hour < 14) return 'lunch'
-  if (hour < 17) return 'snack'
-  if (hour < 20) return 'dinner'
-  return 'snack'
-}
-
-// Meal type icons mapping
-const getMealTypeIcon = (type) => {
-  const typeStr = String(type).toLowerCase()
-  if (typeStr.includes('breakfast') || typeStr.includes('ontbijt')) return Coffee
-  if (typeStr.includes('lunch')) return Sun
-  if (typeStr.includes('dinner') || typeStr.includes('diner')) return Moon
-  if (typeStr.includes('snack') || typeStr.includes('tussendoortje')) return Apple
-  return Utensils
-}
-
-// ===== COMPONENTS =====
-
-// Meal Detail Modal Component
-const MealDetailModal = ({ meal, isOpen, onClose, onNavigate, onCheck, isChecked, db, clientId }) => {
-  const [activeTab, setActiveTab] = useState('overview')
-  const [isFavorite, setIsFavorite] = useState(false)
-  const [nutritionScore, setNutritionScore] = useState(0)
-  const [imageLoading, setImageLoading] = useState(true)
+// ===== MEAL DETAIL POPUP =====
+const MealDetailPopup = ({ isOpen, onClose, meal, db }) => {
+  const [details, setDetails] = useState(null)
+  const [loading, setLoading] = useState(true)
   
   useEffect(() => {
-    if (meal) {
-      // Calculate nutrition score (simple algorithm)
-      const proteinScore = Math.min((meal.protein / 30) * 100, 100)
-      const carbScore = Math.min((meal.carbs / 40) * 100, 100)
-      const fatScore = Math.min((meal.fat / 20) * 100, 100)
-      setNutritionScore(Math.round((proteinScore + carbScore + fatScore) / 3))
+    if (isOpen && meal) {
+      loadMealDetails()
     }
-  }, [meal])
-
+  }, [isOpen, meal])
+  
+  const loadMealDetails = async () => {
+    setLoading(true)
+    try {
+      // Laad extra details uit database
+      if (db && meal.id) {
+        const fullMeal = await db.getMealDetails(meal.id)
+        setDetails(fullMeal || meal)
+      } else {
+        setDetails(meal)
+      }
+    } catch (error) {
+      console.error('Error loading meal details:', error)
+      setDetails(meal)
+    } finally {
+      setLoading(false)
+    }
+  }
+  
   if (!isOpen || !meal) return null
-
-  // Enhanced ingredients data
-  const ingredients = meal.ingredients || [
-    { name: 'Kipfilet', amount: 150, unit: 'gram', calories: 165 },
-    { name: 'Basmati rijst', amount: 75, unit: 'gram', calories: 260 },
-    { name: 'Broccoli', amount: 200, unit: 'gram', calories: 68 },
-    { name: 'Olijfolie', amount: 10, unit: 'ml', calories: 88 },
-    { name: 'Knoflook', amount: 1, unit: 'teen', calories: 4 }
-  ]
-
-  const totalIngredientCalories = ingredients.reduce((sum, ing) => sum + (ing.calories || 0), 0)
-
-  // Mobile responsive check
-  const isMobile = window.innerWidth <= 768
-
+  
   return (
     <div style={{
       position: 'fixed',
@@ -241,672 +65,272 @@ const MealDetailModal = ({ meal, isOpen, onClose, onNavigate, onCheck, isChecked
       bottom: 0,
       background: 'rgba(0, 0, 0, 0.95)',
       display: 'flex',
-      alignItems: isMobile ? 'flex-end' : 'center',
+      alignItems: 'center',
       justifyContent: 'center',
       zIndex: 10000,
-      padding: isMobile ? 0 : '1rem',
-      backdropFilter: 'blur(10px)',
-      WebkitBackdropFilter: 'blur(10px)'
-    }}>
-      <div 
-        style={{
-          background: 'linear-gradient(180deg, #1a1a1a 0%, #0f0f0f 100%)',
-          borderRadius: isMobile ? '24px 24px 0 0' : '24px',
-          width: '100%',
-          maxWidth: isMobile ? '100%' : '700px',
-          maxHeight: isMobile ? '90vh' : '85vh',
-          height: isMobile ? 'auto' : 'auto',
-          overflow: 'hidden',
-          position: 'relative',
-          border: '1px solid rgba(16, 185, 129, 0.2)',
-          boxShadow: '0 20px 60px rgba(0, 0, 0, 0.5)',
-          display: 'flex',
-          flexDirection: 'column'
-        }}
-      >
-        {/* Enhanced Header with Image Background */}
+      padding: '1rem',
+      backdropFilter: 'blur(10px)'
+    }} onClick={onClose}>
+      <div style={{
+        background: 'linear-gradient(180deg, #1a1a1a 0%, #0f0f0f 100%)',
+        borderRadius: '24px',
+        width: '100%',
+        maxWidth: '500px',
+        maxHeight: '80vh',
+        overflow: 'hidden',
+        border: '1px solid rgba(16, 185, 129, 0.2)',
+        boxShadow: '0 20px 60px rgba(0, 0, 0, 0.5)',
+        display: 'flex',
+        flexDirection: 'column'
+      }} onClick={(e) => e.stopPropagation()}>
+        {/* Header */}
         <div style={{
-          position: 'relative',
-          background: meal.image_url 
-            ? `linear-gradient(180deg, rgba(0,0,0,0.3) 0%, rgba(0,0,0,0.8) 100%), url(${meal.image_url})`
-            : 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-          backgroundSize: 'cover',
-          backgroundPosition: 'center',
-          padding: isMobile ? '1.5rem 1rem' : '2rem',
-          color: '#fff'
+          padding: '1.5rem',
+          borderBottom: '1px solid rgba(16, 185, 129, 0.1)',
+          background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.05) 0%, rgba(16, 185, 129, 0.02) 100%)'
         }}>
-          {/* Top Actions Bar */}
           <div style={{
             display: 'flex',
-            justifyContent: 'space-between',
             alignItems: 'center',
-            marginBottom: '1.5rem'
+            justifyContent: 'space-between'
           }}>
-            <div style={{ display: 'flex', gap: '0.5rem' }}>
-              <button
-                onClick={() => setIsFavorite(!isFavorite)}
-                style={{
-                  background: 'rgba(0, 0, 0, 0.5)',
-                  backdropFilter: 'blur(10px)',
-                  border: 'none',
-                  borderRadius: '12px',
-                  width: '40px',
-                  height: '40px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  cursor: 'pointer',
-                  transition: 'all 0.3s ease'
-                }}
-              >
-                <Heart 
-                  size={20} 
-                  style={{ 
-                    color: isFavorite ? '#ef4444' : '#fff',
-                    fill: isFavorite ? '#ef4444' : 'none'
-                  }} 
-                />
-              </button>
-              
-              <button
-                style={{
-                  background: 'rgba(0, 0, 0, 0.5)',
-                  backdropFilter: 'blur(10px)',
-                  border: 'none',
-                  borderRadius: '12px',
-                  width: '40px',
-                  height: '40px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  cursor: 'pointer'
-                }}
-              >
-                <Share2 size={20} style={{ color: '#fff' }} />
-              </button>
-            </div>
-
-            <button
-              onClick={onClose}
-              style={{
-                background: 'rgba(255, 255, 255, 0.2)',
-                backdropFilter: 'blur(10px)',
-                border: 'none',
-                borderRadius: '12px',
-                width: '40px',
-                height: '40px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                cursor: 'pointer',
-                transition: 'all 0.3s ease'
-              }}
-            >
-              <X size={20} style={{ color: '#fff' }} />
-            </button>
-          </div>
-
-          {/* Meal Title and Info */}
-          <div>
             <h2 style={{
-              fontSize: isMobile ? '1.5rem' : '1.8rem',
-              marginBottom: '0.5rem',
+              color: '#fff',
+              fontSize: '1.25rem',
               fontWeight: 'bold',
-              textShadow: '0 2px 4px rgba(0,0,0,0.5)'
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem'
             }}>
+              <BookOpen size={20} style={{ color: 'rgba(16, 185, 129, 0.8)' }} />
               {meal.name}
             </h2>
             
-            {meal.category && (
-              <div style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '0.5rem',
-                padding: '0.25rem 0.75rem',
-                background: 'rgba(16, 185, 129, 0.2)',
-                borderRadius: '20px',
-                fontSize: '0.85rem',
-                marginBottom: '0.5rem'
-              }}>
-                <ChefHat size={14} />
-                {meal.category}
-              </div>
-            )}
-            
-            {/* Nutrition Score */}
-            <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.5rem',
-              marginTop: '0.5rem'
-            }}>
-              <div style={{
-                display: 'flex',
-                gap: '2px'
-              }}>
-                {[1, 2, 3, 4, 5].map(star => (
-                  <Star
-                    key={star}
-                    size={16}
-                    style={{
-                      color: star <= Math.round(nutritionScore / 20) ? '#f59e0b' : 'rgba(255,255,255,0.2)',
-                      fill: star <= Math.round(nutritionScore / 20) ? '#f59e0b' : 'none'
-                    }}
-                  />
-                ))}
-              </div>
-              <span style={{ fontSize: '0.85rem', opacity: 0.8 }}>
-                Nutrition Score: {nutritionScore}%
-              </span>
-            </div>
-          </div>
-        </div>
-
-        {/* Tabs */}
-        <div style={{
-          display: 'flex',
-          borderBottom: '1px solid rgba(16, 185, 129, 0.2)',
-          background: 'rgba(0, 0, 0, 0.5)'
-        }}>
-          {['overview', 'ingredients', 'instructions'].map(tab => (
             <button
-              key={tab}
-              onClick={() => setActiveTab(tab)}
+              onClick={onClose}
               style={{
-                flex: 1,
-                padding: isMobile ? '0.75rem' : '1rem',
-                background: activeTab === tab 
-                  ? 'linear-gradient(180deg, rgba(16, 185, 129, 0.1) 0%, transparent 100%)'
-                  : 'transparent',
+                background: 'rgba(255, 255, 255, 0.1)',
                 border: 'none',
-                borderBottom: activeTab === tab ? '2px solid #10b981' : '2px solid transparent',
-                color: activeTab === tab ? '#10b981' : 'rgba(255,255,255,0.6)',
+                borderRadius: '10px',
+                padding: '0.5rem',
                 cursor: 'pointer',
-                transition: 'all 0.3s ease',
-                fontSize: isMobile ? '0.85rem' : '0.95rem',
-                fontWeight: activeTab === tab ? 'bold' : 'normal',
-                textTransform: 'capitalize'
+                color: 'rgba(255, 255, 255, 0.6)'
               }}
             >
-              {tab === 'overview' ? 'Overzicht' : 
-               tab === 'ingredients' ? 'Ingrediënten' : 'Bereiding'}
+              <X size={20} />
             </button>
-          ))}
+          </div>
         </div>
-
-        {/* Content Area */}
+        
+        {/* Content */}
         <div style={{
           flex: 1,
           overflowY: 'auto',
-          padding: isMobile ? '1rem' : '1.5rem',
-          paddingBottom: '100px'
+          padding: '1.5rem'
         }}>
-          {/* Overview Tab */}
-          {activeTab === 'overview' && (
-            <div style={{ animation: 'fadeIn 0.3s ease' }}>
-              {/* Macro Cards Grid */}
+          {loading ? (
+            <div style={{ textAlign: 'center', padding: '2rem' }}>
+              <div style={{
+                width: '40px',
+                height: '40px',
+                border: '3px solid rgba(16, 185, 129, 0.2)',
+                borderTopColor: 'rgba(16, 185, 129, 0.8)',
+                borderRadius: '50%',
+                margin: '0 auto',
+                animation: 'spin 1s linear infinite'
+              }} />
+            </div>
+          ) : (
+            <>
+              {/* Image */}
+              {(details?.image_url || meal.image_url) && (
+                <div style={{
+                  width: '100%',
+                  height: '200px',
+                  borderRadius: '12px',
+                  background: `url(${details?.image_url || meal.image_url}) center/cover`,
+                  marginBottom: '1.5rem'
+                }} />
+              )}
+              
+              {/* Macros */}
               <div style={{
                 display: 'grid',
-                gridTemplateColumns: 'repeat(2, 1fr)',
+                gridTemplateColumns: 'repeat(4, 1fr)',
                 gap: '0.75rem',
                 marginBottom: '1.5rem'
               }}>
-                <div style={{
-                  background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.1) 0%, rgba(245, 158, 11, 0.05) 100%)',
-                  borderRadius: '16px',
-                  padding: '1rem',
-                  border: '1px solid rgba(245, 158, 11, 0.3)',
-                  textAlign: 'center'
-                }}>
-                  <Flame size={24} style={{ color: '#f59e0b', marginBottom: '0.5rem' }} />
-                  <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: '#f59e0b' }}>
-                    {meal.kcal || meal.calories || 0}
-                  </div>
-                  <div style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.6)' }}>Calorieën</div>
-                </div>
-
-                <div style={{
-                  background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.1) 0%, rgba(59, 130, 246, 0.05) 100%)',
-                  borderRadius: '16px',
-                  padding: '1rem',
-                  border: '1px solid rgba(59, 130, 246, 0.3)',
-                  textAlign: 'center'
-                }}>
-                  <Dumbbell size={24} style={{ color: '#3b82f6', marginBottom: '0.5rem' }} />
-                  <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: '#3b82f6' }}>
-                    {meal.protein || 0}g
-                  </div>
-                  <div style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.6)' }}>Eiwitten</div>
-                </div>
-
-                <div style={{
-                  background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.1) 0%, rgba(16, 185, 129, 0.05) 100%)',
-                  borderRadius: '16px',
-                  padding: '1rem',
-                  border: '1px solid rgba(16, 185, 129, 0.3)',
-                  textAlign: 'center'
-                }}>
-                  <Zap size={24} style={{ color: '#10b981', marginBottom: '0.5rem' }} />
-                  <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: '#10b981' }}>
-                    {meal.carbs || 0}g
-                  </div>
-                  <div style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.6)' }}>Koolhydraten</div>
-                </div>
-
-                <div style={{
-                  background: 'linear-gradient(135deg, rgba(239, 68, 68, 0.1) 0%, rgba(239, 68, 68, 0.05) 100%)',
-                  borderRadius: '16px',
-                  padding: '1rem',
-                  border: '1px solid rgba(239, 68, 68, 0.3)',
-                  textAlign: 'center'
-                }}>
-                  <Droplets size={24} style={{ color: '#ef4444', marginBottom: '0.5rem' }} />
-                  <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: '#ef4444' }}>
-                    {meal.fat || 0}g
-                  </div>
-                  <div style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.6)' }}>Vetten</div>
-                </div>
-              </div>
-
-              {/* Additional Info Cards */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                {meal.prep_time && (
-                  <div style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '0.75rem',
-                    padding: '1rem',
-                    background: 'rgba(0, 0, 0, 0.3)',
-                    borderRadius: '12px',
-                    border: '1px solid rgba(16, 185, 129, 0.2)'
-                  }}>
-                    <Timer size={20} style={{ color: '#10b981' }} />
-                    <div>
-                      <div style={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.85rem' }}>
-                        Bereidingstijd
-                      </div>
-                      <div style={{ color: '#fff', fontWeight: 'bold' }}>
-                        {meal.prep_time} minuten
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {meal.difficulty && (
-                  <div style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '0.75rem',
-                    padding: '1rem',
-                    background: 'rgba(0, 0, 0, 0.3)',
-                    borderRadius: '12px',
-                    border: '1px solid rgba(16, 185, 129, 0.2)'
-                  }}>
-                    <TrendingUp size={20} style={{ color: '#3b82f6' }} />
-                    <div>
-                      <div style={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.85rem' }}>
-                        Moeilijkheidsgraad
-                      </div>
-                      <div style={{ color: '#fff', fontWeight: 'bold' }}>
-                        {meal.difficulty}
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {meal.servings && (
-                  <div style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '0.75rem',
-                    padding: '1rem',
-                    background: 'rgba(0, 0, 0, 0.3)',
-                    borderRadius: '12px',
-                    border: '1px solid rgba(16, 185, 129, 0.2)'
-                  }}>
-                    <Users size={20} style={{ color: '#f59e0b' }} />
-                    <div>
-                      <div style={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.85rem' }}>
-                        Porties
-                      </div>
-                      <div style={{ color: '#fff', fontWeight: 'bold' }}>
-                        {meal.servings} personen
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* Description */}
-              {meal.description && (
-                <div style={{
-                  marginTop: '1.5rem',
-                  padding: '1rem',
-                  background: 'rgba(16, 185, 129, 0.05)',
-                  borderRadius: '12px',
-                  border: '1px solid rgba(16, 185, 129, 0.2)'
-                }}>
-                  <div style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '0.5rem',
-                    marginBottom: '0.5rem',
-                    color: '#10b981'
-                  }}>
-                    <Info size={16} />
-                    <span style={{ fontWeight: 'bold', fontSize: '0.9rem' }}>Beschrijving</span>
-                  </div>
-                  <p style={{ 
-                    color: 'rgba(255,255,255,0.8)', 
-                    lineHeight: '1.6',
-                    fontSize: '0.9rem'
-                  }}>
-                    {meal.description}
-                  </p>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Ingredients Tab */}
-          {activeTab === 'ingredients' && (
-            <div style={{ animation: 'fadeIn 0.3s ease' }}>
-              <div style={{
-                background: 'rgba(0, 0, 0, 0.3)',
-                borderRadius: '16px',
-                padding: '1rem',
-                border: '1px solid rgba(16, 185, 129, 0.2)'
-              }}>
-                <h3 style={{
-                  color: '#fff',
-                  fontSize: '1.1rem',
-                  marginBottom: '1rem',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.5rem'
-                }}>
-                  <Package size={20} style={{ color: '#10b981' }} />
-                  Ingrediënten
-                  <span style={{
-                    marginLeft: 'auto',
-                    fontSize: '0.85rem',
-                    color: 'rgba(255,255,255,0.6)'
-                  }}>
-                    {ingredients.length} items
-                  </span>
-                </h3>
-                
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                  {ingredients.map((ingredient, idx) => (
-                    <div 
-                      key={idx}
-                      style={{
-                        display: 'flex',
-                        justifyContent: 'space-between',
-                        alignItems: 'center',
-                        padding: '0.75rem',
-                        background: 'rgba(255, 255, 255, 0.02)',
-                        borderRadius: '10px',
-                        border: '1px solid rgba(16, 185, 129, 0.1)',
-                        transition: 'all 0.2s ease'
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.background = 'rgba(16, 185, 129, 0.05)'
-                        e.currentTarget.style.borderColor = 'rgba(16, 185, 129, 0.3)'
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.background = 'rgba(255, 255, 255, 0.02)'
-                        e.currentTarget.style.borderColor = 'rgba(16, 185, 129, 0.1)'
-                      }}
-                    >
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                        <div style={{
-                          width: '32px',
-                          height: '32px',
-                          background: 'rgba(16, 185, 129, 0.1)',
-                          borderRadius: '8px',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center'
-                        }}>
-                          <Scale size={16} style={{ color: '#10b981' }} />
-                        </div>
-                        <div>
-                          <div style={{ color: '#fff', fontWeight: '500' }}>
-                            {ingredient.name}
-                          </div>
-                          {ingredient.calories && (
-                            <div style={{ 
-                              color: 'rgba(255,255,255,0.5)', 
-                              fontSize: '0.75rem',
-                              marginTop: '2px'
-                            }}>
-                              {ingredient.calories} kcal
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                      <div style={{ 
-                        color: '#10b981', 
-                        fontWeight: 'bold',
-                        fontSize: '0.9rem'
-                      }}>
-                        {ingredient.amount} {ingredient.unit}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-
-                {/* Total Calories from Ingredients */}
-                {totalIngredientCalories > 0 && (
-                  <div style={{
-                    marginTop: '1rem',
+                {[
+                  { icon: Flame, value: meal.kcal, label: 'kcal', color: 'rgba(16, 185, 129, 0.9)' },
+                  { icon: Dumbbell, value: `${meal.protein}g`, label: 'Eiwit', color: 'rgba(5, 150, 105, 0.9)' },
+                  { icon: Zap, value: `${meal.carbs}g`, label: 'Koolh', color: 'rgba(4, 120, 87, 0.9)' },
+                  { icon: Droplets, value: `${meal.fat}g`, label: 'Vet', color: 'rgba(16, 185, 129, 0.7)' }
+                ].map(({ icon: Icon, value, label, color }) => (
+                  <div key={label} style={{
+                    textAlign: 'center',
                     padding: '0.75rem',
-                    background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.1) 0%, rgba(245, 158, 11, 0.05) 100%)',
+                    background: 'rgba(0, 0, 0, 0.3)',
                     borderRadius: '10px',
-                    border: '1px solid rgba(245, 158, 11, 0.3)',
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center'
+                    border: `1px solid ${color}33`
                   }}>
-                    <span style={{ color: 'rgba(255,255,255,0.8)' }}>
-                      Totaal van ingrediënten:
-                    </span>
-                    <span style={{ color: '#f59e0b', fontWeight: 'bold', fontSize: '1.1rem' }}>
-                      {totalIngredientCalories} kcal
-                    </span>
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* Instructions Tab */}
-          {activeTab === 'instructions' && (
-            <div style={{ animation: 'fadeIn 0.3s ease' }}>
-              {meal.instructions ? (
-                <div style={{
-                  background: 'rgba(0, 0, 0, 0.3)',
-                  borderRadius: '16px',
-                  padding: '1rem',
-                  border: '1px solid rgba(16, 185, 129, 0.2)'
-                }}>
-                  <h3 style={{
-                    color: '#fff',
-                    fontSize: '1.1rem',
-                    marginBottom: '1rem',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '0.5rem'
-                  }}>
-                    <List size={20} style={{ color: '#10b981' }} />
-                    Bereidingswijze
-                  </h3>
-                  
-                  {meal.instructions.split('\n').map((step, idx) => (
-                    <div 
-                      key={idx}
-                      style={{
-                        display: 'flex',
-                        gap: '1rem',
-                        marginBottom: '1rem',
-                        padding: '0.75rem',
-                        background: 'rgba(255, 255, 255, 0.02)',
-                        borderRadius: '10px',
-                        border: '1px solid rgba(16, 185, 129, 0.1)'
-                      }}
-                    >
-                      <div style={{
-                        minWidth: '28px',
-                        height: '28px',
-                        background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-                        borderRadius: '50%',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        color: '#000',
-                        fontWeight: 'bold',
-                        fontSize: '0.85rem'
-                      }}>
-                        {idx + 1}
-                      </div>
-                      <p style={{ 
-                        color: 'rgba(255,255,255,0.85)', 
-                        lineHeight: '1.6',
-                        fontSize: '0.9rem',
-                        margin: 0
-                      }}>
-                        {step}
-                      </p>
+                    <Icon size={18} style={{ color, marginBottom: '0.25rem' }} />
+                    <div style={{ color: '#fff', fontWeight: 'bold', fontSize: '0.95rem' }}>
+                      {value}
                     </div>
-                  ))}
-                </div>
-              ) : (
-                <div style={{
-                  textAlign: 'center',
-                  padding: '3rem',
-                  color: 'rgba(255,255,255,0.5)'
-                }}>
-                  <ChefHat size={48} style={{ marginBottom: '1rem', opacity: 0.3 }} />
-                  <p>Bereidingsinstructies komen binnenkort!</p>
+                    <div style={{ color: 'rgba(255, 255, 255, 0.5)', fontSize: '0.7rem' }}>
+                      {label}
+                    </div>
+                  </div>
+                ))}
+              </div>
+              
+              {/* Ingrediënten */}
+              {(details?.ingredients || meal.ingredients) && (
+                <div style={{ marginBottom: '1.5rem' }}>
+                  <h3 style={{
+                    color: 'rgba(16, 185, 129, 0.9)',
+                    fontSize: '0.9rem',
+                    fontWeight: '600',
+                    marginBottom: '0.75rem',
+                    textTransform: 'uppercase'
+                  }}>
+                    Ingrediënten
+                  </h3>
+                  <div style={{
+                    background: 'rgba(0, 0, 0, 0.3)',
+                    borderRadius: '10px',
+                    padding: '1rem'
+                  }}>
+                    {Array.isArray(details?.ingredients || meal.ingredients) ? (
+                      <ul style={{ margin: 0, paddingLeft: '1.5rem' }}>
+                        {(details?.ingredients || meal.ingredients).map((ingredient, idx) => (
+                          <li key={idx} style={{
+                            color: 'rgba(255, 255, 255, 0.8)',
+                            marginBottom: '0.5rem',
+                            fontSize: '0.9rem'
+                          }}>
+                            {ingredient}
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <p style={{ color: 'rgba(255, 255, 255, 0.8)', margin: 0 }}>
+                        {details?.ingredients || meal.ingredients}
+                      </p>
+                    )}
+                  </div>
                 </div>
               )}
-            </div>
+              
+              {/* Bereiding */}
+              {(details?.preparation || meal.preparation) && (
+                <div>
+                  <h3 style={{
+                    color: 'rgba(16, 185, 129, 0.9)',
+                    fontSize: '0.9rem',
+                    fontWeight: '600',
+                    marginBottom: '0.75rem',
+                    textTransform: 'uppercase'
+                  }}>
+                    Bereiding
+                  </h3>
+                  <div style={{
+                    background: 'rgba(0, 0, 0, 0.3)',
+                    borderRadius: '10px',
+                    padding: '1rem',
+                    color: 'rgba(255, 255, 255, 0.8)',
+                    fontSize: '0.9rem',
+                    lineHeight: '1.6'
+                  }}>
+                    {details?.preparation || meal.preparation || 'Bereidingswijze wordt binnenkort toegevoegd.'}
+                  </div>
+                </div>
+              )}
+            </>
           )}
-        </div>
-
-        {/* Fixed Bottom Actions */}
-        <div style={{
-          position: 'absolute',
-          bottom: 0,
-          left: 0,
-          right: 0,
-          padding: isMobile ? '1rem' : '1.5rem',
-          background: 'linear-gradient(180deg, transparent 0%, #0f0f0f 20%, #0f0f0f 100%)',
-          borderTop: '1px solid rgba(16, 185, 129, 0.1)'
-        }}>
-          <div style={{
-            display: 'flex',
-            gap: '0.75rem'
-          }}>
-            <button
-              onClick={onCheck}
-              style={{
-                flex: 1,
-                padding: isMobile ? '0.875rem' : '1rem',
-                background: isChecked
-                  ? 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)'
-                  : 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-                border: 'none',
-                borderRadius: '14px',
-                color: '#fff',
-                fontWeight: 'bold',
-                fontSize: isMobile ? '0.9rem' : '1rem',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '0.5rem',
-                boxShadow: isChecked 
-                  ? '0 4px 20px rgba(239, 68, 68, 0.3)'
-                  : '0 4px 20px rgba(16, 185, 129, 0.3)',
-                transition: 'all 0.3s ease'
-              }}
-            >
-              {isChecked ? (
-                <>
-                  <X size={18} />
-                  Niet gegeten
-                </>
-              ) : (
-                <>
-                  <Award size={18} />
-                  Markeer als gegeten
-                </>
-              )}
-            </button>
-            
-            {onNavigate && (
-              <button
-                onClick={() => {
-                  onClose()
-                  onNavigate('recipe-library')
-                }}
-                style={{
-                  padding: isMobile ? '0.875rem' : '1rem',
-                  background: 'rgba(16, 185, 129, 0.1)',
-                  border: '2px solid #10b981',
-                  borderRadius: '14px',
-                  color: '#10b981',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  transition: 'all 0.3s ease',
-                  minWidth: '50px'
-                }}
-              >
-                <ChevronRight size={20} />
-              </button>
-            )}
-          </div>
         </div>
       </div>
-
-      <style>{`
-        @keyframes fadeIn {
-          from { opacity: 0; transform: translateY(10px); }
-          to { opacity: 1; transform: translateY(0); }
-        }
-      `}</style>
     </div>
   )
 }
 
-
-
-
-// Meal Swap Modal Component
-const MealSwapModal = ({ 
-  isOpen, 
-  onClose, 
-  currentMeal,
-  allMeals,
-  onSelectMeal 
-}) => {
-  const [search, setSearch] = useState('')
-  const [category, setCategory] = useState('all')
+// ===== CUSTOM MEAL CREATOR MODAL =====
+const CustomMealCreator = ({ isOpen, onClose, onSave, db, client }) => {
+  const [mealName, setMealName] = useState('')
+  const [ingredients, setIngredients] = useState([])
+  const [newIngredient, setNewIngredient] = useState('')
+  const [macros, setMacros] = useState({
+    kcal: 0,
+    protein: 0,
+    carbs: 0,
+    fat: 0
+  })
+  const [category, setCategory] = useState('lunch')
+  const [imageUrl, setImageUrl] = useState('')
+  const [uploadingImage, setUploadingImage] = useState(false)
+  const fileInputRef = useRef(null)
+  
+  const handleAddIngredient = () => {
+    if (newIngredient.trim()) {
+      setIngredients([...ingredients, newIngredient.trim()])
+      setNewIngredient('')
+    }
+  }
+  
+  const handleRemoveIngredient = (idx) => {
+    setIngredients(ingredients.filter((_, i) => i !== idx))
+  }
+  
+  const handleImageUpload = async (e) => {
+    const file = e.target.files[0]
+    if (!file) return
+    
+    setUploadingImage(true)
+    try {
+      const placeholder = `https://source.unsplash.com/400x300/?${mealName || 'food'}`
+      setImageUrl(placeholder)
+    } catch (error) {
+      console.error('Error uploading image:', error)
+    } finally {
+      setUploadingImage(false)
+    }
+  }
+  
+  const handleSave = async () => {
+    if (!mealName.trim()) {
+      alert('Geef je maaltijd een naam!')
+      return
+    }
+    
+    const customMeal = {
+      name: mealName,
+      category: category,
+      meal_type: category,
+      kcal: parseInt(macros.kcal) || 0,
+      protein: parseInt(macros.protein) || 0,
+      carbs: parseInt(macros.carbs) || 0,
+      fat: parseInt(macros.fat) || 0,
+      ingredients: ingredients,
+      image_url: imageUrl,
+      is_custom: true,
+      created_by: client?.id,
+      // Voeg client_specific toe zodat het alleen voor deze client is
+      client_specific: true,
+      tags: ['custom', category]
+    }
+    
+    onSave(customMeal)
+    
+    // Reset form
+    setMealName('')
+    setIngredients([])
+    setMacros({ kcal: 0, protein: 0, carbs: 0, fat: 0 })
+    setCategory('lunch')
+    setImageUrl('')
+  }
   
   if (!isOpen) return null
-
-  const filteredMeals = allMeals.filter(meal => {
-    const matchesSearch = !search || 
-      meal.name.toLowerCase().includes(search.toLowerCase())
-    const matchesCategory = category === 'all' || 
-      (meal.category || 'other') === category
-    return matchesSearch && matchesCategory
-  })
-
+  
   return (
     <div style={{
       position: 'fixed',
@@ -914,955 +338,1291 @@ const MealSwapModal = ({
       left: 0,
       right: 0,
       bottom: 0,
-      background: 'rgba(0, 0, 0, 0.9)',
+      background: 'rgba(0, 0, 0, 0.95)',
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
       zIndex: 10000,
-      padding: '1rem'
+      padding: '1rem',
+      backdropFilter: 'blur(10px)'
     }}>
-      <div 
-        className="myarc-modal myarc-glass myarc-modal-content"
-        style={{
-          borderRadius: '20px',
-          padding: '2rem',
-          width: '100%',
-          maxWidth: '800px',
-          maxHeight: '90vh',
-          overflow: 'auto',
-          border: '1px solid rgba(16, 185, 129, 0.3)',
-          position: 'relative'
-        }}
-      >
+      <div style={{
+        background: 'linear-gradient(180deg, #1a1a1a 0%, #0f0f0f 100%)',
+        borderRadius: '24px',
+        width: '100%',
+        maxWidth: '500px',
+        maxHeight: '90vh',
+        overflow: 'hidden',
+        border: '1px solid rgba(16, 185, 129, 0.2)',
+        boxShadow: '0 20px 60px rgba(0, 0, 0, 0.5)',
+        display: 'flex',
+        flexDirection: 'column'
+      }}>
         {/* Header */}
         <div style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          marginBottom: '2rem'
+          padding: '1.5rem',
+          borderBottom: '1px solid rgba(16, 185, 129, 0.1)',
+          background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.05) 0%, rgba(16, 185, 129, 0.02) 100%)'
         }}>
-          <h2 style={{
-            color: '#fff',
-            fontSize: '1.5rem',
+          <div style={{
             display: 'flex',
             alignItems: 'center',
-            gap: '0.5rem'
+            justifyContent: 'space-between'
           }}>
-            <RefreshCw size={24} style={{ color: '#10b981' }} />
-            Vervang: {currentMeal?.name || 'Maaltijd'}
-          </h2>
+            <h2 style={{
+              color: '#fff',
+              fontSize: '1.25rem',
+              fontWeight: 'bold',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem'
+            }}>
+              <ChefHat size={20} style={{ color: 'rgba(16, 185, 129, 0.8)' }} />
+              Eigen Maaltijd Toevoegen
+            </h2>
+            
+            <button
+              onClick={onClose}
+              style={{
+                background: 'rgba(255, 255, 255, 0.1)',
+                border: 'none',
+                borderRadius: '10px',
+                padding: '0.5rem',
+                cursor: 'pointer',
+                color: 'rgba(255, 255, 255, 0.6)'
+              }}
+            >
+              <X size={20} />
+            </button>
+          </div>
+        </div>
+        
+        {/* Content */}
+        <div style={{
+          flex: 1,
+          overflowY: 'auto',
+          padding: '1.5rem'
+        }}>
+          {/* Meal Name */}
+          <div style={{ marginBottom: '1.5rem' }}>
+            <label style={{
+              color: 'rgba(255, 255, 255, 0.7)',
+              fontSize: '0.85rem',
+              fontWeight: '600',
+              display: 'block',
+              marginBottom: '0.5rem'
+            }}>
+              Naam van het gerecht
+            </label>
+            <input
+              type="text"
+              value={mealName}
+              onChange={(e) => setMealName(e.target.value)}
+              placeholder="bijv. Lasagne van mama"
+              style={{
+                width: '100%',
+                padding: '0.75rem',
+                background: 'rgba(0, 0, 0, 0.5)',
+                border: '1px solid rgba(16, 185, 129, 0.2)',
+                borderRadius: '8px',
+                color: '#fff',
+                fontSize: '0.95rem',
+                outline: 'none'
+              }}
+            />
+          </div>
           
+          {/* Category */}
+          <div style={{ marginBottom: '1.5rem' }}>
+            <label style={{
+              color: 'rgba(255, 255, 255, 0.7)',
+              fontSize: '0.85rem',
+              fontWeight: '600',
+              display: 'block',
+              marginBottom: '0.5rem'
+            }}>
+              Categorie
+            </label>
+            <select
+              value={category}
+              onChange={(e) => setCategory(e.target.value)}
+              style={{
+                width: '100%',
+                padding: '0.75rem',
+                background: 'rgba(0, 0, 0, 0.5)',
+                border: '1px solid rgba(16, 185, 129, 0.2)',
+                borderRadius: '8px',
+                color: '#fff',
+                fontSize: '0.95rem',
+                cursor: 'pointer',
+                outline: 'none'
+              }}
+            >
+              <option value="breakfast">Ontbijt</option>
+              <option value="lunch">Lunch</option>
+              <option value="dinner">Diner</option>
+              <option value="snack">Snack</option>
+            </select>
+          </div>
+          
+          {/* Image Upload */}
+          <div style={{ marginBottom: '1.5rem' }}>
+            <label style={{
+              color: 'rgba(255, 255, 255, 0.7)',
+              fontSize: '0.85rem',
+              fontWeight: '600',
+              display: 'block',
+              marginBottom: '0.5rem'
+            }}>
+              Foto (optioneel)
+            </label>
+            
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              onChange={handleImageUpload}
+              style={{ display: 'none' }}
+            />
+            
+            <div style={{
+              display: 'flex',
+              gap: '0.75rem',
+              alignItems: 'center'
+            }}>
+              {imageUrl && (
+                <div style={{
+                  width: '80px',
+                  height: '80px',
+                  borderRadius: '8px',
+                  background: `url(${imageUrl}) center/cover`,
+                  border: '1px solid rgba(16, 185, 129, 0.3)'
+                }} />
+              )}
+              
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                disabled={uploadingImage}
+                style={{
+                  padding: '0.5rem 1rem',
+                  background: 'rgba(16, 185, 129, 0.1)',
+                  border: '1px solid rgba(16, 185, 129, 0.3)',
+                  borderRadius: '8px',
+                  color: 'rgba(16, 185, 129, 0.9)',
+                  fontSize: '0.85rem',
+                  fontWeight: '600',
+                  cursor: uploadingImage ? 'not-allowed' : 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem'
+                }}
+              >
+                <Upload size={16} />
+                {uploadingImage ? 'Uploading...' : 'Upload Foto'}
+              </button>
+            </div>
+          </div>
+          
+          {/* Ingredients */}
+          <div style={{ marginBottom: '1.5rem' }}>
+            <label style={{
+              color: 'rgba(255, 255, 255, 0.7)',
+              fontSize: '0.85rem',
+              fontWeight: '600',
+              display: 'block',
+              marginBottom: '0.5rem'
+            }}>
+              Ingrediënten
+            </label>
+            
+            <div style={{
+              display: 'flex',
+              gap: '0.5rem',
+              marginBottom: '0.75rem'
+            }}>
+              <input
+                type="text"
+                value={newIngredient}
+                onChange={(e) => setNewIngredient(e.target.value)}
+                onKeyPress={(e) => e.key === 'Enter' && handleAddIngredient()}
+                placeholder="Voeg ingrediënt toe..."
+                style={{
+                  flex: 1,
+                  padding: '0.625rem',
+                  background: 'rgba(0, 0, 0, 0.5)',
+                  border: '1px solid rgba(16, 185, 129, 0.2)',
+                  borderRadius: '8px',
+                  color: '#fff',
+                  fontSize: '0.9rem',
+                  outline: 'none'
+                }}
+              />
+              <button
+                onClick={handleAddIngredient}
+                style={{
+                  padding: '0.625rem',
+                  background: 'rgba(16, 185, 129, 0.1)',
+                  border: '1px solid rgba(16, 185, 129, 0.3)',
+                  borderRadius: '8px',
+                  color: 'rgba(16, 185, 129, 0.9)',
+                  cursor: 'pointer'
+                }}
+              >
+                <Plus size={18} />
+              </button>
+            </div>
+            
+            <div style={{
+              display: 'flex',
+              flexWrap: 'wrap',
+              gap: '0.5rem'
+            }}>
+              {ingredients.map((ingredient, idx) => (
+                <div
+                  key={idx}
+                  style={{
+                    padding: '0.375rem 0.75rem',
+                    background: 'rgba(16, 185, 129, 0.1)',
+                    border: '1px solid rgba(16, 185, 129, 0.2)',
+                    borderRadius: '20px',
+                    color: 'rgba(16, 185, 129, 0.9)',
+                    fontSize: '0.85rem',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem'
+                  }}
+                >
+                  {ingredient}
+                  <button
+                    onClick={() => handleRemoveIngredient(idx)}
+                    style={{
+                      background: 'transparent',
+                      border: 'none',
+                      color: 'rgba(255, 255, 255, 0.4)',
+                      cursor: 'pointer',
+                      padding: 0
+                    }}
+                  >
+                    <X size={14} />
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+          
+          {/* Macros */}
+          <div style={{ marginBottom: '1.5rem' }}>
+            <label style={{
+              color: 'rgba(255, 255, 255, 0.7)',
+              fontSize: '0.85rem',
+              fontWeight: '600',
+              display: 'block',
+              marginBottom: '0.75rem'
+            }}>
+              Voedingswaarden (per portie)
+            </label>
+            
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(2, 1fr)',
+              gap: '0.75rem'
+            }}>
+              {[
+                { key: 'kcal', label: 'Calorieën', icon: Flame },
+                { key: 'protein', label: 'Eiwit (g)', icon: Dumbbell },
+                { key: 'carbs', label: 'Koolh. (g)', icon: Zap },
+                { key: 'fat', label: 'Vet (g)', icon: Droplets }
+              ].map(({ key, label, icon: Icon }) => (
+                <div key={key}>
+                  <label style={{
+                    color: 'rgba(255, 255, 255, 0.5)',
+                    fontSize: '0.75rem',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.25rem',
+                    marginBottom: '0.25rem'
+                  }}>
+                    <Icon size={12} />
+                    {label}
+                  </label>
+                  <input
+                    type="number"
+                    value={macros[key]}
+                    onChange={(e) => setMacros({
+                      ...macros,
+                      [key]: e.target.value
+                    })}
+                    placeholder="0"
+                    style={{
+                      width: '100%',
+                      padding: '0.5rem',
+                      background: 'rgba(0, 0, 0, 0.5)',
+                      border: '1px solid rgba(16, 185, 129, 0.2)',
+                      borderRadius: '6px',
+                      color: '#fff',
+                      fontSize: '0.9rem',
+                      outline: 'none'
+                    }}
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+        
+        {/* Footer */}
+        <div style={{
+          padding: '1.5rem',
+          borderTop: '1px solid rgba(16, 185, 129, 0.1)',
+          display: 'flex',
+          gap: '0.75rem'
+        }}>
           <button
             onClick={onClose}
             style={{
+              flex: 1,
+              padding: '0.75rem',
               background: 'rgba(255, 255, 255, 0.1)',
-              border: 'none',
-              borderRadius: '50%',
-              width: '40px',
-              height: '40px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              cursor: 'pointer',
-              color: '#fff'
-            }}
-          >
-            <X size={20} />
-          </button>
-        </div>
-
-        {/* Search and filters */}
-        <div style={{
-          display: 'flex',
-          gap: '1rem',
-          marginBottom: '2rem',
-          flexWrap: 'wrap'
-        }}>
-          <div style={{
-            flex: 1,
-            minWidth: '200px',
-            position: 'relative'
-          }}>
-            <Search size={18} style={{
-              position: 'absolute',
-              left: '12px',
-              top: '50%',
-              transform: 'translateY(-50%)',
-              color: 'var(--c-muted)'
-            }} />
-            <input
-              type="text"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Zoek maaltijd..."
-              style={{
-                width: '100%',
-                padding: '0.75rem 0.75rem 0.75rem 2.5rem',
-                background: 'rgba(0, 0, 0, 0.5)',
-                border: '1px solid rgba(16, 185, 129, 0.3)',
-                borderRadius: '8px',
-                color: '#fff',
-                fontSize: '0.95rem'
-              }}
-            />
-          </div>
-          
-          <select
-            value={category}
-            onChange={(e) => setCategory(e.target.value)}
-            style={{
-              padding: '0.75rem 1rem',
-              background: 'rgba(0, 0, 0, 0.5)',
-              border: '1px solid rgba(16, 185, 129, 0.3)',
-              borderRadius: '8px',
-              color: '#fff',
-              fontSize: '0.95rem',
+              border: '1px solid rgba(255, 255, 255, 0.2)',
+              borderRadius: '10px',
+              color: 'rgba(255, 255, 255, 0.7)',
+              fontWeight: '600',
               cursor: 'pointer'
             }}
           >
-            <option value="all">Alle categorieën</option>
-            <option value="breakfast">Ontbijt</option>
-            <option value="lunch">Lunch</option>
-            <option value="dinner">Diner</option>
-            <option value="snack">Snack</option>
-          </select>
-        </div>
-
-        {/* Meals grid */}
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))',
-          gap: '1rem',
-          maxHeight: '400px',
-          overflowY: 'auto',
-          padding: '0.5rem'
-        }}>
-          {filteredMeals.map(meal => (
-            <div
-              key={meal.id}
-              onClick={() => onSelectMeal(meal)}
-              style={{
-                background: 'rgba(0, 0, 0, 0.5)',
-                borderRadius: '12px',
-                padding: '1rem',
-                cursor: 'pointer',
-                transition: 'all 0.3s ease',
-                border: '1px solid rgba(16, 185, 129, 0.2)'
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.transform = 'translateY(-2px)'
-                e.currentTarget.style.borderColor = '#10b981'
-                e.currentTarget.style.boxShadow = '0 5px 20px rgba(16, 185, 129, 0.3)'
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.transform = 'translateY(0)'
-                e.currentTarget.style.borderColor = 'rgba(16, 185, 129, 0.2)'
-                e.currentTarget.style.boxShadow = 'none'
-              }}
-            >
-              <h4 style={{
-                color: '#fff',
-                fontSize: '1rem',
-                marginBottom: '0.5rem'
-              }}>
-                {meal.name}
-              </h4>
-              
-              <div style={{
-                display: 'flex',
-                gap: '0.5rem',
-                fontSize: '0.8rem',
-                color: 'var(--c-muted)'
-              }}>
-                <span style={{ display: 'flex', alignItems: 'center', gap: '2px' }}>
-                  <Flame size={12} style={{ color: '#f59e0b' }} />
-                  {meal.kcal || meal.calories || 0}
-                </span>
-                <span style={{ display: 'flex', alignItems: 'center', gap: '2px' }}>
-                  <Dumbbell size={12} style={{ color: '#3b82f6' }} />
-                  {meal.protein || 0}g
-                </span>
-                <span style={{ display: 'flex', alignItems: 'center', gap: '2px' }}>
-                  <Zap size={12} style={{ color: '#10b981' }} />
-                  {meal.carbs || 0}g
-                </span>
-                <span style={{ display: 'flex', alignItems: 'center', gap: '2px' }}>
-                  <Droplets size={12} style={{ color: '#ef4444' }} />
-                  {meal.fat || 0}g
-                </span>
-              </div>
-              
-              {meal.tags && meal.tags.length > 0 && (
-                <div style={{
-                  display: 'flex',
-                  gap: '0.25rem',
-                  marginTop: '0.5rem',
-                  flexWrap: 'wrap'
-                }}>
-                  {meal.tags.slice(0, 3).map((tag, idx) => (
-                    <span
-                      key={idx}
-                      style={{
-                        padding: '0.2rem 0.5rem',
-                        background: 'rgba(16, 185, 129, 0.2)',
-                        borderRadius: '12px',
-                        fontSize: '0.7rem',
-                        color: '#10b981'
-                      }}
-                    >
-                      {tag}
-                    </span>
-                  ))}
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
-      </div>
-    </div>
-  )
-}
-
-// Circular Progress Component with Lucide Icons
-const CircularProgress = ({ value, max, color, label, icon: Icon, size = 70 }) => {
-  const percentage = Math.min((value / max) * 100, 100)
-  const strokeWidth = 6
-  const radius = (size - strokeWidth) / 2
-  const circumference = radius * 2 * Math.PI
-  const strokeDashoffset = circumference - (percentage / 100) * circumference
-
-  return (
-    <div style={{ position: 'relative', width: size, height: size }}>
-      <svg width={size} height={size} style={{ transform: 'rotate(-90deg)' }}>
-        <circle
-          cx={size / 2}
-          cy={size / 2}
-          r={radius}
-          stroke="rgba(16, 185, 129, 0.1)"
-          strokeWidth={strokeWidth}
-          fill="none"
-        />
-        <circle
-          cx={size / 2}
-          cy={size / 2}
-          r={radius}
-          stroke={color}
-          strokeWidth={strokeWidth}
-          fill="none"
-          strokeDasharray={circumference}
-          strokeDashoffset={strokeDashoffset}
-          strokeLinecap="round"
-          style={{ 
-            transition: 'stroke-dashoffset 0.5s ease',
-            filter: `drop-shadow(0 0 6px ${color})`
-          }}
-        />
-      </svg>
-      <div style={{
-        position: 'absolute',
-        top: '50%',
-        left: '50%',
-        transform: 'translate(-50%, -50%)',
-        textAlign: 'center',
-        color: '#fff'
-      }}>
-        {Icon && <Icon size={16} style={{ marginBottom: '2px', color }} />}
-        <div style={{ fontWeight: 'bold', fontSize: '12px' }}>{Math.round(value)}</div>
-        <div style={{ opacity: 0.7, fontSize: '9px' }}>{label}</div>
-      </div>
-    </div>
-  )
-}
-
-// Quick Day Actions Component with Lucide Icons
-const QuickDayActions = ({ dayIndex, onCheckDay, onAddPhoto, mostEatenMeals, onQuickAdd, isMobile }) => (
-  <div style={{ 
-    animation: 'slideIn 0.3s ease',
-    marginBottom: '1rem'
-  }}>
-    {/* Hoofdacties in een grid */}
-    <div style={{
-      display: 'grid',
-      gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr',
-      gap: '0.5rem',
-      marginBottom: '0.75rem'
-    }}>
-      <button 
-        onClick={() => onCheckDay(dayIndex)}
-        style={{
-          padding: isMobile ? '0.875rem' : '1rem',
-          fontSize: isMobile ? '0.95rem' : '1.1rem',
-          background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-          border: 'none',
-          borderRadius: '12px',
-          color: '#000',
-          fontWeight: 'bold',
-          cursor: 'pointer',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          gap: '0.5rem',
-          boxShadow: '0 2px 10px rgba(16, 185, 129, 0.3)'
-        }}
-      >
-        <CheckCircle2 size={18} />
-        HELE DAG COMPLEET
-      </button>
-      
-      <button
-        onClick={onAddPhoto}
-        style={{
-          padding: isMobile ? '0.875rem' : '1rem',
-          background: 'rgba(59, 130, 246, 0.1)',
-          border: '1px solid rgba(59, 130, 246, 0.3)',
-          borderRadius: '12px',
-          color: '#3b82f6',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          gap: '0.5rem',
-          fontSize: isMobile ? '0.9rem' : '1rem'
-        }}
-      >
-        <Camera size={18} />
-        Foto maaltijd
-      </button>
-    </div>
-
-    {/* Most Eaten - Compacter op mobile */}
-    {mostEatenMeals && mostEatenMeals.length > 0 && (
-      <details style={{
-        background: 'rgba(0, 0, 0, 0.3)',
-        borderRadius: '8px',
-        border: '1px solid rgba(16, 185, 129, 0.2)',
-        padding: '0.5rem'
-      }}>
-        <summary style={{
-          cursor: 'pointer',
-          color: 'var(--c-muted)',
-          fontSize: '0.85rem',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '0.5rem'
-        }}>
-          <Star size={14} style={{ color: '#f59e0b' }} />
-          Vaak gegeten ({mostEatenMeals.length})
-        </summary>
-        <div style={{
-          display: 'flex',
-          gap: '0.25rem',
-          flexWrap: 'wrap',
-          marginTop: '0.5rem'
-        }}>
-          {mostEatenMeals.slice(0, 3).map(meal => (
-            <button 
-              key={meal.id}
-              onClick={() => onQuickAdd(meal)}
-              style={{
-                padding: '0.25rem 0.5rem',
-                background: 'rgba(16, 185, 129, 0.1)',
-                border: '1px solid rgba(16, 185, 129, 0.3)',
-                borderRadius: '16px',
-                color: '#10b981',
-                fontSize: '0.75rem',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.25rem'
-              }}
-            >
-              <Plus size={12} />
-              {meal.name.length > 15 ? meal.name.substring(0, 15) + '...' : meal.name}
-            </button>
-          ))}
-        </div>
-      </details>
-    )}
-  </div>
-)
-
-// Water Tracker Component
-const WaterTracker = ({ 
-  dayIndex, 
-  currentIntake = 0, 
-  target = 2.0, 
-  onUpdate, 
-  isToday = false,
-  isMobile = false 
-}) => {
-  const [intake, setIntake] = useState(currentIntake)
-  const [showDetail, setShowDetail] = useState(false)
-  
-  // Update local state when prop changes
-  useEffect(() => {
-    setIntake(currentIntake)
-  }, [currentIntake])
-  
-  const percentage = Math.min((intake / target) * 100, 100)
-  const glasses = Math.round(intake * 4) // 250ml per glass
-  
-  const quickAddAmounts = [0.25, 0.5, 0.75, 1.0] // Liters
-  
-  const handleQuickAdd = async (amount) => {
-    const newIntake = Math.min(intake + amount, 5.0) // Max 5L
-    setIntake(newIntake)
-    if (onUpdate) {
-      await onUpdate(dayIndex, newIntake)
-    }
-  }
-
-  const handleReset = async () => {
-    setIntake(0)
-    if (onUpdate) {
-      await onUpdate(dayIndex, 0)
-    }
-  }
-
-  // Compact view for non-today on mobile
-if (isMobile) {
-    return (
-      <div style={{
-        padding: '0.75rem',
-        background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.08) 0%, rgba(59, 130, 246, 0.03) 100%)',
-        borderRadius: '12px',
-        border: '1px solid rgba(59, 130, 246, 0.2)',
-        marginBottom: '0.75rem'
-      }}>
-        {/* Compact Header met Progress */}
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          marginBottom: isToday && !showDetail ? '0.5rem' : 0
-        }}>
-          <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.75rem',
-            flex: 1
-          }}>
-            <Droplets size={16} style={{ color: '#3b82f6' }} />
-            
-            {/* Progress Bar */}
-            <div style={{
-              flex: 1,
-              height: '24px',
-              background: 'rgba(0, 0, 0, 0.3)',
-              borderRadius: '12px',
-              position: 'relative',
-              overflow: 'hidden'
-            }}>
-              <div style={{
-                position: 'absolute',
-                left: 0,
-                top: 0,
-                bottom: 0,
-                width: `${percentage}%`,
-                background: 'linear-gradient(90deg, #3b82f6, #2563eb)',
-                borderRadius: '12px',
-                transition: 'width 0.5s ease'
-              }} />
-              <div style={{
-                position: 'absolute',
-                left: '50%',
-                top: '50%',
-                transform: 'translate(-50%, -50%)',
-                color: '#fff',
-                fontSize: '0.75rem',
-                fontWeight: 'bold',
-                textShadow: '0 1px 2px rgba(0,0,0,0.5)'
-              }}>
-                {intake.toFixed(1)}L / {target}L
-              </div>
-            </div>
-          </div>
-
-          {/* Detail Toggle alleen voor vandaag */}
-          {isToday && (
-            <button
-              onClick={() => setShowDetail(!showDetail)}
-              style={{
-                background: 'transparent',
-                border: 'none',
-                color: '#3b82f6',
-                padding: '0.25rem',
-                cursor: 'pointer'
-              }}
-            >
-              {showDetail ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
-            </button>
-          )}
-        </div>
-
-        {/* Quick Add Buttons - Alleen vandaag, compacter */}
-        {isToday && !showDetail && (
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(4, 1fr)',
-            gap: '0.25rem'
-          }}>
-            {[0.25, 0.5, 0.75, 1.0].map(amount => (
-              <button
-                key={amount}
-                onClick={() => handleQuickAdd(amount)}
-                style={{
-                  padding: '0.4rem',
-                  background: 'rgba(59, 130, 246, 0.1)',
-                  border: '1px solid rgba(59, 130, 246, 0.2)',
-                  borderRadius: '6px',
-                  color: '#3b82f6',
-                  fontSize: '0.7rem',
-                  fontWeight: 'bold',
-                  cursor: 'pointer'
-                }}
-              >
-                +{amount * 1000}ml
-              </button>
-            ))}
-          </div>
-        )}
-
-        {/* Details View */}
-        {showDetail && isToday && (
-          <div style={{
-            marginTop: '0.75rem',
-            padding: '0.5rem',
-            background: 'rgba(0, 0, 0, 0.2)',
-            borderRadius: '8px',
-            fontSize: '0.8rem'
-          }}>
-            <div style={{ marginBottom: '0.5rem', color: 'var(--c-muted)' }}>
-              Glazen: {glasses}/8 • {Math.round(percentage)}% compleet
-            </div>
-            {intake > 0 && (
-              <button
-                onClick={() => handleQuickAdd(-intake)}
-                style={{
-                  width: '100%',
-                  padding: '0.4rem',
-                  background: 'rgba(239, 68, 68, 0.1)',
-                  border: '1px solid rgba(239, 68, 68, 0.3)',
-                  borderRadius: '6px',
-                  color: '#ef4444',
-                  fontSize: '0.75rem',
-                  cursor: 'pointer'
-                }}
-              >
-                Reset
-              </button>
-            )}
-          </div>
-        )}
-      </div>
-    )
-  }
-
-  return (
-    <div style={{
-      padding: isMobile ? '0.75rem' : '1rem',
-      background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.05) 0%, rgba(59, 130, 246, 0.02) 100%)',
-      borderRadius: '12px',
-      border: '1px solid rgba(59, 130, 246, 0.2)',
-      marginBottom: '1rem'
-    }}>
-      {/* Header */}
-      <div style={{
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        marginBottom: '0.75rem'
-      }}>
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '0.5rem',
-          color: '#3b82f6'
-        }}>
-          <Droplets size={18} />
-          <span style={{ fontWeight: 'bold', fontSize: isMobile ? '0.9rem' : '1rem' }}>
-            Water Intake
-          </span>
-        </div>
-        
-        {isToday && (
+            Annuleren
+          </button>
+          
           <button
-            onClick={() => setShowDetail(!showDetail)}
+            onClick={handleSave}
             style={{
-              background: 'rgba(59, 130, 246, 0.1)',
-              border: '1px solid rgba(59, 130, 246, 0.3)',
-              borderRadius: '8px',
-              padding: '0.25rem 0.5rem',
-              color: '#3b82f6',
-              fontSize: '0.75rem',
+              flex: 1,
+              padding: '0.75rem',
+              background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.9) 0%, rgba(5, 150, 105, 0.9) 100%)',
+              border: 'none',
+              borderRadius: '10px',
+              color: '#fff',
+              fontWeight: '600',
               cursor: 'pointer',
               display: 'flex',
               alignItems: 'center',
-              gap: '0.25rem'
+              justifyContent: 'center',
+              gap: '0.5rem'
             }}
           >
-            {showDetail ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-            Details
+            <Save size={16} />
+            Opslaan
           </button>
-        )}
-      </div>
-
-      {/* Visual Progress */}
-      <div style={{
-        position: 'relative',
-        height: '60px',
-        background: 'rgba(0, 0, 0, 0.3)',
-        borderRadius: '30px',
-        overflow: 'hidden',
-        marginBottom: '0.75rem'
-      }}>
-        {/* Water fill animation */}
-        <div style={{
-          position: 'absolute',
-          bottom: 0,
-          left: 0,
-          right: 0,
-          height: `${percentage}%`,
-          background: 'linear-gradient(180deg, rgba(59, 130, 246, 0.8) 0%, rgba(59, 130, 246, 0.4) 100%)',
-          transition: 'height 0.5s ease',
-          borderRadius: '30px'
-        }}>
-          {/* Animated waves */}
-          <div style={{
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            right: 0,
-            height: '20px',
-            background: 'url("data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' viewBox=\'0 0 100 20\'%3E%3Cpath d=\'M0,10 Q25,0 50,10 T100,10 L100,20 L0,20 Z\' fill=\'rgba(59,130,246,0.3)\'/%3E%3C/svg%3E")',
-            backgroundSize: '100px 20px',
-            animation: 'wave 3s linear infinite'
-          }} />
-        </div>
-
-        {/* Glass indicators */}
-        <div style={{
-          position: 'absolute',
-          top: '50%',
-          left: '50%',
-          transform: 'translate(-50%, -50%)',
-          display: 'flex',
-          gap: '4px'
-        }}>
-          {[...Array(8)].map((_, i) => (
-            <div
-              key={i}
-              style={{
-                width: isMobile ? '6px' : '8px',
-                height: isMobile ? '20px' : '24px',
-                background: i < glasses 
-                  ? 'rgba(255, 255, 255, 0.9)' 
-                  : 'rgba(255, 255, 255, 0.1)',
-                borderRadius: '2px',
-                transition: 'all 0.3s ease'
-              }}
-            />
-          ))}
-        </div>
-
-        {/* Text overlay */}
-        <div style={{
-          position: 'absolute',
-          bottom: '8px',
-          left: '50%',
-          transform: 'translateX(-50%)',
-          color: '#fff',
-          fontSize: isMobile ? '0.85rem' : '0.9rem',
-          fontWeight: 'bold',
-          textShadow: '0 1px 2px rgba(0,0,0,0.5)'
-        }}>
-          {intake.toFixed(1)}L / {target}L
         </div>
       </div>
-
-      {/* Quick Add Buttons (Today only) */}
-      {isToday && (
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(4, 1fr)',
-          gap: '0.5rem',
-          marginBottom: showDetail ? '0.75rem' : 0
-        }}>
-          {quickAddAmounts.map(amount => (
-            <button
-              key={amount}
-              onClick={() => handleQuickAdd(amount)}
-              style={{
-                padding: isMobile ? '0.5rem' : '0.6rem',
-                background: 'rgba(59, 130, 246, 0.1)',
-                border: '1px solid rgba(59, 130, 246, 0.3)',
-                borderRadius: '8px',
-                color: '#3b82f6',
-                fontSize: isMobile ? '0.75rem' : '0.85rem',
-                fontWeight: 'bold',
-                cursor: 'pointer',
-                transition: 'all 0.2s ease'
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.background = 'rgba(59, 130, 246, 0.2)'
-                e.currentTarget.style.transform = 'translateY(-2px)'
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.background = 'rgba(59, 130, 246, 0.1)'
-                e.currentTarget.style.transform = 'translateY(0)'
-              }}
-            >
-              +{amount * 1000}ml
-            </button>
-          ))}
-        </div>
-      )}
-
-      {/* Detailed view */}
-      {showDetail && isToday && (
-        <div style={{
-          padding: '0.75rem',
-          background: 'rgba(0, 0, 0, 0.2)',
-          borderRadius: '8px',
-          border: '1px solid rgba(59, 130, 246, 0.2)'
-        }}>
-          <div style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            marginBottom: '0.5rem'
-          }}>
-            <span style={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.85rem' }}>
-              Glazen (250ml):
-            </span>
-            <span style={{ color: '#3b82f6', fontWeight: 'bold' }}>
-              {glasses} / {Math.round(target * 4)}
-            </span>
-          </div>
-          
-          <div style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            marginBottom: '0.5rem'
-          }}>
-            <span style={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.85rem' }}>
-              Percentage:
-            </span>
-            <span style={{ color: '#3b82f6', fontWeight: 'bold' }}>
-              {Math.round(percentage)}%
-            </span>
-          </div>
-
-          {intake >= target && (
-            <div style={{
-              padding: '0.5rem',
-              background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.2) 0%, rgba(16, 185, 129, 0.1) 100%)',
-              borderRadius: '6px',
-              border: '1px solid rgba(16, 185, 129, 0.3)',
-              textAlign: 'center',
-              color: '#10b981',
-              fontSize: '0.85rem',
-              fontWeight: 'bold',
-              marginTop: '0.5rem'
-            }}>
-              🎉 Doel behaald!
-            </div>
-          )}
-
-          {isToday && intake > 0 && (
-            <button
-              onClick={handleReset}
-              style={{
-                width: '100%',
-                padding: '0.5rem',
-                background: 'rgba(239, 68, 68, 0.1)',
-                border: '1px solid rgba(239, 68, 68, 0.3)',
-                borderRadius: '6px',
-                color: '#ef4444',
-                fontSize: '0.85rem',
-                cursor: 'pointer',
-                marginTop: '0.5rem'
-              }}
-            >
-              Reset
-            </button>
-          )}
-        </div>
-      )}
     </div>
   )
 }
 
-// Enhanced Day Card Component with Lucide Icons
-const EnhancedDayCard = ({
-  day,
-  dayIndex,
-  isToday,
-  isExpanded,
-  targets,
-  onToggleExpand,
-  onCheckMeal,
-  onSwapMeal,
-  onMealClick,
-  checkedMeals,
-  mealsMap,
-  onQuickDayComplete,
-  onAddPhoto,
-  mostEatenMeals,
-  onQuickAddMeal,
-  waterIntake = 0,        // ✅ NIEUW
-  onUpdateWater,          // ✅ NIEUW
-  db,                     // ✅ NIEUW
-  client,                 // ✅ NIEUW
-  isMobile                // ✅ NIEUW (als je dit nog niet hebt)
-}) => {
-
-  const currentHour = getCurrentHour()
-  const dayProgress = day.progress || { kcal: 0, protein: 0, carbs: 0, fat: 0 }
-  const completionPercentage = Math.round((dayProgress.kcal / targets.kcal) * 100)
+// ===== ENHANCED SWAP MODAL WITH FAVORITES & CUSTOM MEALS =====
+const SwapModal = ({ isOpen, onClose, currentMeal, onSelectMeal, allMeals = [], favorites = [], customMeals = [], onCreateCustom }) => {
+  const [searchTerm, setSearchTerm] = useState('')
+  const [selectedCategory, setSelectedCategory] = useState('all')
+  const [showOnlyFavorites, setShowOnlyFavorites] = useState(false)
   
-  // Calculate meal timeline positions
-  const mealTimelineData = useMemo(() => {
-    if (!day.meals) return []
-    return day.meals.map((meal, idx) => {
-      let estimatedHour = 8
-      if (meal.slot) {
-        const slotName = meal.slot.toLowerCase()
-        if (slotName.includes('breakfast')) estimatedHour = 8
-        else if (slotName.includes('snack') && slotName.includes('1')) estimatedHour = 10
-        else if (slotName.includes('lunch')) estimatedHour = 13
-        else if (slotName.includes('snack') && slotName.includes('2')) estimatedHour = 16
-        else if (slotName.includes('dinner')) estimatedHour = 19
-        else if (slotName.includes('snack') && slotName.includes('3')) estimatedHour = 21
-      }
-      
-      return {
-        ...meal,
-        idx,
-        estimatedHour,
-        isEaten: checkedMeals[`${dayIndex}_${idx}`],
-        mealData: mealsMap[meal.meal_id]
-      }
-    })
-  }, [day.meals, checkedMeals, dayIndex, mealsMap])
-
-  const MealIcon = getMealTypeIcon(day.meals?.[0]?.slot)
-
+  // Combine all meals with favorites first
+  const combinedMeals = [
+    ...customMeals.map(m => ({ ...m, isCustom: true })),
+    ...allMeals
+  ]
+  
+  // Sort with favorites first
+  const sortedMeals = combinedMeals.sort((a, b) => {
+    const aIsFav = favorites.includes(a.id)
+    const bIsFav = favorites.includes(b.id)
+    if (aIsFav && !bIsFav) return -1
+    if (!aIsFav && bIsFav) return 1
+    if (a.isCustom && !b.isCustom) return -1
+    if (!a.isCustom && b.isCustom) return 1
+    return 0
+  })
+  
+  const filteredMeals = sortedMeals.filter(meal => {
+    if (showOnlyFavorites && !favorites.includes(meal.id) && !meal.isCustom) return false
+    
+    const matchesSearch = meal.name.toLowerCase().includes(searchTerm.toLowerCase())
+    const matchesCategory = selectedCategory === 'all' || 
+      (meal.category && meal.category.toLowerCase() === selectedCategory) ||
+      (meal.meal_type && meal.meal_type.toLowerCase() === selectedCategory) ||
+      (meal.tags && meal.tags.some(tag => tag.toLowerCase() === selectedCategory))
+    return matchesSearch && matchesCategory
+  })
+  
+  if (!isOpen) return null
+  
   return (
-    <div 
-      className={`myarc-day-card ${isToday ? 'myarc-today-glow' : ''}`}
-      style={{
-        background: isToday 
-          ? 'rgba(16, 185, 129, 0.05)'
-          : 'rgba(0, 0, 0, 0.9)',
-        border: isToday 
-          ? '2px solid #10b981' 
-          : '1px solid rgba(16, 185, 129, 0.2)',
-        borderRadius: '16px',
-        padding: '1.5rem',
-        marginBottom: '1rem',
-        transition: 'all 0.3s ease',
-        position: 'relative',
-        overflow: 'hidden'
-      }}
-    >
-      {/* Gradient overlay for today */}
-      {isToday && (
-        <div style={{
-          position: 'absolute',
-          top: 0,
-          left: 0,
-          right: 0,
-          height: '4px',
-          background: 'linear-gradient(90deg, #10b981, #059669, #10b981)',
-          backgroundSize: '200% 100%',
-          animation: 'gradient 3s ease infinite'
-        }} />
-      )}
-
-      {/* Day Header */}
+    <div style={{
+      position: 'fixed',
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      background: 'rgba(0, 0, 0, 0.95)',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      zIndex: 10000,
+      padding: '1rem',
+      backdropFilter: 'blur(10px)'
+    }}>
       <div style={{
+        background: 'linear-gradient(180deg, #1a1a1a 0%, #0f0f0f 100%)',
+        borderRadius: '24px',
+        width: '100%',
+        maxWidth: '500px',
+        maxHeight: '80vh',
+        overflow: 'hidden',
+        border: '1px solid rgba(16, 185, 129, 0.2)',
+        boxShadow: '0 20px 60px rgba(0, 0, 0, 0.5)',
         display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        marginBottom: '1rem'
+        flexDirection: 'column'
       }}>
-        <div>
-          <h3 style={{ 
-            color: '#fff', 
-            fontSize: '1.2rem',
-            marginBottom: '0.25rem',
+        {/* Header */}
+        <div style={{
+          padding: '1.5rem',
+          borderBottom: '1px solid rgba(16, 185, 129, 0.1)',
+          background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.05) 0%, rgba(16, 185, 129, 0.02) 100%)'
+        }}>
+          <div style={{
             display: 'flex',
             alignItems: 'center',
-            gap: '0.5rem'
+            justifyContent: 'space-between',
+            marginBottom: '1rem'
           }}>
-            <Calendar size={18} style={{ color: '#10b981' }} />
-            {formatDate(day.date || addDays(new Date(), dayIndex))}
-          </h3>
-          {isToday && (
-            <span style={{
-              background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-              color: '#000',
-              padding: '0.25rem 0.75rem',
-              borderRadius: '20px',
-              fontSize: '0.8rem',
+            <h2 style={{
+              color: '#fff',
+              fontSize: '1.25rem',
               fontWeight: 'bold',
-              display: 'inline-flex',
+              display: 'flex',
               alignItems: 'center',
-              gap: '0.25rem'
+              gap: '0.5rem'
             }}>
-              <Sparkles size={12} />
-              VANDAAG
-            </span>
+              <RefreshCw size={20} style={{ color: 'rgba(16, 185, 129, 0.8)' }} />
+              Vervang Maaltijd
+            </h2>
+            
+            <button
+              onClick={onClose}
+              style={{
+                background: 'rgba(255, 255, 255, 0.1)',
+                border: 'none',
+                borderRadius: '10px',
+                padding: '0.5rem',
+                cursor: 'pointer',
+                color: 'rgba(255, 255, 255, 0.6)',
+                transition: 'all 0.2s ease'
+              }}
+            >
+              <X size={20} />
+            </button>
+          </div>
+          
+          {/* Current Meal Info */}
+          <div style={{
+            padding: '0.75rem',
+            background: 'rgba(0, 0, 0, 0.3)',
+            borderRadius: '10px',
+            marginBottom: '1rem'
+          }}>
+            <div style={{ color: 'rgba(255, 255, 255, 0.5)', fontSize: '0.75rem', marginBottom: '0.25rem' }}>
+              Huidige maaltijd:
+            </div>
+            <div style={{ color: '#fff', fontWeight: '600' }}>
+              {currentMeal?.name}
+            </div>
+          </div>
+          
+          {/* Search & Filter */}
+          <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.75rem' }}>
+            <div style={{ flex: 1, position: 'relative' }}>
+              <Search size={16} style={{
+                position: 'absolute',
+                left: '12px',
+                top: '50%',
+                transform: 'translateY(-50%)',
+                color: 'rgba(255, 255, 255, 0.4)'
+              }} />
+              <input
+                type="text"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                placeholder="Zoek maaltijd..."
+                style={{
+                  width: '100%',
+                  padding: '0.625rem 0.75rem 0.625rem 2.5rem',
+                  background: 'rgba(0, 0, 0, 0.5)',
+                  border: '1px solid rgba(16, 185, 129, 0.2)',
+                  borderRadius: '8px',
+                  color: '#fff',
+                  fontSize: '0.9rem',
+                  outline: 'none'
+                }}
+              />
+            </div>
+            
+            <select
+              value={selectedCategory}
+              onChange={(e) => setSelectedCategory(e.target.value)}
+              style={{
+                padding: '0.625rem 0.75rem',
+                background: 'rgba(0, 0, 0, 0.5)',
+                border: '1px solid rgba(16, 185, 129, 0.2)',
+                borderRadius: '8px',
+                color: '#fff',
+                fontSize: '0.9rem',
+                cursor: 'pointer',
+                outline: 'none'
+              }}
+            >
+              <option value="all">Alle</option>
+              <option value="breakfast">Ontbijt</option>
+              <option value="lunch">Lunch</option>
+              <option value="dinner">Diner</option>
+              <option value="snack">Snack</option>
+            </select>
+          </div>
+          
+          {/* Quick Filters */}
+          <div style={{ display: 'flex', gap: '0.5rem' }}>
+            <button
+              onClick={() => setShowOnlyFavorites(!showOnlyFavorites)}
+              style={{
+                padding: '0.5rem 0.75rem',
+                background: showOnlyFavorites
+                  ? 'linear-gradient(135deg, rgba(245, 158, 11, 0.2) 0%, rgba(245, 158, 11, 0.1) 100%)'
+                  : 'rgba(0, 0, 0, 0.3)',
+                border: showOnlyFavorites
+                  ? '1px solid rgba(245, 158, 11, 0.3)'
+                  : '1px solid rgba(255, 255, 255, 0.1)',
+                borderRadius: '8px',
+                color: showOnlyFavorites
+                  ? '#f59e0b'
+                  : 'rgba(255, 255, 255, 0.5)',
+                fontSize: '0.8rem',
+                fontWeight: '600',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.3rem'
+              }}
+            >
+              <Star size={14} fill={showOnlyFavorites ? '#f59e0b' : 'none'} />
+              Favorieten
+            </button>
+            
+            <button
+              onClick={onCreateCustom}
+              style={{
+                padding: '0.5rem 0.75rem',
+                background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.15) 0%, rgba(16, 185, 129, 0.08) 100%)',
+                border: '1px solid rgba(16, 185, 129, 0.3)',
+                borderRadius: '8px',
+                color: 'rgba(16, 185, 129, 0.9)',
+                fontSize: '0.8rem',
+                fontWeight: '600',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.3rem'
+              }}
+            >
+              <Plus size={14} />
+              Eigen Maaltijd
+            </button>
+          </div>
+        </div>
+        
+        {/* Meals List */}
+        <div style={{
+          flex: 1,
+          overflowY: 'auto',
+          padding: '1rem'
+        }}>
+          {filteredMeals.map((meal, index) => {
+            const isFavorite = favorites.includes(meal.id)
+            const isCustom = meal.isCustom
+            
+            return (
+              <button
+                key={`${meal.id}-${index}`}
+                onClick={() => onSelectMeal(meal)}
+                style={{
+                  width: '100%',
+                  padding: '0.875rem',
+                  background: 'rgba(0, 0, 0, 0.3)',
+                  border: '1px solid rgba(16, 185, 129, 0.1)',
+                  borderRadius: '12px',
+                  marginBottom: '0.5rem',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s ease',
+                  textAlign: 'left',
+                  position: 'relative'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = 'rgba(16, 185, 129, 0.05)'
+                  e.currentTarget.style.borderColor = 'rgba(16, 185, 129, 0.3)'
+                  e.currentTarget.style.transform = 'translateX(4px)'
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = 'rgba(0, 0, 0, 0.3)'
+                  e.currentTarget.style.borderColor = 'rgba(16, 185, 129, 0.1)'
+                  e.currentTarget.style.transform = 'translateX(0)'
+                }}
+              >
+                {/* Favorite/Custom badges */}
+                <div style={{
+                  position: 'absolute',
+                  top: '0.5rem',
+                  right: '0.5rem',
+                  display: 'flex',
+                  gap: '0.25rem'
+                }}>
+                  {isFavorite && (
+                    <Star size={14} style={{ color: '#f59e0b', fill: '#f59e0b' }} />
+                  )}
+                  {isCustom && (
+                    <ChefHat size={14} style={{ color: 'rgba(16, 185, 129, 0.7)' }} />
+                  )}
+                </div>
+                
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.75rem'
+                }}>
+                  {/* Meal Image */}
+                  {meal.image_url && (
+                    <div style={{
+                      width: '50px',
+                      height: '50px',
+                      borderRadius: '8px',
+                      background: `url(${meal.image_url}) center/cover`,
+                      flexShrink: 0
+                    }} />
+                  )}
+                  
+                  <div style={{ flex: 1 }}>
+                    <div style={{
+                      color: '#fff',
+                      fontWeight: '600',
+                      marginBottom: '0.25rem'
+                    }}>
+                      {meal.name}
+                    </div>
+                    <div style={{
+                      display: 'flex',
+                      gap: '0.75rem',
+                      fontSize: '0.75rem',
+                      color: 'rgba(255, 255, 255, 0.5)'
+                    }}>
+                      <span>{meal.kcal} kcal</span>
+                      <span>{meal.protein}g eiwit</span>
+                      <span>{meal.carbs}g koolh</span>
+                      <span>{meal.fat}g vet</span>
+                    </div>
+                  </div>
+                </div>
+              </button>
+            )
+          })}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ===== ENHANCED HISTORY MODAL WITH REAL DATA =====
+const HistoryModal = ({ isOpen, onClose, historyData = [], targets = {} }) => {
+  const [historyPeriod, setHistoryPeriod] = useState('week')
+  
+  const filteredHistory = historyData.filter(item => {
+    const date = new Date(item.date)
+    const now = new Date()
+    const diffDays = Math.floor((now - date) / (1000 * 60 * 60 * 24))
+    
+    if (historyPeriod === 'week') return diffDays <= 7
+    if (historyPeriod === 'maand') return diffDays <= 30
+    return true
+  })
+  
+  // Calculate statistics
+  const stats = filteredHistory.reduce((acc, item) => {
+    acc.totalDays++
+    acc.totalCalories += item.total_calories || 0
+    acc.totalProtein += item.total_protein || 0
+    acc.totalCarbs += item.total_carbs || 0
+    acc.totalFat += item.total_fat || 0
+    
+    if (item.total_calories >= targets.kcal * 0.9) {
+      acc.daysOnTarget++
+    }
+    
+    return acc
+  }, { totalDays: 0, daysOnTarget: 0, totalCalories: 0, totalProtein: 0, totalCarbs: 0, totalFat: 0 })
+  
+  if (stats.totalDays > 0) {
+    stats.avgCalories = Math.round(stats.totalCalories / stats.totalDays)
+    stats.avgProtein = Math.round(stats.totalProtein / stats.totalDays)
+    stats.avgCarbs = Math.round(stats.totalCarbs / stats.totalDays)
+    stats.avgFat = Math.round(stats.totalFat / stats.totalDays)
+    stats.successRate = Math.round((stats.daysOnTarget / stats.totalDays) * 100)
+  }
+  
+  if (!isOpen) return null
+  
+  return (
+    <div style={{
+      position: 'fixed',
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      background: 'rgba(0, 0, 0, 0.95)',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      zIndex: 10000,
+      padding: '1rem',
+      backdropFilter: 'blur(10px)'
+    }}>
+      <div style={{
+        background: 'linear-gradient(180deg, #1a1a1a 0%, #0f0f0f 100%)',
+        borderRadius: '24px',
+        width: '100%',
+        maxWidth: '500px',
+        maxHeight: '80vh',
+        overflow: 'hidden',
+        border: '1px solid rgba(16, 185, 129, 0.2)',
+        boxShadow: '0 20px 60px rgba(0, 0, 0, 0.5)',
+        display: 'flex',
+        flexDirection: 'column'
+      }}>
+        {/* Header */}
+        <div style={{
+          padding: '1.5rem',
+          borderBottom: '1px solid rgba(16, 185, 129, 0.1)',
+          background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.05) 0%, rgba(16, 185, 129, 0.02) 100%)'
+        }}>
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            marginBottom: '1rem'
+          }}>
+            <h2 style={{
+              color: '#fff',
+              fontSize: '1.25rem',
+              fontWeight: 'bold',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem'
+            }}>
+              <History size={20} style={{ color: 'rgba(16, 185, 129, 0.8)' }} />
+              Geschiedenis
+            </h2>
+            
+            <button
+              onClick={onClose}
+              style={{
+                background: 'rgba(255, 255, 255, 0.1)',
+                border: 'none',
+                borderRadius: '10px',
+                padding: '0.5rem',
+                cursor: 'pointer',
+                color: 'rgba(255, 255, 255, 0.6)'
+              }}
+            >
+              <X size={20} />
+            </button>
+          </div>
+          
+          {/* Period Selector */}
+          <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem' }}>
+            {['week', 'maand', 'alles'].map(period => (
+              <button
+                key={period}
+                onClick={() => setHistoryPeriod(period)}
+                style={{
+                  flex: 1,
+                  padding: '0.5rem',
+                  background: historyPeriod === period
+                    ? 'linear-gradient(135deg, rgba(16, 185, 129, 0.2) 0%, rgba(16, 185, 129, 0.1) 100%)'
+                    : 'rgba(0, 0, 0, 0.3)',
+                  border: historyPeriod === period
+                    ? '1px solid rgba(16, 185, 129, 0.3)'
+                    : '1px solid rgba(255, 255, 255, 0.1)',
+                  borderRadius: '8px',
+                  color: historyPeriod === period
+                    ? 'rgba(16, 185, 129, 0.9)'
+                    : 'rgba(255, 255, 255, 0.5)',
+                  fontSize: '0.85rem',
+                  fontWeight: '600',
+                  cursor: 'pointer',
+                  textTransform: 'capitalize'
+                }}
+              >
+                {period === 'week' ? 'Week' : period === 'maand' ? 'Maand' : 'Alles'}
+              </button>
+            ))}
+          </div>
+          
+          {/* Statistics */}
+          {stats.totalDays > 0 && (
+            <div style={{
+              padding: '0.75rem',
+              background: 'rgba(0, 0, 0, 0.3)',
+              borderRadius: '10px',
+              display: 'grid',
+              gridTemplateColumns: 'repeat(2, 1fr)',
+              gap: '0.5rem'
+            }}>
+              <div>
+                <div style={{ color: 'rgba(255, 255, 255, 0.5)', fontSize: '0.7rem' }}>
+                  Succes Rate
+                </div>
+                <div style={{ color: 'rgba(16, 185, 129, 0.9)', fontWeight: 'bold' }}>
+                  {stats.successRate}%
+                </div>
+              </div>
+              <div>
+                <div style={{ color: 'rgba(255, 255, 255, 0.5)', fontSize: '0.7rem' }}>
+                  Gem. Calorieën
+                </div>
+                <div style={{ color: '#fff', fontWeight: 'bold' }}>
+                  {stats.avgCalories} kcal
+                </div>
+              </div>
+            </div>
           )}
         </div>
         
-        <div style={{ textAlign: 'right' }}>
-          <div style={{ 
-            color: completionPercentage >= 90 ? '#10b981' : 
-                   completionPercentage >= 50 ? '#f59e0b' : '#ef4444',
-            fontSize: '1.5rem',
-            fontWeight: 'bold',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.25rem'
-          }}>
-            {completionPercentage >= 90 && <Award size={20} />}
-            {completionPercentage}%
-          </div>
-          {day.streakDays > 0 && (
-            <div style={{ 
-              color: '#f59e0b', 
-              fontSize: '0.9rem',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.25rem'
+        {/* History List */}
+        <div style={{
+          flex: 1,
+          overflowY: 'auto',
+          padding: '1rem'
+        }}>
+          {filteredHistory.length > 0 ? (
+            filteredHistory.map((item, idx) => {
+              const successRate = Math.round((item.total_calories / targets.kcal) * 100)
+              const isSuccess = successRate >= 90
+              
+              return (
+                <div
+                  key={idx}
+                  style={{
+                    padding: '0.875rem',
+                    background: 'rgba(0, 0, 0, 0.3)',
+                    border: `1px solid ${isSuccess ? 'rgba(16, 185, 129, 0.2)' : 'rgba(255, 255, 255, 0.1)'}`,
+                    borderRadius: '12px',
+                    marginBottom: '0.5rem'
+                  }}
+                >
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    marginBottom: '0.5rem'
+                  }}>
+                    <div style={{
+                      color: '#fff',
+                      fontWeight: '600',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.5rem'
+                    }}>
+                      {new Date(item.date).toLocaleDateString('nl-NL', {
+                        weekday: 'short',
+                        day: 'numeric',
+                        month: 'short'
+                      })}
+                      {isSuccess && <CheckCircle2 size={14} style={{ color: 'rgba(16, 185, 129, 0.8)' }} />}
+                    </div>
+                    <div style={{
+                      color: isSuccess ? 'rgba(16, 185, 129, 0.9)' : 'rgba(255, 255, 255, 0.5)',
+                      fontWeight: '600'
+                    }}>
+                      {item.total_calories} / {targets.kcal} kcal
+                    </div>
+                  </div>
+                  
+                  <div style={{
+                    display: 'flex',
+                    gap: '1rem',
+                    fontSize: '0.75rem',
+                    color: 'rgba(255, 255, 255, 0.4)',
+                    marginBottom: '0.5rem'
+                  }}>
+                    <span>E: {item.total_protein}g</span>
+                    <span>K: {item.total_carbs}g</span>
+                    <span>V: {item.total_fat}g</span>
+                  </div>
+                  
+                  {item.meals_checked && item.meals_checked.length > 0 && (
+                    <div style={{
+                      paddingTop: '0.5rem',
+                      borderTop: '1px solid rgba(255, 255, 255, 0.05)'
+                    }}>
+                      <div style={{
+                        fontSize: '0.7rem',
+                        color: 'rgba(255, 255, 255, 0.3)',
+                        marginBottom: '0.25rem'
+                      }}>
+                        Gegeten maaltijden:
+                      </div>
+                      <div style={{
+                        display: 'flex',
+                        flexWrap: 'wrap',
+                        gap: '0.25rem'
+                      }}>
+                        {item.meals_checked.map((meal, mIdx) => (
+                          <span
+                            key={mIdx}
+                            style={{
+                              padding: '2px 6px',
+                              background: 'rgba(16, 185, 129, 0.1)',
+                              borderRadius: '4px',
+                              fontSize: '0.65rem',
+                              color: 'rgba(16, 185, 129, 0.7)'
+                            }}
+                          >
+                            {meal.meal_name || meal.time_slot}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )
+            })
+          ) : (
+            <div style={{
+              textAlign: 'center',
+              padding: '2rem',
+              color: 'rgba(255, 255, 255, 0.3)'
             }}>
-              <Flame size={14} />
-              {day.streakDays} dagen
+              Geen geschiedenis beschikbaar voor deze periode
             </div>
           )}
         </div>
       </div>
+    </div>
+  )
+}
 
-      {/* Visual Meal Timeline */}
+// ===== TIMELINE PROGRESS COMPONENT =====
+const TimelineProgress = ({ 
+  meals, 
+  checkedMeals, 
+  onToggleMeal,
+  currentProgress,
+  targets,
+  nextMeal,
+  waterIntake,
+  onAddWater,
+  onSwapMeal
+}) => {
+  const isMobile = useIsMobile()
+  const currentHour = new Date().getHours() + new Date().getMinutes() / 60
+  
+  const getMealIcon = (slot) => {
+    if (slot?.toLowerCase().includes('ontbijt') || slot?.toLowerCase().includes('breakfast')) return Coffee
+    if (slot?.toLowerCase().includes('lunch')) return Sun
+    if (slot?.toLowerCase().includes('diner') || slot?.toLowerCase().includes('dinner')) return Moon
+    if (slot?.toLowerCase().includes('snack')) return Apple
+    return Utensils
+  }
+  
+  const handleSwapClick = () => {
+    if (nextMeal && onSwapMeal) {
+      onSwapMeal(nextMeal)
+    }
+  }
+  
+  return (
+    <div style={{
+      background: 'linear-gradient(135deg, rgba(5, 150, 105, 0.08) 0%, rgba(16, 185, 129, 0.03) 100%)',
+      borderRadius: '20px',
+      padding: isMobile ? '1.25rem' : '1.5rem',
+      marginBottom: '1.5rem',
+      border: '1px solid rgba(16, 185, 129, 0.2)',
+      position: 'relative',
+      overflow: 'hidden'
+    }}>
+      {/* Shimmer effect */}
       <div style={{
-        height: '50px',
-        background: 'linear-gradient(90deg, rgba(16, 185, 129, 0.05) 0%, rgba(16, 185, 129, 0.1) 50%, rgba(16, 185, 129, 0.05) 100%)',
-        borderRadius: '25px',
-        position: 'relative',
-        marginBottom: '1rem',
-        overflow: 'hidden',
-        border: '1px solid rgba(16, 185, 129, 0.2)'
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        height: '2px',
+        background: 'linear-gradient(90deg, transparent, rgba(16, 185, 129, 0.5), transparent)',
+        animation: 'shimmer 4s ease infinite'
+      }} />
+      
+      {/* Next Meal Card */}
+      {nextMeal && (
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '0.75rem',
+          padding: '0.75rem',
+          background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.1) 0%, rgba(16, 185, 129, 0.05) 100%)',
+          borderRadius: '12px',
+          marginBottom: '1rem',
+          border: '1px solid rgba(16, 185, 129, 0.2)'
+        }}>
+          <div style={{
+            width: '40px',
+            height: '40px',
+            borderRadius: '8px',
+            background: nextMeal.image_url 
+              ? `url(${nextMeal.image_url}) center/cover`
+              : 'rgba(16, 185, 129, 0.1)',
+            flexShrink: 0
+          }}>
+            {!nextMeal.image_url && (
+              <div style={{
+                width: '100%',
+                height: '100%',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}>
+                <Utensils size={18} style={{ color: 'rgba(16, 185, 129, 0.5)' }} />
+              </div>
+            )}
+          </div>
+          
+          <div style={{ flex: 1 }}>
+            <div style={{
+              color: 'rgba(16, 185, 129, 0.7)',
+              fontSize: '0.75rem',
+              fontWeight: '600',
+              textTransform: 'uppercase',
+              marginBottom: '2px'
+            }}>
+              Volgende: {(() => {
+                const now = new Date().getHours() + new Date().getMinutes() / 60
+                if (nextMeal.plannedTime > now) {
+                  const diff = nextMeal.plannedTime - now
+                  const hours = Math.floor(diff)
+                  const minutes = Math.round((diff - hours) * 60)
+                  return `over ${hours > 0 ? `${hours}u ` : ''}${minutes}m`
+                }
+                return 'Nu'
+              })()}
+            </div>
+            <div style={{
+              color: '#fff',
+              fontSize: '0.9rem',
+              fontWeight: '600'
+            }}>
+              {nextMeal.name}
+            </div>
+          </div>
+          
+          <div style={{ display: 'flex', gap: '0.5rem' }}>
+            <button
+              onClick={handleSwapClick}
+              style={{
+                background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.15) 0%, rgba(59, 130, 246, 0.08) 100%)',
+                border: '1px solid rgba(59, 130, 246, 0.3)',
+                borderRadius: '8px',
+                padding: '0.5rem',
+                color: 'rgba(59, 130, 246, 0.9)',
+                fontWeight: '600',
+                fontSize: '0.8rem',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.3rem'
+              }}
+            >
+              <RefreshCw size={14} />
+              Swap
+            </button>
+            
+            <button
+              onClick={() => {
+                if (onToggleMeal && nextMeal.index !== undefined) {
+                  onToggleMeal(nextMeal.index)
+                }
+              }}
+              style={{
+                background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.9) 0%, rgba(5, 150, 105, 0.9) 100%)',
+                border: 'none',
+                borderRadius: '8px',
+                padding: '0.5rem 0.75rem',
+                color: '#fff',
+                fontWeight: '600',
+                fontSize: '0.8rem',
+                cursor: 'pointer',
+                boxShadow: '0 2px 8px rgba(16, 185, 129, 0.3)'
+              }}
+            >
+              <CheckCircle2 size={14} style={{ display: 'inline', marginRight: '0.3rem' }} />
+              Klaar
+            </button>
+          </div>
+        </div>
+      )}
+      
+      {/* Macro Cards Grid */}
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(5, 1fr)',
+        gap: isMobile ? '0.4rem' : '0.6rem',
+        marginBottom: '1.25rem'
       }}>
-        {/* Time labels */}
+        {/* Macro Cards */}
+        {[
+          { key: 'kcal', icon: Flame, color: 'rgba(16, 185, 129, 0.9)', label: 'Kcal' },
+          { key: 'protein', icon: Dumbbell, color: 'rgba(5, 150, 105, 0.9)', label: 'Eiwit' },
+          { key: 'carbs', icon: Zap, color: 'rgba(4, 120, 87, 0.9)', label: 'Koolh' },
+          { key: 'fat', icon: Droplets, color: 'rgba(16, 185, 129, 0.7)', label: 'Vet' }
+        ].map((macro) => {
+          const Icon = macro.icon
+          const value = currentProgress[macro.key]
+          const target = targets[macro.key]
+          const percentage = Math.min((value / target) * 100, 100)
+          
+          return (
+            <div
+              key={macro.key}
+              style={{
+                background: `linear-gradient(135deg, ${macro.color}22 0%, ${macro.color}11 100%)`,
+                borderRadius: '12px',
+                padding: isMobile ? '0.6rem' : '0.875rem',
+                border: `1px solid ${macro.color}33`,
+                position: 'relative',
+                overflow: 'hidden',
+                minHeight: isMobile ? '65px' : '75px'
+              }}
+            >
+              <div style={{
+                position: 'absolute',
+                bottom: 0,
+                left: 0,
+                right: 0,
+                height: `${percentage}%`,
+                background: `linear-gradient(180deg, ${macro.color}22 0%, ${macro.color}11 100%)`,
+                transition: 'height 0.8s cubic-bezier(0.4, 0, 0.2, 1)'
+              }} />
+              
+              <div style={{
+                position: 'relative',
+                textAlign: 'center'
+              }}>
+                <Icon size={isMobile ? 13 : 15} style={{ 
+                  color: macro.color, 
+                  marginBottom: '2px'
+                }} />
+                <div style={{ 
+                  color: macro.color, 
+                  fontWeight: 'bold',
+                  fontSize: isMobile ? '0.8rem' : '0.9rem'
+                }}>
+                  {value}
+                </div>
+                <div style={{ 
+                  color: 'rgba(255,255,255,0.4)', 
+                  fontSize: '0.55rem'
+                }}>
+                  {macro.label}
+                </div>
+              </div>
+            </div>
+          )
+        })}
+        
+        {/* Water Card */}
+        <div
+          style={{
+            background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.15) 0%, rgba(59, 130, 246, 0.05) 100%)',
+            borderRadius: '12px',
+            padding: isMobile ? '0.6rem' : '0.875rem',
+            border: '1px solid rgba(59, 130, 246, 0.3)',
+            position: 'relative',
+            overflow: 'hidden',
+            minHeight: isMobile ? '65px' : '75px',
+            cursor: 'pointer'
+          }}
+          onClick={() => onAddWater(Math.min(waterIntake + 0.25, 3.0))}
+        >
+          <div style={{
+            position: 'absolute',
+            bottom: 0,
+            left: 0,
+            right: 0,
+            height: `${Math.min((waterIntake / 2.0) * 100, 100)}%`,
+            background: 'linear-gradient(180deg, rgba(59, 130, 246, 0.3) 0%, rgba(59, 130, 246, 0.15) 100%)',
+            transition: 'height 0.8s cubic-bezier(0.4, 0, 0.2, 1)'
+          }} />
+          
+          <div style={{
+            position: 'relative',
+            textAlign: 'center'
+          }}>
+            <Droplets size={isMobile ? 13 : 15} style={{ 
+              color: 'rgba(59, 130, 246, 0.9)', 
+              marginBottom: '2px'
+            }} />
+            <div style={{ 
+              color: 'rgba(59, 130, 246, 0.9)', 
+              fontWeight: 'bold',
+              fontSize: isMobile ? '0.8rem' : '0.9rem'
+            }}>
+              {waterIntake.toFixed(1)}L
+            </div>
+            <div style={{ 
+              color: 'rgba(255,255,255,0.4)', 
+              fontSize: '0.55rem'
+            }}>
+              Water
+            </div>
+          </div>
+          
+          <div style={{
+            position: 'absolute',
+            top: '2px',
+            right: '2px',
+            background: 'rgba(59, 130, 246, 0.2)',
+            borderRadius: '4px',
+            padding: '2px 4px',
+            fontSize: '0.5rem',
+            color: 'rgba(59, 130, 246, 0.7)'
+          }}>
+            +
+          </div>
+        </div>
+      </div>
+      
+      {/* Meal Timeline - FIX: Toon ALLE meals */}
+      <div style={{
+        height: '60px',
+        background: 'linear-gradient(90deg, rgba(16, 185, 129, 0.03) 0%, rgba(16, 185, 129, 0.08) 50%, rgba(16, 185, 129, 0.03) 100%)',
+        borderRadius: '30px',
+        position: 'relative',
+        overflow: 'hidden',
+        border: '1px solid rgba(16, 185, 129, 0.15)'
+      }}>
+        {/* Time markers */}
         <div style={{
           position: 'absolute',
           width: '100%',
           height: '100%',
           display: 'flex',
           justifyContent: 'space-between',
-          padding: '0 15px',
+          padding: '0 20px',
           alignItems: 'center',
           color: 'rgba(255,255,255,0.3)',
-          fontSize: '0.7rem',
+          fontSize: '0.65rem',
           pointerEvents: 'none'
         }}>
           <span>6:00</span>
@@ -1871,511 +1631,268 @@ const EnhancedDayCard = ({
           <span>24:00</span>
         </div>
 
-        {/* Meal indicators */}
-        {mealTimelineData.map((meal) => {
-          const Icon = getMealTypeIcon(meal.slot)
-          return (
-            <div
-              key={meal.idx}
-              style={{
-                position: 'absolute',
-                left: `${((meal.estimatedHour - 6) / 18) * 100}%`,
-                top: '50%',
-                transform: 'translate(-50%, -50%)',
-                width: '40px',
-                height: '40px',
-                borderRadius: '50%',
-                background: meal.isEaten 
-                  ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)'
-                  : 'rgba(0, 0, 0, 0.8)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                cursor: 'pointer',
-                transition: 'all 0.3s ease',
-                border: meal.isEaten 
-                  ? '2px solid #10b981' 
-                  : '2px solid rgba(16, 185, 129, 0.3)',
-                zIndex: 2,
-                boxShadow: meal.isEaten 
-                  ? '0 0 15px rgba(16, 185, 129, 0.5)'
-                  : 'none'
-              }}
-              onClick={() => onCheckMeal(dayIndex, meal.idx)}
-              title={`${meal.slot}: ${meal.mealData?.name || 'Geen meal'}`}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.transform = 'translate(-50%, -50%) scale(1.1)'
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.transform = 'translate(-50%, -50%) scale(1)'
-              }}
-            >
-              <Icon size={20} style={{ color: meal.isEaten ? '#000' : '#10b981' }} />
-            </div>
-          )
-        })}
-
         {/* Current time indicator */}
-        {isToday && currentHour >= 6 && currentHour <= 24 && (
+        {currentHour >= 6 && currentHour <= 24 && (
           <div style={{
             position: 'absolute',
             left: `${((currentHour - 6) / 18) * 100}%`,
             top: '0',
             bottom: '0',
             width: '2px',
-            background: 'linear-gradient(180deg, transparent, #ef4444, transparent)',
-            boxShadow: '0 0 10px #ef4444',
+            background: 'linear-gradient(180deg, transparent, rgba(16, 185, 129, 0.8), transparent)',
+            boxShadow: '0 0 10px rgba(16, 185, 129, 0.5)',
             animation: 'pulse 2s ease infinite',
             zIndex: 1
           }} />
         )}
-      </div>
 
-{/* Mobile Optimized Macro Progress */}
-<div style={{
-  display: 'grid',
-  gridTemplateColumns: 'repeat(4, 1fr)',
-  gap: isMobile ? '0.375rem' : '0.75rem',
-  marginBottom: '0.75rem'
-}}>
-  {[
-    { key: 'kcal', icon: Flame, color: '#f59e0b', label: 'kcal' },
-    { key: 'protein', icon: Dumbbell, color: '#3b82f6', label: 'P' },
-    { key: 'carbs', icon: Zap, color: '#10b981', label: 'C' },
-    { key: 'fat', icon: Droplets, color: '#ef4444', label: 'V' }
-  ].map(macro => {
-    const Icon = macro.icon
-    const value = dayProgress[macro.key]
-    const target = targets[macro.key]
-    const percentage = Math.min((value / target) * 100, 100)
-    
-    return (
-      <div
-        key={macro.key}
+        {/* Meal dots on timeline - TOON ALLE MEALS */}
+        {meals && meals.length > 0 && meals.map((meal, idx) => {
+          const Icon = getMealIcon(meal.timeSlot)
+          const isEaten = checkedMeals[idx]
+          const plannedTime = meal.plannedTime || 12 // Default tijd als plannedTime ontbreekt
+          const position = ((plannedTime - 6) / 18) * 100
+          
+          return (
+            <div
+              key={`timeline-meal-${meal.id || idx}`}
+              onClick={() => onToggleMeal(idx)}
+              style={{
+                position: 'absolute',
+                left: `${Math.min(Math.max(position, 0), 100)}%`,
+                top: '50%',
+                transform: 'translate(-50%, -50%)',
+                width: '44px',
+                height: '44px',
+                borderRadius: '50%',
+                background: isEaten 
+                  ? 'linear-gradient(135deg, rgba(16, 185, 129, 0.9) 0%, rgba(5, 150, 105, 0.9) 100%)'
+                  : 'rgba(0, 0, 0, 0.6)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: 'pointer',
+                transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                border: isEaten 
+                  ? '2px solid rgba(16, 185, 129, 0.8)' 
+                  : '2px solid rgba(16, 185, 129, 0.2)',
+                zIndex: 2,
+                boxShadow: isEaten 
+                  ? '0 0 20px rgba(16, 185, 129, 0.4)'
+                  : '0 2px 8px rgba(0, 0, 0, 0.3)'
+              }}
+              title={`${meal.timeSlot}: ${meal.name}`}
+            >
+              <Icon size={20} style={{ 
+                color: isEaten ? '#fff' : 'rgba(16, 185, 129, 0.6)'
+              }} />
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+// ===== MEAL CARD WITH FAVORITE =====
+const MealCardWithFavorite = ({ 
+  meal, 
+  isEaten, 
+  onToggle, 
+  onSwap,
+  onFavorite,
+  isFavorite,
+  timeSlot,
+  imageUrl,
+  onViewDetails 
+}) => {
+  const isMobile = useIsMobile()
+  
+  return (
+    <div
+      style={{
+        background: isEaten
+          ? 'linear-gradient(135deg, rgba(16, 185, 129, 0.08) 0%, rgba(16, 185, 129, 0.03) 100%)'
+          : 'rgba(0, 0, 0, 0.3)',
+        border: isEaten
+          ? '1px solid rgba(16, 185, 129, 0.25)'
+          : '1px solid rgba(255, 255, 255, 0.08)',
+        borderRadius: '16px',
+        padding: '0.875rem',
+        marginBottom: '0.75rem',
+        transition: 'all 0.3s ease',
+        cursor: 'pointer',
+        position: 'relative'
+      }}
+      onClick={onToggle}
+    >
+      {/* Favorite button */}
+      <button
+        onClick={(e) => {
+          e.stopPropagation()
+          onFavorite()
+        }}
         style={{
-          background: 'rgba(0, 0, 0, 0.3)',
-          borderRadius: '8px',
-          padding: isMobile ? '0.5rem' : '0.75rem',
-          border: `1px solid ${macro.color}22`,
-          position: 'relative',
-          overflow: 'hidden',
-          minHeight: isMobile ? '60px' : '70px'
+          position: 'absolute',
+          top: '0.5rem',
+          right: '0.5rem',
+          background: 'transparent',
+          border: 'none',
+          cursor: 'pointer',
+          padding: '0.25rem',
+          zIndex: 10
         }}
       >
-        {/* Progress bar background */}
-        <div style={{
-          position: 'absolute',
-          bottom: 0,
-          left: 0,
-          right: 0,
-          height: `${percentage}%`,
-          background: `linear-gradient(180deg, ${macro.color}33 0%, ${macro.color}11 100%)`,
-          transition: 'height 0.5s ease'
-        }} />
-        
-        <div style={{
-          position: 'relative',
-          textAlign: 'center'
-        }}>
-          <Icon size={isMobile ? 14 : 16} style={{ color: macro.color, marginBottom: '2px' }} />
-          <div style={{ 
-            color: macro.color, 
-            fontWeight: 'bold',
-            fontSize: isMobile ? '0.8rem' : '0.95rem',
-            lineHeight: 1
-          }}>
-            {value}
-          </div>
-          <div style={{ 
-            color: 'rgba(255,255,255,0.4)', 
-            fontSize: isMobile ? '0.6rem' : '0.65rem',
-            lineHeight: 1,
-            marginTop: '2px'
-          }}>
-            {macro.label}
-          </div>
-        </div>
-      </div>
-    )
-  })}
-</div>
-
- {/* Water Tracker Integration */}
-      <WaterTracker
-        dayIndex={dayIndex}
-        currentIntake={waterIntake}
-        target={2.0}
-        onUpdate={onUpdateWater}
-        isToday={isToday}
-        isMobile={isMobile}
-      />
-
-
-      {/* Quick Stats Bar */}
+        <Star 
+          size={18} 
+          style={{ 
+            color: isFavorite ? '#f59e0b' : 'rgba(255,255,255,0.2)',
+            fill: isFavorite ? '#f59e0b' : 'none',
+            transition: 'all 0.3s ease'
+          }} 
+        />
+      </button>
+      
       <div style={{
         display: 'flex',
-        justifyContent: 'space-between',
-        padding: '0.75rem',
-        background: 'rgba(16, 185, 129, 0.05)',
-        borderRadius: '8px',
-        marginBottom: '1rem',
-        border: '1px solid rgba(16, 185, 129, 0.2)'
+        alignItems: 'center',
+        gap: '0.75rem'
       }}>
-        <span style={{ 
-          color: '#10b981',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '0.25rem'
-        }}>
-          <CheckSquare size={14} />
-          {mealTimelineData.filter(m => m.isEaten).length}/{mealTimelineData.length}
-        </span>
-        <span style={{ 
-          color: '#3b82f6',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '0.25rem'
-        }}>
-          <Droplets size={14} />
-          {day.waterIntake || 0}L
-        </span>
-        <span style={{ 
-          color: '#f59e0b',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '0.25rem'
-        }}>
-          <Activity size={14} />
-          {day.steps || '---'}
-        </span>
-      </div>
-
-      {/* Expand Button */}
-      <button
-        onClick={() => onToggleExpand(dayIndex)}
-        style={{
-          width: '100%',
-          padding: '0.75rem',
-          background: 'rgba(16, 185, 129, 0.05)',
-          border: '1px solid rgba(16, 185, 129, 0.2)',
-          borderRadius: '8px',
-          color: '#10b981',
-          cursor: 'pointer',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          gap: '0.5rem',
-          transition: 'all 0.3s ease',
-          fontWeight: '500'
-        }}
-        onMouseEnter={(e) => {
-          e.currentTarget.style.background = 'rgba(16, 185, 129, 0.1)'
-          e.currentTarget.style.borderColor = '#10b981'
-        }}
-        onMouseLeave={(e) => {
-          e.currentTarget.style.background = 'rgba(16, 185, 129, 0.05)'
-          e.currentTarget.style.borderColor = 'rgba(16, 185, 129, 0.2)'
-        }}
-      >
-        {isExpanded ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
-        {isExpanded ? 'Verberg details' : 'Bekijk maaltijden'}
-      </button>
-
-      {/* Expanded Content */}
-      {isExpanded && (
-        <div style={{
-          marginTop: '1rem',
-          padding: '1rem',
-          background: 'rgba(0, 0, 0, 0.5)',
-          borderRadius: '12px',
-          border: '1px solid rgba(16, 185, 129, 0.1)',
-          animation: 'slideIn 0.3s ease'
-        }}>
-          {/* Quick Actions for Today */}
-          {isToday && (
-            <QuickDayActions
-              dayIndex={dayIndex}
-              onCheckDay={onQuickDayComplete}
-              onAddPhoto={onAddPhoto}
-              mostEatenMeals={mostEatenMeals}
-              onQuickAdd={onQuickAddMeal}
-            />
-          )}
-
-          {/* Detailed Meal List */}
-          <div style={{ marginTop: '1rem' }}>
-            <h4 style={{ 
-              color: '#fff', 
-              marginBottom: '1rem',
+        {/* Meal image/icon - Klik voor details */}
+        <div 
+          onClick={(e) => {
+            e.stopPropagation()
+            onViewDetails(meal)
+          }}
+          style={{
+            width: '56px',
+            height: '56px',
+            borderRadius: '50%',
+            background: imageUrl 
+              ? `url(${imageUrl}) center/cover`
+              : 'linear-gradient(135deg, rgba(16, 185, 129, 0.1) 0%, rgba(16, 185, 129, 0.05) 100%)',
+            border: isEaten 
+              ? '2px solid rgba(16, 185, 129, 0.5)'
+              : '2px solid rgba(255, 255, 255, 0.1)',
+            position: 'relative',
+            flexShrink: 0,
+            overflow: 'hidden',
+            cursor: 'pointer'
+          }}
+        >
+          {!imageUrl && (
+            <div style={{
+              width: '100%',
+              height: '100%',
               display: 'flex',
               alignItems: 'center',
-              gap: '0.5rem'
+              justifyContent: 'center'
             }}>
-              <Utensils size={16} style={{ color: '#10b981' }} />
-              Maaltijden
-            </h4>
-
-
-{/* Mobile Optimized Meal List */}
-{mealTimelineData.map((meal) => {
-  const mealData = meal.mealData
-  if (!mealData) return null
-  
-  const MealTypeIcon = getMealTypeIcon(meal.slot)
-
-  return (
-    <div 
-      key={meal.idx}
-      style={{
-        display: 'flex',
-        alignItems: 'center',
-        padding: isMobile ? '0.6rem' : '0.75rem',
-        background: meal.isEaten 
-          ? 'rgba(16, 185, 129, 0.1)' 
-          : 'rgba(0, 0, 0, 0.3)',
-        borderRadius: '8px',
-        marginBottom: '0.375rem',
-        border: meal.isEaten 
-          ? '1px solid rgba(16, 185, 129, 0.3)'
-          : '1px solid rgba(255,255,255,0.05)',
-        gap: isMobile ? '0.5rem' : '0.75rem'
-      }}
-    >
-      {/* Checkbox */}
-      <div 
-        onClick={() => onCheckMeal(dayIndex, meal.idx)}
-        style={{
-          cursor: 'pointer',
-          color: meal.isEaten ? '#10b981' : 'rgba(255,255,255,0.3)',
-          minWidth: '20px'
-        }}
-      >
-        {meal.isEaten ? <CheckSquare size={18} /> : <Square size={18} />}
-      </div>
-      
-      {/* Meal Info - Compacter */}
-      <div 
-        style={{ flex: 1 }}
-        onClick={() => onMealClick(mealData, dayIndex, meal.idx)}
-      >
-        <div style={{ 
-          color: '#fff', 
-          fontWeight: '500',
-          fontSize: isMobile ? '0.85rem' : '0.95rem',
-          marginBottom: '0.125rem'
-        }}>
-          {mealData.name.length > 25 && isMobile 
-            ? mealData.name.substring(0, 25) + '...' 
-            : mealData.name}
+              <Utensils size={20} style={{ color: 'rgba(16, 185, 129, 0.3)' }} />
+            </div>
+          )}
+          
+          {isEaten && (
+            <div style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.8) 0%, rgba(5, 150, 105, 0.8) 100%)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center'
+            }}>
+              <CheckCircle2 size={24} style={{ color: '#fff' }} />
+            </div>
+          )}
         </div>
         
-        {/* Macros in 2x2 grid voor mobile */}
-        <div style={{ 
-          display: 'grid',
-          gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(4, 1fr)',
-          gap: isMobile ? '0.25rem' : '0.5rem',
-          fontSize: isMobile ? '0.7rem' : '0.8rem',
-          color: 'var(--c-muted)'
-        }}>
-          <span style={{ display: 'flex', alignItems: 'center', gap: '2px' }}>
-            <Flame size={10} style={{ color: '#f59e0b' }} />
-            {mealData.kcal || 0}
-          </span>
-          <span style={{ display: 'flex', alignItems: 'center', gap: '2px' }}>
-            <Dumbbell size={10} style={{ color: '#3b82f6' }} />
-            {mealData.protein || 0}g
-          </span>
-          <span style={{ display: 'flex', alignItems: 'center', gap: '2px' }}>
-            <Zap size={10} style={{ color: '#10b981' }} />
-            {mealData.carbs || 0}g
-          </span>
-          <span style={{ display: 'flex', alignItems: 'center', gap: '2px' }}>
-            <Droplets size={10} style={{ color: '#ef4444' }} />
-            {mealData.fat || 0}g
-          </span>
-        </div>
-      </div>
-
-      {/* Swap button - Kleiner */}
-      <button
-        onClick={() => onSwapMeal(dayIndex, meal.idx, mealData)}
-        style={{
-          padding: isMobile ? '0.375rem' : '0.5rem',
-          background: 'rgba(59, 130, 246, 0.1)',
-          border: '1px solid rgba(59, 130, 246, 0.3)',
-          borderRadius: '6px',
-          color: '#3b82f6',
-          cursor: 'pointer'
-        }}
-      >
-        <RefreshCw size={14} />
-      </button>
-    </div>
-  )
-})}
-
-          </div>
-        </div>
-      )}
-    </div>
-  )
-}
-
-// Smart Meal Suggestions Component (Placeholder for now)
-const SmartMealSuggestions = ({ 
-  currentMacros, 
-  targets, 
-  timeOfDay,
-  mealHistory,
-  onSelectMeal 
-}) => {
-  const remainingMacros = {
-    kcal: targets.kcal - currentMacros.kcal,
-    protein: targets.protein - currentMacros.protein,
-    carbs: targets.carbs - currentMacros.carbs,
-    fat: targets.fat - currentMacros.fat
-  }
-
-  const mealType = getMealTypeFromTime(timeOfDay)
-  
-  return (
-    <div style={{
-      padding: '1.5rem',
-      background: 'linear-gradient(135deg, rgba(139, 92, 246, 0.05) 0%, rgba(139, 92, 246, 0.02) 100%)',
-      borderRadius: '16px',
-      border: '1px solid rgba(139, 92, 246, 0.3)',
-      marginBottom: '1rem'
-    }}>
-      <h3 style={{ 
-        color: '#8b5cf6', 
-        marginBottom: '1rem',
-        display: 'flex',
-        alignItems: 'center',
-        gap: '0.5rem'
-      }}>
-        <Brain size={20} />
-        AI Suggesties voor {mealType} (Coming Soon)
-      </h3>
-      
-      <p style={{ color: 'var(--c-muted)', marginBottom: '1rem' }}>
-        Slimme maaltijdsuggesties op basis van je resterende macros worden binnenkort toegevoegd!
-      </p>
-      
-      <div style={{
-        padding: '1rem',
-        background: 'rgba(0, 0, 0, 0.3)',
-        borderRadius: '12px',
-        border: '1px solid rgba(139, 92, 246, 0.2)'
-      }}>
-        <h4 style={{ color: '#fff', marginBottom: '0.5rem' }}>Je hebt nog nodig:</h4>
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(4, 1fr)',
-          gap: '0.5rem',
-          fontSize: '0.9rem'
-        }}>
-          <div style={{ color: '#f59e0b' }}>
-            <Flame size={14} style={{ marginRight: '4px', display: 'inline' }} />
-            {Math.max(0, remainingMacros.kcal)} kcal
-          </div>
-          <div style={{ color: '#3b82f6' }}>
-            <Dumbbell size={14} style={{ marginRight: '4px', display: 'inline' }} />
-            {Math.max(0, remainingMacros.protein)}g eiwit
-          </div>
-          <div style={{ color: '#10b981' }}>
-            <Zap size={14} style={{ marginRight: '4px', display: 'inline' }} />
-            {Math.max(0, remainingMacros.carbs)}g koolh
-          </div>
-          <div style={{ color: '#ef4444' }}>
-            <Droplets size={14} style={{ marginRight: '4px', display: 'inline' }} />
-            {Math.max(0, remainingMacros.fat)}g vet
-          </div>
-        </div>
-      </div>
-    </div>
-  )
-}
-
-// Progress Tracker Component (Placeholder for now)
-const SimpleProgressTracker = ({ onSave }) => {
-  const [mood, setMood] = useState(3)
-  const [hunger, setHunger] = useState(5)
-  const [energy, setEnergy] = useState(5)
-  const [notes, setNotes] = useState('')
-
-  const moodIcons = [
-    { icon: Heart, color: '#ef4444' },
-    { icon: Activity, color: '#f59e0b' },
-    { icon: Gauge, color: '#eab308' },
-    { icon: BatteryCharging, color: '#3b82f6' },
-    { icon: Star, color: '#10b981' }
-  ]
-
-  return (
-    <div style={{
-      padding: '1.5rem',
-      background: 'rgba(0, 0, 0, 0.9)',
-      borderRadius: '16px',
-      border: '1px solid rgba(16, 185, 129, 0.2)',
-      marginBottom: '1rem'
-    }}>
-      <h3 style={{ 
-        color: '#fff', 
-        marginBottom: '1.5rem',
-        display: 'flex',
-        alignItems: 'center',
-        gap: '0.5rem'
-      }}>
-        <BarChart3 size={20} style={{ color: '#10b981' }} />
-        Dagelijkse Check-in (Coming Soon)
-      </h3>
-
-      <p style={{ color: 'var(--c-muted)', marginBottom: '1rem' }}>
-        Mood tracking, honger niveau, en energie monitoring worden binnenkort toegevoegd!
-      </p>
-
-      {/* Preview of future feature */}
-      <div style={{
-        opacity: 0.5,
-        pointerEvents: 'none'
-      }}>
-        {/* Mood Selector */}
-        <div style={{ marginBottom: '1.5rem' }}>
-          <label style={{ 
-            color: 'var(--c-muted)', 
-            display: 'block', 
-            marginBottom: '0.5rem',
-            fontSize: '0.9rem'
+        {/* Meal info */}
+        <div style={{ flex: 1 }}>
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            marginBottom: '0.25rem'
           }}>
-            Hoe voel je je vandaag?
-          </label>
-          <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center' }}>
-            {moodIcons.map((item, i) => {
-              const Icon = item.icon
-              return (
-                <button
-                  key={i}
-                  style={{
-                    width: '50px',
-                    height: '50px',
-                    background: i === 2 
-                      ? `linear-gradient(135deg, ${item.color}33 0%, ${item.color}11 100%)`
-                      : 'rgba(0, 0, 0, 0.5)',
-                    border: i === 2 
-                      ? `2px solid ${item.color}` 
-                      : '2px solid rgba(255,255,255,0.1)',
-                    borderRadius: '12px',
-                    cursor: 'not-allowed',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    color: i === 2 ? item.color : 'rgba(255,255,255,0.3)'
-                  }}
-                >
-                  <Icon size={24} />
-                </button>
-              )
-            })}
+            <span style={{
+              color: 'rgba(16, 185, 129, 0.6)',
+              fontSize: '0.7rem',
+              fontWeight: '600',
+              textTransform: 'uppercase'
+            }}>
+              {timeSlot}
+            </span>
+            
+            {/* Swap button */}
+            <button
+              onClick={(e) => {
+                e.stopPropagation()
+                onSwap()
+              }}
+              style={{
+                background: 'transparent',
+                border: 'none',
+                color: 'rgba(16, 185, 129, 0.5)',
+                cursor: 'pointer',
+                padding: '0.25rem',
+                transition: 'all 0.2s ease'
+              }}
+            >
+              <RefreshCw size={14} />
+            </button>
+          </div>
+          
+          <div 
+            onClick={(e) => {
+              e.stopPropagation()
+              onViewDetails(meal)
+            }}
+            style={{
+              color: '#fff',
+              fontSize: '0.95rem',
+              fontWeight: '600',
+              marginBottom: '0.5rem',
+              cursor: 'pointer',
+              textDecoration: 'underline',
+              textDecorationColor: 'transparent',
+              transition: 'text-decoration-color 0.2s ease'
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.textDecorationColor = 'rgba(16, 185, 129, 0.5)'
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.textDecorationColor = 'transparent'
+            }}
+          >
+            {meal.name}
+          </div>
+          
+          {/* Macros */}
+          <div style={{
+            display: 'flex',
+            gap: '0.75rem',
+            fontSize: '0.75rem',
+            color: 'rgba(255,255,255,0.5)'
+          }}>
+            <span style={{ display: 'flex', alignItems: 'center', gap: '2px' }}>
+              <Flame size={11} style={{ color: 'rgba(16, 185, 129, 0.6)' }} />
+              {meal.kcal}
+            </span>
+            <span style={{ display: 'flex', alignItems: 'center', gap: '2px' }}>
+              <Dumbbell size={11} style={{ color: 'rgba(5, 150, 105, 0.6)' }} />
+              {meal.protein}g
+            </span>
+            <span style={{ display: 'flex', alignItems: 'center', gap: '2px' }}>
+              <Zap size={11} style={{ color: 'rgba(4, 120, 87, 0.6)' }} />
+              {meal.carbs}g
+            </span>
+            <span style={{ display: 'flex', alignItems: 'center', gap: '2px' }}>
+              <Droplets size={11} style={{ color: 'rgba(16, 185, 129, 0.5)' }} />
+              {meal.fat}g
+            </span>
           </div>
         </div>
       </div>
@@ -2383,1193 +1900,728 @@ const SimpleProgressTracker = ({ onSave }) => {
   )
 }
 
-// ===== OPLOSSING PROBLEEM 1: Dubbele SimpleProgressTracker =====
-
-
-
-// ===== OPLOSSING PROBLEEM 2: DayViewSelector toevoegen =====
-
-// STAP 2: VOEG DayViewSelector TOE
-// LOCATIE: NA de EERSTE SimpleProgressTracker (rond regel ~2600)
-// VOOR de regel: export default function ClientMealPlan
-
-// ✅ PLAK DIT NA SimpleProgressTracker:
-
-// Day View Selector Component
-const DayViewSelector = ({ dayViewMode, setDayViewMode, isMobile }) => (
-  <div style={{
-    display: 'flex',
-    gap: '0.5rem',
-    marginBottom: '1rem',
-    padding: '0.5rem',
-    background: 'rgba(0, 0, 0, 0.6)',
-    borderRadius: '12px',
-    border: '1px solid rgba(16, 185, 129, 0.2)'
-  }}>
-    <button
-      onClick={() => setDayViewMode('today')}
-      style={{
-        flex: 1,
-        padding: isMobile ? '0.6rem' : '0.75rem',
-        background: dayViewMode === 'today' 
-          ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)'
-          : 'transparent',
-        border: dayViewMode === 'today'
-          ? 'none'
-          : '1px solid rgba(16, 185, 129, 0.3)',
-        borderRadius: '8px',
-        color: dayViewMode === 'today' ? '#000' : '#10b981',
-        fontWeight: 'bold',
-        fontSize: isMobile ? '0.85rem' : '0.95rem',
-        cursor: 'pointer',
-        transition: 'all 0.3s ease',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        gap: '0.5rem'
-      }}
-    >
-      <Calendar size={16} />
-      Vandaag
-    </button>
-    
-    <button
-      onClick={() => setDayViewMode('week')}
-      style={{
-        flex: 1,
-        padding: isMobile ? '0.6rem' : '0.75rem',
-        background: dayViewMode === 'week'
-          ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)'
-          : 'transparent',
-        border: dayViewMode === 'week'
-          ? 'none'
-          : '1px solid rgba(16, 185, 129, 0.3)',
-        borderRadius: '8px',
-        color: dayViewMode === 'week' ? '#000' : '#10b981',
-        fontWeight: 'bold',
-        fontSize: isMobile ? '0.85rem' : '0.95rem',
-        cursor: 'pointer',
-        transition: 'all 0.3s ease',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        gap: '0.5rem'
-      }}
-    >
-      <TrendingUp size={16} />
-      3 Dagen
-    </button>
-    
-    <button
-      onClick={() => setDayViewMode('all')}
-      style={{
-        flex: 1,
-        padding: isMobile ? '0.6rem' : '0.75rem',
-        background: dayViewMode === 'all'
-          ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)'
-          : 'transparent',
-        border: dayViewMode === 'all'
-          ? 'none'
-          : '1px solid rgba(16, 185, 129, 0.3)',
-        borderRadius: '8px',
-        color: dayViewMode === 'all' ? '#000' : '#10b981',
-        fontWeight: 'bold',
-        fontSize: isMobile ? '0.85rem' : '0.95rem',
-        cursor: 'pointer',
-        transition: 'all 0.3s ease',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        gap: '0.5rem'
-      }}
-    >
-      <BarChart3 size={16} />
-      Week
-    </button>
-  </div>
-)
-
-// Week Summary Component
-const WeekSummaryBar = ({ avgCompliance, totalKcal, streak }) => (
-  <div style={{
-    padding: '1.5rem',
-    background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.05) 0%, rgba(16, 185, 129, 0.02) 100%)',
-    borderRadius: '16px',
-    border: '1px solid rgba(16, 185, 129, 0.3)',
-    display: 'grid',
-    gridTemplateColumns: 'repeat(3, 1fr)',
-    gap: '1rem',
-    marginTop: '1rem'
-  }}>
-    <div style={{ 
-      textAlign: 'center',
-      padding: '1rem',
-      background: 'rgba(0, 0, 0, 0.5)',
-      borderRadius: '12px',
-      border: '1px solid rgba(16, 185, 129, 0.2)'
-    }}>
-      <PieChart size={24} style={{ color: '#10b981', marginBottom: '0.5rem' }} />
-      <div style={{ color: 'var(--c-muted)', fontSize: '0.85rem' }}>Compliance</div>
-      <div className="myarc-gradient-text" style={{ fontSize: '1.8rem', fontWeight: 'bold' }}>
-        {avgCompliance}%
-      </div>
-    </div>
-    
-    <div style={{ 
-      textAlign: 'center',
-      padding: '1rem',
-      background: 'rgba(0, 0, 0, 0.5)',
-      borderRadius: '12px',
-      border: '1px solid rgba(245, 158, 11, 0.2)'
-    }}>
-      <Flame size={24} style={{ color: '#f59e0b', marginBottom: '0.5rem' }} />
-      <div style={{ color: 'var(--c-muted)', fontSize: '0.85rem' }}>Totaal kcal</div>
-      <div style={{ color: '#f59e0b', fontSize: '1.8rem', fontWeight: 'bold' }}>
-        {totalKcal.toLocaleString()}
-      </div>
-    </div>
-    
-    <div style={{ 
-      textAlign: 'center',
-      padding: '1rem',
-      background: 'rgba(0, 0, 0, 0.5)',
-      borderRadius: '12px',
-      border: '1px solid rgba(239, 68, 68, 0.2)'
-    }}>
-      <TrendingUp size={24} style={{ color: '#ef4444', marginBottom: '0.5rem' }} />
-      <div style={{ color: 'var(--c-muted)', fontSize: '0.85rem' }}>Streak</div>
-      <div style={{ 
-        color: '#ef4444', 
-        fontSize: '1.8rem', 
-        fontWeight: 'bold',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        gap: '0.25rem'
-      }}>
-        <Flame size={20} />
-        {streak}
-      </div>
-    </div>
-  </div>
-)
-
-// ===== MAIN COMPONENT =====
+// ===== MAIN COMPONENT met alle features werkend =====
 export default function ClientMealPlan({ client, onNavigate, db }) {
-  const { t } = useLanguage()
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState(null)
-  
-  // Core state
-  const [plan, setPlan] = useState(null)
-  const [weekStructure, setWeekStructure] = useState([])
-  const [mealsMap, setMealsMap] = useState({})
+  const [meals, setMeals] = useState([])
   const [allMeals, setAllMeals] = useState([])
-  const [activeWeek, setActiveWeek] = useState(0)
+  const [customMeals, setCustomMeals] = useState([])
+  const [checkedMeals, setCheckedMeals] = useState({})
+  const [waterIntake, setWaterIntake] = useState(0.5)
+  const [favorites, setFavorites] = useState([])
+  const [showHistory, setShowHistory] = useState(false)
+  const [showSwapForMeal, setShowSwapForMeal] = useState(null)
+  const [showCustomCreator, setShowCustomCreator] = useState(false)
+  const [showMealDetail, setShowMealDetail] = useState(null)
+  const [historyData, setHistoryData] = useState([])
+  const [plan, setPlan] = useState(null)
+  const [saveStatus, setSaveStatus] = useState('')
+  const isMobile = useIsMobile()
+  
   const [targets, setTargets] = useState({
-    kcal: 2000,
-    protein: 150,
-    carbs: 200,
-    fat: 67
+    kcal: 2200,
+    protein: 165,
+    carbs: 220,
+    fat: 73
   })
   
-  // UI state
-  const [checkedMeals, setCheckedMeals] = useState({})
-  const [expandedDays, setExpandedDays] = useState({})
-  const [showProgressTracker, setShowProgressTracker] = useState(false)
-  const [currentHour] = useState(getCurrentHour())
-  
-  // Smart features state
-  const [mostEatenMeals, setMostEatenMeals] = useState([])
-  const [showSmartSuggestions, setShowSmartSuggestions] = useState(false)
-  
-  // Modal states
-  const [selectedMealDetail, setSelectedMealDetail] = useState(null)
-  const [showSwapModal, setShowSwapModal] = useState(null)
- 
-  // ⭐⭐⭐ VOEG HIER TOE (na regel ~2660): ⭐⭐⭐
-  // Water tracking state
-  const [waterIntakes, setWaterIntakes] = useState({})
-  
-  // ⭐⭐⭐ EN VOEG OOK DIT TOE VOOR MOBILE: ⭐⭐⭐
-  const [isMobile, setIsMobile] = useState(window.innerWidth <= 768)
-  const [dayViewMode, setDayViewMode] = useState('today')
-
-  // ⭐⭐⭐ VOEG DEZE useEffect TOE VOOR MOBILE RESIZE: ⭐⭐⭐
-  useEffect(() => {
-    const handleResize = () => {
-      setIsMobile(window.innerWidth <= 768)
-    }
-    
-    window.addEventListener('resize', handleResize)
-    return () => window.removeEventListener('resize', handleResize)
-  }, [])
-
-
-  
-  // Load meal plan data
+  // ===== DATA LOADING FROM DATABASE =====
   useEffect(() => {
     loadMealPlan()
-    loadAllMeals()
-  }, [client])
-
-  const loadAllMeals = async () => {
-    if (!db) return
-    
-    try {
-      const meals = await db.getAllMeals()
-      setAllMeals(meals || [])
-    } catch (err) {
-      console.error('Error loading all meals:', err)
+  }, [client, db])
+  
+  // Auto-save wanneer meals worden gechecked
+  useEffect(() => {
+    if (Object.keys(checkedMeals).length > 0) {
+      const saveTimer = setTimeout(() => {
+        saveMealProgress(checkedMeals)
+      }, 1000) // Save na 1 seconde
+      
+      return () => clearTimeout(saveTimer)
     }
-  }
-
+  }, [checkedMeals])
+  
   const loadMealPlan = async () => {
-    if (!client?.id || !db) {
-      setError('No client or database connection')
-      setLoading(false)
-      return
-    }
-
+    if (!client?.id || !db) return
+    
+    setLoading(true)
+    
     try {
-      setLoading(true)
+      const clientId = client.id || client.user_id
       
-      // ✅ Gebruik getClientMealPlan (correcte method)
-      const activePlan = await db.getClientMealPlan(client.id)
+      // Load client's meal plan
+      const clientPlan = await db.getClientMealPlan(clientId)
       
-      if (!activePlan) {
-        setError('No active meal plan found')
-        setLoading(false)
-        return
+      if (clientPlan) {
+        setPlan(clientPlan)
+        
+        // Set targets from plan
+        if (clientPlan.targets) {
+          setTargets(clientPlan.targets)
+        }
+        
+        // Process week structure to get today's meals
+        const today = new Date()
+        const startDate = clientPlan.start_date ? new Date(clientPlan.start_date) : new Date()
+        const dayIndex = Math.floor((today - startDate) / (1000 * 60 * 60 * 24))
+        const todayMeals = clientPlan.week_structure?.[dayIndex % 7]?.meals || []
+        
+        // Get meal details
+        const mealIds = todayMeals.map(m => m.meal_id).filter(Boolean)
+        if (mealIds.length > 0) {
+          const mealDetails = await db.getMealsByIds(mealIds)
+          
+          // Combine meal data with time slots
+          const mealsWithTiming = todayMeals.map((slot, idx) => {
+            const meal = mealDetails.find(m => m.id === slot.meal_id)
+            if (!meal) return null
+            
+            // Extract time from slot or use default
+            const timeSlot = slot.time_slot || `Meal ${idx + 1}`
+            const plannedTime = extractTimeFromSlot(timeSlot)
+            
+            return {
+              ...meal,
+              timeSlot,
+              plannedTime,
+              targetKcal: slot.target_kcal
+            }
+          }).filter(Boolean)
+          
+          setMeals(mealsWithTiming)
+        }
       }
-
-      setPlan(activePlan)
-      setWeekStructure(activePlan.week_structure || [])
       
-      // Set targets
-      if (activePlan.targets) {
-        setTargets({
-          kcal: activePlan.targets.kcal || 2000,
-          protein: activePlan.targets.protein || 150,
-          carbs: activePlan.targets.carbs || 200,
-          fat: activePlan.targets.fat || 67
-        })
-      }
-
-      // Load all meals
-      const allMealIds = new Set()
-      activePlan.week_structure?.forEach(day => {
-        day.meals?.forEach(meal => {
-          if (meal.meal_id) allMealIds.add(meal.meal_id)
-        })
-      })
-
-      if (allMealIds.size > 0) {
-        const meals = await db.getMealsByIds(Array.from(allMealIds))
-        const mealMap = {}
-        meals.forEach(meal => {
-          mealMap[meal.id] = meal
-        })
-        setMealsMap(mealMap)
-      }
-
-      // ✅ Load meal progress voor vandaag
-      const today = new Date().toISOString().split('T')[0]
-      const todayProgress = await db.getMealProgress(client.id, today)
+      // Load all meals for swap functionality
+      const allMealsList = await db.getAllMeals()
+      setAllMeals(allMealsList || [])
       
-      if (todayProgress && todayProgress.meals_checked) {
-        // Convert to checked meals format
-        const checkedFormat = {}
-        todayProgress.meals_checked.forEach((check) => {
-          checkedFormat[`${check.day_index}_${check.meal_index}`] = check
-        })
-        setCheckedMeals(checkedFormat)
+      // Load custom meals - alleen voor deze client
+      const customMealsList = await db.getCustomMeals(clientId)
+      setCustomMeals(customMealsList || [])
+      
+      // Load today's progress
+      const today = new Date()
+      const todayDate = today.toISOString().split('T')[0]
+      const progress = await db.getMealProgress(clientId, todayDate)
+      
+      if (progress?.meals_checked) {
+        const restoredChecks = {}
+        
+        // Parse meals_checked als het een string is
+        let mealsCheckedData = progress.meals_checked
+        if (typeof mealsCheckedData === 'string') {
+          try {
+            mealsCheckedData = JSON.parse(mealsCheckedData)
+          } catch (e) {
+            console.error('Error parsing meals_checked:', e)
+            mealsCheckedData = []
+          }
+        }
+        
+        if (Array.isArray(mealsCheckedData)) {
+          mealsCheckedData.forEach(check => {
+            if (check.meal_index !== undefined) {
+              restoredChecks[check.meal_index] = true
+            }
+          })
+        }
+        
+        setCheckedMeals(restoredChecks)
       }
-
-      // Load most eaten meals
-      const frequentMeals = await db.getMostEatenMeals(client.id, 30)
-      setMostEatenMeals(frequentMeals || [])
-
-
- // ⭐⭐⭐ VOEG DIT TOE HIER (na de most eaten meals): ⭐⭐⭐
-    
-    // ✅ NIEUWE CODE: Load water intake for this week
-    console.log('📊 Loading water intake data...')
-    const weekDates = []
-    const currentDate = new Date()
-    const currentDayOfWeek = currentDate.getDay()
-    
-    // Genereer datums voor hele week (zondag t/m zaterdag)
-    for (let i = 0; i < 7; i++) {
-      const date = new Date(currentDate)
-      date.setDate(currentDate.getDate() - currentDayOfWeek + i)
-      weekDates.push(date.toISOString().split('T')[0])
-    }
-    
-    // Laad water data voor elke dag
-    const waterData = {}
-    for (const date of weekDates) {
-      try {
-        const intake = await db.getWaterIntake(client.id, date)
-        waterData[date] = intake || 0
-        console.log(`💧 Water for ${date}: ${intake}L`)
-      } catch (err) {
-        console.warn(`Could not load water for ${date}`, err)
-        waterData[date] = 0
+      
+      // Load water intake
+      const water = await db.getWaterIntake(clientId, todayDate)
+      setWaterIntake(water?.amount || 0.5)
+      
+      // Load meal history (last 30 days)
+      const history = await db.getMealHistory(clientId, 30)
+      setHistoryData(history || [])
+      
+      // Load favorites from preferences
+      const preferences = await db.getMealPreferences(clientId)
+      if (preferences?.favorite_meals) {
+        setFavorites(preferences.favorite_meals)
       }
-    }
-    
-    setWaterIntakes(waterData)
-    console.log('✅ Water data loaded:', waterData)
-    // ⭐⭐⭐ EINDE NIEUWE CODE ⭐⭐⭐
-
-
-
-      // Auto-expand today
-      const todayIndex = new Date().getDay()
-      setExpandedDays({ [todayIndex]: true })
-
-    } catch (err) {
-      console.error('Error loading meal plan:', err)
-      setError(err.message)
+      
+    } catch (error) {
+      console.error('Error loading meal plan:', error)
     } finally {
       setLoading(false)
     }
   }
-
-  // Handle meal click for detail view
-  const handleMealClick = (meal, dayIndex, mealIndex) => {
-    setSelectedMealDetail({
-      meal,
-      dayIndex,
-      mealIndex,
-      isChecked: checkedMeals[`${dayIndex}_${mealIndex}`]
-    })
-  }
-
-  // Handle swap button click
-  const handleSwapMeal = (dayIndex, mealIndex, currentMeal) => {
-    setShowSwapModal({
-      dayIndex,
-      mealIndex,
-      currentMeal
-    })
-  }
-
-  // Handle meal selection from swap modal
-  const handleSelectSwapMeal = async (newMeal) => {
-    if (!showSwapModal || !db || !plan) return
-    
-    const { dayIndex, mealIndex } = showSwapModal
-    
-    // Update local state
-    const newStructure = [...weekStructure]
-    newStructure[dayIndex].meals[mealIndex].meal_id = newMeal.id
-    setWeekStructure(newStructure)
-    
-    // Update meals map
-    setMealsMap(prev => ({
-      ...prev,
-      [newMeal.id]: newMeal
-    }))
-    
-    // Save to database
-    await db.saveMealSwap(
-      client.id,
-      plan.id,
-      dayIndex,
-      newStructure[dayIndex].meals[mealIndex].slot,
-      newMeal.id
-    )
-    
-    setShowSwapModal(null)
-  }
-
-  // Check/uncheck meal
-  const handleCheckMeal = async (dayIndex, mealIndex) => {
-    const key = `${dayIndex}_${mealIndex}`
-    const newCheckedMeals = { ...checkedMeals }
-    
-    if (newCheckedMeals[key]) {
-      delete newCheckedMeals[key]
-    } else {
-      newCheckedMeals[key] = {
-        checked_at: new Date().toISOString(),
-        day_index: dayIndex,
-        meal_index: mealIndex
-      }
+  
+  // Helper function to extract time from slot string
+  const extractTimeFromSlot = (slot) => {
+    const match = slot.match(/(\d{1,2}):(\d{2})/)
+    if (match) {
+      return parseInt(match[1]) + parseInt(match[2]) / 60
     }
-    
-    setCheckedMeals(newCheckedMeals)
-    
-    // ✅ Save to database met correcte format
-    if (db && plan) {
-      const today = new Date().toISOString().split('T')[0]
-      
-      // Calculate totals for today
-      let totalCalories = 0, totalProtein = 0, totalCarbs = 0, totalFat = 0
-      
-      Object.keys(newCheckedMeals).forEach(checkKey => {
-        const [dayIdx, mealIdx] = checkKey.split('_')
-        if (parseInt(dayIdx) === dayIndex) {
-          const meal = weekStructure[dayIdx]?.meals?.[mealIdx]
-          if (meal?.meal_id) {
-            const mealData = mealsMap[meal.meal_id]
-            if (mealData) {
-              totalCalories += mealData.kcal || 0
-              totalProtein += mealData.protein || 0
-              totalCarbs += mealData.carbs || 0
-              totalFat += mealData.fat || 0
-            }
-          }
-        }
-      })
-      
-      await db.saveMealProgress(client.id, {
-        planId: plan.id,
-        date: today,
-        dayIndex: dayIndex,
-        mealsChecked: Object.values(newCheckedMeals),
-        totalCalories,
-        totalProtein,
-        totalCarbs,
-        totalFat
-      })
+    // Default times
+    if (slot.toLowerCase().includes('ontbijt')) return 8
+    if (slot.toLowerCase().includes('lunch')) return 13
+    if (slot.toLowerCase().includes('diner')) return 19
+    if (slot.toLowerCase().includes('snack')) {
+      if (slot.includes('1')) return 10.5
+      if (slot.includes('2')) return 16
+      return 15
     }
-    
-    // Update modal if open
-    if (selectedMealDetail && 
-        selectedMealDetail.dayIndex === dayIndex && 
-        selectedMealDetail.mealIndex === mealIndex) {
-      setSelectedMealDetail(prev => ({
-        ...prev,
-        isChecked: !prev.isChecked
-      }))
-    }
-  }
-
-  // Quick complete entire day
-  const handleQuickDayComplete = async (dayIndex) => {
-    const day = weekStructure[dayIndex]
-    if (!day) return
-
-    const newCheckedMeals = { ...checkedMeals }
-    
-    // Check all meals for this day
-    day.meals?.forEach((meal, idx) => {
-      const key = `${dayIndex}_${idx}`
-      newCheckedMeals[key] = {
-        checked_at: new Date().toISOString(),
-        day_index: dayIndex,
-        meal_index: idx
-      }
-    })
-    
-    setCheckedMeals(newCheckedMeals)
-    
-    // ✅ Save to database met correcte format
-    if (db && plan) {
-      const today = new Date().toISOString().split('T')[0]
-      
-      // Calculate totals for the day
-      let totalCalories = 0, totalProtein = 0, totalCarbs = 0, totalFat = 0
-      
-      day.meals?.forEach((meal, idx) => {
-        if (meal?.meal_id) {
-          const mealData = mealsMap[meal.meal_id]
-          if (mealData) {
-            totalCalories += mealData.kcal || 0
-            totalProtein += mealData.protein || 0
-            totalCarbs += mealData.carbs || 0
-            totalFat += mealData.fat || 0
-          }
-        }
-      })
-      
-      await db.saveMealProgress(client.id, {
-        planId: plan.id,
-        date: today,
-        dayIndex: dayIndex,
-        mealsChecked: Object.values(newCheckedMeals).filter(m => m.day_index === dayIndex),
-        totalCalories,
-        totalProtein,
-        totalCarbs,
-        totalFat,
-        notes: 'Hele dag compleet! 💪'
-      })
-    }
-
-    // Show success animation
-    alert('✅ Hele dag compleet! Goed bezig! 💪')
-  }
-
-  // Handle photo upload
-  const handleAddPhoto = async () => {
-    const input = document.createElement('input')
-    input.type = 'file'
-    input.accept = 'image/*'
-    input.onchange = async (e) => {
-      const file = e.target.files[0]
-      if (file) {
-        console.log('Photo selected:', file.name)
-        alert(`📸 Photo "${file.name}" selected - AI recognition coming soon!`)
-      }
-    }
-    input.click()
-  }
-
-  // Quick add meal
-  const handleQuickAddMeal = async (meal) => {
-    if (db && client) {
-      const today = new Date().toISOString().split('T')[0]
-      const currentHour = new Date().getHours()
-      
-      let mealType = 'snack'
-      if (currentHour < 10) mealType = 'breakfast'
-      else if (currentHour < 14) mealType = 'lunch'
-      else if (currentHour < 20) mealType = 'dinner'
-      
-      console.log(`Adding ${meal.name} as ${mealType} to today`)
-      alert(`➕ "${meal.name}" wordt toegevoegd als ${mealType}`)
-    }
-  }
-
-const handleUpdateWater = async (dayIndex, amount) => {
-  if (!db || !client?.id) {
-    console.warn('No database or client connection for water update')
-    return
+    return 12
   }
   
-  try {
-    // Bereken de exacte datum voor deze dayIndex
-    const baseDate = new Date()
-    const currentDayOfWeek = baseDate.getDay()
-    const targetDate = new Date(baseDate)
-    targetDate.setDate(baseDate.getDate() - currentDayOfWeek + dayIndex)
-    const dateStr = targetDate.toISOString().split('T')[0]
-    
-    console.log(`💧 Updating water for day ${dayIndex} (${dateStr}) to ${amount}L`)
-    
-    // Save to database
-    const result = await db.saveWaterIntake(client.id, dateStr, amount)
-    
-    if (result) {
-      // Update local state
-      setWaterIntakes(prev => ({
-        ...prev,
-        [dateStr]: amount
-      }))
-      
-      console.log(`✅ Water intake saved: ${amount}L for ${dateStr}`)
-      
-      // Show feedback for today's water
-      if (dayIndex === new Date().getDay()) {
-        if (amount >= 2.0) {
-          console.log('🎉 Daily water goal reached!')
-        }
-      }
-    }
-  } catch (error) {
-    console.error('❌ Error updating water intake:', error)
-    alert('Er ging iets mis bij het opslaan van water intake')
-  }
-}
-
-
-  // Toggle day expansion
-  const toggleDayExpand = (dayIndex) => {
-    setExpandedDays(prev => ({
-      ...prev,
-      [dayIndex]: !prev[dayIndex]
-    }))
-  }
-
-  // Save progress tracker data
-  const handleSaveProgress = async (data) => {
-    if (db && client) {
-      const result = await db.saveClientProgress(client.id, {
-        ...data,
-        date: new Date().toISOString()
-      })
-      
-      if (result) {
-        setShowProgressTracker(false)
-        alert('✅ Check-in opgeslagen!')
-      } else {
-        alert('❌ Er ging iets mis bij het opslaan')
-      }
-    }
-  }
-
-  // Calculate day progress
-  const calculateDayProgress = (dayIndex) => {
-    const day = weekStructure[dayIndex]
-    if (!day) return { kcal: 0, protein: 0, carbs: 0, fat: 0 }
-
+  // ===== PROGRESS CALCULATION =====
+  const calculateProgress = () => {
     let totals = { kcal: 0, protein: 0, carbs: 0, fat: 0 }
     
-    day.meals?.forEach((meal, idx) => {
-      const key = `${dayIndex}_${idx}`
-      if (checkedMeals[key]) {
-        const mealData = mealsMap[meal.meal_id]
-        if (mealData) {
-          const targetKcal = meal.targetKcal || meal.target_kcal
-          let scaleFactor = 1
-          
-          if (targetKcal && mealData.kcal) {
-            scaleFactor = targetKcal / mealData.kcal
-          }
-          
-          totals.kcal += Math.round((mealData.kcal || 0) * scaleFactor)
-          totals.protein += Math.round((mealData.protein || 0) * scaleFactor)
-          totals.carbs += Math.round((mealData.carbs || 0) * scaleFactor)
-          totals.fat += Math.round((mealData.fat || 0) * scaleFactor)
-        }
+    meals.forEach((meal, idx) => {
+      if (checkedMeals[idx]) {
+        totals.kcal += meal.kcal || 0
+        totals.protein += meal.protein || 0
+        totals.carbs += meal.carbs || 0
+        totals.fat += meal.fat || 0
       }
     })
     
     return totals
   }
-
-  // Get current week data
-const getCurrentWeek = () => {
-  const startIdx = activeWeek * 7
-  const endIdx = startIdx + 7
-  return weekStructure.slice(startIdx, endIdx).map((day, idx) => {
-    const dayIndex = startIdx + idx
-    const progress = calculateDayProgress(dayIndex)
-    
-    let streakDays = 0
-    if (progress.kcal >= targets.kcal * 0.8) {
-      for (let i = dayIndex - 1; i >= 0; i--) {
-        const prevProgress = calculateDayProgress(i)
-        if (prevProgress.kcal >= targets.kcal * 0.8) {
-          streakDays++
-        } else {
-          break
-        }
-      }
-    }
-    
-    return {
-      ...day,
-      progress,
-      streakDays,
-      date: addDays(new Date(), idx - new Date().getDay()),
-      originalIndex: idx  // ✅ BELANGRIJK: Bewaar originele index!
-    }
-  })
-}
-
-  // Calculate week stats
-  const calculateWeekStats = () => {
-    const currentWeek = getCurrentWeek()
-    let totalCompliance = 0
-    let totalKcal = 0
-    let daysWithData = 0
-    let streak = 0
-
-    currentWeek.forEach((day, idx) => {
-      const dayProgress = calculateDayProgress(activeWeek * 7 + idx)
-      if (dayProgress.kcal > 0) {
-        const compliance = Math.min((dayProgress.kcal / targets.kcal) * 100, 100)
-        totalCompliance += compliance
-        totalKcal += dayProgress.kcal
-        daysWithData++
-        
-        if (compliance >= 80) {
-          streak++
-        } else {
-          streak = 0
-        }
-      }
-    })
-
-    return {
-      avgCompliance: daysWithData > 0 ? Math.round(totalCompliance / daysWithData) : 0,
-      totalKcal,
-      streak
-    }
-  }
-
-const getVisibleDays = () => {
-  const week = getCurrentWeek()
-  const todayIdx = todayIndex >= 0 ? todayIndex : new Date().getDay()
   
-  switch(dayViewMode) {
-    case 'today':
-      // Alleen vandaag
-      if (activeWeek === 0 && todayIdx >= 0 && todayIdx < week.length) {
-        return [week[todayIdx]]
+  const getNextMeal = () => {
+    const currentHour = new Date().getHours() + new Date().getMinutes() / 60
+    
+    for (let i = 0; i < meals.length; i++) {
+      if (!checkedMeals[i] && meals[i].plannedTime > currentHour - 1) {
+        return { ...meals[i], index: i }
       }
-      // Als niet in huidige week, toon eerste dag
-      return week.length > 0 ? [week[0]] : []
-      
-    case 'week':
-      // Vandaag + 1 ervoor + 1 erna (of 2 erna als geen gisteren)
-      if (activeWeek === 0 && todayIdx >= 0) {
-        const days = []
-        
-        // Vandaag altijd eerst
-        if (week[todayIdx]) days.push(week[todayIdx])
-        
-        // Morgen
-        if (todayIdx < 6 && week[todayIdx + 1]) {
-          days.push(week[todayIdx + 1])
-        }
-        
-        // Overmorgen (als er ruimte is)
-        if (todayIdx < 5 && week[todayIdx + 2]) {
-          days.push(week[todayIdx + 2])
-        }
-        
-        // Gisteren (als het bestaat)
-        if (todayIdx > 0 && week[todayIdx - 1]) {
-          days.push(week[todayIdx - 1])
-        }
-        
-        return days
+    }
+    
+    for (let i = 0; i < meals.length; i++) {
+      if (!checkedMeals[i]) {
+        return { ...meals[i], index: i }
       }
-      // Voor andere weken, toon eerste 3 dagen
-      return week.slice(0, 3)
-      
-    case 'all':
-    default:
-      // Hele week maar met vandaag bovenaan (alleen voor huidige week)
-      if (activeWeek === 0 && todayIdx >= 0 && todayIdx < week.length) {
-        const reordered = []
-        
-        // Vandaag eerst
-        reordered.push(week[todayIdx])
-        
-        // Dan de rest van de week (morgen t/m zaterdag)
-        for (let i = todayIdx + 1; i < week.length; i++) {
-          reordered.push(week[i])
-        }
-        
-        // Dan het begin van de week (zondag t/m gisteren)
-        for (let i = 0; i < todayIdx; i++) {
-          reordered.push(week[i])
-        }
-        
-        return reordered
-      }
-      // Voor andere weken, normale volgorde
-      return week
+    }
+    
+    return null
   }
-}
-
-
-
-  // Loading state
+  
+  const currentProgress = calculateProgress()
+  const nextMeal = getNextMeal()
+  
+  // ===== ACTION HANDLERS =====
+  const handleToggleMeal = async (idx) => {
+    const newCheckedMeals = {
+      ...checkedMeals,
+      [idx]: !checkedMeals[idx]
+    }
+    setCheckedMeals(newCheckedMeals)
+    setSaveStatus('Opslaan...')
+  }
+  
+  const saveMealProgress = async (checkedMealsData) => {
+    if (!db || !client) return
+    
+    try {
+      const today = new Date().toISOString().split('T')[0]
+      const clientId = client.id || client.user_id
+      
+      console.log('💾 Saving progress for client:', clientId)
+      
+      const mealsChecked = []
+      let totalCalories = 0, totalProtein = 0, totalCarbs = 0, totalFat = 0
+      
+      meals.forEach((meal, idx) => {
+        if (checkedMealsData[idx]) {
+          totalCalories += meal.kcal || 0
+          totalProtein += meal.protein || 0
+          totalCarbs += meal.carbs || 0
+          totalFat += meal.fat || 0
+          
+          mealsChecked.push({
+            meal_index: idx,
+            meal_id: meal.id,
+            meal_name: meal.name,
+            time_slot: meal.timeSlot,
+            macros: {
+              kcal: meal.kcal,
+              protein: meal.protein,
+              carbs: meal.carbs,
+              fat: meal.fat
+            },
+            checked_at: new Date().toISOString()
+          })
+        }
+      })
+      
+      const progressData = {
+        plan_id: plan?.id || null,
+        date: today,
+        day_index: 0,
+        meals_checked: mealsChecked,
+        total_calories: totalCalories,
+        total_protein: totalProtein,
+        total_carbs: totalCarbs,
+        total_fat: totalFat
+      }
+      
+      await db.saveMealProgress(clientId, progressData)
+      
+      // Reload history
+      const history = await db.getMealHistory(clientId, 30)
+      setHistoryData(history || [])
+      
+      setSaveStatus('✓ Opgeslagen')
+      setTimeout(() => setSaveStatus(''), 2000)
+    } catch (error) {
+      console.error('❌ Error saving meal progress:', error)
+      setSaveStatus('❌ Opslaan mislukt')
+      setTimeout(() => setSaveStatus(''), 3000)
+    }
+  }
+  
+  const handleToggleFavorite = async (mealId) => {
+    const newFavorites = favorites.includes(mealId) 
+      ? favorites.filter(id => id !== mealId)
+      : [...favorites, mealId]
+    
+    setFavorites(newFavorites)
+    
+    // Save to database
+    if (db && client) {
+      const clientId = client.id || client.user_id
+      const preferences = await db.getMealPreferences(clientId) || {}
+      await db.saveMealPreferences(clientId, {
+        ...preferences,
+        favorite_meals: newFavorites
+      })
+    }
+  }
+  
+  const handleSwapMeal = (meal) => {
+    setShowSwapForMeal(meal)
+  }
+  
+  const handleSelectSwapMeal = async (newMeal) => {
+    if (!showSwapForMeal || !db || !client) {
+      setShowSwapForMeal(null)
+      return
+    }
+    
+    const mealIndex = meals.findIndex(m => 
+      (m.id === showSwapForMeal.id && m.timeSlot === showSwapForMeal.timeSlot)
+    )
+    
+    if (mealIndex === -1) {
+      setShowSwapForMeal(null)
+      return
+    }
+    
+    // Update local state
+    const newMeals = [...meals]
+    newMeals[mealIndex] = {
+      ...newMeal,
+      timeSlot: showSwapForMeal.timeSlot,
+      plannedTime: showSwapForMeal.plannedTime
+    }
+    setMeals(newMeals)
+    
+    // Save to database if plan exists
+    if (plan) {
+      const clientId = client.id || client.user_id
+      const today = new Date()
+      const startDate = plan.start_date ? new Date(plan.start_date) : new Date()
+      const dayIndex = Math.floor((today - startDate) / (1000 * 60 * 60 * 24))
+      
+      await db.saveMealSwap(
+        clientId, 
+        plan.id, 
+        dayIndex % 7, 
+        showSwapForMeal.timeSlot, 
+        newMeal.id
+      )
+    }
+    
+    setShowSwapForMeal(null)
+  }
+  
+  const handleSaveCustomMeal = async (customMeal) => {
+    if (!db || !client) {
+      console.error('❌ Missing db or client')
+      setShowCustomCreator(false)
+      return
+    }
+    
+    try {
+      const clientId = client.id || client.user_id
+      console.log('📝 Saving custom meal with client ID:', clientId)
+      
+      const mealToSave = {
+        ...customMeal,
+        created_by: clientId,
+        client_specific: true // Alleen voor deze client
+      }
+      
+      const savedMeal = await db.saveCustomMeal(mealToSave)
+      
+      if (savedMeal) {
+        // Check of meal al bestaat om duplicates te voorkomen
+        setCustomMeals(prev => {
+          const exists = prev.some(m => m.id === savedMeal.id)
+          if (exists) return prev
+          return [...prev, savedMeal]
+        })
+        
+        setAllMeals(prev => {
+          const exists = prev.some(m => m.id === savedMeal.id)
+          if (exists) return prev
+          return [...prev, savedMeal]
+        })
+        
+        console.log('✅ Custom meal saved successfully')
+        setShowCustomCreator(false)
+        
+        if (showSwapForMeal) {
+          handleSelectSwapMeal(savedMeal)
+        }
+      }
+    } catch (error) {
+      console.error('❌ Error saving custom meal:', error)
+      alert('Er ging iets mis bij het opslaan van je maaltijd.')
+    }
+  }
+  
+  const handleAddWater = async (newAmount) => {
+    setWaterIntake(newAmount)
+    
+    if (db && client) {
+      try {
+        const today = new Date().toISOString().split('T')[0]
+        const clientId = client.id || client.user_id
+        
+        console.log('💧 Saving water for client:', clientId, 'date:', today)
+        await db.saveWaterIntake(clientId, today, newAmount)
+      } catch (error) {
+        console.error('❌ Failed to save water intake:', error)
+      }
+    }
+  }
+  
+  const handleViewMealDetails = (meal) => {
+    setShowMealDetail(meal)
+  }
+  
+  // ===== LOADING STATE =====
   if (loading) {
     return (
       <div style={{
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        minHeight: '400px',
-        color: '#fff'
+        minHeight: '100vh',
+        background: 'linear-gradient(180deg, #0a0f0d 0%, #1a1a1a 100%)'
       }}>
-        <div className="myarc-spinner"></div>
-        <span style={{ marginLeft: '1rem' }}>Meal plan laden...</span>
+        <div style={{ textAlign: 'center' }}>
+          <div style={{
+            width: '60px',
+            height: '60px',
+            border: '4px solid rgba(16, 185, 129, 0.2)',
+            borderTopColor: 'rgba(16, 185, 129, 0.8)',
+            borderRadius: '50%',
+            margin: '0 auto 1.5rem',
+            animation: 'spin 1s linear infinite'
+          }} />
+          <div style={{ color: 'rgba(255,255,255,0.6)' }}>
+            Loading your meal plan...
+          </div>
+        </div>
       </div>
     )
   }
-
-  // Error state
-  if (error) {
-    return (
-      <div style={{
-        padding: '2rem',
-        background: 'rgba(239, 68, 68, 0.05)',
-        borderRadius: '16px',
-        border: '1px solid rgba(239, 68, 68, 0.3)',
-        color: '#ef4444',
-        textAlign: 'center'
-      }}>
-        <AlertCircle size={48} style={{ marginBottom: '1rem' }} />
-        <h3 style={{ marginBottom: '0.5rem' }}>{error}</h3>
-        <p style={{ color: 'var(--c-muted)' }}>
-          Neem contact op met je coach voor hulp.
-        </p>
-      </div>
-    )
-  }
-
-  const currentWeek = getCurrentWeek()
-  const weekStats = calculateWeekStats()
-  const today = new Date()
-  const todayIndex = activeWeek === 0 ? today.getDay() : -1
-
+  
+  // ===== MAIN RENDER =====
   return (
-    <div className="myarc-meal-plan-container" style={{ padding: '1rem' }}>
-      <div dangerouslySetInnerHTML={{ __html: customStyles }} />
-      
+    <div style={{
+      minHeight: '100vh',
+      background: 'linear-gradient(180deg, #0a0f0d 0%, #1a1a1a 100%)',
+      paddingBottom: '80px'
+    }}>
       {/* Modals */}
-<MealDetailModal
-  meal={selectedMealDetail?.meal}
-  isOpen={!!selectedMealDetail}
-  onClose={() => setSelectedMealDetail(null)}
-  onNavigate={onNavigate}
-  onCheck={() => handleCheckMeal(selectedMealDetail.dayIndex, selectedMealDetail.mealIndex)}
-  isChecked={selectedMealDetail?.isChecked}
-  db={db}
-  clientId={client?.id}
-/>      
-      <MealSwapModal
-        isOpen={!!showSwapModal}
-        onClose={() => setShowSwapModal(null)}
-        currentMeal={showSwapModal?.currentMeal}
-        allMeals={allMeals}
-        onSelectMeal={handleSelectSwapMeal}
+      <MealDetailPopup
+        isOpen={!!showMealDetail}
+        onClose={() => setShowMealDetail(null)}
+        meal={showMealDetail}
+        db={db}
       />
       
-      {/* Header */}
-      <div style={{
-        marginBottom: '2rem',
-        padding: '2rem',
-        background: 'linear-gradient(135deg, rgba(0, 0, 0, 0.95) 0%, rgba(0, 0, 0, 0.85) 100%)',
-        borderRadius: '20px',
-        border: '1px solid rgba(16, 185, 129, 0.2)',
-        position: 'relative',
-        overflow: 'hidden'
-      }}>
-        {/* Animated background gradient */}
+      <CustomMealCreator
+        isOpen={showCustomCreator}
+        onClose={() => setShowCustomCreator(false)}
+        onSave={handleSaveCustomMeal}
+        db={db}
+        client={client}
+      />
+      
+      <SwapModal
+        isOpen={!!showSwapForMeal}
+        onClose={() => setShowSwapForMeal(null)}
+        currentMeal={showSwapForMeal}
+        onSelectMeal={handleSelectSwapMeal}
+        allMeals={allMeals}
+        favorites={favorites}
+        customMeals={customMeals}
+        onCreateCustom={() => {
+          setShowSwapForMeal(null)
+          setShowCustomCreator(true)
+        }}
+      />
+      
+      <HistoryModal
+        isOpen={showHistory}
+        onClose={() => setShowHistory(false)}
+        historyData={historyData}
+        targets={targets}
+      />
+      
+      {/* Save Status Indicator */}
+      {saveStatus && (
         <div style={{
-          position: 'absolute',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          background: 'linear-gradient(45deg, rgba(16, 185, 129, 0.05), transparent, rgba(16, 185, 129, 0.05))',
-          animation: 'gradient 10s ease infinite',
-          backgroundSize: '200% 200%'
-        }} />
-        
-        <h1 style={{ 
-          color: '#fff', 
-          fontSize: '2rem',
-          marginBottom: '0.5rem',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '0.75rem',
-          position: 'relative'
+          position: 'fixed',
+          top: '20px',
+          right: '20px',
+          background: saveStatus.includes('✓') 
+            ? 'rgba(16, 185, 129, 0.9)' 
+            : saveStatus.includes('❌')
+            ? 'rgba(239, 68, 68, 0.9)'
+            : 'rgba(59, 130, 246, 0.9)',
+          color: '#fff',
+          padding: '0.5rem 1rem',
+          borderRadius: '8px',
+          fontSize: '0.85rem',
+          fontWeight: '600',
+          zIndex: 9999,
+          animation: 'slideIn 0.3s ease'
         }}>
-          <div style={{
-            width: '48px',
-            height: '48px',
-            background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-            borderRadius: '12px',
+          {saveStatus}
+        </div>
+      )}
+      
+      {/* Main Content */}
+      <div style={{ padding: isMobile ? '0.75rem' : '1rem' }}>
+        {/* Timeline Progress Section */}
+        <TimelineProgress
+          meals={meals}
+          checkedMeals={checkedMeals}
+          onToggleMeal={handleToggleMeal}
+          currentProgress={currentProgress}
+          targets={targets}
+          nextMeal={nextMeal}
+          waterIntake={waterIntake}
+          onAddWater={handleAddWater}
+          onSwapMeal={handleSwapMeal}
+        />
+        
+        {/* Meals List Section */}
+        <div style={{
+          background: 'rgba(0, 0, 0, 0.4)',
+          backdropFilter: 'blur(10px)',
+          borderRadius: '20px',
+          padding: '1rem',
+          border: '1px solid rgba(16, 185, 129, 0.15)',
+          marginBottom: '1.5rem'
+        }}>
+          <h3 style={{
+            color: '#fff',
+            fontSize: '1.1rem',
+            fontWeight: 'bold',
+            marginBottom: '1rem',
             display: 'flex',
             alignItems: 'center',
-            justifyContent: 'center'
+            gap: '0.5rem'
           }}>
-            <Utensils size={24} style={{ color: '#000' }} />
-          </div>
-          Mijn Voedingsplan
-        </h1>
-        
-        {plan?.title && (
-          <p style={{ 
-            color: 'var(--c-muted)',
-            marginLeft: '60px'
-          }}>
-            {plan.title}
-          </p>
-        )}
-
-        {/* Quick Actions Bar */}
-        <div style={{
-          display: 'flex',
-          gap: '1rem',
-          marginTop: '1.5rem',
-          flexWrap: 'wrap',
-          position: 'relative'
-        }}>
-          <button
-            onClick={() => setShowProgressTracker(!showProgressTracker)}
-            className="myarc-btn-3d"
-            style={{
-              padding: '0.75rem 1.5rem',
-              background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
-              border: 'none',
-              borderRadius: '10px',
-              color: '#fff',
-              fontWeight: 'bold',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.5rem',
-              transition: 'all 0.3s ease'
-            }}
-          >
-            <BarChart3 size={18} />
-            Dagelijkse Check-in
-          </button>
+            <Utensils size={20} style={{ color: 'rgba(16, 185, 129, 0.7)' }} />
+            Vandaag's Maaltijden
+          </h3>
           
+          {meals.length > 0 ? (
+            meals.map((meal, idx) => (
+              <MealCardWithFavorite
+                key={`meal-${meal.id || idx}-${idx}`}
+                meal={meal}
+                isEaten={checkedMeals[idx]}
+                onToggle={() => handleToggleMeal(idx)}
+                onSwap={() => handleSwapMeal(meal)}
+                onFavorite={() => handleToggleFavorite(meal.id)}
+                isFavorite={favorites.includes(meal.id)}
+                timeSlot={meal.timeSlot}
+                imageUrl={meal.image_url}
+                onViewDetails={handleViewMealDetails}
+              />
+            ))
+          ) : (
+            <div style={{
+              textAlign: 'center',
+              padding: '2rem',
+              color: 'rgba(255, 255, 255, 0.4)'
+            }}>
+              Geen maaltijden gepland voor vandaag.
+              Vraag je coach om een meal plan voor je te maken!
+            </div>
+          )}
+          
+          {/* Add Custom Meal Button */}
           <button
-            onClick={() => setShowSmartSuggestions(!showSmartSuggestions)}
-            className="myarc-btn-3d"
+            onClick={() => setShowCustomCreator(true)}
             style={{
-              padding: '0.75rem 1.5rem',
-              background: 'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)',
-              border: 'none',
-              borderRadius: '10px',
-              color: '#fff',
-              fontWeight: 'bold',
+              width: '100%',
+              padding: '0.875rem',
+              marginTop: '1rem',
+              background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.1) 0%, rgba(16, 185, 129, 0.05) 100%)',
+              border: '1px solid rgba(16, 185, 129, 0.2)',
+              borderRadius: '12px',
+              color: 'rgba(16, 185, 129, 0.9)',
+              fontWeight: '600',
               cursor: 'pointer',
               display: 'flex',
               alignItems: 'center',
+              justifyContent: 'center',
               gap: '0.5rem',
-              transition: 'all 0.3s ease'
+              transition: 'all 0.2s ease'
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = 'linear-gradient(135deg, rgba(16, 185, 129, 0.15) 0%, rgba(16, 185, 129, 0.08) 100%)'
+              e.currentTarget.style.borderColor = 'rgba(16, 185, 129, 0.3)'
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = 'linear-gradient(135deg, rgba(16, 185, 129, 0.1) 0%, rgba(16, 185, 129, 0.05) 100%)'
+              e.currentTarget.style.borderColor = 'rgba(16, 185, 129, 0.2)'
             }}
           >
-            <Brain size={18} />
-            Slimme Suggesties
+            <PlusCircle size={18} />
+            Voeg Eigen Maaltijd Toe
           </button>
         </div>
       </div>
-
-      {/* Progress Tracker */}
-      {showProgressTracker && (
-        <SimpleProgressTracker onSave={handleSaveProgress} />
-      )}
-
-      {/* Smart Suggestions */}
-      {showSmartSuggestions && (
-        <SmartMealSuggestions
-          currentMacros={calculateDayProgress(todayIndex >= 0 ? todayIndex : 0)}
-          targets={targets}
-          timeOfDay={currentHour}
-          mealHistory={[]}
-          onSelectMeal={(meal) => console.log('Selected:', meal)}
-        />
-      )}
-
-      {/* Week Navigation */}
+      
+      {/* Bottom Navigation - 3 Buttons */}
       <div style={{
+        position: 'fixed',
+        bottom: 0,
+        left: 0,
+        right: 0,
+        background: 'linear-gradient(180deg, transparent 0%, #0a0f0d 30%, #0a0f0d 100%)',
+        padding: '0.75rem',
         display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        marginBottom: '1.5rem',
-        padding: '1rem',
-        background: 'rgba(0, 0, 0, 0.6)',
-        borderRadius: '12px',
-        border: '1px solid rgba(16, 185, 129, 0.2)'
+        justifyContent: 'space-around',
+        borderTop: '1px solid rgba(16, 185, 129, 0.1)'
       }}>
-        <button
-          onClick={() => setActiveWeek(Math.max(0, activeWeek - 1))}
-          disabled={activeWeek === 0}
-          className="myarc-btn-3d"
+        <button 
+          onClick={() => onNavigate('shopping')}
           style={{
-            padding: '0.5rem 1rem',
-            background: activeWeek === 0 
-              ? 'rgba(255,255,255,0.05)' 
-              : 'linear-gradient(135deg, rgba(16, 185, 129, 0.2) 0%, rgba(16, 185, 129, 0.1) 100%)',
-            border: '1px solid rgba(16, 185, 129, 0.3)',
-            borderRadius: '8px',
-            color: activeWeek === 0 ? 'rgba(255,255,255,0.3)' : '#10b981',
-            cursor: activeWeek === 0 ? 'not-allowed' : 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.25rem'
-          }}
-        >
-          <ChevronLeft size={18} />
-          Vorige
-        </button>
-        
-        <h2 className="myarc-gradient-text" style={{ fontSize: '1.5rem', fontWeight: 'bold' }}>
-          Week {activeWeek + 1}
-        </h2>
-        
-        <button
-          onClick={() => setActiveWeek(activeWeek + 1)}
-          disabled={!weekStructure[activeWeek * 7 + 7]}
-          className="myarc-btn-3d"
-          style={{
-            padding: '0.5rem 1rem',
-            background: !weekStructure[activeWeek * 7 + 7]
-              ? 'rgba(255,255,255,0.05)'
-              : 'linear-gradient(135deg, rgba(16, 185, 129, 0.2) 0%, rgba(16, 185, 129, 0.1) 100%)',
-            border: '1px solid rgba(16, 185, 129, 0.3)',
-            borderRadius: '8px',
-            color: !weekStructure[activeWeek * 7 + 7] ? 'rgba(255,255,255,0.3)' : '#10b981',
-            cursor: !weekStructure[activeWeek * 7 + 7] ? 'not-allowed' : 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.25rem'
-          }}
-        >
-          Volgende
-          <ChevronRight size={18} />
-        </button>
-      </div>
-
-{activeWeek === 0 && (
-  <DayViewSelector 
-    dayViewMode={dayViewMode}
-    setDayViewMode={setDayViewMode}
-    isMobile={isMobile}
-  />
-)}
- 
-      {/* Days Grid */}
-      <div style={{
-        display: 'grid',
-        gridTemplateColumns: isMobile 
-          ? '1fr' 
-          : dayViewMode === 'today' 
-            ? '1fr'
-            : window.innerWidth < 1024 
-              ? 'repeat(2, 1fr)'
-              : 'repeat(auto-fill, minmax(380px, 1fr))',
-        gap: '1.5rem'
-      }}>
-        {getVisibleDays().map((day, idx) => {
-          // ⚠️ BELANGRIJK: dayIndex moet uit day komen, niet uit idx!
-          const dayIndex = day.originalIndex !== undefined 
-            ? activeWeek * 7 + day.originalIndex 
-            : activeWeek * 7 + idx
-          
-          const isToday = activeWeek === 0 && day.originalIndex === todayIndex
-          
-          // Calculate date for water tracking
-          const currentDate = new Date()
-          const dayOfWeek = currentDate.getDay()
-          const targetDate = new Date(currentDate)
-          targetDate.setDate(currentDate.getDate() - dayOfWeek + (day.originalIndex || idx))
-          const dateStr = targetDate.toISOString().split('T')[0]
-          
-          return (
-            <EnhancedDayCard
-              key={dayIndex}
-              day={day}
-              dayIndex={dayIndex}
-              isToday={isToday}
-              isExpanded={expandedDays[dayIndex] || isToday}
-              targets={targets}
-              onToggleExpand={toggleDayExpand}
-              onCheckMeal={handleCheckMeal}
-              onSwapMeal={handleSwapMeal}
-              onMealClick={handleMealClick}
-              checkedMeals={checkedMeals}
-              mealsMap={mealsMap}
-              onQuickDayComplete={handleQuickDayComplete}
-              onAddPhoto={handleAddPhoto}
-              mostEatenMeals={mostEatenMeals}
-              onQuickAddMeal={handleQuickAddMeal}
-              waterIntake={waterIntakes[dateStr] || 0}
-              onUpdateWater={handleUpdateWater}
-              db={db}
-              client={client}
-              isMobile={isMobile}
-            />
-          )
-        })}
-      </div>
-
-      {/* Week Summary */}
-      <WeekSummaryBar 
-        avgCompliance={weekStats.avgCompliance}
-        totalKcal={weekStats.totalKcal}
-        streak={weekStats.streak}
-      />
-
-      {/* Floating Action Buttons */}
-      <div className="myarc-floating-container">
-        {/* Shopping List Button */}
-        <button
-          onClick={() => onNavigate && onNavigate('shopping-list')}
-          className="myarc-btn-3d"
-          style={{
-            padding: '1rem',
-            background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+            background: 'transparent',
             border: 'none',
-            borderRadius: '50px',
-            color: '#fff',
-            cursor: 'pointer',
-            fontSize: '0.9rem',
-            fontWeight: 'bold',
-            boxShadow: '0 4px 15px rgba(245, 158, 11, 0.4)',
+            color: 'rgba(255,255,255,0.5)',
             display: 'flex',
+            flexDirection: 'column',
             alignItems: 'center',
-            gap: '0.5rem',
-            transition: 'all 0.3s',
-            whiteSpace: 'nowrap'
+            gap: '0.25rem',
+            cursor: 'pointer',
+            padding: '0.5rem 1.5rem',
+            borderRadius: '8px',
+            transition: 'all 0.2s ease'
           }}
           onMouseEnter={(e) => {
-            e.currentTarget.style.transform = 'scale(1.05)'
-            e.currentTarget.style.boxShadow = '0 6px 20px rgba(245, 158, 11, 0.6)'
+            e.currentTarget.style.background = 'rgba(16, 185, 129, 0.05)'
+            e.currentTarget.style.color = 'rgba(16, 185, 129, 0.8)'
           }}
           onMouseLeave={(e) => {
-            e.currentTarget.style.transform = 'scale(1)'
-            e.currentTarget.style.boxShadow = '0 4px 15px rgba(245, 158, 11, 0.4)'
+            e.currentTarget.style.background = 'transparent'
+            e.currentTarget.style.color = 'rgba(255,255,255,0.5)'
           }}
         >
-          <ShoppingCart size={20} />
-          Boodschappen
+          <ShoppingCart size={22} />
+          <span style={{ fontSize: '0.75rem', fontWeight: '600' }}>Shop</span>
         </button>
         
-        {/* Recipe Library Button */}
-        <button
-          onClick={() => onNavigate && onNavigate('recipe-library')}
-          className="myarc-btn-3d"
+        <button 
           style={{
-            padding: '1rem',
-            background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-            border: 'none',
-            borderRadius: '50px',
-            color: '#000',
-            cursor: 'pointer',
-            fontSize: '0.9rem',
-            fontWeight: 'bold',
-            boxShadow: '0 4px 15px rgba(16, 185, 129, 0.4)',
+            background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.1) 0%, rgba(16, 185, 129, 0.05) 100%)',
+            border: '1px solid rgba(16, 185, 129, 0.25)',
+            borderRadius: '8px',
+            color: 'rgba(16, 185, 129, 0.9)',
             display: 'flex',
+            flexDirection: 'column',
             alignItems: 'center',
-            gap: '0.5rem',
-            transition: 'all 0.3s',
-            whiteSpace: 'nowrap'
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.transform = 'scale(1.05)'
-            e.currentTarget.style.boxShadow = '0 6px 20px rgba(16, 185, 129, 0.6)'
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.transform = 'scale(1)'
-            e.currentTarget.style.boxShadow = '0 4px 15px rgba(16, 185, 129, 0.4)'
+            gap: '0.25rem',
+            cursor: 'pointer',
+            padding: '0.5rem 1.5rem'
           }}
         >
-          <BookOpen size={20} />
-          Recepten
+          <Utensils size={22} />
+          <span style={{ fontSize: '0.75rem', fontWeight: '700' }}>Meals</span>
         </button>
-
-        {/* Mobile Quick Complete Button */}
-        {window.innerWidth < 768 && activeWeek === 0 && todayIndex >= 0 && (
-          <button
-            onClick={() => handleQuickDayComplete(todayIndex)}
-            className="myarc-btn-3d"
-            style={{
-              width: '64px',
-              height: '64px',
-              borderRadius: '50%',
-              background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-              border: 'none',
-              color: '#000',
-              fontSize: '1.5rem',
-              boxShadow: '0 8px 25px rgba(16, 185, 129, 0.4)',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center'
-            }}
-          >
-            <CheckCircle2 size={28} />
-          </button>
-        )}
+        
+        <button 
+          onClick={() => setShowHistory(true)}
+          style={{
+            background: 'transparent',
+            border: 'none',
+            color: 'rgba(255,255,255,0.5)',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            gap: '0.25rem',
+            cursor: 'pointer',
+            padding: '0.5rem 1.5rem',
+            borderRadius: '8px',
+            transition: 'all 0.2s ease'
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.background = 'rgba(16, 185, 129, 0.05)'
+            e.currentTarget.style.color = 'rgba(16, 185, 129, 0.8)'
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.background = 'transparent'
+            e.currentTarget.style.color = 'rgba(255,255,255,0.5)'
+          }}
+        >
+          <History size={22} />
+          <span style={{ fontSize: '0.75rem', fontWeight: '600' }}>History</span>
+        </button>
       </div>
+      
+      {/* CSS Animations */}
+      <style>{`
+        @keyframes spin {
+          to { transform: rotate(360deg); }
+        }
+        
+        @keyframes shimmer {
+          0% { transform: translateX(-100%); }
+          100% { transform: translateX(100%); }
+        }
+        
+        @keyframes pulse {
+          0%, 100% { opacity: 0.5; }
+          50% { opacity: 1; }
+        }
+        
+        @keyframes slideIn {
+          from { transform: translateX(100%); opacity: 0; }
+          to { transform: translateX(0); opacity: 1; }
+        }
+        
+        @keyframes wave {
+          0% { background-position: 0 0; }
+          100% { background-position: 100px 0; }
+        }
+        
+        @keyframes rise {
+          from { height: 0%; }
+        }
+        
+        @keyframes countUp {
+          from { opacity: 0; transform: scale(0.8); }
+          to { opacity: 1; transform: scale(1); }
+        }
+      `}</style>
     </div>
   )
 }
-

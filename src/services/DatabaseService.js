@@ -3,14 +3,23 @@
 
 import { supabase } from '../lib/supabase'
 import { extendDatabaseService } from './DatabaseServiceOptimized'
+import NotificationService from '../modules/notifications/NotificationService';
+
+
+
+
+
 
 class DatabaseServiceClass {
   constructor() {
     // Cache management
-this.supabase = supabase
+    this.supabase = supabase
     this.cache = new Map()
     this.cacheTimeout = 5 * 60 * 1000 // 5 minutes
-    
+    this.notifications = new NotificationService(this.supabase);  // GOED - gebruik this.supabase
+
+
+
     // Event subscribers
     this.subscribers = new Map()
     
@@ -118,17 +127,61 @@ this.supabase = supabase
     }
   }
 
-  async resetPassword(email) {
-    try {
-      const { error } = await supabase.auth.resetPasswordForEmail(email)
-      if (error) throw error
-      return true
-    } catch (error) {
-      console.error('❌ Password reset failed:', error)
-      throw error
+async resetPassword(email, redirectTo = null) {
+  try {
+    const options = {}
+    
+    if (redirectTo) {
+      options.redirectTo = redirectTo
+    } else {
+      options.redirectTo = `${window.location.origin}/reset-password`
     }
+    
+    const { data, error } = await supabase.auth.resetPasswordForEmail(email, options)
+    
+    if (error) throw error
+    
+    console.log('✅ Password reset email sent to:', email)
+    return { success: true, data }
+    
+  } catch (error) {
+    console.error('❌ Password reset failed:', error)
+    throw error
   }
+}
 
+// VOEG deze NIEUWE methods toe NA resetPassword:
+async updatePassword(newPassword) {
+  try {
+    const { data, error } = await supabase.auth.updateUser({
+      password: newPassword
+    })
+    
+    if (error) throw error
+    
+    console.log('✅ Password updated successfully')
+    this.clearCache()
+    return { success: true, data }
+    
+  } catch (error) {
+    console.error('❌ Password update failed:', error)
+    throw error
+  }
+}
+
+async verifyPasswordResetToken() {
+  try {
+    const { data: { session }, error } = await supabase.auth.getSession()
+    
+    if (error) throw error
+    
+    return session !== null
+    
+  } catch (error) {
+    console.error('❌ Token verification failed:', error)
+    return false
+  }
+}
   // ===== CLIENT MANAGEMENT =====
   async getClients(trainerId = null) {
     try {
@@ -249,8 +302,440 @@ this.supabase = supabase
     }
   }
 
+
+
+
+
+
+
+
+
+
+
+
+// ========================================
+// WORKOUT LOG METHODS - ADD TO DatabaseService.js
+// Voeg deze toe aan je DatabaseService class (rond regel 4800-5000)
+// ========================================
+
+// Quick Log Workout - COMPLETE SAVE METHOD
+async saveQuickWorkoutLog(clientId, exerciseName, sets, notes = null) {
+  try {
+    // 1. Create or get today's workout session
+    const today = new Date().toISOString().split('T')[0]
+    
+    // Check if session exists for today
+    let { data: session, error: sessionError } = await this.supabase
+      .from('workout_sessions')
+      .select('*')
+      .eq('client_id', clientId)
+      .eq('workout_date', today)
+      .single()
+    
+    // Create new session if not exists
+    if (!session) {
+      const { data: newSession, error: createError } = await this.supabase
+        .from('workout_sessions')
+        .insert({
+          client_id: clientId,
+          user_id: clientId, // Same as client_id for now
+          workout_date: today,
+          day_name: new Date().toLocaleDateString('en-US', { weekday: 'long' }),
+          day_display_name: `Quick Log - ${new Date().toLocaleDateString()}`,
+          exercises_completed: [],
+          is_completed: false,
+          created_at: new Date().toISOString()
+        })
+        .select()
+        .single()
+      
+      if (createError) {
+        console.error('Failed to create workout session:', createError)
+        throw createError
+      }
+      session = newSession
+    }
+    
+    // 2. Save workout progress
+    const { data: progress, error: progressError } = await this.supabase
+      .from('workout_progress')
+      .insert({
+        session_id: session.id,
+        exercise_name: exerciseName,
+        sets: sets, // JSONB array of {weight, reps}
+        notes: notes,
+        created_at: new Date().toISOString()
+      })
+      .select()
+      .single()
+    
+    if (progressError) {
+      console.error('Failed to save workout progress:', progressError)
+      throw progressError
+    }
+    
+    // 3. Update session with completed exercise
+    const updatedExercises = [
+      ...(session.exercises_completed || []),
+      { 
+        name: exerciseName, 
+        sets: sets.length,
+        completed_at: new Date().toISOString()
+      }
+    ]
+    
+    const { error: updateError } = await this.supabase
+      .from('workout_sessions')
+      .update({
+        exercises_completed: updatedExercises,
+        completion_percentage: Math.min(100, (updatedExercises.length / 5) * 100),
+        is_completed: updatedExercises.length >= 3 // Mark complete after 3 exercises
+      })
+      .eq('id', session.id)
+    
+    if (updateError) {
+      console.error('Failed to update workout session:', updateError)
+      throw updateError
+    }
+    
+    console.log('✅ Quick workout logged successfully')
+    return { session, progress }
+    
+  } catch (error) {
+    console.error('❌ Quick workout log failed:', error)
+    throw error
+  }
+}
+
+// Get Workout Chart Data - Voor progress charts
+async getWorkoutChartData(clientId, days = 30) {
+  try {
+    const endDate = new Date()
+    const startDate = new Date()
+    startDate.setDate(startDate.getDate() - days)
+    
+    // Get workout sessions with progress
+    const { data: sessions, error } = await this.supabase
+      .from('workout_sessions')
+      .select(`
+        *,
+        workout_progress (
+          exercise_name,
+          sets,
+          created_at
+        )
+      `)
+      .eq('client_id', clientId)
+      .gte('workout_date', startDate.toISOString().split('T')[0])
+      .lte('workout_date', endDate.toISOString().split('T')[0])
+      .order('workout_date', { ascending: true })
+    
+    if (error) throw error
+    
+    // Calculate volume per session
+    const chartData = sessions.map(session => {
+      let totalVolume = 0
+      let exerciseCount = 0
+      
+      if (session.workout_progress) {
+        session.workout_progress.forEach(progress => {
+          exerciseCount++
+          if (progress.sets && Array.isArray(progress.sets)) {
+            progress.sets.forEach(set => {
+              if (set.weight && set.reps) {
+                totalVolume += (set.weight * set.reps)
+              }
+            })
+          }
+        })
+      }
+      
+      return {
+        date: session.workout_date,
+        volume: totalVolume,
+        exercises: exerciseCount,
+        duration: session.duration_minutes || 0
+      }
+    })
+    
+    return chartData
+    
+  } catch (error) {
+    console.error('❌ Get workout chart data failed:', error)
+    return []
+  }
+}
+
+// Get Recent Workout Stats - Voor dashboard widget
+async getRecentWorkoutStats(clientId) {
+  try {
+    const today = new Date().toISOString().split('T')[0]
+    const lastWeek = new Date()
+    lastWeek.setDate(lastWeek.getDate() - 7)
+    
+    // Get this week's workouts
+    const { data: weekWorkouts, error } = await this.supabase
+      .from('workout_sessions')
+      .select('*')
+      .eq('client_id', clientId)
+      .gte('workout_date', lastWeek.toISOString().split('T')[0])
+      .order('workout_date', { ascending: false })
+    
+    if (error) throw error
+    
+    // Get today's progress if session exists
+    let todayProgress = []
+    if (weekWorkouts && weekWorkouts.length > 0 && weekWorkouts[0].workout_date === today) {
+      const { data: progress } = await this.supabase
+        .from('workout_progress')
+        .select('*')
+        .eq('session_id', weekWorkouts[0].id)
+      
+      todayProgress = progress || []
+    }
+    
+    // Calculate stats
+    const stats = {
+      workoutsThisWeek: weekWorkouts.length,
+      todayExercises: todayProgress.length,
+      currentStreak: this.calculateWorkoutStreak(weekWorkouts),
+      lastWorkout: weekWorkouts[0]?.workout_date || null,
+      totalVolume: 0
+    }
+    
+    // Calculate total volume for the week
+    for (const workout of weekWorkouts) {
+      const { data: progress } = await this.supabase
+        .from('workout_progress')
+        .select('sets')
+        .eq('session_id', workout.id)
+      
+      if (progress) {
+        progress.forEach(p => {
+          if (p.sets && Array.isArray(p.sets)) {
+            p.sets.forEach(set => {
+              if (set.weight && set.reps) {
+                stats.totalVolume += (set.weight * set.reps)
+              }
+            })
+          }
+        })
+      }
+    }
+    
+    return stats
+    
+  } catch (error) {
+    console.error('❌ Get workout stats failed:', error)
+    return {
+      workoutsThisWeek: 0,
+      todayExercises: 0,
+      currentStreak: 0,
+      lastWorkout: null,
+      totalVolume: 0
+    }
+  }
+}
+
+// Save Workout Progress - Alternative method name
+async saveWorkoutProgress(progressData) {
+  try {
+    const { data, error } = await this.supabase
+      .from('workout_progress')
+      .insert({
+        session_id: progressData.session_id,
+        exercise_name: progressData.exercise_name,
+        sets: progressData.sets,
+        notes: progressData.notes || null,
+        created_at: new Date().toISOString()
+      })
+      .select()
+      .single()
+    
+    if (error) throw error
+    
+    console.log('✅ Workout progress saved')
+    return data
+    
+  } catch (error) {
+    console.error('❌ Save workout progress failed:', error)
+    throw error
+  }
+}
+
+// Get Today's Workout Session
+async getTodayWorkoutSession(clientId) {
+  try {
+    const today = new Date().toISOString().split('T')[0]
+    
+    const { data, error } = await this.supabase
+      .from('workout_sessions')
+      .select(`
+        *,
+        workout_progress (*)
+      `)
+      .eq('client_id', clientId)
+      .eq('workout_date', today)
+      .single()
+    
+    if (error && error.code !== 'PGRST116') { // Ignore "no rows" error
+      throw error
+    }
+    
+    return data
+    
+  } catch (error) {
+    console.error('❌ Get today workout session failed:', error)
+    return null
+  }
+}
+
+// Get Workout History
+async getWorkoutHistory(clientId, days = 30) {
+  try {
+    const endDate = new Date()
+    const startDate = new Date()
+    startDate.setDate(startDate.getDate() - days)
+    
+    const { data, error } = await this.supabase
+      .from('workout_sessions')
+      .select(`
+        *,
+        workout_progress (
+          exercise_name,
+          sets,
+          created_at
+        )
+      `)
+      .eq('client_id', clientId)
+      .gte('workout_date', startDate.toISOString().split('T')[0])
+      .lte('workout_date', endDate.toISOString().split('T')[0])
+      .order('workout_date', { ascending: false })
+    
+    if (error) throw error
+    
+    return data || []
+    
+  } catch (error) {
+    console.error('❌ Get workout history failed:', error)
+    return []
+  }
+}
+
+// Helper: Calculate workout streak
+calculateWorkoutStreak(workouts) {
+  if (!workouts || workouts.length === 0) return 0
+  
+  let streak = 0
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  
+  // Sort by date descending
+  const sorted = [...workouts].sort((a, b) => 
+    new Date(b.workout_date) - new Date(a.workout_date)
+  )
+  
+  for (let i = 0; i < sorted.length; i++) {
+    const workoutDate = new Date(sorted[i].workout_date)
+    workoutDate.setHours(0, 0, 0, 0)
+    
+    const expectedDate = new Date(today)
+    expectedDate.setDate(expectedDate.getDate() - i)
+    
+    // Allow 1 day gap for rest days
+    const dayDiff = Math.abs((expectedDate - workoutDate) / (1000 * 60 * 60 * 24))
+    
+    if (dayDiff <= 1) {
+      streak++
+    } else {
+      break
+    }
+  }
+  
+  return streak
+}
+
+// Save Exercise to Personal Database
+async saveExerciseToDatabase(clientId, exerciseName, muscleGroup = null) {
+  try {
+    const { data, error } = await this.supabase
+      .from('exercise_database')
+      .insert({
+        client_id: clientId,
+        name: exerciseName,
+        muscle_group: muscleGroup,
+        created_by: clientId,
+        is_custom: true,
+        created_at: new Date().toISOString()
+      })
+      .select()
+      .single()
+    
+    if (error && error.code === '23505') { // Duplicate key
+      console.log('Exercise already exists in database')
+      return null
+    }
+    
+    if (error) throw error
+    
+    console.log('✅ Exercise saved to database')
+    return data
+    
+  } catch (error) {
+    console.error('❌ Save exercise to database failed:', error)
+    return null
+  }
+}
+
+// Get Personal Exercise Database
+async getPersonalExercises(clientId) {
+  try {
+    const { data, error } = await this.supabase
+      .from('exercise_database')
+      .select('*')
+      .or(`client_id.eq.${clientId},is_public.eq.true`)
+      .order('name', { ascending: true })
+    
+    if (error) throw error
+    
+    return data || []
+    
+  } catch (error) {
+    console.error('❌ Get personal exercises failed:', error)
+    return []
+  }
+}
+
+
+
+
+
+
+
+
+
+
+
+
   // ===== WORKOUT METHODS =====
-  async getWorkoutSchemas(userId = null) {
+ 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+ async getWorkoutSchemas(userId = null) {
     try {
       const uid = userId || (await this.getCurrentUser())?.id
       if (!uid) return []
@@ -489,9 +974,1444 @@ this.supabase = supabase
     }
   }
 
+
+
+
+
+// ========== INGREDIENTS METHODS ==========
+async searchIngredients(searchTerm) {
+  try {
+    if (!searchTerm || searchTerm.trim() === '') {
+      const { data, error } = await this.supabase
+        .from('ingredients')
+        .select('*')
+        .order('name')
+        .limit(50)
+      
+      if (error) throw error
+      return data || []
+    }
+    
+    const { data, error } = await this.supabase
+      .from('ingredients')
+      .select('*')
+      .or(`name.ilike.%${searchTerm}%,category.ilike.%${searchTerm}%`)
+      .order('name')
+      .limit(50)
+    
+    if (error) throw error
+    return data || []
+  } catch (error) {
+    console.error('❌ Error searching ingredients:', error)
+    return []
+  }
+}
+
+async getAllIngredients() {
+  try {
+    const { data, error } = await this.supabase
+      .from('ingredients')
+      .select('*')
+      .order('category', { ascending: true })
+      .order('name', { ascending: true })
+    
+    if (error) throw error
+    console.log(`✅ Loaded all ${data?.length || 0} ingredients`)
+    return data || []
+  } catch (error) {
+    console.error('❌ Error loading all ingredients:', error)
+    return []
+  }
+}
+
+async getIngredientsByCategory(category) {
+  try {
+    const { data, error } = await this.supabase
+      .from('ingredients')
+      .select('*')
+      .eq('category', category)
+      .order('name')
+    
+    if (error) throw error
+    return data || []
+  } catch (error) {
+    console.error('❌ Error loading ingredients by category:', error)
+    return []
+  }
+}
+
+calculateIngredientMacros(ingredient, portionGrams) {
+  if (!ingredient || !portionGrams) return null
+  
+  const factor = portionGrams / 100
+  return {
+    calories: Math.round((ingredient.per_100g_kcal || 0) * factor),
+    protein: Math.round((ingredient.per_100g_protein || 0) * factor * 10) / 10,
+    carbs: Math.round((ingredient.per_100g_carbs || 0) * factor * 10) / 10,
+    fat: Math.round((ingredient.per_100g_fat || 0) * factor * 10) / 10,
+    fiber: Math.round((ingredient.per_100g_fiber || 0) * factor * 10) / 10,
+    portionSize: portionGrams
+  }
+}
+
+
+
+
+
   // ===== MEAL PLAN METHODS =====
  
 // ===== MEAL PLAN METHODS =====
+
+
+
+
+
+// src/services/DatabaseService.js - MEAL PLAN METHODS
+// 🍎 Voeg deze methods toe aan je bestaande DatabaseService class
+
+// ===== MEAL PLAN METHODS =====
+
+
+// In DatabaseService.js, voeg deze method toe:
+// Voeg deze methods toe/update ze in DatabaseService.js
+
+// ===== MEAL DETAILS METHOD (NIEUW) =====
+async getMealDetails(mealId) {
+  try {
+    if (!mealId) {
+      console.log('⚠️ No meal ID provided')
+      return null
+    }
+    
+    const { data, error } = await supabase
+      .from('meals')
+      .select('*')
+      .eq('id', mealId)
+      .single()
+    
+    if (error) {
+      console.error('❌ Get meal details error:', error)
+      return null
+    }
+    
+    console.log('✅ Loaded meal details:', data?.name)
+    return data
+  } catch (error) {
+    console.error('❌ Get meal details failed:', error)
+    return null
+  }
+}
+
+// ===== MEAL PROGRESS SAVE (GEFIXTE VERSIE) =====
+async saveMealProgress(clientId, progressData) {
+  try {
+    console.log('💾 Saving meal progress for client:', clientId)
+    console.log('Progress data:', progressData)
+    
+    // Valideer dat alle required fields aanwezig zijn
+    if (!clientId || !progressData.date) {
+      console.error('❌ Missing required fields: clientId or date')
+      return null
+    }
+    
+    // Zorg dat meals_checked correct geformateerd is
+    let mealsCheckedData = progressData.meals_checked || []
+    
+    // Als het al een string is, parse het niet opnieuw
+    if (typeof mealsCheckedData === 'string') {
+      try {
+        mealsCheckedData = JSON.parse(mealsCheckedData)
+      } catch (e) {
+        console.log('meals_checked is already a string, using as-is')
+      }
+    }
+    
+    // Check of record bestaat
+    const { data: existing, error: checkError } = await supabase
+      .from('meal_progress')
+      .select('id')
+      .eq('client_id', clientId)
+      .eq('date', progressData.date)
+      .maybeSingle()
+    
+    if (checkError && checkError.code !== 'PGRST116') {
+      console.error('❌ Check existing error:', checkError)
+      return null
+    }
+    
+    // Prepare data voor save
+    const dataToSave = {
+      client_id: clientId,
+      date: progressData.date,
+      plan_id: progressData.plan_id || null,
+      meals_checked: mealsCheckedData, // Laat Supabase het JSON maken
+      total_calories: parseInt(progressData.total_calories) || 0,
+      total_protein: parseInt(progressData.total_protein) || 0,
+      total_carbs: parseInt(progressData.total_carbs) || 0,
+      total_fat: parseInt(progressData.total_fat) || 0,
+      updated_at: new Date().toISOString()
+    }
+    
+    let result
+    
+    if (existing) {
+      // Update existing record
+      console.log('📝 Updating existing progress record:', existing.id)
+      
+      const { data, error } = await supabase
+        .from('meal_progress')
+        .update(dataToSave)
+        .eq('id', existing.id)
+        .select()
+        .single()
+      
+      if (error) {
+        console.error('❌ Update error:', error)
+        return null
+      }
+      
+      result = data
+    } else {
+      // Insert new record
+      console.log('➕ Creating new progress record')
+      
+      const { data, error } = await supabase
+        .from('meal_progress')
+        .insert({
+          ...dataToSave,
+          created_at: new Date().toISOString()
+        })
+        .select()
+        .single()
+      
+      if (error) {
+        console.error('❌ Insert error:', error)
+        return null
+      }
+      
+      result = data
+    }
+    
+    console.log('✅ Meal progress saved successfully')
+    return result
+  } catch (error) {
+    console.error('❌ Save meal progress failed:', error.message || error)
+    return null
+  }
+}
+
+// ===== GET CUSTOM MEALS (GEFIXTE VERSIE VOOR CLIENT-SPECIFIC) =====
+async getCustomMeals(clientId) {
+  try {
+    if (!clientId) {
+      console.log('⚠️ No clientId provided for getCustomMeals')
+      return []
+    }
+    
+    // Haal alleen custom meals voor deze specifieke client
+    const { data, error } = await supabase
+      .from('meals')
+      .select('*')
+      .eq('created_by', clientId)
+      .eq('is_custom', true)
+      .order('created_at', { ascending: false })
+    
+    if (error) {
+      console.error('❌ Get custom meals error:', error)
+      return []
+    }
+    
+    console.log('✅ Loaded custom meals for client:', data?.length || 0)
+    return data || []
+  } catch (error) {
+    console.error('❌ Get custom meals failed:', error)
+    return []
+  }
+}
+
+// ===== SAVE CUSTOM MEAL (GEFIXTE VERSIE) =====
+async saveCustomMeal(mealData) {
+  try {
+    console.log('💾 Attempting to save custom meal:', mealData)
+    
+    // Zorg dat alle vereiste velden aanwezig zijn
+    const mealToSave = {
+      name: mealData.name,
+      kcal: parseInt(mealData.kcal) || 0,
+      protein: parseInt(mealData.protein) || 0,
+      carbs: parseInt(mealData.carbs) || 0,
+      fat: parseInt(mealData.fat) || 0,
+      is_custom: true,
+      created_by: mealData.created_by,
+      // Optionele velden
+      ...(mealData.category && { category: mealData.category }),
+      ...(mealData.meal_type && { meal_type: mealData.meal_type }),
+      ...(mealData.image_url && { image_url: mealData.image_url }),
+      ...(mealData.ingredients && { ingredients: mealData.ingredients }),
+      ...(mealData.tags && { tags: mealData.tags })
+    }
+    
+    const { data, error } = await supabase
+      .from('meals')
+      .insert(mealToSave)
+      .select()
+      .single()
+    
+    if (error) {
+      console.error('❌ Supabase error:', error)
+      throw error
+    }
+    
+    console.log('✅ Custom meal saved:', data)
+    return data
+  } catch (error) {
+    console.error('❌ Save custom meal failed:', error.message || error)
+    throw error
+  }
+}
+
+// ===== GET MEAL HISTORY (VERBETERDE VERSIE) =====
+async getMealHistory(clientId, days = 30) {
+  try {
+    console.log('📊 Loading meal history for client:', clientId)
+    
+    const startDate = new Date()
+    startDate.setDate(startDate.getDate() - days)
+    
+    const { data, error } = await supabase
+      .from('meal_progress')
+      .select('*')
+      .eq('client_id', clientId)
+      .gte('date', startDate.toISOString().split('T')[0])
+      .order('date', { ascending: false })
+    
+    if (error) {
+      console.error('❌ Get history error:', error)
+      return []
+    }
+    
+    // Parse meals_checked als het een string is
+    const parsedData = data?.map(item => {
+      if (item.meals_checked && typeof item.meals_checked === 'string') {
+        try {
+          item.meals_checked = JSON.parse(item.meals_checked)
+        } catch (e) {
+          console.log('Could not parse meals_checked, keeping as-is')
+        }
+      }
+      return item
+    })
+    
+    console.log('✅ Loaded meal history:', parsedData?.length || 0, 'days')
+    return parsedData || []
+  } catch (error) {
+    console.error('❌ Get meal history failed:', error)
+    return []
+  }
+}
+
+// Voeg deze methods toe aan je DatabaseService.js
+// ===== CUSTOM MEALS =====
+// Voeg toe aan DatabaseService.js
+async getMealDetails(mealId) {
+  try {
+    const { data, error } = await supabase
+      .from('meals')
+      .select('*')
+      .eq('id', mealId)
+      .single()
+    
+    if (error) throw error
+    return data
+  } catch (error) {
+    console.error('Get meal details failed:', error)
+    return null
+  }
+}
+async saveCustomMeal(mealData) {
+  try {
+    console.log('💾 Attempting to save custom meal:', mealData)
+    
+    // Zorg dat alle vereiste velden aanwezig zijn
+    const mealToSave = {
+      name: mealData.name,
+      kcal: parseInt(mealData.kcal) || 0,
+      protein: parseInt(mealData.protein) || 0,
+      carbs: parseInt(mealData.carbs) || 0,
+      fat: parseInt(mealData.fat) || 0,
+      // Optionele velden alleen toevoegen als ze bestaan
+      ...(mealData.category && { category: mealData.category }),
+      ...(mealData.meal_type && { meal_type: mealData.meal_type }),
+      ...(mealData.image_url && { image_url: mealData.image_url }),
+      ...(mealData.ingredients && { ingredients: mealData.ingredients }),
+      ...(mealData.created_by && { created_by: mealData.created_by }),
+      is_custom: true
+    }
+    
+    const { data, error } = await supabase
+      .from('meals')
+      .insert(mealToSave)
+      .select()
+      .single()
+    
+    if (error) {
+      console.error('❌ Supabase error:', error)
+      throw error
+    }
+    
+    console.log('✅ Custom meal saved:', data)
+    return data
+  } catch (error) {
+    console.error('❌ Save custom meal failed:', error.message || error)
+    throw error
+  }
+}
+
+async getCustomMeals(clientId) {
+  try {
+    if (!clientId) {
+      console.log('⚠️ No clientId provided for getCustomMeals')
+      return []
+    }
+    
+    const { data, error } = await supabase
+      .from('meals')
+      .select('*')
+      .eq('created_by', clientId)
+      .eq('is_custom', true)
+      .order('created_at', { ascending: false })
+    
+    if (error) {
+      console.error('❌ Get custom meals error:', error)
+      return []
+    }
+    
+    console.log('✅ Loaded custom meals:', data?.length || 0)
+    return data || []
+  } catch (error) {
+    console.error('❌ Get custom meals failed:', error)
+    return []
+  }
+}
+
+// ===== MEAL PROGRESS & HISTORY =====
+async saveMealProgress(clientId, progressData) {
+  try {
+    console.log('💾 Saving meal progress for client:', clientId)
+    
+    // Check if progress exists for today
+    const { data: existing, error: checkError } = await supabase
+      .from('meal_progress')
+      .select('id')
+      .eq('client_id', clientId)
+      .eq('date', progressData.date)
+      .maybeSingle()
+    
+    if (checkError && checkError.code !== 'PGRST116') {
+      console.error('❌ Check existing progress error:', checkError)
+      throw checkError
+    }
+    
+    let result
+    
+    if (existing) {
+      // Update existing progress
+      const { data, error } = await supabase
+        .from('meal_progress')
+        .update({
+          ...progressData,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', existing.id)
+        .select()
+        .single()
+      
+      if (error) {
+        console.error('❌ Update progress error:', error)
+        throw error
+      }
+      result = data
+    } else {
+      // Create new progress
+      const { data, error } = await supabase
+        .from('meal_progress')
+        .insert({
+          client_id: clientId,
+          ...progressData,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        })
+        .select()
+        .single()
+      
+      if (error) {
+        console.error('❌ Insert progress error:', error)
+        throw error
+      }
+      result = data
+    }
+    
+    console.log('✅ Meal progress saved')
+    return result
+  } catch (error) {
+    console.error('❌ Save meal progress failed:', error.message || error)
+    // Don't throw, return null to prevent app crash
+    return null
+  }
+}
+
+async getMealProgress(clientId, date) {
+  try {
+    const { data, error } = await supabase
+      .from('meal_progress')
+      .select('*')
+      .eq('client_id', clientId)
+      .eq('date', date)
+      .maybeSingle()
+    
+    if (error && error.code !== 'PGRST116') {
+      console.error('❌ Get progress error:', error)
+      return null
+    }
+    
+    return data
+  } catch (error) {
+    console.error('❌ Get meal progress failed:', error)
+    return null
+  }
+}
+
+async getMealHistory(clientId, days = 30) {
+  try {
+    console.log('📊 Loading meal history for client:', clientId)
+    
+    const startDate = new Date()
+    startDate.setDate(startDate.getDate() - days)
+    
+    const { data, error } = await supabase
+      .from('meal_progress')
+      .select('*')
+      .eq('client_id', clientId)
+      .gte('date', startDate.toISOString().split('T')[0])
+      .order('date', { ascending: false })
+    
+    if (error) {
+      console.error('❌ Get history error:', error)
+      return []
+    }
+    
+    console.log('✅ Loaded meal history:', data?.length || 0, 'days')
+    return data || []
+  } catch (error) {
+    console.error('❌ Get meal history failed:', error)
+    return []
+  }
+}
+
+// ===== WATER INTAKE =====
+async saveWaterIntake(clientId, date, amount) {
+  try {
+    console.log('💧 Saving water intake:', { clientId, date, amount })
+    
+    // Validate input
+    if (!clientId || !date) {
+      console.error('❌ Missing required fields for water intake')
+      return null
+    }
+    
+    const { data: existing, error: checkError } = await supabase
+      .from('water_intake')
+      .select('id')
+      .eq('client_id', clientId)
+      .eq('date', date)
+      .maybeSingle()
+    
+    if (checkError && checkError.code !== 'PGRST116') {
+      console.error('❌ Check existing water error:', checkError)
+      return null
+    }
+    
+    let result
+    
+    if (existing) {
+      const { data, error } = await supabase
+        .from('water_intake')
+        .update({
+          amount: amount,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', existing.id)
+        .select()
+        .single()
+      
+      if (error) {
+        console.error('❌ Update water error:', error)
+        return null
+      }
+      result = data
+    } else {
+      const { data, error } = await supabase
+        .from('water_intake')
+        .insert({
+          client_id: clientId,
+          date: date,
+          amount: amount,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        })
+        .select()
+        .single()
+      
+      if (error) {
+        console.error('❌ Insert water error:', error)
+        return null
+      }
+      result = data
+    }
+    
+    console.log('✅ Water intake saved:', amount, 'L')
+    return result
+  } catch (error) {
+    console.error('❌ Save water intake failed:', error.message || error)
+    return null
+  }
+}
+
+async getWaterIntake(clientId, date) {
+  try {
+    const { data, error } = await supabase
+      .from('water_intake')
+      .select('amount')
+      .eq('client_id', clientId)
+      .eq('date', date)
+      .maybeSingle()
+    
+    if (error && error.code !== 'PGRST116') {
+      console.error('❌ Get water error:', error)
+      return null
+    }
+    
+    return data
+  } catch (error) {
+    console.error('❌ Get water intake failed:', error)
+    return null
+  }
+}
+
+// ===== MEAL SWAPS =====
+async saveMealSwap(clientId, planId, dayIndex, timeSlot, newMealId) {
+  try {
+    console.log('🔄 Saving meal swap:', { clientId, planId, dayIndex, timeSlot, newMealId })
+    
+    // Validate required fields
+    if (!clientId || !planId || !newMealId) {
+      console.error('❌ Missing required fields for meal swap')
+      return null
+    }
+    
+    const { data, error } = await supabase
+      .from('meal_swaps')
+      .insert({
+        client_id: clientId,
+        plan_id: planId,
+        day_index: dayIndex,
+        time_slot: timeSlot,
+        new_meal_id: newMealId,
+        created_at: new Date().toISOString()
+      })
+      .select()
+      .single()
+    
+    if (error) {
+      console.error('❌ Save swap error:', error)
+      return null
+    }
+    
+    console.log('✅ Meal swap saved')
+    return data
+  } catch (error) {
+    console.error('❌ Save meal swap failed:', error)
+    return null
+  }
+}
+
+// ===== GET MEALS BY IDS =====
+async getMealsByIds(mealIds) {
+  try {
+    if (!mealIds || mealIds.length === 0) {
+      console.log('⚠️ No meal IDs provided')
+      return []
+    }
+    
+    const { data, error } = await supabase
+      .from('meals')
+      .select('*')
+      .in('id', mealIds)
+    
+    if (error) {
+      console.error('❌ Get meals by IDs error:', error)
+      return []
+    }
+    
+    return data || []
+  } catch (error) {
+    console.error('❌ Get meals by IDs failed:', error)
+    return []
+  }
+}
+
+// ===== MEAL PREFERENCES (Update existing) =====
+async saveMealPreferences(clientId, preferences) {
+  try {
+    console.log('💾 Saving meal preferences for client:', clientId)
+    
+    const { data, error } = await supabase
+      .from('clients')
+      .update({
+        nutrition_info: preferences,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', clientId)
+      .select()
+      .single()
+    
+    if (error) {
+      console.error('❌ Save preferences error:', error)
+      // Fallback to localStorage
+      localStorage.setItem(`meal_preferences_${clientId}`, JSON.stringify(preferences))
+      return preferences
+    }
+    
+    console.log('✅ Meal preferences saved')
+    return data
+  } catch (error) {
+    console.error('❌ Save meal preferences failed:', error)
+    localStorage.setItem(`meal_preferences_${clientId}`, JSON.stringify(preferences))
+    return preferences
+  }
+}
+
+async getMealPreferences(clientId) {
+  try {
+    const { data, error } = await supabase
+      .from('clients')
+      .select('nutrition_info')
+      .eq('id', clientId)
+      .single()
+    
+    if (error && error.code !== 'PGRST116') {
+      console.error('❌ Get preferences error:', error)
+    }
+    
+    if (data?.nutrition_info) {
+      return data.nutrition_info
+    }
+    
+    // Fallback to localStorage
+    const stored = localStorage.getItem(`meal_preferences_${clientId}`)
+    if (stored) {
+      return JSON.parse(stored)
+    }
+    
+    // Default preferences
+    return {
+      dietary_type: 'regular',
+      allergies: [],
+      dislikes: [],
+      favorite_meals: [],
+      meals_per_day: 3,
+      primary_goal: 'maintenance',
+      activity_level: 'moderate'
+    }
+  } catch (error) {
+    console.error('❌ Get meal preferences failed:', error)
+    return {
+      dietary_type: 'regular',
+      allergies: [],
+      dislikes: [],
+      favorite_meals: [],
+      meals_per_day: 3,
+      primary_goal: 'maintenance',
+      activity_level: 'moderate'
+    }
+  }
+}
+
+// ===== MEAL PROGRESS & HISTORY =====
+async saveMealProgress(clientId, progressData) {
+  try {
+    // Check if progress exists for today
+    const { data: existing, error: checkError } = await supabase
+      .from('meal_progress')
+      .select('id')
+      .eq('client_id', clientId)
+      .eq('date', progressData.date)
+      .maybeSingle()
+    
+    if (checkError && checkError.code !== 'PGRST116') {
+      throw checkError
+    }
+    
+    let result
+    
+    if (existing) {
+      // Update existing progress
+      const { data, error } = await supabase
+        .from('meal_progress')
+        .update({
+          ...progressData,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', existing.id)
+        .select()
+        .single()
+      
+      if (error) throw error
+      result = data
+    } else {
+      // Create new progress
+      const { data, error } = await supabase
+        .from('meal_progress')
+        .insert({
+          client_id: clientId,
+          ...progressData,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        })
+        .select()
+        .single()
+      
+      if (error) throw error
+      result = data
+    }
+    
+    console.log('✅ Meal progress saved')
+    return result
+  } catch (error) {
+    console.error('❌ Save meal progress failed:', error)
+    throw error
+  }
+}
+
+async getMealProgress(clientId, date) {
+  try {
+    const { data, error } = await supabase
+      .from('meal_progress')
+      .select('*')
+      .eq('client_id', clientId)
+      .eq('date', date)
+      .maybeSingle()
+    
+    if (error && error.code !== 'PGRST116') {
+      throw error
+    }
+    
+    return data
+  } catch (error) {
+    console.error('❌ Get meal progress failed:', error)
+    return null
+  }
+}
+
+async getMealHistory(clientId, days = 30) {
+  try {
+    const startDate = new Date()
+    startDate.setDate(startDate.getDate() - days)
+    
+    const { data, error } = await supabase
+      .from('meal_progress')
+      .select('*')
+      .eq('client_id', clientId)
+      .gte('date', startDate.toISOString().split('T')[0])
+      .order('date', { ascending: false })
+    
+    if (error) throw error
+    
+    console.log('✅ Loaded meal history:', data?.length || 0, 'days')
+    return data || []
+  } catch (error) {
+    console.error('❌ Get meal history failed:', error)
+    return []
+  }
+}
+
+// ===== WATER INTAKE =====
+async saveWaterIntake(clientId, date, amount) {
+  try {
+    const { data: existing, error: checkError } = await supabase
+      .from('water_intake')
+      .select('id')
+      .eq('client_id', clientId)
+      .eq('date', date)
+      .maybeSingle()
+    
+    if (checkError && checkError.code !== 'PGRST116') {
+      throw checkError
+    }
+    
+    let result
+    
+    if (existing) {
+      const { data, error } = await supabase
+        .from('water_intake')
+        .update({
+          amount: amount,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', existing.id)
+        .select()
+        .single()
+      
+      if (error) throw error
+      result = data
+    } else {
+      const { data, error } = await supabase
+        .from('water_intake')
+        .insert({
+          client_id: clientId,
+          date: date,
+          amount: amount,
+          created_at: new Date().toISOString()
+        })
+        .select()
+        .single()
+      
+      if (error) throw error
+      result = data
+    }
+    
+    console.log('✅ Water intake saved:', amount, 'L')
+    return result
+  } catch (error) {
+    console.error('❌ Save water intake failed:', error)
+    return null
+  }
+}
+
+async getWaterIntake(clientId, date) {
+  try {
+    const { data, error } = await supabase
+      .from('water_intake')
+      .select('amount')
+      .eq('client_id', clientId)
+      .eq('date', date)
+      .maybeSingle()
+    
+    if (error && error.code !== 'PGRST116') {
+      throw error
+    }
+    
+    return data
+  } catch (error) {
+    console.error('❌ Get water intake failed:', error)
+    return null
+  }
+}
+
+// ===== MEAL SWAPS =====
+async saveMealSwap(clientId, planId, dayIndex, timeSlot, newMealId) {
+  try {
+    const { data, error } = await supabase
+      .from('meal_swaps')
+      .insert({
+        client_id: clientId,
+        plan_id: planId,
+        day_index: dayIndex,
+        time_slot: timeSlot,
+        new_meal_id: newMealId,
+        created_at: new Date().toISOString()
+      })
+      .select()
+      .single()
+    
+    if (error) throw error
+    
+    console.log('✅ Meal swap saved')
+    return data
+  } catch (error) {
+    console.error('❌ Save meal swap failed:', error)
+    return null
+  }
+}
+
+// ===== GET MEALS BY IDS =====
+async getMealsByIds(mealIds) {
+  try {
+    const { data, error } = await supabase
+      .from('meals')
+      .select('*')
+      .in('id', mealIds)
+    
+    if (error) throw error
+    
+    return data || []
+  } catch (error) {
+    console.error('❌ Get meals by IDs failed:', error)
+    return []
+  }
+}
+
+// ===== UPLOAD MEAL IMAGE (placeholder voor nu) =====
+async uploadMealImage(file) {
+  try {
+    // In productie: upload naar Supabase Storage
+    const fileName = `meals/${Date.now()}_${file.name}`
+    
+    // Voor nu: return een placeholder
+    console.log('📸 Would upload image:', fileName)
+    return `https://source.unsplash.com/400x300/?food,meal`
+    
+    // Productie code:
+    /*
+    const { data, error } = await supabase.storage
+      .from('meal-images')
+      .upload(fileName, file)
+    
+    if (error) throw error
+    
+    const { data: { publicUrl } } = supabase.storage
+      .from('meal-images')
+      .getPublicUrl(fileName)
+    
+    return publicUrl
+    */
+  } catch (error) {
+    console.error('❌ Upload meal image failed:', error)
+    throw error
+  }
+}
+
+async getCustomMeals(clientId) {
+  try {
+    // Check of er een user is ingelogd
+    const { data: { user } } = await this.supabase.auth.getUser()
+    if (!user) return []
+    
+    const { data, error } = await this.supabase
+      .from('meals')
+      .select('*')
+      .eq('is_custom', true)
+      .eq('created_by', user.id)  // Gebruik user.id ipv clientId
+      .order('created_at', { ascending: false })
+    
+    if (error) throw error
+    return data || []
+  } catch (error) {
+    console.error('❌ Get custom meals failed:', error)
+    return []  // Return lege array ipv throw
+  }
+}
+
+
+// Get client's active meal plan
+async getClientMealPlan(clientId) {
+  try {
+    const { data, error } = await this.supabase
+      .from('client_meal_plans')
+      .select('*')
+      .eq('client_id', clientId)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .single()
+    
+    if (error && error.code !== 'PGRST116') throw error
+    return data
+  } catch (error) {
+    console.error('❌ Get client meal plan failed:', error)
+    return null
+  }
+}
+
+// Get all meals from catalog
+async getAllMeals() {
+  try {
+    const { data, error } = await this.supabase
+      .from('meals')
+      .select('*')
+      .order('name')
+    
+    if (error) throw error
+    return data || []
+  } catch (error) {
+    console.error('❌ Get all meals failed:', error)
+    return []
+  }
+}
+
+// Get specific meals by IDs
+async getMealsByIds(mealIds) {
+  if (!mealIds || mealIds.length === 0) return []
+  
+  try {
+    const { data, error } = await this.supabase
+      .from('meals')
+      .select('*')
+      .in('id', mealIds)
+    
+    if (error) throw error
+    return data || []
+  } catch (error) {
+    console.error('❌ Get meals by IDs failed:', error)
+    return []
+  }
+}
+
+// Get client meal overrides (swaps)
+async getClientMealOverrides(clientId, planId) {
+  try {
+    const { data, error } = await this.supabase
+      .from('client_meal_overrides')
+      .select('week_structure')
+      .eq('client_id', clientId)
+      .eq('plan_id', planId)
+      .single()
+    
+    if (error && error.code !== 'PGRST116') throw error
+    return data?.week_structure || null
+  } catch (error) {
+    console.error('❌ Get client meal overrides failed:', error)
+    return null
+  }
+}
+
+// Save meal swap
+async saveMealSwap(clientId, planId, dayIndex, slot, mealId) {
+  try {
+    // First get current overrides
+    const { data: existing } = await this.supabase
+      .from('client_meal_overrides')
+      .select('week_structure')
+      .eq('client_id', clientId)
+      .eq('plan_id', planId)
+      .single()
+    
+    let weekStructure = existing?.week_structure || []
+    
+    // Ensure dayIndex exists
+    while (weekStructure.length <= dayIndex) {
+      weekStructure.push({ 
+        day: `Day ${weekStructure.length + 1}`, 
+        meals: [] 
+      })
+    }
+    
+    // Update the specific meal
+    if (!weekStructure[dayIndex].meals) {
+      weekStructure[dayIndex].meals = []
+    }
+    
+    // Find and update the meal slot
+    const mealIndex = weekStructure[dayIndex].meals.findIndex(m => m.slot === slot || m.time_slot === slot)
+    if (mealIndex >= 0) {
+      weekStructure[dayIndex].meals[mealIndex].meal_id = mealId
+    } else {
+      weekStructure[dayIndex].meals.push({ 
+        slot, 
+        meal_id: mealId,
+        target_kcal: 500 // Default
+      })
+    }
+    
+    // Save back to database
+    const { error } = await this.supabase
+      .from('client_meal_overrides')
+      .upsert({
+        client_id: clientId,
+        plan_id: planId,
+        week_structure: weekStructure,
+        updated_at: new Date().toISOString()
+      })
+    
+    if (error) throw error
+    console.log('✅ Meal swap saved successfully')
+    return true
+  } catch (error) {
+    console.error('❌ Save meal swap failed:', error)
+    return false
+  }
+}
+
+// Save meal progress (checked meals)
+async saveMealProgress(clientId, progressData) {
+  try {
+    const { data, error } = await this.supabase
+      .from('meal_progress')
+      .upsert({
+        client_id: clientId,
+        plan_id: progressData.plan_id,
+        date: progressData.date,
+        day_index: progressData.day_index,
+        meals_checked: progressData.meals_checked,
+        total_calories: progressData.total_calories,
+        total_protein: progressData.total_protein,
+        total_carbs: progressData.total_carbs,
+        total_fat: progressData.total_fat,
+        notes: progressData.notes || null,
+        updated_at: new Date().toISOString()
+      }, {
+        onConflict: 'client_id,date'
+      })
+      .select()
+      .single()
+    
+    if (error) throw error
+    console.log('✅ Meal progress saved')
+    return data
+  } catch (error) {
+    console.error('❌ Save meal progress failed:', error)
+    throw error
+  }
+}
+
+// Get meal progress for specific date
+async getMealProgress(clientId, date) {
+  try {
+    const { data, error } = await this.supabase
+      .from('meal_progress')
+      .select('*')
+      .eq('client_id', clientId)
+      .eq('date', date)
+      .single()
+    
+    if (error && error.code !== 'PGRST116') throw error
+    return data
+  } catch (error) {
+    console.error('❌ Get meal progress failed:', error)
+    return null
+  }
+}
+
+// Get meal history
+async getMealHistory(clientId, days = 7) {
+  try {
+    const endDate = new Date()
+    const startDate = new Date()
+    startDate.setDate(startDate.getDate() - days)
+    
+    const { data, error } = await this.supabase
+      .from('meal_progress')
+      .select('*')
+      .eq('client_id', clientId)
+      .gte('date', startDate.toISOString().split('T')[0])
+      .lte('date', endDate.toISOString().split('T')[0])
+      .order('date', { ascending: false })
+    
+    if (error) throw error
+    return data || []
+  } catch (error) {
+    console.error('❌ Get meal history failed:', error)
+    return []
+  }
+}
+
+// Save water intake
+async saveWaterIntake(clientId, date, amount) {
+  try {
+    const { data, error } = await this.supabase
+      .from('water_intake')
+      .upsert({
+        client_id: clientId,
+        date: date,
+        amount: amount,
+        updated_at: new Date().toISOString()
+      }, {
+        onConflict: 'client_id,date'
+      })
+      .select()
+      .single()
+    
+    if (error) throw error
+    console.log('✅ Water intake saved')
+    return data
+  } catch (error) {
+    console.error('❌ Save water intake failed:', error)
+    throw error
+  }
+}
+
+// Get water intake for date
+async getWaterIntake(clientId, date) {
+  try {
+    const { data, error } = await this.supabase
+      .from('water_intake')
+      .select('*')
+      .eq('client_id', clientId)
+      .eq('date', date)
+      .single()
+    
+    if (error && error.code !== 'PGRST116') throw error
+    return data
+  } catch (error) {
+    console.error('❌ Get water intake failed:', error)
+    return null
+  }
+}
+
+// Get meal preferences
+async getMealPreferences(clientId) {
+  try {
+    const { data, error } = await this.supabase
+      .from('clients')
+      .select('nutrition_info')
+      .eq('id', clientId)
+      .single()
+    
+    if (error) throw error
+    return data?.nutrition_info || {}
+  } catch (error) {
+    console.error('❌ Get meal preferences failed:', error)
+    return {}
+  }
+}
+
+// Save meal preferences
+async saveMealPreferences(clientId, preferences) {
+  try {
+    const { data, error } = await this.supabase
+      .from('clients')
+      .update({
+        nutrition_info: preferences,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', clientId)
+      .select()
+      .single()
+    
+    if (error) throw error
+    console.log('✅ Meal preferences saved')
+    return data
+  } catch (error) {
+    console.error('❌ Save meal preferences failed:', error)
+    throw error
+  }
+}
+
+// Get meal compliance stats
+async getMealCompliance(clientId, days = 7) {
+  try {
+    const history = await this.getMealHistory(clientId, days)
+    
+    if (!history || history.length === 0) {
+      return {
+        daysTracked: 0,
+        averageCalories: 0,
+        averageProtein: 0,
+        averageCarbs: 0,
+        averageFat: 0,
+        compliancePercentage: 0
+      }
+    }
+    
+    const totalDays = history.length
+    const totalCalories = history.reduce((sum, day) => sum + (day.total_calories || 0), 0)
+    const totalProtein = history.reduce((sum, day) => sum + (day.total_protein || 0), 0)
+    const totalCarbs = history.reduce((sum, day) => sum + (day.total_carbs || 0), 0)
+    const totalFat = history.reduce((sum, day) => sum + (day.total_fat || 0), 0)
+    
+    return {
+      daysTracked: totalDays,
+      averageCalories: Math.round(totalCalories / totalDays),
+      averageProtein: Math.round(totalProtein / totalDays),
+      averageCarbs: Math.round(totalCarbs / totalDays),
+      averageFat: Math.round(totalFat / totalDays),
+      compliancePercentage: Math.round((totalDays / days) * 100)
+    }
+  } catch (error) {
+    console.error('❌ Get meal compliance failed:', error)
+    return null
+  }
+}
+
+// ===== CUSTOM MEALS & FAVORITES =====
+
+// Create custom meal
+async createCustomMeal(mealData) {
+  try {
+    const { data: { user } } = await this.supabase.auth.getUser()
+    
+    const { data, error } = await this.supabase
+      .from('meals')
+      .insert({
+        name: mealData.name,
+        kcal: mealData.kcal,
+        protein: mealData.protein || 0,
+        carbs: mealData.carbs || 0,
+        fat: mealData.fat || 0,
+        category: mealData.category || 'lunch',
+        image_url: mealData.image_url,
+        ingredients: mealData.ingredients || [],
+        is_custom: true,
+        created_by: mealData.created_by || user?.id
+      })
+      .select()
+      .single()
+    
+    if (error) throw error
+    console.log('✅ Custom meal created')
+    return data
+  } catch (error) {
+    console.error('❌ Create custom meal failed:', error)
+    throw error
+  }
+}
+
+// Get custom meals for client
+async getCustomMeals(clientId) {
+  try {
+    const { data, error } = await this.supabase
+      .from('meals')
+      .select('*')
+      .eq('is_custom', true)
+      .eq('created_by', clientId)
+      .order('created_at', { ascending: false })
+    
+    if (error) throw error
+    return data || []
+  } catch (error) {
+    console.error('❌ Get custom meals failed:', error)
+    return []
+  }
+}
+
+// Update meal with image
+async updateMealImage(mealId, imageUrl) {
+  try {
+    const { data, error } = await this.supabase
+      .from('meals')
+      .update({ 
+        image_url: imageUrl,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', mealId)
+      .select()
+      .single()
+    
+    if (error) throw error
+    console.log('✅ Meal image updated')
+    return data
+  } catch (error) {
+    console.error('❌ Update meal image failed:', error)
+    throw error
+  }
+}
+
+// Delete custom meal
+async deleteCustomMeal(mealId) {
+  try {
+    const { error } = await this.supabase
+      .from('meals')
+      .delete()
+      .eq('id', mealId)
+      .eq('is_custom', true)
+    
+    if (error) throw error
+    console.log('✅ Custom meal deleted')
+    return true
+  } catch (error) {
+    console.error('❌ Delete custom meal failed:', error)
+    return false
+  }
+}
 
 async saveMealProgress(clientId, progressData) {
   try {
@@ -950,7 +2870,36 @@ async getWaterIntakeRange(clientId, startDate, endDate) {
 }
 
 
+// Voeg deze method toe aan DatabaseService.js
 
+async getMealHistory(clientId, days = 30) {
+  try {
+    const startDate = new Date()
+    startDate.setDate(startDate.getDate() - days)
+    
+    const { data, error } = await this.supabase
+      .from('meal_progress')
+      .select('*')
+      .eq('client_id', clientId)
+      .gte('date', startDate.toISOString().split('T')[0])
+      .order('date', { ascending: false })
+    
+    if (error) throw error
+    
+    // Return formatted data for charts
+    return (data || []).map(day => ({
+      date: day.date,
+      calories: day.calories || 0,
+      protein: day.protein || 0,
+      carbs: day.carbs || 0,
+      fat: day.fat || 0,
+      target_calories: day.target_calories || 2000
+    }))
+  } catch (error) {
+    console.error('Get meal history error:', error)
+    return []
+  }
+}
 
 
 
@@ -1189,6 +3138,336 @@ async getClientGoals(clientId) {
       return 0
     }
   }
+
+
+
+
+// src/services/DatabaseService.js - MEAL PLAN METHODS
+// 🍎 Voeg deze methods toe aan je bestaande DatabaseService class
+
+// ===== MEAL PLAN METHODS =====
+
+// Get client's active meal plan
+async getClientMealPlan(clientId) {
+  try {
+    const { data, error } = await this.supabase
+      .from('client_meal_plans')
+      .select('*')
+      .eq('client_id', clientId)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .single()
+    
+    if (error && error.code !== 'PGRST116') throw error
+    return data
+  } catch (error) {
+    console.error('❌ Get client meal plan failed:', error)
+    return null
+  }
+}
+
+// Get all meals from catalog
+async getAllMeals() {
+  try {
+    const { data, error } = await this.supabase
+      .from('meals')
+      .select('*')
+      .order('name')
+    
+    if (error) throw error
+    return data || []
+  } catch (error) {
+    console.error('❌ Get all meals failed:', error)
+    return []
+  }
+}
+
+// Get specific meals by IDs
+async getMealsByIds(mealIds) {
+  if (!mealIds || mealIds.length === 0) return []
+  
+  try {
+    const { data, error } = await this.supabase
+      .from('meals')
+      .select('*')
+      .in('id', mealIds)
+    
+    if (error) throw error
+    return data || []
+  } catch (error) {
+    console.error('❌ Get meals by IDs failed:', error)
+    return []
+  }
+}
+
+// Get client meal overrides (swaps)
+async getClientMealOverrides(clientId, planId) {
+  try {
+    const { data, error } = await this.supabase
+      .from('client_meal_overrides')
+      .select('week_structure')
+      .eq('client_id', clientId)
+      .eq('plan_id', planId)
+      .single()
+    
+    if (error && error.code !== 'PGRST116') throw error
+    return data?.week_structure || null
+  } catch (error) {
+    console.error('❌ Get client meal overrides failed:', error)
+    return null
+  }
+}
+
+// Save meal swap
+async saveMealSwap(clientId, planId, dayIndex, slot, mealId) {
+  try {
+    // First get current overrides
+    const { data: existing } = await this.supabase
+      .from('client_meal_overrides')
+      .select('week_structure')
+      .eq('client_id', clientId)
+      .eq('plan_id', planId)
+      .single()
+    
+    let weekStructure = existing?.week_structure || []
+    
+    // Ensure dayIndex exists
+    while (weekStructure.length <= dayIndex) {
+      weekStructure.push({ 
+        day: `Day ${weekStructure.length + 1}`, 
+        meals: [] 
+      })
+    }
+    
+    // Update the specific meal
+    if (!weekStructure[dayIndex].meals) {
+      weekStructure[dayIndex].meals = []
+    }
+    
+    // Find and update the meal slot
+    const mealIndex = weekStructure[dayIndex].meals.findIndex(m => m.slot === slot || m.time_slot === slot)
+    if (mealIndex >= 0) {
+      weekStructure[dayIndex].meals[mealIndex].meal_id = mealId
+    } else {
+      weekStructure[dayIndex].meals.push({ 
+        slot, 
+        meal_id: mealId,
+        target_kcal: 500 // Default
+      })
+    }
+    
+    // Save back to database
+    const { error } = await this.supabase
+      .from('client_meal_overrides')
+      .upsert({
+        client_id: clientId,
+        plan_id: planId,
+        week_structure: weekStructure,
+        updated_at: new Date().toISOString()
+      })
+    
+    if (error) throw error
+    console.log('✅ Meal swap saved successfully')
+    return true
+  } catch (error) {
+    console.error('❌ Save meal swap failed:', error)
+    return false
+  }
+}
+
+// Save meal progress (checked meals)
+async saveMealProgress(clientId, progressData) {
+  try {
+    const { data, error } = await this.supabase
+      .from('meal_progress')
+      .upsert({
+        client_id: clientId,
+        plan_id: progressData.plan_id,
+        date: progressData.date,
+        day_index: progressData.day_index,
+        meals_checked: progressData.meals_checked,
+        total_calories: progressData.total_calories,
+        total_protein: progressData.total_protein,
+        total_carbs: progressData.total_carbs,
+        total_fat: progressData.total_fat,
+        notes: progressData.notes || null,
+        updated_at: new Date().toISOString()
+      }, {
+        onConflict: 'client_id,date'
+      })
+      .select()
+      .single()
+    
+    if (error) throw error
+    console.log('✅ Meal progress saved')
+    return data
+  } catch (error) {
+    console.error('❌ Save meal progress failed:', error)
+    throw error
+  }
+}
+
+// Get meal progress for specific date
+async getMealProgress(clientId, date) {
+  try {
+    const { data, error } = await this.supabase
+      .from('meal_progress')
+      .select('*')
+      .eq('client_id', clientId)
+      .eq('date', date)
+      .single()
+    
+    if (error && error.code !== 'PGRST116') throw error
+    return data
+  } catch (error) {
+    console.error('❌ Get meal progress failed:', error)
+    return null
+  }
+}
+
+// Get meal history
+async getMealHistory(clientId, days = 7) {
+  try {
+    const endDate = new Date()
+    const startDate = new Date()
+    startDate.setDate(startDate.getDate() - days)
+    
+    const { data, error } = await this.supabase
+      .from('meal_progress')
+      .select('*')
+      .eq('client_id', clientId)
+      .gte('date', startDate.toISOString().split('T')[0])
+      .lte('date', endDate.toISOString().split('T')[0])
+      .order('date', { ascending: false })
+    
+    if (error) throw error
+    return data || []
+  } catch (error) {
+    console.error('❌ Get meal history failed:', error)
+    return []
+  }
+}
+
+// Save water intake
+async saveWaterIntake(clientId, date, amount) {
+  try {
+    const { data, error } = await this.supabase
+      .from('water_intake')
+      .upsert({
+        client_id: clientId,
+        date: date,
+        amount: amount,
+        updated_at: new Date().toISOString()
+      }, {
+        onConflict: 'client_id,date'
+      })
+      .select()
+      .single()
+    
+    if (error) throw error
+    console.log('✅ Water intake saved')
+    return data
+  } catch (error) {
+    console.error('❌ Save water intake failed:', error)
+    throw error
+  }
+}
+
+// Get water intake for date
+async getWaterIntake(clientId, date) {
+  try {
+    const { data, error } = await this.supabase
+      .from('water_intake')
+      .select('*')
+      .eq('client_id', clientId)
+      .eq('date', date)
+      .single()
+    
+    if (error && error.code !== 'PGRST116') throw error
+    return data
+  } catch (error) {
+    console.error('❌ Get water intake failed:', error)
+    return null
+  }
+}
+
+// Get meal preferences
+async getMealPreferences(clientId) {
+  try {
+    const { data, error } = await this.supabase
+      .from('clients')
+      .select('nutrition_info')
+      .eq('id', clientId)
+      .single()
+    
+    if (error) throw error
+    return data?.nutrition_info || {}
+  } catch (error) {
+    console.error('❌ Get meal preferences failed:', error)
+    return {}
+  }
+}
+
+// Save meal preferences
+async saveMealPreferences(clientId, preferences) {
+  try {
+    const { data, error } = await this.supabase
+      .from('clients')
+      .update({
+        nutrition_info: preferences,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', clientId)
+      .select()
+      .single()
+    
+    if (error) throw error
+    console.log('✅ Meal preferences saved')
+    return data
+  } catch (error) {
+    console.error('❌ Save meal preferences failed:', error)
+    throw error
+  }
+}
+
+// Get meal compliance stats
+async getMealCompliance(clientId, days = 7) {
+  try {
+    const history = await this.getMealHistory(clientId, days)
+    
+    if (!history || history.length === 0) {
+      return {
+        daysTracked: 0,
+        averageCalories: 0,
+        averageProtein: 0,
+        averageCarbs: 0,
+        averageFat: 0,
+        compliancePercentage: 0
+      }
+    }
+    
+    const totalDays = history.length
+    const totalCalories = history.reduce((sum, day) => sum + (day.total_calories || 0), 0)
+    const totalProtein = history.reduce((sum, day) => sum + (day.total_protein || 0), 0)
+    const totalCarbs = history.reduce((sum, day) => sum + (day.total_carbs || 0), 0)
+    const totalFat = history.reduce((sum, day) => sum + (day.total_fat || 0), 0)
+    
+    return {
+      daysTracked: totalDays,
+      averageCalories: Math.round(totalCalories / totalDays),
+      averageProtein: Math.round(totalProtein / totalDays),
+      averageCarbs: Math.round(totalCarbs / totalDays),
+      averageFat: Math.round(totalFat / totalDays),
+      compliancePercentage: Math.round((totalDays / days) * 100)
+    }
+  } catch (error) {
+    console.error('❌ Get meal compliance failed:', error)
+    return null
+  }
+}
+
+
+
 
   // ===== BONUS CONTENT =====
   async getClientBonuses(clientId) {
@@ -1938,25 +4217,81 @@ async saveProgress(progressData) {
 }
 
 // FIX 10: Save goal naar client_goals
+// ========================================
+// FIXED saveGoal METHOD voor DatabaseService.js
+// Vervangt de oude saveGoal method
+// ========================================
+
 async saveGoal(goalData) {
   try {
-    const { data, error } = await supabase
+    // Voor het nieuwe systeem: gebruik insert zonder upsert
+    // Dit staat meerdere goals van hetzelfde type toe
+    const { data, error } = await this.supabase
       .from('client_goals')
-      .insert([{
+      .insert({
         client_id: goalData.client_id,
-        goal_type: goalData.goal_type || goalData.title,
-        target_value: goalData.target_value || 0,
-        current_value: 0,
+        title: goalData.title || goalData.goal_type,
+        goal_type: goalData.goal_type || 'custom',
+        category: goalData.category || 'personal',
+        measurement_type: goalData.measurement_type || 'number',
+        target_value: parseFloat(goalData.target_value) || 0,
+        current_value: goalData.current_value || 0,
+        start_value: goalData.current_value || 0, // Save starting point
         target_date: goalData.target_date,
-        status: 'active',
-        updated_at: new Date().toISOString() // ⭐ Geen created_at meer!
-      }])
+        unit: goalData.unit || '',
+        frequency: goalData.frequency || 'daily',
+        frequency_target: goalData.frequency_target || 7,
+        notes: goalData.notes || '',
+        status: goalData.status || 'active',
+        color: goalData.color || '#10b981',
+        icon: goalData.icon || 'target',
+        measurement_config: goalData.measurement_config || {},
+        is_public: goalData.is_public || false,
+        reminder_enabled: goalData.reminder_enabled || false,
+        reminder_time: goalData.reminder_time || null,
+        progress_data: goalData.progress_data || [],
+        updated_at: new Date().toISOString()
+      })
       .select()
       .single()
     
-    if (error) throw error
+    if (error) {
+      // Als het een duplicate key error is, geef een vriendelijke melding
+      if (error.code === '23505') {
+        console.error('Goal already exists, updating instead...')
+        
+        // Probeer te updaten als insert faalt (fallback voor oude structure)
+        const { data: updateData, error: updateError } = await this.supabase
+          .from('client_goals')
+          .update({
+            title: goalData.title || goalData.goal_type,
+            target_value: parseFloat(goalData.target_value) || 0,
+            target_date: goalData.target_date,
+            unit: goalData.unit || '',
+            notes: goalData.notes || '',
+            status: 'active',
+            color: goalData.color || '#10b981',
+            icon: goalData.icon || 'target',
+            measurement_type: goalData.measurement_type || 'number',
+            frequency: goalData.frequency || 'daily',
+            frequency_target: goalData.frequency_target || 7,
+            updated_at: new Date().toISOString()
+          })
+          .eq('client_id', goalData.client_id)
+          .eq('goal_type', goalData.goal_type)
+          .select()
+          .single()
+        
+        if (updateError) throw updateError
+        
+        this.clearCache(`goals_${goalData.client_id}`)
+        return updateData
+      }
+      throw error
+    }
     
     this.clearCache(`goals_${goalData.client_id}`)
+    console.log('✅ Goal saved successfully:', data)
     return data
   } catch (error) {
     console.error('Error saving goal:', error)
@@ -1964,6 +4299,28 @@ async saveGoal(goalData) {
   }
 }
 
+// Ook voeg deze helper method toe voor het updaten van bestaande goals:
+async updateGoal(goalId, updates) {
+  try {
+    const { data, error } = await this.supabase
+      .from('client_goals')
+      .update({
+        ...updates,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', goalId)
+      .select()
+      .single()
+    
+    if (error) throw error
+    
+    this.clearCache('goals')
+    return data
+  } catch (error) {
+    console.error('Error updating goal:', error)
+    throw error
+  }
+}
 // FIX 11: Update goal status
 async updateGoalStatus(goalId, status) {
   try {
@@ -1986,6 +4343,2839 @@ async updateGoalStatus(goalId, status) {
     throw error
   }
 }
+
+// ===== ADD DEZE METHODS AAN DatabaseService.js =====
+// Plaats deze methods IN de DatabaseService class, VOOR de laatste closing bracket }
+
+// ===== WORKOUT PROGRESS METHODS =====
+
+async saveWorkoutProgress(data) {
+  try {
+    const { data: result, error } = await this.supabase
+      .from('workout_progress')
+      .insert({
+        client_id: data.client_id,
+        exercise_name: data.exercise_name,
+        date: data.date,
+        sets: data.sets,
+        notes: data.notes || null,
+        created_at: new Date().toISOString()
+      })
+      .select()
+      .single()
+    
+    if (error) throw error
+    this.clearCache(`workout_${data.client_id}`)
+    console.log('✅ Workout progress saved')
+    return result
+  } catch (error) {
+    console.error('Save workout progress error:', error)
+    throw error
+  }
+}
+
+async getTodayWorkout(clientId) {
+  try {
+    const today = new Date().toISOString().split('T')[0]
+    
+    // Get today's planned workout
+    const { data: completion, error: completionError } = await this.supabase
+      .from('workout_completions')
+      .select('*')
+      .eq('client_id', clientId)
+      .eq('workout_date', today)
+      .single()
+    
+    if (completionError || !completion) {
+      console.log('No workout planned for today')
+      return null
+    }
+    
+    // Get the workout details
+    const { data: workout, error: workoutError } = await this.supabase
+      .from('client_workouts')
+      .select('*')
+      .eq('id', completion.workout_id)
+      .single()
+    
+    if (workoutError) throw workoutError
+    
+    // Parse exercises if stored as JSON
+    if (workout && typeof workout.exercises === 'string') {
+      workout.exercises = JSON.parse(workout.exercises)
+    }
+    
+    return workout
+  } catch (error) {
+    console.error('Get today workout error:', error)
+    return null
+  }
+}
+
+async getRecentWorkouts(clientId, days = 7) {
+  try {
+    const startDate = new Date()
+    startDate.setDate(startDate.getDate() - days)
+    
+    const { data, error } = await this.supabase
+      .from('workout_completions')
+      .select(`
+        *,
+        client_workouts (*)
+      `)
+      .eq('client_id', clientId)
+      .eq('completed', true)
+      .gte('workout_date', startDate.toISOString().split('T')[0])
+      .order('workout_date', { ascending: false })
+    
+    if (error) throw error
+    
+    // Parse exercises in each workout
+    const workouts = (data || []).map(item => {
+      const workout = item.client_workouts || {}
+      if (typeof workout.exercises === 'string') {
+        workout.exercises = JSON.parse(workout.exercises)
+      }
+      return {
+        ...workout,
+        date: item.workout_date,
+        completed: item.completed
+      }
+    })
+    
+    return workouts
+  } catch (error) {
+    console.error('Get recent workouts error:', error)
+    return []
+  }
+}
+
+async getWorkoutProgress(clientId, days = 30) {
+  try {
+    const startDate = new Date()
+    startDate.setDate(startDate.getDate() - days)
+    
+    // Get workout progress records
+    const { data: progressData, error: progressError } = await this.supabase
+      .from('workout_progress')
+      .select('*')
+      .eq('client_id', clientId)
+      .gte('date', startDate.toISOString().split('T')[0])
+      .order('date', { ascending: false })
+    
+    if (progressError) throw progressError
+    
+    // Get completions
+    const { data: completions, error: completionsError } = await this.supabase
+      .from('workout_completions')
+      .select('*')
+      .eq('client_id', clientId)
+      .gte('workout_date', startDate.toISOString().split('T')[0])
+      .order('workout_date', { ascending: false })
+    
+    if (completionsError) throw completionsError
+    
+    // Group exercises by name for PRs
+    const exerciseMap = {}
+    progressData?.forEach(record => {
+      if (!exerciseMap[record.exercise_name]) {
+        exerciseMap[record.exercise_name] = []
+      }
+      exerciseMap[record.exercise_name].push(record)
+    })
+    
+    // Calculate PRs
+    const prs = []
+    Object.entries(exerciseMap).forEach(([name, records]) => {
+      const maxWeight = Math.max(...records.flatMap(r => 
+        r.sets?.map(s => s.weight) || [0]
+      ))
+      if (maxWeight > 0) {
+        prs.push({ name, weight: maxWeight })
+      }
+    })
+    
+    // Calculate week progress
+    const weekDates = this.getWeekDates()
+    const weekProgress = {}
+    weekDates.forEach(date => {
+      const completed = completions?.some(c => 
+        c.workout_date === date && c.completed
+      ) || false
+      weekProgress[date] = completed
+    })
+    
+    return {
+      exercises: progressData || [],
+      completions: completions || [],
+      prs: prs.slice(0, 10), // Top 10 PRs
+      weekProgress
+    }
+  } catch (error) {
+    console.error('Get workout progress error:', error)
+    return { exercises: [], completions: [], prs: [], weekProgress: {} }
+  }
+}
+
+// ===== MEAL/NUTRITION PROGRESS METHODS =====
+
+async getTodaysMealProgress(clientId) {
+  try {
+    const today = new Date().toISOString().split('T')[0]
+    
+    // Get today's meal progress
+    const { data: mealProgress, error } = await this.supabase
+      .from('meal_progress')
+      .select('*')
+      .eq('client_id', clientId)
+      .eq('date', today)
+      .single()
+    
+    if (error || !mealProgress) {
+      // Return default values if no data
+      return {
+        calories: 0,
+        protein: 0,
+        carbs: 0,
+        fat: 0,
+        target_calories: 2000,
+        target_protein: 150,
+        target_carbs: 250,
+        target_fat: 65,
+        meals: [],
+        water: []
+      }
+    }
+    
+    // Get water intake
+    const { data: waterData } = await this.supabase
+      .from('water_intake')
+      .select('*')
+      .eq('client_id', clientId)
+      .eq('date', today)
+      .single()
+    
+    return {
+      ...mealProgress,
+      water: waterData ? [{ glasses: waterData.glasses || 0 }] : []
+    }
+  } catch (error) {
+    console.error('Get today meal progress error:', error)
+    return {
+      calories: 0,
+      protein: 0,
+      carbs: 0,
+      fat: 0,
+      target_calories: 2000,
+      target_protein: 150,
+      target_carbs: 250,
+      target_fat: 65,
+      meals: [],
+      water: []
+    }
+  }
+}
+
+async logWaterIntake(clientId, glasses) {
+  try {
+    const today = new Date().toISOString().split('T')[0]
+    
+    const { data, error } = await this.supabase
+      .from('water_intake')
+      .upsert({
+        client_id: clientId,
+        date: today,
+        glasses: glasses,
+        updated_at: new Date().toISOString()
+      }, {
+        onConflict: 'client_id,date'
+      })
+      .select()
+      .single()
+    
+    if (error) throw error
+    console.log('✅ Water intake logged')
+    return data
+  } catch (error) {
+    console.error('Log water intake error:', error)
+    throw error
+  }
+}
+
+// ===== ACHIEVEMENT METHODS =====
+
+async getAchievements(clientId) {
+  try {
+    const { data, error } = await this.supabase
+      .from('achievements')
+      .select('*')
+      .eq('client_id', clientId)
+      .order('achieved_at', { ascending: false })
+    
+    if (error) throw error
+    return data || []
+  } catch (error) {
+    console.error('Get achievements error:', error)
+    return []
+  }
+}
+
+async unlockAchievement(clientId, achievementId) {
+  try {
+    const { data, error } = await this.supabase
+      .from('achievements')
+      .insert({
+        client_id: clientId,
+        achievement_id: achievementId,
+        achieved_at: new Date().toISOString()
+      })
+      .select()
+      .single()
+    
+    if (error) throw error
+    console.log('✅ Achievement unlocked:', achievementId)
+    return data
+  } catch (error) {
+    console.error('Unlock achievement error:', error)
+    throw error
+  }
+}
+
+// ===== WEIGHT PROGRESS METHODS =====
+
+async saveWeight(clientId, weight, date) {
+  try {
+    const { data, error } = await this.supabase
+      .from('weight_progress')
+      .insert({
+        client_id: clientId,
+        weight: parseFloat(weight),
+        date: date,
+        created_at: new Date().toISOString()
+      })
+      .select()
+      .single()
+    
+    if (error) throw error
+    this.clearCache(`weight_${clientId}`)
+    console.log('✅ Weight saved')
+    return data
+  } catch (error) {
+    console.error('Save weight error:', error)
+    throw error
+  }
+}
+
+async getWeightHistory(clientId, days = 30) {
+  try {
+    const startDate = new Date()
+    startDate.setDate(startDate.getDate() - days)
+    
+    const { data, error } = await this.supabase
+      .from('weight_progress')
+      .select('*')
+      .eq('client_id', clientId)
+      .gte('date', startDate.toISOString().split('T')[0])
+      .order('date', { ascending: false })
+    
+    if (error) throw error
+    return data || []
+  } catch (error) {
+    console.error('Get weight history error:', error)
+    return []
+  }
+}
+
+// ===== BODY MEASUREMENTS METHODS =====
+
+async saveMeasurements(clientId, measurements, date) {
+  try {
+    const { data, error } = await this.supabase
+      .from('body_measurements')
+      .insert({
+        client_id: clientId,
+        date: date,
+        chest: measurements.chest ? parseFloat(measurements.chest) : null,
+        arms: measurements.arms ? parseFloat(measurements.arms) : null,
+        waist: measurements.waist ? parseFloat(measurements.waist) : null,
+        hips: measurements.hips ? parseFloat(measurements.hips) : null,
+        thighs: measurements.thighs ? parseFloat(measurements.thighs) : null,
+        created_at: new Date().toISOString()
+      })
+      .select()
+      .single()
+    
+    if (error) throw error
+    this.clearCache(`measurements_${clientId}`)
+    console.log('✅ Measurements saved')
+    return data
+  } catch (error) {
+    console.error('Save measurements error:', error)
+    throw error
+  }
+}
+
+async getMeasurementsHistory(clientId, days = 30) {
+  try {
+    const startDate = new Date()
+    startDate.setDate(startDate.getDate() - days)
+    
+    const { data, error } = await this.supabase
+      .from('body_measurements')
+      .select('*')
+      .eq('client_id', clientId)
+      .gte('date', startDate.toISOString().split('T')[0])
+      .order('date', { ascending: false })
+    
+    if (error) throw error
+    return data || []
+  } catch (error) {
+    console.error('Get measurements history error:', error)
+    return []
+  }
+}
+
+// ===== PROGRESS PHOTOS METHODS =====
+
+async uploadProgressPhoto(clientId, file, type = 'front') {
+  try {
+    // Upload to Supabase Storage
+    const fileName = `${clientId}/${Date.now()}_${type}.jpg`
+    const { data: uploadData, error: uploadError } = await this.supabase
+      .storage
+      .from('progress-photos')
+      .upload(fileName, file)
+    
+    if (uploadError) throw uploadError
+    
+    // Get public URL
+    const { data: { publicUrl } } = this.supabase
+      .storage
+      .from('progress-photos')
+      .getPublicUrl(fileName)
+    
+    // Save to database
+    const { data, error } = await this.supabase
+      .from('progress_photos')
+      .insert({
+        client_id: clientId,
+        photo_url: publicUrl,
+        photo_type: type,
+        date: new Date().toISOString().split('T')[0],
+        created_at: new Date().toISOString()
+      })
+      .select()
+      .single()
+    
+    if (error) throw error
+    console.log('✅ Photo uploaded')
+    return data
+  } catch (error) {
+    console.error('Upload photo error:', error)
+    throw error
+  }
+}
+
+async getProgressPhotos(clientId) {
+  try {
+    const { data, error } = await this.supabase
+      .from('progress_photos')
+      .select('*')
+      .eq('client_id', clientId)
+      .order('date', { ascending: false })
+    
+    if (error) throw error
+    return data || []
+  } catch (error) {
+    console.error('Get progress photos error:', error)
+    return []
+  }
+}
+
+// ===== COMPLIANCE & NUTRITION METHODS =====
+
+async getNutritionCompliance(clientId, days = 30) {
+  try {
+    const startDate = new Date()
+    startDate.setDate(startDate.getDate() - days)
+    
+    const { data, error } = await this.supabase
+      .from('meal_progress')
+      .select('*')
+      .eq('client_id', clientId)
+      .gte('date', startDate.toISOString().split('T')[0])
+      .order('date', { ascending: false })
+    
+    if (error) throw error
+    
+    // Calculate average compliance
+    const compliance = data?.map(day => {
+      const caloriePercentage = (day.calories / day.target_calories) * 100
+      if (caloriePercentage >= 90 && caloriePercentage <= 110) {
+        return 100
+      } else if (caloriePercentage >= 80 && caloriePercentage <= 120) {
+        return 75
+      } else if (caloriePercentage >= 70 && caloriePercentage <= 130) {
+        return 50
+      } else {
+        return 25
+      }
+    }) || []
+    
+    const averageCompliance = compliance.length > 0
+      ? Math.round(compliance.reduce((a, b) => a + b, 0) / compliance.length)
+      : 0
+    
+    return averageCompliance
+  } catch (error) {
+    console.error('Get nutrition compliance error:', error)
+    return 0
+  }
+}
+
+// ===== HELPER METHODS =====
+
+getWeekDates(baseDate = new Date()) {
+  const dates = []
+  const startOfWeek = new Date(baseDate)
+  startOfWeek.setDate(baseDate.getDate() - baseDate.getDay() + 1)
+  
+  for (let i = 0; i < 7; i++) {
+    const date = new Date(startOfWeek)
+    date.setDate(startOfWeek.getDate() + i)
+    dates.push(date.toISOString().split('T')[0])
+  }
+  return dates
+}
+
+// ===== WORKOUT COMPLETIONS =====
+
+async getWorkoutCompletions(clientId) {
+  try {
+    const { data, error } = await this.supabase
+      .from('workout_completions')
+      .select('*')
+      .eq('client_id', clientId)
+      .order('workout_date', { ascending: false })
+      .limit(100)
+    
+    if (error) throw error
+    return data || []
+  } catch (error) {
+    console.error('Get workout completions error:', error)
+    return []
+  }
+}
+
+async markWorkoutComplete(clientId, workoutId, date) {
+  try {
+    const { data, error } = await this.supabase
+      .from('workout_completions')
+      .update({ completed: true })
+      .eq('client_id', clientId)
+      .eq('workout_id', workoutId)
+      .eq('workout_date', date)
+      .select()
+      .single()
+    
+    if (error) throw error
+    console.log('✅ Workout marked complete')
+    return data
+  } catch (error) {
+    console.error('Mark workout complete error:', error)
+    throw error
+  }
+}
+
+// ========================================
+// ADD THESE METHODS TO DatabaseService.js
+// Progress Tracking Feature Methods
+// ========================================
+
+// ===== WEIGHT TRACKING =====
+async saveWeight(clientId, weight, date) {
+  try {
+    const { data, error } = await this.supabase
+      .from('weight_history')
+      .upsert({
+        client_id: clientId,
+        date: date,
+        weight: parseFloat(weight)
+      }, {
+        onConflict: 'client_id,date'
+      })
+      .select()
+      .single()
+    
+    if (error) throw error
+    this.clearCache(`weight_${clientId}`)
+    return data
+  } catch (error) {
+    console.error('Save weight error:', error)
+    throw error
+  }
+}
+
+async getWeightHistory(clientId, days = 30) {
+  try {
+    const startDate = new Date()
+    startDate.setDate(startDate.getDate() - days)
+    
+    const { data, error } = await this.supabase
+      .from('weight_history')
+      .select('*')
+      .eq('client_id', clientId)
+      .gte('date', startDate.toISOString())
+      .order('date', { ascending: false })
+    
+    if (error) throw error
+    return data || []
+  } catch (error) {
+    console.error('Get weight history error:', error)
+    return []
+  }
+}
+
+// ===== MEASUREMENTS =====
+async saveMeasurements(clientId, measurements, date) {
+  try {
+    const { data, error } = await this.supabase
+      .from('measurements')
+      .insert({
+        client_id: clientId,
+        date: date,
+        ...measurements
+      })
+      .select()
+      .single()
+    
+    if (error) throw error
+    this.clearCache(`measurements_${clientId}`)
+    return data
+  } catch (error) {
+    console.error('Save measurements error:', error)
+    throw error
+  }
+}
+
+async getMeasurementsHistory(clientId, days = 30) {
+  try {
+    const startDate = new Date()
+    startDate.setDate(startDate.getDate() - days)
+    
+    const { data, error } = await this.supabase
+      .from('measurements')
+      .select('*')
+      .eq('client_id', clientId)
+      .gte('date', startDate.toISOString())
+      .order('date', { ascending: false })
+    
+    if (error) throw error
+    return data || []
+  } catch (error) {
+    console.error('Get measurements error:', error)
+    return []
+  }
+}
+
+// ===== WORKOUT PROGRESS =====
+async saveWorkoutProgress(progressData) {
+  try {
+    const { data, error } = await this.supabase
+      .from('workout_progress')
+      .upsert(progressData, {
+        onConflict: 'client_id,date,exercise_name'
+      })
+      .select()
+      .single()
+    
+    if (error) throw error
+    this.clearCache(`workout_${progressData.client_id}`)
+    return data
+  } catch (error) {
+    console.error('Save workout progress error:', error)
+    throw error
+  }
+}
+
+async getWorkoutProgress(clientId, days = 30) {
+  try {
+    const startDate = new Date()
+    startDate.setDate(startDate.getDate() - days)
+    
+    const { data, error } = await this.supabase
+      .from('workout_progress')
+      .select('*')
+      .eq('client_id', clientId)
+      .gte('date', startDate.toISOString())
+      .order('date', { ascending: false })
+    
+    if (error) throw error
+    
+    // Calculate PRs and stats
+    const exercises = data || []
+    const prs = []
+    const exerciseHistory = []
+    const weekProgress = {}
+    
+    exercises.forEach(ex => {
+      exerciseHistory.push(ex)
+      
+      // Track week progress
+      const weekDay = new Date(ex.date).toISOString().split('T')[0]
+      if (!weekProgress[weekDay]) weekProgress[weekDay] = []
+      weekProgress[weekDay].push(ex)
+      
+      // Calculate PRs
+      if (ex.sets && Array.isArray(ex.sets)) {
+        const maxWeight = Math.max(...ex.sets.map(s => parseFloat(s.weight) || 0))
+        if (maxWeight > 0) {
+          prs.push({
+            name: ex.exercise_name,
+            weight: maxWeight,
+            date: ex.date
+          })
+        }
+      }
+    })
+    
+    // Sort PRs by weight and get top 5
+    prs.sort((a, b) => b.weight - a.weight)
+    
+    return {
+      exercises: exerciseHistory,
+      prs: prs.slice(0, 5),
+      weekProgress
+    }
+  } catch (error) {
+    console.error('Get workout progress error:', error)
+    return { exercises: [], prs: [], weekProgress: {} }
+  }
+}
+
+async getClientProgressByDate(clientId, date) {
+  try {
+    const { data, error } = await this.supabase
+      .from('workout_progress')
+      .select('*')
+      .eq('client_id', clientId)
+      .eq('date', date)
+    
+    if (error) throw error
+    return data || []
+  } catch (error) {
+    console.error('Get progress by date error:', error)
+    return []
+  }
+}
+
+async getExerciseHistory(clientId) {
+  try {
+    const { data, error } = await this.supabase
+      .from('workout_progress')
+      .select('exercise_name')
+      .eq('client_id', clientId)
+    
+    if (error) throw error
+    if (!data) return []
+    
+    // Get unique exercise names
+    return [...new Set(data.map(d => d.exercise_name))]
+  } catch (error) {
+    console.error('Get exercise history error:', error)
+    return []
+  }
+}
+
+// ===== GOALS =====
+async getClientGoals(clientId) {
+  try {
+    const { data, error } = await this.supabase
+      .from('client_goals')
+      .select('*')
+      .eq('client_id', clientId)
+      .order('created_at', { ascending: false })
+    
+    if (error) throw error
+    
+    // Ensure all goals have a status
+    return (data || []).map(goal => ({
+      ...goal,
+      status: goal.status || 'active'
+    }))
+  } catch (error) {
+    console.error('Get client goals error:', error)
+    return []
+  }
+}
+
+async saveGoal(goalData) {
+  try {
+    const { data, error } = await this.supabase
+      .from('client_goals')
+      .upsert(goalData, {
+        onConflict: 'client_id,goal_type'
+      })
+      .select()
+      .single()
+    
+    if (error) throw error
+    this.clearCache(`goals_${goalData.client_id}`)
+    return data
+  } catch (error) {
+    console.error('Save goal error:', error)
+    throw error
+  }
+}
+
+async updateGoalProgress(clientId, goalType, currentValue) {
+  try {
+    const { data, error } = await this.supabase
+      .from('client_goals')
+      .update({ 
+        current_value: currentValue,
+        updated_at: new Date().toISOString()
+      })
+      .eq('client_id', clientId)
+      .eq('goal_type', goalType)
+      .select()
+      .single()
+    
+    if (error) throw error
+    return data
+  } catch (error) {
+    console.error('Update goal progress error:', error)
+    throw error
+  }
+}
+
+// ===== WORKOUT COMPLETIONS =====
+async getWorkoutCompletions(clientId) {
+  try {
+    const { data, error } = await this.supabase
+      .from('workout_completions')
+      .select('*')
+      .eq('client_id', clientId)
+      .order('workout_date', { ascending: false })
+    
+    if (error) throw error
+    return data || []
+  } catch (error) {
+    console.error('Get workout completions error:', error)
+    return []
+  }
+}
+
+async markWorkoutComplete(clientId, date, duration, notes) {
+  try {
+    const { data, error } = await this.supabase
+      .from('workout_completions')
+      .upsert({
+        client_id: clientId,
+        workout_date: date,
+        completed: true,
+        duration_minutes: duration,
+        notes: notes
+      }, {
+        onConflict: 'client_id,workout_date'
+      })
+      .select()
+      .single()
+    
+    if (error) throw error
+    this.clearCache(`completions_${clientId}`)
+    return data
+  } catch (error) {
+    console.error('Mark workout complete error:', error)
+    throw error
+  }
+}
+
+// ===== TODAY'S WORKOUT =====
+async getTodayWorkout(clientId) {
+  try {
+    const today = new Date()
+    const dayOfWeek = today.getDay() || 7 // Sunday = 7
+    
+    const { data, error } = await this.supabase
+      .from('client_workouts')
+      .select('*')
+      .eq('client_id', clientId)
+      .eq('day_of_week', dayOfWeek)
+    
+    if (error) throw error
+    return data?.[0] || null
+  } catch (error) {
+    console.error('Get today workout error:', error)
+    return null
+  }
+}
+
+async getRecentWorkouts(clientId, days = 7) {
+  try {
+    const startDate = new Date()
+    startDate.setDate(startDate.getDate() - days)
+    
+    const { data, error } = await this.supabase
+      .from('workout_progress')
+      .select('*')
+      .eq('client_id', clientId)
+      .gte('date', startDate.toISOString())
+      .order('date', { ascending: false })
+      .limit(10)
+    
+    if (error) throw error
+    return data || []
+  } catch (error) {
+    console.error('Get recent workouts error:', error)
+    return []
+  }
+}
+
+// ===== PROGRESS PHOTOS =====
+async getProgressPhotos(clientId) {
+  try {
+    const { data, error } = await this.supabase
+      .from('progress_photos')
+      .select('*')
+      .eq('client_id', clientId)
+      .order('date', { ascending: false })
+    
+    if (error) throw error
+    return data || []
+  } catch (error) {
+    console.error('Get progress photos error:', error)
+    return []
+  }
+}
+
+async saveProgressPhoto(clientId, photoData) {
+  try {
+    const { data, error } = await this.supabase
+      .from('progress_photos')
+      .insert({
+        client_id: clientId,
+        ...photoData
+      })
+      .select()
+      .single()
+    
+    if (error) throw error
+    this.clearCache(`photos_${clientId}`)
+    return data
+  } catch (error) {
+    console.error('Save progress photo error:', error)
+    throw error
+  }
+}
+
+async deleteProgressPhoto(photoId) {
+  try {
+    const { error } = await this.supabase
+      .from('progress_photos')
+      .delete()
+      .eq('id', photoId)
+    
+    if (error) throw error
+    return true
+  } catch (error) {
+    console.error('Delete progress photo error:', error)
+    throw error
+  }
+}
+
+// ===== ACHIEVEMENTS =====
+async getAchievements(clientId) {
+  try {
+    const { data, error } = await this.supabase
+      .from('achievements')
+      .select('*')
+      .eq('client_id', clientId)
+      .order('achieved_date', { ascending: false })
+    
+    if (error) throw error
+    return data || []
+  } catch (error) {
+    console.error('Get achievements error:', error)
+    return []
+  }
+}
+
+async unlockAchievement(clientId, achievementType, details = {}) {
+  try {
+    // Check if already unlocked
+    const { data: existing } = await this.supabase
+      .from('achievements')
+      .select('id')
+      .eq('client_id', clientId)
+      .eq('achievement_type', achievementType)
+      .single()
+    
+    if (existing) return existing // Already unlocked
+    
+    const { data, error } = await this.supabase
+      .from('achievements')
+      .insert({
+        client_id: clientId,
+        achievement_type: achievementType,
+        achieved_date: new Date().toISOString().split('T')[0],
+        details: details
+      })
+      .select()
+      .single()
+    
+    if (error) throw error
+    this.clearCache(`achievements_${clientId}`)
+    return data
+  } catch (error) {
+    console.error('Unlock achievement error:', error)
+    throw error
+  }
+}
+
+// ===== NUTRITION/MEALS =====
+async getTodaysMealProgress(clientId) {
+  try {
+    const today = new Date().toISOString().split('T')[0]
+    
+    const { data, error } = await this.supabase
+      .from('meal_progress')
+      .select('*')
+      .eq('client_id', clientId)
+      .eq('date', today)
+      .single()
+    
+    if (error && error.code !== 'PGRST116') throw error // Ignore "no rows" error
+    
+    return data || {
+      calories: 0,
+      protein: 0,
+      carbs: 0,
+      fat: 0,
+      fiber: 0,
+      sugar: 0,
+      sodium: 0,
+      water_glasses: 0,
+      target_calories: 2000,
+      target_protein: 150,
+      target_carbs: 250,
+      target_fat: 70,
+      meals: []
+    }
+  } catch (error) {
+    console.error('Get todays meal progress error:', error)
+    return {
+      calories: 0,
+      protein: 0,
+      carbs: 0,
+      fat: 0,
+      target_calories: 2000,
+      meals: []
+    }
+  }
+}
+
+async getMealHistory(clientId, days = 30) {
+  try {
+    const startDate = new Date()
+    startDate.setDate(startDate.getDate() - days)
+    
+    const { data, error } = await this.supabase
+      .from('meal_progress')
+      .select('*')
+      .eq('client_id', clientId)
+      .gte('date', startDate.toISOString())
+      .order('date', { ascending: false })
+    
+    if (error) throw error
+    return data || []
+  } catch (error) {
+    console.error('Get meal history error:', error)
+    return []
+  }
+}
+
+async saveMealProgress(clientId, mealData, date) {
+  try {
+    const { data, error } = await this.supabase
+      .from('meal_progress')
+      .upsert({
+        client_id: clientId,
+        date: date,
+        ...mealData
+      }, {
+        onConflict: 'client_id,date'
+      })
+      .select()
+      .single()
+    
+    if (error) throw error
+    this.clearCache(`meals_${clientId}`)
+    return data
+  } catch (error) {
+console.error('❌ Save meal progress failed:', error.message || error)
+    throw error
+  }
+}
+
+async logWaterIntake(clientId, glasses) {
+  try {
+    const today = new Date().toISOString().split('T')[0]
+    
+    // Get current water intake
+    const { data: current } = await this.supabase
+      .from('meal_progress')
+      .select('water_glasses')
+      .eq('client_id', clientId)
+      .eq('date', today)
+      .single()
+    
+    const currentGlasses = current?.water_glasses || 0
+    const newTotal = currentGlasses + glasses
+    
+    const { data, error } = await this.supabase
+      .from('meal_progress')
+      .upsert({
+        client_id: clientId,
+        date: today,
+        water_glasses: newTotal
+      }, {
+        onConflict: 'client_id,date'
+      })
+      .select()
+      .single()
+    
+    if (error) throw error
+    return data
+  } catch (error) {
+    console.error('Log water intake error:', error)
+    throw error
+  }
+}
+
+// ===== STREAK CALCULATION =====
+async getClientStreak(clientId) {
+  try {
+    const { data: completions } = await this.supabase
+      .from('workout_completions')
+      .select('workout_date')
+      .eq('client_id', clientId)
+      .eq('completed', true)
+      .order('workout_date', { ascending: false })
+      .limit(100)
+    
+    if (!completions || completions.length === 0) return 0
+    
+    let streak = 0
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    
+    const sortedDates = completions
+      .map(w => new Date(w.workout_date))
+      .sort((a, b) => b - a)
+    
+    // Check if today or yesterday has a workout
+    const todayStr = today.toISOString().split('T')[0]
+    const yesterday = new Date(today)
+    yesterday.setDate(yesterday.getDate() - 1)
+    const yesterdayStr = yesterday.toISOString().split('T')[0]
+    
+    const firstDateStr = sortedDates[0].toISOString().split('T')[0]
+    
+    if (firstDateStr === todayStr || firstDateStr === yesterdayStr) {
+      streak = 1
+      let lastDate = sortedDates[0]
+      
+      for (let i = 1; i < sortedDates.length; i++) {
+        const dayDiff = (lastDate - sortedDates[i]) / (1000 * 60 * 60 * 24)
+        
+        if (dayDiff <= 1.5) {
+          streak++
+          lastDate = sortedDates[i]
+        } else {
+          break
+        }
+      }
+    }
+    
+    return streak
+  } catch (error) {
+    console.error('Get client streak error:', error)
+    return 0
+  }
+}
+
+// ===== HELPER: Clear specific cache =====
+clearCache(key) {
+  // If you implement caching, clear it here
+  // For now, just a placeholder
+  if (this.cache && this.cache[key]) {
+    delete this.cache[key]
+  }
+}
+
+// ENHANCED GOALS METHODS voor DatabaseService.js
+// Voeg deze toe aan je DatabaseService class
+// ========================================
+
+// Enhanced saveGoal met alle nieuwe velden
+async saveGoal(goalData) {
+  try {
+    const { data, error } = await this.supabase
+      .from('client_goals')
+      .insert([{
+        client_id: goalData.client_id,
+        title: goalData.title,
+        goal_type: goalData.goal_type || 'custom',
+        category: goalData.category || 'personal',
+        measurement_type: goalData.measurement_type || 'number',
+        target_value: parseFloat(goalData.target_value) || 0,
+        current_value: goalData.current_value || 0,
+        target_date: goalData.target_date,
+        unit: goalData.unit,
+        frequency: goalData.frequency || 'daily',
+        frequency_target: goalData.frequency_target || 7,
+        notes: goalData.notes,
+        status: goalData.status || 'active',
+        color: goalData.color || '#10b981',
+        icon: goalData.icon || 'target',
+        measurement_config: goalData.measurement_config || {},
+        is_public: goalData.is_public || false,
+        reminder_enabled: goalData.reminder_enabled || false,
+        reminder_time: goalData.reminder_time,
+        updated_at: new Date().toISOString()
+      }])
+      .select()
+      .single()
+    
+    if (error) throw error
+    
+    this.clearCache(`goals_${goalData.client_id}`)
+    return data
+  } catch (error) {
+    console.error('Error saving goal:', error)
+    throw error
+  }
+}
+
+// Update goal progress
+async updateGoalProgress(goalId, progressData) {
+  try {
+    const today = new Date().toISOString().split('T')[0]
+    
+    // Upsert progress entry
+    const { data: progress, error: progressError } = await this.supabase
+      .from('goal_progress')
+      .upsert({
+        goal_id: goalId,
+        client_id: progressData.client_id,
+        date: progressData.date || today,
+        value: progressData.value || null,
+        checked: progressData.checked || false,
+        photo_urls: progressData.photo_urls || null,
+        notes: progressData.notes || '',
+        duration_minutes: progressData.duration_minutes || null,
+        metadata: progressData.metadata || {}
+      }, {
+        onConflict: 'goal_id,date'
+      })
+      .select()
+      .single()
+    
+    if (progressError) throw progressError
+    
+    // Update current_value in goals table
+    if (progressData.value !== undefined) {
+      const { error: updateError } = await this.supabase
+        .from('client_goals')
+        .update({ 
+          current_value: progressData.value,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', goalId)
+      
+      if (updateError) throw updateError
+    }
+    
+    this.clearCache(`goals_${progressData.client_id}`)
+    this.clearCache(`goal_progress_${goalId}`)
+    
+    return progress
+  } catch (error) {
+    console.error('Error updating goal progress:', error)
+    throw error
+  }
+}
+
+// Get goal templates
+async getGoalTemplates(category = null) {
+  try {
+    let query = this.supabase
+      .from('goal_templates')
+      .select('*')
+      .eq('is_public', true)
+      .order('category', { ascending: true })
+    
+    if (category) {
+      query = query.eq('category', category)
+    }
+    
+    const { data, error } = await query
+    
+    if (error) throw error
+    return data || []
+  } catch (error) {
+    console.error('Error fetching goal templates:', error)
+    return []
+  }
+}
+
+// Get goal progress history
+async getGoalProgress(goalId, days = 30) {
+  try {
+    const startDate = new Date()
+    startDate.setDate(startDate.getDate() - days)
+    
+    const { data, error } = await this.supabase
+      .from('goal_progress')
+      .select('*')
+      .eq('goal_id', goalId)
+      .gte('date', startDate.toISOString())
+      .order('date', { ascending: false })
+    
+    if (error) throw error
+    return data || []
+  } catch (error) {
+    console.error('Error fetching goal progress:', error)
+    return []
+  }
+}
+
+// Get client goals with progress
+async getClientGoalsWithProgress(clientId) {
+  try {
+    // Get goals
+    const { data: goals, error: goalsError } = await this.supabase
+      .from('client_goals')
+      .select('*')
+      .eq('client_id', clientId)
+      .order('updated_at', { ascending: false })
+    
+    if (goalsError) throw goalsError
+    
+    // Get recent progress for each goal
+    const goalsWithProgress = await Promise.all(goals.map(async (goal) => {
+      const progress = await this.getGoalProgress(goal.id, 7) // Last 7 days
+      return {
+        ...goal,
+        recent_progress: progress
+      }
+    }))
+    
+    return goalsWithProgress || []
+  } catch (error) {
+    console.error('Error fetching goals with progress:', error)
+    return []
+  }
+}
+
+// Delete goal
+async deleteGoal(goalId) {
+  try {
+    const { error } = await this.supabase
+      .from('client_goals')
+      .delete()
+      .eq('id', goalId)
+    
+    if (error) throw error
+    
+    this.clearCache('goals')
+    return true
+  } catch (error) {
+    console.error('Error deleting goal:', error)
+    throw error
+  }
+}
+
+// Get goal statistics
+async getGoalStatistics(clientId) {
+  try {
+    const goals = await this.getClientGoalsWithProgress(clientId)
+    
+    const stats = {
+      total: goals.length,
+      active: goals.filter(g => g.status === 'active').length,
+      completed: goals.filter(g => g.status === 'completed').length,
+      average_progress: 0,
+      streak_days: 0,
+      most_consistent: null
+    }
+    
+    // Calculate average progress
+    if (stats.active > 0) {
+      const totalProgress = goals
+        .filter(g => g.status === 'active')
+        .reduce((sum, goal) => {
+          const progress = goal.target_value > 0 
+            ? (goal.current_value / goal.target_value) * 100 
+            : 0
+          return sum + Math.min(100, progress)
+        }, 0)
+      
+      stats.average_progress = Math.round(totalProgress / stats.active)
+    }
+    
+    return stats
+  } catch (error) {
+    console.error('Error calculating goal statistics:', error)
+    return {
+      total: 0,
+      active: 0,
+      completed: 0,
+      average_progress: 0,
+      streak_days: 0,
+      most_consistent: null
+    }
+  }
+}
+
+// ========================================
+// COMPLETE GOALS METHODS VOOR DatabaseService.js
+// Voeg deze methods toe aan je DatabaseService class
+// ========================================
+
+// ===== GOAL TEMPLATE METHODS =====
+
+// Get templates by category with caching
+async getGoalTemplatesByCategory(category, subcategory = null) {
+  const cacheKey = `templates_${category}_${subcategory}`
+  const cached = this.getCachedData(cacheKey)
+  if (cached) return cached
+  
+  try {
+    let query = this.supabase
+      .from('goal_templates')
+      .select('*')
+      .eq('main_category', category)
+      .eq('coach_recommended', true)
+      .order('popularity_score', { ascending: false })
+    
+    if (subcategory) {
+      query = query.eq('subcategory', subcategory)
+    }
+    
+    const { data, error } = await query.limit(10)
+    
+    if (error) throw error
+    
+    this.setCachedData(cacheKey, data || [])
+    return data || []
+  } catch (error) {
+    console.error('Error fetching goal templates:', error)
+    return []
+  }
+}
+
+// Track template usage for popularity
+async trackGoalTemplateUsage(templateId) {
+  try {
+    // Get current popularity score
+    const { data: template } = await this.supabase
+      .from('goal_templates')
+      .select('popularity_score')
+      .eq('id', templateId)
+      .single()
+    
+    if (template) {
+      // Increment popularity
+      await this.supabase
+        .from('goal_templates')
+        .update({ 
+          popularity_score: (template.popularity_score || 0) + 1 
+        })
+        .eq('id', templateId)
+    }
+  } catch (error) {
+    console.error('Error tracking template usage:', error)
+  }
+}
+
+// ===== ENHANCED GOAL METHODS =====
+
+// Save goal with category support
+async saveGoal(goalData) {
+  try {
+    const { data, error } = await this.supabase
+      .from('client_goals')
+      .insert({
+        client_id: goalData.client_id,
+        title: goalData.title,
+        goal_type: goalData.goal_type || 'custom',
+        main_category: goalData.category || goalData.main_category,
+        subcategory: goalData.subcategory,
+        measurement_type: goalData.measurement_type || 'number',
+        target_value: parseFloat(goalData.target_value) || 0,
+        current_value: goalData.current_value || 0,
+        start_value: goalData.current_value || 0,
+        target_date: goalData.target_date,
+        unit: goalData.unit || '',
+        frequency: goalData.frequency || 'daily',
+        frequency_target: goalData.frequency_target || 7,
+        notes: goalData.notes || '',
+        status: goalData.status || 'active',
+        color: goalData.color || '#10b981',
+        icon: goalData.icon || 'target',
+        measurement_config: goalData.measurement_config || {},
+        difficulty_level: goalData.difficulty_level || 'beginner',
+        expected_duration_weeks: goalData.expected_duration_weeks || 4,
+        is_public: goalData.is_public || false,
+        reminder_enabled: goalData.reminder_enabled || false,
+        reminder_time: goalData.reminder_time || null,
+        updated_at: new Date().toISOString()
+      })
+      .select()
+      .single()
+    
+    if (error) throw error
+    
+    this.clearCache(`goals_${goalData.client_id}`)
+    console.log('✅ Goal saved successfully:', data)
+    return data
+  } catch (error) {
+    console.error('Error saving goal:', error)
+    throw error
+  }
+}
+
+// Get goals by category
+async getGoalsByCategory(clientId, category) {
+  try {
+    const { data, error } = await this.supabase
+      .from('client_goals')
+      .select('*')
+      .eq('client_id', clientId)
+      .eq('main_category', category)
+      .eq('status', 'active')
+      .order('updated_at', { ascending: false })
+    
+    if (error) throw error
+    return data || []
+  } catch (error) {
+    console.error('Error fetching goals by category:', error)
+    return []
+  }
+}
+
+// Get client goals with full journey data
+async getClientGoalsWithJourney(clientId) {
+  try {
+    // Get goals
+    const { data: goals } = await this.supabase
+      .from('client_goals')
+      .select('*')
+      .eq('client_id', clientId)
+      .order('updated_at', { ascending: false })
+    
+    if (!goals || goals.length === 0) return []
+    
+    // Get journey data for each goal
+    const goalsWithJourney = await Promise.all(goals.map(async (goal) => {
+      // Get milestones
+      const { data: milestones } = await this.supabase
+        .from('goal_milestones')
+        .select('*')
+        .eq('goal_id', goal.id)
+        .order('order_index')
+      
+      // Get actions
+      const { data: actions } = await this.supabase
+        .from('goal_actions')
+        .select('*')
+        .eq('goal_id', goal.id)
+      
+      // Get recent progress
+      const { data: progress } = await this.supabase
+        .from('goal_progress')
+        .select('*')
+        .eq('goal_id', goal.id)
+        .order('date', { ascending: false })
+        .limit(7)
+      
+      return {
+        ...goal,
+        milestones: milestones || [],
+        actions: actions || [],
+        recent_progress: progress || []
+      }
+    }))
+    
+    return goalsWithJourney
+  } catch (error) {
+    console.error('Error fetching goals with journey:', error)
+    return []
+  }
+}
+
+// ===== JOURNEY METHODS =====
+
+// Save milestone
+async saveGoalMilestone(milestoneData) {
+  try {
+    const { data, error } = await this.supabase
+      .from('goal_milestones')
+      .insert({
+        goal_id: milestoneData.goal_id,
+        title: milestoneData.title,
+        target_value: milestoneData.target_value,
+        unit: milestoneData.unit,
+        target_date: milestoneData.target_date,
+        order_index: milestoneData.order_index || 0,
+        icon: milestoneData.icon || 'flag',
+        percentage: milestoneData.percentage
+      })
+      .select()
+      .single()
+    
+    if (error) throw error
+    
+    this.clearCache(`milestones_${milestoneData.goal_id}`)
+    return data
+  } catch (error) {
+    console.error('Error saving milestone:', error)
+    throw error
+  }
+}
+
+// Complete milestone
+async completeMilestone(milestoneId) {
+  try {
+    const { data, error } = await this.supabase
+      .from('goal_milestones')
+      .update({
+        completed: true,
+        completed_date: new Date().toISOString().split('T')[0]
+      })
+      .eq('id', milestoneId)
+      .select()
+      .single()
+    
+    if (error) throw error
+    
+    // Check if this completes the goal
+    const { data: milestone } = await this.supabase
+      .from('goal_milestones')
+      .select('goal_id, percentage')
+      .eq('id', milestoneId)
+      .single()
+    
+    if (milestone && milestone.percentage === 100) {
+      // Mark goal as completed
+      await this.updateGoalStatus(milestone.goal_id, 'completed')
+    }
+    
+    return data
+  } catch (error) {
+    console.error('Error completing milestone:', error)
+    throw error
+  }
+}
+
+// Save goal action
+async saveGoalAction(actionData) {
+  try {
+    const { data, error } = await this.supabase
+      .from('goal_actions')
+      .insert({
+        goal_id: actionData.goal_id,
+        title: actionData.title,
+        frequency: actionData.frequency || 'weekly',
+        frequency_target: actionData.frequency_target || 3,
+        icon: actionData.icon || 'zap'
+      })
+      .select()
+      .single()
+    
+    if (error) throw error
+    
+    this.clearCache(`actions_${actionData.goal_id}`)
+    return data
+  } catch (error) {
+    console.error('Error saving action:', error)
+    throw error
+  }
+}
+
+// Track action completion
+async trackActionCompletion(actionId, date) {
+  try {
+    // Log the completion
+    const { error: logError } = await this.supabase
+      .from('goal_action_logs')
+      .upsert({
+        action_id: actionId,
+        date: date,
+        completed: true
+      }, {
+        onConflict: 'action_id,date'
+      })
+    
+    if (logError) throw logError
+    
+    // Get current action data
+    const { data: action } = await this.supabase
+      .from('goal_actions')
+      .select('*')
+      .eq('id', actionId)
+      .single()
+    
+    if (action) {
+      // Calculate new streak
+      const lastCompleted = action.last_completed 
+        ? new Date(action.last_completed) 
+        : new Date(0)
+      
+      const today = new Date(date)
+      const daysDiff = Math.floor((today - lastCompleted) / (1000 * 60 * 60 * 24))
+      
+      // Reset streak if more than 2 days gap
+      const newStreak = daysDiff <= 2 
+        ? (action.current_streak || 0) + 1 
+        : 1
+      
+      const bestStreak = Math.max(newStreak, action.best_streak || 0)
+      
+      // Update action
+      await this.supabase
+        .from('goal_actions')
+        .update({
+          current_streak: newStreak,
+          best_streak: bestStreak,
+          last_completed: date
+        })
+        .eq('id', actionId)
+    }
+    
+    return true
+  } catch (error) {
+    console.error('Error tracking action completion:', error)
+    throw error
+  }
+}
+
+// Get action logs for a period
+async getActionLogs(actionId, startDate, endDate) {
+  try {
+    const { data, error } = await this.supabase
+      .from('goal_action_logs')
+      .select('*')
+      .eq('action_id', actionId)
+      .gte('date', startDate)
+      .lte('date', endDate)
+      .order('date', { ascending: false })
+    
+    if (error) throw error
+    return data || []
+  } catch (error) {
+    console.error('Error fetching action logs:', error)
+    return []
+  }
+}
+
+// ===== ANALYTICS METHODS =====
+
+// Get goal analytics
+async getGoalAnalytics(clientId, goalId) {
+  try {
+    // Get goal data
+    const { data: goal } = await this.supabase
+      .from('client_goals')
+      .select('*')
+      .eq('id', goalId)
+      .single()
+    
+    if (!goal) return null
+    
+    // Get progress history
+    const { data: progressHistory } = await this.supabase
+      .from('goal_progress')
+      .select('*')
+      .eq('goal_id', goalId)
+      .order('date', { ascending: false })
+      .limit(30)
+    
+    // Get milestones completion rate
+    const { data: milestones } = await this.supabase
+      .from('goal_milestones')
+      .select('*')
+      .eq('goal_id', goalId)
+    
+    const completedMilestones = milestones?.filter(m => m.completed).length || 0
+    const totalMilestones = milestones?.length || 0
+    
+    // Get actions consistency
+    const { data: actions } = await this.supabase
+      .from('goal_actions')
+      .select('*')
+      .eq('goal_id', goalId)
+    
+    const totalStreak = actions?.reduce((sum, a) => sum + (a.current_streak || 0), 0) || 0
+    const avgStreak = actions?.length > 0 ? totalStreak / actions.length : 0
+    
+    // Calculate progress rate
+    const startDate = new Date(goal.created_at || Date.now())
+    const currentDate = new Date()
+    const daysElapsed = Math.floor((currentDate - startDate) / (1000 * 60 * 60 * 24))
+    const progressPercentage = goal.target_value > 0 
+      ? ((goal.current_value - (goal.start_value || 0)) / (goal.target_value - (goal.start_value || 0))) * 100
+      : 0
+    
+    const dailyProgressRate = daysElapsed > 0 ? progressPercentage / daysElapsed : 0
+    
+    // Estimate completion
+    const remainingProgress = 100 - progressPercentage
+    const estimatedDaysToComplete = dailyProgressRate > 0 
+      ? Math.ceil(remainingProgress / dailyProgressRate)
+      : null
+    
+    const estimatedCompletionDate = estimatedDaysToComplete
+      ? new Date(Date.now() + estimatedDaysToComplete * 24 * 60 * 60 * 1000)
+      : null
+    
+    return {
+      goal: goal,
+      progressHistory: progressHistory || [],
+      milestoneCompletion: totalMilestones > 0 
+        ? Math.round((completedMilestones / totalMilestones) * 100)
+        : 0,
+      averageStreak: Math.round(avgStreak),
+      dailyProgressRate: dailyProgressRate.toFixed(2),
+      estimatedCompletionDate: estimatedCompletionDate?.toISOString().split('T')[0],
+      successProbability: calculateSuccessProbability(
+        progressPercentage,
+        avgStreak,
+        daysElapsed,
+        estimatedDaysToComplete
+      )
+    }
+  } catch (error) {
+    console.error('Error calculating goal analytics:', error)
+    return null
+  }
+}
+
+// Get category progress
+async getCategoryProgress(clientId, category) {
+  try {
+    const { data: goals } = await this.supabase
+      .from('client_goals')
+      .select('*')
+      .eq('client_id', clientId)
+      .eq('main_category', category)
+      .eq('status', 'active')
+    
+    if (!goals || goals.length === 0) {
+      return {
+        category: category,
+        totalGoals: 0,
+        averageProgress: 0,
+        completedGoals: 0,
+        totalXP: 0
+      }
+    }
+    
+    const totalProgress = goals.reduce((sum, goal) => {
+      const progress = goal.target_value > 0
+        ? (goal.current_value / goal.target_value) * 100
+        : 0
+      return sum + Math.min(100, progress)
+    }, 0)
+    
+    const completedGoals = goals.filter(g => g.status === 'completed').length
+    
+    // Calculate XP (0.5 per percent progress + 50 bonus per completed goal)
+    const totalXP = Math.floor(totalProgress * 0.5) + (completedGoals * 50)
+    
+    return {
+      category: category,
+      totalGoals: goals.length,
+      averageProgress: Math.round(totalProgress / goals.length),
+      completedGoals: completedGoals,
+      totalXP: totalXP
+    }
+  } catch (error) {
+    console.error('Error calculating category progress:', error)
+    return {
+      category: category,
+      totalGoals: 0,
+      averageProgress: 0,
+      completedGoals: 0,
+      totalXP: 0
+    }
+  }
+}
+
+// Get all categories progress
+async getAllCategoriesProgress(clientId) {
+  const categories = ['herstel', 'mindset', 'workout', 'voeding', 'structuur']
+  
+  try {
+    const progressData = await Promise.all(
+      categories.map(cat => this.getCategoryProgress(clientId, cat))
+    )
+    
+    return progressData
+  } catch (error) {
+    console.error('Error fetching all categories progress:', error)
+    return categories.map(cat => ({
+      category: cat,
+      totalGoals: 0,
+      averageProgress: 0,
+      completedGoals: 0,
+      totalXP: 0
+    }))
+  }
+
+}
+
+
+
+async updateGoalProgress(goalId, progressData) {
+  try {
+    // Update current_value in client_goals
+    const { data: goalUpdate, error: goalError } = await this.supabase
+      .from('client_goals')
+      .update({
+        current_value: progressData.value,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', goalId)
+      .select()
+      .single()
+    
+    if (goalError) throw goalError
+    
+    // Log progress in goal_progress table
+    const { data: progressLog, error: progressError } = await this.supabase
+      .from('goal_progress')
+      .insert({
+        goal_id: goalId,
+        client_id: progressData.client_id,
+        date: progressData.date || new Date().toISOString().split('T')[0],
+        value: progressData.value,
+        notes: progressData.notes || '',
+        checked: false
+      })
+      .select()
+      .single()
+    
+    if (progressError) throw progressError
+    
+    this.clearCache(`goals_${progressData.client_id}`)
+    console.log('✅ Goal progress updated')
+    return { goal: goalUpdate, progress: progressLog }
+  } catch (error) {
+    console.error('Update goal progress error:', error)
+    throw error
+  }
+}
+
+// Save week progress voor checkbox goals
+async saveWeekProgress(goalId, clientId, checkedDays) {
+  try {
+    const weekDates = this.getWeekDates(new Date())
+    const updates = []
+    
+    // Create upsert data for each day of the week
+    for (let i = 0; i < 7; i++) {
+      const date = weekDates[i]
+      const isChecked = checkedDays.includes(i)
+      
+      updates.push({
+        goal_id: goalId,
+        client_id: clientId,
+        date: date,
+        checked: isChecked,
+        value: isChecked ? 1 : 0,
+        notes: `Week progress: Day ${i + 1}`
+      })
+    }
+    
+    // Upsert all days at once
+    const { data, error } = await this.supabase
+      .from('goal_progress')
+      .upsert(updates, {
+        onConflict: 'goal_id,date'
+      })
+    
+    if (error) throw error
+    
+    // Update current_value in client_goals
+    const { error: updateError } = await this.supabase
+      .from('client_goals')
+      .update({
+        current_value: checkedDays.length,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', goalId)
+    
+    if (updateError) throw updateError
+    
+    this.clearCache(`goals_${clientId}`)
+    console.log('✅ Week progress saved:', checkedDays.length, 'days completed')
+    return data
+  } catch (error) {
+    console.error('Save week progress error:', error)
+    throw error
+  }
+}
+
+// Get week progress voor checkbox goals
+async getWeekProgress(goalId, weekStart = null) {
+  try {
+    const weekDates = this.getWeekDates(weekStart || new Date())
+    const startDate = weekDates[0]
+    const endDate = weekDates[6]
+    
+    const { data, error } = await this.supabase
+      .from('goal_progress')
+      .select('*')
+      .eq('goal_id', goalId)
+      .gte('date', startDate)
+      .lte('date', endDate)
+      .order('date', { ascending: true })
+    
+    if (error) throw error
+    
+    // Convert to array of checked day indices
+    const checkedDays = []
+    data?.forEach(entry => {
+      if (entry.checked) {
+        const date = new Date(entry.date)
+        const dayIndex = date.getDay() === 0 ? 6 : date.getDay() - 1 // Mon=0, Sun=6
+        checkedDays.push(dayIndex)
+      }
+    })
+    
+    return checkedDays
+  } catch (error) {
+    console.error('Get week progress error:', error)
+    return []
+  }
+}
+
+// Load all weekly progress voor multiple checkbox goals
+async loadWeeklyProgress(clientId) {
+  try {
+    // Get all active checkbox goals
+    const { data: goals, error: goalsError } = await this.supabase
+      .from('client_goals')
+      .select('id')
+      .eq('client_id', clientId)
+      .eq('measurement_type', 'checkbox')
+      .eq('status', 'active')
+    
+    if (goalsError) throw goalsError
+    
+    const progress = {}
+    
+    // Load week progress for each goal
+    for (const goal of goals || []) {
+      const weekData = await this.getWeekProgress(goal.id)
+      progress[goal.id] = weekData
+    }
+    
+    return progress
+  } catch (error) {
+    console.error('Load weekly progress error:', error)
+    return {}
+  }
+}
+
+// Complete goal method (als deze nog niet bestaat)
+async completeGoal(goalId) {
+  try {
+    const { data, error } = await this.supabase
+      .from('client_goals')
+      .update({
+        status: 'completed',
+        completed_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', goalId)
+      .select()
+      .single()
+    
+    if (error) throw error
+    
+    // Track XP earning
+    if (data) {
+      // Award 50 XP for completing a goal
+      const xp = 50
+      console.log(`🎉 Goal completed! +${xp} XP earned`)
+      
+      // You could also track this in a separate XP table if needed
+    }
+    
+    this.clearCache('goals')
+    return data
+  } catch (error) {
+    console.error('Complete goal error:', error)
+    throw error
+  }
+}
+
+// Delete goal method (als deze nog niet bestaat)
+async deleteGoal(goalId) {
+  try {
+    // First delete all related data
+    await this.supabase.from('goal_progress').delete().eq('goal_id', goalId)
+    await this.supabase.from('goal_milestones').delete().eq('goal_id', goalId)
+    await this.supabase.from('goal_actions').delete().eq('goal_id', goalId)
+    
+    // Then delete the goal itself
+    const { error } = await this.supabase
+      .from('client_goals')
+      .delete()
+      .eq('id', goalId)
+    
+    if (error) throw error
+    
+    this.clearCache('goals')
+    console.log('✅ Goal deleted')
+    return true
+  } catch (error) {
+    console.error('Delete goal error:', error)
+    throw error
+  }}
+
+
+
+
+
+
+ async getRandomQuote(language = 'nl') {
+    try {
+      const { data, error } = await this.supabase
+        .from('quotes')
+        .select('*')
+        .eq('is_active', true)
+        .eq('language', language)
+      
+      if (error) throw error
+      
+      if (data && data.length > 0) {
+        const randomIndex = Math.floor(Math.random() * data.length)
+        return data[randomIndex]
+      }
+      
+      return null
+    } catch (error) {
+      console.error('Error getting quote:', error)
+      return null
+    }
+  }
+
+  async getQuoteOfTheDay() {
+    try {
+      const today = new Date().toISOString().split('T')[0]
+      
+      // First check if there's a specific quote for today
+      const { data: specificQuote } = await this.supabase
+        .from('quotes')
+        .select('*')
+        .eq('display_date', today)
+        .eq('is_active', true)
+        .single()
+      
+      if (specificQuote) return specificQuote
+      
+      // Otherwise get a random quote
+      return await this.getRandomQuote()
+    } catch (error) {
+      console.error('Error getting quote of the day:', error)
+      return null
+    }
+  }
+
+  // ===== WELCOME MESSAGES =====
+  async getWelcomeMessage() {
+    try {
+      const hour = new Date().getHours()
+      let timeOfDay = 'morning'
+      
+      if (hour >= 12 && hour < 18) timeOfDay = 'afternoon'
+      else if (hour >= 18) timeOfDay = 'evening'
+      
+      const { data, error } = await this.supabase
+        .from('daily_welcomes')
+        .select('*')
+        .eq('is_active', true)
+        .eq('time_of_day', timeOfDay)
+      
+      if (error) throw error
+      
+      if (data && data.length > 0) {
+        const randomIndex = Math.floor(Math.random() * data.length)
+        return data[randomIndex]
+      }
+      
+      return {
+        welcome_text: 'Klaar om je doelen te verpletteren?',
+        subtitle: 'Laten we er een geweldige dag van maken!'
+      }
+    } catch (error) {
+      console.error('Error getting welcome message:', error)
+      return {
+        welcome_text: 'Welkom terug!',
+        subtitle: 'Tijd om aan je doelen te werken.'
+      }
+    }
+  }
+
+  // ===== SCHEDULED CALLS =====
+  async getNextScheduledCall(clientId) {
+    try {
+      const today = new Date().toISOString().split('T')[0]
+      
+      const { data, error } = await this.supabase
+        .from('scheduled_calls')
+        .select('*')
+        .eq('client_id', clientId)
+        .eq('status', 'scheduled')
+        .gte('call_date', today)
+        .order('call_date', { ascending: true })
+        .order('call_time', { ascending: true })
+        .limit(1)
+        .single()
+      
+      if (error && error.code !== 'PGRST116') throw error // PGRST116 = no rows returned
+      
+      return data
+    } catch (error) {
+      console.error('Error getting next call:', error)
+      return null
+    }
+  }
+
+  async getRecentCalls(clientId, limit = 5) {
+    try {
+      const { data, error } = await this.supabase
+        .from('scheduled_calls')
+        .select('*')
+        .eq('client_id', clientId)
+        .eq('status', 'completed')
+        .order('call_date', { ascending: false })
+        .limit(limit)
+      
+      if (error) throw error
+      
+      return data || []
+    } catch (error) {
+      console.error('Error getting recent calls:', error)
+      return []
+    }
+  }
+
+  async scheduleCall(callData) {
+    try {
+      const { data, error } = await this.supabase
+        .from('scheduled_calls')
+        .insert([{
+          ...callData,
+          status: 'scheduled',
+          reminder_sent: false
+        }])
+        .select()
+        .single()
+      
+      if (error) throw error
+      
+      return data
+    } catch (error) {
+      console.error('Error scheduling call:', error)
+      throw error
+    }
+  }
+
+  async updateCallStatus(callId, status) {
+    try {
+      const { data, error } = await this.supabase
+        .from('scheduled_calls')
+        .update({ 
+          status,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', callId)
+        .select()
+        .single()
+      
+      if (error) throw error
+      
+      return data
+    } catch (error) {
+      console.error('Error updating call status:', error)
+      throw error
+    }
+  }
+
+  // ===== COACH VIDEOS =====
+  async getCoachVideos(coachId, category = null) {
+    try {
+      let query = this.supabase
+        .from('coach_videos')
+        .select('*')
+        .eq('is_active', true)
+        .or(`coach_id.eq.${coachId},is_featured.eq.true`)
+        .order('order_index', { ascending: true })
+      
+      if (category && category !== 'all') {
+        query = query.eq('category', category)
+      }
+      
+      const { data, error } = await query.limit(20)
+      
+      if (error) throw error
+      
+      return data || []
+    } catch (error) {
+      console.error('Error getting coach videos:', error)
+      return []
+    }
+  }
+
+  async getFeaturedVideos(limit = 5) {
+    try {
+      const { data, error } = await this.supabase
+        .from('coach_videos')
+        .select('*')
+        .eq('is_active', true)
+        .eq('is_featured', true)
+        .order('order_index', { ascending: true })
+        .limit(limit)
+      
+      if (error) throw error
+      
+      return data || []
+    } catch (error) {
+      console.error('Error getting featured videos:', error)
+      return []
+    }
+  }
+
+  async incrementVideoView(videoId) {
+    try {
+      // First get current view count
+      const { data: video } = await this.supabase
+        .from('coach_videos')
+        .select('view_count')
+        .eq('id', videoId)
+        .single()
+      
+      if (video) {
+        const { error } = await this.supabase
+          .from('coach_videos')
+          .update({ 
+            view_count: (video.view_count || 0) + 1,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', videoId)
+        
+        if (error) throw error
+      }
+    } catch (error) {
+      console.error('Error incrementing video view:', error)
+    }
+  }
+
+  // ===== COACH MESSAGES / NOTIFICATIONS =====
+  async getUnreadCoachMessages(clientId) {
+    try {
+      const { data, error } = await this.supabase
+        .from('coach_notifications')
+        .select('*')
+        .eq('client_id', clientId)
+        .eq('status', 'unread')
+        .order('created_at', { ascending: false })
+        .limit(10)
+      
+      if (error) throw error
+      
+      return data || []
+    } catch (error) {
+      console.error('Error getting coach messages:', error)
+      return []
+    }
+  }
+
+  async markMessageAsRead(messageId) {
+    try {
+      const { error } = await this.supabase
+        .from('coach_notifications')
+        .update({ 
+          status: 'read',
+          read_at: new Date().toISOString()
+        })
+        .eq('id', messageId)
+      
+      if (error) throw error
+      
+      return true
+    } catch (error) {
+      console.error('Error marking message as read:', error)
+      return false
+    }
+  }
+
+  async sendCoachMessage(clientId, message) {
+    try {
+      const { data, error } = await this.supabase
+        .from('coach_notifications')
+        .insert([{
+          client_id: clientId,
+          type: message.type || 'message',
+          priority: message.priority || 'normal',
+          title: message.title || 'Coach Bericht',
+          message: message.text,
+          action_type: message.action?.type,
+          action_target: message.action?.target,
+          action_label: message.action?.label,
+          status: 'unread'
+        }])
+        .select()
+        .single()
+      
+      if (error) throw error
+      
+      return data
+    } catch (error) {
+      console.error('Error sending coach message:', error)
+      throw error
+    }
+  }
+
+  // ===== QUICK ACTIONS DATA =====
+  async getTodaysWorkout(clientId) {
+    try {
+      const dayNames = ['Zondag', 'Maandag', 'Dinsdag', 'Woensdag', 'Donderdag', 'Vrijdag', 'Zaterdag']
+      const today = dayNames[new Date().getDay()]
+      
+      const { data, error } = await this.supabase
+        .from('client_workouts')
+        .select('*, workout_templates(*)')
+        .eq('client_id', clientId)
+        .eq('is_active', true)
+        .single()
+      
+      if (error && error.code !== 'PGRST116') throw error
+      
+      if (data?.workout_templates?.exercises) {
+        const todaysExercises = data.workout_templates.exercises.find(ex => 
+          ex.day?.toLowerCase() === today.toLowerCase()
+        )
+        return todaysExercises
+      }
+      
+      return null
+    } catch (error) {
+      console.error('Error getting today workout:', error)
+      return null
+    }
+  }
+
+  async getNextGoalDeadline(clientId) {
+    try {
+      const { data, error } = await this.supabase
+        .from('client_goals')
+        .select('*')
+        .eq('client_id', clientId)
+        .eq('status', 'active')
+        .gte('target_date', new Date().toISOString())
+        .order('target_date', { ascending: true })
+        .limit(1)
+        .single()
+      
+      if (error && error.code !== 'PGRST116') throw error
+      
+      return data
+    } catch (error) {
+      console.error('Error getting next goal:', error)
+      return null
+    }
+  }
+
+  async getWeeklyProgress(clientId) {
+    try {
+      const weekAgo = new Date()
+      weekAgo.setDate(weekAgo.getDate() - 7)
+      
+      const [workouts, meals, goals] = await Promise.all([
+        this.getWeeklyWorkoutCount(clientId),
+        this.getWeeklyMealAdherence(clientId),
+        this.getGoalProgress(clientId)
+      ])
+      
+      return {
+        workouts,
+        meals,
+        goals,
+        streak: await this.getClientStreak(clientId)
+      }
+    } catch (error) {
+      console.error('Error getting weekly progress:', error)
+      return {
+        workouts: 0,
+        meals: 0,
+        goals: 0,
+        streak: 0
+      }
+    }
+  }
+
+  async getWeeklyMealAdherence(clientId) {
+    try {
+      const weekAgo = new Date()
+      weekAgo.setDate(weekAgo.getDate() - 7)
+      
+      const { data, error } = await this.supabase
+        .from('meal_logs')
+        .select('adherence_percentage')
+        .eq('client_id', clientId)
+        .gte('date', weekAgo.toISOString())
+      
+      if (error) throw error
+      
+      if (data && data.length > 0) {
+        const totalAdherence = data.reduce((sum, log) => sum + (log.adherence_percentage || 0), 0)
+        return Math.round(totalAdherence / data.length)
+      }
+      
+      return 0
+    } catch (error) {
+      console.error('Error getting meal adherence:', error)
+      return 0
+    }
+  }
+
+  async getGoalProgress(clientId) {
+    try {
+      const goals = await this.getClientGoals(clientId)
+      const activeGoals = goals.filter(g => g.status === 'active')
+      
+      if (activeGoals.length === 0) return 0
+      
+      const totalProgress = activeGoals.reduce((sum, goal) => {
+        const progress = (goal.current_value / goal.target_value) * 100
+        return sum + Math.min(100, progress)
+      }, 0)
+      
+      return Math.round(totalProgress / activeGoals.length)
+    } catch (error) {
+      console.error('Error getting goal progress:', error)
+      return 0
+    }
+  }
+
+
+
+
+
+
+
+
+// ADD DEZE METHODS AAN DatabaseService.js (onderaan het bestand)
+// Zoek naar het einde van de class of voeg toe waar andere methods staan
+
+// ==========================================
+// INGREDIENT METHODS - Voor AI Meal Generator
+// ==========================================
+
+async getAllIngredients() {
+  try {
+    console.log('🥗 Fetching all ingredients...')
+    const { data, error } = await this.supabase
+      .from('ingredients')
+      .select('*')
+      .order('name', { ascending: true })
+    
+    if (error) {
+      console.error('❌ Error fetching ingredients:', error)
+      throw error
+    }
+    
+    console.log(`✅ Loaded ${data?.length || 0} ingredients`)
+    return data || []
+  } catch (error) {
+    console.error('❌ getAllIngredients failed:', error)
+    return []
+  }
+}
+
+async searchIngredients(searchTerm) {
+  try {
+    if (!searchTerm || searchTerm.length < 2) return []
+    
+    console.log('🔍 Searching ingredients for:', searchTerm)
+    const { data, error } = await this.supabase
+      .from('ingredients')
+      .select('*')
+      .ilike('name', `%${searchTerm}%`)
+      .order('name', { ascending: true })
+      .limit(20)
+    
+    if (error) {
+      console.error('❌ Search error:', error)
+      throw error
+    }
+    
+    return data || []
+  } catch (error) {
+    console.error('❌ searchIngredients failed:', error)
+    return []
+  }
+}
+
+async getIngredientsByCategory(category) {
+  try {
+    console.log('📂 Fetching ingredients for category:', category)
+    const { data, error } = await this.supabase
+      .from('ingredients')
+      .select('*')
+      .eq('category', category)
+      .order('name', { ascending: true })
+    
+    if (error) {
+      console.error('❌ Category fetch error:', error)
+      throw error
+    }
+    
+    return data || []
+  } catch (error) {
+    console.error('❌ getIngredientsByCategory failed:', error)
+    return []
+  }
+}
+
+async getIngredientById(id) {
+  try {
+    const { data, error } = await this.supabase
+      .from('ingredients')
+      .select('*')
+      .eq('id', id)
+      .single()
+    
+    if (error) {
+      console.error('❌ Error fetching ingredient:', error)
+      throw error
+    }
+    
+    return data
+  } catch (error) {
+    console.error('❌ getIngredientById failed:', error)
+    return null
+  }
+}
+
+// Calculate macros voor specifieke portie
+calculateIngredientMacros(ingredient, portionGrams) {
+  if (!ingredient) return { calories: 0, protein: 0, carbs: 0, fat: 0 }
+  
+  const factor = portionGrams / 100
+  
+  return {
+    calories: Math.round((ingredient.calories_per_100g || 0) * factor),
+    protein: Math.round((ingredient.protein_per_100g || 0) * factor * 10) / 10,
+    carbs: Math.round((ingredient.carbs_per_100g || 0) * factor * 10) / 10,
+    fat: Math.round((ingredient.fat_per_100g || 0) * factor * 10) / 10,
+    fiber: Math.round((ingredient.fiber_per_100g || 0) * factor * 10) / 10
+  }
+}
+
+// Save custom recipe
+async saveRecipe(recipeData) {
+  try {
+    console.log('💾 Saving recipe:', recipeData.name)
+    
+    // Save recipe hoofddata
+    const { data: recipe, error: recipeError } = await this.supabase
+      .from('recipes')
+      .insert({
+        name: recipeData.name,
+        category: recipeData.category || 'custom',
+        total_calories: recipeData.calories,
+        total_protein: recipeData.protein,
+        total_carbs: recipeData.carbs,
+        total_fat: recipeData.fat,
+        total_weight_grams: recipeData.totalWeight,
+        preparation_steps: recipeData.steps || '',
+        created_by: recipeData.createdBy || 'coach'
+      })
+      .select()
+      .single()
+    
+    if (recipeError) {
+      console.error('❌ Recipe save error:', recipeError)
+      throw recipeError
+    }
+    
+    // Save recipe ingredients
+    if (recipe && recipeData.ingredients?.length > 0) {
+      const ingredientRows = recipeData.ingredients.map(ing => ({
+        recipe_id: recipe.id,
+        ingredient_id: ing.id,
+        amount_grams: ing.amount,
+        notes: ing.notes || null
+      }))
+      
+      const { error: ingredientsError } = await this.supabase
+        .from('recipe_ingredients')
+        .insert(ingredientRows)
+      
+      if (ingredientsError) {
+        console.error('❌ Recipe ingredients save error:', ingredientsError)
+        // Rollback recipe als ingredients falen
+        await this.supabase
+          .from('recipes')
+          .delete()
+          .eq('id', recipe.id)
+        throw ingredientsError
+      }
+    }
+    
+    console.log('✅ Recipe saved successfully:', recipe.id)
+    return recipe
+  } catch (error) {
+    console.error('❌ saveRecipe failed:', error)
+    throw error
+  }
+}
+
+// Get recipes voor meal planning
+async getRecipes(category = null) {
+  try {
+    let query = this.supabase
+      .from('recipes')
+      .select(`
+        *,
+        recipe_ingredients (
+          amount_grams,
+          ingredients (*)
+        )
+      `)
+      .order('name', { ascending: true })
+    
+    if (category) {
+      query = query.eq('category', category)
+    }
+    
+    const { data, error } = await query
+    
+    if (error) {
+      console.error('❌ Error fetching recipes:', error)
+      throw error
+    }
+    
+    return data || []
+  } catch (error) {
+    console.error('❌ getRecipes failed:', error)
+    return []
+  }
+}
+
+// Product variants voor merken
+async getProductVariants(ingredientId) {
+  try {
+    const { data, error } = await this.supabase
+      .from('product_variants')
+      .select('*')
+      .eq('ingredient_id', ingredientId)
+      .order('brand', { ascending: true })
+    
+    if (error) {
+      console.error('❌ Error fetching variants:', error)
+      throw error
+    }
+    
+    return data || []
+  } catch (error) {
+    console.error('❌ getProductVariants failed:', error)
+    return []
+  }
+}
+
+// Save product variant (merk-specifiek)
+async saveProductVariant(variantData) {
+  try {
+    const { data, error } = await this.supabase
+      .from('product_variants')
+      .insert({
+        ingredient_id: variantData.ingredientId,
+        brand: variantData.brand,
+        barcode: variantData.barcode || null,
+        calories_per_100g: variantData.calories,
+        protein_per_100g: variantData.protein,
+        carbs_per_100g: variantData.carbs,
+        fat_per_100g: variantData.fat,
+        verified: variantData.verified || false,
+        source: variantData.source || 'manual'
+      })
+      .select()
+      .single()
+    
+    if (error) {
+      console.error('❌ Variant save error:', error)
+      throw error
+    }
+    
+    console.log('✅ Product variant saved:', data.id)
+    return data
+  } catch (error) {
+    console.error('❌ saveProductVariant failed:', error)
+    throw error
+  }
+}
+
+
+
+
+// ===== plak hier =====
+
+
+
+
+
+
+
+}
+// ===== HELPER FUNCTIONS =====
+
+// Calculate success probability
+function calculateSuccessProbability(currentProgress, avgStreak, daysElapsed, estimatedDaysToComplete) {
+  let probability = 50 // Base probability
+  
+  // Adjust based on current progress
+  if (currentProgress > 75) probability += 30
+  else if (currentProgress > 50) probability += 20
+  else if (currentProgress > 25) probability += 10
+  
+  // Adjust based on consistency (streak)
+  if (avgStreak > 14) probability += 20
+  else if (avgStreak > 7) probability += 15
+  else if (avgStreak > 3) probability += 10
+  
+  // Adjust based on time remaining
+  if (estimatedDaysToComplete && estimatedDaysToComplete < 30) probability += 10
+  else if (estimatedDaysToComplete && estimatedDaysToComplete > 180) probability -= 10
+  
+  // Cap between 5 and 95
+  return Math.min(95, Math.max(5, probability))
+
+
+
+
+
+
+
+
 
 
 

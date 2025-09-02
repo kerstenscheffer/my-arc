@@ -1,3 +1,4 @@
+import useIsMobile from '../../hooks/useIsMobile'
 import React, { useState, useEffect, useCallback, useRef } from 'react'
 import { 
   TrendingUp, Target, Calendar, Activity, Award, Camera, Plus,
@@ -19,7 +20,7 @@ export default function ClientProgress({ client, db, onNavigate }) {
   const [quickAddType, setQuickAddType] = useState('weight')
   const [fullscreenChart, setFullscreenChart] = useState(false)
   
-  const isMobile = window.innerWidth <= 768
+  const isMobile = useIsMobile()
   const swipeStartX = useRef(null)
   const pullStartY = useRef(null)
   

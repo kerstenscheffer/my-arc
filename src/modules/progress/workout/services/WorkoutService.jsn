@@ -1,0 +1,94 @@
+// src/modules/progress/workout/services/WorkoutService.js - UPDATED getScheduledWorkout
+
+class WorkoutService {
+  constructor(db) {
+    this.db = db;
+    this.supabase = db?.supabase || db;
+  }
+
+  /**
+   * Get scheduled workout - SYNC MET WORKOUT PLAN SYSTEEM
+   */
+  async getScheduledWorkout(clientId) {
+    if (!clientId) return null;
+
+    try {
+      // Get weekSchedule uit localStorage (zoals WorkoutPlan doet)
+      const scheduleKey = `workout_schedule_${clientId}`
+      const savedSchedule = localStorage.getItem(scheduleKey)
+      
+      if (!savedSchedule) {
+        console.log('No saved schedule found');
+        return null;
+      }
+
+      const weekSchedule = JSON.parse(savedSchedule)
+      
+      // Bepaal vandaag's workout (zelfde logic als WorkoutPlan)
+      const weekDays = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+      const todayIndex = (new Date().getDay() + 6) % 7
+      const todayDay = weekDays[todayIndex]
+      const todayWorkoutKey = weekSchedule[todayDay]
+      
+      if (!todayWorkoutKey) {
+        console.log('No workout scheduled for today');
+        return null;
+      }
+
+      // Haal schema op om workout details te krijgen
+      const { data: client } = await this.supabase
+        .from('clients')
+        .select('assigned_schema_id')
+        .eq('id', clientId)
+        .single();
+
+      if (!client?.assigned_schema_id) return null;
+
+      const { data: schema } = await this.supabase
+        .from('workout_schemas')
+        .select('*')
+        .eq('id', client.assigned_schema_id)
+        .single();
+
+      if (!schema?.week_structure?.[todayWorkoutKey]) return null;
+
+      const todayWorkout = schema.week_structure[todayWorkoutKey];
+
+      // Check of vandaag al completed is
+      const today = new Date().toISOString().split('T')[0];
+      const { data: completedToday } = await this.supabase
+        .from('workout_sessions')
+        .select('id')
+        .eq('client_id', clientId)
+        .eq('workout_date', today)
+        .eq('is_completed', true)
+        .single();
+
+      // Haal laatste workout data op voor referentie
+      const lastWorkout = await this.getLastWorkoutData(clientId, todayWorkoutKey);
+
+      // Return in verwachte format
+      return {
+        scheduled: {
+          id: todayWorkoutKey,
+          name: todayWorkout.name || todayWorkoutKey.replace('_', ' ').toUpperCase(),
+          exercises: todayWorkout.exercises?.map(ex => ({
+            id: ex.name.toLowerCase().replace(/\s+/g, '-'),
+            name: ex.name,
+            sets: ex.sets || 3,
+            reps: ex.reps || '8-10',
+            rest: ex.rest || 60
+          })) || []
+        },
+        lastWorkout,
+        completed: !!completedToday
+      };
+
+    } catch (error) {
+      console.error('Error fetching scheduled workout:', error);
+      return null;
+    }
+  }
+
+  // Rest van de methods blijven hetzelfde...
+}

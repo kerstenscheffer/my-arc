@@ -1,0 +1,200 @@
+import useIsMobile from '../../hooks/useIsMobile'
+// src/coach/pages/CoachMealPlannerDashboard.jsx
+// 🚀 MY ARC COACH MEAL PLANNER - ULTIMATE FUSION VERSION WITH SAVE & LOAD!
+// Features: Drag & Drop, Portie scaling, Coach suggestions, Meal swap, Day detail, Video/Notes, SAVE TEMPLATES, LOAD TEMPLATES
+
+
+import { useState, useEffect, useMemo, useRef } from 'react'
+import DatabaseService from '../../services/DatabaseService'
+import {
+  getClientPlanWithOverrides,
+  assignTemplateToClient,
+  createMealPlanTemplate,
+  fetchMealsByIds,
+  getPlannerMealsPool,
+  generateSmartPlanForClient,
+  regenerateDay,
+  regenerateWeek,
+  getClientMealPlans,
+  saveClientMealSwap
+} from '../../lib/mealplanDatabase'
+
+const db = DatabaseService
+
+
+// 🎯 ADVANCED PORTION CALCULATOR WITH INGREDIENT SCALING
+const PortionCalculator = {
+  calculateOptimalPortion(meal, targetKcal, targetMacros = {}) {
+    if (!meal.kcal || meal.kcal <= 0) {
+      return { 
+        multiplier: 1.0, 
+        newPortion: meal.default_portion || '1 portie',
+        scaledMacros: meal,
+        ingredients: meal.ingredients 
+      }
+    }
+    
+    const kcalMultiplier = targetKcal / meal.kcal
+    let optimalMultiplier = kcalMultiplier
+    
+    if (targetMacros.protein && meal.protein > 0) {
+      const proteinMultiplier = targetMacros.protein / meal.protein
+      optimalMultiplier = (kcalMultiplier * 0.6) + (proteinMultiplier * 0.4)
+    }
+    
+    const finalMultiplier = Math.max(0.25, Math.min(4.0, optimalMultiplier))
+    const newPortion = this.scalePortionText(meal.default_portion, finalMultiplier)
+    
+    const scaledMacros = {
+      kcal: Math.round(meal.kcal * finalMultiplier),
+      protein: Math.round((meal.protein || 0) * finalMultiplier),
+      carbs: Math.round((meal.carbs || 0) * finalMultiplier),
+      fat: Math.round((meal.fat || 0) * finalMultiplier)
+    }
+    
+    const scaledIngredients = this.scaleIngredients(meal.ingredients, finalMultiplier)
+    
+    return {
+      multiplier: finalMultiplier,
+      newPortion,
+      scaledMacros,
+      ingredients: scaledIngredients
+    }
+  },
+
+  calculateScaledPortion(meal, targetKcal) {
+    if (!meal.kcal || meal.kcal === 0) return { 
+      factor: 1, 
+      newPortion: meal.default_portion || '1 portie',
+      scaledMacros: meal 
+    }
+    
+    const scaleFactor = Math.max(0.5, Math.min(8.0, targetKcal / meal.kcal))
+    const currentPortion = meal.default_portion || '100g'
+    const newPortion = this.scalePortionText(currentPortion, scaleFactor)
+    
+    return {
+      factor: scaleFactor,
+      newPortion,
+      scaledMacros: {
+        kcal: Math.round(meal.kcal * scaleFactor),
+        protein: Math.round(meal.protein * scaleFactor),
+        carbs: Math.round(meal.carbs * scaleFactor),
+        fat: Math.round(meal.fat * scaleFactor)
+      }
+    }
+  },
+
+  scalePortionText(portionText, factor) {
+    if (!portionText) return `${Math.round(factor * 100)}g`
+    
+    const patterns = [
+      { regex: /(\d+(?:\.\d+)?)\s*g/i, replacement: (match, amount) => `${Math.round(parseFloat(amount) * factor)}g` },
+      { regex: /(\d+(?:\.\d+)?)\s*ml/i, replacement: (match, amount) => `${Math.round(parseFloat(amount) * factor)}ml` },
+      { regex: /(\d+(?:\.\d+)?)\s*stuks?/i, replacement: (match, amount) => {
+        const scaled = parseFloat(amount) * factor
+        return scaled < 1 ? `${scaled.toFixed(1)} stuk` : `${Math.round(scaled)} stuks`
+      }},
+      { regex: /(\d+(?:\.\d+)?)\s*portie/i, replacement: (match, amount) => `${(parseFloat(amount) * factor).toFixed(1)} portie` }
+    ]
+    
+    for (const pattern of patterns) {
+      if (pattern.regex.test(portionText)) {
+        return portionText.replace(pattern.regex, pattern.replacement)
+      }
+    }
+    
+    return `${(factor).toFixed(1)}x ${portionText}`
+  },
+
+  scaleIngredients(ingredients, factor) {
+    if (!ingredients) return null
+    
+    try {
+      const parsed = typeof ingredients === 'string' ? JSON.parse(ingredients) : ingredients
+      
+      if (Array.isArray(parsed)) {
+        return parsed.map(ing => {
+          if (typeof ing !== 'string') return ing
+          
+          return ing.replace(/(\d+(?:\.\d+)?)\s*(g|ml|stuks?)/gi, (match, amount, unit) => {
+            const scaled = parseFloat(amount) * factor
+            const rounded = unit.toLowerCase() === 'stuks' || unit.toLowerCase() === 'stuk' 
+              ? (scaled < 1 ? scaled.toFixed(1) : Math.round(scaled))
+              : Math.round(scaled)
+            return `${rounded}${unit}`
+          })
+        })
+      }
+      
+      return parsed
+    } catch (e) {
+      return ingredients
+    }
+  }
+}
+
+// 🎨 MACRO DISPLAY COMPONENT
+function MacroDisplay({ macros, compact = false }) {
+  if (compact) {
+    return (
+      <span style={{ fontSize: '0.75rem', color: '#10b981' }}>
+        {macros.kcal}kcal • P{macros.protein}g
+      </span>
+    )
+  }
+  
+  return (
+    <div style={{ fontSize: '0.875rem', color: '#9ca3af' }}>
+      <span style={{ color: '#10b981', fontWeight: 'bold' }}>{macros.kcal} kcal</span>
+      {' • '}
+      <span>P: {macros.protein}g</span>
+      {' • '}
+      <span>C: {macros.carbs}g</span>
+      {' • '}
+      <span>F: {macros.fat}g</span>
+    </div>
+  )
+}
+
+// Helper functions
+function formatDate(d) {
+  return d.toLocaleDateString('nl-NL', { weekday: 'short', day: '2-digit', month: '2-digit' })
+}
+
+function addDays(date, n) {
+  const x = new Date(date)
+  x.setDate(x.getDate() + n)
+  return x
+}
+
+function sumMacros(meals) {
+  return meals.reduce((acc, m) => ({
+    kcal: acc.kcal + (m?.kcal || 0),
+    protein: acc.protein + (m?.protein || 0),
+    carbs: acc.carbs + (m?.carbs || 0),
+    fat: acc.fat + (m?.fat || 0)
+  }), { kcal: 0, protein: 0, carbs: 0, fat: 0 })
+}
+
+export default function CoachMealPlannerDashboard({ db, clients: propsClients, currentUser }) {
+
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
+  
+  // Core State
+  const [clients, setClients] = useState([])
+  const [selectedClient, setSelectedClient] = useState(null)
+  const [clientPlan, setClientPlan] = useState(null)
+  const [weekStructure, setWeekStructure] = useState([])
+  const [mealsMap, setMealsMap] = useState({})
+  const [activeWeek, setActiveWeek] = useState(0)
+  const [availableMeals, setAvailableMeals] = useState([])
+  const [existingTemplates, setExistingTemplates] = useState([]) // NEW!
+  
+  // UI State
+  const [showGenerator, setShowGenerator] = useState(false)
+  const [showPreferences, setShowPreferences] = useState(false)
+  const [showCoachNotes, setShowCoachNotes] = useState(false)
+  const [showMealSwap, setShowMealSwap] = useState(null)
+  const [showDayDetail, setShowDayDetail] = useState(null)

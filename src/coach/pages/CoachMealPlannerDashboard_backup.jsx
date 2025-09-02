@@ -1,3 +1,4 @@
+import useIsMobile from '../../hooks/useIsMobile'
 // src/coach/pages/CoachMealPlannerDashboard.jsx
 // 🚀 MY ARC COACH MEAL PLANNER - ULTIMATE LAUNCH DAY VERSION!
 // Features: Portie scaling, Coach suggestions, Enhanced design, Video/Notes interface
@@ -119,7 +120,7 @@ export default function CoachMealPlannerDashboard() {
   })
 
   // Mobile check
-  const isMobile = window.innerWidth <= 768
+  const isMobile = useIsMobile()
 
   // Load all available meals on mount
   useEffect(() => {

@@ -1,0 +1,932 @@
+import useIsMobile from '../hooks/useIsMobile'
+// src/coach/CoachHub.jsx
+// CENTRAAL COACH MANAGEMENT SYSTEEM
+// Alle client management op één plek
+
+import WorkoutLogModule from '../modules/progress/workout/WorkoutLogModule'
+
+import CoachVideoTab from '../modules/videos/CoachVideoTab'
+import { useState, useEffect } from 'react'
+import DatabaseService from '../services/DatabaseService'
+import AIGenerator from '../components/AIGenerator'
+import CoachMealPlannerDashboard from "./pages/CoachMealPlannerDashboard"
+import CoachProgressTab from '../modules/progress/CoachProgressTab'
+import ClientManagementCore from '../modules/client-management/ClientManagementCore'
+import { CallPlanningTab } from '../modules/call-planning/CallPlanningComponents' 
+export default function CoachHub() {
+  // ===== STATE MANAGEMENT =====
+  const [loading, setLoading] = useState(false)
+  const [activeTab, setActiveTab] = useState('overview')
+  const [selectedClient, setSelectedClient] = useState(null)
+  
+  // Data states
+  const [clients, setClients] = useState([])
+  const [workoutSchemas, setWorkoutSchemas] = useState([])
+  const [mealTemplates, setMealTemplates] = useState([])
+  const [notifications, setNotifications] = useState([])
+  
+  // Sub-tabs for client detail
+  const [clientDetailTab, setClientDetailTab] = useState('info')
+  
+  // Forms
+  const [showNewClientForm, setShowNewClientForm] = useState(false)
+  const [showBulkActions, setShowBulkActions] = useState(false)
+  const [selectedClients, setSelectedClients] = useState([])
+  
+  // Quick Actions
+  const [quickAction, setQuickAction] = useState(null)
+  
+  const db = DatabaseService
+  const isMobile = useIsMobile()
+
+  // ===== LIFECYCLE =====
+  useEffect(() => {
+    initializeHub()
+    
+    // Subscribe to updates
+    const unsubClients = db.subscribe('clients', (data) => {
+      setClients(data)
+    })
+    
+    return () => {
+      unsubClients()
+    }
+  }, [])
+
+
+const initializeHub = async () => {
+  setLoading(true)
+  try {
+    const [clientsData, schemasData, mealsData] = await Promise.all([
+      db.getClients(),
+      db.getWorkoutSchemas(),
+      db.getMealPlanTemplates()
+    ])
+
+    // VOEG DIT TOE:
+    console.log('🔍 Client data structure:', clientsData)
+    console.log('🔍 First client:', clientsData?.[0])
+    
+    setClients(clientsData)
+    setWorkoutSchemas(schemasData)
+    setMealTemplates(mealsData)
+  } catch (error) {
+    console.error('Failed to initialize hub:', error)
+  } finally {
+    setLoading(false)   
+  }
+}
+
+  // ===== CLIENT OPERATIONS =====
+  const handleCreateClient = async (formData) => {
+    try {
+      setLoading(true)
+      const user = await db.getCurrentUser()
+      const result = await db.createClient(formData, user.id)
+      
+      alert(`✅ Client aangemaakt!\nEmail: ${result.loginCredentials.email}\nWachtwoord: ${result.loginCredentials.password}`)
+      
+      setShowNewClientForm(false)
+      await initializeHub()
+    } catch (error) {
+      alert(`❌ Fout: ${error.message}`)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleUpdateClient = async (clientId, updates) => {
+    try {
+      setLoading(true)
+      await db.updateClient(clientId, updates)
+      await initializeHub()
+      alert('✅ Client bijgewerkt!')
+    } catch (error) {
+      alert(`❌ Fout: ${error.message}`)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // ===== BULK OPERATIONS =====
+  const handleBulkAssign = async (type, itemId) => {
+    try {
+      setLoading(true)
+      
+      for (const clientId of selectedClients) {
+        if (type === 'workout') {
+          await db.assignWorkoutToClient(clientId, itemId)
+        } else if (type === 'meal') {
+          await db.saveMealPlan(clientId, { template_id: itemId })
+        }
+      }
+      
+      alert(`✅ ${type} toegewezen aan ${selectedClients.length} clients!`)
+      setSelectedClients([])
+      setShowBulkActions(false)
+      await initializeHub()
+    } catch (error) {
+      alert(`❌ Fout: ${error.message}`)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // ===== NOTIFICATIONS =====
+  const sendNotification = async (clientId, message) => {
+    try {
+      await db.sendNotification(clientId, 'coach_message', message)
+      alert('✅ Melding verzonden!')
+    } catch (error) {
+      alert(`❌ Fout: ${error.message}`)
+    }
+  }
+
+  // ===== RENDER HELPERS =====
+  const renderClientCard = (client) => {
+    const isSelected = selectedClients.includes(client.id)
+    
+    return (
+      <div 
+        key={client.id}
+        className="myarc-card"
+        style={{
+          background: isSelected ? 'linear-gradient(135deg, #064e3b 0%, #0a5c42 100%)' : 'var(--c-bg-card)',
+          border: isSelected ? '2px solid var(--c-accent)' : '1px solid var(--c-border)',
+          cursor: 'pointer',
+          transition: 'all 0.3s ease'
+        }}
+        onClick={() => setSelectedClient(client)}
+      >
+        <div className="myarc-flex myarc-justify-between myarc-items-center">
+          <div>
+            <h4 style={{color: '#fff', fontSize: 'var(--text-lg)'}}>
+              {client.first_name} {client.last_name}
+            </h4>
+            <p style={{color: 'var(--c-muted)', fontSize: 'var(--text-sm)'}}>
+              {client.email}
+            </p>
+          </div>
+          
+          <div className="myarc-flex myarc-gap-sm">
+            {/* Quick Actions */}
+            <button
+              className="myarc-btn myarc-btn-sm"
+              style={{background: 'var(--c-accent)'}}
+              onClick={(e) => {
+                e.stopPropagation()
+                setQuickAction({ type: 'workout', client })
+              }}
+            >
+              💪 Workout
+            </button>
+            
+            <button
+              className="myarc-btn myarc-btn-sm"
+              style={{background: 'var(--c-accent-2)'}}
+              onClick={(e) => {
+                e.stopPropagation()
+                setQuickAction({ type: 'meal', client })
+              }}
+            >
+              🍽️ Meal
+            </button>
+            
+            <input
+              type="checkbox"
+              checked={isSelected}
+              onChange={(e) => {
+                e.stopPropagation()
+                if (isSelected) {
+                  setSelectedClients(prev => prev.filter(id => id !== client.id))
+                } else {
+                  setSelectedClients(prev => [...prev, client.id])
+                }
+              }}
+              style={{width: '20px', height: '20px'}}
+            />
+          </div>
+        </div>
+        
+        {/* Client Stats */}
+        <div className="myarc-grid myarc-grid-3" style={{marginTop: 'var(--s-4)'}}>
+          <div>
+            <span style={{color: 'var(--c-muted)', fontSize: 'var(--text-xs)'}}>Doel</span>
+            <p style={{color: '#fff'}}>{client.goal || 'Niet ingesteld'}</p>
+          </div>
+          <div>
+            <span style={{color: 'var(--c-muted)', fontSize: 'var(--text-xs)'}}>Ervaring</span>
+            <p style={{color: '#fff'}}>{client.experience || 'Onbekend'}</p>
+          </div>
+          <div>
+            <span style={{color: 'var(--c-muted)', fontSize: 'var(--text-xs)'}}>Dagen/week</span>
+            <p style={{color: '#fff'}}>{client.days_per_week || '?'}</p>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  const renderClientDetail = () => {
+    if (!selectedClient) return null
+    
+    return (
+      <div className="myarc-card" style={{marginTop: 'var(--s-6)'}}>
+        <div className="myarc-card-header">
+          <h3 className="myarc-card-title">
+            {selectedClient.first_name} {selectedClient.last_name} - Management
+          </h3>
+          
+          {/* Sub-tabs */}
+          <div className="myarc-flex myarc-gap-md" style={{marginTop: 'var(--s-4)'}}>
+            {['info', 'workout', 'meals', 'workouts' ,  'progress', 'accountability', 'bonuses'].map(tab => (
+              <button
+                key={tab}
+                className={`myarc-btn ${clientDetailTab === tab ? 'myarc-btn-primary' : 'myarc-btn-ghost'}`}
+                onClick={() => setClientDetailTab(tab)}
+              >
+                {tab.charAt(0).toUpperCase() + tab.slice(1)}
+              </button>
+            ))}
+          </div>
+        </div>
+        
+        <div style={{padding: 'var(--s-5)'}}>
+          {clientDetailTab === 'info' && <ClientInfoTab client={selectedClient} onUpdate={handleUpdateClient} />}
+          {clientDetailTab === 'workout' && <ClientWorkoutTab client={selectedClient} schemas={workoutSchemas} db={db} />}
+          {clientDetailTab === 'meals' && <ClientMealsTab client={selectedClient} templates={mealTemplates} db={db} />}
+          {clientDetailTab === 'progress' && <ClientProgressTab client={selectedClient} db={db} />}
+{clientDetailTab === 'workouts' && <WorkoutLogModule client={selectedClient} db={db} />}
+ {clientDetailTab === 'accountability' && <ClientAccountabilityTab client={selectedClient} db={db} />}
+          {clientDetailTab === 'bonuses' && <ClientBonusesTab client={selectedClient} db={db} />}
+        </div>
+      </div>
+    )
+  }
+
+  // ===== MAIN RENDER =====
+  return (
+    <div className="myarc-app">
+      <div className="myarc-container">
+{/* Header */}
+<div className="myarc-header">
+  <div className="myarc-flex myarc-justify-between myarc-items-center">
+    <div>
+      <h1 className="myarc-logo">MY ARC COACH HUB</h1>
+      <p style={{color: 'var(--c-muted)'}}>Centraal Management Systeem</p>
+    </div>
+    <button 
+      className="myarc-btn myarc-btn-secondary"
+      onClick={async () => {
+        await db.signOut()
+        window.location.href = '/'
+      }}
+    >
+       Uitloggen
+    </button>
+  </div>
+</div>
+
+
+
+
+
+{/* Main Tabs */}
+<div className="myarc-flex myarc-gap-md" style={{marginBottom: 'var(--s-6)'}}>
+  {['overview', 'clients', 'management', 'progress', 'coachvids', 'ai-generator', 'calls', 'meal-builder', 'programs', 'analytics'].map(tab => ( 
+    <button
+      key={tab}
+      className={`myarc-btn ${activeTab === tab ? 'myarc-btn-primary' : 'myarc-btn-secondary'}`}
+      onClick={() => setActiveTab(tab)}
+    >
+      {tab === 'overview' && '📊 Overzicht'}
+      {tab === 'clients' && '👥 Cliënten'}
+      {tab === 'management' && '🎯 Management'}
+      {tab === 'progress' && '📈 Progress'}
+      {tab === 'coachvids' && '🎬 Videos'}
+      {tab === 'ai-generator' && '🤖 AI Generator'}
+      {tab === 'calls' && '📞 Call Planning'}
+      {tab === 'meal-builder' && '🍽️ Meal Planner'}
+      {tab === 'programs' && '📋 Programma\'s'}
+      {tab === 'analytics' && '📈 Analytics'}
+    </button>
+  ))} 
+</div>
+        {/* Loading State */}
+        {loading && (
+          <div className="myarc-loading">
+            <div className="myarc-spinner"></div>
+            <p>Laden...</p>
+          </div>
+        )}
+
+        {/* Overview Tab */}
+        {activeTab === 'overview' && !loading && (
+          <div className="myarc-grid myarc-grid-3">
+            <div className="myarc-card">
+              <h3 style={{color: 'var(--c-accent)', fontSize: 'var(--text-2xl)'}}>{clients.length}</h3>
+              <p style={{color: 'var(--c-muted)'}}>Actieve Cliënten</p>
+            </div>
+            <div className="myarc-card">
+              <h3 style={{color: 'var(--c-accent)', fontSize: 'var(--text-2xl)'}}>{workoutSchemas.length}</h3>
+              <p style={{color: 'var(--c-muted)'}}>Workout Schema's</p>
+            </div>
+            <div className="myarc-card">
+              <h3 style={{color: 'var(--c-accent)', fontSize: 'var(--text-2xl)'}}>{mealTemplates.length}</h3>
+              <p style={{color: 'var(--c-muted)'}}>Meal Templates</p>
+            </div>
+          </div>
+        )}
+
+        {/* Clients Tab */}
+        {activeTab === 'clients' && !loading && (
+          <>
+            {/* Action Bar */}
+            <div className="myarc-flex myarc-justify-between myarc-items-center" style={{marginBottom: 'var(--s-4)'}}>
+              <div className="myarc-flex myarc-gap-md">
+                <button
+                  className="myarc-btn myarc-btn-primary"
+                  onClick={() => setShowNewClientForm(true)}
+                >
+                  ➕ Nieuwe Client
+                </button>
+                
+                {selectedClients.length > 0 && (
+                  <button
+                    className="myarc-btn myarc-btn-secondary"
+                    onClick={() => setShowBulkActions(true)}
+                  >
+                    🚀 Bulk Acties ({selectedClients.length})
+                  </button>
+                )}
+              </div>
+              
+              <div style={{color: 'var(--c-muted)'}}>
+                {clients.length} clients totaal
+              </div>
+            </div>
+
+            {/* Client Grid */}
+            <div className={isMobile ? 'myarc-flex myarc-flex-col myarc-gap-md' : 'myarc-grid myarc-grid-2'}>
+              {clients.map(renderClientCard)}
+            </div>
+
+            {/* Client Detail */}
+            {renderClientDetail()}
+          </>
+        )}
+
+
+        {/* Programs Tab */}
+        {activeTab === 'programs' && !loading && (
+          <div>
+            <h2 style={{color: '#fff', marginBottom: 'var(--s-4)'}}>Programma Beheer</h2>
+            
+            <div className="myarc-grid myarc-grid-2">
+              {/* Workout Schemas */}
+              <div className="myarc-card">
+                <h3 className="myarc-card-title">Workout Schema's</h3>
+                <div style={{maxHeight: '400px', overflowY: 'auto'}}>
+                  {workoutSchemas.map(schema => (
+                    <div key={schema.id} style={{
+                      padding: 'var(--s-3)',
+                      borderBottom: '1px solid var(--c-border)',
+                      cursor: 'pointer'
+                    }}>
+                      <h4 style={{color: '#fff'}}>{schema.name}</h4>
+                      <p style={{color: 'var(--c-muted)', fontSize: 'var(--text-sm)'}}>
+                        {schema.primary_goal} - {schema.days_per_week} dagen
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+
+              {/* Meal Templates */}
+              <div className="myarc-card">
+                <h3 className="myarc-card-title">Meal Templates</h3>
+                <div style={{maxHeight: '400px', overflowY: 'auto'}}>
+                  {mealTemplates.map(template => (
+                    <div key={template.id} style={{
+                      padding: 'var(--s-3)',
+                      borderBottom: '1px solid var(--c-border)',
+                      cursor: 'pointer'
+                    }}>
+                      <h4 style={{color: '#fff'}}>{template.title}</h4>
+                      <p style={{color: 'var(--c-muted)', fontSize: 'var(--text-sm)'}}>
+                        {template.targets?.kcal}kcal - {template.targets?.protein}g eiwit
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+{/* Ergens in je render, waar de andere tabs ook staan */}
+{activeTab === 'coachvids' && (
+  <CoachVideoTab 
+    clients={clients} 
+    db={db}
+  />
+)}
+
+{/* AI Generator Tab */}
+{activeTab === 'ai-generator' && !loading && (
+  <div className="myarc-card">
+    <h2>AI Workout Generator</h2>
+    <AIGenerator />
+  </div>
+)}
+
+{/* VOEG DIT TOE - Call Planning Tab */}
+// In CoachHub.jsx
+{activeTab === 'calls' && !loading && (
+  <div className="myarc-card">
+    <h2>Call Planning & Management</h2>
+    <CallPlanningTab
+      db={db}
+      clients={clients || []}  // Zorg voor empty array fallback
+      currentUser={db.currentUser || null}
+    />
+  </div>
+)}
+
+
+{/* Meal Builder Tab */}
+{activeTab === 'meal-builder' && !loading && (
+  <div className="myarc-card">
+    <h2>Meal Plan Builder</h2>
+    <CoachMealPlannerDashboard />  {/* Gebruik nieuwe naam */}
+  </div>
+)}
+
+{/* progress tab  */}
+{activeTab === 'progress' && !loading && (
+  <div className="myarc-card"> 
+    <h2>Meal Plan Builder</h2>
+    <CoachProgressTab />  {/* Gebruik nieuwe naam */}
+  </div>
+)}
+
+
+{/* CLIENT MANAGEMENT TAB - NIEUW */}
+{activeTab === 'management' && !loading && (
+  <div className="myarc-card">
+    <h2>Client Management</h2>
+    <ClientManagementCore 
+      db={db}
+    />
+  </div>
+)}
+
+        {/* New Client Form Modal */}
+        {showNewClientForm && (
+          <NewClientModal 
+            onClose={() => setShowNewClientForm(false)}
+            onSubmit={handleCreateClient}
+          />
+        )}
+
+        {/* Bulk Actions Modal */}
+        {showBulkActions && (
+          <BulkActionsModal
+            selectedCount={selectedClients.length}
+            schemas={workoutSchemas}
+            templates={mealTemplates}
+            onAssign={handleBulkAssign}
+            onClose={() => setShowBulkActions(false)}
+          />
+        )}
+
+        {/* Quick Action Modal */}
+        {quickAction && (
+          <QuickActionModal
+            action={quickAction}
+            schemas={workoutSchemas}
+            templates={mealTemplates}
+            db={db}
+            onClose={() => setQuickAction(null)}
+          />
+        )}
+      </div>
+    </div>
+  )
+}
+
+// ===== SUB-COMPONENTS =====
+
+function ClientInfoTab({ client, onUpdate }) {
+  const [editing, setEditing] = useState(false)
+  const [formData, setFormData] = useState(client)
+
+  const handleSave = () => {
+    onUpdate(client.id, formData)
+    setEditing(false)
+  }
+
+  return (
+    <div>
+      <div className="myarc-flex myarc-justify-between myarc-items-center" style={{marginBottom: 'var(--s-4)'}}>
+        <h3 style={{color: '#fff'}}>Client Informatie</h3>
+        <button
+          className="myarc-btn myarc-btn-primary"
+          onClick={() => editing ? handleSave() : setEditing(true)}
+        >
+          {editing ? '💾 Opslaan' : '✏️ Bewerken'}
+        </button>
+      </div>
+
+      <div className="myarc-grid myarc-grid-2">
+        {Object.entries({
+          'Voornaam': 'first_name',
+          'Achternaam': 'last_name',
+          'Email': 'email',
+          'Telefoon': 'phone',
+          'Doel': 'goal',
+          'Ervaring': 'experience',
+          'Gewicht': 'current_weight',
+          'Lengte': 'height',
+          'Dagen/week': 'days_per_week'
+        }).map(([label, key]) => (
+          <div key={key}>
+            <label style={{color: 'var(--c-muted)', fontSize: 'var(--text-sm)'}}>{label}</label>
+            {editing ? (
+              <input
+                className="myarc-input"
+                value={formData[key] || ''}
+                onChange={(e) => setFormData({...formData, [key]: e.target.value})}
+              />
+            ) : (
+              <p style={{color: '#fff'}}>{client[key] || 'Niet ingesteld'}</p>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function ClientWorkoutTab({ client, schemas, db }) {
+  const [assigning, setAssigning] = useState(false)
+  const [currentPlan, setCurrentPlan] = useState(null)
+
+  useEffect(() => {
+    loadCurrentPlan()
+  }, [client])
+
+  const loadCurrentPlan = async () => {
+    // Load current workout plan
+    // Implementation here
+  }
+
+  const handleAssign = async (schemaId) => {
+    setAssigning(true)
+    try {
+      await db.assignWorkoutToClient(client.id, schemaId)
+      alert('✅ Workout toegewezen!')
+      loadCurrentPlan()
+    } catch (error) {
+      alert(`❌ Fout: ${error.message}`)
+    } finally {
+      setAssigning(false)
+    }
+  }
+
+  return (
+    <div>
+      <h3 style={{color: '#fff', marginBottom: 'var(--s-4)'}}>Workout Management</h3>
+      
+      {currentPlan && (
+        <div className="myarc-card" style={{marginBottom: 'var(--s-4)'}}>
+          <h4 style={{color: 'var(--c-accent)'}}>Huidig Schema</h4>
+          <p style={{color: '#fff'}}>{currentPlan.name}</p>
+        </div>
+      )}
+
+      <h4 style={{color: 'var(--c-muted)', marginBottom: 'var(--s-3)'}}>Beschikbare Schema's</h4>
+      <div style={{maxHeight: '300px', overflowY: 'auto'}}>
+        {schemas.map(schema => (
+          <div key={schema.id} className="myarc-flex myarc-justify-between myarc-items-center" style={{
+            padding: 'var(--s-3)',
+            borderBottom: '1px solid var(--c-border)'
+          }}>
+            <div>
+              <p style={{color: '#fff'}}>{schema.name}</p>
+              <p style={{color: 'var(--c-muted)', fontSize: 'var(--text-sm)'}}>
+                {schema.days_per_week} dagen - {schema.primary_goal}
+              </p>
+            </div>
+            <button
+              className="myarc-btn myarc-btn-sm myarc-btn-primary"
+              onClick={() => handleAssign(schema.id)}
+              disabled={assigning}
+            >
+              Toewijzen
+            </button>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function ClientMealsTab({ client, templates, db }) {
+  return (
+    <div>
+      <h3 style={{color: '#fff'}}>Meal Plan Management</h3>
+      {/* Similar to WorkoutTab */}
+    </div>
+  )
+}
+
+function ClientProgressTab({ client, db }) {
+  const [progress, setProgress] = useState([])
+  
+  useEffect(() => {
+    loadProgress()
+  }, [client])
+
+  const loadProgress = async () => {
+    const data = await db.getClientProgress(client.id)
+    setProgress(data)
+  }
+
+  return (
+    <div>
+      <h3 style={{color: '#fff'}}>Progress Tracking</h3>
+      {progress.length === 0 ? (
+        <p style={{color: 'var(--c-muted)'}}>Nog geen progress data</p>
+      ) : (
+        <div>
+          {/* Progress charts here */}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function ClientAccountabilityTab({ client, db }) {
+  const [message, setMessage] = useState('')
+
+  const sendMessage = async () => {
+    await db.sendNotification(client.id, 'coach_message', message)
+    setMessage('')
+    alert('✅ Bericht verzonden!')
+  }
+
+  return (
+    <div>
+      <h3 style={{color: '#fff'}}>Accountability & Meldingen</h3>
+      
+      <div style={{marginTop: 'var(--s-4)'}}>
+        <label style={{color: 'var(--c-muted)'}}>Stuur bericht naar client</label>
+        <textarea
+          className="myarc-input"
+          rows="4"
+          value={message}
+          onChange={(e) => setMessage(e.target.value)}
+          placeholder="Type je bericht..."
+        />
+        <button
+          className="myarc-btn myarc-btn-primary"
+          onClick={sendMessage}
+          style={{marginTop: 'var(--s-3)'}}
+        >
+          📨 Verzend
+        </button>
+      </div>
+    </div>
+  )
+}
+
+function ClientBonusesTab({ client, db }) {
+  const [bonuses, setBonuses] = useState([])
+
+  useEffect(() => {
+    loadBonuses()
+  }, [client])
+
+  const loadBonuses = async () => {
+    const data = await db.getClientBonuses(client.id)
+    setBonuses(data)
+  }
+
+  return (
+    <div>
+      <h3 style={{color: '#fff'}}>Bonus Content</h3>
+      {bonuses.length === 0 ? (
+        <p style={{color: 'var(--c-muted)'}}>Geen bonussen toegewezen</p>
+      ) : (
+        <div>
+          {bonuses.map(bonus => (
+            <div key={bonus.id} className="myarc-card">
+              <h4 style={{color: 'var(--c-accent)'}}>{bonus.bonuses?.title}</h4>
+              <p style={{color: 'var(--c-muted)'}}>{bonus.bonuses?.description}</p>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ===== MODALS =====
+
+function NewClientModal({ onClose, onSubmit }) {
+  const [formData, setFormData] = useState({
+    firstName: '',
+    lastName: '',
+    email: '',
+    phone: '',
+    goal: '',
+    experience: '',
+    password: 'Welcome123!'
+  })
+
+  return (
+    <div style={{
+      position: 'fixed',
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      background: 'rgba(0,0,0,0.8)',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      zIndex: 1000
+    }}>
+      <div className="myarc-card" style={{
+        width: '90%',
+        maxWidth: '600px',
+        maxHeight: '90vh',
+        overflowY: 'auto'
+      }}>
+        <h2 style={{color: '#fff', marginBottom: 'var(--s-4)'}}>Nieuwe Client Toevoegen</h2>
+        
+        <div className="myarc-flex myarc-flex-col myarc-gap-md">
+          <input
+            className="myarc-input"
+            placeholder="Voornaam"
+            value={formData.firstName}
+            onChange={(e) => setFormData({...formData, firstName: e.target.value})}
+          />
+          <input
+            className="myarc-input"
+            placeholder="Achternaam"
+            value={formData.lastName}
+            onChange={(e) => setFormData({...formData, lastName: e.target.value})}
+          />
+          <input
+            className="myarc-input"
+            type="email"
+            placeholder="Email"
+            value={formData.email}
+            onChange={(e) => setFormData({...formData, email: e.target.value})}
+          />
+          <input
+            className="myarc-input"
+            placeholder="Telefoon"
+            value={formData.phone}
+            onChange={(e) => setFormData({...formData, phone: e.target.value})}
+          />
+          <select
+            className="myarc-input"
+            value={formData.goal}
+            onChange={(e) => setFormData({...formData, goal: e.target.value})}
+          >
+            <option value="">Selecteer doel</option>
+            <option value="Weight Loss">Afvallen</option>
+            <option value="Muscle Gain">Spieropbouw</option>
+            <option value="Strength">Kracht</option>
+            <option value="General Fitness">Algemene Fitness</option>
+          </select>
+          <select
+            className="myarc-input"
+            value={formData.experience}
+            onChange={(e) => setFormData({...formData, experience: e.target.value})}
+          >
+            <option value="">Selecteer ervaring</option>
+            <option value="Beginner">Beginner (0-18 maanden)</option>
+            <option value="Intermediate">Intermediate (1.5-3 jaar)</option>
+            <option value="Advanced">Advanced (3+ jaar)</option>
+          </select>
+        </div>
+
+        <div className="myarc-flex myarc-gap-md" style={{marginTop: 'var(--s-4)'}}>
+          <button
+            className="myarc-btn myarc-btn-primary"
+            onClick={() => onSubmit(formData)}
+          >
+            ✅ Aanmaken
+          </button>
+          <button
+            className="myarc-btn myarc-btn-secondary"
+            onClick={onClose}
+          >
+            ❌ Annuleren
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function BulkActionsModal({ selectedCount, schemas, templates, onAssign, onClose }) {
+  return (
+    <div style={{
+      position: 'fixed',
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      background: 'rgba(0,0,0,0.8)',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      zIndex: 1000
+    }}>
+      <div className="myarc-card" style={{width: '90%', maxWidth: '500px'}}>
+        <h2 style={{color: '#fff'}}>Bulk Acties voor {selectedCount} clients</h2>
+        
+        <div style={{marginTop: 'var(--s-4)'}}>
+          <h3 style={{color: 'var(--c-accent)'}}>Workout Toewijzen</h3>
+          <select
+            className="myarc-input"
+            onChange={(e) => e.target.value && onAssign('workout', e.target.value)}
+          >
+            <option value="">Selecteer schema...</option>
+            {schemas.map(s => (
+              <option key={s.id} value={s.id}>{s.name}</option>
+            ))}
+          </select>
+        </div>
+
+        <button
+          className="myarc-btn myarc-btn-secondary"
+          onClick={onClose}
+          style={{marginTop: 'var(--s-4)'}}
+        >
+          Sluiten
+        </button>
+      </div>
+    </div>
+  )
+}
+
+function QuickActionModal({ action, schemas, templates, db, onClose }) {
+  const handleAssign = async (itemId) => {
+    if (action.type === 'workout') {
+      await db.assignWorkoutToClient(action.client.id, itemId)
+    } else {
+      await db.saveMealPlan(action.client.id, { template_id: itemId })
+    }
+    alert('✅ Toegewezen!')
+    onClose()
+  }
+
+  return (
+    <div style={{
+      position: 'fixed',
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      background: 'rgba(0,0,0,0.8)',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      zIndex: 1000
+    }}>
+      <div className="myarc-card" style={{width: '90%', maxWidth: '400px'}}>
+        <h3 style={{color: '#fff'}}>
+          {action.type === 'workout' ? 'Workout' : 'Meal Plan'} voor {action.client.first_name}
+        </h3>
+        
+        <div style={{maxHeight: '300px', overflowY: 'auto', marginTop: 'var(--s-3)'}}>
+          {(action.type === 'workout' ? schemas : templates).map(item => (
+            <div
+              key={item.id}
+              className="myarc-card"
+              style={{cursor: 'pointer', marginBottom: 'var(--s-2)'}}
+              onClick={() => handleAssign(item.id)}
+            >
+              <p style={{color: '#fff'}}>{item.name || item.title}</p>
+            </div>
+          ))}
+        </div>
+
+        <button
+          className="myarc-btn myarc-btn-secondary"
+          onClick={onClose}
+          style={{marginTop: 'var(--s-3)'}}
+        >
+          Annuleren
+        </button>
+      </div>
+    </div>
+  )
+}

@@ -1,8 +1,13 @@
 // src/services/DatabaseServiceOptimized.js
-// Uitbreidingen voor DatabaseService met caching en batch operations
+// FIXED VERSION - Alle supabase references gefixed + import toegevoegd
 
-class OptimizedDatabaseService {
+import { supabase } from '../lib/supabase'
+
+class DatabaseServiceOptimized {
   constructor() {
+    // Store supabase reference
+    this.supabase = supabase
+    
     // In-memory cache
     this.cache = new Map()
     this.cacheTimeout = 5 * 60 * 1000 // 5 minutes
@@ -81,87 +86,527 @@ class OptimizedDatabaseService {
     }
   }
 
-  // ===== OPTIMIZED WEIGHT METHODS =====
-  async getWeightHistory(clientId, days = 30, useCache = true) {
-    const cacheKey = this.getCacheKey('getWeightHistory', clientId, days)
+// ========================================
+// FIX voor DatabaseServiceOptimized.js
+// Voeg deze methods toe of vervang bestaande
+// ========================================
+
+// ===== WEIGHT TRACKING (FIXED VERSION) =====
+async saveWeight(clientId, weight, date) {
+  try {
+    // Clear cache first
+    this.clearClientCache(clientId)
     
-    if (useCache) {
-      const cached = this.getFromCache(cacheKey)
-      if (cached) return cached
-    }
+    // First check if entry exists
+    const { data: existing } = await this.supabase
+      .from('weight_history')
+      .select('id')
+      .eq('client_id', clientId)
+      .eq('date', date)
+      .single()
     
-    try {
-      const startDate = new Date()
-      startDate.setDate(startDate.getDate() - days)
-      
-      const { data, error } = await supabase
-        .from('weight_tracking')
-        .select('weight, date, created_at')
-        .eq('client_id', clientId)
-        .gte('date', startDate.toISOString().split('T')[0])
-        .order('date', { ascending: false })
+    if (existing) {
+      // UPDATE existing entry
+      console.log('Updating existing weight for date:', date)
+      const { data, error } = await this.supabase
+        .from('weight_history')
+        .update({ 
+          weight: parseFloat(weight),
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', existing.id)
+        .select()
+        .single()
       
       if (error) throw error
-      
-      // Remove duplicates (keep latest per day)
-      const uniqueByDate = {}
-      data?.forEach(entry => {
-        if (!uniqueByDate[entry.date] || 
-            new Date(entry.created_at) > new Date(uniqueByDate[entry.date].created_at)) {
-          uniqueByDate[entry.date] = entry
-        }
-      })
-      
-      const result = Object.values(uniqueByDate)
-        .sort((a, b) => new Date(b.date) - new Date(a.date))
-      
-      this.setCache(cacheKey, result)
-      return result
-    } catch (error) {
-      console.error('Get weight history error:', error)
-      return []
-    }
-  }
-
-  async saveWeight(clientId, weight, date) {
-    // Clear relevant cache
-    this.clearCache(`getWeightHistory_${clientId}`)
-    this.clearCache(`getLatestWeight_${clientId}`)
-    
-    try {
-      const { data, error } = await supabase
-        .from('weight_tracking')
-        .upsert({
+      console.log('✅ Weight updated successfully')
+      return data
+    } else {
+      // INSERT new entry
+      console.log('Creating new weight entry for date:', date)
+      const { data, error } = await this.supabase
+        .from('weight_history')
+        .insert({
           client_id: clientId,
-          weight: parseFloat(weight),
-          date: date
-        }, {
-          onConflict: 'client_id,date'
+          date: date,
+          weight: parseFloat(weight)
         })
         .select()
         .single()
       
       if (error) throw error
-      
-      // Also update client_goals if exists
-      this.addToBatch(async () => {
-        await supabase
-          .from('client_goals')
-          .update({
-            current_value: weight,
-            updated_at: new Date().toISOString()
-          })
-          .eq('client_id', clientId)
-          .eq('goal_type', 'weight')
-      })
-      
+      console.log('✅ Weight created successfully')
       return data
-    } catch (error) {
-      console.error('Save weight error:', error)
-      throw error
+    }
+  } catch (error) {
+    console.error('Save weight error:', error)
+    throw error
+  }
+}
+
+// Alternative versie die ALTIJD werkt:
+async saveWeightSafe(clientId, weight, date) {
+  try {
+    // Eerst checken of record bestaat
+    const { data: existing } = await this.supabase
+      .from('weight_history')
+      .select('id')
+      .eq('client_id', clientId)
+      .eq('date', date)
+      .single()
+    
+    if (existing) {
+      // Update existing
+      const { data, error } = await this.supabase
+        .from('weight_history')
+        .update({ weight: parseFloat(weight) })
+        .eq('id', existing.id)
+        .select()
+        .single()
+      
+      if (error) throw error
+      return data
+    } else {
+      // Insert new
+      const { data, error } = await this.supabase
+        .from('weight_history')
+        .insert({
+          client_id: clientId,
+          date: date,
+          weight: parseFloat(weight)
+        })
+        .select()
+        .single()
+      
+      if (error) throw error
+      return data
+    }
+  } catch (error) {
+    console.error('Save weight safe error:', error)
+    throw error
+  }
+}
+
+// ===== WORKOUT COMPLETIONS (FIXED) =====
+async markWorkoutComplete(clientId, date, duration, notes) {
+  try {
+    // Check if duration_minutes column exists by trying insert
+    const { data, error } = await this.supabase
+      .from('workout_completions')
+      .upsert({
+        client_id: clientId,
+        workout_date: date,
+        completed: true,
+        duration_minutes: duration || null,  // Safe: gebruik null als niet gegeven
+        notes: notes || null
+      })
+      .select()
+      .single()
+    
+    if (error) {
+      // Als duration_minutes niet bestaat, probeer zonder
+      console.warn('Duration column issue, trying without:', error)
+      const { data: fallbackData, error: fallbackError } = await this.supabase
+        .from('workout_completions')
+        .upsert({
+          client_id: clientId,
+          workout_date: date,
+          completed: true,
+          notes: notes || null
+        })
+        .select()
+        .single()
+      
+      if (fallbackError) throw fallbackError
+      return fallbackData
+    }
+    
+    return data
+  } catch (error) {
+    console.error('Mark workout complete error:', error)
+    throw error
+  }
+}
+
+// ===== ADD DEZE HELPER METHODS ALS ZE MISSEN =====
+
+async getWeightHistory(clientId, days = 30) {
+  try {
+    const startDate = new Date()
+    startDate.setDate(startDate.getDate() - days)
+    
+    const { data, error } = await this.supabase
+      .from('weight_history')
+      .select('*')
+      .eq('client_id', clientId)
+      .gte('date', startDate.toISOString())
+      .order('date', { ascending: false })
+    
+    if (error) throw error
+    return data || []
+  } catch (error) {
+    console.error('Get weight history error:', error)
+    return []
+  }
+}
+
+async getMeasurementsHistory(clientId, days = 30) {
+  try {
+    const startDate = new Date()
+    startDate.setDate(startDate.getDate() - days)
+    
+    const { data, error } = await this.supabase
+      .from('measurements')
+      .select('*')
+      .eq('client_id', clientId)
+      .gte('date', startDate.toISOString())
+      .order('date', { ascending: false })
+    
+    if (error) throw error
+    return data || []
+  } catch (error) {
+    console.error('Get measurements error:', error)
+    return []
+  }
+}
+
+async getWorkoutCompletions(clientId) {
+  try {
+    const { data, error } = await this.supabase
+      .from('workout_completions')
+      .select('*')
+      .eq('client_id', clientId)
+      .order('workout_date', { ascending: false })
+    
+    if (error) throw error
+    return data || []
+  } catch (error) {
+    console.error('Get workout completions error:', error)
+    return []
+  }
+}
+
+async getClientGoals(clientId) {
+  try {
+    const { data, error } = await this.supabase
+      .from('client_goals')
+      .select('*')
+      .eq('client_id', clientId)
+      .order('created_at', { ascending: false })
+    
+    if (error) throw error
+    
+    // Ensure all goals have a status
+    return (data || []).map(goal => ({
+      ...goal,
+      status: goal.status || 'active'
+    }))
+  } catch (error) {
+    console.error('Get client goals error:', error)
+    return []
+  }
+}
+
+async saveGoal(goalData) {
+  try {
+    const { data, error } = await this.supabase
+      .from('client_goals')
+      .upsert(goalData)
+      .select()
+      .single()
+    
+    if (error) throw error
+    return data
+  } catch (error) {
+    console.error('Save goal error:', error)
+    throw error
+  }
+}
+
+async getWorkoutProgress(clientId, days = 30) {
+  try {
+    const startDate = new Date()
+    startDate.setDate(startDate.getDate() - days)
+    
+    const { data, error } = await this.supabase
+      .from('workout_progress')
+      .select('*')
+      .eq('client_id', clientId)
+      .gte('date', startDate.toISOString())
+      .order('date', { ascending: false })
+    
+    if (error) throw error
+    
+    // Process data
+    const exercises = data || []
+    const prs = []
+    const exerciseHistory = []
+    const weekProgress = {}
+    
+    exercises.forEach(ex => {
+      exerciseHistory.push(ex)
+      
+      const weekDay = new Date(ex.date).toISOString().split('T')[0]
+      if (!weekProgress[weekDay]) weekProgress[weekDay] = []
+      weekProgress[weekDay].push(ex)
+      
+      if (ex.sets && Array.isArray(ex.sets)) {
+        const maxWeight = Math.max(...ex.sets.map(s => parseFloat(s.weight) || 0))
+        if (maxWeight > 0) {
+          prs.push({
+            name: ex.exercise_name,
+            weight: maxWeight,
+            date: ex.date
+          })
+        }
+      }
+    })
+    
+    prs.sort((a, b) => b.weight - a.weight)
+    
+    return {
+      exercises: exerciseHistory,
+      prs: prs.slice(0, 5),
+      weekProgress
+    }
+  } catch (error) {
+    console.error('Get workout progress error:', error)
+    return { exercises: [], prs: [], weekProgress: {} }
+  }
+}
+
+async saveWorkoutProgress(progressData) {
+  try {
+    const { data, error } = await this.supabase
+      .from('workout_progress')
+      .upsert(progressData)
+      .select()
+      .single()
+    
+    if (error) throw error
+    return data
+  } catch (error) {
+    console.error('Save workout progress error:', error)
+    throw error
+  }
+}
+
+async getClientProgressByDate(clientId, date) {
+  try {
+    const { data, error } = await this.supabase
+      .from('workout_progress')
+      .select('*')
+      .eq('client_id', clientId)
+      .eq('date', date)
+    
+    if (error) throw error
+    return data || []
+  } catch (error) {
+    console.error('Get progress by date error:', error)
+    return []
+  }
+}
+
+async getExerciseHistory(clientId) {
+  try {
+    const { data, error } = await this.supabase
+      .from('workout_progress')
+      .select('exercise_name')
+      .eq('client_id', clientId)
+    
+    if (error) throw error
+    if (!data) return []
+    
+    // Get unique exercise names
+    return [...new Set(data.map(d => d.exercise_name))]
+  } catch (error) {
+    console.error('Get exercise history error:', error)
+    return []
+  }
+}
+
+async getTodayWorkout(clientId) {
+  try {
+    const today = new Date()
+    const dayOfWeek = today.getDay() || 7 // Sunday = 7
+    
+    const { data, error } = await this.supabase
+      .from('client_workouts')
+      .select('*')
+      .eq('client_id', clientId)
+      .eq('day_of_week', dayOfWeek)
+    
+    if (error) throw error
+    return data?.[0] || null
+  } catch (error) {
+    console.error('Get today workout error:', error)
+    return null
+  }
+}
+
+async getRecentWorkouts(clientId, days = 7) {
+  try {
+    const startDate = new Date()
+    startDate.setDate(startDate.getDate() - days)
+    
+    const { data, error } = await this.supabase
+      .from('workout_progress')
+      .select('*')
+      .eq('client_id', clientId)
+      .gte('date', startDate.toISOString())
+      .order('date', { ascending: false })
+      .limit(10)
+    
+    if (error) throw error
+    return data || []
+  } catch (error) {
+    console.error('Get recent workouts error:', error)
+    return []
+  }
+}
+
+async getProgressPhotos(clientId) {
+  try {
+    const { data, error } = await this.supabase
+      .from('progress_photos')
+      .select('*')
+      .eq('client_id', clientId)
+      .order('date', { ascending: false })
+    
+    if (error) throw error
+    return data || []
+  } catch (error) {
+    console.error('Get progress photos error:', error)
+    return []
+  }
+}
+
+async getAchievements(clientId) {
+  try {
+    const { data, error } = await this.supabase
+      .from('achievements')
+      .select('*')
+      .eq('client_id', clientId)
+      .order('achieved_date', { ascending: false })
+    
+    if (error) throw error
+    return data || []
+  } catch (error) {
+    console.error('Get achievements error:', error)
+    return []
+  }
+}
+
+async getTodaysMealProgress(clientId) {
+  try {
+    const today = new Date().toISOString().split('T')[0]
+    
+    const { data, error } = await this.supabase
+      .from('meal_progress')
+      .select('*')
+      .eq('client_id', clientId)
+      .eq('date', today)
+      .single()
+    
+    if (error && error.code !== 'PGRST116') throw error // Ignore "no rows" error
+    
+    return data || {
+      calories: 0,
+      protein: 0,
+      carbs: 0,
+      fat: 0,
+      fiber: 0,
+      sugar: 0,
+      sodium: 0,
+      water_glasses: 0,
+      target_calories: 2000,
+      target_protein: 150,
+      target_carbs: 250,
+      target_fat: 70,
+      meals: []
+    }
+  } catch (error) {
+    console.error('Get todays meal progress error:', error)
+    return {
+      calories: 0,
+      protein: 0,
+      carbs: 0,
+      fat: 0,
+      target_calories: 2000,
+      meals: []
     }
   }
+}
 
+async getMealHistory(clientId, days = 30) {
+  try {
+    const startDate = new Date()
+    startDate.setDate(startDate.getDate() - days)
+    
+    const { data, error } = await this.supabase
+      .from('meal_progress')
+      .select('*')
+      .eq('client_id', clientId)
+      .gte('date', startDate.toISOString())
+      .order('date', { ascending: false })
+    
+    if (error) throw error
+    return data || []
+  } catch (error) {
+    console.error('Get meal history error:', error)
+    return []
+  }
+}
+
+async getClientStreak(clientId) {
+  try {
+    const { data: completions } = await this.supabase
+      .from('workout_completions')
+      .select('workout_date')
+      .eq('client_id', clientId)
+      .eq('completed', true)
+      .order('workout_date', { ascending: false })
+      .limit(100)
+    
+    if (!completions || completions.length === 0) return 0
+    
+    let streak = 0
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    
+    const sortedDates = completions
+      .map(w => new Date(w.workout_date))
+      .sort((a, b) => b - a)
+    
+    const todayStr = today.toISOString().split('T')[0]
+    const yesterday = new Date(today)
+    yesterday.setDate(yesterday.getDate() - 1)
+    const yesterdayStr = yesterday.toISOString().split('T')[0]
+    
+    const firstDateStr = sortedDates[0].toISOString().split('T')[0]
+    
+    if (firstDateStr === todayStr || firstDateStr === yesterdayStr) {
+      streak = 1
+      let lastDate = sortedDates[0]
+      
+      for (let i = 1; i < sortedDates.length; i++) {
+        const dayDiff = (lastDate - sortedDates[i]) / (1000 * 60 * 60 * 24)
+        
+        if (dayDiff <= 1.5) {
+          streak++
+          lastDate = sortedDates[i]
+        } else {
+          break
+        }
+      }
+    }
+    
+    return streak
+  } catch (error) {
+    console.error('Get client streak error:', error)
+    return 0
+  }
+}
   // ===== OPTIMIZED WORKOUT METHODS =====
   async getWorkoutProgress(clientId, dateRange = 30, useCache = true) {
     const cacheKey = this.getCacheKey('getWorkoutProgress', clientId, dateRange)
@@ -175,21 +620,97 @@ class OptimizedDatabaseService {
       const startDate = new Date()
       startDate.setDate(startDate.getDate() - dateRange)
       
-      const { data, error } = await supabase
+      // Get workout progress records
+      const { data: progressData, error: progressError } = await this.supabase  // ⭐ FIXED
         .from('workout_progress')
         .select('*')
         .eq('client_id', clientId)
         .gte('date', startDate.toISOString().split('T')[0])
         .order('date', { ascending: false })
-        .limit(100) // Limit for performance
+        .limit(100)
       
-      if (error) throw error
+      if (progressError) throw progressError
       
-      this.setCache(cacheKey, data || [])
-      return data || []
+      // Get completions
+      const { data: completions, error: completionsError } = await this.supabase  // ⭐ FIXED
+        .from('workout_completions')
+        .select('*')
+        .eq('client_id', clientId)
+        .gte('workout_date', startDate.toISOString().split('T')[0])
+        .order('workout_date', { ascending: false })
+      
+      if (completionsError) console.warn('Completions query failed:', completionsError)
+      
+      // Group exercises by name for PRs
+      const exerciseMap = {}
+      progressData?.forEach(record => {
+        if (!exerciseMap[record.exercise_name]) {
+          exerciseMap[record.exercise_name] = []
+        }
+        exerciseMap[record.exercise_name].push(record)
+      })
+      
+      // Calculate PRs
+      const prs = []
+      Object.entries(exerciseMap).forEach(([name, records]) => {
+        const maxWeight = Math.max(...records.flatMap(r => 
+          r.sets?.map(s => parseFloat(s.weight) || 0) || [0]
+        ))
+        if (maxWeight > 0) {
+          prs.push({ name, weight: maxWeight })
+        }
+      })
+      
+      // Calculate week progress
+      const weekDates = this.getWeekDates()
+      const weekProgress = {}
+      weekDates.forEach(date => {
+        const completed = completions?.some(c => 
+          c.workout_date === date && c.completed
+        ) || false
+        weekProgress[date] = completed
+      })
+      
+      const result = {
+        exercises: progressData || [],
+        completions: completions || [],
+        prs: prs.slice(0, 10),
+        weekProgress
+      }
+      
+      this.setCache(cacheKey, result)
+      return result
     } catch (error) {
       console.error('Get workout progress error:', error)
-      return []
+      return { exercises: [], completions: [], prs: [], weekProgress: {} }
+    }
+  }
+
+  async saveWorkoutProgress(data) {
+    // Clear cache
+    this.clearCache(`getWorkoutProgress_${data.client_id}`)
+    this.clearCache(`getClientProgressByDate_${data.client_id}`)
+    
+    try {
+      const { data: result, error } = await this.supabase  // ⭐ FIXED
+        .from('workout_progress')
+        .insert({
+          client_id: data.client_id,
+          exercise_name: data.exercise_name,
+          date: data.date,
+          sets: data.sets,
+          notes: data.notes || null,
+          created_at: new Date().toISOString()
+        })
+        .select()
+        .single()
+      
+      if (error) throw error
+      console.log('✅ Workout progress saved')
+      return result
+    } catch (error) {
+      console.error('Save workout progress error:', error)
+      throw error
     }
   }
 
@@ -202,7 +723,7 @@ class OptimizedDatabaseService {
     }
     
     try {
-      const { data, error } = await supabase
+      const { data, error } = await this.supabase  // ⭐ FIXED
         .from('workout_progress')
         .select('*')
         .eq('client_id', clientId)
@@ -219,7 +740,7 @@ class OptimizedDatabaseService {
     }
   }
 
-  // ===== OPTIMIZED GOALS METHODS =====
+  // ===== GOALS METHODS =====
   async getClientGoals(clientId, useCache = true) {
     const cacheKey = this.getCacheKey('getClientGoals', clientId)
     
@@ -229,7 +750,7 @@ class OptimizedDatabaseService {
     }
     
     try {
-      const { data, error } = await supabase
+      const { data, error } = await this.supabase  // ⭐ FIXED
         .from('client_goals')
         .select('*')
         .eq('client_id', clientId)
@@ -254,13 +775,15 @@ class OptimizedDatabaseService {
     }
     
     try {
-      const { data, error } = await supabase
+      const { data, error } = await this.supabase  // ⭐ FIXED
         .from('exercise_goals')
         .select('*')
         .eq('client_id', clientId)
         .order('updated_at', { ascending: false })
       
-      if (error) throw error
+      if (error && error.code !== 'PGRST116') {
+        console.warn('Exercise goals table might not exist:', error)
+      }
       
       this.setCache(cacheKey, data || [])
       return data || []
@@ -270,14 +793,13 @@ class OptimizedDatabaseService {
     }
   }
 
-  // ===== BATCH SAVE OPERATIONS =====
   async saveWeightGoal(clientId, currentWeight, targetWeight) {
     // Clear cache
     this.clearCache(`getClientGoals_${clientId}`)
     
     try {
       // Check if goal exists to preserve start_value
-      const { data: existingGoal } = await supabase
+      const { data: existingGoal } = await this.supabase  // ⭐ FIXED
         .from('client_goals')
         .select('start_value')
         .eq('client_id', clientId)
@@ -286,7 +808,7 @@ class OptimizedDatabaseService {
       
       const startValue = existingGoal?.start_value || currentWeight
       
-      const { data, error } = await supabase
+      const { data, error } = await this.supabase  // ⭐ FIXED
         .from('client_goals')
         .upsert({
           client_id: clientId,
@@ -305,6 +827,383 @@ class OptimizedDatabaseService {
       console.error('Save weight goal error:', error)
       throw error
     }
+  }
+
+  // ===== BODY MEASUREMENTS =====
+  async saveMeasurements(clientId, measurements, date) {
+    this.clearCache(`getMeasurementsHistory_${clientId}`)
+    
+    try {
+      const { data, error } = await this.supabase  // ⭐ FIXED
+        .from('body_measurements')
+        .upsert({
+          client_id: clientId,
+          date: date,
+          chest: measurements.chest ? parseFloat(measurements.chest) : null,
+          arms: measurements.arms ? parseFloat(measurements.arms) : null,
+          waist: measurements.waist ? parseFloat(measurements.waist) : null,
+          hips: measurements.hips ? parseFloat(measurements.hips) : null,
+          thighs: measurements.thighs ? parseFloat(measurements.thighs) : null,
+          created_at: new Date().toISOString()
+        }, {
+          onConflict: 'client_id,date'
+        })
+        .select()
+        .single()
+      
+      if (error) throw error
+      console.log('✅ Measurements saved')
+      return data
+    } catch (error) {
+      console.error('Save measurements error:', error)
+      throw error
+    }
+  }
+
+  async getMeasurementsHistory(clientId, days = 30, useCache = true) {
+    const cacheKey = this.getCacheKey('getMeasurementsHistory', clientId, days)
+    
+    if (useCache) {
+      const cached = this.getFromCache(cacheKey)
+      if (cached) return cached
+    }
+    
+    try {
+      const startDate = new Date()
+      startDate.setDate(startDate.getDate() - days)
+      
+      const { data, error } = await this.supabase  // ⭐ FIXED
+        .from('body_measurements')
+        .select('*')
+        .eq('client_id', clientId)
+        .gte('date', startDate.toISOString().split('T')[0])
+        .order('date', { ascending: false })
+      
+      if (error) throw error
+      
+      this.setCache(cacheKey, data || [])
+      return data || []
+    } catch (error) {
+      console.error('Get measurements history error:', error)
+      return []
+    }
+  }
+
+  // ===== ACHIEVEMENTS =====
+  async getAchievements(clientId, useCache = true) {
+    const cacheKey = this.getCacheKey('getAchievements', clientId)
+    
+    if (useCache) {
+      const cached = this.getFromCache(cacheKey)
+      if (cached) return cached
+    }
+    
+    try {
+      const { data, error } = await this.supabase  // ⭐ FIXED
+        .from('achievements')
+        .select('*')
+        .eq('client_id', clientId)
+        .order('achieved_at', { ascending: false })
+      
+      if (error && error.code !== 'PGRST116') {
+        console.warn('Achievements table might not exist:', error)
+      }
+      
+      this.setCache(cacheKey, data || [])
+      return data || []
+    } catch (error) {
+      console.error('Get achievements error:', error)
+      return []
+    }
+  }
+
+  // ===== NUTRITION METHODS =====
+  async getTodaysMealProgress(clientId) {
+    try {
+      const today = new Date().toISOString().split('T')[0]
+      
+      // Get today's meal progress
+      const { data: mealProgress, error } = await this.supabase  // ⭐ FIXED
+        .from('meal_progress')
+        .select('*')
+        .eq('client_id', clientId)
+        .eq('date', today)
+        .single()
+      
+      if (error || !mealProgress) {
+        // Return default values if no data
+        return {
+          calories: 0,
+          protein: 0,
+          carbs: 0,
+          fat: 0,
+          target_calories: 2000,
+          target_protein: 150,
+          target_carbs: 250,
+          target_fat: 65,
+          meals: [],
+          water: []
+        }
+      }
+      
+      // Get water intake
+      const { data: waterData } = await this.supabase  // ⭐ FIXED
+        .from('water_intake')
+        .select('*')
+        .eq('client_id', clientId)
+        .eq('date', today)
+        .single()
+      
+      return {
+        ...mealProgress,
+        water: waterData ? [{ glasses: waterData.glasses || 0 }] : []
+      }
+    } catch (error) {
+      console.error('Get today meal progress error:', error)
+      return {
+        calories: 0,
+        protein: 0,
+        carbs: 0,
+        fat: 0,
+        target_calories: 2000,
+        target_protein: 150,
+        target_carbs: 250,
+        target_fat: 65,
+        meals: [],
+        water: []
+      }
+    }
+  }
+
+  async getMealHistory(clientId, days = 30, useCache = true) {
+    const cacheKey = this.getCacheKey('getMealHistory', clientId, days)
+    
+    if (useCache) {
+      const cached = this.getFromCache(cacheKey)
+      if (cached) return cached
+    }
+    
+    try {
+      const startDate = new Date()
+      startDate.setDate(startDate.getDate() - days)
+      
+      const { data, error } = await this.supabase  // ⭐ FIXED
+        .from('meal_progress')
+        .select('*')
+        .eq('client_id', clientId)
+        .gte('date', startDate.toISOString().split('T')[0])
+        .order('date', { ascending: false })
+      
+      if (error) throw error
+      
+      const result = (data || []).map(day => ({
+        date: day.date,
+        calories: day.calories || 0,
+        protein: day.protein || 0,
+        carbs: day.carbs || 0,
+        fat: day.fat || 0,
+        target_calories: day.target_calories || 2000
+      }))
+      
+      this.setCache(cacheKey, result)
+      return result
+    } catch (error) {
+      console.error('Get meal history error:', error)
+      return []
+    }
+  }
+
+  async logWaterIntake(clientId, glasses) {
+    this.clearCache(`getTodaysMealProgress_${clientId}`)
+    
+    try {
+      const today = new Date().toISOString().split('T')[0]
+      
+      const { data, error } = await this.supabase  // ⭐ FIXED
+        .from('water_intake')
+        .upsert({
+          client_id: clientId,
+          date: today,
+          glasses: glasses,
+          updated_at: new Date().toISOString()
+        }, {
+          onConflict: 'client_id,date'
+        })
+        .select()
+        .single()
+      
+      if (error) throw error
+      console.log('✅ Water intake logged')
+      return data
+    } catch (error) {
+      console.error('Log water intake error:', error)
+      throw error
+    }
+  }
+
+  // ===== ADDITIONAL MISSING METHODS =====
+  async getTodayWorkout(clientId) {
+    try {
+      const today = new Date().toISOString().split('T')[0]
+      
+      // Get today's planned workout
+      const { data: completion, error: completionError } = await this.supabase  // ⭐ FIXED
+        .from('workout_completions')
+        .select('*')
+        .eq('client_id', clientId)
+        .eq('workout_date', today)
+        .single()
+      
+      if (completionError || !completion) {
+        console.log('No workout planned for today')
+        return null
+      }
+      
+      // Get the workout details
+      const { data: workout, error: workoutError } = await this.supabase  // ⭐ FIXED
+        .from('client_workouts')
+        .select('*')
+        .eq('id', completion.workout_id)
+        .single()
+      
+      if (workoutError) throw workoutError
+      
+      // Parse exercises if stored as JSON
+      if (workout && typeof workout.exercises === 'string') {
+        workout.exercises = JSON.parse(workout.exercises)
+      }
+      
+      return workout
+    } catch (error) {
+      console.error('Get today workout error:', error)
+      return null
+    }
+  }
+
+  async getRecentWorkouts(clientId, days = 7) {
+    try {
+      const startDate = new Date()
+      startDate.setDate(startDate.getDate() - days)
+      
+      const { data, error } = await this.supabase  // ⭐ FIXED
+        .from('workout_completions')
+        .select(`
+          *,
+          client_workouts (*)
+        `)
+        .eq('client_id', clientId)
+        .eq('completed', true)
+        .gte('workout_date', startDate.toISOString().split('T')[0])
+        .order('workout_date', { ascending: false })
+      
+      if (error) throw error
+      
+      // Parse exercises in each workout
+      const workouts = (data || []).map(item => {
+        const workout = item.client_workouts || {}
+        if (typeof workout.exercises === 'string') {
+          workout.exercises = JSON.parse(workout.exercises)
+        }
+        return {
+          ...workout,
+          date: item.workout_date,
+          completed: item.completed
+        }
+      })
+      
+      return workouts
+    } catch (error) {
+      console.error('Get recent workouts error:', error)
+      return []
+    }
+  }
+
+  async getWorkoutCompletions(clientId) {
+    try {
+      const { data, error } = await this.supabase  // ⭐ FIXED
+        .from('workout_completions')
+        .select('*')
+        .eq('client_id', clientId)
+        .order('workout_date', { ascending: false })
+        .limit(100)
+      
+      if (error) throw error
+      return data || []
+    } catch (error) {
+      console.error('Get workout completions error:', error)
+      return []
+    }
+  }
+
+  async getProgressPhotos(clientId) {
+    try {
+      const { data, error } = await this.supabase  // ⭐ FIXED
+        .from('progress_photos')
+        .select('*')
+        .eq('client_id', clientId)
+        .order('date', { ascending: false })
+      
+      if (error && error.code !== 'PGRST116') {
+        console.warn('Progress photos table might not exist:', error)
+      }
+      
+      return data || []
+    } catch (error) {
+      console.error('Get progress photos error:', error)
+      return []
+    }
+  }
+
+  async getExerciseHistory(clientId) {
+    try {
+      const { data, error } = await this.supabase  // ⭐ FIXED
+        .from('workout_progress')
+        .select('exercise_name')
+        .eq('client_id', clientId)
+        .order('created_at', { ascending: false })
+        .limit(100)
+      
+      if (error) throw error
+      
+      // Get unique exercise names
+      const uniqueExercises = [...new Set(data?.map(d => d.exercise_name) || [])]
+      return uniqueExercises
+    } catch (error) {
+      console.error('Get exercise history error:', error)
+      return []
+    }
+  }
+
+  async getExerciseProgress(clientId, exerciseName, limit = 10) {
+    try {
+      const { data, error } = await this.supabase  // ⭐ FIXED
+        .from('workout_progress')
+        .select('*')
+        .eq('client_id', clientId)
+        .eq('exercise_name', exerciseName)
+        .order('date', { ascending: false })
+        .limit(limit)
+      
+      if (error) throw error
+      return data || []
+    } catch (error) {
+      console.error('Get exercise progress error:', error)
+      return []
+    }
+  }
+
+  // ===== HELPER METHODS =====
+  getWeekDates(baseDate = new Date()) {
+    const dates = []
+    const startOfWeek = new Date(baseDate)
+    startOfWeek.setDate(baseDate.getDate() - baseDate.getDay() + 1)
+    
+    for (let i = 0; i < 7; i++) {
+      const date = new Date(startOfWeek)
+      date.setDate(startOfWeek.getDate() + i)
+      dates.push(date.toISOString().split('T')[0])
+    }
+    return dates
   }
 
   // ===== PERFORMANCE MONITORING =====
@@ -340,129 +1239,34 @@ class OptimizedDatabaseService {
     await Promise.all(operations)
     console.log('Progress data prefetched and cached')
   }
-
-  // ===== LAZY LOADING METHODS =====
-  async getExerciseProgress(clientId, exerciseName, limit = 10) {
-    try {
-      const { data, error } = await supabase
-        .from('workout_progress')
-        .select('*')
-        .eq('client_id', clientId)
-        .eq('exercise_name', exerciseName)
-        .order('date', { ascending: false })
-        .limit(limit)
-      
-      if (error) throw error
-      return data || []
-    } catch (error) {
-      console.error('Get exercise progress error:', error)
-      return []
-    }
-  }
-
-  // ===== NEW METHODS FOR MISSING FEATURES =====
-  
-  // Body Measurements
-  async saveMeasurements(clientId, measurements, date) {
-    this.clearCache(`getMeasurementsHistory_${clientId}`)
-    
-    try {
-      const { data, error } = await supabase
-        .from('body_measurements')
-        .upsert({
-          client_id: clientId,
-          date: date,
-          ...measurements,
-          updated_at: new Date().toISOString()
-        }, {
-          onConflict: 'client_id,date'
-        })
-        .select()
-        .single()
-      
-      if (error) throw error
-      return data
-    } catch (error) {
-      console.error('Save measurements error:', error)
-      throw error
-    }
-  }
-
-  async getMeasurementsHistory(clientId, days = 30, useCache = true) {
-    const cacheKey = this.getCacheKey('getMeasurementsHistory', clientId, days)
-    
-    if (useCache) {
-      const cached = this.getFromCache(cacheKey)
-      if (cached) return cached
-    }
-    
-    try {
-      const startDate = new Date()
-      startDate.setDate(startDate.getDate() - days)
-      
-      const { data, error } = await supabase
-        .from('body_measurements')
-        .select('*')
-        .eq('client_id', clientId)
-        .gte('date', startDate.toISOString().split('T')[0])
-        .order('date', { ascending: false })
-      
-      if (error) throw error
-      
-      this.setCache(cacheKey, data || [])
-      return data || []
-    } catch (error) {
-      console.error('Get measurements history error:', error)
-      return []
-    }
-  }
-
-  // Achievements
-  async getAchievements(clientId, useCache = true) {
-    const cacheKey = this.getCacheKey('getAchievements', clientId)
-    
-    if (useCache) {
-      const cached = this.getFromCache(cacheKey)
-      if (cached) return cached
-    }
-    
-    try {
-      const { data, error } = await supabase
-        .from('achievements')
-        .select('*')
-        .eq('client_id', clientId)
-        .order('achieved_at', { ascending: false })
-      
-      if (error) throw error
-      
-      this.setCache(cacheKey, data || [])
-      return data || []
-    } catch (error) {
-      console.error('Get achievements error:', error)
-      return []
-    }
-  }
 }
 
-// Export singleton instance
-const OptimizedDB = new OptimizedDatabaseService()
 
-// Extend existing DatabaseService
-export function extendDatabaseService(DatabaseService) {
-  // Add optimized methods to existing service
-  Object.getOwnPropertyNames(OptimizedDatabaseService.prototype).forEach(name => {
+
+
+// Helemaal onderaan DatabaseServiceOptimized.js, NA de class:
+
+// Export function voor extending
+export function extendDatabaseService(DatabaseServiceClass) {
+  const optimized = new DatabaseServiceOptimized()
+  
+  // Copy all methods to the target class
+  Object.getOwnPropertyNames(Object.getPrototypeOf(optimized)).forEach(name => {
     if (name !== 'constructor') {
-      DatabaseService.prototype[name] = OptimizedDatabaseService.prototype[name]
+      DatabaseServiceClass.prototype[name] = function(...args) {
+        return optimized[name].apply(optimized, args)
+      }
     }
   })
   
-  // Initialize cache and batch queue
-  DatabaseService.prototype.cache = new Map()
-  DatabaseService.prototype.batchQueue = []
-  DatabaseService.prototype.cacheTimeout = 5 * 60 * 1000
-  DatabaseService.prototype.batchDelay = 100
+  // Add cache properties
+  DatabaseServiceClass.prototype.cache = optimized.cache
+  DatabaseServiceClass.prototype.batchQueue = optimized.batchQueue
+  DatabaseServiceClass.prototype.cacheTimeout = optimized.cacheTimeout
+  DatabaseServiceClass.prototype.batchDelay = optimized.batchDelay
   
-  return DatabaseService
+  return DatabaseServiceClass
 }
 
-export default OptimizedDB
+// Export singleton instance
+export default new DatabaseServiceOptimized()

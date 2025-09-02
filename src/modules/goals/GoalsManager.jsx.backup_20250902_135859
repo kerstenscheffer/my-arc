@@ -1,0 +1,1192 @@
+import React, { useState, useEffect } from 'react'
+import { 
+  Target, Plus, X, Camera, CheckCircle, Circle, Timer, TrendingUp,
+  Calendar, Droplets, Dumbbell, Brain, Heart, Book, Trophy, Star,
+  Flag, Edit2, Trash2, Save, ChevronRight, Clock, BarChart3,
+  Zap, Moon, Apple, Flame, ArrowRight, Shield,
+  ChevronDown, Info, Check, CalendarDays, CalendarRange, 
+  CalendarClock, CalendarCheck, RefreshCw, Sparkles
+} from 'lucide-react'
+
+// Category configuration
+const goalCategories = {
+  herstel: {
+    name: 'Herstel',
+    gradient: 'linear-gradient(135deg, #60a5fa 0%, #dbeafe 100%)',
+    darkGradient: 'linear-gradient(135deg, rgba(96, 165, 250, 0.2) 0%, rgba(219, 234, 254, 0.05) 100%)',
+    icon: Moon,
+    color: '#60a5fa',
+    bgColor: 'rgba(96, 165, 250, 0.1)',
+    subcategories: ['Slaap', 'Recovery', 'Stretching', 'Meditatie', 'Breathwork']
+  },
+  mindset: {
+    name: 'Mindset', 
+    gradient: 'linear-gradient(135deg, #ef4444 0%, #fee2e2 100%)',
+    darkGradient: 'linear-gradient(135deg, rgba(239, 68, 68, 0.2) 0%, rgba(254, 226, 226, 0.05) 100%)',
+    icon: Brain,
+    color: '#ef4444',
+    bgColor: 'rgba(239, 68, 68, 0.1)',
+    subcategories: ['Focus', 'Discipline', 'Motivatie', 'Visualisatie', 'Journaling']
+  },
+  workout: {
+    name: 'Workout',
+    gradient: 'linear-gradient(135deg, #f59e0b 0%, #fef3c7 100%)',
+    darkGradient: 'linear-gradient(135deg, rgba(245, 158, 11, 0.2) 0%, rgba(254, 243, 199, 0.05) 100%)',
+    icon: Dumbbell,
+    color: '#f59e0b',
+    bgColor: 'rgba(245, 158, 11, 0.1)',
+    subcategories: ['Kracht', 'Cardio', 'Mobility', 'Sport', 'Skills']
+  },
+  voeding: {
+    name: 'Voeding',
+    gradient: 'linear-gradient(135deg, #10b981 0%, #d1fae5 100%)',
+    darkGradient: 'linear-gradient(135deg, rgba(16, 185, 129, 0.2) 0%, rgba(209, 250, 229, 0.05) 100%)',
+    icon: Apple,
+    color: '#10b981',
+    bgColor: 'rgba(16, 185, 129, 0.1)',
+    subcategories: ['Calorieën', 'Macros', 'Hydratatie', 'Supplementen', 'Meal Prep']
+  },
+  structuur: {
+    name: 'Structuur',
+    gradient: 'linear-gradient(135deg, #8b5cf6 0%, #ede9fe 100%)',
+    darkGradient: 'linear-gradient(135deg, rgba(139, 92, 246, 0.2) 0%, rgba(237, 233, 254, 0.05) 100%)',
+    icon: Calendar,
+    color: '#8b5cf6',
+    bgColor: 'rgba(139, 92, 246, 0.1)',
+    subcategories: ['Routine', 'Habits', 'Planning', 'Consistency', 'Time Management']
+  }
+}
+
+// Measurement types
+const measurementTypes = [
+  { id: 'checkbox', name: 'Dagen', icon: CheckCircle, description: 'per week' },
+  { id: 'number', name: 'Getal', icon: BarChart3, description: 'kg, km, etc.' },
+  { id: 'timer', name: 'Tijd', icon: Clock, description: 'minuten/uren' },
+  { id: 'counter', name: 'Teller', icon: Plus, description: 'reps, glazen' }
+]
+
+// Duration presets
+const durationPresets = [
+  { id: '1_week', label: '1 Week', days: 7, icon: CalendarDays },
+  { id: '2_weeks', label: '2 Weken', days: 14, icon: CalendarRange },
+  { id: '4_weeks', label: '4 Weken', days: 28, icon: Calendar },
+  { id: '2_months', label: '2 Maanden', days: 60, icon: CalendarClock },
+  { id: 'custom', label: 'Handmatig', days: null, icon: Edit2 }
+]
+
+// Helper functions
+const getDayInfo = () => {
+  const today = new Date()
+  const tomorrow = new Date(today)
+  tomorrow.setDate(tomorrow.getDate() + 1)
+  
+  const dayNames = ['Zondag', 'Maandag', 'Dinsdag', 'Woensdag', 'Donderdag', 'Vrijdag', 'Zaterdag']
+  const monthNames = ['januari', 'februari', 'maart', 'april', 'mei', 'juni', 
+                      'juli', 'augustus', 'september', 'oktober', 'november', 'december']
+  
+  return {
+    today: today,
+    tomorrow: tomorrow,
+    todayName: dayNames[today.getDay()],
+    tomorrowName: dayNames[tomorrow.getDay()],
+    todayDate: `${today.getDate()} ${monthNames[today.getMonth()]}`,
+    tomorrowDate: `${tomorrow.getDate()} ${monthNames[tomorrow.getMonth()]}`,
+    currentWeek: `Week ${Math.ceil(today.getDate() / 7)}`
+  }
+}
+
+const getWeekDates = (startDate = new Date()) => {
+  const dates = []
+  const monday = new Date(startDate)
+  const day = monday.getDay()
+  const diff = monday.getDate() - day + (day === 0 ? -6 : 1)
+  monday.setDate(diff)
+  
+  for (let i = 0; i < 7; i++) {
+    const date = new Date(monday)
+    date.setDate(monday.getDate() + i)
+    dates.push(date.toISOString().split('T')[0])
+  }
+  return dates
+}
+
+// Main Component
+export default function GoalsManager({ client, db, goals = [], onRefresh }) {
+  const dayInfo = getDayInfo()
+  
+  // State
+  const [selectedCategory, setSelectedCategory] = useState(null)
+  const [showAddGoal, setShowAddGoal] = useState(false)
+  const [showCategorySelector, setShowCategorySelector] = useState(false)
+  const [activeGoalId, setActiveGoalId] = useState(null)
+  const [weeklyProgress, setWeeklyProgress] = useState({})
+  const [trackingData, setTrackingData] = useState({})
+  const [selectedDuration, setSelectedDuration] = useState('4_weeks')
+  const [showCustomDate, setShowCustomDate] = useState(false)
+  const [loading, setLoading] = useState(false)
+  
+  // Goal form
+  const [goalForm, setGoalForm] = useState({
+    title: '',
+    category: null,
+    subcategory: null,
+    measurement_type: 'checkbox',
+    target_value: '',
+    unit: '',
+    frequency_target: 5,
+    target_date: '',
+    notes: ''
+  })
+  
+  // Load weekly progress on mount
+  useEffect(() => {
+    if (client?.id && db) {
+      loadWeeklyProgress()
+    }
+  }, [client?.id, goals])
+  
+  // Load saved weekly progress
+  const loadWeeklyProgress = async () => {
+    if (!db?.loadWeeklyProgress) return
+    
+    try {
+      const progress = await db.loadWeeklyProgress(client.id)
+      setWeeklyProgress(progress)
+    } catch (error) {
+      console.error('Load weekly progress error:', error)
+    }
+  }
+  
+  // Calculate deadline
+  const calculateDeadline = (preset) => {
+    const tomorrow = dayInfo.tomorrow
+    const presetData = durationPresets.find(p => p.id === preset)
+    
+    if (presetData && presetData.days) {
+      const deadline = new Date(tomorrow)
+      deadline.setDate(tomorrow.getDate() + presetData.days)
+      return deadline.toISOString().split('T')[0]
+    }
+    
+    return ''
+  }
+  
+  // Save goal
+  const saveGoal = async () => {
+    if (!goalForm.title || !goalForm.target_value) {
+      alert('Vul alle verplichte velden in')
+      return
+    }
+    
+    let targetDate = goalForm.target_date
+    if (!showCustomDate && selectedDuration !== 'custom') {
+      targetDate = calculateDeadline(selectedDuration)
+    }
+    
+    if (!targetDate) {
+      alert('Kies een deadline voor je doel')
+      return
+    }
+    
+    setLoading(true)
+    try {
+      const categoryConfig = goalCategories[goalForm.category]
+      
+      await db.saveGoal({
+        client_id: client.id,
+        title: goalForm.title,
+        goal_type: 'custom',
+        category: goalForm.category,
+        main_category: goalForm.category,
+        subcategory: goalForm.subcategory,
+        measurement_type: goalForm.measurement_type,
+        target_value: parseFloat(goalForm.target_value),
+        current_value: 0,
+        target_date: targetDate,
+        unit: goalForm.unit,
+        frequency: 'weekly',
+        frequency_target: goalForm.frequency_target,
+        notes: goalForm.notes,
+        status: 'active',
+        color: categoryConfig.color,
+        icon: 'target',
+        measurement_config: {
+          start_date: dayInfo.tomorrow.toISOString().split('T')[0]
+        }
+      })
+      
+      alert(`✅ Doel opgeslagen! Start vanaf morgen (${dayInfo.tomorrowName})`)
+      
+      setShowAddGoal(false)
+      resetForm()
+      onRefresh()
+    } catch (error) {
+      console.error('Save goal error:', error)
+      alert('Fout bij opslaan')
+    } finally {
+      setLoading(false)
+    }
+  }
+  
+  // Reset form
+  const resetForm = () => {
+    setGoalForm({
+      title: '',
+      category: null,
+      subcategory: null,
+      measurement_type: 'checkbox',
+      target_value: '',
+      unit: '',
+      frequency_target: 5,
+      target_date: '',
+      notes: ''
+    })
+    setSelectedCategory(null)
+    setSelectedDuration('4_weeks')
+    setShowCustomDate(false)
+  }
+  
+  // Update week progress
+  const updateWeekProgress = async (goal, checkedDays) => {
+    setLoading(true)
+    try {
+      await db.saveWeekProgress(goal.id, client.id, checkedDays)
+      
+      setWeeklyProgress({
+        ...weeklyProgress,
+        [goal.id]: checkedDays
+      })
+      
+      alert(`✅ Week opgeslagen! ${checkedDays.length}/${goal.frequency_target} dagen voltooid`)
+      onRefresh()
+    } catch (error) {
+      console.error('Update week progress error:', error)
+      alert('Fout bij opslaan week progress')
+    } finally {
+      setLoading(false)
+    }
+  }
+  
+  // Update other goal types
+  const updateProgress = async (goal, value) => {
+    setLoading(true)
+    try {
+      await db.updateGoalProgress(goal.id, {
+        client_id: client.id,
+        value: value,
+        notes: trackingData[goal.id]?.notes || ''
+      })
+      
+      const progress = calculateProgress({ ...goal, current_value: value })
+      if (progress >= 100 && goal.status !== 'completed') {
+        await db.completeGoal(goal.id)
+        alert('🎉 Doel bereikt! Gefeliciteerd!')
+      }
+      
+      onRefresh()
+    } catch (error) {
+      console.error('Update progress error:', error)
+      alert('Fout bij bijwerken')
+    } finally {
+      setLoading(false)
+    }
+  }
+  
+  // Calculate progress
+  const calculateProgress = (goal) => {
+    if (!goal.current_value || !goal.target_value) return 0
+    const progress = (goal.current_value / goal.target_value) * 100
+    return Math.min(100, Math.round(progress))
+  }
+  
+  // Get days remaining
+  const getDaysRemaining = (targetDate) => {
+    const target = new Date(targetDate)
+    const today = new Date()
+    const diff = target - today
+    return Math.ceil(diff / (1000 * 60 * 60 * 24))
+  }
+  
+  // Render progress ring
+  const renderProgressRing = (progress, color, size = 60) => {
+    const circumference = 2 * Math.PI * 25
+    const strokeDashoffset = circumference - (progress / 100) * circumference
+    
+    return (
+      <svg width={size} height={size} style={{ transform: 'rotate(-90deg)' }}>
+        <circle
+          cx={size/2}
+          cy={size/2}
+          r="25"
+          stroke="rgba(255,255,255,0.1)"
+          strokeWidth="4"
+          fill="none"
+        />
+        <circle
+          cx={size/2}
+          cy={size/2}
+          r="25"
+          stroke={color}
+          strokeWidth="4"
+          fill="none"
+          strokeDasharray={circumference}
+          strokeDashoffset={strokeDashoffset}
+          style={{ transition: 'stroke-dashoffset 0.5s ease' }}
+        />
+      </svg>
+    )
+  }
+  
+  // Render tracking input
+  const renderTrackingInput = (goal) => {
+    const currentValue = trackingData[goal.id]?.value || goal.current_value || 0
+    const categoryConfig = goalCategories[goal.category || goal.main_category] || goalCategories.structuur
+    
+    switch (goal.measurement_type) {
+      case 'checkbox':
+        const days = ['Ma', 'Di', 'Wo', 'Do', 'Vr', 'Za', 'Zo']
+        const checkedDays = trackingData[goal.id]?.checkedDays || weeklyProgress[goal.id] || []
+        const today = new Date().getDay()
+        const todayIndex = today === 0 ? 6 : today - 1
+        
+        return (
+          <div>
+            <div style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              marginBottom: '0.75rem'
+            }}>
+              <label style={{ fontSize: '0.875rem', color: 'rgba(255,255,255,0.6)' }}>
+                Deze week ({checkedDays.length}/{goal.frequency_target} dagen)
+              </label>
+              <div style={{
+                fontSize: '0.75rem',
+                padding: '0.25rem 0.75rem',
+                background: categoryConfig.bgColor,
+                borderRadius: '12px',
+                color: categoryConfig.color,
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem'
+              }}>
+                <CalendarCheck size={14} />
+                {dayInfo.todayName}, {dayInfo.currentWeek}
+              </div>
+            </div>
+            
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '0.25rem' }}>
+              {days.map((day, index) => {
+                const isToday = index === todayIndex
+                const isChecked = checkedDays.includes(index)
+                const isPast = index < todayIndex
+                const wasSaved = weeklyProgress[goal.id]?.includes(index)
+                
+                return (
+                  <div key={day} style={{ textAlign: 'center' }}>
+                    <button
+                      onClick={() => {
+                        const newChecked = isChecked
+                          ? checkedDays.filter(d => d !== index)
+                          : [...checkedDays, index]
+                        setTrackingData({
+                          ...trackingData,
+                          [goal.id]: { ...trackingData[goal.id], checkedDays: newChecked }
+                        })
+                      }}
+                      disabled={loading}
+                      style={{
+                        width: '100%',
+                        padding: '0.75rem 0.25rem',
+                        background: isChecked || wasSaved
+                          ? categoryConfig.gradient
+                          : 'rgba(255,255,255,0.1)',
+                        border: isToday 
+                          ? `2px solid ${categoryConfig.color}`
+                          : 'none',
+                        borderRadius: '8px',
+                        color: isChecked || wasSaved
+                          ? '#000' 
+                          : '#fff',
+                        fontSize: '0.75rem',
+                        fontWeight: 'bold',
+                        cursor: loading ? 'wait' : 'pointer',
+                        transition: 'all 0.2s',
+                        opacity: wasSaved && !isChecked ? 0.7 : 1
+                      }}
+                    >
+                      {day}
+                      {wasSaved && !isChecked && (
+                        <Check size={10} style={{ marginLeft: '2px', display: 'inline' }} />
+                      )}
+                    </button>
+                    {isToday && (
+                      <div style={{
+                        fontSize: '0.6rem',
+                        color: categoryConfig.color,
+                        marginTop: '0.25rem'
+                      }}>
+                        Vandaag
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+            
+            <button
+              onClick={() => updateWeekProgress(goal, checkedDays)}
+              disabled={loading}
+              style={{
+                marginTop: '0.75rem',
+                width: '100%',
+                padding: '0.75rem',
+                background: categoryConfig.gradient,
+                border: 'none',
+                borderRadius: '8px',
+                color: '#000',
+                fontWeight: 'bold',
+                cursor: loading ? 'wait' : 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '0.5rem'
+              }}
+            >
+              {loading ? <RefreshCw size={18} className="animate-spin" /> : <Save size={18} />}
+              Week Opslaan
+            </button>
+          </div>
+        )
+      
+      case 'number':
+      case 'counter':
+      case 'timer':
+        return (
+          <div>
+            <label style={{ fontSize: '0.875rem', color: 'rgba(255,255,255,0.6)' }}>
+              Huidige waarde ({goal.unit})
+            </label>
+            <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>
+              <input
+                type="number"
+                value={currentValue}
+                onChange={(e) => setTrackingData({
+                  ...trackingData,
+                  [goal.id]: { ...trackingData[goal.id], value: e.target.value }
+                })}
+                disabled={loading}
+                style={{
+                  flex: 1,
+                  padding: '0.75rem',
+                  background: 'rgba(255,255,255,0.1)',
+                  border: `1px solid ${categoryConfig.color}33`,
+                  borderRadius: '8px',
+                  color: '#fff',
+                  fontSize: '1.25rem'
+                }}
+              />
+              <button
+                onClick={() => updateProgress(goal, currentValue)}
+                disabled={loading}
+                style={{
+                  padding: '0 1.5rem',
+                  background: categoryConfig.gradient,
+                  border: 'none',
+                  borderRadius: '8px',
+                  color: '#000',
+                  fontWeight: 'bold',
+                  cursor: loading ? 'wait' : 'pointer'
+                }}
+              >
+                {loading ? '...' : 'Update'}
+              </button>
+            </div>
+          </div>
+        )
+      
+      default:
+        return null
+    }
+  }
+  
+  return (
+    <div>
+      {/* Header Stats */}
+      <div style={{
+        background: 'linear-gradient(135deg, #8b5cf6 0%, #3b82f6 100%)',
+        borderRadius: '16px',
+        padding: '1.5rem',
+        marginBottom: '1.5rem',
+        boxShadow: '0 10px 30px rgba(139, 92, 246, 0.3)'
+      }}>
+        <div style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          marginBottom: '1rem'
+        }}>
+          <h3 style={{ fontSize: '1.1rem', fontWeight: 'bold', color: '#fff' }}>
+            {dayInfo.todayName}, {dayInfo.todayDate}
+          </h3>
+          <div style={{
+            padding: '0.5rem 1rem',
+            background: 'rgba(255,255,255,0.2)',
+            borderRadius: '8px',
+            fontSize: '0.875rem',
+            color: '#fff'
+          }}>
+            {dayInfo.currentWeek}
+          </div>
+        </div>
+        
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(100px, 1fr))',
+          gap: '1rem'
+        }}>
+          <div style={{ textAlign: 'center' }}>
+            <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: '#fff' }}>
+              {goals.filter(g => g.status === 'active').length}
+            </div>
+            <div style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.8)' }}>
+              Actieve Doelen
+            </div>
+          </div>
+          <div style={{ textAlign: 'center' }}>
+            <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: '#fff' }}>
+              {goals.filter(g => g.status === 'completed').length}
+            </div>
+            <div style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.8)' }}>
+              Voltooid
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      {/* Add Goal Button */}
+      <button
+        onClick={() => setShowCategorySelector(true)}
+        disabled={loading}
+        style={{
+          width: '100%',
+          padding: '1rem',
+          background: 'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)',
+          border: 'none',
+          borderRadius: '12px',
+          color: '#fff',
+          fontWeight: 'bold',
+          fontSize: '1.1rem',
+          cursor: loading ? 'wait' : 'pointer',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: '0.5rem',
+          marginBottom: '1.5rem',
+          boxShadow: '0 4px 15px rgba(139, 92, 246, 0.4)',
+          transition: 'transform 0.2s'
+        }}
+        onMouseEnter={(e) => !loading && (e.currentTarget.style.transform = 'translateY(-2px)')}
+        onMouseLeave={(e) => e.currentTarget.style.transform = 'translateY(0)'}
+      >
+        <Plus size={24} />
+        Nieuw Doel Stellen
+      </button>
+      
+      {/* Category Selector */}
+      {showCategorySelector && (
+        <div style={{
+          marginBottom: '1.5rem',
+          padding: '1.5rem',
+          background: 'rgba(0, 0, 0, 0.8)',
+          borderRadius: '16px',
+          border: '1px solid rgba(255,255,255,0.1)'
+        }}>
+          <h3 style={{
+            fontSize: '1.2rem',
+            marginBottom: '1rem',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between'
+          }}>
+            <span>Kies een categorie</span>
+            <button
+              onClick={() => {
+                setShowCategorySelector(false)
+                setSelectedCategory(null)
+              }}
+              style={{
+                background: 'none',
+                border: 'none',
+                cursor: 'pointer'
+              }}
+            >
+              <X size={20} color="#fff" />
+            </button>
+          </h3>
+          
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))',
+            gap: '1rem'
+          }}>
+            {Object.entries(goalCategories).map(([key, category]) => {
+              const IconComponent = category.icon
+              
+              return (
+                <button
+                  key={key}
+                  onClick={() => {
+                    setSelectedCategory(key)
+                    setGoalForm({ ...goalForm, category: key })
+                    setShowAddGoal(true)
+                    setShowCategorySelector(false)
+                  }}
+                  style={{
+                    padding: '1.5rem',
+                    background: category.darkGradient,
+                    border: `2px solid transparent`,
+                    borderRadius: '12px',
+                    cursor: 'pointer',
+                    transition: 'all 0.3s ease'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.transform = 'scale(1.05)'
+                    e.currentTarget.style.boxShadow = `0 8px 20px ${category.color}44`
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.transform = 'scale(1)'
+                    e.currentTarget.style.boxShadow = 'none'
+                  }}
+                >
+                  <IconComponent size={32} color={category.color} style={{ marginBottom: '0.5rem' }} />
+                  <div style={{ fontSize: '1rem', fontWeight: 'bold', color: '#fff' }}>
+                    {category.name}
+                  </div>
+                  <div style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.6)', marginTop: '0.25rem' }}>
+                    {category.subcategories.length} opties
+                  </div>
+                </button>
+              )
+            })}
+          </div>
+        </div>
+      )}
+      
+      {/* Active Goals */}
+      {Object.entries(goalCategories).map(([categoryKey, category]) => {
+        const categoryGoals = goals.filter(g => 
+          (g.category === categoryKey || g.main_category === categoryKey) && 
+          g.status === 'active'
+        )
+        if (categoryGoals.length === 0) return null
+        
+        const IconComponent = category.icon
+        
+        return (
+          <div key={categoryKey} style={{ marginBottom: '2rem' }}>
+            <h3 style={{
+              fontSize: '1.1rem',
+              marginBottom: '1rem',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem',
+              color: category.color
+            }}>
+              <IconComponent size={20} />
+              {category.name} ({categoryGoals.length})
+            </h3>
+            
+            <div style={{ display: 'grid', gap: '1rem' }}>
+              {categoryGoals.map((goal) => {
+                const progress = calculateProgress(goal)
+                const daysLeft = getDaysRemaining(goal.target_date)
+                const isExpanded = activeGoalId === goal.id
+                
+                return (
+                  <div key={goal.id} style={{
+                    background: category.darkGradient,
+                    border: `1px solid ${category.color}33`,
+                    borderRadius: '12px',
+                    padding: '1.5rem',
+                    position: 'relative',
+                    overflow: 'hidden',
+                    cursor: 'pointer',
+                    transition: 'all 0.3s ease'
+                  }}
+                  onClick={() => setActiveGoalId(isExpanded ? null : goal.id)}
+                  >
+                    <div style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      marginBottom: '1rem'
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                        <div style={{
+                          width: '50px',
+                          height: '50px',
+                          borderRadius: '12px',
+                          background: category.gradient,
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center'
+                        }}>
+                          <Target size={24} color="#fff" />
+                        </div>
+                        <div>
+                          <h4 style={{ fontSize: '1.1rem', fontWeight: 'bold', marginBottom: '0.25rem' }}>
+                            {goal.title}
+                          </h4>
+                          <div style={{ fontSize: '0.875rem', color: 'rgba(255,255,255,0.6)' }}>
+                            {goal.current_value || 0} / {goal.target_value} {goal.unit}
+                          </div>
+                        </div>
+                      </div>
+                      
+                      <div style={{ position: 'relative' }}>
+                        {renderProgressRing(progress, category.color)}
+                        <div style={{
+                          position: 'absolute',
+                          top: '50%',
+                          left: '50%',
+                          transform: 'translate(-50%, -50%)',
+                          fontSize: '0.875rem',
+                          fontWeight: 'bold',
+                          color: category.color
+                        }}>
+                          {progress}%
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <div style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      fontSize: '0.875rem',
+                      color: 'rgba(255,255,255,0.6)'
+                    }}>
+                      <span>
+                        {daysLeft > 0 ? `${daysLeft} dagen te gaan` : 'Deadline bereikt'}
+                      </span>
+                      <ChevronRight size={16} style={{
+                        transform: isExpanded ? 'rotate(90deg)' : 'rotate(0)',
+                        transition: 'transform 0.2s'
+                      }} />
+                    </div>
+                    
+                    {isExpanded && (
+                      <div style={{
+                        marginTop: '1rem',
+                        paddingTop: '1rem',
+                        borderTop: `1px solid ${category.color}20`
+                      }}
+                      onClick={(e) => e.stopPropagation()}
+                      >
+                        {renderTrackingInput(goal)}
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        )
+      })}
+      
+      {/* Add Goal Modal */}
+      {showAddGoal && selectedCategory && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(0, 0, 0, 0.95)',
+          zIndex: 1000,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: '1rem',
+          overflowY: 'auto'
+        }}>
+          <div style={{
+            background: goalCategories[selectedCategory].darkGradient,
+            backgroundBlendMode: 'overlay',
+            backgroundColor: '#1a1a1a',
+            borderRadius: '20px',
+            padding: '2rem',
+            width: '100%',
+            maxWidth: '600px',
+            maxHeight: '90vh',
+            overflowY: 'auto',
+            border: `2px solid ${goalCategories[selectedCategory].color}33`,
+            boxShadow: `0 20px 60px ${goalCategories[selectedCategory].color}22`
+          }}>
+            <h2 style={{
+              fontSize: '1.5rem',
+              fontWeight: 'bold',
+              marginBottom: '1.5rem',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between'
+            }}>
+              <span style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                {React.createElement(goalCategories[selectedCategory].icon, { 
+                  size: 24, 
+                  color: goalCategories[selectedCategory].color 
+                })}
+                <span style={{ color: '#fff' }}>
+                  Nieuw {goalCategories[selectedCategory].name} Doel
+                </span>
+              </span>
+              <button
+                onClick={() => {
+                  setShowAddGoal(false)
+                  resetForm()
+                }}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer'
+                }}
+              >
+                <X size={20} color="#fff" />
+              </button>
+            </h2>
+            
+            {/* Start Info */}
+            <div style={{
+              marginBottom: '1.5rem',
+              padding: '1rem',
+              background: goalCategories[selectedCategory].bgColor,
+              borderRadius: '12px',
+              border: `1px solid ${goalCategories[selectedCategory].color}33`
+            }}>
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem',
+                color: goalCategories[selectedCategory].color,
+                fontSize: '0.875rem',
+                marginBottom: '0.5rem'
+              }}>
+                <CalendarCheck size={16} />
+                <strong>Start vanaf morgen</strong>
+              </div>
+              <div style={{
+                fontSize: '0.875rem',
+                color: 'rgba(255,255,255,0.7)'
+              }}>
+                Je doel begint {dayInfo.tomorrowName} {dayInfo.tomorrowDate}
+              </div>
+            </div>
+            
+            {/* Goal Title */}
+            <div style={{ marginBottom: '1rem' }}>
+              <label style={{
+                display: 'block',
+                marginBottom: '0.5rem',
+                color: 'rgba(255,255,255,0.8)',
+                fontSize: '0.875rem'
+              }}>
+                Titel van je doel *
+              </label>
+              <input
+                type="text"
+                value={goalForm.title}
+                onChange={(e) => setGoalForm({ ...goalForm, title: e.target.value })}
+                placeholder="Bijv. '8 uur slaap per nacht'"
+                style={{
+                  width: '100%',
+                  padding: '0.75rem',
+                  background: 'rgba(255,255,255,0.1)',
+                  border: `1px solid ${goalCategories[selectedCategory].color}33`,
+                  borderRadius: '8px',
+                  color: '#fff'
+                }}
+              />
+            </div>
+            
+            {/* Measurement Type */}
+            <div style={{ marginBottom: '1rem' }}>
+              <label style={{
+                display: 'block',
+                marginBottom: '0.5rem',
+                color: 'rgba(255,255,255,0.8)',
+                fontSize: '0.875rem'
+              }}>
+                Hoe meet je dit? *
+              </label>
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(2, 1fr)',
+                gap: '0.5rem'
+              }}>
+                {measurementTypes.map(type => {
+                  const IconComponent = type.icon
+                  return (
+                    <button
+                      key={type.id}
+                      onClick={() => setGoalForm({ ...goalForm, measurement_type: type.id })}
+                      style={{
+                        padding: '0.75rem',
+                        background: goalForm.measurement_type === type.id
+                          ? goalCategories[selectedCategory].gradient
+                          : 'rgba(255,255,255,0.05)',
+                        border: `1px solid ${goalForm.measurement_type === type.id
+                          ? goalCategories[selectedCategory].color
+                          : 'rgba(255,255,255,0.1)'}`,
+                        borderRadius: '8px',
+                        color: goalForm.measurement_type === type.id ? '#000' : '#fff',
+                        cursor: 'pointer',
+                        fontSize: '0.875rem',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        gap: '0.25rem'
+                      }}
+                    >
+                      <IconComponent size={20} />
+                      <span>{type.name}</span>
+                      <span style={{ fontSize: '0.65rem', opacity: 0.7 }}>
+                        {type.description}
+                      </span>
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+            
+            {/* Target Value & Unit */}
+            <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '0.5rem', marginBottom: '1rem' }}>
+              <div>
+                <label style={{
+                  display: 'block',
+                  marginBottom: '0.5rem',
+                  color: 'rgba(255,255,255,0.8)',
+                  fontSize: '0.875rem'
+                }}>
+                  Target Waarde *
+                </label>
+                <input
+                  type="number"
+                  value={goalForm.target_value}
+                  onChange={(e) => setGoalForm({ ...goalForm, target_value: e.target.value })}
+                  placeholder="8"
+                  style={{
+                    width: '100%',
+                    padding: '0.75rem',
+                    background: 'rgba(255,255,255,0.1)',
+                    border: `1px solid ${goalCategories[selectedCategory].color}33`,
+                    borderRadius: '8px',
+                    color: '#fff'
+                  }}
+                />
+              </div>
+              <div>
+                <label style={{
+                  display: 'block',
+                  marginBottom: '0.5rem',
+                  color: 'rgba(255,255,255,0.8)',
+                  fontSize: '0.875rem'
+                }}>
+                  Eenheid
+                </label>
+                <input
+                  type="text"
+                  value={goalForm.unit}
+                  onChange={(e) => setGoalForm({ ...goalForm, unit: e.target.value })}
+                  placeholder="uur"
+                  style={{
+                    width: '100%',
+                    padding: '0.75rem',
+                    background: 'rgba(255,255,255,0.1)',
+                    border: `1px solid ${goalCategories[selectedCategory].color}33`,
+                    borderRadius: '8px',
+                    color: '#fff'
+                  }}
+                />
+              </div>
+            </div>
+            
+            {/* Frequency for checkbox */}
+            {goalForm.measurement_type === 'checkbox' && (
+              <div style={{ marginBottom: '1rem' }}>
+                <label style={{
+                  display: 'block',
+                  marginBottom: '0.5rem',
+                  color: 'rgba(255,255,255,0.8)',
+                  fontSize: '0.875rem'
+                }}>
+                  Hoe vaak per week? *
+                </label>
+                <div style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(7, 1fr)',
+                  gap: '0.5rem'
+                }}>
+                  {[1,2,3,4,5,6,7].map(num => (
+                    <button
+                      key={num}
+                      onClick={() => setGoalForm({ ...goalForm, frequency_target: num })}
+                      style={{
+                        padding: '0.75rem 0.5rem',
+                        background: goalForm.frequency_target === num
+                          ? goalCategories[selectedCategory].gradient
+                          : 'rgba(255,255,255,0.05)',
+                        border: `1px solid ${goalForm.frequency_target === num
+                          ? goalCategories[selectedCategory].color
+                          : 'rgba(255,255,255,0.1)'}`,
+                        borderRadius: '6px',
+                        color: goalForm.frequency_target === num ? '#000' : '#fff',
+                        fontSize: '0.875rem',
+                        fontWeight: 'bold',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      {num}x
+                    </button>
+                  ))}
+                </div>
+                <div style={{
+                  marginTop: '0.5rem',
+                  fontSize: '0.75rem',
+                  color: 'rgba(255,255,255,0.6)',
+                  textAlign: 'center'
+                }}>
+                  {goalForm.frequency_target} {goalForm.frequency_target === 1 ? 'dag' : 'dagen'} per week
+                </div>
+              </div>
+            )}
+            
+            {/* Duration Preset */}
+            <div style={{ marginBottom: '1rem' }}>
+              <label style={{
+                display: 'block',
+                marginBottom: '0.5rem',
+                color: 'rgba(255,255,255,0.8)',
+                fontSize: '0.875rem'
+              }}>
+                Hoe lang wil je dit doel? *
+              </label>
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fit, minmax(100px, 1fr))',
+                gap: '0.5rem'
+              }}>
+                {durationPresets.map(preset => {
+                  const IconComponent = preset.icon
+                  return (
+                    <button
+                      key={preset.id}
+                      onClick={() => {
+                        setSelectedDuration(preset.id)
+                        setShowCustomDate(preset.id === 'custom')
+                        if (preset.id !== 'custom') {
+                          setGoalForm({
+                            ...goalForm,
+                            target_date: calculateDeadline(preset.id)
+                          })
+                        }
+                      }}
+                      style={{
+                        padding: '0.75rem 0.5rem',
+                        background: selectedDuration === preset.id
+                          ? goalCategories[selectedCategory].gradient
+                          : 'rgba(255,255,255,0.05)',
+                        border: `1px solid ${selectedDuration === preset.id
+                          ? goalCategories[selectedCategory].color
+                          : 'rgba(255,255,255,0.1)'}`,
+                        borderRadius: '8px',
+                        color: selectedDuration === preset.id ? '#000' : '#fff',
+                        fontSize: '0.875rem',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        gap: '0.25rem'
+                      }}
+                    >
+                      <IconComponent size={18} />
+                      <span style={{ fontSize: '0.75rem' }}>{preset.label}</span>
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+            
+            {/* Custom Date Picker */}
+            {showCustomDate && (
+              <div style={{ marginBottom: '1rem' }}>
+                <label style={{
+                  display: 'block',
+                  marginBottom: '0.5rem',
+                  color: 'rgba(255,255,255,0.8)',
+                  fontSize: '0.875rem'
+                }}>
+                  Kies deadline
+                </label>
+                <input
+                  type="date"
+                  value={goalForm.target_date}
+                  onChange={(e) => setGoalForm({ ...goalForm, target_date: e.target.value })}
+                  min={dayInfo.tomorrow.toISOString().split('T')[0]}
+                  style={{
+                    width: '100%',
+                    padding: '0.75rem',
+                    background: 'rgba(255,255,255,0.1)',
+                    border: `1px solid ${goalCategories[selectedCategory].color}33`,
+                    borderRadius: '8px',
+                    color: '#fff'
+                  }}
+                />
+              </div>
+            )}
+            
+            {/* Save Button */}
+            <button
+              onClick={saveGoal}
+              disabled={!goalForm.title || !goalForm.target_value || loading}
+              style={{
+                width: '100%',
+                padding: '1rem',
+                background: !goalForm.title || !goalForm.target_value
+                  ? 'rgba(139, 92, 246, 0.3)'
+                  : goalCategories[selectedCategory].gradient,
+                border: 'none',
+                borderRadius: '8px',
+                color: !goalForm.title || !goalForm.target_value
+                  ? 'rgba(255,255,255,0.5)'
+                  : '#000',
+                fontWeight: 'bold',
+                fontSize: '1rem',
+                cursor: !goalForm.title || !goalForm.target_value || loading
+                  ? 'not-allowed'
+                  : 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '0.5rem'
+              }}
+            >
+              {loading ? <RefreshCw size={20} className="animate-spin" /> : <Trophy size={20} />}
+              {loading ? 'Opslaan...' : 'Doel Opslaan'}
+            </button>
+          </div>
+        </div>
+      )}
+      
+      <style>{`
+        @keyframes spin {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
+        }
+        .animate-spin {
+          animation: spin 1s linear infinite;
+        }
+      `}</style>
+    </div>
+  )
+}

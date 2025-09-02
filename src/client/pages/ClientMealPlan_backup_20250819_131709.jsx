@@ -1,3 +1,4 @@
+import useIsMobile from '../../hooks/useIsMobile'
 // src/client/pages/ClientMealPlan.jsx
 // 🚀 MY ARC CLIENT MEAL PLAN - FINAL LAUNCH VERSION
 // Features: Swap functie, Geen emoji's, Mooie goal boxes zoals ClientProgress
@@ -264,7 +265,7 @@ export default function ClientMealPlan({ client }) {
   const [pendingSwaps, setPendingSwaps] = useState({})
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
   
-  const isMobile = window.innerWidth <= 768
+  const isMobile = useIsMobile()
 
   // Load all meals for swap functionality
   useEffect(() => {

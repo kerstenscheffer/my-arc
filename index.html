@@ -1,19 +1,274 @@
-<!doctype html>
-<html lang="en">
+<!DOCTYPE html>
+<html lang="nl">
   <head>
     <meta charset="UTF-8" />
+    
+    <!-- Favicon -->
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
-    <!-- CRITICAL: Viewport voor mobile responsiveness -->
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-    <!-- Prevent zooming on iOS -->
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <!-- Theme color voor mobile browsers -->
-    <meta name="theme-color" content="#10b981">
+    <link rel="icon" type="image/png" sizes="32x32" href="/icons/icon-32x32.png" />
+    <link rel="icon" type="image/png" sizes="16x16" href="/icons/icon-16x16.png" />
+    
+    <!-- VIEWPORT: Essentieel voor mobile & PWA -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes, viewport-fit=cover" />
+    
+    <!-- 🆕 PWA Manifest -->
+    <link rel="manifest" href="/manifest.json" />
+    
+    <!-- iOS Specific (VERBETERD VOOR PWA) -->
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="MY ARC" />
+    <link rel="apple-touch-icon" href="/icons/icon-180x180.png" />
+    <link rel="apple-touch-icon" sizes="152x152" href="/icons/icon-152x152.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/icons/icon-180x180.png" />
+    <link rel="apple-touch-icon" sizes="167x167" href="/icons/icon-167x167.png" />
+    
+    <!-- 🆕 iOS Splash Screens -->
+    <link rel="apple-touch-startup-image" href="/splash/splash-2048x2732.png" media="(device-width: 1024px) and (device-height: 1366px) and (-webkit-device-pixel-ratio: 2)" />
+    <link rel="apple-touch-startup-image" href="/splash/splash-1668x2388.png" media="(device-width: 834px) and (device-height: 1194px) and (-webkit-device-pixel-ratio: 2)" />
+    <link rel="apple-touch-startup-image" href="/splash/splash-1536x2048.png" media="(device-width: 768px) and (device-height: 1024px) and (-webkit-device-pixel-ratio: 2)" />
+    <link rel="apple-touch-startup-image" href="/splash/splash-1242x2688.png" media="(device-width: 414px) and (device-height: 896px) and (-webkit-device-pixel-ratio: 3)" />
+    <link rel="apple-touch-startup-image" href="/splash/splash-1125x2436.png" media="(device-width: 375px) and (device-height: 812px) and (-webkit-device-pixel-ratio: 3)" />
+    
+    <!-- Android Specific (VERBETERD) -->
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="theme-color" content="#10b981" />
+    <meta name="application-name" content="MY ARC" />
+    
+    <!-- 🆕 Microsoft Tiles -->
+    <meta name="msapplication-TileColor" content="#10b981" />
+    <meta name="msapplication-tap-highlight" content="no" />
+    
+    <!-- SEO & Description (UITGEBREID) -->
+    <meta name="description" content="MY ARC - Premium Personal Training Platform. Jouw complete fitness journey met gepersonaliseerde workouts, meal plans en progress tracking." />
+    <meta name="author" content="Kersten Scheffer" />
+    <meta property="og:title" content="MY ARC Personal Training" />
+    <meta property="og:description" content="Premium Personal Training Platform - Transform your fitness journey" />
+    <meta property="og:type" content="website" />
+    <meta property="og:image" content="/icons/icon-512x512.png" />
+    
+    <!-- Title -->
     <title>MY ARC - Personal Training Platform</title>
+    
+    <!-- Critical Mobile CSS (BEHOUDEN + PWA extras) -->
+    <style>
+      /* Reset & Base Styles */
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+        -webkit-tap-highlight-color: transparent;
+      }
+      
+      /* Prevent layout issues */
+      html {
+        overflow-x: hidden;
+        width: 100%;
+        height: 100%;
+      }
+      
+      body {
+        margin: 0;
+        padding: 0;
+        width: 100%;
+        min-height: 100vh;
+        overflow-x: hidden;
+        background: #0a0f0d;
+        color: #ffffff;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
+        -webkit-overflow-scrolling: touch;
+        overscroll-behavior-y: contain; /* 🆕 Prevent pull-to-refresh */
+      }
+      
+      /* Root container */
+      #root {
+        width: 100%;
+        min-height: 100vh;
+        position: relative;
+        overflow-x: hidden;
+      }
+      
+      /* Prevent zoom on input focus (iOS/Android) */
+      input,
+      select,
+      textarea,
+      button {
+        font-size: 16px !important;
+        -webkit-appearance: none;
+        -moz-appearance: none;
+        appearance: none;
+        border-radius: 0;
+      }
+      
+      /* Fix for iOS input zoom */
+      @media screen and (max-width: 768px) {
+        input:focus,
+        select:focus,
+        textarea:focus {
+          font-size: 16px !important;
+          transform: scale(1) !important;
+        }
+      }
+      
+      /* Safe area insets for modern phones (iPhone X+) */
+      @supports (padding: env(safe-area-inset-top)) {
+        body {
+          padding-top: env(safe-area-inset-top);
+          padding-left: env(safe-area-inset-left);
+          padding-right: env(safe-area-inset-right);
+        }
+        
+        /* Bottom nav padding for home indicator */
+        .bottom-nav {
+          padding-bottom: env(safe-area-inset-bottom);
+        }
+      }
+      
+      /* Loading animation */
+      .app-loading {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: linear-gradient(180deg, #0a0f0d 0%, #1a1a1a 100%);
+        z-index: 9999;
+      }
+      
+      .app-loading-spinner {
+        width: 50px;
+        height: 50px;
+        border: 3px solid rgba(16, 185, 129, 0.2);
+        border-top-color: #10b981;
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+      }
+      
+      @keyframes spin {
+        to { transform: rotate(360deg); }
+      }
+      
+      /* Smooth scrolling */
+      html {
+        scroll-behavior: smooth;
+      }
+      
+      /* Better scrollbar */
+      ::-webkit-scrollbar {
+        width: 8px;
+        height: 8px;
+      }
+      
+      ::-webkit-scrollbar-track {
+        background: rgba(255, 255, 255, 0.05);
+      }
+      
+      ::-webkit-scrollbar-thumb {
+        background: rgba(16, 185, 129, 0.5);
+        border-radius: 4px;
+      }
+      
+      ::-webkit-scrollbar-thumb:hover {
+        background: rgba(16, 185, 129, 0.7);
+      }
+      
+      /* Focus styles for accessibility */
+      :focus-visible {
+        outline: 2px solid #10b981;
+        outline-offset: 2px;
+      }
+      
+      /* Landscape mode adjustments */
+      @media screen and (max-width: 768px) and (orientation: landscape) {
+        body {
+          font-size: 14px;
+        }
+        
+        .myarc-header {
+          padding: 0.5rem 1rem;
+        }
+      }
+      
+      /* Print styles */
+      @media print {
+        body {
+          background: white;
+          color: black;
+        }
+      }
+      
+      /* 🆕 PWA Install banner hiding */
+      .pwa-install-prompt {
+        animation: slideUp 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+      }
+      
+      @keyframes slideUp {
+        from {
+          transform: translateY(100px);
+          opacity: 0;
+        }
+        to {
+          transform: translateY(0);
+          opacity: 1;
+        }
+      }
+    </style>
+    
+    <!-- Preconnect to external domains for better performance -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    
+    <!-- 🆕 PWA Service Worker Registration -->
+    <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('/service-worker.js')
+            .then(registration => {
+              console.log('✅ MY ARC Service Worker geregistreerd:', registration.scope);
+              
+              // Check for updates every hour
+              setInterval(() => {
+                registration.update();
+              }, 60 * 60 * 1000);
+            })
+            .catch(error => {
+              console.error('❌ Service Worker registratie mislukt:', error);
+            });
+        });
+      }
+      
+      // 🆕 Standalone mode detection
+      if (window.matchMedia('(display-mode: standalone)').matches) {
+        console.log('🚀 MY ARC draait als geïnstalleerde app!');
+      }
+    </script>
   </head>
+  
   <body>
-    <div id="root"></div>
+    <!-- Loading indicator (wordt verwijderd door React) -->
+    <div id="root">
+      <div class="app-loading">
+        <div>
+          <div class="app-loading-spinner"></div>
+          <p style="color: #10b981; margin-top: 1rem; font-size: 0.9rem;">MY ARC laden...</p>
+        </div>
+      </div>
+    </div>
+    
+    <!-- React App -->
     <script type="module" src="/src/main.jsx"></script>
+    
+    <!-- No JS fallback -->
+    <noscript>
+      <div style="padding: 2rem; text-align: center; background: #0a0f0d; color: #fff;">
+        <h1>JavaScript Vereist</h1>
+        <p>MY ARC heeft JavaScript nodig om te werken. Schakel JavaScript in je browser in.</p>
+      </div>
+    </noscript>
   </body>
 </html>

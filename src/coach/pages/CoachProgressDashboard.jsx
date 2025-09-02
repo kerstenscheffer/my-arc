@@ -1,3 +1,4 @@
+import useIsMobile from '../../hooks/useIsMobile'
 // src/coach/pages/CoachProgressDashboard.jsx  
 // MY ARC Coach Progress Dashboard - Complete Client Progress Monitoring
 import { useState, useEffect } from 'react'
@@ -18,7 +19,7 @@ import {
 
 export default function CoachProgressDashboard({ user }) {
   const { t, language } = useLanguage()
-  const isMobile = window.innerWidth <= 768
+  const isMobile = useIsMobile()
   
   // State management
   const [clients, setClients] = useState([])
