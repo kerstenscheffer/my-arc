@@ -80,38 +80,126 @@ class DatabaseServiceClass {
   }
 
   // ===== AUTH METHODS =====
-  async getCurrentUser() {
-    try {
-      // Check cache first
-      if (this.currentUser) return this.currentUser
-      
-      const { data: { user }, error } = await supabase.auth.getUser()
-      if (error) throw error
-      
-      this.currentUser = user
-      return user
-    } catch (error) {
-      console.error('❌ Get current user failed:', error)
-      return null
-    }
-  }
 
-  async signIn(email, password) {
-    try {
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email,
-        password
-      })
-      if (error) throw error
-      
-      this.currentUser = data.user
-      this.clearCache() // Clear cache on login
-      return data
-    } catch (error) {
-      console.error('❌ Sign in failed:', error)
-      throw error
+// UPDATE voor getCurrentUser method in DatabaseService.js
+// Vervang de huidige getCurrentUser method met deze versie:
+
+async getCurrentUser() {
+  try {
+    // iOS PWA Fix: Check for standalone mode
+    const isStandalone = window.matchMedia('(display-mode: standalone)').matches || 
+                        window.navigator.standalone;
+    
+    if (isStandalone) {
+      console.log('📱 iOS PWA Mode detected - using enhanced auth check');
     }
+    
+    // ALTIJD eerst getSession voor PWA
+    const { data: { session }, error: sessionError } = await this.supabase.auth.getSession()
+    
+    if (sessionError) {
+      console.error('Session error:', sessionError);
+      
+      // iOS PWA Fallback: Try to refresh session
+      if (isStandalone) {
+        console.log('🔄 Attempting session refresh for iOS PWA...');
+        const { data: { session: refreshedSession } } = await this.supabase.auth.refreshSession();
+        
+        if (refreshedSession?.user) {
+          console.log('✅ Session refreshed successfully');
+          this.currentUser = refreshedSession.user;
+          return refreshedSession.user;
+        }
+      }
+    }
+    
+    if (session?.user) {
+      console.log('✅ Session found:', session.user.email)
+      this.currentUser = session.user
+      return session.user
+    }
+    
+    // Extra check voor iOS PWA: Check localStorage manual
+    if (isStandalone) {
+      const storedSession = localStorage.getItem('supabase.auth.token');
+      if (storedSession) {
+        console.log('📱 Found stored session in localStorage, attempting recovery...');
+        // Try to set session manually
+        try {
+          const { data: { user } } = await this.supabase.auth.getUser();
+          if (user) {
+            console.log('✅ User recovered from stored session');
+            this.currentUser = user;
+            return user;
+          }
+        } catch (e) {
+          console.error('Failed to recover user:', e);
+        }
+      }
+    }
+    
+    console.log('❌ No session found')
+    return null
+  } catch (error) {
+    console.error('❌ getCurrentUser error:', error)
+    
+    // Don't crash the app - return null
+    return null
   }
+}
+
+// Ook update signIn voor betere iOS PWA support:
+async signIn(email, password) {
+  try {
+    console.log('🔐 Attempting sign in...')
+    
+    const { data, error } = await this.supabase.auth.signInWithPassword({
+      email,
+      password
+    })
+    
+    if (error) {
+      console.error('❌ Sign in error:', error)
+      return { error: error.message }
+    }
+    
+    if (data.user) {
+      console.log('✅ Sign in successful:', data.user.email)
+      this.currentUser = data.user
+      
+      // iOS PWA Fix: Force session persistence
+      const isStandalone = window.matchMedia('(display-mode: standalone)').matches || 
+                          window.navigator.standalone;
+      
+      if (isStandalone) {
+        console.log('📱 iOS PWA: Ensuring session persistence...');
+        // Force a session refresh to ensure tokens are stored
+        await this.supabase.auth.refreshSession();
+      }
+      
+      return { user: data.user }
+    }
+    
+    return { error: 'No user returned' }
+  } catch (error) {
+    console.error('❌ Sign in exception:', error)
+    return { error: error.message }
+  }
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
   async signOut() {
     try {

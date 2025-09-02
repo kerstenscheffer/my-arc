@@ -8,15 +8,26 @@ if (!supabaseUrl || !supabaseKey) {
   throw new Error('Supabase credentials missing!')
 }
 
-export const supabase = createClient(supabaseUrl, supabaseKey, {
-  auth: {
-    persistSession: true,
-    autoRefreshToken: true,
-    storage: window.localStorage,
-    storageKey: 'my-arc-auth',
-    flowType: 'pkce'  // Voeg deze toe
+
+
+// SINGLETON PATTERN - voorkomt meerdere instances
+let supabaseInstance = null;
+
+export const supabase = (() => {
+  if (!supabaseInstance) {
+    supabaseInstance = createClient(supabaseUrl, supabaseKey, {
+      auth: {
+        persistSession: true,
+        autoRefreshToken: true,
+        detectSessionInUrl: true,
+        storage: window.localStorage,
+        storageKey: `sb-${supabaseUrl.split('//')[1].split('.')[0]}-auth-token`
+      }
+    })
   }
-})
+  return supabaseInstance
+})()
+
 
 // ===== AUTH FUNCTIONS =====
 

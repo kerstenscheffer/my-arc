@@ -1,3 +1,4 @@
+import CoachWorkoutAnalytics from './pages/CoachWorkoutAnalytics'
 import AIMealGenerator from '../modules/ai-meal-generator/AIMealGenerator'
 import useIsMobile from '../hooks/useIsMobile'
 import WorkoutLogModule from '../modules/progress/workout/WorkoutLogModule'
@@ -18,6 +19,7 @@ import {
 Sparkles,
   Target,
   TrendingUp,
+Activity,
   Trophy,
   Video,
   Bot,
@@ -175,12 +177,13 @@ const allNavItems = [
   { id: 'clients', label: 'Cliënten', Icon: Users },
   { id: 'management', label: 'Client Beheer', Icon: Target }, 
   { id: 'progress', label: 'Progress', Icon: TrendingUp },
+  { id: 'workout-analytics', label: 'Workout Analytics', Icon: Activity }, // <-- NIEUW
   { id: 'challenges', label: 'Challenges', Icon: Trophy },
   { id: 'coachvids', label: 'Videos', Icon: Video },
   { id: 'ai-generator', label: 'AI Generator', Icon: Bot },     
   { id: 'calls', label: 'Call Planning', Icon: Phone },   
   { id: 'meal-builder', label: 'Meal Planner', Icon: Utensils },
-  { id: 'ai-meals', label: 'AI Meals', Icon: Sparkles }, // <-- NIEUW
+  { id: 'ai-meals', label: 'AI Meals', Icon: Sparkles },
   { id: 'programs', label: 'Programma\'s', Icon: ClipboardList },
   { id: 'analytics', label: 'Analytics', Icon: BarChart3 }
 ]
@@ -1360,6 +1363,26 @@ const allNavItems = [
                 <CoachMealPlannerDashboard />
               </div>
             )}
+
+
+
+
+{activeTab === 'workout-analytics' && !loading && (
+  <div style={{
+    background: 'rgba(17, 17, 17, 0.5)',
+    backdropFilter: 'blur(10px)',
+    borderRadius: '16px',
+    border: '1px solid rgba(255, 255, 255, 0.1)',
+    padding: isMobile ? '0' : '0', // Component heeft eigen padding
+    boxShadow: '0 10px 30px rgba(0, 0, 0, 0.3)'
+  }}>
+    <CoachWorkoutAnalytics 
+      db={db}
+      coachId={user?.id || coachData?.id}
+    />
+  </div>
+)}
+
 
 
 

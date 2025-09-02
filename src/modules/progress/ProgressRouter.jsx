@@ -105,15 +105,18 @@ export default function ProgressRouter({ client, db, onNavigate }) {
     activeChallenge: null,
     totalChallenges: 0
   })
-  
+const [goals, setGoals] = useState([])  
+
+
   // Verbeterde mobile detection - minder restrictief
   const isMobile = window.innerWidth <= 768
 
-  useEffect(() => {
-    if (db && client?.id) {
-      loadStats()
-    }
-  }, [db, client])
+useEffect(() => {
+  if (db && client?.id) {
+    loadStats()
+    loadGoals()  // ADD THIS LINE
+  }
+}, [db, client])
 
   // Close mobile menu when clicking outside
   useEffect(() => {
@@ -158,6 +161,19 @@ export default function ProgressRouter({ client, db, onNavigate }) {
     }
   }
 
+const loadGoals = async () => {
+  if (!client?.id || !db) return
+  
+  try {
+    const goalsData = await db.getClientGoals(client.id)
+    setGoals(goalsData || [])
+  } catch (error) {
+    console.error('Error loading goals:', error)
+    setGoals([])
+  }
+}
+
+
   const modules = [
     { id: 'overview', label: 'Overview', Icon: TrendingUp, theme: MODULE_THEMES.overview },
     { id: 'weight', label: 'Gewicht', Icon: Weight, theme: MODULE_THEMES.weight },
@@ -184,8 +200,19 @@ export default function ProgressRouter({ client, db, onNavigate }) {
         return <PhotosModule {...commonProps} />
       case 'challenges':
         return <ClientChallenges {...commonProps} />
-      case 'goals':
-        return <GoalsManager {...commonProps} />
+
+case 'goals':
+  return (
+    <GoalsManager 
+      {...commonProps} 
+      goals={goals}
+      onRefresh={async () => {
+        console.log('Goals updated, refreshing...')
+        await loadGoals()
+      }}
+    />
+  )
+
       default:
         return <OverviewTab {...commonProps} stats={stats} onNavigate={setActiveModule} />
     }
