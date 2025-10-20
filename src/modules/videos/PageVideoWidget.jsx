@@ -1,646 +1,595 @@
-import useIsMobile from '../../hooks/useIsMobile'
+// src/modules/videos/PageVideoWidget.jsx - EXAMPLESLIDER STYLE
 import React, { useState, useEffect, useRef } from 'react'
 import { 
-  Play, X, ChevronRight, Sparkles, Grid, Eye, Phone, Trophy
+  Play, Pause, ChevronLeft, ChevronRight, Volume2, VolumeX,
+  Zap, Target, Apple, Brain, Heart, GraduationCap, Trophy,
+  Clock, Sparkles, Info
 } from 'lucide-react'
-import videoService from '../../modules/videos/VideoService'  // Import VideoService
+import videoService from './VideoService'
 
-// Cache
-let globalVideoCache = {}
-
-// Page color schemes - UITGEBREID MET CALLS EN CHALLENGES
-const PAGE_THEMES = {
-  home: {
-    primary: '#3b82f6',
-    primaryDark: '#2563eb',
-    primaryDarkest: '#1d4ed8',
-    gradient: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 50%, #1d4ed8 100%)',
-    borderColor: 'rgba(59, 130, 246, 0.1)',
-    borderActive: 'rgba(59, 130, 246, 0.2)',
-    shadow: '0 10px 25px rgba(59, 130, 246, 0.25)',
-    label: 'Video van de Dag',
-    icon: Sparkles
-  },
-  workout: {
-    primary: '#f97316',
-    primaryDark: '#ea580c',
-    primaryLight: '#fb923c',
-    gradient: 'linear-gradient(135deg, #f97316 0%, #ea580c 100%)',
-    borderColor: 'rgba(249, 115, 22, 0.1)',
-    borderActive: 'rgba(249, 115, 22, 0.2)',
-    shadow: '0 10px 25px rgba(249, 115, 22, 0.25)',
-    label: 'Training Focus',
-    icon: Sparkles
-  },
-  meals: {
-    primary: '#10b981',
-    primaryDark: '#059669',
-    primaryLight: '#34d399',
-    gradient: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-    borderColor: 'rgba(16, 185, 129, 0.1)',
-    borderActive: 'rgba(16, 185, 129, 0.2)',
-    shadow: '0 10px 25px rgba(16, 185, 129, 0.25)',
-    label: 'Nutrition Tip',
-    icon: Sparkles
-  },
-  calls: {
-    primary: '#3b82f6',
-    primaryDark: '#2563eb',
-    primaryLight: '#60a5fa',
-    gradient: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
-    borderColor: 'rgba(59, 130, 246, 0.1)',
-    borderActive: 'rgba(59, 130, 246, 0.2)',
-    shadow: '0 10px 25px rgba(59, 130, 246, 0.25)',
-    label: 'Call Preparation',
-    icon: Phone
-  },
-  challenges: {
-    primary: '#dc2626',
-    primaryDark: '#991b1b',
-    primaryLight: '#ef4444',
-    gradient: 'linear-gradient(135deg, #dc2626 0%, #991b1b 100%)',
-    borderColor: 'rgba(220, 38, 38, 0.1)',
-    borderActive: 'rgba(220, 38, 38, 0.2)',
-    shadow: '0 10px 25px rgba(220, 38, 38, 0.25)',
-    label: 'Challenge Boost',
-    icon: Trophy
-  }
+// VIDEO CATEGORIES CONFIGURATION
+const VIDEO_CATEGORIES = {
+  motivation: { icon: Zap, label: 'Motivatie', color: '#f97316' },
+  technique: { icon: Target, label: 'Techniek', color: '#3b82f6' },
+  nutrition: { icon: Apple, label: 'Voeding', color: '#10b981' },
+  mindset: { icon: Brain, label: 'Mindset', color: '#8b5cf6' },
+  recovery: { icon: Heart, label: 'Herstel', color: '#ec4899' },
+  education: { icon: GraduationCap, label: 'Educatie', color: '#06b6d4' },
+  challenge: { icon: Trophy, label: 'Challenge', color: '#dc2626' }
 }
 
-export default function PageVideoWidget({ 
-  client, 
-  db,  // Optioneel - kan verwijderd worden als niet elders gebruikt
-  pageContext = 'home',
-  contextData = {}
-}) {
-  const [todaysVideo, setTodaysVideo] = useState(null)
-  const [recentVideos, setRecentVideos] = useState([])
-  const [loading, setLoading] = useState(true)
+// PAGE STYLING CONFIGURATION
+const PAGE_STYLES = {
+  home: { primary: '#3b82f6' },
+  workout: { primary: '#f97316' },
+  meals: { primary: '#288705' },
+  tracking: { primary: '#8b5cf6' },
+  weight: { primary: '#0ea5e9' },
+  calls: { primary: '#3b82f6' },
+  profile: { primary: '#ec4899' }
+}
+
+export default function PageVideoWidget({ client, db, pageContext = 'home' }) {
+  const [allVideos, setAllVideos] = useState([])
+  const [filteredVideos, setFilteredVideos] = useState([])
+  const [currentIndex, setCurrentIndex] = useState(0)
+  const [selectedCategory, setSelectedCategory] = useState(null)
   const [isPlaying, setIsPlaying] = useState(false)
-  const [showAllVideos, setShowAllVideos] = useState(false)
+  const [isMuted, setIsMuted] = useState(true)
+  const [isPaused, setIsPaused] = useState(false)
+  const [loading, setLoading] = useState(true)
+  const [availableCategories, setAvailableCategories] = useState([])
   
-  const loadedRef = useRef(false)
-  const mountedRef = useRef(true)
+  const intervalRef = useRef(null)
+  const playerRef = useRef(null)
+  const isMobile = window.innerWidth <= 768
   
-  const isMobile = useIsMobile()
-  const theme = PAGE_THEMES[pageContext] || PAGE_THEMES.home
-  const ThemeIcon = theme.icon
-  const cacheKey = `${client?.id}-${pageContext}`
+  // Get page-specific styling
+  const pageStyle = PAGE_STYLES[pageContext] || PAGE_STYLES.home
 
+  // Load videos on mount
   useEffect(() => {
-    return () => {
-      mountedRef.current = false
-    }
-  }, [])
-
-  useEffect(() => {
-    if (!client?.id) {
-      setLoading(false)
-      return
-    }
-    
-    // Check cache
-    if (globalVideoCache[cacheKey]) {
-      const cachedData = globalVideoCache[cacheKey]
-      const cacheAge = Date.now() - cachedData.timestamp
-      
-      if (cacheAge < 60000) {
-        setTodaysVideo(cachedData.todaysVideo)
-        setRecentVideos(cachedData.recentVideos)
-        setLoading(false)
-        return
-      }
-    }
-    
-    if (loadedRef.current) return
-    loadedRef.current = true
     loadVideos()
-    
-    return () => {
-      loadedRef.current = false
-    }
   }, [client?.id, pageContext])
 
+  // Filter videos when category changes
+  useEffect(() => {
+    if (!selectedCategory || selectedCategory === 'all') {
+      setFilteredVideos(allVideos)
+    } else {
+      const filtered = allVideos.filter(v => v.video?.category === selectedCategory)
+      setFilteredVideos(filtered)
+    }
+    setCurrentIndex(0)
+  }, [selectedCategory, allVideos])
+
+  // Auto-slide functionality
+  useEffect(() => {
+    if (!isPaused && filteredVideos.length > 1) {
+      intervalRef.current = setInterval(() => {
+        setCurrentIndex((prev) => (prev + 1) % filteredVideos.length)
+      }, 4000) // 4 seconds like ExampleSlider
+      
+      return () => clearInterval(intervalRef.current)
+    } else if (intervalRef.current) {
+      clearInterval(intervalRef.current)
+    }
+  }, [isPaused, filteredVideos.length])
+
+  // Load videos from database
   const loadVideos = async () => {
-    if (!mountedRef.current) return
+    if (!client?.id || !db) return
     
     setLoading(true)
     try {
-      // FIXED: Gebruik videoService.getVideosForPage
-      const videos = await videoService.getVideosForPage(
+      const pageVideos = await videoService.getVideosForPage(
         client.id, 
-        pageContext
+        pageContext,
+        {},
+        db
       )
       
-      if (!mountedRef.current) return
+      setAllVideos(pageVideos)
+      setFilteredVideos(pageVideos)
       
-      const featured = videos && videos.length > 0 ? videos[0] : null
+      // Get unique categories
+      const categories = [...new Set(pageVideos.map(v => v.video?.category).filter(Boolean))]
+      setAvailableCategories(categories)
       
-      if (mountedRef.current) {
-        setTodaysVideo(featured)
-        setRecentVideos(videos)
-        
-        globalVideoCache[cacheKey] = {
-          todaysVideo: featured,
-          recentVideos: videos,
-          timestamp: Date.now()
-        }
+      // Set first category as default
+      if (categories.length > 0) {
+        setSelectedCategory(categories[0])
       }
+      
     } catch (error) {
       console.error('Error loading videos:', error)
     } finally {
-      if (mountedRef.current) {
-        setLoading(false)
-      }
+      setLoading(false)
     }
   }
 
-  const handlePlayVideo = async (video) => {
-    setTodaysVideo(video)
-    setIsPlaying(true)
-    
-    if (video.id) {
-      try {
-        // FIXED: Gebruik videoService.markVideoAsViewed
-        await videoService.markVideoAsViewed(video.id)
-      } catch (e) {
-        console.log('Could not mark video as watched')
-      }
-    }
+  // Manual navigation
+  const goToPrevious = () => {
+    setCurrentIndex((prev) => (prev - 1 + filteredVideos.length) % filteredVideos.length)
+    setIsPaused(true)
+    setTimeout(() => setIsPaused(false), 5000)
   }
 
+  const goToNext = () => {
+    setCurrentIndex((prev) => (prev + 1) % filteredVideos.length)
+    setIsPaused(true)
+    setTimeout(() => setIsPaused(false), 5000)
+  }
+
+  // Extract YouTube ID
   const extractYouTubeId = (url) => {
     if (!url) return null
     const match = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([^&\n?#]+)/)
     return match ? match[1] : null
   }
 
-  // Get best thumbnail URL (custom -> YouTube -> fallback)
-  const getBestThumbnailUrl = (video) => {
-    // Check for custom thumbnail first
-    if (video.thumbnail_url) {
-      return video.thumbnail_url
+  // Handle video play
+  const handlePlay = async () => {
+    const currentVideo = filteredVideos[currentIndex]
+    if (!currentVideo) return
+    
+    setIsPlaying(true)
+    
+    if (currentVideo.id) {
+      await videoService.markAsViewed(currentVideo.id)
     }
-    
-    // Fallback to YouTube thumbnail
-    const videoUrl = video.video_url || video.url
-    const youtubeId = extractYouTubeId(videoUrl)
-    
-    if (youtubeId) {
-      return `https://img.youtube.com/vi/${youtubeId}/maxresdefault.jpg`
-    }
-    
-    // Final fallback - placeholder
-    return 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAwIiBoZWlnaHQ9IjIyNSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iNDAwIiBoZWlnaHQ9IjIyNSIgZmlsbD0iIzMzMyIvPjx0ZXh0IHRleHQtYW5jaG9yPSJtaWRkbGUiIHg9IjIwMCIgeT0iMTEyLjUiIGZvbnQtc2l6ZT0iMjAiIGZpbGw9IiM5OTkiPk5vIFRodW1ibmFpbDwvdGV4dD48L3N2Zz4='
   }
 
-  // Loading
-  if (loading) {
+  // Handle image error
+  const handleImageError = (e) => {
+    e.target.style.display = 'none'
+    const currentCat = VIDEO_CATEGORIES[currentVideo?.category] || VIDEO_CATEGORIES.motivation
+    e.target.parentElement.style.background = `linear-gradient(135deg, ${currentCat.color}20, ${currentCat.color}10)`
+  }
+
+  // Don't render if loading or no videos
+  if (loading || allVideos.length === 0) {
     return null
   }
 
-  // No videos
-  if (!todaysVideo) {
+  const currentVideo = filteredVideos[currentIndex]?.video
+  const videoId = extractYouTubeId(currentVideo?.video_url)
+  const currentCategory = VIDEO_CATEGORIES[currentVideo?.category] || VIDEO_CATEGORIES.motivation
+  const Icon = currentCategory.icon
+
+  if (!currentVideo) {
     return null
   }
 
-  const video = todaysVideo.video || todaysVideo
-  const videoId = extractYouTubeId(video.video_url || video.url)
-  const thumbnailUrl = getBestThumbnailUrl(video)
-  
   return (
-    <>
+    <div style={{
+      marginTop: '0.5rem',
+      marginBottom: '0.5rem'
+    }}>
+      {/* Header - Minimal like ExampleSlider */}
       <div style={{
-        marginBottom: '1rem',
-        position: 'relative'
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: '0.5rem',
+        padding: '0 0.25rem'
       }}>
-        {/* Compact Info Card */}
         <div style={{
-          background: 'linear-gradient(135deg, rgba(23, 23, 23, 0.95) 0%, rgba(10, 10, 10, 0.95) 100%)',
-          backdropFilter: 'blur(10px)',
-          borderRadius: '14px',
-          padding: isMobile ? '0.75rem' : '1rem',
-          marginBottom: '0.75rem',
-          border: `1px solid ${theme.borderColor}`,
-          boxShadow: '0 4px 15px rgba(0,0,0,0.3)'
+          fontSize: isMobile ? '0.75rem' : '0.85rem',
+          color: `${pageStyle.primary}b3`,
+          textTransform: 'uppercase',
+          letterSpacing: '0.05em',
+          fontWeight: '600',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '0.5rem'
         }}>
-          <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            gap: '1rem'
-          }}>
-            <div style={{ flex: 1 }}>
-              <div style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.4rem',
-                marginBottom: '0.35rem'
-              }}>
-                <ThemeIcon size={14} color={theme.primary} />
-                <span style={{
-                  fontSize: '0.75rem',
-                  color: theme.primary,
-                  fontWeight: '600',
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.05em'
-                }}>
-                  {theme.label}
-                </span>
-              </div>
-              <h3 style={{
-                fontSize: isMobile ? '0.95rem' : '1.05rem',
-                fontWeight: '600',
-                color: '#fff',
-                lineHeight: 1.2,
-                marginBottom: '0.25rem'
-              }}>
-                {video.title}
-              </h3>
-              {video.description && (
-                <p style={{
-                  fontSize: '0.75rem',
-                  color: 'rgba(255,255,255,0.5)',
-                  lineHeight: 1.3,
-                  display: '-webkit-box',
-                  WebkitLineClamp: 1,
-                  WebkitBoxOrient: 'vertical',
-                  overflow: 'hidden'
-                }}>
-                  {video.description}
-                </p>
-              )}
-            </div>
-
-            {/* More Videos Button */}
-            {recentVideos.length > 1 && (
+          <Sparkles size={14} color={pageStyle.primary} opacity={0.7} />
+          Coach Video's
+        </div>
+        
+        {/* Category Dots - Compact */}
+        <div style={{
+          display: 'flex',
+          gap: '0.375rem'
+        }}>
+          {availableCategories.map((catKey) => {
+            const cat = VIDEO_CATEGORIES[catKey]
+            if (!cat) return null
+            
+            const isActive = selectedCategory === catKey
+            const CatIcon = cat.icon
+            
+            return (
               <button
-                onClick={() => setShowAllVideos(true)}
+                key={catKey}
+                onClick={() => {
+                  setSelectedCategory(catKey)
+                  setIsPaused(true)
+                  setTimeout(() => setIsPaused(false), 5000)
+                }}
                 style={{
-                  background: theme.gradient,
-                  border: 'none',
-                  borderRadius: '10px',
-                  padding: '0.5rem',
+                  width: isMobile ? '24px' : '28px',
+                  height: isMobile ? '24px' : '28px',
+                  borderRadius: '6px',
+                  background: isActive 
+                    ? `linear-gradient(135deg, ${cat.color}25 0%, ${cat.color}15 100%)`
+                    : 'rgba(255, 255, 255, 0.03)',
+                  border: isActive 
+                    ? `1px solid ${cat.color}40`
+                    : '1px solid rgba(255, 255, 255, 0.08)',
                   cursor: 'pointer',
+                  transition: 'all 0.2s ease',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  minWidth: '36px',
-                  height: '36px',
-                  transition: 'all 0.2s ease',
-                  opacity: 0.9,
+                  transform: isActive ? 'scale(1.05)' : 'scale(1)',
                   touchAction: 'manipulation',
                   WebkitTapHighlightColor: 'transparent'
                 }}
-                onMouseEnter={(e) => {
-                  if (!isMobile) e.currentTarget.style.opacity = '1'
-                }}
-                onMouseLeave={(e) => {
-                  if (!isMobile) e.currentTarget.style.opacity = '0.9'
-                }}
               >
-                <Grid size={16} color="#fff" />
+                <CatIcon size={12} color={isActive ? cat.color : 'rgba(255, 255, 255, 0.4)'} />
               </button>
-            )}
-          </div>
-
-          {/* Quick Stats */}
-          {todaysVideo.status === 'viewed' && (
-            <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.5rem',
-              marginTop: '0.5rem',
-              paddingTop: '0.5rem',
-              borderTop: `1px solid ${theme.borderColor}`
-            }}>
-              <Eye size={12} color={theme.primary} />
-              <span style={{
-                fontSize: '0.7rem',
-                color: theme.primary,
-                fontWeight: '500'
-              }}>
-                Bekeken
-              </span>
-            </div>
-          )}
+            )
+          })}
         </div>
+      </div>
 
-        {/* Video Player */}
+      {/* Slider Container - Seamless like ExampleSlider */}
+      <div 
+        style={{
+          position: 'relative',
+          borderRadius: '12px',
+          overflow: 'hidden',
+          background: 'linear-gradient(135deg, rgba(17, 17, 17, 0.3) 0%, rgba(10, 10, 10, 0.3) 100%)',
+          border: `1px solid ${pageStyle.primary}14`,
+          marginBottom: '0.5rem'
+        }}
+        onMouseEnter={() => setIsPaused(true)}
+        onMouseLeave={() => setIsPaused(false)}
+        onTouchStart={() => setIsPaused(true)}
+        onTouchEnd={() => setTimeout(() => setIsPaused(false), 3000)}
+      >
+        {/* Main Container */}
         <div style={{
           position: 'relative',
           width: '100%',
-          paddingBottom: isPlaying ? '0' : '56.25%',
-          background: '#000',
-          borderRadius: '14px',
+          paddingBottom: isPlaying ? '0' : (isMobile ? '50%' : '45%'), // Shorter height
           overflow: 'hidden',
-          cursor: isPlaying ? 'default' : 'pointer',
-          boxShadow: theme.shadow
-        }}
-        onClick={() => !isPlaying && handlePlayVideo(todaysVideo)}
-        >
-          {!isPlaying ? (
+          background: `linear-gradient(135deg, ${currentCategory.color}10 0%, ${currentCategory.color}05 100%)`
+        }}>
+          {!isPlaying && videoId ? (
             <>
+              {/* Fallback icon */}
+              <div style={{
+                position: 'absolute',
+                top: '50%',
+                left: '50%',
+                transform: 'translate(-50%, -50%)',
+                opacity: 0.15
+              }}>
+                <Icon size={48} color={currentCategory.color} />
+              </div>
+              
+              {/* Thumbnail */}
               <img
-                src={thumbnailUrl}
-                alt={video.title}
+                key={currentVideo.id}
+                src={currentVideo.thumbnail_url || `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`}
+                alt={currentVideo.title}
                 style={{
                   position: 'absolute',
                   top: 0,
                   left: 0,
                   width: '100%',
                   height: '100%',
-                  objectFit: 'cover'
+                  objectFit: 'cover',
+                  transition: 'opacity 0.5s ease'
                 }}
-                onError={(e) => {
-                  // Fallback naar YouTube thumbnail
-                  if (videoId && e.target.src !== `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`) {
-                    e.target.src = `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`
-                  }
-                }}
+                onError={handleImageError}
               />
               
+              {/* Gradient Overlay */}
               <div style={{
                 position: 'absolute',
-                top: 0,
+                bottom: 0,
                 left: 0,
                 right: 0,
-                bottom: 0,
-                background: 'linear-gradient(to bottom, transparent 0%, rgba(0,0,0,0.4) 100%)',
+                height: '50%',
+                background: 'linear-gradient(to top, rgba(0, 0, 0, 0.8), transparent)',
+                pointerEvents: 'none'
+              }} />
+              
+              {/* Category Badge - Top Left */}
+              <div style={{
+                position: 'absolute',
+                top: isMobile ? '0.5rem' : '0.75rem',
+                left: isMobile ? '0.5rem' : '0.75rem',
+                background: `${currentCategory.color}ee`,
+                backdropFilter: 'blur(10px)',
+                borderRadius: '8px',
+                padding: isMobile ? '0.3rem 0.5rem' : '0.375rem 0.625rem',
                 display: 'flex',
                 alignItems: 'center',
-                justifyContent: 'center'
+                gap: '0.25rem',
+                boxShadow: '0 2px 8px rgba(0, 0, 0, 0.3)'
               }}>
-                <div style={{
-                  width: '60px',
-                  height: '60px',
+                <Icon size={12} color="white" />
+                <span style={{
+                  fontSize: isMobile ? '0.65rem' : '0.7rem',
+                  fontWeight: '600',
+                  color: 'white',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.03em'
+                }}>
+                  {currentCategory.label}
+                </span>
+              </div>
+              
+              {/* Video Title - Bottom */}
+              <div style={{
+                position: 'absolute',
+                bottom: isMobile ? '0.75rem' : '1rem',
+                left: isMobile ? '0.75rem' : '1rem',
+                right: isMobile ? '0.75rem' : '1rem',
+                zIndex: 2
+              }}>
+                <h3 style={{
+                  fontSize: isMobile ? '0.95rem' : '1.1rem',
+                  fontWeight: '700',
+                  color: 'white',
+                  marginBottom: '0.25rem',
+                  textShadow: '0 2px 4px rgba(0,0,0,0.5)'
+                }}>
+                  {currentVideo.title}
+                </h3>
+                {currentVideo.description && (
+                  <p style={{
+                    fontSize: isMobile ? '0.7rem' : '0.75rem',
+                    color: 'rgba(255,255,255,0.8)',
+                    lineHeight: '1.3',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    display: '-webkit-box',
+                    WebkitLineClamp: 2,
+                    WebkitBoxOrient: 'vertical'
+                  }}>
+                    {currentVideo.description}
+                  </p>
+                )}
+              </div>
+              
+              {/* Play Button - Center */}
+              <button
+                onClick={handlePlay}
+                style={{
+                  position: 'absolute',
+                  top: '50%',
+                  left: '50%',
+                  transform: 'translate(-50%, -50%)',
+                  width: isMobile ? '48px' : '56px',
+                  height: isMobile ? '48px' : '56px',
                   borderRadius: '50%',
                   background: 'rgba(255,255,255,0.95)',
+                  backdropFilter: 'blur(10px)',
+                  border: 'none',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  boxShadow: '0 8px 25px rgba(0,0,0,0.4)',
-                  transition: 'transform 0.2s ease'
+                  cursor: 'pointer',
+                  boxShadow: '0 4px 12px rgba(0,0,0,0.4)',
+                  transition: 'all 0.2s ease'
                 }}
                 onMouseEnter={(e) => {
-                  if (!isMobile) e.currentTarget.style.transform = 'scale(1.1)'
+                  if (!isMobile) {
+                    e.currentTarget.style.transform = 'translate(-50%, -50%) scale(1.1)'
+                  }
                 }}
                 onMouseLeave={(e) => {
-                  if (!isMobile) e.currentTarget.style.transform = 'scale(1)'
+                  if (!isMobile) {
+                    e.currentTarget.style.transform = 'translate(-50%, -50%) scale(1)'
+                  }
                 }}
-                >
-                  <Play size={24} color="#000" style={{ marginLeft: '3px' }} />
-                </div>
-              </div>
+              >
+                <Play size={isMobile ? 20 : 24} color="#000" style={{ marginLeft: '2px' }} />
+              </button>
+              
+              {/* Navigation Buttons - Smaller */}
+              <button
+                onClick={goToPrevious}
+                style={{
+                  position: 'absolute',
+                  left: isMobile ? '0.375rem' : '0.5rem',
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  width: isMobile ? '28px' : '32px',
+                  height: isMobile ? '28px' : '32px',
+                  borderRadius: '50%',
+                  background: 'rgba(0, 0, 0, 0.5)',
+                  backdropFilter: 'blur(10px)',
+                  border: '1px solid rgba(255, 255, 255, 0.1)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s ease',
+                  opacity: isMobile || isPaused ? 0.7 : 0,
+                  touchAction: 'manipulation',
+                  WebkitTapHighlightColor: 'transparent'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.opacity = '1'
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.opacity = isMobile || isPaused ? '0.7' : '0'
+                }}
+              >
+                <ChevronLeft size={16} color="white" />
+              </button>
+              
+              <button
+                onClick={goToNext}
+                style={{
+                  position: 'absolute',
+                  right: isMobile ? '0.375rem' : '0.5rem',
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  width: isMobile ? '28px' : '32px',
+                  height: isMobile ? '28px' : '32px',
+                  borderRadius: '50%',
+                  background: 'rgba(0, 0, 0, 0.5)',
+                  backdropFilter: 'blur(10px)',
+                  border: '1px solid rgba(255, 255, 255, 0.1)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s ease',
+                  opacity: isMobile || isPaused ? 0.7 : 0,
+                  touchAction: 'manipulation',
+                  WebkitTapHighlightColor: 'transparent'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.opacity = '1'
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.opacity = isMobile || isPaused ? '0.7' : '0'
+                }}
+              >
+                <ChevronRight size={16} color="white" />
+              </button>
             </>
           ) : isPlaying && videoId ? (
+            /* YouTube Player */
             <div style={{
               position: 'relative',
               width: '100%',
               paddingBottom: '56.25%'
             }}>
               <iframe
-                src={`https://www.youtube.com/embed/${videoId}?autoplay=1&controls=1&rel=0&modestbranding=1&playsinline=1&showinfo=0`}
+                ref={playerRef}
+                src={`https://www.youtube.com/embed/${videoId}?autoplay=1&mute=0&controls=1&rel=0&modestbranding=1&playsinline=1`}
                 style={{
                   position: 'absolute',
                   top: 0,
                   left: 0,
                   width: '100%',
                   height: '100%',
-                  border: 'none',
-                  borderRadius: '14px',
-                  backgroundColor: '#000',
-                  objectFit: 'cover'
+                  border: 'none'
                 }}
                 allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                 allowFullScreen
               />
               
               <button
-                onClick={(e) => {
-                  e.stopPropagation()
-                  setIsPlaying(false)
-                }}
+                onClick={() => setIsPlaying(false)}
                 style={{
                   position: 'absolute',
-                  top: '0.75rem',
-                  right: '0.75rem',
-                  background: 'rgba(0,0,0,0.6)',
-                  border: 'none',
-                  borderRadius: '50%',
+                  top: '0.5rem',
+                  right: '0.5rem',
                   width: '32px',
                   height: '32px',
-                  cursor: 'pointer',
+                  borderRadius: '8px',
+                  background: 'rgba(0,0,0,0.5)',
+                  backdropFilter: 'blur(10px)',
+                  border: '1px solid rgba(255,255,255,0.1)',
+                  color: '#fff',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  backdropFilter: 'blur(10px)',
-                  touchAction: 'manipulation',
-                  WebkitTapHighlightColor: 'transparent'
+                  cursor: 'pointer',
+                  fontSize: '1.2rem'
                 }}
               >
-                <X size={16} color="#fff" />
+                ×
               </button>
             </div>
           ) : null}
         </div>
+        
+        {/* Progress Bar - Thin at bottom */}
+        {!isPlaying && (
+          <div style={{
+            position: 'absolute',
+            bottom: 0,
+            left: 0,
+            right: 0,
+            height: '2px',
+            background: 'rgba(255, 255, 255, 0.05)'
+          }}>
+            <div style={{
+              height: '100%',
+              width: `${((currentIndex + 1) / filteredVideos.length) * 100}%`,
+              background: `linear-gradient(90deg, ${currentCategory.color} 0%, ${currentCategory.color}cc 100%)`,
+              transition: 'width 0.3s ease',
+              boxShadow: `0 0 6px ${currentCategory.color}40`
+            }} />
+          </div>
+        )}
       </div>
 
-      {/* All Videos Modal */}
-      {showAllVideos && (
+      {/* Tips Section - Compact */}
+      {currentVideo.description && (
         <div style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          background: 'rgba(0,0,0,0.95)',
-          zIndex: 10000,
-          display: 'flex',
-          flexDirection: 'column',
-          padding: isMobile ? '1rem' : '2rem'
+          padding: isMobile ? '0.5rem' : '0.625rem',
+          background: `linear-gradient(135deg, ${currentCategory.color}08 0%, ${currentCategory.color}03 100%)`,
+          borderRadius: '10px',
+          border: `1px solid ${currentCategory.color}15`
         }}>
-          {/* Header */}
           <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            marginBottom: '1.5rem'
+            fontSize: isMobile ? '0.6rem' : '0.65rem',
+            color: currentCategory.color,
+            textTransform: 'uppercase',
+            letterSpacing: '0.05em',
+            marginBottom: '0.2rem',
+            fontWeight: '600',
+            opacity: 0.8
           }}>
-            <h2 style={{
-              fontSize: '1.25rem',
-              fontWeight: 'bold',
-              color: '#fff',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.5rem'
-            }}>
-              <ThemeIcon size={20} color={theme.primary} />
-              Alle Videos
-            </h2>
-            <button
-              onClick={() => setShowAllVideos(false)}
-              style={{
-                background: 'rgba(255,255,255,0.1)',
-                border: 'none',
-                borderRadius: '50%',
-                width: '36px',
-                height: '36px',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                touchAction: 'manipulation',
-                WebkitTapHighlightColor: 'transparent'
-              }}
-            >
-              <X size={18} color="#fff" />
-            </button>
+            Info
           </div>
-
-          {/* Videos Grid */}
           <div style={{
-            flex: 1,
-            overflowY: 'auto',
-            display: 'grid',
-            gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fill, minmax(300px, 1fr))',
-            gap: '1rem'
+            fontSize: isMobile ? '0.75rem' : '0.8rem',
+            color: 'rgba(255, 255, 255, 0.6)',
+            lineHeight: '1.3'
           }}>
-            {recentVideos.map((v, i) => {
-              const rvideo = v.video || v
-              const rvid = extractYouTubeId(rvideo.video_url || rvideo.url)
-              const rThumbnailUrl = getBestThumbnailUrl(rvideo)
-              const isActive = todaysVideo?.id === v.id
-              
-              return (
-                <div
-                  key={i}
-                  onClick={() => {
-                    handlePlayVideo(v)
-                    setShowAllVideos(false)
-                  }}
-                  style={{
-                    background: isActive ? theme.gradient : 'linear-gradient(135deg, rgba(23, 23, 23, 0.9) 0%, rgba(10, 10, 10, 0.9) 100%)',
-                    borderRadius: '12px',
-                    overflow: 'hidden',
-                    cursor: 'pointer',
-                    border: `1px solid ${isActive ? theme.borderActive : theme.borderColor}`,
-                    transition: 'all 0.2s ease'
-                  }}
-                  onMouseEnter={(e) => {
-                    if (!isMobile && !isActive) {
-                      e.currentTarget.style.borderColor = theme.borderActive
-                      e.currentTarget.style.transform = 'translateY(-2px)'
-                    }
-                  }}
-                  onMouseLeave={(e) => {
-                    if (!isMobile && !isActive) {
-                      e.currentTarget.style.borderColor = theme.borderColor
-                      e.currentTarget.style.transform = 'translateY(0)'
-                    }
-                  }}
-                >
-                  {/* Thumbnail */}
-                  <div style={{
-                    position: 'relative',
-                    paddingBottom: '56.25%',
-                    background: '#000'
-                  }}>
-                    <img
-                      src={rThumbnailUrl}
-                      alt={rvideo.title}
-                      style={{
-                        position: 'absolute',
-                        top: 0,
-                        left: 0,
-                        width: '100%',
-                        height: '100%',
-                        objectFit: 'cover'
-                      }}
-                      onError={(e) => {
-                        // Fallback naar YouTube thumbnail
-                        if (rvid && e.target.src !== `https://img.youtube.com/vi/${rvid}/mqdefault.jpg`) {
-                          e.target.src = `https://img.youtube.com/vi/${rvid}/mqdefault.jpg`
-                        }
-                      }}
-                    />
-                    <div style={{
-                      position: 'absolute',
-                      top: 0,
-                      left: 0,
-                      right: 0,
-                      bottom: 0,
-                      background: 'rgba(0,0,0,0.3)',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      opacity: 0,
-                      transition: 'opacity 0.2s ease'
-                    }}
-                    onMouseEnter={(e) => e.currentTarget.style.opacity = 1}
-                    onMouseLeave={(e) => e.currentTarget.style.opacity = 0}
-                    >
-                      <Play size={32} color="#fff" />
-                    </div>
-
-                    {v.status === 'viewed' && (
-                      <div style={{
-                        position: 'absolute',
-                        top: '0.5rem',
-                        right: '0.5rem',
-                        background: 'rgba(0,0,0,0.6)',
-                        backdropFilter: 'blur(10px)',
-                        borderRadius: '6px',
-                        padding: '0.25rem 0.5rem',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '0.25rem'
-                      }}>
-                        <Eye size={12} color="#fff" />
-                        <span style={{
-                          fontSize: '0.65rem',
-                          color: '#fff',
-                          fontWeight: '500'
-                        }}>
-                          Bekeken
-                        </span>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Info */}
-                  <div style={{
-                    padding: '0.75rem'
-                  }}>
-                    <h4 style={{
-                      fontSize: '0.9rem',
-                      fontWeight: '600',
-                      color: isActive ? '#fff' : 'rgba(255,255,255,0.9)',
-                      marginBottom: '0.25rem',
-                      lineHeight: 1.2
-                    }}>
-                      {rvideo.title}
-                    </h4>
-                    {rvideo.description && (
-                      <p style={{
-                        fontSize: '0.75rem',
-                        color: isActive ? 'rgba(255,255,255,0.9)' : 'rgba(255,255,255,0.5)',
-                        lineHeight: 1.3,
-                        display: '-webkit-box',
-                        WebkitLineClamp: 2,
-                        WebkitBoxOrient: 'vertical',
-                        overflow: 'hidden'
-                      }}>
-                        {rvideo.description}
-                      </p>
-                    )}
-                  </div>
-                </div>
-              )
-            })}
+            {currentVideo.description}
           </div>
         </div>
       )}
-    </>
+
+      {/* Dots Indicator - Minimal */}
+      {filteredVideos.length > 1 && (
+        <div style={{
+          display: 'flex',
+          justifyContent: 'center',
+          gap: '0.2rem',
+          marginTop: '0.5rem'
+        }}>
+          {filteredVideos.map((_, idx) => (
+            <button
+              key={idx}
+              onClick={() => {
+                setCurrentIndex(idx)
+                setIsPaused(true)
+                setTimeout(() => setIsPaused(false), 5000)
+              }}
+              style={{
+                width: idx === currentIndex ? '12px' : '4px',
+                height: '4px',
+                borderRadius: '2px',
+                background: idx === currentIndex 
+                  ? currentCategory.color 
+                  : 'rgba(255, 255, 255, 0.15)',
+                cursor: 'pointer',
+                transition: 'all 0.2s ease',
+                border: 'none',
+                padding: 0,
+                touchAction: 'manipulation',
+                WebkitTapHighlightColor: 'transparent'
+              }}
+            />
+          ))}
+        </div>
+      )}
+    </div>
   )
 }

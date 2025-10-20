@@ -31,18 +31,9 @@ export default function RecipeBuilder({ db, onRecipeCreated }) {
   
   const loadIngredients = async () => {
     try {
-      // Check of getAllIngredients bestaat
-      if (db.getAllIngredients) {
-        const ingredients = await db.getAllIngredients()
-        setAllIngredients(ingredients)
-        console.log(`✅ Loaded ${ingredients.length} ingredients from database`)
-      } else if (IngredientsService.getAllIngredients) {
-        const ingredients = await IngredientsService.getAllIngredients()
-        setAllIngredients(ingredients)
-        console.log(`✅ Loaded ${ingredients.length} ingredients via service`)
-      } else {
-        console.error('❌ No method to load ingredients found')
-      }
+      const ingredients = await IngredientsService.getAllIngredients()
+      setAllIngredients(ingredients)
+      console.log(`✅ Loaded ${ingredients.length} ingredients from database`)
     } catch (error) {
       console.error('❌ Error loading ingredients:', error)
     }
@@ -53,7 +44,7 @@ export default function RecipeBuilder({ db, onRecipeCreated }) {
     const newIngredient = {
       ...ingredient,
       amount: 100, // Default 100g
-      unit: ingredient.default_unit || 'gram'
+      unit: ingredient.unit || 'gram'
     }
     setSelectedIngredients([...selectedIngredients, newIngredient])
     setSearchTerm('')
@@ -72,24 +63,25 @@ export default function RecipeBuilder({ db, onRecipeCreated }) {
     setSelectedIngredients(selectedIngredients.filter((_, i) => i !== index))
   }
   
-  // Calculate total nutrition
+  // Calculate total nutrition - FIX veldnamen
   const calculateTotalNutrition = () => {
     let totals = { kcal: 0, protein: 0, carbs: 0, fat: 0, fiber: 0, weight: 0 }
     
     selectedIngredients.forEach(ing => {
       const factor = ing.amount / 100
-      totals.kcal += Math.round(ing.per_100g_kcal * factor)
-      totals.protein += Math.round(ing.per_100g_protein * factor * 10) / 10
-      totals.carbs += Math.round(ing.per_100g_carbs * factor * 10) / 10
-      totals.fat += Math.round(ing.per_100g_fat * factor * 10) / 10
-      totals.fiber += Math.round((ing.per_100g_fiber || 0) * factor * 10) / 10
+      // Gebruik correcte database veldnamen
+      totals.kcal += Math.round((ing.calories_per_100g || ing.per_100g_kcal || 0) * factor)
+      totals.protein += Math.round((ing.protein_per_100g || ing.per_100g_protein || 0) * factor * 10) / 10
+      totals.carbs += Math.round((ing.carbs_per_100g || ing.per_100g_carbs || 0) * factor * 10) / 10
+      totals.fat += Math.round((ing.fat_per_100g || ing.per_100g_fat || 0) * factor * 10) / 10
+      totals.fiber += Math.round((ing.fiber_per_100g || ing.per_100g_fiber || 0) * factor * 10) / 10
       totals.weight += ing.amount
     })
     
     return totals
   }
   
-  // Save recipe
+  // Save recipe - COMPLETE FIX
   const saveRecipe = async () => {
     if (!recipeName.trim()) {
       alert('Geef het recept een naam!')
@@ -105,43 +97,69 @@ export default function RecipeBuilder({ db, onRecipeCreated }) {
     try {
       const totals = calculateTotalNutrition()
       
+      // Gebruik correcte data structuur voor database
       const recipeData = {
         name: recipeName,
         category: recipeCategory,
-        base_portion_grams: Math.round(totals.weight),
-        servings: 1,
-        prep_time_minutes: prepTime,
-        cook_time_minutes: cookTime,
-        instructions: recipeInstructions,
+        calories: totals.kcal,
+        protein: totals.protein,
+        carbs: totals.carbs,
+        fat: totals.fat,
+        totalWeight: Math.round(totals.weight),
         ingredients: selectedIngredients.map(ing => ({
-          ingredient_id: ing.id,
+          id: ing.id,
           amount: ing.amount,
-          unit: ing.unit
-        }))
+          notes: ing.customName || null
+        })),
+        steps: recipeInstructions,
+        createdBy: 'coach'
       }
       
-      const recipe = await IngredientsService.createRecipe(recipeData)
+      console.log('💾 Saving recipe with data:', recipeData)
+      
+      // Gebruik saveRecipe (niet createRecipe)
+      const recipe = await IngredientsService.saveRecipe(recipeData)
       
       if (recipe) {
-        // Create meal from recipe
-        const meal = await IngredientsService.createMealFromRecipe(recipe.id, {
-          name: recipeName
-        })
+        // Success notification met mobile styling
+        const notification = document.createElement('div')
+        notification.style.cssText = `
+          position: fixed;
+          top: ${isMobile ? '20px' : '40px'};
+          left: 50%;
+          transform: translateX(-50%);
+          background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+          color: white;
+          padding: ${isMobile ? '1rem 1.5rem' : '1.25rem 2rem'};
+          border-radius: ${isMobile ? '12px' : '16px'};
+          font-size: ${isMobile ? '0.95rem' : '1.1rem'};
+          font-weight: 600;
+          box-shadow: 0 10px 40px rgba(16, 185, 129, 0.4);
+          z-index: 9999;
+          animation: slideDown 0.3s ease;
+        `
+        notification.textContent = `✅ Recept "${recipeName}" succesvol opgeslagen!`
+        document.body.appendChild(notification)
         
-        alert(`✅ Recept "${recipeName}" succesvol opgeslagen!`)
+        setTimeout(() => {
+          notification.style.animation = 'slideUp 0.3s ease'
+          setTimeout(() => document.body.removeChild(notification), 300)
+        }, 3000)
         
         // Reset form
         setRecipeName('')
         setSelectedIngredients([])
         setRecipeInstructions('')
+        setPrepTime(15)
+        setCookTime(30)
         
         if (onRecipeCreated) {
-          onRecipeCreated(recipe, meal)
+          onRecipeCreated(recipe)
         }
       }
     } catch (error) {
       console.error('Error saving recipe:', error)
-      alert('Fout bij opslaan van recept')
+      alert('Fout bij opslaan van recept: ' + error.message)
     } finally {
       setLoading(false)
     }
@@ -259,64 +277,6 @@ export default function RecipeBuilder({ db, onRecipeCreated }) {
               <option value="dinner">Diner</option>
               <option value="snack">Snack</option>
             </select>
-          </div>
-          
-          {/* Prep Time */}
-          <div>
-            <label style={{
-              display: 'block',
-              fontSize: isMobile ? '0.875rem' : '0.95rem',
-              color: 'rgba(255,255,255,0.7)',
-              marginBottom: '0.5rem',
-              fontWeight: '500'
-            }}>
-              Voorbereidingstijd (min)
-            </label>
-            <input
-              type="number"
-              value={prepTime}
-              onChange={(e) => setPrepTime(parseInt(e.target.value) || 0)}
-              style={{
-                width: '100%',
-                padding: isMobile ? '0.75rem' : '1rem',
-                background: '#1a1a1a',
-                border: '1px solid #333',
-                borderRadius: isMobile ? '8px' : '10px',
-                color: '#fff',
-                fontSize: isMobile ? '0.9rem' : '1rem',
-                touchAction: 'manipulation',
-                minHeight: '44px'
-              }}
-            />
-          </div>
-          
-          {/* Cook Time */}
-          <div>
-            <label style={{
-              display: 'block',
-              fontSize: isMobile ? '0.875rem' : '0.95rem',
-              color: 'rgba(255,255,255,0.7)',
-              marginBottom: '0.5rem',
-              fontWeight: '500'
-            }}>
-              Kooktijd (min)
-            </label>
-            <input
-              type="number"
-              value={cookTime}
-              onChange={(e) => setCookTime(parseInt(e.target.value) || 0)}
-              style={{
-                width: '100%',
-                padding: isMobile ? '0.75rem' : '1rem',
-                background: '#1a1a1a',
-                border: '1px solid #333',
-                borderRadius: isMobile ? '8px' : '10px',
-                color: '#fff',
-                fontSize: isMobile ? '0.9rem' : '1rem',
-                touchAction: 'manipulation',
-                minHeight: '44px'
-              }}
-            />
           </div>
         </div>
       </div>
@@ -462,7 +422,7 @@ export default function RecipeBuilder({ db, onRecipeCreated }) {
                     color: 'rgba(255,255,255,0.5)',
                     marginTop: '0.25rem'
                   }}>
-                    {ing.per_100g_kcal} kcal | P: {ing.per_100g_protein}g
+                    {ing.calories_per_100g || ing.per_100g_kcal || 0} kcal | P: {ing.protein_per_100g || ing.per_100g_protein || 0}g
                   </div>
                 </div>
               ))}
@@ -499,7 +459,10 @@ export default function RecipeBuilder({ db, onRecipeCreated }) {
                   color: 'rgba(255,255,255,0.5)',
                   marginTop: '0.25rem'
                 }}>
-                  Per 100g: {ing.per_100g_kcal} kcal | P: {ing.per_100g_protein}g | C: {ing.per_100g_carbs}g | F: {ing.per_100g_fat}g
+                  Per 100g: {ing.calories_per_100g || ing.per_100g_kcal || 0} kcal | 
+                  P: {ing.protein_per_100g || ing.per_100g_protein || 0}g | 
+                  C: {ing.carbs_per_100g || ing.per_100g_carbs || 0}g | 
+                  F: {ing.fat_per_100g || ing.per_100g_fat || 0}g
                 </div>
               </div>
               
@@ -832,10 +795,30 @@ export default function RecipeBuilder({ db, onRecipeCreated }) {
         </button>
       </div>
       
-      {/* CSS Animation */}
+      {/* CSS Animations */}
       <style>{`
         @keyframes spin {
           to { transform: rotate(360deg); }
+        }
+        @keyframes slideDown {
+          from { 
+            opacity: 0;
+            transform: translate(-50%, -20px);
+          }
+          to { 
+            opacity: 1;
+            transform: translate(-50%, 0);
+          }
+        }
+        @keyframes slideUp {
+          from { 
+            opacity: 1;
+            transform: translate(-50%, 0);
+          }
+          to { 
+            opacity: 0;
+            transform: translate(-50%, -20px);
+          }
         }
       `}</style>
     </div>

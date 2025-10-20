@@ -1,35 +1,31 @@
-
-import useIsMobile from '../../hooks/useIsMobile'
 // src/modules/workout/WorkoutPlan.jsx
-
-import ProgressChartsWidget from "../progress/ProgressChartsWidget";
-import ProgressWidget from '../progress-widget/ProgressWidget'
-import WorkoutCard from './components/WorkoutCard'
-import { useState, useEffect } from 'react'
+import useIsMobile from '../../hooks/useIsMobile'
+import ProgressChartsWidget from "../progress/ProgressChartsWidget"
+import { useState, useEffect, useRef } from 'react'
 import { useLanguage } from '../../contexts/LanguageContext'
-import { Calendar } from 'lucide-react'
+import { Calendar, ChevronDown, ChevronUp } from 'lucide-react'
 
 // Import sub-components
 import WeekSchedule from './components/WeekSchedule'
-import WorkoutDetails from './components/WorkoutDetails'
-import SwapMode from './components/SwapMode'
-import TodayWorkout from './components/TodayWorkout'
-import AlternativeExercises from './components/AlternativeExercises'
-import WorkoutPicker from './components/WorkoutPicker'
+import WorkoutDetailsPage from './components/WorkoutDetailsPage'
+import TodaysWorkoutMain from './components/todays-workout/TodaysWorkoutMain'
+import WorkoutChallengeSidebar from '../../client/components/WorkoutChallengeSidebar'
+import WorkoutPhotoSlider from './components/WorkoutPhotoSlider'
+import WorkoutProgressToast from './components/WorkoutProgressToast'
+import TodaysLogToast from './components/TodaysLogToast'
+import ProgressInsightsSection from '../progress/ProgressInsightsSection'
 
 // Import hooks
 import useWorkoutSchedule from './hooks/useWorkoutSchedule'
 import useWorkoutProgress from './hooks/useWorkoutProgress'
-
-// Import service
-import WorkoutService from './WorkoutService'
-
-// Import PageVideoWidget
 import PageVideoWidget from '../videos/PageVideoWidget'
 
 export default function WorkoutPlan({ client, schema, db }) {
   const { t } = useLanguage()
   const isMobile = useIsMobile()
+  const detailsRef = useRef(null)
+  const chartRef = useRef(null)
+  const chartWidgetRef = useRef(null)
   
   // State management via custom hooks
   const {
@@ -50,12 +46,10 @@ export default function WorkoutPlan({ client, schema, db }) {
     loadWeeklyProgress
   } = useWorkoutProgress(client?.id, db)
   
-  // Local state for modals
+  // Local state
   const [selectedDay, setSelectedDay] = useState(null)
-  const [showAlternatives, setShowAlternatives] = useState(false)
-  const [currentExercise, setCurrentExercise] = useState(null)
-  const [showWorkoutPicker, setShowWorkoutPicker] = useState(false)
-  const [selectedSwapDay, setSelectedSwapDay] = useState(null)
+  const [selectedDayIndex, setSelectedDayIndex] = useState(null)
+  const [detailsExpanded, setDetailsExpanded] = useState(false) // ⭐ NEW
   
   // Get current date info
   const currentDate = new Date()
@@ -70,36 +64,75 @@ export default function WorkoutPlan({ client, schema, db }) {
     }
   }, [client?.id])
   
-  // Handle alternative exercises
-  const handleShowAlternatives = async (exercise, muscleGroup) => {
-    setCurrentExercise({ ...exercise, muscleGroup })
-    setShowAlternatives(true)
-  }
+  // Set today's workout as default
+  useEffect(() => {
+    if (schema && todayWorkout && !selectedDay) {
+      setSelectedDay(todayWorkout)
+      setSelectedDayIndex(todayIndex)
+    }
+  }, [schema, todayWorkout])
   
-  const handleReplaceExercise = async (oldExercise, newExercise) => {
-    const workoutService = new WorkoutService(db)
-    const result = await workoutService.replaceExercise(
-      client.id,
-      selectedDay,
-      oldExercise.name,
-      newExercise
-    )
-    
-    if (result) {
-      // Refresh schema or update local state
-      setShowAlternatives(false)
-      // You might want to trigger a schema reload here
+  // Handle day click
+  const handleDayClick = (day, workoutKey) => {
+    if (workoutKey) {
+      setSelectedDay(workoutKey)
+      const dayIndex = weekDays.indexOf(day)
+      setSelectedDayIndex(dayIndex)
+      setDetailsExpanded(true) // ⭐ Auto expand on click
+      
+      // Smooth scroll to details section
+      if (detailsRef.current) {
+        setTimeout(() => {
+          detailsRef.current.scrollIntoView({ 
+            behavior: 'smooth', 
+            block: 'start' 
+          })
+        }, 100)
+      }
     }
   }
   
-  // Handle workout completion
-  const handleCompleteWorkout = async (workoutKey) => {
-    const day = weekDays.find(d => weekSchedule[d] === workoutKey)
-    if (day) {
-      await markWorkoutComplete({
-        name: schema.week_structure[workoutKey].name,
-        day: day
+  // Handle day navigation in details
+  const handleDayNavigation = (newDayIndex) => {
+    const newDay = weekDays[newDayIndex]
+    const newWorkoutKey = weekSchedule[newDay]
+    if (newWorkoutKey) {
+      setSelectedDay(newWorkoutKey)
+      setSelectedDayIndex(newDayIndex)
+    }
+  }
+  
+  // Handle toast click - scroll to chart
+  const handleToastViewChart = (exercise) => {
+    if (chartRef.current) {
+      const elementPosition = chartRef.current.getBoundingClientRect().top + window.pageYOffset
+      const offsetPosition = elementPosition - (isMobile ? 100 : 150)
+      
+      window.scrollTo({
+        top: offsetPosition,
+        behavior: 'smooth'
       })
+    }
+  }
+  
+  // Handle insight exercise selection with metric - WITH OFFSET SCROLL
+  const handleInsightExerciseSelect = (exercise, metric = '1rm') => {
+    // Scroll to chart with offset for better visibility
+    if (chartRef.current) {
+      const elementPosition = chartRef.current.getBoundingClientRect().top + window.pageYOffset
+      const offsetPosition = elementPosition - (isMobile ? 100 : 150)
+      
+      window.scrollTo({
+        top: offsetPosition,
+        behavior: 'smooth'
+      })
+    }
+    
+    // Open specific exercise + metric in chart widget
+    if (chartWidgetRef.current && chartWidgetRef.current.openExercise) {
+      setTimeout(() => {
+        chartWidgetRef.current.openExercise(exercise, metric)
+      }, 400)
     }
   }
   
@@ -153,21 +186,37 @@ export default function WorkoutPlan({ client, schema, db }) {
       animation: 'fadeIn 0.5s ease',
       position: 'relative'
     }}>
-    
+      {/* 1. Today's Workout */}
+      <TodaysWorkoutMain
+        client={client}
+        schema={schema}
+        db={db}
+      />
+      
+      {/* 2. ❌ REMOVED: PumpPhotoSection */}
+      
+      {/* 3. Today's Log Toast (priority) */}
+      <TodaysLogToast
+        client={client}
+        db={db}
+      />
+      
+      {/* 4. Progress Toast Notification */}
+      <WorkoutProgressToast
+        client={client}
+        db={db}
+        onViewChart={handleToastViewChart}
+      />
+      
+      {/* 5. Challenge Sidebar */}
+      <WorkoutChallengeSidebar client={client} db={db} />
 
-
-
-
-
-
-  {/* Video Widget for Workout Page */}
+      {/* 6. Video Widget */}
       <div style={{ 
         paddingTop: isMobile ? '1rem' : '1.5rem',
         paddingLeft: isMobile ? '1rem' : '1.5rem',
         paddingRight: isMobile ? '1rem' : '1.5rem',
         paddingBottom: '0.5rem',
-        position: 'relative',
-        zIndex: 10,
         marginBottom: '0.5rem'
       }}>
         <PageVideoWidget
@@ -178,46 +227,123 @@ export default function WorkoutPlan({ client, schema, db }) {
           compact={true}
         />
       </div>
-   
-
-
-
-
-
-
-
       
-      {/* Today's Workout */}
-      {todayWorkout && !swapMode && (
-        <TodayWorkout
-          workout={schema.week_structure[todayWorkout]}
-          onStart={() => setSelectedDay(todayWorkout)}
-          client={client}
-          db={db}
-        />
-     )}   
-
-
-{/* ===== PROGRESS WIDGET - HIER TOEVOEGEN ===== */}
-{schema && weekSchedule && Object.keys(weekSchedule).length > 0 && (
-  <div style={{ 
-    paddingLeft: isMobile ? '1rem' : '1.5rem',
-    paddingRight: isMobile ? '1rem' : '1.5rem',
-    paddingBottom: isMobile ? '1rem' : '1.5rem',
-    marginBottom: '0.5rem'
-  }}>
-    <ProgressWidget 
-      client={client}
-      schema={schema}
-      weekSchedule={weekSchedule}
-      db={db}
-    />
-  </div>
-)}
-{/* ===== EINDE PROGRESS WIDGET ===== */}
-
-  
-      {/* Week Schedule */}
+      {/* 7. Workout Details - ⭐ COLLAPSIBLE */}
+      {selectedDay && (
+        <div 
+          ref={detailsRef}
+          style={{
+            marginTop: '1.5rem',
+            marginLeft: isMobile ? '1rem' : '1.5rem',
+            marginRight: isMobile ? '1rem' : '1.5rem',
+            background: 'rgba(23, 23, 23, 0.6)',
+            backdropFilter: 'blur(10px)',
+            border: '1px solid rgba(249, 115, 22, 0.1)',
+            borderRadius: isMobile ? '10px' : '12px',
+            overflow: 'hidden',
+            transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
+          }}
+        >
+          {/* Collapsible Header */}
+          <button
+            onClick={() => setDetailsExpanded(!detailsExpanded)}
+            style={{
+              width: '100%',
+              padding: isMobile ? '1rem' : '1.25rem',
+              background: 'transparent',
+              border: 'none',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              cursor: 'pointer',
+              transition: 'all 0.3s ease',
+              touchAction: 'manipulation',
+              WebkitTapHighlightColor: 'transparent'
+            }}
+            onMouseEnter={(e) => {
+              if (!isMobile) {
+                e.currentTarget.style.background = 'rgba(249, 115, 22, 0.05)'
+              }
+            }}
+            onMouseLeave={(e) => {
+              if (!isMobile) {
+                e.currentTarget.style.background = 'transparent'
+              }
+            }}
+          >
+            <div style={{ textAlign: 'left' }}>
+              <h3 style={{
+                fontSize: isMobile ? '0.9rem' : '1rem',
+                color: 'rgba(255,255,255,0.5)',
+                fontWeight: '700',
+                textTransform: 'uppercase',
+                letterSpacing: '0.05em',
+                margin: 0,
+                marginBottom: '0.25rem'
+              }}>
+                Workout Details
+              </h3>
+              {selectedDayIndex !== null && (
+                <span style={{
+                  fontSize: isMobile ? '0.75rem' : '0.8rem',
+                  color: '#f97316',
+                  fontWeight: '700',
+                  background: 'rgba(249, 115, 22, 0.15)',
+                  padding: '0.25rem 0.5rem',
+                  borderRadius: '6px',
+                  textTransform: 'capitalize',
+                  display: 'inline-block'
+                }}>
+                  {weekDays[selectedDayIndex]}
+                </span>
+              )}
+            </div>
+            
+            <div style={{
+              width: '36px',
+              height: '36px',
+              borderRadius: '8px',
+              background: detailsExpanded 
+                ? 'rgba(249, 115, 22, 0.2)' 
+                : 'rgba(249, 115, 22, 0.1)',
+              border: `1px solid ${detailsExpanded ? 'rgba(249, 115, 22, 0.3)' : 'rgba(249, 115, 22, 0.2)'}`,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              transition: 'all 0.3s ease'
+            }}>
+              {detailsExpanded ? (
+                <ChevronUp size={20} color="#f97316" />
+              ) : (
+                <ChevronDown size={20} color="#f97316" />
+              )}
+            </div>
+          </button>
+          
+          {/* Collapsible Content */}
+          {detailsExpanded && (
+            <div style={{
+              borderTop: '1px solid rgba(249, 115, 22, 0.1)',
+              animation: 'slideDown 0.3s ease'
+            }}>
+              <WorkoutDetailsPage
+                workout={schema.week_structure[selectedDay]}
+                workoutKey={selectedDay}
+                client={client}
+                db={db}
+                onDayChange={handleDayNavigation}
+                currentDayIndex={selectedDayIndex}
+                weekDays={weekDays}
+              />
+            </div>
+          )}
+        </div>
+      )}
+      
+      {/* 8. Photo Slider */}
+      <WorkoutPhotoSlider />
+      
+      {/* 9. Week Schedule - ⭐ FOCUS VOOR UPGRADE */}
       <WeekSchedule
         weekSchedule={weekSchedule}
         schema={schema}
@@ -225,172 +351,30 @@ export default function WorkoutPlan({ client, schema, db }) {
         selectedWorkout={selectedWorkout}
         completedWorkouts={completedWorkouts}
         todayIndex={todayIndex}
-        onDayClick={(day, workoutKey) => {
-          if (swapMode) {   
-            if (!workoutKey && !selectedWorkout) {
-              setSelectedSwapDay(day)
-              setShowWorkoutPicker(true)
-            } else {
-              handleDaySwap(day)
-            }
-          } else if (workoutKey) {
-            setSelectedDay(workoutKey)
-          }
+        onDayClick={handleDayClick}
+        clientId={client?.id}
+        db={db}
+        onScheduleUpdate={(newSchedule) => {
+          setWeekSchedule(newSchedule)
         }}
-      />  
-        
-            
-        
-
-
-          
-
-          
-
-      {/* Header */}
-
-      <div style={{
-
-        paddingTop: isMobile ? '1rem' : '1.5rem',
-
-        paddingLeft: isMobile ? '1rem' : '1.5rem',
-
-        paddingRight: isMobile ? '1rem' : '1.5rem',
-
-        paddingBottom: 0
-
-      }}>
-
-        <SwapMode
-
-          schema={schema}  
-
-          swapMode={swapMode}
-
-          setSwapMode={setSwapMode}
-
-          selectedWorkout={selectedWorkout}
-
-          setSelectedWorkout={setSelectedWorkout}
-
-          weeklyStats={weeklyStats} 
-
-        />
-
-      </div>
-
-
-
-   
-      {/* Scheduled Workouts List */}
-      {!swapMode && (
-        <div style={{          paddingLeft: '1rem',
-          paddingRight: '1rem',
-          marginTop: '1rem'
-        }}>
-          <h3 style={{
-            fontSize: '0.9rem',
-            color: 'rgba(255,255,255,0.5)',
-            marginBottom: '0.75rem',
-            fontWeight: '600',
-            textTransform: 'uppercase',
-            letterSpacing: '0.05em'
-          }}>
-            This Week's Schedule
-          </h3>
-          
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-            {weekDays.map((day, index) => {
-              const workoutKey = weekSchedule[day]
-              if (!workoutKey) return null
-              
-              const workout = schema.week_structure[workoutKey]
-              const isToday = index === todayIndex
-              const isCompleted = completedWorkouts.some(w => w.workout_day === day)
-              
-              return (
-                <WorkoutCard
-                  key={day}
-                  day={day}
-                  workout={workout}
-                  isToday={isToday}
-                  isCompleted={isCompleted}
-                  onClick={() => setSelectedDay(workoutKey)}
-                />
-              )
-            })}
-          </div>
-        </div>
-      )}
-
-
-
-
-
-
-
-
-
-
- {/* 5. NIEUWE SECTIE - Progress Log Widget */}
-      <div style={{ padding: '0 1rem', marginBottom: '1.5rem' }}>
-        <h3>Progress Log</h3>
-        <div>{/* Placeholder voor widget */}</div>
-      </div>
+      />
       
-<ProgressChartsWidget 
-  db={db}
-  clientId={client?.id}
-/>
-
-   
-
-   {/* Modals */}
-      {selectedDay && (
-        <WorkoutDetails
-          workout={schema.week_structure[selectedDay]}
-          workoutKey={selectedDay}
-          onClose={() => setSelectedDay(null)}
-          onComplete={() => handleCompleteWorkout(selectedDay)}
-          onShowAlternatives={handleShowAlternatives}
-          client={client}
+      {/* 10. Progress Insights & Stats */}
+      <div ref={chartRef} style={{ marginTop: '2rem' }}>
+        {/* Progress Insights */}
+        <ProgressInsightsSection
           db={db}
-          weekSchedule={weekSchedule}
-          weekDays={weekDays}
+          clientId={client?.id}
+          onSelectExercise={handleInsightExerciseSelect}
         />
-      )}
-      
-      {showWorkoutPicker && (
-        <WorkoutPicker
-          schema={schema}
-          weekSchedule={weekSchedule}
-          selectedDay={selectedSwapDay}
-          onSelect={(workoutKey) => {
-            quickAssignWorkout(workoutKey, selectedSwapDay)
-            setShowWorkoutPicker(false)
-            setSelectedSwapDay(null)
-          }}
-          onClose={() => {
-            setShowWorkoutPicker(false)
-            setSelectedSwapDay(null)
-          }}
-          onClearDay={() => {
-            const newSchedule = { ...weekSchedule }
-            delete newSchedule[selectedSwapDay]
-            setWeekSchedule(newSchedule)
-            setShowWorkoutPicker(false)
-            setSelectedSwapDay(null)
-          }}
+        
+        {/* Progress Charts */}
+        <ProgressChartsWidget 
+          ref={chartWidgetRef}
+          db={db}
+          clientId={client?.id}
         />
-      )}
-      
-      {showAlternatives && currentExercise && (
-        <AlternativeExercises
-          exercise={currentExercise}
-          onSelect={handleReplaceExercise}
-          onClose={() => setShowAlternatives(false)}
-        />
-      )}
+      </div>
       
       {/* CSS Animations */}
       <style>{`
@@ -399,14 +383,15 @@ export default function WorkoutPlan({ client, schema, db }) {
           to { opacity: 1; }
         }
         
-        @keyframes slideIn {
-          from { transform: translateX(100%); }
-          to { transform: translateX(0); }
-        }
-        
-        @keyframes slideUp {
-          from { transform: translateY(100%); }
-          to { transform: translateY(0); }
+        @keyframes slideDown {
+          from {
+            opacity: 0;
+            transform: translateY(-10px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
         }
         
         * {
@@ -426,8 +411,11 @@ export default function WorkoutPlan({ client, schema, db }) {
           background: rgba(16, 185, 129, 0.3);
           border-radius: 3px;
         }
+        
+        html {
+          scroll-behavior: smooth;
+        }
       `}</style>
     </div>
   )
 }
-

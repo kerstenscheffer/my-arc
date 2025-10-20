@@ -10,15 +10,21 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@supabase/supabase-js": "^2.56.0",
+    "@stripe/stripe-js": "^7.9.0",
+    "@supabase/supabase-js": "^2.57.4",
+    "@zxing/browser": "^0.1.5",
+    "@zxing/library": "^0.21.3",
     "axios": "^1.11.0",
-    "html5-qrcode": "^2.3.8",
+    "html2canvas": "^1.4.1",
+    "jspdf": "^3.0.3",
     "lucide-react": "^0.540.0",
     "puppeteer": "^24.18.0",
     "quagga": "^0.12.1",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
-    "recharts": "^3.1.2"
+    "react-qr-barcode-scanner": "^2.1.16",
+    "recharts": "^3.1.2",
+    "stripe": "^18.5.0"
   },
   "devDependencies": {
     "@eslint/js": "^9.33.0",

@@ -1,6 +1,6 @@
 import useIsMobile from '../../../hooks/useIsMobile'
 import React, { useEffect } from 'react';
-import { X, Sparkles, AlertCircle } from 'lucide-react';
+import { X, Calendar, Info } from 'lucide-react';
 import { callTypeConfig } from '../constants/callTypes';
 
 export default function BookingModal({
@@ -24,11 +24,10 @@ export default function BookingModal({
       if (existingScript) {
         setCalendlyLoaded(true);
         console.log('✅ Calendly script already exists');
-        // Force re-initialization after modal renders
         setTimeout(() => {
           const widget = document.querySelector('.calendly-inline-widget');
           if (window.Calendly && selectedCall?.calendly_link && widget) {
-            console.log('🎯 Initializing Calendly widget with URL:', selectedCall.calendly_link);
+            console.log('🎯 Initializing Calendly widget');
             try {
               window.Calendly.initInlineWidget({
                 url: selectedCall.calendly_link,
@@ -36,9 +35,8 @@ export default function BookingModal({
                 prefill: {},
                 utm: {}
               });
-              console.log('✅ Calendly widget initialized');
             } catch (e) {
-              console.log('⚠️ Calendly auto-init mode:', e);
+              console.log('⚠️ Calendly auto-init mode');
             }
           }
         }, 500);
@@ -53,7 +51,6 @@ export default function BookingModal({
         setCalendlyLoaded(true);
         console.log('✅ Calendly script loaded successfully');
         
-        // Initialize after script loads
         setTimeout(() => {
           const widget = document.querySelector('.calendly-inline-widget');
           if (window.Calendly && selectedCall?.calendly_link && widget) {
@@ -64,7 +61,6 @@ export default function BookingModal({
                 prefill: {},
                 utm: {}
               });
-              console.log('✅ Calendly widget initialized after script load');
             } catch (e) {
               console.log('⚠️ Calendly will auto-init');
             }
@@ -85,7 +81,6 @@ export default function BookingModal({
       setTimeout(() => {
         const widget = document.querySelector('.calendly-inline-widget');
         if (widget && window.Calendly) {
-          console.log('🚀 Force initializing Calendly for call', selectedCall.call_number);
           const url = widget.getAttribute('data-url');
           if (url) {
             try {
@@ -95,7 +90,6 @@ export default function BookingModal({
                 prefill: {},
                 utm: {}
               });
-              console.log('✅ Calendly force initialized with URL:', url);
             } catch (e) {
               console.log('⚠️ Calendly might already be initialized');
             }
@@ -201,47 +195,54 @@ export default function BookingModal({
       background: 'rgba(0, 0, 0, 0.95)',
       backdropFilter: 'blur(20px)',
       display: 'flex',
-      alignItems: 'center',
+      alignItems: isMobile ? 'flex-end' : 'center',
       justifyContent: 'center',
-      padding: '1rem',
+      padding: isMobile ? '0' : '1rem',
       zIndex: 9999,
       animation: 'fadeIn 0.3s ease'
     }}>
       <div style={{
-        background: 'linear-gradient(135deg, #1a1a1a 0%, #0f0f0f 100%)',
-        borderRadius: '24px',
-        border: `2px solid ${config.color}44`,
-        maxWidth: '900px',
+        background: '#1a1a1a',
+        borderRadius: isMobile ? '24px 24px 0 0' : '20px',
+        border: `1px solid ${config.color}30`,
+        maxWidth: isMobile ? '100%' : '900px',
         width: '100%',
-        maxHeight: '90vh',
-        overflow: 'hidden',
-        boxShadow: `0 25px 50px rgba(0, 0, 0, 0.7), 0 0 100px ${config.color}22`,
-        animation: 'slideUp 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
+        height: isMobile ? '85vh' : 'auto',
+        maxHeight: isMobile ? '85vh' : '90vh',
+        display: 'flex',
+        flexDirection: 'column',
+        boxShadow: `0 -10px 40px rgba(0, 0, 0, 0.5), 0 0 60px ${config.color}15`,
+        animation: isMobile ? 'slideUp 0.3s cubic-bezier(0.4, 0, 0.2, 1)' : 'scaleIn 0.3s ease'
       }}>
-        {/* Modal Header */}
+        {/* Fixed Header */}
         <div style={{
           background: config.gradient,
-          padding: isMobile ? '1.5rem' : '2rem',
+          padding: isMobile ? '1.25rem' : '1.5rem',
           display: 'flex',
           justifyContent: 'space-between',
-          alignItems: 'center'
+          alignItems: 'center',
+          borderRadius: isMobile ? '24px 24px 0 0' : '20px 20px 0 0',
+          flexShrink: 0
         }}>
           <div>
             <h3 style={{
-              fontSize: isMobile ? '1.35rem' : '1.75rem',
+              fontSize: isMobile ? '1.15rem' : '1.4rem',
               fontWeight: '700',
               color: '#fff',
-              marginBottom: '0.5rem',
-              textShadow: '0 2px 10px rgba(0, 0, 0, 0.3)'
+              marginBottom: '0.25rem',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem'
             }}>
-              Plan Call #{selectedCall.call_number}
+              <Calendar size={isMobile ? 18 : 20} />
+              Call {selectedCall.call_number}
             </h3>
             <p style={{ 
-              color: 'rgba(255, 255, 255, 0.95)',
-              fontSize: isMobile ? '0.95rem' : '1.1rem',
+              color: 'rgba(255, 255, 255, 0.9)',
+              fontSize: isMobile ? '0.85rem' : '0.95rem',
               fontWeight: '500'
             }}>
-              {config.name} - {config.description}
+              {config.name}
             </p>
           </div>
           <button
@@ -250,82 +251,81 @@ export default function BookingModal({
               setSelectedCall(null);
             }}
             style={{
-              width: isMobile ? '40px' : '48px',
-              height: isMobile ? '40px' : '48px',
-              borderRadius: '50%',
-              background: 'rgba(255, 255, 255, 0.2)',
+              width: isMobile ? '36px' : '40px',
+              height: isMobile ? '36px' : '40px',
+              borderRadius: '10px',
+              background: 'rgba(255, 255, 255, 0.15)',
               backdropFilter: 'blur(10px)',
-              border: '2px solid rgba(255, 255, 255, 0.3)',
+              border: '1px solid rgba(255, 255, 255, 0.2)',
               color: '#fff',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               cursor: 'pointer',
-              transition: 'all 0.3s ease',
+              transition: 'all 0.2s ease',
               touchAction: 'manipulation',
-              WebkitTapHighlightColor: 'transparent'
+              WebkitTapHighlightColor: 'transparent',
+              minWidth: '44px',
+              minHeight: '44px'
             }}
-            onMouseEnter={(e) => {
-              if (!isMobile) {
-                e.currentTarget.style.background = 'rgba(255, 255, 255, 0.3)';
-                e.currentTarget.style.transform = 'scale(1.1)';
-              }
+            onTouchStart={(e) => {
+              if (isMobile) e.currentTarget.style.transform = 'scale(0.95)';
             }}
-            onMouseLeave={(e) => {
-              if (!isMobile) {
-                e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)';
-                e.currentTarget.style.transform = 'scale(1)';
-              }
+            onTouchEnd={(e) => {
+              if (isMobile) e.currentTarget.style.transform = 'scale(1)';
             }}
           >
-            <X size={isMobile ? 20 : 24} />
+            <X size={isMobile ? 18 : 20} />
           </button>
         </div>
 
-        {/* Modal Body */}
-        <div style={{ padding: isMobile ? '1.5rem' : '2rem' }}>
+        {/* Scrollable Body */}
+        <div style={{ 
+          flex: 1,
+          overflowY: 'auto',
+          WebkitOverflowScrolling: 'touch',
+          padding: isMobile ? '1rem' : '1.5rem'
+        }}>
           {selectedCall.calendly_link ? (
             <div>
+              {/* Compact Info Box */}
               <div style={{
-                marginBottom: '1.5rem',
-                padding: isMobile ? '1rem' : '1.25rem',
-                background: config.darkGradient,
-                border: `1px solid ${config.color}44`,
-                borderRadius: isMobile ? '12px' : '16px',
+                marginBottom: isMobile ? '1rem' : '1.25rem',
+                padding: isMobile ? '0.75rem' : '1rem',
+                background: 'rgba(59, 130, 246, 0.08)',
+                border: `1px solid rgba(59, 130, 246, 0.2)`,
+                borderRadius: '10px',
                 display: 'flex',
                 alignItems: 'center',
-                gap: '1rem'
+                gap: isMobile ? '0.75rem' : '1rem'
               }}>
-                <Sparkles size={isMobile ? 20 : 24} style={{ color: config.color }} />
+                <Info size={isMobile ? 16 : 18} style={{ 
+                  color: '#3b82f6',
+                  flexShrink: 0
+                }} />
                 <div>
                   <p style={{ 
-                    color: '#fff', 
-                    fontSize: isMobile ? '0.9rem' : '1rem',
-                    fontWeight: '500',
-                    marginBottom: '0.25rem'
+                    color: 'rgba(255, 255, 255, 0.9)', 
+                    fontSize: isMobile ? '0.85rem' : '0.9rem',
+                    lineHeight: '1.4'
                   }}>
-                    Kies een moment dat jou uitkomt
-                  </p>
-                  <p style={{ 
-                    color: 'rgba(255, 255, 255, 0.7)', 
-                    fontSize: isMobile ? '0.8rem' : '0.875rem' 
-                  }}>
-                    Na het plannen ontvang je direct een bevestiging met Zoom link
+                    Kies een moment • Direct Zoom link in je mail
                   </p>
                 </div>
               </div>
               
+              {/* Calendly Widget - Adjusted Height */}
               <div
                 key={`calendly-${selectedCall.id}-${modalKey}`}
                 className="calendly-inline-widget"
-                data-url={`${selectedCall.calendly_link}?hide_landing_page_details=1&hide_gdpr_banner=1&background_color=1a1a1a&text_color=ffffff&primary_color=${config.color?.replace('#', '') || '10b981'}`}
+                data-url={`${selectedCall.calendly_link}?hide_landing_page_details=1&hide_gdpr_banner=1&background_color=1a1a1a&text_color=ffffff&primary_color=3b82f6`}
                 style={{
                   minWidth: '320px',
-                  height: isMobile ? '500px' : '600px',
-                  borderRadius: '16px',
+                  height: isMobile ? '400px' : '550px',
+                  borderRadius: '12px',
                   overflow: 'hidden',
-                  border: `1px solid ${config.color}22`,
-                  background: '#1a1a1a',
+                  border: `1px solid rgba(59, 130, 246, 0.15)`,
+                  background: '#0a0a0a',
                   position: 'relative'
                 }}
               >
@@ -339,84 +339,117 @@ export default function BookingModal({
                     textAlign: 'center'
                   }}>
                     <div className="spinner" style={{
-                      borderTopColor: config.color
+                      width: '40px',
+                      height: '40px',
+                      border: '3px solid rgba(59, 130, 246, 0.2)',
+                      borderTopColor: '#3b82f6',
+                      borderRadius: '50%',
+                      animation: 'spin 1s linear infinite'
                     }} />
-                    <p style={{ color: 'rgba(255, 255, 255, 0.6)', marginTop: '1rem' }}>
+                    <p style={{ 
+                      color: 'rgba(255, 255, 255, 0.5)', 
+                      marginTop: '1rem',
+                      fontSize: isMobile ? '0.85rem' : '0.9rem'
+                    }}>
                       Kalender laden...
                     </p>
                   </div>
                 )}
               </div>
               
-              {/* Debug info */}
+              {/* Help Text */}
               <div style={{
-                marginTop: '1rem',
-                padding: isMobile ? '0.65rem' : '0.75rem',
+                marginTop: isMobile ? '0.75rem' : '1rem',
+                padding: isMobile ? '0.6rem' : '0.75rem',
                 background: 'rgba(0, 0, 0, 0.3)',
                 borderRadius: '8px',
-                fontSize: isMobile ? '0.7rem' : '0.75rem',
-                color: 'rgba(255, 255, 255, 0.5)',
                 display: 'flex',
                 justifyContent: 'space-between',
                 alignItems: 'center'
               }}>
-                <span>Call #{selectedCall.call_number} • {selectedCall.calendly_link?.split('/').pop()}</span>
-                <button
-                  onClick={() => {
-                    const widget = document.querySelector('.calendly-inline-widget');
-                    if (window.Calendly && widget) {
-                      window.Calendly.initInlineWidget({
-                        url: selectedCall.calendly_link,
-                        parentElement: widget,
-                        prefill: {},
-                        utm: {}
-                      });
-                      console.log('🔄 Calendly manually reloaded');
-                    }
-                  }}
-                  style={{
-                    padding: '0.25rem 0.75rem',
-                    background: 'rgba(255, 255, 255, 0.1)',
-                    border: '1px solid rgba(255, 255, 255, 0.2)',
-                    borderRadius: '6px',
-                    color: '#fff',
-                    fontSize: isMobile ? '0.7rem' : '0.75rem',
-                    cursor: 'pointer',
-                    touchAction: 'manipulation',
-                    WebkitTapHighlightColor: 'transparent'
-                  }}
-                >
-                  Herlaad Kalender
-                </button>
+                <p style={{
+                  fontSize: isMobile ? '0.75rem' : '0.8rem',
+                  color: 'rgba(255, 255, 255, 0.5)',
+                  margin: 0
+                }}>
+                  Scroll voor meer tijdslots
+                </p>
+                {!isMobile && (
+                  <button
+                    onClick={() => {
+                      const widget = document.querySelector('.calendly-inline-widget');
+                      if (window.Calendly && widget) {
+                        window.Calendly.initInlineWidget({
+                          url: selectedCall.calendly_link,
+                          parentElement: widget,
+                          prefill: {},
+                          utm: {}
+                        });
+                      }
+                    }}
+                    style={{
+                      padding: '0.3rem 0.6rem',
+                      background: 'rgba(255, 255, 255, 0.05)',
+                      border: '1px solid rgba(255, 255, 255, 0.1)',
+                      borderRadius: '6px',
+                      color: 'rgba(255, 255, 255, 0.6)',
+                      fontSize: '0.75rem',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    Herlaad
+                  </button>
+                )}
               </div>
             </div>
           ) : (
             <div style={{
               textAlign: 'center',
-              padding: isMobile ? '3rem' : '4rem'
+              padding: isMobile ? '2rem' : '3rem'
             }}>
-              <AlertCircle size={isMobile ? 60 : 80} style={{ 
+              <Calendar size={isMobile ? 48 : 60} style={{ 
                 color: '#fbbf24', 
-                margin: '0 auto 1.5rem' 
+                margin: '0 auto 1rem' 
               }} />
               <p style={{ 
                 color: '#fff', 
-                fontSize: isMobile ? '1.1rem' : '1.25rem', 
+                fontSize: isMobile ? '1rem' : '1.1rem', 
                 fontWeight: '600',
-                marginBottom: '0.75rem' 
+                marginBottom: '0.5rem' 
               }}>
                 Calendly configuratie ontbreekt
               </p>
               <p style={{ 
-                color: 'rgba(255, 255, 255, 0.7)',
-                fontSize: isMobile ? '0.9rem' : '1rem'
+                color: 'rgba(255, 255, 255, 0.6)',
+                fontSize: isMobile ? '0.85rem' : '0.9rem'
               }}>
-                Neem contact op met je coach om deze call in te plannen
+                Neem contact op met je coach
               </p>
             </div>
           )}
         </div>
       </div>
+
+      {/* Animation Styles */}
+      <style>{`
+        @keyframes slideUp {
+          from { transform: translateY(100%); }
+          to { transform: translateY(0); }
+        }
+        @keyframes scaleIn {
+          from { 
+            transform: scale(0.95);
+            opacity: 0;
+          }
+          to { 
+            transform: scale(1);
+            opacity: 1;
+          }
+        }
+        @keyframes spin {
+          to { transform: rotate(360deg); }
+        }
+      `}</style>
     </div>
   );
 }

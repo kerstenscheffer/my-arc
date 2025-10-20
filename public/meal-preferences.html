@@ -1,0 +1,1267 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Meal Plan Voorkeuren Checklist</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: #0a0a0a;
+            color: #fff;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            line-height: 1.6;
+            padding: 20px;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 40px;
+        }
+
+        .badge {
+            background: #09db09;
+            color: #000;
+            font-size: 14px;
+            font-weight: 700;
+            padding: 8px 20px;
+            border-radius: 25px;
+            display: inline-block;
+            margin-bottom: 20px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .main-title {
+            font-size: clamp(24px, 5vw, 42px);
+            font-weight: 900;
+            color: #fff;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 15px;
+            line-height: 1.2;
+        }
+
+        .subtitle {
+            font-size: clamp(16px, 3vw, 18px);
+            color: #ccc;
+            font-weight: 400;
+            margin-bottom: 40px;
+        }
+
+        /* Form Container */
+        .form-container {
+            background: #1a1a1a;
+            border: 3px solid #09db09;
+            border-radius: 25px;
+            padding: 40px;
+            position: relative;
+        }
+
+        .form-container::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 6px;
+            background: #09db09;
+            border-radius: 25px 25px 0 0;
+        }
+
+        /* Goal Selection */
+        .goal-section {
+            margin-bottom: 40px;
+            text-align: center;
+        }
+
+        .goal-label {
+            font-size: clamp(18px, 4vw, 24px);
+            font-weight: 700;
+            color: #09db09;
+            margin-bottom: 20px;
+            text-transform: uppercase;
+        }
+
+        .goal-select {
+            background: rgba(9, 219, 9, 0.1);
+            border: 2px solid #09db09;
+            border-radius: 15px;
+            color: #fff;
+            font-size: clamp(16px, 3vw, 20px);
+            font-weight: 700;
+            padding: 15px 20px;
+            width: 100%;
+            max-width: 400px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .goal-select:focus {
+            outline: none;
+            box-shadow: 0 0 20px rgba(9, 219, 9, 0.5);
+            background: rgba(9, 219, 9, 0.2);
+        }
+
+        .goal-select option {
+            background: #1a1a1a;
+            color: #fff;
+            padding: 10px;
+        }
+
+        /* Meal Sections */
+        .meal-section {
+            margin-bottom: 40px;
+            background: rgba(9, 219, 9, 0.05);
+            border: 1px solid rgba(9, 219, 9, 0.2);
+            border-radius: 20px;
+            padding: 30px;
+        }
+
+        .section-title {
+            font-size: clamp(20px, 4vw, 28px);
+            font-weight: 900;
+            color: #09db09;
+            text-transform: uppercase;
+            margin-bottom: 25px;
+            text-align: center;
+            letter-spacing: 1px;
+        }
+
+        .subsection {
+            margin-bottom: 30px;
+        }
+
+        .subsection-title {
+            font-size: clamp(16px, 3vw, 20px);
+            font-weight: 700;
+            color: #fff;
+            margin-bottom: 15px;
+            padding-left: 10px;
+            border-left: 4px solid #09db09;
+        }
+
+        .checkbox-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .checkbox-item {
+            background: rgba(9, 219, 9, 0.1);
+            border: 1px solid rgba(9, 219, 9, 0.3);
+            border-radius: 10px;
+            padding: 12px 15px;
+            transition: all 0.3s ease;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .checkbox-item:hover {
+            background: rgba(9, 219, 9, 0.15);
+            border-color: #09db09;
+        }
+
+        .checkbox-item.checked {
+            background: rgba(9, 219, 9, 0.2);
+            border-color: #09db09;
+            box-shadow: 0 0 15px rgba(9, 219, 9, 0.3);
+        }
+
+        .checkbox-item input[type="checkbox"] {
+            width: 18px;
+            height: 18px;
+            accent-color: #09db09;
+            cursor: pointer;
+        }
+
+        .checkbox-item label {
+            font-size: clamp(14px, 2.5vw, 16px);
+            color: #fff;
+            cursor: pointer;
+            flex: 1;
+        }
+
+        .counter {
+            font-size: 12px;
+            color: #09db09;
+            font-weight: 700;
+            background: rgba(9, 219, 9, 0.1);
+            padding: 4px 8px;
+            border-radius: 12px;
+            margin-left: 10px;
+        }
+
+        .counter.warning {
+            color: #ff6b6b;
+            background: rgba(255, 107, 107, 0.1);
+        }
+
+        /* Custom Input Fields */
+        .custom-input {
+            background: rgba(9, 219, 9, 0.05);
+            border: 1px solid rgba(9, 219, 9, 0.3);
+            border-radius: 10px;
+            color: #fff;
+            font-size: clamp(14px, 3vw, 16px);
+            padding: 12px 15px;
+            width: 100%;
+            margin-top: 15px;
+            resize: vertical;
+            min-height: 50px;
+        }
+
+        .custom-input:focus {
+            outline: none;
+            border-color: #09db09;
+            background: rgba(9, 219, 9, 0.1);
+            box-shadow: 0 0 10px rgba(9, 219, 9, 0.3);
+        }
+
+        .custom-input::placeholder {
+            color: rgba(255, 255, 255, 0.5);
+        }
+
+        /* Final Form Section */
+        .final-section {
+            background: linear-gradient(135deg, #1a1a1a 0%, #0f0f0f 100%);
+            border-radius: 20px;
+            padding: 30px;
+            margin-top: 40px;
+        }
+
+        .final-title {
+            font-size: clamp(18px, 4vw, 24px);
+            font-weight: 700;
+            color: #09db09;
+            text-transform: uppercase;
+            margin-bottom: 25px;
+            text-align: center;
+        }
+
+        .form-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .form-field {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .field-label {
+            font-size: clamp(14px, 3vw, 16px);
+            font-weight: 600;
+            color: #09db09;
+            margin-bottom: 8px;
+        }
+
+        .form-input {
+            background: rgba(9, 219, 9, 0.05);
+            border: 1px solid rgba(9, 219, 9, 0.3);
+            border-radius: 10px;
+            color: #fff;
+            font-size: clamp(14px, 3vw, 16px);
+            padding: 12px 15px;
+            transition: all 0.3s ease;
+        }
+
+        .form-input:focus {
+            outline: none;
+            border-color: #09db09;
+            background: rgba(9, 219, 9, 0.1);
+            box-shadow: 0 0 10px rgba(9, 219, 9, 0.3);
+        }
+
+        .form-input::placeholder {
+            color: rgba(255, 255, 255, 0.5);
+        }
+
+        /* Submit Button */
+        .submit-section {
+            text-align: center;
+            margin-top: 40px;
+        }
+
+        .submit-btn {
+            background: linear-gradient(45deg, #09db09, #00ff88);
+            color: #000;
+            border: none;
+            border-radius: 20px;
+            font-size: clamp(16px, 3vw, 20px);
+            font-weight: 900;
+            padding: 18px 40px;
+            cursor: pointer;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            transition: all 0.3s ease;
+            box-shadow: 0 6px 20px rgba(9, 219, 9, 0.4);
+            min-width: 250px;
+        }
+
+        .submit-btn:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 25px rgba(9, 219, 9, 0.5);
+        }
+
+        .submit-btn:disabled {
+            background: #666;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
+        /* Success Message */
+        .success-message {
+            display: none;
+            background: rgba(9, 219, 9, 0.1);
+            border: 2px solid #09db09;
+            border-radius: 15px;
+            padding: 30px;
+            text-align: center;
+            margin-top: 30px;
+        }
+
+        .success-message h3 {
+            color: #09db09;
+            font-size: clamp(18px, 4vw, 24px);
+            margin-bottom: 15px;
+        }
+
+        .success-message p {
+            color: #ccc;
+            font-size: clamp(14px, 3vw, 16px);
+        }
+
+        /* Validation Messages */
+        .validation-error {
+            color: #ff6b6b;
+            font-size: 14px;
+            margin-top: 10px;
+            padding: 8px 12px;
+            background: rgba(255, 107, 107, 0.1);
+            border-radius: 8px;
+            border: 1px solid rgba(255, 107, 107, 0.3);
+        }
+
+        /* Mobile Optimization */
+        @media (max-width: 768px) {
+            body {
+                padding: 10px;
+            }
+
+            .form-container {
+                padding: 20px;
+            }
+
+            .meal-section {
+                padding: 20px;
+            }
+
+            .checkbox-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .form-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        /* Loading State */
+        .loading {
+            opacity: 0.7;
+            pointer-events: none;
+        }
+
+        .loading .submit-btn::after {
+            content: " ⏳";
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="badge">MEAL PLAN BUILDER</div>
+            <h1 class="main-title">Jouw Persoonlijke Meal Plan</h1>
+            <p class="subtitle">Vertel ons jouw voorkeuren en wij maken het perfecte voedingsplan voor jou</p>
+        </div>
+
+        <form id="mealPlanForm" class="form-container">
+            <!-- Goal Selection -->
+            <div class="goal-section">
+                <label class="goal-label">Ik wil...</label>
+                <select id="goalSelect" class="goal-select" required>
+                    <option value="">Kies je doel</option>
+                    <option value="afvallen">Afvallen / Gewicht verliezen</option>
+                    <option value="spieropbouw">Spieren opbouwen / Massa aankomen</option>
+                </select>
+            </div>
+
+            <!-- Meal Sections (populated by JavaScript) -->
+            <div id="mealSections"></div>
+
+            <!-- Final Form Section -->
+            <div class="final-section">
+                <h3 class="final-title">Extra Informatie</h3>
+                
+                <div class="form-grid">
+                    <div class="form-field">
+                        <label class="field-label">Allergieën</label>
+                        <textarea class="form-input" id="allergies" placeholder="Bijvoorbeeld: noten, lactose, gluten..."></textarea>
+                    </div>
+                    
+                    <div class="form-field">
+                        <label class="field-label">Favoriete Gerechten</label>
+                        <textarea class="form-input" id="favorites" placeholder="Wat eet je het liefst?"></textarea>
+                    </div>
+                    
+                    <div class="form-field">
+                        <label class="field-label">Producten die NIET mogen</label>
+                        <textarea class="form-input" id="forbidden" placeholder="Wat wil je absoluut niet in je plan?"></textarea>
+                    </div>
+                </div>
+                
+                <div class="form-grid">
+                    <div class="form-field">
+                        <label class="field-label">Jouw Naam *</label>
+                        <input type="text" class="form-input" id="clientName" placeholder="Vul je naam in" required>
+                    </div>
+                    
+                    <div class="form-field">
+                        <label class="field-label">E-mailadres *</label>
+                        <input type="email" class="form-input" id="clientEmail" placeholder="je@email.com" required>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Submit Section -->
+            <div class="submit-section">
+                <button type="submit" class="submit-btn" id="submitBtn">
+                    🚀 Verstuur Voorkeuren
+                </button>
+                <div id="validationErrors"></div>
+            </div>
+        </form>
+
+        <!-- Success Message -->
+        <div class="success-message" id="successMessage">
+            <h3>✅ Bedankt voor je voorkeuren!</h3>
+            <p>We gaan direct aan de slag met jouw persoonlijke meal plan. Je hoort binnenkort van ons!</p>
+        </div>
+    </div>
+
+    <!-- EmailJS CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
+    
+    <script>
+        // ============================================
+        // EMAILJS CONFIGURATIE
+        // Vervang deze waardes met jouw EmailJS gegevens
+        // ============================================
+        
+        const EMAILJS_CONFIG = {
+            PUBLIC_KEY: 'gFO99iIp1ouubYWpc',     // ✅ Jouw Public Key
+            SERVICE_ID: 'service_3ccr4fp',       // ✅ Jouw Service ID  
+            TEMPLATE_ID: 'template_63f5r0f'      // ✅ Jouw Template ID
+        };
+
+        // Initialize EmailJS when page loads (with error handling)
+        document.addEventListener('DOMContentLoaded', function() {
+            // Check if EmailJS is loaded
+            if (typeof emailjs !== 'undefined') {
+                emailjs.init(EMAILJS_CONFIG.PUBLIC_KEY);
+                console.log('✅ EmailJS initialized successfully');
+            } else {
+                console.warn('⚠️ EmailJS not loaded, using fallback mode');
+            }
+        });
+
+        // ============================================
+        // MAALTIJDEN EN INGREDIËNTEN DATA
+        // ============================================
+        
+       // MAALTIJDEN DATA
+const mealData = {
+    afvallen: {
+        ontbijt: [
+            "Griekse yoghurt met bessen",
+            "Havermout met appel en kaneel",
+            "Smoothie met spinazie en banaan",
+            "Magere kwark met aardbeien",
+            "Gekookt ei met volkoren cracker",
+            "Cottage cheese met komkommer",
+            "Eiwitomelet met paprika",
+            "Overnight oats met framboos",
+            "Volkoren toast met kalkoenfilet",
+            "Chiapudding met mango",
+            "Groenteomelet",
+            "Magere yoghurt met muesli",
+            "Fruit salade",
+            "Volkoren cracker met hüttenkäse",
+            "Kefir met blauwe bessen",
+            "Courgette pannenkoekjes",
+            "Skyr met aardbei",
+            "Kleine smoothie bowl",
+            "Gekookt ei met tomaat",
+            "Kleine groene salade"
+        ],
+        lunch: [
+            "Salade met gegrilde kip",
+            "Volkoren wrap met tonijn",
+            "Kikkererwten salade",
+            "Pompoensoep met volkorenbrood",
+            "Geroosterde groente met feta",
+            "Salade met zalm en spinazie",
+            "Wokgroenten met tofu",
+            "Volkoren sandwich met kip",
+            "Couscous salade",
+            "Komkommersoep",
+            "Ei-muffins met groente",
+            "Linzensalade",
+            "Quinoa salade met groenten",
+            "Bietensalade",
+            "Geitenkaas salade",
+            "Garnalen salade",
+            "Geroosterde paprika met hüttenkäse",
+            "Spinazie omelet",
+            "Courgettesoep",
+            "Groentebowl met hummus"
+        ],
+        diner: [
+            "Groentecurry met quinoa",
+            "Gegrilde zalm met broccoli",
+            "Kipfilet met bloemkoolrijst",
+            "Wokschotel met garnalen",
+            "Vegetarische chili",
+            "Magere biefstuk met salade",
+            "Courgetti met tomatensaus",
+            "Kabeljauw met spinazie",
+            "Ratatouille",
+            "Kip-kerrie met sperziebonen",
+            "Pittige linzenstoof",
+            "Groene asperges met kalkoen",
+            "Zalm uit de oven",
+            "Taco bowl zonder wraps",
+            "Aubergine lasagne",
+            "Tofu curry",
+            "Zoete aardappel schotel",
+            "Paddenstoelen risotto",
+            "Thaise kip salade",
+            "Vegetarische stir-fry"
+        ],
+        snacks: [
+            "Komkommer met hummus",
+            "Cherrytomaatjes",
+            "Stukje magere kaas",
+            "Handje walnoten",
+            "Selderij met pindakaas",
+            "Appel met kaneel",
+            "Gekookt eitje",
+            "Snackwortels",
+            "Griekse yoghurt mini",
+            "Plakje kipfilet",
+            "Bleekselderij",
+            "Magere kwark",
+            "Mandarijn",
+            "Paprika reepjes",
+            "Blauwe bessen",
+            "Volkoren mini rijstwafel",
+            "Gedroogde abrikozen",
+            "Wortelsticks",
+            "Bosbessen",
+            "Kleine fruitsalade"
+        ]
+    },
+    spieropbouw: {
+        ontbijt: [
+            "Protein pancakes met banaan",
+            "Havermout met whey en pindakaas",
+            "Omelet met spinazie en ham",
+            "Kwark met noten en honing",
+            "Bananenbrood met amandel",
+            "Griekse yoghurt met granola",
+            "Smoothie met eiwitpoeder",
+            "Volkoren toast met zalm",
+            "Kipfilet met volkorenbrood",
+            "Skyr met chiazaad",
+            "Gebakken eieren met avocado",
+            "Overnight oats met pindakaas",
+            "Kokos proteïne bowl",
+            "Whey protein shake",
+            "Volkoren wraps met ei",
+            "High protein smoothie bowl",
+            "Muffins van eiwit en havermout",
+            "Eiwitrijke havermout",
+            "Kwark pannenkoeken",
+            "Cottage cheese bowl met banaan"
+        ],
+        lunch: [
+            "Quinoa bowl met kip",
+            "Bruine rijst met zalm",
+            "Wraps met rundvlees",
+            "Bonensalade met tonijn",
+            "Bulgur salade met feta",
+            "Omelet wrap met kip",
+            "Rijst met tofu en broccoli",
+            "Kipfilet sandwich",
+            "Pasta met biefstukreepjes",
+            "Volkoren pita met kip",
+            "Zalm salade met avocado",
+            "Burrito bowl met kip",
+            "Linzensalade met tonijn",
+            "Hummus bowl met ei",
+            "Volkoren pasta salade",
+            "Kalkoen sandwich",
+            "Bonen chili met kaas",
+            "Gegrilde kip wraps",
+            "Salade met biefstuk",
+            "Power omelet met groenten"
+        ],
+        diner: [
+            "Kipfilet met zoete aardappel",
+            "Biefstuk met volkoren pasta",
+            "Zalmfilet met quinoa",
+            "Runderstoof met aardappel",
+            "Burrito's met bonen en kip",
+            "Garnalen met rijst",
+            "Kabeljauw met pesto en pasta",
+            "Kip uit de oven met groenten",
+            "Kalkoenburger met zoete aardappel",
+            "Groentewok met tofu",
+            "Volkoren risotto met kip",
+            "Linzencurry met rundvlees",
+            "Rundergehakt met volkoren wrap",
+            "Curry met zalm",
+            "Pasta bolognese met linzen",
+            "Kikkererwtenstoof",
+            "Steak met groenten",
+            "Gegrilde zalm met groenten",
+            "Rijst met rundvlees",
+            "Gegrilde kipspiezen"
+        ],
+        snacks: [
+            "Protein reep",
+            "Handje amandelen",
+            "Magere kwark met honing",
+            "Kipfilet rolletjes",
+            "Harde gekookte eieren",
+            "High protein yoghurt",
+            "Smoothie met noten",
+            "Hüttenkäse met ananas",
+            "Griekse yoghurt met chia",
+            "Plakje kipfilet",
+            "Rijstwafel met pindakaas",
+            "Magere kwark met bessen",
+            "Boerenomelet mini",
+            "Cottage cheese met fruit",
+            "Kwarkbolletje",
+            "Gebakken ei",
+            "Handje walnoten",
+            "Eiwitshake",
+            "Kikkererwten snack",
+            "Volkoren wrap met zalm"
+        ]
+    }
+};
+
+// INGREDIËNTEN DATA  
+const ingredientData = {
+    afvallen: {
+        ontbijt: [
+            "Spinazie",
+            "Komkommer",
+            "Kippenbouillon",
+            "Courgette",
+            "Aardbei",
+            "Banaan",
+            "Havermout",
+            "Magere kwark",
+            "Volkoren cracker",
+            "Hüttenkäse",
+            "Blauwe bessen",
+            "Kefir",
+            "Paprika",
+            "Skyr",
+            "Appel",
+            "Muesli",
+            "Tomaat",
+            "Eiwitpoeder",
+            "Framboos",
+            "Kalkoenfilet"
+        ],
+        lunch: [
+            "Gegrilde kip",
+            "Tonijn",
+            "Kikkererwten",
+            "Pompoen",
+            "Volkoren brood",
+            "Feta",
+            "Spinazie",
+            "Tofu",
+            "Couscous",
+            "Komkommer",
+            "Ei",
+            "Linzen",
+            "Bieten",
+            "Geitenkaas",
+            "Garnalen",
+            "Paprika",
+            "Hüttenkäse",
+            "Tomaat",
+            "Hummus",
+            "Wortel"
+        ],
+        diner: [
+            "Quinoa",
+            "Broccoli",
+            "Kipfilet",
+            "Bloemkoolrijst",
+            "Garnalen",
+            "Biefstuk",
+            "Courgetti",
+            "Kabeljauw",
+            "Ratatouille groenten",
+            "Sperziebonen",
+            "Linzen",
+            "Kalkoen",
+            "Zalm",
+            "Aubergine",
+            "Tofu",
+            "Zoete aardappel",
+            "Paddenstoel",
+            "Thaise kruiden",
+            "Peultjes",
+            "Salade"
+        ],
+        snacks: [
+            "Komkommer",
+            "Hummus",
+            "Walnoten",
+            "Selderij",
+            "Appel",
+            "Gekookt ei",
+            "Snackwortel",
+            "Griekse yoghurt",
+            "Kipfilet",
+            "Bleekselderij",
+            "Magere kwark",
+            "Mandarijn",
+            "Paprika",
+            "Blauwe bessen",
+            "Rijstwafel",
+            "Gedroogde abrikozen",
+            "Wortel",
+            "Bosbes",
+            "Fruitsalade",
+            "Aardbei"
+        ]
+    },
+    spieropbouw: {
+        ontbijt: [
+            "Whey protein",
+            "Banaan",
+            "Havermout",
+            "Eieren",
+            "Kwark",
+            "Noten",
+            "Pindakaas",
+            "Griekse yoghurt",
+            "Chiazaad",
+            "Amandelmelk",
+            "Zalm",
+            "Volkoren brood",
+            "Avocado",
+            "Cottage cheese",
+            "Granola",
+            "Kokos",
+            "Kaneel",
+            "Skyr",
+            "Kalkoenfilet",
+            "Aardbei"
+        ],
+        lunch: [
+            "Quinoa",
+            "Kipfilet",
+            "Bruine rijst",
+            "Zalm",
+            "Rundvlees",
+            "Tonijn",
+            "Feta",
+            "Tofu",
+            "Pasta volkoren",
+            "Avocado",
+            "Kalkoen",
+            "Bulgur",
+            "Ei",
+            "Bonen",
+            "Kaassoorten",
+            "Spinazie",
+            "Broccoli",
+            "Wrap volkoren",
+            "Pinda",
+            "Hüttenkäse"
+        ],
+        diner: [
+            "Kipfilet",
+            "Zoete aardappel",
+            "Biefstuk",
+            "Quinoa",
+            "Zalmfilet",
+            "Rundergehakt",
+            "Pasta volkoren",
+            "Kalkoen",
+            "Tofu",
+            "Risotto rijst",
+            "Bonen",
+            "Groene groenten",
+            "Avocado",
+            "Eieren",
+            "Linzen",
+            "Broccoli",
+            "Garnalen",
+            "Havermout",
+            "Courgette",
+            "Olie"
+        ],
+        snacks: [
+            "Protein reep",
+            "Amandelen",
+            "Magere kwark",
+            "Kipfilet",
+            "Eieren",
+            "High protein yoghurt",
+            "Noten",
+            "Hüttenkäse",
+            "Chiazaad",
+            "Plakje kipfilet",
+            "Rijstwafel",
+            "Boerenomelet",
+            "Kwarkbolletje",
+            "Walnoten",
+            "Eiwitshake",
+            "Kikkererwten",
+            "Zalm",
+            "Pindakaas",
+            "Banaan",
+            "Skyr"
+        ]
+    }
+};
+
+
+        // ============================================
+        // JAVASCRIPT FUNCTIONALITY
+        // ============================================
+
+        let selectedGoal = '';
+        let selectionCounts = {
+            ontbijt: { meals: 0, ingredients: 0 },
+            lunch: { meals: 0, ingredients: 0 },
+            diner: { meals: 0, ingredients: 0 },
+            snacks: { meals: 0, ingredients: 0 }
+        };
+
+        // Initialize the form
+        document.addEventListener('DOMContentLoaded', function() {
+            const goalSelect = document.getElementById('goalSelect');
+            goalSelect.addEventListener('change', handleGoalChange);
+            
+            const form = document.getElementById('mealPlanForm');
+            form.addEventListener('submit', handleFormSubmit);
+        });
+
+        function handleGoalChange(event) {
+            selectedGoal = event.target.value;
+            if (selectedGoal) {
+                generateMealSections();
+            } else {
+                document.getElementById('mealSections').innerHTML = '';
+            }
+        }
+
+        function generateMealSections() {
+            const container = document.getElementById('mealSections');
+            const sections = ['ontbijt', 'lunch', 'diner', 'snacks'];
+            const sectionTitles = {
+                ontbijt: 'Ontbijt',
+                lunch: 'Middageten', 
+                diner: 'Avondeten',
+                snacks: 'Snacks'
+            };
+
+            let html = '';
+            
+            sections.forEach(section => {
+                const meals = mealData[selectedGoal][section];
+                const ingredients = ingredientData[selectedGoal][section];
+                
+                html += `
+                    <div class="meal-section">
+                        <h2 class="section-title">${sectionTitles[section]}</h2>
+                        
+                        <!-- Maaltijden -->
+                        <div class="subsection">
+                            <h3 class="subsection-title">
+                                Maaltijden 
+                                <span class="counter" id="counter-${section}-meals">0/5 minimaal</span>
+                            </h3>
+                            <div class="checkbox-grid">
+                                ${meals.map((meal, index) => `
+                                    <div class="checkbox-item" onclick="toggleCheckbox('${section}-meal-${index}')">
+                                        <input type="checkbox" id="${section}-meal-${index}" name="${section}-meals" value="${meal}" onchange="updateCounter('${section}', 'meals')">
+                                        <label for="${section}-meal-${index}">${meal}</label>
+                                    </div>
+                                `).join('')}
+                            </div>
+                            <textarea class="custom-input" name="${section}-meals-custom" placeholder="Mis je een maaltijd? Schrijf het hier..."></textarea>
+                        </div>
+                        
+                        <!-- Ingrediënten -->
+                        <div class="subsection">
+                            <h3 class="subsection-title">
+                                Losse Ingrediënten 
+                                <span class="counter" id="counter-${section}-ingredients">0/5 minimaal</span>
+                            </h3>
+                            <div class="checkbox-grid">
+                                ${ingredients.map((ingredient, index) => `
+                                    <div class="checkbox-item" onclick="toggleCheckbox('${section}-ingredient-${index}')">
+                                        <input type="checkbox" id="${section}-ingredient-${index}" name="${section}-ingredients" value="${ingredient}" onchange="updateCounter('${section}', 'ingredients')">
+                                        <label for="${section}-ingredient-${index}">${ingredient}</label>
+                                    </div>
+                                `).join('')}
+                            </div>
+                            <textarea class="custom-input" name="${section}-ingredients-custom" placeholder="Mis je een ingrediënt? Schrijf het hier..."></textarea>
+                        </div>
+                    </div>
+                `;
+            });
+
+            container.innerHTML = html;
+            
+            // Reset counters
+            selectionCounts = {
+                ontbijt: { meals: 0, ingredients: 0 },
+                lunch: { meals: 0, ingredients: 0 },
+                diner: { meals: 0, ingredients: 0 },
+                snacks: { meals: 0, ingredients: 0 }
+            };
+        }
+
+        function toggleCheckbox(checkboxId) {
+            const checkbox = document.getElementById(checkboxId);
+            const item = checkbox.closest('.checkbox-item');
+            
+            checkbox.checked = !checkbox.checked;
+            
+            if (checkbox.checked) {
+                item.classList.add('checked');
+            } else {
+                item.classList.remove('checked');
+            }
+            
+            // Trigger the change event
+            checkbox.dispatchEvent(new Event('change'));
+        }
+
+        function updateCounter(section, type) {
+            const checkboxes = document.querySelectorAll(`input[name="${section}-${type}"]:checked`);
+            const count = checkboxes.length;
+            const counter = document.getElementById(`counter-${section}-${type}`);
+            
+            selectionCounts[section][type] = count;
+            
+            if (count >= 5) {
+                counter.textContent = `${count}/5 ✅`;
+                counter.classList.remove('warning');
+            } else {
+                counter.textContent = `${count}/5 minimaal`;
+                counter.classList.add('warning');
+            }
+            
+            updateSubmitButton();
+        }
+
+        function updateSubmitButton() {
+            const submitBtn = document.getElementById('submitBtn');
+            let allValid = true;
+            
+            // Check if goal is selected
+            if (!selectedGoal) {
+                allValid = false;
+            }
+            
+            // Check if all sections have minimum 5 selections
+            Object.keys(selectionCounts).forEach(section => {
+                if (selectionCounts[section].meals < 5 || selectionCounts[section].ingredients < 5) {
+                    allValid = false;
+                }
+            });
+            
+            // Check required form fields
+            const name = document.getElementById('clientName').value.trim();
+            const email = document.getElementById('clientEmail').value.trim();
+            
+            if (!name || !email) {
+                allValid = false;
+            }
+            
+            submitBtn.disabled = !allValid;
+        }
+
+        function validateForm() {
+            const errors = [];
+            
+            // Check goal selection
+            if (!selectedGoal) {
+                errors.push('Selecteer eerst je doel (afvallen of spieropbouw)');
+            }
+            
+            // Check minimum selections for each section
+            Object.keys(selectionCounts).forEach(section => {
+                const sectionName = {
+                    ontbijt: 'Ontbijt',
+                    lunch: 'Middageten',
+                    diner: 'Avondeten', 
+                    snacks: 'Snacks'
+                }[section];
+                
+                if (selectionCounts[section].meals < 5) {
+                    errors.push(`${sectionName}: Selecteer minimaal 5 maaltijden (nu ${selectionCounts[section].meals})`);
+                }
+                
+                if (selectionCounts[section].ingredients < 5) {
+                    errors.push(`${sectionName}: Selecteer minimaal 5 ingrediënten (nu ${selectionCounts[section].ingredients})`);
+                }
+            });
+            
+            // Check required fields
+            const name = document.getElementById('clientName').value.trim();
+            const email = document.getElementById('clientEmail').value.trim();
+            
+            if (!name) {
+                errors.push('Vul je naam in');
+            }
+            
+            if (!email) {
+                errors.push('Vul je e-mailadres in');
+            } else if (!isValidEmail(email)) {
+                errors.push('Vul een geldig e-mailadres in');
+            }
+            
+            return errors;
+        }
+
+        function isValidEmail(email) {
+            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            return emailRegex.test(email);
+        }
+
+        function collectFormData() {
+            const data = {
+                goal: selectedGoal,
+                name: document.getElementById('clientName').value.trim(),
+                email: document.getElementById('clientEmail').value.trim(),
+                allergies: document.getElementById('allergies').value.trim(),
+                favorites: document.getElementById('favorites').value.trim(),
+                forbidden: document.getElementById('forbidden').value.trim(),
+                selections: {}
+            };
+            
+            // Collect selections for each section
+            ['ontbijt', 'lunch', 'diner', 'snacks'].forEach(section => {
+                data.selections[section] = {
+                    meals: Array.from(document.querySelectorAll(`input[name="${section}-meals"]:checked`)).map(cb => cb.value),
+                    mealsCustom: document.querySelector(`textarea[name="${section}-meals-custom"]`).value.trim(),
+                    ingredients: Array.from(document.querySelectorAll(`input[name="${section}-ingredients"]:checked`)).map(cb => cb.value),
+                    ingredientsCustom: document.querySelector(`textarea[name="${section}-ingredients-custom"]`).value.trim()
+                };
+            });
+            
+            return data;
+        }
+
+        function generateEmailContent(data) {
+            const sectionNames = {
+                ontbijt: 'Ontbijt',
+                lunch: 'Middageten',
+                diner: 'Avondeten',
+                snacks: 'Snacks'
+            };
+            
+            let emailContent = `Meal plan voorkeuren van ${data.name}\n\n`;
+            emailContent += `Doel: ${data.goal === 'afvallen' ? 'Afvallen / Gewicht verliezen' : 'Spieren opbouwen / Massa aankomen'}\n`;
+            emailContent += `E-mail: ${data.email}\n\n`;
+            
+            Object.keys(data.selections).forEach(section => {
+                const sectionData = data.selections[section];
+                const sectionName = sectionNames[section];
+                
+                emailContent += `${sectionName} - Maaltijden:\n`;
+                sectionData.meals.forEach(meal => {
+                    emailContent += `• ${meal}\n`;
+                });
+                
+                if (sectionData.mealsCustom) {
+                    emailContent += `Toevoeging ${section}: ${sectionData.mealsCustom}\n`;
+                }
+                
+                emailContent += `\n${sectionName} - Losse ingrediënten:\n`;
+                sectionData.ingredients.forEach(ingredient => {
+                    emailContent += `• ${ingredient}\n`;
+                });
+                
+                if (sectionData.ingredientsCustom) {
+                    emailContent += `Toevoeging ingrediënten ${section}: ${sectionData.ingredientsCustom}\n`;
+                }
+                
+                emailContent += '\n';
+            });
+            
+            if (data.allergies) {
+                emailContent += `Allergieën: ${data.allergies}\n`;
+            }
+            
+            if (data.forbidden) {
+                emailContent += `Producten die niet mogen: ${data.forbidden}\n`;
+            }
+            
+            if (data.favorites) {
+                emailContent += `Favoriete gerechten: ${data.favorites}\n`;
+            }
+            
+            return emailContent;
+        }
+
+        async function handleFormSubmit(event) {
+            event.preventDefault();
+            
+            const errors = validateForm();
+            const errorContainer = document.getElementById('validationErrors');
+            
+            if (errors.length > 0) {
+                errorContainer.innerHTML = `<div class="validation-error">${errors.join('<br>')}</div>`;
+                return;
+            }
+            
+            errorContainer.innerHTML = '';
+            
+            // Show loading state
+            const form = document.getElementById('mealPlanForm');
+            const submitBtn = document.getElementById('submitBtn');
+            
+            form.classList.add('loading');
+            submitBtn.disabled = true;
+            
+            try {
+                const formData = collectFormData();
+                const emailContent = generateEmailContent(formData);
+                
+                // Send email with form data
+                await sendEmail({
+                    subject: `Meal plan voorkeuren van ${formData.name}`,
+                    body: emailContent,
+                    from_name: formData.name,
+                    reply_to: formData.email
+                });
+                
+                // Show success message
+                form.style.display = 'none';
+                document.getElementById('successMessage').style.display = 'block';
+                
+            } catch (error) {
+                console.error('Error sending form:', error);
+                errorContainer.innerHTML = `<div class="validation-error">Er ging iets mis bij het verzenden. Probeer het opnieuw.</div>`;
+            } finally {
+                form.classList.remove('loading');
+                submitBtn.disabled = false;
+            }
+        }
+
+        async function sendEmail(emailData) {
+            // Check if EmailJS is loaded and configured
+            if (typeof emailjs === 'undefined' || 
+                EMAILJS_CONFIG.PUBLIC_KEY === 'YOUR_PUBLIC_KEY_HERE' || 
+                EMAILJS_CONFIG.SERVICE_ID === 'YOUR_SERVICE_ID_HERE' || 
+                EMAILJS_CONFIG.TEMPLATE_ID === 'YOUR_TEMPLATE_ID_HERE') {
+                
+                console.warn('EmailJS not loaded or configured yet. Showing email content instead.');
+                
+                // Show email content in console for testing
+                console.log('=== EMAIL CONTENT ===');
+                console.log('To: Kerstenscheffer@gmail.com');
+                console.log('Subject:', emailData.subject);
+                console.log('From:', emailData.from_name, '(' + emailData.reply_to + ')');
+                console.log('Message:');
+                console.log(emailData.body);
+                console.log('=== END EMAIL ===');
+                
+                // Show alert with email content for easy copying
+                alert(`✅ Formulier succesvol ingevuld!\n\n📧 Email content (zie console voor volledige versie):\n\nAan: Kerstenscheffer@gmail.com\nOnderwerp: ${emailData.subject}\nVan: ${emailData.from_name}\n\n${emailData.body.substring(0, 300)}...`);
+                
+                return Promise.resolve();
+            }
+
+            try {
+                // Prepare template parameters for EmailJS (matching the template exactly)
+                const templateParams = {
+                    subject: emailData.subject,
+                    message: emailData.body,
+                    from_name: emailData.from_name || 'Meal Plan Form',
+                    reply_to: emailData.reply_to || 'noreply@example.com'
+                };
+
+                // Send email using EmailJS
+                const response = await emailjs.send(
+                    EMAILJS_CONFIG.SERVICE_ID,
+                    EMAILJS_CONFIG.TEMPLATE_ID,
+                    templateParams
+                );
+
+                console.log('✅ Email sent successfully:', response);
+                return response;
+                
+            } catch (error) {
+                console.error('❌ EmailJS error:', error);
+                
+                // More detailed error message
+                let errorMessage = 'Failed to send email';
+                if (error.text) {
+                    errorMessage += ': ' + error.text;
+                } else if (error.message) {
+                    errorMessage += ': ' + error.message;
+                } else {
+                    errorMessage += ': Unknown error occurred';
+                }
+                
+                throw new Error(errorMessage);
+            }
+        }
+
+        // Add event listeners for real-time validation
+        document.addEventListener('DOMContentLoaded', function() {
+            const nameInput = document.getElementById('clientName');
+            const emailInput = document.getElementById('clientEmail');
+            
+            nameInput.addEventListener('input', updateSubmitButton);
+            emailInput.addEventListener('input', updateSubmitButton);
+        });
+    </script>
+</body>
+</html>

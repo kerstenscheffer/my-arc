@@ -364,82 +364,88 @@ const videoService = {
   // ========================================
   // GET VIDEOS FOR PAGE - Client Dashboard Method
   // ========================================
-  getVideosForPage: async (clientId, pageContext = 'home') => {
-    try {
-      console.log('📹 Loading videos for client:', clientId, 'context:', pageContext)
-      
-      // Debug: Check if we can fetch ANY assignments for this client
-      const { data: allAssignments, error: allError } = await supabase
-        .from('video_assignments')
-        .select('*')
-        .eq('client_id', clientId)
-      
-      console.log('📹 ALL assignments for client (debug):', allAssignments?.length || 0, allAssignments)
-      
-      // First fetch assignments
-      const { data: assignments, error: assignmentError } = await supabase
-        .from('video_assignments')
-        .select('*')
-        .eq('client_id', clientId)
-        .eq('page_context', pageContext)
-        .in('status', ['pending', 'viewed'])
-        .order('scheduled_for', { ascending: true })
+// FIXED getVideosForPage method - plaats dit in VideoService.js
+// Vervang de bestaande getVideosForPage methode (regel 369-434) met deze:
 
-      if (assignmentError) {
-        console.error('❌ Error fetching assignments:', assignmentError)
-        return []
-      }
+getVideosForPage: async (clientId, pageContext = 'home') => {
+  try {
+    console.log('📹 Loading videos for client:', clientId, 'context:', pageContext)
+    
+    // Debug: Check if we can fetch ANY assignments for this client
+    const { data: allAssignments, error: allError } = await supabase
+      .from('video_assignments')
+      .select('*')
+      .eq('client_id', clientId)
+    
+    console.log('📹 ALL assignments for client (debug):', allAssignments?.length || 0, allAssignments)
+    
+    // Fetch assignments - ZONDER status filter (dat was het probleem!)
+    const { data: assignments, error: assignmentError } = await supabase
+      .from('video_assignments')
+      .select('*')
+      .eq('client_id', clientId)
+      .eq('page_context', pageContext)
+      .order('scheduled_for', { ascending: false }) // Nieuwste eerst
 
-      console.log('📹 Found assignments:', assignments?.length || 0, assignments)
-
-      if (!assignments || assignments.length === 0) {
-        console.log('📹 No pending assignments found')
-        return []
-      }
-
-      // Get unique video IDs
-      const videoIds = [...new Set(assignments.map(a => a.video_id).filter(Boolean))]
-      
-      if (videoIds.length === 0) {
-        console.log('📹 No valid video IDs in assignments')
-        return []
-      }
-
-      // Fetch videos separately
-      const { data: videos, error: videoError } = await supabase
-        .from('coach_videos')
-        .select('*')
-        .in('id', videoIds)
-
-      if (videoError) {
-        console.error('❌ Error fetching videos:', videoError)
-        return []
-      }
-
-      // Create video map for quick lookup
-      const videoMap = new Map()
-      videos?.forEach(video => {
-        videoMap.set(video.id, video)
-      })
-
-      // Combine assignments with videos
-      const result = assignments.map(assignment => {
-        const video = videoMap.get(assignment.video_id)
-        return {
-          ...assignment,
-          video: video || null
-        }
-      }).filter(item => item.video !== null)
-
-      console.log(`✅ Loaded ${result.length} videos for page ${pageContext}`)
-      return result
-
-    } catch (error) {
-      console.error('❌ Failed to fetch videos for page:', error)
+    if (assignmentError) {
+      console.error('❌ Error fetching assignments:', assignmentError)
       return []
     }
-  },
 
+    console.log('📹 Found assignments for page:', assignments?.length || 0, assignments)
+
+    if (!assignments || assignments.length === 0) {
+      console.log('📹 No assignments found for page:', pageContext)
+      return []
+    }
+
+    // Get unique video IDs
+    const videoIds = [...new Set(assignments.map(a => a.video_id).filter(Boolean))]
+    
+    if (videoIds.length === 0) {
+      console.log('📹 No valid video IDs in assignments')
+      return []
+    }
+
+    console.log('📹 Fetching videos for IDs:', videoIds)
+
+    // Fetch videos separately
+    const { data: videos, error: videoError } = await supabase
+      .from('coach_videos')
+      .select('*')
+      .in('id', videoIds)
+      .eq('is_active', true) // Alleen actieve videos
+
+    if (videoError) {
+      console.error('❌ Error fetching videos:', videoError)
+      return []
+    }
+
+    console.log('📹 Found videos:', videos?.length || 0)
+
+    // Create video map for quick lookup
+    const videoMap = new Map()
+    videos?.forEach(video => {
+      videoMap.set(video.id, video)
+    })
+
+    // Combine assignments with videos
+    const result = assignments.map(assignment => {
+      const video = videoMap.get(assignment.video_id)
+      return {
+        ...assignment,
+        video: video || null
+      }
+    }).filter(item => item.video !== null) // Filter out assignments zonder video
+
+    console.log(`✅ Loaded ${result.length} videos for page ${pageContext}`)
+    return result
+
+  } catch (error) {
+    console.error('❌ Failed to fetch videos for page:', error)
+    return []
+  }
+},
   // ========================================
   // GET CLIENT VIDEO ASSIGNMENTS - Extended version
   // ========================================

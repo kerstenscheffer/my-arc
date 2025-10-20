@@ -1,7 +1,7 @@
 import useIsMobile from '../../hooks/useIsMobile'
 import React, { useState, useEffect } from 'react';
 import { 
-  Bell, RefreshCw, Plus, Sparkles, Gift, HelpCircle
+  Bell, RefreshCw, Plus, HelpCircle
 } from 'lucide-react';
 import PageVideoWidget from '../videos/PageVideoWidget';
 import CallPlanningService from './CallPlanningService';
@@ -32,39 +32,33 @@ export default function ClientCalls({ db, clientInfo }) {
 
   const isMobile = useIsMobile();
 
-  // FIXED: Body scroll management voor modals
+  // Body scroll management voor modals
   useEffect(() => {
     if (showBookingModal || showRequestModal) {
-      // Sla huidige scroll positie op
       const scrollY = window.scrollY;
       
-      // Disable body scroll
       document.body.style.position = 'fixed';
       document.body.style.top = `-${scrollY}px`;
       document.body.style.width = '100%';
       document.body.style.overflow = 'hidden';
       
-      // iOS specific fixes
       if (isMobile) {
         document.documentElement.style.overflow = 'hidden';
         document.documentElement.style.height = '100%';
       }
       
       return () => {
-        // Re-enable body scroll
         const scrollY = document.body.style.top;
         document.body.style.position = '';
         document.body.style.top = '';
         document.body.style.width = '';
         document.body.style.overflow = '';
         
-        // iOS specific reset
         if (isMobile) {
           document.documentElement.style.overflow = '';
           document.documentElement.style.height = '';
         }
         
-        // Restore scroll position
         window.scrollTo(0, parseInt(scrollY || '0') * -1);
       };
     }
@@ -163,7 +157,7 @@ export default function ClientCalls({ db, clientInfo }) {
         4: 'https://calendly.com/kerstenscheffer/halfway-progressie-call',
         5: 'https://calendly.com/kerstenscheffer/final-sprint-call',
         6: 'https://calendly.com/kerstenscheffer/final-call',
-        99: 'https://calendly.com/kerstenscheffer/bonus-call' // Bonus call link
+        99: 'https://calendly.com/kerstenscheffer/bonus-call'
       };
       
       if (fallbackLinks[callWithLink.call_number]) {
@@ -171,10 +165,8 @@ export default function ClientCalls({ db, clientInfo }) {
       }
     }
     
-    // Voor bonus calls, gebruik de juiste titel en onderwerp
     if (callWithLink.call_number === 99) {
       callWithLink.call_title = callWithLink.call_title || 'Bonus Call';
-      // Als er een client_subject is, gebruik dat voor het onderwerp
       if (callWithLink.client_subject) {
         callWithLink.display_subject = callWithLink.client_subject;
       }
@@ -185,17 +177,13 @@ export default function ClientCalls({ db, clientInfo }) {
       return;
     }
 
-    // Add tracking parameters
     const separator = callWithLink.calendly_link.includes('?') ? '&' : '?';
     const clientEmail = clientInfo?.email || '';
     const fullCalendlyUrl = `${callWithLink.calendly_link}${separator}utm_content=call_${call.id}&email=${encodeURIComponent(clientEmail)}`;
     
     callWithLink.calendly_link = fullCalendlyUrl;
     
-    // Reset calendly loaded state to force re-init
     setCalendlyLoaded(false);
-    
-    // Set selected call and open modal
     setSelectedCall(callWithLink);
     setShowBookingModal(true);
     setModalKey(prev => prev + 1);
@@ -217,8 +205,22 @@ export default function ClientCalls({ db, clientInfo }) {
         borderRadius: '20px'
       }}>
         <div style={{ textAlign: 'center' }}>
-          <div className="spinner" />
-          <div style={{ color: 'rgba(255, 255, 255, 0.6)', marginTop: '1rem' }}>Calls laden...</div>
+          <div style={{
+            width: '40px',
+            height: '40px',
+            border: '3px solid rgba(59, 130, 246, 0.2)',
+            borderTopColor: '#3b82f6',
+            borderRadius: '50%',
+            animation: 'spin 1s linear infinite',
+            margin: '0 auto'
+          }} />
+          <div style={{ 
+            color: 'rgba(255, 255, 255, 0.6)', 
+            marginTop: '1rem',
+            fontSize: isMobile ? '0.9rem' : '1rem'
+          }}>
+            Calls laden...
+          </div>
         </div>
       </div>
     );
@@ -230,58 +232,31 @@ export default function ClientCalls({ db, clientInfo }) {
 
   return (
     <div style={{ 
-      padding: '1rem', 
+      padding: isMobile ? '0.75rem' : '1rem', 
       background: 'linear-gradient(180deg, #0a0f0d 0%, #1a1a1a 100%)', 
       minHeight: '100vh' 
     }}>
-
-
-
-{/* Video Widget */}
-      {clientInfo && db && (
-        <div style={{
-          paddingTop: isMobile ? '1rem' : '1.5rem',
-          paddingLeft: isMobile ? '1rem' : '1.5rem',
-          paddingRight: isMobile ? '1rem' : '1.5rem',
-          paddingBottom: '0.5rem',
-          position: 'relative',
-          zIndex: 10,
-          marginBottom: '0.5rem'
-        }}>
-          <PageVideoWidget   
-            client={clientInfo}
-            db={db}
-            pageContext="calls"
-            title="Coaching Call Tips & Technieken"
-            compact={true}
-          />
-        </div>
-      )}
-
-
-
 
       {/* Compact Header */}
       <div style={{
         background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 50%, #1d4ed8 100%)',
         borderRadius: isMobile ? '16px' : '20px',
-        padding: isMobile ? '1.25rem 1rem' : '1.5rem',
-        marginBottom: '1.5rem',
+        padding: isMobile ? '1rem' : '1.25rem',
+        marginBottom: isMobile ? '1.25rem' : '1.5rem',
         position: 'relative',
         overflow: 'hidden',
-        boxShadow: '0 10px 30px rgba(59, 130, 246, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.2)'
+        boxShadow: '0 8px 24px rgba(59, 130, 246, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.1)'
       }}>
         {/* Animated Background Pattern */}
         <div className="float-animation" style={{
           position: 'absolute',
           top: '-50%',
           right: '-10%',
-          width: isMobile ? '200px' : '300px',
-          height: isMobile ? '200px' : '300px',
-          background: 'radial-gradient(circle, rgba(255, 255, 255, 0.1) 0%, transparent 70%)',
+          width: isMobile ? '150px' : '250px',
+          height: isMobile ? '150px' : '250px',
+          background: 'radial-gradient(circle, rgba(255, 255, 255, 0.08) 0%, transparent 70%)',
           borderRadius: '50%'
         }} />
-
 
         {/* Header Content */}
         <div style={{ position: 'relative', zIndex: 1 }}>
@@ -289,56 +264,61 @@ export default function ClientCalls({ db, clientInfo }) {
             display: 'flex',
             justifyContent: 'space-between',
             alignItems: isMobile ? 'flex-start' : 'center',
-            marginBottom: isMobile ? '1rem' : '1.25rem',
+            marginBottom: isMobile ? '0.75rem' : '1rem',
             flexDirection: isMobile ? 'column' : 'row',
-            gap: isMobile ? '0.75rem' : '1rem'
+            gap: isMobile ? '0.5rem' : '0.75rem'
           }}>
             <div>
               <h1 style={{
-                fontSize: isMobile ? '1.5rem' : '1.75rem',
-                fontWeight: 'bold',
+                fontSize: isMobile ? '1.25rem' : '1.5rem',
+                fontWeight: '700',
                 color: '#fff',
-                marginBottom: '0.25rem',
-                textShadow: '0 2px 10px rgba(0, 0, 0, 0.3)'
+                marginBottom: '0.2rem',
+                textShadow: '0 2px 8px rgba(0, 0, 0, 0.2)'
               }}>
-                Jouw Coaching Journey
+                Coaching Journey
               </h1>
               <p style={{ 
-                color: 'rgba(255, 255, 255, 0.9)', 
-                fontSize: isMobile ? '0.85rem' : '0.95rem',
-                lineHeight: '1.4'
+                color: 'rgba(255, 255, 255, 0.85)', 
+                fontSize: isMobile ? '0.8rem' : '0.9rem',
+                lineHeight: '1.3'
               }}>
-                6 strategische calls om je doelen te bereiken
+                6 strategische calls voor je transformatie
               </p>
             </div>
             
             <div style={{ 
               display: 'flex', 
-              gap: isMobile ? '0.5rem' : '0.75rem',
+              gap: isMobile ? '0.5rem' : '0.6rem',
               width: isMobile ? '100%' : 'auto'
             }}>
               <button
                 onClick={loadCallData}
-                className="button-hover"
                 style={{
                   flex: isMobile ? 1 : 'none',
-                  padding: isMobile ? '0.65rem' : '0.75rem 1.25rem',
-                  background: 'rgba(255, 255, 255, 0.2)',
+                  padding: isMobile ? '0.6rem 0.8rem' : '0.65rem 1rem',
+                  background: 'rgba(255, 255, 255, 0.15)',
                   backdropFilter: 'blur(10px)',
-                  border: '2px solid rgba(255, 255, 255, 0.3)',
+                  border: '1px solid rgba(255, 255, 255, 0.25)',
                   borderRadius: '10px',
-                  color: '#fffff',
+                  color: '#fff',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
                   gap: '0.4rem',
                   cursor: 'pointer',
-                  transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                  transition: 'all 0.2s ease',
                   fontWeight: '600',
-                  fontSize: isMobile ? '0.8rem' : '0.875rem',
+                  fontSize: isMobile ? '0.85rem' : '0.9rem',
                   touchAction: 'manipulation',
                   WebkitTapHighlightColor: 'transparent',
                   minHeight: '44px'
+                }}
+                onTouchStart={(e) => {
+                  if (isMobile) e.currentTarget.style.transform = 'scale(0.98)';
+                }}
+                onTouchEnd={(e) => {
+                  if (isMobile) e.currentTarget.style.transform = 'scale(1)';
                 }}
               >
                 <RefreshCw size={isMobile ? 16 : 18} />
@@ -346,97 +326,65 @@ export default function ClientCalls({ db, clientInfo }) {
               </button>
               
               {activePlan && (
-                <div style={{ position: 'relative' }}>
-                  {/* Tooltip/Info bubble */}
-                  <div className="bounce-animation" style={{
-                    position: 'absolute',
-                    bottom: '120%',
-                    right: '0',
-                    background: 'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)',
-                    padding: isMobile ? '0.5rem 0.75rem' : '0.625rem 1rem',
+                <button
+                  onClick={() => setShowRequestModal(true)}
+                  style={{
+                    flex: isMobile ? 1 : 'none',
+                    padding: isMobile ? '0.6rem 0.8rem' : '0.65rem 1rem',
+                    background: 'rgba(255, 255, 255, 0.95)',
+                    border: 'none',
                     borderRadius: '10px',
-                    fontSize: isMobile ? '0.65rem' : '0.7rem',
-                    color: '#fff',
-                    fontWeight: '600',
-                    whiteSpace: 'nowrap',
-                    boxShadow: '0 4px 15px rgba(139, 92, 246, 0.4)',
+                    color: '#7c3aed',
                     display: 'flex',
                     alignItems: 'center',
-                    gap: '0.3rem'
-                  }}>
-                    <Gift size={12} />
-                    Extra hulp nodig?
-                    <div style={{
-                      position: 'absolute',
-                      bottom: '-5px',
-                      right: '20px',
-                      width: '10px',
-                      height: '10px',
-                      background: 'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)',
-                      transform: 'rotate(45deg)'
-                    }} />
-                  </div>
-                  
-                  <button
-                    onClick={() => setShowRequestModal(true)}
-                    className="bonus-button"
-                    style={{
-                      padding: isMobile ? '0.65rem' : '0.75rem 1.25rem',
-                      background: '#fff',
-                      border: 'none',
-                      borderRadius: '10px',
-                      color: '#7c3aed',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      gap: '0.4rem',
-                      cursor: 'pointer',
-                      fontWeight: '700',
-                      transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                      boxShadow: '0 4px 15px rgba(255, 255, 255, 0.3)',
-                      fontSize: isMobile ? '0.8rem' : '0.875rem',
-                      touchAction: 'manipulation',
-                      WebkitTapHighlightColor: 'transparent',
-                      position: 'relative',
-                      minHeight: '44px'
-                    }}
-                  >
-                    <Plus size={isMobile ? 16 : 18} />
-                    <span>Bonus Call</span>
-                    <Sparkles size={12} style={{ marginLeft: '-0.2rem' }} />
-                  </button>
-                </div>
+                    justifyContent: 'center',
+                    gap: '0.4rem',
+                    cursor: 'pointer',
+                    fontWeight: '700',
+                    transition: 'all 0.2s ease',
+                    boxShadow: '0 4px 12px rgba(255, 255, 255, 0.2)',
+                    fontSize: isMobile ? '0.85rem' : '0.9rem',
+                    touchAction: 'manipulation',
+                    WebkitTapHighlightColor: 'transparent',
+                    minHeight: '44px'
+                  }}
+                  onTouchStart={(e) => {
+                    if (isMobile) e.currentTarget.style.transform = 'scale(0.98)';
+                  }}
+                  onTouchEnd={(e) => {
+                    if (isMobile) e.currentTarget.style.transform = 'scale(1)';
+                  }}
+                >
+                  <Plus size={isMobile ? 16 : 18} />
+                  <span>Bonus Call</span>
+                </button>
               )}
             </div>
           </div>
 
-          {/* Info Section */}
+          {/* Info Section - Smaller */}
           <div style={{
-            background: 'rgba(255, 255, 255, 0.15)',
+            background: 'rgba(255, 255, 255, 0.1)',
             backdropFilter: 'blur(10px)',
-            borderRadius: '12px',
-            padding: isMobile ? '0.875rem' : '1rem',
-            marginBottom: isMobile ? '1rem' : '1.25rem',
-            border: '1px solid rgba(255, 255, 255, 0.2)'
+            borderRadius: '10px',
+            padding: isMobile ? '0.65rem 0.75rem' : '0.75rem 0.9rem',
+            marginBottom: isMobile ? '0.75rem' : '0.9rem',
+            border: '1px solid rgba(255, 255, 255, 0.15)'
           }}>
-            <div style={{
+            <p style={{
+              color: 'rgba(255, 255, 255, 0.9)',
+              fontSize: isMobile ? '0.75rem' : '0.8rem',
+              lineHeight: '1.4',
+              margin: 0,
               display: 'flex',
               alignItems: 'flex-start',
-              gap: '0.75rem'
+              gap: '0.5rem'
             }}>
-              <HelpCircle size={isMobile ? 18 : 20} style={{ color: '#fff', marginTop: '2px', flexShrink: 0 }} />
-              <div style={{ flex: 1 }}>
-                <p style={{
-                  color: '#fff',
-                  fontSize: isMobile ? '0.8rem' : '0.875rem',
-                  lineHeight: '1.5',
-                  marginBottom: '0.5rem'
-                }}>
-                  <strong>Hoe werkt het?</strong> Elke call is een strategisch moment in je transformatie. 
-                  Plan je calls wanneer het jou uitkomt en krijg direct een Zoom link.
-                </p>
-              </div>
-            </div>
+              <HelpCircle size={14} style={{ flexShrink: 0, marginTop: '1px' }} />
+              <span>
+                <strong>Tip:</strong> Plan calls wanneer het jou uitkomt en krijg direct een Zoom link.
+              </span>
+            </p>
           </div>
 
           {/* Progress Bar */}
@@ -449,42 +397,63 @@ export default function ClientCalls({ db, clientInfo }) {
         </div>
       </div>
 
+      {/* Video Widget - Under Header */}
+      {clientInfo && db && (
+        <div style={{
+          marginBottom: isMobile ? '1.25rem' : '1.5rem'
+        }}>
+          <PageVideoWidget   
+            client={clientInfo}
+            db={db}
+            pageContext="calls"
+            title="Coaching Call Tips"
+            compact={true}
+          />
+        </div>
+      )}
 
       {/* Notifications */}
       {notifications.length > 0 && (
         <div style={{
-          background: 'linear-gradient(135deg, rgba(251, 191, 36, 0.15) 0%, rgba(251, 191, 36, 0.05) 100%)',
+          background: 'linear-gradient(135deg, rgba(251, 191, 36, 0.12) 0%, rgba(251, 191, 36, 0.05) 100%)',
           backdropFilter: 'blur(10px)',
-          borderLeft: '4px solid #fbbf24',
-          borderRadius: isMobile ? '14px' : '16px',
-          padding: isMobile ? '1.25rem' : '1.5rem',
-          marginBottom: '2rem',
-          border: '1px solid rgba(251, 191, 36, 0.2)',
-          animation: 'slideIn 0.3s ease'
+          borderLeft: '3px solid #fbbf24',
+          borderRadius: isMobile ? '12px' : '14px',
+          padding: isMobile ? '1rem' : '1.25rem',
+          marginBottom: isMobile ? '1.5rem' : '2rem',
+          border: '1px solid rgba(251, 191, 36, 0.2)'
         }}>
-          <div style={{ display: 'flex', gap: isMobile ? '0.75rem' : '1rem' }}>
-            <Bell size={isMobile ? 18 : 20} style={{ color: '#fbbf24', marginTop: '2px', flexShrink: 0 }} />
+          <div style={{ display: 'flex', gap: isMobile ? '0.6rem' : '0.75rem' }}>
+            <Bell size={isMobile ? 16 : 18} style={{ 
+              color: '#fbbf24', 
+              marginTop: '2px', 
+              flexShrink: 0 
+            }} />
             <div style={{ flex: 1 }}>
               <h3 style={{ 
                 fontWeight: '700', 
                 color: '#fff', 
-                marginBottom: '0.75rem',
-                fontSize: isMobile ? '1rem' : '1.1rem'
+                marginBottom: '0.5rem',
+                fontSize: isMobile ? '0.95rem' : '1.05rem'
               }}>
                 Nieuwe Updates
               </h3>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: isMobile ? '0.5rem' : '0.75rem' }}>
+              <div style={{ 
+                display: 'flex', 
+                flexDirection: 'column', 
+                gap: isMobile ? '0.4rem' : '0.5rem' 
+              }}>
                 {notifications.map(notif => (
                   <div 
                     key={notif.id} 
                     style={{ 
-                      fontSize: isMobile ? '0.8rem' : '0.875rem', 
-                      color: 'rgba(255, 255, 255, 0.9)',
-                      padding: isMobile ? '0.625rem' : '0.75rem',
-                      background: 'rgba(0, 0, 0, 0.3)',
-                      borderRadius: isMobile ? '8px' : '10px',
-                      borderLeft: '3px solid #fbbf24',
-                      lineHeight: '1.5'
+                      fontSize: isMobile ? '0.8rem' : '0.85rem', 
+                      color: 'rgba(255, 255, 255, 0.85)',
+                      padding: isMobile ? '0.5rem' : '0.6rem',
+                      background: 'rgba(0, 0, 0, 0.2)',
+                      borderRadius: '8px',
+                      borderLeft: '2px solid #fbbf24',
+                      lineHeight: '1.4'
                     }}
                   >
                     {notif.message}
@@ -505,19 +474,19 @@ export default function ClientCalls({ db, clientInfo }) {
       )}
 
       {/* Call Cards Grid */}
-      <div style={{ marginTop: '2rem' }}>
+      <div style={{ marginTop: isMobile ? '1.5rem' : '2rem' }}>
         <h2 style={{ 
-          fontSize: isMobile ? '1.35rem' : '1.6rem', 
+          fontSize: isMobile ? '1.25rem' : '1.5rem', 
           fontWeight: '700', 
           color: '#fff', 
-          marginBottom: '1.5rem'
+          marginBottom: isMobile ? '1rem' : '1.25rem'
         }}>
           Jouw 6-Call Journey
         </h2>
         
         <div style={{
           display: 'grid',
-          gap: isMobile ? '1rem' : '1.5rem',
+          gap: isMobile ? '0.9rem' : '1.25rem',
           gridTemplateColumns: window.innerWidth > 1024 ? 'repeat(3, 1fr)' 
             : window.innerWidth > 640 ? 'repeat(2, 1fr)' 
             : '1fr'
@@ -533,7 +502,7 @@ export default function ClientCalls({ db, clientInfo }) {
         </div>
       </div>
 
-      {/* Booking Modal - FIXED with proper scroll management */}
+      {/* Booking Modal */}
       {showBookingModal && selectedCall && (
         <BookingModal
           selectedCall={selectedCall}
@@ -557,6 +526,17 @@ export default function ClientCalls({ db, clientInfo }) {
           loadCallData={loadCallData}
         />
       )}
+
+      {/* Animation Styles */}
+      <style>{`
+        @keyframes spin {
+          to { transform: rotate(360deg); }
+        }
+        @keyframes float-animation {
+          0%, 100% { transform: translateY(0); }
+          50% { transform: translateY(-10px); }
+        }
+      `}</style>
     </div>
   );
 }

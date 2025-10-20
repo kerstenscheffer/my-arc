@@ -1,13 +1,12 @@
-// src/components/ResetPassword.jsx
-// Deze pagina wordt getoond wanneer gebruiker op de reset link in email klikt
+// src/components/ResetPassword.jsx - UPDATED WITH NEW SERVICE
 import { useState, useEffect } from 'react'
-import DatabaseService from '../services/DatabaseService'
+import PasswordResetService from '../services/PasswordResetService' // NEW SERVICE
 import { 
   KeyRound, Lock, AlertCircle, CheckCircle, 
-  Shield, ArrowRight, Activity, Loader
+  Shield, ArrowRight, Loader
 } from 'lucide-react'
 
-const db = DatabaseService
+const passwordReset = PasswordResetService
 
 export default function ResetPassword() {
   const [newPassword, setNewPassword] = useState('')
@@ -19,21 +18,22 @@ export default function ResetPassword() {
   
   const isMobile = typeof window !== 'undefined' && window.innerWidth <= 768
 
-  // Check if we have a valid reset token
   useEffect(() => {
     checkResetToken()
   }, [])
 
   const checkResetToken = async () => {
     try {
-      const valid = await db.verifyPasswordResetToken()
-      setIsValidToken(valid)
+      const result = await passwordReset.verifyResetToken()
       
-      if (!valid) {
+      if (result.valid) {
+        setIsValidToken(true)
+      } else {
         setMessage({
           type: 'error',
-          text: 'Ongeldige of verlopen reset link. Vraag een nieuwe wachtwoord reset aan.'
+          text: result.error || 'Ongeldige of verlopen reset link. Vraag een nieuwe wachtwoord reset aan.'
         })
+        setIsValidToken(false)
       }
     } catch (error) {
       console.error('Token check error:', error)
@@ -41,6 +41,7 @@ export default function ResetPassword() {
         type: 'error',
         text: 'Kan reset link niet verifiëren. Probeer het opnieuw.'
       })
+      setIsValidToken(false)
     } finally {
       setCheckingToken(false)
     }
@@ -50,15 +51,7 @@ export default function ResetPassword() {
     e.preventDefault()
     setMessage(null)
     
-    // Validate passwords
-    if (newPassword.length < 6) {
-      setMessage({
-        type: 'error',
-        text: 'Wachtwoord moet minimaal 6 tekens bevatten'
-      })
-      return
-    }
-    
+    // Validate passwords match
     if (newPassword !== confirmPassword) {
       setMessage({
         type: 'error',
@@ -67,11 +60,21 @@ export default function ResetPassword() {
       return
     }
     
+    // Validate minimum length
+    if (newPassword.length < 6) {
+      setMessage({
+        type: 'error',
+        text: 'Wachtwoord moet minimaal 6 tekens bevatten'
+      })
+      return
+    }
+    
     setLoading(true)
     
-    try {
-      await db.updatePassword(newPassword)
-      
+    // Use new PasswordResetService
+    const result = await passwordReset.updatePassword(newPassword)
+    
+    if (result.success) {
       setMessage({
         type: 'success',
         text: 'Wachtwoord succesvol bijgewerkt! Je wordt doorgestuurd naar de login...'
@@ -81,16 +84,14 @@ export default function ResetPassword() {
       setTimeout(() => {
         window.location.href = '/'
       }, 2000)
-      
-    } catch (error) {
-      console.error('Password update error:', error)
+    } else {
       setMessage({
         type: 'error',
-        text: error.message || 'Kan wachtwoord niet bijwerken'
+        text: result.error || 'Kon wachtwoord niet bijwerken'
       })
-    } finally {
-      setLoading(false)
     }
+    
+    setLoading(false)
   }
 
   // Loading state
@@ -243,7 +244,7 @@ export default function ResetPassword() {
                   value={newPassword}
                   onChange={(e) => setNewPassword(e.target.value)}
                   required
-                  placeholder="Voer nieuw wachtwoord in"
+                  placeholder="Minimaal 6 tekens"
                   style={{
                     width: '100%',
                     padding: '0.875rem 1rem 0.875rem 2.75rem',
@@ -256,12 +257,12 @@ export default function ResetPassword() {
                     transition: 'all 0.3s'
                   }}
                   onFocus={(e) => {
-                    e.target.style.borderColor = 'rgba(16, 185, 129, 0.5)'
-                    e.target.style.background = 'rgba(255, 255, 255, 0.08)'
+                    e.currentTarget.style.borderColor = 'rgba(16, 185, 129, 0.5)'
+                    e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)'
                   }}
                   onBlur={(e) => {
-                    e.target.style.borderColor = 'rgba(255, 255, 255, 0.1)'
-                    e.target.style.background = 'rgba(255, 255, 255, 0.05)'
+                    e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.1)'
+                    e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)'
                   }}
                   disabled={loading}
                   minLength={6}
@@ -280,7 +281,7 @@ export default function ResetPassword() {
                 fontSize: '0.75rem',
                 marginTop: '0.25rem'
               }}>
-                Minimaal 6 tekens
+                Gebruik een combinatie van letters, cijfers en symbolen
               </p>
             </div>
 
@@ -300,7 +301,7 @@ export default function ResetPassword() {
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
                   required
-                  placeholder="Bevestig nieuw wachtwoord"
+                  placeholder="Herhaal nieuw wachtwoord"
                   style={{
                     width: '100%',
                     padding: '0.875rem 1rem 0.875rem 2.75rem',
@@ -313,12 +314,12 @@ export default function ResetPassword() {
                     transition: 'all 0.3s'
                   }}
                   onFocus={(e) => {
-                    e.target.style.borderColor = 'rgba(16, 185, 129, 0.5)'
-                    e.target.style.background = 'rgba(255, 255, 255, 0.08)'
+                    e.currentTarget.style.borderColor = 'rgba(16, 185, 129, 0.5)'
+                    e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)'
                   }}
                   onBlur={(e) => {
-                    e.target.style.borderColor = 'rgba(255, 255, 255, 0.1)'
-                    e.target.style.background = 'rgba(255, 255, 255, 0.05)'
+                    e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.1)'
+                    e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)'
                   }}
                   disabled={loading}
                   minLength={6}
@@ -394,6 +395,16 @@ export default function ResetPassword() {
                 gap: '0.5rem',
                 boxShadow: '0 4px 15px rgba(16,185,129,0.3)'
               }}
+              onMouseEnter={(e) => {
+                if (!loading && newPassword && confirmPassword) {
+                  e.currentTarget.style.transform = 'translateY(-2px)'
+                  e.currentTarget.style.boxShadow = '0 8px 25px rgba(16,185,129,0.4)'
+                }
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.transform = 'translateY(0)'
+                e.currentTarget.style.boxShadow = '0 4px 15px rgba(16,185,129,0.3)'
+              }}
             >
               <Lock size={18} />
               {loading ? 'Bijwerken...' : 'Wachtwoord Bijwerken'}
@@ -422,6 +433,14 @@ export default function ResetPassword() {
                 justifyContent: 'center',
                 gap: '0.5rem',
                 boxShadow: '0 4px 15px rgba(16,185,129,0.3)'
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.transform = 'translateY(-2px)'
+                e.currentTarget.style.boxShadow = '0 8px 25px rgba(16,185,129,0.4)'
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.transform = 'translateY(0)'
+                e.currentTarget.style.boxShadow = '0 4px 15px rgba(16,185,129,0.3)'
               }}
             >
               <ArrowRight size={18} />

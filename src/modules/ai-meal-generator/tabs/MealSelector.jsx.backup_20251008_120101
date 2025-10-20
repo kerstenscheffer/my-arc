@@ -1,0 +1,1290 @@
+// src/modules/ai-meal-generator/tabs/MealSelector.jsx
+// TAB 2: Complete Meal & Ingredient Selection System - FIXED WITH PROPS
+
+import { useState, useEffect } from 'react'
+import { 
+  Search, Filter, Star, Zap, X, Plus, Info,
+  ChevronDown, ChevronUp, Utensils, Apple, Coffee,
+  Ban, AlertCircle, Leaf, Package, Heart,
+  Clock, DollarSign, Target, Beef, Cookie, Check
+} from 'lucide-react'
+
+export default function MealSelector({
+  db,
+  selectedClient,
+  clientProfile,
+  forcedMeals,
+  setForcedMeals,
+  excludedIngredients,
+  setExcludedIngredients,
+  selectedIngredients,      // FIXED: Now receiving from parent
+  setSelectedIngredients,   // FIXED: Now receiving setter from parent
+  mealPreferences,
+  setMealPreferences,
+  isMobile
+}) {
+  // Main states
+  const [activeTab, setActiveTab] = useState('meals')
+  const [allMeals, setAllMeals] = useState([])
+  const [allIngredients, setAllIngredients] = useState([])
+  const [filteredItems, setFilteredItems] = useState([])
+  const [loading, setLoading] = useState(false)
+  
+  // Search & Filter states
+  const [searchTerm, setSearchTerm] = useState('')
+  const [selectedTiming, setSelectedTiming] = useState('all')
+  const [selectedCategory, setSelectedCategory] = useState('all')
+  const [selectedLabels, setSelectedLabels] = useState([])
+  const [selectedCostTier, setSelectedCostTier] = useState('all')
+  const [showAdvancedFilters, setShowAdvancedFilters] = useState(false)
+  
+  // Favorites from localStorage
+  const [favorites, setFavorites] = useState(() => {
+    const saved = localStorage.getItem('aiMealFavorites')
+    return saved ? JSON.parse(saved) : []
+  })
+  
+  // Macro filters
+  const [macroFilters, setMacroFilters] = useState({
+    minProtein: 0,
+    maxCalories: 9999,
+    minFiber: 0
+  })
+  
+  // Selection mode for ingredients
+  const [ingredientMode, setIngredientMode] = useState('exclude')
+  
+  // Available labels from AI meals
+  const mealLabels = [
+    { id: 'high_protein', label: '💪 High Protein', color: '#10b981' },
+    { id: 'low_cal', label: '🥗 Low Cal', color: '#3b82f6' },
+    { id: 'meal_prep', label: '📦 Meal Prep', color: '#f59e0b' },
+    { id: 'vegetarian', label: '🌱 Vegetarian', color: '#10b981' },
+    { id: 'vegan', label: '🌿 Vegan', color: '#059669' },
+    { id: 'bulk_friendly', label: '💪 Bulk', color: '#8b5cf6' },
+    { id: 'cut_friendly', label: '✂️ Cut', color: '#ef4444' },
+    { id: 'quick', label: '⚡ Quick', color: '#ec4899' }
+  ]
+  
+  const mealTimings = [
+    { id: 'all', label: 'Alle', icon: Utensils },
+    { id: 'breakfast', label: 'Ontbijt', icon: Coffee },
+    { id: 'lunch', label: 'Lunch', icon: Apple },
+    { id: 'dinner', label: 'Diner', icon: Utensils },
+    { id: 'snack', label: 'Snack', icon: Apple }
+  ]
+  
+  const ingredientCategories = [
+    { id: 'all', label: 'Alle', icon: Package, color: '#10b981' },
+    { id: 'protein', label: 'Eiwit', icon: Beef, color: '#ef4444' },
+    { id: 'carbs', label: 'Koolhydraten', icon: Cookie, color: '#f59e0b' },
+    { id: 'vegetables', label: 'Groente', icon: Leaf, color: '#10b981' },
+    { id: 'fruit', label: 'Fruit', icon: Apple, color: '#ec4899' },
+    { id: 'dairy', label: 'Zuivel', icon: Coffee, color: '#3b82f6' },
+    { id: 'fats', label: 'Vetten', icon: Heart, color: '#8b5cf6' }
+  ]
+  
+  const costTiers = [
+    { id: 'all', label: 'Alle Prijzen' },
+    { id: 'budget', label: '💰 Budget', color: '#10b981' },
+    { id: 'moderate', label: '💳 Moderate', color: '#f59e0b' },
+    { id: 'premium', label: '💎 Premium', color: '#ec4899' }
+  ]
+  
+  // Load data on mount
+  useEffect(() => {
+    if (selectedClient) {
+      loadAllData()
+      loadClientPreferences()
+    }
+  }, [selectedClient])
+  
+  // Apply filters when changed
+  useEffect(() => {
+    applyFilters()
+  }, [searchTerm, selectedTiming, selectedCategory, selectedLabels, selectedCostTier, 
+      macroFilters, allMeals, allIngredients, activeTab, excludedIngredients, selectedIngredients])
+  
+  // Save favorites to localStorage
+  useEffect(() => {
+    localStorage.setItem('aiMealFavorites', JSON.stringify(favorites))
+  }, [favorites])
+  
+  // Debug logging for selected ingredients
+  useEffect(() => {
+    console.log('📍 MealSelector - selectedIngredients updated:', selectedIngredients)
+  }, [selectedIngredients])
+  
+  const loadAllData = async () => {
+    setLoading(true)
+    try {
+      // Load AI meals
+      const meals = await db.getAIMeals()
+      
+      // Process and score meals
+      const scoredMeals = (meals || []).map(meal => ({
+        ...meal,
+        type: 'meal',
+        aiScore: calculateAIScore(meal),
+        isFavorite: favorites.includes(`meal-${meal.id}`),
+        displayCategory: meal.timing?.[0] || 'other'
+      }))
+      
+      setAllMeals(scoredMeals)
+      
+      // Load AI ingredients
+      const ingredients = await db.getAIIngredients()
+      
+      // Process ingredients
+      const processedIngredients = (ingredients || []).map(ing => ({
+        ...ing,
+        type: 'ingredient',
+        isFavorite: favorites.includes(`ingredient-${ing.id}`),
+        displayCategory: ing.category || 'other',
+        // Check if ingredient is already selected/excluded
+        isExcluded: excludedIngredients.some(exc => exc.id === ing.id),
+        isSelected: selectedIngredients.some(sel => sel.id === ing.id),
+        // Nutrition per 100g for display
+        displayCalories: ing.calories_per_100g || 0,
+        displayProtein: ing.protein_per_100g || 0,
+        displayCarbs: ing.carbs_per_100g || 0,
+        displayFat: ing.fat_per_100g || 0
+      }))
+      
+      setAllIngredients(processedIngredients)
+      
+    } catch (error) {
+      console.error('Error loading data:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
+  
+  const loadClientPreferences = () => {
+    // Load any client-specific allergies or preferences
+    if (clientProfile?.allergies) {
+      const allergyList = Array.isArray(clientProfile.allergies) 
+        ? clientProfile.allergies 
+        : clientProfile.allergies.split(',').map(a => a.trim())
+      
+      const autoExcluded = allergyList.map(allergy => ({
+        id: allergy.toLowerCase(),
+        name: allergy,
+        reason: 'allergie'
+      }))
+      
+      // Only add if not already excluded
+      setExcludedIngredients(prev => {
+        const existing = prev.map(e => e.id)
+        const newExclusions = autoExcluded.filter(a => !existing.includes(a.id))
+        return [...prev, ...newExclusions]
+      })
+    }
+  }
+  
+  const calculateAIScore = (meal) => {
+    if (!clientProfile) return 0
+    
+    let score = 0
+    
+    // Goal alignment
+    if (clientProfile.primary_goal === 'muscle_gain' && meal.protein > 25) score += 3
+    if (clientProfile.primary_goal === 'fat_loss' && meal.calories < 400) score += 3
+    
+    // Label matching
+    const labels = meal.labels || []
+    if (clientProfile.primary_goal === 'muscle_gain' && labels.includes('bulk_friendly')) score += 5
+    if (clientProfile.primary_goal === 'fat_loss' && labels.includes('cut_friendly')) score += 5
+    
+    // Dietary matching
+    if (clientProfile.dietary_type === 'vegetarian' && labels.includes('vegetarian')) score += 10
+    if (clientProfile.dietary_type === 'vegan' && labels.includes('vegan')) score += 10
+    
+    // FIXED: Bonus for meals containing selected ingredients
+    if (selectedIngredients.length > 0 && meal.ingredients_list) {
+      const mealIngredients = typeof meal.ingredients_list === 'object'
+        ? Object.keys(meal.ingredients_list).map(i => i.toLowerCase())
+        : []
+      
+      const hasSelectedIngredient = selectedIngredients.some(sel => {
+        const searchTerm = (sel.name || sel.id || '').toLowerCase()
+        return mealIngredients.some(ing => ing.includes(searchTerm))
+      })
+      
+      if (hasSelectedIngredient) {
+        score += 10 // Bonus for containing selected ingredients
+      }
+    }
+    
+    return score
+  }
+  
+  const applyFilters = () => {
+    let items = []
+    
+    // Select items based on active tab
+    if (activeTab === 'meals') {
+      items = [...allMeals]
+      
+      // Filter out excluded ingredients
+      if (excludedIngredients.length > 0) {
+        items = items.filter(meal => {
+          if (!meal.ingredients_list) return true
+          
+          const mealIngredients = typeof meal.ingredients_list === 'object'
+            ? Object.keys(meal.ingredients_list).map(i => i.toLowerCase())
+            : []
+          
+          const hasExcluded = excludedIngredients.some(exc => {
+            const searchTerm = (exc.name || exc.id || '').toLowerCase()
+            return mealIngredients.some(ing => ing.includes(searchTerm))
+          })
+          
+          return !hasExcluded
+        })
+      }
+      
+      // FIXED: Prioritize meals with selected ingredients
+      if (selectedIngredients.length > 0) {
+        items = items.map(meal => ({
+          ...meal,
+          aiScore: calculateAIScore(meal) // Recalculate with selected ingredients
+        }))
+      }
+      
+      // Apply timing filter
+      if (selectedTiming !== 'all') {
+        items = items.filter(meal => meal.timing?.includes(selectedTiming))
+      }
+      
+      // Apply label filters
+      if (selectedLabels.length > 0) {
+        items = items.filter(meal => {
+          const mealLabels = meal.labels || []
+          return selectedLabels.every(label => mealLabels.includes(label))
+        })
+      }
+    } else if (activeTab === 'ingredients') {
+      // Update ingredient states
+      items = allIngredients.map(ing => ({
+        ...ing,
+        isExcluded: excludedIngredients.some(exc => exc.id === ing.id),
+        isSelected: selectedIngredients.some(sel => sel.id === ing.id)
+      }))
+      
+      // Apply category filter
+      if (selectedCategory !== 'all') {
+        items = items.filter(ing => ing.category === selectedCategory)
+      }
+    } else if (activeTab === 'favorites') {
+      // Get all favorited items
+      const favMeals = allMeals.filter(m => favorites.includes(`meal-${m.id}`))
+      const favIngredients = allIngredients.filter(i => favorites.includes(`ingredient-${i.id}`))
+      items = [...favMeals, ...favIngredients]
+    }
+    
+    // Apply search
+    if (searchTerm) {
+      items = items.filter(item =>
+        item.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        item.name_en?.toLowerCase().includes(searchTerm.toLowerCase())
+      )
+    }
+    
+    // Apply cost tier filter
+    if (selectedCostTier !== 'all') {
+      items = items.filter(item => item.cost_tier === selectedCostTier)
+    }
+    
+    // Apply macro filters
+    if (activeTab === 'meals') {
+      items = items.filter(meal => {
+        return meal.protein >= macroFilters.minProtein &&
+               meal.calories <= macroFilters.maxCalories &&
+               (meal.fiber || 0) >= macroFilters.minFiber
+      })
+    }
+    
+    // Sort by AI score (meals), then favorites, then name
+    items.sort((a, b) => {
+      if (a.type === 'meal' && b.type === 'meal') {
+        if (a.aiScore !== b.aiScore) return b.aiScore - a.aiScore
+      }
+      if (a.isFavorite !== b.isFavorite) return a.isFavorite ? -1 : 1
+      return a.name.localeCompare(b.name)
+    })
+    
+    setFilteredItems(items)
+  }
+  
+  const toggleFavorite = (item) => {
+    const itemKey = `${item.type}-${item.id}`
+    setFavorites(prev => {
+      if (prev.includes(itemKey)) {
+        return prev.filter(fav => fav !== itemKey)
+      } else {
+        return [...prev, itemKey]
+      }
+    })
+    
+    // Update item state
+    if (item.type === 'meal') {
+      setAllMeals(prev => prev.map(meal => 
+        meal.id === item.id ? {...meal, isFavorite: !meal.isFavorite} : meal
+      ))
+    } else {
+      setAllIngredients(prev => prev.map(ing => 
+        ing.id === item.id ? {...ing, isFavorite: !ing.isFavorite} : ing
+      ))
+    }
+  }
+  
+  const addToForced = (item) => {
+    if (item.type === 'meal' && !forcedMeals.find(m => m.id === item.id)) {
+      setForcedMeals([...forcedMeals, item])
+    }
+  }
+  
+  const removeFromForced = (itemId) => {
+    setForcedMeals(forcedMeals.filter(m => m.id !== itemId))
+  }
+  
+  const toggleLabel = (labelId) => {
+    setSelectedLabels(prev => {
+      if (prev.includes(labelId)) {
+        return prev.filter(l => l !== labelId)
+      } else {
+        return [...prev, labelId]
+      }
+    })
+  }
+  
+  // FIXED: Use parent's setters for ingredient management
+  const handleIngredientClick = (ingredient) => {
+    if (ingredientMode === 'exclude') {
+      // Toggle exclusion
+      if (excludedIngredients.some(exc => exc.id === ingredient.id)) {
+        // Remove from excluded
+        setExcludedIngredients(prev => prev.filter(exc => exc.id !== ingredient.id))
+      } else {
+        // Add to excluded (remove from selected if present)
+        setSelectedIngredients(prev => prev.filter(sel => sel.id !== ingredient.id))
+        setExcludedIngredients(prev => [...prev, {
+          id: ingredient.id,
+          name: ingredient.name,
+          label: ingredient.name
+        }])
+      }
+    } else {
+      // Toggle selection for preferred ingredients
+      if (selectedIngredients.some(sel => sel.id === ingredient.id)) {
+        // Remove from selected
+        setSelectedIngredients(prev => prev.filter(sel => sel.id !== ingredient.id))
+      } else {
+        // Add to selected (remove from excluded if present)
+        setExcludedIngredients(prev => prev.filter(exc => exc.id !== ingredient.id))
+        setSelectedIngredients(prev => [...prev, {
+          id: ingredient.id,
+          name: ingredient.name,
+          category: ingredient.category
+        }])
+        console.log('✅ Added to selected ingredients:', ingredient.name)
+      }
+    }
+  }
+  
+  const removeExcludedIngredient = (ingredientId) => {
+    setExcludedIngredients(excludedIngredients.filter(ing => 
+      ing.id !== ingredientId && ing.name !== ingredientId
+    ))
+  }
+  
+  const removeSelectedIngredient = (ingredientId) => {
+    setSelectedIngredients(selectedIngredients.filter(ing => ing.id !== ingredientId))
+    console.log('🗑️ Removed from selected ingredients:', ingredientId)
+  }
+  
+  if (!selectedClient) {
+    return (
+      <div style={{
+        textAlign: 'center',
+        padding: '3rem',
+        color: 'rgba(255,255,255,0.5)'
+      }}>
+        <Utensils size={48} style={{ marginBottom: '1rem', opacity: 0.3 }} />
+        <p>Selecteer eerst een client in Tab 1</p>
+      </div>
+    )
+  }
+  
+  return (
+    <div style={{
+      display: 'flex',
+      flexDirection: 'column',
+      gap: isMobile ? '1rem' : '1.5rem'
+    }}>
+      {/* Header */}
+      <div>
+        <h2 style={{
+          fontSize: isMobile ? '1.25rem' : '1.5rem',
+          fontWeight: '700',
+          color: '#fff',
+          marginBottom: '0.5rem'
+        }}>
+          AI Meal & Ingredient Selection
+        </h2>
+        <p style={{
+          fontSize: isMobile ? '0.875rem' : '0.95rem',
+          color: 'rgba(255,255,255,0.6)'
+        }}>
+          Selecteer maaltijden, ingrediënten en stel voorkeuren in
+        </p>
+      </div>
+      
+      {/* Main Tabs - REST OF COMPONENT UNCHANGED FROM HERE */}
+      <div style={{
+        background: 'rgba(255,255,255,0.03)',
+        borderRadius: '12px',
+        border: '1px solid rgba(255,255,255,0.1)',
+        overflow: 'hidden'
+      }}>
+        {/* Tab Headers */}
+        <div style={{
+          display: 'flex',
+          borderBottom: '1px solid rgba(255,255,255,0.1)',
+          background: 'rgba(255,255,255,0.02)'
+        }}>
+          <button
+            onClick={() => setActiveTab('meals')}
+            style={{
+              flex: 1,
+              padding: isMobile ? '0.75rem' : '1rem',
+              background: activeTab === 'meals' 
+                ? 'rgba(16, 185, 129, 0.1)' 
+                : 'transparent',
+              border: 'none',
+              borderBottom: activeTab === 'meals' 
+                ? '2px solid #10b981' 
+                : '2px solid transparent',
+              color: activeTab === 'meals' ? '#10b981' : 'rgba(255,255,255,0.6)',
+              fontSize: isMobile ? '0.9rem' : '1rem',
+              fontWeight: activeTab === 'meals' ? '600' : '400',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '0.5rem',
+              transition: 'all 0.3s ease',
+              minHeight: '44px',
+              touchAction: 'manipulation',
+              WebkitTapHighlightColor: 'transparent'
+            }}
+          >
+            <Utensils size={18} />
+            Maaltijden
+            <span style={{
+              fontSize: '0.8rem',
+              opacity: 0.7
+            }}>
+              ({allMeals.length})
+            </span>
+          </button>
+          
+          <button
+            onClick={() => setActiveTab('ingredients')}
+            style={{
+              flex: 1,
+              padding: isMobile ? '0.75rem' : '1rem',
+              background: activeTab === 'ingredients' 
+                ? 'rgba(139, 92, 246, 0.1)' 
+                : 'transparent',
+              border: 'none',
+              borderBottom: activeTab === 'ingredients' 
+                ? '2px solid #8b5cf6' 
+                : '2px solid transparent',
+              color: activeTab === 'ingredients' ? '#8b5cf6' : 'rgba(255,255,255,0.6)',
+              fontSize: isMobile ? '0.9rem' : '1rem',
+              fontWeight: activeTab === 'ingredients' ? '600' : '400',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '0.5rem',
+              transition: 'all 0.3s ease',
+              minHeight: '44px',
+              touchAction: 'manipulation',
+              WebkitTapHighlightColor: 'transparent'
+            }}
+          >
+            <Leaf size={18} />
+            Ingrediënten
+            {selectedIngredients.length > 0 && (
+              <span style={{
+                fontSize: '0.7rem',
+                background: '#10b981',
+                color: '#fff',
+                padding: '2px 6px',
+                borderRadius: '10px',
+                fontWeight: '600'
+              }}>
+                {selectedIngredients.length}
+              </span>
+            )}
+            {excludedIngredients.length > 0 && (
+              <span style={{
+                fontSize: '0.7rem',
+                background: '#ef4444',
+                color: '#fff',
+                padding: '2px 6px',
+                borderRadius: '10px',
+                fontWeight: '600'
+              }}>
+                -{excludedIngredients.length}
+              </span>
+            )}
+          </button>
+          
+          <button
+            onClick={() => setActiveTab('favorites')}
+            style={{
+              flex: 1,
+              padding: isMobile ? '0.75rem' : '1rem',
+              background: activeTab === 'favorites' 
+                ? 'rgba(245, 158, 11, 0.1)' 
+                : 'transparent',
+              border: 'none',
+              borderBottom: activeTab === 'favorites' 
+                ? '2px solid #f59e0b' 
+                : '2px solid transparent',
+              color: activeTab === 'favorites' ? '#f59e0b' : 'rgba(255,255,255,0.6)',
+              fontSize: isMobile ? '0.9rem' : '1rem',
+              fontWeight: activeTab === 'favorites' ? '600' : '400',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '0.5rem',
+              transition: 'all 0.3s ease',
+              minHeight: '44px',
+              touchAction: 'manipulation',
+              WebkitTapHighlightColor: 'transparent'
+            }}
+          >
+            <Star size={18} />
+            Favorieten
+            <span style={{
+              fontSize: '0.8rem',
+              opacity: 0.7
+            }}>
+              ({favorites.length})
+            </span>
+          </button>
+        </div>
+        
+        {/* Tab Content */}
+        <div style={{
+          padding: isMobile ? '1rem' : '1.25rem'
+        }}>
+          {/* Search Bar */}
+          <div style={{ position: 'relative', marginBottom: '1rem' }}>
+            <Search size={18} style={{
+              position: 'absolute',
+              left: '1rem',
+              top: '50%',
+              transform: 'translateY(-50%)',
+              color: activeTab === 'meals' ? '#10b981' : 
+                     activeTab === 'ingredients' ? '#8b5cf6' : '#f59e0b'
+            }} />
+            <input
+              type="text"
+              placeholder={
+                activeTab === 'meals' ? "Zoek maaltijden..." :
+                activeTab === 'ingredients' ? "Zoek ingrediënten..." :
+                "Zoek in favorieten..."
+              }
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              style={{
+                width: '100%',
+                padding: '0.75rem 1rem 0.75rem 3rem',
+                background: 'rgba(255,255,255,0.05)',
+                border: '1px solid rgba(255,255,255,0.1)',
+                borderRadius: '10px',
+                color: '#fff',
+                fontSize: isMobile ? '0.9rem' : '1rem'
+              }}
+            />
+          </div>
+          
+          {/* Filters for Meals */}
+          {activeTab === 'meals' && (
+            <>
+              {/* Timing Filter */}
+              <div style={{
+                display: 'flex',
+                gap: '0.5rem',
+                flexWrap: 'wrap',
+                marginBottom: '1rem'
+              }}>
+                {mealTimings.map(timing => (
+                  <button
+                    key={timing.id}
+                    onClick={() => setSelectedTiming(timing.id)}
+                    style={{
+                      padding: '0.5rem 0.75rem',
+                      background: selectedTiming === timing.id
+                        ? 'rgba(16, 185, 129, 0.2)'
+                        : 'rgba(255,255,255,0.05)',
+                      border: `1px solid ${selectedTiming === timing.id ? '#10b981' : 'rgba(255,255,255,0.1)'}`,
+                      borderRadius: '8px',
+                      color: selectedTiming === timing.id ? '#10b981' : 'rgba(255,255,255,0.6)',
+                      fontSize: isMobile ? '0.8rem' : '0.875rem',
+                      fontWeight: selectedTiming === timing.id ? '600' : '400',
+                      cursor: 'pointer',
+                      minHeight: '40px',
+                      touchAction: 'manipulation',
+                      WebkitTapHighlightColor: 'transparent'
+                    }}
+                  >
+                    {timing.label}
+                  </button>
+                ))}
+              </div>
+              
+              {/* Label Filters */}
+              <div style={{
+                display: 'flex',
+                gap: '0.5rem',
+                flexWrap: 'wrap',
+                marginBottom: '1rem'
+              }}>
+                {mealLabels.map(label => (
+                  <button
+                    key={label.id}
+                    onClick={() => toggleLabel(label.id)}
+                    style={{
+                      padding: '0.4rem 0.6rem',
+                      background: selectedLabels.includes(label.id)
+                        ? `${label.color}20`
+                        : 'rgba(255,255,255,0.05)',
+                      border: `1px solid ${selectedLabels.includes(label.id) ? label.color : 'rgba(255,255,255,0.1)'}`,
+                      borderRadius: '6px',
+                      color: selectedLabels.includes(label.id) ? label.color : 'rgba(255,255,255,0.6)',
+                      fontSize: isMobile ? '0.7rem' : '0.75rem',
+                      fontWeight: selectedLabels.includes(label.id) ? '600' : '400',
+                      cursor: 'pointer',
+                      minHeight: '32px',
+                      touchAction: 'manipulation'
+                    }}
+                  >
+                    {label.label}
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
+          
+          {/* Filters for Ingredients */}
+          {activeTab === 'ingredients' && (
+            <>
+              {/* Mode Toggle */}
+              <div style={{
+                display: 'flex',
+                gap: '0.5rem',
+                marginBottom: '1rem',
+                padding: '0.25rem',
+                background: 'rgba(255,255,255,0.03)',
+                borderRadius: '8px'
+              }}>
+                <button
+                  onClick={() => setIngredientMode('select')}
+                  style={{
+                    flex: 1,
+                    padding: '0.5rem',
+                    background: ingredientMode === 'select'
+                      ? 'rgba(16, 185, 129, 0.2)'
+                      : 'transparent',
+                    border: ingredientMode === 'select'
+                      ? '1px solid #10b981'
+                      : '1px solid transparent',
+                    borderRadius: '6px',
+                    color: ingredientMode === 'select' ? '#10b981' : 'rgba(255,255,255,0.6)',
+                    fontSize: isMobile ? '0.85rem' : '0.9rem',
+                    fontWeight: ingredientMode === 'select' ? '600' : '400',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '0.5rem',
+                    minHeight: '44px',
+                    touchAction: 'manipulation'
+                  }}
+                >
+                  <Heart size={16} />
+                  Gewenst ({selectedIngredients.length})
+                </button>
+                
+                <button
+                  onClick={() => setIngredientMode('exclude')}
+                  style={{
+                    flex: 1,
+                    padding: '0.5rem',
+                    background: ingredientMode === 'exclude'
+                      ? 'rgba(239, 68, 68, 0.2)'
+                      : 'transparent',
+                    border: ingredientMode === 'exclude'
+                      ? '1px solid #ef4444'
+                      : '1px solid transparent',
+                    borderRadius: '6px',
+                    color: ingredientMode === 'exclude' ? '#ef4444' : 'rgba(255,255,255,0.6)',
+                    fontSize: isMobile ? '0.85rem' : '0.9rem',
+                    fontWeight: ingredientMode === 'exclude' ? '600' : '400',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '0.5rem',
+                    minHeight: '44px',
+                    touchAction: 'manipulation'
+                  }}
+                >
+                  <Ban size={16} />
+                  Uitsluiten ({excludedIngredients.length})
+                </button>
+              </div>
+              
+              {/* Category Filter */}
+              <div style={{
+                display: 'flex',
+                gap: '0.5rem',
+                flexWrap: 'wrap',
+                marginBottom: '1rem'
+              }}>
+                {ingredientCategories.map(cat => {
+                  const Icon = cat.icon
+                  return (
+                    <button
+                      key={cat.id}
+                      onClick={() => setSelectedCategory(cat.id)}
+                      style={{
+                        padding: '0.4rem 0.6rem',
+                        background: selectedCategory === cat.id
+                          ? `${cat.color}20`
+                          : 'rgba(255,255,255,0.05)',
+                        border: `1px solid ${selectedCategory === cat.id ? cat.color : 'rgba(255,255,255,0.1)'}`,
+                        borderRadius: '6px',
+                        color: selectedCategory === cat.id ? cat.color : 'rgba(255,255,255,0.6)',
+                        fontSize: isMobile ? '0.75rem' : '0.8rem',
+                        fontWeight: selectedCategory === cat.id ? '600' : '400',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.25rem',
+                        minHeight: '32px',
+                        touchAction: 'manipulation'
+                      }}
+                    >
+                      <Icon size={14} />
+                      {cat.label}
+                    </button>
+                  )
+                })}
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+      
+      {/* Results Grid */}
+      <div style={{
+        background: 'rgba(255,255,255,0.03)',
+        borderRadius: '12px',
+        border: '1px solid rgba(255,255,255,0.1)',
+        padding: isMobile ? '1rem' : '1.25rem',
+        maxHeight: '500px',
+        overflowY: 'auto'
+      }}>
+        {loading ? (
+          <div style={{ textAlign: 'center', padding: '2rem' }}>
+            <div style={{
+              width: '40px',
+              height: '40px',
+              border: '3px solid rgba(255,255,255,0.1)',
+              borderTopColor: '#10b981',
+              borderRadius: '50%',
+              margin: '0 auto',
+              animation: 'spin 1s linear infinite'
+            }} />
+          </div>
+        ) : filteredItems.length === 0 ? (
+          <div style={{
+            textAlign: 'center',
+            padding: '2rem',
+            color: 'rgba(255,255,255,0.5)'
+          }}>
+            {activeTab === 'favorites' && favorites.length === 0 
+              ? 'Nog geen favorieten toegevoegd'
+              : 'Geen items gevonden met deze filters'}
+          </div>
+        ) : (
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: activeTab === 'ingredients' 
+              ? (isMobile ? 'repeat(2, 1fr)' : 'repeat(3, 1fr)')
+              : (isMobile ? '1fr' : 'repeat(2, 1fr)'),
+            gap: '0.75rem'
+          }}>
+            {filteredItems.map(item => (
+              <div 
+                key={`${item.type}-${item.id}`} 
+                style={{
+                  background: item.type === 'ingredient' 
+                    ? (item.isExcluded 
+                        ? 'rgba(239, 68, 68, 0.1)' 
+                        : item.isSelected 
+                          ? 'rgba(16, 185, 129, 0.1)'
+                          : item.isFavorite
+                            ? 'rgba(245, 158, 11, 0.05)'
+                            : 'rgba(255,255,255,0.02)')
+                    : (item.isFavorite 
+                        ? 'rgba(245, 158, 11, 0.05)' 
+                        : 'rgba(255,255,255,0.02)'),
+                  borderRadius: '10px',
+                  border: item.type === 'ingredient'
+                    ? (item.isExcluded
+                        ? '2px solid rgba(239, 68, 68, 0.5)'
+                        : item.isSelected
+                          ? '2px solid rgba(16, 185, 129, 0.5)'
+                          : item.isFavorite
+                            ? '1px solid rgba(245, 158, 11, 0.3)'
+                            : '1px solid rgba(255,255,255,0.1)')
+                    : (item.isFavorite 
+                        ? '1px solid rgba(245, 158, 11, 0.3)'
+                        : '1px solid rgba(255,255,255,0.1)'),
+                  padding: isMobile ? '0.75rem' : '1rem',
+                  position: 'relative',
+                  cursor: item.type === 'ingredient' ? 'pointer' : 'default',
+                  transition: 'all 0.2s ease',
+                  minHeight: '44px',
+                  touchAction: 'manipulation',
+                  WebkitTapHighlightColor: 'transparent'
+                }}
+                onClick={() => {
+                  if (item.type === 'ingredient') {
+                    handleIngredientClick(item)
+                  }
+                }}
+                onTouchStart={(e) => {
+                  if (isMobile && item.type === 'ingredient') {
+                    e.currentTarget.style.transform = 'scale(0.98)'
+                  }
+                }}
+                onTouchEnd={(e) => {
+                  if (isMobile && item.type === 'ingredient') {
+                    e.currentTarget.style.transform = 'scale(1)'
+                  }
+                }}
+              >
+                {/* Selection Indicator for Ingredients */}
+                {item.type === 'ingredient' && (item.isExcluded || item.isSelected) && (
+                  <div style={{
+                    position: 'absolute',
+                    top: '-8px',
+                    right: '10px',
+                    background: item.isExcluded 
+                      ? 'linear-gradient(135deg, #ef4444, #dc2626)'
+                      : 'linear-gradient(135deg, #10b981, #059669)',
+                    borderRadius: '50%',
+                    width: '24px',
+                    height: '24px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center'
+                  }}>
+                    {item.isExcluded ? (
+                      <X size={14} color="#fff" strokeWidth={3} />
+                    ) : (
+                      <Check size={14} color="#fff" strokeWidth={3} />
+                    )}
+                  </div>
+                )}
+                
+                {/* AI Score Badge (Meals only) */}
+                {item.type === 'meal' && item.aiScore > 0 && (
+                  <div style={{
+                    position: 'absolute',
+                    top: '-8px',
+                    left: '10px',
+                    background: 'linear-gradient(135deg, #10b981, #059669)',
+                    borderRadius: '4px',
+                    padding: '2px 6px',
+                    fontSize: '0.65rem',
+                    fontWeight: '600',
+                    color: '#fff'
+                  }}>
+                    AI: {item.aiScore}
+                  </div>
+                )}
+                
+                {/* Item Header */}
+                <div style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'flex-start',
+                  marginBottom: '0.5rem'
+                }}>
+                  <div style={{ flex: 1 }}>
+                    <h4 style={{
+                      fontSize: isMobile ? '0.9rem' : '1rem',
+                      fontWeight: '600',
+                      color: '#fff',
+                      margin: 0
+                    }}>
+                      {item.name}
+                    </h4>
+                    {item.type === 'meal' && (
+                      <p style={{
+                        fontSize: '0.75rem',
+                        color: 'rgba(255,255,255,0.5)',
+                        marginTop: '0.25rem'
+                      }}>
+                        {item.timing?.join(', ')} • {item.cost_tier}
+                      </p>
+                    )}
+                    {item.type === 'ingredient' && (
+                      <p style={{
+                        fontSize: '0.75rem',
+                        color: 'rgba(255,255,255,0.5)',
+                        marginTop: '0.25rem'
+                      }}>
+                        {item.category} • {item.cost_tier}
+                      </p>
+                    )}
+                  </div>
+                  
+                  {/* Action Buttons */}
+                  {item.type === 'meal' && (
+                    <div style={{ display: 'flex', gap: '0.25rem' }}>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          toggleFavorite(item)
+                        }}
+                        style={{
+                          padding: '0.5rem',
+                          background: item.isFavorite
+                            ? 'rgba(245, 158, 11, 0.2)'
+                            : 'rgba(255,255,255,0.05)',
+                          border: 'none',
+                          borderRadius: '6px',
+                          color: item.isFavorite ? '#f59e0b' : 'rgba(255,255,255,0.4)',
+                          cursor: 'pointer',
+                          minHeight: '32px',
+                          minWidth: '32px',
+                          touchAction: 'manipulation'
+                        }}
+                      >
+                        <Star size={16} fill={item.isFavorite ? '#f59e0b' : 'none'} />
+                      </button>
+                      
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          addToForced(item)
+                        }}
+                        style={{
+                          padding: '0.5rem',
+                          background: forcedMeals.find(m => m.id === item.id)
+                            ? 'rgba(245, 158, 11, 0.2)'
+                            : 'rgba(255,255,255,0.05)',
+                          border: 'none',
+                          borderRadius: '6px',
+                          color: forcedMeals.find(m => m.id === item.id)
+                            ? '#f59e0b'
+                            : 'rgba(255,255,255,0.6)',
+                          cursor: 'pointer',
+                          minHeight: '32px',
+                          minWidth: '32px',
+                          touchAction: 'manipulation'
+                        }}
+                      >
+                        <Zap size={16} />
+                      </button>
+                    </div>
+                  )}
+                  
+                  {/* Favorite Button for Ingredients */}
+                  {item.type === 'ingredient' && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        toggleFavorite(item)
+                      }}
+                      style={{
+                        padding: '0.4rem',
+                        background: item.isFavorite
+                          ? 'rgba(245, 158, 11, 0.2)'
+                          : 'rgba(255,255,255,0.05)',
+                        border: 'none',
+                        borderRadius: '6px',
+                        color: item.isFavorite ? '#f59e0b' : 'rgba(255,255,255,0.4)',
+                        cursor: 'pointer',
+                        minHeight: '28px',
+                        minWidth: '28px',
+                        touchAction: 'manipulation'
+                      }}
+                    >
+                      <Star size={14} fill={item.isFavorite ? '#f59e0b' : 'none'} />
+                    </button>
+                  )}
+                </div>
+                
+                {/* Macros */}
+                <div style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(4, 1fr)',
+                  gap: '0.5rem',
+                  fontSize: '0.7rem',
+                  color: 'rgba(255,255,255,0.6)'
+                }}>
+                  <div>
+                    <span style={{ color: 'rgba(255,255,255,0.4)' }}>kcal:</span>
+                    <br />
+                    <strong style={{ color: '#fff' }}>
+                      {Math.round(item.type === 'meal' ? item.calories : item.displayCalories)}
+                    </strong>
+                  </div>
+                  <div>
+                    <span style={{ color: 'rgba(255,255,255,0.4)' }}>P:</span>
+                    <br />
+                    <strong style={{ color: '#10b981' }}>
+                      {Math.round(item.type === 'meal' ? item.protein : item.displayProtein)}g
+                    </strong>
+                  </div>
+                  <div>
+                    <span style={{ color: 'rgba(255,255,255,0.4)' }}>C:</span>
+                    <br />
+                    <strong style={{ color: '#3b82f6' }}>
+                      {Math.round(item.type === 'meal' ? item.carbs : item.displayCarbs)}g
+                    </strong>
+                  </div>
+                  <div>
+                    <span style={{ color: 'rgba(255,255,255,0.4)' }}>F:</span>
+                    <br />
+                    <strong style={{ color: '#f59e0b' }}>
+                      {Math.round(item.type === 'meal' ? item.fat : item.displayFat)}g
+                    </strong>
+                  </div>
+                </div>
+                
+                {/* Click hint for ingredients */}
+                {item.type === 'ingredient' && !item.isExcluded && !item.isSelected && (
+                  <div style={{
+                    marginTop: '0.5rem',
+                    paddingTop: '0.5rem',
+                    borderTop: '1px solid rgba(255,255,255,0.05)',
+                    fontSize: '0.65rem',
+                    color: ingredientMode === 'exclude' 
+                      ? 'rgba(239, 68, 68, 0.6)' 
+                      : 'rgba(16, 185, 129, 0.6)',
+                    textAlign: 'center'
+                  }}>
+                    Klik om te {ingredientMode === 'exclude' ? 'excluderen' : 'selecteren'}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+      
+      {/* Selected/Excluded Summary */}
+      {(forcedMeals.length > 0 || excludedIngredients.length > 0 || selectedIngredients.length > 0) && (
+        <div style={{
+          background: 'rgba(255,255,255,0.03)',
+          borderRadius: '12px',
+          border: '1px solid rgba(255,255,255,0.1)',
+          padding: isMobile ? '1rem' : '1.25rem'
+        }}>
+          {/* Forced Meals */}
+          {forcedMeals.length > 0 && (
+            <div style={{ marginBottom: forcedMeals.length > 0 ? '1rem' : 0 }}>
+              <h3 style={{
+                fontSize: isMobile ? '0.95rem' : '1.05rem',
+                fontWeight: '600',
+                color: '#f59e0b',
+                marginBottom: '0.75rem',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem'
+              }}>
+                <Zap size={18} />
+                Verplichte Maaltijden ({forcedMeals.length})
+              </h3>
+              
+              <div style={{
+                display: 'flex',
+                flexWrap: 'wrap',
+                gap: '0.5rem'
+              }}>
+                {forcedMeals.map(meal => (
+                  <div key={meal.id} style={{
+                    padding: '0.5rem 0.75rem',
+                    background: 'rgba(245, 158, 11, 0.1)',
+                    border: '1px solid rgba(245, 158, 11, 0.3)',
+                    borderRadius: '8px',
+                    fontSize: '0.875rem',
+                    color: '#fff',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem'
+                  }}>
+                    {meal.name}
+                    <button
+                      onClick={() => removeFromForced(meal.id)}
+                      style={{
+                        background: 'transparent',
+                        border: 'none',
+                        color: '#ef4444',
+                        cursor: 'pointer',
+                        padding: 0,
+                        minHeight: '20px',
+                        minWidth: '20px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center'
+                      }}
+                    >
+                      <X size={14} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+          
+          {/* Selected Ingredients (FIXED: Now shown) */}
+          {selectedIngredients.length > 0 && (
+            <div style={{ marginBottom: excludedIngredients.length > 0 ? '1rem' : 0 }}>
+              <h3 style={{
+                fontSize: isMobile ? '0.95rem' : '1.05rem',
+                fontWeight: '600',
+                color: '#10b981',
+                marginBottom: '0.75rem',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem'
+              }}>
+                <Heart size={18} />
+                Gewenste Ingrediënten ({selectedIngredients.length})
+              </h3>
+              
+              <div style={{
+                display: 'flex',
+                flexWrap: 'wrap',
+                gap: '0.5rem'
+              }}>
+                {selectedIngredients.map(ing => (
+                  <div key={ing.id} style={{
+                    padding: '0.5rem 0.75rem',
+                    background: 'rgba(16, 185, 129, 0.1)',
+                    border: '1px solid rgba(16, 185, 129, 0.3)',
+                    borderRadius: '8px',
+                    fontSize: '0.875rem',
+                    color: '#fff',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem'
+                  }}>
+                    {ing.name}
+                    <button
+                      onClick={() => removeSelectedIngredient(ing.id)}
+                      style={{
+                        background: 'transparent',
+                        border: 'none',
+                        color: '#ef4444',
+                        cursor: 'pointer',
+                        padding: 0,
+                        minHeight: '20px',
+                        minWidth: '20px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center'
+                      }}
+                    >
+                      <X size={14} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+          
+          {/* Excluded Ingredients */}
+          {excludedIngredients.length > 0 && (
+            <div>
+              <h3 style={{
+                fontSize: isMobile ? '0.95rem' : '1.05rem',
+                fontWeight: '600',
+                color: '#ef4444',
+                marginBottom: '0.75rem',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem'
+              }}>
+                <Ban size={18} />
+                Uitgesloten Ingrediënten ({excludedIngredients.length})
+              </h3>
+              
+              <div style={{
+                display: 'flex',
+                flexWrap: 'wrap',
+                gap: '0.5rem'
+              }}>
+                {excludedIngredients.map(ing => (
+                  <div key={ing.id || ing.name} style={{
+                    padding: '0.5rem 0.75rem',
+                    background: 'rgba(239, 68, 68, 0.1)',
+                    border: '1px solid rgba(239, 68, 68, 0.3)',
+                    borderRadius: '8px',
+                    fontSize: '0.875rem',
+                    color: '#fff',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem'
+                  }}>
+                    {ing.label || ing.name}
+                    <button
+                      onClick={() => removeExcludedIngredient(ing.id || ing.name)}
+                      style={{
+                        background: 'transparent',
+                        border: 'none',
+                        color: '#ef4444',
+                        cursor: 'pointer',
+                        padding: 0,
+                        minHeight: '20px',
+                        minWidth: '20px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center'
+                      }}
+                    >
+                      <X size={14} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+      
+      {/* CSS */}
+      <style>{`
+        @keyframes spin {
+          to { transform: rotate(360deg); }
+        }
+      `}</style>
+    </div>
+  )
+}

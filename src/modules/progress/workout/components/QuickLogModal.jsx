@@ -1,15 +1,15 @@
-// COMPLETE QUICK LOG MODAL - Met Workout Sessions & Progress Integration
+// src/modules/progress/workout/components/QuickLogModal.jsx - ULTRA COMPACT UPGRADE
 import { useState, useRef, useEffect } from 'react'
 import { X, Plus, Dumbbell, Search, Target, Activity, Star, CheckCircle } from 'lucide-react'
 import ExerciseDatabase from '../../../../utils/ExerciseDatabase'
 
 const THEME = {
   primary: '#f97316',
-  gradient: 'linear-gradient(135deg, #f97316 0%, #ea580c 100%)',
+  gradient: 'linear-gradient(135deg, rgba(249, 115, 22, 0.3) 0%, rgba(234, 88, 12, 0.2) 100%)',
   success: '#10b981'
 }
 
-// QuickSetInputRow Component
+// QuickSetInputRow Component - UPGRADED
 function QuickSetInputRow({ 
   setNumber, 
   weight, 
@@ -22,91 +22,202 @@ function QuickSetInputRow({
 }) {
   return (
     <div style={{
-      display: 'flex',
+      display: 'grid',
+      gridTemplateColumns: '32px 1fr 1fr 36px',
+      gap: isMobile ? '0.4rem' : '0.5rem',
       alignItems: 'center',
-      gap: isMobile ? '0.5rem' : '0.75rem',
-      padding: isMobile ? '0.75rem' : '0.875rem',
+      padding: isMobile ? '0.5rem' : '0.625rem',
       background: completed 
-        ? 'rgba(16, 185, 129, 0.15)' 
-        : 'rgba(15, 23, 42, 0.6)',
-      border: `2px solid ${completed ? THEME.success : 'rgba(249, 115, 22, 0.25)'}`,
-      borderRadius: '12px',
-      transition: 'all 0.3s ease'
+        ? 'linear-gradient(135deg, rgba(16, 185, 129, 0.15) 0%, rgba(5, 150, 105, 0.08) 100%)' 
+        : 'rgba(23, 23, 23, 0.6)',
+      border: `1px solid ${completed ? 'rgba(16, 185, 129, 0.3)' : 'rgba(249, 115, 22, 0.1)'}`,
+      borderRadius: '8px',
+      transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+      backdropFilter: 'blur(10px)',
+      minHeight: '44px',
+      boxShadow: completed ? '0 0 15px rgba(16, 185, 129, 0.15)' : 'none'
     }}>
+      {/* Set number badge */}
       <div style={{
         width: isMobile ? '28px' : '32px',
         height: isMobile ? '28px' : '32px',
-        borderRadius: '8px',
-        background: completed ? THEME.success : THEME.primary,
-        color: '#000',
+        borderRadius: '6px',
+        background: completed 
+          ? 'rgba(16, 185, 129, 0.2)'
+          : 'rgba(249, 115, 22, 0.2)',
+        border: `1px solid ${completed ? 'rgba(16, 185, 129, 0.3)' : 'rgba(249, 115, 22, 0.3)'}`,
+        color: completed ? '#10b981' : '#f97316',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        fontSize: isMobile ? '0.8rem' : '0.875rem',
-        fontWeight: '700'
+        fontSize: isMobile ? '0.75rem' : '0.8rem',
+        fontWeight: '800',
+        boxShadow: completed 
+          ? '0 0 12px rgba(16, 185, 129, 0.3)'
+          : '0 0 12px rgba(249, 115, 22, 0.3)'
       }}>
         {setNumber}
       </div>
       
-      <div style={{ flex: '1' }}>
+      {/* Weight input */}
+      <div style={{
+        background: 'rgba(23, 23, 23, 0.6)',
+        backdropFilter: 'blur(10px)',
+        border: '1px solid rgba(249, 115, 22, 0.1)',
+        borderRadius: '6px',
+        display: 'flex',
+        flexDirection: 'column',
+        justifyContent: 'center',
+        textAlign: 'center',
+        minHeight: '44px',
+        overflow: 'hidden'
+      }}>
         <input
-          type="number"
+          type="text"
+          inputMode="decimal"
           value={weight}
-          onChange={(e) => onWeightChange(parseFloat(e.target.value) || 0)}
+          onChange={(e) => {
+            const val = e.target.value
+            if (val === '') {
+              onWeightChange('')
+            } else {
+              const num = parseFloat(val)
+              if (!isNaN(num)) {
+                onWeightChange(num)
+              }
+            }
+          }}
+          onFocus={(e) => {
+            if (e.target.value === '0') {
+              e.target.select()
+            }
+          }}
           placeholder="kg"
           style={{
             width: '100%',
-            padding: isMobile ? '0.5rem' : '0.625rem',
-            background: 'rgba(0, 0, 0, 0.4)',
-            border: '1px solid rgba(255, 255, 255, 0.1)',
-            borderRadius: '8px',
-            color: '#fff',
-            fontSize: isMobile ? '0.9rem' : '1rem',
+            padding: isMobile ? '0.35rem' : '0.4rem',
+            background: 'transparent',
+            border: 'none',
+            color: '#f97316',
+            fontSize: isMobile ? '0.95rem' : '1rem',
+            fontWeight: '800',
             textAlign: 'center',
-            outline: 'none'
+            outline: 'none',
+            letterSpacing: '-0.02em'
           }}
         />
+        <div style={{
+          fontSize: isMobile ? '0.55rem' : '0.6rem',
+          color: 'rgba(255, 255, 255, 0.5)',
+          fontWeight: '600',
+          textTransform: 'uppercase',
+          letterSpacing: '0.05em',
+          padding: '0 0.2rem 0.2rem'
+        }}>
+          KG
+        </div>
       </div>
       
-      <div style={{ flex: '1' }}>
+      {/* Reps input */}
+      <div style={{
+        background: 'rgba(23, 23, 23, 0.6)',
+        backdropFilter: 'blur(10px)',
+        border: '1px solid rgba(249, 115, 22, 0.1)',
+        borderRadius: '6px',
+        display: 'flex',
+        flexDirection: 'column',
+        justifyContent: 'center',
+        textAlign: 'center',
+        minHeight: '44px',
+        overflow: 'hidden'
+      }}>
         <input
-          type="number"
+          type="text"
+          inputMode="numeric"
           value={reps}
-          onChange={(e) => onRepsChange(parseInt(e.target.value) || 0)}
+          onChange={(e) => {
+            const val = e.target.value
+            if (val === '') {
+              onRepsChange('')
+            } else {
+              const num = parseInt(val)
+              if (!isNaN(num)) {
+                onRepsChange(num)
+              }
+            }
+          }}
+          onFocus={(e) => {
+            if (e.target.value === '0') {
+              e.target.select()
+            }
+          }}
           placeholder="reps"
           style={{
             width: '100%',
-            padding: isMobile ? '0.5rem' : '0.625rem',
-            background: 'rgba(0, 0, 0, 0.4)',
-            border: '1px solid rgba(255, 255, 255, 0.1)',
-            borderRadius: '8px',
-            color: '#fff',
-            fontSize: isMobile ? '0.9rem' : '1rem',
+            padding: isMobile ? '0.35rem' : '0.4rem',
+            background: 'transparent',
+            border: 'none',
+            color: '#f97316',
+            fontSize: isMobile ? '0.95rem' : '1rem',
+            fontWeight: '800',
             textAlign: 'center',
-            outline: 'none'
+            outline: 'none',
+            letterSpacing: '-0.02em'
           }}
         />
+        <div style={{
+          fontSize: isMobile ? '0.55rem' : '0.6rem',
+          color: 'rgba(255, 255, 255, 0.5)',
+          fontWeight: '600',
+          textTransform: 'uppercase',
+          letterSpacing: '0.05em',
+          padding: '0 0.2rem 0.2rem'
+        }}>
+          REPS
+        </div>
       </div>
       
+      {/* Check button */}
       <button
         onClick={onComplete}
         style={{
-          width: isMobile ? '36px' : '40px',
-          height: isMobile ? '36px' : '40px',
-          borderRadius: '10px',
-          background: completed ? THEME.success : 'rgba(249, 115, 22, 0.2)',
-          border: `2px solid ${completed ? THEME.success : THEME.primary}`,
-          color: completed ? '#000' : THEME.primary,
+          width: isMobile ? '32px' : '36px',
+          height: isMobile ? '32px' : '36px',
+          minHeight: isMobile ? '32px' : '36px',
+          borderRadius: '8px',
+          background: completed 
+            ? 'rgba(16, 185, 129, 0.2)'
+            : 'rgba(249, 115, 22, 0.1)',
+          border: `1px solid ${completed ? 'rgba(16, 185, 129, 0.3)' : 'rgba(249, 115, 22, 0.2)'}`,
+          color: completed ? '#10b981' : '#f97316',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
           cursor: 'pointer',
-          fontSize: isMobile ? '1.2rem' : '1.4rem',
-          fontWeight: '700',
-          transition: 'all 0.2s ease'
+          transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+          touchAction: 'manipulation',
+          WebkitTapHighlightColor: 'transparent',
+          boxShadow: completed ? '0 0 15px rgba(16, 185, 129, 0.3)' : 'none'
+        }}
+        onMouseEnter={(e) => {
+          if (!isMobile) {
+            e.currentTarget.style.transform = 'scale(1.1)'
+          }
+        }}
+        onMouseLeave={(e) => {
+          if (!isMobile) {
+            e.currentTarget.style.transform = 'scale(1)'
+          }
         }}
       >
-        ✓
+        <CheckCircle 
+          size={isMobile ? 14 : 16} 
+          style={{
+            filter: completed 
+              ? 'drop-shadow(0 0 6px rgba(16, 185, 129, 0.6))'
+              : 'none'
+          }}
+        />
       </button>
     </div>
   )
@@ -135,16 +246,13 @@ export default function QuickLogModal({
   const searchInputRef = useRef(null)
   const dropdownRef = useRef(null)
 
-  // Load exercises from database
   const loadExerciseDatabase = async () => {
     try {
       const exercises = await ExerciseDatabase.loadExercisesFromDatabase(db, client?.id)
-      console.log('📊 Loaded exercises from ExerciseDatabase:', exercises.length)
       setDatabaseExercises(exercises)
     } catch (error) {
       console.error('Error loading exercise database:', error)
       const fallbackExercises = ExerciseDatabase.getAllExercises()
-      console.log('📊 Using fallback exercises:', fallbackExercises.length)
       setDatabaseExercises(fallbackExercises)
     }
   }
@@ -154,22 +262,10 @@ export default function QuickLogModal({
     if (searchInputRef.current) {
       searchInputRef.current.focus()
     }
-    
-    console.log('🚀 QUICKLOG MODAL MOUNTED')
-    console.log('📋 todaysWorkout prop:', todaysWorkout)
-    console.log('🏋️ client prop:', client?.name || client?.id)
-    console.log('📊 todaysLogs received:', todaysLogs?.length || 0)
-    
-    const scheduled = getScheduledExercises()
-    console.log('📅 Scheduled exercises on mount:', scheduled)
   }, [todaysLogs])
 
-  // Get scheduled exercises from today's workout
   const getScheduledExercises = () => {
-    console.log('🔍 Checking todaysWorkout:', todaysWorkout)
-    
     if (!todaysWorkout) {
-      console.log('❌ No todaysWorkout found')
       return []
     }
     
@@ -191,9 +287,6 @@ export default function QuickLogModal({
         return ex.name || ex.exercise_name || ex.exercise || ''
       }).filter(Boolean)
       
-      console.log('📅 TODAY\'S SCHEDULED EXERCISES LOADED:', scheduled)
-      console.log('📊 Total scheduled exercises:', scheduled.length)
-      
       return scheduled
     } catch (error) {
       console.error('❌ Error getting scheduled exercises:', error)
@@ -201,19 +294,16 @@ export default function QuickLogModal({
     }
   }
 
-  // Get ordered exercises for display
   const getOrderedExercises = () => {
     const scheduledExercises = getScheduledExercises()
     const searchLower = exerciseSearchTerm.toLowerCase()
     
-    // Filter out already completed exercises
     const completedExerciseNames = todaysLogs?.map(log => log.exercise_name || log.exercise) || []
     const availableScheduled = scheduledExercises.filter(exercise => 
       !completedExerciseNames.includes(exercise)
     )
     
     if (!searchLower) {
-      console.log('📝 No search term - limiting results to 10')
       const limitedDatabase = databaseExercises
         .filter(ex => !scheduledExercises.includes(ex.name))
         .slice(0, 10)
@@ -246,16 +336,12 @@ export default function QuickLogModal({
   }
 
   const handleExerciseSelect = (exercise) => {
-    console.log('🎯 Exercise selected:', exercise)
     setSelectedExercise(exercise)
     setExerciseSearchTerm(exercise)
     setCustomExercise('')
     setShowExerciseDropdown(false)
 
-    // Smart pre-fill sets from today's workout schema
     if (todaysWorkout) {
-      console.log('🔍 Looking for exercise data in todaysWorkout:', exercise)
-      
       let exerciseData = null
       
       if (todaysWorkout.exercises && Array.isArray(todaysWorkout.exercises)) {
@@ -264,8 +350,6 @@ export default function QuickLogModal({
           return name === exercise
         })
       }
-      
-      console.log('🔍 Found exercise data:', exerciseData)
       
       if (exerciseData && typeof exerciseData === 'object') {
         const targetSets = parseInt(exerciseData.sets) || 3
@@ -279,7 +363,6 @@ export default function QuickLogModal({
         }))
         
         setQuickSets(newSets)
-        console.log(`🎯 PRE-FILLED: ${targetSets} sets of ${targetReps} reps for ${exercise}`)
       }
     }
   }
@@ -304,7 +387,6 @@ export default function QuickLogModal({
     setQuickSets(newSets)
   }
 
-  // COMPLETE SAVE FUNCTION WITH DATABASE INTEGRATION
   const saveQuickLog = async () => {
     const exerciseName = customExercise || selectedExercise || exerciseSearchTerm
     
@@ -322,13 +404,11 @@ export default function QuickLogModal({
     setSavingQuick(true)
     
     try {
-      // ECHTE DATABASE SAVE
       const setsData = completedSets.map(set => ({
         weight: set.weight,
         reps: set.reps
       }))
       
-      // Check if saveQuickWorkoutLog exists, otherwise use alternative
       if (db.saveQuickWorkoutLog) {
         await db.saveQuickWorkoutLog(
           client?.id || client,
@@ -337,7 +417,6 @@ export default function QuickLogModal({
           `Quick log - ${new Date().toLocaleDateString()}`
         )
       } else if (db.saveWorkoutProgress) {
-        // Fallback to existing method
         await db.saveWorkoutProgress({
           client_id: client?.id || client,
           exercise_name: exerciseName,
@@ -345,22 +424,14 @@ export default function QuickLogModal({
           date: new Date().toISOString().split('T')[0],
           notes: `Quick log - ${new Date().toLocaleDateString()}`
         })
-      } else {
-        console.warn('No workout save method available in DatabaseService')
-        throw new Error('Workout save method not implemented')
       }
       
-      console.log('✅ Workout saved to database!')
-      
-      // Show success state
       setSaveSuccess(true)
       
-      // Update parent if callback exists
       if (onDataReload) {
         await onDataReload()
       }
       
-      // Update local state if setters exist
       if (setTodaysLogs) {
         setTodaysLogs(prev => [...prev, {
           exercise_name: exerciseName,
@@ -377,10 +448,8 @@ export default function QuickLogModal({
         }))
       }
       
-      // Success feedback
       if (navigator.vibrate) navigator.vibrate([50, 100, 50])
       
-      // Close after short delay to show success
       setTimeout(() => {
         onClose()
       }, 1000)
@@ -409,95 +478,109 @@ export default function QuickLogModal({
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
-      padding: isMobile ? '1rem' : '2rem',
+      padding: isMobile ? '0.75rem' : '1.5rem',
       animation: 'fadeIn 0.3s ease'
     }}
     onClick={onClose}
     >
       <div 
         style={{
-          background: 'linear-gradient(135deg, rgba(15, 23, 42, 0.98) 0%, rgba(30, 41, 59, 0.98) 100%)',
-          borderRadius: isMobile ? '20px' : '24px',
+          background: 'linear-gradient(135deg, rgba(17, 17, 17, 0.98) 0%, rgba(10, 10, 10, 0.98) 100%)',
+          borderRadius: isMobile ? '14px' : '18px',
           padding: 0,
           width: isMobile ? '95vw' : '600px',
-          height: isMobile ? '90vh' : '80vh',
-          maxHeight: '800px',
-          boxShadow: '0 25px 50px rgba(249, 115, 22, 0.3), 0 0 0 1px rgba(249, 115, 22, 0.2)',
-          border: '2px solid rgba(249, 115, 22, 0.3)',
+          maxHeight: isMobile ? '85vh' : '80vh',
+          boxShadow: '0 20px 60px rgba(249, 115, 22, 0.25)',
+          border: '1px solid rgba(249, 115, 22, 0.25)',
           position: 'relative',
           display: 'flex',
           flexDirection: 'column',
-          overflow: 'hidden'
+          overflow: 'hidden',
+          backdropFilter: 'blur(20px)'
         }}
         onClick={(e) => e.stopPropagation()}
       >
         
-        {/* Top accent */}
+        {/* Top glow accent */}
         <div style={{
           position: 'absolute',
           top: 0,
           left: 0,
           right: 0,
-          height: '4px',
-          background: THEME.gradient,
-          borderRadius: isMobile ? '20px 20px 0 0' : '24px 24px 0 0',
-          boxShadow: '0 0 20px rgba(249, 115, 22, 0.6)'
+          height: '2px',
+          background: 'linear-gradient(90deg, transparent 0%, #f97316 50%, transparent 100%)',
+          opacity: 0.6
         }} />
         
-        {/* Header */}
+        {/* Header - ULTRA COMPACT */}
         <div style={{
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
-          padding: isMobile ? '1.5rem 1.25rem 1rem 1.25rem' : '2rem 1.75rem 1.25rem 1.75rem',
-          borderBottom: '1px solid rgba(249, 115, 22, 0.15)',
+          padding: isMobile ? '0.875rem 1rem' : '1rem 1.25rem',
+          borderBottom: '1px solid rgba(249, 115, 22, 0.1)',
           flexShrink: 0
         }}>
           <div>
             <h2 style={{
-              fontSize: isMobile ? '1.5rem' : '1.75rem',
-              background: THEME.gradient,
-              WebkitBackgroundClip: 'text',
-              WebkitTextFillColor: 'transparent',
+              fontSize: isMobile ? '1.1rem' : '1.3rem',
+              color: '#fff',
               fontWeight: '800',
               margin: 0,
-              marginBottom: '0.25rem'
+              marginBottom: '0.2rem',
+              letterSpacing: '-0.02em'
             }}>
               Quick Log
             </h2>
             <p style={{
-              color: 'rgba(148, 163, 184, 0.8)',
-              fontSize: isMobile ? '0.875rem' : '0.95rem',
-              margin: 0
+              color: 'rgba(255, 255, 255, 0.5)',
+              fontSize: isMobile ? '0.65rem' : '0.7rem',
+              margin: 0,
+              fontWeight: '600',
+              textTransform: 'uppercase',
+              letterSpacing: '0.05em'
             }}>
-              {todaysWorkout?.name || 'Vrije Training'}
+              {todaysWorkout?.name || 'VRIJE TRAINING'}
             </p>
           </div>
           
           <button
             onClick={onClose}
             style={{
-              width: isMobile ? '44px' : '48px',
-              height: isMobile ? '44px' : '48px',
-              minHeight: isMobile ? '44px' : '48px',
-              borderRadius: '12px',
-              background: 'rgba(255, 255, 255, 0.05)',
-              border: '1px solid rgba(255, 255, 255, 0.1)',
+              width: '44px',
+              height: '44px',
+              minHeight: '44px',
+              borderRadius: '10px',
+              background: 'rgba(23, 23, 23, 0.6)',
+              backdropFilter: 'blur(10px)',
+              border: '1px solid rgba(249, 115, 22, 0.2)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               cursor: 'pointer',
-              transition: 'all 0.3s ease',
-              color: 'rgba(255, 255, 255, 0.6)',
+              transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+              color: '#f97316',
               touchAction: 'manipulation',
               WebkitTapHighlightColor: 'transparent'
             }}
+            onMouseEnter={(e) => {
+              if (!isMobile) {
+                e.currentTarget.style.background = 'rgba(249, 115, 22, 0.15)'
+                e.currentTarget.style.borderColor = 'rgba(249, 115, 22, 0.3)'
+              }
+            }}
+            onMouseLeave={(e) => {
+              if (!isMobile) {
+                e.currentTarget.style.background = 'rgba(23, 23, 23, 0.6)'
+                e.currentTarget.style.borderColor = 'rgba(249, 115, 22, 0.2)'
+              }
+            }}
           >
-            <X size={isMobile ? 20 : 22} />
+            <X size={isMobile ? 18 : 20} strokeWidth={2.5} />
           </button>
         </div>
 
-        {/* SCROLLABLE CONTENT AREA */}
+        {/* SCROLLABLE CONTENT */}
         <div style={{
           flex: 1,
           display: 'flex',
@@ -505,40 +588,39 @@ export default function QuickLogModal({
           overflow: 'hidden'
         }}>
           
-          {/* Content with internal scroll */}
           <div style={{
             flex: 1,
-            padding: isMobile ? '1.25rem' : '1.75rem',
+            padding: isMobile ? '0.875rem 1rem' : '1rem 1.25rem',
             overflowY: 'auto',
             display: 'flex',
             flexDirection: 'column',
-            gap: '1.5rem'
+            gap: isMobile ? '1rem' : '1.25rem'
           }}>
 
-            {/* Exercise Selection */}
+            {/* Exercise Selection - COMPACT */}
             <div style={{ flexShrink: 0 }}>
               <label style={{
                 display: 'block',
-                color: 'rgba(148, 163, 184, 0.9)',
-                fontSize: isMobile ? '0.8rem' : '0.875rem',
-                fontWeight: '600',
+                color: 'rgba(255, 255, 255, 0.5)',
+                fontSize: isMobile ? '0.55rem' : '0.6rem',
+                fontWeight: '700',
                 textTransform: 'uppercase',
                 letterSpacing: '0.05em',
-                marginBottom: '1rem'
+                marginBottom: '0.5rem'
               }}>
-                SELECTEER OEFENING
+                OEFENING
               </label>
               
               <div style={{ position: 'relative' }}>
                 <div style={{ position: 'relative' }}>
                   <Search 
-                    size={isMobile ? 18 : 20} 
+                    size={isMobile ? 14 : 16} 
                     style={{
                       position: 'absolute',
-                      left: '1.25rem',
+                      left: isMobile ? '0.75rem' : '0.875rem',
                       top: '50%',
                       transform: 'translateY(-50%)',
-                      color: 'rgba(148, 163, 184, 0.5)',
+                      color: 'rgba(249, 115, 22, 0.4)',
                       pointerEvents: 'none',
                       zIndex: 1
                     }}
@@ -546,7 +628,7 @@ export default function QuickLogModal({
                   <input
                     ref={searchInputRef}
                     type="text"
-                    placeholder="Zoek oefening of voer nieuwe in..."
+                    placeholder="Zoek oefening..."
                     value={exerciseSearchTerm}
                     onChange={(e) => {
                       setExerciseSearchTerm(e.target.value)
@@ -559,22 +641,24 @@ export default function QuickLogModal({
                     onFocus={() => setShowExerciseDropdown(true)}
                     style={{
                       width: '100%',
-                      padding: isMobile ? '1rem 1.25rem 1rem 3.25rem' : '1.125rem 1.5rem 1.125rem 3.5rem',
-                      background: 'rgba(15, 23, 42, 0.8)',
-                      border: `2px solid ${showExerciseDropdown ? THEME.primary : 'rgba(249, 115, 22, 0.3)'}`,
-                      borderRadius: '14px',
+                      padding: isMobile ? '0.625rem 0.75rem 0.625rem 2.25rem' : '0.75rem 0.875rem 0.75rem 2.5rem',
+                      background: 'rgba(23, 23, 23, 0.6)',
+                      backdropFilter: 'blur(10px)',
+                      border: `1px solid ${showExerciseDropdown ? 'rgba(249, 115, 22, 0.3)' : 'rgba(249, 115, 22, 0.15)'}`,
+                      borderRadius: '10px',
                       color: 'white',
-                      fontSize: isMobile ? '1rem' : '1.1rem',
-                      fontWeight: '500',
+                      fontSize: isMobile ? '0.85rem' : '0.9rem',
+                      fontWeight: '600',
                       outline: 'none',
-                      transition: 'all 0.3s ease',
+                      transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
                       touchAction: 'manipulation',
-                      WebkitTapHighlightColor: 'transparent'
+                      WebkitTapHighlightColor: 'transparent',
+                      minHeight: '44px'
                     }}
                   />
                 </div>
                 
-                {/* Dropdown */}
+                {/* Dropdown - COMPACT */}
                 {showExerciseDropdown && (
                   <div 
                     ref={dropdownRef}
@@ -583,14 +667,14 @@ export default function QuickLogModal({
                       top: '100%',
                       left: 0,
                       right: 0,
-                      background: 'rgba(15, 23, 42, 0.98)',
-                      border: '2px solid rgba(249, 115, 22, 0.3)',
-                      borderRadius: '16px',
-                      marginTop: '0.75rem',
-                      height: isMobile ? '280px' : '320px',
-                      zIndex: 20,
+                      background: 'rgba(17, 17, 17, 0.98)',
                       backdropFilter: 'blur(20px)',
-                      boxShadow: '0 25px 50px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(249, 115, 22, 0.2)',
+                      border: '1px solid rgba(249, 115, 22, 0.2)',
+                      borderRadius: '12px',
+                      marginTop: '0.4rem',
+                      maxHeight: isMobile ? '220px' : '260px',
+                      zIndex: 20,
+                      boxShadow: '0 10px 30px rgba(0, 0, 0, 0.5)',
                       display: 'flex',
                       flexDirection: 'column',
                       overflow: 'hidden'
@@ -607,33 +691,33 @@ export default function QuickLogModal({
                       {orderedExercises.hasScheduled && orderedExercises.scheduled.length > 0 && (
                         <>
                           <div style={{
-                            padding: isMobile ? '1rem 1.25rem' : '1.125rem 1.5rem',
-                            background: 'linear-gradient(135deg, rgba(249, 115, 22, 0.25) 0%, rgba(249, 115, 22, 0.15) 50%, rgba(16, 185, 129, 0.1) 100%)',
-                            borderBottom: '2px solid rgba(249, 115, 22, 0.3)',
-                            fontSize: isMobile ? '0.8rem' : '0.875rem',
-                            color: THEME.primary,
-                            fontWeight: '800',
+                            padding: isMobile ? '0.5rem 0.75rem' : '0.625rem 0.875rem',
+                            background: 'linear-gradient(135deg, rgba(249, 115, 22, 0.2) 0%, rgba(234, 88, 12, 0.1) 100%)',
+                            borderBottom: '1px solid rgba(249, 115, 22, 0.15)',
+                            fontSize: isMobile ? '0.55rem' : '0.6rem',
+                            color: 'rgba(255, 255, 255, 0.5)',
+                            fontWeight: '700',
                             textTransform: 'uppercase',
-                            letterSpacing: '0.1em',
+                            letterSpacing: '0.05em',
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'space-between',
                             flexShrink: 0
                           }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                              <Star size={isMobile ? 16 : 18} fill={THEME.primary} />
-                              <span>VANDAAG'S WORKOUT</span>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                              <Star size={isMobile ? 11 : 12} fill="#f97316" color="#f97316" />
+                              <span>VANDAAG</span>
                             </div>
                             <div style={{
                               background: 'rgba(249, 115, 22, 0.2)',
-                              color: THEME.primary,
-                              padding: '0.375rem 0.75rem',
-                              borderRadius: '20px',
-                              fontSize: isMobile ? '0.7rem' : '0.75rem',
-                              fontWeight: '700',
-                              border: '1px solid rgba(249, 115, 22, 0.4)'
+                              color: '#f97316',
+                              padding: '0.15rem 0.4rem',
+                              borderRadius: '6px',
+                              fontSize: isMobile ? '0.55rem' : '0.6rem',
+                              fontWeight: '800',
+                              border: '1px solid rgba(249, 115, 22, 0.3)'
                             }}>
-                              {orderedExercises.scheduled.length} OEFENINGEN
+                              {orderedExercises.scheduled.length}
                             </div>
                           </div>
                           
@@ -644,13 +728,13 @@ export default function QuickLogModal({
                                 key={`scheduled-${idx}`}
                                 onClick={() => !isCompleted && handleExerciseSelect(exercise)}
                                 style={{
-                                  padding: isMobile ? '1rem 1.25rem' : '1.125rem 1.5rem',
+                                  padding: isMobile ? '0.625rem 0.75rem' : '0.75rem 0.875rem',
                                   cursor: isCompleted ? 'not-allowed' : 'pointer',
-                                  borderBottom: '1px solid rgba(249, 115, 22, 0.15)',
+                                  borderBottom: '1px solid rgba(249, 115, 22, 0.05)',
                                   color: isCompleted ? 'rgba(255,255,255,0.3)' : '#fff',
-                                  fontSize: isMobile ? '1rem' : '1.1rem',
+                                  fontSize: isMobile ? '0.8rem' : '0.85rem',
                                   fontWeight: '600',
-                                  transition: 'all 0.25s ease',
+                                  transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
                                   touchAction: 'manipulation',
                                   WebkitTapHighlightColor: 'transparent',
                                   background: isCompleted 
@@ -658,12 +742,13 @@ export default function QuickLogModal({
                                     : 'transparent',
                                   display: 'flex',
                                   alignItems: 'center',
-                                  gap: '1rem',
-                                  opacity: isCompleted ? 0.5 : 1
+                                  gap: '0.5rem',
+                                  opacity: isCompleted ? 0.5 : 1,
+                                  minHeight: '44px'
                                 }}
                                 onMouseEnter={(e) => {
-                                  if (!isCompleted) {
-                                    e.currentTarget.style.background = 'linear-gradient(135deg, rgba(249, 115, 22, 0.2) 0%, rgba(249, 115, 22, 0.1) 100%)'
+                                  if (!isCompleted && !isMobile) {
+                                    e.currentTarget.style.background = 'rgba(249, 115, 22, 0.08)'
                                   }
                                 }}
                                 onMouseLeave={(e) => {
@@ -673,17 +758,14 @@ export default function QuickLogModal({
                                 }}
                               >
                                 <div style={{
-                                  width: '12px',
-                                  height: '12px',
+                                  width: '6px',
+                                  height: '6px',
                                   borderRadius: '50%',
-                                  background: isCompleted 
-                                    ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)'
-                                    : THEME.gradient,
+                                  background: isCompleted ? '#10b981' : '#f97316',
+                                  flexShrink: 0,
                                   boxShadow: isCompleted 
-                                    ? '0 0 15px rgba(16, 185, 129, 0.5)'
-                                    : `0 0 15px ${THEME.primary}60`,
-                                  animation: isCompleted ? 'none' : 'pulse 2s infinite',
-                                  flexShrink: 0
+                                    ? '0 0 8px rgba(16, 185, 129, 0.5)'
+                                    : '0 0 8px rgba(249, 115, 22, 0.5)'
                                 }} />
                                 
                                 <span style={{ 
@@ -691,34 +773,21 @@ export default function QuickLogModal({
                                   textDecoration: isCompleted ? 'line-through' : 'none'
                                 }}>{exercise}</span>
                                 
-                                <div style={{
-                                  background: isCompleted 
-                                    ? 'rgba(16, 185, 129, 0.2)'
-                                    : 'rgba(16, 185, 129, 0.15)',
-                                  color: '#10b981',
-                                  padding: '0.25rem 0.5rem',
-                                  borderRadius: '8px',
-                                  fontSize: isMobile ? '0.7rem' : '0.75rem',
-                                  fontWeight: '700',
-                                  textTransform: 'uppercase',
-                                  border: isCompleted 
-                                    ? '1px solid rgba(16, 185, 129, 0.4)'
-                                    : '1px solid rgba(16, 185, 129, 0.3)',
-                                  letterSpacing: '0.05em',
-                                  flexShrink: 0,
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  gap: '0.25rem'
-                                }}>
-                                  {isCompleted ? (
-                                    <>
-                                      <CheckCircle size={10} />
-                                      GEDAAN
-                                    </>
-                                  ) : (
-                                    'GEPLAND'
-                                  )}
-                                </div>
+                                {isCompleted && (
+                                  <div style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '0.25rem',
+                                    color: '#10b981',
+                                    fontSize: isMobile ? '0.55rem' : '0.6rem',
+                                    fontWeight: '700',
+                                    textTransform: 'uppercase',
+                                    letterSpacing: '0.05em'
+                                  }}>
+                                    <CheckCircle size={isMobile ? 10 : 11} />
+                                    KLAAR
+                                  </div>
+                                )}
                               </div>
                             )
                           })}
@@ -730,28 +799,28 @@ export default function QuickLogModal({
                         <>
                           {orderedExercises.hasScheduled && orderedExercises.scheduled.length > 0 && (
                             <div style={{
-                              height: '8px',
-                              background: 'linear-gradient(90deg, transparent 0%, rgba(148, 163, 184, 0.1) 50%, transparent 100%)',
-                              margin: '0.5rem 0'
+                              height: '1px',
+                              background: 'rgba(249, 115, 22, 0.1)',
+                              margin: '0.25rem 0'
                             }} />
                           )}
                           
                           <div style={{
-                            padding: isMobile ? '0.875rem 1.25rem' : '1rem 1.5rem',
-                            background: 'rgba(148, 163, 184, 0.05)',
-                            borderBottom: '1px solid rgba(148, 163, 184, 0.15)',
-                            fontSize: isMobile ? '0.75rem' : '0.8rem',
-                            color: 'rgba(148, 163, 184, 0.7)',
+                            padding: isMobile ? '0.5rem 0.75rem' : '0.625rem 0.875rem',
+                            background: 'rgba(249, 115, 22, 0.03)',
+                            borderBottom: '1px solid rgba(249, 115, 22, 0.08)',
+                            fontSize: isMobile ? '0.55rem' : '0.6rem',
+                            color: 'rgba(255, 255, 255, 0.5)',
                             fontWeight: '700',
                             textTransform: 'uppercase',
                             letterSpacing: '0.05em',
                             display: 'flex',
                             alignItems: 'center',
-                            gap: '0.5rem',
+                            gap: '0.35rem',
                             flexShrink: 0
                           }}>
-                            <Activity size={14} />
-                            ALLE OEFENINGEN ({orderedExercises.database.length})
+                            <Activity size={isMobile ? 11 : 12} />
+                            ALLE OEFENINGEN
                           </div>
                           
                           {orderedExercises.database.map((exercise, idx) => (
@@ -759,22 +828,25 @@ export default function QuickLogModal({
                               key={`db-${idx}`}
                               onClick={() => handleExerciseSelect(exercise.name)}
                               style={{
-                                padding: isMobile ? '0.875rem 1.25rem' : '1rem 1.5rem',
+                                padding: isMobile ? '0.625rem 0.75rem' : '0.75rem 0.875rem',
                                 cursor: 'pointer',
-                                borderBottom: idx < orderedExercises.database.length - 1 ? '1px solid rgba(148, 163, 184, 0.08)' : 'none',
-                                color: 'rgba(255, 255, 255, 0.8)',
-                                fontSize: isMobile ? '0.9rem' : '1rem',
+                                borderBottom: idx < orderedExercises.database.length - 1 ? '1px solid rgba(249, 115, 22, 0.05)' : 'none',
+                                color: 'rgba(255, 255, 255, 0.7)',
+                                fontSize: isMobile ? '0.75rem' : '0.8rem',
                                 fontWeight: '500',
-                                transition: 'all 0.2s ease',
+                                transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
                                 touchAction: 'manipulation',
                                 WebkitTapHighlightColor: 'transparent',
                                 background: 'transparent',
                                 display: 'flex',
                                 alignItems: 'center',
-                                justifyContent: 'space-between'
+                                justifyContent: 'space-between',
+                                minHeight: '44px'
                               }}
                               onMouseEnter={(e) => {
-                                e.currentTarget.style.background = 'rgba(148, 163, 184, 0.08)'
+                                if (!isMobile) {
+                                  e.currentTarget.style.background = 'rgba(249, 115, 22, 0.05)'
+                                }
                               }}
                               onMouseLeave={(e) => {
                                 e.currentTarget.style.background = 'transparent'
@@ -783,10 +855,10 @@ export default function QuickLogModal({
                               <span>{exercise.name}</span>
                               {exercise.muscle_group && (
                                 <span style={{
-                                  fontSize: isMobile ? '0.75rem' : '0.8rem',
-                                  color: 'rgba(148, 163, 184, 0.6)',
+                                  fontSize: isMobile ? '0.6rem' : '0.65rem',
+                                  color: 'rgba(249, 115, 22, 0.4)',
                                   textTransform: 'capitalize',
-                                  fontWeight: '500'
+                                  fontWeight: '600'
                                 }}>
                                   {exercise.muscle_group}
                                 </span>
@@ -796,7 +868,7 @@ export default function QuickLogModal({
                         </>
                       )}
                       
-                      {/* Add new exercise option */}
+                      {/* Add new exercise */}
                       {exerciseSearchTerm && 
                        !orderedExercises.scheduled.includes(exerciseSearchTerm) && 
                        !orderedExercises.database.some(ex => ex.name === exerciseSearchTerm) && (
@@ -807,27 +879,22 @@ export default function QuickLogModal({
                             setShowExerciseDropdown(false)
                           }}
                           style={{
-                            padding: isMobile ? '1rem 1.25rem' : '1.125rem 1.5rem',
+                            padding: isMobile ? '0.625rem 0.75rem' : '0.75rem 0.875rem',
                             cursor: 'pointer',
-                            color: THEME.primary,
-                            fontSize: isMobile ? '0.9rem' : '1rem',
+                            color: '#f97316',
+                            fontSize: isMobile ? '0.75rem' : '0.8rem',
                             fontWeight: '600',
-                            borderTop: '2px solid rgba(249, 115, 22, 0.25)',
+                            borderTop: '1px solid rgba(249, 115, 22, 0.15)',
                             background: 'rgba(249, 115, 22, 0.08)',
                             display: 'flex',
                             alignItems: 'center',
-                            gap: '0.75rem',
-                            transition: 'all 0.25s ease'
-                          }}
-                          onMouseEnter={(e) => {
-                            e.currentTarget.style.background = 'rgba(249, 115, 22, 0.15)'
-                          }}
-                          onMouseLeave={(e) => {
-                            e.currentTarget.style.background = 'rgba(249, 115, 22, 0.08)'
+                            gap: '0.4rem',
+                            transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                            minHeight: '44px'
                           }}
                         >
-                          <Plus size={16} />
-                          Voeg nieuwe toe: "{exerciseSearchTerm}"
+                          <Plus size={isMobile ? 13 : 14} />
+                          Voeg toe: "{exerciseSearchTerm}"
                         </div>
                       )}
                     </div>
@@ -836,18 +903,18 @@ export default function QuickLogModal({
               </div>
             </div>
 
-            {/* Sets Section */}
+            {/* Sets Section - COMPACT */}
             <div style={{ flexShrink: 0 }}>
               <div style={{
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'space-between',
-                marginBottom: '1rem'
+                marginBottom: '0.5rem'
               }}>
                 <label style={{
-                  color: 'rgba(148, 163, 184, 0.9)',
-                  fontSize: isMobile ? '0.8rem' : '0.875rem',
-                  fontWeight: '600',
+                  color: 'rgba(255, 255, 255, 0.5)',
+                  fontSize: isMobile ? '0.55rem' : '0.6rem',
+                  fontWeight: '700',
                   textTransform: 'uppercase',
                   letterSpacing: '0.05em'
                 }}>
@@ -859,32 +926,41 @@ export default function QuickLogModal({
                   style={{
                     display: 'flex',
                     alignItems: 'center',
-                    gap: '0.5rem',
-                    padding: isMobile ? '0.625rem 1rem' : '0.75rem 1.125rem',
-                    background: 'rgba(249, 115, 22, 0.12)',
-                    border: '1px solid rgba(249, 115, 22, 0.3)',
-                    borderRadius: '12px',
-                    color: THEME.primary,
-                    fontSize: isMobile ? '0.875rem' : '0.95rem',
-                    fontWeight: '600',
+                    gap: '0.3rem',
+                    padding: isMobile ? '0.4rem 0.625rem' : '0.5rem 0.75rem',
+                    background: 'rgba(249, 115, 22, 0.1)',
+                    border: '1px solid rgba(249, 115, 22, 0.2)',
+                    borderRadius: '8px',
+                    color: '#f97316',
+                    fontSize: isMobile ? '0.65rem' : '0.7rem',
+                    fontWeight: '700',
                     cursor: 'pointer',
-                    transition: 'all 0.3s ease',
+                    transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
                     touchAction: 'manipulation',
-                    WebkitTapHighlightColor: 'transparent'
+                    WebkitTapHighlightColor: 'transparent',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.05em',
+                    minHeight: '44px'
                   }}
                   onMouseEnter={(e) => {
-                    e.currentTarget.style.background = 'rgba(249, 115, 22, 0.2)'
+                    if (!isMobile) {
+                      e.currentTarget.style.background = 'rgba(249, 115, 22, 0.15)'
+                      e.currentTarget.style.borderColor = 'rgba(249, 115, 22, 0.3)'
+                    }
                   }}
                   onMouseLeave={(e) => {
-                    e.currentTarget.style.background = 'rgba(249, 115, 22, 0.12)'
+                    if (!isMobile) {
+                      e.currentTarget.style.background = 'rgba(249, 115, 22, 0.1)'
+                      e.currentTarget.style.borderColor = 'rgba(249, 115, 22, 0.2)'
+                    }
                   }}
                 >
-                  <Plus size={isMobile ? 16 : 18} />
-                  Add Set
+                  <Plus size={isMobile ? 13 : 14} />
+                  SET
                 </button>
               </div>
               
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: isMobile ? '0.5rem' : '0.625rem' }}>
                 {quickSets.map((set, index) => (
                   <QuickSetInputRow
                     key={index}
@@ -902,10 +978,10 @@ export default function QuickLogModal({
             </div>
           </div>
 
-          {/* SAVE BUTTON */}
+          {/* SAVE BUTTON - COMPACT */}
           <div style={{
-            padding: isMobile ? '1.25rem' : '1.75rem',
-            borderTop: '1px solid rgba(249, 115, 22, 0.15)',
+            padding: isMobile ? '0.75rem 1rem' : '1rem 1.25rem',
+            borderTop: '1px solid rgba(249, 115, 22, 0.1)',
             flexShrink: 0
           }}>
             <button
@@ -913,45 +989,46 @@ export default function QuickLogModal({
               disabled={savingQuick || (!customExercise && !selectedExercise && !exerciseSearchTerm)}
               style={{
                 width: '100%',
-                padding: isMobile ? '1.125rem 1.25rem' : '1.25rem 1.5rem',
+                padding: isMobile ? '0.75rem' : '0.875rem',
                 background: saveSuccess 
                   ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)'
                   : savingQuick || (!customExercise && !selectedExercise && !exerciseSearchTerm)
                     ? 'rgba(107, 114, 128, 0.3)'
-                    : THEME.gradient,
+                    : 'linear-gradient(135deg, #f97316 0%, #ea580c 100%)',
                 border: 'none',
-                borderRadius: '16px',
-                color: '#fff',
-                fontSize: isMobile ? '1.1rem' : '1.2rem',
+                borderRadius: '10px',
+                color: savingQuick || (!customExercise && !selectedExercise && !exerciseSearchTerm) ? 'rgba(255, 255, 255, 0.5)' : '#000',
+                fontSize: isMobile ? '0.85rem' : '0.9rem',
                 fontWeight: '700',
                 cursor: savingQuick || (!customExercise && !selectedExercise && !exerciseSearchTerm) ? 'not-allowed' : 'pointer',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                gap: '0.75rem',
-                transition: 'all 0.3s ease',
+                gap: '0.5rem',
+                transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
                 boxShadow: saveSuccess 
-                  ? '0 15px 35px rgba(16, 185, 129, 0.4)'
+                  ? '0 10px 25px rgba(16, 185, 129, 0.3)'
                   : savingQuick || (!customExercise && !selectedExercise && !exerciseSearchTerm)
                     ? 'none'
-                    : '0 15px 35px rgba(249, 115, 22, 0.4)',
+                    : '0 8px 20px rgba(249, 115, 22, 0.35)',
                 transform: savingQuick ? 'scale(0.98)' : 'scale(1)',
                 touchAction: 'manipulation',
                 WebkitTapHighlightColor: 'transparent',
                 textTransform: 'uppercase',
-                letterSpacing: '0.05em'
+                letterSpacing: '0.05em',
+                minHeight: '44px'
               }}
             >
               {saveSuccess ? (
                 <>
-                  <CheckCircle size={isMobile ? 20 : 22} />
+                  <CheckCircle size={isMobile ? 16 : 18} />
                   Opgeslagen!
                 </>
               ) : savingQuick ? (
                 <>
                   <div style={{
-                    width: '22px',
-                    height: '22px',
+                    width: isMobile ? '16px' : '18px',
+                    height: isMobile ? '16px' : '18px',
                     border: '2px solid rgba(255, 255, 255, 0.3)',
                     borderTopColor: '#fff',
                     borderRadius: '50%',
@@ -961,8 +1038,8 @@ export default function QuickLogModal({
                 </>
               ) : (
                 <>
-                  <Dumbbell size={isMobile ? 20 : 22} />
-                  Save Workout
+                  <Dumbbell size={isMobile ? 16 : 18} />
+                  Opslaan
                 </>
               )}
             </button>
@@ -978,11 +1055,6 @@ export default function QuickLogModal({
         
         @keyframes spin {
           to { transform: rotate(360deg); }
-        }
-        
-        @keyframes pulse {
-          0%, 100% { opacity: 1; transform: scale(1); }
-          50% { opacity: 0.7; transform: scale(1.1); }
         }
       `}</style>
     </div>

@@ -1,7 +1,25 @@
+// vite.config.js
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 
-// https://vite.dev/config/
 export default defineConfig({
-  plugins: [react()],
+  plugins: [
+    react({
+      jsxRuntime: 'automatic' // Automatic JSX Transform - no React import needed
+    })
+  ],
+  build: {
+    minify: 'esbuild',
+    sourcemap: false,
+    target: 'es2015',
+    rollupOptions: {
+      output: {
+        manualChunks: undefined // Let Vite handle chunking
+      }
+    }
+  },
+  server: {
+    port: 5173,
+    host: true
+  }
 })

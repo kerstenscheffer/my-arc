@@ -1,48 +1,41 @@
-// src/client/ClientDashboard.jsx - CHALLENGE UPDATE VERSION
-import NotificationWidget from '../modules/notifications/NotificationWidget';
-import { useState, useEffect, useRef } from 'react'
+// src/client/ClientDashboard.jsx - CLEAN VERSION
+import { useState, useEffect } from 'react'
 import DatabaseService from '../services/DatabaseService'
+import { useLanguage } from '../contexts/LanguageContext'
+
+// Component Imports - ALLEEN ESSENTIEEL
 import ClientHome from './pages/ClientHome'
 import MealPlanMain from '../modules/meal-plan/MealPlanMain'
 import ClientWorkoutPlan from './pages/ClientWorkoutPlan'
-import ClientProgress from './pages/ClientProgress'
-import ClientProfile from './pages/ClientProfile'
-import ClientRecipeLibrary from './pages/ClientRecipeLibrary'
-import ClientShoppingList from './pages/ClientShoppingList'
 import ClientCalls from '../modules/call-planning/ClientCalls'
-import ClientChallengePage from './pages/ClientChallengePage'
-import { useLanguage } from '../contexts/LanguageContext'
+import ProgressMain from '../modules/progress/ProgressMain'
+import ClientProfile from './pages/ClientProfile'
+import ShoppingHub from '../modules/shopping/ShoppingHub'
+import NotificationWidget from '../modules/notifications/NotificationWidget'
+import PWAUpdateBanner from '../components/PWAUpdateBanner'
 
-// Lucide Icons imports
+// Lucide Icons
 import { 
-  Home, 
-  Dumbbell, 
-  Utensils, 
-  TrendingUp, 
-  User, 
+  Home,
+  Dumbbell,
+  Utensils,
+  Camera,
   Phone,
-  Bell,
+  User,
+  ShoppingCart,
   Menu,
   X,
-  LogOut,
-  ChevronRight,
-  Trophy // Trophy icon voor challenges
+  LogOut
 } from 'lucide-react'
 
-// Initialize database service
+// Initialize database
 const db = DatabaseService
 
-// Debug check
-if (!db) {
-  console.error('DatabaseService not initialized!')
-}
-
-// THEME CONFIGURATION - Added challenges theme
+// Theme Configuration
 const pageThemes = {
   home: {
     primary: '#3b82f6',
     primaryDark: '#2563eb',
-    primaryDarkest: '#1d4ed8',
     gradient: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 50%, #1d4ed8 100%)',
     backgroundGradient: 'linear-gradient(135deg, rgba(59, 130, 246, 0.1) 0%, rgba(29, 78, 216, 0.05) 100%)',
     borderColor: 'rgba(59, 130, 246, 0.1)',
@@ -53,7 +46,6 @@ const pageThemes = {
   workout: {
     primary: '#f97316',
     primaryDark: '#ea580c',
-    primaryLight: '#fb923c',
     gradient: 'linear-gradient(135deg, #f97316 0%, #ea580c 100%)',
     backgroundGradient: 'linear-gradient(135deg, rgba(249, 115, 22, 0.1) 0%, rgba(234, 88, 12, 0.05) 100%)',
     borderColor: 'rgba(249, 115, 22, 0.1)',
@@ -61,10 +53,9 @@ const pageThemes = {
     boxShadow: '0 10px 25px rgba(249, 115, 22, 0.25)',
     glow: '0 0 60px rgba(249, 115, 22, 0.1)'
   },
-  mealplan: {
+  meal: {
     primary: '#10b981',
     primaryDark: '#059669',
-    primaryLight: '#34d399',
     gradient: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
     backgroundGradient: 'linear-gradient(135deg, rgba(16, 185, 129, 0.1) 0%, rgba(5, 150, 105, 0.05) 100%)',
     borderColor: 'rgba(16, 185, 129, 0.1)',
@@ -72,21 +63,29 @@ const pageThemes = {
     boxShadow: '0 10px 25px rgba(16, 185, 129, 0.25)',
     glow: '0 0 60px rgba(16, 185, 129, 0.1)'
   },
-  challenges: {
-    primary: '#dc2626',
-    primaryDark: '#991b1b',
-    primaryLight: '#ef4444',
-    gradient: 'linear-gradient(135deg, #dc2626 0%, #991b1b 100%)',
-    backgroundGradient: 'linear-gradient(135deg, rgba(220, 38, 38, 0.1) 0%, rgba(153, 27, 27, 0.05) 100%)',
-    borderColor: 'rgba(220, 38, 38, 0.1)',
-    borderActive: 'rgba(220, 38, 38, 0.2)',
-    boxShadow: '0 10px 25px rgba(220, 38, 38, 0.25)',
-    glow: '0 0 60px rgba(220, 38, 38, 0.1)'
+  boodschappen: {
+    primary: '#f59e0b',
+    primaryDark: '#d97706',
+    gradient: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+    backgroundGradient: 'linear-gradient(135deg, rgba(245, 158, 11, 0.1) 0%, rgba(217, 119, 6, 0.05) 100%)',
+    borderColor: 'rgba(245, 158, 11, 0.1)',
+    borderActive: 'rgba(245, 158, 11, 0.2)',
+    boxShadow: '0 10px 25px rgba(245, 158, 11, 0.25)',
+    glow: '0 0 60px rgba(245, 158, 11, 0.1)'
+  },
+  tracking: {
+    primary: '#8b5cf6',
+    primaryDark: '#7c3aed',
+    gradient: 'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)',
+    backgroundGradient: 'linear-gradient(135deg, rgba(139, 92, 246, 0.1) 0%, rgba(124, 58, 237, 0.05) 100%)',
+    borderColor: 'rgba(139, 92, 246, 0.1)',
+    borderActive: 'rgba(139, 92, 246, 0.2)',
+    boxShadow: '0 10px 25px rgba(139, 92, 246, 0.25)',
+    glow: '0 0 60px rgba(139, 92, 246, 0.1)'
   },
   calls: {
     primary: '#3b82f6',
     primaryDark: '#2563eb',
-    primaryDarkest: '#1d4ed8',
     gradient: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 50%, #1d4ed8 100%)',
     backgroundGradient: 'linear-gradient(135deg, rgba(59, 130, 246, 0.1) 0%, rgba(29, 78, 216, 0.05) 100%)',
     borderColor: 'rgba(59, 130, 246, 0.1)',
@@ -94,21 +93,9 @@ const pageThemes = {
     boxShadow: '0 10px 25px rgba(59, 130, 246, 0.25)',
     glow: '0 0 60px rgba(59, 130, 246, 0.1)'
   },
-  progress: {
-    primary: '#a855f7',
-    primaryDark: '#9333ea',
-    primaryLight: '#c084fc',
-    gradient: 'linear-gradient(135deg, #a855f7 0%, #9333ea 100%)',
-    backgroundGradient: 'linear-gradient(135deg, rgba(168, 85, 247, 0.1) 0%, rgba(147, 51, 234, 0.05) 100%)',
-    borderColor: 'rgba(168, 85, 247, 0.1)',
-    borderActive: 'rgba(168, 85, 247, 0.2)',
-    boxShadow: '0 10px 25px rgba(168, 85, 247, 0.25)',
-    glow: '0 0 60px rgba(168, 85, 247, 0.1)'
-  },
   profile: {
     primary: '#ec4899',
     primaryDark: '#db2777',
-    primaryLight: '#f9a8d4',
     gradient: 'linear-gradient(135deg, #ec4899 0%, #db2777 100%)',
     backgroundGradient: 'linear-gradient(135deg, rgba(236, 72, 153, 0.1) 0%, rgba(219, 39, 119, 0.05) 100%)',
     borderColor: 'rgba(236, 72, 153, 0.1)',
@@ -118,7 +105,7 @@ const pageThemes = {
   }
 }
 
-// Premium NavIcon component met Lucide icons
+// NavIcon Component
 function NavIcon({ Icon, size = 24, active = false, theme }) {
   return (
     <div style={{
@@ -139,15 +126,13 @@ function NavIcon({ Icon, size = 24, active = false, theme }) {
       <Icon 
         size={size}
         color={active ? theme.primary : 'rgba(255, 255, 255, 0.7)'}
-        style={{
-          transition: 'all 0.3s ease'
-        }}
+        style={{ transition: 'all 0.3s ease' }}
       />
     </div>
   )
 }
 
-// Main ClientDashboard Component
+// Main Component
 export default function ClientDashboard() {
   const [currentView, setCurrentView] = useState('home')
   const [user, setUser] = useState(null)
@@ -158,23 +143,38 @@ export default function ClientDashboard() {
   const [error, setError] = useState(null)
   const [isMobile, setIsMobile] = useState(window.innerWidth <= 768)
   
-  // Use language context
   const { t, language, toggleLanguage } = useLanguage()
-  
-  // Get current theme
   const currentTheme = pageThemes[currentView] || pageThemes.home
   
-  // Handle window resize
+  // Navigation Items - OPGESCHOOND
+  const bottomNavItems = [
+    { id: 'home', label: 'Home', Icon: Home },
+    { id: 'workout', label: 'Workout', Icon: Dumbbell },
+    { id: 'meal', label: 'Meal', Icon: Utensils },
+    { id: 'tracking', label: 'Tracking', Icon: Camera },
+    { id: 'calls', label: 'Calls', Icon: Phone },
+    { id: 'profile', label: 'Profile', Icon: User }
+  ]
+
+  const sideMenuItems = [
+    { id: 'home', label: 'Home', Icon: Home },
+    { id: 'workout', label: 'Workout', Icon: Dumbbell },
+    { id: 'meal', label: 'Meal', Icon: Utensils },
+    { id: 'boodschappen', label: 'Boodschappen', Icon: ShoppingCart },
+    { id: 'tracking', label: 'Tracking', Icon: Camera },
+    { id: 'calls', label: 'Calls', Icon: Phone },
+    { id: 'profile', label: 'Profile', Icon: User }
+  ]
+  
+  // Window resize handler
   useEffect(() => {
     const handleResize = () => {
       setIsMobile(window.innerWidth <= 768)
-      
-      // Fix viewport height for mobile browsers
       const vh = window.innerHeight * 0.01
       document.documentElement.style.setProperty('--vh', `${vh}px`)
     }
     
-    handleResize() // Initial call
+    handleResize()
     window.addEventListener('resize', handleResize)
     window.addEventListener('orientationchange', handleResize)
     
@@ -184,28 +184,7 @@ export default function ClientDashboard() {
     }
   }, [])
 
-  // Navigation items - BOTTOM NAV (zonder Profile)
-  const bottomNavItems = [
-    { id: 'home', label: t('nav.home'), Icon: Home },
-    { id: 'workout', label: t('nav.workout'), Icon: Dumbbell },
-    { id: 'mealplan', label: t('nav.mealplan'), Icon: Utensils },
-    { id: 'challenges', label: 'Challenges', Icon: Trophy },
-    { id: 'calls', label: 'Calls', Icon: Phone },
-    { id: 'progress', label: t('nav.progress'), Icon: TrendingUp }
-  ]
-
-  // Navigation items - SIDE MENU (met Profile)
-  const sideMenuItems = [
-    { id: 'home', label: t('nav.home'), Icon: Home },
-    { id: 'workout', label: t('nav.workout'), Icon: Dumbbell },
-    { id: 'mealplan', label: t('nav.mealplan'), Icon: Utensils },
-    { id: 'challenges', label: 'Challenges', Icon: Trophy },
-    { id: 'calls', label: 'Calls', Icon: Phone },
-    { id: 'progress', label: t('nav.progress'), Icon: TrendingUp },
-    { id: 'profile', label: t('nav.profile'), Icon: User }
-  ]
-
-  // Add viewport meta tag for mobile
+  // Viewport meta tag
   useEffect(() => {
     let metaViewport = document.querySelector('meta[name="viewport"]')
     if (!metaViewport) {
@@ -214,24 +193,18 @@ export default function ClientDashboard() {
       document.head.appendChild(metaViewport)
     }
     metaViewport.content = 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no'
-    
-    return () => {
-      // Cleanup if needed
-    }
   }, [])
   
+  // Load client data
   useEffect(() => {
     loadClientData()
   }, [])
 
   const loadClientData = async () => {
     try {
-      console.log('🔍 Step 1: Getting auth user...')
       const authUser = await db.getCurrentUser()
-      console.log('Auth user:', authUser)
       
       if (!authUser?.email) {
-        console.error('No auth user found')
         setError('Geen gebruiker gevonden')
         setLoading(false)
         return
@@ -239,12 +212,9 @@ export default function ClientDashboard() {
       
       setUser(authUser)
       
-      console.log('🔍 Step 2: Getting client data for email:', authUser.email)
       const clientData = await db.getClientByEmail(authUser.email)
-      console.log('Client data:', clientData)
       
       if (!clientData) {
-        console.error('No client found for email:', authUser.email)
         setError('Client account niet gevonden voor: ' + authUser.email)
         setLoading(false)
         return
@@ -252,19 +222,14 @@ export default function ClientDashboard() {
       
       setClient(clientData)
       
-      console.log('🔍 Step 3: Getting assigned schema...')
       if (clientData.assigned_schema_id) {
         try {
           const schemaData = await db.getClientSchema(clientData.id)
-          console.log('Schema data:', schemaData)
           setSchema(schemaData)
         } catch (schemaError) {
           console.warn('Could not load schema:', schemaError)
-          // Don't fail completely if schema fails
           setSchema(null)
         }
-      } else {
-        console.log('No schema assigned to client')
       }
     } catch (error) {
       console.error('Error loading client data:', error)
@@ -283,6 +248,7 @@ export default function ClientDashboard() {
     }
   }
 
+  // Loading state
   if (loading) {
     return (
       <div style={{ 
@@ -307,13 +273,14 @@ export default function ClientDashboard() {
             fontSize: '1.1rem',
             fontWeight: '500'
           }}>
-            {t('common.loading')}...
+            Loading...
           </div>
         </div>
       </div>
     )
   }
 
+  // Error state
   if (error) {
     return (
       <div style={{ 
@@ -341,7 +308,7 @@ export default function ClientDashboard() {
             color: '#fff',
             marginBottom: '1rem'
           }}>
-            ⚠️ {t('common.error')}
+            ⚠️ Error
           </h2>
           <p style={{
             color: 'rgba(255, 255, 255, 0.7)',
@@ -368,16 +335,8 @@ export default function ClientDashboard() {
                 transition: 'all 0.3s ease',
                 boxShadow: '0 4px 15px rgba(16, 185, 129, 0.3)'
               }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.transform = 'translateY(-2px)'
-                e.currentTarget.style.boxShadow = '0 8px 25px rgba(16, 185, 129, 0.4)'
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.transform = 'translateY(0)'
-                e.currentTarget.style.boxShadow = '0 4px 15px rgba(16, 185, 129, 0.3)'
-              }}
             >
-              {t('common.refresh')}
+              Refresh
             </button>
             <button 
               onClick={handleLogout}
@@ -391,14 +350,8 @@ export default function ClientDashboard() {
                 cursor: 'pointer',
                 transition: 'all 0.3s ease'
               }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.background = 'rgba(255, 255, 255, 0.15)'
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)'
-              }}
             >
-              {t('common.logout')}
+              Logout
             </button>
           </div>
         </div>
@@ -406,6 +359,7 @@ export default function ClientDashboard() {
     )
   }
 
+  // No client state
   if (!client) {
     return (
       <div style={{ 
@@ -463,16 +417,8 @@ export default function ClientDashboard() {
               transition: 'all 0.3s ease',
               boxShadow: '0 4px 15px rgba(239, 68, 68, 0.3)'
             }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.transform = 'translateY(-2px)'
-              e.currentTarget.style.boxShadow = '0 8px 25px rgba(239, 68, 68, 0.4)'
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.transform = 'translateY(0)'
-              e.currentTarget.style.boxShadow = '0 4px 15px rgba(239, 68, 68, 0.3)'
-            }}
           >
-            {t('common.logout')}
+            Logout
           </button>
         </div>
       </div>
@@ -485,7 +431,10 @@ export default function ClientDashboard() {
       background: 'linear-gradient(180deg, #0a0a0a 0%, #171717 100%)',
       position: 'relative'
     }}>
-      {/* Premium Header */}
+      {/* PWA Update Banner */}
+      <PWAUpdateBanner />
+
+      {/* Header */}
       <header style={{
         background: 'linear-gradient(135deg, rgba(17, 17, 17, 0.98) 0%, rgba(10, 10, 10, 0.98) 100%)',
         backdropFilter: 'blur(20px)',
@@ -525,21 +474,11 @@ export default function ClientDashboard() {
                 color: '#fff'
               }}
             >
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                {mobileMenuOpen ? (
-                  <path d="M6 18L18 6M6 6l12 12" />
-                ) : (
-                  <>
-                    <path d="M3 12h18" />
-                    <path d="M3 6h18" />
-                    <path d="M3 18h18" />
-                  </>
-                )}
-              </svg>
+              {mobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
             </button>
           )}
           
-          {/* Logo Section - Centered on mobile */}
+          {/* Logo */}
           <div style={{
             display: 'flex',
             alignItems: 'center',
@@ -554,7 +493,7 @@ export default function ClientDashboard() {
                 WebkitBackgroundClip: 'text',
                 WebkitTextFillColor: 'transparent',
                 backgroundClip: 'text',
-                color: currentTheme.primary, // Fallback voor browsers zonder support
+                color: currentTheme.primary,
                 margin: 0,
                 letterSpacing: '-0.02em',
                 display: 'inline-block',
@@ -574,7 +513,7 @@ export default function ClientDashboard() {
             </div>
           </div>
           
-          {/* Desktop Logout Button */}
+          {/* Desktop Logout */}
           {!isMobile && (
             <div style={{
               display: 'flex',
@@ -607,14 +546,14 @@ export default function ClientDashboard() {
                 }}
               >
                 <LogOut size={18} />
-                {t('common.logout')}
+                Logout
               </button>
             </div>
           )}
         </div>
       </header>
 
-      {/* Mobile Sliding Menu - MET Profile */}
+      {/* Mobile Sliding Menu */}
       {isMobile && (
         <div style={{
           position: 'fixed',
@@ -693,13 +632,13 @@ export default function ClientDashboard() {
               }}
             >
               <LogOut size={18} />
-              {t('common.logout')}
+              Logout
             </button>
           </nav>
         </div>
       )}
 
-      {/* Overlay for mobile menu */}
+      {/* Overlay */}
       {isMobile && mobileMenuOpen && (
         <div
           onClick={() => setMobileMenuOpen(false)}
@@ -727,7 +666,7 @@ export default function ClientDashboard() {
           display: 'flex',
           gap: '2rem'
         }}>
-          {/* Desktop Side Navigation - MET Profile */}
+          {/* Desktop Side Navigation */}
           {!isMobile && (
             <nav style={{
               position: 'sticky',
@@ -805,13 +744,7 @@ export default function ClientDashboard() {
                 setCurrentView={setCurrentView} 
               />
             )}
-            {currentView === 'mealplan' && (
-              <MealPlanMain
-                client={client}
-                db={db}
-                onNavigate={setCurrentView}
-              />
-            )}
+            
             {currentView === 'workout' && (
               <ClientWorkoutPlan 
                 client={client} 
@@ -819,25 +752,37 @@ export default function ClientDashboard() {
                 db={db}
               />
             )}
-            {currentView === 'challenges' && (
-              <ClientChallengePage 
-                db={db}
+            
+            {currentView === 'meal' && (
+              <MealPlanMain
                 client={client}
+                db={db}
+                onNavigate={setCurrentView}
               />
             )}
+            
+            {currentView === 'boodschappen' && (
+              <ShoppingHub 
+                client={client}
+                db={db}
+                onNavigate={setCurrentView}
+              />
+            )}
+            
+            {currentView === 'tracking' && (
+              <ProgressMain 
+                db={db} 
+                client={client} 
+              />
+            )}
+            
             {currentView === 'calls' && (
               <ClientCalls 
                 db={db}
                 clientInfo={client} 
               />
             )}
-            {currentView === 'progress' && (
-              <ClientProgress 
-                client={client} 
-                schema={schema}
-                db={db}
-              />
-            )}
+            
             {currentView === 'profile' && (
               <ClientProfile 
                 client={client} 
@@ -845,25 +790,11 @@ export default function ClientDashboard() {
                 db={db}
               />
             )}
-            {currentView === 'recipe-library' && (
-              <ClientRecipeLibrary 
-                client={client} 
-                db={db}
-                onNavigate={setCurrentView}
-              />
-            )}
-            {currentView === 'shopping-list' && (
-              <ClientShoppingList 
-                client={client}
-                db={db}
-                onNavigate={setCurrentView}
-              />
-            )}
           </div>
         </div>
       </main>
 
-      {/* Mobile Bottom Navigation - ZONDER Profile */}
+      {/* Mobile Bottom Navigation */}
       {isMobile && (
         <nav style={{
           position: 'fixed',
@@ -876,7 +807,6 @@ export default function ClientDashboard() {
           zIndex: 100,
           boxShadow: `0 -4px 20px rgba(0, 0, 0, 0.5), ${currentTheme.glow}`
         }}>
-          {/* Gradient fade effect at top */}
           <div style={{
             position: 'absolute',
             top: '-20px',
@@ -948,24 +878,8 @@ export default function ClientDashboard() {
           to { opacity: 1; transform: translateY(0); }
         }
         
-        @keyframes slideDown {
-          from { 
-            opacity: 0; 
-            transform: translateY(-10px);
-          }
-          to { 
-            opacity: 1; 
-            transform: translateY(0);
-          }
-        }
-        
         @keyframes spin {
           to { transform: rotate(360deg); }
-        }
-        
-        @keyframes pulse {
-          0%, 100% { opacity: 1; }
-          50% { opacity: 0.6; }
         }
         
         @keyframes gradientShift {
@@ -974,14 +888,11 @@ export default function ClientDashboard() {
           100% { background-position: 0% 50%; }
         }
         
-        /* Basic Mobile Fixes */
         @media (max-width: 768px) {
-          /* Prevent horizontal scroll */
           body {
             overflow-x: hidden;
           }
           
-          /* Fix input zoom on iOS */
           input, select, textarea {
             font-size: 16px !important;
           }

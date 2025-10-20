@@ -1,30 +1,44 @@
+// src/main.jsx
 import './styles/theme.css'
 import { createRoot } from 'react-dom/client'
 import './index.css'
 import './styles/ai-generator.css'
 import App from './App.jsx'
 
-// Wait for DOM to be fully ready (iOS PWA fix)
-const mountApp = () => {
-  const container = document.getElementById('root');
-  
-  if (!container) {
-    console.error('Root element not found!');
-    return;
-  }
-  
-  // Clear any existing content to prevent hydration issues
-  container.innerHTML = '';
-  
-  // Create root and render
-  const root = createRoot(container);
-  root.render(<App />);
-};
+// Mount application
+const container = document.getElementById('root');
+const root = createRoot(container);
 
-// Ensure DOM is ready before mounting
-if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', mountApp);
-} else {
-  // DOM already loaded (PWA scenario)
-  mountApp();
+root.render(
+  <App />
+);
+
+// TIJDELIJK UITGESCHAKELD - Service worker veroorzaakt mounting issues
+/*
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/service-worker.js')
+      .then(registration => {
+        console.log('✅ Service Worker registered:', registration);
+        
+        // Check for updates every hour
+        setInterval(() => {
+          registration.update();
+        }, 3600000);
+        
+        // Listen for updates
+        registration.addEventListener('updatefound', () => {
+          const newWorker = registration.installing;
+          newWorker.addEventListener('statechange', () => {
+            if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+              console.log('🔄 New version available! Refresh to update.');
+            }
+          });
+        });
+      })
+      .catch(error => {
+        console.error('❌ Service Worker registration failed:', error);
+      });
+  });
 }
+*/

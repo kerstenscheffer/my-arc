@@ -1,204 +1,212 @@
+// src/App.jsx
+import InfoPage from './pages/InfoPage'
+import ClientOnboarding from './client/pages/ClientOnboarding'
+import FunnelPage from './funnel/FunnelPage'
+import TillTheGoalPage from './till-the-goal/TillTheGoalPage'
+
+import YourArcFunnel from './modules/funnel-pages/your-arc/YourArcFunnel'
+import MyArcFunnel from './modules/funnel-pages/my-arc/MyArcFunnelMain'
+import CheckoutPage from './pages/CheckoutPage'
+import EightWeekCheckout from './pages/EightWeekCheckout'
+import Homepage from './pages/Homepage'
+import LeadPicGenerator from './modules/lead-pic-generator/LeadPicGenerator'
 import { useState, useEffect } from 'react'
-import React from 'react'
 import Login from './components/Login'
 import ResetPassword from './components/ResetPassword'
-import AIGenerator from './components/AIGenerator'
-import Goals from './components/Goals'
 import ClientDashboard from './client/ClientDashboard'
-import Dashboard from './components/Dashboard'
 import CoachHub from './coach/CoachHub'
 import CoachHubV2 from './coach/CoachHubV2'
+import FunnelViewer from './pages/FunnelViewer'
 import DatabaseService from './services/DatabaseService'
 import { LanguageProvider } from './contexts/LanguageContext'
 import PWAInstaller from './components/PWAInstaller'
+import UpdateModal from './components/UpdateModal'
 
 const db = DatabaseService
 
-// iOS PWA Detection Helper
-const isInStandaloneMode = () => {
-  return (window.matchMedia('(display-mode: standalone)').matches) || 
-         (window.navigator.standalone) || 
-         document.referrer.includes('android-app://');
-}
+function App() {
+  const currentPath = window.location.pathname
+  const isFunnelRoute = currentPath.startsWith('/funnel/')
 
-// Error Boundary voor iOS PWA debugging
-class ErrorBoundary extends React.Component {
-  constructor(props) {
-    super(props);
-    this.state = { hasError: false, error: null, errorInfo: null };
+  // ==============================================
+  // STATE INITIALIZATION (Must be before any returns)
+  // ==============================================
+  const storedMode = localStorage.getItem('isClientMode') === 'true'
+  const useV2CoachHub = false // Toggle between CoachHub versions
+
+  const [user, setUser] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [isClientMode, setIsClientMode] = useState(storedMode)
+
+  useEffect(() => {
+    checkUser()
+  }, [])
+
+  useEffect(() => {
+    localStorage.setItem('isClientMode', isClientMode)
+  }, [isClientMode])
+
+  const checkUser = async () => {
+    try {
+      const currentUser = await db.getCurrentUser()
+      setUser(currentUser)
+    } catch (error) {
+      console.log('Not authenticated')
+    }
+    setLoading(false)
   }
 
-  static getDerivedStateFromError(error) {
-    return { hasError: true };
+  const handleLogout = () => {
+    localStorage.removeItem('isClientMode')
+    setIsClientMode(false)
   }
 
-  componentDidCatch(error, errorInfo) {
-    console.error('🚨 App Error:', error, errorInfo);
-    this.setState({
-      error: error.toString(),
-      errorInfo: errorInfo
-    });
+  // ==============================================
+  // PUBLIC ROUTES (No Authentication Required)
+  // ==============================================
+
+  // Main page - InfoPage (link-in-bio)
+  if (currentPath === '/' || currentPath === '/home' || currentPath === '/info') {
+    return <InfoPage />
   }
 
-  render() {
-    if (this.state.hasError) {
-      const isStandalone = isInStandaloneMode();
-      
-      return (
+  // Call booking funnel (moved to /fitworden)
+  if (currentPath === '/fitworden') {
+    return <Homepage />
+  }
+
+  // Checkout pages (public)
+  if (currentPath === '/checkout') {
+    return <CheckoutPage />
+  }
+
+  if (currentPath === '/8-week-checkout') {
+    return <EightWeekCheckout />
+  }
+
+  // Success page after payment
+  if (currentPath === '/success') {
+    return (
+      <div style={{
+        minHeight: '100vh',
+        background: 'linear-gradient(180deg, #0a0a0a 0%, #171717 100%)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: '2rem',
+        textAlign: 'center'
+      }}>
         <div style={{
-          minHeight: '100vh',
-          background: 'linear-gradient(180deg, #0a0a0a 0%, #171717 100%)',
-          color: '#fff',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          padding: '20px'
+          maxWidth: '500px',
+          background: 'rgba(17, 17, 17, 0.8)',
+          backdropFilter: 'blur(10px)',
+          borderRadius: '20px',
+          padding: '3rem',
+          border: '2px solid #10b981'
         }}>
           <div style={{
-            maxWidth: '400px',
-            width: '100%',
-            background: 'rgba(17, 17, 17, 0.9)',
-            backdropFilter: 'blur(20px)',
-            borderRadius: '20px',
-            border: '1px solid #ef4444',
-            padding: '2rem',
-            textAlign: 'center',
-            boxShadow: '0 20px 40px rgba(239, 68, 68, 0.3)'
+            fontSize: '4rem',
+            marginBottom: '1rem'
           }}>
-            <h1 style={{ 
-              color: '#ef4444', 
-              marginBottom: '1rem',
-              fontSize: '1.5rem'
-            }}>
-              MY ARC Error
-            </h1>
-            
-            <div style={{
-              background: 'rgba(239, 68, 68, 0.1)',
-              borderRadius: '12px',
-              padding: '1rem',
-              marginBottom: '1.5rem'
-            }}>
-              <p style={{ 
-                marginBottom: '0.5rem',
-                fontSize: '0.9rem',
-                color: '#10b981'
-              }}>
-                {isStandalone ? '📱 PWA Mode Active' : '🌐 Browser Mode'}
-              </p>
-              <p style={{ 
-                color: 'rgba(255, 255, 255, 0.8)',
-                fontSize: '0.85rem',
-                wordBreak: 'break-word',
-                lineHeight: '1.4'
-              }}>
-                {this.state.error}
-              </p>
-            </div>
-            
-            <div style={{
-              display: 'flex',
-              gap: '1rem',
-              justifyContent: 'center'
-            }}>
-              <button 
-                onClick={() => window.location.reload()}
-                style={{
-                  background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-                  color: '#fff',
-                  border: 'none',
-                  padding: '0.75rem 1.5rem',
-                  borderRadius: '10px',
-                  fontSize: '0.95rem',
-                  fontWeight: '600',
-                  cursor: 'pointer',
-                  boxShadow: '0 4px 15px rgba(16, 185, 129, 0.3)'
-                }}
-              >
-                Reload App
-              </button>
-              
-              {isStandalone && (
-                <button 
-                  onClick={() => {
-                    // Clear cache and reload for PWA
-                    localStorage.clear();
-                    sessionStorage.clear();
-                    window.location.reload();
-                  }}
-                  style={{
-                    background: 'rgba(255, 255, 255, 0.1)',
-                    color: '#fff',
-                    border: '1px solid rgba(255, 255, 255, 0.2)',
-                    padding: '0.75rem 1.5rem',
-                    borderRadius: '10px',
-                    fontSize: '0.95rem',
-                    fontWeight: '600',
-                    cursor: 'pointer'
-                  }}
-                >
-                  Clear Cache
-                </button>
-              )}
-            </div>
-            
-            {/* Debug info voor development */}
-            {process.env.NODE_ENV === 'development' && (
-              <details style={{ 
-                marginTop: '1.5rem',
-                textAlign: 'left'
-              }}>
-                <summary style={{ 
-                  cursor: 'pointer',
-                  color: 'rgba(255, 255, 255, 0.5)',
-                  fontSize: '0.8rem'
-                }}>
-                  Technical Details
-                </summary>
-                <pre style={{
-                  fontSize: '0.7rem',
-                  color: 'rgba(255, 255, 255, 0.4)',
-                  overflow: 'auto',
-                  marginTop: '0.5rem'
-                }}>
-                  {JSON.stringify(this.state.errorInfo, null, 2)}
-                </pre>
-              </details>
-            )}
+            🎉
           </div>
+          <h1 style={{
+            fontSize: '2rem',
+            fontWeight: '700',
+            color: '#10b981',
+            marginBottom: '1rem'
+          }}>
+            Betaling Succesvol!
+          </h1>
+          <p style={{
+            color: 'rgba(255, 255, 255, 0.7)',
+            marginBottom: '2rem',
+            lineHeight: '1.6'
+          }}>
+            Welkom bij MY ARC! Je ontvangt binnen enkele minuten een email met je login gegevens.
+          </p>
+          <button
+            onClick={() => window.location.href = '/'}
+            style={{
+              padding: '1rem 2rem',
+              background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+              border: 'none',
+              borderRadius: '10px',
+              color: '#fff',
+              fontSize: '1rem',
+              fontWeight: '600',
+              cursor: 'pointer',
+              transition: 'all 0.3s ease'
+            }}
+            onMouseEnter={(e) => {
+              e.target.style.transform = 'translateY(-2px)'
+              e.target.style.boxShadow = '0 8px 20px rgba(16, 185, 129, 0.3)'
+            }}
+            onMouseLeave={(e) => {
+              e.target.style.transform = 'translateY(0)'
+              e.target.style.boxShadow = 'none'
+            }}
+          >
+            Naar Homepage
+          </button>
         </div>
-      );
-    }
-
-    return this.props.children;
+      </div>
+    )
   }
+
+  // Meal preferences form
+  if (currentPath === '/meal-preferences') {
+    window.location.href = '/meal-preferences.html'
+    return null
+  }
+
+  // Post maker / Lead generator
+  if (currentPath === '/postmaker') {
+    return <LeadPicGenerator />
+  }
+
+  // Client onboarding (public for new clients)
+  if (currentPath === '/onboarding') {
+    return (
+      <LanguageProvider>
+        <ClientOnboarding db={db} user={null} />
+        <PWAInstaller />
+      </LanguageProvider>
+    )
+  }
+
+  // Funnel pages
+  if (currentPath === '/funnel') {
+    return <FunnelPage />
+  }
+
+  if (currentPath === '/your-arc') {
+    return <YourArcFunnel />
+  }
+
+
+// My Arc funnel - NIEUW
+if (currentPath === '/my-arc') {
+  return <MyArcFunnel />
 }
 
-function App() {
-  // Debug logging voor iOS PWA
-  useEffect(() => {
-    console.log('🔍 APP MOUNTED');
-    console.log('Standalone mode:', isInStandaloneMode());
-    console.log('User Agent:', navigator.userAgent);
-    console.log('Window location:', window.location.pathname);
-    
-    // iOS PWA specific debug
-    if (isInStandaloneMode()) {
-      console.log('🚀 Running as installed PWA!');
-      
-      // Check localStorage/sessionStorage availability
-      try {
-        localStorage.setItem('pwa-test', 'true');
-        localStorage.removeItem('pwa-test');
-        console.log('✅ localStorage available');
-      } catch (e) {
-        console.error('❌ localStorage error:', e);
-      }
-    }
-  }, []);
+// Till The Goal funnel - NIEUW
+if (currentPath === '/till-the-goal') {
+  return <TillTheGoalPage />
+}
 
-  // DIRECT CHECK - VOOR ALLES ANDERS!
-  if (window.location.pathname === '/reset-password') {
+
+  if (isFunnelRoute) {
+    const slug = currentPath.replace('/funnel/', '')
+    return (
+      <LanguageProvider>
+        <FunnelViewer slug={slug} />
+      </LanguageProvider>
+    )
+  }
+
+  // Password reset
+  if (currentPath === '/reset-password') {
     return (
       <LanguageProvider>
         <ResetPassword />
@@ -207,185 +215,20 @@ function App() {
     )
   }
 
-  // Check localStorage on init
-  const storedMode = localStorage.getItem('isClientMode') === 'true'
-  
-  // V2 TOGGLE
-  const useV2CoachHub = false
+  // ==============================================
+  // AUTHENTICATED ROUTES (Login Required)
+  // ==============================================
 
-  const [user, setUser] = useState(null)
-  const [loading, setLoading] = useState(true)
-  const [isClientMode, setIsClientMode] = useState(storedMode)
-  const [authError, setAuthError] = useState(null)
-
-  useEffect(() => {
-    checkUser()
-  }, [])
-
-  // Save to localStorage when mode changes
-  useEffect(() => {
-    localStorage.setItem('isClientMode', isClientMode)
-  }, [isClientMode])
-
-  const checkUser = async () => {
-    try {
-      console.log('🔍 Checking authentication...');
-      
-      // Extra check voor iOS PWA
-      if (isInStandaloneMode()) {
-        console.log('📱 PWA: Checking auth in standalone mode');
-      }
-      
-      const currentUser = await db.getCurrentUser()
-      
-      if (currentUser) {
-        console.log('✅ User found:', currentUser.email);
-        setUser(currentUser)
-        setAuthError(null)
-      } else {
-        console.log('❌ No user - showing login');
-        setUser(null)
-      }
-    } catch (error) {
-      console.error('Auth error:', error)
-      setAuthError(error.message)
-      setUser(null)
-      
-      // iOS PWA specific error logging
-      if (isInStandaloneMode()) {
-        console.error('🚨 PWA Auth Error:', error);
-      }
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const handleLogout = () => {
-    localStorage.removeItem('isClientMode')
-    setIsClientMode(false)
-  }
-
-  // Enhanced loading screen with PWA indicator
   if (loading) {
     return (
-      <div style={{
-        minHeight: '100vh',
-        background: 'linear-gradient(180deg, #0a0a0a 0%, #171717 100%)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center'
-      }}>
-        <div style={{ textAlign: 'center' }}>
-          <div style={{
-            width: '60px',
-            height: '60px',
-            border: '3px solid rgba(16, 185, 129, 0.2)',
-            borderTopColor: '#10b981',
-            borderRadius: '50%',
-            margin: '0 auto 1.5rem',
-            animation: 'spin 1s linear infinite'
-          }} />
-          <div style={{ 
-            color: '#fff', 
-            fontSize: '1.1rem',
-            fontWeight: '500'
-          }}>
-            Loading MY ARC...
-          </div>
-          {isInStandaloneMode() && (
-            <div style={{ 
-              color: '#10b981', 
-              fontSize: '0.85rem',
-              marginTop: '0.5rem'
-            }}>
-              PWA Mode Active
-            </div>
-          )}
-        </div>
+      <div className="min-h-screen bg-black flex items-center justify-center">
+        <div className="text-white">Loading...</div>
       </div>
     )
   }
 
-  // Show auth error if exists (for PWA debugging)
-  if (authError && isInStandaloneMode()) {
-    return (
-      <div style={{
-        minHeight: '100vh',
-        background: 'linear-gradient(180deg, #0a0a0a 0%, #171717 100%)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        padding: '1rem'
-      }}>
-        <div style={{
-          maxWidth: '400px',
-          width: '100%',
-          background: 'rgba(17, 17, 17, 0.9)',
-          backdropFilter: 'blur(20px)',
-          borderRadius: '20px',
-          border: '1px solid rgba(239, 68, 68, 0.3)',
-          padding: '2rem',
-          textAlign: 'center'
-        }}>
-          <h2 style={{
-            fontSize: '1.3rem',
-            fontWeight: '700',
-            color: '#fff',
-            marginBottom: '1rem'
-          }}>
-            PWA Authentication Issue
-          </h2>
-          <p style={{
-            color: 'rgba(255, 255, 255, 0.7)',
-            marginBottom: '1rem',
-            fontSize: '0.9rem'
-          }}>
-            {authError}
-          </p>
-          <div style={{ 
-            display: 'flex', 
-            gap: '1rem',
-            justifyContent: 'center'
-          }}>
-            <button 
-              onClick={() => window.location.reload()}
-              style={{
-                padding: '0.75rem 1.5rem',
-                background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-                border: 'none',
-                borderRadius: '10px',
-                color: '#fff',
-                fontWeight: '600',
-                cursor: 'pointer'
-              }}
-            >
-              Retry
-            </button>
-            <button 
-              onClick={() => {
-                localStorage.clear();
-                window.location.reload();
-              }}
-              style={{
-                padding: '0.75rem 1.5rem',
-                background: 'rgba(255, 255, 255, 0.1)',
-                border: '1px solid rgba(255, 255, 255, 0.2)',
-                borderRadius: '10px',
-                color: '#fff',
-                fontWeight: '600',
-                cursor: 'pointer'
-              }}
-            >
-              Clear & Retry
-            </button>
-          </div>
-        </div>
-      </div>
-    )
-  }
-
-  // Check URL for client login
-  if (window.location.pathname === '/client-login') {
+  // Client login route
+  if (currentPath === '/client-login') {
     if (!user) {
       return (
         <LanguageProvider>
@@ -395,6 +238,7 @@ function App() {
             checkUser()
           }} />
           <PWAInstaller />
+          <UpdateModal db={db} />
         </LanguageProvider>
       )
     }
@@ -410,16 +254,18 @@ function App() {
           checkUser()
         }} />
         <PWAInstaller />
+        <UpdateModal db={db} />
       </LanguageProvider>
     )
   }
 
-  // Dashboard routing based on state
+  // Dashboard routing based on mode
   if (isClientMode) {
     return (
       <LanguageProvider>
         <ClientDashboard onLogout={handleLogout} />
         <PWAInstaller />
+        <UpdateModal db={db} />
       </LanguageProvider>
     )
   } else {
@@ -429,11 +275,13 @@ function App() {
           <>
             <CoachHubV2 onLogout={handleLogout} />
             <PWAInstaller />
+            <UpdateModal db={db} />
           </>
         ) : (
           <>
             <CoachHub onLogout={handleLogout} />
             <PWAInstaller />
+            <UpdateModal db={db} />
           </>
         )}
       </LanguageProvider>
@@ -441,24 +289,4 @@ function App() {
   }
 }
 
-// Export met Error Boundary wrapper
-export default function AppWithErrorBoundary() {
-  return (
-    <ErrorBoundary>
-      <App />
-    </ErrorBoundary>
-  );
-}
-
-// CSS Animation (wordt toegevoegd door index.html)
-// Voeg dit toe als het nog niet bestaat:
-if (!document.getElementById('app-animations')) {
-  const style = document.createElement('style');
-  style.id = 'app-animations';
-  style.textContent = `
-    @keyframes spin {
-      to { transform: rotate(360deg); }
-    }
-  `;
-  document.head.appendChild(style);
-}
+export default App

@@ -1,8 +1,10 @@
+import AIMealDashboard from './AIMealDashboard'
 // src/modules/meal-plan/MealPlanMain.jsx
 import React, { useState, useEffect, useRef } from 'react'
+import { X, BarChart3 } from 'lucide-react'
 import MealPlanService from './MealPlanService'
 
-// Import nieuwe componenten
+// Import componenten
 import TimelineProgress from './components/TimelineProgress'
 import MealGoalCard from './components/MealGoalCard'
 import QuickActions from './components/QuickActions'
@@ -10,6 +12,8 @@ import WaterTracker from './components/WaterTracker'
 import NextMealCard from './components/NextMealCard'
 import MealListToday from './components/MealListToday'
 import MealNavigation from './components/MealNavigation'
+import FavoritesModal from './components/FavoritesModal'
+import AlternativesModal from './components/AlternativesModal'
 
 // Import Video Widget
 import PageVideoWidget from '../../modules/videos/PageVideoWidget'
@@ -18,7 +22,10 @@ import PageVideoWidget from '../../modules/videos/PageVideoWidget'
 import MealSwapModal from './components/MealSwapModal'
 import RecipeDetailModal from './components/RecipeDetailModal'
 import CustomMealModal from './components/CustomMealModal'
-import HistoryModal from './components/HistoryModal'
+import CleanHistoryModal from './components/CleanHistoryModal'
+
+// Import nutrition progress als beschikbaar
+import NutritionProgressMain from '../nutrition-progress/NutritionProgressMain'
 
 export default function MealPlanMain({ client, onNavigate, db }) {
   const [service] = useState(() => new MealPlanService(db))
@@ -43,12 +50,15 @@ export default function MealPlanMain({ client, onNavigate, db }) {
   const [checkedMeals, setCheckedMeals] = useState({})
   const [waterIntake, setWaterIntake] = useState(0)
   
-  // Modals
+  // Modals - uitgebreid met alle functies
   const [modals, setModals] = useState({
     swap: null,
     detail: null,
     custom: false,
-    history: false
+    history: false,
+    favorites: false,
+    alternatives: false,
+    recipes: false
   })
   
   // Load data + Scroll indicator management
@@ -80,6 +90,13 @@ export default function MealPlanMain({ client, onNavigate, db }) {
     }
   }
   
+ // HIER DE CHECK TOEVOEGEN:
+  // Check of het een AI generated plan is
+  if (!loading && data.plan?.ai_generated === true) {
+    return <AIMealDashboard client={client} onNavigate={onNavigate} db={db} />
+  }
+  
+
   // Auto-save handlers
   const autoSaveMealProgress = async (newCheckedMeals) => {
     if (mealSaveTimeout.current) clearTimeout(mealSaveTimeout.current)
@@ -175,6 +192,32 @@ export default function MealPlanMain({ client, onNavigate, db }) {
     }
   }
   
+  // Navigation handlers
+  const handleNavigation = (page) => {
+    switch(page) {
+      case 'shopping':
+        onNavigate('shopping')
+        break
+      case 'progress':
+        onNavigate('progress')
+        break
+      case 'recipes':
+        onNavigate('recipes')
+        break
+      case 'favorites':
+        setModals(prev => ({ ...prev, favorites: true }))
+        break
+      case 'alternatives':
+        setModals(prev => ({ ...prev, alternatives: true }))
+        break
+      case 'history':
+        setModals(prev => ({ ...prev, history: true }))
+        break
+      default:
+        break
+    }
+  }
+  
   // Calculations
   const progress = service.calculateProgress(data.meals, checkedMeals)
   const nextMeal = service.getNextMeal(data.meals, checkedMeals)
@@ -206,7 +249,8 @@ export default function MealPlanMain({ client, onNavigate, db }) {
       minHeight: '100vh',
       background: 'linear-gradient(180deg, #0a0a0a 0%, #171717 100%)',
       paddingBottom: isMobile ? '5rem' : '2rem',
-      animation: 'fadeIn 0.5s ease'
+      animation: 'fadeIn 0.5s ease',
+      position: 'relative'
     }}>
       {/* Save Indicator */}
       {isSaving && (
@@ -227,19 +271,64 @@ export default function MealPlanMain({ client, onNavigate, db }) {
         </div>
       )}
       
-      {/* 1. MealGoalCard - Met water functie */}
-      <MealGoalCard
-        progress={progress}
-        targets={data.targets}
-        plan={data.plan}
-        waterIntake={waterIntake}
-        onAddWater={(amount) => {
-          setWaterIntake(amount)
-          autoSaveWater(amount)
-        }}
+      {/* Scroll Indicator */}
+      {showScrollIndicator && !loading && data.meals.length > 0 && (
+        <div style={{
+          position: 'fixed',
+          bottom: isMobile ? '100px' : '40px',
+          left: '50%',
+          transform: 'translateX(-50%)',
+          zIndex: 1000,
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          gap: '8px',
+          animation: 'fadeInUp 0.5s ease-out',
+          pointerEvents: 'none'
+        }}>
+          <span style={{
+            color: 'rgba(255, 255, 255, 0.5)',
+            fontSize: isMobile ? '0.75rem' : '0.85rem',
+            fontWeight: '500',
+            letterSpacing: '0.5px',
+            textTransform: 'uppercase'
+          }}>
+            Scroll
+          </span>
+          <div style={{
+            width: isMobile ? '24px' : '30px',
+            height: isMobile ? '40px' : '50px',
+            border: '2px solid rgba(16, 185, 129, 0.3)',
+            borderRadius: '15px',
+            position: 'relative',
+            background: 'rgba(0, 0, 0, 0.2)',
+            backdropFilter: 'blur(10px)'
+          }}>
+            <div style={{
+              position: 'absolute',
+              top: '8px',
+              left: '50%',
+              transform: 'translateX(-50%)',
+              width: '3px',
+              height: '10px',
+              background: '#10b981',
+              borderRadius: '2px',
+              animation: 'scrollDown 2s infinite'
+            }} />
+          </div>
+        </div>
+      )}
+      
+      {/* 1. Next Meal Card */}
+      <NextMealCard 
+        nextMeal={nextMeal}
+        meals={data.meals}
+        checkedMeals={checkedMeals}
+        onMealClick={(meal) => setModals(prev => ({ ...prev, detail: meal }))}
+        onSwapMeal={(meal) => setModals(prev => ({ ...prev, swap: meal }))}
       />
-
-      {/* 2. Video Widget - Coach Video's voor Voeding */}
+      
+      {/* 2. Video Widget */}
       <div style={{ 
         paddingTop: isMobile ? '1rem' : '1.5rem',
         paddingLeft: isMobile ? '1rem' : '1.5rem',
@@ -258,16 +347,19 @@ export default function MealPlanMain({ client, onNavigate, db }) {
         />
       </div>
       
-      {/* 3. Next Meal Card - Volgende maaltijd highlight met tijdlijn */}
-      <NextMealCard 
-        nextMeal={nextMeal}
-        meals={data.meals}
-        checkedMeals={checkedMeals}
-        onMealClick={(meal) => setModals(prev => ({ ...prev, detail: meal }))}
-        onSwapMeal={(meal) => setModals(prev => ({ ...prev, swap: meal }))}
+      {/* 3. MealGoalCard */}
+      <MealGoalCard
+        progress={progress}
+        targets={data.targets}
+        plan={data.plan}
+        waterIntake={waterIntake}
+        onAddWater={(amount) => {
+          setWaterIntake(amount)
+          autoSaveWater(amount)
+        }}
       />
-      
-      {/* 4. Today's Meals (vandaags planning) */}
+         
+      {/* 4. Today's Meals */}
       <MealListToday
         meals={data.meals}
         checkedMeals={checkedMeals}
@@ -278,15 +370,16 @@ export default function MealPlanMain({ client, onNavigate, db }) {
         onToggleFavorite={handleToggleFavorite}
       />
       
-      {/* 5. Quick Actions */}
+      {/* 5. Quick Actions - Fixed */}
       <QuickActions
         onAddCustom={() => setModals(prev => ({ ...prev, custom: true }))}
         onShowHistory={() => setModals(prev => ({ ...prev, history: true }))}
-        onNavigate={onNavigate}
+        onShowProgress={() => onNavigate('progress')}
+        onNavigate={handleNavigation}
+        onShowFavorites={() => setModals(prev => ({ ...prev, favorites: true }))}
+        onShowAlternatives={() => setModals(prev => ({ ...prev, alternatives: true }))}
+        onShowRecipes={() => onNavigate('recipes')}
       />
-      
-      {/* 6. Timeline Progress - Nu geïntegreerd in NextMealCard */}
-      {/* TimelineProgress is verplaatst naar NextMealCard voor betere UI */}
       
       {/* Modals */}
       <MealSwapModal
@@ -317,20 +410,38 @@ export default function MealPlanMain({ client, onNavigate, db }) {
         client={client}
       />
       
-      <HistoryModal
+      {/* Clean History Modal */}
+      <CleanHistoryModal
         isOpen={modals.history}
         onClose={() => setModals(prev => ({ ...prev, history: false }))}
-        historyData={data.history}
-        targets={data.targets}
+        client={client}
         db={db}
-        clientId={client?.id}
       />
       
-      {/* Bottom Navigation */}
+      {/* Favorites Modal */}
+      <FavoritesModal
+        isOpen={modals.favorites}
+        onClose={() => setModals(prev => ({ ...prev, favorites: false }))}
+        db={db}
+        client={client}
+        onSwapMeal={handleSwapMeal}
+      />
+      
+      {/* Alternatives Modal */}
+      <AlternativesModal
+        isOpen={modals.alternatives}
+        onClose={() => setModals(prev => ({ ...prev, alternatives: false }))}
+        currentMeal={modals.swap || data.meals[0]}
+        db={db}
+        client={client}
+        onSwapMeal={handleSwapMeal}
+      />
+      
+      {/* Bottom Navigation - Fixed */}
       <MealNavigation
         activePage="meals"
-        onNavigate={onNavigate}
-        onShowHistory={() => setModals(prev => ({ ...prev, history: false }))}
+        onNavigate={handleNavigation}
+        onShowHistory={() => setModals(prev => ({ ...prev, history: true }))}
       />
       
       <style>{`
@@ -338,26 +449,47 @@ export default function MealPlanMain({ client, onNavigate, db }) {
           from { opacity: 0; }
           to { opacity: 1; }
         }
-        @keyframes fadeInOut {
-          0%, 100% { 
+        
+        @keyframes fadeInUp {
+          from {
             opacity: 0;
-            transform: translateY(10px);
+            transform: translateX(-50%) translateY(20px);
           }
-          20%, 80% { 
+          to {
             opacity: 1;
-            transform: translateY(0);
+            transform: translateX(-50%) translateY(0);
           }
         }
-        @keyframes scrollBounce {
-          0%, 100% {
+        
+        @keyframes scrollDown {
+          0% {
             transform: translateX(-50%) translateY(0);
+            opacity: 0.3;
+          }
+          40% {
             opacity: 1;
+          }
+          80% {
+            transform: translateX(-50%) translateY(15px);
+            opacity: 0;
+          }
+          100% {
+            transform: translateX(-50%) translateY(0);
+            opacity: 0;
+          }
+        }
+        
+        @keyframes pulse {
+          0%, 100% {
+            transform: scale(1);
+            opacity: 0.9;
           }
           50% {
-            transform: translateX(-50%) translateY(12px);
-            opacity: 0.5;
+            transform: scale(1.05);
+            opacity: 1;
           }
         }
+        
         * {
           -webkit-tap-highlight-color: transparent;
         }

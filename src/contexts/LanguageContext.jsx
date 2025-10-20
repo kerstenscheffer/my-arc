@@ -39,7 +39,8 @@ const translations = {
       close: 'Close',
       view: 'View',
       assign: 'Assign',
-      change: 'Change'
+      change: 'Change',
+      error: 'Error'
     },
     
     // Client Dashboard
@@ -98,22 +99,11 @@ const translations = {
       dragToSchedule: 'Drag to Schedule',
       tapToSelect: 'Tap to Select',
       tapDay: 'Tap a day below',
-  dropHere: "Drop here",
-  planWeek: "Plan Week",
-  save: "Save",
-  tapToSelect: "Tap to Select",
-  dragToSchedule: "Drag to Schedule",
-  sets: "Sets",
-  reps: "Reps",
-  rest: "Rest",
-  rpe: "RPE",
-  exerciseLibrary: "Exercise Library",
-  startWorkout: "Start Workout",
-  alternativeExercises: "Alternative Exercises",
-  weekOverview: "Week Overview",
-  workouts: "Workouts",
-  restDays: "Rest Days",
-  minPerWeek: "Min/Week",
+      dropHere: "Drop here",
+      save: "Save",
+      exerciseLibrary: "Exercise Library",
+      startWorkout: "Start Workout",
+      alternativeExercises: "Alternative Exercises",
       scheduled: 'Scheduled'
     },
     
@@ -189,7 +179,8 @@ const translations = {
       close: 'Sluiten',
       view: 'Bekijken',
       assign: 'Toewijzen',
-      change: 'Wijzigen'
+      change: 'Wijzigen',
+      error: 'Fout'
     },
     
     // Client Dashboard
@@ -248,26 +239,11 @@ const translations = {
       dragToSchedule: 'Sleep om te Plannen',
       tapToSelect: 'Tik om te Selecteren',
       tapDay: 'Tik een dag hieronder',
- yourWeek: "Jouw Week",
-  workoutExplanation: "Workout Uitleg",
-  personalTrainingVideo: "Persoonlijke Training Video",
-  restDay: "Rustdag",
-  dropHere: "Sleep hier",
-  planWeek: "Plan Week",
-  save: "Opslaan",
-  tapToSelect: "Tik om te selecteren",
-  dragToSchedule: "Sleep om te plannen",
-  sets: "Sets",
-  reps: "Herhalingen",
-  rest: "Rust",
-  rpe: "RPE",
-  exerciseLibrary: "Oefeningen Bibliotheek",
-  startWorkout: "Start Workout",
-  alternativeExercises: "Alternatieve Oefeningen",
-  weekOverview: "Week Overzicht",
-  workouts: "Workouts",
-  restDays: "Rustdagen",
-  minPerWeek: "Min/Week",
+      dropHere: "Sleep hier",
+      save: "Opslaan",
+      exerciseLibrary: "Oefeningen Bibliotheek",
+      startWorkout: "Start Workout",
+      alternativeExercises: "Alternatieve Oefeningen",
       scheduled: 'Ingepland'
     },
     

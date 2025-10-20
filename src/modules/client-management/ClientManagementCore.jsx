@@ -1,27 +1,20 @@
 import useIsMobile from '../../hooks/useIsMobile'
 // src/modules/client-management/ClientManagementCore.jsx
 // ===== IMPORTS - Client Management Core =====
-
 // React Hooks
 import { useState, useEffect, useCallback, useMemo } from 'react'
-
-
-
 // Assignment Modals
 import {
   WorkoutSchemaAssignmentModal,
   BulkActionsModal
 } from './AssignmentModals'
-
 // Meal Plan Generator (nieuwe implementatie)
 import { MealPlanGenerator } from './MealPlanGenerator'
-
 // Progress & Export Components
 import {
   ProgressCharts,
   ExportManager
 } from './ProgressChartsExport'
-
 // Client Management Modules - GEBRUIK DEZE IMPORTS
 import AccountabilityModule from './modules/AccountabilityModule'
 import AnalyticsModule from './modules/AnalyticsModule'
@@ -33,17 +26,14 @@ import MealTrackingModule from './modules/MealTrackingModule'
 import ProgressModule from './modules/ProgressModule'
 import WorkoutModule from './modules/WorkoutModule'
 import CoachNotificationTab from '../notifications/CoachNotificationTab';
-
 // Services (indien nodig)
 import DatabaseService from '../../services/DatabaseService'
-
 // ===== MODULE REGISTRY =====
 class ModuleRegistry {
   constructor() {
     this.modules = new Map()
     this.dataCache = new Map()
   }
-
   register(moduleConfig) {
     if (!moduleConfig.id || !moduleConfig.component) {
       console.error('Module must have id and component')
@@ -55,20 +45,17 @@ class ModuleRegistry {
       enabled: moduleConfig.enabled !== false
     })
   }
-
   getActiveModules() {
     return Array.from(this.modules.values())
       .filter(m => m.enabled)
       .sort((a, b) => (a.priority || 999) - (b.priority || 999))
   }
-
   cacheData(key, data) {
     this.dataCache.set(key, {
       data,
       timestamp: Date.now()
     })
   }
-
   getCachedData(key, maxAge = 60000) {
     const cached = this.dataCache.get(key)
     if (!cached) return null
@@ -81,9 +68,7 @@ class ModuleRegistry {
     return cached.data
   }
 }
-
 const registry = new ModuleRegistry()
-
 // Register all modules - GEBRUIK DE GEÏMPORTEERDE COMPONENTEN
 registry.register({
   id: 'progress',
@@ -101,7 +86,6 @@ registry.register({
   },
   priority: 1
 })
-
 registry.register({
   id: 'meals',
   name: 'Meal Plans',
@@ -129,7 +113,6 @@ registry.register({
   },
   priority: 2
 })
-
 registry.register({
   id: 'workouts',
   name: 'Training',
@@ -146,7 +129,6 @@ registry.register({
   },
   priority: 3
 })
-
 registry.register({
   id: 'goals',
   name: 'Doelen',
@@ -163,7 +145,6 @@ registry.register({
   },
   priority: 4
 })
-
 registry.register({
   id: 'notifications',
   name: 'Meldingen',
@@ -180,8 +161,6 @@ registry.register({
   },
   priority: 4.5
 })
-
-
 registry.register({
   id: 'communication',
   name: 'Berichten',
@@ -198,7 +177,6 @@ registry.register({
   },
   priority: 5
 })
-
 // Optioneel: Register andere modules als ze beschikbaar zijn
 // registry.register({
 //   id: 'accountability',
@@ -211,7 +189,6 @@ registry.register({
 //   },
 //   priority: 6
 // })
-
 // registry.register({
 //   id: 'analytics',
 //   name: 'Analytics',
@@ -223,7 +200,6 @@ registry.register({
 //   },
 //   priority: 7
 // })
-
 // registry.register({
 //   id: 'bonuses',
 //   name: 'Bonuses',
@@ -235,7 +211,6 @@ registry.register({
 //   },
 //   priority: 8
 // })
-
 // registry.register({
 //   id: 'content',
 //   name: 'Content',
@@ -247,7 +222,6 @@ registry.register({
 //   },
 //   priority: 9
 // })
-
 // ===== MAIN COMPONENT =====
 export default function ClientManagementCore({ db }) {
   const [loading, setLoading] = useState(true)
@@ -268,7 +242,6 @@ export default function ClientManagementCore({ db }) {
   const [showExport, setShowExport] = useState(false)
   
   const isMobile = useIsMobile()
-
   useEffect(() => {
     loadInitialData()
     
@@ -279,13 +252,11 @@ export default function ClientManagementCore({ db }) {
     
     return () => clearInterval(interval)
   }, [])
-
   useEffect(() => {
     if (selectedClient) {
       loadClientData(selectedClient.id)
     }
   }, [selectedClient, refreshTrigger])
-
   const loadInitialData = async () => {
     setLoading(true)
     try {
@@ -304,7 +275,6 @@ export default function ClientManagementCore({ db }) {
       setLoading(false)
     }
   }
-
   const loadClientData = async (clientId) => {
     const modules = registry.getActiveModules()
     const newModuleData = {}
@@ -329,7 +299,6 @@ export default function ClientManagementCore({ db }) {
     
     setModuleData(newModuleData)
   }
-
   const filteredClients = useMemo(() => {
     let filtered = clients || []
     
@@ -360,11 +329,9 @@ export default function ClientManagementCore({ db }) {
     
     return filtered
   }, [clients, searchQuery, filterStatus])
-
   const handleModuleAction = async (moduleId, action, params) => {
     try {
       console.log(`Action: ${moduleId}.${action}`, params)
-
       switch(action) {
         case 'sendMessage':
           if (params.message && selectedClient) {
@@ -373,7 +340,6 @@ export default function ClientManagementCore({ db }) {
             setRefreshTrigger(prev => prev + 1)
           }
           break
-
         case 'saveProgress':
           if (params && selectedClient) {
             await db.saveProgress(params)
@@ -397,7 +363,6 @@ export default function ClientManagementCore({ db }) {
             setRefreshTrigger(prev => prev + 1)
           }
           break
-
         case 'assignWorkout':
           setShowWorkoutModal(true)
           break
@@ -442,7 +407,6 @@ export default function ClientManagementCore({ db }) {
       alert(`❌ Action failed: ${error.message}`)
     }
   }
-
   const getClientHealth = (client) => {
     const mealCompliance = moduleData.meals?.compliance?.average || 0
     const workoutCompliance = moduleData.workouts?.compliance || 0
@@ -457,7 +421,6 @@ export default function ClientManagementCore({ db }) {
               healthScore >= 40 ? 'fair' : 'poor'
     }
   }
-
   const renderClientSelector = () => (
     <div className="myarc-card" style={{ 
       marginBottom: 'var(--s-6)',
@@ -625,7 +588,6 @@ export default function ClientManagementCore({ db }) {
       </div>
     </div>
   )
-
   const renderModuleGrid = () => {
     if (!selectedClient) {
       return (
@@ -802,7 +764,6 @@ export default function ClientManagementCore({ db }) {
       </div>
     )
   }
-
   if (loading) {
     return (
       <div style={{ 
@@ -827,7 +788,6 @@ export default function ClientManagementCore({ db }) {
       </div>
     )
   }
-
   return (
     <div className="myarc-client-management">
       <style>{`
@@ -925,3 +885,6 @@ export default function ClientManagementCore({ db }) {
     </div>
   )
 }
+
+
+

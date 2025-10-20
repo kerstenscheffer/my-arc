@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Bell, X, TrendingUp, Award, Utensils, AlertCircle, Sparkles, CheckCircle } from 'lucide-react';
 
 export default function NotificationWidget({ db, clientId, currentPage = 'all' }) {
+  const isMobile = window.innerWidth <= 768;
   const [notifications, setNotifications] = useState([]);
   const [isExpanded, setIsExpanded] = useState(false);
   const [hasUnread, setHasUnread] = useState(false);
@@ -91,25 +92,12 @@ export default function NotificationWidget({ db, clientId, currentPage = 'all' }
   };
 
   const getIcon = (type) => {
-    const iconProps = { size: 20 };
+    const iconProps = { size: 18, strokeWidth: 2 };
     switch(type) {
       case 'workout': return <TrendingUp {...iconProps} />;
       case 'meal': return <Utensils {...iconProps} />;
       case 'streak': return <Award {...iconProps} />;
       default: return <Sparkles {...iconProps} />;
-    }
-  };
-
-  const getPriorityGradient = (priority) => {
-    switch(priority) {
-      case 'urgent':
-        return 'linear-gradient(135deg, rgba(239, 68, 68, 0.15) 0%, rgba(239, 68, 68, 0.05) 100%)';
-      case 'high':
-        return 'linear-gradient(135deg, rgba(245, 158, 11, 0.15) 0%, rgba(245, 158, 11, 0.05) 100%)';
-      case 'normal':
-        return 'linear-gradient(135deg, rgba(139, 92, 246, 0.15) 0%, rgba(139, 92, 246, 0.05) 100%)';
-      default:
-        return 'linear-gradient(135deg, rgba(107, 114, 128, 0.15) 0%, rgba(107, 114, 128, 0.05) 100%)';
     }
   };
 
@@ -119,15 +107,6 @@ export default function NotificationWidget({ db, clientId, currentPage = 'all' }
       case 'high': return '#f59e0b';
       case 'normal': return '#8b5cf6';
       default: return '#6b7280';
-    }
-  };
-
-  const getPriorityBorder = (priority) => {
-    switch(priority) {
-      case 'urgent': return '2px solid rgba(239, 68, 68, 0.3)';
-      case 'high': return '2px solid rgba(245, 158, 11, 0.3)';
-      case 'normal': return '2px solid rgba(139, 92, 246, 0.3)';
-      default: return '2px solid rgba(107, 114, 128, 0.3)';
     }
   };
 
@@ -151,93 +130,115 @@ export default function NotificationWidget({ db, clientId, currentPage = 'all' }
 
   return (
     <>
-      {/* Floating Bell Button */}
+      {/* Cleaner Floating Bell Button */}
       <button
         onClick={handleBellClick}
         style={{ 
           position: 'fixed',
           bottom: '100px',
-          right: '20px', 
-          zIndex: 9999,
-          width: '60px',
-          height: '60px',
-          background: hasUnread 
-            ? `linear-gradient(135deg, ${getPriorityColor(highestPriority)} 0%, ${getPriorityColor(highestPriority)}CC 100%)`
-            : 'linear-gradient(135deg, #6b7280 0%, #4b5563 100%)',
-          border: 'none',
-          borderRadius: '20px',
+          right: '0',
+          zIndex: 997,
+          width: isMobile ? '44px' : '48px',
+          height: isMobile ? '44px' : '48px',
+          background: hasUnread && isExpanded
+            ? `linear-gradient(135deg, ${getPriorityColor(highestPriority)}20 0%, ${getPriorityColor(highestPriority)}10 100%)`
+            : 'rgba(17, 17, 17, 0.7)',
+          backdropFilter: 'blur(12px)',
+          WebkitBackdropFilter: 'blur(12px)',
+          border: hasUnread && isExpanded
+            ? `0.5px solid ${getPriorityColor(highestPriority)}40`
+            : '0.5px solid rgba(255, 255, 255, 0.08)',
+          borderRadius: '50%',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          color: 'white',
           cursor: 'pointer',
-          boxShadow: hasUnread 
-            ? `0 10px 30px ${getPriorityColor(highestPriority)}66`
-            : '0 10px 30px rgba(0,0,0,0.3)',
+          boxShadow: hasUnread && isExpanded
+            ? `0 4px 12px ${getPriorityColor(highestPriority)}20`
+            : '0 2px 8px rgba(0, 0, 0, 0.2)',
           transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-          animation: hasUnread ? 'bellPulse 2s infinite' : 'none'
+          transform: `translateX(${isMobile ? '8px' : '10px'})`,
+          touchAction: 'manipulation',
+          WebkitTapHighlightColor: 'transparent'
         }}
         onMouseEnter={(e) => {
-          e.currentTarget.style.transform = 'translateY(-4px) scale(1.05)';
-          e.currentTarget.style.boxShadow = `0 15px 40px ${getPriorityColor(highestPriority)}88`;
+          if (!isMobile && !isExpanded) {
+            e.currentTarget.style.transform = 'translateX(6px)';
+            e.currentTarget.style.background = 'rgba(17, 17, 17, 0.85)';
+            e.currentTarget.style.borderColor = hasUnread ? `${getPriorityColor(highestPriority)}30` : 'rgba(255, 255, 255, 0.1)';
+          }
         }}
         onMouseLeave={(e) => {
-          e.currentTarget.style.transform = 'translateY(0) scale(1)';
-          e.currentTarget.style.boxShadow = hasUnread 
-            ? `0 10px 30px ${getPriorityColor(highestPriority)}66`
-            : '0 10px 30px rgba(0,0,0,0.3)';
+          if (!isMobile && !isExpanded) {
+            e.currentTarget.style.transform = 'translateX(10px)';
+            e.currentTarget.style.background = 'rgba(17, 17, 17, 0.7)';
+            e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.08)';
+          }
+        }}
+        onTouchStart={(e) => {
+          if (isMobile && !isExpanded) {
+            e.currentTarget.style.transform = 'translateX(4px) scale(0.95)';
+          }
+        }}
+        onTouchEnd={(e) => {
+          if (isMobile) {
+            e.currentTarget.style.transform = 'translateX(8px) scale(1)';
+          }
         }}
         aria-label="Toggle notifications"
       >
-        <Bell size={26} style={{ color: 'white' }} />
+        <Bell size={isMobile ? 18 : 20} color={hasUnread && isExpanded ? getPriorityColor(highestPriority) : 'rgba(255, 255, 255, 0.6)'} strokeWidth={2} />
         {hasUnread && (
           <span style={{
             position: 'absolute',
-            top: '-5px',
-            right: '-5px',
-            background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-            color: 'white',
-            fontSize: '12px',
-            fontWeight: 'bold',
+            top: '-2px',
+            left: '-2px',
+            background: '#ef4444',
+            color: '#fff',
+            fontSize: '0.6rem',
+            fontWeight: '700',
             borderRadius: '50%',
-            width: '24px',
-            height: '24px',
+            width: '14px',
+            height: '14px',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            border: '2px solid #1a1a1a',
-            animation: 'badgeBounce 0.5s ease'
+            border: '1.5px solid rgba(0, 0, 0, 0.3)',
+            boxShadow: '0 1px 4px rgba(239, 68, 68, 0.5)'
           }}>
-            {notifications.filter(n => n.status === 'active').length}
+            {notifications.filter(n => n.status === 'active').length < 10 
+              ? notifications.filter(n => n.status === 'active').length 
+              : '•'}
           </span>
         )}
       </button>
 
-      {/* Notification Panel */}
+      {/* Cleaner Notification Panel */}
       {isExpanded && (
         <div style={{
           position: 'fixed',
-          bottom: '180px',
+          bottom: '160px',
           right: '20px',
           width: '90%',
-          maxWidth: '420px',
-          maxHeight: '70vh',
-          background: 'linear-gradient(135deg, rgba(26, 26, 26, 0.95) 0%, rgba(26, 26, 26, 0.9) 100%)',
-          borderRadius: '24px',
-          boxShadow: '0 20px 60px rgba(0,0,0,0.5)',
-          zIndex: 9998,
+          maxWidth: '380px',
+          maxHeight: '60vh',
+          background: 'rgba(17, 17, 17, 0.95)',
+          borderRadius: '16px',
+          boxShadow: '0 4px 20px rgba(0, 0, 0, 0.3)',
+          zIndex: 999,
           display: 'flex',
           flexDirection: 'column',
           overflow: 'hidden',
-          backdropFilter: 'blur(20px)',
-          border: '1px solid rgba(255, 255, 255, 0.1)',
-          animation: 'slideInUp 0.4s cubic-bezier(0.34, 1.56, 0.64, 1)'
+          backdropFilter: 'blur(16px)',
+          WebkitBackdropFilter: 'blur(16px)',
+          border: '0.5px solid rgba(255, 255, 255, 0.08)',
+          animation: 'slideInUp 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
         }}>
-          {/* Header with coach info */}
+          {/* Cleaner Header */}
           <div style={{
-            padding: '1.5rem',
-            background: 'linear-gradient(135deg, rgba(139, 92, 246, 0.2) 0%, rgba(59, 130, 246, 0.1) 100%)',
-            borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
+            padding: isMobile ? '1rem' : '1.25rem',
+            background: 'rgba(0, 0, 0, 0.2)',
+            borderBottom: '0.5px solid rgba(255, 255, 255, 0.05)',
             display: 'flex',
             justifyContent: 'space-between',
             alignItems: 'center'
@@ -245,36 +246,36 @@ export default function NotificationWidget({ db, clientId, currentPage = 'all' }
             <div style={{
               display: 'flex',
               alignItems: 'center',
-              gap: '1rem'
+              gap: '0.75rem'
             }}>
               <img 
                 src={coachAvatar}
                 alt={coachName}
                 style={{
-                  width: '48px',
-                  height: '48px',
-                  borderRadius: '16px',
-                  border: '2px solid rgba(139, 92, 246, 0.5)',
+                  width: isMobile ? '36px' : '40px',
+                  height: isMobile ? '36px' : '40px',
+                  borderRadius: '12px',
+                  border: '0.5px solid rgba(255, 255, 255, 0.1)',
                   objectFit: 'cover'
                 }}
               />
               <div>
                 <h3 style={{
                   margin: 0,
-                  fontSize: '1.1rem',
-                  fontWeight: '700',
-                  color: '#fff',
+                  fontSize: isMobile ? '0.95rem' : '1rem',
+                  fontWeight: '600',
+                  color: 'rgba(255, 255, 255, 0.9)',
                   display: 'flex',
                   alignItems: 'center',
-                  gap: '0.5rem'
+                  gap: '0.4rem'
                 }}>
                   {coachName}
-                  <Sparkles size={16} style={{ color: '#8b5cf6' }} />
+                  <Sparkles size={14} style={{ color: 'rgba(139, 92, 246, 0.6)' }} />
                 </h3>
                 <p style={{
                   margin: 0,
-                  fontSize: '0.875rem',
-                  color: 'rgba(255, 255, 255, 0.6)'
+                  fontSize: isMobile ? '0.7rem' : '0.75rem',
+                  color: 'rgba(255, 255, 255, 0.4)'
                 }}>
                   {notifications.filter(n => n.status === 'active').length} nieuwe berichten
                 </p>
@@ -283,32 +284,36 @@ export default function NotificationWidget({ db, clientId, currentPage = 'all' }
             <button
               onClick={() => setIsExpanded(false)}
               style={{
-                width: '36px',
-                height: '36px',
-                borderRadius: '12px',
-                border: 'none',
-                background: 'rgba(255, 255, 255, 0.1)',
+                width: '32px',
+                height: '32px',
+                borderRadius: '8px',
+                border: '0.5px solid rgba(255, 255, 255, 0.08)',
+                background: 'transparent',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
                 cursor: 'pointer',
-                transition: 'all 0.3s ease'
+                transition: 'all 0.2s ease'
               }}
               onMouseEnter={(e) => {
-                e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)';
+                if (!isMobile) {
+                  e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)';
+                }
               }}
               onMouseLeave={(e) => {
-                e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)';
+                if (!isMobile) {
+                  e.currentTarget.style.background = 'transparent';
+                }
               }}
             >
-              <X size={20} style={{ color: 'rgba(255, 255, 255, 0.8)' }} />
+              <X size={16} style={{ color: 'rgba(255, 255, 255, 0.4)' }} />
             </button>
           </div>
 
-          {/* Auto-hide timer indicator */}
+          {/* Auto-hide timer indicator - Subtler */}
           <div style={{
-            height: '2px',
-            background: 'rgba(255, 255, 255, 0.1)',
+            height: '1px',
+            background: 'rgba(255, 255, 255, 0.05)',
             position: 'relative',
             overflow: 'hidden'
           }}>
@@ -318,28 +323,29 @@ export default function NotificationWidget({ db, clientId, currentPage = 'all' }
               left: 0,
               height: '100%',
               width: '100%',
-              background: 'linear-gradient(90deg, #8b5cf6 0%, #3b82f6 100%)',
-              animation: 'timerShrink 10s linear'
+              background: 'rgba(139, 92, 246, 0.3)',
+              animation: 'timerShrink 10s linear',
+              transformOrigin: 'left'
             }} />
           </div>
 
-          {/* Notifications List */}
+          {/* Notifications List - Cleaner */}
           <div style={{
             flex: 1,
             overflowY: 'auto',
-            padding: '1rem'
+            padding: isMobile ? '0.75rem' : '1rem'
           }}>
             {isLoading ? (
               <div style={{
                 textAlign: 'center',
-                padding: '3rem',
-                color: 'rgba(255, 255, 255, 0.6)'
+                padding: '2rem',
+                color: 'rgba(255, 255, 255, 0.4)'
               }}>
                 <div style={{
-                  width: '40px',
-                  height: '40px',
-                  border: '3px solid rgba(139, 92, 246, 0.2)',
-                  borderTopColor: '#8b5cf6',
+                  width: '32px',
+                  height: '32px',
+                  border: '2px solid rgba(255, 255, 255, 0.1)',
+                  borderTopColor: 'rgba(139, 92, 246, 0.5)',
                   borderRadius: '50%',
                   margin: '0 auto',
                   animation: 'spin 1s linear infinite'
@@ -348,71 +354,95 @@ export default function NotificationWidget({ db, clientId, currentPage = 'all' }
             ) : notifications.length === 0 ? (
               <div style={{
                 textAlign: 'center',
-                padding: '3rem'
+                padding: '2rem'
               }}>
-                <Bell size={48} style={{ color: 'rgba(255, 255, 255, 0.2)', margin: '0 auto 1rem' }} />
-                <p style={{ color: 'rgba(255, 255, 255, 0.6)', margin: 0 }}>
+                <Bell size={32} style={{ color: 'rgba(255, 255, 255, 0.15)', margin: '0 auto 0.75rem' }} />
+                <p style={{ color: 'rgba(255, 255, 255, 0.4)', margin: 0, fontSize: isMobile ? '0.8rem' : '0.85rem' }}>
                   Geen nieuwe berichten
                 </p>
               </div>
             ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: isMobile ? '0.5rem' : '0.75rem' }}>
                 {notifications.map((notification, index) => (
                   <div
                     key={notification.id}
                     id={`notification-${notification.id}`}
                     onClick={() => notification.status === 'active' && handleMarkAsRead(notification.id)}
                     style={{
-                      padding: '1rem',
-                      borderRadius: '16px',
-                      background: getPriorityGradient(notification.priority),
-                      border: getPriorityBorder(notification.priority),
-                      backdropFilter: 'blur(10px)',
+                      padding: isMobile ? '0.875rem' : '1rem',
+                      borderRadius: '12px',
+                      background: notification.priority === 'urgent'
+                        ? 'rgba(239, 68, 68, 0.08)'
+                        : notification.priority === 'high'
+                        ? 'rgba(245, 158, 11, 0.08)'
+                        : 'rgba(0, 0, 0, 0.3)',
+                      border: `0.5px solid ${
+                        notification.priority === 'urgent'
+                          ? 'rgba(239, 68, 68, 0.15)'
+                          : notification.priority === 'high'
+                          ? 'rgba(245, 158, 11, 0.15)'
+                          : 'rgba(255, 255, 255, 0.05)'
+                      }`,
+                      backdropFilter: 'blur(8px)',
                       cursor: notification.status === 'active' ? 'pointer' : 'default',
-                      transition: 'all 0.3s ease',
-                      opacity: notification.status === 'read' ? 0.6 : 1,
-                      animation: `slideInRight 0.4s ease ${index * 0.1}s both`,
+                      transition: 'all 0.2s ease',
+                      opacity: notification.status === 'read' ? 0.5 : 1,
+                      animation: `slideInRight 0.3s ease ${index * 0.05}s both`,
                       position: 'relative',
                       overflow: 'hidden'
                     }}
                     onMouseEnter={(e) => {
-                      if (notification.status === 'active') {
-                        e.currentTarget.style.transform = 'translateX(-4px)';
-                        e.currentTarget.style.boxShadow = `0 8px 20px ${getPriorityColor(notification.priority)}33`;
+                      if (notification.status === 'active' && !isMobile) {
+                        e.currentTarget.style.transform = 'translateX(-2px)';
+                        e.currentTarget.style.background = 
+                          notification.priority === 'urgent'
+                            ? 'rgba(239, 68, 68, 0.1)'
+                            : notification.priority === 'high'
+                            ? 'rgba(245, 158, 11, 0.1)'
+                            : 'rgba(0, 0, 0, 0.4)';
                       }
                     }}
                     onMouseLeave={(e) => {
-                      e.currentTarget.style.transform = 'translateX(0)';
-                      e.currentTarget.style.boxShadow = 'none';
+                      if (!isMobile) {
+                        e.currentTarget.style.transform = 'translateX(0)';
+                        e.currentTarget.style.background = 
+                          notification.priority === 'urgent'
+                            ? 'rgba(239, 68, 68, 0.08)'
+                            : notification.priority === 'high'
+                            ? 'rgba(245, 158, 11, 0.08)'
+                            : 'rgba(0, 0, 0, 0.3)';
+                      }
                     }}
                   >
-                    {/* Priority indicator line */}
+                    {/* Priority indicator line - Subtler */}
                     <div style={{
                       position: 'absolute',
                       left: 0,
                       top: 0,
                       bottom: 0,
-                      width: '3px',
+                      width: '2px',
                       background: getPriorityColor(notification.priority),
-                      borderRadius: '3px'
+                      opacity: 0.5,
+                      borderRadius: '2px'
                     }} />
 
                     <div style={{ 
                       display: 'flex', 
-                      gap: '1rem', 
+                      gap: isMobile ? '0.75rem' : '1rem', 
                       alignItems: 'flex-start',
                       paddingLeft: '0.5rem'
                     }}>
                       <div style={{
-                        width: '40px',
-                        height: '40px',
-                        borderRadius: '12px',
-                        background: `linear-gradient(135deg, ${getPriorityColor(notification.priority)} 0%, ${getPriorityColor(notification.priority)}CC 100%)`,
+                        width: isMobile ? '32px' : '36px',
+                        height: isMobile ? '32px' : '36px',
+                        borderRadius: '10px',
+                        background: `linear-gradient(135deg, ${getPriorityColor(notification.priority)}15 0%, ${getPriorityColor(notification.priority)}08 100%)`,
+                        border: `0.5px solid ${getPriorityColor(notification.priority)}20`,
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
                         flexShrink: 0,
-                        boxShadow: `0 4px 12px ${getPriorityColor(notification.priority)}44`
+                        color: getPriorityColor(notification.priority)
                       }}>
                         {getIcon(notification.type)}
                       </div>
@@ -420,17 +450,17 @@ export default function NotificationWidget({ db, clientId, currentPage = 'all' }
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <h4 style={{
                           margin: '0 0 0.25rem 0',
-                          fontSize: '0.95rem',
+                          fontSize: isMobile ? '0.85rem' : '0.9rem',
                           fontWeight: '600',
-                          color: '#fff'
+                          color: 'rgba(255, 255, 255, 0.9)'
                         }}>
                           {notification.title}
                         </h4>
                         <p style={{
-                          margin: '0 0 0.75rem 0',
-                          fontSize: '0.875rem',
-                          color: 'rgba(255, 255, 255, 0.7)',
-                          lineHeight: '1.5'
+                          margin: '0 0 0.5rem 0',
+                          fontSize: isMobile ? '0.75rem' : '0.8rem',
+                          color: 'rgba(255, 255, 255, 0.6)',
+                          lineHeight: '1.4'
                         }}>
                           {notification.message}
                         </p>
@@ -443,13 +473,13 @@ export default function NotificationWidget({ db, clientId, currentPage = 'all' }
                         }}>
                           {notification.source === 'smart' && (
                             <span style={{
-                              padding: '0.25rem 0.75rem',
-                              borderRadius: '12px',
-                              background: 'linear-gradient(135deg, rgba(139, 92, 246, 0.2) 0%, rgba(59, 130, 246, 0.2) 100%)',
-                              color: '#8b5cf6',
-                              fontSize: '0.75rem',
+                              padding: '0.15rem 0.5rem',
+                              borderRadius: '8px',
+                              background: 'rgba(139, 92, 246, 0.1)',
+                              color: 'rgba(139, 92, 246, 0.8)',
+                              fontSize: isMobile ? '0.65rem' : '0.7rem',
                               fontWeight: '600',
-                              border: '1px solid rgba(139, 92, 246, 0.3)'
+                              border: '0.5px solid rgba(139, 92, 246, 0.2)'
                             }}>
                               AI Insight
                             </span>
@@ -459,10 +489,10 @@ export default function NotificationWidget({ db, clientId, currentPage = 'all' }
                               display: 'flex',
                               alignItems: 'center',
                               gap: '0.25rem',
-                              fontSize: '0.75rem',
-                              color: 'rgba(255, 255, 255, 0.5)'
+                              fontSize: isMobile ? '0.65rem' : '0.7rem',
+                              color: 'rgba(255, 255, 255, 0.4)'
                             }}>
-                              <CheckCircle size={14} />
+                              <CheckCircle size={12} />
                               Gelezen
                             </span>
                           )}
@@ -472,26 +502,33 @@ export default function NotificationWidget({ db, clientId, currentPage = 'all' }
                       <button
                         onClick={(e) => handleDismiss(e, notification.id)}
                         style={{
-                          width: '32px',
-                          height: '32px',
-                          borderRadius: '10px',
+                          width: '28px',
+                          height: '28px',
+                          borderRadius: '8px',
                           border: 'none',
-                          background: 'rgba(255, 255, 255, 0.1)',
+                          background: 'transparent',
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
                           cursor: 'pointer',
                           flexShrink: 0,
-                          transition: 'all 0.3s ease'
+                          transition: 'all 0.2s ease',
+                          opacity: 0.5
                         }}
                         onMouseEnter={(e) => {
-                          e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)';
+                          if (!isMobile) {
+                            e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)';
+                            e.currentTarget.style.opacity = '1';
+                          }
                         }}
                         onMouseLeave={(e) => {
-                          e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)';
+                          if (!isMobile) {
+                            e.currentTarget.style.background = 'transparent';
+                            e.currentTarget.style.opacity = '0.5';
+                          }
                         }}
                       >
-                        <X size={16} style={{ color: 'rgba(255, 255, 255, 0.6)' }} />
+                        <X size={14} style={{ color: 'rgba(255, 255, 255, 0.6)' }} />
                       </button>
                     </div>
                   </div>
@@ -504,30 +541,9 @@ export default function NotificationWidget({ db, clientId, currentPage = 'all' }
 
       {/* Animations */}
       <style>{`
-        @keyframes bellPulse {
-          0%, 100% { 
-            transform: scale(1);
-          }
-          50% { 
-            transform: scale(1.05);
-          }
-        }
-
-        @keyframes badgeBounce {
-          0% { 
-            transform: scale(0);
-          }
-          50% { 
-            transform: scale(1.2);
-          }
-          100% { 
-            transform: scale(1);
-          }
-        }
-
         @keyframes slideInUp {
           from {
-            transform: translateY(100px);
+            transform: translateY(20px);
             opacity: 0;
           }
           to {
@@ -538,7 +554,7 @@ export default function NotificationWidget({ db, clientId, currentPage = 'all' }
 
         @keyframes slideInRight {
           from {
-            transform: translateX(50px);
+            transform: translateX(20px);
             opacity: 0;
           }
           to {
@@ -553,7 +569,7 @@ export default function NotificationWidget({ db, clientId, currentPage = 'all' }
             opacity: 1;
           }
           to {
-            transform: translateX(50px);
+            transform: translateX(20px);
             opacity: 0;
           }
         }

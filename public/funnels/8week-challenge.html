@@ -1,0 +1,1016 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>MY ARC - Transform Je Lichaam in 8 Weken</title>
+    <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+    <style>
+        * { 
+            margin: 0; 
+            padding: 0; 
+            box-sizing: border-box; 
+        }
+        
+        :root {
+            --vh: 1vh;
+            --primary-green: #10b981;
+            --primary-dark: #059669;
+            --danger-red: #ef4444;
+            --dark-bg: #000;
+            --dark-card: #111;
+            --dark-border: #333;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(180deg, var(--dark-bg) 0%, #1a1a1a 100%);
+            color: #fff;
+            overflow: hidden;
+            height: 100vh;
+            height: calc(var(--vh, 1vh) * 100);
+            position: fixed;
+            width: 100vw;
+            -webkit-overflow-scrolling: touch;
+            touch-action: manipulation;
+        }
+        
+        .funnel-container {
+            width: 100vw;
+            height: 100vh;
+            height: calc(var(--vh, 1vh) * 100);
+            position: relative;
+        }
+        
+        .slide {
+            width: 100%;
+            height: 100%;
+            height: calc(var(--vh, 1vh) * 100);
+            padding: clamp(1rem, 4vw, 2rem);
+            display: none;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            position: relative;
+            background: linear-gradient(135deg, var(--dark-bg) 0%, var(--dark-card) 100%);
+            overflow-y: auto;
+            -webkit-overflow-scrolling: touch;
+        }
+        
+        .slide.active {
+            display: flex;
+            animation: slideIn 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .slide h1 {
+            font-size: clamp(2.5rem, 8vw, 4rem);
+            font-weight: 900;
+            background: linear-gradient(135deg, var(--primary-green) 0%, #34d399 100%);
+            background-clip: text;
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: clamp(1rem, 3vw, 2rem);
+            letter-spacing: -0.03em;
+            line-height: 1.1;
+        }
+        
+        .slide h2 {
+            font-size: clamp(1.8rem, 6vw, 2.8rem);
+            font-weight: 700;
+            color: var(--primary-green);
+            margin-bottom: clamp(1rem, 3vw, 2rem);
+            line-height: 1.2;
+        }
+        
+        .slide h3 {
+            font-size: clamp(1.4rem, 4vw, 2rem);
+            font-weight: 600;
+            color: #fff;
+            margin-bottom: clamp(1rem, 2vw, 1.5rem);
+        }
+        
+        .slide p {
+            font-size: clamp(1.1rem, 3.5vw, 1.4rem);
+            line-height: 1.6;
+            color: rgba(255, 255, 255, 0.8);
+            max-width: clamp(300px, 85vw, 700px);
+            margin: 0 auto clamp(1rem, 2vw, 1.5rem);
+        }
+        
+        .cta-button {
+            background: linear-gradient(135deg, var(--primary-green) 0%, var(--primary-dark) 100%);
+            border: none;
+            padding: clamp(1.25rem, 4vw, 1.75rem) clamp(2rem, 6vw, 3rem);
+            border-radius: 16px;
+            color: #fff;
+            font-size: clamp(1.1rem, 3.5vw, 1.4rem);
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            box-shadow: 0 10px 30px rgba(16, 185, 129, 0.3);
+            margin: clamp(1.5rem, 4vw, 2.5rem) 0;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            position: relative;
+            overflow: hidden;
+            touch-action: manipulation;
+            -webkit-tap-highlight-color: transparent;
+            min-height: 48px;
+            width: 100%;
+            max-width: clamp(280px, 80vw, 400px);
+        }
+        
+        .cta-button::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+            transition: left 0.6s;
+        }
+        
+        .cta-button:hover::before {
+            left: 100%;
+        }
+        
+        .cta-button:hover {
+            transform: translateY(-2px) scale(1.02);
+            box-shadow: 0 15px 40px rgba(16, 185, 129, 0.4);
+        }
+        
+        .cta-button:active {
+            transform: translateY(-1px) scale(0.98);
+        }
+        
+        .problem-grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: clamp(1rem, 3vw, 1.5rem);
+            margin: clamp(2rem, 4vw, 3rem) 0;
+            width: 100%;
+            max-width: 900px;
+        }
+        
+        .problem-card {
+            background: linear-gradient(135deg, rgba(239, 68, 68, 0.1) 0%, rgba(220, 38, 38, 0.05) 100%);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(239, 68, 68, 0.3);
+            border-radius: 16px;
+            padding: clamp(1.5rem, 4vw, 2rem);
+            text-align: left;
+            transition: all 0.3s ease;
+            position: relative;
+        }
+        
+        .problem-card:hover {
+            transform: translateY(-3px);
+            border-color: rgba(239, 68, 68, 0.5);
+            box-shadow: 0 15px 30px rgba(239, 68, 68, 0.2);
+        }
+        
+        .problem-card h4 {
+            color: var(--danger-red);
+            font-size: clamp(1.2rem, 3.5vw, 1.5rem);
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            font-weight: 700;
+        }
+        
+        .problem-card p {
+            color: rgba(255, 255, 255, 0.7);
+            font-size: clamp(1rem, 3vw, 1.2rem);
+            text-align: left;
+            margin: 0;
+        }
+        
+        .solution-features {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(clamp(200px, 40vw, 250px), 1fr));
+            gap: clamp(1rem, 3vw, 1.5rem);
+            margin: clamp(2rem, 4vw, 3rem) 0;
+            width: 100%;
+            max-width: 800px;
+        }
+        
+        .feature-card {
+            background: linear-gradient(135deg, rgba(16, 185, 129, 0.1) 0%, rgba(16, 185, 129, 0.05) 100%);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(16, 185, 129, 0.2);
+            border-radius: 16px;
+            padding: clamp(1.5rem, 4vw, 2rem);
+            text-align: center;
+            transition: all 0.3s ease;
+            position: relative;
+        }
+        
+        .feature-card:hover {
+            transform: translateY(-3px);
+            border-color: rgba(16, 185, 129, 0.4);
+            box-shadow: 0 15px 30px rgba(16, 185, 129, 0.2);
+        }
+        
+        .feature-icon {
+            width: clamp(48px, 12vw, 64px);
+            height: clamp(48px, 12vw, 64px);
+            margin: 0 auto 1rem;
+            color: var(--primary-green);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .feature-card h4 {
+            color: var(--primary-green);
+            font-size: clamp(1.1rem, 3vw, 1.3rem);
+            margin-bottom: 0.75rem;
+            font-weight: 700;
+        }
+        
+        .testimonial-card {
+            background: linear-gradient(135deg, rgba(17, 17, 17, 0.9) 0%, rgba(17, 17, 17, 0.7) 100%);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 20px;
+            padding: clamp(2rem, 5vw, 3rem);
+            margin: clamp(2rem, 4vw, 3rem) auto;
+            max-width: clamp(300px, 85vw, 600px);
+            position: relative;
+        }
+        
+        .testimonial-card::before {
+            content: '';
+            position: absolute;
+            top: -2px;
+            left: 20px;
+            width: 32px;
+            height: 32px;
+            background: var(--primary-green);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .testimonial-text {
+            font-size: clamp(1.1rem, 3.5vw, 1.4rem);
+            font-style: italic;
+            line-height: 1.6;
+            margin-bottom: 1.5rem;
+            color: rgba(255, 255, 255, 0.9);
+        }
+        
+        .testimonial-author {
+            font-weight: 600;
+            color: var(--primary-green);
+            text-align: right;
+            font-size: clamp(0.9rem, 2.5vw, 1.1rem);
+        }
+        
+        .price-container {
+            background: linear-gradient(135deg, rgba(16, 185, 129, 0.15) 0%, rgba(16, 185, 129, 0.05) 100%);
+            backdrop-filter: blur(20px);
+            border: 2px solid var(--primary-green);
+            border-radius: 20px;
+            padding: clamp(2rem, 6vw, 3rem);
+            margin: clamp(2rem, 4vw, 3rem) auto;
+            max-width: clamp(320px, 85vw, 500px);
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .price-container::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: linear-gradient(45deg, transparent, rgba(16, 185, 129, 0.1), transparent);
+            animation: shimmer 3s infinite linear;
+        }
+        
+        @keyframes shimmer {
+            0% { transform: translateX(-100%) translateY(-100%) rotate(45deg); }
+            100% { transform: translateX(100%) translateY(100%) rotate(45deg); }
+        }
+        
+        .price-badge {
+            background: var(--danger-red);
+            color: #fff;
+            padding: 0.75rem 1.5rem;
+            border-radius: 25px;
+            font-size: clamp(0.9rem, 2.5vw, 1.1rem);
+            font-weight: 700;
+            margin-bottom: 1rem;
+            display: inline-block;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        .price-main {
+            font-size: clamp(3rem, 10vw, 4.5rem);
+            font-weight: 900;
+            color: var(--primary-green);
+            margin: 1rem 0;
+            line-height: 1;
+        }
+        
+        .price-subtitle {
+            font-size: clamp(1rem, 3vw, 1.3rem);
+            color: rgba(255, 255, 255, 0.7);
+            margin-bottom: 2rem;
+        }
+        
+        .guarantee-badge {
+            background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+            color: #fff;
+            padding: 1rem 2rem;
+            border-radius: 50px;
+            font-weight: 700;
+            margin: 1.5rem auto;
+            display: inline-block;
+            box-shadow: 0 10px 25px rgba(245, 158, 11, 0.3);
+            animation: pulse 2s infinite;
+            font-size: clamp(0.9rem, 2.5vw, 1.1rem);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+        }
+        
+        .urgency-timer {
+            background: linear-gradient(135deg, rgba(239, 68, 68, 0.1) 0%, rgba(220, 38, 38, 0.05) 100%);
+            backdrop-filter: blur(10px);
+            border: 2px solid var(--danger-red);
+            border-radius: 16px;
+            padding: clamp(1.5rem, 4vw, 2rem);
+            margin: 2rem auto;
+            max-width: 400px;
+            text-align: center;
+        }
+        
+        .timer-text {
+            color: var(--danger-red);
+            font-weight: 700;
+            font-size: clamp(1.1rem, 3vw, 1.4rem);
+            margin-bottom: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        .timer-display {
+            font-size: clamp(2rem, 6vw, 2.8rem);
+            font-weight: 900;
+            color: #fff;
+            font-family: 'Courier New', monospace;
+        }
+        
+        .progress-indicator {
+            position: fixed;
+            top: 0;
+            left: 0;
+            height: 4px;
+            background: linear-gradient(90deg, var(--primary-green) 0%, #34d399 100%);
+            transition: width 0.3s ease;
+            z-index: 1000;
+        }
+        
+        .slide-nav {
+            position: fixed;
+            bottom: clamp(20px, 5vw, 40px);
+            right: clamp(20px, 5vw, 40px);
+            display: flex;
+            gap: 0.75rem;
+            z-index: 1000;
+        }
+        
+        .nav-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.3);
+            cursor: pointer;
+            transition: all 0.3s ease;
+            touch-action: manipulation;
+        }
+        
+        .nav-dot.active {
+            background: var(--primary-green);
+            transform: scale(1.3);
+            box-shadow: 0 0 15px rgba(16, 185, 129, 0.5);
+        }
+        
+        .form-container {
+            background: linear-gradient(135deg, rgba(17, 17, 17, 0.9) 0%, rgba(17, 17, 17, 0.7) 100%);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(16, 185, 129, 0.3);
+            border-radius: 20px;
+            padding: clamp(2rem, 6vw, 3rem);
+            margin: clamp(2rem, 4vw, 3rem) auto;
+            max-width: clamp(320px, 85vw, 500px);
+        }
+        
+        .form-field {
+            margin-bottom: 1.5rem;
+        }
+        
+        .form-field label {
+            display: block;
+            margin-bottom: 0.75rem;
+            color: var(--primary-green);
+            font-weight: 600;
+            font-size: clamp(0.9rem, 2.5vw, 1.1rem);
+        }
+        
+        .form-field input {
+            width: 100%;
+            padding: clamp(1rem, 3vw, 1.25rem);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 12px;
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(10px);
+            color: #fff;
+            font-size: clamp(1rem, 3vw, 1.1rem);
+            transition: all 0.3s ease;
+            min-height: 48px;
+        }
+        
+        .form-field input:focus {
+            outline: none;
+            border-color: var(--primary-green);
+            box-shadow: 0 0 20px rgba(16, 185, 129, 0.3);
+            background: rgba(255, 255, 255, 0.08);
+        }
+        
+        .form-field input::placeholder {
+            color: rgba(255, 255, 255, 0.5);
+        }
+        
+        /* Mobile Responsive */
+        @media (max-width: 768px) {
+            .problem-grid { 
+                grid-template-columns: 1fr; 
+                gap: 1rem;
+            }
+            
+            .solution-features { 
+                grid-template-columns: repeat(2, 1fr);
+                gap: 1rem;
+            }
+            
+            .slide {
+                padding: 1rem;
+                justify-content: flex-start;
+                padding-top: 2rem;
+            }
+            
+            .cta-button {
+                width: 100%;
+                max-width: none;
+                margin: 2rem 0;
+            }
+            
+            .slide-nav {
+                bottom: 15px;
+                right: 50%;
+                transform: translateX(50%);
+                gap: 0.5rem;
+            }
+            
+            .nav-dot {
+                width: 10px;
+                height: 10px;
+            }
+        }
+        
+        @media (max-width: 480px) {
+            .solution-features {
+                grid-template-columns: 1fr;
+            }
+            
+            .feature-card,
+            .problem-card {
+                padding: 1.25rem;
+            }
+        }
+        
+        /* Touch improvements */
+        @media (hover: none) and (pointer: coarse) {
+            .problem-card:hover,
+            .feature-card:hover,
+            .cta-button:hover {
+                transform: none;
+            }
+            
+            .cta-button:active {
+                transform: scale(0.98);
+            }
+        }
+        
+        /* Prevent zoom on input focus (iOS) */
+        @media screen and (-webkit-min-device-pixel-ratio: 0) {
+            .form-field input {
+                font-size: 16px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="progress-indicator" id="progress-bar"></div>
+    
+    <div class="funnel-container">
+        <!-- Slide 1: Hook - Problem Awareness -->
+        <div class="slide active">
+            <h1>Ben jij het zat?</h1>
+            <div class="problem-grid">
+                <div class="problem-card">
+                    <h4>
+                        <i data-lucide="refresh-ccw"></i>
+                        Elke keer beginnen...
+                    </h4>
+                    <p>Je start vol goede moed, maar na 2 weken ben je alweer gestopt.</p>
+                </div>
+                <div class="problem-card">
+                    <h4>
+                        <i data-lucide="help-circle"></i>
+                        Weet niet hoe...
+                    </h4>
+                    <p>Zoveel tegenstrijdige informatie. Waar moet je nou beginnen?</p>
+                </div>
+                <div class="problem-card">
+                    <h4>
+                        <i data-lucide="alert-triangle"></i>
+                        Bang om te falen...
+                    </h4>
+                    <p>Wat als het weer niks wordt? Wat zeggen anderen ervan?</p>
+                </div>
+            </div>
+            <p style="font-size: clamp(1.3rem, 4vw, 1.8rem); color: var(--primary-green); font-weight: 600;">
+                Het probleem zit niet aan jou... maar aan je aanpak.
+            </p>
+        </div>
+
+        <!-- Slide 2: Agitate - Paint the Pain -->
+        <div class="slide">
+            <h2>Ik snap het...</h2>
+            <p>Je hebt al van alles geprobeerd. Diëten, sportschoolabonnementen, workout apps, YouTube video's...</p>
+            <p style="font-size: clamp(1.2rem, 4vw, 1.6rem); color: var(--danger-red); font-weight: 600; margin: 2rem 0;">
+                En toch sta je elke ochtend voor de spiegel met hetzelfde gevoel van teleurstelling.
+            </p>
+            <div class="testimonial-card">
+                <div class="testimonial-text">
+                    "Ik had mezelf al opgegeven. Dacht dat ik gewoon niet geschikt was voor fitness. Totdat ik begreep dat het niet aan mij lag, maar aan het systeem dat ik gebruikte."
+                </div>
+                <div class="testimonial-author">- Mark, 34 jaar</div>
+            </div>
+            <p>Het probleem is niet je motivatie. Het probleem is dat je geen <strong style="color: var(--primary-green);">bewezen systeem</strong> hebt.</p>
+        </div>
+
+        <!-- Slide 3: Solution - Introduce MY ARC -->
+        <div class="slide">
+            <h1>MY ARC</h1>
+            <h2>Het systeem dat wél werkt</h2>
+            <div class="solution-features">
+                <div class="feature-card">
+                    <div class="feature-icon">
+                        <i data-lucide="target"></i>
+                    </div>
+                    <h4>Persoonlijk Plan</h4>
+                    <p>Voor jouw leven, niet voor iemand anders</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">
+                        <i data-lucide="smartphone"></i>
+                    </div>
+                    <h4>App Begeleiding</h4>
+                    <p>Alles in één systeem, altijd bij je</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">
+                        <i data-lucide="user-check"></i>
+                    </div>
+                    <h4>Persoonlijke Coach</h4>
+                    <p>1-op-1 begeleiding wanneer je het nodig hebt</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">
+                        <i data-lucide="trophy"></i>
+                    </div>
+                    <h4>Bewezen Resultaten</h4>
+                    <p>Honderden succesvolle transformaties</p>
+                </div>
+            </div>
+            <p>Geen giswerk meer. Geen twijfels meer. Eindelijk een systeem dat écht werkt.</p>
+        </div>
+
+        <!-- Slide 4: Social Proof -->
+        <div class="slide">
+            <h2>Echte Resultaten van Echte Mannen</h2>
+            <div class="testimonial-card">
+                <div class="testimonial-text">
+                    "In 8 weken 12 kg kwijt. Nog nooit zo gemakkelijk gevoeld. Het systeem werkt echt als je het volgt."
+                </div>
+                <div class="testimonial-author">- Tim, 28 jaar | -12kg in 8 weken</div>
+            </div>
+            <div class="testimonial-card">
+                <div class="testimonial-text">
+                    "Eindelijk een aanpak die bij mijn drukke leven past. Geen uren in de sportschool, gewoon slim trainen."
+                </div>
+                <div class="testimonial-author">- Dennis, 41 jaar | +8kg spieren in 12 weken</div>
+            </div>
+            <div class="testimonial-card">
+                <div class="testimonial-text">
+                    "Voor het eerst in jaren kijk ik weer met vertrouwen in de spiegel. MY ARC heeft mijn leven veranderd."
+                </div>
+                <div class="testimonial-author">- Kevin, 35 jaar | Complete lifestyle transformatie</div>
+            </div>
+        </div>
+
+        <!-- Slide 5: Challenge Offer -->
+        <div class="slide">
+            <h1>8-Weken Transformatie Challenge</h1>
+            <div class="price-container">
+                <div class="price-badge">Beperkte Tijd</div>
+                <h3>Win Je Geld Terug Garantie</h3>
+                <div class="price-main">€497</div>
+                <div class="price-subtitle">Eenmalige investering - Volledige terugbetaling mogelijk</div>
+                <div class="guarantee-badge">
+                    <i data-lucide="shield-check" style="display: inline; width: 20px; height: 20px; margin-right: 8px;"></i>
+                    100% Geld Terug Bij Succes
+                </div>
+            </div>
+            <p style="font-size: clamp(1.2rem, 3.5vw, 1.4rem); margin: 2rem 0;">
+                <strong>Zo werkt het:</strong> Betaal €497, volg het programma 8 weken, 
+                en krijg je <span style="color: var(--primary-green);">volledige investering terug</span> 
+                als je de eenvoudige actievoorwaarden voltooit.
+            </p>
+        </div>
+
+        <!-- Slide 6: How It Works -->
+        <div class="slide">
+            <h2>Hoe Het Werkt</h2>
+            <div class="solution-features">
+                <div class="feature-card">
+                    <div class="feature-icon">
+                        <i data-lucide="clipboard-list"></i>
+                    </div>
+                    <h4>Jouw Plan</h4>
+                    <p>We maken samen een realistisch 8-weken doel</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">
+                        <i data-lucide="zap"></i>
+                    </div>
+                    <h4>Simpele Regels</h4>
+                    <p>3x per week trainen + voeding loggen</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">
+                        <i data-lucide="calendar-check"></i>
+                    </div>
+                    <h4>Wekelijkse Check</h4>
+                    <p>Elke vrijdag: weging + voortgangsfoto</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">
+                        <i data-lucide="phone-call"></i>
+                    </div>
+                    <h4>Coaching Calls</h4>
+                    <p>6 persoonlijke sessies voor support</p>
+                </div>
+            </div>
+            <div style="background: rgba(16, 185, 129, 0.1); backdrop-filter: blur(10px); border: 2px solid var(--primary-green); border-radius: 15px; padding: 2rem; margin: 2rem 0;">
+                <p style="color: var(--primary-green); font-weight: 700; font-size: clamp(1.2rem, 3.5vw, 1.4rem);">
+                    <i data-lucide="check-circle" style="display: inline; width: 24px; height: 24px; margin-right: 8px;"></i>
+                    Voltooi alle voorwaarden = €497 retour + je transformatie!
+                </p>
+            </div>
+        </div>
+
+        <!-- Slide 7: Urgency & Scarcity -->
+        <div class="slide">
+            <h2>Laatste Kans Deze Maand</h2>
+            <div class="urgency-timer">
+                <div class="timer-text">
+                    <i data-lucide="clock" style="display: inline; width: 20px; height: 20px; margin-right: 8px;"></i>
+                    Actie Eindigt Over:
+                </div>
+                <div class="timer-display" id="countdown">02:14:37</div>
+            </div>
+            <p style="font-size: clamp(1.2rem, 3.5vw, 1.4rem); color: var(--danger-red); font-weight: 600; margin: 2rem 0;">
+                Ik neem slechts <strong>10 nieuwe mensen</strong> aan per maand. 
+                Waarom? Omdat ik persoonlijk bij elke transformatie betrokken ben.
+            </p>
+            <div class="testimonial-card" style="border-color: var(--danger-red);">
+                <div class="testimonial-text">
+                    "Ik twijfelde eerst omdat het vol zat. Best blij dat ik heb gewacht op een plekje. 
+                    Kersten geeft echt persoonlijke aandacht aan iedereen."
+                </div>
+                <div class="testimonial-author">- Rick, 31 jaar</div>
+            </div>
+            <p>De laatste 3 plekken voor deze maand zijn beschikbaar...</p>
+        </div>
+
+        <!-- Slide 8: Final CTA -->
+        <div class="slide">
+            <h1>Klaar Voor Jouw Transformatie?</h1>
+            <div class="price-container">
+                <h3 style="margin-bottom: 1rem;">8-Weken Transformatie Challenge</h3>
+                <div style="display: flex; align-items: center; justify-content: center; gap: 1rem; margin: 1rem 0; flex-wrap: wrap;">
+                    <span style="font-size: 1.5rem; text-decoration: line-through; color: rgba(255,255,255,0.5);">€797</span>
+                    <div class="price-main" style="margin: 0;">€497</div>
+                </div>
+                <div class="guarantee-badge">
+                    <i data-lucide="award" style="display: inline; width: 20px; height: 20px; margin-right: 8px;"></i>
+                    Win Je Geld Terug
+                </div>
+                <button class="cta-button" onclick="showForm()">
+                    <i data-lucide="rocket" style="display: inline; width: 20px; height: 20px; margin-right: 8px;"></i>
+                    Start Mijn Transformatie Nu
+                </button>
+            </div>
+            <p style="font-size: 1rem; color: rgba(255,255,255,0.6); margin-top: 2rem;">
+                <i data-lucide="check" style="display: inline; width: 16px; height: 16px; margin-right: 4px;"></i> Persoonlijk plan 
+                <i data-lucide="check" style="display: inline; width: 16px; height: 16px; margin: 0 4px 0 12px;"></i> MY ARC app 
+                <i data-lucide="check" style="display: inline; width: 16px; height: 16px; margin: 0 4px 0 12px;"></i> 1-op-1 coaching 
+                <i data-lucide="check" style="display: inline; width: 16px; height: 16px; margin: 0 4px 0 12px;"></i> Geld terug garantie
+            </p>
+        </div>
+
+        <!-- Slide 9: Form -->
+        <div class="slide">
+            <h2>Claim Je Plek Nu</h2>
+            <div class="form-container">
+                <form id="signup-form">
+                    <div class="form-field">
+                        <label>
+                            <i data-lucide="user" style="display: inline; width: 16px; height: 16px; margin-right: 8px;"></i>
+                            Voornaam
+                        </label>
+                        <input type="text" name="firstname" required placeholder="Je voornaam">
+                    </div>
+                    <div class="form-field">
+                        <label>
+                            <i data-lucide="mail" style="display: inline; width: 16px; height: 16px; margin-right: 8px;"></i>
+                            Email
+                        </label>
+                        <input type="email" name="email" required placeholder="je@email.nl">
+                    </div>
+                    <div class="form-field">
+                        <label>
+                            <i data-lucide="phone" style="display: inline; width: 16px; height: 16px; margin-right: 8px;"></i>
+                            Telefoon
+                        </label>
+                        <input type="tel" name="phone" required placeholder="06 - 12 34 56 78">
+                    </div>
+                    <div class="form-field">
+                        <label>
+                            <i data-lucide="target" style="display: inline; width: 16px; height: 16px; margin-right: 8px;"></i>
+                            Wat is je hoofddoel voor de komende 8 weken?
+                        </label>
+                        <input type="text" name="goal" required placeholder="Bijvoorbeeld: 10kg afvallen">
+                    </div>
+                    <button type="submit" class="cta-button" style="width: 100%; margin: 2rem 0 0 0;">
+                        <i data-lucide="send" style="display: inline; width: 20px; height: 20px; margin-right: 8px;"></i>
+                        Verstuur & Claim Mijn Plek
+                    </button>
+                </form>
+            </div>
+            <p style="font-size: 0.9rem; color: rgba(255,255,255,0.6);">
+                Na verzending krijg je binnen 24 uur persoonlijk contact van mij om je transformatie te plannen.
+            </p>
+        </div>
+
+        <!-- Slide 10: Thank You -->
+        <div class="slide">
+            <h1 style="color: var(--primary-green);">
+                <i data-lucide="party-popper" style="display: inline; width: 64px; height: 64px; margin-right: 16px;"></i>
+                Welkom bij MY ARC!
+            </h1>
+            <div style="background: linear-gradient(135deg, rgba(16, 185, 129, 0.15) 0%, rgba(16, 185, 129, 0.05) 100%); backdrop-filter: blur(20px); border: 2px solid var(--primary-green); border-radius: 20px; padding: 3rem; margin: 2rem auto; max-width: 600px;">
+                <h3>Je transformatie begint nu!</h3>
+                <p style="margin: 1.5rem 0; font-size: 1.2rem;">
+                    Binnen 24 uur krijg je een persoonlijk bericht van mij om je 8-weken plan te bespreken.
+                </p>
+                <div style="background: rgba(0,0,0,0.3); border-radius: 10px; padding: 1.5rem; margin: 1.5rem 0;">
+                    <p style="color: var(--primary-green); font-weight: 700; margin-bottom: 1rem;">
+                        <i data-lucide="clipboard-check" style="display: inline; width: 20px; height: 20px; margin-right: 8px;"></i>
+                        Wat gebeurt er nu?
+                    </p>
+                    <p>
+                        <i data-lucide="check" style="display: inline; width: 16px; height: 16px; margin-right: 8px; color: var(--primary-green);"></i> Persoonlijk kennismakingsgesprek<br>
+                        <i data-lucide="check" style="display: inline; width: 16px; height: 16px; margin-right: 8px; color: var(--primary-green);"></i> Je specifieke doelen bepalen<br>
+                        <i data-lucide="check" style="display: inline; width: 16px; height: 16px; margin-right: 8px; color: var(--primary-green);"></i> MY ARC app installatie & uitleg<br>
+                        <i data-lucide="check" style="display: inline; width: 16px; height: 16px; margin-right: 8px; color: var(--primary-green);"></i> Start van je transformatie!
+                    </p>
+                </div>
+            </div>
+            <p style="font-size: 1.1rem; color: rgba(255,255,255,0.8);">
+                Welkom in de MY ARC familie. Je transformatie begint vandaag!
+                <i data-lucide="heart" style="display: inline; width: 20px; height: 20px; margin-left: 8px; color: var(--primary-green);"></i>
+            </p>
+        </div>
+    </div>
+
+    <div class="slide-nav" id="slide-nav">
+        <!-- Navigation dots will be generated by JavaScript -->
+    </div>
+
+    <script>
+        // Initialize Lucide icons
+        lucide.createIcons();
+        
+        let currentSlide = 0;
+        const slides = document.querySelectorAll('.slide');
+        const totalSlides = slides.length;
+
+        // Set viewport height for mobile
+        function setViewportHeight() {
+            const vh = window.innerHeight * 0.01;
+            document.documentElement.style.setProperty('--vh', `${vh}px`);
+        }
+
+        // Generate navigation dots
+        function createNavigation() {
+            const navContainer = document.getElementById('slide-nav');
+            navContainer.innerHTML = '';
+            for (let i = 0; i < totalSlides; i++) {
+                const dot = document.createElement('div');
+                dot.className = 'nav-dot';
+                if (i === 0) dot.classList.add('active');
+                dot.addEventListener('click', () => goToSlide(i));
+                navContainer.appendChild(dot);
+            }
+        }
+
+        // Update progress bar
+        function updateProgress() {
+            const progress = ((currentSlide + 1) / totalSlides) * 100;
+            document.getElementById('progress-bar').style.width = progress + '%';
+        }
+
+        // Show specific slide
+        function showSlide(n) {
+            slides.forEach((slide, index) => {
+                slide.classList.remove('active');
+                const dots = document.querySelectorAll('.nav-dot');
+                if (dots[index]) dots[index].classList.remove('active');
+            });
+            
+            if (slides[n]) {
+                slides[n].classList.add('active');
+                const dots = document.querySelectorAll('.nav-dot');
+                if (dots[n]) dots[n].classList.add('active');
+                updateProgress();
+                
+                // Re-initialize Lucide icons for new slide
+                setTimeout(() => lucide.createIcons(), 100);
+            }
+        }
+
+        // Go to specific slide
+        function goToSlide(n) {
+            if (n >= 0 && n < totalSlides) {
+                currentSlide = n;
+                showSlide(currentSlide);
+            }
+        }
+
+        // Next slide
+        function nextSlide() {
+            if (currentSlide < totalSlides - 1) {
+                currentSlide++;
+                showSlide(currentSlide);
+            }
+        }
+
+        // Previous slide  
+        function prevSlide() {
+            if (currentSlide > 0) {
+                currentSlide--;
+                showSlide(currentSlide);
+            }
+        }
+
+        // Show form (from CTA button)
+        function showForm() {
+            goToSlide(8); // Form is slide 9 (index 8)
+        }
+
+        // Countdown timer
+        function startCountdown() {
+            let timeLeft = 2 * 3600 + 14 * 60 + 37; // 2:14:37 in seconds
+            
+            function updateTimer() {
+                const hours = Math.floor(timeLeft / 3600);
+                const minutes = Math.floor((timeLeft % 3600) / 60);
+                const seconds = timeLeft % 60;
+                
+                const timerElement = document.getElementById('countdown');
+                if (timerElement) {
+                    timerElement.textContent = 
+                        `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+                }
+                
+                if (timeLeft > 0) {
+                    timeLeft--;
+                } else {
+                    timeLeft = 2 * 3600 + 14 * 60 + 37; // Reset timer
+                }
+            }
+            
+            updateTimer();
+            setInterval(updateTimer, 1000);
+        }
+
+        // Form submission
+        document.getElementById('signup-form').addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            // Here you would normally send the data to Shopify
+            const formData = {
+                firstname: this.firstname.value,
+                email: this.email.value,
+                phone: this.phone.value,
+                goal: this.goal.value
+            };
+            
+            console.log('Form submitted:', formData);
+            
+            // Show thank you slide
+            goToSlide(9);
+        });
+
+        // Touch/Swipe support
+        let startX = null;
+        let startY = null;
+
+        document.addEventListener('touchstart', (e) => {
+            startX = e.touches[0].clientX;
+            startY = e.touches[0].clientY;
+        }, { passive: true });
+
+        document.addEventListener('touchend', (e) => {
+            if (!startX || !startY) return;
+            
+            const endX = e.changedTouches[0].clientX;
+            const endY = e.changedTouches[0].clientY;
+            const diffX = startX - endX;
+            const diffY = startY - endY;
+            
+            // Only trigger if horizontal swipe is more significant than vertical
+            if (Math.abs(diffX) > Math.abs(diffY) && Math.abs(diffX) > 50) {
+                if (diffX > 0) {
+                    nextSlide(); // Swipe left = next slide
+                } else {
+                    prevSlide(); // Swipe right = previous slide  
+                }
+            }
+            
+            startX = null;
+            startY = null;
+        }, { passive: true });
+
+        // Keyboard navigation
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'ArrowRight' || e.key === ' ') {
+                e.preventDefault();
+                nextSlide();
+            }
+            if (e.key === 'ArrowLeft') {
+                e.preventDefault();
+                prevSlide();
+            }
+        });
+
+        // Handle resize and orientation change
+        window.addEventListener('resize', setViewportHeight);
+        window.addEventListener('orientationchange', () => {
+            setTimeout(setViewportHeight, 100);
+        });
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', function() {
+            setViewportHeight();
+            createNavigation();
+            updateProgress();
+            startCountdown();
+            lucide.createIcons();
+        });
+    </script>
+</body>
+</html>

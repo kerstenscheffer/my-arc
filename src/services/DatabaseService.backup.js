@@ -5,6 +5,7 @@ import { supabase } from '../lib/supabase'
 import { extendDatabaseService } from './DatabaseServiceOptimized'
 import NotificationService from '../modules/notifications/NotificationService';
 
+import { getAIMealPlanningService } from '../modules/ai-meal-generator/AIMealPlanningService'
 
 
 
@@ -17,7 +18,6 @@ class DatabaseServiceClass {
     this.cache = new Map()
     this.cacheTimeout = 5 * 60 * 1000 // 5 minutes
     this.notifications = new NotificationService(this.supabase);  // GOED - gebruik this.supabase
-
 
 
     // Event subscribers
@@ -80,10 +80,38 @@ class DatabaseServiceClass {
   }
 
   // ===== AUTH METHODS =====
+
+// UPDATE voor getCurrentUser method in DatabaseService.js
+// Vervang de huidige getCurrentUser method met deze versie:
+
 async getCurrentUser() {
   try {
+    // iOS PWA Fix: Check for standalone mode
+    const isStandalone = window.matchMedia('(display-mode: standalone)').matches || 
+                        window.navigator.standalone;
+    
+    if (isStandalone) {
+      console.log('📱 iOS PWA Mode detected - using enhanced auth check');
+    }
+    
     // ALTIJD eerst getSession voor PWA
-    const { data: { session } } = await this.supabase.auth.getSession()
+    const { data: { session }, error: sessionError } = await this.supabase.auth.getSession()
+    
+    if (sessionError) {
+      console.error('Session error:', sessionError);
+      
+      // iOS PWA Fallback: Try to refresh session
+      if (isStandalone) {
+        console.log('🔄 Attempting session refresh for iOS PWA...');
+        const { data: { session: refreshedSession } } = await this.supabase.auth.refreshSession();
+        
+        if (refreshedSession?.user) {
+          console.log('✅ Session refreshed successfully');
+          this.currentUser = refreshedSession.user;
+          return refreshedSession.user;
+        }
+      }
+    }
     
     if (session?.user) {
       console.log('✅ Session found:', session.user.email)
@@ -91,38 +119,88 @@ async getCurrentUser() {
       return session.user
     }
     
-    console.log('❌ No session')
+    // Extra check voor iOS PWA: Check localStorage manual
+    if (isStandalone) {
+      const storedSession = localStorage.getItem('supabase.auth.token');
+      if (storedSession) {
+        console.log('📱 Found stored session in localStorage, attempting recovery...');
+        // Try to set session manually
+        try {
+          const { data: { user } } = await this.supabase.auth.getUser();
+          if (user) {
+            console.log('✅ User recovered from stored session');
+            this.currentUser = user;
+            return user;
+          }
+        } catch (e) {
+          console.error('Failed to recover user:', e);
+        }
+      }
+    }
+    
+    console.log('❌ No session found')
     return null
   } catch (error) {
     console.error('❌ getCurrentUser error:', error)
+    
+    // Don't crash the app - return null
     return null
   }
 }
- 
+
+// Ook update signIn voor betere iOS PWA support:
 async signIn(email, password) {
   try {
+    console.log('🔐 Attempting sign in...')
+    
     const { data, error } = await this.supabase.auth.signInWithPassword({
       email,
       password
     })
     
-    if (error) throw error
-    
-    // Force session refresh voor PWA
-    const { data: { session } } = await this.supabase.auth.getSession()
-    
-    if (session) {
-      console.log('✅ Login successful, session stored')
-      this.currentUser = session.user
+    if (error) {
+      console.error('❌ Sign in error:', error)
+      return { error: error.message }
     }
     
-    this.clearCache()
-    return data
+    if (data.user) {
+      console.log('✅ Sign in successful:', data.user.email)
+      this.currentUser = data.user
+      
+      // iOS PWA Fix: Force session persistence
+      const isStandalone = window.matchMedia('(display-mode: standalone)').matches || 
+                          window.navigator.standalone;
+      
+      if (isStandalone) {
+        console.log('📱 iOS PWA: Ensuring session persistence...');
+        // Force a session refresh to ensure tokens are stored
+        await this.supabase.auth.refreshSession();
+      }
+      
+      return { user: data.user }
+    }
+    
+    return { error: 'No user returned' }
   } catch (error) {
-    console.error('❌ Sign in failed:', error)
-    throw error
+    console.error('❌ Sign in exception:', error)
+    return { error: error.message }
   }
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
   async signOut() {
     try {
       const { error } = await supabase.auth.signOut()
@@ -192,6 +270,14 @@ async verifyPasswordResetToken() {
     return false
   }
 }
+
+async getAIMealService() {
+  if (!this.aiMealService) {
+    const { default: AIMealPlanningService } = await import('../modules/ai-meal-generator/AIMealPlanningService')
+    this.aiMealService = new AIMealPlanningService(this.supabase)
+  }
+  return this.aiMealService
+}
   // ===== CLIENT MANAGEMENT =====
   async getClients(trainerId = null) {
     try {
@@ -241,38 +327,137 @@ async verifyPasswordResetToken() {
     }
   }
 
-  async createClient(clientData, trainerId) {
-    try {
-      const { data, error } = await supabase
-        .from('clients')
-        .insert([{
-          ...clientData,
-          trainer_id: trainerId,
-          status: 'active'
-        }])
-        .select()
-        .single()
-      
-      if (error) throw error
-      
-      this.clearCache('clients')
-      this.emit('clients', await this.getClients())
-      
-      // Generate temp password
-      const tempPassword = `Welcome${Math.floor(Math.random() * 10000)}!`
-      
-      return {
-        client: data,
-        loginCredentials: {
-          email: clientData.email,
-          password: tempPassword
+// Vervang de createClient method in DatabaseService.js met deze versie:
+
+async createClient(clientData, trainerId) {
+  try {
+    console.log('📝 Creating client with data:', clientData)
+    
+    // Generate temp password
+    const tempPassword = `Welcome${Math.floor(Math.random() * 9000) + 1000}!`
+    
+    // Save current coach session
+    const { data: { session: coachSession } } = await supabase.auth.getSession()
+    if (!coachSession) {
+      throw new Error('No coach session found')
+    }
+    
+    console.log('📌 Current coach ID:', coachSession.user.id)
+    
+    // Create auth user with regular signup (admin API not available)
+    const { data: authData, error: authError } = await supabase.auth.signUp({
+      email: clientData.email,
+      password: tempPassword,
+      options: {
+        emailRedirectTo: window.location.origin,
+        data: {
+          first_name: clientData.first_name,
+          last_name: clientData.last_name,
+          role: 'client'
         }
       }
-    } catch (error) {
-      console.error('❌ Create client failed:', error)
+    })
+    
+    if (authError) {
+      console.error('Auth signup error:', authError)
+      throw authError
+    }
+    
+    if (!authData.user) {
+      throw new Error('User creation failed - no user returned')
+    }
+    
+    console.log('✅ Auth user created:', authData.user.id)
+    
+    // IMPORTANT: Immediately restore coach session after signup
+    console.log('🔄 Restoring coach session...')
+    const { error: sessionError } = await supabase.auth.setSession({
+      access_token: coachSession.access_token,
+      refresh_token: coachSession.refresh_token
+    })
+    
+    if (sessionError) {
+      console.error('Session restore error:', sessionError)
+    } else {
+      console.log('✅ Coach session restored')
+    }
+    
+    // Create client record in database
+    const { data, error } = await supabase
+      .from('clients')
+      .insert([{
+        id: authData.user.id,
+        auth_user_id: authData.user.id,
+        email: clientData.email,
+        first_name: clientData.first_name || '',
+        last_name: clientData.last_name || '',
+        phone: clientData.phone || null,
+        goal: clientData.primary_goal || null,
+        experience: clientData.experience_level || null,
+        trainer_id: trainerId,
+        coach_id: trainerId,
+        status: 'active',
+        created_at: new Date().toISOString(),
+        activated_at: new Date().toISOString()
+      }])
+      .select()
+      .single()
+    
+    if (error) {
+      console.error('Database insert error:', error)
       throw error
     }
+    
+    console.log('✅ Client record created:', data)
+    
+    // Clear cache and emit update
+    this.clearCache('clients')
+    
+    // Get fresh clients list
+    const updatedClients = await this.getClients()
+    this.emit('clients', updatedClients)
+    
+    // Return with credentials
+    return {
+      success: true,
+      client: data,
+      loginCredentials: {
+        email: clientData.email,
+        password: tempPassword,
+        message: 'Client kan direct inloggen met deze gegevens'
+      }
+    }
+    
+  } catch (error) {
+    console.error('❌ Create client failed:', error)
+    
+    // Try to restore coach session if something went wrong
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session || session.user.email !== clientData.email) {
+        console.log('Session check OK - still logged in as coach')
+      } else {
+        console.log('⚠️ Session switched to new client - attempting restore...')
+        // May need to re-login coach here
+      }
+    } catch (e) {
+      console.error('Session check failed:', e)
+    }
+    
+    throw error
   }
+}
+
+
+
+
+
+
+
+
+
+
+
 
   async updateClient(clientId, updates) {
     try {
@@ -315,7 +500,59 @@ async verifyPasswordResetToken() {
 
 
 
+// Voeg deze method toe aan DatabaseService.js als hij nog niet bestaat:
 
+async deleteClient(clientId) {
+  try {
+    console.log('🗑️ Deleting client:', clientId)
+    
+    // First, get the client to find their auth_user_id
+    const { data: clientData, error: fetchError } = await supabase
+      .from('clients')
+      .select('auth_user_id, email')
+      .eq('id', clientId)
+      .single()
+    
+    if (fetchError) {
+      console.error('Error fetching client:', fetchError)
+      throw fetchError
+    }
+    
+    // Delete client record from database
+    const { error: deleteError } = await supabase
+      .from('clients')
+      .delete()
+      .eq('id', clientId)
+    
+    if (deleteError) {
+      console.error('Error deleting client record:', deleteError)
+      throw deleteError
+    }
+    
+    // Optional: Try to delete auth user (may require admin privileges)
+    if (clientData?.auth_user_id) {
+      try {
+        // This might fail if you don't have admin access
+        await supabase.auth.admin.deleteUser(clientData.auth_user_id)
+        console.log('✅ Auth user also deleted')
+      } catch (authError) {
+        console.log('⚠️ Could not delete auth user (admin access needed):', authError)
+        // Continue anyway - client record is deleted
+      }
+    }
+    
+    console.log('✅ Client deleted successfully')
+    
+    // Clear cache and emit update
+    this.clearCache('clients')
+    this.emit('clients', await this.getClients())
+    
+    return { success: true }
+  } catch (error) {
+    console.error('❌ Delete client failed:', error)
+    throw error
+  }
+}
 
 
 
@@ -989,6 +1226,15 @@ async getPersonalExercises(clientId) {
 
 
 // ========== INGREDIENTS METHODS ==========
+
+
+
+
+
+
+
+
+
 async searchIngredients(searchTerm) {
   try {
     if (!searchTerm || searchTerm.trim() === '') {
@@ -6629,73 +6875,244 @@ async deleteGoal(goalId) {
   }
 
   // ===== COACH VIDEOS =====
-  async getCoachVideos(coachId, category = null) {
-    try {
-      let query = this.supabase
-        .from('coach_videos')
-        .select('*')
-        .eq('is_active', true)
-        .or(`coach_id.eq.${coachId},is_featured.eq.true`)
-        .order('order_index', { ascending: true })
-      
-      if (category && category !== 'all') {
-        query = query.eq('category', category)
-      }
-      
-      const { data, error } = await query.limit(20)
-      
-      if (error) throw error
-      
-      return data || []
-    } catch (error) {
-      console.error('Error getting coach videos:', error)
-      return []
-    }
-  }
+ 
 
-  async getFeaturedVideos(limit = 5) {
-    try {
-      const { data, error } = await this.supabase
-        .from('coach_videos')
-        .select('*')
-        .eq('is_active', true)
-        .eq('is_featured', true)
-        .order('order_index', { ascending: true })
-        .limit(limit)
-      
-      if (error) throw error
-      
-      return data || []
-    } catch (error) {
-      console.error('Error getting featured videos:', error)
-      return []
-    }
-  }
 
-  async incrementVideoView(videoId) {
-    try {
-      // First get current view count
-      const { data: video } = await this.supabase
+
+// ===== ADD DEZE MISSENDE VIDEO METHODS AAN DatabaseService.js =====
+// BEHOUD je bestaande getCoachVideos, getFeaturedVideos, incrementVideoView!
+// Voeg alleen deze toe:
+
+// Create new video
+async createVideo(videoData) {
+  try {
+    const { data, error } = await this.supabase
+      .from('coach_videos')
+      .insert([{
+        coach_id: videoData.coach_id,
+        title: videoData.title,
+        description: videoData.description,
+        video_url: videoData.video_url,
+        thumbnail_url: videoData.thumbnail_url,
+        category: videoData.category,
+        tags: videoData.tags || [],
+        duration_seconds: videoData.duration_seconds,
+        difficulty_level: videoData.difficulty_level || 'beginner',
+        best_time_to_watch: videoData.best_time_to_watch || 'anytime',
+        page_context: videoData.page_context,
+        is_active: true,
+        is_featured: false,
+        view_count: 0,
+        like_count: 0
+      }])
+      .select()
+      .single()
+
+    if (error) throw error
+    return { success: true, data }
+  } catch (error) {
+    console.error('❌ Error creating video:', error)
+    return { success: false, error: error.message }
+  }
+}
+
+// Delete video (soft delete)
+async deleteVideo(videoId) {
+  try {
+    const { error } = await this.supabase
+      .from('coach_videos')
+      .update({ 
+        is_active: false,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', videoId)
+
+    if (error) throw error
+    return { success: true }
+  } catch (error) {
+    console.error('❌ Error deleting video:', error)
+    return { success: false, error: error.message }
+  }
+}
+
+// Assign video to clients
+async assignVideoToClients(videoId, clientIds, assignmentData = {}) {
+  try {
+    const assignments = clientIds.map(clientId => ({
+      video_id: videoId,
+      client_id: clientId,
+      assigned_by: assignmentData.assigned_by,
+      assignment_type: assignmentData.type || 'manual',
+      scheduled_for: assignmentData.scheduledFor || new Date().toISOString().split('T')[0],
+      time_of_day: assignmentData.timeOfDay || 'anytime',
+      page_context: assignmentData.pageContext || 'home',
+      context_data: assignmentData.contextData || {},
+      notes: assignmentData.notes || '',
+      status: 'assigned',
+      created_at: new Date().toISOString()
+    }))
+
+    const { data, error } = await this.supabase
+      .from('video_assignments')
+      .insert(assignments)
+      .select()
+
+    if (error) throw error
+    return { success: true, data }
+  } catch (error) {
+    console.error('❌ Error assigning video:', error)
+    return { success: false, error: error.message }
+  }
+}
+
+// Get video assignments for a specific video
+async getVideoAssignments(videoId) {
+  try {
+    const { data, error } = await this.supabase
+      .from('video_assignments')
+      .select(`
+        *,
+        client:clients(id, first_name, last_name, email)
+      `)
+      .eq('video_id', videoId)
+      .order('created_at', { ascending: false })
+
+    if (error) throw error
+    return data || []
+  } catch (error) {
+    console.error('❌ Error fetching video assignments:', error)
+    return []
+  }
+}
+
+// Remove assignment
+async removeVideoAssignment(assignmentId) {
+  try {
+    const { error } = await this.supabase
+      .from('video_assignments')
+      .delete()
+      .eq('id', assignmentId)
+
+    if (error) throw error
+    return { success: true }
+  } catch (error) {
+    console.error('❌ Error removing assignment:', error)
+    return { success: false, error: error.message }
+  }
+}
+
+// Upload video thumbnail to storage
+async uploadVideoThumbnail(file, coachId) {
+  try {
+    // Create unique filename
+    const fileExt = file.name.split('.').pop()
+    const fileName = `${coachId}/${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`
+    
+    // Upload to storage
+    const { data, error } = await this.supabase.storage
+      .from('video-thumbnails')
+      .upload(fileName, file, {
+        cacheControl: '3600',
+        upsert: false
+      })
+
+    if (error) throw error
+
+    // Get public URL
+    const { data: { publicUrl } } = this.supabase.storage
+      .from('video-thumbnails')
+      .getPublicUrl(fileName)
+
+    return { success: true, thumbnailUrl: publicUrl }
+  } catch (error) {
+    console.error('❌ Error uploading thumbnail:', error)
+    return { success: false, error: error.message }
+  }
+}
+
+
+
+
+
+
+// Voeg ALLEEN deze toe aan DatabaseService.js als ze ontbreken
+// Je VideoService.js doet het meeste werk al!
+
+// Voor compatibiliteit met andere delen van de app
+async getCoachVideos(coachId, category = null) {
+  try {
+    let query = this.supabase
+      .from('coach_videos')
+      .select('*')
+      .eq('is_active', true)
+      .or(`coach_id.eq.${coachId},is_featured.eq.true`)
+      .order('order_index', { ascending: true })
+    
+    if (category && category !== 'all') {
+      query = query.eq('category', category)
+    }
+    
+    const { data, error } = await query.limit(20)
+    
+    if (error) throw error
+    
+    return data || []
+  } catch (error) {
+    console.error('Error getting coach videos:', error)
+    return []
+  }
+}
+
+// Als deze ook ontbreekt
+async getFeaturedVideos(limit = 5) {
+  try {
+    const { data, error } = await this.supabase
+      .from('coach_videos')
+      .select('*')
+      .eq('is_active', true)
+      .eq('is_featured', true)
+      .order('order_index', { ascending: true })
+      .limit(limit)
+    
+    if (error) throw error
+    
+    return data || []
+  } catch (error) {
+    console.error('Error getting featured videos:', error)
+    return []
+  }
+}
+
+// Als deze ook ontbreekt
+async incrementVideoView(videoId) {
+  try {
+    const { data: video } = await this.supabase
+      .from('coach_videos')
+      .select('view_count')
+      .eq('id', videoId)
+      .single()
+    
+    if (video) {
+      const { error } = await this.supabase
         .from('coach_videos')
-        .select('view_count')
+        .update({ 
+          view_count: (video.view_count || 0) + 1,
+          updated_at: new Date().toISOString()
+        })
         .eq('id', videoId)
-        .single()
       
-      if (video) {
-        const { error } = await this.supabase
-          .from('coach_videos')
-          .update({ 
-            view_count: (video.view_count || 0) + 1,
-            updated_at: new Date().toISOString()
-          })
-          .eq('id', videoId)
-        
-        if (error) throw error
-      }
-    } catch (error) {
-      console.error('Error incrementing video view:', error)
+      if (error) throw error
     }
+  } catch (error) {
+    console.error('Error incrementing video view:', error)
   }
+}
+
+
+
+
+
+
 
   // ===== COACH MESSAGES / NOTIFICATIONS =====
   async getUnreadCoachMessages(clientId) {
@@ -7001,22 +7418,29 @@ calculateIngredientMacros(ingredient, portionGrams) {
 }
 
 // Save custom recipe
+// VERVANG DE saveRecipe METHOD IN DatabaseService.js
+// Zoek naar: async saveRecipe(recipeData)
+
 async saveRecipe(recipeData) {
   try {
     console.log('💾 Saving recipe:', recipeData.name)
     
-    // Save recipe hoofddata
+    // Save recipe hoofddata - met CORRECTE veldnamen
     const { data: recipe, error: recipeError } = await this.supabase
       .from('recipes')
       .insert({
         name: recipeData.name,
         category: recipeData.category || 'custom',
-        total_calories: recipeData.calories,
-        total_protein: recipeData.protein,
-        total_carbs: recipeData.carbs,
-        total_fat: recipeData.fat,
-        total_weight_grams: recipeData.totalWeight,
+        total_calories: Math.round(recipeData.calories || 0),
+        total_protein: Math.round((recipeData.protein || 0) * 10) / 10,
+        total_carbs: Math.round((recipeData.carbs || 0) * 10) / 10,
+        total_fat: Math.round((recipeData.fat || 0) * 10) / 10,
+        total_fiber: Math.round((recipeData.fiber || 0) * 10) / 10,
+        total_weight_grams: Math.round(recipeData.totalWeight || 0),
         preparation_steps: recipeData.steps || '',
+        prep_time_minutes: recipeData.prepTime || 15,
+        cook_time_minutes: recipeData.cookTime || 30,
+        servings: recipeData.servings || 1,
         created_by: recipeData.createdBy || 'coach'
       })
       .select()
@@ -7024,41 +7448,67 @@ async saveRecipe(recipeData) {
     
     if (recipeError) {
       console.error('❌ Recipe save error:', recipeError)
+      console.error('❌ Error details:', {
+        message: recipeError.message,
+        details: recipeError.details,
+        hint: recipeError.hint,
+        code: recipeError.code
+      })
       throw recipeError
     }
     
-    // Save recipe ingredients
+    console.log('✅ Recipe saved with ID:', recipe.id)
+    
+    // Save recipe ingredients als die er zijn
     if (recipe && recipeData.ingredients?.length > 0) {
       const ingredientRows = recipeData.ingredients.map(ing => ({
         recipe_id: recipe.id,
         ingredient_id: ing.id,
-        amount_grams: ing.amount,
+        amount_grams: Math.round((ing.amount || 0) * 10) / 10,
         notes: ing.notes || null
       }))
       
-      const { error: ingredientsError } = await this.supabase
+      console.log('💾 Saving', ingredientRows.length, 'ingredients...')
+      
+      const { data: ingredientData, error: ingredientsError } = await this.supabase
         .from('recipe_ingredients')
         .insert(ingredientRows)
+        .select()
       
       if (ingredientsError) {
         console.error('❌ Recipe ingredients save error:', ingredientsError)
+        console.error('❌ Error details:', {
+          message: ingredientsError.message,
+          details: ingredientsError.details,
+          hint: ingredientsError.hint
+        })
+        
         // Rollback recipe als ingredients falen
+        console.log('⏮️ Rolling back recipe...')
         await this.supabase
           .from('recipes')
           .delete()
           .eq('id', recipe.id)
+        
         throw ingredientsError
       }
+      
+      console.log('✅ Saved', ingredientData.length, 'ingredients')
     }
     
     console.log('✅ Recipe saved successfully:', recipe.id)
     return recipe
+    
   } catch (error) {
     console.error('❌ saveRecipe failed:', error)
+    console.error('Full error object:', {
+      name: error.name,
+      message: error.message,
+      stack: error.stack
+    })
     throw error
   }
 }
-
 // Get recipes voor meal planning
 async getRecipes(category = null) {
   try {
@@ -7143,6 +7593,43 @@ async saveProductVariant(variantData) {
     throw error
   }
 }
+
+
+
+
+async getClientByEmail(email) {
+  try {
+    console.log('🔍 Fetching client for email:', email);
+    
+    const { data, error } = await this.supabase
+      .from('clients')
+      .select('*')
+      .eq('email', email)
+      .single();
+    
+    if (error) {
+      console.error('❌ Client fetch failed:', error);
+      
+      // Specifieke 406 error handling
+      if (error.code === 'PGRST116') {
+        console.error('🔴 RLS Policy Error - Run diagnostics tool!');
+        throw new Error('Database permission error - contact admin');
+      }
+      
+      throw error;
+    }
+    
+    console.log('✅ Client found:', data?.first_name, data?.last_name);
+    return data;
+    
+  } catch (error) {
+    console.error('getClientByEmail error:', error);
+    return null;
+  }
+}
+
+
+
 
 
 

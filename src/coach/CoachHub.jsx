@@ -1,52 +1,53 @@
-import CoachWorkoutAnalytics from './pages/CoachWorkoutAnalytics'
-import AIMealGenerator from '../modules/ai-meal-generator/AIMealGenerator'
-import useIsMobile from '../hooks/useIsMobile'
-import WorkoutLogModule from '../modules/progress/workout/WorkoutLogModule'
-import ChallengeBuilder from "../modules/challenges/ChallengeBuilder"
-import CoachVideoTab from '../modules/videos/CoachVideoTab'
+// src/coach/CoachHub.jsx - COMPLETE VERSION WITH WORKOUT BUILDER
 import { useState, useEffect } from 'react'
 import DatabaseService from '../services/DatabaseService'
-import AIGenerator from '../components/AIGenerator'
-import CoachMealPlannerDashboard from "./pages/CoachMealPlannerDashboard"
-import CoachProgressTab from '../modules/progress/CoachProgressTab'
-import ClientManagementCore from '../modules/client-management/ClientManagementCore'
+import useIsMobile from '../hooks/useIsMobile'
+import FunnelManagerDashboard from '../modules/funnel-manager/FunnelManagerDashboard'
+import SpotsManager from '../modules/spots/SpotsManager'
+import '../services/SpotsService' // Load service
+
+// Component Imports
+import CoachCommandCenter from '../modules/coach-command-center/CoachCommandCenter'
+import ClientInfoTab from './tabs/ClientInfoTab'
+import CoachChallengeHub from './pages/CoachChallengeHub'
+import MealPlanGenerator from '../modules/ai-meal-generator/MealPlanGenerator'
 import { CallPlanningTab } from '../modules/call-planning/CallPlanningComponents'
+import CoachVideoTab from '../modules/videos/CoachVideoTab'
+import CoachWorkoutAnalytics from './pages/CoachWorkoutAnalytics'
+import ChallengeBuilder from "../modules/challenges/ChallengeBuilder"
+import ClientManagementCore from '../modules/client-management/ClientManagementCore'
+import ManualWorkoutBuilder from '../modules/manual-workout-builder/ManualWorkoutBuilder'
+import LeadManagement from '../modules/lead-management/LeadManagement'
+
+
 
 // Lucide Icons imports
 import { 
   Home,
   Users,
-Sparkles,
+UserPlus,  
+ Shield,
+  Share2,
+  Sparkles,
   Target,
-  TrendingUp,
-Activity,
   Trophy,
   Video,
-  Bot,
   Phone,
-  Utensils,
-  ClipboardList,
-  BarChart3,
+  Activity,
+  LogOut,
   Menu,
   X,
-  LogOut,
-  Plus,
-  CheckSquare,
   Bell,
-  Search,
-  Filter,
-  MoreVertical,
-  Dumbbell,
-  MessageSquare,
-  Gift
+  Globe,  // Added for AppUpdatePanel
+  Save,   // Added for AppUpdatePanel
+  Dumbbell // Added for ManualWorkoutBuilder
 } from 'lucide-react'
 
-// Theme configuration - Coach specific colors
+// Theme configuration
 const pageThemes = {
   overview: {
     primary: '#10b981',
     primaryDark: '#059669',
-    primaryLight: '#34d399',
     gradient: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
     backgroundGradient: 'linear-gradient(135deg, rgba(16, 185, 129, 0.1) 0%, rgba(5, 150, 105, 0.05) 100%)',
     borderColor: 'rgba(16, 185, 129, 0.1)',
@@ -54,7 +55,17 @@ const pageThemes = {
     boxShadow: '0 10px 25px rgba(16, 185, 129, 0.25)',
     glow: '0 0 60px rgba(16, 185, 129, 0.1)'
   },
-  clients: {
+  command: {
+    primary: '#10b981',
+    primaryDark: '#059669',
+    gradient: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+    backgroundGradient: 'linear-gradient(135deg, rgba(16, 185, 129, 0.1) 0%, rgba(5, 150, 105, 0.05) 100%)',
+    borderColor: 'rgba(16, 185, 129, 0.1)',
+    borderActive: 'rgba(16, 185, 129, 0.2)',
+    boxShadow: '0 10px 25px rgba(16, 185, 129, 0.25)',
+    glow: '0 0 60px rgba(16, 185, 129, 0.1)'
+  },
+  'client-intelligence': {
     primary: '#3b82f6',
     primaryDark: '#2563eb',
     gradient: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
@@ -74,6 +85,92 @@ const pageThemes = {
     boxShadow: '0 10px 25px rgba(139, 92, 246, 0.25)',
     glow: '0 0 60px rgba(139, 92, 246, 0.1)'
   },
+  'challenge-hub': {
+    primary: '#dc2626',
+    primaryDark: '#991b1b',
+    gradient: 'linear-gradient(135deg, #dc2626 0%, #991b1b 100%)',
+    backgroundGradient: 'linear-gradient(135deg, rgba(220, 38, 38, 0.1) 0%, rgba(153, 27, 27, 0.05) 100%)',
+    borderColor: 'rgba(220, 38, 38, 0.1)',
+    borderActive: 'rgba(220, 38, 38, 0.2)',
+    boxShadow: '0 10px 25px rgba(220, 38, 38, 0.25)',
+    glow: '0 0 60px rgba(220, 38, 38, 0.1)'
+  },
+  'ai-meals': {
+    primary: '#8b5cf6',
+    primaryDark: '#7c3aed',
+    gradient: 'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)',
+    backgroundGradient: 'linear-gradient(135deg, rgba(139, 92, 246, 0.1) 0%, rgba(124, 58, 237, 0.05) 100%)',
+    borderColor: 'rgba(139, 92, 246, 0.1)',
+    borderActive: 'rgba(139, 92, 246, 0.2)',
+    boxShadow: '0 10px 25px rgba(139, 92, 246, 0.25)',
+    glow: '0 0 60px rgba(139, 92, 246, 0.1)'
+  },
+  funnels: {
+    primary: '#8b5cf6',
+    primaryDark: '#7c3aed', 
+    primaryLight: '#a78bfa',
+    gradient: 'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)',
+    backgroundGradient: 'linear-gradient(135deg, rgba(139, 92, 246, 0.1) 0%, rgba(124, 58, 237, 0.05) 100%)',
+    borderColor: 'rgba(139, 92, 246, 0.1)',
+    borderActive: 'rgba(139, 92, 246, 0.2)', 
+    boxShadow: '0 10px 25px rgba(139, 92, 246, 0.25)',
+    glow: '0 0 60px rgba(139, 92, 246, 0.1)'
+  },
+  calls: {
+    primary: '#3b82f6',
+    primaryDark: '#2563eb',
+    gradient: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
+    backgroundGradient: 'linear-gradient(135deg, rgba(59, 130, 246, 0.1) 0%, rgba(37, 99, 235, 0.05) 100%)',
+    borderColor: 'rgba(59, 130, 246, 0.1)',
+    borderActive: 'rgba(59, 130, 246, 0.2)',
+    boxShadow: '0 10px 25px rgba(59, 130, 246, 0.25)',
+    glow: '0 0 60px rgba(59, 130, 246, 0.1)'
+  },
+
+leads: {
+  primary: '#3b82f6',
+  primaryDark: '#2563eb',
+  primaryLight: '#60a5fa',
+  gradient: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
+  backgroundGradient: 'linear-gradient(135deg, rgba(59, 130, 246, 0.1) 0%, rgba(37, 99, 235, 0.05) 100%)',
+  borderColor: 'rgba(59, 130, 246, 0.1)',
+  borderActive: 'rgba(59, 130, 246, 0.2)',
+  boxShadow: '0 10px 25px rgba(59, 130, 246, 0.25)',
+  glow: '0 0 60px rgba(59, 130, 246, 0.1)'
+},
+
+
+
+  coachvids: {
+    primary: '#ec4899',
+    primaryDark: '#db2777',
+    gradient: 'linear-gradient(135deg, #ec4899 0%, #db2777 100%)',
+    backgroundGradient: 'linear-gradient(135deg, rgba(236, 72, 153, 0.1) 0%, rgba(219, 39, 119, 0.05) 100%)',
+    borderColor: 'rgba(236, 72, 153, 0.1)',
+    borderActive: 'rgba(236, 72, 153, 0.2)',
+    boxShadow: '0 10px 25px rgba(236, 72, 153, 0.25)',
+    glow: '0 0 60px rgba(236, 72, 153, 0.1)'
+  },
+  'workout-builder': {
+    primary: '#f97316',
+    primaryDark: '#ea580c',
+    gradient: 'linear-gradient(135deg, #f97316 0%, #ea580c 100%)',
+    backgroundGradient: 'linear-gradient(135deg, rgba(249, 115, 22, 0.1) 0%, rgba(234, 88, 12, 0.05) 100%)',
+    borderColor: 'rgba(249, 115, 22, 0.1)',
+    borderActive: 'rgba(249, 115, 22, 0.2)',
+    boxShadow: '0 10px 25px rgba(249, 115, 22, 0.25)',
+    glow: '0 0 60px rgba(249, 115, 22, 0.1)'
+  },
+  'workout-analytics': {
+    primary: '#f97316',
+    primaryDark: '#ea580c',
+    gradient: 'linear-gradient(135deg, #f97316 0%, #ea580c 100%)',
+    backgroundGradient: 'linear-gradient(135deg, rgba(249, 115, 22, 0.1) 0%, rgba(234, 88, 12, 0.05) 100%)',
+    borderColor: 'rgba(249, 115, 22, 0.1)',
+    borderActive: 'rgba(249, 115, 22, 0.2)',
+    boxShadow: '0 10px 25px rgba(249, 115, 22, 0.25)',
+    glow: '0 0 60px rgba(249, 115, 22, 0.1)'
+  },
   challenges: {
     primary: '#f59e0b',
     primaryDark: '#d97706',
@@ -83,26 +180,10 @@ const pageThemes = {
     borderActive: 'rgba(245, 158, 11, 0.2)',
     boxShadow: '0 10px 25px rgba(245, 158, 11, 0.25)',
     glow: '0 0 60px rgba(245, 158, 11, 0.1)'
-  },
-
-
-'ai-meals': {
-  primary: '#8b5cf6',
-  primaryDark: '#7c3aed',
-  primaryLight: '#a78bfa',
-  gradient: 'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)',
-  backgroundGradient: 'linear-gradient(135deg, rgba(139, 92, 246, 0.1) 0%, rgba(124, 58, 237, 0.05) 100%)',
-  borderColor: 'rgba(139, 92, 246, 0.1)',
-  borderActive: 'rgba(139, 92, 246, 0.2)',
-  boxShadow: '0 10px 25px rgba(139, 92, 246, 0.25)',
-  glow: '0 0 60px rgba(139, 92, 246, 0.1)'
+  }
 }
 
-
-
-}
-
-// Premium NavIcon component
+// NavIcon component
 function NavIcon({ Icon, size = 24, active = false, theme }) {
   return (
     <div style={{
@@ -123,16 +204,14 @@ function NavIcon({ Icon, size = 24, active = false, theme }) {
       <Icon 
         size={size}
         color={active ? theme.primary : 'rgba(255, 255, 255, 0.7)'}
-        style={{
-          transition: 'all 0.3s ease'
-        }}
+        style={{ transition: 'all 0.3s ease' }}
       />
     </div>
   )
 }
 
 export default function CoachHub() {
-  // ===== STATE MANAGEMENT =====
+  // State Management
   const [loading, setLoading] = useState(false)
   const [activeTab, setActiveTab] = useState('overview')
   const [selectedClient, setSelectedClient] = useState(null)
@@ -145,64 +224,34 @@ export default function CoachHub() {
   const [notifications, setNotifications] = useState([])
   const [user, setUser] = useState(null)
   
-  // Sub-tabs for client detail
-  const [clientDetailTab, setClientDetailTab] = useState('info')
-  
-  // Forms
-  const [showNewClientForm, setShowNewClientForm] = useState(false)
-  const [showBulkActions, setShowBulkActions] = useState(false)
-  const [selectedClients, setSelectedClients] = useState([])
-  
-  // Quick Actions
-  const [quickAction, setQuickAction] = useState(null)
-  
   const db = DatabaseService
   const isMobile = useIsMobile()
-
-  // Get current theme
   const currentTheme = pageThemes[activeTab] || pageThemes.overview
 
-const bottomNavItems = [
-  { id: 'overview', label: 'Dashboard', Icon: Home }, 
-  { id: 'clients', label: 'Cliënten', Icon: Users },
-  { id: 'management', label: 'Beheer', Icon: Target },
-  { id: 'challenges', label: 'Challenges', Icon: Trophy },
-  { id: 'ai-meals', label: 'AI Meals', Icon: Sparkles }, // <-- UPDATED
-  { id: 'calls', label: 'Calls', Icon: Phone }
-]
+  // Navigation Items - UPDATED WITH WORKOUT BUILDER
+  const allNavItems = [
+    { id: 'overview', label: 'Dashboard', Icon: Home },
+    { id: 'command', label: 'Command Center', Icon: Shield },
+    { id: 'client-intelligence', label: 'Client Intelligence', Icon: Users },
+    { id: 'management', label: 'Client Beheer', Icon: Target },
+ { id: 'leads', label: 'Lead Management', Icon: UserPlus },   
+ { id: 'challenge-hub', label: 'Challenge Hub', Icon: Trophy },
+    { id: 'ai-meals', label: 'AI Meals', Icon: Sparkles },
+    { id: 'funnels', label: 'Funnel Manager', Icon: Share2 },
+    { id: 'workout-builder', label: 'Workout Builder', Icon: Dumbbell },
+    { id: 'calls', label: 'Call Planning', Icon: Phone },
+    { id: 'coachvids', label: 'Videos', Icon: Video },
+    { id: 'workout-analytics', label: 'Workout Analytics', Icon: Activity },
+    { id: 'challenges', label: 'Challenges', Icon: Trophy }
+  ]
 
-// Update allNavItems - voeg 'ai-meals' toe NA 'meal-builder':
-const allNavItems = [
-  { id: 'overview', label: 'Dashboard', Icon: Home },
-  { id: 'clients', label: 'Cliënten', Icon: Users },
-  { id: 'management', label: 'Client Beheer', Icon: Target }, 
-  { id: 'progress', label: 'Progress', Icon: TrendingUp },
-  { id: 'workout-analytics', label: 'Workout Analytics', Icon: Activity }, // <-- NIEUW
-  { id: 'challenges', label: 'Challenges', Icon: Trophy },
-  { id: 'coachvids', label: 'Videos', Icon: Video },
-  { id: 'ai-generator', label: 'AI Generator', Icon: Bot },     
-  { id: 'calls', label: 'Call Planning', Icon: Phone },   
-  { id: 'meal-builder', label: 'Meal Planner', Icon: Utensils },
-  { id: 'ai-meals', label: 'AI Meals', Icon: Sparkles },
-  { id: 'programs', label: 'Programma\'s', Icon: ClipboardList },
-  { id: 'analytics', label: 'Analytics', Icon: BarChart3 }
-]
+  // Mobile Bottom Nav - First 6
+  const bottomNavItems = allNavItems.slice(0, 6)
 
-
-
-  // ===== LIFECYCLE =====
+  // Lifecycle
   useEffect(() => {
     initializeHub()
     loadUser()
-    
-    // Subscribe to updates
-    const unsubClients = db.subscribe('clients', (data) => {
-      setClients(data)
-    })
-    
-    return () => {
-      unsubClients()
-    }
   }, [])
 
   const loadUser = async () => {
@@ -222,35 +271,14 @@ const allNavItems = [
         db.getWorkoutSchemas(),
         db.getMealPlanTemplates()
       ])
-
-      console.log('🔍 Client data structure:', clientsData)
-      console.log('🔍 First client:', clientsData?.[0])
       
-      setClients(clientsData)
-      setWorkoutSchemas(schemasData)
-      setMealTemplates(mealsData)
+      setClients(clientsData || [])
+      setWorkoutSchemas(schemasData || [])
+      setMealTemplates(mealsData || [])
     } catch (error) {
       console.error('Failed to initialize hub:', error)
     } finally {
       setLoading(false)   
-    }
-  }
-
-  // ===== CLIENT OPERATIONS =====
-  const handleCreateClient = async (formData) => {
-    try {
-      setLoading(true)
-      const user = await db.getCurrentUser()
-      const result = await db.createClient(formData, user.id)
-      
-      alert(`✅ Client aangemaakt!\nEmail: ${result.loginCredentials.email}\nWachtwoord: ${result.loginCredentials.password}`)
-      
-      setShowNewClientForm(false)
-      await initializeHub()
-    } catch (error) {
-      alert(`❌ Fout: ${error.message}`)
-    } finally {
-      setLoading(false)
     }
   }
 
@@ -267,40 +295,6 @@ const allNavItems = [
     }
   }
 
-  // ===== BULK OPERATIONS =====
-  const handleBulkAssign = async (type, itemId) => {
-    try {
-      setLoading(true)
-      
-      for (const clientId of selectedClients) {
-        if (type === 'workout') {
-          await db.assignWorkoutToClient(clientId, itemId)
-        } else if (type === 'meal') {
-          await db.saveMealPlan(clientId, { template_id: itemId })
-        }
-      }
-      
-      alert(`✅ ${type} toegewezen aan ${selectedClients.length} clients!`)
-      setSelectedClients([])
-      setShowBulkActions(false)
-      await initializeHub()
-    } catch (error) {
-      alert(`❌ Fout: ${error.message}`)
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  // ===== NOTIFICATIONS =====
-  const sendNotification = async (clientId, message) => {
-    try {
-      await db.sendNotification(clientId, 'coach_message', message)
-      alert('✅ Melding verzonden!')
-    } catch (error) {
-      alert(`❌ Fout: ${error.message}`)
-    }
-  }
-
   const handleLogout = async () => {
     try {
       await db.signOut()
@@ -310,304 +304,307 @@ const allNavItems = [
     }
   }
 
-  // ===== RENDER HELPERS =====
-  const renderClientCard = (client) => {
-    const isSelected = selectedClients.includes(client.id)
-    
-    return (
-      <div 
-        key={client.id}
-        style={{
-          background: isSelected 
-            ? 'linear-gradient(135deg, rgba(16, 185, 129, 0.2) 0%, rgba(16, 185, 129, 0.1) 100%)' 
-            : 'rgba(17, 17, 17, 0.5)',
-          backdropFilter: 'blur(10px)',
-          border: isSelected ? '2px solid #10b981' : '1px solid rgba(255, 255, 255, 0.1)',
-          borderRadius: '16px',
-          padding: isMobile ? '1rem' : '1.5rem',
-          cursor: 'pointer',
-          transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-          boxShadow: '0 10px 30px rgba(0, 0, 0, 0.3)'
-        }}
-        onClick={() => setSelectedClient(client)}
-        onMouseEnter={(e) => {
-          if (!isSelected) {
-            e.currentTarget.style.transform = 'translateY(-2px)'
-            e.currentTarget.style.boxShadow = '0 15px 40px rgba(0, 0, 0, 0.4)'
-          }
-        }}
-        onMouseLeave={(e) => {
-          e.currentTarget.style.transform = 'translateY(0)'
-          e.currentTarget.style.boxShadow = '0 10px 30px rgba(0, 0, 0, 0.3)'
-        }}
-      >
-        <div style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          marginBottom: '1rem'
-        }}>
-          <div>
-            <h4 style={{
-              color: '#fff',
-              fontSize: isMobile ? '1.1rem' : '1.25rem',
-              fontWeight: '600',
-              marginBottom: '0.25rem'
-            }}>
-              {client.first_name} {client.last_name}
-            </h4>
-            <p style={{
-              color: 'rgba(255, 255, 255, 0.6)',
-              fontSize: isMobile ? '0.85rem' : '0.9rem'
-            }}>
-              {client.email}
-            </p>
-          </div>
-          
-          <input
-            type="checkbox"
-            checked={isSelected}
-            onChange={(e) => {
-              e.stopPropagation()
-              if (isSelected) {
-                setSelectedClients(prev => prev.filter(id => id !== client.id))
-              } else {
-                setSelectedClients(prev => [...prev, client.id])
-              }
-            }}
-            style={{
-              width: '20px',
-              height: '20px',
-              cursor: 'pointer'
-            }}
-          />
-        </div>
-        
-        {/* Quick Actions */}
-        <div style={{
-          display: 'flex',
-          gap: '0.5rem',
-          marginBottom: '1rem'
-        }}>
-          <button
-            style={{
-              flex: 1,
-              padding: '0.5rem',
-              background: 'linear-gradient(135deg, #f97316 0%, #ea580c 100%)',
-              border: 'none',
-              borderRadius: '8px',
-              color: '#fff',
-              fontSize: isMobile ? '0.85rem' : '0.9rem',
-              fontWeight: '600',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '0.25rem',
-              transition: 'all 0.3s ease'
-            }}
-            onClick={(e) => {
-              e.stopPropagation()
-              setQuickAction({ type: 'workout', client })
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.transform = 'scale(1.05)'
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.transform = 'scale(1)'
-            }}
-          >
-            <Dumbbell size={16} />
-            Workout
-          </button>
-          
-          <button
-            style={{
-              flex: 1,
-              padding: '0.5rem',
-              background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-              border: 'none',
-              borderRadius: '8px',
-              color: '#fff',
-              fontSize: isMobile ? '0.85rem' : '0.9rem',
-              fontWeight: '600',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '0.25rem',
-              transition: 'all 0.3s ease'
-            }}
-            onClick={(e) => {
-              e.stopPropagation()
-              setQuickAction({ type: 'meal', client })
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.transform = 'scale(1.05)'
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.transform = 'scale(1)'
-            }}
-          >
-            <Utensils size={16} />
-            Meal
-          </button>
-        </div>
-        
-        {/* Client Stats */}
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(3, 1fr)',
-          gap: '0.75rem',
-          paddingTop: '0.75rem',
-          borderTop: '1px solid rgba(255, 255, 255, 0.1)'
-        }}>
-          <div>
-            <span style={{
-              color: 'rgba(255, 255, 255, 0.5)',
-              fontSize: isMobile ? '0.75rem' : '0.8rem',
-              display: 'block',
-              marginBottom: '0.25rem'
-            }}>
-              Doel
-            </span>
-            <p style={{
-              color: '#fff',
-              fontSize: isMobile ? '0.85rem' : '0.9rem',
-              fontWeight: '500'
-            }}>
-              {client.goal || 'Niet ingesteld'}
-            </p>
-          </div>
-          <div>
-            <span style={{
-              color: 'rgba(255, 255, 255, 0.5)',
-              fontSize: isMobile ? '0.75rem' : '0.8rem',
-              display: 'block',
-              marginBottom: '0.25rem'
-            }}>
-              Ervaring
-            </span>
-            <p style={{
-              color: '#fff',
-              fontSize: isMobile ? '0.85rem' : '0.9rem',
-              fontWeight: '500'
-            }}>
-              {client.experience || 'Onbekend'}
-            </p>
-          </div>
-          <div>
-            <span style={{
-              color: 'rgba(255, 255, 255, 0.5)',
-              fontSize: isMobile ? '0.75rem' : '0.8rem',
-              display: 'block',
-              marginBottom: '0.25rem'
-            }}>
-              Dagen/week
-            </span>
-            <p style={{
-              color: '#fff',
-              fontSize: isMobile ? '0.85rem' : '0.9rem',
-              fontWeight: '500'
-            }}>
-              {client.days_per_week || '?'}
-            </p>
-          </div>
-        </div>
-      </div>
-    )
-  }
+  // AppUpdatePanel Component
+  function AppUpdatePanel({ db }) {
+    const [currentConfig, setCurrentConfig] = useState(null)
+    const [newUrl, setNewUrl] = useState('')
+    const [version, setVersion] = useState('')
+    const [message, setMessage] = useState('')
+    const [loading, setLoading] = useState(false)
+    const [saved, setSaved] = useState(false)
+    const isMobile = window.innerWidth <= 768
 
-  const renderClientDetail = () => {
-    if (!selectedClient) return null
-    
+    useEffect(() => {
+      loadCurrentConfig()
+    }, [])
+
+    const loadCurrentConfig = async () => {
+      const config = await db.getAppConfig()
+      if (config) {
+        setCurrentConfig(config)
+        setNewUrl(config.current_url)
+        setVersion(config.version)
+        setMessage(config.message)
+      }
+    }
+
+    const handleUpdate = async () => {
+      if (!newUrl || !version) {
+        alert('Vul URL en versie in')
+        return
+      }
+
+      setLoading(true)
+      try {
+        await db.updateAppConfig(newUrl, version, message)
+        setSaved(true)
+        setTimeout(() => setSaved(false), 3000)
+        await loadCurrentConfig()
+      } catch (error) {
+        alert('Update failed: ' + error.message)
+      }
+      setLoading(false)
+    }
+
     return (
       <div style={{
-        background: 'rgba(17, 17, 17, 0.5)',
-        backdropFilter: 'blur(10px)',
-        borderRadius: '16px',
-        border: '1px solid rgba(255, 255, 255, 0.1)',
+        background: 'linear-gradient(135deg, rgba(17, 17, 17, 0.95) 0%, rgba(10, 10, 10, 0.95) 100%)',
+        borderRadius: '20px',
+        border: '1px solid rgba(16, 185, 129, 0.2)',
+        padding: isMobile ? '1.5rem' : '2rem',
         marginTop: '2rem',
-        overflow: 'hidden',
         boxShadow: '0 10px 30px rgba(0, 0, 0, 0.3)'
       }}>
+        {/* Header */}
         <div style={{
-          background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.1) 0%, rgba(5, 150, 105, 0.05) 100%)',
-          padding: isMobile ? '1rem' : '1.5rem',
-          borderBottom: '1px solid rgba(255, 255, 255, 0.1)'
+          display: 'flex',
+          alignItems: 'center',
+          gap: '1rem',
+          marginBottom: '1.5rem'
         }}>
-          <h3 style={{
-            color: '#fff',
-            fontSize: isMobile ? '1.25rem' : '1.5rem',
-            fontWeight: '700',
-            marginBottom: '1rem'
-          }}>
-            {selectedClient.first_name} {selectedClient.last_name} - Management
-          </h3>
-          
-          {/* Sub-tabs */}
           <div style={{
+            background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+            borderRadius: '12px',
+            width: '40px',
+            height: '40px',
             display: 'flex',
-            gap: isMobile ? '0.5rem' : '1rem',
-            flexWrap: 'wrap'
+            alignItems: 'center',
+            justifyContent: 'center'
           }}>
-            {['info', 'workout', 'meals', 'workouts', 'progress', 'accountability', 'bonuses'].map(tab => (
-              <button
-                key={tab}
-                style={{
-                  padding: isMobile ? '0.5rem 1rem' : '0.75rem 1.5rem',
-                  background: clientDetailTab === tab 
-                    ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)'
-                    : 'rgba(255, 255, 255, 0.05)',
-                  border: clientDetailTab === tab 
-                    ? '1px solid #10b981'
-                    : '1px solid rgba(255, 255, 255, 0.1)',
-                  borderRadius: '8px',
-                  color: clientDetailTab === tab ? '#fff' : 'rgba(255, 255, 255, 0.7)',
-                  fontSize: isMobile ? '0.85rem' : '0.95rem',
-                  fontWeight: clientDetailTab === tab ? '600' : '500',
-                  cursor: 'pointer',
-                  transition: 'all 0.3s ease'
-                }}
-                onClick={() => setClientDetailTab(tab)}
-                onMouseEnter={(e) => {
-                  if (clientDetailTab !== tab) {
-                    e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)'
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  if (clientDetailTab !== tab) {
-                    e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)'
-                  }
-                }}
-              >
-                {tab.charAt(0).toUpperCase() + tab.slice(1)}
-              </button>
-            ))}
+            <Globe size={22} color="white" />
+          </div>
+          <div>
+            <h3 style={{
+              fontSize: isMobile ? '1.1rem' : '1.3rem',
+              fontWeight: '700',
+              color: '#10b981',
+              margin: 0
+            }}>
+              PWA Update Manager
+            </h3>
+            <p style={{
+              fontSize: isMobile ? '0.8rem' : '0.85rem',
+              color: 'rgba(255, 255, 255, 0.5)',
+              margin: '0.25rem 0 0 0'
+            }}>
+              Update de app URL voor alle gebruikers
+            </p>
           </div>
         </div>
-        
-        <div style={{padding: isMobile ? '1rem' : '1.5rem'}}>
-          {clientDetailTab === 'info' && <ClientInfoTab client={selectedClient} onUpdate={handleUpdateClient} isMobile={isMobile} />}
-          {clientDetailTab === 'workout' && <ClientWorkoutTab client={selectedClient} schemas={workoutSchemas} db={db} isMobile={isMobile} />}
-          {clientDetailTab === 'meals' && <ClientMealsTab client={selectedClient} templates={mealTemplates} db={db} isMobile={isMobile} />}
-          {clientDetailTab === 'progress' && <ClientProgressTab client={selectedClient} db={db} />}
-          {clientDetailTab === 'workouts' && <WorkoutLogModule client={selectedClient} db={db} />}
-          {clientDetailTab === 'accountability' && <ClientAccountabilityTab client={selectedClient} db={db} isMobile={isMobile} />}
-          {clientDetailTab === 'bonuses' && <ClientBonusesTab client={selectedClient} db={db} isMobile={isMobile} />}
+
+        {/* Current Status */}
+        {currentConfig && (
+          <div style={{
+            background: 'rgba(16, 185, 129, 0.1)',
+            borderRadius: '12px',
+            padding: '1rem',
+            marginBottom: '1.5rem',
+            border: '1px solid rgba(16, 185, 129, 0.2)'
+          }}>
+            <p style={{
+              fontSize: '0.8rem',
+              color: 'rgba(255, 255, 255, 0.5)',
+              margin: '0 0 0.5rem 0',
+              textTransform: 'uppercase',
+              letterSpacing: '0.05em'
+            }}>
+              Huidige Configuratie
+            </p>
+            <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
+              <div>
+                <span style={{ color: 'rgba(255, 255, 255, 0.5)', fontSize: '0.85rem' }}>URL: </span>
+                <span style={{ color: '#10b981', fontSize: '0.9rem' }}>{currentConfig.current_url}</span>
+              </div>
+              <div>
+                <span style={{ color: 'rgba(255, 255, 255, 0.5)', fontSize: '0.85rem' }}>Versie: </span>
+                <span style={{ color: '#10b981', fontSize: '0.9rem' }}>{currentConfig.version}</span>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Update Form */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+          {/* URL Input */}
+          <div>
+            <label style={{
+              display: 'block',
+              fontSize: '0.85rem',
+              color: 'rgba(255, 255, 255, 0.7)',
+              marginBottom: '0.5rem',
+              fontWeight: '500'
+            }}>
+              Nieuwe URL
+            </label>
+            <input
+              type="text"
+              value={newUrl}
+              onChange={(e) => setNewUrl(e.target.value)}
+              placeholder="https://workapp-nieuwe-versie.vercel.app"
+              style={{
+                width: '100%',
+                padding: isMobile ? '0.75rem' : '0.875rem',
+                background: 'rgba(255, 255, 255, 0.05)',
+                border: '1px solid rgba(255, 255, 255, 0.1)',
+                borderRadius: '10px',
+                color: 'white',
+                fontSize: isMobile ? '0.9rem' : '0.95rem',
+                outline: 'none',
+                transition: 'all 0.3s ease'
+              }}
+              onFocus={(e) => {
+                e.target.style.border = '1px solid rgba(16, 185, 129, 0.5)'
+                e.target.style.background = 'rgba(255, 255, 255, 0.08)'
+              }}
+              onBlur={(e) => {
+                e.target.style.border = '1px solid rgba(255, 255, 255, 0.1)'
+                e.target.style.background = 'rgba(255, 255, 255, 0.05)'
+              }}
+            />
+          </div>
+
+          {/* Version Input */}
+          <div>
+            <label style={{
+              display: 'block',
+              fontSize: '0.85rem',
+              color: 'rgba(255, 255, 255, 0.7)',
+              marginBottom: '0.5rem',
+              fontWeight: '500'
+            }}>
+              Versie Nummer
+            </label>
+            <input
+              type="text"
+              value={version}
+              onChange={(e) => setVersion(e.target.value)}
+              placeholder="1.0.1"
+              style={{
+                width: '100%',
+                padding: isMobile ? '0.75rem' : '0.875rem',
+                background: 'rgba(255, 255, 255, 0.05)',
+                border: '1px solid rgba(255, 255, 255, 0.1)',
+                borderRadius: '10px',
+                color: 'white',
+                fontSize: isMobile ? '0.9rem' : '0.95rem',
+                outline: 'none',
+                transition: 'all 0.3s ease'
+              }}
+              onFocus={(e) => {
+                e.target.style.border = '1px solid rgba(16, 185, 129, 0.5)'
+                e.target.style.background = 'rgba(255, 255, 255, 0.08)'
+              }}
+              onBlur={(e) => {
+                e.target.style.border = '1px solid rgba(255, 255, 255, 0.1)'
+                e.target.style.background = 'rgba(255, 255, 255, 0.05)'
+              }}
+            />
+          </div>
+
+          {/* Message Input */}
+          <div>
+            <label style={{
+              display: 'block',
+              fontSize: '0.85rem',
+              color: 'rgba(255, 255, 255, 0.7)',
+              marginBottom: '0.5rem',
+              fontWeight: '500'
+            }}>
+              Update Bericht (optioneel)
+            </label>
+            <textarea
+              value={message}
+              onChange={(e) => setMessage(e.target.value)}
+              placeholder="Nieuwe features en verbeteringen..."
+              rows={3}
+              style={{
+                width: '100%',
+                padding: isMobile ? '0.75rem' : '0.875rem',
+                background: 'rgba(255, 255, 255, 0.05)',
+                border: '1px solid rgba(255, 255, 255, 0.1)',
+                borderRadius: '10px',
+                color: 'white',
+                fontSize: isMobile ? '0.9rem' : '0.95rem',
+                outline: 'none',
+                transition: 'all 0.3s ease',
+                resize: 'vertical',
+                fontFamily: 'inherit'
+              }}
+              onFocus={(e) => {
+                e.target.style.border = '1px solid rgba(16, 185, 129, 0.5)'
+                e.target.style.background = 'rgba(255, 255, 255, 0.08)'
+              }}
+              onBlur={(e) => {
+                e.target.style.border = '1px solid rgba(255, 255, 255, 0.1)'
+                e.target.style.background = 'rgba(255, 255, 255, 0.05)'
+              }}
+            />
+          </div>
+
+          {/* Update Button */}
+          <button
+            onClick={handleUpdate}
+            disabled={loading}
+            style={{
+              background: saved 
+                ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)'
+                : loading 
+                  ? 'rgba(255, 255, 255, 0.1)'
+                  : 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+              border: 'none',
+              borderRadius: '12px',
+              padding: isMobile ? '0.875rem' : '1rem',
+              color: 'white',
+              fontSize: isMobile ? '0.95rem' : '1rem',
+              fontWeight: '600',
+              cursor: loading ? 'not-allowed' : 'pointer',
+              transition: 'all 0.3s ease',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '0.5rem',
+              boxShadow: '0 4px 15px rgba(16, 185, 129, 0.3)',
+              touchAction: 'manipulation',
+              WebkitTapHighlightColor: 'transparent',
+              minHeight: '44px',
+              opacity: loading ? 0.5 : 1
+            }}
+            onMouseEnter={(e) => {
+              if (!loading) {
+                e.currentTarget.style.transform = 'translateY(-2px)'
+                e.currentTarget.style.boxShadow = '0 8px 25px rgba(16, 185, 129, 0.4)'
+              }
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.transform = 'translateY(0)'
+              e.currentTarget.style.boxShadow = '0 4px 15px rgba(16, 185, 129, 0.3)'
+            }}
+            onTouchStart={(e) => {
+              if (isMobile && !loading) {
+                e.currentTarget.style.transform = 'scale(0.98)'
+              }
+            }}
+            onTouchEnd={(e) => {
+              if (isMobile) {
+                e.currentTarget.style.transform = 'scale(1)'
+              }
+            }}
+          >
+            <Save size={18} />
+            {loading ? 'Updaten...' : saved ? 'Opgeslagen!' : 'Update App URL'}
+          </button>
         </div>
       </div>
     )
   }
 
-  // ===== MAIN RENDER =====
   return (
     <div style={{ 
       minHeight: '100vh',
       background: 'linear-gradient(180deg, #0a0a0a 0%, #171717 100%)',
       position: 'relative'
     }}>
-      {/* Premium Header */}
+      {/* Header */}
       <header style={{
         background: 'linear-gradient(135deg, rgba(17, 17, 17, 0.98) 0%, rgba(10, 10, 10, 0.98) 100%)',
         backdropFilter: 'blur(20px)',
@@ -651,7 +648,7 @@ const allNavItems = [
             </button>
           )}
           
-          {/* Logo Section */}
+          {/* Logo */}
           <div style={{
             display: 'flex',
             alignItems: 'center',
@@ -692,7 +689,6 @@ const allNavItems = [
               alignItems: 'center',
               gap: '1rem'
             }}>
-              {/* Notification Icon */}
               <button style={{
                 width: '40px',
                 height: '40px',
@@ -721,7 +717,6 @@ const allNavItems = [
                 )}
               </button>
               
-              {/* User Info */}
               <div style={{
                 padding: '0.5rem 1rem',
                 background: 'rgba(255, 255, 255, 0.05)',
@@ -737,7 +732,6 @@ const allNavItems = [
                 </p>
               </div>
               
-              {/* Logout Button */}
               <button
                 onClick={handleLogout}
                 style={{
@@ -857,7 +851,7 @@ const allNavItems = [
         </div>
       )}
 
-      {/* Overlay for mobile menu */}
+      {/* Overlay */}
       {isMobile && mobileMenuOpen && (
         <div
           onClick={() => setMobileMenuOpen(false)}
@@ -983,7 +977,7 @@ const allNavItems = [
               </div>
             )}
 
-            {/* Overview Tab */}
+            {/* Tab Content */}
             {activeTab === 'overview' && !loading && (
               <div>
                 <h2 style={{
@@ -1072,232 +1066,23 @@ const allNavItems = [
                     </p>
                   </div>
                 </div>
-              </div>
-            )}
 
-            {/* Clients Tab */}
-            {activeTab === 'clients' && !loading && (
-              <>
-                {/* Action Bar */}
-                <div style={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                  marginBottom: '2rem',
-                  flexWrap: 'wrap',
-                  gap: '1rem'
-                }}>
-                  <div style={{
-                    display: 'flex',
-                    gap: '1rem',
-                    flexWrap: 'wrap'
-                  }}>
-                    <button
-                      onClick={() => setShowNewClientForm(true)}
-                      style={{
-                        padding: isMobile ? '0.75rem 1.25rem' : '0.875rem 1.5rem',
-                        background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-                        border: 'none',
-                        borderRadius: '12px',
-                        color: '#fff',
-                        fontSize: isMobile ? '0.9rem' : '1rem',
-                        fontWeight: '600',
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '0.5rem',
-                        transition: 'all 0.3s ease',
-                        boxShadow: '0 4px 15px rgba(16, 185, 129, 0.3)'
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.transform = 'translateY(-2px)'
-                        e.currentTarget.style.boxShadow = '0 8px 25px rgba(16, 185, 129, 0.4)'
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.transform = 'translateY(0)'
-                        e.currentTarget.style.boxShadow = '0 4px 15px rgba(16, 185, 129, 0.3)'
-                      }}
-                    >
-                      <Plus size={20} />
-                      Nieuwe Client
-                    </button>
-                    
-                    {selectedClients.length > 0 && (
-                      <button
-                        onClick={() => setShowBulkActions(true)}
-                        style={{
-                          padding: isMobile ? '0.75rem 1.25rem' : '0.875rem 1.5rem',
-                          background: 'rgba(255, 255, 255, 0.1)',
-                          border: '1px solid rgba(255, 255, 255, 0.2)',
-                          borderRadius: '12px',
-                          color: '#fff',
-                          fontSize: isMobile ? '0.9rem' : '1rem',
-                          fontWeight: '600',
-                          cursor: 'pointer',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '0.5rem',
-                          transition: 'all 0.3s ease'
-                        }}
-                      >
-                        <CheckSquare size={20} />
-                        Bulk Acties ({selectedClients.length})
-                      </button>
-                    )}
-                  </div>
-                  
-                  <div style={{
-                    color: 'rgba(255, 255, 255, 0.7)',
-                    fontSize: isMobile ? '0.9rem' : '1rem'
-                  }}>
-                    {clients.length} clients totaal
-                  </div>
-                </div>
-
-                {/* Client Grid */}
-                <div style={{
-                  display: 'grid',
-                  gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fill, minmax(350px, 1fr))',
-                  gap: '1.5rem'
-                }}>
-                  {clients.map(renderClientCard)}
-                </div>
-
-                {/* Client Detail */}
-                {renderClientDetail()}
-              </>
-            )}
-
-            {/* Programs Tab */}
-            {activeTab === 'programs' && !loading && (
-              <div>
-                <h2 style={{
-                  color: '#fff',
-                  fontSize: isMobile ? '1.5rem' : '2rem',
-                  fontWeight: '700',
-                  marginBottom: '2rem'
-                }}>
-                  Programma Beheer
-                </h2>
+                {/* Client Spots Panel */}
+                <SpotsManager db={db} compact={true} />
                 
-                <div style={{
-                  display: 'grid',
-                  gridTemplateColumns: isMobile ? '1fr' : 'repeat(2, 1fr)',
-                  gap: '1.5rem'
-                }}>
-                  {/* Workout Schemas */}
-                  <div style={{
-                    background: 'rgba(17, 17, 17, 0.5)',
-                    backdropFilter: 'blur(10px)',
-                    borderRadius: '16px',
-                    border: '1px solid rgba(255, 255, 255, 0.1)',
-                    padding: isMobile ? '1rem' : '1.5rem',
-                    boxShadow: '0 10px 30px rgba(0, 0, 0, 0.3)'
-                  }}>
-                    <h3 style={{
-                      color: '#fff',
-                      fontSize: isMobile ? '1.25rem' : '1.5rem',
-                      fontWeight: '600',
-                      marginBottom: '1rem'
-                    }}>
-                      Workout Schema's
-                    </h3>
-                    <div style={{
-                      maxHeight: '400px',
-                      overflowY: 'auto'
-                    }}>
-                      {workoutSchemas.map(schema => (
-                        <div key={schema.id} style={{
-                          padding: '1rem',
-                          borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
-                          cursor: 'pointer',
-                          transition: 'all 0.3s ease'
-                        }}
-                        onMouseEnter={(e) => {
-                          e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)'
-                        }}
-                        onMouseLeave={(e) => {
-                          e.currentTarget.style.background = 'transparent'
-                        }}>
-                          <h4 style={{
-                            color: '#fff',
-                            fontSize: isMobile ? '1rem' : '1.1rem',
-                            marginBottom: '0.25rem'
-                          }}>
-                            {schema.name}
-                          </h4>
-                          <p style={{
-                            color: 'rgba(255, 255, 255, 0.6)',
-                            fontSize: isMobile ? '0.85rem' : '0.9rem'
-                          }}>
-                            {schema.primary_goal} - {schema.days_per_week} dagen
-                          </p>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Meal Templates */}
-                  <div style={{
-                    background: 'rgba(17, 17, 17, 0.5)',
-                    backdropFilter: 'blur(10px)',
-                    borderRadius: '16px',
-                    border: '1px solid rgba(255, 255, 255, 0.1)',
-                    padding: isMobile ? '1rem' : '1.5rem',
-                    boxShadow: '0 10px 30px rgba(0, 0, 0, 0.3)'
-                  }}>
-                    <h3 style={{
-                      color: '#fff',
-                      fontSize: isMobile ? '1.25rem' : '1.5rem',
-                      fontWeight: '600',
-                      marginBottom: '1rem'
-                    }}>
-                      Meal Templates
-                    </h3>
-                    <div style={{
-                      maxHeight: '400px',
-                      overflowY: 'auto'
-                    }}>
-                      {mealTemplates.map(template => (
-                        <div key={template.id} style={{
-                          padding: '1rem',
-                          borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
-                          cursor: 'pointer',
-                          transition: 'all 0.3s ease'
-                        }}
-                        onMouseEnter={(e) => {
-                          e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)'
-                        }}
-                        onMouseLeave={(e) => {
-                          e.currentTarget.style.background = 'transparent'
-                        }}>
-                          <h4 style={{
-                            color: '#fff',
-                            fontSize: isMobile ? '1rem' : '1.1rem',
-                            marginBottom: '0.25rem'
-                          }}>
-                            {template.title}
-                          </h4>
-                          <p style={{
-                            color: 'rgba(255, 255, 255, 0.6)',
-                            fontSize: isMobile ? '0.85rem' : '0.9rem'
-                          }}>
-                            {template.targets?.kcal}kcal - {template.targets?.protein}g eiwit
-                          </p>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
+                {/* PWA Update Panel */}
+                <AppUpdatePanel db={db} />
               </div>
             )}
 
-            {/* Other tabs remain the same but wrapped in proper containers */}
-            {activeTab === 'coachvids' && (
-              <CoachVideoTab clients={clients} db={db} />
+            {activeTab === 'command' && !loading && (
+              <CoachCommandCenter 
+                db={db} 
+                clients={clients || []}
+              />
             )}
 
-            {activeTab === 'ai-generator' && !loading && (
+            {activeTab === 'client-intelligence' && !loading && (
               <div style={{
                 background: 'rgba(17, 17, 17, 0.5)',
                 backdropFilter: 'blur(10px)',
@@ -1312,9 +1097,139 @@ const allNavItems = [
                   fontWeight: '700',
                   marginBottom: '1.5rem'
                 }}>
-                  AI Workout Generator
+                  Client Intelligence System
                 </h2>
-                <AIGenerator />
+                <ClientInfoTab
+                  client={null}
+                  onUpdate={handleUpdateClient}
+                  db={db}
+                  isMobile={isMobile}
+                />
+              </div>
+            )}
+
+
+
+{activeTab === 'leads' && !loading && (
+  <div style={{
+    background: 'rgba(17, 17, 17, 0.5)',
+    backdropFilter: 'blur(10px)',
+    borderRadius: '16px',
+    border: '1px solid rgba(255, 255, 255, 0.1)',
+    padding: isMobile ? '1rem' : '2rem',
+    boxShadow: '0 10px 30px rgba(0, 0, 0, 0.3)'
+  }}>
+    <LeadManagement
+      db={db}
+      isMobile={isMobile}
+      coachId={user?.id}
+      user={user}
+    />
+  </div>
+)}
+
+            {activeTab === 'management' && !loading && (
+              <div style={{
+                background: 'rgba(17, 17, 17, 0.5)',
+                backdropFilter: 'blur(10px)',
+                borderRadius: '16px',
+                border: '1px solid rgba(255, 255, 255, 0.1)',
+                padding: isMobile ? '1rem' : '2rem',
+                boxShadow: '0 10px 30px rgba(0, 0, 0, 0.3)'
+              }}>
+                <h2 style={{
+                  color: '#fff',
+                  fontSize: isMobile ? '1.5rem' : '2rem',
+                  fontWeight: '700',
+                  marginBottom: '1.5rem'
+                }}>
+                  Client Management
+                </h2>
+                <ClientManagementCore db={db} />
+              </div>
+            )}
+
+            {activeTab === 'challenge-hub' && !loading && (
+              <div style={{
+                background: 'rgba(17, 17, 17, 0.5)',
+                backdropFilter: 'blur(10px)',
+                borderRadius: '16px',
+                border: '1px solid rgba(255, 255, 255, 0.1)',
+                padding: isMobile ? '1rem' : '2rem',
+                boxShadow: '0 10px 30px rgba(0, 0, 0, 0.3)'
+              }}>
+                <CoachChallengeHub
+                  db={db}
+                  clients={clients || []}
+                />
+              </div>
+            )}
+
+            {activeTab === 'ai-meals' && !loading && (
+              <div style={{
+                background: 'rgba(17, 17, 17, 0.5)',
+                backdropFilter: 'blur(10px)',
+                borderRadius: '16px',
+                border: '1px solid rgba(255, 255, 255, 0.1)',
+                padding: isMobile ? '1rem' : '2rem',
+                boxShadow: '0 10px 30px rgba(0, 0, 0, 0.3)'
+              }}>
+                <h2 style={{
+                  color: '#fff',
+                  fontSize: isMobile ? '1.5rem' : '2rem',
+                  fontWeight: '700',
+                  marginBottom: '1.5rem',
+                  background: 'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)',
+                  WebkitBackgroundClip: 'text',
+                  WebkitTextFillColor: 'transparent',
+                  backgroundClip: 'text'
+                }}>
+                  AI Meal Plan Generator
+                </h2>
+                <MealPlanGenerator 
+                  db={db}
+                  clients={clients || []}
+                  selectedClient={selectedClient}
+                  onClientSelect={setSelectedClient}
+                />
+              </div>
+            )}
+
+            {activeTab === 'funnels' && !loading && (
+              <div style={{
+                background: 'rgba(17, 17, 17, 0.5)',
+                backdropFilter: 'blur(10px)',
+                borderRadius: '16px',
+                border: '1px solid rgba(255, 255, 255, 0.1)',
+                padding: isMobile ? '1rem' : '2rem',
+                boxShadow: '0 10px 30px rgba(0, 0, 0, 0.3)'
+              }}>
+                <h2 style={{
+                  color: '#fff',
+                  fontSize: isMobile ? '1.5rem' : '2rem',
+                  fontWeight: '700',
+                  marginBottom: '1.5rem'
+                }}>
+                  Funnel Manager & Analytics
+                </h2>
+                <FunnelManagerDashboard db={db} isMobile={isMobile} />
+              </div>
+            )}
+
+            {/* NIEUWE WORKOUT BUILDER TAB */}
+            {activeTab === 'workout-builder' && !loading && (
+              <div style={{
+                background: 'rgba(17, 17, 17, 0.5)',
+                backdropFilter: 'blur(10px)',
+                borderRadius: '16px',
+                border: '1px solid rgba(249, 115, 22, 0.2)',
+                padding: 0,
+                boxShadow: '0 10px 30px rgba(0, 0, 0, 0.3)'
+              }}>
+                <ManualWorkoutBuilder 
+                  db={db}
+                  clients={clients || []}
+                />
               </div>
             )}
 
@@ -1338,125 +1253,28 @@ const allNavItems = [
                 <CallPlanningTab
                   db={db}
                   clients={clients || []}
-                  currentUser={db.currentUser || null}
+                  currentUser={user || null}
                 />
               </div>
             )}
 
-            {activeTab === 'meal-builder' && !loading && (
-              <div style={{
-                background: 'rgba(17, 17, 17, 0.5)',
-                backdropFilter: 'blur(10px)',
-                borderRadius: '16px',
-                border: '1px solid rgba(255, 255, 255, 0.1)',
-                padding: isMobile ? '1rem' : '2rem',
-                boxShadow: '0 10px 30px rgba(0, 0, 0, 0.3)'
-              }}>
-                <h2 style={{
-                  color: '#fff',
-                  fontSize: isMobile ? '1.5rem' : '2rem',
-                  fontWeight: '700',
-                  marginBottom: '1.5rem'
-                }}>
-                  Meal Plan Builder
-                </h2>
-                <CoachMealPlannerDashboard />
-              </div>
+            {activeTab === 'coachvids' && (
+              <CoachVideoTab clients={clients} db={db} />
             )}
 
-
-
-
-{activeTab === 'workout-analytics' && !loading && (
-  <div style={{
-    background: 'rgba(17, 17, 17, 0.5)',
-    backdropFilter: 'blur(10px)',
-    borderRadius: '16px',
-    border: '1px solid rgba(255, 255, 255, 0.1)',
-    padding: isMobile ? '0' : '0', // Component heeft eigen padding
-    boxShadow: '0 10px 30px rgba(0, 0, 0, 0.3)'
-  }}>
-    <CoachWorkoutAnalytics 
-      db={db}
-      coachId={user?.id || coachData?.id}
-    />
-  </div>
-)}
-
-
-
-
-{activeTab === 'ai-meals' && !loading && (
-  <div style={{
-    animation: 'fadeIn 0.5s ease'
-  }}>
-    <div style={{
-      background: 'linear-gradient(135deg, rgba(17, 17, 17, 0.98) 0%, rgba(10, 10, 10, 0.98) 100%)',
-      backdropFilter: 'blur(20px)',
-      borderRadius: isMobile ? '16px' : '20px',
-      border: '1px solid rgba(139, 92, 246, 0.2)',
-      padding: isMobile ? '1.5rem' : '2rem',
-      boxShadow: '0 20px 40px rgba(0, 0, 0, 0.5)'
-    }}>
-      <div style={{
-        display: 'flex',
-        alignItems: 'center',
-        gap: '1rem',
-        marginBottom: '2rem'
-      }}>
-        <Sparkles size={32} style={{ color: '#8b5cf6' }} />
-        <div>
-          <h2 style={{
-            fontSize: isMobile ? '1.5rem' : '2rem',
-            fontWeight: '700',
-            backgroundImage: 'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)',
-            WebkitBackgroundClip: 'text',
-            WebkitTextFillColor: 'transparent',
-            backgroundClip: 'text',
-            margin: 0
-          }}>
-            AI Meal Generator
-          </h2>
-          <p style={{
-            color: 'rgba(255, 255, 255, 0.5)',
-            fontSize: isMobile ? '0.875rem' : '1rem',
-            marginTop: '0.25rem'
-          }}>
-            Smart meal planning met exacte porties en macro targeting
-          </p>
-        </div>
-      </div>
-      
-      <AIMealGenerator 
-        db={db}
-        clients={clients}
-        selectedClient={selectedClient}
-        onClientSelect={setSelectedClient}
-      />
-    </div>
-  </div>
-)}
-
-
-
-            {activeTab === 'progress' && !loading && (
+            {activeTab === 'workout-analytics' && !loading && (
               <div style={{
                 background: 'rgba(17, 17, 17, 0.5)',
                 backdropFilter: 'blur(10px)',
                 borderRadius: '16px',
                 border: '1px solid rgba(255, 255, 255, 0.1)',
-                padding: isMobile ? '1rem' : '2rem',
+                padding: '0',
                 boxShadow: '0 10px 30px rgba(0, 0, 0, 0.3)'
               }}>
-                <h2 style={{
-                  color: '#fff',
-                  fontSize: isMobile ? '1.5rem' : '2rem',
-                  fontWeight: '700',
-                  marginBottom: '1.5rem'
-                }}>
-                  Client Progress Tracking
-                </h2>
-                <CoachProgressTab />
+                <CoachWorkoutAnalytics 
+                  db={db}
+                  coachId={user?.id}
+                />
               </div>
             )}
 
@@ -1484,27 +1302,6 @@ const allNavItems = [
                     console.log('Challenge created:', challenge)
                   }}
                 />
-              </div>
-            )}
-
-            {activeTab === 'management' && !loading && (
-              <div style={{
-                background: 'rgba(17, 17, 17, 0.5)',
-                backdropFilter: 'blur(10px)',
-                borderRadius: '16px',
-                border: '1px solid rgba(255, 255, 255, 0.1)',
-                padding: isMobile ? '1rem' : '2rem',
-                boxShadow: '0 10px 30px rgba(0, 0, 0, 0.3)'
-              }}>
-                <h2 style={{
-                  color: '#fff',
-                  fontSize: isMobile ? '1.5rem' : '2rem',
-                  fontWeight: '700',
-                  marginBottom: '1.5rem'
-                }}>
-                  Client Management
-                </h2>
-                <ClientManagementCore db={db} />
               </div>
             )}
           </div>
@@ -1581,37 +1378,6 @@ const allNavItems = [
         </nav>
       )}
 
-      {/* Modals */}
-      {showNewClientForm && (
-        <NewClientModal 
-          onClose={() => setShowNewClientForm(false)}
-          onSubmit={handleCreateClient}
-          isMobile={isMobile}
-        />
-      )}
-
-      {showBulkActions && (
-        <BulkActionsModal
-          selectedCount={selectedClients.length}
-          schemas={workoutSchemas}
-          templates={mealTemplates}
-          onAssign={handleBulkAssign}
-          onClose={() => setShowBulkActions(false)}
-          isMobile={isMobile}
-        />
-      )}
-
-      {quickAction && (
-        <QuickActionModal
-          action={quickAction}
-          schemas={workoutSchemas}
-          templates={mealTemplates}
-          db={db}
-          onClose={() => setQuickAction(null)}
-          isMobile={isMobile}
-        />
-      )}
-
       {/* CSS Animations */}
       <style>{`
         @keyframes fadeIn {
@@ -1629,7 +1395,6 @@ const allNavItems = [
           100% { background-position: 0% 50%; }
         }
         
-        /* Mobile Fixes */
         @media (max-width: 768px) {
           body {
             overflow-x: hidden;

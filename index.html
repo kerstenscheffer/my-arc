@@ -2,122 +2,62 @@
 <html lang="nl">
   <head>
     <meta charset="UTF-8" />
-    
-    <!-- Favicon -->
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
-    <link rel="icon" type="image/png" sizes="32x32" href="/icons/icon-32x32.png" />
-    <link rel="icon" type="image/png" sizes="16x16" href="/icons/icon-16x16.png" />
-    
-    <!-- VIEWPORT: Essentieel voor mobile & PWA -->
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes, viewport-fit=cover" />
-    
-    <!-- PWA Manifest -->
     <link rel="manifest" href="/manifest.json" />
     
-    <!-- iOS Specific -->
+    <!-- iOS PWA -->
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="MY ARC" />
     <link rel="apple-touch-icon" href="/icons/icon-180x180.png" />
-    <link rel="apple-touch-icon" sizes="152x152" href="/icons/icon-152x152.png" />
-    <link rel="apple-touch-icon" sizes="180x180" href="/icons/icon-180x180.png" />
-    <link rel="apple-touch-icon" sizes="167x167" href="/icons/icon-167x167.png" />
     
-    <!-- Android Specific -->
+    <!-- Android PWA -->
     <meta name="mobile-web-app-capable" content="yes" />
-    <meta name="theme-color" content="#10b981" />
-    <meta name="application-name" content="MY ARC" />
+    <meta name="theme-color" content="#000000" />
     
-    <!-- Microsoft Tiles -->
-    <meta name="msapplication-TileColor" content="#10b981" />
-    <meta name="msapplication-tap-highlight" content="no" />
+    <!-- Fullscreen mode hints -->
+    <meta name="display" content="standalone" />
+    <meta name="browsermode" content="application" />
+    <meta name="full-screen" content="yes" />
+    <meta name="x5-fullscreen" content="true" />
+    <meta name="screen-orientation" content="portrait" />
     
-    <!-- SEO & Description -->
-    <meta name="description" content="MY ARC - Premium Personal Training Platform" />
-    <meta name="author" content="Kersten Scheffer" />
+    <title>MY ARC</title>
     
-    <!-- Title -->
-    <title>MY ARC - Personal Training Platform</title>
-    
-    <!-- Critical Mobile CSS -->
     <style>
       * {
         margin: 0;
         padding: 0;
         box-sizing: border-box;
-        -webkit-tap-highlight-color: transparent;
-      }
-      
-      html {
-        overflow-x: hidden;
-        width: 100%;
-        height: 100%;
       }
       
       body {
         margin: 0;
-        padding: 0;
-        width: 100%;
-        min-height: 100vh;
-        overflow-x: hidden;
-        background: #0a0f0d;
-        color: #ffffff;
-        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
+        background: #000;
+        color: #fff;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
         -webkit-font-smoothing: antialiased;
         -moz-osx-font-smoothing: grayscale;
-        -webkit-overflow-scrolling: touch;
-        overscroll-behavior-y: contain;
       }
       
       #root {
         width: 100%;
         min-height: 100vh;
-        position: relative;
-        overflow-x: hidden;
       }
       
-      /* Prevent zoom on input focus */
-      input,
-      select,
-      textarea,
-      button {
-        font-size: 16px !important;
-        -webkit-appearance: none;
-        -moz-appearance: none;
-        appearance: none;
-        border-radius: 0;
-      }
-      
-      /* Safe area insets for modern phones */
-      @supports (padding: env(safe-area-inset-top)) {
-        body {
-          padding-top: env(safe-area-inset-top);
-          padding-left: env(safe-area-inset-left);
-          padding-right: env(safe-area-inset-right);
-        }
-        
-        .bottom-nav {
-          padding-bottom: env(safe-area-inset-bottom);
-        }
-      }
-      
-      /* Simple loading state - NO CONTENT IN ROOT */
-      .app-loading {
-        position: fixed;
-        top: 0;
-        left: 0;
-        right: 0;
-        bottom: 0;
+      /* Loading state */
+      .loading-container {
         display: flex;
         align-items: center;
         justify-content: center;
-        background: linear-gradient(180deg, #0a0f0d 0%, #1a1a1a 100%);
-        z-index: 9999;
+        min-height: 100vh;
+        background: linear-gradient(180deg, #0a0a0a 0%, #171717 100%);
       }
       
-      .app-loading-spinner {
-        width: 50px;
-        height: 50px;
+      .loading-spinner {
+        width: 60px;
+        height: 60px;
         border: 3px solid rgba(16, 185, 129, 0.2);
         border-top-color: #10b981;
         border-radius: 50%;
@@ -127,66 +67,14 @@
       @keyframes spin {
         to { transform: rotate(360deg); }
       }
-      
-      /* Smooth scrolling */
-      html {
-        scroll-behavior: smooth;
-      }
-      
-      /* Focus styles for accessibility */
-      :focus-visible {
-        outline: 2px solid #10b981;
-        outline-offset: 2px;
-      }
     </style>
-    
-    <!-- Preconnect to external domains -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   </head>
-  
   <body>
-    <!-- CRITICAL: Empty root div - React will fill this -->
-    <div id="root"></div>
-    
-    <!-- React App -->
-    <script type="module" src="/src/main.jsx"></script>
-    
-    <!-- Service Worker Registration - AFTER React loads -->
-    <script>
-      // Delay service worker registration until after app loads
-      window.addEventListener('load', () => {
-        // Extra delay to ensure React is fully mounted
-        setTimeout(() => {
-          if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.register('/service-worker.js')
-              .then(registration => {
-                console.log('✅ Service Worker registered:', registration.scope);
-                
-                // Check for updates every hour
-                setInterval(() => {
-                  registration.update();
-                }, 60 * 60 * 1000);
-              })
-              .catch(error => {
-                console.error('❌ Service Worker registration failed:', error);
-              });
-          }
-          
-          // Standalone mode detection
-          if (window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone) {
-            console.log('🚀 MY ARC running as installed app!');
-          }
-        }, 2000); // 2 second delay
-      });
-    </script>
-    
-    <!-- No JS fallback -->
-    <noscript>
-      <div style="padding: 2rem; text-align: center; background: #0a0f0d; color: #fff;">
-        <h1>JavaScript Vereist</h1>
-        <p>MY ARC heeft JavaScript nodig om te werken. Schakel JavaScript in je browser in.</p>
+    <div id="root">
+      <div class="loading-container">
+        <div class="loading-spinner"></div>
       </div>
-    </noscript>
+    </div>
+    <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>

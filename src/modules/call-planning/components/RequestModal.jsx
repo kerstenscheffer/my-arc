@@ -1,6 +1,6 @@
 import useIsMobile from '../../../hooks/useIsMobile'
 import React, { useState } from 'react';
-import { X, Plus } from 'lucide-react';
+import { X, Plus, Sparkles } from 'lucide-react';
 import CallPlanningService from '../CallPlanningService';
 
 export default function RequestModal({ setShowRequestModal, clientInfo, plans, loadCallData }) {
@@ -69,121 +69,163 @@ export default function RequestModal({ setShowRequestModal, clientInfo, plans, l
       background: 'rgba(0, 0, 0, 0.95)',
       backdropFilter: 'blur(20px)',
       display: 'flex',
-      alignItems: 'center',
+      alignItems: isMobile ? 'flex-end' : 'center',
       justifyContent: 'center',
-      padding: '1rem',
+      padding: isMobile ? '0' : '1rem',
       zIndex: 50,
       animation: 'fadeIn 0.3s ease'
     }}>
       <div style={{
-        background: 'linear-gradient(135deg, rgba(139, 92, 246, 0.1) 0%, rgba(59, 130, 246, 0.05) 100%)',
-        backgroundColor: '#1a1a1a',
-        borderRadius: isMobile ? '20px' : '24px',
-        border: '2px solid rgba(139, 92, 246, 0.3)',
-        padding: isMobile ? '1.5rem' : '2rem',
-        maxWidth: '500px',
+        background: 'linear-gradient(135deg, #1a1a1a 0%, #0f0f0f 100%)',
+        borderRadius: isMobile ? '24px 24px 0 0' : '20px',
+        border: '1px solid rgba(139, 92, 246, 0.2)',
+        padding: isMobile ? '1.25rem' : '1.75rem',
+        maxWidth: isMobile ? '100%' : '480px',
         width: '100%',
-        boxShadow: '0 25px 50px rgba(0, 0, 0, 0.7), 0 0 60px rgba(139, 92, 246, 0.1)',
-        animation: 'slideUp 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
+        maxHeight: isMobile ? '85vh' : 'auto',
+        overflowY: 'auto',
+        boxShadow: '0 -10px 40px rgba(139, 92, 246, 0.1)',
+        animation: isMobile ? 'slideUp 0.3s cubic-bezier(0.4, 0, 0.2, 1)' : 'scaleIn 0.3s ease'
       }}>
-        <h3 style={{
-          fontSize: isMobile ? '1.35rem' : '1.75rem',
-          fontWeight: '700',
-          background: 'linear-gradient(135deg, #8b5cf6 0%, #3b82f6 100%)',
-          WebkitBackgroundClip: 'text',
-          WebkitTextFillColor: 'transparent',
-          backgroundClip: 'text',
-          marginBottom: '1.5rem',
+        {/* Header */}
+        <div style={{
           display: 'flex',
           alignItems: 'center',
-          justifyContent: 'space-between'
+          justifyContent: 'space-between',
+          marginBottom: isMobile ? '1rem' : '1.25rem'
         }}>
-          <span style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <Plus size={isMobile ? 20 : 24} style={{ color: '#8b5cf6' }} />
-            <span style={{ WebkitTextFillColor: '#fff', color: '#fff' }}>
-              Bonus Call Aanvragen
-            </span>
-          </span>
+          <div style={{ 
+            display: 'flex', 
+            alignItems: 'center', 
+            gap: isMobile ? '0.5rem' : '0.75rem' 
+          }}>
+            <div style={{
+              width: isMobile ? '36px' : '40px',
+              height: isMobile ? '36px' : '40px',
+              borderRadius: '10px',
+              background: 'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              boxShadow: '0 4px 12px rgba(139, 92, 246, 0.3)'
+            }}>
+              <Sparkles size={isMobile ? 18 : 20} color="#fff" />
+            </div>
+            <h3 style={{
+              fontSize: isMobile ? '1.1rem' : '1.25rem',
+              fontWeight: '700',
+              color: '#fff',
+              margin: 0
+            }}>
+              Bonus Call
+            </h3>
+          </div>
           <button
             onClick={() => setShowRequestModal(false)}
             style={{
-              background: 'none',
-              border: 'none',
+              width: isMobile ? '32px' : '36px',
+              height: isMobile ? '32px' : '36px',
+              borderRadius: '8px',
+              background: 'rgba(255, 255, 255, 0.05)',
+              border: '1px solid rgba(255, 255, 255, 0.1)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
               cursor: 'pointer',
               touchAction: 'manipulation',
-              WebkitTapHighlightColor: 'transparent'
+              WebkitTapHighlightColor: 'transparent',
+              transition: 'all 0.2s ease',
+              minWidth: '44px',
+              minHeight: '44px'
+            }}
+            onTouchStart={(e) => {
+              if (isMobile) e.currentTarget.style.transform = 'scale(0.95)';
+            }}
+            onTouchEnd={(e) => {
+              if (isMobile) e.currentTarget.style.transform = 'scale(1)';
             }}
           >
-            <X size={isMobile ? 18 : 20} color="#fff" />
+            <X size={isMobile ? 18 : 20} color="rgba(255, 255, 255, 0.6)" />
           </button>
-        </h3>
+        </div>
 
-        {/* Info Box */}
+        {/* Info Box - Compacter */}
         <div style={{
-          background: 'linear-gradient(135deg, rgba(139, 92, 246, 0.2) 0%, rgba(139, 92, 246, 0.05) 100%)',
+          background: 'rgba(139, 92, 246, 0.08)',
           borderLeft: '3px solid #8b5cf6',
-          padding: isMobile ? '0.875rem' : '1rem',
-          borderRadius: '10px',
-          marginBottom: '1.5rem'
+          padding: isMobile ? '0.75rem' : '0.9rem',
+          borderRadius: '8px',
+          marginBottom: isMobile ? '1rem' : '1.25rem'
         }}>
           <p style={{
-            color: 'rgba(255, 255, 255, 0.9)',
-            fontSize: isMobile ? '0.8rem' : '0.875rem',
-            lineHeight: '1.5'
+            color: 'rgba(255, 255, 255, 0.8)',
+            fontSize: isMobile ? '0.75rem' : '0.8rem',
+            lineHeight: '1.4',
+            margin: 0
           }}>
-            💡 <strong>Wanneer een bonus call aanvragen?</strong><br/>
-            • Als je vastloopt met een specifiek probleem<br/>
-            • Bij belangrijke beslissingen in je traject<br/>
-            • Voor extra motivatie of accountability
+            <strong>Wanneer aanvragen?</strong><br/>
+            • Vastgelopen met specifiek probleem<br/>
+            • Belangrijke beslissing<br/>
+            • Extra motivatie nodig
           </p>
         </div>
         
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+        {/* Form */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: isMobile ? '1rem' : '1.25rem' }}>
+          {/* Reason */}
           <div>
             <label style={{
               display: 'block',
-              fontSize: isMobile ? '0.85rem' : '0.9rem',
+              fontSize: isMobile ? '0.8rem' : '0.85rem',
               fontWeight: '600',
-              color: 'rgba(255, 255, 255, 0.9)',
-              marginBottom: '0.5rem'
+              color: 'rgba(255, 255, 255, 0.8)',
+              marginBottom: '0.4rem'
             }}>
-              Waarom heb je een extra call nodig? *
+              Waarom extra call? *
             </label>
             <textarea
               value={requestData.reason}
               onChange={(e) => setRequestData({...requestData, reason: e.target.value})}
-              rows={4}
+              rows={3}
               style={{
                 width: '100%',
-                padding: isMobile ? '0.875rem' : '1rem',
-                background: 'rgba(0, 0, 0, 0.5)',
-                border: '1px solid rgba(139, 92, 246, 0.3)',
-                borderRadius: '12px',
+                padding: isMobile ? '0.75rem' : '0.9rem',
+                background: 'rgba(0, 0, 0, 0.4)',
+                border: '1px solid rgba(139, 92, 246, 0.2)',
+                borderRadius: '10px',
                 color: '#fff',
-                fontSize: isMobile ? '0.85rem' : '0.95rem',
-                resize: 'vertical',
-                transition: 'border-color 0.3s ease',
-                fontFamily: 'inherit'
+                fontSize: isMobile ? '0.9rem' : '0.95rem',
+                resize: 'none',
+                transition: 'all 0.2s ease',
+                fontFamily: 'inherit',
+                minHeight: '80px'
               }}
               onFocus={(e) => {
-                e.currentTarget.style.borderColor = 'rgba(139, 92, 246, 0.6)';
+                e.currentTarget.style.borderColor = 'rgba(139, 92, 246, 0.4)';
                 e.currentTarget.style.outline = 'none';
+                e.currentTarget.style.background = 'rgba(0, 0, 0, 0.6)';
               }}
               onBlur={(e) => {
-                e.currentTarget.style.borderColor = 'rgba(139, 92, 246, 0.3)';
+                e.currentTarget.style.borderColor = 'rgba(139, 92, 246, 0.2)';
+                e.currentTarget.style.background = 'rgba(0, 0, 0, 0.4)';
               }}
-              placeholder="Beschrijf kort waarom deze extra ondersteuning belangrijk is..."
+              placeholder="Kort beschrijven..."
             />
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+          {/* Date and Urgency Grid */}
+          <div style={{ 
+            display: 'grid', 
+            gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', 
+            gap: isMobile ? '0.75rem' : '1rem' 
+          }}>
             <div>
               <label style={{
                 display: 'block',
-                fontSize: isMobile ? '0.85rem' : '0.9rem',
+                fontSize: isMobile ? '0.8rem' : '0.85rem',
                 fontWeight: '600',
-                color: 'rgba(255, 255, 255, 0.9)',
-                marginBottom: '0.5rem'
+                color: 'rgba(255, 255, 255, 0.8)',
+                marginBottom: '0.4rem'
               }}>
                 Voorkeursdatum
               </label>
@@ -193,25 +235,32 @@ export default function RequestModal({ setShowRequestModal, clientInfo, plans, l
                 onChange={(e) => setRequestData({...requestData, preferred_date: e.target.value})}
                 style={{
                   width: '100%',
-                  padding: isMobile ? '0.75rem' : '0.875rem',
-                  background: 'rgba(0, 0, 0, 0.5)',
-                  border: '1px solid rgba(139, 92, 246, 0.3)',
-                  borderRadius: '12px',
+                  padding: isMobile ? '0.75rem' : '0.85rem',
+                  background: 'rgba(0, 0, 0, 0.4)',
+                  border: '1px solid rgba(139, 92, 246, 0.2)',
+                  borderRadius: '10px',
                   color: '#fff',
-                  fontSize: isMobile ? '0.85rem' : '0.95rem',
-                  fontFamily: 'inherit'
+                  fontSize: isMobile ? '0.9rem' : '0.95rem',
+                  fontFamily: 'inherit',
+                  minHeight: '44px'
                 }}
-                onFocus={(e) => e.currentTarget.style.outline = 'none'}
+                onFocus={(e) => {
+                  e.currentTarget.style.outline = 'none';
+                  e.currentTarget.style.borderColor = 'rgba(139, 92, 246, 0.4)';
+                }}
+                onBlur={(e) => {
+                  e.currentTarget.style.borderColor = 'rgba(139, 92, 246, 0.2)';
+                }}
               />
             </div>
 
             <div>
               <label style={{
                 display: 'block',
-                fontSize: isMobile ? '0.85rem' : '0.9rem',
+                fontSize: isMobile ? '0.8rem' : '0.85rem',
                 fontWeight: '600',
-                color: 'rgba(255, 255, 255, 0.9)',
-                marginBottom: '0.5rem'
+                color: 'rgba(255, 255, 255, 0.8)',
+                marginBottom: '0.4rem'
               }}>
                 Urgentie
               </label>
@@ -220,55 +269,66 @@ export default function RequestModal({ setShowRequestModal, clientInfo, plans, l
                 onChange={(e) => setRequestData({...requestData, urgency: e.target.value})}
                 style={{
                   width: '100%',
-                  padding: isMobile ? '0.75rem' : '0.875rem',
-                  background: 'rgba(0, 0, 0, 0.5)',
-                  border: '1px solid rgba(139, 92, 246, 0.3)',
-                  borderRadius: '12px',
+                  padding: isMobile ? '0.75rem' : '0.85rem',
+                  background: 'rgba(0, 0, 0, 0.4)',
+                  border: '1px solid rgba(139, 92, 246, 0.2)',
+                  borderRadius: '10px',
                   color: '#fff',
-                  fontSize: isMobile ? '0.85rem' : '0.95rem',
+                  fontSize: isMobile ? '0.9rem' : '0.95rem',
                   cursor: 'pointer',
-                  fontFamily: 'inherit'
+                  fontFamily: 'inherit',
+                  minHeight: '44px'
                 }}
-                onFocus={(e) => e.currentTarget.style.outline = 'none'}
+                onFocus={(e) => {
+                  e.currentTarget.style.outline = 'none';
+                  e.currentTarget.style.borderColor = 'rgba(139, 92, 246, 0.4)';
+                }}
+                onBlur={(e) => {
+                  e.currentTarget.style.borderColor = 'rgba(139, 92, 246, 0.2)';
+                }}
               >
-                <option value="normal" style={{ background: '#1a1a1a' }}>🟢 Normaal</option>
-                <option value="high" style={{ background: '#1a1a1a' }}>🟡 Hoog</option>
-                <option value="urgent" style={{ background: '#1a1a1a' }}>🔴 Urgent</option>
+                <option value="normal" style={{ background: '#1a1a1a' }}>Normaal</option>
+                <option value="high" style={{ background: '#1a1a1a' }}>Hoog</option>
+                <option value="urgent" style={{ background: '#1a1a1a' }}>Urgent</option>
               </select>
             </div>
           </div>
 
+          {/* Time preference */}
           <div>
             <label style={{
               display: 'block',
-              fontSize: isMobile ? '0.85rem' : '0.9rem',
+              fontSize: isMobile ? '0.8rem' : '0.85rem',
               fontWeight: '600',
-              color: 'rgba(255, 255, 255, 0.9)',
-              marginBottom: '0.5rem'
+              color: 'rgba(255, 255, 255, 0.8)',
+              marginBottom: '0.4rem'
             }}>
-              Voorkeurstijd (optioneel)
+              Voorkeurstijd
             </label>
             <input
               type="text"
               value={requestData.preferred_time}
               onChange={(e) => setRequestData({...requestData, preferred_time: e.target.value})}
-              placeholder="Bijv: ochtend, middag, na 18:00"
+              placeholder="Bijv: ochtend, na 18:00"
               style={{
                 width: '100%',
-                padding: isMobile ? '0.75rem' : '0.875rem',
-                background: 'rgba(0, 0, 0, 0.5)',
-                border: '1px solid rgba(139, 92, 246, 0.3)',
-                borderRadius: '12px',
+                padding: isMobile ? '0.75rem' : '0.85rem',
+                background: 'rgba(0, 0, 0, 0.4)',
+                border: '1px solid rgba(139, 92, 246, 0.2)',
+                borderRadius: '10px',
                 color: '#fff',
-                fontSize: isMobile ? '0.85rem' : '0.95rem',
-                fontFamily: 'inherit'
+                fontSize: isMobile ? '0.9rem' : '0.95rem',
+                fontFamily: 'inherit',
+                minHeight: '44px'
               }}
               onFocus={(e) => {
-                e.currentTarget.style.borderColor = 'rgba(139, 92, 246, 0.6)';
+                e.currentTarget.style.borderColor = 'rgba(139, 92, 246, 0.4)';
                 e.currentTarget.style.outline = 'none';
+                e.currentTarget.style.background = 'rgba(0, 0, 0, 0.6)';
               }}
               onBlur={(e) => {
-                e.currentTarget.style.borderColor = 'rgba(139, 92, 246, 0.3)';
+                e.currentTarget.style.borderColor = 'rgba(139, 92, 246, 0.2)';
+                e.currentTarget.style.background = 'rgba(0, 0, 0, 0.4)';
               }}
             />
           </div>
@@ -277,30 +337,31 @@ export default function RequestModal({ setShowRequestModal, clientInfo, plans, l
         {/* Action Buttons */}
         <div style={{
           display: 'flex',
-          gap: '1rem',
-          marginTop: '2rem'
+          gap: isMobile ? '0.75rem' : '1rem',
+          marginTop: isMobile ? '1.25rem' : '1.5rem'
         }}>
           <button
             onClick={() => setShowRequestModal(false)}
             style={{
               flex: 1,
-              padding: isMobile ? '0.875rem' : '1rem',
-              background: 'rgba(255, 255, 255, 0.1)',
-              border: '1px solid rgba(255, 255, 255, 0.2)',
-              borderRadius: '12px',
-              color: '#fff',
+              padding: isMobile ? '0.85rem' : '0.95rem',
+              background: 'rgba(255, 255, 255, 0.05)',
+              border: '1px solid rgba(255, 255, 255, 0.15)',
+              borderRadius: '10px',
+              color: 'rgba(255, 255, 255, 0.7)',
               fontWeight: '600',
               cursor: 'pointer',
-              transition: 'all 0.3s ease',
-              fontSize: isMobile ? '0.85rem' : '1rem',
+              transition: 'all 0.2s ease',
+              fontSize: isMobile ? '0.9rem' : '0.95rem',
               touchAction: 'manipulation',
-              WebkitTapHighlightColor: 'transparent'
+              WebkitTapHighlightColor: 'transparent',
+              minHeight: '48px'
             }}
-            onMouseEnter={(e) => {
-              if (!isMobile) e.currentTarget.style.background = 'rgba(255, 255, 255, 0.15)';
+            onTouchStart={(e) => {
+              if (isMobile) e.currentTarget.style.transform = 'scale(0.98)';
             }}
-            onMouseLeave={(e) => {
-              if (!isMobile) e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)';
+            onTouchEnd={(e) => {
+              if (isMobile) e.currentTarget.style.transform = 'scale(1)';
             }}
           >
             Annuleren
@@ -310,67 +371,69 @@ export default function RequestModal({ setShowRequestModal, clientInfo, plans, l
             disabled={!requestData.reason}
             style={{
               flex: 1,
-              padding: isMobile ? '0.875rem' : '1rem',
+              padding: isMobile ? '0.85rem' : '0.95rem',
               background: !requestData.reason
-                ? 'rgba(139, 92, 246, 0.3)'
+                ? 'rgba(139, 92, 246, 0.2)'
                 : 'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)',
               border: 'none',
-              borderRadius: '12px',
+              borderRadius: '10px',
               color: '#fff',
               fontWeight: '700',
               cursor: !requestData.reason ? 'not-allowed' : 'pointer',
-              transition: 'all 0.3s ease',
-              fontSize: isMobile ? '0.85rem' : '1rem',
-              boxShadow: !requestData.reason ? 'none' : '0 4px 15px rgba(139, 92, 246, 0.4)',
+              transition: 'all 0.2s ease',
+              fontSize: isMobile ? '0.9rem' : '0.95rem',
+              boxShadow: !requestData.reason ? 'none' : '0 4px 12px rgba(139, 92, 246, 0.3)',
               touchAction: 'manipulation',
               WebkitTapHighlightColor: 'transparent',
-              position: 'relative',
-              overflow: 'hidden'
+              minHeight: '48px',
+              opacity: !requestData.reason ? 0.5 : 1
             }}
-            onMouseEnter={(e) => {
-              if (requestData.reason && !isMobile) {
-                e.currentTarget.style.transform = 'translateY(-2px)';
-                e.currentTarget.style.boxShadow = '0 8px 25px rgba(139, 92, 246, 0.5)';
+            onTouchStart={(e) => {
+              if (isMobile && requestData.reason) {
+                e.currentTarget.style.transform = 'scale(0.98)';
               }
             }}
-            onMouseLeave={(e) => {
-              if (!isMobile) {
-                e.currentTarget.style.transform = 'translateY(0)';
-                e.currentTarget.style.boxShadow = '0 4px 15px rgba(139, 92, 246, 0.4)';
+            onTouchEnd={(e) => {
+              if (isMobile && requestData.reason) {
+                e.currentTarget.style.transform = 'scale(1)';
               }
             }}
           >
-            {requestData.reason && (
-              <span style={{
-                position: 'absolute',
-                top: '50%',
-                left: '50%',
-                transform: 'translate(-50%, -50%)',
-                width: '200%',
-                height: '200%',
-                background: 'radial-gradient(circle, rgba(255, 255, 255, 0.1) 0%, transparent 60%)',
-                animation: 'pulse 2s infinite'
-              }} />
-            )}
-            <span style={{ position: 'relative' }}>
-              Verstuur Aanvraag
-            </span>
+            Verstuur
           </button>
         </div>
 
-        {/* Extra Info */}
+        {/* Footer text */}
         <p style={{
-          marginTop: '1rem',
+          marginTop: isMobile ? '0.75rem' : '1rem',
           fontSize: isMobile ? '0.7rem' : '0.75rem',
-          color: 'rgba(255, 255, 255, 0.5)',
+          color: 'rgba(255, 255, 255, 0.4)',
           textAlign: 'center'
         }}>
-          Je coach neemt binnen 24 uur contact met je op
+          Reactie binnen 24 uur
         </p>
       </div>
 
       {/* Animation Styles */}
       <style>{`
+        @keyframes slideUp {
+          from {
+            transform: translateY(100%);
+          }
+          to {
+            transform: translateY(0);
+          }
+        }
+        @keyframes scaleIn {
+          from {
+            transform: scale(0.95);
+            opacity: 0;
+          }
+          to {
+            transform: scale(1);
+            opacity: 1;
+          }
+        }
         @keyframes slideOut {
           to {
             transform: translateX(120%);
