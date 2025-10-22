@@ -1,5 +1,6 @@
 import ChallengeHomeBanner from "../components/challenge-banner/ChallengeHomeBanner"
 import FloatingActionPanel from '../components/FloatingActionPanel'
+import TestButton from '../components/TestButton'
 import useIsMobile from '../../hooks/useIsMobile'
 import React, { useState, useEffect } from 'react'
 import { 
@@ -452,7 +453,10 @@ export default function ClientHome({ client, db, setCurrentView }) {
       
       {/* Welcome Section */}
       <WelcomeSection client={client} db={db} />
-      
+
+      {/* Test Button */}
+      <TestButton />
+
       {/* Video Widget */}
       <div style={{ 
         padding: isMobile ? '0 1rem 1rem' : '0 1.5rem 1.5rem'
