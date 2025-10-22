@@ -1,10 +1,10 @@
 // src/modules/meal-plan/components/MealSetupWizard.jsx
 import React, { useState, useEffect } from 'react'
-import { X, ArrowLeft, ArrowRight, Check, Zap } from 'lucide-react'
+import { X, ArrowLeft, ArrowRight, Check, Zap, AlertCircle } from 'lucide-react'
 import StandardFoodsSection from '../../client-meal-base/components/StandardFoodsSection'
 import AICustomMealBuilder from './AICustomMealBuilder'
 import AIFavoritesModal from './AIFavoritesModal'
-import WeekPlannerService from '../services/WeekPlannerService'
+import { getAIMealPlanningService } from '../../ai-meal-generator/AIMealPlanningService'
 
 export default function MealSetupWizard({
   isOpen,
@@ -26,6 +26,8 @@ export default function MealSetupWizard({
   })
   
   const [loading, setLoading] = useState(false)
+  const [loadingMessage, setLoadingMessage] = useState('')
+  const [error, setError] = useState(null)
   const [showMealBuilder, setShowMealBuilder] = useState(false)
   const [showFavoritesModal, setShowFavoritesModal] = useState(false)
   
@@ -89,49 +91,154 @@ export default function MealSetupWizard({
   }
   
   const handleGenerateWeek = async () => {
+    console.log('🚀 [WIZARD] Starting meal plan generation...')
     setLoading(true)
-    
+    setError(null)
+    setLoadingMessage('Voorkeuren voorbereiden...')
+
     try {
-      const weekPlannerService = new WeekPlannerService(db)
-      const result = await weekPlannerService.generateWeekPlan(
+      // Step 1: Extract selected ingredients from standard foods
+      console.log('📊 [WIZARD] Extracting selected ingredients...')
+      const selectedProteins = (wizardData.standardFoods?.protein || [])
+        .filter(item => item?.meal?.id)
+        .map(item => ({
+          id: item.meal.id,
+          name: item.meal.name,
+          type: 'protein'
+        }))
+
+      const selectedCarbs = (wizardData.standardFoods?.carbs || [])
+        .filter(item => item?.meal?.id)
+        .map(item => ({
+          id: item.meal.id,
+          name: item.meal.name,
+          type: 'carb'
+        }))
+
+      const selectedMealPreps = (wizardData.standardFoods?.meal_prep || [])
+        .filter(item => item?.meal?.id)
+        .map(item => ({
+          id: item.meal.id,
+          name: item.meal.name,
+          type: 'meal_prep'
+        }))
+
+      const selectedIngredients = [
+        ...selectedProteins,
+        ...selectedCarbs,
+        ...selectedMealPreps
+      ]
+
+      console.log('✅ [WIZARD] Selected ingredients:', {
+        proteins: selectedProteins.length,
+        carbs: selectedCarbs.length,
+        mealPreps: selectedMealPreps.length,
+        total: selectedIngredients.length
+      })
+
+      // Step 2: Get AI Meal Planning Service
+      console.log('🤖 [WIZARD] Initializing AI Meal Planning Service...')
+      setLoadingMessage('AI service initialiseren...')
+      const aiService = getAIMealPlanningService(db.supabase)
+
+      // Step 3: Get client profile
+      console.log('👤 [WIZARD] Loading client profile...')
+      setLoadingMessage('Profiel laden...')
+      const clientProfile = await aiService.ensureClientProfile(client)
+
+      console.log('✅ [WIZARD] Client profile loaded:', {
+        name: clientProfile.first_name,
+        targetCalories: clientProfile.target_calories,
+        targetProtein: clientProfile.target_protein_g,
+        mealsPerDay: wizardData.preferences.mealsPerDay
+      })
+
+      // Update profile with wizard preferences
+      clientProfile.meals_per_day = wizardData.preferences.mealsPerDay
+
+      // Step 4: Generate AI Week Plan
+      console.log('🎯 [WIZARD] Generating AI week plan...')
+      setLoadingMessage('AI genereert je week plan...')
+
+      const generationOptions = {
+        days: 7,
+        variationLevel: wizardData.preferences.varietyLevel || 'medium',
+        avoidDuplicates: true,
+        selectedIngredients: selectedIngredients,
+        excludedIngredients: [],
+        mealPreferences: {
+          mealsPerDay: wizardData.preferences.mealsPerDay,
+          varietyLevel: wizardData.preferences.varietyLevel
+        }
+      }
+
+      console.log('📋 [WIZARD] Generation options:', generationOptions)
+
+      const aiPlan = await aiService.generateWeekPlan(clientProfile, generationOptions)
+
+      console.log('✅ [WIZARD] AI Plan generated successfully:', {
+        daysGenerated: aiPlan.weekPlan.length,
+        dailyTargets: aiPlan.dailyTargets,
+        stats: aiPlan.stats
+      })
+
+      // Step 5: Save plan to database
+      console.log('💾 [WIZARD] Saving plan to database...')
+      setLoadingMessage('Plan opslaan...')
+
+      const savedPlan = await aiService.savePlan(
+        aiPlan,
         client.id,
-        wizardData.preferences
+        `Wizard Setup - ${new Date().toLocaleDateString('nl-NL')}`
       )
-      
+
+      console.log('✅ [WIZARD] Plan saved with ID:', savedPlan.id)
+
+      // Step 6: Store week structure in wizard data
       setWizardData(prev => ({
         ...prev,
-        weekStructure: result.weekStructure
+        weekStructure: savedPlan.week_structure,
+        generatedPlan: aiPlan
       }))
-      
-      // Save to database
-      const activePlan = await db.getClientMealPlan(client.id)
-      await db.supabase
-        .from('client_meal_plans')
-        .update({
-          week_structure: result.weekStructure,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', activePlan.id)
-      
+
+      console.log('🎉 [WIZARD] Generation complete! Moving to review step.')
       setCurrentStep(7) // Go to review
-      
+
     } catch (error) {
-      console.error('Generate failed:', error)
-      alert('Fout bij genereren: ' + error.message)
+      console.error('❌ [WIZARD] Generation failed:', error)
+      console.error('❌ [WIZARD] Error stack:', error.stack)
+      setError(error.message || 'Er is iets misgegaan bij het genereren van je plan')
     } finally {
       setLoading(false)
+      setLoadingMessage('')
     }
   }
-  
+
   const handleComplete = async () => {
-    // Mark wizard as completed
-    await db.supabase
-      .from('clients')
-      .update({ has_completed_meal_setup: true })
-      .eq('id', client.id)
-    
-    onComplete()
-    onClose()
+    console.log('✅ [WIZARD] Completing wizard setup...')
+
+    try {
+      // Mark wizard as completed
+      console.log('📝 [WIZARD] Marking wizard as completed in database...')
+      const { error } = await db.supabase
+        .from('clients')
+        .update({ has_completed_meal_setup: true })
+        .eq('id', client.id)
+
+      if (error) {
+        console.error('❌ [WIZARD] Failed to mark wizard complete:', error)
+        throw error
+      }
+
+      console.log('✅ [WIZARD] Wizard marked as completed')
+      console.log('🎊 [WIZARD] Setup complete! Closing wizard...')
+
+      onComplete()
+      onClose()
+    } catch (error) {
+      console.error('❌ [WIZARD] Error completing wizard:', error)
+      setError('Kon wizard niet afronden. Probeer het opnieuw.')
+    }
   }
   
   const handleSetFood = async (category, slotNumber) => {
@@ -621,6 +728,68 @@ export default function MealSetupWizard({
                 </div>
               </div>
               
+              {/* Error Display */}
+              {error && (
+                <div style={{
+                  background: 'rgba(239, 68, 68, 0.1)',
+                  border: '1px solid rgba(239, 68, 68, 0.3)',
+                  borderRadius: '12px',
+                  padding: '1rem',
+                  marginTop: '1rem',
+                  display: 'flex',
+                  alignItems: 'flex-start',
+                  gap: '0.75rem'
+                }}>
+                  <AlertCircle size={20} color="#ef4444" style={{ flexShrink: 0, marginTop: '2px' }} />
+                  <div>
+                    <div style={{
+                      fontSize: '0.9rem',
+                      fontWeight: '600',
+                      color: '#ef4444',
+                      marginBottom: '0.25rem'
+                    }}>
+                      Generatie Mislukt
+                    </div>
+                    <div style={{
+                      fontSize: '0.875rem',
+                      color: 'rgba(255, 255, 255, 0.7)'
+                    }}>
+                      {error}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Loading Status Display */}
+              {loading && loadingMessage && (
+                <div style={{
+                  background: 'rgba(16, 185, 129, 0.1)',
+                  border: '1px solid rgba(16, 185, 129, 0.3)',
+                  borderRadius: '12px',
+                  padding: '1rem',
+                  marginTop: '1rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.75rem'
+                }}>
+                  <div style={{
+                    width: '20px',
+                    height: '20px',
+                    border: '2px solid rgba(16, 185, 129, 0.3)',
+                    borderTopColor: '#10b981',
+                    borderRadius: '50%',
+                    animation: 'spin 1s linear infinite'
+                  }} />
+                  <div style={{
+                    fontSize: '0.9rem',
+                    color: '#10b981',
+                    fontWeight: '500'
+                  }}>
+                    {loadingMessage}
+                  </div>
+                </div>
+              )}
+
               <button
                 onClick={handleGenerateWeek}
                 disabled={loading}
@@ -640,7 +809,9 @@ export default function MealSetupWizard({
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  gap: '0.5rem'
+                  gap: '0.5rem',
+                  opacity: loading ? 0.6 : 1,
+                  transition: 'all 0.3s ease'
                 }}
               >
                 <Zap size={20} />
@@ -651,7 +822,7 @@ export default function MealSetupWizard({
           
           {/* STEP 7: REVIEW */}
           {currentStep === 7 && (
-            <div style={{ textAlign: 'center' }}>
+            <div style={{ textAlign: 'center', maxWidth: '600px', margin: '0 auto' }}>
               <div style={{ fontSize: '4rem', marginBottom: '1rem' }}>🎉</div>
               <h3 style={{
                 fontSize: isMobile ? '1.5rem' : '2rem',
@@ -666,11 +837,102 @@ export default function MealSetupWizard({
                 color: 'rgba(255, 255, 255, 0.7)',
                 marginBottom: '2rem'
               }}>
-                Je kunt nu starten met je gepersonaliseerde meal plan.
+                Je gepersonaliseerde meal plan is succesvol gegenereerd en opgeslagen.
               </p>
-              
+
+              {/* Plan Summary */}
+              {wizardData.generatedPlan && (
+                <div style={{
+                  background: 'rgba(16, 185, 129, 0.1)',
+                  border: '1px solid rgba(16, 185, 129, 0.3)',
+                  borderRadius: '12px',
+                  padding: '1.5rem',
+                  marginBottom: '2rem',
+                  textAlign: 'left'
+                }}>
+                  <h4 style={{
+                    fontSize: '1rem',
+                    fontWeight: '600',
+                    color: '#10b981',
+                    marginBottom: '1rem',
+                    textAlign: 'center'
+                  }}>
+                    📊 Plan Overzicht
+                  </h4>
+
+                  <div style={{
+                    display: 'grid',
+                    gridTemplateColumns: '1fr 1fr',
+                    gap: '1rem',
+                    fontSize: '0.875rem',
+                    color: 'rgba(255, 255, 255, 0.8)'
+                  }}>
+                    <div>
+                      <div style={{ color: 'rgba(255, 255, 255, 0.5)', marginBottom: '0.25rem' }}>
+                        Dagelijks Doel
+                      </div>
+                      <div style={{ fontWeight: '600', fontSize: '1rem' }}>
+                        {wizardData.generatedPlan.dailyTargets.kcal} kcal
+                      </div>
+                    </div>
+
+                    <div>
+                      <div style={{ color: 'rgba(255, 255, 255, 0.5)', marginBottom: '0.25rem' }}>
+                        Eiwit Doel
+                      </div>
+                      <div style={{ fontWeight: '600', fontSize: '1rem' }}>
+                        {wizardData.generatedPlan.dailyTargets.protein}g
+                      </div>
+                    </div>
+
+                    <div>
+                      <div style={{ color: 'rgba(255, 255, 255, 0.5)', marginBottom: '0.25rem' }}>
+                        Maaltijden per Dag
+                      </div>
+                      <div style={{ fontWeight: '600', fontSize: '1rem' }}>
+                        {wizardData.preferences.mealsPerDay}
+                      </div>
+                    </div>
+
+                    <div>
+                      <div style={{ color: 'rgba(255, 255, 255, 0.5)', marginBottom: '0.25rem' }}>
+                        Variatie Niveau
+                      </div>
+                      <div style={{ fontWeight: '600', fontSize: '1rem', textTransform: 'capitalize' }}>
+                        {wizardData.preferences.varietyLevel}
+                      </div>
+                    </div>
+                  </div>
+
+                  {wizardData.generatedPlan.stats && (
+                    <div style={{
+                      marginTop: '1rem',
+                      paddingTop: '1rem',
+                      borderTop: '1px solid rgba(16, 185, 129, 0.2)',
+                      textAlign: 'center'
+                    }}>
+                      <div style={{
+                        fontSize: '0.875rem',
+                        color: 'rgba(255, 255, 255, 0.6)',
+                        marginBottom: '0.5rem'
+                      }}>
+                        Plan Nauwkeurigheid
+                      </div>
+                      <div style={{
+                        fontSize: '1.5rem',
+                        fontWeight: '700',
+                        color: '#10b981'
+                      }}>
+                        {wizardData.generatedPlan.stats.averageAccuracy}%
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
               <button
                 onClick={handleComplete}
+                disabled={loading}
                 style={{
                   padding: '1.25rem 3rem',
                   background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
@@ -679,16 +941,31 @@ export default function MealSetupWizard({
                   color: '#fff',
                   fontSize: '1.125rem',
                   fontWeight: '600',
-                  cursor: 'pointer',
+                  cursor: loading ? 'not-allowed' : 'pointer',
                   display: 'flex',
                   alignItems: 'center',
                   gap: '0.5rem',
-                  margin: '0 auto'
+                  margin: '0 auto',
+                  opacity: loading ? 0.6 : 1
                 }}
               >
                 <Check size={20} />
-                Start met Mijn Plan
+                {loading ? 'Bezig...' : 'Start met Mijn Plan'}
               </button>
+
+              {error && (
+                <div style={{
+                  marginTop: '1rem',
+                  padding: '0.75rem',
+                  background: 'rgba(239, 68, 68, 0.1)',
+                  border: '1px solid rgba(239, 68, 68, 0.3)',
+                  borderRadius: '8px',
+                  fontSize: '0.875rem',
+                  color: '#ef4444'
+                }}>
+                  {error}
+                </div>
+              )}
             </div>
           )}
         </div>
