@@ -215,6 +215,78 @@ function WelcomeSection({ client, db }) {
 }
 
 // ============================================
+// TEST BUTTON - DEVELOPMENT TESTING
+// ============================================
+function TestButton() {
+  const isMobile = useIsMobile()
+  const [isHovered, setIsHovered] = useState(false)
+
+  const handleTestClick = () => {
+    console.log('Test clicked')
+  }
+
+  return (
+    <div style={{
+      padding: isMobile ? '0 1rem 1rem' : '0 1.5rem 1.5rem'
+    }}>
+      <button
+        onClick={handleTestClick}
+        onMouseEnter={() => setIsHovered(true)}
+        onMouseLeave={() => setIsHovered(false)}
+        style={{
+          ...getCardStyle(isMobile, isHovered),
+          width: '100%',
+          cursor: 'pointer',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: '0.5rem',
+          padding: isMobile ? '1rem' : '1.25rem',
+          background: `linear-gradient(135deg, rgba(139, 92, 246, 0.1) 0%, rgba(139, 92, 246, 0.05) 100%)`,
+          borderColor: isHovered ? 'rgba(139, 92, 246, 0.4)' : 'rgba(139, 92, 246, 0.2)',
+          touchAction: 'manipulation',
+          WebkitTapHighlightColor: 'transparent'
+        }}
+        onTouchStart={(e) => {
+          if (isMobile) {
+            e.currentTarget.style.transform = 'scale(0.98)'
+          }
+        }}
+        onTouchEnd={(e) => {
+          if (isMobile) {
+            e.currentTarget.style.transform = isHovered ? 'translateY(-2px)' : 'translateY(0)'
+          }
+        }}
+      >
+        <Rocket
+          size={isMobile ? 18 : 20}
+          color={COLORS.purple}
+          style={{
+            transition: 'all 0.3s ease',
+            transform: isHovered ? 'scale(1.1) rotate(5deg)' : 'scale(1)'
+          }}
+        />
+        <span style={{
+          fontSize: isMobile ? '0.95rem' : '1rem',
+          fontWeight: '700',
+          color: COLORS.textPrimary,
+          letterSpacing: '0.02em'
+        }}>
+          Test Button
+        </span>
+        <span style={{
+          fontSize: isMobile ? '0.75rem' : '0.8rem',
+          color: COLORS.textMuted,
+          fontWeight: '500'
+        }}>
+          (Check Console)
+        </span>
+      </button>
+    </div>
+  )
+}
+
+// ============================================
 // QUICK ACTIONS - FIXED ROUTES
 // ============================================
 function QuickActions({ client, db, onNavigate }) {
@@ -452,7 +524,10 @@ export default function ClientHome({ client, db, setCurrentView }) {
       
       {/* Welcome Section */}
       <WelcomeSection client={client} db={db} />
-      
+
+      {/* Test Button */}
+      <TestButton />
+
       {/* Video Widget */}
       <div style={{ 
         padding: isMobile ? '0 1rem 1rem' : '0 1.5rem 1.5rem'
