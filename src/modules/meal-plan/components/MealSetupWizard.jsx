@@ -1,10 +1,13 @@
 // src/modules/meal-plan/components/MealSetupWizard.jsx
+// VERSION: 2.0.0 - AI Generation Enabled (2025-10-22)
 import React, { useState, useEffect } from 'react'
 import { X, ArrowLeft, ArrowRight, Check, Zap, AlertCircle } from 'lucide-react'
 import StandardFoodsSection from '../../client-meal-base/components/StandardFoodsSection'
 import AICustomMealBuilder from './AICustomMealBuilder'
 import AIFavoritesModal from './AIFavoritesModal'
 import { getAIMealPlanningService } from '../../ai-meal-generator/AIMealPlanningService'
+
+console.log('🔍 [WIZARD] MealSetupWizard.jsx loaded - VERSION 2.0.0 - AI Generation Enabled')
 
 export default function MealSetupWizard({
   isOpen,
