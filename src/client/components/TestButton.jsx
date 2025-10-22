@@ -7,7 +7,7 @@ export default function TestButton() {
   const [isHovered, setIsHovered] = useState(false)
 
   const handleClick = () => {
-    console.log('Hoi Kersten')
+    console.log('Doei Kersten')
   }
 
   return (
@@ -68,7 +68,7 @@ export default function TestButton() {
           color: isHovered ? '#ffffff' : 'rgba(255, 255, 255, 0.7)',
           transition: 'all 0.3s ease'
         }}>
-          Hoi Kersten
+          Doei Kersten
         </span>
       </button>
     </div>
