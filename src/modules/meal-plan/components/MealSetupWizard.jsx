@@ -91,7 +91,12 @@ export default function MealSetupWizard({
   }
   
   const handleGenerateWeek = async () => {
-    console.log('🚀 [WIZARD] Starting meal plan generation...')
+    console.log('='.repeat(80))
+    console.log('🚀 [WIZARD] ===== STARTING MEAL PLAN GENERATION =====')
+    console.log('='.repeat(80))
+    console.log('🔍 [WIZARD] handleGenerateWeek() called at:', new Date().toISOString())
+    console.log('📍 [WIZARD] Current step:', currentStep)
+
     setLoading(true)
     setError(null)
     setLoadingMessage('Voorkeuren voorbereiden...')
@@ -201,16 +206,24 @@ export default function MealSetupWizard({
         generatedPlan: aiPlan
       }))
 
-      console.log('🎉 [WIZARD] Generation complete! Moving to review step.')
+      console.log('='.repeat(80))
+      console.log('🎉 [WIZARD] ===== GENERATION COMPLETE! =====')
+      console.log('='.repeat(80))
+      console.log('📍 [WIZARD] Moving to review step (Step 7)...')
       setCurrentStep(7) // Go to review
 
     } catch (error) {
-      console.error('❌ [WIZARD] Generation failed:', error)
+      console.log('='.repeat(80))
+      console.error('❌ [WIZARD] ===== GENERATION FAILED =====')
+      console.error('❌ [WIZARD] Error:', error)
+      console.error('❌ [WIZARD] Error message:', error.message)
       console.error('❌ [WIZARD] Error stack:', error.stack)
+      console.log('='.repeat(80))
       setError(error.message || 'Er is iets misgegaan bij het genereren van je plan')
     } finally {
       setLoading(false)
       setLoadingMessage('')
+      console.log('🏁 [WIZARD] handleGenerateWeek() function ended')
     }
   }
 
@@ -791,7 +804,10 @@ export default function MealSetupWizard({
               )}
 
               <button
-                onClick={handleGenerateWeek}
+                onClick={() => {
+                  console.log('🖱️  [WIZARD] "Genereer Mijn Week!" button clicked')
+                  handleGenerateWeek()
+                }}
                 disabled={loading}
                 style={{
                   width: '100%',
