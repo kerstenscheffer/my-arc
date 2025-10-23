@@ -4,15 +4,16 @@ import AIMealPlanService from './AIMealPlanService'
 
 // Core Components
 import AIDailyGoals from './components/AIDailyGoals'
+import PlanWithCoachSection from './components/PlanWithCoachSection'
 import AINextMeal from './components/AINextMeal'
 import AIDaySchedule from './components/AIDaySchedule'
 import AIQuickActions from './components/AIQuickActions'
 import MealLibrarySection from './components/MealLibrarySection'
 import AIWeekPlanner from './components/AIWeekPlanner'
-import MealSetupWizardV2 from './components/wizard/MealSetupWizardV2'
+import MealSetupWizard from "./components/wizard/MealSetupWizard"
 
-// Challenge Banner
-import MealChallengeBanner from '../../client/components/MealChallengeBanner'
+// Challenge Sidebar (NEW)
+import MealChallengeSidebar from '../../client/components/MealChallengeSidebar'
 
 // Modals
 import AIAlternativesModal from './components/AIAlternativesModal'
@@ -63,10 +64,10 @@ export default function AIMealDashboard({ client, onNavigate, db }) {
         .eq('id', client.id)
         .single()
       
-      // Auto-open wizard if first time
-      if (!data?.has_completed_meal_setup) {
-        setShowWizard(true)
-      }
+      // Don't auto-open wizard anymore - user opens manually via button
+      // if (!data?.has_completed_meal_setup) {
+      //   setShowWizard(true)
+      // }
     } catch (error) {
       console.error('Failed to check setup status:', error)
     }
@@ -350,10 +351,10 @@ export default function AIMealDashboard({ client, onNavigate, db }) {
       animation: 'fadeIn 0.5s ease'
     }}>
       
-      <div style={{ padding: isMobile ? '1rem 1rem 0' : '1.5rem 1.5rem 0' }}>
-        <MealChallengeBanner client={client} db={db} />
-      </div>
+      {/* Challenge Sidebar - Floating Widget */}
+      <MealChallengeSidebar client={client} db={db} />
       
+      {/* 1. DAGELIJKSE DOELEN */}
       <AIDailyGoals
         dailyTotals={dashboardData.dailyTotals || {
           targets: { calories: 2200, protein: 165, carbs: 220, fat: 73 },
@@ -370,65 +371,13 @@ export default function AIMealDashboard({ client, onNavigate, db }) {
         db={db}
       />
       
-      <AINextMeal
-        nextMeal={dashboardData.nextMeal}
-        todayMeals={dashboardData.todayMeals || []}
-        onOpenInfo={(meal) => setModals(prev => ({ ...prev, info: meal }))}
-        onOpenAlternatives={(meal) => setModals(prev => ({ ...prev, alternatives: meal }))}
-        onFinishMeal={handleFinishMeal}
-        onOpenDaySchedule={() => {
-          document.getElementById('day-schedule')?.scrollIntoView({ 
-            behavior: 'smooth', 
-            block: 'start' 
-          })
-        }}
-        db={db}
+      {/* 2. PLAN MET COACH SECTIE - NIEUW */}
+      <PlanWithCoachSection 
+        onOpenWizard={() => setShowWizard(true)}
+        isMobile={isMobile}
       />
       
-      <div id="quick-actions">
-        <AIQuickActions
-          db={db}
-          client={client}
-          clientId={client.id}
-          onOpenFavorites={handleOpenFavorites}
-          onOpenHistory={() => setModals(prev => ({ ...prev, history: true }))}
-          onOpenMealBase={() => alert('Meal database komt binnenkort!')}
-          onOpenShopping={() => onNavigate('shopping')}
-          onOpenRecipes={() => onNavigate('recipe-library')}
-          onMealCreated={() => loadDashboardData()}
-          onOpenWeekPlanner={() => setShowWeekPlanner(!showWeekPlanner)}
-          onOpenWizard={() => setShowWizard(true)}
-        />
-      </div>
-      
-      {showWeekPlanner && (
-        <AIWeekPlanner
-          activePlan={dashboardData.activePlan}
-          client={client}
-          db={db}
-          onWeekUpdated={loadDashboardData}
-          dailyTotals={dashboardData.dailyTotals}
-        />
-      )}
-      
-      <MealLibrarySection
-        client={client}
-        db={db}
-        onMealCreated={loadDashboardData}
-      />
-      
-      <div style={{
-        padding: isMobile ? '0 1rem 1rem' : '0 1.5rem 1.5rem'
-      }}>
-        <PageVideoWidget
-          client={client}
-          db={db}
-          pageContext="nutrition"
-          title="Voeding & Meal Prep Video's"
-          compact={true}
-        />
-      </div>
-      
+      {/* 3. DAG SCHEMA */}
       <div id="day-schedule">
         {dashboardData.todayMeals && dashboardData.todayMeals.length > 0 && (
           <AIDaySchedule
@@ -447,6 +396,71 @@ export default function AIMealDashboard({ client, onNavigate, db }) {
         )}
       </div>
       
+      {/* 4. QUICK ACTIONS */}
+      <div id="quick-actions">
+        <AIQuickActions
+          db={db}
+          client={client}
+          clientId={client.id}
+          onOpenFavorites={handleOpenFavorites}
+          onOpenHistory={() => setModals(prev => ({ ...prev, history: true }))}
+          onOpenMealBase={() => alert('Meal database komt binnenkort!')}
+          onOpenShopping={() => onNavigate('shopping')}
+          onOpenRecipes={() => onNavigate('recipe-library')}
+          onMealCreated={() => loadDashboardData()}
+          onOpenWeekPlanner={() => setShowWeekPlanner(!showWeekPlanner)}
+          onOpenWizard={() => setShowWizard(true)}
+        />
+      </div>
+      
+      {/* 5. VOLGENDE MAALTIJD */}
+      <AINextMeal
+        nextMeal={dashboardData.nextMeal}
+        todayMeals={dashboardData.todayMeals || []}
+        onOpenInfo={(meal) => setModals(prev => ({ ...prev, info: meal }))}
+        onOpenAlternatives={(meal) => setModals(prev => ({ ...prev, alternatives: meal }))}
+        onFinishMeal={handleFinishMeal}
+        onOpenDaySchedule={() => {
+          document.getElementById('day-schedule')?.scrollIntoView({ 
+            behavior: 'smooth', 
+            block: 'start' 
+          })
+        }}
+        db={db}
+      />
+      
+      {/* Week Planner */}
+      {showWeekPlanner && (
+        <AIWeekPlanner
+          activePlan={dashboardData.activePlan}
+          client={client}
+          db={db}
+          onWeekUpdated={loadDashboardData}
+          dailyTotals={dashboardData.dailyTotals}
+        />
+      )}
+      
+      {/* Meal Library */}
+      <MealLibrarySection
+        client={client}
+        db={db}
+        onMealCreated={loadDashboardData}
+      />
+      
+      {/* Video Widget */}
+      <div style={{
+        padding: isMobile ? '0 1rem 1rem' : '0 1.5rem 1.5rem'
+      }}>
+        <PageVideoWidget
+          client={client}
+          db={db}
+          pageContext="meals"
+          title="Voeding & Meal Prep Video's"
+          compact={true}
+        />
+      </div>
+      
+      {/* MODALS */}
       {modals.alternatives && (
         <AIAlternativesModal
           isOpen={!!modals.alternatives}
@@ -493,8 +507,9 @@ export default function AIMealDashboard({ client, onNavigate, db }) {
         />
       )}
       
+      {/* Coach Strategy Wizard */}
       {showWizard && (
-        <MealSetupWizardV2
+        <MealSetupWizard
           isOpen={showWizard}
           onClose={() => setShowWizard(false)}
           onComplete={() => {

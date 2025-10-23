@@ -36,7 +36,7 @@ export default function AIDailyGoals({
   ))
   const waterPercent = Math.min(100, Math.round((waterIntake / 2000) * 100))
   
-  // Mood icons with Lucide
+  // Mood icons
   const moodIcons = [
     { icon: Frown, color: '#ef4444', label: 'Slecht' },
     { icon: Meh, color: '#f97316', label: 'Matig' },
@@ -51,134 +51,83 @@ export default function AIDailyGoals({
   }
   
   const handleMoodSelect = async (score) => {
-    console.log('🎯 Selecting mood:', score)
-    
-    // Update local state immediately for UI feedback
     setSelectedMoodScore(score)
     setShowMoodSelector(false)
     
-    // Save to database
     const result = await onLogMood({ score, reason: null })
     
-    // If save failed, revert to previous state
     if (!result) {
-      console.error('❌ Failed to save mood, reverting')
       setSelectedMoodScore(todayMood?.mood_score || null)
     }
   }
 
   // Helper function for macro card
-  const MacroCard = ({ label, icon: Icon, value, target, unit, percent, color, iconSize = 16 }) => {
+  const MacroCard = ({ label, icon: Icon, value, target, unit, percent, color }) => {
     const isGood = percent >= 90
     const isOk = percent >= 70
     
     return (
       <div style={{
-        background: isGood 
-          ? 'linear-gradient(135deg, rgba(16, 185, 129, 0.12) 0%, rgba(16, 185, 129, 0.04) 100%)'
-          : isOk
-          ? `linear-gradient(135deg, rgba(16, 185, 129, 0.08) 0%, ${color}08 100%)`
-          : `linear-gradient(135deg, ${color}12 0%, ${color}04 100%)`,
-        borderRadius: isMobile ? '12px' : '14px',
-        padding: isMobile ? '0.75rem' : '1rem',
-        border: isGood 
-          ? '1px solid rgba(16, 185, 129, 0.25)'
-          : isOk
-          ? '1px solid rgba(16, 185, 129, 0.15)'
-          : `1px solid ${color}20`,
-        position: 'relative',
-        backdropFilter: 'blur(20px)',
-        boxShadow: isGood
-          ? '0 4px 16px rgba(16, 185, 129, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.03)'
-          : '0 4px 16px rgba(0, 0, 0, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.02)',
-        minHeight: isMobile ? '90px' : '100px',
-        overflow: 'hidden'
+        background: 'rgba(23, 23, 23, 0.6)',
+        backdropFilter: 'blur(10px)',
+        border: '1px solid rgba(16, 185, 129, 0.1)',
+        borderRadius: '10px',
+        padding: isMobile ? '0.6rem' : '0.75rem',
+        textAlign: 'center',
+        minHeight: '44px',
+        display: 'flex',
+        flexDirection: 'column',
+        justifyContent: 'center',
+        transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
       }}>
-        {/* Glass overlay */}
-        <div style={{
-          position: 'absolute',
-          top: 0,
-          left: 0,
-          right: 0,
-          height: '40%',
-          background: 'linear-gradient(180deg, rgba(255, 255, 255, 0.04) 0%, transparent 100%)',
-          pointerEvents: 'none'
-        }} />
-        
-        {/* Header */}
+        {/* Icon + Label */}
         <div style={{
           display: 'flex',
-          justifyContent: 'space-between',
           alignItems: 'center',
-          marginBottom: isMobile ? '0.3rem' : '0.4rem'
+          justifyContent: 'center',
+          gap: '0.25rem',
+          marginBottom: '0.3rem'
         }}>
-          <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.3rem'
-          }}>
-            <Icon size={isMobile ? 12 : 13} color={isOk ? '#10b981' : color} style={{ opacity: 0.8 }} />
-            <span style={{
-              fontSize: isMobile ? '0.55rem' : '0.6rem',
-              color: 'rgba(255, 255, 255, 0.35)',
-              fontWeight: '600',
-              textTransform: 'uppercase',
-              letterSpacing: '0.04em'
-            }}>
-              {label}
-            </span>
-          </div>
-          
-          <div style={{
-            background: isGood 
-              ? 'linear-gradient(135deg, rgba(16, 185, 129, 0.25) 0%, rgba(16, 185, 129, 0.15) 100%)'
-              : isOk
-              ? 'linear-gradient(135deg, rgba(16, 185, 129, 0.15) 0%, rgba(16, 185, 129, 0.08) 100%)'
-              : `linear-gradient(135deg, ${color}20 0%, ${color}10 100%)`,
-            padding: '0.1rem 0.3rem',
-            borderRadius: '4px',
+          <Icon size={isMobile ? 12 : 13} color={isOk ? '#10b981' : color} style={{ opacity: 0.8 }} />
+          <span style={{
             fontSize: isMobile ? '0.55rem' : '0.6rem',
-            fontWeight: '700',
-            color: isOk ? '#10b981' : color,
-            border: `1px solid ${isOk ? 'rgba(16, 185, 129, 0.3)' : color + '25'}`,
-            backdropFilter: 'blur(10px)'
+            color: 'rgba(255, 255, 255, 0.5)',
+            fontWeight: '600',
+            textTransform: 'uppercase',
+            letterSpacing: '0.05em'
           }}>
-            {percent}%
-          </div>
+            {label}
+          </span>
         </div>
         
         {/* Value */}
         <div style={{
-          display: 'flex',
-          alignItems: 'baseline',
-          gap: '0.25rem',
+          fontSize: isMobile ? '1.1rem' : '1.25rem',
+          fontWeight: '800',
+          color: isOk ? '#10b981' : color,
+          marginBottom: '0.1rem',
+          letterSpacing: '-0.02em'
+        }}>
+          {value}
+        </div>
+        
+        {/* Target */}
+        <div style={{
+          fontSize: isMobile ? '0.55rem' : '0.6rem',
+          color: 'rgba(255, 255, 255, 0.4)',
+          fontWeight: '500',
           marginBottom: '0.3rem'
         }}>
-          <span style={{
-            fontSize: isMobile ? '1.1rem' : '1.3rem',
-            fontWeight: '800',
-            color: isOk ? '#10b981' : color,
-            lineHeight: 1,
-            letterSpacing: '-0.02em'
-          }}>
-            {value}
-          </span>
-          <span style={{
-            fontSize: isMobile ? '0.6rem' : '0.65rem',
-            color: 'rgba(255, 255, 255, 0.25)',
-            fontWeight: '500'
-          }}>
-            / {target}{unit}
-          </span>
+          / {target}{unit}
         </div>
         
         {/* Progress bar */}
         <div style={{
-          height: '5px',
-          background: 'rgba(0, 0, 0, 0.4)',
-          borderRadius: '2.5px',
+          height: '4px',
+          background: 'rgba(0, 0, 0, 0.5)',
+          borderRadius: '2px',
           overflow: 'hidden',
-          border: '0.5px solid rgba(16, 185, 129, 0.08)'
+          border: '1px solid rgba(16, 185, 129, 0.1)'
         }}>
           <div style={{
             height: '100%',
@@ -187,12 +136,22 @@ export default function AIDailyGoals({
               ? 'linear-gradient(90deg, #10b981 0%, #34d399 100%)'
               : isOk
               ? 'linear-gradient(90deg, #84cc16 0%, #10b981 100%)'
-              : `linear-gradient(90deg, ${color} 0%, ${color}99 100%)`,
-            transition: 'width 0.5s cubic-bezier(0.4, 0, 0.2, 1)',
+              : `linear-gradient(90deg, ${color} 0%, ${color}aa 100%)`,
+            transition: 'width 0.6s cubic-bezier(0.4, 0, 0.2, 1)',
             boxShadow: isOk 
               ? '0 0 10px rgba(16, 185, 129, 0.4)'
               : `0 0 8px ${color}40`
           }} />
+        </div>
+        
+        {/* Percentage badge */}
+        <div style={{
+          marginTop: '0.3rem',
+          fontSize: isMobile ? '0.55rem' : '0.6rem',
+          fontWeight: '700',
+          color: isOk ? '#10b981' : color
+        }}>
+          {percent}%
         </div>
       </div>
     )
@@ -200,282 +159,333 @@ export default function AIDailyGoals({
 
   return (
     <div style={{ 
-      padding: isMobile ? '0.75rem' : '1.5rem'
+      padding: isMobile ? '1rem' : '1.5rem'
     }}>
-      {/* Header - Compact with green gradient */}
+      {/* Main Card Container - Workout Style */}
       <div style={{
-        marginBottom: isMobile ? '0.5rem' : '1rem'
+        background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.12) 0%, rgba(16, 185, 129, 0.04) 100%)',
+        backdropFilter: 'blur(20px)',
+        border: '1px solid rgba(16, 185, 129, 0.25)',
+        borderRadius: isMobile ? '12px' : '16px',
+        padding: isMobile ? '1.25rem' : '1.5rem',
+        boxShadow: '0 8px 32px rgba(16, 185, 129, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.03)',
+        position: 'relative',
+        overflow: 'hidden',
+        marginBottom: isMobile ? '1rem' : '1.25rem'
       }}>
-        <h2 style={{
-          fontSize: isMobile ? '1rem' : '1.25rem',
-          fontWeight: '700',
-          margin: 0,
-          background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-          WebkitBackgroundClip: 'text',
-          WebkitTextFillColor: 'transparent',
-          backgroundClip: 'text',
-          marginBottom: '0.15rem'
+        {/* Top glow accent */}
+        <div style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          height: '2px',
+          background: 'linear-gradient(90deg, transparent 0%, #10b981 50%, transparent 100%)',
+          opacity: 0.6
+        }} />
+        
+        {/* Background decoration */}
+        <div style={{
+          position: 'absolute',
+          top: '-20%',
+          right: '-10%',
+          opacity: 0.03,
+          pointerEvents: 'none',
+          zIndex: 0
         }}>
-          Dagelijkse Doelen
-        </h2>
-        <p style={{
-          fontSize: isMobile ? '0.65rem' : '0.75rem',
-          color: 'rgba(16, 185, 129, 0.5)',
-          margin: 0,
-          fontWeight: '500'
-        }}>
-          {dailyTotals?.mealsConsumed || 0} van {dailyTotals?.mealsPlanned || 4} maaltijden • {new Date().toLocaleDateString('nl-NL', { weekday: 'long' })}
-        </p>
-      </div>
-      
-      {/* Primary Goals Cards - 2x2 GRID voor alle 4 macros */}
-      <div style={{
-        display: 'grid',
-        gridTemplateColumns: 'repeat(2, 1fr)', // 2x2 grid
-        gap: isMobile ? '0.5rem' : '1rem',
-        marginBottom: isMobile ? '0.625rem' : '1rem'
-      }}>
-        {/* Calories */}
-        <MacroCard
-          label="Calorieën"
-          icon={Activity}
-          value={dailyTotals?.consumed?.calories || 0}
-          target={dailyTotals?.targets?.calories || 2200}
-          unit=""
-          percent={caloriesPercent}
-          color="#f97316"
-        />
+          <Activity size={isMobile ? 140 : 180} color="#10b981" />
+        </div>
         
-        {/* Protein */}
-        <MacroCard
-          label="Eiwitten"
-          icon={Zap}
-          value={dailyTotals?.consumed?.protein || 0}
-          target={dailyTotals?.targets?.protein || 165}
-          unit="g"
-          percent={proteinPercent}
-          color="#8b5cf6"
-        />
-        
-        {/* Carbs */}
-        <MacroCard
-          label="Koolhydraten"
-          icon={Wheat}
-          value={dailyTotals?.consumed?.carbs || 0}
-          target={dailyTotals?.targets?.carbs || 220}
-          unit="g"
-          percent={carbsPercent}
-          color="#3b82f6"
-        />
-        
-        {/* Fat */}
-        <MacroCard
-          label="Vetten"
-          icon={Beef}
-          value={dailyTotals?.consumed?.fat || 0}
-          target={dailyTotals?.targets?.fat || 73}
-          unit="g"
-          percent={fatPercent}
-          color="#fbbf24"
-        />
-      </div>
-      
-      {/* Action Bar - Premium Glass with MORE green accents */}
-      <div style={{
-        display: 'grid',
-        gridTemplateColumns: '2fr 1fr 1fr',
-        gap: isMobile ? '0.5rem' : '0.75rem'
-      }}>
-        {/* Water Intake - 50% - GREEN when good */}
-        <button
-          onClick={handleWaterClick}
-          style={{
-            background: waterPercent >= 80
-              ? 'linear-gradient(135deg, rgba(16, 185, 129, 0.1) 0%, rgba(16, 185, 129, 0.04) 100%)'
-              : 'linear-gradient(135deg, rgba(59, 130, 246, 0.08) 0%, rgba(59, 130, 246, 0.03) 100%)',
-            borderRadius: '14px',
-            padding: isMobile ? '0.75rem' : '0.875rem',
-            border: waterPercent >= 80
-              ? '1px solid rgba(16, 185, 129, 0.2)'
-              : '1px solid rgba(59, 130, 246, 0.15)',
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
-            touchAction: 'manipulation',
-            WebkitTapHighlightColor: 'transparent',
-            minHeight: '48px',
-            backdropFilter: 'blur(20px)',
-            boxShadow: '0 4px 16px rgba(0, 0, 0, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.03)',
-            position: 'relative',
-            overflow: 'hidden'
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.transform = 'translateY(-1px)'
-            e.currentTarget.style.boxShadow = '0 6px 20px rgba(0, 0, 0, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.05)'
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.transform = 'translateY(0)'
-            e.currentTarget.style.boxShadow = '0 4px 16px rgba(0, 0, 0, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.03)'
-          }}
-        >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <Droplets size={16} color={waterPercent >= 80 ? '#10b981' : '#3b82f6'} />
-            <div style={{ textAlign: 'left' }}>
+        {/* Content */}
+        <div style={{ position: 'relative', zIndex: 1 }}>
+          {/* Header */}
+          <div style={{
+            marginBottom: isMobile ? '0.875rem' : '1rem'
+          }}>
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem',
+              marginBottom: isMobile ? '0.5rem' : '0.625rem'
+            }}>
               <div style={{
-                fontSize: '0.6rem',
-                color: 'rgba(255, 255, 255, 0.4)',
-                textTransform: 'uppercase',
-                letterSpacing: '0.05em',
-                marginBottom: '0.1rem'
+                width: isMobile ? '28px' : '32px',
+                height: isMobile ? '28px' : '32px',
+                borderRadius: '8px',
+                background: 'rgba(16, 185, 129, 0.2)',
+                border: '1px solid rgba(16, 185, 129, 0.3)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                boxShadow: '0 0 15px rgba(16, 185, 129, 0.3)'
               }}>
-                Water
+                <Target 
+                  size={isMobile ? 14 : 16} 
+                  color="#10b981"
+                  style={{ filter: 'drop-shadow(0 0 6px rgba(16, 185, 129, 0.6))' }}
+                />
               </div>
-              <div style={{
-                fontSize: isMobile ? '0.95rem' : '1.05rem',
+              <span style={{
+                fontSize: isMobile ? '0.65rem' : '0.7rem',
+                color: '#10b981',
                 fontWeight: '700',
-                color: waterPercent >= 80 ? '#10b981' : '#3b82f6'
+                textTransform: 'uppercase',
+                letterSpacing: '0.05em'
               }}>
-                {(waterIntake / 1000).toFixed(1)}L
-              </div>
+                VANDAAG
+              </span>
             </div>
+            
+            <h2 style={{
+              fontSize: isMobile ? '1.1rem' : '1.3rem',
+              fontWeight: '800',
+              color: '#fff',
+              margin: '0 0 0.5rem 0',
+              letterSpacing: '-0.02em'
+            }}>
+              Dagelijkse Doelen
+            </h2>
+            
+            <div style={{
+              fontSize: isMobile ? '0.75rem' : '0.8rem',
+              color: 'rgba(255, 255, 255, 0.7)',
+              fontWeight: '600'
+            }}>
+              {dailyTotals?.mealsConsumed || 0} van {dailyTotals?.mealsPlanned || 4} maaltijden • {new Date().toLocaleDateString('nl-NL', { weekday: 'long' })}
+            </div>
+          </div>
+          {/* Primary Goals - 2x2 GRID */}
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(2, 1fr)',
+            gap: isMobile ? '0.5rem' : '0.625rem',
+            marginBottom: isMobile ? '1rem' : '1.25rem'
+          }}>
+            <MacroCard
+              label="Calorieën"
+              icon={Activity}
+              value={dailyTotals?.consumed?.calories || 0}
+              target={dailyTotals?.targets?.calories || 2200}
+              unit=""
+              percent={caloriesPercent}
+              color="#f97316"
+            />
+            
+            <MacroCard
+              label="Eiwitten"
+              icon={Zap}
+              value={dailyTotals?.consumed?.protein || 0}
+              target={dailyTotals?.targets?.protein || 165}
+              unit="g"
+              percent={proteinPercent}
+              color="#8b5cf6"
+            />
+            
+            <MacroCard
+              label="Koolhydraten"
+              icon={Wheat}
+              value={dailyTotals?.consumed?.carbs || 0}
+              target={dailyTotals?.targets?.carbs || 220}
+              unit="g"
+              percent={carbsPercent}
+              color="#3b82f6"
+            />
+            
+            <MacroCard
+              label="Vetten"
+              icon={Beef}
+              value={dailyTotals?.consumed?.fat || 0}
+              target={dailyTotals?.targets?.fat || 73}
+              unit="g"
+              percent={fatPercent}
+              color="#fbbf24"
+            />
           </div>
           
-          {/* Mini circular progress - GREEN when good */}
+          {/* Action Bar */}
           <div style={{
-            width: '36px',
-            height: '36px',
-            position: 'relative'
+            display: 'grid',
+            gridTemplateColumns: '2fr 1fr 1fr',
+            gap: isMobile ? '0.5rem' : '0.625rem'
           }}>
-            <svg width="36" height="36" style={{ transform: 'rotate(-90deg)' }}>
-              <circle
-                cx="18" cy="18" r="15"
-                fill="none"
-                stroke={waterPercent >= 80 ? 'rgba(16, 185, 129, 0.1)' : 'rgba(59, 130, 246, 0.1)'}
-                strokeWidth="2"
-              />
-              <circle
-                cx="18" cy="18" r="15"
-                fill="none"
-                stroke={waterPercent >= 80 ? '#10b981' : '#3b82f6'}
-                strokeWidth="2"
-                strokeDasharray={`${waterPercent * 0.94} 94`}
-                strokeLinecap="round"
-                style={{ transition: 'all 0.5s cubic-bezier(0.4, 0, 0.2, 1)' }}
-              />
-            </svg>
-            <div style={{
-              position: 'absolute',
-              top: '50%',
-              left: '50%',
-              transform: 'translate(-50%, -50%)',
-              fontSize: '0.6rem',
-              fontWeight: '700',
-              color: waterPercent >= 80 ? '#10b981' : '#3b82f6'
-            }}>
-              {waterPercent}%
-            </div>
+            {/* Water Intake */}
+            <button
+              onClick={handleWaterClick}
+              style={{
+                background: 'rgba(23, 23, 23, 0.6)',
+                backdropFilter: 'blur(10px)',
+                border: waterPercent >= 80
+                  ? '1px solid rgba(16, 185, 129, 0.25)'
+                  : '1px solid rgba(59, 130, 246, 0.2)',
+                borderRadius: '10px',
+                padding: isMobile ? '0.6rem 0.75rem' : '0.75rem 0.875rem',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                touchAction: 'manipulation',
+                WebkitTapHighlightColor: 'transparent',
+                minHeight: '44px'
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.transform = 'translateY(-2px)'
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.transform = 'translateY(0)'
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <Droplets size={isMobile ? 16 : 18} color={waterPercent >= 80 ? '#10b981' : '#3b82f6'} />
+                <div style={{ textAlign: 'left' }}>
+                  <div style={{
+                    fontSize: '0.55rem',
+                    color: 'rgba(255, 255, 255, 0.5)',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.05em',
+                    marginBottom: '0.1rem',
+                    fontWeight: '600'
+                  }}>
+                    Water
+                  </div>
+                  <div style={{
+                    fontSize: isMobile ? '0.9rem' : '1rem',
+                    fontWeight: '800',
+                    color: waterPercent >= 80 ? '#10b981' : '#3b82f6'
+                  }}>
+                    {(waterIntake / 1000).toFixed(1)}L
+                  </div>
+                </div>
+              </div>
+              
+              {/* Mini progress */}
+              <div style={{
+                width: '32px',
+                height: '32px',
+                position: 'relative'
+              }}>
+                <svg width="32" height="32" style={{ transform: 'rotate(-90deg)' }}>
+                  <circle
+                    cx="16" cy="16" r="14"
+                    fill="none"
+                    stroke={waterPercent >= 80 ? 'rgba(16, 185, 129, 0.15)' : 'rgba(59, 130, 246, 0.15)'}
+                    strokeWidth="2.5"
+                  />
+                  <circle
+                    cx="16" cy="16" r="14"
+                    fill="none"
+                    stroke={waterPercent >= 80 ? '#10b981' : '#3b82f6'}
+                    strokeWidth="2.5"
+                    strokeDasharray={`${waterPercent * 0.88} 88`}
+                    strokeLinecap="round"
+                    style={{ transition: 'all 0.6s cubic-bezier(0.4, 0, 0.2, 1)' }}
+                  />
+                </svg>
+                <div style={{
+                  position: 'absolute',
+                  top: '50%',
+                  left: '50%',
+                  transform: 'translate(-50%, -50%)',
+                  fontSize: '0.55rem',
+                  fontWeight: '800',
+                  color: waterPercent >= 80 ? '#10b981' : '#3b82f6'
+                }}>
+                  {waterPercent}%
+                </div>
+              </div>
+            </button>
+            
+            {/* Mood Log */}
+            <button
+              onClick={() => setShowMoodSelector(true)}
+              style={{
+                background: 'rgba(23, 23, 23, 0.6)',
+                backdropFilter: 'blur(10px)',
+                border: '1px solid ' + (selectedMoodScore ? 'rgba(16, 185, 129, 0.25)' : 'rgba(255, 255, 255, 0.1)'),
+                borderRadius: '10px',
+                padding: isMobile ? '0.6rem' : '0.75rem',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexDirection: 'column',
+                gap: '0.2rem',
+                transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                touchAction: 'manipulation',
+                WebkitTapHighlightColor: 'transparent',
+                minHeight: '44px'
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.transform = 'translateY(-2px)'
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.transform = 'translateY(0)'
+              }}
+            >
+              {selectedMoodScore ? (
+                React.createElement(moodIcons[selectedMoodScore - 1].icon, {
+                  size: isMobile ? 18 : 20,
+                  color: moodIcons[selectedMoodScore - 1].color
+                })
+              ) : (
+                <SmilePlus size={isMobile ? 18 : 20} color="rgba(255, 255, 255, 0.5)" />
+              )}
+              <div style={{
+                fontSize: '0.55rem',
+                color: selectedMoodScore ? '#10b981' : 'rgba(255, 255, 255, 0.5)',
+                textTransform: 'uppercase',
+                letterSpacing: '0.05em',
+                fontWeight: '600'
+              }}>
+                {selectedMoodScore ? moodIcons[selectedMoodScore - 1].label : 'Mood'}
+              </div>
+            </button>
+            
+            {/* Quick Log */}
+            <button
+              onClick={() => setShowIntakeModal(true)}
+              style={{
+                background: 'rgba(23, 23, 23, 0.6)',
+                backdropFilter: 'blur(10px)',
+                border: '1px solid rgba(16, 185, 129, 0.2)',
+                borderRadius: '10px',
+                padding: isMobile ? '0.6rem' : '0.75rem',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexDirection: 'column',
+                gap: '0.2rem',
+                transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                touchAction: 'manipulation',
+                WebkitTapHighlightColor: 'transparent',
+                minHeight: '44px'
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.transform = 'translateY(-2px)'
+                e.currentTarget.style.background = 'rgba(16, 185, 129, 0.1)'
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.transform = 'translateY(0)'
+                e.currentTarget.style.background = 'rgba(23, 23, 23, 0.6)'
+              }}
+            >
+              <Plus size={isMobile ? 18 : 20} color="#10b981" strokeWidth={2.5} />
+              <div style={{
+                fontSize: '0.55rem',
+                color: '#10b981',
+                textTransform: 'uppercase',
+                letterSpacing: '0.05em',
+                fontWeight: '700'
+              }}>
+                Quick
+              </div>
+            </button>
           </div>
-        </button>
-        
-        {/* Mood Log - 25% ALWAYS CLICKABLE - GREEN when selected */}
-        <button
-          onClick={() => setShowMoodSelector(true)}
-          style={{
-            background: selectedMoodScore 
-              ? 'linear-gradient(135deg, rgba(16, 185, 129, 0.1) 0%, rgba(16, 185, 129, 0.04) 100%)'
-              : 'linear-gradient(135deg, rgba(255, 255, 255, 0.04) 0%, rgba(255, 255, 255, 0.02) 100%)',
-            borderRadius: '14px',
-            padding: isMobile ? '0.75rem 0.5rem' : '0.875rem 0.625rem',
-            border: '1px solid ' + (selectedMoodScore ? 'rgba(16, 185, 129, 0.2)' : 'rgba(255, 255, 255, 0.08)'),
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            flexDirection: 'column',
-            gap: '0.2rem',
-            transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
-            touchAction: 'manipulation',
-            WebkitTapHighlightColor: 'transparent',
-            minHeight: '48px',
-            backdropFilter: 'blur(20px)',
-            boxShadow: '0 4px 16px rgba(0, 0, 0, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.03)',
-            position: 'relative'
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.transform = 'translateY(-1px)'
-            e.currentTarget.style.boxShadow = '0 6px 20px rgba(0, 0, 0, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.05)'
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.transform = 'translateY(0)'
-            e.currentTarget.style.boxShadow = '0 4px 16px rgba(0, 0, 0, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.03)'
-          }}
-        >
-          {selectedMoodScore ? (
-            React.createElement(moodIcons[selectedMoodScore - 1].icon, {
-              size: isMobile ? 20 : 22,
-              color: moodIcons[selectedMoodScore - 1].color
-            })
-          ) : (
-            <SmilePlus size={isMobile ? 20 : 22} color="rgba(255, 255, 255, 0.4)" />
-          )}
-          <div style={{
-            fontSize: '0.6rem',
-            color: selectedMoodScore ? 'rgba(16, 185, 129, 0.9)' : 'rgba(255, 255, 255, 0.4)',
-            textTransform: 'uppercase',
-            letterSpacing: '0.05em'
-          }}>
-            {selectedMoodScore ? moodIcons[selectedMoodScore - 1].label : 'Mood?'}
-          </div>
-        </button>
-        
-        {/* Quick Log - 25% STRONG GREEN */}
-        <button
-          onClick={() => setShowIntakeModal(true)}
-          style={{
-            background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.12) 0%, rgba(16, 185, 129, 0.05) 100%)',
-            borderRadius: '14px',
-            padding: isMobile ? '0.75rem 0.5rem' : '0.875rem 0.625rem',
-            border: '1px solid rgba(16, 185, 129, 0.25)',
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            flexDirection: 'column',
-            gap: '0.2rem',
-            transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
-            touchAction: 'manipulation',
-            WebkitTapHighlightColor: 'transparent',
-            minHeight: '48px',
-            backdropFilter: 'blur(20px)',
-            boxShadow: '0 4px 16px rgba(16, 185, 129, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.03)'
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.background = 'linear-gradient(135deg, rgba(16, 185, 129, 0.18) 0%, rgba(16, 185, 129, 0.08) 100%)'
-            e.currentTarget.style.transform = 'translateY(-1px)'
-            e.currentTarget.style.boxShadow = '0 6px 20px rgba(16, 185, 129, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.05)'
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.background = 'linear-gradient(135deg, rgba(16, 185, 129, 0.12) 0%, rgba(16, 185, 129, 0.05) 100%)'
-            e.currentTarget.style.transform = 'translateY(0)'
-            e.currentTarget.style.boxShadow = '0 4px 16px rgba(16, 185, 129, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.03)'
-          }}
-        >
-          <Plus size={isMobile ? 18 : 20} color="#10b981" />
-          <div style={{
-            fontSize: '0.6rem',
-            color: '#10b981',
-            textTransform: 'uppercase',
-            letterSpacing: '0.05em',
-            fontWeight: '600'
-          }}>
-            Quick
-          </div>
-        </button>
+        </div>
       </div>
       
-      {/* Mood Selector Popup - Shows current mood highlighted */}
+      {/* Mood Selector Popup */}
       {showMoodSelector && (
         <div style={{
           position: 'fixed',
@@ -485,10 +495,10 @@ export default function AIDailyGoals({
           background: 'linear-gradient(135deg, rgba(17, 17, 17, 0.98) 0%, rgba(10, 10, 10, 0.98) 100%)',
           backdropFilter: 'blur(30px)',
           borderRadius: '20px',
-          border: '1px solid rgba(16, 185, 129, 0.15)',
+          border: '1px solid rgba(16, 185, 129, 0.2)',
           padding: '1.25rem',
           zIndex: 100,
-          boxShadow: '0 20px 40px rgba(0, 0, 0, 0.6), 0 0 40px rgba(16, 185, 129, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.05)',
+          boxShadow: '0 20px 40px rgba(0, 0, 0, 0.6), 0 0 40px rgba(16, 185, 129, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.06)',
           display: 'flex',
           gap: '0.75rem'
         }}>
@@ -498,15 +508,15 @@ export default function AIDailyGoals({
               onClick={() => handleMoodSelect(index + 1)}
               style={{
                 background: selectedMoodScore === (index + 1)
-                  ? `${mood.color}20`
-                  : 'rgba(255, 255, 255, 0.03)',
+                  ? `${mood.color}25`
+                  : 'rgba(255, 255, 255, 0.04)',
                 border: selectedMoodScore === (index + 1)
                   ? `2px solid ${mood.color}`
-                  : '1px solid rgba(255, 255, 255, 0.08)',
+                  : '1px solid rgba(255, 255, 255, 0.1)',
                 cursor: 'pointer',
                 padding: '0.75rem',
                 borderRadius: '12px',
-                transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+                transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
                 touchAction: 'manipulation',
                 WebkitTapHighlightColor: 'transparent',
                 display: 'flex',
@@ -514,23 +524,23 @@ export default function AIDailyGoals({
                 justifyContent: 'center',
                 backdropFilter: 'blur(10px)',
                 transform: selectedMoodScore === (index + 1) ? 'scale(1.1)' : 'scale(1)',
-                boxShadow: selectedMoodScore === (index + 1) ? `0 8px 20px ${mood.color}30` : 'none'
+                boxShadow: selectedMoodScore === (index + 1) ? `0 8px 20px ${mood.color}35` : 'none'
               }}
               onMouseEnter={(e) => {
                 e.currentTarget.style.transform = 'scale(1.1) translateY(-2px)'
-                e.currentTarget.style.background = `${mood.color}15`
+                e.currentTarget.style.background = `${mood.color}20`
                 e.currentTarget.style.borderColor = mood.color
-                e.currentTarget.style.boxShadow = `0 8px 20px ${mood.color}30`
+                e.currentTarget.style.boxShadow = `0 8px 20px ${mood.color}35`
               }}
               onMouseLeave={(e) => {
                 e.currentTarget.style.transform = selectedMoodScore === (index + 1) ? 'scale(1.1)' : 'scale(1)'
                 e.currentTarget.style.background = selectedMoodScore === (index + 1) 
-                  ? `${mood.color}20`
-                  : 'rgba(255, 255, 255, 0.03)'
+                  ? `${mood.color}25`
+                  : 'rgba(255, 255, 255, 0.04)'
                 e.currentTarget.style.borderColor = selectedMoodScore === (index + 1)
                   ? mood.color
-                  : 'rgba(255, 255, 255, 0.08)'
-                e.currentTarget.style.boxShadow = selectedMoodScore === (index + 1) ? `0 8px 20px ${mood.color}30` : 'none'
+                  : 'rgba(255, 255, 255, 0.1)'
+                e.currentTarget.style.boxShadow = selectedMoodScore === (index + 1) ? `0 8px 20px ${mood.color}35` : 'none'
               }}
             >
               {React.createElement(mood.icon, {
@@ -550,9 +560,9 @@ export default function AIDailyGoals({
               width: '28px',
               height: '28px',
               borderRadius: '50%',
-              background: 'rgba(16, 185, 129, 0.1)',
-              border: '1px solid rgba(16, 185, 129, 0.2)',
-              color: 'rgba(255, 255, 255, 0.6)',
+              background: 'rgba(16, 185, 129, 0.15)',
+              border: '1px solid rgba(16, 185, 129, 0.25)',
+              color: 'rgba(255, 255, 255, 0.7)',
               fontSize: '18px',
               fontWeight: '300',
               cursor: 'pointer',
@@ -562,12 +572,12 @@ export default function AIDailyGoals({
               transition: 'all 0.2s ease'
             }}
             onMouseEnter={(e) => {
-              e.currentTarget.style.background = 'rgba(16, 185, 129, 0.15)'
-              e.currentTarget.style.color = 'rgba(255, 255, 255, 0.9)'
+              e.currentTarget.style.background = 'rgba(16, 185, 129, 0.2)'
+              e.currentTarget.style.color = 'rgba(255, 255, 255, 0.95)'
             }}
             onMouseLeave={(e) => {
-              e.currentTarget.style.background = 'rgba(16, 185, 129, 0.1)'
-              e.currentTarget.style.color = 'rgba(255, 255, 255, 0.6)'
+              e.currentTarget.style.background = 'rgba(16, 185, 129, 0.15)'
+              e.currentTarget.style.color = 'rgba(255, 255, 255, 0.7)'
             }}
           >
             ×
@@ -588,7 +598,7 @@ export default function AIDailyGoals({
   )
 }
 
-// Quick Intake Modal - Premium Glass with GREEN theme
+// Quick Intake Modal Component
 function QuickIntakeModal({ onClose, onSave, targets, isMobile }) {
   const [selectedType, setSelectedType] = useState('percentage')
   const [percentage, setPercentage] = useState(null)
@@ -641,13 +651,13 @@ function QuickIntakeModal({ onClose, onSave, targets, isMobile }) {
         padding: isMobile ? '1.5rem' : '2rem',
         width: '100%',
         maxWidth: '500px',
-        border: '1px solid rgba(16, 185, 129, 0.15)',
-        boxShadow: '0 30px 60px rgba(0, 0, 0, 0.6), 0 0 40px rgba(16, 185, 129, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.05)',
+        border: '1px solid rgba(16, 185, 129, 0.2)',
+        boxShadow: '0 30px 60px rgba(0, 0, 0, 0.6), 0 0 40px rgba(16, 185, 129, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.06)',
         backdropFilter: 'blur(30px)'
       }}>
         <h3 style={{
           fontSize: isMobile ? '1.25rem' : '1.5rem',
-          fontWeight: '700',
+          fontWeight: '800',
           background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
           WebkitBackgroundClip: 'text',
           WebkitTextFillColor: 'transparent',
@@ -669,12 +679,12 @@ function QuickIntakeModal({ onClose, onSave, targets, isMobile }) {
               flex: 1,
               padding: '0.75rem',
               background: selectedType === 'percentage' 
-                ? 'linear-gradient(135deg, rgba(16, 185, 129, 0.15) 0%, rgba(16, 185, 129, 0.08) 100%)'
-                : 'rgba(255, 255, 255, 0.03)',
-              border: '1px solid ' + (selectedType === 'percentage' ? 'rgba(16, 185, 129, 0.3)' : 'rgba(255, 255, 255, 0.08)'),
+                ? 'linear-gradient(135deg, rgba(16, 185, 129, 0.18) 0%, rgba(16, 185, 129, 0.1) 100%)'
+                : 'rgba(255, 255, 255, 0.04)',
+              border: '1px solid ' + (selectedType === 'percentage' ? 'rgba(16, 185, 129, 0.35)' : 'rgba(255, 255, 255, 0.1)'),
               borderRadius: '12px',
               color: selectedType === 'percentage' ? '#10b981' : 'rgba(255, 255, 255, 0.5)',
-              fontWeight: '600',
+              fontWeight: '700',
               cursor: 'pointer',
               transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
               backdropFilter: 'blur(10px)'
@@ -688,12 +698,12 @@ function QuickIntakeModal({ onClose, onSave, targets, isMobile }) {
               flex: 1,
               padding: '0.75rem',
               background: selectedType === 'exact' 
-                ? 'linear-gradient(135deg, rgba(16, 185, 129, 0.15) 0%, rgba(16, 185, 129, 0.08) 100%)'
-                : 'rgba(255, 255, 255, 0.03)',
-              border: '1px solid ' + (selectedType === 'exact' ? 'rgba(16, 185, 129, 0.3)' : 'rgba(255, 255, 255, 0.08)'),
+                ? 'linear-gradient(135deg, rgba(16, 185, 129, 0.18) 0%, rgba(16, 185, 129, 0.1) 100%)'
+                : 'rgba(255, 255, 255, 0.04)',
+              border: '1px solid ' + (selectedType === 'exact' ? 'rgba(16, 185, 129, 0.35)' : 'rgba(255, 255, 255, 0.1)'),
               borderRadius: '12px',
               color: selectedType === 'exact' ? '#10b981' : 'rgba(255, 255, 255, 0.5)',
-              fontWeight: '600',
+              fontWeight: '700',
               cursor: 'pointer',
               transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
               backdropFilter: 'blur(10px)'
@@ -717,22 +727,22 @@ function QuickIntakeModal({ onClose, onSave, targets, isMobile }) {
                 style={{
                   padding: isMobile ? '1.25rem' : '1.5rem',
                   background: percentage === option.value 
-                    ? `linear-gradient(135deg, ${option.color}15 0%, ${option.color}08 100%)`
-                    : 'rgba(255, 255, 255, 0.03)',
-                  border: `1.5px solid ${percentage === option.value ? option.color : 'rgba(255, 255, 255, 0.08)'}`,
+                    ? `linear-gradient(135deg, ${option.color}18 0%, ${option.color}08 100%)`
+                    : 'rgba(255, 255, 255, 0.04)',
+                  border: `1.5px solid ${percentage === option.value ? option.color : 'rgba(255, 255, 255, 0.1)'}`,
                   borderRadius: '16px',
                   cursor: 'pointer',
-                  transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+                  transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
                   transform: percentage === option.value ? 'scale(1.02)' : 'scale(1)',
                   touchAction: 'manipulation',
                   WebkitTapHighlightColor: 'transparent',
                   backdropFilter: 'blur(10px)',
-                  boxShadow: percentage === option.value ? `0 8px 20px ${option.color}20` : 'none'
+                  boxShadow: percentage === option.value ? `0 8px 20px ${option.color}25` : 'none'
                 }}
               >
                 <div style={{
                   fontSize: isMobile ? '1.5rem' : '1.75rem',
-                  fontWeight: '800',
+                  fontWeight: '900',
                   color: percentage === option.value ? option.color : 'rgba(255, 255, 255, 0.7)',
                   marginBottom: '0.25rem'
                 }}>
@@ -749,98 +759,32 @@ function QuickIntakeModal({ onClose, onSave, targets, isMobile }) {
           </div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-            <input
-              type="number"
-              value={exactValues.calories}
-              onChange={(e) => setExactValues(prev => ({ ...prev, calories: e.target.value }))}
-              placeholder="Calorieën"
-              style={{
-                width: '100%',
-                padding: '0.875rem',
-                background: 'rgba(255, 255, 255, 0.03)',
-                border: '1px solid rgba(16, 185, 129, 0.15)',
-                borderRadius: '10px',
-                color: 'white',
-                fontSize: '1rem',
-                outline: 'none',
-                backdropFilter: 'blur(10px)'
-              }}
-              onFocus={(e) => {
-                e.currentTarget.style.borderColor = 'rgba(16, 185, 129, 0.3)'
-              }}
-              onBlur={(e) => {
-                e.currentTarget.style.borderColor = 'rgba(16, 185, 129, 0.15)'
-              }}
-            />
-            <input
-              type="number"
-              value={exactValues.protein}
-              onChange={(e) => setExactValues(prev => ({ ...prev, protein: e.target.value }))}
-              placeholder="Eiwitten (g)"
-              style={{
-                width: '100%',
-                padding: '0.875rem',
-                background: 'rgba(255, 255, 255, 0.03)',
-                border: '1px solid rgba(16, 185, 129, 0.15)',
-                borderRadius: '10px',
-                color: 'white',
-                fontSize: '1rem',
-                outline: 'none',
-                backdropFilter: 'blur(10px)'
-              }}
-              onFocus={(e) => {
-                e.currentTarget.style.borderColor = 'rgba(16, 185, 129, 0.3)'
-              }}
-              onBlur={(e) => {
-                e.currentTarget.style.borderColor = 'rgba(16, 185, 129, 0.15)'
-              }}
-            />
-            <input
-              type="number"
-              value={exactValues.carbs}
-              onChange={(e) => setExactValues(prev => ({ ...prev, carbs: e.target.value }))}
-              placeholder="Koolhydraten (g)"
-              style={{
-                width: '100%',
-                padding: '0.875rem',
-                background: 'rgba(255, 255, 255, 0.03)',
-                border: '1px solid rgba(16, 185, 129, 0.15)',
-                borderRadius: '10px',
-                color: 'white',
-                fontSize: '1rem',
-                outline: 'none',
-                backdropFilter: 'blur(10px)'
-              }}
-              onFocus={(e) => {
-                e.currentTarget.style.borderColor = 'rgba(16, 185, 129, 0.3)'
-              }}
-              onBlur={(e) => {
-                e.currentTarget.style.borderColor = 'rgba(16, 185, 129, 0.15)'
-              }}
-            />
-            <input
-              type="number"
-              value={exactValues.fat}
-              onChange={(e) => setExactValues(prev => ({ ...prev, fat: e.target.value }))}
-              placeholder="Vetten (g)"
-              style={{
-                width: '100%',
-                padding: '0.875rem',
-                background: 'rgba(255, 255, 255, 0.03)',
-                border: '1px solid rgba(16, 185, 129, 0.15)',
-                borderRadius: '10px',
-                color: 'white',
-                fontSize: '1rem',
-                outline: 'none',
-                backdropFilter: 'blur(10px)'
-              }}
-              onFocus={(e) => {
-                e.currentTarget.style.borderColor = 'rgba(16, 185, 129, 0.3)'
-              }}
-              onBlur={(e) => {
-                e.currentTarget.style.borderColor = 'rgba(16, 185, 129, 0.15)'
-              }}
-            />
+            {['calories', 'protein', 'carbs', 'fat'].map((field) => (
+              <input
+                key={field}
+                type="number"
+                value={exactValues[field]}
+                onChange={(e) => setExactValues(prev => ({ ...prev, [field]: e.target.value }))}
+                placeholder={field === 'calories' ? 'Calorieën' : field === 'protein' ? 'Eiwitten (g)' : field === 'carbs' ? 'Koolhydraten (g)' : 'Vetten (g)'}
+                style={{
+                  width: '100%',
+                  padding: '0.875rem',
+                  background: 'rgba(255, 255, 255, 0.04)',
+                  border: '1px solid rgba(16, 185, 129, 0.2)',
+                  borderRadius: '10px',
+                  color: 'white',
+                  fontSize: '1rem',
+                  outline: 'none',
+                  backdropFilter: 'blur(10px)'
+                }}
+                onFocus={(e) => {
+                  e.currentTarget.style.borderColor = 'rgba(16, 185, 129, 0.35)'
+                }}
+                onBlur={(e) => {
+                  e.currentTarget.style.borderColor = 'rgba(16, 185, 129, 0.2)'
+                }}
+              />
+            ))}
           </div>
         )}
         
@@ -855,11 +799,11 @@ function QuickIntakeModal({ onClose, onSave, targets, isMobile }) {
             style={{
               flex: 1,
               padding: '0.875rem',
-              background: 'rgba(255, 255, 255, 0.03)',
-              border: '1px solid rgba(255, 255, 255, 0.08)',
+              background: 'rgba(255, 255, 255, 0.04)',
+              border: '1px solid rgba(255, 255, 255, 0.1)',
               borderRadius: '12px',
               color: 'rgba(255, 255, 255, 0.5)',
-              fontWeight: '600',
+              fontWeight: '700',
               cursor: 'pointer',
               backdropFilter: 'blur(10px)',
               transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)'
@@ -877,7 +821,7 @@ function QuickIntakeModal({ onClose, onSave, targets, isMobile }) {
               border: '1px solid rgba(16, 185, 129, 0.3)',
               borderRadius: '12px',
               color: 'white',
-              fontWeight: '600',
+              fontWeight: '700',
               cursor: 'pointer',
               opacity: (selectedType === 'percentage' ? !percentage : !exactValues.calories) ? 0.5 : 1,
               boxShadow: '0 4px 15px rgba(16, 185, 129, 0.4)',

@@ -1,5 +1,5 @@
 // src/modules/workout/components/todays-workout/LogModal.jsx
-import { X, CheckCircle, Dumbbell } from 'lucide-react'
+import { X, CheckCircle, Dumbbell, Check } from 'lucide-react'
 import { useState, useEffect } from 'react'
 import ExerciseList from './components/ExerciseList'
 
@@ -7,11 +7,33 @@ export default function LogModal({ workout, todaysLogs, onClose, onLogsUpdate, c
   const isMobile = window.innerWidth <= 768
   const [visible, setVisible] = useState(false)
   const [completedCount, setCompletedCount] = useState(0)
+  const [isFinishing, setIsFinishing] = useState(false)
+  const [isWorkoutCompleted, setIsWorkoutCompleted] = useState(false)
   
   // Progressive reveal animation
   useEffect(() => {
     setTimeout(() => setVisible(true), 50)
+    checkWorkoutCompletion()
   }, [])
+  
+  // Check if workout is already completed
+  const checkWorkoutCompletion = async () => {
+    if (!client?.id || !db) return
+    
+    try {
+      const today = new Date().toISOString().split('T')[0]
+      const { data } = await db.supabase
+        .from('workout_completions')
+        .select('completed')
+        .eq('client_id', client.id)
+        .eq('workout_date', today)
+        .single()
+      
+      setIsWorkoutCompleted(data?.completed || false)
+    } catch (error) {
+      setIsWorkoutCompleted(false)
+    }
+  }
   
   // Count completed exercises
   useEffect(() => {
@@ -28,6 +50,47 @@ export default function LogModal({ workout, todaysLogs, onClose, onLogsUpdate, c
     setTimeout(() => {
       onClose()
     }, 300)
+  }
+  
+  // ⭐ FIXED: Finish Workout zonder 'notes'
+  const handleFinishWorkout = async () => {
+    if (!client?.id || !db) return
+    
+    setIsFinishing(true)
+    
+    try {
+      const today = new Date().toISOString().split('T')[0]
+      
+      // 🔥 FIX: Gebruik correcte table 'workout_completions' zonder 'notes' column
+      const { error } = await db.supabase
+        .from('workout_completions')
+        .upsert({
+          client_id: client.id,
+          workout_date: today,
+          completed: true
+        }, {
+          onConflict: 'client_id,workout_date'
+        })
+      
+      if (error) throw error
+      
+      console.log('✅ Workout marked as completed')
+      
+      // Success feedback
+      if (navigator.vibrate) navigator.vibrate([50, 100, 50, 100, 50])
+      
+      setIsWorkoutCompleted(true)
+      
+      // Close modal after 1 second
+      setTimeout(() => {
+        handleClose()
+      }, 1000)
+      
+    } catch (error) {
+      console.error('❌ Error finishing workout:', error)
+      alert('Er ging iets mis bij het voltooien. Probeer opnieuw.')
+      setIsFinishing(false)
+    }
   }
   
   // Prevent body scroll when modal open
@@ -109,27 +172,41 @@ export default function LogModal({ workout, todaysLogs, onClose, onLogsUpdate, c
                 width: isMobile ? '24px' : '28px',
                 height: isMobile ? '24px' : '28px',
                 borderRadius: '8px',
-                background: 'rgba(249, 115, 22, 0.2)',
-                border: '1px solid rgba(249, 115, 22, 0.3)',
+                background: isWorkoutCompleted 
+                  ? 'rgba(16, 185, 129, 0.2)' 
+                  : 'rgba(249, 115, 22, 0.2)',
+                border: isWorkoutCompleted
+                  ? '1px solid rgba(16, 185, 129, 0.3)'
+                  : '1px solid rgba(249, 115, 22, 0.3)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                boxShadow: '0 0 15px rgba(249, 115, 22, 0.3)'
+                boxShadow: isWorkoutCompleted
+                  ? '0 0 15px rgba(16, 185, 129, 0.3)'
+                  : '0 0 15px rgba(249, 115, 22, 0.3)'
               }}>
-                <Dumbbell 
-                  size={isMobile ? 12 : 14} 
-                  color="#f97316"
-                  style={{ filter: 'drop-shadow(0 0 6px rgba(249, 115, 22, 0.6))' }}
-                />
+                {isWorkoutCompleted ? (
+                  <CheckCircle 
+                    size={isMobile ? 12 : 14} 
+                    color="#10b981"
+                    style={{ filter: 'drop-shadow(0 0 6px rgba(16, 185, 129, 0.6))' }}
+                  />
+                ) : (
+                  <Dumbbell 
+                    size={isMobile ? 12 : 14} 
+                    color="#f97316"
+                    style={{ filter: 'drop-shadow(0 0 6px rgba(249, 115, 22, 0.6))' }}
+                  />
+                )}
               </div>
               <span style={{
                 fontSize: isMobile ? '0.65rem' : '0.7rem',
-                color: '#f97316',
+                color: isWorkoutCompleted ? '#10b981' : '#f97316',
                 fontWeight: '700',
                 textTransform: 'uppercase',
                 letterSpacing: '0.05em'
               }}>
-                LOG WORKOUT
+                {isWorkoutCompleted ? 'VOLTOOID' : 'LOG WORKOUT'}
               </span>
             </div>
             
@@ -274,8 +351,121 @@ export default function LogModal({ workout, todaysLogs, onClose, onLogsUpdate, c
         </div>
       </div>
       
-      {/* Footer with completion message */}
-      {completedCount === totalExercises && totalExercises > 0 && (
+      {/* ⭐ FOOTER - FINISH WORKOUT KNOP */}
+      {!isWorkoutCompleted && (
+        <div style={{
+          background: 'linear-gradient(135deg, rgba(17, 17, 17, 0.98) 0%, rgba(10, 10, 10, 0.98) 100%)',
+          backdropFilter: 'blur(20px)',
+          borderTop: '1px solid rgba(249, 115, 22, 0.25)',
+          padding: isMobile ? '1rem' : '1.25rem 1.5rem',
+          position: 'relative',
+          overflow: 'hidden'
+        }}>
+          {/* Top glow */}
+          <div style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            height: '2px',
+            background: 'linear-gradient(90deg, transparent 0%, #10b981 50%, transparent 100%)',
+            opacity: 0.4
+          }} />
+          
+          <div style={{
+            maxWidth: '1200px',
+            margin: '0 auto'
+          }}>
+            {/* Grote groene FINISH knop */}
+            <button
+              onClick={handleFinishWorkout}
+              disabled={isFinishing}
+              style={{
+                width: '100%',
+                background: isFinishing
+                  ? 'rgba(16, 185, 129, 0.5)'
+                  : 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                border: 'none',
+                borderRadius: '12px',
+                padding: isMobile ? '1rem' : '1.25rem',
+                color: '#000',
+                fontSize: isMobile ? '0.95rem' : '1.05rem',
+                fontWeight: '800',
+                textTransform: 'uppercase',
+                letterSpacing: '0.05em',
+                cursor: isFinishing ? 'not-allowed' : 'pointer',
+                boxShadow: isFinishing
+                  ? 'none'
+                  : '0 8px 32px rgba(16, 185, 129, 0.4)',
+                transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '0.625rem',
+                minHeight: '56px',
+                touchAction: 'manipulation',
+                WebkitTapHighlightColor: 'transparent',
+                opacity: isFinishing ? 0.7 : 1
+              }}
+              onMouseEnter={(e) => {
+                if (!isMobile && !isFinishing) {
+                  e.currentTarget.style.transform = 'translateY(-2px)'
+                  e.currentTarget.style.boxShadow = '0 12px 40px rgba(16, 185, 129, 0.5)'
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (!isMobile && !isFinishing) {
+                  e.currentTarget.style.transform = 'translateY(0)'
+                  e.currentTarget.style.boxShadow = '0 8px 32px rgba(16, 185, 129, 0.4)'
+                }
+              }}
+              onTouchStart={(e) => {
+                if (isMobile && !isFinishing) {
+                  e.currentTarget.style.transform = 'scale(0.98)'
+                }
+              }}
+              onTouchEnd={(e) => {
+                if (isMobile && !isFinishing) {
+                  e.currentTarget.style.transform = 'scale(1)'
+                }
+              }}
+            >
+              {isFinishing ? (
+                <>
+                  <div style={{
+                    width: isMobile ? '18px' : '20px',
+                    height: isMobile ? '18px' : '20px',
+                    border: '3px solid rgba(0, 0, 0, 0.3)',
+                    borderTopColor: '#000',
+                    borderRadius: '50%',
+                    animation: 'spin 1s linear infinite'
+                  }} />
+                  Voltooien...
+                </>
+              ) : (
+                <>
+                  <Check size={isMobile ? 22 : 24} strokeWidth={3} />
+                  Workout Voltooien
+                </>
+              )}
+            </button>
+            
+            {/* Kleine tekst onder knop */}
+            <p style={{
+              textAlign: 'center',
+              fontSize: isMobile ? '0.65rem' : '0.7rem',
+              color: 'rgba(255, 255, 255, 0.4)',
+              margin: '0.75rem 0 0 0',
+              fontWeight: '600'
+            }}>
+              Klik hier om je workout als voltooid te markeren
+            </p>
+          </div>
+        </div>
+      )}
+      
+      {/* Success message als workout completed */}
+      {isWorkoutCompleted && (
         <div style={{
           background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.15) 0%, rgba(5, 150, 105, 0.08) 100%)',
           backdropFilter: 'blur(10px)',
@@ -323,7 +513,9 @@ export default function LogModal({ workout, todaysLogs, onClose, onLogsUpdate, c
               color: 'rgba(255, 255, 255, 0.7)',
               fontWeight: '600'
             }}>
-              Geweldig werk vandaag! Alle {totalExercises} oefeningen gelogd.
+              {totalExercises > 0 && completedCount === totalExercises
+                ? `Geweldig werk! Alle ${totalExercises} oefeningen gelogd.`
+                : 'Geweldig werk vandaag! Workout voltooid.'}
             </div>
           </div>
         </div>
@@ -340,6 +532,10 @@ export default function LogModal({ workout, todaysLogs, onClose, onLogsUpdate, c
             opacity: 1;
             transform: translateY(0);
           }
+        }
+        
+        @keyframes spin {
+          to { transform: rotate(360deg); }
         }
         
         /* Custom scrollbar */

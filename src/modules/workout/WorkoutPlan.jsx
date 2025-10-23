@@ -14,11 +14,15 @@ import WorkoutPhotoSlider from './components/WorkoutPhotoSlider'
 import WorkoutProgressToast from './components/WorkoutProgressToast'
 import TodaysLogToast from './components/TodaysLogToast'
 import ProgressInsightsSection from '../progress/ProgressInsightsSection'
+import PlanningWizard from './components/planning/PlanningWizard'
 
 // Import hooks
 import useWorkoutSchedule from './hooks/useWorkoutSchedule'
 import useWorkoutProgress from './hooks/useWorkoutProgress'
 import PageVideoWidget from '../videos/PageVideoWidget'
+
+// 🔥 Import WorkoutService
+import WorkoutService from '../../services/WorkoutService'
 
 export default function WorkoutPlan({ client, schema, db }) {
   const { t } = useLanguage()
@@ -26,6 +30,12 @@ export default function WorkoutPlan({ client, schema, db }) {
   const detailsRef = useRef(null)
   const chartRef = useRef(null)
   const chartWidgetRef = useRef(null)
+  
+  // 🔥 Initialize WorkoutService
+  const [workoutService] = useState(() => new WorkoutService(db.supabase))
+  
+  // ⭐ NIEUW: Challenge refresh key
+  const [challengeRefreshKey, setChallengeRefreshKey] = useState(0)
   
   // State management via custom hooks
   const {
@@ -49,7 +59,8 @@ export default function WorkoutPlan({ client, schema, db }) {
   // Local state
   const [selectedDay, setSelectedDay] = useState(null)
   const [selectedDayIndex, setSelectedDayIndex] = useState(null)
-  const [detailsExpanded, setDetailsExpanded] = useState(false) // ⭐ NEW
+  const [detailsExpanded, setDetailsExpanded] = useState(false)
+  const [showWizard, setShowWizard] = useState(false)
   
   // Get current date info
   const currentDate = new Date()
@@ -78,7 +89,7 @@ export default function WorkoutPlan({ client, schema, db }) {
       setSelectedDay(workoutKey)
       const dayIndex = weekDays.indexOf(day)
       setSelectedDayIndex(dayIndex)
-      setDetailsExpanded(true) // ⭐ Auto expand on click
+      setDetailsExpanded(true)
       
       // Smooth scroll to details section
       if (detailsRef.current) {
@@ -136,6 +147,18 @@ export default function WorkoutPlan({ client, schema, db }) {
     }
   }
   
+  // 🔥 Handle wizard complete
+  const handleWizardComplete = (newSchedule) => {
+    setWeekSchedule(newSchedule)
+    setShowWizard(false)
+  }
+  
+  // ⭐ NIEUW: Handle workout completed - refresh challenge banner
+  const handleWorkoutCompleted = () => {
+    console.log('🔔 Workout completed in WorkoutPlan - refreshing challenge banner')
+    setChallengeRefreshKey(prev => prev + 1)
+  }
+  
   // No plan view
   if (!schema) {
     return (
@@ -186,32 +209,36 @@ export default function WorkoutPlan({ client, schema, db }) {
       animation: 'fadeIn 0.5s ease',
       position: 'relative'
     }}>
-      {/* 1. Today's Workout */}
+      {/* 1. Today's Workout - 🔥 MET WORKOUTSERVICE + CALLBACK */}
       <TodaysWorkoutMain
         client={client}
         schema={schema}
         db={db}
+        workoutService={workoutService}
+        onWorkoutCompleted={handleWorkoutCompleted}
       />
       
-      {/* 2. ❌ REMOVED: PumpPhotoSection */}
-      
-      {/* 3. Today's Log Toast (priority) */}
+      {/* 2. Today's Log Toast (priority) */}
       <TodaysLogToast
         client={client}
         db={db}
       />
       
-      {/* 4. Progress Toast Notification */}
+      {/* 3. Progress Toast Notification */}
       <WorkoutProgressToast
         client={client}
         db={db}
         onViewChart={handleToastViewChart}
       />
       
-      {/* 5. Challenge Sidebar */}
-      <WorkoutChallengeSidebar client={client} db={db} />
+      {/* 4. Challenge Sidebar - ⭐ MET REFRESH KEY */}
+      <WorkoutChallengeSidebar 
+        client={client} 
+        db={db}
+        key={challengeRefreshKey}
+      />
 
-      {/* 6. Video Widget */}
+      {/* 5. Video Widget */}
       <div style={{ 
         paddingTop: isMobile ? '1rem' : '1.5rem',
         paddingLeft: isMobile ? '1rem' : '1.5rem',
@@ -228,7 +255,28 @@ export default function WorkoutPlan({ client, schema, db }) {
         />
       </div>
       
-      {/* 7. Workout Details - ⭐ COLLAPSIBLE */}
+      {/* 6. Week Schedule - 🔥 VERPLAATST NAAR POSITIE 2 */}
+      <WeekSchedule
+        weekSchedule={weekSchedule}
+        schema={schema}
+        swapMode={swapMode}
+        selectedWorkout={selectedWorkout}
+        completedWorkouts={completedWorkouts}
+        todayIndex={todayIndex}
+        onDayClick={handleDayClick}
+        clientId={client?.id}
+        db={db}
+        workoutService={workoutService}
+        onScheduleUpdate={(newSchedule) => {
+          setWeekSchedule(newSchedule)
+        }}
+        onOpenWizard={() => setShowWizard(true)}
+      />
+      
+      {/* 7. Photo Slider - VERPLAATST NAAR POSITIE 3 */}
+      <WorkoutPhotoSlider />
+      
+      {/* 8. Workout Details - COLLAPSIBLE - VERPLAATST NAAR POSITIE 4 */}
       {selectedDay && (
         <div 
           ref={detailsRef}
@@ -340,26 +388,7 @@ export default function WorkoutPlan({ client, schema, db }) {
         </div>
       )}
       
-      {/* 8. Photo Slider */}
-      <WorkoutPhotoSlider />
-      
-      {/* 9. Week Schedule - ⭐ FOCUS VOOR UPGRADE */}
-      <WeekSchedule
-        weekSchedule={weekSchedule}
-        schema={schema}
-        swapMode={swapMode}
-        selectedWorkout={selectedWorkout}
-        completedWorkouts={completedWorkouts}
-        todayIndex={todayIndex}
-        onDayClick={handleDayClick}
-        clientId={client?.id}
-        db={db}
-        onScheduleUpdate={(newSchedule) => {
-          setWeekSchedule(newSchedule)
-        }}
-      />
-      
-      {/* 10. Progress Insights & Stats */}
+      {/* 9. Progress Insights & Stats - POSITIE 5 */}
       <div ref={chartRef} style={{ marginTop: '2rem' }}>
         {/* Progress Insights */}
         <ProgressInsightsSection
@@ -375,6 +404,18 @@ export default function WorkoutPlan({ client, schema, db }) {
           clientId={client?.id}
         />
       </div>
+      
+      {/* 🔥 WIZARD MODAL */}
+      {showWizard && (
+        <PlanningWizard
+          schema={schema}
+          clientId={client?.id}
+          db={db}
+          workoutService={workoutService}
+          onClose={() => setShowWizard(false)}
+          onComplete={handleWizardComplete}
+        />
+      )}
       
       {/* CSS Animations */}
       <style>{`

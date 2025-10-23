@@ -307,7 +307,7 @@ export default function TodaysWorkoutCard({ workout, onLogClick, logsCount, clie
             </div>
           </div>
           
-          {/* LOG NU Button */}
+          {/* BUTTON - DARK GREEN GRADIENT */}
           <button
             onClick={(e) => {
               e.stopPropagation()
@@ -316,43 +316,41 @@ export default function TodaysWorkoutCard({ workout, onLogClick, logsCount, clie
             style={{
               width: '100%',
               background: isCompleted
-                ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)'
-                : 'linear-gradient(135deg, #f97316 0%, #ea580c 100%)',
-              border: 'none',
-              borderRadius: '10px',
-              padding: isMobile ? '0.75rem' : '0.875rem',
-              color: '#000',
-              fontSize: isMobile ? '0.85rem' : '0.9rem',
-              fontWeight: '700',
+                ? 'linear-gradient(135deg, rgba(16, 185, 129, 0.18) 0%, rgba(16, 185, 129, 0.1) 100%)'
+                : 'linear-gradient(135deg, rgba(16, 185, 129, 0.18) 0%, rgba(16, 185, 129, 0.1) 100%)',
+              backdropFilter: 'blur(20px)',
+              border: '1px solid rgba(16, 185, 129, 0.35)',
+              borderRadius: '14px',
+              color: '#10b981',
+              fontSize: isMobile ? '0.9rem' : '1rem',
+              fontWeight: '800',
               textTransform: 'uppercase',
               letterSpacing: '0.05em',
               cursor: 'pointer',
-              boxShadow: isCompleted
-                ? '0 4px 20px rgba(16, 185, 129, 0.35)'
-                : '0 4px 20px rgba(249, 115, 22, 0.35)',
+              boxShadow: '0 8px 32px rgba(16, 185, 129, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.03)',
               transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              gap: '0.5rem',
-              minHeight: '44px',
+              gap: '0.75rem',
+              minHeight: '56px',
               touchAction: 'manipulation',
-              WebkitTapHighlightColor: 'transparent'
+              WebkitTapHighlightColor: 'transparent',
+              position: 'relative',
+              overflow: 'hidden'
             }}
             onMouseEnter={(e) => {
               if (!isMobile) {
                 e.currentTarget.style.transform = 'translateY(-2px)'
-                e.currentTarget.style.boxShadow = isCompleted
-                  ? '0 8px 30px rgba(16, 185, 129, 0.5)'
-                  : '0 8px 30px rgba(249, 115, 22, 0.5)'
+                e.currentTarget.style.background = 'linear-gradient(135deg, rgba(16, 185, 129, 0.25) 0%, rgba(16, 185, 129, 0.15) 100%)'
+                e.currentTarget.style.boxShadow = '0 12px 40px rgba(16, 185, 129, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.05)'
               }
             }}
             onMouseLeave={(e) => {
               if (!isMobile) {
                 e.currentTarget.style.transform = 'translateY(0)'
-                e.currentTarget.style.boxShadow = isCompleted
-                  ? '0 4px 20px rgba(16, 185, 129, 0.35)'
-                  : '0 4px 20px rgba(249, 115, 22, 0.35)'
+                e.currentTarget.style.background = 'linear-gradient(135deg, rgba(16, 185, 129, 0.18) 0%, rgba(16, 185, 129, 0.1) 100%)'
+                e.currentTarget.style.boxShadow = '0 8px 32px rgba(16, 185, 129, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.03)'
               }
             }}
             onTouchStart={(e) => {
@@ -366,10 +364,46 @@ export default function TodaysWorkoutCard({ workout, onLogClick, logsCount, clie
               }
             }}
           >
-            <Dumbbell size={isMobile ? 16 : 18} />
+            {/* Top glow */}
+            <div style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              height: '2px',
+              background: 'linear-gradient(90deg, transparent 0%, #10b981 50%, transparent 100%)',
+              opacity: 0.6,
+              pointerEvents: 'none'
+            }} />
+            
+            {/* Shine effect */}
+            <div style={{
+              position: 'absolute',
+              top: 0,
+              left: '-100%',
+              width: '100%',
+              height: '100%',
+              background: 'linear-gradient(90deg, transparent, rgba(16, 185, 129, 0.15), transparent)',
+              animation: 'shine 3s infinite',
+              pointerEvents: 'none'
+            }} />
+            
+            <Dumbbell 
+              size={isMobile ? 20 : 22} 
+              strokeWidth={2.5}
+              style={{ filter: 'drop-shadow(0 0 6px rgba(16, 185, 129, 0.4))' }}
+            />
             {isCompleted ? 'BEKIJK WORKOUT' : 'LOG NU'}
           </button>
         </div>
+        
+        <style>{`
+          @keyframes shine {
+            0% { left: -100%; }
+            50% { left: 100%; }
+            100% { left: 100%; }
+          }
+        `}</style>
       </div>
     </div>
   )

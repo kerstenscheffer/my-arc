@@ -1,288 +1,265 @@
 // src/modules/meal-plan/components/wizard/slides/Slide4ProteinPicker.jsx
-import React, { useState } from 'react'
-import { Plus, X } from 'lucide-react'
-import WizardLayout from '../shared/WizardLayout'
-import IngredientPickerModal from '../pickers/IngredientPickerModal'
+// Slide 4: Eiwit Bronnen Picker (3 selecties)
 
-export default function Slide4ProteinPicker({ data, onUpdate, db, isMobile }) {
-  const [showPicker, setShowPicker] = useState(false)
-  const [editingSlot, setEditingSlot] = useState(null)
+import { useState, useEffect } from 'react'
+import CoachBubble from '../shared/CoachBubble'
+import IngredientGrid from '../pickers/IngredientGrid'
+import { COACH_PICKS } from '../utils/wizardData'
 
-  const proteinSources = data.proteinSources || []
-
-  const handleOpenPicker = (slotIndex) => {
-    setEditingSlot(slotIndex)
-    setShowPicker(true)
+export default function Slide4ProteinPicker({ 
+  db,
+  selectedProteins = [],
+  onProteinsSelect
+}) {
+  const isMobile = window.innerWidth <= 768
+  const [allProteins, setAllProteins] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
+  
+  // Load protein ingredients from database
+  useEffect(() => {
+    loadProteins()
+  }, [])
+  
+  const loadProteins = async () => {
+    try {
+      setLoading(true)
+      
+      // Get all ingredients with category = 'protein'
+      const { data, error } = await db.supabase
+        .from('ai_ingredients')
+        .select('*')
+        .eq('category', 'protein')
+        .order('protein_per_100g', { ascending: false })
+      
+      if (error) throw error
+      
+      setAllProteins(data || [])
+    } catch (err) {
+      console.error('❌ Load proteins failed:', err)
+      setError('Kon eiwitbronnen niet laden')
+    } finally {
+      setLoading(false)
+    }
   }
-
-  const handleSelectIngredient = (ingredient) => {
-    const newSources = [...proteinSources]
-    newSources[editingSlot] = ingredient
-    onUpdate(newSources)
-    setShowPicker(false)
-    setEditingSlot(null)
-  }
-
-  const handleRemove = (slotIndex) => {
-    const newSources = [...proteinSources]
-    newSources[slotIndex] = null
-    onUpdate(newSources)
-  }
-
-  const kerstenMessage = `Omdat genoeg eiwitten eten essentieel is, heb ik hier iets op bedacht wat enorm helpt je eiwitten te halen: 3 bronnen opstellen die je dagelijks zou kunnen/willen eten.
-
-Dit maakt het kiezen van je maaltijden veel makkelijker en zorgt dat je altijd genoeg eiwit binnen krijgt!`
-
-  const suggestions = ['Whey', 'Varkensvlees', 'Eieren']
-
+  
   return (
-    <>
-      <WizardLayout
-        coachMessage={kerstenMessage}
-        title="🥩 Jouw 3 Eiwitbronnen"
-        subtitle="Selecteer 3 eiwitbronnen die je vaak eet en makkelijk kunt bereiden"
-        isMobile={isMobile}
-      >
-        {/* Selection Slots */}
+    <div style={{
+      width: '100%',
+      padding: isMobile ? '1rem 0' : '1.5rem 0'
+    }}>
+      {/* Header */}
+      <div style={{
+        textAlign: 'center',
+        marginBottom: isMobile ? '1.5rem' : '2rem'
+      }}>
         <div style={{
-          display: 'grid',
-          gridTemplateColumns: isMobile ? '1fr' : 'repeat(3, 1fr)',
-          gap: isMobile ? '1rem' : '1.5rem'
+          fontSize: isMobile ? '2.5rem' : '3rem',
+          marginBottom: isMobile ? '0.75rem' : '1rem'
         }}>
-          {[0, 1, 2].map(slotIndex => {
-            const ingredient = proteinSources[slotIndex]
-
-            return (
-              <div key={slotIndex}>
-                {ingredient ? (
-                  // Filled Slot
-                  <div style={{
-                    background: 'linear-gradient(135deg, rgba(239, 68, 68, 0.1) 0%, rgba(239, 68, 68, 0.05) 100%)',
-                    border: '2px solid rgba(239, 68, 68, 0.3)',
-                    borderRadius: '16px',
-                    padding: isMobile ? '1.25rem' : '1.5rem',
-                    position: 'relative',
-                    minHeight: '180px',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    justifyContent: 'space-between'
-                  }}>
-                    {/* Remove Button */}
-                    <button
-                      onClick={() => handleRemove(slotIndex)}
-                      style={{
-                        position: 'absolute',
-                        top: '0.75rem',
-                        right: '0.75rem',
-                        width: '32px',
-                        height: '32px',
-                        borderRadius: '8px',
-                        background: 'rgba(0, 0, 0, 0.5)',
-                        border: '1px solid rgba(255, 255, 255, 0.1)',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        cursor: 'pointer',
-                        color: '#fff',
-                        transition: 'all 0.2s ease'
-                      }}
-                    >
-                      <X size={16} />
-                    </button>
-
-                    {/* Content */}
-                    <div>
-                      <div style={{
-                        fontSize: '0.75rem',
-                        fontWeight: '600',
-                        color: '#ef4444',
-                        textTransform: 'uppercase',
-                        letterSpacing: '0.05em',
-                        marginBottom: '0.5rem'
-                      }}>
-                        Eiwitbron {slotIndex + 1}
-                      </div>
-
-                      <div style={{
-                        fontSize: isMobile ? '1.125rem' : '1.25rem',
-                        fontWeight: '700',
-                        color: '#fff',
-                        marginBottom: '1rem'
-                      }}>
-                        {ingredient.name}
-                      </div>
-
-                      {/* Macros */}
-                      <div style={{
-                        display: 'grid',
-                        gridTemplateColumns: 'repeat(2, 1fr)',
-                        gap: '0.5rem'
-                      }}>
-                        <div style={{
-                          background: 'rgba(0, 0, 0, 0.3)',
-                          borderRadius: '8px',
-                          padding: '0.5rem',
-                          textAlign: 'center'
-                        }}>
-                          <div style={{
-                            fontSize: '1.25rem',
-                            fontWeight: '700',
-                            color: '#10b981'
-                          }}>
-                            {ingredient.protein_per_100g}g
-                          </div>
-                          <div style={{
-                            fontSize: '0.7rem',
-                            color: 'rgba(255, 255, 255, 0.5)',
-                            textTransform: 'uppercase'
-                          }}>
-                            Eiwit
-                          </div>
-                        </div>
-
-                        <div style={{
-                          background: 'rgba(0, 0, 0, 0.3)',
-                          borderRadius: '8px',
-                          padding: '0.5rem',
-                          textAlign: 'center'
-                        }}>
-                          <div style={{
-                            fontSize: '1.25rem',
-                            fontWeight: '700',
-                            color: '#f59e0b'
-                          }}>
-                            {ingredient.calories_per_100g}
-                          </div>
-                          <div style={{
-                            fontSize: '0.7rem',
-                            color: 'rgba(255, 255, 255, 0.5)',
-                            textTransform: 'uppercase'
-                          }}>
-                            Kcal
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Change Button */}
-                    <button
-                      onClick={() => handleOpenPicker(slotIndex)}
-                      style={{
-                        width: '100%',
-                        padding: '0.75rem',
-                        marginTop: '1rem',
-                        background: 'rgba(239, 68, 68, 0.2)',
-                        border: '1px solid rgba(239, 68, 68, 0.3)',
-                        borderRadius: '10px',
-                        color: '#ef4444',
-                        fontSize: '0.875rem',
-                        fontWeight: '600',
-                        cursor: 'pointer',
-                        transition: 'all 0.2s ease'
-                      }}
-                    >
-                      Wijzig
-                    </button>
-                  </div>
-                ) : (
-                  // Empty Slot
-                  <button
-                    onClick={() => handleOpenPicker(slotIndex)}
-                    style={{
-                      width: '100%',
-                      minHeight: '180px',
-                      background: 'rgba(255, 255, 255, 0.03)',
-                      border: '2px dashed rgba(239, 68, 68, 0.3)',
-                      borderRadius: '16px',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      gap: '0.75rem',
-                      cursor: 'pointer',
-                      transition: 'all 0.3s ease',
-                      padding: '1.5rem'
-                    }}
-                  >
-                    <div style={{
-                      width: '56px',
-                      height: '56px',
-                      borderRadius: '50%',
-                      background: 'linear-gradient(135deg, rgba(239, 68, 68, 0.2) 0%, rgba(239, 68, 68, 0.1) 100%)',
-                      border: '2px solid rgba(239, 68, 68, 0.3)',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center'
-                    }}>
-                      <Plus size={28} color="#ef4444" />
-                    </div>
-
-                    <div>
-                      <div style={{
-                        fontSize: '1rem',
-                        fontWeight: '600',
-                        color: '#ef4444',
-                        marginBottom: '0.25rem'
-                      }}>
-                        Eiwitbron {slotIndex + 1}
-                      </div>
-                      <div style={{
-                        fontSize: '0.875rem',
-                        color: 'rgba(255, 255, 255, 0.5)'
-                      }}>
-                        Klik om te kiezen
-                      </div>
-                    </div>
-                  </button>
-                )}
-              </div>
-            )
-          })}
+          🥩
         </div>
-
-        {/* Progress Indicator */}
+        
+        <h1 style={{
+          fontSize: isMobile ? '1.5rem' : '2rem',
+          fontWeight: '900',
+          background: 'linear-gradient(135deg, #f97316 0%, #ea580c 100%)',
+          WebkitBackgroundClip: 'text',
+          WebkitTextFillColor: 'transparent',
+          backgroundClip: 'text',
+          margin: '0 0 0.5rem 0',
+          letterSpacing: '-0.02em'
+        }}>
+          Eiwit Bronnen
+        </h1>
+        
+        <p style={{
+          fontSize: isMobile ? '0.9rem' : '1rem',
+          color: 'rgba(255, 255, 255, 0.7)',
+          margin: 0,
+          fontWeight: '500'
+        }}>
+          Kies 3 eiwitbronnen die je dagelijks wilt eten
+        </p>
+      </div>
+      
+      {/* Coach Message */}
+      <CoachBubble 
+        message="Genoeg eiwitten eten is essentieel voor spiergroei én behoud. Door 3 vaste bronnen te kiezen die je dagelijks zou kunnen eten, maak je het jezelf super makkelijk om je eiwit target te halen. Ik gebruik zelf kipfilet, whey protein en eieren - maar kies wat JIJ lekker vindt!"
+        variant="warning"
+      />
+      
+      {/* Why Protein Info */}
+      <div style={{
+        marginBottom: isMobile ? '1.5rem' : '2rem',
+        padding: isMobile ? '1.25rem' : '1.5rem',
+        background: 'linear-gradient(135deg, rgba(249, 115, 22, 0.12) 0%, rgba(249, 115, 22, 0.04) 100%)',
+        border: '1px solid rgba(249, 115, 22, 0.25)',
+        borderRadius: isMobile ? '14px' : '16px'
+      }}>
+        <h3 style={{
+          fontSize: isMobile ? '0.95rem' : '1.05rem',
+          fontWeight: '700',
+          color: '#f97316',
+          margin: '0 0 0.75rem 0',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '0.5rem'
+        }}>
+          <span>💪</span>
+          Waarom 3 vaste eiwitbronnen?
+        </h3>
+        <ul style={{
+          margin: 0,
+          paddingLeft: isMobile ? '1.25rem' : '1.5rem',
+          fontSize: isMobile ? '0.85rem' : '0.9rem',
+          color: 'rgba(255, 255, 255, 0.8)',
+          lineHeight: '1.7'
+        }}>
+          <li style={{ marginBottom: '0.5rem' }}>
+            <strong>Consistentie:</strong> Je weet altijd wat je moet kopen
+          </li>
+          <li style={{ marginBottom: '0.5rem' }}>
+            <strong>Eenvoud:</strong> Geen dagelijkse beslissingen nodig
+          </li>
+          <li style={{ marginBottom: '0.5rem' }}>
+            <strong>Macro's halen:</strong> Makkelijker om je eiwit target te bereiken
+          </li>
+          <li>
+            <strong>Meal prep:</strong> Je kunt in bulk koken en bewaren
+          </li>
+        </ul>
+      </div>
+      
+      {/* Loading State */}
+      {loading && (
         <div style={{
-          marginTop: '2rem',
-          padding: '1rem',
-          background: 'rgba(16, 185, 129, 0.1)',
-          border: '1px solid rgba(16, 185, 129, 0.3)',
-          borderRadius: '12px',
+          padding: isMobile ? '3rem 1rem' : '4rem 2rem',
           textAlign: 'center'
         }}>
           <div style={{
-            fontSize: '1rem',
-            fontWeight: '600',
-            color: '#10b981'
+            width: isMobile ? '48px' : '60px',
+            height: isMobile ? '48px' : '60px',
+            border: '3px solid rgba(249, 115, 22, 0.2)',
+            borderTopColor: '#f97316',
+            borderRadius: '50%',
+            margin: '0 auto 1.5rem',
+            animation: 'spin 1s linear infinite'
+          }} />
+          <p style={{
+            fontSize: isMobile ? '0.9rem' : '1rem',
+            color: 'rgba(255, 255, 255, 0.7)',
+            margin: 0
           }}>
-            {proteinSources.filter(Boolean).length} / 3 eiwitbronnen geselecteerd
-          </div>
-          {proteinSources.filter(Boolean).length < 3 && (
-            <div style={{
-              fontSize: '0.875rem',
-              color: 'rgba(255, 255, 255, 0.6)',
-              marginTop: '0.25rem'
-            }}>
-              Selecteer nog {3 - proteinSources.filter(Boolean).length} {proteinSources.filter(Boolean).length === 2 ? 'bron' : 'bronnen'}
-            </div>
-          )}
+            Laden van eiwitbronnen...
+          </p>
         </div>
-      </WizardLayout>
-
-      {/* Ingredient Picker Modal */}
-      {showPicker && (
-        <IngredientPickerModal
-          isOpen={showPicker}
-          onClose={() => {
-            setShowPicker(false)
-            setEditingSlot(null)
-          }}
-          onSelect={handleSelectIngredient}
+      )}
+      
+      {/* Error State */}
+      {error && (
+        <div style={{
+          padding: isMobile ? '2rem 1rem' : '3rem 2rem',
+          textAlign: 'center',
+          background: 'rgba(239, 68, 68, 0.1)',
+          border: '1px solid rgba(239, 68, 68, 0.3)',
+          borderRadius: isMobile ? '14px' : '16px'
+        }}>
+          <div style={{
+            fontSize: isMobile ? '2.5rem' : '3rem',
+            marginBottom: '1rem'
+          }}>
+            ⚠️
+          </div>
+          <h3 style={{
+            fontSize: isMobile ? '1rem' : '1.1rem',
+            fontWeight: '700',
+            color: '#ef4444',
+            margin: '0 0 0.5rem 0'
+          }}>
+            Er ging iets mis
+          </h3>
+          <p style={{
+            fontSize: isMobile ? '0.85rem' : '0.9rem',
+            color: 'rgba(255, 255, 255, 0.7)',
+            margin: '0 0 1rem 0'
+          }}>
+            {error}
+          </p>
+          <button
+            onClick={loadProteins}
+            style={{
+              padding: isMobile ? '0.75rem 1.5rem' : '0.875rem 2rem',
+              background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
+              border: 'none',
+              borderRadius: isMobile ? '10px' : '12px',
+              color: '#fff',
+              fontSize: isMobile ? '0.9rem' : '1rem',
+              fontWeight: '600',
+              cursor: 'pointer',
+              transition: 'all 0.3s ease',
+              
+              // Touch optimization
+              touchAction: 'manipulation',
+              WebkitTapHighlightColor: 'transparent',
+              minHeight: '44px'
+            }}
+          >
+            Opnieuw proberen
+          </button>
+        </div>
+      )}
+      
+      {/* Ingredient Grid */}
+      {!loading && !error && allProteins.length > 0 && (
+        <IngredientGrid
+          ingredients={allProteins}
+          selected={selectedProteins}
+          onSelect={onProteinsSelect}
+          maxSelect={3}
+          coachPicks={COACH_PICKS.proteins}
           category="protein"
-          suggestions={suggestions}
-          db={db}
-          isMobile={isMobile}
         />
       )}
-    </>
+      
+      {/* Empty State */}
+      {!loading && !error && allProteins.length === 0 && (
+        <div style={{
+          padding: isMobile ? '3rem 1rem' : '4rem 2rem',
+          textAlign: 'center',
+          background: 'rgba(17, 17, 17, 0.4)',
+          borderRadius: isMobile ? '14px' : '16px',
+          border: '1px solid rgba(255, 255, 255, 0.1)'
+        }}>
+          <div style={{
+            fontSize: isMobile ? '3rem' : '4rem',
+            marginBottom: '1rem'
+          }}>
+            🍖
+          </div>
+          <h3 style={{
+            fontSize: isMobile ? '1rem' : '1.1rem',
+            fontWeight: '700',
+            color: '#fff',
+            margin: '0 0 0.5rem 0'
+          }}>
+            Geen eiwitbronnen gevonden
+          </h3>
+          <p style={{
+            fontSize: isMobile ? '0.85rem' : '0.9rem',
+            color: 'rgba(255, 255, 255, 0.6)',
+            margin: 0
+          }}>
+            Er zijn momenteel geen eiwitbronnen beschikbaar
+          </p>
+        </div>
+      )}
+      
+      <style>{`
+        @keyframes spin {
+          to { transform: rotate(360deg); }
+        }
+      `}</style>
+    </div>
   )
 }

@@ -3,17 +3,17 @@ import { useState, useEffect } from 'react'
 import TodaysWorkoutCard from './TodaysWorkoutCard'
 import LogModal from './LogModal'
 
-export default function TodaysWorkoutMain({ client, schema, db }) {
+export default function TodaysWorkoutMain({ client, schema, db, workoutService }) {
   const isMobile = window.innerWidth <= 768
   const [showLogModal, setShowLogModal] = useState(false)
   const [todaysWorkout, setTodaysWorkout] = useState(null)
   const [todaysLogs, setTodaysLogs] = useState([])
   const [loading, setLoading] = useState(true)
-  const [reloadKey, setReloadKey] = useState(0) // ⭐ Force reload trigger
+  const [reloadKey, setReloadKey] = useState(0)
   
   // Get today's day index (0 = Monday, 6 = Sunday)
   const currentDate = new Date()
-  const todayIndex = (currentDate.getDay() + 6) % 7 // Convert Sunday=0 to Monday=0
+  const todayIndex = (currentDate.getDay() + 6) % 7
   const weekDays = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
   
   useEffect(() => {
@@ -21,9 +21,9 @@ export default function TodaysWorkoutMain({ client, schema, db }) {
       loadTodaysWorkout()
       loadTodaysLogs()
     }
-  }, [schema, client?.id, reloadKey]) // ⭐ Trigger on reloadKey change
+  }, [schema, client?.id, reloadKey])
   
-  // Load today's workout from SAVED SCHEDULE (not schema directly!)
+  // Load today's workout - WITH CUSTOM SUPPORT
   const loadTodaysWorkout = async () => {
     if (!client?.id || !db) {
       console.log('ℹ️ No client or db')
@@ -32,7 +32,7 @@ export default function TodaysWorkoutMain({ client, schema, db }) {
     }
     
     try {
-      // ⭐ STAP 1: Laad FRESH schema uit database (niet uit prop!)
+      // STAP 1: Laad FRESH schema
       let freshSchema = schema
       
       if (client.assigned_schema_id) {
@@ -45,7 +45,7 @@ export default function TodaysWorkoutMain({ client, schema, db }) {
         
         if (schemaError) {
           console.error('❌ Error loading fresh schema:', schemaError)
-          freshSchema = schema // Fallback to prop
+          freshSchema = schema
         } else {
           freshSchema = schemaData
           console.log('✅ Fresh schema loaded from database')
@@ -58,32 +58,68 @@ export default function TodaysWorkoutMain({ client, schema, db }) {
         return
       }
       
-      // STAP 2: Laad opgeslagen schedule uit database
+      // STAP 2: Laad opgeslagen schedule
       const savedSchedule = await db.getClientWorkoutSchedule(client.id)
       console.log('📅 Saved schedule from database:', savedSchedule)
       
-      // STAP 3: Bepaal vandaag's dag naam
+      // STAP 3: Bepaal vandaag
       const todayName = weekDays[todayIndex]
-      console.log('📅 Today is:', todayName, '(index:', todayIndex, ')')
+      console.log('📅 Today is:', todayName)
       
-      // STAP 4: Check welke workout KEY er staat voor vandaag
+      // STAP 4: Check welke workout KEY er staat
       const workoutKey = savedSchedule && savedSchedule[todayName]
         ? savedSchedule[todayName]
         : null
       
       console.log('📅 Workout KEY for today:', workoutKey)
       
-      if (workoutKey && freshSchema.week_structure[workoutKey]) {
-        // STAP 5: Haal de workout DATA op uit FRESH schema
+      // ⭐ STAP 5: CHECK OF HET CUSTOM IS
+      if (workoutKey && workoutKey.startsWith('custom_')) {
+        console.log('🎯 Custom workout detected!')
+        
+        const customId = workoutKey.replace('custom_', '')
+        console.log('🔍 Custom workout ID:', customId)
+        
+        try {
+          // Laad custom workout via WorkoutService
+          const customWorkout = await workoutService.getCustomWorkoutById(customId)
+          
+          if (customWorkout) {
+            console.log('✅ Custom workout loaded:', customWorkout.name)
+            
+            // Format naar TodaysWorkoutCard format
+            setTodaysWorkout({
+              name: customWorkout.name,
+              focus: getCustomWorkoutTypeLabel(customWorkout.type),
+              geschatteTijd: `${customWorkout.duration} min`,
+              exercises: [], // Custom workouts hebben geen exercises
+              workoutKey: workoutKey,
+              dayKey: workoutKey,
+              dayName: todayName,
+              isCustom: true,
+              customData: customWorkout // Extra data
+            })
+          } else {
+            console.log('⚠️ Custom workout not found (deleted?)')
+            setTodaysWorkout(null)
+          }
+        } catch (error) {
+          console.error('❌ Error loading custom workout:', error)
+          setTodaysWorkout(null)
+        }
+      }
+      // STAP 6: Check schema workout
+      else if (workoutKey && freshSchema.week_structure[workoutKey]) {
         const workout = freshSchema.week_structure[workoutKey]
-        console.log('✅ Today\'s workout loaded:', workout.name)
+        console.log('✅ Schema workout loaded:', workout.name)
         console.log('✅ Exercises:', workout.exercises?.map(e => e.name).join(', '))
         
         setTodaysWorkout({
           ...workout,
           workoutKey: workoutKey,
           dayKey: workoutKey,
-          dayName: todayName
+          dayName: todayName,
+          isCustom: false
         })
       } else {
         console.log('ℹ️ No workout scheduled for today (rest day)')
@@ -95,6 +131,21 @@ export default function TodaysWorkoutMain({ client, schema, db }) {
     }
     
     setLoading(false)
+  }
+  
+  // Helper: Get type label
+  const getCustomWorkoutTypeLabel = (type) => {
+    const labels = {
+      cardio: 'Cardio',
+      cycling: 'Fietsen',
+      running: 'Hardlopen',
+      swimming: 'Zwemmen',
+      hiking: 'Wandelen',
+      yoga: 'Yoga',
+      sports: 'Sport',
+      custom: 'Custom'
+    }
+    return labels[type] || type
   }
   
   // Load today's logs
@@ -114,58 +165,31 @@ export default function TodaysWorkoutMain({ client, schema, db }) {
   // Handle open log modal
   const handleOpenLog = () => {
     setShowLogModal(true)
-    // Refresh logs when opening
     loadTodaysLogs()
   }
   
   // Handle close log modal
   const handleCloseLog = () => {
     setShowLogModal(false)
-    // Refresh logs after closing
     loadTodaysLogs()
   }
   
-  // Handle logs update (from ExerciseCard swap)
+  // Handle logs update
   const handleLogsUpdate = async (options) => {
     console.log('🔄 handleLogsUpdate called with options:', options)
     
-    // If swap happened, FORCE FULL RELOAD
     if (options?.reloadSchema) {
       console.log('🔄 SWAP DETECTED - Full reload triggered')
-      
-      // ⭐ MODAL BLIJFT OPEN - alleen reload schema
       console.log('🔄 Forcing schema reload...')
       setReloadKey(prev => prev + 1)
       
-      // Success feedback
       if (navigator.vibrate) navigator.vibrate([50, 100, 50])
-      
     } else {
-      // Normal log update (no swap)
       await loadTodaysLogs()
     }
   }
   
-  // Check if workout is completed today
-  const isWorkoutCompleted = async () => {
-    if (!client?.id || !db) return false
-    
-    try {
-      const today = new Date().toISOString().split('T')[0]
-      const { data } = await db.supabase
-        .from('workout_completions')
-        .select('completed')
-        .eq('client_id', client.id)
-        .eq('workout_date', today)
-        .single()
-      
-      return data?.completed || false
-    } catch (error) {
-      return false
-    }
-  }
-  
-  // If no schema, show message
+  // If no schema
   if (!schema) {
     return (
       <div style={{
