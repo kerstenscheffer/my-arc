@@ -9,7 +9,7 @@ import AIDaySchedule from './components/AIDaySchedule'
 import AIQuickActions from './components/AIQuickActions'
 import MealLibrarySection from './components/MealLibrarySection'
 import AIWeekPlanner from './components/AIWeekPlanner'
-import MealSetupWizard from './components/MealSetupWizard'
+import MealSetupWizardV2 from './components/wizard/MealSetupWizardV2'
 
 // Challenge Banner
 import MealChallengeBanner from '../../client/components/MealChallengeBanner'
@@ -494,7 +494,7 @@ export default function AIMealDashboard({ client, onNavigate, db }) {
       )}
       
       {showWizard && (
-        <MealSetupWizard
+        <MealSetupWizardV2
           isOpen={showWizard}
           onClose={() => setShowWizard(false)}
           onComplete={() => {
