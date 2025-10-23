@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react'
 import { X, ArrowLeft, ArrowRight, Check, Zap } from 'lucide-react'
 import StandardFoodsSection from '../../client-meal-base/components/StandardFoodsSection'
-import AICustomMealBuilder from './AICustomMealBuilder'
+import CustomMealBuilder from './CustomMealBuilder'
 import AIFavoritesModal from './AIFavoritesModal'
 import WeekPlannerService from '../services/WeekPlannerService'
 
@@ -792,15 +792,18 @@ export default function MealSetupWizard({
       )}
       
       {showMealBuilder && (
-        <AICustomMealBuilder
+        <CustomMealBuilder
           isOpen={showMealBuilder}
           onClose={() => {
             setShowMealBuilder(false)
             loadExistingData()
           }}
+          onSave={() => {
+            setShowMealBuilder(false)
+            loadExistingData()
+          }}
           db={db}
           client={client}
-          isMobile={isMobile}
         />
       )}
     </>
