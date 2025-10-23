@@ -777,7 +777,7 @@ export default function CoachHub() {
           backdropFilter: 'blur(20px)',
           borderRight: `1px solid ${currentTheme.borderActive}`,
           transition: 'left 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-          zIndex: 99,
+          zIndex: 101,
           padding: '1.5rem',
           paddingTop: '5rem',
           boxShadow: mobileMenuOpen ? '10px 0 40px rgba(0, 0, 0, 0.5)' : 'none',
@@ -862,7 +862,7 @@ export default function CoachHub() {
             right: 0,
             bottom: 0,
             background: 'rgba(0, 0, 0, 0.7)',
-            zIndex: 98,
+            zIndex: 100,
             backdropFilter: 'blur(5px)'
           }}
         />

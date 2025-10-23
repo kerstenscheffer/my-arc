@@ -234,7 +234,7 @@ const initializeCoach = async () => {
               right: 0,
               bottom: 0,
               background: 'rgba(0, 0, 0, 0.7)',
-              zIndex: 98,
+              zIndex: 100,
               backdropFilter: 'blur(5px)'
             }}
           />
@@ -247,7 +247,7 @@ const initializeCoach = async () => {
             background: 'linear-gradient(180deg, #1a1a1a 0%, #0f0f0f 100%)',
             backdropFilter: 'blur(20px)',
             borderRight: `1px solid ${currentTheme.borderActive}`,
-            zIndex: 99,
+            zIndex: 101,
             padding: '5rem 1.5rem 1.5rem',
             overflowY: 'auto',
             boxShadow: '10px 0 40px rgba(0, 0, 0, 0.5)'
