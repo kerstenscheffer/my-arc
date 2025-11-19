@@ -1,18 +1,22 @@
 // src/modules/meal-plan/AIMealDashboard.jsx
+// ✅ FIXED - Quick Intake & Meal Logging now properly reload dashboard data with timing guarantee
 import React, { useState, useEffect } from 'react'
 import AIMealPlanService from './AIMealPlanService'
+import MealLoggingService from '../meal-logging-wizard/MealLoggingService'
 
 // Core Components
 import AIDailyGoals from './components/AIDailyGoals'
 import PlanWithCoachSection from './components/PlanWithCoachSection'
 import AINextMeal from './components/AINextMeal'
-import AIDaySchedule from './components/AIDaySchedule'
 import AIQuickActions from './components/AIQuickActions'
 import MealLibrarySection from './components/MealLibrarySection'
 import AIWeekPlanner from './components/AIWeekPlanner'
-import MealSetupWizard from "./components/wizard/MealSetupWizard"
+import MealSetupWizard from './components/wizard/MealSetupWizard'
+import MealPhotoSlider from './components/MealPhotoSlider'
+import MealPhotoNav from './components/MealPhotoNav'
 
-// Challenge Sidebar (NEW)
+
+// Challenge Sidebar
 import MealChallengeSidebar from '../../client/components/MealChallengeSidebar'
 
 // Modals
@@ -20,13 +24,13 @@ import AIAlternativesModal from './components/AIAlternativesModal'
 import AIMealInfoModal from './components/AIMealInfoModal'
 import AIFavoritesModal from './components/AIFavoritesModal'
 import AIMealHistoryModal from './components/AIMealHistoryModal'
-import CustomMealBuilder from '../custom-meals/CustomMealBuilder'
 
 // Video Widget
 import PageVideoWidget from '../videos/PageVideoWidget'
 
 export default function AIMealDashboard({ client, onNavigate, db }) {
   const [service] = useState(() => new AIMealPlanService(db))
+  const [mealLoggingService, setMealLoggingService] = useState(null)
   const isMobile = window.innerWidth <= 768
   
   const [loading, setLoading] = useState(true)
@@ -48,30 +52,21 @@ export default function AIMealDashboard({ client, onNavigate, db }) {
     recipes: false
   })
   
+  // Initialize MealLoggingService
+  useEffect(() => {
+    if (db?.supabase) {
+      const loggingService = new MealLoggingService(db.supabase)
+      setMealLoggingService(loggingService)
+      console.log('✅ MealLoggingService initialized')
+    }
+  }, [db])
+  
   useEffect(() => {
     if (client?.id) {
       loadDashboardData()
       loadTemplates()
-      checkFirstTimeSetup()
     }
   }, [client])
-  
-  const checkFirstTimeSetup = async () => {
-    try {
-      const { data } = await db.supabase
-        .from('clients')
-        .select('has_completed_meal_setup')
-        .eq('id', client.id)
-        .single()
-      
-      // Don't auto-open wizard anymore - user opens manually via button
-      // if (!data?.has_completed_meal_setup) {
-      //   setShowWizard(true)
-      // }
-    } catch (error) {
-      console.error('Failed to check setup status:', error)
-    }
-  }
   
   const loadTemplates = async () => {
     try {
@@ -84,26 +79,29 @@ export default function AIMealDashboard({ client, onNavigate, db }) {
   }
   
   const loadDashboardData = async () => {
+    console.log('🚀 Loading AI dashboard data')
     setLoading(true)
     
     try {
       const data = await service.loadAIDashboardData(client.id)
       
-      if (data.dailyTotals && data.activePlan) {
+      if (data.dailyTotals) {
+        // ✅ Use client's target values directly from clients table
         const planTargets = {
-          calories: data.activePlan.daily_calories || 2200,
-          protein: data.activePlan.daily_protein || 165,
-          carbs: data.activePlan.daily_carbs || 220,
-          fat: data.activePlan.daily_fat || 73
+          calories: client.target_calories || 0,
+          protein: client.target_protein || 0,
+          carbs: client.target_carbs || 0,
+          fat: client.target_fat || 0
         }
         
         data.dailyTotals.targets = planTargets
         
+        // Calculate percentages (prevent division by zero)
         data.dailyTotals.percentages = {
-          calories: Math.round((data.dailyTotals.consumed.calories / planTargets.calories) * 100),
-          protein: Math.round((data.dailyTotals.consumed.protein / planTargets.protein) * 100),
-          carbs: Math.round((data.dailyTotals.consumed.carbs / planTargets.carbs) * 100),
-          fat: Math.round((data.dailyTotals.consumed.fat / planTargets.fat) * 100)
+          calories: planTargets.calories > 0 ? Math.round((data.dailyTotals.consumed.calories / planTargets.calories) * 100) : 0,
+          protein: planTargets.protein > 0 ? Math.round((data.dailyTotals.consumed.protein / planTargets.protein) * 100) : 0,
+          carbs: planTargets.carbs > 0 ? Math.round((data.dailyTotals.consumed.carbs / planTargets.carbs) * 100) : 0,
+          fat: planTargets.fat > 0 ? Math.round((data.dailyTotals.consumed.fat / planTargets.fat) * 100) : 0
         }
       }
       
@@ -115,15 +113,23 @@ export default function AIMealDashboard({ client, onNavigate, db }) {
       }
       
       setDashboardData(data)
+      console.log('✅ AI Dashboard loaded')
+      console.log('📊 Daily Totals:', data.dailyTotals)
     } catch (error) {
       console.error('Failed to load dashboard:', error)
+      // ✅ Use client's actual target values in error fallback
       setDashboardData({
         activePlan: null,
         todayMeals: [],
         nextMeal: null,
         todayProgress: null,
         dailyTotals: {
-          targets: { calories: 2200, protein: 165, carbs: 220, fat: 73 },
+          targets: { 
+            calories: client.target_calories || 0, 
+            protein: client.target_protein || 0, 
+            carbs: client.target_carbs || 0, 
+            fat: client.target_fat || 0 
+          },
           consumed: { calories: 0, protein: 0, carbs: 0, fat: 0 },
           percentages: { calories: 0, protein: 0, carbs: 0, fat: 0 },
           mealsConsumed: 0,
@@ -166,17 +172,39 @@ export default function AIMealDashboard({ client, onNavigate, db }) {
     }
   }
   
+  // ✅ FIXED: Quick Intake with proper reload timing
   const handleQuickIntake = async (intakeData) => {
+    console.log('🍽️ [AIMealDashboard] handleQuickIntake called with:', intakeData)
     try {
       await service.logManualIntake(
         client.id, 
         dashboardData.activePlan?.id,
         intakeData
       )
+      
+      console.log('⏳ [AIMealDashboard] Waiting for database write to complete...')
+      await new Promise(resolve => setTimeout(resolve, 300))
+      
+      console.log('🔄 [AIMealDashboard] Reloading dashboard data...')
       await loadDashboardData()
+      
+      console.log('✅ [AIMealDashboard] Quick Intake complete, dashboard refreshed')
     } catch (error) {
-      console.error('Failed to log manual intake:', error)
+      console.error('❌ [AIMealDashboard] Quick Intake failed:', error)
+      throw error
     }
+  }
+
+  // ✅ FIXED: Meal logged with proper reload timing
+  const handleMealLogged = async (loggedData) => {
+    console.log('✅ [AIMealDashboard] Meal logged:', loggedData)
+    
+    await new Promise(resolve => setTimeout(resolve, 300))
+    
+    console.log('🔄 [AIMealDashboard] Reloading dashboard data...')
+    await loadDashboardData()
+    
+    console.log('✅ [AIMealDashboard] Dashboard refreshed after meal log')
   }
   
   const handleCheckMeal = async (slot, mealData) => {
@@ -235,11 +263,16 @@ export default function AIMealDashboard({ client, onNavigate, db }) {
       console.error('Failed to swap meal:', error)
     }
   }
-  
-  const handleDayChange = (day) => {
-    setSelectedDay(day)
+
+  const handleDayChange = (newDay) => {
+    setSelectedDay(newDay)
   }
-  
+
+  const handleWizardComplete = async (planData) => {
+    setShowWizard(false)
+    await loadDashboardData()
+  }
+
   const handleOpenFavorites = () => {
     setModals(prev => ({ ...prev, favorites: true }))
   }
@@ -253,25 +286,14 @@ export default function AIMealDashboard({ client, onNavigate, db }) {
         alignItems: 'center',
         justifyContent: 'center'
       }}>
-        <div style={{ textAlign: 'center' }}>
-          <div style={{
-            width: '60px',
-            height: '60px',
-            border: '3px solid rgba(16, 185, 129, 0.2)',
-            borderTopColor: '#10b981',
-            borderRadius: '50%',
-            animation: 'spin 1s linear infinite',
-            margin: '0 auto 1.5rem'
-          }} />
-          <div style={{
-            color: '#fff',
-            fontSize: '1.1rem',
-            fontWeight: '500'
-          }}>
-            AI Meal Dashboard laden...
-          </div>
-        </div>
-        <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+        <div style={{
+          width: '48px',
+          height: '48px',
+          border: '4px solid rgba(16, 185, 129, 0.2)',
+          borderTop: '4px solid #10b981',
+          borderRadius: '50%',
+          animation: 'spin 1s linear infinite'
+        }} />
       </div>
     )
   }
@@ -281,31 +303,25 @@ export default function AIMealDashboard({ client, onNavigate, db }) {
       <div style={{
         minHeight: '100vh',
         background: 'linear-gradient(180deg, #0a0a0a 0%, #171717 100%)',
-        padding: isMobile ? '2rem 1rem' : '4rem 2rem'
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: isMobile ? '2rem 1rem' : '3rem 2rem'
       }}>
         <div style={{
-          maxWidth: '600px',
-          margin: '0 auto',
-          textAlign: 'center'
+          textAlign: 'center',
+          maxWidth: '500px',
+          background: 'rgba(17, 17, 17, 0.6)',
+          backdropFilter: 'blur(20px)',
+          border: '1px solid rgba(255, 255, 255, 0.1)',
+          borderRadius: '24px',
+          padding: isMobile ? '2rem 1.5rem' : '3rem 2.5rem',
+          boxShadow: '0 20px 60px rgba(0, 0, 0, 0.5)'
         }}>
-          <div style={{
-            width: '100px',
-            height: '100px',
-            background: 'linear-gradient(135deg, rgba(251, 191, 36, 0.2) 0%, rgba(251, 191, 36, 0.1) 100%)',
-            borderRadius: '24px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            margin: '0 auto 2rem',
-            border: '1px solid rgba(251, 191, 36, 0.3)'
-          }}>
-            <span style={{ fontSize: '3rem' }}>🍽️</span>
-          </div>
-          
           <h2 style={{
             fontSize: isMobile ? '1.5rem' : '2rem',
             fontWeight: '700',
-            color: 'white',
+            color: '#10b981',
             marginBottom: '1rem'
           }}>
             Geen actief meal plan
@@ -353,50 +369,97 @@ export default function AIMealDashboard({ client, onNavigate, db }) {
       
       {/* Challenge Sidebar - Floating Widget */}
       <MealChallengeSidebar client={client} db={db} />
-      
-      {/* 1. DAGELIJKSE DOELEN */}
-      <AIDailyGoals
-        dailyTotals={dashboardData.dailyTotals || {
-          targets: { calories: 2200, protein: 165, carbs: 220, fat: 73 },
-          consumed: { calories: 0, protein: 0, carbs: 0, fat: 0 },
-          percentages: { calories: 0, protein: 0, carbs: 0, fat: 0 },
-          mealsConsumed: 0,
-          mealsPlanned: dashboardData.todayMeals?.length || 0
+
+
+      {/* 4. FOTO SLIDER */}
+      <MealPhotoSlider />
+  
+
+
+
+{/* 1. DAGELIJKSE DOELEN */}
+<AIDailyGoals
+  client={client}
+  db={db}
+  dailyTotals={dashboardData.dailyTotals || {
+    targets: { 
+      calories: client.target_calories || 0, 
+      protein: client.target_protein || 0, 
+      carbs: client.target_carbs || 0, 
+      fat: client.target_fat || 0 
+    },
+    consumed: { calories: 0, protein: 0, carbs: 0, fat: 0 },
+    percentages: { calories: 0, protein: 0, carbs: 0, fat: 0 },
+    mealsConsumed: 0,
+    mealsPlanned: dashboardData.todayMeals?.length || 0
+  }}
+  waterIntake={dashboardData.waterIntake || 0}
+  todayMood={dashboardData.mood}
+  onUpdateWater={handleUpdateWater}
+  onLogMood={handleMoodLog}
+  onMealLogged={loadDashboardData}  // ✅ FIXED: Added this line
+  onQuickIntake={handleQuickIntake}
+  activePlan={dashboardData.activePlan}
+  todayMeals={dashboardData.todayMeals || []}
+  todayProgress={dashboardData.todayProgress}
+  onCheckMeal={handleCheckMeal}
+  onUncheckMeal={handleUncheckMeal}
+  onOpenInfo={(meal) => setModals(prev => ({ ...prev, info: meal }))}
+  onOpenAlternatives={(meal) => setModals(prev => ({ ...prev, alternatives: meal }))}
+  dayTemplates={dayTemplates}
+  clients={[client]}
+  onPlanUpdate={loadDashboardData}
+  onNavigateToDay={handleDayChange}
+  selectedDay={selectedDay}
+/>
+
+      {/* 2. VOLGENDE MAALTIJD */}
+      <AINextMeal
+        nextMeal={dashboardData.nextMeal}
+        todayMeals={dashboardData.todayMeals || []}
+        onOpenInfo={(meal) => setModals(prev => ({ ...prev, info: meal }))}
+        onOpenAlternatives={(meal) => setModals(prev => ({ ...prev, alternatives: meal }))}
+        onFinishMeal={handleFinishMeal}
+        onOpenDaySchedule={() => {
+          console.log('Day schedule is now modal-only')
         }}
-        waterIntake={dashboardData.waterIntake || 0}
-        todayMood={dashboardData.mood}
-        onUpdateWater={handleUpdateWater}
-        onLogMood={handleMoodLog}
-        onQuickIntake={handleQuickIntake}
         db={db}
       />
-      
-      {/* 2. PLAN MET COACH SECTIE - NIEUW */}
-      <PlanWithCoachSection 
-        onOpenWizard={() => setShowWizard(true)}
-        isMobile={isMobile}
-      />
-      
-      {/* 3. DAG SCHEMA */}
-      <div id="day-schedule">
-        {dashboardData.todayMeals && dashboardData.todayMeals.length > 0 && (
-          <AIDaySchedule
-            todayMeals={dashboardData.todayMeals}
-            todayProgress={dashboardData.todayProgress}
-            activePlan={dashboardData.activePlan}
-            selectedDay={selectedDay}
-            dayTemplates={dayTemplates}
-            onDayChange={handleDayChange}
-            onCheckMeal={handleCheckMeal}
-            onUncheckMeal={handleUncheckMeal}
-            onOpenInfo={(meal) => setModals(prev => ({ ...prev, info: meal }))}
-            onOpenAlternatives={(meal) => setModals(prev => ({ ...prev, alternatives: meal }))}
-            db={db}
-          />
-        )}
-      </div>
-      
-      {/* 4. QUICK ACTIONS */}
+
+
+
+     
+
+{/* 5. MEAL PHOTO NAVIGATION */}
+<div id="meal-photo-nav">
+  <MealPhotoNav
+    onActionClick={(actionId) => {
+      switch(actionId) {
+        case 'schedule':
+          setShowWeekPlanner(!showWeekPlanner)
+          break
+        case 'shopping':
+          onNavigate('boodschappen')
+          break
+        case 'custom':
+          setShowWizard(true)
+          break
+        case 'history':
+          setModals(prev => ({ ...prev, history: true }))
+          break
+        case 'swap':
+          handleOpenFavorites()
+          break
+        case 'stats':
+          alert('Week statistieken komen binnenkort!')
+          break
+      }
+    }}
+  />
+</div>
+
+
+      {/* 5. QUICK ACTIONS */}
       <div id="quick-actions">
         <AIQuickActions
           db={db}
@@ -413,22 +476,7 @@ export default function AIMealDashboard({ client, onNavigate, db }) {
         />
       </div>
       
-      {/* 5. VOLGENDE MAALTIJD */}
-      <AINextMeal
-        nextMeal={dashboardData.nextMeal}
-        todayMeals={dashboardData.todayMeals || []}
-        onOpenInfo={(meal) => setModals(prev => ({ ...prev, info: meal }))}
-        onOpenAlternatives={(meal) => setModals(prev => ({ ...prev, alternatives: meal }))}
-        onFinishMeal={handleFinishMeal}
-        onOpenDaySchedule={() => {
-          document.getElementById('day-schedule')?.scrollIntoView({ 
-            behavior: 'smooth', 
-            block: 'start' 
-          })
-        }}
-        db={db}
-      />
-      
+          
       {/* Week Planner */}
       {showWeekPlanner && (
         <AIWeekPlanner
@@ -439,13 +487,6 @@ export default function AIMealDashboard({ client, onNavigate, db }) {
           dailyTotals={dashboardData.dailyTotals}
         />
       )}
-      
-      {/* Meal Library */}
-      <MealLibrarySection
-        client={client}
-        db={db}
-        onMealCreated={loadDashboardData}
-      />
       
       {/* Video Widget */}
       <div style={{
@@ -512,9 +553,7 @@ export default function AIMealDashboard({ client, onNavigate, db }) {
         <MealSetupWizard
           isOpen={showWizard}
           onClose={() => setShowWizard(false)}
-          onComplete={() => {
-            loadDashboardData()
-          }}
+          onComplete={handleWizardComplete}
           client={client}
           db={db}
           isMobile={isMobile}
@@ -525,6 +564,19 @@ export default function AIMealDashboard({ client, onNavigate, db }) {
         @keyframes fadeIn {
           from { opacity: 0; }
           to { opacity: 1; }
+        }
+        @keyframes spin {
+          to { transform: rotate(360deg); }
+        }
+        @keyframes slideDown {
+          from {
+            opacity: 0;
+            transform: translateY(-20px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
         }
       `}</style>
     </div>

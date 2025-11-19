@@ -1,5 +1,5 @@
 // src/modules/client-meal-builder/ClientMealBuilder.jsx
-// MODULAR VERSION - Clean & Simple
+// ✅ FIXED: Safety check voor db prop
 
 import { useState, useEffect } from 'react'
 import { X } from 'lucide-react'
@@ -11,22 +11,90 @@ import IngredientList from './components/IngredientList'
 import SaveSection from './components/SaveSection'
 
 export default function ClientMealBuilder({ client, db, onClose, onMealCreated }) {
-  const [service] = useState(() => new ClientMealBuilderService(db))
-  const [visible, setVisible] = useState(false)
   const isMobile = window.innerWidth <= 768
   
-  // CRITICAL: Check client prop
-  useEffect(() => {
-    console.log('🔍 ClientMealBuilder props:', { 
-      hasClient: !!client, 
-      clientId: client?.id,
-      hasDb: !!db 
-    })
-    
-    if (!client || !client.id) {
-      console.error('❌ CRITICAL: No client or client.id!')
-    }
-  }, [client, db])
+  // ✅ FIX: Safety check VOOR service initialization
+  if (!db) {
+    console.error('❌ CRITICAL: ClientMealBuilder - no db prop!')
+    return (
+      <div style={{
+        position: 'fixed',
+        inset: 0,
+        background: 'rgba(0, 0, 0, 0.95)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        zIndex: 9999
+      }}>
+        <div style={{
+          color: '#fff',
+          fontSize: '1.5rem',
+          textAlign: 'center',
+          padding: '2rem'
+        }}>
+          ❌ Database niet beschikbaar
+          <button 
+            onClick={onClose}
+            style={{
+              display: 'block',
+              margin: '1rem auto',
+              padding: '0.75rem 1.5rem',
+              background: '#10b981',
+              border: 'none',
+              borderRadius: '8px',
+              color: '#fff',
+              cursor: 'pointer'
+            }}
+          >
+            Sluiten
+          </button>
+        </div>
+      </div>
+    )
+  }
+  
+  if (!client || !client.id) {
+    console.error('❌ CRITICAL: ClientMealBuilder - no client prop!')
+    return (
+      <div style={{
+        position: 'fixed',
+        inset: 0,
+        background: 'rgba(0, 0, 0, 0.95)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        zIndex: 9999
+      }}>
+        <div style={{
+          color: '#fff',
+          fontSize: '1.5rem',
+          textAlign: 'center',
+          padding: '2rem'
+        }}>
+          ❌ Client data niet beschikbaar
+          <button 
+            onClick={onClose}
+            style={{
+              display: 'block',
+              margin: '1rem auto',
+              padding: '0.75rem 1.5rem',
+              background: '#10b981',
+              border: 'none',
+              borderRadius: '8px',
+              color: '#fff',
+              cursor: 'pointer'
+            }}
+          >
+            Sluiten
+          </button>
+        </div>
+      </div>
+    )
+  }
+  
+  // ✅ NOW SAFE: Initialize service after safety checks
+  const [service] = useState(() => new ClientMealBuilderService(db))
+  const [visible, setVisible] = useState(false)
   
   // Custom hook handles ALL state logic
   const {
@@ -50,44 +118,6 @@ export default function ClientMealBuilder({ client, db, onClose, onMealCreated }
   useEffect(() => {
     setTimeout(() => setVisible(true), 100)
   }, [])
-  
-  // Safety check
-  if (!client || !client.id) {
-    return (
-      <div style={{
-        position: 'fixed',
-        inset: 0,
-        background: 'rgba(0, 0, 0, 0.95)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        zIndex: 9999
-      }}>
-        <div style={{
-          color: '#fff',
-          fontSize: '1.5rem',
-          textAlign: 'center'
-        }}>
-          ❌ Fout: Geen client data
-          <button 
-            onClick={onClose}
-            style={{
-              display: 'block',
-              margin: '1rem auto',
-              padding: '0.75rem 1.5rem',
-              background: '#10b981',
-              border: 'none',
-              borderRadius: '8px',
-              color: '#fff',
-              cursor: 'pointer'
-            }}
-          >
-            Sluiten
-          </button>
-        </div>
-      </div>
-    )
-  }
   
   return (
     <div style={{
@@ -140,13 +170,14 @@ export default function ClientMealBuilder({ client, db, onClose, onMealCreated }
           style={{
             width: '44px',
             height: '44px',
-            borderRadius: '0',
+            borderRadius: '12px',
             background: 'rgba(16, 185, 129, 0.1)',
             border: '1px solid rgba(16, 185, 129, 0.3)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            cursor: 'pointer'
+            cursor: 'pointer',
+            transition: 'all 0.3s ease'
           }}
         >
           <X size={20} color="#10b981" />

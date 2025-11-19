@@ -1,0 +1,1037 @@
+// src/modules/ai-meal-generator/AIMealPlanningService.js
+// 🔥 FIXED VERSION v2.0 - STRICT ingredient filtering + Higher bonuses
+/**
+ * MY ARC - AI MEAL PLANNING SERVICE WITH INGREDIENT PREFERENCES
+ * 
+ * CRITICAL FIXES APPLIED:
+ * ✅ FIX #1: STRICT pre-filtering - meals MUST contain selected ingredients
+ * ✅ FIX #2: Score bonus increased from +10 to +25 per selected ingredient (max 50)
+ * ✅ FIX #3: Popular ingredients get extra +10 bonus
+ * ✅ FIX #4: Forced meals (meal prep) always pass filtering
+ * 
+ * FLOW:
+ * 1. loadAIMeals() - Load all meals from database
+ * 2. filterMealsBySelectedIngredients() - STRICT filter (NEW)
+ * 3. scoreAllMeals() - Score only eligible meals
+ * 4. generateWeekPlan() - Build 7-day plan with portion scaling
+ */
+class AIMealPlanningService {
+  constructor(supabase) {
+    this.supabase = supabase
+    this.cache = new Map()
+    this.cacheTimeout = 5 * 60 * 1000 // 5 minutes
+  }
+  // ========================================
+  // POPULAR INGREDIENTS LISTS
+  // ========================================
+  POPULAR_PROTEINS = ['kwark', 'eieren', 'whey', 'hüttenkäse', 'kipfilet', 'zalm', 'tonijn', 'kip', 'greek yogurt', 'skyr']
+  POPULAR_CARBS = ['bruin brood', 'havermout', 'rijst', 'pasta', 'aardappel', 'zoete aardappel', 'quinoa', 'couscous']
+  // ========================================
+  // 1. CLIENT PROFILE MANAGEMENT
+  // ========================================
+  async ensureClientProfile(client) {
+    if (!client?.id) throw new Error('No client provided')
+    const cacheKey = `profile_${client.id}`
+    if (this.cache.has(cacheKey)) {
+      return this.cache.get(cacheKey)
+    }
+    try {
+      const { data: clientData, error } = await this.supabase
+        .from('clients')
+        .select(`
+          id, first_name, last_name,
+          age, gender, height, 
+          current_weight, target_weight,
+          activity_level, primary_goal,
+          target_calories, target_protein, 
+          target_carbs, target_fat,
+          dietary_type, allergies, intolerances,
+          loved_foods, hated_foods,
+          budget_per_week, cooking_skill
+        `)
+        .eq('id', client.id)
+        .single()
+      if (error || !clientData) {
+        console.log('Client not found, using calculated profile')
+        return this.calculateProfileFromClient(client)
+      }
+      const profile = {
+        client_id: clientData.id,
+        first_name: clientData.first_name,
+        last_name: clientData.last_name,
+        gender: clientData.gender || 'male',
+        age: clientData.age || 30,
+        height_cm: clientData.height || 175,
+        current_weight_kg: parseFloat(clientData.current_weight) || 70,
+        target_weight_kg: parseFloat(clientData.target_weight) || 70,
+        activity_level: clientData.activity_level || 'moderate',
+        primary_goal: clientData.primary_goal || 'maintain',
+        target_calories: clientData.target_calories || 2000,
+        target_protein_g: clientData.target_protein || 150,
+        target_carbs_g: clientData.target_carbs || 200,
+        target_fat_g: clientData.target_fat || 60,
+        budget_tier: this.calculateBudgetTier(clientData.budget_per_week),
+        cooking_skill: clientData.cooking_skill || 'intermediate',
+        meal_prep_preference: 'mixed',
+        meals_per_day: 4,
+        loved_ingredients: clientData.loved_foods || [],
+        hated_ingredients: clientData.hated_foods || [],
+        allergies: clientData.allergies || [],
+        dietary_type: clientData.dietary_type || 'flexible'
+      }
+      this.cache.set(cacheKey, profile)
+      setTimeout(() => this.cache.delete(cacheKey), this.cacheTimeout)
+      return profile
+    } catch (error) {
+      console.error('Error loading profile:', error)
+      return this.calculateProfileFromClient(client)
+    }
+  }
+  calculateBudgetTier(weeklyBudget) {
+    if (!weeklyBudget) return 'moderate'
+    if (weeklyBudget < 50) return 'budget'
+    if (weeklyBudget > 100) return 'premium'
+    return 'moderate'
+  }
+  calculateProfileFromClient(client) {
+    const weight = parseFloat(client.current_weight) || 70
+    const height = parseFloat(client.height) || 175
+    
+    return {
+      client_id: client.id,
+      first_name: client.first_name,
+      last_name: client.last_name,
+      gender: client.gender || 'male',
+      age: client.age || 30,
+      height_cm: height,
+      current_weight_kg: weight,
+      target_weight_kg: weight,
+      activity_level: 'moderate',
+      primary_goal: client.primary_goal || 'maintain',
+      target_calories: 2500,
+      target_protein_g: Math.round(weight * 2),
+      target_carbs_g: 250,
+      target_fat_g: 70,
+      budget_tier: 'moderate',
+      cooking_skill: 'intermediate',
+      meal_prep_preference: 'mixed',
+      meals_per_day: 4,
+      loved_ingredients: [],
+      hated_ingredients: [],
+      allergies: [],
+      dietary_type: 'flexible'
+    }
+  }
+  // ========================================
+  // 2. MEAL LOADING
+  // ========================================
+  async loadAIMeals() {
+    const cacheKey = 'all_ai_meals'
+    if (this.cache.has(cacheKey)) {
+      return this.cache.get(cacheKey)
+    }
+    try {
+      const { data: meals, error } = await this.supabase
+        .from('ai_meals')
+        .select('*')
+        .order('name')
+      if (error) throw error
+      const processedMeals = (meals || []).map(meal => ({
+        ...meal,
+        labels: typeof meal.labels === 'string' ? 
+          JSON.parse(meal.labels) : (meal.labels || []),
+        timing: meal.timing || [],
+        allergens: meal.allergens || [],
+        ingredients: meal.ingredients_list || {}
+      }))
+      console.log(`✅ Loaded ${processedMeals.length} AI meals`)
+      if (processedMeals.length < 20) {
+        console.log(`⚠️ Only ${processedMeals.length} meals available - creating variations`)
+        return this.createMealVariations(processedMeals)
+      }
+      this.cache.set(cacheKey, processedMeals)
+      setTimeout(() => this.cache.delete(cacheKey), this.cacheTimeout)
+      
+      return processedMeals
+    } catch (error) {
+      console.error('❌ Error loading AI meals:', error)
+      return []
+    }
+  }
+  createMealVariations(originalMeals) {
+    const variations = [...originalMeals]
+    
+    originalMeals.forEach(meal => {
+      variations.push({
+        ...meal,
+        id: `${meal.id}_small`,
+        name: `${meal.name} (Kleine Portie)`,
+        calories: Math.round(meal.calories * 0.75),
+        protein: Math.round(meal.protein * 0.75),
+        carbs: Math.round(meal.carbs * 0.75),
+        fat: Math.round(meal.fat * 0.75),
+        isVariation: true,
+        baseId: meal.id,
+        scaleFactor: 0.75
+      })
+      
+      variations.push({
+        ...meal,
+        id: `${meal.id}_large`,
+        name: `${meal.name} (Grote Portie)`,
+        calories: Math.round(meal.calories * 1.5),
+        protein: Math.round(meal.protein * 1.5),
+        carbs: Math.round(meal.carbs * 1.5),
+        fat: Math.round(meal.fat * 1.5),
+        isVariation: true,
+        baseId: meal.id,
+        scaleFactor: 1.5
+      })
+      
+      variations.push({
+        ...meal,
+        id: `${meal.id}_xl`,
+        name: `${meal.name} (XL Portie)`,
+        calories: Math.round(meal.calories * 2),
+        protein: Math.round(meal.protein * 2),
+        carbs: Math.round(meal.carbs * 2),
+        fat: Math.round(meal.fat * 2),
+        isVariation: true,
+        baseId: meal.id,
+        scaleFactor: 2
+      })
+    })
+    
+    console.log(`✅ Created ${variations.length} meal variations from ${originalMeals.length} base meals`)
+    return variations
+  }
+  async loadAIIngredients() {
+    try {
+      const { data: ingredients, error } = await this.supabase
+        .from('ai_ingredients')
+        .select('*')
+        .order('name')
+      if (error) throw error
+      return ingredients || []
+    } catch (error) {
+      console.error('Error loading ingredients:', error)
+      return []
+    }
+  }
+  // ========================================
+  // 🔥 3. CRITICAL FIX: STRICT INGREDIENT FILTERING
+  // ========================================
+  /**
+   * Check if ingredient is popular
+   */
+  isPopularIngredient(ingredientName) {
+    const lower = ingredientName.toLowerCase()
+    return this.POPULAR_PROTEINS.some(p => lower.includes(p)) ||
+           this.POPULAR_CARBS.some(c => lower.includes(c))
+  }
+  /**
+   * Extract ingredients from meal
+   */
+  extractMealIngredients(meal) {
+    let mealIngredients = []
+    
+    if (typeof meal.ingredients_list === 'object' && meal.ingredients_list !== null) {
+      mealIngredients = Object.keys(meal.ingredients_list).map(k => k.toLowerCase())
+    } else if (typeof meal.ingredients_list === 'string') {
+      try {
+        const parsed = JSON.parse(meal.ingredients_list)
+        mealIngredients = Object.keys(parsed).map(k => k.toLowerCase())
+      } catch {
+        mealIngredients = []
+      }
+    }
+    
+    return mealIngredients
+  }
+  /**
+   * Check if meal contains a selected ingredient
+   * 🔥 FIXED: Now handles both UUID strings AND ingredient objects {id, name}
+   */
+  mealHasSelectedIngredient(meal, selectedIngredients) {
+    const mealIngredients = this.extractMealIngredients(meal)
+    const mealNameLower = (meal.name || '').toLowerCase()
+    
+    return selectedIngredients.some(sel => {
+      // 🔥 FIX: Handle BOTH formats
+      let searchTerm
+      
+      if (typeof sel === 'object' && sel.name) {
+        // New format: ingredient object
+        searchTerm = sel.name.toLowerCase().trim()
+      } else if (typeof sel === 'string') {
+        // Legacy format: UUID string or name
+        const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(sel)
+        if (isUUID) {
+          console.warn(`⚠️ Legacy UUID format detected: ${sel}`)
+          return false // Skip UUIDs - they won't match
+        }
+        searchTerm = sel.toLowerCase().trim()
+      } else {
+        searchTerm = (sel.id || sel.label || sel).toLowerCase().trim()
+      }
+      
+      if (!searchTerm) return false
+      
+      // Check in ingredients list
+      const foundInIngredients = mealIngredients.some(ing => {
+        return ing === searchTerm || 
+               ing.includes(searchTerm) || 
+               searchTerm.includes(ing)
+      })
+      
+      // Check in meal name
+      const foundInName = mealNameLower.includes(searchTerm)
+      
+      return foundInIngredients || foundInName
+    })
+  }
+  /**
+   * STRICT FILTERING - Meals MUST contain selected ingredients
+   * This runs BEFORE scoring to eliminate irrelevant meals
+   */
+  filterMealsBySelectedIngredients(meals, selectedIngredients, forcedMealIds = []) {
+    // If no selected ingredients, return all meals
+    if (!selectedIngredients || selectedIngredients.length === 0) {
+      console.log('⚠️ No selected ingredients - returning all meals')
+      return meals
+    }
+    console.log(`🔍 STRICT FILTERING: ${meals.length} meals by ${selectedIngredients.length} selected ingredients`)
+    console.log(`   Selected: ${selectedIngredients.map(s => s.name || s.label || s).join(', ')}`)
+    console.log(`   Forced meals: ${forcedMealIds.length}`)
+    const forcedMealIdSet = new Set(forcedMealIds)
+    const filtered = meals.filter(meal => {
+      // ✅ ALWAYS include forced meals (meal prep)
+      if (forcedMealIdSet.has(meal.id)) {
+        return true
+      }
+      // ✅ Check if meal contains AT LEAST ONE selected ingredient
+      return this.mealHasSelectedIngredient(meal, selectedIngredients)
+    })
+    const forcedCount = filtered.filter(m => forcedMealIdSet.has(m.id)).length
+    const regularCount = filtered.length - forcedCount
+    console.log(`✅ FILTERING RESULT:`)
+    console.log(`   Forced meals: ${forcedCount}`)
+    console.log(`   Regular meals with selected ingredients: ${regularCount}`)
+    console.log(`   Total eligible: ${filtered.length}`)
+    console.log(`   Filtered out: ${meals.length - filtered.length}`)
+    if (filtered.length < 20) {
+      console.warn(`⚠️ Only ${filtered.length} meals passed filtering - may need to relax criteria`)
+    }
+    return filtered
+  }
+  /**
+   * Count how many selected ingredients a meal contains
+   * 🔥 FIXED: Now handles both UUID strings AND ingredient objects {id, name}
+   */
+  countSelectedIngredientsInMeal(meal, selectedIngredients) {
+    const mealIngredients = this.extractMealIngredients(meal)
+    const mealNameLower = (meal.name || '').toLowerCase()
+    
+    let count = 0
+    const foundIngredients = []
+    
+    selectedIngredients.forEach(sel => {
+      // 🔥 FIX: Handle BOTH formats
+      // Format 1: Object {id: '...', name: 'Kwark'}
+      // Format 2: Legacy UUID string 'c0a21e98-...'
+      let searchTerm
+      
+      if (typeof sel === 'object' && sel.name) {
+        // New format: ingredient object
+        searchTerm = sel.name.toLowerCase().trim()
+      } else if (typeof sel === 'string') {
+        // Legacy format: UUID string - try to lookup name
+        const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(sel)
+        if (isUUID) {
+          console.warn(`⚠️ Legacy UUID format detected: ${sel} - ingredient matching may not work correctly`)
+          return // Skip UUIDs - they won't match ingredient names
+        }
+        searchTerm = sel.toLowerCase().trim()
+      } else {
+        // Fallback
+        searchTerm = (sel.id || sel.label || sel).toLowerCase().trim()
+      }
+      
+      if (!searchTerm) return
+      
+      // Check in ingredients list
+      const foundInIngredients = mealIngredients.some(ing => {
+        // More flexible matching
+        return ing === searchTerm || 
+               ing.includes(searchTerm) || 
+               searchTerm.includes(ing)
+      })
+      
+      // Check in meal name
+      const foundInName = mealNameLower.includes(searchTerm)
+      
+      if (foundInIngredients || foundInName) {
+        count++
+        foundIngredients.push(searchTerm)
+      }
+    })
+    
+    return { count, foundIngredients }
+  }
+  // ========================================
+  // 4. MEAL SCORING (WITH HIGHER BONUSES)
+  // ========================================
+  scoreAllMeals(meals, profile, excludedIngredients = [], selectedIngredients = []) {
+    console.log(`🎯 Scoring ${meals.length} meals`)
+    console.log(`   Profile goal: ${profile.primary_goal}`)
+    console.log(`   Excluded: ${excludedIngredients.length}`)
+    console.log(`   Selected: ${selectedIngredients.length}`)
+    
+    return meals.map(meal => {
+      const score = this.calculateMealScore(meal, profile, excludedIngredients, selectedIngredients)
+      return {
+        ...meal,
+        aiScore: score.total,
+        scoreBreakdown: score.breakdown
+      }
+    }).sort((a, b) => b.aiScore - a.aiScore)
+  }
+  calculateMealScore(meal, profile, excludedIngredients = [], selectedIngredients = []) {
+    const breakdown = {
+      goalAlignment: 0,
+      macroFit: 0,
+      preferences: 0,
+      practical: 0,
+      budget: 0,
+      variety: 0,
+      selectedBonus: 0  // 🔥 NEW: Higher bonus for selected ingredients
+    }
+    // ========================================
+    // 🔥 SELECTED INGREDIENTS BONUS (FIRST!)
+    // ========================================
+    if (selectedIngredients && selectedIngredients.length > 0) {
+      const { count, foundIngredients } = this.countSelectedIngredientsInMeal(meal, selectedIngredients)
+      
+      if (count > 0) {
+        // 🔥 NEW SCORING: +25 points per selected ingredient (max 50)
+        breakdown.selectedBonus = Math.min(50, count * 25)
+        
+        // 🔥 POPULAR INGREDIENT EXTRA BONUS: +10
+        const hasPopular = foundIngredients.some(ing => this.isPopularIngredient(ing))
+        if (hasPopular) {
+          breakdown.selectedBonus += 10
+        }
+        
+        console.log(`✅ "${meal.name}" contains ${count} selected ingredients (+${breakdown.selectedBonus} points)`)
+        if (foundIngredients.length > 0) {
+          console.log(`   Found: ${foundIngredients.join(', ')}`)
+        }
+      }
+    }
+    // ========================================
+    // EXCLUDED INGREDIENTS CHECK
+    // ========================================
+    if (excludedIngredients.length > 0) {
+      const mealIngredients = this.extractMealIngredients(meal)
+      const mealNameLower = (meal.name || '').toLowerCase()
+      
+      const hasExcluded = excludedIngredients.some(excluded => {
+        const excludedLower = (excluded.name || excluded.id || excluded.label || excluded).toLowerCase()
+        return mealIngredients.some(ing => ing.includes(excludedLower)) ||
+               mealNameLower.includes(excludedLower)
+      })
+      
+      if (hasExcluded) {
+        console.log(`❌ "${meal.name}" contains excluded ingredient - DISQUALIFIED`)
+        return { total: -100, breakdown }
+      }
+    }
+    // ========================================
+    // 1. GOAL ALIGNMENT (0-30 points)
+    // ========================================
+    const goalLabels = {
+      'muscle_gain': ['bulk_friendly', 'high_protein', 'high_cal'],
+      'fat_loss': ['cut_friendly', 'high_protein', 'low_cal'],
+      'maintain': ['balanced', 'moderate'],
+      'performance': ['high_carbs', 'pre_workout', 'post_workout']
+    }
+    const targetLabels = goalLabels[profile.primary_goal] || []
+    const mealLabels = meal.labels || []
+    const matchedLabels = targetLabels.filter(label => mealLabels.includes(label)).length
+    breakdown.goalAlignment = targetLabels.length > 0 
+      ? (matchedLabels / targetLabels.length) * 30 
+      : 15
+    // ========================================
+    // 2. MACRO FIT (0-25 points)
+    // ========================================
+    const mealsPerDay = profile.meals_per_day || 3
+    const targetPerMeal = profile.target_calories / mealsPerDay
+    const calorieDeviation = Math.abs(meal.calories - targetPerMeal) / targetPerMeal
+    
+    breakdown.macroFit = Math.max(0, 25 - (calorieDeviation * 10))
+    if (profile.primary_goal === 'muscle_gain' && meal.protein > 30) {
+      breakdown.macroFit += 5
+    }
+    // ========================================
+    // 3. PREFERENCES (0-20 points)
+    // ========================================
+    if (profile.loved_ingredients?.length > 0 && meal.ingredients_list) {
+      const mealIngredients = this.extractMealIngredients(meal)
+      const mealNameLower = (meal.name || '').toLowerCase()
+      
+      const hasLoved = profile.loved_ingredients.some(loved => {
+        const lovedLower = loved.toLowerCase()
+        return mealNameLower.includes(lovedLower) ||
+               mealIngredients.some(ing => ing.includes(lovedLower))
+      })
+      if (hasLoved) breakdown.preferences += 10
+    }
+    if (profile.hated_ingredients?.length > 0 && meal.ingredients_list) {
+      const mealIngredients = this.extractMealIngredients(meal)
+      const mealNameLower = (meal.name || '').toLowerCase()
+      
+      const hasHated = profile.hated_ingredients.some(hated => {
+        const hatedLower = hated.toLowerCase()
+        return mealNameLower.includes(hatedLower) ||
+               mealIngredients.some(ing => ing.includes(hatedLower))
+      })
+      if (hasHated) breakdown.preferences -= 20
+    }
+    if (profile.allergies?.length > 0 && meal.allergens?.length > 0) {
+      const hasAllergen = profile.allergies.some(allergy =>
+        meal.allergens.some(allergen => 
+          allergen.toLowerCase().includes(allergy.toLowerCase())
+        )
+      )
+      if (hasAllergen) return { total: -100, breakdown }
+    }
+    if (profile.dietary_type) {
+      if (profile.dietary_type === 'vegetarian' && mealLabels.includes('vegetarian')) {
+        breakdown.preferences += 5
+      } else if (profile.dietary_type === 'vegan' && mealLabels.includes('vegan')) {
+        breakdown.preferences += 5
+      }
+    }
+    // ========================================
+    // 4. PRACTICAL (0-15 points)
+    // ========================================
+    const skillMap = {
+      'beginner': 'easy',
+      'intermediate': 'medium',
+      'advanced': 'hard'
+    }
+    
+    if (meal.difficulty === skillMap[profile.cooking_skill] || 
+        meal.difficulty === 'easy' && profile.cooking_skill === 'beginner') {
+      breakdown.practical += 7
+    }
+    if (profile.meal_prep_preference === 'full_prep' && 
+        mealLabels.includes('meal_prep')) {
+      breakdown.practical += 8
+    } else if (profile.meal_prep_preference === 'daily_fresh' && 
+               (meal.prep_time_min < 20 || mealLabels.includes('quick'))) {
+      breakdown.practical += 8
+    }
+    // ========================================
+    // 5. BUDGET (0-10 points)
+    // ========================================
+    if (meal.cost_tier === profile.budget_tier) {
+      breakdown.budget = 10
+    } else if (profile.budget_tier === 'moderate') {
+      if (meal.cost_tier === 'budget') breakdown.budget = 8
+      if (meal.cost_tier === 'premium') breakdown.budget = 3
+    } else if (profile.budget_tier === 'budget' && meal.cost_tier !== 'premium') {
+      breakdown.budget = 5
+    }
+    // ========================================
+    // 6. VARIETY BONUS (0-5 points)
+    // ========================================
+    breakdown.variety = Math.random() * 5
+    // ========================================
+    // CALCULATE TOTAL
+    // ========================================
+    const total = Object.values(breakdown).reduce((sum, val) => sum + val, 0)
+    return { 
+      total: Math.round(total), 
+      breakdown 
+    }
+  }
+  // ========================================
+  // 5. PLAN GENERATION WITH PORTION SCALING
+  // ========================================
+  async generateWeekPlan(clientProfile, options = {}) {
+    const {
+      days = 7,
+      variationLevel = 'high',
+      avoidDuplicates = true,
+      forcedMeals = [],
+      forcedMealIds = [],  // 🔥 NEW: Accept meal IDs
+      excludedIngredients = [],
+      excludedIngredientIds = [],  // 🔥 NEW: Accept ingredient IDs
+      selectedIngredients = [],  // 🔥 CRITICAL
+      mealPreferences = {}
+    } = options
+    console.log('🚀 Generating AI week plan for:', clientProfile.first_name)
+    console.log(`📊 Target: ${clientProfile.target_calories} kcal, ${clientProfile.target_protein_g}g protein`)
+    console.log(`✅ Selected ingredients: ${selectedIngredients.length}`)
+    console.log(`🚫 Excluded ingredients: ${excludedIngredients.length}`)
+    console.log(`🍱 Forced meals: ${forcedMealIds.length}`)
+    // Load all meals
+    const allMeals = await this.loadAIMeals()
+    if (allMeals.length === 0) {
+      throw new Error('No meals available in database')
+    }
+    console.log(`📚 Total meals in database: ${allMeals.length}`)
+    // 🔥 STEP 1: STRICT FILTERING (before scoring!)
+    const eligibleMeals = this.filterMealsBySelectedIngredients(
+      allMeals, 
+      selectedIngredients, 
+      forcedMealIds
+    )
+    if (eligibleMeals.length === 0) {
+      throw new Error('No meals match your selected ingredients. Please adjust your selection.')
+    }
+    console.log(`🎯 Eligible meals after filtering: ${eligibleMeals.length}`)
+    // 🔥 STEP 2: SCORE eligible meals (with higher bonuses)
+    const scoredMeals = this.scoreAllMeals(
+      eligibleMeals, 
+      clientProfile, 
+      excludedIngredients, 
+      selectedIngredients
+    )
+    
+    const validMeals = scoredMeals.filter(m => m.aiScore >= 0)
+    console.log(`📊 ${validMeals.length} meals passed scoring`)
+    
+    // Log top meals
+    const topMeals = validMeals.slice(0, 5)
+    console.log('🏆 Top 5 scoring meals:')
+    topMeals.forEach(meal => {
+      console.log(`  - ${meal.name}: ${meal.aiScore} points (selected bonus: ${meal.scoreBreakdown?.selectedBonus || 0})`)
+    })
+    
+    if (validMeals.length === 0) {
+      console.error('❌ No eligible meals after filtering and scoring')
+      throw new Error('No meals match your criteria')
+    }
+    
+    // 🔥 STEP 3: Generate week plan
+    const distribution = this.calculateMealDistribution(clientProfile)
+    
+    const weekPlan = []
+    const usedMealIds = new Set()
+    
+    for (let day = 0; day < days; day++) {
+      const dayPlan = this.generateDayPlanWithScaling(
+        clientProfile,
+        validMeals,
+        distribution,
+        usedMealIds,
+        { 
+          avoidDuplicates: validMeals.length > 10 ? avoidDuplicates : false,
+          variationLevel,
+          forcedMeals: forcedMeals.slice(day * 3, (day + 1) * 3),
+          selectedIngredients
+        }
+      )
+      weekPlan.push(dayPlan)
+    }
+    
+    // 🔥 STEP 4: Verify selected ingredients usage
+    const usedMealIdsArray = []
+    weekPlan.forEach(day => {
+      if (day.breakfast?.id) usedMealIdsArray.push(day.breakfast.id)
+      if (day.lunch?.id) usedMealIdsArray.push(day.lunch.id)
+      if (day.dinner?.id) usedMealIdsArray.push(day.dinner.id)
+      day.snacks?.forEach(s => s.id && usedMealIdsArray.push(s.id))
+    })
+    
+    console.log(`📋 Week plan uses ${new Set(usedMealIdsArray).size} unique meals`)
+    
+    // Verify all meals have selected ingredients
+    const planMeals = allMeals.filter(m => usedMealIdsArray.includes(m.id))
+    const mealsWithSelected = planMeals.filter(m => 
+      this.mealHasSelectedIngredient(m, selectedIngredients) || 
+      forcedMealIds.includes(m.id)
+    )
+    
+    console.log(`✅ ${mealsWithSelected.length}/${planMeals.length} meals contain selected ingredients`)
+    
+    const stats = this.calculatePlanStatistics(weekPlan, clientProfile)
+    const aiAnalysis = this.analyzePlan(weekPlan, clientProfile, selectedIngredients, excludedIngredients)
+    
+    return {
+      weekPlan,
+      dailyTargets: {
+        kcal: clientProfile.target_calories,
+        protein: clientProfile.target_protein_g,
+        carbs: clientProfile.target_carbs_g,
+        fat: clientProfile.target_fat_g
+      },
+      stats,
+      aiAnalysis,
+      clientProfile,
+      generatedAt: new Date(),
+      aiOptimized: true,
+      ingredientPreferences: {
+        selected: selectedIngredients.length,
+        excluded: excludedIngredients.length
+      }
+    }
+  }
+  calculateMealDistribution(profile) {
+    const mealsPerDay = profile.meals_per_day || 4
+    
+    const patterns = {
+      'muscle_gain': {
+        3: [0.25, 0.35, 0.40],
+        4: [0.20, 0.30, 0.20, 0.30],
+        5: [0.20, 0.25, 0.15, 0.20, 0.20],
+        6: [0.15, 0.20, 0.15, 0.15, 0.20, 0.15]
+      },
+      'fat_loss': {
+        3: [0.30, 0.35, 0.35],
+        4: [0.25, 0.30, 0.15, 0.30],
+        5: [0.20, 0.25, 0.15, 0.15, 0.25],
+        6: [0.15, 0.20, 0.15, 0.15, 0.20, 0.15]
+      },
+      'maintain': {
+        3: [0.30, 0.35, 0.35],
+        4: [0.25, 0.30, 0.20, 0.25],
+        5: [0.20, 0.25, 0.15, 0.15, 0.25],
+        6: [0.17, 0.20, 0.13, 0.13, 0.20, 0.17]
+      }
+    }
+    
+    const mealTypes = ['breakfast', 'lunch', 'snack', 'dinner']
+    const percentages = patterns[profile.primary_goal]?.[mealsPerDay] || patterns['maintain'][4]
+    
+    const distribution = {}
+    percentages.forEach((pct, idx) => {
+      const mealType = mealTypes[Math.min(idx, mealTypes.length - 1)]
+      if (!distribution[mealType]) {
+        distribution[mealType] = {
+          targetCalories: Math.round(profile.target_calories * pct),
+          targetProtein: Math.round(profile.target_protein_g * pct)
+        }
+      } else {
+        distribution[mealType].targetCalories += Math.round(profile.target_calories * pct)
+        distribution[mealType].targetProtein += Math.round(profile.target_protein_g * pct)
+      }
+    })
+    
+    return distribution
+  }
+  scaleMealToTarget(meal, targetCalories, targetProtein) {
+    const calScale = targetCalories / meal.calories
+    const protScale = targetProtein / meal.protein
+    const scaleFactor = (calScale + protScale) / 2
+    
+    return {
+      ...meal,
+      calories: Math.round(meal.calories * scaleFactor),
+      protein: Math.round(meal.protein * scaleFactor),
+      carbs: Math.round(meal.carbs * scaleFactor),
+      fat: Math.round(meal.fat * scaleFactor),
+      scaleFactor: scaleFactor,
+      baseId: meal.id,
+      name: scaleFactor > 1.25 
+        ? `${meal.name} (${Math.round(scaleFactor * 100)}% portie)`
+        : scaleFactor < 0.75
+          ? `${meal.name} (${Math.round(scaleFactor * 100)}% portie)`
+          : meal.name
+    }
+  }
+  generateDayPlanWithScaling(profile, eligibleMeals, distribution, usedMealIds, options) {
+    const dayPlan = {
+      breakfast: null,
+      lunch: null,
+      dinner: null,
+      snacks: [],
+      totals: { kcal: 0, protein: 0, carbs: 0, fat: 0 },
+      accuracy: { total: 0, calories: 0, protein: 0 }
+    }
+    
+    const forcedMeals = options.forcedMeals || []
+    const forcedByTiming = {}
+    
+    forcedMeals.forEach(meal => {
+      if (meal.timing && meal.timing[0]) {
+        const timing = meal.timing[0]
+        if (!forcedByTiming[timing]) forcedByTiming[timing] = []
+        forcedByTiming[timing].push(meal)
+      }
+    })
+    
+    const todaysMeals = []
+    
+    Object.entries(distribution).forEach(([mealType, targets]) => {
+      if (forcedByTiming[mealType] && forcedByTiming[mealType].length > 0) {
+        const forcedMeal = forcedByTiming[mealType].shift()
+        const scaledMeal = this.scaleMealToTarget(forcedMeal, targets.targetCalories, targets.targetProtein)
+        dayPlan[mealType] = { ...scaledMeal, forced: true }
+        todaysMeals.push(scaledMeal.id)
+      } else {
+        let candidates = eligibleMeals.filter(meal => {
+          if (!meal.timing?.includes(mealType)) return false
+          if (todaysMeals.includes(meal.id)) return false
+          if (eligibleMeals.length <= 5) return true
+          if (options.avoidDuplicates && usedMealIds.has(meal.id)) return false
+          return true
+        })
+        
+        if (candidates.length === 0) {
+          candidates = eligibleMeals.filter(meal =>
+            meal.timing?.includes(mealType) && !todaysMeals.includes(meal.id)
+          )
+        }
+        
+        if (candidates.length === 0) {
+          candidates = eligibleMeals.filter(meal =>
+            meal.timing?.includes(mealType)
+          )
+        }
+        
+        if (candidates.length > 0) {
+          let selected
+          if (candidates.length <= 3) {
+            selected = candidates[0]
+          } else {
+            const variationFactor = options.variationLevel === 'high' ? 5 : 
+                                   options.variationLevel === 'medium' ? 3 : 1
+            const topCandidates = candidates.slice(0, Math.min(variationFactor, candidates.length))
+            selected = topCandidates[Math.floor(Math.random() * topCandidates.length)]
+          }
+          
+          const scaledMeal = this.scaleMealToTarget(selected, targets.targetCalories, targets.targetProtein)
+          
+          if (mealType === 'snack') {
+            dayPlan.snacks.push(scaledMeal)
+          } else {
+            dayPlan[mealType] = scaledMeal
+          }
+          
+          todaysMeals.push(selected.id)
+          usedMealIds.add(selected.id)
+          
+          if (usedMealIds.size > eligibleMeals.length * 2) {
+            const oldestId = usedMealIds.values().next().value
+            usedMealIds.delete(oldestId)
+          }
+        }
+      }
+    })
+    
+    const allMeals = [dayPlan.breakfast, dayPlan.lunch, dayPlan.dinner, ...dayPlan.snacks].filter(Boolean)
+    
+    allMeals.forEach(meal => {
+      dayPlan.totals.kcal += meal.calories || 0
+      dayPlan.totals.protein += meal.protein || 0
+      dayPlan.totals.carbs += meal.carbs || 0
+      dayPlan.totals.fat += meal.fat || 0
+    })
+    
+    const finalCalorieRatio = profile.target_calories / dayPlan.totals.kcal
+    const finalProteinRatio = profile.target_protein_g / dayPlan.totals.protein
+    
+    if (Math.abs(1 - finalCalorieRatio) > 0.1 || Math.abs(1 - finalProteinRatio) > 0.1) {
+      const finalScale = Math.max(finalCalorieRatio, finalProteinRatio)
+      
+      allMeals.forEach(meal => {
+        meal.finalScale = finalScale
+        meal.calories = Math.round(meal.calories * finalScale)
+        meal.protein = Math.round(meal.protein * finalScale)
+        meal.carbs = Math.round(meal.carbs * finalScale)
+        meal.fat = Math.round(meal.fat * finalScale)
+      })
+      
+      dayPlan.totals = { kcal: 0, protein: 0, carbs: 0, fat: 0 }
+      allMeals.forEach(meal => {
+        dayPlan.totals.kcal += meal.calories || 0
+        dayPlan.totals.protein += meal.protein || 0
+        dayPlan.totals.carbs += meal.carbs || 0
+        dayPlan.totals.fat += meal.fat || 0
+      })
+    }
+    
+    const calAccuracy = 100 - Math.min(20, Math.abs(100 - (dayPlan.totals.kcal / profile.target_calories * 100)))
+    const protAccuracy = 100 - Math.min(20, Math.abs(100 - (dayPlan.totals.protein / profile.target_protein_g * 100)))
+    
+    dayPlan.accuracy = {
+      total: Math.round((calAccuracy + protAccuracy) / 2),
+      calories: Math.round(calAccuracy),
+      protein: Math.round(protAccuracy)
+    }
+    
+    return dayPlan
+  }
+  // ========================================
+  // 6. ANALYSIS & OPTIMIZATION
+  // ========================================
+  calculatePlanStatistics(weekPlan, profile) {
+    const stats = {
+      averageAccuracy: 0,
+      weekAverages: { kcal: 0, protein: 0, carbs: 0, fat: 0 },
+      mealVariety: new Set(),
+      complianceScore: 0,
+      varietyScore: 0,
+      scalingUsed: false,
+      averageScaleFactor: 0
+    }
+    
+    let totalAccuracy = 0
+    let totalScaleFactor = 0
+    let scaledMealsCount = 0
+    
+    weekPlan.forEach(day => {
+      totalAccuracy += day.accuracy?.total || 0
+      
+      stats.weekAverages.kcal += day.totals.kcal
+      stats.weekAverages.protein += day.totals.protein
+      stats.weekAverages.carbs += day.totals.carbs
+      stats.weekAverages.fat += day.totals.fat
+      
+      const meals = [day.breakfast, day.lunch, day.dinner, ...day.snacks].filter(Boolean)
+      meals.forEach(meal => {
+        const baseId = meal.baseId || meal.id
+        stats.mealVariety.add(baseId)
+        
+        if (meal.scaleFactor) {
+          totalScaleFactor += meal.scaleFactor
+          scaledMealsCount++
+          stats.scalingUsed = true
+        }
+      })
+    })
+    
+    const days = weekPlan.length || 1
+    
+    stats.averageAccuracy = Math.round(totalAccuracy / days)
+    stats.weekAverages.kcal = Math.round(stats.weekAverages.kcal / days)
+    stats.weekAverages.protein = Math.round(stats.weekAverages.protein / days)
+    stats.weekAverages.carbs = Math.round(stats.weekAverages.carbs / days)
+    stats.weekAverages.fat = Math.round(stats.weekAverages.fat / days)
+    
+    if (scaledMealsCount > 0) {
+      stats.averageScaleFactor = (totalScaleFactor / scaledMealsCount).toFixed(2)
+    }
+    
+    const totalMealSlots = days * (profile.meals_per_day || 4)
+    stats.varietyScore = Math.round((stats.mealVariety.size / Math.min(totalMealSlots, 20)) * 100)
+    
+    const calCompliance = 100 - Math.min(10, Math.abs(100 - (stats.weekAverages.kcal / profile.target_calories * 100)))
+    const protCompliance = 100 - Math.min(10, Math.abs(100 - (stats.weekAverages.protein / profile.target_protein_g * 100)))
+    stats.complianceScore = Math.round((calCompliance + protCompliance) / 2)
+    
+    return stats
+  }
+  analyzePlan(weekPlan, profile, selectedIngredients = [], excludedIngredients = []) {
+    const analysis = {
+      averageScore: 0,
+      labelDistribution: {},
+      budgetAnalysis: { total: 0, daily: 0 },
+      portionCompliance: 100,
+      recommendations: [],
+      scalingImpact: 'none',
+      selectedIngredientUsage: {
+        total: selectedIngredients.length,
+        used: 0,
+        coverage: 0
+      }
+    }
+    
+    let totalScore = 0
+    let mealsCount = 0
+    
+    weekPlan.forEach(day => {
+      const meals = [day.breakfast, day.lunch, day.dinner, ...day.snacks].filter(Boolean)
+      meals.forEach(meal => {
+        if (meal.aiScore) {
+          totalScore += meal.aiScore
+          mealsCount++
+        }
+      })
+    })
+    
+    if (mealsCount > 0) {
+      analysis.averageScore = Math.round(totalScore / mealsCount)
+    }
+    
+    return analysis
+  }
+  generateShoppingList(weekPlan) {
+    const ingredientTotals = {}
+    
+    weekPlan.forEach((day, dayIndex) => {
+      const dayName = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'][dayIndex]
+      const meals = [day.breakfast, day.lunch, day.dinner, ...day.snacks].filter(Boolean)
+      
+      meals.forEach(meal => {
+        if (meal.ingredients_list && typeof meal.ingredients_list === 'object') {
+          Object.entries(meal.ingredients_list).forEach(([ingredientName, amount]) => {
+            if (!ingredientTotals[ingredientName]) {
+              ingredientTotals[ingredientName] = {
+                totalAmount: 0,
+                unit: 'g',
+                days: []
+              }
+            }
+            
+            const scaledAmount = amount * (meal.scaleFactor || 1)
+            ingredientTotals[ingredientName].totalAmount += scaledAmount
+            ingredientTotals[ingredientName].days.push({ day: dayName, meal: meal.name, amount: scaledAmount })
+          })
+        }
+      })
+    })
+    
+    return Object.entries(ingredientTotals).map(([name, data]) => ({
+      ingredient: name,
+      totalAmount: Math.round(data.totalAmount),
+      unit: data.unit,
+      instances: data.days
+    }))
+  }
+  async savePlan(plan, clientId, name) {
+    try {
+      const planData = {
+        client_id: clientId,
+        template_name: name || `AI Plan - ${new Date().toLocaleDateString()}`,
+        week_structure: plan.weekPlan,
+        daily_targets: plan.dailyTargets,
+        ai_generated: true,
+        ai_version: 'v2_strict_filtering',
+        stats: plan.stats,
+        created_at: new Date().toISOString()
+      }
+      
+      const { data, error } = await this.supabase
+        .from('client_meal_plans')
+        .insert([planData])
+        .select()
+      
+      if (error) throw error
+      
+      console.log('✅ Plan saved successfully')
+      return data[0]
+      
+    } catch (error) {
+      console.error('❌ Failed to save plan:', error)
+      throw error
+    }
+  }
+}
+// ========================================
+// EXPORT
+// ========================================
+let serviceInstance = null
+export function getAIMealPlanningService(supabase) {
+  if (!serviceInstance || serviceInstance.supabase !== supabase) {
+    serviceInstance = new AIMealPlanningService(supabase)
+  }
+  return serviceInstance
+}
+export default AIMealPlanningService
+
+
+

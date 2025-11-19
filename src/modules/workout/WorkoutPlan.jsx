@@ -3,12 +3,12 @@ import useIsMobile from '../../hooks/useIsMobile'
 import ProgressChartsWidget from "../progress/ProgressChartsWidget"
 import { useState, useEffect, useRef } from 'react'
 import { useLanguage } from '../../contexts/LanguageContext'
-import { Calendar, ChevronDown, ChevronUp } from 'lucide-react'
+import { Calendar } from 'lucide-react'
 
 // Import sub-components
 import WeekSchedule from './components/WeekSchedule'
-import WorkoutDetailsPage from './components/WorkoutDetailsPage'
 import TodaysWorkoutMain from './components/todays-workout/TodaysWorkoutMain'
+import LogModal from './components/todays-workout/LogModal'
 import WorkoutChallengeSidebar from '../../client/components/WorkoutChallengeSidebar'
 import WorkoutPhotoSlider from './components/WorkoutPhotoSlider'
 import WorkoutProgressToast from './components/WorkoutProgressToast'
@@ -27,15 +27,19 @@ import WorkoutService from '../../services/WorkoutService'
 export default function WorkoutPlan({ client, schema, db }) {
   const { t } = useLanguage()
   const isMobile = useIsMobile()
-  const detailsRef = useRef(null)
-  const chartRef = useRef(null)
+  const chartsRef = useRef(null)
   const chartWidgetRef = useRef(null)
   
   // 🔥 Initialize WorkoutService
   const [workoutService] = useState(() => new WorkoutService(db.supabase))
   
-  // ⭐ NIEUW: Challenge refresh key
+  // ⭐ Challenge refresh key
   const [challengeRefreshKey, setChallengeRefreshKey] = useState(0)
+  
+  // 🔥 NEW: LogModal state for any day
+  const [showLogModal, setShowLogModal] = useState(false)
+  const [selectedWorkoutData, setSelectedWorkoutData] = useState(null)
+  const [selectedDayLogs, setSelectedDayLogs] = useState([])
   
   // State management via custom hooks
   const {
@@ -57,9 +61,6 @@ export default function WorkoutPlan({ client, schema, db }) {
   } = useWorkoutProgress(client?.id, db)
   
   // Local state
-  const [selectedDay, setSelectedDay] = useState(null)
-  const [selectedDayIndex, setSelectedDayIndex] = useState(null)
-  const [detailsExpanded, setDetailsExpanded] = useState(false)
   const [showWizard, setShowWizard] = useState(false)
   
   // Get current date info
@@ -75,48 +76,163 @@ export default function WorkoutPlan({ client, schema, db }) {
     }
   }, [client?.id])
   
-  // Set today's workout as default
-  useEffect(() => {
-    if (schema && todayWorkout && !selectedDay) {
-      setSelectedDay(todayWorkout)
-      setSelectedDayIndex(todayIndex)
-    }
-  }, [schema, todayWorkout])
-  
-  // Handle day click
-  const handleDayClick = (day, workoutKey) => {
-    if (workoutKey) {
-      setSelectedDay(workoutKey)
-      const dayIndex = weekDays.indexOf(day)
-      setSelectedDayIndex(dayIndex)
-      setDetailsExpanded(true)
+  // 🔥 NEW: Handle day click - Open LogModal with workout data
+  const handleDayClick = async (day, workoutKey) => {
+    if (!workoutKey) return
+    
+    console.log('🎯 Day clicked:', day, 'Workout key:', workoutKey)
+    
+    try {
+      let workoutData = null
       
-      // Smooth scroll to details section
-      if (detailsRef.current) {
-        setTimeout(() => {
-          detailsRef.current.scrollIntoView({ 
-            behavior: 'smooth', 
-            block: 'start' 
-          })
-        }, 100)
+      // Check if custom workout
+      if (workoutKey.startsWith('custom_')) {
+        const customId = workoutKey.replace('custom_', '')
+        console.log('🔍 Loading custom workout:', customId)
+        
+        const customWorkout = await workoutService.getCustomWorkoutById(customId)
+        
+        if (customWorkout) {
+          workoutData = {
+            name: customWorkout.name,
+            focus: getCustomWorkoutTypeLabel(customWorkout.type),
+            geschatteTijd: `${customWorkout.duration} min`,
+            exercises: [],
+            workoutKey: workoutKey,
+            dayKey: workoutKey,
+            dayName: day,
+            isCustom: true,
+            customData: customWorkout
+          }
+        }
       }
+      // Check if activity (cardio, swimming, etc)
+      else if (['swimming', 'cardio', 'hiking', 'cycling', 'running'].includes(workoutKey)) {
+        const activityLabels = {
+          swimming: 'Zwemmen',
+          cardio: 'Cardio',
+          hiking: 'Wandelen',
+          cycling: 'Fietsen',
+          running: 'Hardlopen'
+        }
+        
+        workoutData = {
+          name: activityLabels[workoutKey],
+          focus: 'Cardio',
+          geschatteTijd: '60 min',
+          exercises: [],
+          workoutKey: workoutKey,
+          dayKey: workoutKey,
+          dayName: day,
+          isActivity: true
+        }
+      }
+      // Schema workout
+      else if (schema?.week_structure?.[workoutKey]) {
+        const workout = schema.week_structure[workoutKey]
+        workoutData = {
+          ...workout,
+          workoutKey: workoutKey,
+          dayKey: workoutKey,
+          dayName: day,
+          isCustom: false
+        }
+      }
+      
+      if (workoutData) {
+        console.log('✅ Workout data prepared:', workoutData)
+        setSelectedWorkoutData(workoutData)
+        
+        // Load logs for this day
+        await loadDayLogs(day)
+        
+        // Open modal
+        setShowLogModal(true)
+      } else {
+        console.log('❌ No workout data found')
+      }
+      
+    } catch (error) {
+      console.error('❌ Error loading workout for day:', error)
     }
   }
   
-  // Handle day navigation in details
-  const handleDayNavigation = (newDayIndex) => {
-    const newDay = weekDays[newDayIndex]
-    const newWorkoutKey = weekSchedule[newDay]
-    if (newWorkoutKey) {
-      setSelectedDay(newWorkoutKey)
-      setSelectedDayIndex(newDayIndex)
+  // Helper: Load logs for specific day
+  const loadDayLogs = async (dayName) => {
+    if (!client?.id || !db) return
+    
+    try {
+      // Get the date for this day
+      const dayIndex = weekDays.indexOf(dayName)
+      const targetDate = new Date()
+      const currentDayIndex = (targetDate.getDay() + 6) % 7
+      const daysDiff = dayIndex - currentDayIndex
+      targetDate.setDate(targetDate.getDate() + daysDiff)
+      
+      const dateString = targetDate.toISOString().split('T')[0]
+      
+      const { data, error } = await db.supabase
+        .from('workout_logs')
+        .select('*')
+        .eq('client_id', client.id)
+        .eq('date', dateString)
+        .order('created_at', { ascending: false })
+      
+      if (error) throw error
+      
+      console.log(`✅ Logs loaded for ${dayName}:`, data?.length || 0)
+      setSelectedDayLogs(data || [])
+      
+    } catch (error) {
+      console.error('❌ Error loading day logs:', error)
+      setSelectedDayLogs([])
+    }
+  }
+  
+  // Helper: Get custom workout type label
+  const getCustomWorkoutTypeLabel = (type) => {
+    const labels = {
+      cardio: 'Cardio',
+      cycling: 'Fietsen',
+      running: 'Hardlopen',
+      swimming: 'Zwemmen',
+      hiking: 'Wandelen',
+      yoga: 'Yoga',
+      sports: 'Sport',
+      custom: 'Custom'
+    }
+    return labels[type] || type
+  }
+  
+  // Handle close log modal
+  const handleCloseLogModal = () => {
+    setShowLogModal(false)
+    setSelectedWorkoutData(null)
+    setSelectedDayLogs([])
+  }
+  
+  // Handle logs update from modal
+  const handleLogsUpdate = async (options) => {
+    console.log('🔄 Logs updated from modal')
+    
+    // Reload progress
+    await loadWeeklyProgress()
+    
+    // Reload day logs if modal still open
+    if (selectedWorkoutData?.dayName) {
+      await loadDayLogs(selectedWorkoutData.dayName)
+    }
+    
+    // If workout completed, refresh challenge
+    if (options?.workoutCompleted) {
+      handleWorkoutCompleted()
     }
   }
   
   // Handle toast click - scroll to chart
   const handleToastViewChart = (exercise) => {
-    if (chartRef.current) {
-      const elementPosition = chartRef.current.getBoundingClientRect().top + window.pageYOffset
+    if (chartsRef.current) {
+      const elementPosition = chartsRef.current.getBoundingClientRect().top + window.pageYOffset
       const offsetPosition = elementPosition - (isMobile ? 100 : 150)
       
       window.scrollTo({
@@ -126,11 +242,11 @@ export default function WorkoutPlan({ client, schema, db }) {
     }
   }
   
-  // Handle insight exercise selection with metric - WITH OFFSET SCROLL
+  // Handle insight exercise selection - scroll to chartsRef
   const handleInsightExerciseSelect = (exercise, metric = '1rm') => {
-    // Scroll to chart with offset for better visibility
-    if (chartRef.current) {
-      const elementPosition = chartRef.current.getBoundingClientRect().top + window.pageYOffset
+    // Scroll to charts with offset for better visibility
+    if (chartsRef.current) {
+      const elementPosition = chartsRef.current.getBoundingClientRect().top + window.pageYOffset
       const offsetPosition = elementPosition - (isMobile ? 100 : 150)
       
       window.scrollTo({
@@ -147,15 +263,15 @@ export default function WorkoutPlan({ client, schema, db }) {
     }
   }
   
-  // 🔥 Handle wizard complete
+  // Handle wizard complete
   const handleWizardComplete = (newSchedule) => {
     setWeekSchedule(newSchedule)
     setShowWizard(false)
   }
   
-  // ⭐ NIEUW: Handle workout completed - refresh challenge banner
+  // Handle workout completed - refresh challenge banner
   const handleWorkoutCompleted = () => {
-    console.log('🔔 Workout completed in WorkoutPlan - refreshing challenge banner')
+    console.log('🔔 Workout completed - refreshing challenge banner')
     setChallengeRefreshKey(prev => prev + 1)
   }
   
@@ -209,7 +325,7 @@ export default function WorkoutPlan({ client, schema, db }) {
       animation: 'fadeIn 0.5s ease',
       position: 'relative'
     }}>
-      {/* 1. Today's Workout - 🔥 MET WORKOUTSERVICE + CALLBACK */}
+      {/* 1. Today's Workout */}
       <TodaysWorkoutMain
         client={client}
         schema={schema}
@@ -218,7 +334,7 @@ export default function WorkoutPlan({ client, schema, db }) {
         onWorkoutCompleted={handleWorkoutCompleted}
       />
       
-      {/* 2. Today's Log Toast (priority) */}
+      {/* 2. Today's Log Toast */}
       <TodaysLogToast
         client={client}
         db={db}
@@ -231,7 +347,7 @@ export default function WorkoutPlan({ client, schema, db }) {
         onViewChart={handleToastViewChart}
       />
       
-      {/* 4. Challenge Sidebar - ⭐ MET REFRESH KEY */}
+      {/* 4. Challenge Sidebar */}
       <WorkoutChallengeSidebar 
         client={client} 
         db={db}
@@ -255,7 +371,7 @@ export default function WorkoutPlan({ client, schema, db }) {
         />
       </div>
       
-      {/* 6. Week Schedule - 🔥 VERPLAATST NAAR POSITIE 2 */}
+      {/* 6. Week Schedule - WITH DAY CLICK TO LOGMODAL */}
       <WeekSchedule
         weekSchedule={weekSchedule}
         schema={schema}
@@ -273,123 +389,11 @@ export default function WorkoutPlan({ client, schema, db }) {
         onOpenWizard={() => setShowWizard(true)}
       />
       
-      {/* 7. Photo Slider - VERPLAATST NAAR POSITIE 3 */}
+      {/* 7. Photo Slider */}
       <WorkoutPhotoSlider />
       
-      {/* 8. Workout Details - COLLAPSIBLE - VERPLAATST NAAR POSITIE 4 */}
-      {selectedDay && (
-        <div 
-          ref={detailsRef}
-          style={{
-            marginTop: '1.5rem',
-            marginLeft: isMobile ? '1rem' : '1.5rem',
-            marginRight: isMobile ? '1rem' : '1.5rem',
-            background: 'rgba(23, 23, 23, 0.6)',
-            backdropFilter: 'blur(10px)',
-            border: '1px solid rgba(249, 115, 22, 0.1)',
-            borderRadius: isMobile ? '10px' : '12px',
-            overflow: 'hidden',
-            transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
-          }}
-        >
-          {/* Collapsible Header */}
-          <button
-            onClick={() => setDetailsExpanded(!detailsExpanded)}
-            style={{
-              width: '100%',
-              padding: isMobile ? '1rem' : '1.25rem',
-              background: 'transparent',
-              border: 'none',
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              cursor: 'pointer',
-              transition: 'all 0.3s ease',
-              touchAction: 'manipulation',
-              WebkitTapHighlightColor: 'transparent'
-            }}
-            onMouseEnter={(e) => {
-              if (!isMobile) {
-                e.currentTarget.style.background = 'rgba(249, 115, 22, 0.05)'
-              }
-            }}
-            onMouseLeave={(e) => {
-              if (!isMobile) {
-                e.currentTarget.style.background = 'transparent'
-              }
-            }}
-          >
-            <div style={{ textAlign: 'left' }}>
-              <h3 style={{
-                fontSize: isMobile ? '0.9rem' : '1rem',
-                color: 'rgba(255,255,255,0.5)',
-                fontWeight: '700',
-                textTransform: 'uppercase',
-                letterSpacing: '0.05em',
-                margin: 0,
-                marginBottom: '0.25rem'
-              }}>
-                Workout Details
-              </h3>
-              {selectedDayIndex !== null && (
-                <span style={{
-                  fontSize: isMobile ? '0.75rem' : '0.8rem',
-                  color: '#f97316',
-                  fontWeight: '700',
-                  background: 'rgba(249, 115, 22, 0.15)',
-                  padding: '0.25rem 0.5rem',
-                  borderRadius: '6px',
-                  textTransform: 'capitalize',
-                  display: 'inline-block'
-                }}>
-                  {weekDays[selectedDayIndex]}
-                </span>
-              )}
-            </div>
-            
-            <div style={{
-              width: '36px',
-              height: '36px',
-              borderRadius: '8px',
-              background: detailsExpanded 
-                ? 'rgba(249, 115, 22, 0.2)' 
-                : 'rgba(249, 115, 22, 0.1)',
-              border: `1px solid ${detailsExpanded ? 'rgba(249, 115, 22, 0.3)' : 'rgba(249, 115, 22, 0.2)'}`,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              transition: 'all 0.3s ease'
-            }}>
-              {detailsExpanded ? (
-                <ChevronUp size={20} color="#f97316" />
-              ) : (
-                <ChevronDown size={20} color="#f97316" />
-              )}
-            </div>
-          </button>
-          
-          {/* Collapsible Content */}
-          {detailsExpanded && (
-            <div style={{
-              borderTop: '1px solid rgba(249, 115, 22, 0.1)',
-              animation: 'slideDown 0.3s ease'
-            }}>
-              <WorkoutDetailsPage
-                workout={schema.week_structure[selectedDay]}
-                workoutKey={selectedDay}
-                client={client}
-                db={db}
-                onDayChange={handleDayNavigation}
-                currentDayIndex={selectedDayIndex}
-                weekDays={weekDays}
-              />
-            </div>
-          )}
-        </div>
-      )}
-      
-      {/* 9. Progress Insights & Stats - POSITIE 5 */}
-      <div ref={chartRef} style={{ marginTop: '2rem' }}>
+      {/* 8. Progress Insights & Stats */}
+      <div style={{ marginTop: '2rem' }}>
         {/* Progress Insights */}
         <ProgressInsightsSection
           db={db}
@@ -397,12 +401,14 @@ export default function WorkoutPlan({ client, schema, db }) {
           onSelectExercise={handleInsightExerciseSelect}
         />
         
-        {/* Progress Charts */}
-        <ProgressChartsWidget 
-          ref={chartWidgetRef}
-          db={db}
-          clientId={client?.id}
-        />
+        {/* Charts Wrapper */}
+        <div ref={chartsRef}>
+          <ProgressChartsWidget 
+            ref={chartWidgetRef}
+            db={db}
+            clientId={client?.id}
+          />
+        </div>
       </div>
       
       {/* 🔥 WIZARD MODAL */}
@@ -417,22 +423,24 @@ export default function WorkoutPlan({ client, schema, db }) {
         />
       )}
       
+      {/* 🔥 LOG MODAL - FOR ANY DAY WORKOUT */}
+      {showLogModal && selectedWorkoutData && (
+        <LogModal
+          workout={selectedWorkoutData}
+          todaysLogs={selectedDayLogs}
+          onClose={handleCloseLogModal}
+          onLogsUpdate={handleLogsUpdate}
+          client={client}
+          schema={schema}
+          db={db}
+        />
+      )}
+      
       {/* CSS Animations */}
       <style>{`
         @keyframes fadeIn {
           from { opacity: 0; }
           to { opacity: 1; }
-        }
-        
-        @keyframes slideDown {
-          from {
-            opacity: 0;
-            transform: translateY(-10px);
-          }
-          to {
-            opacity: 1;
-            transform: translateY(0);
-          }
         }
         
         * {

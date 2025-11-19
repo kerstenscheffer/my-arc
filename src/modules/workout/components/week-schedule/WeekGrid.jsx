@@ -1,7 +1,4 @@
-
-// ========================================
-// 📁 src/modules/workout/components/week-schedule/WeekGrid.jsx
-// ========================================
+// src/modules/workout/components/week-schedule/WeekGrid.jsx
 import DayCard from './DayCard'
 
 export default function WeekGrid({
@@ -25,7 +22,8 @@ export default function WeekGrid({
     <div style={{
       display: 'grid',
       gridTemplateColumns: 'repeat(7, 1fr)',
-      gap: isMobile ? '0.4rem' : '0.6rem'
+      gap: isMobile ? '0.5rem' : '0.625rem',
+      marginBottom: isMobile ? '0.5rem' : '0.625rem'
     }}>
       {weekDays.map((day, index) => {
         const assignedWorkout = tempSchedule[day]
@@ -65,4 +63,3 @@ export default function WeekGrid({
     </div>
   )
 }
-

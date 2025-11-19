@@ -1,37 +1,33 @@
-// ========================================
-// 📁 src/modules/workout/components/week-schedule/PlanningButtons.jsx
-// ========================================
+// src/modules/workout/components/week-schedule/PlanningButtons.jsx
 import { Calendar, Zap } from 'lucide-react'
 
 export default function PlanningButtons({ onOpenWizard, onOpenCustom, isMobile }) {
   return (
     <div style={{
       display: 'grid',
-      gridTemplateColumns: isMobile ? '1fr' : '2fr 1fr',
-      gap: '0.75rem'
+      gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr',
+      gap: isMobile ? '0.625rem' : '0.75rem'
     }}>
-      {/* Main Planning Button - Dark Green Gradient */}
+      {/* Main Planning Button - Green */}
       <button
         onClick={onOpenWizard}
         style={{
-          padding: isMobile ? '1rem' : '1.125rem',
-          background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.18) 0%, rgba(16, 185, 129, 0.1) 100%)',
-          backdropFilter: 'blur(20px)',
-          border: '1px solid rgba(16, 185, 129, 0.35)',
-          borderRadius: '14px',
+          padding: isMobile ? '0.875rem 1rem' : '1rem 1.25rem',
+          background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.25) 0%, rgba(16, 185, 129, 0.15) 100%)',
+          backdropFilter: 'blur(12px)',
+          border: '1px solid rgba(16, 185, 129, 0.4)',
+          borderRadius: isMobile ? '12px' : '14px',
           color: '#10b981',
-          fontSize: isMobile ? '0.9rem' : '1rem',
-          fontWeight: '800',
-          textTransform: 'uppercase',
-          letterSpacing: '0.05em',
+          fontSize: isMobile ? '0.85rem' : '0.9rem',
+          fontWeight: '700',
           cursor: 'pointer',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          gap: '0.75rem',
+          gap: isMobile ? '0.5rem' : '0.625rem',
           transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-          boxShadow: '0 8px 32px rgba(16, 185, 129, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.03)',
-          minHeight: '56px',
+          boxShadow: '0 4px 16px rgba(16, 185, 129, 0.2)',
+          minHeight: '48px',
           touchAction: 'manipulation',
           WebkitTapHighlightColor: 'transparent',
           position: 'relative',
@@ -40,15 +36,15 @@ export default function PlanningButtons({ onOpenWizard, onOpenCustom, isMobile }
         onMouseEnter={(e) => {
           if (!isMobile) {
             e.currentTarget.style.transform = 'translateY(-2px)'
-            e.currentTarget.style.background = 'linear-gradient(135deg, rgba(16, 185, 129, 0.25) 0%, rgba(16, 185, 129, 0.15) 100%)'
-            e.currentTarget.style.boxShadow = '0 12px 40px rgba(16, 185, 129, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.05)'
+            e.currentTarget.style.background = 'linear-gradient(135deg, rgba(16, 185, 129, 0.35) 0%, rgba(16, 185, 129, 0.25) 100%)'
+            e.currentTarget.style.boxShadow = '0 6px 20px rgba(16, 185, 129, 0.3)'
           }
         }}
         onMouseLeave={(e) => {
           if (!isMobile) {
             e.currentTarget.style.transform = 'translateY(0)'
-            e.currentTarget.style.background = 'linear-gradient(135deg, rgba(16, 185, 129, 0.18) 0%, rgba(16, 185, 129, 0.1) 100%)'
-            e.currentTarget.style.boxShadow = '0 8px 32px rgba(16, 185, 129, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.03)'
+            e.currentTarget.style.background = 'linear-gradient(135deg, rgba(16, 185, 129, 0.25) 0%, rgba(16, 185, 129, 0.15) 100%)'
+            e.currentTarget.style.boxShadow = '0 4px 16px rgba(16, 185, 129, 0.2)'
           }
         }}
         onTouchStart={(e) => {
@@ -62,7 +58,6 @@ export default function PlanningButtons({ onOpenWizard, onOpenCustom, isMobile }
           }
         }}
       >
-        {/* Top glow accent */}
         <div style={{
           position: 'absolute',
           top: 0,
@@ -74,61 +69,47 @@ export default function PlanningButtons({ onOpenWizard, onOpenCustom, isMobile }
           pointerEvents: 'none'
         }} />
         
-        {/* Subtle shine effect */}
-        <div style={{
-          position: 'absolute',
-          top: 0,
-          left: '-100%',
-          width: '100%',
-          height: '100%',
-          background: 'linear-gradient(90deg, transparent, rgba(16, 185, 129, 0.15), transparent)',
-          animation: 'shine 3s infinite',
-          pointerEvents: 'none'
-        }} />
-        
-        <Calendar size={isMobile ? 20 : 22} strokeWidth={2.5} style={{ filter: 'drop-shadow(0 0 6px rgba(16, 185, 129, 0.4))' }} />
-        Maak een Week Planning
+        <Calendar size={isMobile ? 18 : 20} strokeWidth={2.5} />
+        <span>Plan Je Workout Week</span>
       </button>
       
-      {/* Custom Workouts Button - Orange Accent */}
+      {/* Custom Workouts Button - Orange */}
       <button
         onClick={onOpenCustom}
         style={{
-          padding: isMobile ? '1rem' : '1.125rem',
-          background: 'linear-gradient(135deg, rgba(249, 115, 22, 0.15) 0%, rgba(249, 115, 22, 0.08) 100%)',
-          backdropFilter: 'blur(20px)',
-          border: '1px solid rgba(249, 115, 22, 0.3)',
-          borderRadius: '14px',
+          padding: isMobile ? '0.875rem 1rem' : '1rem 1.25rem',
+          background: 'linear-gradient(135deg, rgba(249, 115, 22, 0.25) 0%, rgba(249, 115, 22, 0.15) 100%)',
+          backdropFilter: 'blur(12px)',
+          border: '1px solid rgba(249, 115, 22, 0.4)',
+          borderRadius: isMobile ? '12px' : '14px',
           color: '#f97316',
-          fontSize: isMobile ? '0.85rem' : '0.95rem',
-          fontWeight: '800',
-          textTransform: 'uppercase',
-          letterSpacing: '0.05em',
+          fontSize: isMobile ? '0.85rem' : '0.9rem',
+          fontWeight: '700',
           cursor: 'pointer',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          gap: '0.6rem',
+          gap: isMobile ? '0.5rem' : '0.625rem',
           transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-          minHeight: '56px',
+          minHeight: '48px',
           touchAction: 'manipulation',
           WebkitTapHighlightColor: 'transparent',
-          boxShadow: '0 4px 20px rgba(249, 115, 22, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.02)',
+          boxShadow: '0 4px 16px rgba(249, 115, 22, 0.2)',
           position: 'relative',
           overflow: 'hidden'
         }}
         onMouseEnter={(e) => {
           if (!isMobile) {
-            e.currentTarget.style.background = 'linear-gradient(135deg, rgba(249, 115, 22, 0.22) 0%, rgba(249, 115, 22, 0.12) 100%)'
+            e.currentTarget.style.background = 'linear-gradient(135deg, rgba(249, 115, 22, 0.35) 0%, rgba(249, 115, 22, 0.25) 100%)'
             e.currentTarget.style.transform = 'translateY(-2px)'
-            e.currentTarget.style.boxShadow = '0 6px 28px rgba(249, 115, 22, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.04)'
+            e.currentTarget.style.boxShadow = '0 6px 20px rgba(249, 115, 22, 0.3)'
           }
         }}
         onMouseLeave={(e) => {
           if (!isMobile) {
-            e.currentTarget.style.background = 'linear-gradient(135deg, rgba(249, 115, 22, 0.15) 0%, rgba(249, 115, 22, 0.08) 100%)'
+            e.currentTarget.style.background = 'linear-gradient(135deg, rgba(249, 115, 22, 0.25) 0%, rgba(249, 115, 22, 0.15) 100%)'
             e.currentTarget.style.transform = 'translateY(0)'
-            e.currentTarget.style.boxShadow = '0 4px 20px rgba(249, 115, 22, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.02)'
+            e.currentTarget.style.boxShadow = '0 4px 16px rgba(249, 115, 22, 0.2)'
           }
         }}
         onTouchStart={(e) => {
@@ -142,7 +123,6 @@ export default function PlanningButtons({ onOpenWizard, onOpenCustom, isMobile }
           }
         }}
       >
-        {/* Top glow accent */}
         <div style={{
           position: 'absolute',
           top: 0,
@@ -150,22 +130,13 @@ export default function PlanningButtons({ onOpenWizard, onOpenCustom, isMobile }
           right: 0,
           height: '2px',
           background: 'linear-gradient(90deg, transparent 0%, #f97316 50%, transparent 100%)',
-          opacity: 0.5,
+          opacity: 0.6,
           pointerEvents: 'none'
         }} />
         
-        <Zap size={isMobile ? 18 : 20} strokeWidth={2.5} style={{ filter: 'drop-shadow(0 0 4px rgba(249, 115, 22, 0.4))' }} />
-        Custom Workouts
+        <Zap size={isMobile ? 18 : 20} strokeWidth={2.5} />
+        <span>Maak Je Eigen Week</span>
       </button>
-      
-      <style>{`
-        @keyframes shine {
-          0% { left: -100%; }
-          50% { left: 100%; }
-          100% { left: 100%; }
-        }
-      `}</style>
     </div>
   )
 }
-

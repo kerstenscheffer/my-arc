@@ -236,3 +236,4 @@ export default class WeightTrackerService {
     return date.getDay() === 5
   }
 }
+

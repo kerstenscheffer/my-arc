@@ -108,7 +108,7 @@ export default function AIMealInfoModal({
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
-      zIndex: 1000,
+      zIndex: 10500,
       padding: isMobile ? '1rem' : '2rem',
       animation: 'fadeIn 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
     }}>

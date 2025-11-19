@@ -12,24 +12,22 @@ export async function loadWeightData(db, clientId, challengeData) {
     const startDate = new Date(challengeData.start_date)
     const endDate = new Date(challengeData.end_date)
     
+    // ✅ FIXED: Changed from weight_logs to weight_challenge_logs
     const { data } = await db.supabase
-      .from('weight_logs')
+      .from('weight_challenge_logs')
       .select('*')
       .eq('client_id', clientId)
       .gte('date', startDate.toISOString().split('T')[0])
       .lte('date', endDate.toISOString().split('T')[0])
       .order('date', { ascending: false })
     
-    // Filter ONLY Friday weigh-ins
-    const fridayWeighIns = data?.filter(w => {
-      const day = new Date(w.date).getDay()
-      return day === 5
-    }) || []
+    // NO FRIDAY FILTER - count ALL entries (matches banner logic)
+    const count = data?.length || 0
     
     return {
-      current: fridayWeighIns.length,
-      lastEntry: fridayWeighIns[0]?.date || null,
-      lastEntryData: fridayWeighIns[0] || null
+      current: count,
+      lastEntry: data?.[0]?.date || null,
+      lastEntryData: data?.[0] || null
     }
   } catch (error) {
     console.error('Error loading weight data:', error)
@@ -42,9 +40,9 @@ export async function addWeight(db, clientId, challengeData) {
     const startDate = new Date(challengeData.start_date)
     const endDate = new Date(challengeData.end_date)
     
-    // Get existing Friday weigh-ins
+    // ✅ FIXED: Get existing from weight_challenge_logs
     const { data: existing } = await db.supabase
-      .from('weight_logs')
+      .from('weight_challenge_logs')
       .select('date')
       .eq('client_id', clientId)
       .gte('date', startDate.toISOString().split('T')[0])
@@ -52,7 +50,7 @@ export async function addWeight(db, clientId, challengeData) {
     
     const existingDates = new Set(existing?.map(w => w.date) || [])
     
-    // Find first Friday without weigh-in (start from most recent)
+    // Find first date without weigh-in (start from most recent)
     let targetDate = null
     const today = new Date()
     
@@ -62,7 +60,6 @@ export async function addWeight(db, clientId, challengeData) {
       
       if (checkDate < startDate) break
       if (checkDate > endDate) continue
-      if (checkDate.getDay() !== 5) continue  // Skip non-Fridays
       
       const dateStr = checkDate.toISOString().split('T')[0]
       if (!existingDates.has(dateStr)) {
@@ -72,12 +69,12 @@ export async function addWeight(db, clientId, challengeData) {
     }
     
     if (!targetDate) {
-      throw new Error('Geen beschikbare vrijdag in challenge periode')
+      throw new Error('Geen beschikbare datum in challenge periode')
     }
     
-    // CRITICAL: Get client's latest weight + add small variation
+    // ✅ FIXED: Get client's latest weight from weight_challenge_logs
     const { data: latestWeight } = await db.supabase
-      .from('weight_logs')
+      .from('weight_challenge_logs')
       .select('weight')
       .eq('client_id', clientId)
       .order('date', { ascending: false })
@@ -99,13 +96,15 @@ export async function addWeight(db, clientId, challengeData) {
       // Use client's current weight
       const weightValue = parseFloat(clientData.current_weight)
       
+      // ✅ FIXED: Insert into weight_challenge_logs with correct columns
       const { error } = await db.supabase
-        .from('weight_logs')
+        .from('weight_challenge_logs')
         .insert({
           client_id: clientId,
           date: targetDate,
           weight: weightValue,
-          notes: 'Handmatige aanpassing door coach - Controleer gewicht'
+          time_of_day: 'morning',
+          is_friday_weighin: new Date(targetDate).getDay() === 5
         })
       
       if (error) throw error
@@ -119,13 +118,15 @@ export async function addWeight(db, clientId, challengeData) {
     // Add 0.1kg variation (coach can edit manually later)
     const weightValue = parseFloat(latestWeight.weight) + 0.1
     
+    // ✅ FIXED: Insert into weight_challenge_logs
     const { error } = await db.supabase
-      .from('weight_logs')
+      .from('weight_challenge_logs')
       .insert({
         client_id: clientId,
         date: targetDate,
         weight: weightValue,
-        notes: 'Handmatige aanpassing door coach - Controleer gewicht'
+        time_of_day: 'morning',
+        is_friday_weighin: new Date(targetDate).getDay() === 5
       })
     
     if (error) throw error
@@ -146,8 +147,9 @@ export async function removeWeight(db, clientId, lastEntryData) {
       throw new Error('Geen weging om te verwijderen')
     }
     
+    // ✅ FIXED: Delete from weight_challenge_logs
     const { error } = await db.supabase
-      .from('weight_logs')
+      .from('weight_challenge_logs')
       .delete()
       .eq('id', lastEntryData.id)
     

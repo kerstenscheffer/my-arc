@@ -13,43 +13,68 @@ import {
 import ClientCallsWidget from '../widgets/ClientCallsWidget'
 import GoalsWidget from '../widgets/Goalswidget'
 import PageVideoWidget from '../../modules/videos/PageVideoWidget'
+import MotivationQuoteSlider from '../components/MotivationQuoteSlider'
 
 // ============================================
-// UNIFIED STYLING SYSTEM
+// DARK BLUE STYLING SYSTEM v1.0
 // ============================================
 const COLORS = {
-  primary: '#3b82f6',
-  primaryDark: '#2563eb',
+  // Dark Blue Primary
+  primary: '#2563eb',           // Main blue
+  primaryDark: '#1e3a8a',       // Deep blue
+  accentBlue: '#3b82f6',        // Bright blue
+  skyBlue: '#60a5fa',           // Light accent
+  
+  // Blue Opacity Scale
+  blueBg04: 'rgba(37, 99, 235, 0.04)',
+  blueBg08: 'rgba(37, 99, 235, 0.08)',
+  blueBg10: 'rgba(37, 99, 235, 0.1)',
+  blueBg12: 'rgba(37, 99, 235, 0.12)',
+  blueBg15: 'rgba(37, 99, 235, 0.15)',
+  blueBg20: 'rgba(37, 99, 235, 0.2)',
+  blueBorder20: 'rgba(37, 99, 235, 0.2)',
+  blueBorder25: 'rgba(37, 99, 235, 0.25)',
+  blueBorder30: 'rgba(37, 99, 235, 0.3)',
+  blueBorder35: 'rgba(37, 99, 235, 0.35)',
+  
+  // State Colors
   success: '#10b981',
-  successDark: '#059669',
-  warning: '#f59e0b',
-  purple: '#8b5cf6',
+  successBg: 'rgba(16, 185, 129, 0.12)',
+  successBorder: 'rgba(16, 185, 129, 0.25)',
+  warning: '#f97316',
+  warningBg: 'rgba(249, 115, 22, 0.12)',
+  error: '#ef4444',
+  premium: '#a855f7',
+  
+  // Base Colors
   background: 'linear-gradient(180deg, #0a0a0a 0%, #111111 100%)',
-  cardBg: 'rgba(17, 17, 17, 0.6)',
-  glassBg: 'rgba(255, 255, 255, 0.02)',
+  cardBg: 'rgba(23, 23, 23, 0.6)',
+  glassBg: 'rgba(37, 99, 235, 0.06)',
   borderDefault: 'rgba(255, 255, 255, 0.08)',
-  borderActive: 'rgba(59, 130, 246, 0.3)',
+  borderActive: 'rgba(37, 99, 235, 0.3)',
+  
+  // Text
   textPrimary: '#ffffff',
   textSecondary: 'rgba(255, 255, 255, 0.7)',
   textMuted: 'rgba(255, 255, 255, 0.5)'
 }
 
 const getCardStyle = (isMobile, isHovered = false) => ({
-  background: `linear-gradient(135deg, ${COLORS.glassBg} 0%, rgba(17, 17, 17, 0.4) 100%)`,
-  backdropFilter: 'blur(20px)',
-  WebkitBackdropFilter: 'blur(20px)',
-  border: `1px solid ${isHovered ? COLORS.borderActive : COLORS.borderDefault}`,
-  borderRadius: isMobile ? '16px' : '20px',
-  padding: isMobile ? '1.25rem' : '1.5rem',
+  background: `linear-gradient(135deg, ${COLORS.blueBg10} 0%, rgba(23, 23, 23, 0.8) 100%)`,
+  backdropFilter: 'blur(12px)',
+  WebkitBackdropFilter: 'blur(12px)',
+  border: `1px solid ${isHovered ? COLORS.blueBorder25 : COLORS.borderDefault}`,
+  borderRadius: isMobile ? '12px' : '14px',
+  padding: isMobile ? '1rem' : '1.25rem',
   transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-  transform: isHovered ? 'translateY(-2px)' : 'translateY(0)',
+  transform: isHovered ? 'translateY(-2px) translateZ(0)' : 'translateZ(0)',
   boxShadow: isHovered 
-    ? '0 20px 40px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.05)'
-    : '0 10px 30px rgba(0, 0, 0, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.03)'
+    ? `0 6px 20px ${COLORS.blueBorder25}, inset 0 1px 0 rgba(255, 255, 255, 0.05)`
+    : `0 4px 16px ${COLORS.blueBg15}, inset 0 1px 0 rgba(255, 255, 255, 0.03)`
 })
 
 // ============================================
-// QUOTE OF THE DAY - CLEANER DESIGN
+// QUOTE OF THE DAY - DARK BLUE ACCENT
 // ============================================
 function QuoteOfDay() {
   const isMobile = useIsMobile()
@@ -65,11 +90,25 @@ function QuoteOfDay() {
   
   return (
     <div style={{
+      position: 'relative',
       padding: isMobile ? '1rem' : '1.25rem',
       textAlign: 'center',
       borderBottom: `1px solid ${COLORS.borderDefault}`,
-      background: 'linear-gradient(180deg, rgba(59, 130, 246, 0.03) 0%, transparent 100%)'
+      background: `linear-gradient(180deg, ${COLORS.blueBg08} 0%, transparent 100%)`,
+      overflow: 'hidden'
     }}>
+      {/* Top accent glow line */}
+      <div style={{
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        height: '2px',
+        background: `linear-gradient(90deg, transparent 0%, ${COLORS.primary} 50%, transparent 100%)`,
+        opacity: 0.6,
+        zIndex: 10
+      }} />
+      
       <p style={{
         fontSize: isMobile ? '0.9rem' : '1rem',
         fontStyle: 'italic',
@@ -89,8 +128,8 @@ function QuoteOfDay() {
         fontWeight: '600',
         letterSpacing: '0.05em',
         textTransform: 'uppercase',
-        color: COLORS.primary,
-        opacity: 0.7
+        color: COLORS.accentBlue,
+        opacity: 0.8
       }}>
         — {quote.author}
       </span>
@@ -99,7 +138,7 @@ function QuoteOfDay() {
 }
 
 // ============================================
-// WELCOME SECTION - PREMIUM GLASS CARD
+// WELCOME SECTION - DARK BLUE HERO CARD
 // ============================================
 function WelcomeSection({ client, db }) {
   const [arcScore, setArcScore] = useState(85)
@@ -150,13 +189,29 @@ function WelcomeSection({ client, db }) {
   
   return (
     <div style={{
-      ...getCardStyle(isMobile),
-      margin: isMobile ? '1rem' : '1.5rem',
-      background: `linear-gradient(135deg, rgba(59, 130, 246, 0.1) 0%, rgba(37, 99, 235, 0.05) 100%)`,
-      borderColor: 'rgba(59, 130, 246, 0.2)',
       position: 'relative',
-      overflow: 'hidden'
+      margin: isMobile ? '1rem' : '1.5rem',
+      padding: isMobile ? '1.25rem' : '1.5rem',
+      borderRadius: isMobile ? '16px' : '20px',
+      background: `linear-gradient(135deg, ${COLORS.blueBg20} 0%, ${COLORS.primaryDark}10 100%)`,
+      border: `2px solid ${COLORS.blueBorder30}`,
+      backdropFilter: 'blur(12px)',
+      boxShadow: `0 8px 32px ${COLORS.blueBorder20}`,
+      overflow: 'hidden',
+      transform: 'translateZ(0)'
     }}>
+      {/* Top accent glow line */}
+      <div style={{
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        height: '2px',
+        background: `linear-gradient(90deg, transparent 0%, ${COLORS.primary} 50%, transparent 100%)`,
+        opacity: 0.6,
+        zIndex: 10
+      }} />
+      
       {/* Floating gradient orb */}
       <div style={{
         position: 'absolute',
@@ -164,7 +219,7 @@ function WelcomeSection({ client, db }) {
         right: '-20%',
         width: isMobile ? '200px' : '300px',
         height: isMobile ? '200px' : '300px',
-        background: 'radial-gradient(circle, rgba(59, 130, 246, 0.15) 0%, transparent 70%)',
+        background: `radial-gradient(circle, ${COLORS.blueBg20} 0%, transparent 70%)`,
         borderRadius: '50%',
         filter: 'blur(40px)',
         animation: 'float 6s ease-in-out infinite'
@@ -177,7 +232,7 @@ function WelcomeSection({ client, db }) {
           alignItems: 'center',
           gap: '0.5rem',
           marginBottom: '0.75rem',
-          color: COLORS.primary
+          color: COLORS.accentBlue
         }}>
           {getTimeIcon()}
           <span style={{ 
@@ -215,14 +270,14 @@ function WelcomeSection({ client, db }) {
 }
 
 // ============================================
-// QUICK ACTIONS - FIXED ROUTES
+// QUICK ACTIONS - DARK BLUE CARDS
 // ============================================
 function QuickActions({ client, db, onNavigate }) {
   const [loading, setLoading] = useState(false)
   const [hoveredAction, setHoveredAction] = useState(null)
   const isMobile = useIsMobile()
   
-  // FIXED ROUTES - Matching ClientDashboard exactly
+  // Action configs with state colors
   const actionConfigs = [
     {
       icon: Dumbbell,
@@ -230,7 +285,7 @@ function QuickActions({ client, db, onNavigate }) {
       color: COLORS.warning,
       label: 'Workout',
       sublabel: 'Start training',
-      navigate: 'workout' // ✅ Correct
+      navigate: 'workout'
     },
     {
       icon: Apple,
@@ -238,7 +293,7 @@ function QuickActions({ client, db, onNavigate }) {
       color: COLORS.success,
       label: 'Voeding',
       sublabel: 'Track maaltijden',
-      navigate: 'meal' // ✅ FIXED: was 'mealplan'
+      navigate: 'meal'
     },
     {
       icon: ShoppingCart,
@@ -246,23 +301,23 @@ function QuickActions({ client, db, onNavigate }) {
       color: '#ec4899',
       label: 'Boodschappen',
       sublabel: 'Shopping lijst',
-      navigate: 'boodschappen' // ✅ NEW: Added shopping
+      navigate: 'boodschappen'
     },
     {
       icon: TrendingUp,
       key: 'tracking',
-      color: COLORS.purple,
+      color: COLORS.premium,
       label: 'Tracking',
-      sublabel: 'Bekijk progress',
-      navigate: 'tracking' // ✅ FIXED: was 'progress'
+      sublabel: 'Progress inzien',
+      navigate: 'tracking'
     },
     {
       icon: Phone,
       key: 'call',
-      color: COLORS.primary,
+      color: COLORS.accentBlue,
       label: 'Coach Call',
       sublabel: 'Plan gesprek',
-      navigate: 'calls' // ✅ Correct
+      navigate: 'calls'
     },
     {
       icon: User,
@@ -270,7 +325,7 @@ function QuickActions({ client, db, onNavigate }) {
       color: '#06b6d4',
       label: 'Profiel',
       sublabel: 'Instellingen',
-      navigate: 'profile' // ✅ Correct
+      navigate: 'profile'
     }
   ]
   
@@ -288,7 +343,7 @@ function QuickActions({ client, db, onNavigate }) {
         alignItems: 'center',
         gap: '0.5rem'
       }}>
-        <Zap size={isMobile ? 16 : 18} color={COLORS.primary} />
+        <Zap size={isMobile ? 16 : 18} color={COLORS.accentBlue} />
         Quick Actions
       </h3>
       
@@ -305,33 +360,59 @@ function QuickActions({ client, db, onNavigate }) {
             <button
               key={action.key}
               onClick={() => onNavigate(action.navigate)}
-              onMouseEnter={() => setHoveredAction(action.key)}
-              onMouseLeave={() => setHoveredAction(null)}
+              onMouseEnter={() => !isMobile && setHoveredAction(action.key)}
+              onMouseLeave={() => !isMobile && setHoveredAction(null)}
               style={{
-                ...getCardStyle(isMobile, isHovered),
+                position: 'relative',
                 padding: isMobile ? '1rem' : '1.25rem',
+                background: isHovered 
+                  ? `linear-gradient(135deg, ${COLORS.blueBg12} 0%, ${COLORS.blueBg08} 100%)`
+                  : `linear-gradient(135deg, ${COLORS.blueBg10} 0%, rgba(23, 23, 23, 0.8) 100%)`,
+                border: `1px solid ${isHovered ? COLORS.blueBorder25 : COLORS.borderDefault}`,
+                borderRadius: isMobile ? '12px' : '14px',
+                backdropFilter: 'blur(12px)',
+                boxShadow: isHovered
+                  ? `0 6px 20px ${COLORS.blueBg20}`
+                  : `0 4px 16px ${COLORS.blueBg15}`,
                 cursor: 'pointer',
                 textAlign: 'left',
-                position: 'relative',
                 overflow: 'hidden',
                 touchAction: 'manipulation',
                 WebkitTapHighlightColor: 'transparent',
                 minHeight: isMobile ? '100px' : '120px',
                 display: 'flex',
                 flexDirection: 'column',
-                justifyContent: 'space-between'
+                justifyContent: 'space-between',
+                transform: isHovered ? 'translateY(-2px) translateZ(0)' : 'translateZ(0)',
+                transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
               }}
               onTouchStart={(e) => {
                 if (isMobile) {
                   e.currentTarget.style.transform = 'scale(0.98)'
+                  e.currentTarget.style.background = `linear-gradient(135deg, ${COLORS.blueBg15} 0%, ${COLORS.blueBg10} 100%)`
                 }
               }}
               onTouchEnd={(e) => {
                 if (isMobile) {
                   e.currentTarget.style.transform = 'scale(1)'
+                  e.currentTarget.style.background = `linear-gradient(135deg, ${COLORS.blueBg10} 0%, rgba(23, 23, 23, 0.8) 100%)`
                 }
               }}
             >
+              {/* Top accent line for hovered state */}
+              {isHovered && (
+                <div style={{
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  height: '2px',
+                  background: `linear-gradient(90deg, transparent 0%, ${action.color} 50%, transparent 100%)`,
+                  opacity: 0.6,
+                  zIndex: 10
+                }} />
+              )}
+              
               {/* Icon Header */}
               <div style={{
                 display: 'flex',
@@ -340,9 +421,9 @@ function QuickActions({ client, db, onNavigate }) {
                 marginBottom: '0.75rem'
               }}>
                 <div style={{
-                  width: isMobile ? '36px' : '40px',
-                  height: isMobile ? '36px' : '40px',
-                  borderRadius: '10px',
+                  width: isMobile ? '40px' : '44px',
+                  height: isMobile ? '40px' : '44px',
+                  borderRadius: isMobile ? '10px' : '12px',
                   background: `linear-gradient(135deg, ${action.color}20 0%, ${action.color}10 100%)`,
                   border: `1px solid ${action.color}30`,
                   display: 'flex',
@@ -355,7 +436,8 @@ function QuickActions({ client, db, onNavigate }) {
                     color={action.color}
                     style={{
                       transition: 'all 0.3s ease',
-                      transform: isHovered ? 'scale(1.1)' : 'scale(1)'
+                      transform: isHovered ? 'scale(1.1)' : 'scale(1)',
+                      filter: isHovered ? `drop-shadow(0 0 8px ${action.color}50)` : 'none'
                     }}
                   />
                 </div>
@@ -453,6 +535,7 @@ export default function ClientHome({ client, db, setCurrentView }) {
       {/* Welcome Section */}
       <WelcomeSection client={client} db={db} />
       
+      
       {/* Video Widget */}
       <div style={{ 
         padding: isMobile ? '0 1rem 1rem' : '0 1.5rem 1.5rem'
@@ -475,9 +558,13 @@ export default function ClientHome({ client, db, setCurrentView }) {
           onNavigate={setCurrentView}
         />
       </div>
+
+ {/* Motivation Quote Slider */}
+      <MotivationQuoteSlider />
+
+
       
-      
-      {/* Quick Actions - WITH FIXED ROUTES */}
+      {/* Quick Actions */}
       <QuickActions client={client} db={db} onNavigate={setCurrentView} />
       
       {/* Floating Action Panel */}

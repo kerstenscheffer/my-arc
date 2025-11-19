@@ -199,7 +199,7 @@ export default function AIAlternativesModal({
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
-      zIndex: 1000,
+      zIndex: 10500,
       padding: isMobile ? '0.75rem' : '2rem',
       animation: 'fadeIn 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
     }}>

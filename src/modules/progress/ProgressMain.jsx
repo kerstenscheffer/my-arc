@@ -1,5 +1,5 @@
 // src/modules/progress/ProgressMain.jsx
-import React, { useState, useEffect, useRef } from 'react'
+import React, { useState, useEffect } from 'react'
 import { Loader2, Scale, AlertTriangle } from 'lucide-react'
 
 // Photo Module
@@ -11,20 +11,11 @@ import WeightProgressRing from '../weight-tracker/components/WeightProgressRing'
 import WeightStatsGrid from '../weight-tracker/components/WeightStatsGrid'
 import WeightHistory from '../weight-tracker/components/WeightHistory'
 
-// Banner Components
-import GeneralProgressBanner from '../progress-photos/components/GeneralProgressBanner'
-import ChallengeProgressBanner from '../progress-photos/components/ChallengeProgressBanner'
+// Challenge Sidebar
+import ProgressChallengeSidebar from '../../client/components/ProgressChallengeSidebar'
 
 // Challenge Hook
 import { useChallenge } from '../../hooks/useChallenge'
-
-// Theme for Friday alert
-const FRIDAY_THEME = {
-  primary: '#8b5cf6',
-  light: '#a78bfa',
-  background: 'rgba(139, 92, 246, 0.1)',
-  border: 'rgba(139, 92, 246, 0.3)'
-}
 
 export default function ProgressMain({ db, client }) {
   // Services
@@ -32,10 +23,6 @@ export default function ProgressMain({ db, client }) {
   
   // Challenge detection
   const { isInChallenge, challengeData } = useChallenge(db, client?.id)
-  
-  // Refs for scrolling
-  const photosRef = useRef(null)
-  const weightRef = useRef(null)
   
   // State for weight data
   const [weight, setWeight] = useState(70.0)
@@ -151,21 +138,6 @@ export default function ProgressMain({ db, client }) {
     return Math.min(100, Math.max(0, (progress / total) * 100))
   }, [weightStats?.current, client?.goal_weight, client?.start_weight])
 
-  // Scroll handlers
-  const scrollToPhotos = () => {
-    photosRef.current?.scrollIntoView({ 
-      behavior: 'smooth',
-      block: 'start'
-    })
-  }
-
-  const scrollToWeight = () => {
-    weightRef.current?.scrollIntoView({ 
-      behavior: 'smooth',
-      block: 'start'
-    })
-  }
-
   if (loading) {
     return (
       <div style={{
@@ -176,8 +148,11 @@ export default function ProgressMain({ db, client }) {
       }}>
         <Loader2 
           size={32} 
-          style={{ animation: 'spin 1s linear infinite' }} 
-          color="#3b82f6" 
+          style={{ 
+            animation: 'spin 1s linear infinite',
+            filter: 'drop-shadow(0 0 8px rgba(16, 185, 129, 0.6))'
+          }} 
+          color="#10b981" 
         />
       </div>
     )
@@ -185,6 +160,16 @@ export default function ProgressMain({ db, client }) {
 
   return (
     <div style={{ paddingBottom: isMobile ? '100px' : '2rem' }}>
+      {/* Progress Challenge Sidebar */}
+      <ProgressChallengeSidebar
+        client={client}
+        db={db}
+        challengeData={challengeData}
+        weightStats={weightStats}
+        fridayData={fridayData}
+        photoCount={photoCount}
+      />
+
       {/* Message Toast */}
       {message && (
         <div style={{
@@ -194,110 +179,79 @@ export default function ProgressMain({ db, client }) {
           transform: 'translateX(-50%)',
           padding: isMobile ? '0.75rem 1.25rem' : '0.875rem 1.5rem',
           background: message.type === 'error' 
-            ? '#dc2626' 
-            : 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
+            ? 'linear-gradient(135deg, rgba(239, 68, 68, 0.95) 0%, rgba(220, 38, 38, 0.9) 100%)' 
+            : 'linear-gradient(135deg, rgba(16, 185, 129, 0.95) 0%, rgba(5, 150, 105, 0.9) 100%)',
+          backdropFilter: 'blur(10px)',
           borderRadius: '12px',
+          border: message.type === 'error'
+            ? '1px solid rgba(239, 68, 68, 0.3)'
+            : '1px solid rgba(16, 185, 129, 0.3)',
           color: '#fff',
           fontSize: isMobile ? '0.875rem' : '1rem',
+          fontWeight: '600',
           animation: 'slideDown 0.3s ease',
-          boxShadow: '0 8px 24px rgba(0, 0, 0, 0.2)',
+          boxShadow: message.type === 'error'
+            ? '0 8px 24px rgba(239, 68, 68, 0.3)'
+            : '0 8px 24px rgba(16, 185, 129, 0.3)',
           zIndex: 2000
         }}>
           {message.text}
         </div>
       )}
 
-      {/* Conditional Banner - Challenge or General */}
-      {isInChallenge ? (
-        <ChallengeProgressBanner
-          challengeData={challengeData}
-          weightStats={weightStats}
-          fridayData={fridayData}
-          photoCount={photoCount}
-          client={client}
-          onScrollToPhotos={scrollToPhotos}
-          onScrollToWeight={scrollToWeight}
-          isMobile={isMobile}
-        />
-      ) : (
-        <GeneralProgressBanner
-          weightStats={weightStats}
-          photoCount={photoCount}
-          client={client}
-          onScrollToPhotos={scrollToPhotos}
-          onScrollToWeight={scrollToWeight}
-          isMobile={isMobile}
-        />
-      )}
-
-      {/* Photos Section */}
-      <div ref={photosRef} style={{ marginBottom: '2rem' }}>
-        <h2 style={{
-          fontSize: isMobile ? '1.25rem' : '1.5rem',
-          fontWeight: '600',
-          color: 'white',
-          marginBottom: '1rem',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '0.5rem'
-        }}>
-          📸 Voortgangsfoto's
-        </h2>
-        <ProgressPhotos db={db} client={client} />
-      </div>
-
-      {/* Elegant Divider */}
-      <div style={{
-        height: '1px',
-        background: 'linear-gradient(90deg, transparent, rgba(59, 130, 246, 0.3), transparent)',
-        margin: '2rem 0'
-      }} />
-
       {/* Weight Section */}
-      <div ref={weightRef}>
-        <h2 style={{
-          fontSize: isMobile ? '1.25rem' : '1.5rem',
-          fontWeight: '600',
-          color: 'white',
-          marginBottom: '1.5rem',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '0.5rem'
-        }}>
-          ⚖️ Gewicht Bijhouden
-        </h2>
-
-        {/* Friday Alert - Inline Implementation */}
+      <div style={{ marginBottom: '2rem' }}>
+        {/* Friday Alert - Emerald Styling */}
         {isFriday && !todayEntry && (
           <div style={{
-            background: `linear-gradient(135deg, ${FRIDAY_THEME.background} 0%, rgba(139, 92, 246, 0.05) 100%)`,
-            border: `1px solid ${FRIDAY_THEME.border}`,
+            background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.15) 0%, rgba(5, 150, 105, 0.08) 100%)',
+            border: '1px solid rgba(16, 185, 129, 0.3)',
             borderRadius: '12px',
             padding: isMobile ? '0.75rem' : '1rem',
             marginBottom: '1.5rem',
             display: 'flex',
             alignItems: 'flex-start',
             gap: '0.75rem',
-            animation: 'pulse 2s infinite'
+            animation: 'pulse 2s infinite',
+            backdropFilter: 'blur(10px)',
+            boxShadow: '0 4px 20px rgba(16, 185, 129, 0.15)',
+            position: 'relative',
+            overflow: 'hidden'
           }}>
+            {/* Top glow */}
+            <div style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              height: '2px',
+              background: 'linear-gradient(90deg, transparent 0%, #10b981 50%, transparent 100%)',
+              opacity: 0.6
+            }} />
+
             <Scale
               size={isMobile ? 18 : 20}
-              color={FRIDAY_THEME.primary}
-              style={{ flexShrink: 0, marginTop: '2px' }}
+              color="#10b981"
+              style={{ 
+                flexShrink: 0, 
+                marginTop: '2px',
+                filter: 'drop-shadow(0 0 8px rgba(16, 185, 129, 0.6))'
+              }}
             />
             <div style={{ flex: 1 }}>
               <div style={{
                 fontSize: isMobile ? '0.875rem' : '1rem',
-                fontWeight: '600',
-                color: FRIDAY_THEME.primary,
-                marginBottom: '0.25rem'
+                fontWeight: '700',
+                color: '#10b981',
+                marginBottom: '0.25rem',
+                textTransform: 'uppercase',
+                letterSpacing: '0.05em'
               }}>
                 Vrijdag Weegmoment Vereist!
               </div>
               <div style={{
                 fontSize: isMobile ? '0.7rem' : '0.75rem',
-                color: FRIDAY_THEME.light,
-                opacity: 0.8,
+                color: 'rgba(16, 185, 129, 0.8)',
                 lineHeight: '1.4'
               }}>
                 Voltooi je wekelijkse weging voor de 8-weken challenge
@@ -307,13 +261,21 @@ export default function ProgressMain({ db, client }) {
                   marginTop: '0.5rem',
                   display: 'flex',
                   alignItems: 'center',
-                  gap: '0.5rem'
+                  gap: '0.5rem',
+                  padding: '0.5rem',
+                  background: 'rgba(16, 185, 129, 0.1)',
+                  borderRadius: '8px',
+                  border: '1px solid rgba(16, 185, 129, 0.2)'
                 }}>
-                  <AlertTriangle size={14} color={FRIDAY_THEME.primary} />
+                  <AlertTriangle 
+                    size={14} 
+                    color="#10b981"
+                    style={{ filter: 'drop-shadow(0 0 6px rgba(16, 185, 129, 0.5))' }}
+                  />
                   <span style={{
                     fontSize: isMobile ? '0.65rem' : '0.7rem',
-                    color: FRIDAY_THEME.primary,
-                    fontWeight: '500'
+                    color: '#10b981',
+                    fontWeight: '600'
                   }}>
                     Gemiste vrijdag wegingen beïnvloeden je challenge compliance
                   </span>
@@ -356,6 +318,19 @@ export default function ProgressMain({ db, client }) {
         />
       </div>
 
+      {/* Elegant Divider */}
+      <div style={{
+        height: '1px',
+        background: 'linear-gradient(90deg, transparent, rgba(16, 185, 129, 0.3), transparent)',
+        margin: '2rem 0',
+        boxShadow: '0 0 10px rgba(16, 185, 129, 0.2)'
+      }} />
+
+      {/* Photos Section */}
+      <div>
+        <ProgressPhotos db={db} client={client} />
+      </div>
+
       <style>{`
         @keyframes spin {
           to { transform: rotate(360deg); }
@@ -378,8 +353,8 @@ export default function ProgressMain({ db, client }) {
             transform: scale(1);
           }
           50% { 
-            opacity: 0.9;
-            transform: scale(0.98);
+            opacity: 0.95;
+            transform: scale(0.995);
           }
         }
       `}</style>

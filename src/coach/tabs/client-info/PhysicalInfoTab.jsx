@@ -59,6 +59,44 @@ export default function PhysicalInfoTab({ db, client, isEditing, setIsEditing, s
         waterIntakeTarget: formData.waterIntakeTarget
       }
       
+      // 🚨 CRITICAL FIX: Check if user has manual macro targets
+      // If yes, DO NOT recalculate or update target_calories
+      if (!client.manual_macro_targets) {
+        // Only auto-calculate TDEE if user hasn't manually set macros
+        const tdee = calculateTDEE()
+        if (tdee && client.primary_goal) {
+          let targetCalories = tdee
+          
+          // Adjust based on goal
+          if (client.primary_goal === 'fat_loss') {
+            targetCalories = tdee - 500
+          } else if (client.primary_goal === 'muscle_gain') {
+            targetCalories = tdee + 300
+          }
+          
+          console.log('🤖 AUTO-CALCULATING macros based on physical changes')
+          console.log('   TDEE:', tdee, '→ Target:', targetCalories)
+          
+          // Add calculated target to updates
+          updates.targetCalories = targetCalories
+          
+          // Auto-calculate protein/carbs/fat
+          const weight = parseFloat(formData.currentWeight)
+          if (weight) {
+            updates.targetProtein = Math.round(weight * 2.2) // 2.2g per kg
+            updates.targetFat = Math.round(weight * 1.0)     // 1g per kg
+            
+            const proteinCal = updates.targetProtein * 4
+            const fatCal = updates.targetFat * 9
+            const carbCal = targetCalories - proteinCal - fatCal
+            updates.targetCarbs = Math.round(carbCal / 4)
+          }
+        }
+      } else {
+        console.log('✋ MANUAL MACROS MODE - Skipping automatic TDEE calculation')
+        console.log('   User has manually set target_calories in Goals tab')
+      }
+      
       // Also update start_weight directly via updateClient
       if (formData.startWeight !== undefined) {
         await db.updateClient(client.id, {
@@ -247,6 +285,22 @@ export default function PhysicalInfoTab({ db, client, isEditing, setIsEditing, s
         )}
       </div>
       
+      {/* Manual Macro Warning */}
+      {client.manual_macro_targets && (
+        <div style={{
+          padding: isMobile ? '0.75rem' : '1rem',
+          background: 'rgba(59, 130, 246, 0.1)',
+          border: '1px solid rgba(59, 130, 246, 0.2)',
+          borderRadius: '8px',
+          marginBottom: '1rem',
+          fontSize: isMobile ? '0.8rem' : '0.85rem',
+          color: '#3b82f6'
+        }}>
+          ℹ️ <strong>Manual Macro Mode:</strong> Target calories won't auto-update when you change physical stats. 
+          Update macros manually in the Goals tab.
+        </div>
+      )}
+      
       {/* Content Grid */}
       <div style={{
         display: 'grid',
@@ -424,6 +478,15 @@ export default function PhysicalInfoTab({ db, client, isEditing, setIsEditing, s
               {tdee || '-'} 
               {tdee && <span style={{ fontSize: isMobile ? '0.8rem' : '0.9rem', marginLeft: '0.25rem' }}>kcal</span>}
             </div>
+            {tdee && !client.manual_macro_targets && (
+              <div style={{ 
+                fontSize: isMobile ? '0.65rem' : '0.7rem', 
+                color: 'rgba(255, 255, 255, 0.4)',
+                marginTop: '0.25rem'
+              }}>
+                💡 Saves automatically if Goal macros not manually set
+              </div>
+            )}
           </div>
           
           {/* Progress Stats */}

@@ -201,15 +201,17 @@ export default function ClientCalls({ db, clientInfo }) {
         justifyContent: 'center',
         alignItems: 'center',
         height: '400px',
-        background: 'linear-gradient(135deg, #1a1a1a 0%, #0a0f0d 100%)',
-        borderRadius: '20px'
+        background: 'linear-gradient(135deg, rgba(37, 99, 235, 0.12) 0%, rgba(23, 23, 23, 0.8) 100%)',
+        border: '1px solid rgba(37, 99, 235, 0.25)',
+        borderRadius: isMobile ? '16px' : '20px',
+        backdropFilter: 'blur(12px)'
       }}>
         <div style={{ textAlign: 'center' }}>
           <div style={{
             width: '40px',
             height: '40px',
-            border: '3px solid rgba(59, 130, 246, 0.2)',
-            borderTopColor: '#3b82f6',
+            border: '3px solid rgba(37, 99, 235, 0.2)',
+            borderTopColor: '#2563eb',
             borderRadius: '50%',
             animation: 'spin 1s linear infinite',
             margin: '0 auto'
@@ -233,144 +235,270 @@ export default function ClientCalls({ db, clientInfo }) {
   return (
     <div style={{ 
       padding: isMobile ? '0.75rem' : '1rem', 
-      background: 'linear-gradient(180deg, #0a0f0d 0%, #1a1a1a 100%)', 
-      minHeight: '100vh' 
+      maxWidth: '1400px',
+      margin: '0 auto'
     }}>
-
-      {/* Compact Header */}
+      {/* Hero Section - Dark Blue Upgraded */}
       <div style={{
-        background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 50%, #1d4ed8 100%)',
-        borderRadius: isMobile ? '16px' : '20px',
-        padding: isMobile ? '1rem' : '1.25rem',
-        marginBottom: isMobile ? '1.25rem' : '1.5rem',
         position: 'relative',
+        background: 'linear-gradient(135deg, rgba(37, 99, 235, 0.2) 0%, rgba(30, 58, 138, 0.1) 100%)',
+        backdropFilter: 'blur(12px)',
+        borderRadius: isMobile ? '16px' : '20px',
+        padding: isMobile ? '1.5rem 1rem' : '2rem 1.5rem',
+        marginBottom: isMobile ? '1.5rem' : '2rem',
+        border: '2px solid rgba(37, 99, 235, 0.3)',
+        boxShadow: '0 8px 32px rgba(37, 99, 235, 0.2)',
         overflow: 'hidden',
-        boxShadow: '0 8px 24px rgba(59, 130, 246, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.1)'
+        transform: 'translateZ(0)'
       }}>
-        {/* Animated Background Pattern */}
-        <div className="float-animation" style={{
+        {/* Top Accent Glow Line */}
+        <div style={{
           position: 'absolute',
-          top: '-50%',
-          right: '-10%',
-          width: isMobile ? '150px' : '250px',
-          height: isMobile ? '150px' : '250px',
-          background: 'radial-gradient(circle, rgba(255, 255, 255, 0.08) 0%, transparent 70%)',
-          borderRadius: '50%'
+          top: 0,
+          left: 0,
+          right: 0,
+          height: '2px',
+          background: 'linear-gradient(90deg, transparent 0%, #2563eb 50%, transparent 100%)',
+          opacity: 0.6,
+          zIndex: 10
         }} />
 
-        {/* Header Content */}
         <div style={{ position: 'relative', zIndex: 1 }}>
+          {/* Header Content */}
           <div style={{
             display: 'flex',
+            flexDirection: isMobile ? 'column' : 'row',
             justifyContent: 'space-between',
             alignItems: isMobile ? 'flex-start' : 'center',
-            marginBottom: isMobile ? '0.75rem' : '1rem',
-            flexDirection: isMobile ? 'column' : 'row',
-            gap: isMobile ? '0.5rem' : '0.75rem'
+            gap: isMobile ? '1rem' : '1.5rem',
+            marginBottom: isMobile ? '1.25rem' : '1.5rem'
           }}>
             <div>
-              <h1 style={{
-                fontSize: isMobile ? '1.25rem' : '1.5rem',
+              <h1 style={{ 
+                fontSize: isMobile ? '1.5rem' : '2rem', 
                 fontWeight: '700',
                 color: '#fff',
-                marginBottom: '0.2rem',
-                textShadow: '0 2px 8px rgba(0, 0, 0, 0.2)'
+                marginBottom: '0.5rem',
+                textShadow: '0 2px 8px rgba(0, 0, 0, 0.3)',
+                letterSpacing: '-0.01em'
               }}>
-                Coaching Journey
+                🎯 Jouw Coaching Calls
               </h1>
-              <p style={{ 
-                color: 'rgba(255, 255, 255, 0.85)', 
-                fontSize: isMobile ? '0.8rem' : '0.9rem',
-                lineHeight: '1.3'
+              <p style={{
+                color: 'rgba(255, 255, 255, 0.75)',
+                fontSize: isMobile ? '0.875rem' : '0.95rem',
+                margin: 0
               }}>
-                6 strategische calls voor je transformatie
+                Plan je calls en blijf op schema voor maximaal resultaat
               </p>
             </div>
-            
-            <div style={{ 
-              display: 'flex', 
-              gap: isMobile ? '0.5rem' : '0.6rem',
+
+            {/* Stats Cards - Dark Blue */}
+            <div style={{
+              display: 'flex',
+              gap: isMobile ? '0.6rem' : '0.75rem',
               width: isMobile ? '100%' : 'auto'
             }}>
-              <button
-                onClick={loadCallData}
-                style={{
-                  flex: isMobile ? 1 : 'none',
-                  padding: isMobile ? '0.6rem 0.8rem' : '0.65rem 1rem',
-                  background: 'rgba(255, 255, 255, 0.15)',
-                  backdropFilter: 'blur(10px)',
-                  border: '1px solid rgba(255, 255, 255, 0.25)',
-                  borderRadius: '10px',
-                  color: '#fff',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '0.4rem',
-                  cursor: 'pointer',
-                  transition: 'all 0.2s ease',
+              <div style={{
+                flex: 1,
+                background: 'linear-gradient(135deg, rgba(37, 99, 235, 0.15) 0%, rgba(37, 99, 235, 0.08) 100%)',
+                backdropFilter: 'blur(10px)',
+                borderRadius: isMobile ? '10px' : '12px',
+                padding: isMobile ? '0.65rem 0.75rem' : '0.75rem 0.9rem',
+                border: '1px solid rgba(37, 99, 235, 0.3)',
+                boxShadow: '0 4px 16px rgba(37, 99, 235, 0.15)'
+              }}>
+                <div style={{ 
+                  fontSize: isMobile ? '1.3rem' : '1.5rem', 
+                  fontWeight: '800', 
+                  color: '#3b82f6',
+                  textShadow: '0 0 12px rgba(37, 99, 235, 0.4)'
+                }}>
+                  {userStats.completedCalls}
+                </div>
+                <div style={{ 
+                  fontSize: isMobile ? '0.65rem' : '0.7rem', 
+                  color: 'rgba(255, 255, 255, 0.7)',
                   fontWeight: '600',
-                  fontSize: isMobile ? '0.85rem' : '0.9rem',
-                  touchAction: 'manipulation',
-                  WebkitTapHighlightColor: 'transparent',
-                  minHeight: '44px'
-                }}
-                onTouchStart={(e) => {
-                  if (isMobile) e.currentTarget.style.transform = 'scale(0.98)';
-                }}
-                onTouchEnd={(e) => {
-                  if (isMobile) e.currentTarget.style.transform = 'scale(1)';
-                }}
-              >
-                <RefreshCw size={isMobile ? 16 : 18} />
-                <span>Refresh</span>
-              </button>
-              
-              {activePlan && (
-                <button
-                  onClick={() => setShowRequestModal(true)}
-                  style={{
-                    flex: isMobile ? 1 : 'none',
-                    padding: isMobile ? '0.6rem 0.8rem' : '0.65rem 1rem',
-                    background: 'rgba(255, 255, 255, 0.95)',
-                    border: 'none',
-                    borderRadius: '10px',
-                    color: '#7c3aed',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: '0.4rem',
-                    cursor: 'pointer',
-                    fontWeight: '700',
-                    transition: 'all 0.2s ease',
-                    boxShadow: '0 4px 12px rgba(255, 255, 255, 0.2)',
-                    fontSize: isMobile ? '0.85rem' : '0.9rem',
-                    touchAction: 'manipulation',
-                    WebkitTapHighlightColor: 'transparent',
-                    minHeight: '44px'
-                  }}
-                  onTouchStart={(e) => {
-                    if (isMobile) e.currentTarget.style.transform = 'scale(0.98)';
-                  }}
-                  onTouchEnd={(e) => {
-                    if (isMobile) e.currentTarget.style.transform = 'scale(1)';
-                  }}
-                >
-                  <Plus size={isMobile ? 16 : 18} />
-                  <span>Bonus Call</span>
-                </button>
-              )}
+                  letterSpacing: '0.05em',
+                  textTransform: 'uppercase'
+                }}>
+                  Voltooid
+                </div>
+              </div>
+
+              <div style={{
+                flex: 1,
+                background: 'linear-gradient(135deg, rgba(37, 99, 235, 0.15) 0%, rgba(37, 99, 235, 0.08) 100%)',
+                backdropFilter: 'blur(10px)',
+                borderRadius: isMobile ? '10px' : '12px',
+                padding: isMobile ? '0.65rem 0.75rem' : '0.75rem 0.9rem',
+                border: '1px solid rgba(37, 99, 235, 0.3)',
+                boxShadow: '0 4px 16px rgba(37, 99, 235, 0.15)'
+              }}>
+                <div style={{ 
+                  fontSize: isMobile ? '1.3rem' : '1.5rem', 
+                  fontWeight: '800', 
+                  color: '#60a5fa',
+                  textShadow: '0 0 12px rgba(96, 165, 250, 0.4)'
+                }}>
+                  {userStats.scheduledCalls}
+                </div>
+                <div style={{ 
+                  fontSize: isMobile ? '0.65rem' : '0.7rem', 
+                  color: 'rgba(255, 255, 255, 0.7)',
+                  fontWeight: '600',
+                  letterSpacing: '0.05em',
+                  textTransform: 'uppercase'
+                }}>
+                  Gepland
+                </div>
+              </div>
+
+              <div style={{
+                flex: 1,
+                background: 'linear-gradient(135deg, rgba(37, 99, 235, 0.15) 0%, rgba(37, 99, 235, 0.08) 100%)',
+                backdropFilter: 'blur(10px)',
+                borderRadius: isMobile ? '10px' : '12px',
+                padding: isMobile ? '0.65rem 0.75rem' : '0.75rem 0.9rem',
+                border: '1px solid rgba(37, 99, 235, 0.3)',
+                boxShadow: '0 4px 16px rgba(37, 99, 235, 0.15)'
+              }}>
+                <div style={{ 
+                  fontSize: isMobile ? '1.3rem' : '1.5rem', 
+                  fontWeight: '800', 
+                  color: '#2563eb',
+                  textShadow: '0 0 12px rgba(37, 99, 235, 0.4)'
+                }}>
+                  {userStats.totalCalls}
+                </div>
+                <div style={{ 
+                  fontSize: isMobile ? '0.65rem' : '0.7rem', 
+                  color: 'rgba(255, 255, 255, 0.7)',
+                  fontWeight: '600',
+                  letterSpacing: '0.05em',
+                  textTransform: 'uppercase'
+                }}>
+                  Totaal
+                </div>
+              </div>
             </div>
           </div>
 
-          {/* Info Section - Smaller */}
+          {/* Action Buttons - Dark Blue */}
           <div style={{
-            background: 'rgba(255, 255, 255, 0.1)',
+            display: 'flex',
+            flexWrap: 'wrap',
+            gap: isMobile ? '0.6rem' : '0.75rem',
+            marginBottom: isMobile ? '0.75rem' : '0.9rem'
+          }}>
+            <button
+              onClick={loadCallData}
+              style={{
+                flex: isMobile ? 1 : 'none',
+                padding: isMobile ? '0.75rem 1.125rem' : '0.875rem 1.375rem',
+                background: 'linear-gradient(135deg, rgba(37, 99, 235, 0.2) 0%, rgba(37, 99, 235, 0.12) 100%)',
+                border: '1px solid rgba(37, 99, 235, 0.35)',
+                borderRadius: isMobile ? '10px' : '12px',
+                color: '#3b82f6',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '0.5rem',
+                cursor: 'pointer',
+                transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                fontWeight: '700',
+                fontSize: isMobile ? '0.85rem' : '0.9rem',
+                touchAction: 'manipulation',
+                WebkitTapHighlightColor: 'transparent',
+                minHeight: '44px',
+                backdropFilter: 'blur(10px)',
+                boxShadow: '0 4px 16px rgba(37, 99, 235, 0.15)',
+                letterSpacing: '0.02em'
+              }}
+              onTouchStart={(e) => {
+                if (isMobile) {
+                  e.currentTarget.style.transform = 'scale(0.98)';
+                  e.currentTarget.style.background = 'rgba(37, 99, 235, 0.25)';
+                }
+              }}
+              onTouchEnd={(e) => {
+                if (isMobile) {
+                  e.currentTarget.style.transform = 'scale(1)';
+                  e.currentTarget.style.background = 'linear-gradient(135deg, rgba(37, 99, 235, 0.2) 0%, rgba(37, 99, 235, 0.12) 100%)';
+                }
+              }}
+            >
+              <RefreshCw size={isMobile ? 16 : 18} />
+              <span>Refresh</span>
+            </button>
+            
+            {activePlan && (
+              <button
+                onClick={() => setShowRequestModal(true)}
+                style={{
+                  flex: isMobile ? 1 : 'none',
+                  padding: isMobile ? '0.75rem 1.125rem' : '0.875rem 1.375rem',
+                  background: 'linear-gradient(135deg, rgba(168, 85, 247, 0.2) 0%, rgba(168, 85, 247, 0.12) 100%)',
+                  border: '1px solid rgba(168, 85, 247, 0.35)',
+                  borderRadius: isMobile ? '10px' : '12px',
+                  color: '#a855f7',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '0.5rem',
+                  cursor: 'pointer',
+                  fontWeight: '700',
+                  transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                  boxShadow: '0 4px 16px rgba(168, 85, 247, 0.15)',
+                  fontSize: isMobile ? '0.85rem' : '0.9rem',
+                  touchAction: 'manipulation',
+                  WebkitTapHighlightColor: 'transparent',
+                  minHeight: '44px',
+                  backdropFilter: 'blur(10px)',
+                  letterSpacing: '0.02em'
+                }}
+                onTouchStart={(e) => {
+                  if (isMobile) {
+                    e.currentTarget.style.transform = 'scale(0.98)';
+                    e.currentTarget.style.background = 'rgba(168, 85, 247, 0.25)';
+                  }
+                }}
+                onTouchEnd={(e) => {
+                  if (isMobile) {
+                    e.currentTarget.style.transform = 'scale(1)';
+                    e.currentTarget.style.background = 'linear-gradient(135deg, rgba(168, 85, 247, 0.2) 0%, rgba(168, 85, 247, 0.12) 100%)';
+                  }
+                }}
+              >
+                <Plus size={isMobile ? 16 : 18} />
+                <span>Bonus Call</span>
+              </button>
+            )}
+          </div>
+
+          {/* Info Section - Dark Blue */}
+          <div style={{
+            position: 'relative',
+            background: 'linear-gradient(135deg, rgba(37, 99, 235, 0.08) 0%, rgba(23, 23, 23, 0.6) 100%)',
             backdropFilter: 'blur(10px)',
-            borderRadius: '10px',
+            borderRadius: isMobile ? '10px' : '12px',
             padding: isMobile ? '0.65rem 0.75rem' : '0.75rem 0.9rem',
             marginBottom: isMobile ? '0.75rem' : '0.9rem',
-            border: '1px solid rgba(255, 255, 255, 0.15)'
+            border: '1px solid rgba(37, 99, 235, 0.2)',
+            overflow: 'hidden'
           }}>
+            {/* Subtle top glow */}
+            <div style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              height: '1px',
+              background: 'linear-gradient(90deg, transparent 0%, rgba(37, 99, 235, 0.4) 50%, transparent 100%)',
+              opacity: 0.5
+            }} />
+            
             <p style={{
               color: 'rgba(255, 255, 255, 0.9)',
               fontSize: isMobile ? '0.75rem' : '0.8rem',
@@ -380,9 +508,9 @@ export default function ClientCalls({ db, clientInfo }) {
               alignItems: 'flex-start',
               gap: '0.5rem'
             }}>
-              <HelpCircle size={14} style={{ flexShrink: 0, marginTop: '1px' }} />
+              <HelpCircle size={14} style={{ flexShrink: 0, marginTop: '1px', color: '#60a5fa' }} />
               <span>
-                <strong>Tip:</strong> Plan calls wanneer het jou uitkomt en krijg direct een Zoom link.
+                <strong style={{ color: '#3b82f6' }}>Tip:</strong> Plan calls wanneer het jou uitkomt en krijg direct een Zoom link.
               </span>
             </p>
           </div>
@@ -412,20 +540,34 @@ export default function ClientCalls({ db, clientInfo }) {
         </div>
       )}
 
-      {/* Notifications */}
+      {/* Notifications - Keep Yellow (Warning State) */}
       {notifications.length > 0 && (
         <div style={{
-          background: 'linear-gradient(135deg, rgba(251, 191, 36, 0.12) 0%, rgba(251, 191, 36, 0.05) 100%)',
+          position: 'relative',
+          background: 'linear-gradient(135deg, rgba(249, 115, 22, 0.12) 0%, rgba(249, 115, 22, 0.05) 100%)',
           backdropFilter: 'blur(10px)',
-          borderLeft: '3px solid #fbbf24',
+          borderLeft: '3px solid #f97316',
           borderRadius: isMobile ? '12px' : '14px',
           padding: isMobile ? '1rem' : '1.25rem',
           marginBottom: isMobile ? '1.5rem' : '2rem',
-          border: '1px solid rgba(251, 191, 36, 0.2)'
+          border: '1px solid rgba(249, 115, 22, 0.25)',
+          overflow: 'hidden'
         }}>
+          {/* Top accent glow */}
+          <div style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            height: '2px',
+            background: 'linear-gradient(90deg, transparent 0%, #f97316 50%, transparent 100%)',
+            opacity: 0.5,
+            zIndex: 10
+          }} />
+          
           <div style={{ display: 'flex', gap: isMobile ? '0.6rem' : '0.75rem' }}>
             <Bell size={isMobile ? 16 : 18} style={{ 
-              color: '#fbbf24', 
+              color: '#f97316', 
               marginTop: '2px', 
               flexShrink: 0 
             }} />
@@ -452,7 +594,7 @@ export default function ClientCalls({ db, clientInfo }) {
                       padding: isMobile ? '0.5rem' : '0.6rem',
                       background: 'rgba(0, 0, 0, 0.2)',
                       borderRadius: '8px',
-                      borderLeft: '2px solid #fbbf24',
+                      borderLeft: '2px solid #f97316',
                       lineHeight: '1.4'
                     }}
                   >
@@ -479,7 +621,8 @@ export default function ClientCalls({ db, clientInfo }) {
           fontSize: isMobile ? '1.25rem' : '1.5rem', 
           fontWeight: '700', 
           color: '#fff', 
-          marginBottom: isMobile ? '1rem' : '1.25rem'
+          marginBottom: isMobile ? '1rem' : '1.25rem',
+          letterSpacing: '-0.01em'
         }}>
           Jouw 6-Call Journey
         </h2>

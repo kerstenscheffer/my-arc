@@ -1,8 +1,8 @@
-// src/modules/progress/ProgressChartsWidget.jsx v2 - WITH IMPERATIVE METHODS
+// src/modules/progress/ProgressChartsWidget.jsx v3 - REORGANIZED LAYOUT
 import { useState, useEffect, useImperativeHandle, forwardRef } from 'react'
-import { BarChart3, ChevronDown, Dumbbell, Search, Clock } from 'lucide-react'
+import { BarChart3, ChevronDown, Dumbbell, Search, Clock, Calendar } from 'lucide-react'
 
-// Import new components
+// Import components
 import ChartMetricSelector from './components/ChartMetricSelector'
 import ChartContextHeader from './components/ChartContextHeader'
 import EnhancedChart from './components/EnhancedChart'
@@ -17,6 +17,7 @@ const ProgressChartsWidget = forwardRef(({ db, clientId, onOpenFullView }, ref) 
   const [selectedExercise, setSelectedExercise] = useState('all')
   const [selectedMetric, setSelectedMetric] = useState('1rm')
   const [showExerciseDropdown, setShowExerciseDropdown] = useState(false)
+  const [showPeriodDropdown, setShowPeriodDropdown] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [period, setPeriod] = useState('month')
   const [viewMode, setViewMode] = useState('chart')
@@ -189,7 +190,6 @@ const ProgressChartsWidget = forwardRef(({ db, clientId, onOpenFullView }, ref) 
 
       switch(metric) {
         case '1rm':
-          // Estimate 1RM using Brzycki formula: weight × (36 / (37 - reps))
           value = Math.max(...records.flatMap(r => 
             (Array.isArray(r.sets) ? r.sets : []).map(set => {
               const weight = parseFloat(set.weight) || 0
@@ -230,24 +230,18 @@ const ProgressChartsWidget = forwardRef(({ db, clientId, onOpenFullView }, ref) 
         case 'frequency':
           value = records.length
           break
+
+        default:
+          value = 0
       }
 
-      return {
-        date,
-        value: Math.round(value * 10) / 10
-      }
+      return { date, value: Math.round(value * 10) / 10 }
     })
 
-    // Sort by date
-    chartData.sort((a, b) => {
-      const dateA = new Date(a.date)
-      const dateB = new Date(b.date)
-      return dateA - dateB
-    })
-
-    // Get current and previous values
-    const current = chartData.length > 0 ? chartData[chartData.length - 1].value : null
-    const previous = chartData.length > 1 ? chartData[chartData.length - 2].value : null
+    // Calculate current and previous values
+    const values = chartData.map(d => d.value)
+    const current = values.length > 0 ? values[values.length - 1] : null
+    const previous = values.length > 1 ? values[values.length - 2] : null
 
     return { chartData, current, previous }
   }
@@ -259,7 +253,7 @@ const ProgressChartsWidget = forwardRef(({ db, clientId, onOpenFullView }, ref) 
       'maxWeight': 'Max Gewicht',
       'totalSets': 'Totaal Sets',
       'totalReps': 'Totaal Reps',
-      'frequency': 'Training Frequentie'
+      'frequency': 'Trainingsfrequentie'
     }
     return labels[metric] || metric
   }
@@ -269,9 +263,9 @@ const ProgressChartsWidget = forwardRef(({ db, clientId, onOpenFullView }, ref) 
       '1rm': 'kg',
       'volume': 'kg',
       'maxWeight': 'kg',
-      'totalSets': '',
-      'totalReps': '',
-      'frequency': 'x'
+      'totalSets': 'sets',
+      'totalReps': 'reps',
+      'frequency': 'sessies'
     }
     return units[metric] || ''
   }
@@ -279,272 +273,273 @@ const ProgressChartsWidget = forwardRef(({ db, clientId, onOpenFullView }, ref) 
   const getMetricColor = (metric) => {
     const colors = {
       '1rm': '#f97316',
-      'volume': '#3b82f6',
-      'maxWeight': '#10b981',
-      'totalSets': '#8b5cf6',
-      'totalReps': '#ec4899',
-      'frequency': '#f59e0b'
+      'volume': '#10b981',
+      'maxWeight': '#ef4444',
+      'totalSets': '#3b82f6',
+      'totalReps': '#a855f7',
+      'frequency': '#f97316'
     }
     return colors[metric] || '#f97316'
   }
 
-  const filteredExercises = exercises.filter(ex => 
-    ex.name.toLowerCase().includes(searchQuery.toLowerCase())
+  const getPeriodLabel = () => {
+    const labels = {
+      'week': 'Deze Week',
+      'month': 'Deze Maand',
+      'year': 'Dit Jaar'
+    }
+    return labels[period] || 'Periode'
+  }
+
+  const filteredExercises = exercises.filter(exercise =>
+    exercise.name.toLowerCase().includes(searchQuery.toLowerCase())
   )
 
-  // History view
   if (viewMode === 'history') {
-    return <WorkoutHistory 
-      db={db} 
-      clientId={clientId} 
-      onBack={() => setViewMode('chart')} 
-    />
+    return (
+      <WorkoutHistory
+        db={db}
+        clientId={clientId}
+        onBack={() => setViewMode('chart')}
+      />
+    )
   }
 
   return (
-    <div style={{
-      background: 'rgba(23, 23, 23, 0.6)',
-      borderRadius: isMobile ? '14px' : '16px',
-      border: '1px solid rgba(249, 115, 22, 0.2)',
-      overflow: 'hidden',
-      position: 'relative',
-      backdropFilter: 'blur(10px)'
-    }}>
-      {/* HEADER */}
+    <div 
+      id="workout-charts-section"
+      style={{
+        position: 'relative',
+        background: 'linear-gradient(135deg, rgba(23, 23, 23, 0.95) 0%, rgba(10, 10, 10, 0.9) 100%)',
+        borderRadius: isMobile ? '16px' : '20px',
+        border: '1px solid rgba(249, 115, 22, 0.25)',
+        backdropFilter: 'blur(12px)',
+        boxShadow: '0 4px 16px rgba(249, 115, 22, 0.15)',
+        overflow: 'hidden',
+        marginBottom: isMobile ? '1rem' : '1.5rem'
+      }}
+    >
+      {/* Top accent glow line */}
       <div style={{
-        padding: isMobile ? '0.875rem' : '1rem',
-        background: 'linear-gradient(135deg, rgba(249, 115, 22, 0.1) 0%, rgba(234, 88, 12, 0.05) 100%)',
-        borderBottom: '1px solid rgba(249, 115, 22, 0.15)'
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        height: '2px',
+        background: 'linear-gradient(90deg, transparent 0%, #f97316 50%, transparent 100%)',
+        opacity: 0.6,
+        zIndex: 10
+      }} />
+
+      {/* HEADER with Exercise + Period Selectors */}
+      <div style={{
+        padding: isMobile ? '1rem' : '1.25rem',
+        borderBottom: '1px solid rgba(249, 115, 22, 0.15)',
+        background: 'linear-gradient(135deg, rgba(249, 115, 22, 0.08) 0%, rgba(23, 23, 23, 0.6) 100%)'
       }}>
         <div style={{
           display: 'flex',
-          justifyContent: 'space-between',
           alignItems: 'center',
-          marginBottom: isMobile ? '0.6rem' : '0.75rem'
+          justifyContent: 'space-between',
+          marginBottom: isMobile ? '0.75rem' : '1rem'
         }}>
-          <h3 style={{
-            fontSize: isMobile ? '0.95rem' : '1.1rem',
-            fontWeight: '800',
-            color: '#f97316',
-            margin: 0,
+          <div style={{
             display: 'flex',
             alignItems: 'center',
-            gap: '0.4rem',
-            letterSpacing: '-0.02em'
+            gap: isMobile ? '0.75rem' : '1rem'
           }}>
-            <BarChart3 size={isMobile ? 16 : 20} color="#f97316" />
-            Workout Grafieken
-          </h3>
-          
-          <div style={{ display: 'flex', gap: '0.4rem' }}>
-            <button
-              onClick={() => setViewMode('history')}
+            <BarChart3 
+              size={isMobile ? 20 : 24} 
+              color="#f97316"
               style={{
-                background: 'rgba(249, 115, 22, 0.1)',
-                border: '1px solid rgba(249, 115, 22, 0.2)',
-                borderRadius: '8px',
-                padding: isMobile ? '0.35rem 0.5rem' : '0.4rem 0.6rem',
-                color: '#f97316',
-                fontSize: isMobile ? '0.7rem' : '0.75rem',
+                filter: 'drop-shadow(0 0 8px rgba(249, 115, 22, 0.5))'
+              }}
+            />
+            <h3 style={{
+              fontSize: isMobile ? '1.05rem' : '1.25rem',
+              fontWeight: '800',
+              color: '#fff',
+              margin: 0,
+              letterSpacing: '-0.02em'
+            }}>
+              Workout Analytics
+            </h3>
+          </div>
+
+          {/* History Button */}
+          <button
+            onClick={() => setViewMode('history')}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: isMobile ? '0.3rem' : '0.375rem',
+              padding: isMobile ? '0.5rem 0.75rem' : '0.625rem 0.875rem',
+              background: 'linear-gradient(135deg, rgba(249, 115, 22, 0.12) 0%, rgba(249, 115, 22, 0.06) 100%)',
+              border: '1px solid rgba(249, 115, 22, 0.25)',
+              borderRadius: isMobile ? '8px' : '10px',
+              color: '#f97316',
+              fontSize: isMobile ? '0.725rem' : '0.775rem',
+              fontWeight: '600',
+              cursor: 'pointer',
+              transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+              touchAction: 'manipulation',
+              WebkitTapHighlightColor: 'transparent',
+              backdropFilter: 'blur(8px)',
+              minHeight: '36px'
+            }}
+            onMouseEnter={(e) => {
+              if (!isMobile) {
+                e.currentTarget.style.background = 'linear-gradient(135deg, rgba(249, 115, 22, 0.18) 0%, rgba(249, 115, 22, 0.1) 100%)'
+                e.currentTarget.style.transform = 'translateY(-1px)'
+              }
+            }}
+            onMouseLeave={(e) => {
+              if (!isMobile) {
+                e.currentTarget.style.background = 'linear-gradient(135deg, rgba(249, 115, 22, 0.12) 0%, rgba(249, 115, 22, 0.06) 100%)'
+                e.currentTarget.style.transform = 'translateY(0)'
+              }
+            }}
+            onTouchStart={(e) => {
+              if (isMobile) {
+                e.currentTarget.style.transform = 'scale(0.97)'
+              }
+            }}
+            onTouchEnd={(e) => {
+              if (isMobile) {
+                e.currentTarget.style.transform = 'scale(1)'
+              }
+            }}
+          >
+            <Clock size={isMobile ? 13 : 14} />
+            {!isMobile && <span>Geschiedenis</span>}
+          </button>
+        </div>
+
+        {/* Selectors Grid */}
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: isMobile ? '1fr' : '1fr 200px',
+          gap: isMobile ? '0.625rem' : '0.75rem'
+        }}>
+          {/* Exercise Selector */}
+          <div style={{ position: 'relative' }}>
+            <button
+              onClick={() => {
+                setShowExerciseDropdown(!showExerciseDropdown)
+                setShowPeriodDropdown(false)
+              }}
+              style={{
+                width: '100%',
+                padding: isMobile ? '0.625rem 0.875rem' : '0.75rem 1rem',
+                background: 'linear-gradient(135deg, rgba(249, 115, 22, 0.12) 0%, rgba(249, 115, 22, 0.06) 100%)',
+                border: '1px solid rgba(249, 115, 22, 0.25)',
+                borderRadius: isMobile ? '10px' : '12px',
+                color: selectedExercise === 'all' ? 'rgba(255, 255, 255, 0.7)' : '#fff',
+                fontSize: isMobile ? '0.8rem' : '0.875rem',
                 fontWeight: '600',
                 cursor: 'pointer',
                 display: 'flex',
                 alignItems: 'center',
-                gap: '0.25rem',
+                justifyContent: 'space-between',
                 transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
                 touchAction: 'manipulation',
                 WebkitTapHighlightColor: 'transparent',
-                minHeight: '32px'
+                minHeight: '44px',
+                backdropFilter: 'blur(8px)'
               }}
             >
-              <Clock size={isMobile ? 12 : 14} />
-              Historie
-            </button>
-          </div>
-        </div>
-
-        {/* Period Selector */}
-        <div style={{
-          display: 'flex',
-          gap: '0.4rem',
-          marginBottom: '0.6rem'
-        }}>
-          {['week', 'month', 'year'].map(p => (
-            <button
-              key={p}
-              onClick={() => setPeriod(p)}
-              style={{
-                flex: 1,
-                padding: isMobile ? '0.4rem' : '0.5rem',
-                background: period === p 
-                  ? 'rgba(249, 115, 22, 0.15)'
-                  : 'rgba(255, 255, 255, 0.02)',
-                border: period === p
-                  ? '1px solid rgba(249, 115, 22, 0.3)'
-                  : '1px solid rgba(255, 255, 255, 0.05)',
-                borderRadius: '8px',
-                color: period === p ? '#f97316' : 'rgba(255, 255, 255, 0.5)',
-                fontSize: isMobile ? '0.7rem' : '0.75rem',
-                fontWeight: '600',
-                cursor: 'pointer',
-                transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                textTransform: 'capitalize',
-                touchAction: 'manipulation',
-                WebkitTapHighlightColor: 'transparent',
-                minHeight: '32px'
-              }}
-            >
-              {p === 'week' ? 'Week' : p === 'month' ? 'Maand' : 'Jaar'}
-            </button>
-          ))}
-        </div>
-        
-        {/* Exercise Selector */}
-        <div style={{ position: 'relative' }}>
-          <button
-            onClick={() => setShowExerciseDropdown(!showExerciseDropdown)}
-            style={{
-              width: '100%',
-              padding: isMobile ? '0.5rem 0.75rem' : '0.6rem 0.875rem',
-              background: 'rgba(249, 115, 22, 0.1)',
-              border: '1px solid rgba(249, 115, 22, 0.2)',
-              borderRadius: '10px',
-              color: selectedExercise === 'all' ? '#f97316' : '#fff',
-              fontSize: isMobile ? '0.75rem' : '0.85rem',
-              fontWeight: '600',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-              touchAction: 'manipulation',
-              WebkitTapHighlightColor: 'transparent',
-              minHeight: '44px'
-            }}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-              <Dumbbell size={isMobile ? 14 : 16} />
-              <span>{selectedExercise === 'all' ? 'Alle Workouts' : selectedExercise}</span>
-            </div>
-            <ChevronDown 
-              size={isMobile ? 14 : 16} 
-              style={{ 
-                transform: showExerciseDropdown ? 'rotate(180deg)' : 'rotate(0deg)',
-                transition: 'transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
-              }} 
-            />
-          </button>
-          
-          {showExerciseDropdown && (
-            <div style={{
-              position: 'absolute',
-              top: '100%',
-              left: 0,
-              right: 0,
-              marginTop: '0.4rem',
-              background: 'rgba(23, 23, 23, 0.98)',
-              border: '1px solid rgba(249, 115, 22, 0.2)',
-              borderRadius: '12px',
-              backdropFilter: 'blur(20px)',
-              zIndex: 20,
-              maxHeight: isMobile ? '60vh' : '300px',
-              overflow: 'hidden',
-              boxShadow: '0 10px 30px rgba(0,0,0,0.5)'
-            }}>
-              <div style={{
-                padding: isMobile ? '0.6rem' : '0.75rem',
-                borderBottom: '1px solid rgba(249, 115, 22, 0.1)'
-              }}>
-                <div style={{ position: 'relative' }}>
-                  <Search 
-                    size={isMobile ? 12 : 14} 
-                    style={{
-                      position: 'absolute',
-                      left: '0.75rem',
-                      top: '50%',
-                      transform: 'translateY(-50%)',
-                      color: 'rgba(249, 115, 22, 0.5)'
-                    }}
-                  />
-                  <input
-                    type="text"
-                    placeholder="Zoek oefening..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    onClick={(e) => e.stopPropagation()}
-                    style={{
-                      width: '100%',
-                      padding: isMobile ? '0.4rem 0.6rem 0.4rem 1.8rem' : '0.5rem 0.75rem 0.5rem 2rem',
-                      background: 'rgba(249, 115, 22, 0.05)',
-                      border: '1px solid rgba(249, 115, 22, 0.1)',
-                      borderRadius: '8px',
-                      color: '#fff',
-                      fontSize: isMobile ? '16px' : '0.85rem',
-                      outline: 'none'
-                    }}
-                  />
-                </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <Dumbbell size={isMobile ? 14 : 16} color="#f97316" />
+                <span>{selectedExercise === 'all' ? 'Alle Workouts' : selectedExercise}</span>
               </div>
-              
+              <ChevronDown 
+                size={isMobile ? 14 : 16}
+                color="#f97316"
+                style={{ 
+                  transform: showExerciseDropdown ? 'rotate(180deg)' : 'rotate(0deg)',
+                  transition: 'transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
+                }} 
+              />
+            </button>
+            
+            {/* Exercise Dropdown */}
+            {showExerciseDropdown && (
               <div style={{
-                maxHeight: isMobile ? 'calc(60vh - 60px)' : '200px',
-                overflowY: 'auto',
-                WebkitOverflowScrolling: 'touch'
+                position: 'absolute',
+                top: '100%',
+                left: 0,
+                right: 0,
+                marginTop: '0.5rem',
+                background: 'rgba(23, 23, 23, 0.98)',
+                border: '1px solid rgba(249, 115, 22, 0.25)',
+                borderRadius: isMobile ? '10px' : '12px',
+                backdropFilter: 'blur(20px)',
+                zIndex: 30,
+                maxHeight: isMobile ? '60vh' : '320px',
+                overflow: 'hidden',
+                boxShadow: '0 8px 24px rgba(0, 0, 0, 0.6)'
               }}>
-                <button
-                  onClick={() => {
-                    setSelectedExercise('all')
-                    setShowExerciseDropdown(false)
-                    setSearchQuery('')
-                  }}
-                  style={{
-                    width: '100%',
-                    padding: isMobile ? '0.75rem' : '0.875rem',
-                    background: selectedExercise === 'all' 
-                      ? 'rgba(249, 115, 22, 0.15)' 
-                      : 'transparent',
-                    border: 'none',
-                    color: selectedExercise === 'all' ? '#f97316' : 'rgba(255,255,255,0.7)',
-                    fontSize: isMobile ? '0.8rem' : '0.85rem',
-                    fontWeight: '600',
-                    cursor: 'pointer',
-                    textAlign: 'left',
-                    transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    minHeight: '44px',
-                    touchAction: 'manipulation',
-                    WebkitTapHighlightColor: 'transparent'
-                  }}
-                >
-                  <span>Alle Workouts</span>
-                  <span style={{ fontSize: isMobile ? '0.65rem' : '0.7rem', opacity: 0.5 }}>
-                    Overzicht
-                  </span>
-                </button>
+                {/* Search */}
+                <div style={{
+                  padding: isMobile ? '0.625rem' : '0.75rem',
+                  borderBottom: '1px solid rgba(249, 115, 22, 0.1)'
+                }}>
+                  <div style={{ position: 'relative' }}>
+                    <Search 
+                      size={isMobile ? 12 : 14} 
+                      style={{
+                        position: 'absolute',
+                        left: '0.75rem',
+                        top: '50%',
+                        transform: 'translateY(-50%)',
+                        color: 'rgba(249, 115, 22, 0.5)'
+                      }}
+                    />
+                    <input
+                      type="text"
+                      placeholder="Zoek oefening..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      onClick={(e) => e.stopPropagation()}
+                      style={{
+                        width: '100%',
+                        padding: isMobile ? '0.5rem 0.625rem 0.5rem 2rem' : '0.5rem 0.75rem 0.5rem 2.25rem',
+                        background: 'rgba(249, 115, 22, 0.06)',
+                        border: '1px solid rgba(249, 115, 22, 0.15)',
+                        borderRadius: '8px',
+                        color: '#fff',
+                        fontSize: isMobile ? '16px' : '0.85rem',
+                        outline: 'none'
+                      }}
+                    />
+                  </div>
+                </div>
                 
-                {filteredExercises.map(exercise => (
+                {/* Options */}
+                <div style={{
+                  maxHeight: isMobile ? 'calc(60vh - 70px)' : '220px',
+                  overflowY: 'auto',
+                  WebkitOverflowScrolling: 'touch'
+                }}>
                   <button
-                    key={exercise.name}
                     onClick={() => {
-                      setSelectedExercise(exercise.name)
+                      setSelectedExercise('all')
                       setShowExerciseDropdown(false)
                       setSearchQuery('')
                     }}
                     style={{
                       width: '100%',
-                      padding: isMobile ? '0.75rem' : '0.875rem',
-                      background: selectedExercise === exercise.name 
+                      padding: isMobile ? '0.75rem' : '0.875rem 1rem',
+                      background: selectedExercise === 'all' 
                         ? 'rgba(249, 115, 22, 0.15)' 
                         : 'transparent',
                       border: 'none',
-                      color: selectedExercise === exercise.name ? '#f97316' : 'rgba(255,255,255,0.7)',
-                      fontSize: isMobile ? '0.8rem' : '0.85rem',
+                      color: selectedExercise === 'all' ? '#f97316' : 'rgba(255,255,255,0.7)',
+                      fontSize: isMobile ? '0.8rem' : '0.875rem',
                       fontWeight: '600',
                       cursor: 'pointer',
                       textAlign: 'left',
-                      transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                      transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'space-between',
@@ -553,26 +548,153 @@ const ProgressChartsWidget = forwardRef(({ db, clientId, onOpenFullView }, ref) 
                       WebkitTapHighlightColor: 'transparent'
                     }}
                   >
-                    <span>{exercise.name}</span>
+                    <span>Alle Workouts</span>
                     <span style={{ fontSize: isMobile ? '0.65rem' : '0.7rem', opacity: 0.5 }}>
-                      {exercise.count}x
+                      Overzicht
                     </span>
                   </button>
-                ))}
-                
-                {filteredExercises.length === 0 && (
-                  <div style={{
-                    padding: '1rem',
-                    textAlign: 'center',
-                    color: 'rgba(255,255,255,0.4)',
-                    fontSize: isMobile ? '0.75rem' : '0.85rem'
-                  }}>
-                    Geen oefeningen gevonden
-                  </div>
-                )}
+                  
+                  {filteredExercises.map(exercise => (
+                    <button
+                      key={exercise.name}
+                      onClick={() => {
+                        setSelectedExercise(exercise.name)
+                        setShowExerciseDropdown(false)
+                        setSearchQuery('')
+                      }}
+                      style={{
+                        width: '100%',
+                        padding: isMobile ? '0.75rem' : '0.875rem 1rem',
+                        background: selectedExercise === exercise.name 
+                          ? 'rgba(249, 115, 22, 0.15)' 
+                          : 'transparent',
+                        border: 'none',
+                        color: selectedExercise === exercise.name ? '#f97316' : 'rgba(255,255,255,0.7)',
+                        fontSize: isMobile ? '0.8rem' : '0.875rem',
+                        fontWeight: '600',
+                        cursor: 'pointer',
+                        textAlign: 'left',
+                        transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        minHeight: '44px',
+                        touchAction: 'manipulation',
+                        WebkitTapHighlightColor: 'transparent'
+                      }}
+                    >
+                      <span>{exercise.name}</span>
+                      <span style={{ fontSize: isMobile ? '0.65rem' : '0.7rem', opacity: 0.5 }}>
+                        {exercise.count}x
+                      </span>
+                    </button>
+                  ))}
+                  
+                  {filteredExercises.length === 0 && (
+                    <div style={{
+                      padding: '1.5rem 1rem',
+                      textAlign: 'center',
+                      color: 'rgba(255,255,255,0.4)',
+                      fontSize: isMobile ? '0.75rem' : '0.85rem'
+                    }}>
+                      Geen oefeningen gevonden
+                    </div>
+                  )}
+                </div>
               </div>
-            </div>
-          )}
+            )}
+          </div>
+
+          {/* Period Selector */}
+          <div style={{ position: 'relative' }}>
+            <button
+              onClick={() => {
+                setShowPeriodDropdown(!showPeriodDropdown)
+                setShowExerciseDropdown(false)
+              }}
+              style={{
+                width: '100%',
+                padding: isMobile ? '0.625rem 0.875rem' : '0.75rem 1rem',
+                background: 'linear-gradient(135deg, rgba(249, 115, 22, 0.12) 0%, rgba(249, 115, 22, 0.06) 100%)',
+                border: '1px solid rgba(249, 115, 22, 0.25)',
+                borderRadius: isMobile ? '10px' : '12px',
+                color: '#fff',
+                fontSize: isMobile ? '0.8rem' : '0.875rem',
+                fontWeight: '600',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                touchAction: 'manipulation',
+                WebkitTapHighlightColor: 'transparent',
+                minHeight: '44px',
+                backdropFilter: 'blur(8px)'
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <Calendar size={isMobile ? 14 : 16} color="#f97316" />
+                <span>{getPeriodLabel()}</span>
+              </div>
+              <ChevronDown 
+                size={isMobile ? 14 : 16}
+                color="#f97316"
+                style={{ 
+                  transform: showPeriodDropdown ? 'rotate(180deg)' : 'rotate(0deg)',
+                  transition: 'transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
+                }} 
+              />
+            </button>
+
+            {/* Period Dropdown */}
+            {showPeriodDropdown && (
+              <div style={{
+                position: 'absolute',
+                top: '100%',
+                left: 0,
+                right: 0,
+                marginTop: '0.5rem',
+                background: 'rgba(23, 23, 23, 0.98)',
+                border: '1px solid rgba(249, 115, 22, 0.25)',
+                borderRadius: isMobile ? '10px' : '12px',
+                backdropFilter: 'blur(20px)',
+                zIndex: 30,
+                overflow: 'hidden',
+                boxShadow: '0 8px 24px rgba(0, 0, 0, 0.6)'
+              }}>
+                {['week', 'month', 'year'].map(p => (
+                  <button
+                    key={p}
+                    onClick={() => {
+                      setPeriod(p)
+                      setShowPeriodDropdown(false)
+                    }}
+                    style={{
+                      width: '100%',
+                      padding: isMobile ? '0.75rem' : '0.875rem 1rem',
+                      background: period === p 
+                        ? 'rgba(249, 115, 22, 0.15)' 
+                        : 'transparent',
+                      border: 'none',
+                      color: period === p ? '#f97316' : 'rgba(255,255,255,0.7)',
+                      fontSize: isMobile ? '0.8rem' : '0.875rem',
+                      fontWeight: '600',
+                      cursor: 'pointer',
+                      textAlign: 'left',
+                      transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+                      minHeight: '44px',
+                      touchAction: 'manipulation',
+                      WebkitTapHighlightColor: 'transparent'
+                    }}
+                  >
+                    {p === 'week' && 'Deze Week'}
+                    {p === 'month' && 'Deze Maand'}
+                    {p === 'year' && 'Dit Jaar'}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
@@ -580,14 +702,7 @@ const ProgressChartsWidget = forwardRef(({ db, clientId, onOpenFullView }, ref) 
       <div style={{
         padding: isMobile ? '1rem' : '1.25rem'
       }}>
-        {/* Metric Selector */}
-        <ChartMetricSelector
-          activeMetric={selectedMetric}
-          onSelectMetric={setSelectedMetric}
-          disabled={selectedExercise === 'all'}
-        />
-
-        {/* Context Header */}
+        {/* Context Header - COMPACT */}
         {selectedExercise !== 'all' && (
           <ChartContextHeader
             exerciseName={contextData.exerciseName}
@@ -609,18 +724,26 @@ const ProgressChartsWidget = forwardRef(({ db, clientId, onOpenFullView }, ref) 
           showPRMarkers={selectedMetric === '1rm' || selectedMetric === 'maxWeight'}
         />
 
+        {/* Metric Selector - UNDER CHART - 2x3 GRID */}
+        <ChartMetricSelector
+          activeMetric={selectedMetric}
+          onSelectMetric={setSelectedMetric}
+          disabled={selectedExercise === 'all'}
+        />
+
         {/* Info message for "all" selection */}
         {selectedExercise === 'all' && (
           <div style={{
-            marginTop: '1rem',
+            marginTop: isMobile ? '0.875rem' : '1rem',
             padding: isMobile ? '0.875rem' : '1rem',
             background: 'rgba(249, 115, 22, 0.1)',
             border: '1px solid rgba(249, 115, 22, 0.2)',
-            borderRadius: '10px',
+            borderRadius: isMobile ? '10px' : '12px',
             fontSize: isMobile ? '0.75rem' : '0.8rem',
             color: 'rgba(255, 255, 255, 0.7)',
             textAlign: 'center',
-            fontWeight: '500'
+            fontWeight: '500',
+            backdropFilter: 'blur(8px)'
           }}>
             💡 Selecteer een specifieke oefening om metrics te bekijken
           </div>

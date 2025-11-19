@@ -1,0 +1,89 @@
+// src/modules/workout/components/WorkoutPhotoSlider.jsx
+import { useState, useEffect } from 'react'
+
+const workoutImages = [
+  'https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=1600&h=600&fit=crop',
+  'https://images.unsplash.com/photo-1518611012118-696072aa579a?w=1600&h=600&fit=crop',
+  'https://images.unsplash.com/photo-1581009146145-b5ef050c2e1e?w=1600&h=600&fit=crop',
+  'https://images.unsplash.com/photo-1552674605-db6ffd4facb5?w=1600&h=600&fit=crop',
+  'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?w=1600&h=600&fit=crop'
+]
+
+export default function WorkoutPhotoSlider() {
+  const isMobile = window.innerWidth <= 768
+  const [currentIndex, setCurrentIndex] = useState(0)
+  const [touchStart, setTouchStart] = useState(null)
+  
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setCurrentIndex(prev => (prev === workoutImages.length - 1 ? 0 : prev + 1))
+    }, 5000)
+    return () => clearInterval(interval)
+  }, [])
+  
+  const handleTouchStart = (e) => {
+    setTouchStart(e.targetTouches[0].clientX)
+  }
+  
+  const handleTouchEnd = (e) => {
+    if (!touchStart) return
+    const diff = touchStart - e.changedTouches[0].clientX
+    if (Math.abs(diff) > 50) {
+      setCurrentIndex(prev => 
+        diff > 0 
+          ? (prev === workoutImages.length - 1 ? 0 : prev + 1)
+          : (prev === 0 ? workoutImages.length - 1 : prev - 1)
+      )
+    }
+    setTouchStart(null)
+  }
+  
+  return (
+    <div
+      onTouchStart={handleTouchStart}
+      onTouchEnd={handleTouchEnd}
+      style={{
+        width: '100%',
+        height: isMobile ? '220px' : '340px',
+        backgroundImage: `url(${workoutImages[currentIndex]})`,
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+        position: 'relative',
+        transition: 'background-image 0.6s ease',
+        touchAction: 'pan-y',
+        userSelect: 'none',
+        margin: isMobile ? '1rem 0' : '1.5rem 0'
+      }}
+    >
+      {/* Dots */}
+      <div style={{
+        position: 'absolute',
+        bottom: '1rem',
+        left: '50%',
+        transform: 'translateX(-50%)',
+        display: 'flex',
+        gap: '0.5rem',
+        zIndex: 10
+      }}>
+        {workoutImages.map((_, index) => (
+          <button
+            key={index}
+            onClick={() => setCurrentIndex(index)}
+            style={{
+              width: index === currentIndex ? '28px' : '8px',
+              height: '8px',
+              borderRadius: '4px',
+              background: index === currentIndex ? 'white' : 'rgba(255,255,255,0.4)',
+              border: 'none',
+              cursor: 'pointer',
+              transition: 'all 0.3s ease',
+              padding: 0,
+              touchAction: 'manipulation',
+              WebkitTapHighlightColor: 'transparent'
+            }}
+          />
+        ))}
+      </div>
+    </div>
+  )
+}

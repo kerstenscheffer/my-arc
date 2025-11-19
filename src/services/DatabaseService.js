@@ -541,38 +541,44 @@ async getClientByEmail(email) {
 async deleteClient(clientId) {
   try {
     console.log('🗑️ Deleting client:', clientId)
-    
+          
     // First, get the client to find their auth_user_id
     const { data: clientData, error: fetchError } = await supabase
       .from('clients')
-      .select('auth_user_id, email')
+      .select('auth_user_id, email, first_name, last_name')  // ← VOEG first_name, last_name TOE
       .eq('id', clientId)
-      .single()
-    
+      .single()  
+     
     if (fetchError) {
       console.error('Error fetching client:', fetchError)
       throw fetchError
-    }
+    } 
     
+    console.log('📋 Client to delete:', clientData.email)  // ← NIEUWE LOG
+  
     // Delete client record from database
     const { error: deleteError } = await supabase
       .from('clients')
       .delete()
       .eq('id', clientId)
-    
+
     if (deleteError) {
       console.error('Error deleting client record:', deleteError)
       throw deleteError
     }
     
+    console.log('✅ Client record deleted successfully')  // ← NIEUWE LOG
+    
     // Optional: Try to delete auth user (may require admin privileges)
     if (clientData?.auth_user_id) {
       try {
+        console.log('🔐 Attempting to delete auth user...')  // ← NIEUWE LOG
         // This might fail if you don't have admin access
         await supabase.auth.admin.deleteUser(clientData.auth_user_id)
         console.log('✅ Auth user also deleted')
       } catch (authError) {
-        console.log('⚠️ Could not delete auth user (admin access needed):', authError)
+        console.log('⚠️ Could not delete auth user (no admin access):', authError.message)  // ← .message TOEGEVOEGD
+        console.log('💡 The client record is deleted. Auth user remains but cannot access system.')  // ← NIEUWE LOG
         // Continue anyway - client record is deleted
       }
     }
@@ -580,16 +586,20 @@ async deleteClient(clientId) {
     console.log('✅ Client deleted successfully')
     
     // Clear cache and emit update
+    this.clearCache(`client_${clientId}`)  // ← VOEG DEZE REGEL TOE (specifieke client cache)
     this.clearCache('clients')
     this.emit('clients', await this.getClients())
-    
-    return { success: true }
+       
+    return { 
+      success: true,
+      message: `Client ${clientData.first_name} ${clientData.last_name} deleted successfully`  // ← VOEG message TOE
+    }
+
   } catch (error) {
     console.error('❌ Delete client failed:', error)
     throw error
   }
 }
-
 
 
 
@@ -11129,6 +11139,223 @@ async resumeChallenge(assignmentId) {
     throw error
   }
 }
+
+
+// ==================== COMMAND CENTER: ACTIVITY TIMELINE ====================
+
+async getWorkoutSessionsForTimeline(clientId, startDate, endDate) {
+  try {
+    const { data, error } = await this.supabase
+      .from('workout_sessions')
+      .select('workout_date, is_completed, completion_percentage, feeling')
+      .eq('client_id', clientId)
+      .gte('workout_date', startDate)
+      .lte('workout_date', endDate)
+      .order('workout_date', { ascending: true })
+
+    if (error) throw error
+    return data || []
+  } catch (error) {
+    console.error('❌ [DatabaseService] getWorkoutSessionsForTimeline error:', error)
+    return []
+  }
+}
+
+async getWorkoutSessionsForTimelineBatch(clientIds, startDate, endDate) {
+  try {
+    const { data, error } = await this.supabase
+      .from('workout_sessions')
+      .select('client_id, workout_date, is_completed, completion_percentage, feeling')
+      .in('client_id', clientIds)
+      .gte('workout_date', startDate)
+      .lte('workout_date', endDate)
+      .order('workout_date', { ascending: true })
+
+    if (error) throw error
+    return data || []
+  } catch (error) {
+    console.error('❌ [DatabaseService] getWorkoutSessionsForTimelineBatch error:', error)
+    return []
+  }
+}
+
+
+async generateShoppingList(mealPlanId) {
+  try {
+    const { data: plan, error } = await this.supabase
+      .from('client_meal_plans')
+      .select('week_structure, shopping_list')
+      .eq('id', mealPlanId)
+      .single()
+
+    if (error) throw error
+    
+    // If shopping list already exists and is recent, return it
+    if (plan?.shopping_list?.generatedAt) {
+      const generatedDate = new Date(plan.shopping_list.generatedAt)
+      const hoursSince = (Date.now() - generatedDate.getTime()) / (1000 * 60 * 60)
+      
+      if (hoursSince < 24) {
+        console.log('✅ Using cached shopping list')
+        return plan.shopping_list
+      }
+    }
+    
+    // Generate fresh shopping list
+    if (!plan?.week_structure) {
+      console.warn('⚠️ No week structure found')
+      return { items: [], totalCost: 0, itemCount: 0 }
+    }
+    
+    const ShoppingService = (await import('../modules/shopping/ShoppingService')).default
+    const shoppingService = new ShoppingService(this)
+    
+    const shoppingList = await shoppingService.generateShoppingList(plan.week_structure)
+    
+    // Save back to plan for caching
+    await this.supabase
+      .from('client_meal_plans')
+      .update({ 
+        shopping_list: shoppingList,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', mealPlanId)
+    
+    console.log(`✅ Generated fresh shopping list: ${shoppingList.itemCount} items`)
+    
+    return shoppingList
+  } catch (error) {
+    console.error('❌ Shopping list generation failed:', error)
+    return { items: [], totalCost: 0, itemCount: 0 }
+  }
+}
+
+/**
+ * NIEUWE METHOD - Add to DatabaseService.js
+ * Force regenerate shopping list (bypass cache)
+ */
+async regenerateShoppingList(mealPlanId) {
+  try {
+    const { data: plan, error } = await this.supabase
+      .from('client_meal_plans')
+      .select('week_structure')
+      .eq('id', mealPlanId)
+      .single()
+
+    if (error) throw error
+    if (!plan?.week_structure) return { items: [], totalCost: 0, itemCount: 0 }
+    
+    const ShoppingService = (await import('../modules/shopping/ShoppingService')).default
+    const shoppingService = new ShoppingService(this)
+    
+    const shoppingList = await shoppingService.generateShoppingList(plan.week_structure)
+    
+    // Update plan
+    await this.supabase
+      .from('client_meal_plans')
+      .update({ 
+        shopping_list: shoppingList,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', mealPlanId)
+    
+    console.log(`✅ Regenerated shopping list: ${shoppingList.itemCount} items`)
+    
+    return shoppingList
+  } catch (error) {
+    console.error('❌ Shopping list regeneration failed:', error)
+    return { items: [], totalCost: 0, itemCount: 0 }
+  }
+}
+
+/**
+ * NIEUWE METHOD - Add to DatabaseService.js
+ * Update meal in plan AND regenerate shopping list
+ */
+async updateMealInPlanWithShopping(planId, day, slot, newMealId) {
+  try {
+    // Get current plan
+    const { data: plan, error: fetchError } = await this.supabase
+      .from('client_meal_plans')
+      .select('week_structure')
+      .eq('id', planId)
+      .single()
+    
+    if (fetchError) throw fetchError
+    
+    const weekStructure = { ...plan.week_structure }
+    
+    // Update meal slot
+    if (slot === 'snacks') {
+      weekStructure[day][slot] = Array.isArray(weekStructure[day][slot]) 
+        ? [newMealId, ...weekStructure[day][slot].slice(1)]
+        : [newMealId]
+    } else {
+      weekStructure[day][slot] = newMealId
+    }
+    
+    // Save updated structure
+    const { error: updateError } = await this.supabase
+      .from('client_meal_plans')
+      .update({ 
+        week_structure: weekStructure,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', planId)
+    
+    if (updateError) throw updateError
+    
+    // 🔥 Auto-regenerate shopping list
+    const newShoppingList = await this.regenerateShoppingList(planId)
+    
+    console.log('✅ Meal updated with shopping list regeneration')
+    
+    return { success: true, shoppingList: newShoppingList }
+  } catch (error) {
+    console.error('❌ Failed to update meal with shopping:', error)
+    return { success: false, error: error.message }
+  }
+}
+
+/**
+ * NIEUWE METHOD - Add to DatabaseService.js  
+ * Get shopping list status (progress tracking)
+ */
+async getShoppingListWithProgress(clientId, planId) {
+  try {
+    // Get plan with shopping list
+    const { data: plan } = await this.supabase
+      .from('client_meal_plans')
+      .select('shopping_list')
+      .eq('id', planId)
+      .single()
+    
+    // Get progress
+    const { data: progress } = await this.supabase
+      .from('ai_shopping_progress')
+      .select('*')
+      .eq('client_id', clientId)
+      .eq('plan_id', planId)
+      .single()
+    
+    return {
+      shoppingList: plan?.shopping_list || { items: [], totalCost: 0, itemCount: 0 },
+      progress: progress || { purchased_items: {}, purchased_count: 0 }
+    }
+  } catch (error) {
+    console.error('❌ Failed to get shopping list with progress:', error)
+    return {
+      shoppingList: { items: [], totalCost: 0, itemCount: 0 },
+      progress: { purchased_items: {}, purchased_count: 0 }
+    }
+  }
+}
+
+
+
+
+
+
 
 
 

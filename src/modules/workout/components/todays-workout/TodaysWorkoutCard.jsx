@@ -1,13 +1,17 @@
 // src/modules/workout/components/todays-workout/TodaysWorkoutCard.jsx
-import { Dumbbell, Zap, Clock, Target, CheckCircle } from 'lucide-react'
+import { Dumbbell, Zap, Clock, Target, CheckCircle, TrendingUp } from 'lucide-react'
 import { useState, useEffect } from 'react'
 
 export default function TodaysWorkoutCard({ workout, onLogClick, logsCount, client, db }) {
-  const isMobile = window.innerWidth <= 768
+  const [isMobile, setIsMobile] = useState(window.innerWidth <= 768)
   const [isCompleted, setIsCompleted] = useState(false)
-  const [loading, setLoading] = useState(false)
   
-  // Check if workout is started/completed
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth <= 768)
+    window.addEventListener('resize', handleResize)
+    return () => window.removeEventListener('resize', handleResize)
+  }, [])
+  
   useEffect(() => {
     checkWorkoutStatus()
   }, [client?.id, logsCount])
@@ -30,284 +34,250 @@ export default function TodaysWorkoutCard({ workout, onLogClick, logsCount, clie
     }
   }
   
-  // Calculate totals
   const exerciseCount = workout.exercises?.length || 0
   const totalSets = workout.exercises?.reduce((sum, ex) => sum + (parseInt(ex.sets) || 0), 0) || 0
   
+  // Workout photo
+  const workoutImage = 'https://images.unsplash.com/photo-1532029837206-abbe2b7620e3?w=1600&h=500&fit=crop&q=85'
+
   return (
-    <div style={{
-      padding: isMobile ? '1rem' : '1.5rem',
-      marginBottom: isMobile ? '1rem' : '1.25rem'
-    }}>
-      <div
-        onClick={onLogClick}
-        style={{
-          background: 'linear-gradient(135deg, rgba(249, 115, 22, 0.12) 0%, rgba(249, 115, 22, 0.04) 100%)',
-          backdropFilter: 'blur(20px)',
-          border: isCompleted 
-            ? '1px solid rgba(16, 185, 129, 0.3)'
-            : '1px solid rgba(249, 115, 22, 0.25)',
-          borderRadius: isMobile ? '12px' : '16px',
-          padding: isMobile ? '1.25rem' : '1.5rem',
-          cursor: 'pointer',
-          boxShadow: isCompleted
-            ? '0 8px 32px rgba(16, 185, 129, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.03)'
-            : '0 8px 32px rgba(249, 115, 22, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.03)',
-          position: 'relative',
-          overflow: 'hidden',
-          transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-          minHeight: '44px',
-          touchAction: 'manipulation',
-          WebkitTapHighlightColor: 'transparent'
-        }}
-        onMouseEnter={(e) => {
-          if (!isMobile) {
-            e.currentTarget.style.transform = 'translateY(-2px)'
-            e.currentTarget.style.boxShadow = isCompleted
-              ? '0 12px 40px rgba(16, 185, 129, 0.35)'
-              : '0 12px 40px rgba(249, 115, 22, 0.35)'
-          }
-        }}
-        onMouseLeave={(e) => {
-          if (!isMobile) {
-            e.currentTarget.style.transform = 'translateY(0)'
-            e.currentTarget.style.boxShadow = isCompleted
-              ? '0 8px 32px rgba(16, 185, 129, 0.25)'
-              : '0 8px 32px rgba(249, 115, 22, 0.25)'
-          }
-        }}
-        onTouchStart={(e) => {
-          if (isMobile) {
-            e.currentTarget.style.transform = 'scale(0.98)'
-          }
-        }}
-        onTouchEnd={(e) => {
-          if (isMobile) {
-            e.currentTarget.style.transform = 'scale(1)'
-          }
-        }}
+    <div style={{ padding: isMobile ? '0.5rem' : '0.625rem', marginBottom: isMobile ? '1rem' : '1.5rem' }}>
+      <div style={{
+        position: 'relative',
+        height: isMobile ? '240px' : '300px',
+        borderRadius: isMobile ? '16px' : '20px',
+        overflow: 'hidden',
+        border: '2px solid rgba(249, 115, 22, 0.3)',
+        boxShadow: '0 8px 32px rgba(249, 115, 22, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.03)',
+        background: '#000',
+        touchAction: 'manipulation',
+        WebkitTapHighlightColor: 'transparent',
+        cursor: 'pointer',
+        transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
+      }}
+      onClick={onLogClick}
+      onMouseEnter={(e) => {
+        if (!isMobile) {
+          e.currentTarget.style.transform = 'translateY(-2px)'
+          e.currentTarget.style.boxShadow = '0 12px 40px rgba(249, 115, 22, 0.35)'
+        }
+      }}
+      onMouseLeave={(e) => {
+        if (!isMobile) {
+          e.currentTarget.style.transform = 'translateY(0)'
+          e.currentTarget.style.boxShadow = '0 8px 32px rgba(249, 115, 22, 0.2)'
+        }
+      }}
+      onTouchStart={(e) => {
+        if (isMobile) e.currentTarget.style.transform = 'scale(0.98)'
+      }}
+      onTouchEnd={(e) => {
+        if (isMobile) e.currentTarget.style.transform = 'scale(1)'
+      }}
       >
-        {/* Top glow accent */}
+        {/* Background Image */}
+        <div style={{
+          position: 'absolute',
+          inset: 0,
+          backgroundImage: `url(${workoutImage})`,
+          backgroundSize: 'cover',
+          backgroundPosition: 'center'
+        }} />
+        
+        {/* Top vignette */}
         <div style={{
           position: 'absolute',
           top: 0,
           left: 0,
           right: 0,
-          height: '2px',
-          background: isCompleted
-            ? 'linear-gradient(90deg, transparent 0%, #10b981 50%, transparent 100%)'
-            : 'linear-gradient(90deg, transparent 0%, #f97316 50%, transparent 100%)',
-          opacity: 0.6
+          height: '40%',
+          background: 'linear-gradient(to bottom, rgba(0,0,0,0.5), transparent)',
+          pointerEvents: 'none'
         }} />
         
-        {/* Background decoration */}
+        {/* Bottom gradient - DARKER OVERLAY */}
         <div style={{
           position: 'absolute',
-          top: '-20%',
-          right: '-10%',
-          opacity: 0.03,
-          pointerEvents: 'none',
-          zIndex: 0
+          bottom: 0,
+          left: 0,
+          right: 0,
+          height: '80%',
+          background: 'linear-gradient(to top, rgba(0,0,0,0.95) 0%, rgba(0,0,0,0.6) 70%, transparent 100%)',
+          pointerEvents: 'none'
+        }} />
+        
+        {/* Status Badge - Top Left - SMALLER */}
+        <div style={{
+          position: 'absolute',
+          top: isMobile ? '0.75rem' : '1rem',
+          left: isMobile ? '0.75rem' : '1rem',
+          background: 'linear-gradient(135deg, rgba(23, 23, 23, 0.9) 0%, rgba(23, 23, 23, 0.8) 100%)',
+          backdropFilter: 'blur(12px)',
+          border: isCompleted
+            ? '1px solid rgba(16, 185, 129, 0.4)'
+            : '1px solid rgba(249, 115, 22, 0.4)',
+          borderRadius: '8px',
+          padding: isMobile ? '0.375rem 0.5rem' : '0.4rem 0.625rem',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '0.3rem',
+          boxShadow: isCompleted
+            ? '0 4px 16px rgba(16, 185, 129, 0.3), 0 0 0 1px rgba(0,0,0,0.5)'
+            : '0 4px 16px rgba(249, 115, 22, 0.3), 0 0 0 1px rgba(0,0,0,0.5)',
+          zIndex: 10
         }}>
-          <Dumbbell size={isMobile ? 140 : 180} color="#f97316" />
+          {isCompleted ? (
+            <CheckCircle size={isMobile ? 11 : 12} color="#10b981" />
+          ) : (
+            <Zap size={isMobile ? 11 : 12} color="#f97316" fill="#f97316" />
+          )}
+          <span style={{
+            fontSize: isMobile ? '0.7rem' : '0.75rem',
+            fontWeight: '700',
+            color: isCompleted ? '#10b981' : '#f97316'
+          }}>
+            {isCompleted ? 'Voltooid' : 'Vandaag'}
+          </span>
         </div>
         
-        {/* Content */}
-        <div style={{ position: 'relative', zIndex: 1 }}>
-          {/* Header */}
+        {/* Logs Count Badge - Top Right - SMALLER */}
+        {logsCount > 0 && (
           <div style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'flex-start',
-            marginBottom: isMobile ? '0.875rem' : '1rem'
+            position: 'absolute',
+            top: isMobile ? '0.75rem' : '1rem',
+            right: isMobile ? '0.75rem' : '1rem',
+            background: 'linear-gradient(135deg, rgba(23, 23, 23, 0.9) 0%, rgba(23, 23, 23, 0.8) 100%)',
+            backdropFilter: 'blur(12px)',
+            border: '1px solid rgba(249, 115, 22, 0.3)',
+            borderRadius: '8px',
+            padding: isMobile ? '0.375rem 0.5rem' : '0.4rem 0.625rem',
+            boxShadow: '0 4px 16px rgba(249, 115, 22, 0.2), 0 0 0 1px rgba(0,0,0,0.5)',
+            zIndex: 10
           }}>
-            <div style={{ flex: 1 }}>
-              {/* Badge */}
-              <div style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.5rem',
-                marginBottom: isMobile ? '0.5rem' : '0.625rem'
-              }}>
-                <div style={{
-                  width: isMobile ? '28px' : '32px',
-                  height: isMobile ? '28px' : '32px',
-                  borderRadius: '8px',
-                  background: isCompleted
-                    ? 'rgba(16, 185, 129, 0.2)'
-                    : 'rgba(249, 115, 22, 0.2)',
-                  border: isCompleted
-                    ? '1px solid rgba(16, 185, 129, 0.3)'
-                    : '1px solid rgba(249, 115, 22, 0.3)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  boxShadow: isCompleted
-                    ? '0 0 15px rgba(16, 185, 129, 0.3)'
-                    : '0 0 15px rgba(249, 115, 22, 0.3)'
-                }}>
-                  {isCompleted ? (
-                    <CheckCircle 
-                      size={isMobile ? 14 : 16} 
-                      color="#10b981"
-                      style={{ filter: 'drop-shadow(0 0 6px rgba(16, 185, 129, 0.6))' }}
-                    />
-                  ) : (
-                    <Zap 
-                      size={isMobile ? 14 : 16} 
-                      color="#f97316"
-                      fill="#f97316"
-                      style={{ filter: 'drop-shadow(0 0 6px rgba(249, 115, 22, 0.6))' }}
-                    />
-                  )}
-                </div>
-                <span style={{
-                  fontSize: isMobile ? '0.65rem' : '0.7rem',
-                  color: isCompleted ? '#10b981' : '#f97316',
-                  fontWeight: '700',
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.05em'
-                }}>
-                  {isCompleted ? 'VOLTOOID' : 'VANDAAG'}
-                </span>
-                {logsCount > 0 && (
-                  <span style={{
-                    fontSize: isMobile ? '0.6rem' : '0.65rem',
-                    color: isCompleted ? '#10b981' : '#f97316',
-                    fontWeight: '700',
-                    background: isCompleted
-                      ? 'rgba(16, 185, 129, 0.1)'
-                      : 'rgba(249, 115, 22, 0.1)',
-                    padding: '0.15rem 0.4rem',
-                    borderRadius: '6px',
-                    border: isCompleted
-                      ? '1px solid rgba(16, 185, 129, 0.15)'
-                      : '1px solid rgba(249, 115, 22, 0.15)',
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.05em'
-                  }}>
-                    {logsCount} GELOGD
-                  </span>
-                )}
-              </div>
-              
-              {/* Title */}
-              <h2 style={{
-                fontSize: isMobile ? '1.1rem' : '1.3rem',
-                fontWeight: '800',
-                color: '#fff',
-                margin: '0 0 0.5rem 0',
-                letterSpacing: '-0.02em'
-              }}>
-                {workout.name}
-              </h2>
-              
-              {/* Stats */}
-              <div style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: isMobile ? '0.75rem' : '1rem',
-                flexWrap: 'wrap'
-              }}>
-                <div style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.3rem',
-                  fontSize: isMobile ? '0.75rem' : '0.8rem',
-                  color: 'rgba(255, 255, 255, 0.7)',
-                  fontWeight: '600'
-                }}>
-                  <Target size={isMobile ? 13 : 14} style={{ opacity: 0.7 }} />
-                  {workout.focus}
-                </div>
-                <div style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.3rem',
-                  fontSize: isMobile ? '0.75rem' : '0.8rem',
-                  color: 'rgba(255, 255, 255, 0.7)',
-                  fontWeight: '600'
-                }}>
-                  <Clock size={isMobile ? 13 : 14} style={{ opacity: 0.7 }} />
-                  {workout.geschatteTijd || '~90 min'}
-                </div>
-              </div>
-            </div>
-          </div>
-          
-          {/* Quick stats grid */}
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(2, 1fr)',
-            gap: isMobile ? '0.5rem' : '0.625rem',
-            marginBottom: isMobile ? '1rem' : '1.25rem'
-          }}>
-            <div style={{
-              background: 'rgba(23, 23, 23, 0.6)',
-              backdropFilter: 'blur(10px)',
-              border: '1px solid rgba(249, 115, 22, 0.1)',
-              borderRadius: '10px',
-              padding: isMobile ? '0.6rem' : '0.75rem',
-              textAlign: 'center',
-              minHeight: '44px',
-              display: 'flex',
-              flexDirection: 'column',
-              justifyContent: 'center'
+            <span style={{
+              fontSize: isMobile ? '0.7rem' : '0.75rem',
+              fontWeight: '700',
+              color: '#f97316'
             }}>
-              <div style={{
-                fontSize: isMobile ? '1.1rem' : '1.25rem',
-                fontWeight: '800',
-                color: '#f97316',
-                marginBottom: '0.1rem',
-                letterSpacing: '-0.02em'
-              }}>
-                {exerciseCount}
+              {logsCount} gelogd
+            </span>
+          </div>
+        )}
+        
+        {/* Content Layer - Bottom */}
+        <div style={{
+          position: 'absolute',
+          bottom: 0,
+          left: 0,
+          right: 0,
+          padding: isMobile ? '1rem' : '1.25rem',
+          zIndex: 3
+        }}>
+          {/* Workout Info Container - BLACK/ORANGE */}
+          <div style={{
+            background: 'linear-gradient(135deg, rgba(23, 23, 23, 0.95) 0%, rgba(10, 10, 10, 0.9) 100%)',
+            backdropFilter: 'blur(12px)',
+            border: '1px solid rgba(249, 115, 22, 0.3)',
+            borderRadius: isMobile ? '12px' : '14px',
+            padding: isMobile ? '0.875rem' : '1rem',
+            boxShadow: '0 4px 16px rgba(249, 115, 22, 0.2), inset 0 1px 0 rgba(249, 115, 22, 0.05)',
+            marginBottom: isMobile ? '0.75rem' : '0.875rem'
+          }}>
+            {/* Top row: Workout name + Focus */}
+            <div style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              marginBottom: '0.625rem'
+            }}>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{
+                  fontSize: isMobile ? '0.65rem' : '0.7rem',
+                  color: 'rgba(255, 255, 255, 0.5)',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.05em',
+                  fontWeight: '600',
+                  marginBottom: '0.15rem'
+                }}>
+                  Workout
+                </div>
+                <div style={{
+                  fontSize: isMobile ? '1.15rem' : '1.375rem',
+                  fontWeight: '800',
+                  color: 'white',
+                  letterSpacing: '-0.02em',
+                  lineHeight: 1.1,
+                  textShadow: '0 2px 8px rgba(0, 0, 0, 0.6)',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap'
+                }}>
+                  {workout.name?.length > 20 ? workout.name.substring(0, 20) + '...' : workout.name}
+                </div>
               </div>
+              
               <div style={{
-                fontSize: isMobile ? '0.55rem' : '0.65rem',
-                color: 'rgba(255, 255, 255, 0.5)',
-                fontWeight: '600',
-                textTransform: 'uppercase',
-                letterSpacing: '0.05em'
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.25rem',
+                marginLeft: '0.75rem',
+                flexShrink: 0
               }}>
-                Oefeningen
+                <Target size={isMobile ? 12 : 13} color="#f97316" style={{ opacity: 0.8 }} />
+                <span style={{
+                  fontSize: isMobile ? '0.75rem' : '0.8rem',
+                  fontWeight: '700',
+                  color: '#f97316'
+                }}>
+                  {workout.focus}
+                </span>
               </div>
             </div>
             
+            {/* Stats Row - Compact inline */}
             <div style={{
-              background: 'rgba(23, 23, 23, 0.6)',
-              backdropFilter: 'blur(10px)',
-              border: '1px solid rgba(249, 115, 22, 0.1)',
-              borderRadius: '10px',
-              padding: isMobile ? '0.6rem' : '0.75rem',
-              textAlign: 'center',
-              minHeight: '44px',
               display: 'flex',
-              flexDirection: 'column',
-              justifyContent: 'center'
+              gap: isMobile ? '1rem' : '1.25rem',
+              alignItems: 'center',
+              paddingTop: '0.625rem',
+              borderTop: '1px solid rgba(255, 255, 255, 0.08)'
             }}>
-              <div style={{
-                fontSize: isMobile ? '1.1rem' : '1.25rem',
-                fontWeight: '800',
-                color: '#f97316',
-                marginBottom: '0.1rem',
-                letterSpacing: '-0.02em'
-              }}>
-                {totalSets}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                <Dumbbell size={isMobile ? 12 : 13} color="#a78bfa" style={{ opacity: 0.8 }} />
+                <span style={{
+                  fontSize: isMobile ? '0.8rem' : '0.875rem',
+                  fontWeight: '700',
+                  color: '#a78bfa'
+                }}>
+                  {exerciseCount} oef.
+                </span>
               </div>
-              <div style={{
-                fontSize: isMobile ? '0.55rem' : '0.65rem',
-                color: 'rgba(255, 255, 255, 0.5)',
-                fontWeight: '600',
-                textTransform: 'uppercase',
-                letterSpacing: '0.05em'
-              }}>
-                Totaal Sets
+              
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                <TrendingUp size={isMobile ? 12 : 13} color="#60a5fa" style={{ opacity: 0.8 }} />
+                <span style={{
+                  fontSize: isMobile ? '0.8rem' : '0.875rem',
+                  fontWeight: '700',
+                  color: '#60a5fa'
+                }}>
+                  {totalSets} sets
+                </span>
+              </div>
+              
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                <Clock size={isMobile ? 12 : 13} color="#fbbf24" style={{ opacity: 0.8 }} />
+                <span style={{
+                  fontSize: isMobile ? '0.8rem' : '0.875rem',
+                  fontWeight: '700',
+                  color: '#fbbf24'
+                }}>
+                  {workout.geschatteTijd || '~90 min'}
+                </span>
               </div>
             </div>
           </div>
           
-          {/* BUTTON - DARK GREEN GRADIENT */}
+          {/* Action Button */}
           <button
             onClick={(e) => {
               e.stopPropagation()
@@ -316,94 +286,62 @@ export default function TodaysWorkoutCard({ workout, onLogClick, logsCount, clie
             style={{
               width: '100%',
               background: isCompleted
-                ? 'linear-gradient(135deg, rgba(16, 185, 129, 0.18) 0%, rgba(16, 185, 129, 0.1) 100%)'
-                : 'linear-gradient(135deg, rgba(16, 185, 129, 0.18) 0%, rgba(16, 185, 129, 0.1) 100%)',
-              backdropFilter: 'blur(20px)',
-              border: '1px solid rgba(16, 185, 129, 0.35)',
-              borderRadius: '14px',
+                ? 'linear-gradient(135deg, rgba(16, 185, 129, 0.25) 0%, rgba(16, 185, 129, 0.15) 100%)'
+                : 'linear-gradient(135deg, rgba(16, 185, 129, 0.25) 0%, rgba(16, 185, 129, 0.15) 100%)',
+              backdropFilter: 'blur(12px)',
+              border: '1px solid rgba(16, 185, 129, 0.4)',
+              borderRadius: '10px',
+              padding: isMobile ? '0.875rem' : '1rem',
               color: '#10b981',
-              fontSize: isMobile ? '0.9rem' : '1rem',
-              fontWeight: '800',
-              textTransform: 'uppercase',
-              letterSpacing: '0.05em',
+              fontSize: isMobile ? '0.9rem' : '0.95rem',
+              fontWeight: '700',
               cursor: 'pointer',
-              boxShadow: '0 8px 32px rgba(16, 185, 129, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.03)',
-              transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              gap: '0.75rem',
-              minHeight: '56px',
+              gap: '0.5rem',
+              transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
               touchAction: 'manipulation',
               WebkitTapHighlightColor: 'transparent',
-              position: 'relative',
-              overflow: 'hidden'
+              minHeight: '48px',
+              boxShadow: '0 4px 12px rgba(16, 185, 129, 0.2)',
+              textTransform: 'uppercase',
+              letterSpacing: '0.05em'
             }}
             onMouseEnter={(e) => {
-              if (!isMobile) {
-                e.currentTarget.style.transform = 'translateY(-2px)'
-                e.currentTarget.style.background = 'linear-gradient(135deg, rgba(16, 185, 129, 0.25) 0%, rgba(16, 185, 129, 0.15) 100%)'
-                e.currentTarget.style.boxShadow = '0 12px 40px rgba(16, 185, 129, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.05)'
-              }
+              e.currentTarget.style.background = 'linear-gradient(135deg, rgba(16, 185, 129, 0.35) 0%, rgba(16, 185, 129, 0.25) 100%)'
+              e.currentTarget.style.transform = 'translateY(-1px)'
+              e.currentTarget.style.boxShadow = '0 6px 20px rgba(16, 185, 129, 0.3)'
             }}
             onMouseLeave={(e) => {
-              if (!isMobile) {
-                e.currentTarget.style.transform = 'translateY(0)'
-                e.currentTarget.style.background = 'linear-gradient(135deg, rgba(16, 185, 129, 0.18) 0%, rgba(16, 185, 129, 0.1) 100%)'
-                e.currentTarget.style.boxShadow = '0 8px 32px rgba(16, 185, 129, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.03)'
-              }
+              e.currentTarget.style.background = 'linear-gradient(135deg, rgba(16, 185, 129, 0.25) 0%, rgba(16, 185, 129, 0.15) 100%)'
+              e.currentTarget.style.transform = 'translateY(0)'
+              e.currentTarget.style.boxShadow = '0 4px 12px rgba(16, 185, 129, 0.2)'
             }}
             onTouchStart={(e) => {
-              if (isMobile) {
-                e.currentTarget.style.transform = 'scale(0.98)'
-              }
+              if (isMobile) e.currentTarget.style.transform = 'scale(0.98)'
             }}
             onTouchEnd={(e) => {
-              if (isMobile) {
-                e.currentTarget.style.transform = 'scale(1)'
-              }
+              if (isMobile) e.currentTarget.style.transform = 'scale(1)'
             }}
           >
-            {/* Top glow */}
-            <div style={{
-              position: 'absolute',
-              top: 0,
-              left: 0,
-              right: 0,
-              height: '2px',
-              background: 'linear-gradient(90deg, transparent 0%, #10b981 50%, transparent 100%)',
-              opacity: 0.6,
-              pointerEvents: 'none'
-            }} />
-            
-            {/* Shine effect */}
-            <div style={{
-              position: 'absolute',
-              top: 0,
-              left: '-100%',
-              width: '100%',
-              height: '100%',
-              background: 'linear-gradient(90deg, transparent, rgba(16, 185, 129, 0.15), transparent)',
-              animation: 'shine 3s infinite',
-              pointerEvents: 'none'
-            }} />
-            
-            <Dumbbell 
-              size={isMobile ? 20 : 22} 
-              strokeWidth={2.5}
-              style={{ filter: 'drop-shadow(0 0 6px rgba(16, 185, 129, 0.4))' }}
-            />
-            {isCompleted ? 'BEKIJK WORKOUT' : 'LOG NU'}
+            <Dumbbell size={19} strokeWidth={2.5} />
+            <span>{isCompleted ? 'Bekijk Workout' : 'Log Nu'}</span>
           </button>
         </div>
         
-        <style>{`
-          @keyframes shine {
-            0% { left: -100%; }
-            50% { left: 100%; }
-            100% { left: 100%; }
-          }
-        `}</style>
+        {/* Top accent glow - ORANGE */}
+        <div style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          height: '2px',
+          background: 'linear-gradient(90deg, transparent 0%, #f97316 50%, transparent 100%)',
+          opacity: 0.6,
+          pointerEvents: 'none',
+          zIndex: 4
+        }} />
       </div>
     </div>
   )

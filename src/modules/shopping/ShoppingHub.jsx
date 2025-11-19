@@ -4,7 +4,7 @@ import ShoppingService from './ShoppingService'
 import { 
   ShoppingCart, Package, BookOpen, Sparkles, 
   ChevronRight, TrendingUp, Zap, Clock, Euro,
-  ShoppingBag, Target, Award
+  ShoppingBag, Target, Award, RefreshCw
 } from 'lucide-react'
 
 // Tab Components
@@ -20,6 +20,7 @@ export default function ShoppingHub({ client, db, onNavigate }) {
   const [loading, setLoading] = useState(true)
   const [shoppingData, setShoppingData] = useState(null)
   const [animateStats, setAnimateStats] = useState(false)
+  const [refreshing, setRefreshing] = useState(false)
   
   // Load shopping data on mount
   useEffect(() => {
@@ -35,13 +36,41 @@ export default function ShoppingHub({ client, db, onNavigate }) {
     }
   }, [shoppingData])
   
+  // 🔥 AUTO-REFRESH when meal plan changes
+  useEffect(() => {
+    const handleStorageChange = (e) => {
+      if (e.key === 'meal_plan_updated') {
+        console.log('🔄 Meal plan changed, refreshing shopping list...')
+        loadShoppingData()
+        localStorage.removeItem('meal_plan_updated')
+      }
+    }
+    
+    const handleFocus = () => {
+      const lastUpdate = localStorage.getItem('meal_plan_last_update')
+      if (lastUpdate) {
+        const timeSince = Date.now() - parseInt(lastUpdate)
+        if (timeSince < 10000) {
+          console.log('🔄 Recent update detected, refreshing...')
+          loadShoppingData()
+        }
+      }
+    }
+    
+    window.addEventListener('storage', handleStorageChange)
+    window.addEventListener('focus', handleFocus)
+    
+    return () => {
+      window.removeEventListener('storage', handleStorageChange)
+      window.removeEventListener('focus', handleFocus)
+    }
+  }, [client])
+  
   const loadShoppingData = async () => {
     setLoading(true)
     try {
-      // Get active meal plan with shopping list
       const activePlan = await service.getActiveMealPlan(client.id)
       
-      // Parse shopping list if exists
       let shoppingList = null
       if (activePlan?.shopping_list) {
         shoppingList = typeof activePlan.shopping_list === 'string' 
@@ -49,7 +78,6 @@ export default function ShoppingHub({ client, db, onNavigate }) {
           : activePlan.shopping_list
       }
       
-      // Get any saved progress
       const progress = await service.getShoppingProgress(client.id, activePlan?.id)
       
       setShoppingData({
@@ -70,6 +98,89 @@ export default function ShoppingHub({ client, db, onNavigate }) {
     }
   }
   
+  // 🔥 MANUAL REFRESH with shopping list regeneration
+  const handleManualRefresh = async () => {
+    if (refreshing) return
+    
+    setRefreshing(true)
+    
+    try {
+      if (shoppingData?.activePlan?.id) {
+        console.log('🔄 Manually regenerating shopping list...')
+        
+        // Regenerate shopping list
+        const newList = await service.generateShoppingList(shoppingData.activePlan.week_structure)
+        
+        // Update in database
+        await db.supabase
+          .from('client_meal_plans')
+          .update({ 
+            shopping_list: newList,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', shoppingData.activePlan.id)
+        
+        // Update local state
+        setShoppingData(prev => ({
+          ...prev,
+          shoppingList: newList
+        }))
+        
+        // Success toast
+        showToast('✅ Boodschappenlijst bijgewerkt!', 'success')
+      }
+    } catch (error) {
+      console.error('❌ Refresh failed:', error)
+      showToast('❌ Vernieuwen mislukt', 'error')
+    } finally {
+      setRefreshing(false)
+    }
+  }
+  
+  // Toast helper
+  const showToast = (message, type = 'success') => {
+    const toast = document.createElement('div')
+    toast.textContent = message
+    toast.style.cssText = `
+      position: fixed;
+      ${isMobile ? 'bottom: 80px' : 'top: 20px'};
+      left: 50%;
+      transform: translateX(-50%);
+      background: ${type === 'success' 
+        ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)'
+        : 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)'};
+      color: white;
+      padding: ${isMobile ? '1rem 1.5rem' : '1rem 2rem'};
+      border-radius: 16px;
+      font-weight: 600;
+      font-size: ${isMobile ? '0.9rem' : '1rem'};
+      z-index: 9999;
+      box-shadow: 0 10px 30px ${type === 'success' ? 'rgba(16, 185, 129, 0.3)' : 'rgba(239, 68, 68, 0.3)'};
+      animation: slideIn 0.3s ease;
+    `
+    
+    const style = document.createElement('style')
+    style.textContent = `
+      @keyframes slideIn {
+        from {
+          opacity: 0;
+          transform: translateX(-50%) ${isMobile ? 'translateY(20px)' : 'translateY(-20px)'};
+        }
+        to {
+          opacity: 1;
+          transform: translateX(-50%) translateY(0);
+        }
+      }
+    `
+    document.head.appendChild(style)
+    document.body.appendChild(toast)
+    
+    setTimeout(() => {
+      toast.remove()
+      style.remove()
+    }, 3000)
+  }
+  
   // Calculate progress
   const calculateProgress = () => {
     if (!shoppingData?.progress?.purchased_items || !shoppingData?.shoppingList?.items) return 0
@@ -77,7 +188,7 @@ export default function ShoppingHub({ client, db, onNavigate }) {
     return Math.round((checkedCount / shoppingData.shoppingList.items.length) * 100)
   }
   
-  // Tab configuration with enhanced styling
+  // Tab configuration
   const tabs = [
     {
       id: 'week',
@@ -123,41 +234,63 @@ export default function ShoppingHub({ client, db, onNavigate }) {
     }
   ]
   
-  const activeTabConfig = tabs.find(t => t.id === activeTab)
+  // Quick stats
   const progress = calculateProgress()
+  const totalItems = shoppingData?.shoppingList?.items?.length || 0
+  const totalCost = shoppingData?.shoppingList?.totalCost || '0.00'
+  
+  // 🔥 Format euro values to 2 decimalen
+  const formatEuro = (value) => {
+    const num = typeof value === 'string' ? parseFloat(value) : value
+    return isNaN(num) ? '0.00' : num.toFixed(2)
+  }
   
   if (loading) {
     return (
       <div style={{
         minHeight: '100vh',
-        background: 'linear-gradient(180deg, #0a0a0a 0%, #171717 100%)',
+        background: 'linear-gradient(to bottom, #000 0%, #050505 100%)',
         display: 'flex',
         alignItems: 'center',
-        justifyContent: 'center'
+        justifyContent: 'center',
+        position: 'relative',
+        overflow: 'hidden'
       }}>
-        <div style={{ textAlign: 'center' }}>
+        <div style={{
+          textAlign: 'center',
+          animation: 'fadeInUp 0.6s cubic-bezier(0.4, 0, 0.2, 1)'
+        }}>
           <div style={{
-            width: '60px',
-            height: '60px',
-            border: '3px solid rgba(16, 185, 129, 0.2)',
-            borderTopColor: '#10b981',
-            borderRadius: '50%',
-            animation: 'spin 1s linear infinite',
-            margin: '0 auto 1.5rem'
-          }} />
-          <div style={{
-            color: '#fff',
-            fontSize: '1.1rem',
-            fontWeight: '500'
+            width: '80px',
+            height: '80px',
+            margin: '0 auto',
+            marginBottom: '1.5rem',
+            borderRadius: '20px',
+            background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.15) 0%, rgba(16, 185, 129, 0.05) 100%)',
+            backdropFilter: 'blur(20px)',
+            border: '1px solid rgba(16, 185, 129, 0.2)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            animation: 'pulse 2s ease-in-out infinite'
           }}>
-            Shopping laden...
+            <ShoppingCart size={32} color="#10b981" />
+          </div>
+          <div style={{
+            fontSize: '1.125rem',
+            fontWeight: '600',
+            color: 'rgba(255, 255, 255, 0.8)',
+            marginBottom: '0.5rem'
+          }}>
+            Boodschappenlijst laden...
+          </div>
+          <div style={{
+            fontSize: '0.875rem',
+            color: 'rgba(255, 255, 255, 0.4)'
+          }}>
+            Even geduld
           </div>
         </div>
-        <style>{`
-          @keyframes spin { 
-            to { transform: rotate(360deg); }
-          }
-        `}</style>
       </div>
     )
   }
@@ -165,349 +298,181 @@ export default function ShoppingHub({ client, db, onNavigate }) {
   return (
     <div style={{
       minHeight: '100vh',
-      background: 'linear-gradient(180deg, #0a0a0a 0%, #171717 100%)',
-      paddingBottom: isMobile ? '6rem' : '2rem',
-      position: 'relative'
+      background: 'linear-gradient(to bottom, #000 0%, #050505 100%)',
+      position: 'relative',
+      paddingBottom: isMobile ? '80px' : '2rem'
     }}>
-      {/* Animated Background Particles */}
+      {/* Animated background elements */}
       <div style={{
         position: 'absolute',
-        top: 0,
-        left: 0,
-        right: 0,
+        top: '10%',
+        right: '5%',
+        width: '400px',
         height: '400px',
-        overflow: 'hidden',
-        opacity: 0.5,
+        background: 'radial-gradient(circle, rgba(16, 185, 129, 0.08) 0%, transparent 70%)',
+        borderRadius: '50%',
+        filter: 'blur(60px)',
+        animation: 'float 20s ease-in-out infinite',
         pointerEvents: 'none'
-      }}>
-        {[...Array(5)].map((_, i) => (
-          <div
-            key={i}
-            style={{
-              position: 'absolute',
-              width: `${20 + i * 10}px`,
-              height: `${20 + i * 10}px`,
-              background: activeTabConfig.gradient,
-              borderRadius: '50%',
-              filter: 'blur(40px)',
-              top: `${20 + i * 15}%`,
-              left: `${10 + i * 20}%`,
-              animation: `float ${15 + i * 5}s ease-in-out infinite`,
-              animationDelay: `${i * 2}s`
-            }}
-          />
-        ))}
-      </div>
-      
-      {/* Premium Header Section */}
+      }} />
       <div style={{
-        padding: isMobile ? '1rem' : '1.5rem',
-        background: 'linear-gradient(180deg, rgba(0, 0, 0, 0.8) 0%, transparent 100%)',
-        backdropFilter: 'blur(20px)',
-        borderBottom: '1px solid rgba(255, 255, 255, 0.05)',
+        position: 'absolute',
+        bottom: '20%',
+        left: '10%',
+        width: '300px',
+        height: '300px',
+        background: 'radial-gradient(circle, rgba(139, 92, 246, 0.06) 0%, transparent 70%)',
+        borderRadius: '50%',
+        filter: 'blur(50px)',
+        animation: 'float 25s ease-in-out infinite reverse',
+        pointerEvents: 'none'
+      }} />
+      
+      {/* Main Content */}
+      <div style={{
         position: 'relative',
-        zIndex: 10
+        zIndex: 1,
+        maxWidth: '1200px',
+        margin: '0 auto',
+        padding: isMobile ? '0.75rem' : '1.5rem 1rem'
       }}>
-        {/* Main Header */}
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          marginBottom: isMobile ? '1.5rem' : '2rem'
-        }}>
-          <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '1rem'
-          }}>
-            <div style={{
-              width: isMobile ? '48px' : '56px',
-              height: isMobile ? '48px' : '56px',
-              background: activeTabConfig.gradient,
-              borderRadius: '16px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              boxShadow: `0 12px 32px ${activeTabConfig.color}40`,
-              animation: 'pulse 2s ease-in-out infinite'
-            }}>
-              <ShoppingBag size={isMobile ? 24 : 28} color="white" />
-            </div>
-            <div>
-              <h1 style={{
-                fontSize: isMobile ? '1.5rem' : '1.875rem',
-                fontWeight: '800',
-                background: activeTabConfig.gradient,
-                WebkitBackgroundClip: 'text',
-                WebkitTextFillColor: 'transparent',
-                backgroundClip: 'text',
-                letterSpacing: '-0.03em',
-                margin: 0,
-                lineHeight: 1.1
-              }}>
-                Smart Shopping
-              </h1>
-              {shoppingData?.activePlan && (
-                <p style={{
-                  fontSize: isMobile ? '0.825rem' : '0.925rem',
-                  color: 'rgba(255, 255, 255, 0.5)',
-                  margin: '0.25rem 0 0 0',
-                  fontWeight: '500',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.375rem'
-                }}>
-                  <Clock size={12} style={{ opacity: 0.7 }} />
-                  Week {new Date().toLocaleDateString('nl-NL', { week: 'long' }).split(' ')[1]}
-                </p>
-              )}
-            </div>
-          </div>
-        </div>
-        
-        {/* Premium Stats Cards */}
+        {/* 🔥 COMPACT: Header stats - smaller, cleaner */}
         {shoppingData?.shoppingList && (
           <div style={{
-            display: 'grid',
-            gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(4, 1fr)',
-            gap: isMobile ? '0.75rem' : '1rem',
-            marginBottom: '1.5rem'
+            marginBottom: isMobile ? '0.75rem' : '1rem',
+            animation: 'fadeInUp 0.6s cubic-bezier(0.4, 0, 0.2, 1)'
           }}>
-            {/* Total Cost Card */}
             <div style={{
-              background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.15) 0%, rgba(16, 185, 129, 0.05) 100%)',
-              backdropFilter: 'blur(20px)',
-              borderRadius: '16px',
-              padding: isMobile ? '1rem' : '1.25rem',
-              border: '1px solid rgba(16, 185, 129, 0.15)',
-              position: 'relative',
-              overflow: 'hidden',
-              transform: animateStats ? 'scale(1)' : 'scale(0.95)',
-              opacity: animateStats ? 1 : 0,
-              transition: 'all 0.5s cubic-bezier(0.4, 0, 0.2, 1)'
+              display: 'grid',
+              gridTemplateColumns: isMobile ? 'repeat(3, 1fr)' : 'repeat(3, 1fr)',
+              gap: isMobile ? '0.5rem' : '0.625rem'
             }}>
+              {/* Items stat - COMPACT */}
               <div style={{
-                position: 'absolute',
-                top: '-50%',
-                right: '-50%',
-                width: '200%',
-                height: '200%',
-                background: 'radial-gradient(circle, rgba(16, 185, 129, 0.1) 0%, transparent 70%)',
-                animation: 'rotate 20s linear infinite'
-              }} />
-              
-              <div style={{
-                position: 'relative',
-                zIndex: 1
+                background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.1) 0%, rgba(16, 185, 129, 0.05) 100%)',
+                backdropFilter: 'blur(10px)',
+                border: '1px solid rgba(16, 185, 129, 0.2)',
+                borderRadius: isMobile ? '10px' : '12px',
+                padding: isMobile ? '0.75rem' : '0.875rem',
+                transform: animateStats ? 'scale(1)' : 'scale(0.9)',
+                opacity: animateStats ? 1 : 0,
+                transition: 'all 0.4s ease'
               }}>
                 <div style={{
                   display: 'flex',
                   alignItems: 'center',
-                  gap: '0.5rem',
-                  marginBottom: '0.5rem'
+                  gap: '0.375rem',
+                  marginBottom: '0.375rem'
                 }}>
-                  <Euro size={16} style={{ color: '#10b981', opacity: 0.8 }} />
-                  <span style={{
-                    fontSize: isMobile ? '0.7rem' : '0.75rem',
-                    color: 'rgba(16, 185, 129, 0.7)',
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.05em',
-                    fontWeight: '700'
-                  }}>
-                    Totaal
-                  </span>
-                </div>
-                <div style={{
-                  fontSize: isMobile ? '1.75rem' : '2rem',
-                  fontWeight: '800',
-                  color: '#10b981',
-                  letterSpacing: '-0.02em',
-                  lineHeight: 1
-                }}>
-                  €{shoppingData.shoppingList?.totalCost?.toFixed(0) || '0'}
-                </div>
-                <div style={{
-                  fontSize: isMobile ? '0.75rem' : '0.825rem',
-                  color: 'rgba(255, 255, 255, 0.4)',
-                  marginTop: '0.25rem'
-                }}>
-                  Geschat bedrag
-                </div>
-              </div>
-            </div>
-            
-            {/* Items Count Card */}
-            <div style={{
-              background: 'linear-gradient(135deg, rgba(139, 92, 246, 0.15) 0%, rgba(139, 92, 246, 0.05) 100%)',
-              backdropFilter: 'blur(20px)',
-              borderRadius: '16px',
-              padding: isMobile ? '1rem' : '1.25rem',
-              border: '1px solid rgba(139, 92, 246, 0.15)',
-              position: 'relative',
-              overflow: 'hidden',
-              transform: animateStats ? 'scale(1)' : 'scale(0.95)',
-              opacity: animateStats ? 1 : 0,
-              transition: 'all 0.5s cubic-bezier(0.4, 0, 0.2, 1) 0.1s'
-            }}>
-              <div style={{
-                position: 'relative',
-                zIndex: 1
-              }}>
-                <div style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.5rem',
-                  marginBottom: '0.5rem'
-                }}>
-                  <Package size={16} style={{ color: '#8b5cf6', opacity: 0.8 }} />
-                  <span style={{
-                    fontSize: isMobile ? '0.7rem' : '0.75rem',
-                    color: 'rgba(139, 92, 246, 0.7)',
+                  <ShoppingBag size={isMobile ? 12 : 14} color="#10b981" />
+                  <div style={{
+                    fontSize: isMobile ? '0.65rem' : '0.7rem',
+                    color: 'rgba(255, 255, 255, 0.6)',
                     textTransform: 'uppercase',
                     letterSpacing: '0.05em',
                     fontWeight: '700'
                   }}>
                     Items
-                  </span>
+                  </div>
                 </div>
                 <div style={{
-                  fontSize: isMobile ? '1.75rem' : '2rem',
+                  fontSize: isMobile ? '1.375rem' : '1.5rem',
                   fontWeight: '800',
-                  color: '#8b5cf6',
+                  color: '#10b981',
                   letterSpacing: '-0.02em',
                   lineHeight: 1
                 }}>
-                  {shoppingData.shoppingList?.itemCount || 0}
-                </div>
-                <div style={{
-                  fontSize: isMobile ? '0.75rem' : '0.825rem',
-                  color: 'rgba(255, 255, 255, 0.4)',
-                  marginTop: '0.25rem'
-                }}>
-                  Unieke producten
+                  {totalItems}
                 </div>
               </div>
-            </div>
-            
-            {/* Progress Card */}
-            <div style={{
-              background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.15) 0%, rgba(245, 158, 11, 0.05) 100%)',
-              backdropFilter: 'blur(20px)',
-              borderRadius: '16px',
-              padding: isMobile ? '1rem' : '1.25rem',
-              border: '1px solid rgba(245, 158, 11, 0.15)',
-              position: 'relative',
-              overflow: 'hidden',
-              transform: animateStats ? 'scale(1)' : 'scale(0.95)',
-              opacity: animateStats ? 1 : 0,
-              transition: 'all 0.5s cubic-bezier(0.4, 0, 0.2, 1) 0.2s',
-              display: isMobile ? 'none' : 'block'
-            }}>
+              
+              {/* Cost stat - COMPACT */}
               <div style={{
-                position: 'relative',
-                zIndex: 1
+                background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.1) 0%, rgba(245, 158, 11, 0.05) 100%)',
+                backdropFilter: 'blur(10px)',
+                border: '1px solid rgba(245, 158, 11, 0.2)',
+                borderRadius: isMobile ? '10px' : '12px',
+                padding: isMobile ? '0.75rem' : '0.875rem',
+                transform: animateStats ? 'scale(1)' : 'scale(0.9)',
+                opacity: animateStats ? 1 : 0,
+                transition: 'all 0.4s ease 0.1s'
               }}>
                 <div style={{
                   display: 'flex',
                   alignItems: 'center',
-                  gap: '0.5rem',
-                  marginBottom: '0.5rem'
+                  gap: '0.375rem',
+                  marginBottom: '0.375rem'
                 }}>
-                  <Target size={16} style={{ color: '#f59e0b', opacity: 0.8 }} />
-                  <span style={{
-                    fontSize: '0.75rem',
-                    color: 'rgba(245, 158, 11, 0.7)',
+                  <Euro size={isMobile ? 12 : 14} color="#f59e0b" />
+                  <div style={{
+                    fontSize: isMobile ? '0.65rem' : '0.7rem',
+                    color: 'rgba(255, 255, 255, 0.6)',
                     textTransform: 'uppercase',
                     letterSpacing: '0.05em',
                     fontWeight: '700'
                   }}>
-                    Progress
-                  </span>
+                    Totaal
+                  </div>
                 </div>
                 <div style={{
-                  fontSize: '2rem',
+                  fontSize: isMobile ? '1.125rem' : '1.25rem',
                   fontWeight: '800',
                   color: '#f59e0b',
                   letterSpacing: '-0.02em',
                   lineHeight: 1
                 }}>
-                  {progress}%
-                </div>
-                <div style={{
-                  fontSize: '0.825rem',
-                  color: 'rgba(255, 255, 255, 0.4)',
-                  marginTop: '0.25rem'
-                }}>
-                  Afgevinkt
+                  €{formatEuro(totalCost)}
                 </div>
               </div>
-            </div>
-            
-            {/* Savings Card */}
-            <div style={{
-              background: 'linear-gradient(135deg, rgba(236, 72, 153, 0.15) 0%, rgba(236, 72, 153, 0.05) 100%)',
-              backdropFilter: 'blur(20px)',
-              borderRadius: '16px',
-              padding: isMobile ? '1rem' : '1.25rem',
-              border: '1px solid rgba(236, 72, 153, 0.15)',
-              position: 'relative',
-              overflow: 'hidden',
-              transform: animateStats ? 'scale(1)' : 'scale(0.95)',
-              opacity: animateStats ? 1 : 0,
-              transition: 'all 0.5s cubic-bezier(0.4, 0, 0.2, 1) 0.3s',
-              display: isMobile ? 'none' : 'block'
-            }}>
+              
+              {/* Progress stat - COMPACT */}
               <div style={{
-                position: 'relative',
-                zIndex: 1
+                background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.1) 0%, rgba(16, 185, 129, 0.05) 100%)',
+                backdropFilter: 'blur(10px)',
+                border: '1px solid rgba(16, 185, 129, 0.2)',
+                borderRadius: isMobile ? '10px' : '12px',
+                padding: isMobile ? '0.75rem' : '0.875rem',
+                transform: animateStats ? 'scale(1)' : 'scale(0.9)',
+                opacity: animateStats ? 1 : 0,
+                transition: 'all 0.4s ease 0.2s'
               }}>
                 <div style={{
                   display: 'flex',
                   alignItems: 'center',
-                  gap: '0.5rem',
-                  marginBottom: '0.5rem'
+                  gap: '0.375rem',
+                  marginBottom: '0.375rem'
                 }}>
-                  <Award size={16} style={{ color: '#ec4899', opacity: 0.8 }} />
-                  <span style={{
-                    fontSize: '0.75rem',
-                    color: 'rgba(236, 72, 153, 0.7)',
+                  <Target size={isMobile ? 12 : 14} color="#10b981" />
+                  <div style={{
+                    fontSize: isMobile ? '0.65rem' : '0.7rem',
+                    color: 'rgba(255, 255, 255, 0.6)',
                     textTransform: 'uppercase',
                     letterSpacing: '0.05em',
                     fontWeight: '700'
                   }}>
-                    Besparing
-                  </span>
+                    Voortgang
+                  </div>
                 </div>
                 <div style={{
-                  fontSize: '2rem',
+                  fontSize: isMobile ? '1.375rem' : '1.5rem',
                   fontWeight: '800',
-                  color: '#ec4899',
+                  color: '#10b981',
                   letterSpacing: '-0.02em',
                   lineHeight: 1
                 }}>
-                  €12
-                </div>
-                <div style={{
-                  fontSize: '0.825rem',
-                  color: 'rgba(255, 255, 255, 0.4)',
-                  marginTop: '0.25rem'
-                }}>
-                  Met bulk korting
+                  {progress}%
                 </div>
               </div>
             </div>
           </div>
         )}
         
-        {/* Premium Tab Navigation */}
+        {/* 🔥 COMPACT: Tabs met responsive grid */}
         <div style={{
-          display: 'flex',
-          gap: isMobile ? '0.625rem' : '0.75rem',
-          overflowX: 'auto',
-          paddingBottom: '0.25rem',
-          WebkitScrollbar: { display: 'none' },
-          msOverflowStyle: 'none',
-          scrollbarWidth: 'none'
+          display: 'grid',
+          gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(4, 1fr)',
+          gap: isMobile ? '0.5rem' : '0.625rem',
+          marginBottom: isMobile ? '0.75rem' : '1rem'
         }}>
           {tabs.map((tab, index) => {
             const Icon = tab.icon
@@ -519,9 +484,7 @@ export default function ShoppingHub({ client, db, onNavigate }) {
                 onClick={() => tab.available && setActiveTab(tab.id)}
                 disabled={!tab.available}
                 style={{
-                  flex: isMobile ? '0 0 auto' : 1,
-                  minWidth: isMobile ? '110px' : 'auto',
-                  padding: isMobile ? '0.875rem' : '1rem 1.25rem',
+                  padding: isMobile ? '0.625rem 0.75rem' : '0.75rem 1rem',
                   background: isActive
                     ? tab.lightGradient
                     : 'linear-gradient(135deg, rgba(17, 17, 17, 0.6) 0%, rgba(17, 17, 17, 0.3) 100%)',
@@ -540,16 +503,17 @@ export default function ShoppingHub({ client, db, onNavigate }) {
                   WebkitTapHighlightColor: 'transparent',
                   opacity: tab.available ? 1 : 0.4,
                   transform: isActive ? 'scale(1)' : 'scale(0.98)',
-                  animation: `slideUp 0.5s cubic-bezier(0.4, 0, 0.2, 1) ${index * 0.05}s both`
+                  animation: `slideUp 0.5s cubic-bezier(0.4, 0, 0.2, 1) ${index * 0.05}s both`,
+                  outline: 'none'
                 }}
                 onMouseEnter={(e) => {
-                  if (tab.available && !isActive) {
+                  if (tab.available && !isActive && !isMobile) {
                     e.currentTarget.style.transform = 'scale(1.02) translateY(-2px)'
                     e.currentTarget.style.background = tab.lightGradient
                   }
                 }}
                 onMouseLeave={(e) => {
-                  if (tab.available && !isActive) {
+                  if (tab.available && !isActive && !isMobile) {
                     e.currentTarget.style.transform = 'scale(0.98)'
                     e.currentTarget.style.background = 'linear-gradient(135deg, rgba(17, 17, 17, 0.6) 0%, rgba(17, 17, 17, 0.3) 100%)'
                   }
@@ -566,29 +530,29 @@ export default function ShoppingHub({ client, db, onNavigate }) {
                 }}
               >
                 <div style={{
-                  width: '32px',
-                  height: '32px',
+                  width: isMobile ? '28px' : '32px',
+                  height: isMobile ? '28px' : '32px',
                   background: isActive ? tab.gradient : 'transparent',
-                  borderRadius: '10px',
+                  borderRadius: '8px',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
                   marginBottom: '0.25rem',
                   transition: 'all 0.4s ease'
                 }}>
-                  <Icon size={18} color={isActive ? 'white' : tab.color} />
+                  <Icon size={isMobile ? 16 : 18} color={isActive ? 'white' : tab.color} />
                 </div>
                 
-                <div>
+                <div style={{ textAlign: 'center' }}>
                   <div style={{
-                    fontSize: isMobile ? '0.825rem' : '0.925rem',
+                    fontSize: isMobile ? '0.75rem' : '0.8125rem',
                     fontWeight: '700',
                     letterSpacing: '-0.01em'
                   }}>
                     {tab.label}
                   </div>
                   <div style={{
-                    fontSize: isMobile ? '0.65rem' : '0.7rem',
+                    fontSize: isMobile ? '0.625rem' : '0.65rem',
                     opacity: 0.6,
                     marginTop: '0.125rem'
                   }}>
@@ -633,7 +597,7 @@ export default function ShoppingHub({ client, db, onNavigate }) {
         </div>
       </div>
       
-      {/* Tab Content with Animation */}
+      {/* Tab Content */}
       <div style={{ 
         animation: 'fadeInUp 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
         minHeight: '60vh',
@@ -650,44 +614,21 @@ export default function ShoppingHub({ client, db, onNavigate }) {
           />
         )}
         
-        {activeTab === 'templates' && (
-          <TemplatesTab />
-        )}
-        
-        {activeTab === 'knowledge' && (
-          <KnowledgeTab
-            db={db}
-            client={client}
-          />
-        )}
-        
-        {activeTab === 'builder' && (
-          <BuilderTab />
-        )}
+        {activeTab === 'templates' && <TemplatesTab />}
+        {activeTab === 'knowledge' && <KnowledgeTab db={db} client={client} />}
+        {activeTab === 'builder' && <BuilderTab />}
       </div>
       
-      {/* CSS Animations */}
+      {/* Animations */}
       <style>{`
         @keyframes fadeInUp {
-          from { 
-            opacity: 0; 
-            transform: translateY(20px);
-          }
-          to { 
-            opacity: 1; 
-            transform: translateY(0);
-          }
+          from { opacity: 0; transform: translateY(20px); }
+          to { opacity: 1; transform: translateY(0); }
         }
         
         @keyframes slideUp {
-          from {
-            opacity: 0;
-            transform: translateY(10px) scale(0.95);
-          }
-          to {
-            opacity: 1;
-            transform: translateY(0) scale(0.98);
-          }
+          from { opacity: 0; transform: translateY(10px) scale(0.95); }
+          to { opacity: 1; transform: translateY(0) scale(0.98); }
         }
         
         @keyframes expandWidth {
@@ -696,33 +637,18 @@ export default function ShoppingHub({ client, db, onNavigate }) {
         }
         
         @keyframes float {
-          0%, 100% { 
-            transform: translateY(0) translateX(0) rotate(0deg);
-          }
-          25% { 
-            transform: translateY(-20px) translateX(10px) rotate(5deg);
-          }
-          50% { 
-            transform: translateY(10px) translateX(-10px) rotate(-5deg);
-          }
-          75% { 
-            transform: translateY(-10px) translateX(15px) rotate(3deg);
-          }
+          0%, 100% { transform: translateY(0) translateX(0) rotate(0deg); }
+          25% { transform: translateY(-20px) translateX(10px) rotate(5deg); }
+          50% { transform: translateY(10px) translateX(-10px) rotate(-5deg); }
+          75% { transform: translateY(-10px) translateX(15px) rotate(3deg); }
         }
         
         @keyframes pulse {
-          0%, 100% { 
-            transform: scale(1);
-            box-shadow: 0 12px 32px rgba(16, 185, 129, 0.4);
-          }
-          50% { 
-            transform: scale(1.05);
-            box-shadow: 0 16px 40px rgba(16, 185, 129, 0.5);
-          }
+          0%, 100% { transform: scale(1); box-shadow: 0 12px 32px rgba(16, 185, 129, 0.4); }
+          50% { transform: scale(1.05); box-shadow: 0 16px 40px rgba(16, 185, 129, 0.5); }
         }
         
-        @keyframes rotate {
-          from { transform: rotate(0deg); }
+        @keyframes spin {
           to { transform: rotate(360deg); }
         }
       `}</style>

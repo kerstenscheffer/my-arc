@@ -18,12 +18,14 @@ import ChallengeBuilder from "../modules/challenges/ChallengeBuilder"
 import ClientManagementCore from '../modules/client-management/ClientManagementCore'
 import ManualWorkoutBuilder from '../modules/manual-workout-builder/ManualWorkoutBuilder'
 import LeadManagement from '../modules/lead-management/LeadManagement'
+import PlanWizard from '../modules/plan-wizard/PlanWizard'
 
 
 
 // Lucide Icons imports
 import { 
   Home,
+Wand2,
   Users,
 UserPlus,  
  Shield,
@@ -151,6 +153,22 @@ leads: {
     boxShadow: '0 10px 25px rgba(236, 72, 153, 0.25)',
     glow: '0 0 60px rgba(236, 72, 153, 0.1)'
   },
+
+'plan-wizard': {
+  primary: '#8b5cf6',
+  primaryDark: '#7c3aed',
+  primaryLight: '#a78bfa',
+  gradient: 'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)',
+  backgroundGradient: 'linear-gradient(135deg, rgba(139, 92, 246, 0.1) 0%, rgba(124, 58, 237, 0.05) 100%)',
+  borderColor: 'rgba(139, 92, 246, 0.1)',
+  borderActive: 'rgba(139, 92, 246, 0.2)',
+  boxShadow: '0 10px 25px rgba(139, 92, 246, 0.25)',
+  glow: '0 0 60px rgba(139, 92, 246, 0.1)'
+},
+
+
+
+
   'workout-builder': {
     primary: '#f97316',
     primaryDark: '#ea580c',
@@ -234,6 +252,7 @@ export default function CoachHub() {
     { id: 'command', label: 'Command Center', Icon: Shield },
     { id: 'client-intelligence', label: 'Client Intelligence', Icon: Users },
     { id: 'management', label: 'Client Beheer', Icon: Target },
+  { id: 'plan-wizard', label: 'Plan Wizard', Icon: Wand2 }, 
  { id: 'leads', label: 'Lead Management', Icon: UserPlus },   
  { id: 'challenge-hub', label: 'Challenge Hub', Icon: Trophy },
     { id: 'ai-meals', label: 'AI Meals', Icon: Sparkles },
@@ -1075,13 +1094,14 @@ export default function CoachHub() {
               </div>
             )}
 
-            {activeTab === 'command' && !loading && (
-              <CoachCommandCenter 
-                db={db} 
-                clients={clients || []}
-              />
-            )}
-
+{activeTab === 'command' && !loading && (
+  <CoachCommandCenter 
+    db={db} 
+    clients={clients || []}
+    onSelectClient={setSelectedClient}
+    setActiveTab={setActiveTab}
+  />
+)}
             {activeTab === 'client-intelligence' && !loading && (
               <div style={{
                 background: 'rgba(17, 17, 17, 0.5)',
@@ -1164,6 +1184,27 @@ export default function CoachHub() {
                 />
               </div>
             )}
+
+
+
+
+{activeTab === 'plan-wizard' && !loading && (
+  <div style={{
+    background: 'rgba(17, 17, 17, 0.5)',
+    backdropFilter: 'blur(10px)',
+    borderRadius: '16px',
+    border: '1px solid rgba(139, 92, 246, 0.2)',
+    padding: isMobile ? '1rem' : '2rem',
+    boxShadow: '0 10px 30px rgba(139, 92, 246, 0.15)'
+  }}>
+    <PlanWizard 
+      db={db} 
+      clients={clients || []}
+    />
+  </div>
+)}
+
+
 
             {activeTab === 'ai-meals' && !loading && (
               <div style={{

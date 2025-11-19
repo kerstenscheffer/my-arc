@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react'
-import { Users, BarChart3, Settings, RefreshCw, Download } from 'lucide-react'
+import { Users, BarChart3, Settings, RefreshCw, Download, LayoutGrid } from 'lucide-react'
 import LeadOverview from './components/LeadOverview'
 import LeadManagementService from './LeadManagementService'
+import KanbanBoard from './components/kanban/KanbanBoard'
+import OutreachAnalytics from './components/analytics/OutreachAnalytics'
 
 export default function LeadManagement({ db, isMobile, coachId, user }) {
   const [activeView, setActiveView] = useState('overview')
@@ -69,7 +71,6 @@ export default function LeadManagement({ db, isMobile, coachId, user }) {
       const service = new LeadManagementService()
       setLeadService(service)
 
-      // Subscribe to real-time updates
       const sub = service.subscribeToLeadUpdates(coachId, (payload) => {
         console.log('📡 Real-time lead update:', payload.eventType)
         handleRealtimeUpdate(payload)
@@ -99,10 +100,7 @@ export default function LeadManagement({ db, isMobile, coachId, user }) {
       const data = await leadService.getLeads(coachId, filterParams)
       setLeads(data)
       
-      // ✅ FIXED: Always update total on first page
       if (pagination.page === 1) {
-        // If we got less than limit, that's the total
-        // If we got exactly limit, there might be more (keep existing total or set to data.length)
         const newTotal = data.length < pagination.limit ? data.length : Math.max(data.length, pagination.total)
         setPagination(prev => ({ ...prev, total: newTotal }))
       }
@@ -130,7 +128,6 @@ export default function LeadManagement({ db, isMobile, coachId, user }) {
       const days = dateRangeMap[filters.dateRange] || 30
       const statsData = await leadService.getLeadStats(coachId, days)
       
-      // ✅ DEBUG LOGGING
       console.log('📊 Stats data received:', statsData)
       console.log('📊 total_leads value:', statsData?.total_leads)
       
@@ -164,7 +161,6 @@ export default function LeadManagement({ db, isMobile, coachId, user }) {
       }
     })
 
-    // ✅ FIXED: Reload stats after any update
     loadStats()
   }
 
@@ -275,6 +271,7 @@ export default function LeadManagement({ db, isMobile, coachId, user }) {
 
   const tabs = [
     { id: 'overview', label: 'Overzicht', icon: Users, badge: stats.total_leads },
+    { id: 'kanban', label: 'Kanban', icon: LayoutGrid, badge: null },
     { id: 'analytics', label: 'Analytics', icon: BarChart3, badge: null },
     { id: 'settings', label: 'Instellingen', icon: Settings, badge: null }
   ]
@@ -493,36 +490,20 @@ export default function LeadManagement({ db, isMobile, coachId, user }) {
           />
         )}
 
+        {activeView === 'kanban' && (
+          <KanbanBoard
+            leadService={leadService}
+            coachId={coachId}
+            isMobile={isMobile}
+          />
+        )}
+
         {activeView === 'analytics' && (
-          <div style={{
-            minHeight: '400px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            background: 'rgba(17, 17, 17, 0.5)',
-            backdropFilter: 'blur(10px)',
-            borderRadius: '16px',
-            padding: '2rem',
-            textAlign: 'center'
-          }}>
-            <div>
-              <BarChart3 size={48} color="rgba(59, 130, 246, 0.5)" style={{ margin: '0 auto 1rem' }} />
-              <h3 style={{
-                fontSize: '1.25rem',
-                fontWeight: '600',
-                color: '#fff',
-                marginBottom: '0.5rem'
-              }}>
-                Analytics Dashboard
-              </h3>
-              <p style={{
-                color: 'rgba(255, 255, 255, 0.7)',
-                fontSize: '0.95rem'
-              }}>
-                Wordt gebouwd in Fase 3
-              </p>
-            </div>
-          </div>
+          <OutreachAnalytics
+            leadService={leadService}
+            coachId={coachId}
+            isMobile={isMobile}
+          />
         )}
 
         {activeView === 'settings' && (

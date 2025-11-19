@@ -1,5 +1,5 @@
 // src/modules/ai-meal-generator/tabs/PlanBuilder.jsx
-// FIXED VERSION - Works with forcedMealsConfig frequency control
+// COMPLETE FIXED VERSION - Shopping list working + All syntax errors resolved
 
 import { useState, useEffect } from 'react'
 import { Calendar, Brain, ToggleLeft, ToggleRight, Grid3x3, Target, CheckCircle, Zap, Hash } from 'lucide-react'
@@ -15,7 +15,7 @@ export default function PlanBuilder({
   clientProfile,
   dailyTargets,
   mealsPerDay,
-  forcedMealsConfig,         // NOW USING CONFIG FORMAT
+  forcedMealsConfig,
   excludedIngredients,
   selectedIngredients,
   mealPreferences,
@@ -54,7 +54,6 @@ export default function PlanBuilder({
         const aiSvc = await db.getAIMealPlanningService()
         setAiService(aiSvc)
         
-        // Initialize Complete Dynamic Optimizer
         const optimizer = new CompleteDynamicOptimizer(db, aiSvc)
         setDynamicOptimizer(optimizer)
         
@@ -116,7 +115,6 @@ export default function PlanBuilder({
         progress: 5
       })
       
-      // Create dynamic week structure based on meals per day
       let weekPlan = []
       for (let day = 0; day < 7; day++) {
         const dayStructure = {
@@ -127,7 +125,6 @@ export default function PlanBuilder({
           accuracy: { total: 100, calories: 100, protein: 100 }
         }
         
-        // Add dynamic slots based on meals per day
         if (mealsPerDay > 3) {
           const extraMeals = mealsPerDay - 3
           for (let i = 0; i < extraMeals; i++) {
@@ -147,9 +144,7 @@ export default function PlanBuilder({
           progress: 15
         })
         
-        // FREQUENCY-BASED DISTRIBUTION
         if (fillAllSlots || totalFrequency > 0) {
-          // Create meal pool based on frequencies
           const mealPool = []
           forcedMealsConfig.forEach(config => {
             for (let i = 0; i < config.frequency; i++) {
@@ -165,11 +160,9 @@ export default function PlanBuilder({
           
           console.log(`📊 Meal pool created: ${mealPool.length} meals from frequency settings`)
           
-          // If pool doesn't fill all slots, add more intelligently
           if (mealPool.length < totalSlots && fillAllSlots) {
             console.log(`⚡ Auto-filling ${totalSlots - mealPool.length} remaining slots...`)
             
-            // Calculate how many more of each meal we need
             const remainingSlots = totalSlots - mealPool.length
             const mealsCount = forcedMealsConfig.length
             const baseExtra = Math.floor(remainingSlots / mealsCount)
@@ -189,7 +182,6 @@ export default function PlanBuilder({
             })
           }
           
-          // Smart distribution across week with timing respect
           weekPlan = await dynamicOptimizer.distributeWithFrequencyControl(
             weekPlan,
             mealPool,
@@ -197,7 +189,7 @@ export default function PlanBuilder({
               mealsPerDay: mealsPerDay,
               respectTiming: true,
               balanceDistribution: true,
-              dailyTargets: dailyTargets, // PASS TARGETS FOR AUTO-SCALING
+              dailyTargets: dailyTargets,
               onProgress: (progressInfo) => {
                 setGenerationStats({
                   step: progressInfo.step,
@@ -208,8 +200,6 @@ export default function PlanBuilder({
           )
           
           dynamicOptimizer.updateAllDayTotals(weekPlan)
-          
-          // CRITICAL: Normalize snacks structure
           dynamicOptimizer.normalizeSnacksStructure(weekPlan, mealsPerDay)
         }
         
@@ -237,7 +227,6 @@ export default function PlanBuilder({
           frequencyControlled: true
         }
         
-        // Load meals for optimization if needed
         if (enableMacroOptimization) {
           setGenerationStats({
             step: 'AI meals laden voor optimalisatie...',
@@ -275,7 +264,6 @@ export default function PlanBuilder({
             id: ing.id,
             name: ing.name || ing.label || ing.id
           })),
-          // Pass frequency hints to AI
           forcedMealsWithFrequency: forcedMealsConfig || []
         }
         
@@ -292,14 +280,12 @@ export default function PlanBuilder({
           progress: 30
         })
         
-        // Score meals with frequency boost for forced meals
         const scoredMeals = aiService.scoreAllMeals(
           allMeals, 
           updatedProfile, 
           updatedProfile.excluded_ingredients,
           updatedProfile.selected_ingredients
         ).map(meal => {
-          // Boost score for forced meals based on frequency
           const forcedConfig = forcedMealsConfig?.find(config => config.meal.id === meal.id)
           if (forcedConfig) {
             meal.aiScore = Math.max(meal.aiScore, 80) + (forcedConfig.frequency * 2)
@@ -322,12 +308,11 @@ export default function PlanBuilder({
           avoidDuplicates: mealPreferences.avoidRepeats,
           respectPortionLimits: true,
           forcedMeals: forcedMeals,
-          forcedMealsConfig: forcedMealsConfig, // Pass full config to AI
+          forcedMealsConfig: forcedMealsConfig,
           excludedIngredients: updatedProfile.excluded_ingredients,
           selectedIngredients: updatedProfile.selected_ingredients
         })
         
-        // Mark forced meals in the plan
         if (forcedMealsConfig && forcedMealsConfig.length > 0) {
           generatedPlan.weekPlan.forEach(day => {
             Object.keys(day).forEach(slot => {
@@ -342,7 +327,6 @@ export default function PlanBuilder({
           })
         }
         
-        // ENSURE AI PLAN IS COMPLETE
         setGenerationStats({
           step: `Controleren op lege slots (target: ${totalSlots})...`,
           progress: 45
@@ -384,9 +368,7 @@ export default function PlanBuilder({
         
         console.log(`🎯 Starting dynamic macro optimization for ${totalSlots} slots...`)
         
-        // Filter available meals for optimization
         const availableForOptimization = allMeals.filter(meal => {
-          // Don't swap locked meals
           const config = forcedMealsConfig?.find(c => c.meal.id === meal.id)
           return !config?.locked
         })
@@ -399,7 +381,7 @@ export default function PlanBuilder({
             tolerance: 0.05,
             maxIterations: 15,
             respectForcedMeals: true,
-            respectFrequency: forcedMealsConfig, // Pass frequency config
+            respectFrequency: forcedMealsConfig,
             fillEmptySlots: true,
             mealsPerDay: mealsPerDay,
             onProgress: (progressInfo) => {
@@ -411,7 +393,6 @@ export default function PlanBuilder({
           }
         )
         
-        // Update plan with optimized version
         generatedPlan.weekPlan = optimizationResult.optimizedPlan
         generatedPlan.stats.dynamicOptimizationStats = optimizationResult.stats
         generatedPlan.optimizationLog = optimizationResult.log
@@ -428,25 +409,66 @@ export default function PlanBuilder({
         })
       }
       
-      // PHASE 4: FINALIZATION
+      // PHASE 4: FINALIZATION - COMPLETE FIXED VERSION
       setGenerationStats({
-        step: 'Boodschappenlijst genereren...',
+        step: 'Shopping list genereren...',
         progress: 90
       })
       
-      const shoppingList = aiService.generateShoppingList(generatedPlan.weekPlan)
+      let shoppingList = null
+      
+      // Always generate shopping list manually for reliability
+      console.log('🛒 Generating shopping list from final plan...')
+      
+      try {
+const shoppingData = await aiService.generateShoppingListFromWeekPlan(generatedPlan.weekPlan)
+shoppingList = shoppingData // Contains: raw, formatted, tips
+console.log('✅ Shopping list generated:', shoppingData.formatted.itemCount, 'items (formatted)')
+console.log('   Raw items:', shoppingData.raw.itemCount)
+        
+        // ✅ ADD SHOPPING LIST TO STATS
+        if (!generatedPlan.stats) {
+          console.log('📊 Creating stats object')
+          generatedPlan.stats = {}
+        }
+        
+        generatedPlan.stats.shoppingList = shoppingList
+        console.log('✅ Shopping list added to generatedPlan.stats')
+        
+      } catch (error) {
+        console.error('❌ Shopping list generation failed:', error)
+        
+        // Create empty shopping list as fallback
+        shoppingList = {
+          ingredients: [],
+          totalCost: '0.00',
+          dailyCost: '0.00',
+          itemCount: 0,
+          weekDays: 7,
+          generatedAt: new Date().toISOString(),
+          mealsProcessed: 0,
+          mealsWithIngredients: 0,
+          mealsWithoutIngredients: 0
+        }
+        
+        // Still add to stats even if empty
+        if (!generatedPlan.stats) {
+          generatedPlan.stats = {}
+        }
+        generatedPlan.stats.shoppingList = shoppingList
+        
+        console.warn('⚠️ Empty shopping list added to stats as fallback')
+      }
       
       setGenerationStats({
         step: 'Plan finaliseren...',
         progress: 95
       })
       
-      // Final validation with frequency check
       const finalEmptySlots = dynamicOptimizer.countEmptySlotsDynamic(generatedPlan.weekPlan, mealsPerDay)
       const isWeekComplete = finalEmptySlots.total === 0
       const filledSlots = totalSlots - finalEmptySlots.total
       
-      // Validate frequency compliance
       const frequencyCompliance = dynamicOptimizer.validateFrequencyCompliance(
         generatedPlan.weekPlan,
         forcedMealsConfig
@@ -459,7 +481,7 @@ export default function PlanBuilder({
       setCurrentPlan(generatedPlan)
       setPlanStats({
         ...generatedPlan.stats,
-        shoppingList,
+        shoppingList,  // ✅ Shopping list accessible here
         selectedIngredientsUsed: selectedIngredients.length,
         excludedIngredientsAvoided: excludedIngredients.length,
         forcedMealsUsed: forcedMealsConfig?.length || 0,

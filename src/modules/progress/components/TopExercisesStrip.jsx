@@ -1,140 +1,150 @@
 // src/modules/progress/components/TopExercisesStrip.jsx
-import { Trophy } from 'lucide-react'
+import { Dumbbell } from 'lucide-react'
 
 export default function TopExercisesStrip({ exercises, onExerciseClick, isMobile }) {
-  if (!exercises || exercises.length === 0) return null
-
-  const medals = ['🥇', '🥈', '🥉']
-  const colors = ['#FFD700', '#C0C0C0', '#CD7F32']
-
   return (
     <div style={{
-      background: 'rgba(23, 23, 23, 0.4)',
-      borderRadius: isMobile ? '12px' : '14px',
-      border: '1px solid rgba(16, 185, 129, 0.15)',
+      background: 'linear-gradient(135deg, rgba(23, 23, 23, 0.95) 0%, rgba(10, 10, 10, 0.9) 100%)',
+      backdropFilter: 'blur(12px)',
+      border: '1px solid rgba(249, 115, 22, 0.25)',
+      borderRadius: isMobile ? '10px' : '12px',
       padding: isMobile ? '0.75rem' : '0.875rem',
-      backdropFilter: 'blur(8px)'
+      boxShadow: '0 2px 12px rgba(249, 115, 22, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.02)',
+      position: 'relative',
+      overflow: 'hidden'
     }}>
+      {/* Top accent line */}
+      <div style={{
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        height: '2px',
+        background: 'linear-gradient(90deg, transparent 0%, #f97316 50%, transparent 100%)',
+        opacity: 0.4
+      }} />
+      
       {/* Header */}
       <div style={{
-        fontSize: isMobile ? '0.65rem' : '0.7rem',
-        fontWeight: '700',
-        color: 'rgba(255, 255, 255, 0.4)',
-        textTransform: 'uppercase',
-        letterSpacing: '0.06em',
-        marginBottom: '0.625rem',
         display: 'flex',
         alignItems: 'center',
-        gap: '0.35rem'
+        gap: '0.375rem',
+        marginBottom: '0.625rem'
       }}>
-        <Trophy size={isMobile ? 11 : 12} />
-        Top 3 Deze Maand
+        <div style={{
+          width: isMobile ? '28px' : '30px',
+          height: isMobile ? '28px' : '30px',
+          borderRadius: '6px',
+          background: 'rgba(249, 115, 22, 0.15)',
+          border: '1px solid rgba(249, 115, 22, 0.25)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center'
+        }}>
+          <Dumbbell size={isMobile ? 13 : 14} color="#f97316" style={{ opacity: 0.9 }} />
+        </div>
+        
+        <span style={{
+          fontSize: isMobile ? '0.8rem' : '0.85rem',
+          fontWeight: '700',
+          color: 'rgba(255, 255, 255, 0.7)',
+          textTransform: 'uppercase',
+          letterSpacing: '0.03em'
+        }}>
+          Top 3 Oefeningen
+        </span>
       </div>
-
-      {/* Exercise Badges */}
+      
+      {/* Exercises Grid */}
       <div style={{
-        display: isMobile ? 'flex' : 'flex',
-        flexDirection: isMobile ? 'column' : 'row',
-        gap: isMobile ? '0.5rem' : '0.625rem',
-        overflowX: isMobile ? 'visible' : 'auto',
-        overflowY: 'hidden',
-        scrollbarWidth: 'none',
-        msOverflowStyle: 'none',
-        WebkitOverflowScrolling: 'touch'
+        display: 'grid',
+        gridTemplateColumns: isMobile ? '1fr' : 'repeat(3, 1fr)',
+        gap: isMobile ? '0.5rem' : '0.625rem'
       }}>
-        {exercises.map((exercise, idx) => {
-          const medal = medals[idx]
-          const color = colors[idx]
-
-          return (
-            <button
-              key={idx}
-              onClick={() => onExerciseClick(exercise.name, '1rm')}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: isMobile ? '0.5rem' : '0.625rem',
-                padding: isMobile ? '0.625rem 0.875rem' : '0.75rem 1rem',
-                background: `linear-gradient(135deg, ${color}15 0%, ${color}08 100%)`,
-                border: `1px solid ${color}30`,
-                borderRadius: '10px',
-                cursor: 'pointer',
-                transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                flexShrink: 0,
-                width: isMobile ? '100%' : 'auto',
-                touchAction: 'manipulation',
-                WebkitTapHighlightColor: 'transparent',
-                minHeight: '44px',
-                boxShadow: `0 2px 12px ${color}15`
-              }}
-              onMouseEnter={(e) => {
-                if (!isMobile) {
-                  e.currentTarget.style.transform = 'translateY(-2px) scale(1.02)'
-                  e.currentTarget.style.boxShadow = `0 4px 20px ${color}25`
-                  e.currentTarget.style.border = `1px solid ${color}40`
-                }
-              }}
-              onMouseLeave={(e) => {
-                if (!isMobile) {
-                  e.currentTarget.style.transform = 'translateY(0) scale(1)'
-                  e.currentTarget.style.boxShadow = `0 2px 12px ${color}15`
-                  e.currentTarget.style.border = `1px solid ${color}30`
-                }
-              }}
-              onTouchStart={(e) => {
-                if (isMobile) {
-                  e.currentTarget.style.transform = 'scale(0.96)'
-                }
-              }}
-              onTouchEnd={(e) => {
-                if (isMobile) {
-                  e.currentTarget.style.transform = 'scale(1)'
-                }
-              }}
-            >
-              {/* Medal */}
+        {exercises.map((exercise, idx) => (
+          <button
+            key={idx}
+            onClick={() => onExerciseClick(exercise.name, '1rm')}
+            style={{
+              background: 'linear-gradient(135deg, rgba(249, 115, 22, 0.1) 0%, rgba(249, 115, 22, 0.05) 100%)',
+              backdropFilter: 'blur(8px)',
+              border: '1px solid rgba(249, 115, 22, 0.2)',
+              borderRadius: '8px',
+              padding: isMobile ? '0.625rem 0.75rem' : '0.75rem 0.875rem',
+              cursor: 'pointer',
+              transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+              touchAction: 'manipulation',
+              WebkitTapHighlightColor: 'transparent',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: '0.5rem',
+              minHeight: '44px'
+            }}
+            onMouseEnter={(e) => {
+              if (!isMobile) {
+                e.currentTarget.style.background = 'linear-gradient(135deg, rgba(249, 115, 22, 0.2) 0%, rgba(249, 115, 22, 0.1) 100%)'
+                e.currentTarget.style.transform = 'translateY(-1px)'
+                e.currentTarget.style.borderColor = 'rgba(249, 115, 22, 0.35)'
+              }
+            }}
+            onMouseLeave={(e) => {
+              if (!isMobile) {
+                e.currentTarget.style.background = 'linear-gradient(135deg, rgba(249, 115, 22, 0.1) 0%, rgba(249, 115, 22, 0.05) 100%)'
+                e.currentTarget.style.transform = 'translateY(0)'
+                e.currentTarget.style.borderColor = 'rgba(249, 115, 22, 0.2)'
+              }
+            }}
+            onTouchStart={(e) => {
+              if (isMobile) e.currentTarget.style.transform = 'scale(0.98)'
+            }}
+            onTouchEnd={(e) => {
+              if (isMobile) e.currentTarget.style.transform = 'scale(1)'
+            }}
+          >
+            <div style={{ flex: 1, textAlign: 'left', minWidth: 0 }}>
               <div style={{
-                fontSize: isMobile ? '1.25rem' : '1.4rem',
-                lineHeight: 1
+                fontSize: isMobile ? '0.85rem' : '0.9rem',
+                fontWeight: '700',
+                color: 'white',
+                marginBottom: '0.125rem',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap'
               }}>
-                {medal}
+                {exercise.name}
               </div>
-
-              {/* Exercise Info */}
               <div style={{
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'flex-start',
-                gap: '0.1rem'
+                fontSize: isMobile ? '0.7rem' : '0.75rem',
+                color: 'rgba(255, 255, 255, 0.5)',
+                fontWeight: '600'
               }}>
-                <div style={{
-                  fontSize: isMobile ? '0.8rem' : '0.85rem',
-                  fontWeight: '800',
-                  color: '#fff',
-                  whiteSpace: 'nowrap',
-                  letterSpacing: '-0.01em'
-                }}>
-                  {exercise.name}
-                </div>
-                <div style={{
-                  fontSize: isMobile ? '0.65rem' : '0.7rem',
-                  fontWeight: '700',
-                  color: 'rgba(255, 255, 255, 0.5)'
-                }}>
-                  {exercise.count} sessies
-                </div>
+                {exercise.count}x getraind
               </div>
-            </button>
-          )
-        })}
+            </div>
+            
+            <div style={{
+              width: isMobile ? '24px' : '26px',
+              height: isMobile ? '24px' : '26px',
+              borderRadius: '6px',
+              background: 'rgba(249, 115, 22, 0.2)',
+              border: '1px solid rgba(249, 115, 22, 0.3)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              flexShrink: 0
+            }}>
+              <span style={{
+                fontSize: isMobile ? '0.75rem' : '0.8rem',
+                fontWeight: '800',
+                color: '#f97316'
+              }}>
+                {idx + 1}
+              </span>
+            </div>
+          </button>
+        ))}
       </div>
-
-      <style>{`
-        /* Hide scrollbar but keep functionality */
-        div::-webkit-scrollbar {
-          display: none;
-        }
-      `}</style>
     </div>
   )
 }

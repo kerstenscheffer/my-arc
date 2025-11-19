@@ -1,169 +1,167 @@
 // src/modules/progress/components/HeroInsightCard.jsx
-import { Award, ChevronRight } from 'lucide-react'
-
 export default function HeroInsightCard({ insight, onClick, isMobile }) {
-  if (!insight) return null
-
+  const Icon = insight.icon
+  
   return (
     <div
       onClick={onClick}
       style={{
-        background: `linear-gradient(135deg, ${insight.color}30 0%, ${insight.color}15 50%, rgba(23, 23, 23, 0.8) 100%)`,
-        backdropFilter: 'blur(20px)',
-        border: `2px solid ${insight.color}50`,
-        borderRadius: isMobile ? '16px' : '20px',
-        padding: 0,
-        cursor: 'pointer',
-        transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
         position: 'relative',
+        height: isMobile ? '180px' : '220px',
+        borderRadius: isMobile ? '14px' : '16px',
         overflow: 'hidden',
-        boxShadow: `0 10px 40px ${insight.color}40, inset 0 1px 0 rgba(255, 255, 255, 0.1)`,
-        marginBottom: isMobile ? '1rem' : '1.25rem',
+        border: `2px solid ${insight.color}40`,
+        boxShadow: `0 6px 24px ${insight.color}30, inset 0 1px 0 rgba(255, 255, 255, 0.03)`,
+        background: '#000',
+        cursor: 'pointer',
+        transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
         touchAction: 'manipulation',
-        WebkitTapHighlightColor: 'transparent'
+        WebkitTapHighlightColor: 'transparent',
+        marginBottom: isMobile ? '0.75rem' : '1rem'
       }}
       onMouseEnter={(e) => {
         if (!isMobile) {
-          e.currentTarget.style.transform = 'translateY(-4px) scale(1.01)'
-          e.currentTarget.style.boxShadow = `0 20px 60px ${insight.color}50, inset 0 1px 0 rgba(255, 255, 255, 0.2)`
+          e.currentTarget.style.transform = 'translateY(-2px)'
+          e.currentTarget.style.boxShadow = `0 10px 32px ${insight.color}45`
         }
       }}
       onMouseLeave={(e) => {
         if (!isMobile) {
-          e.currentTarget.style.transform = 'translateY(0) scale(1)'
-          e.currentTarget.style.boxShadow = `0 10px 40px ${insight.color}40, inset 0 1px 0 rgba(255, 255, 255, 0.1)`
+          e.currentTarget.style.transform = 'translateY(0)'
+          e.currentTarget.style.boxShadow = `0 6px 24px ${insight.color}30`
         }
       }}
       onTouchStart={(e) => {
-        if (isMobile) {
-          e.currentTarget.style.transform = 'scale(0.98)'
-        }
+        if (isMobile) e.currentTarget.style.transform = 'scale(0.98)'
       }}
       onTouchEnd={(e) => {
-        if (isMobile) {
-          e.currentTarget.style.transform = 'scale(1)'
-        }
+        if (isMobile) e.currentTarget.style.transform = 'scale(1)'
       }}
     >
       {/* Background Image */}
+      {insight.image && (
+        <div style={{
+          position: 'absolute',
+          inset: 0,
+          backgroundImage: `url(${insight.image})`,
+          backgroundSize: 'cover',
+          backgroundPosition: 'center'
+        }} />
+      )}
+      
+      {/* Top vignette */}
       <div style={{
         position: 'absolute',
         top: 0,
         left: 0,
         right: 0,
-        bottom: 0,
-        backgroundImage: `url(${insight.image})`,
-        backgroundSize: 'cover',
-        backgroundPosition: 'center',
-        opacity: 0.15,
-        filter: 'blur(2px)'
+        height: '40%',
+        background: 'linear-gradient(to bottom, rgba(0,0,0,0.5), transparent)',
+        pointerEvents: 'none'
       }} />
-
-      {/* Animated Glow */}
+      
+      {/* Bottom gradient */}
       <div style={{
         position: 'absolute',
-        top: '-50%',
-        right: '-20%',
-        width: '200px',
-        height: '200px',
-        background: `radial-gradient(circle, ${insight.color}40 0%, transparent 70%)`,
-        borderRadius: '50%',
-        animation: 'pulse 3s ease-in-out infinite'
+        bottom: 0,
+        left: 0,
+        right: 0,
+        height: '75%',
+        background: 'linear-gradient(to top, rgba(0,0,0,0.95) 0%, rgba(0,0,0,0.6) 70%, transparent 100%)',
+        pointerEvents: 'none'
       }} />
-
+      
+      {/* Badge - Top Left */}
+      <div style={{
+        position: 'absolute',
+        top: isMobile ? '0.75rem' : '1rem',
+        left: isMobile ? '0.75rem' : '1rem',
+        background: 'linear-gradient(135deg, rgba(23, 23, 23, 0.9) 0%, rgba(23, 23, 23, 0.8) 100%)',
+        backdropFilter: 'blur(12px)',
+        border: `1px solid ${insight.color}40`,
+        borderRadius: '8px',
+        padding: isMobile ? '0.375rem 0.5rem' : '0.4rem 0.625rem',
+        display: 'flex',
+        alignItems: 'center',
+        gap: '0.3rem',
+        boxShadow: `0 4px 16px ${insight.color}30, 0 0 0 1px rgba(0,0,0,0.5)`,
+        zIndex: 10
+      }}>
+        <Icon size={isMobile ? 11 : 12} color={insight.color} />
+        <span style={{
+          fontSize: isMobile ? '0.7rem' : '0.75rem',
+          fontWeight: '700',
+          color: insight.color
+        }}>
+          {insight.badge}
+        </span>
+      </div>
+      
       {/* Content */}
       <div style={{
-        position: 'relative',
-        padding: isMobile ? '1.5rem' : '2rem',
-        display: 'flex',
-        flexDirection: 'column',
-        gap: isMobile ? '1rem' : '1.25rem'
+        position: 'absolute',
+        bottom: 0,
+        left: 0,
+        right: 0,
+        padding: isMobile ? '1rem' : '1.25rem',
+        zIndex: 3
       }}>
-        {/* Badge */}
+        {/* Info Container */}
         <div style={{
-          display: 'inline-flex',
-          alignItems: 'center',
-          gap: '0.4rem',
-          alignSelf: 'flex-start',
-          padding: '0.4rem 0.75rem',
-          background: `${insight.color}25`,
-          border: `1px solid ${insight.color}40`,
-          borderRadius: '20px',
-          fontSize: isMobile ? '0.65rem' : '0.7rem',
-          fontWeight: '900',
-          color: insight.color,
-          letterSpacing: '0.08em',
-          textTransform: 'uppercase',
-          boxShadow: `0 0 20px ${insight.color}30`
+          background: 'linear-gradient(135deg, rgba(23, 23, 23, 0.95) 0%, rgba(10, 10, 10, 0.9) 100%)',
+          backdropFilter: 'blur(12px)',
+          border: `1px solid ${insight.color}30`,
+          borderRadius: isMobile ? '10px' : '12px',
+          padding: isMobile ? '0.75rem' : '0.875rem',
+          boxShadow: `0 4px 16px ${insight.color}20, inset 0 1px 0 ${insight.color}05`
         }}>
-          <Award size={isMobile ? 12 : 14} />
-          {insight.badge}
-        </div>
-
-        {/* Title & Text */}
-        <div>
+          {/* Title */}
           <div style={{
-            fontSize: isMobile ? '1.5rem' : '2rem',
-            fontWeight: '900',
-            color: '#fff',
-            marginBottom: '0.5rem',
-            lineHeight: '1.2',
-            textShadow: `0 2px 20px ${insight.color}60`
+            fontSize: isMobile ? '1.05rem' : '1.25rem',
+            fontWeight: '800',
+            color: 'white',
+            letterSpacing: '-0.02em',
+            lineHeight: 1.1,
+            marginBottom: '0.375rem',
+            textShadow: '0 2px 8px rgba(0, 0, 0, 0.6)'
           }}>
             {insight.title}
           </div>
+          
+          {/* Subtitle */}
           <div style={{
-            fontSize: isMobile ? '0.95rem' : '1.05rem',
-            color: 'rgba(255, 255, 255, 0.8)',
-            fontWeight: '600',
-            marginBottom: '0.75rem'
+            fontSize: isMobile ? '0.75rem' : '0.8rem',
+            color: insight.color,
+            fontWeight: '700',
+            marginBottom: '0.5rem',
+            opacity: 0.9
           }}>
             {insight.subtitle}
           </div>
+          
+          {/* Message */}
           <div style={{
-            fontSize: isMobile ? '0.85rem' : '0.9rem',
+            fontSize: isMobile ? '0.8rem' : '0.875rem',
             color: 'rgba(255, 255, 255, 0.7)',
-            lineHeight: '1.5',
-            fontStyle: 'italic'
+            lineHeight: 1.4
           }}>
             {insight.message}
           </div>
         </div>
-
-        {/* CTA */}
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '0.5rem',
-          padding: isMobile ? '0.875rem 1.25rem' : '1rem 1.5rem',
-          background: `${insight.color}20`,
-          border: `1px solid ${insight.color}40`,
-          borderRadius: '12px',
-          alignSelf: 'flex-start'
-        }}>
-          <span style={{
-            fontSize: isMobile ? '0.875rem' : '0.95rem',
-            fontWeight: '700',
-            color: insight.color
-          }}>
-            Bekijk volledige progressie
-          </span>
-          <ChevronRight size={isMobile ? 18 : 20} color={insight.color} />
-        </div>
       </div>
-
-      <style>{`
-        @keyframes pulse {
-          0%, 100% {
-            opacity: 0.6;
-            transform: scale(1);
-          }
-          50% {
-            opacity: 1;
-            transform: scale(1.05);
-          }
-        }
-      `}</style>
+      
+      {/* Top accent glow */}
+      <div style={{
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        height: '2px',
+        background: `linear-gradient(90deg, transparent 0%, ${insight.color} 50%, transparent 100%)`,
+        opacity: 0.6,
+        pointerEvents: 'none',
+        zIndex: 4
+      }} />
     </div>
   )
 }

@@ -1,10 +1,8 @@
 // src/modules/meal-plan/components/AINextMeal.jsx
-import React, { useState } from 'react'
-import { 
-  Clock, ChevronRight, Info, RefreshCw, 
-  Check, Flame, Target, Zap, Droplets,
-  Calendar, AlertCircle
-} from 'lucide-react'
+// ✅ PREMIUM v5.0 - WorkoutPhotoSlider Styling Norm Applied
+// 🎯 CLEAN, COMPACT, GLASSMORPHIC, UNIFORM
+import React, { useState, useEffect } from 'react'
+import { Clock, Info, RefreshCw, Check, AlertCircle, Apple } from 'lucide-react'
 
 export default function AINextMeal({ 
   nextMeal,
@@ -15,10 +13,14 @@ export default function AINextMeal({
   onOpenDaySchedule,
   db
 }) {
-  const isMobile = window.innerWidth <= 768
-  const [hoveredButton, setHoveredButton] = useState(null)
+  const [isMobile, setIsMobile] = useState(window.innerWidth <= 768)
   
-  // Get time display
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth <= 768)
+    window.addEventListener('resize', handleResize)
+    return () => window.removeEventListener('resize', handleResize)
+  }, [])
+  
   const getTimeDisplay = () => {
     if (!nextMeal) return null
     
@@ -27,618 +29,517 @@ export default function AINextMeal({
     const hoursUntil = (nextMeal.plannedTime || 12) - currentHour
     
     if (nextMeal.isPast) {
-      return { 
-        text: 'Gemiste maaltijd', 
-        color: '#ef4444', 
-        bg: 'rgba(239, 68, 68, 0.1)',
-        urgency: 'past'
-      }
+      return { text: 'Gemist', color: '#ef4444', urgency: 'past' }
     }
     
     if (Math.abs(hoursUntil) < 0.5) {
-      return { 
-        text: 'Nu tijd om te eten!', 
-        color: '#fbbf24', 
-        bg: 'rgba(251, 191, 36, 0.1)',
-        pulse: true,
-        urgency: 'now'
-      }
+      return { text: 'Nu!', color: '#fbbf24', pulse: true, urgency: 'now' }
     }
     
     if (hoursUntil < 0) {
-      return { 
-        text: 'Te laat', 
-        color: '#f97316', 
-        bg: 'rgba(249, 115, 22, 0.1)',
-        urgency: 'late'
-      }
+      return { text: 'Te laat', color: '#f97316', urgency: 'late' }
     }
     
     if (hoursUntil < 1) {
       const minutes = Math.round(hoursUntil * 60)
-      return { 
-        text: `Over ${minutes} min`, 
-        color: '#10b981', 
-        bg: 'rgba(16, 185, 129, 0.1)',
-        urgency: 'soon'
-      }
+      return { text: `${minutes}m`, color: '#10b981', urgency: 'soon' }
     }
     
     const hours = Math.floor(hoursUntil)
     const minutes = Math.round((hoursUntil - hours) * 60)
-    const timeStr = minutes > 0 ? `${hours}u ${minutes}m` : `${hours} uur`
-    return { 
-      text: `Over ${timeStr}`, 
-      color: '#3b82f6', 
-      bg: 'rgba(59, 130, 246, 0.1)',
-      urgency: 'later'
-    }
+    const timeStr = minutes > 0 ? `${hours}u ${minutes}m` : `${hours}u`
+    return { text: timeStr, color: '#10b981', urgency: 'later' }
   }
   
   const timeDisplay = getTimeDisplay()
   
-  // Get meal image
   const getMealImage = (meal) => {
     if (meal?.image_url) return meal.image_url
     
-    // Fallback based on meal type
     const mealType = meal?.slot || meal?.timeSlot || 'meal'
     const fallbacks = {
-      breakfast: 'https://images.unsplash.com/photo-1525351484163-7529414344d8?w=800&h=600&fit=crop',
-      lunch: 'https://images.unsplash.com/photo-1547592166-23ac45744acd?w=800&h=600&fit=crop',
-      dinner: 'https://images.unsplash.com/photo-1555939594-58d7cb561ad1?w=800&h=600&fit=crop',
-      snack: 'https://images.unsplash.com/photo-1490474504059-bf2db5ab2348?w=800&h=600&fit=crop'
+      breakfast: 'https://images.unsplash.com/photo-1525351484163-7529414344d8?w=1200&h=600&fit=crop&q=85',
+      lunch: 'https://images.unsplash.com/photo-1547592166-23ac45744acd?w=1200&h=600&fit=crop&q=85',
+      dinner: 'https://images.unsplash.com/photo-1555939594-58d7cb561ad1?w=1200&h=600&fit=crop&q=85',
+      snack: 'https://images.unsplash.com/photo-1490474504059-bf2db5ab2348?w=1200&h=600&fit=crop&q=85'
     }
     
-    return fallbacks[mealType] || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=800&h=600&fit=crop'
+    return fallbacks[mealType] || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=1200&h=600&fit=crop&q=85'
   }
   
-  // Get last meal for completed state
   const getLastMeal = () => {
     if (!todayMeals || todayMeals.length === 0) return null
     return todayMeals[todayMeals.length - 1]
   }
 
-  // Empty state when all meals completed - OVERLAY VERSION
+  // COMPLETED STATE - PREMIUM GLASSMORPHIC
   if (!nextMeal) {
     const lastMeal = getLastMeal()
     
     return (
-      <div style={{
-        padding: isMobile ? '0 1rem 1rem' : '0 1.5rem 1.5rem'
+      <div style={{ 
+        padding: isMobile ? '0.5rem' : '0.625rem',
+        marginBottom: isMobile ? '1rem' : '1.5rem'
       }}>
-        {/* Section Header */}
-        <div style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          marginBottom: '1rem',
-          paddingLeft: '0.25rem'
-        }}>
-          <h2 style={{
-            fontSize: isMobile ? '1.25rem' : '1.5rem',
-            fontWeight: '700',
-            color: 'white',
-            margin: 0,
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.5rem'
-          }}>
-            <Check size={isMobile ? 20 : 24} color="#10b981" />
-            Vandaag Voltooid
-          </h2>
-        </div>
-
-        {/* Card with overlay */}
         <div style={{
           position: 'relative',
-          borderRadius: isMobile ? '20px' : '28px',
-          overflow: 'hidden'
+          height: isMobile ? '200px' : '260px',
+          borderRadius: isMobile ? '16px' : '20px',
+          overflow: 'hidden',
+          border: '2px solid rgba(16, 185, 129, 0.3)',
+          boxShadow: '0 8px 32px rgba(16, 185, 129, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.03)',
+          background: '#000'
         }}>
-          {/* Background - Last Meal Card (faded) */}
+          {/* Background image - faded */}
           {lastMeal && (
             <div style={{
-              opacity: 0.3,
-              filter: 'blur(1px)',
-              transform: 'scale(1.01)'
-            }}>
-              <div style={{
-                background: 'linear-gradient(135deg, #0a0a0a 0%, #171717 100%)',
-                borderRadius: isMobile ? '20px' : '28px',
-                border: '1px solid rgba(255, 255, 255, 0.1)',
-                overflow: 'hidden'
-              }}>
-                <div style={{
-                  height: isMobile ? '200px' : '280px',
-                  background: `url(${getMealImage(lastMeal)}) center/cover`
-                }} />
-                <div style={{
-                  padding: isMobile ? '1rem' : '1.25rem',
-                  height: '120px'
-                }} />
-              </div>
-            </div>
+              position: 'absolute',
+              inset: 0,
+              backgroundImage: `url(${getMealImage(lastMeal)})`,
+              backgroundSize: 'cover',
+              backgroundPosition: 'center',
+              opacity: 0.25,
+              filter: 'blur(2px)'
+            }} />
           )}
           
-          {/* Overlay Content */}
+          {/* Glassmorphic overlay */}
           <div style={{
             position: 'absolute',
             inset: 0,
+            background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.85) 0%, rgba(5, 150, 105, 0.75) 100%)',
+            backdropFilter: 'blur(12px)',
             display: 'flex',
             flexDirection: 'column',
             alignItems: 'center',
             justifyContent: 'center',
-            background: 'linear-gradient(135deg, rgba(6, 78, 59, 0.9) 0%, rgba(4, 120, 87, 0.85) 100%)',
-            backdropFilter: 'blur(10px)',
-            padding: '2rem'
+            padding: isMobile ? '1.5rem' : '2rem'
           }}>
+            {/* Check icon container - glassmorphic */}
             <div style={{
-              width: '80px',
-              height: '80px',
-              background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.2) 0%, rgba(255, 255, 255, 0.1) 100%)',
-              borderRadius: '20px',
+              width: isMobile ? '48px' : '56px',
+              height: isMobile ? '48px' : '56px',
+              background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.25) 0%, rgba(255, 255, 255, 0.15) 100%)',
+              backdropFilter: 'blur(12px)',
+              borderRadius: isMobile ? '12px' : '14px',
+              border: '1px solid rgba(255, 255, 255, 0.3)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              marginBottom: '1.5rem',
-              boxShadow: '0 10px 30px rgba(0, 0, 0, 0.2)'
+              marginBottom: isMobile ? '0.75rem' : '1rem',
+              boxShadow: '0 4px 16px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.2)'
             }}>
-              <Check size={40} color="white" strokeWidth={3} />
+              <Check 
+                size={isMobile ? 24 : 28} 
+                color="white" 
+                strokeWidth={3}
+                style={{ filter: 'drop-shadow(0 2px 4px rgba(0, 0, 0, 0.4))' }}
+              />
             </div>
             
+            {/* Title - ultra-tight typography */}
             <h3 style={{
-              fontSize: isMobile ? '1.5rem' : '1.875rem',
+              fontSize: isMobile ? '1.15rem' : '1.35rem',
               fontWeight: '800',
               color: 'white',
-              marginBottom: '0.5rem',
-              letterSpacing: '-0.02em',
-              textAlign: 'center'
-            }}>
-              Alle maaltijden voltooid!
-            </h3>
-            <p style={{
-              fontSize: isMobile ? '1rem' : '1.125rem',
-              color: 'rgba(255, 255, 255, 0.9)',
               margin: 0,
-              textAlign: 'center'
+              textAlign: 'center',
+              letterSpacing: '-0.02em',
+              textTransform: 'uppercase',
+              textShadow: '0 2px 8px rgba(0, 0, 0, 0.4)',
+              lineHeight: 1.2
             }}>
-              Geweldige prestatie vandaag
-            </p>
+              Voltooid!
+            </h3>
           </div>
+          
+          {/* Top glow line */}
+          <div style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            height: '2px',
+            background: 'linear-gradient(90deg, transparent 0%, rgba(255, 255, 255, 0.6) 50%, transparent 100%)',
+            opacity: 0.8,
+            pointerEvents: 'none'
+          }} />
         </div>
       </div>
     )
   }
 
+  // ACTIVE MEAL STATE - PREMIUM COMPACT
   return (
-    <div style={{
-      padding: isMobile ? '0 1rem 1rem' : '0 1.5rem 1.5rem'
+    <div style={{ 
+      padding: isMobile ? '0.5rem' : '0.625rem',
+      marginBottom: isMobile ? '1rem' : '1.5rem'
     }}>
-      {/* Section Header */}
       <div style={{
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        marginBottom: '1rem',
-        paddingLeft: '0.25rem'
-      }}>
-        <h2 style={{
-          fontSize: isMobile ? '1.25rem' : '1.5rem',
-          fontWeight: '700',
-          color: 'white',
-          margin: 0,
-          display: 'flex',
-          alignItems: 'center',
-          gap: '0.5rem'
-        }}>
-          <Flame size={isMobile ? 20 : 24} color="#f59e0b" />
-          Volgende Maaltijd
-        </h2>
-        
-        <button
-          onClick={onOpenDaySchedule}
-          onMouseEnter={() => setHoveredButton('schedule')}
-          onMouseLeave={() => setHoveredButton(null)}
-          style={{
-            padding: isMobile ? '0.5rem 1rem' : '0.625rem 1.25rem',
-            background: hoveredButton === 'schedule'
-              ? 'linear-gradient(135deg, rgba(59, 130, 246, 0.2) 0%, rgba(59, 130, 246, 0.1) 100%)'
-              : 'linear-gradient(135deg, rgba(30, 58, 138, 0.15) 0%, rgba(59, 130, 246, 0.08) 100%)',
-            border: '1px solid rgba(59, 130, 246, 0.2)',
-            borderRadius: '12px',
-            color: '#3b82f6',
-            fontSize: isMobile ? '0.875rem' : '0.95rem',
-            fontWeight: '600',
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.5rem',
-            transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-            transform: hoveredButton === 'schedule' ? 'translateY(-2px)' : 'translateY(0)',
-            boxShadow: hoveredButton === 'schedule'
-              ? '0 8px 20px rgba(59, 130, 246, 0.2)'
-              : '0 2px 8px rgba(0, 0, 0, 0.1)',
-            touchAction: 'manipulation',
-            WebkitTapHighlightColor: 'transparent'
-          }}
-        >
-          <Calendar size={16} />
-          Dag Schema
-        </button>
-      </div>
-
-      {/* Main Card */}
-      <div style={{
-        background: 'linear-gradient(135deg, #0a0a0a 0%, #171717 100%)',
-        borderRadius: isMobile ? '20px' : '28px',
+        position: 'relative',
+        height: isMobile ? '200px' : '260px',
+        borderRadius: isMobile ? '16px' : '20px',
         overflow: 'hidden',
-        border: '1px solid rgba(255, 255, 255, 0.1)',
-        boxShadow: '0 20px 40px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.02)',
-        position: 'relative'
+        border: '2px solid rgba(16, 185, 129, 0.3)',
+        boxShadow: '0 8px 32px rgba(16, 185, 129, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.03)',
+        background: '#000',
+        touchAction: 'manipulation',
+        WebkitTapHighlightColor: 'transparent'
       }}>
-        {/* Image Section - 2/3 height - KEEPING THIS */}
+        {/* Background image */}
         <div style={{
-          height: isMobile ? '200px' : '280px',
-          position: 'relative',
-          background: `url(${getMealImage(nextMeal)}) center/cover`,
+          position: 'absolute',
+          inset: 0,
+          backgroundImage: `url(${getMealImage(nextMeal)})`,
+          backgroundSize: 'cover',
+          backgroundPosition: 'center',
+          transition: 'opacity 0.5s ease',
+          zIndex: 1
+        }} />
+        
+        {/* Top vignette */}
+        <div style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          height: '40%',
+          background: 'linear-gradient(to bottom, rgba(0,0,0,0.5), transparent)',
+          pointerEvents: 'none',
+          zIndex: 2
+        }} />
+        
+        {/* Bottom gradient */}
+        <div style={{
+          position: 'absolute',
+          bottom: 0,
+          left: 0,
+          right: 0,
+          height: '60%',
+          background: 'linear-gradient(to top, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0.4) 60%, transparent 100%)',
+          pointerEvents: 'none',
+          zIndex: 2
+        }} />
+        
+        {/* Content layer */}
+        <div style={{
+          position: 'absolute',
+          bottom: 0,
+          left: 0,
+          right: 0,
+          padding: isMobile ? '1rem' : '1.5rem',
           display: 'flex',
-          alignItems: 'flex-end'
+          flexDirection: 'column',
+          gap: isMobile ? '0.625rem' : '0.75rem',
+          zIndex: 3
         }}>
-          {/* Gradient Overlay */}
-          <div style={{
-            position: 'absolute',
-            inset: 0,
-            background: `linear-gradient(to top, 
-              rgba(10, 10, 10, 0.95) 0%, 
-              rgba(10, 10, 10, 0.4) 30%, 
-              rgba(10, 10, 10, 0.2) 50%,
-              transparent 100%)`
-          }} />
-
-          {/* Time Badge - Premium Style */}
-          {timeDisplay && (
-            <div style={{
-              position: 'absolute',
-              top: '1rem',
-              right: '1rem',
-              background: timeDisplay.bg,
-              backdropFilter: 'blur(20px)',
-              border: `1px solid ${timeDisplay.color}40`,
-              borderRadius: '14px',
-              padding: isMobile ? '0.625rem 1rem' : '0.75rem 1.25rem',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.5rem',
-              boxShadow: `0 8px 24px ${timeDisplay.color}20`,
-              animation: timeDisplay.pulse ? 'pulse 2s ease-in-out infinite' : 'none'
-            }}>
-              <Clock size={18} color={timeDisplay.color} />
-              <span style={{
-                fontSize: isMobile ? '0.875rem' : '0.95rem',
-                fontWeight: '700',
-                color: timeDisplay.color,
-                letterSpacing: '0.02em'
-              }}>
-                {timeDisplay.text}
-              </span>
-            </div>
-          )}
-
-          {/* Meal Type Badge */}
-          <div style={{
-            position: 'absolute',
-            bottom: '1rem',
-            left: '1rem',
-            zIndex: 2
-          }}>
-            <div style={{
-              background: 'rgba(0, 0, 0, 0.8)',
-              backdropFilter: 'blur(20px)',
-              borderRadius: '12px',
-              padding: isMobile ? '0.5rem 1rem' : '0.625rem 1.25rem',
-              border: '1px solid rgba(255, 255, 255, 0.1)',
-              boxShadow: '0 8px 24px rgba(0, 0, 0, 0.4)'
-            }}>
-              <div style={{
-                fontSize: isMobile ? '0.75rem' : '0.85rem',
-                color: 'rgba(255, 255, 255, 0.6)',
-                fontWeight: '600',
-                textTransform: 'uppercase',
-                letterSpacing: '0.1em',
-                marginBottom: '0.125rem'
-              }}>
-                {nextMeal.timeSlot || nextMeal.slot || 'Maaltijd'}
-              </div>
-             
-
-<div style={{
-                fontSize: isMobile ? '1.125rem' : '1.375rem',
-                fontWeight: '800',
-                color: 'white',
-                letterSpacing: '-0.02em'
-              }}>
-                {(() => {
-                  const mealName = nextMeal.name || nextMeal.meal_name || 'Maaltijd'
-                  return mealName.length > 19 ? mealName.substring(0, 19) + '...' : mealName
-                })()}
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Content Section - REDESIGNED */}
-        <div style={{
-          padding: isMobile ? '1rem' : '1.25rem',
-          background: 'rgba(17, 17, 17, 0.5)',
-          backdropFilter: 'blur(10px)'
-        }}>
-          {/* Macro Bar - MOBILE OPTIMIZED */}
+          {/* Top row - Meal name + Time badge */}
           <div style={{
             display: 'flex',
             justifyContent: 'space-between',
             alignItems: 'center',
-            marginBottom: isMobile ? '0.75rem' : '1rem',
-            padding: '0'
+            gap: '0.75rem'
           }}>
-            {/* Calories - Hero */}
+            {/* Meal name container - glassmorphic */}
             <div style={{
+              background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.15) 0%, rgba(16, 185, 129, 0.08) 100%)',
+              backdropFilter: 'blur(12px)',
+              border: '1px solid rgba(16, 185, 129, 0.3)',
+              borderRadius: isMobile ? '12px' : '14px',
+              padding: isMobile ? '0.75rem 1rem' : '0.875rem 1.25rem',
               display: 'flex',
-              alignItems: 'baseline',
-              gap: '0.25rem'
+              alignItems: 'center',
+              gap: isMobile ? '0.5rem' : '0.625rem',
+              boxShadow: '0 4px 16px rgba(16, 185, 129, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.05)',
+              flex: 1,
+              minWidth: 0
             }}>
-              <Flame 
-                size={isMobile ? 16 : 18} 
-                color="#f59e0b" 
-                style={{ 
-                  opacity: 0.9,
-                  marginBottom: '0.125rem'
-                }} 
-              />
-
-
-<span style={{
-                fontSize: isMobile ? '1.5rem' : '1.75rem',
-                fontWeight: '800',
-                background: 'linear-gradient(135deg, #f59e0b 0%, #dc2626 100%)',
-                WebkitBackgroundClip: 'text',
-                WebkitTextFillColor: 'transparent',
-                backgroundClip: 'text',
-                lineHeight: 1,
-                letterSpacing: '-0.02em'
+              {/* Green apple icon container */}
+              <div style={{
+                width: isMobile ? '28px' : '32px',
+                height: isMobile ? '28px' : '32px',
+                borderRadius: '8px',
+                background: 'rgba(16, 185, 129, 0.2)',
+                border: '1px solid rgba(16, 185, 129, 0.4)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexShrink: 0,
+                boxShadow: '0 0 12px rgba(16, 185, 129, 0.3)'
               }}>
-                {Math.round(nextMeal.calories || 0)}
-              </span>
+                <Apple 
+                  size={isMobile ? 14 : 16} 
+                  color="#10b981"
+                  fill="#10b981"
+                  style={{ filter: 'drop-shadow(0 0 4px rgba(16, 185, 129, 0.6))' }}
+                />
+              </div>
+              
+              {/* Meal name text */}
               <span style={{
-                fontSize: isMobile ? '0.6rem' : '0.65rem',
-                color: 'rgba(245, 158, 11, 0.5)',
+                color: 'white',
+                fontSize: isMobile ? '0.95rem' : '1.15rem',
+                fontWeight: '800',
+                letterSpacing: '-0.02em',
                 textTransform: 'uppercase',
-                letterSpacing: '0.05em',
-                fontWeight: '600',
-                alignSelf: 'center',
-                marginRight: '0.5rem'
+                textShadow: '0 2px 8px rgba(0, 0, 0, 0.6)',
+                lineHeight: 1.2,
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap'
               }}>
-                kcal
+                {nextMeal.name || nextMeal.slot || 'Maaltijd'}
               </span>
             </div>
-            {/* Other Macros - Compact */}
-            <div style={{
-              display: 'flex',
-              gap: isMobile ? '0.625rem' : '0.875rem',
-              alignItems: 'center'
-            }}>
-              {/* Protein */}
+            
+            {/* Time badge - glassmorphic */}
+            {timeDisplay && (
               <div style={{
+                background: 'linear-gradient(135deg, rgba(23, 23, 23, 0.8) 0%, rgba(23, 23, 23, 0.6) 100%)',
+                backdropFilter: 'blur(12px)',
+                border: `1px solid ${timeDisplay.color}40`,
+                borderRadius: isMobile ? '10px' : '12px',
+                padding: isMobile ? '0.625rem 0.875rem' : '0.75rem 1rem',
                 display: 'flex',
                 alignItems: 'center',
-                gap: '0.2rem'
+                gap: '0.375rem',
+                boxShadow: `0 4px 16px ${timeDisplay.color}30, inset 0 1px 0 rgba(255, 255, 255, 0.05)`,
+                flexShrink: 0,
+                animation: timeDisplay.pulse ? 'pulse 2s ease-in-out infinite' : 'none'
               }}>
-                <Target size={isMobile ? 13 : 15} color="#8b5cf6" style={{ opacity: 0.7 }} />
+                <Clock 
+                  size={isMobile ? 12 : 14} 
+                  color={timeDisplay.color}
+                  style={{ 
+                    flexShrink: 0,
+                    filter: `drop-shadow(0 0 6px ${timeDisplay.color})`
+                  }}
+                />
                 <span style={{
-                  fontSize: isMobile ? '0.875rem' : '0.95rem',
-                  fontWeight: '700',
-                  color: '#8b5cf6'
+                  fontSize: isMobile ? '0.8rem' : '0.875rem',
+                  color: timeDisplay.color,
+                  fontWeight: '800',
+                  letterSpacing: '-0.01em',
+                  textShadow: `0 0 8px ${timeDisplay.color}60`
                 }}>
-                  {Math.round(nextMeal.protein || 0)}g
+                  {timeDisplay.text}
                 </span>
               </div>
-
-              {/* Carbs */}
-              <div style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.2rem'
-              }}>
-                <Zap size={isMobile ? 13 : 15} color="#ef4444" style={{ opacity: 0.7 }} />
-                <span style={{
-                  fontSize: isMobile ? '0.875rem' : '0.95rem',
-                  fontWeight: '700',
-                  color: '#ef4444'
-                }}>
-                  {Math.round(nextMeal.carbs || 0)}g
-                </span>
-              </div>
-
-              {/* Fat */}
-              <div style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.2rem'
-              }}>
-                <Droplets size={isMobile ? 13 : 15} color="#3b82f6" style={{ opacity: 0.7 }} />
-                <span style={{
-                  fontSize: isMobile ? '0.875rem' : '0.95rem',
-                  fontWeight: '700',
-                  color: '#3b82f6'
-                }}>
-                  {Math.round(nextMeal.fat || 0)}g
-                </span>
-              </div>
-            </div>
+            )}
           </div>
-          {/* Action Buttons - CLEAN MINIMALIST */}
+          
+          {/* Bottom row - Action buttons */}
           <div style={{
-            display: 'grid',
-            gridTemplateColumns: '1fr 1fr 2fr',
-            gap: isMobile ? '0.5rem' : '0.625rem'
+            display: 'flex',
+            gap: isMobile ? '0.5rem' : '0.625rem',
+            alignItems: 'stretch'
           }}>
-            {/* Info Button */}
+            {/* Info button - glassmorphic */}
             <button
               onClick={() => onOpenInfo(nextMeal)}
               style={{
-                background: 'rgba(59, 130, 246, 0.08)',
-                border: '1px solid rgba(59, 130, 246, 0.15)',
-                borderRadius: '10px',
+                background: 'linear-gradient(135deg, rgba(23, 23, 23, 0.8) 0%, rgba(23, 23, 23, 0.6) 100%)',
+                backdropFilter: 'blur(12px)',
+                border: '1px solid rgba(255, 255, 255, 0.1)',
+                borderRadius: isMobile ? '10px' : '12px',
                 padding: isMobile ? '0.75rem' : '0.875rem',
-                color: '#3b82f6',
-                fontSize: isMobile ? '0.875rem' : '0.95rem',
-                fontWeight: '600',
+                color: '#10b981',
+                fontSize: isMobile ? '0.8rem' : '0.875rem',
+                fontWeight: '700',
                 cursor: 'pointer',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
                 gap: '0.375rem',
-                transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+                transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
                 touchAction: 'manipulation',
                 WebkitTapHighlightColor: 'transparent',
-                minHeight: '44px'
+                minHeight: '44px',
+                minWidth: isMobile ? '44px' : 'auto',
+                boxShadow: '0 2px 8px rgba(16, 185, 129, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.05)',
+                flex: isMobile ? '0 0 auto' : '1'
               }}
               onMouseEnter={(e) => {
-                e.currentTarget.style.background = 'rgba(59, 130, 246, 0.15)'
-                e.currentTarget.style.transform = 'translateY(-1px)'
+                if (!isMobile) {
+                  e.currentTarget.style.background = 'linear-gradient(135deg, rgba(16, 185, 129, 0.2) 0%, rgba(16, 185, 129, 0.1) 100%)'
+                  e.currentTarget.style.transform = 'translateY(-2px)'
+                  e.currentTarget.style.boxShadow = '0 4px 12px rgba(16, 185, 129, 0.25)'
+                }
               }}
               onMouseLeave={(e) => {
-                e.currentTarget.style.background = 'rgba(59, 130, 246, 0.08)'
-                e.currentTarget.style.transform = 'translateY(0)'
+                if (!isMobile) {
+                  e.currentTarget.style.background = 'linear-gradient(135deg, rgba(23, 23, 23, 0.8) 0%, rgba(23, 23, 23, 0.6) 100%)'
+                  e.currentTarget.style.transform = 'translateY(0)'
+                  e.currentTarget.style.boxShadow = '0 2px 8px rgba(16, 185, 129, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.05)'
+                }
               }}
             >
-              <Info size={18} />
+              <Info 
+                size={isMobile ? 16 : 17}
+                style={{ filter: 'drop-shadow(0 0 6px rgba(16, 185, 129, 0.6))' }}
+              />
               {!isMobile && <span>Info</span>}
             </button>
 
-            {/* Swap Button */}
+            {/* Swap button - glassmorphic */}
             <button
               onClick={() => onOpenAlternatives(nextMeal)}
               style={{
-                background: 'rgba(251, 191, 36, 0.08)',
-                border: '1px solid rgba(251, 191, 36, 0.15)',
-                borderRadius: '10px',
+                background: 'linear-gradient(135deg, rgba(23, 23, 23, 0.8) 0%, rgba(23, 23, 23, 0.6) 100%)',
+                backdropFilter: 'blur(12px)',
+                border: '1px solid rgba(255, 255, 255, 0.1)',
+                borderRadius: isMobile ? '10px' : '12px',
                 padding: isMobile ? '0.75rem' : '0.875rem',
-                color: '#fbbf24',
-                fontSize: isMobile ? '0.875rem' : '0.95rem',
-                fontWeight: '600',
+                color: '#10b981',
+                fontSize: isMobile ? '0.8rem' : '0.875rem',
+                fontWeight: '700',
                 cursor: 'pointer',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
                 gap: '0.375rem',
-                transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+                transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
                 touchAction: 'manipulation',
                 WebkitTapHighlightColor: 'transparent',
-                minHeight: '44px'
+                minHeight: '44px',
+                minWidth: isMobile ? '44px' : 'auto',
+                boxShadow: '0 2px 8px rgba(16, 185, 129, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.05)',
+                flex: isMobile ? '0 0 auto' : '1'
               }}
               onMouseEnter={(e) => {
-                e.currentTarget.style.background = 'rgba(251, 191, 36, 0.15)'
-                e.currentTarget.style.transform = 'translateY(-1px)'
+                if (!isMobile) {
+                  e.currentTarget.style.background = 'linear-gradient(135deg, rgba(16, 185, 129, 0.2) 0%, rgba(16, 185, 129, 0.1) 100%)'
+                  e.currentTarget.style.transform = 'translateY(-2px)'
+                  e.currentTarget.style.boxShadow = '0 4px 12px rgba(16, 185, 129, 0.25)'
+                }
               }}
               onMouseLeave={(e) => {
-                e.currentTarget.style.background = 'rgba(251, 191, 36, 0.08)'
-                e.currentTarget.style.transform = 'translateY(0)'
+                if (!isMobile) {
+                  e.currentTarget.style.background = 'linear-gradient(135deg, rgba(23, 23, 23, 0.8) 0%, rgba(23, 23, 23, 0.6) 100%)'
+                  e.currentTarget.style.transform = 'translateY(0)'
+                  e.currentTarget.style.boxShadow = '0 2px 8px rgba(16, 185, 129, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.05)'
+                }
               }}
             >
-              <RefreshCw size={18} />
+              <RefreshCw 
+                size={isMobile ? 16 : 17}
+                style={{ filter: 'drop-shadow(0 0 6px rgba(16, 185, 129, 0.6))' }}
+              />
               {!isMobile && <span>Wissel</span>}
             </button>
 
-            {/* Finish Button - Primary CTA */}
+            {/* Complete button - PRIMARY glassmorphic with green emphasis */}
             <button
               onClick={() => onFinishMeal(nextMeal)}
               style={{
-                background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.15) 0%, rgba(16, 185, 129, 0.08) 100%)',
-                border: '1px solid rgba(16, 185, 129, 0.25)',
-                borderRadius: '10px',
-                padding: isMobile ? '0.75rem' : '0.875rem',
+                background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.25) 0%, rgba(5, 150, 105, 0.15) 100%)',
+                backdropFilter: 'blur(12px)',
+                border: '1px solid rgba(16, 185, 129, 0.4)',
+                borderRadius: isMobile ? '10px' : '12px',
+                padding: isMobile ? '0.75rem 1rem' : '0.875rem 1.25rem',
                 color: '#10b981',
-                fontSize: isMobile ? '0.95rem' : '1rem',
-                fontWeight: '700',
+                fontSize: isMobile ? '0.85rem' : '0.9rem',
+                fontWeight: '800',
                 cursor: 'pointer',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
                 gap: '0.5rem',
-                transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+                transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
                 touchAction: 'manipulation',
                 WebkitTapHighlightColor: 'transparent',
-                minHeight: '48px',
-                position: 'relative',
-                overflow: 'hidden'
+                minHeight: '44px',
+                boxShadow: '0 4px 16px rgba(16, 185, 129, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.05)',
+                flex: '2',
+                letterSpacing: '-0.01em',
+                textTransform: 'uppercase'
               }}
               onMouseEnter={(e) => {
-                e.currentTarget.style.background = 'linear-gradient(135deg, rgba(16, 185, 129, 0.25) 0%, rgba(16, 185, 129, 0.15) 100%)'
-                e.currentTarget.style.transform = 'translateY(-1px)'
-                e.currentTarget.style.boxShadow = '0 8px 20px rgba(16, 185, 129, 0.2)'
+                e.currentTarget.style.background = 'linear-gradient(135deg, rgba(16, 185, 129, 0.35) 0%, rgba(5, 150, 105, 0.25) 100%)'
+                e.currentTarget.style.transform = 'translateY(-2px)'
+                e.currentTarget.style.boxShadow = '0 8px 24px rgba(16, 185, 129, 0.35)'
               }}
               onMouseLeave={(e) => {
-                e.currentTarget.style.background = 'linear-gradient(135deg, rgba(16, 185, 129, 0.15) 0%, rgba(16, 185, 129, 0.08) 100%)'
+                e.currentTarget.style.background = 'linear-gradient(135deg, rgba(16, 185, 129, 0.25) 0%, rgba(5, 150, 105, 0.15) 100%)'
                 e.currentTarget.style.transform = 'translateY(0)'
-                e.currentTarget.style.boxShadow = 'none'
+                e.currentTarget.style.boxShadow = '0 4px 16px rgba(16, 185, 129, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.05)'
               }}
               onTouchStart={(e) => {
-                if (isMobile) {
-                  e.currentTarget.style.transform = 'scale(0.98)'
-                }
+                if (isMobile) e.currentTarget.style.transform = 'scale(0.98)'
               }}
               onTouchEnd={(e) => {
-                if (isMobile) {
-                  e.currentTarget.style.transform = 'scale(1)'
-                }
+                if (isMobile) e.currentTarget.style.transform = 'scale(1)'
               }}
             >
-              <Check size={20} strokeWidth={2.5} />
-              <span>Maaltijd Afronden</span>
+              <Check 
+                size={isMobile ? 16 : 18} 
+                strokeWidth={2.5}
+                style={{ filter: 'drop-shadow(0 0 8px rgba(16, 185, 129, 0.6))' }}
+              />
+              <span>Afronden</span>
             </button>
           </div>
-
-          {/* Urgency Message - CLEANER */}
+          
+          {/* Urgency alert - only when time is NOW */}
           {timeDisplay?.urgency === 'now' && (
             <div style={{
-              marginTop: '0.75rem',
-              padding: isMobile ? '0.625rem 0.75rem' : '0.75rem 1rem',
-              background: 'rgba(251, 191, 36, 0.05)',
-              border: '1px solid rgba(251, 191, 36, 0.15)',
-              borderRadius: '10px',
+              background: 'linear-gradient(135deg, rgba(251, 191, 36, 0.2) 0%, rgba(245, 158, 11, 0.12) 100%)',
+              backdropFilter: 'blur(12px)',
+              border: '1px solid rgba(251, 191, 36, 0.4)',
+              borderRadius: isMobile ? '10px' : '12px',
+              padding: isMobile ? '0.625rem 0.875rem' : '0.75rem 1rem',
               display: 'flex',
               alignItems: 'center',
-              gap: '0.5rem'
+              justifyContent: 'center',
+              gap: '0.5rem',
+              boxShadow: '0 4px 16px rgba(251, 191, 36, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.05)',
+              animation: 'pulse 2s ease-in-out infinite'
             }}>
-              <AlertCircle size={16} color="#fbbf24" style={{ flexShrink: 0 }} />
+              <AlertCircle 
+                size={isMobile ? 14 : 15} 
+                color="#fbbf24" 
+                style={{ 
+                  flexShrink: 0,
+                  filter: 'drop-shadow(0 0 6px rgba(251, 191, 36, 0.6))'
+                }}
+              />
               <span style={{
                 fontSize: isMobile ? '0.8rem' : '0.875rem',
-                color: 'rgba(251, 191, 36, 0.9)',
-                fontWeight: '500',
-                lineHeight: 1.3
+                color: '#fbbf24',
+                fontWeight: '800',
+                letterSpacing: '-0.01em',
+                textTransform: 'uppercase',
+                textShadow: '0 0 8px rgba(251, 191, 36, 0.3)'
               }}>
-                Het is tijd voor je {nextMeal.timeSlot || 'maaltijd'}!
+                Tijd om te eten!
               </span>
             </div>
           )}
         </div>
+        
+        {/* Top green accent glow */}
+        <div style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          height: '2px',
+          background: 'linear-gradient(90deg, transparent 0%, #10b981 50%, transparent 100%)',
+          opacity: 0.6,
+          pointerEvents: 'none',
+          zIndex: 4
+        }} />
       </div>
 
-      {/* Animations */}
       <style>{`
-        @keyframes float {
-          0%, 100% { transform: translateY(0px) rotate(0deg); }
-          50% { transform: translateY(-20px) rotate(5deg); }
-        }
-        
         @keyframes pulse {
-          0%, 100% {
-            transform: scale(1);
-            opacity: 1;
+          0%, 100% { 
+            transform: scale(1); 
+            opacity: 1; 
           }
-          50% {
-            transform: scale(1.05);
-            opacity: 0.8;
+          50% { 
+            transform: scale(1.02); 
+            opacity: 0.9; 
           }
         }
       `}</style>

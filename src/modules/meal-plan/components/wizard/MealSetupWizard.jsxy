@@ -1,0 +1,417 @@
+// src/modules/meal-plan/components/wizard/MealSetupWizard.jsx
+// UPDATED: Now 9 slides with meal prep builder and week preview
+// FIXES APPLIED: #8 (forcedMealIds), #1 (weekPlanMeals), #6 (wizardData prop)
+
+import { useState, useEffect } from 'react'
+import WizardLayout from './shared/WizardLayout'
+import Slide1Intro from './slides/Slide1Intro'
+import Slide2MacroGoals from './slides/Slide2MacroGoals'
+import Slide3MealStructure from './slides/Slide3MealStructure'
+import Slide4ProteinPicker from './slides/Slide4ProteinPicker'
+import Slide5CarbPicker from './slides/Slide5CarbPicker'
+import Slide6MealPrepIntro from './slides/Slide6MealPrepIntro'
+import Slide7WeeklyPrepBuilder from './slides/Slide7WeeklyPrepBuilder'
+import Slide8DailyPrepBuilder from './slides/Slide8DailyPrepBuilder'
+import Slide9WeekPreview from './slides/Slide9WeekPreview'
+import { getAIMealPlanningService } from '../../../ai-meal-generator/AIMealPlanningService'
+
+export default function MealSetupWizard({ isOpen, onClose, onComplete, client, db, isMobile }) {
+  const [currentSlide, setCurrentSlide] = useState(1)
+  const [isGenerating, setIsGenerating] = useState(false)
+  const [generatedWeekPlan, setGeneratedWeekPlan] = useState(null)
+  
+  const totalSlides = 9 // UPDATED from 6 to 9
+  
+  const [wizardData, setWizardData] = useState({
+    mealStructure: null,
+    selectedProteins: [],
+    selectedCarbs: [],
+    weeklyPrep: {
+      cookDay: null,
+      portions: 7,
+      selectedMeals: []
+    },
+    dailyPrep: {
+      portions: 2,
+      selectedMeals: []
+    }
+  })
+
+  // Load AI meals for pickers
+  const [allMeals, setAllMeals] = useState([])
+  const [weekPlanMeals, setWeekPlanMeals] = useState([])
+
+  useEffect(() => {
+    if (isOpen) {
+      console.log('🧙 [WIZARD] Component rendered', { currentSlide, totalSlides })
+      loadAIMeals()
+    }
+  }, [isOpen])
+
+  useEffect(() => {
+    console.log('✅ [WIZARD] isOpen changed:', isOpen)
+  }, [isOpen])
+
+  useEffect(() => {
+    console.log('📍 [WIZARD] Current slide:', `${currentSlide}/${totalSlides}`)
+    console.log('   Can go next:', canGoNext())
+    console.log('   Wizard data:', wizardData)
+  }, [currentSlide])
+
+  useEffect(() => {
+    console.log('💾 [WIZARD] Wizard data updated:', wizardData)
+  }, [wizardData])
+
+  const loadAIMeals = async () => {
+    try {
+      const { data: meals } = await db.supabase
+        .from('ai_meals')
+        .select('*')
+        .order('protein', { ascending: false })
+      
+      setAllMeals(meals || [])
+      console.log(`✅ [WIZARD] Loaded ${meals?.length || 0} meals for pickers`)
+    } catch (error) {
+      console.error('❌ [WIZARD] Failed to load meals:', error)
+      setAllMeals([])
+    }
+  }
+
+  const handleUpdateData = (key, value) => {
+    console.log(`🔄 [WIZARD] Updating "${key}":`, value)
+    setWizardData(prev => ({
+      ...prev,
+      [key]: value
+    }))
+  }
+
+  const canGoNext = () => {
+    switch (currentSlide) {
+      case 1:
+        return true
+      case 2:
+        return true
+      case 3:
+        return wizardData.mealStructure !== null
+      case 4:
+        return wizardData.selectedProteins.length === 3
+      case 5:
+        return wizardData.selectedCarbs.length === 3
+      case 6:
+        return true
+      case 7:
+        return wizardData.weeklyPrep.cookDay !== null &&
+               wizardData.weeklyPrep.portions > 0 &&
+               wizardData.weeklyPrep.selectedMeals.length === 3
+      case 8:
+        return true // Optional slide
+      case 9:
+        return true // Can always complete
+      default:
+        return false
+    }
+  }
+
+  const handleNext = async () => {
+    console.log(`➡️ [WIZARD] handleNext called from slide ${currentSlide}`)
+    
+    if (currentSlide < totalSlides) {
+      console.log(`   Moving to slide ${currentSlide + 1}`)
+      
+      // Generate plan when moving from slide 8 to 9
+      if (currentSlide === 8 && !generatedWeekPlan) {
+        await handleGeneratePlan()
+      }
+      
+      setCurrentSlide(currentSlide + 1)
+    } else {
+      console.log('🏁 [WIZARD] Last slide reached - calling handleComplete')
+      handleComplete()
+    }
+  }
+
+  const handleBack = () => {
+    if (currentSlide > 1) {
+      setCurrentSlide(currentSlide - 1)
+    }
+  }
+
+  // ============================================
+  // ✅ FIX #8: FORCE MEAL PREP MEALS IN GENERATION
+  // ============================================
+  const handleGeneratePlan = async () => {
+    console.log('🎨 [WIZARD] Generating AI meal plan...')
+    setIsGenerating(true)
+
+    try {
+      const aiService = getAIMealPlanningService(db.supabase)
+      const clientProfile = await aiService.ensureClientProfile(client)
+      
+      // Combine selected proteins + carbs
+      const selectedIngredients = [
+        ...wizardData.selectedProteins,
+        ...wizardData.selectedCarbs
+      ]
+      
+      // ⭐ BUILD FORCED MEAL IDS from meal prep config
+      const forcedMealIds = []
+      
+      // Add weekly prep meals
+      if (wizardData.weeklyPrep?.selectedMeals?.length > 0) {
+        forcedMealIds.push(...wizardData.weeklyPrep.selectedMeals)
+        console.log('🍱 [WIZARD] Forcing weekly prep meals:', wizardData.weeklyPrep.selectedMeals)
+      }
+      
+      // Add daily prep meals
+      if (wizardData.dailyPrep?.selectedMeals?.length > 0) {
+        forcedMealIds.push(...wizardData.dailyPrep.selectedMeals)
+        console.log('🍱 [WIZARD] Forcing daily prep meals:', wizardData.dailyPrep.selectedMeals)
+      }
+      
+      console.log('🎯 [WIZARD] Total forced meals:', forcedMealIds.length)
+      
+      const mealsPerDay = wizardData.mealStructure.meals + wizardData.mealStructure.snacks
+      
+      // Options for AI generation
+      const options = {
+        excludedIngredientIds: [],
+        forcedMealIds: forcedMealIds, // ✅ NOW HAS MEAL PREP MEALS!
+        mealsPerDay: mealsPerDay,
+        selectedIngredients: selectedIngredients
+      }
+      
+      console.log('📊 [WIZARD] Generation options:', {
+        mealsPerDay: options.mealsPerDay,
+        forcedMeals: options.forcedMealIds.length,
+        selectedIngredients: options.selectedIngredients.length
+      })
+
+      const result = await aiService.generateWeekPlan(clientProfile, options)
+      
+      // Verify forced meals are in plan
+      const usedMealIds = new Set()
+      result.weekPlan.forEach(day => {
+        if (day.breakfast?.id) usedMealIds.add(day.breakfast.id)
+        if (day.lunch?.id) usedMealIds.add(day.lunch.id)
+        if (day.dinner?.id) usedMealIds.add(day.dinner.id)
+        day.snacks?.forEach(s => usedMealIds.add(s.id))
+      })
+      
+      const forcedMealsUsed = forcedMealIds.filter(id => usedMealIds.has(id))
+      console.log(`✅ [WIZARD] ${forcedMealsUsed.length}/${forcedMealIds.length} forced meals used in plan`)
+      
+      if (forcedMealsUsed.length < forcedMealIds.length) {
+        console.warn('⚠️ [WIZARD] Not all forced meals could be included. Plan may need adjustment.')
+      }
+      
+      setGeneratedWeekPlan(result)
+      
+      // ⭐ POPULATE weekPlanMeals for tab switcher (FIX #1)
+      const uniqueMeals = Array.from(usedMealIds)
+      const planMeals = allMeals.filter(m => uniqueMeals.includes(m.id))
+      setWeekPlanMeals(planMeals)
+      console.log('📋 [WIZARD] Week plan contains', planMeals.length, 'unique meals')
+      
+      setIsGenerating(false)
+
+    } catch (error) {
+      console.error('❌ [WIZARD] Generation failed:', error)
+      setIsGenerating(false)
+      alert('Plan genereren mislukt. Probeer opnieuw.')
+    }
+  }
+
+  const handleRegenerate = async () => {
+    console.log('🔄 [WIZARD] Regenerating plan...')
+    setGeneratedWeekPlan(null)
+    await handleGeneratePlan()
+  }
+
+  const handleComplete = async () => {
+    console.log('🎯 [WIZARD] handleComplete started')
+    
+    try {
+      const generationSettings = {
+        wizard_completed: true,
+        completed_at: new Date().toISOString(),
+        meal_structure: wizardData.mealStructure,
+        preferred_proteins: wizardData.selectedProteins,
+        preferred_carbs: wizardData.selectedCarbs,
+        meal_prep_config: {
+          weekly_prep_meals: wizardData.weeklyPrep.selectedMeals,
+          weekly_prep_config: {
+            portions: wizardData.weeklyPrep.portions,
+            cookDay: wizardData.weeklyPrep.cookDay
+          },
+          daily_prep_meals: wizardData.dailyPrep.selectedMeals,
+          daily_prep_config: {
+            portions: wizardData.dailyPrep.portions
+          }
+        }
+      }
+
+      if (!generatedWeekPlan) {
+        throw new Error('No week plan generated')
+      }
+
+      const weekStructure = {}
+      const days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday']
+      
+      generatedWeekPlan.weekPlan.forEach((day, index) => {
+        weekStructure[days[index]] = {
+          breakfast: day.breakfast?.id ? {
+            meal_id: day.breakfast.id,
+            meal_name: day.breakfast.name,
+            calories: day.breakfast.calories,
+            protein: day.breakfast.protein,
+            carbs: day.breakfast.carbs,
+            fat: day.breakfast.fat,
+            scale_factor: day.breakfast.scaleFactor || 1
+          } : null,
+          lunch: day.lunch?.id ? {
+            meal_id: day.lunch.id,
+            meal_name: day.lunch.name,
+            calories: day.lunch.calories,
+            protein: day.lunch.protein,
+            carbs: day.lunch.carbs,
+            fat: day.lunch.fat,
+            scale_factor: day.lunch.scaleFactor || 1
+          } : null,
+          dinner: day.dinner?.id ? {
+            meal_id: day.dinner.id,
+            meal_name: day.dinner.name,
+            calories: day.dinner.calories,
+            protein: day.dinner.protein,
+            carbs: day.dinner.carbs,
+            fat: day.dinner.fat,
+            scale_factor: day.dinner.scaleFactor || 1
+          } : null,
+          snacks: day.snacks.map(s => ({
+            meal_id: s.id,
+            meal_name: s.name,
+            calories: s.calories,
+            protein: s.protein,
+            carbs: s.carbs,
+            fat: s.fat,
+            scale_factor: s.scaleFactor || 1
+          })),
+          totals: day.totals
+        }
+      })
+
+      const { data: existingPlans } = await db.supabase
+        .from('client_meal_plans')
+        .select('id')
+        .eq('client_id', client.id)
+        .eq('is_active', true)
+
+      if (existingPlans && existingPlans.length > 0) {
+        const { error: updateError } = await db.supabase
+          .from('client_meal_plans')
+          .update({
+            generation_settings: generationSettings,
+            week_structure: weekStructure,
+            ai_generated: true,
+            ai_version: 'wizard_v2',
+            daily_calories: generatedWeekPlan.dailyTargets.kcal,
+            daily_protein: generatedWeekPlan.dailyTargets.protein,
+            daily_carbs: generatedWeekPlan.dailyTargets.carbs,
+            daily_fat: generatedWeekPlan.dailyTargets.fat,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', existingPlans[0].id)
+
+        if (updateError) throw updateError
+      } else {
+        const { error: insertError } = await db.supabase
+          .from('client_meal_plans')
+          .insert([{
+            client_id: client.id,
+            template_name: `AI Wizard Plan - ${new Date().toLocaleDateString('nl-NL')}`,
+            generation_settings: generationSettings,
+            week_structure: weekStructure,
+            ai_generated: true,
+            ai_version: 'wizard_v2',
+            is_active: true,
+            daily_calories: generatedWeekPlan.dailyTargets.kcal,
+            daily_protein: generatedWeekPlan.dailyTargets.protein,
+            daily_carbs: generatedWeekPlan.dailyTargets.carbs,
+            daily_fat: generatedWeekPlan.dailyTargets.fat,
+            start_date: new Date().toISOString().split('T')[0],
+            created_via: 'wizard'
+          }])
+
+        if (insertError) throw insertError
+      }
+
+      console.log('🎉 [WIZARD] Complete success!')
+      onComplete(wizardData)
+
+    } catch (error) {
+      console.error('❌ [WIZARD] handleComplete failed:', error)
+      alert('Plan opslaan mislukt. Probeer opnieuw.')
+    }
+  }
+
+  const renderSlide = () => {
+    switch (currentSlide) {
+      case 1:
+        return <Slide1Intro client={client} isMobile={isMobile} />
+      case 2:
+        return <Slide2MacroGoals client={client} isMobile={isMobile} />
+      case 3:
+        return <Slide3MealStructure wizardData={wizardData} onUpdate={handleUpdateData} isMobile={isMobile} />
+      case 4:
+        return <Slide4ProteinPicker wizardData={wizardData} onUpdate={handleUpdateData} db={db} isMobile={isMobile} />
+      case 5:
+        return <Slide5CarbPicker wizardData={wizardData} onUpdate={handleUpdateData} db={db} isMobile={isMobile} />
+      case 6:
+        return <Slide6MealPrepIntro isMobile={isMobile} />
+      case 7:
+        return <Slide7WeeklyPrepBuilder wizardData={wizardData} onUpdate={handleUpdateData} allMeals={allMeals} weekPlanMeals={weekPlanMeals} isMobile={isMobile} />
+      case 8:
+        return <Slide8DailyPrepBuilder wizardData={wizardData} onUpdate={handleUpdateData} allMeals={allMeals} weekPlanMeals={weekPlanMeals} isMobile={isMobile} />
+      case 9:
+        if (isGenerating) {
+          return (
+            <div style={{ padding: isMobile ? '2rem 1rem' : '3rem 2rem', textAlign: 'center' }}>
+              <div style={{ fontSize: isMobile ? '3rem' : '4rem', marginBottom: '1rem', animation: 'spin 2s linear infinite' }}>🎨</div>
+              <div style={{ fontSize: isMobile ? '1.25rem' : '1.5rem', color: 'white', marginBottom: '0.5rem' }}>Jouw perfecte week wordt gegenereerd...</div>
+              <div style={{ fontSize: isMobile ? '0.875rem' : '1rem', color: 'rgba(255, 255, 255, 0.5)' }}>De AI analyseert jouw voorkeuren en macro's</div>
+              <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+            </div>
+          )
+        }
+        // ⭐ FIX #6: Pass wizardData prop for meal prep indicators
+        return (
+          <Slide9WeekPreview 
+            wizardData={wizardData}
+            generatedWeekPlan={generatedWeekPlan}
+            allMeals={allMeals}
+            onUpdate={handleUpdateData}
+            onRegenerate={handleRegenerate}
+            isMobile={isMobile}
+          />
+        )
+      default:
+        return null
+    }
+  }
+
+  if (!isOpen) return null
+
+  return (
+    <WizardLayout
+      currentSlide={currentSlide}
+      totalSlides={totalSlides}
+      canGoNext={canGoNext()}
+      canGoBack={currentSlide > 1}
+      onNext={handleNext}
+      onBack={handleBack}
+      onClose={onClose}
+      isMobile={isMobile}
+    >
+      {renderSlide()}
+    </WizardLayout>
+  )
+}

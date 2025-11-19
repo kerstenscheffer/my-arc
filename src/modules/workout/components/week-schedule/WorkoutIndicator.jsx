@@ -1,7 +1,4 @@
-
-// ========================================
-// 📁 src/modules/workout/components/week-schedule/WorkoutIndicator.jsx
-// ========================================
+// src/modules/workout/components/week-schedule/WorkoutIndicator.jsx
 const muscleGroupImages = {
   chest: 'https://images.unsplash.com/photo-1581009146145-b5ef050c2e1e?w=400&h=300&fit=crop',
   back: 'https://images.unsplash.com/photo-1603287681836-b174ce5074c2?w=400&h=300&fit=crop',
@@ -31,25 +28,27 @@ export default function WorkoutIndicator({ workoutData, isMobile }) {
       display: 'flex', 
       flexDirection: 'column', 
       alignItems: 'center', 
-      gap: '0.25rem' 
+      gap: isMobile ? '0.25rem' : '0.3rem'
     }}>
       <div style={{ 
-        width: isMobile ? '32px' : '36px', 
-        height: isMobile ? '32px' : '36px', 
-        borderRadius: '10px', 
+        width: isMobile ? '28px' : '32px', 
+        height: isMobile ? '28px' : '32px', 
+        borderRadius: '8px', 
         background: `url(${workoutImage}) center/cover`, 
-        border: '2px solid rgba(249, 115, 22, 0.2)', 
+        border: '1px solid rgba(249, 115, 22, 0.25)', 
         position: 'relative', 
-        overflow: 'hidden' 
+        overflow: 'hidden',
+        boxShadow: '0 2px 8px rgba(0, 0, 0, 0.15)'
       }} />
       <div style={{ 
-        fontSize: isMobile ? '0.55rem' : '0.65rem', 
+        fontSize: isMobile ? '0.55rem' : '0.6rem', 
         color: 'rgba(255,255,255,0.6)', 
         lineHeight: 1.2, 
-        maxWidth: isMobile ? '45px' : '60px', 
+        maxWidth: isMobile ? '45px' : '55px', 
         overflow: 'hidden', 
         textOverflow: 'ellipsis', 
-        whiteSpace: 'nowrap' 
+        whiteSpace: 'nowrap',
+        fontWeight: '600'
       }}>
         {workoutData.focus?.split(',')[0] || ''}
       </div>

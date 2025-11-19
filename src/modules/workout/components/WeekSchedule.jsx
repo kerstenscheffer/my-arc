@@ -1,6 +1,6 @@
 // src/modules/workout/components/WeekSchedule.jsx
 import useIsMobile from '../../../hooks/useIsMobile'
-import { Info } from 'lucide-react'
+import { Info, AlertCircle } from 'lucide-react'
 import { useState, useEffect } from 'react'
 import PlanningModal from './planning/PlanningModal'
 import PlanningButtons from './week-schedule/PlanningButtons'
@@ -48,7 +48,6 @@ export default function WeekSchedule({
     }
   }, [weekSchedule, loading])
   
-  // Load custom workouts referenced in schedule
   const loadCustomWorkoutsForSchedule = async (schedule) => {
     if (!workoutService || !schedule) {
       console.log('⚠️ Missing workoutService or schedule')
@@ -174,17 +173,14 @@ export default function WeekSchedule({
     }
   }
   
-  // Get workout data (schema, custom, or activity)
   const getWorkoutData = (workoutKey) => {
     if (!workoutKey) return null
     
-    // Custom workouts
     if (workoutKey.startsWith('custom_')) {
       const customId = workoutKey.replace('custom_', '')
       return customWorkouts[customId] || null
     }
     
-    // Standard activities (swimming, cardio, etc)
     const activities = {
       swimming: {
         name: 'Zwemmen',
@@ -227,7 +223,6 @@ export default function WeekSchedule({
       return activities[workoutKey]
     }
     
-    // Schema workouts
     if (schema?.week_structure?.[workoutKey]) {
       return schema.week_structure[workoutKey]
     }
@@ -238,21 +233,23 @@ export default function WeekSchedule({
   if (!hasValidSchema) {
     return (
       <div style={{ 
-        paddingLeft: isMobile ? '0.75rem' : '1.5rem',
-        paddingRight: isMobile ? '0.75rem' : '1.5rem',
+        padding: isMobile ? '0.5rem' : '0.625rem',
         marginBottom: '1rem'
       }}>
         <div style={{
-          padding: isMobile ? '1rem' : '1.5rem',
-          background: 'rgba(17, 17, 17, 0.8)',
-          borderRadius: '12px',
+          padding: isMobile ? '1.5rem' : '2rem',
+          background: 'linear-gradient(135deg, rgba(23, 23, 23, 0.9) 0%, rgba(10, 10, 10, 0.85) 100%)',
+          borderRadius: isMobile ? '16px' : '20px',
           border: '1px solid rgba(255, 255, 255, 0.1)',
-          textAlign: 'center'
+          textAlign: 'center',
+          backdropFilter: 'blur(10px)'
         }}>
+          <AlertCircle size={isMobile ? 32 : 40} color="rgba(255, 255, 255, 0.3)" style={{ marginBottom: '1rem' }} />
           <p style={{
             color: 'rgba(255, 255, 255, 0.5)',
             margin: 0,
-            fontSize: isMobile ? '0.9rem' : '1rem'
+            fontSize: isMobile ? '0.9rem' : '1rem',
+            fontWeight: '500'
           }}>
             Geen workout schema beschikbaar
           </p>
@@ -263,29 +260,59 @@ export default function WeekSchedule({
   
   return (
     <div style={{ 
-      paddingLeft: isMobile ? '0.75rem' : '1.5rem',
-      paddingRight: isMobile ? '0.75rem' : '1.5rem',
+      padding: isMobile ? '0.5rem' : '0.625rem',
       marginBottom: '1rem'
     }}>
-      {/* Swap Mode Info */}
+      {/* Swap Mode Info Banner - UPGRADED */}
       {localSwapMode && (
         <div style={{
           marginBottom: '1rem',
-          padding: isMobile ? '0.75rem' : '1rem',
-          background: 'linear-gradient(135deg, rgba(249, 115, 22, 0.08) 0%, rgba(234, 88, 12, 0.04) 100%)',
-          borderRadius: '12px',
-          border: '1px solid rgba(249, 115, 22, 0.15)',
+          background: 'linear-gradient(135deg, rgba(23, 23, 23, 0.95) 0%, rgba(10, 10, 10, 0.9) 100%)',
+          backdropFilter: 'blur(12px)',
+          border: '1px solid rgba(249, 115, 22, 0.3)',
+          borderRadius: isMobile ? '12px' : '14px',
+          padding: isMobile ? '0.875rem 1rem' : '1rem 1.25rem',
           display: 'flex',
           alignItems: 'center',
-          gap: '0.75rem'
+          gap: isMobile ? '0.75rem' : '1rem',
+          boxShadow: '0 4px 16px rgba(249, 115, 22, 0.2), inset 0 1px 0 rgba(249, 115, 22, 0.05)',
+          position: 'relative',
+          overflow: 'hidden'
         }}>
-          <Info size={18} color="#f97316" />
+          {/* Orange glow line top */}
+          <div style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            height: '2px',
+            background: 'linear-gradient(90deg, transparent 0%, #f97316 50%, transparent 100%)',
+            opacity: 0.6
+          }} />
+          
+          {/* Icon container */}
+          <div style={{
+            width: isMobile ? '32px' : '36px',
+            height: isMobile ? '32px' : '36px',
+            borderRadius: '8px',
+            background: 'rgba(249, 115, 22, 0.15)',
+            border: '1px solid rgba(249, 115, 22, 0.3)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            flexShrink: 0,
+            boxShadow: '0 0 12px rgba(249, 115, 22, 0.3)'
+          }}>
+            <Info size={isMobile ? 16 : 18} color="#f97316" style={{ filter: 'drop-shadow(0 0 4px rgba(249, 115, 22, 0.6))' }} />
+          </div>
+          
           <div style={{ flex: 1 }}>
             <p style={{
-              fontSize: isMobile ? '0.8rem' : '0.85rem',
+              fontSize: isMobile ? '0.8rem' : '0.875rem',
               color: '#f97316',
               margin: 0,
-              fontWeight: '600'
+              fontWeight: '600',
+              lineHeight: 1.4
             }}>
               {selectedForSwap ? 
                 selectedForSwap.workoutKey ?
@@ -314,7 +341,7 @@ export default function WeekSchedule({
         isMobile={isMobile}
       />
       
-      {/* Planning Buttons - VERPLAATST NAAR ONDER GRID */}
+      {/* Planning Buttons */}
       <div style={{ marginTop: '1rem' }}>
         <PlanningButtons
           onOpenWizard={onOpenWizard}

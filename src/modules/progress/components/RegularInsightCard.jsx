@@ -1,51 +1,51 @@
 // src/modules/progress/components/RegularInsightCard.jsx
-import { ChevronRight } from 'lucide-react'
-
 export default function RegularInsightCard({ insight, onClick, isMobile }) {
   const Icon = insight.icon
-
+  const isClickable = insight.exercise && insight.metric
+  
   return (
     <div
-      onClick={onClick}
+      onClick={isClickable ? onClick : undefined}
       style={{
-        background: `linear-gradient(135deg, ${insight.color}25 0%, ${insight.color}10 100%)`,
-        backdropFilter: 'blur(10px)',
-        border: `1px solid ${insight.color}40`,
-        borderRadius: isMobile ? '14px' : '16px',
-        padding: isMobile ? '1.25rem' : '1.5rem',
-        cursor: 'pointer',
+        background: 'linear-gradient(135deg, rgba(23, 23, 23, 0.95) 0%, rgba(10, 10, 10, 0.9) 100%)',
+        backdropFilter: 'blur(12px)',
+        border: `1px solid ${insight.color}25`,
+        borderRadius: isMobile ? '10px' : '12px',
+        padding: isMobile ? '0.875rem' : '1rem',
+        cursor: isClickable ? 'pointer' : 'default',
         transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-        position: 'relative',
-        overflow: 'hidden',
-        boxShadow: `0 4px 20px ${insight.color}20`,
         touchAction: 'manipulation',
         WebkitTapHighlightColor: 'transparent',
-        minHeight: '44px'
+        boxShadow: `0 2px 12px ${insight.color}15, inset 0 1px 0 rgba(255, 255, 255, 0.02)`,
+        position: 'relative',
+        overflow: 'hidden'
       }}
       onMouseEnter={(e) => {
-        if (!isMobile) {
-          e.currentTarget.style.transform = 'translateY(-2px) scale(1.02)'
-          e.currentTarget.style.boxShadow = `0 8px 30px ${insight.color}30`
+        if (!isMobile && isClickable) {
+          e.currentTarget.style.transform = 'translateY(-1px)'
+          e.currentTarget.style.boxShadow = `0 4px 16px ${insight.color}25`
+          e.currentTarget.style.borderColor = `${insight.color}40`
         }
       }}
       onMouseLeave={(e) => {
-        if (!isMobile) {
-          e.currentTarget.style.transform = 'translateY(0) scale(1)'
-          e.currentTarget.style.boxShadow = `0 4px 20px ${insight.color}20`
+        if (!isMobile && isClickable) {
+          e.currentTarget.style.transform = 'translateY(0)'
+          e.currentTarget.style.boxShadow = `0 2px 12px ${insight.color}15`
+          e.currentTarget.style.borderColor = `${insight.color}25`
         }
       }}
       onTouchStart={(e) => {
-        if (isMobile) {
+        if (isMobile && isClickable) {
           e.currentTarget.style.transform = 'scale(0.98)'
         }
       }}
       onTouchEnd={(e) => {
-        if (isMobile) {
+        if (isMobile && isClickable) {
           e.currentTarget.style.transform = 'scale(1)'
         }
       }}
     >
-      {/* Top Glow */}
+      {/* Top accent line */}
       <div style={{
         position: 'absolute',
         top: 0,
@@ -53,94 +53,78 @@ export default function RegularInsightCard({ insight, onClick, isMobile }) {
         right: 0,
         height: '2px',
         background: `linear-gradient(90deg, transparent 0%, ${insight.color} 50%, transparent 100%)`,
-        opacity: 0.8
+        opacity: 0.4
       }} />
-
-      {/* Badge */}
-      {insight.badge && (
-        <div style={{
-          position: 'absolute',
-          top: isMobile ? '0.75rem' : '1rem',
-          right: isMobile ? '0.75rem' : '1rem',
-          padding: '0.25rem 0.5rem',
-          background: `${insight.color}20`,
-          border: `1px solid ${insight.color}30`,
-          borderRadius: '12px',
-          fontSize: '0.6rem',
-          fontWeight: '800',
-          color: insight.color,
-          letterSpacing: '0.05em',
-          textTransform: 'uppercase'
-        }}>
-          {insight.badge}
-        </div>
-      )}
-
-      {/* Icon */}
+      
+      {/* Header: Icon + Badge */}
       <div style={{
-        width: isMobile ? '48px' : '56px',
-        height: isMobile ? '48px' : '56px',
-        borderRadius: '14px',
-        background: `${insight.color}20`,
-        border: `1px solid ${insight.color}30`,
         display: 'flex',
         alignItems: 'center',
-        justifyContent: 'center',
-        marginBottom: '1rem',
-        boxShadow: `0 0 25px ${insight.color}30`
+        justifyContent: 'space-between',
+        marginBottom: '0.625rem'
       }}>
-        <Icon 
-          size={isMobile ? 26 : 30} 
-          color={insight.color}
-          style={{
-            filter: `drop-shadow(0 0 10px ${insight.color}60)`
-          }}
-        />
-      </div>
-
-      {/* Content */}
-      <div>
         <div style={{
-          fontSize: isMobile ? '1rem' : '1.1rem',
-          fontWeight: '800',
-          color: '#fff',
-          marginBottom: '0.4rem',
-          letterSpacing: '-0.02em'
+          width: isMobile ? '32px' : '36px',
+          height: isMobile ? '32px' : '36px',
+          borderRadius: '8px',
+          background: `${insight.color}15`,
+          border: `1px solid ${insight.color}25`,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center'
         }}>
-          {insight.title}
+          <Icon size={isMobile ? 15 : 16} color={insight.color} style={{ opacity: 0.9 }} />
         </div>
+        
         <div style={{
-          fontSize: isMobile ? '0.8rem' : '0.85rem',
-          color: 'rgba(255, 255, 255, 0.7)',
-          fontWeight: '500',
-          marginBottom: '0.75rem'
+          background: `${insight.color}15`,
+          border: `1px solid ${insight.color}25`,
+          borderRadius: '6px',
+          padding: isMobile ? '0.25rem 0.4rem' : '0.3rem 0.5rem'
+        }}>
+          <span style={{
+            fontSize: isMobile ? '0.65rem' : '0.7rem',
+            fontWeight: '700',
+            color: insight.color,
+            textTransform: 'uppercase',
+            letterSpacing: '0.03em'
+          }}>
+            {insight.badge}
+          </span>
+        </div>
+      </div>
+      
+      {/* Title */}
+      <div style={{
+        fontSize: isMobile ? '0.9rem' : '0.975rem',
+        fontWeight: '700',
+        color: 'white',
+        marginBottom: '0.375rem',
+        lineHeight: 1.2
+      }}>
+        {insight.title}
+      </div>
+      
+      {/* Subtitle */}
+      {insight.subtitle && (
+        <div style={{
+          fontSize: isMobile ? '0.75rem' : '0.8rem',
+          color: insight.color,
+          fontWeight: '600',
+          marginBottom: '0.5rem',
+          opacity: 0.8
         }}>
           {insight.subtitle}
         </div>
-        {insight.message && (
-          <div style={{
-            fontSize: isMobile ? '0.75rem' : '0.8rem',
-            color: 'rgba(255, 255, 255, 0.6)',
-            lineHeight: '1.4',
-            fontStyle: 'italic',
-            marginBottom: '1rem'
-          }}>
-            {insight.message}
-          </div>
-        )}
-
-        {/* CTA */}
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '0.4rem',
-          color: insight.color,
-          fontSize: isMobile ? '0.8rem' : '0.85rem',
-          fontWeight: '700'
-        }}>
-          <span>Bekijk nu</span>
-          <ChevronRight size={isMobile ? 14 : 16} />
-        </div>
+      )}
+      
+      {/* Message */}
+      <div style={{
+        fontSize: isMobile ? '0.8rem' : '0.85rem',
+        color: 'rgba(255, 255, 255, 0.65)',
+        lineHeight: 1.4
+      }}>
+        {insight.message}
       </div>
     </div>
   )

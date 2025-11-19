@@ -1,3 +1,4 @@
+// src/modules/progress/WorkoutHistory.jsx - COMPACT WORKOUT STYLING
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { 
   Calendar, Search, Filter, ChevronDown, ChevronUp, 
@@ -8,7 +9,7 @@ export default function WorkoutHistory({ db, clientId, onBack }) {
   const [workouts, setWorkouts] = useState([])
   const [loading, setLoading] = useState(true)
   const [loadingMore, setLoadingMore] = useState(false)
-  const [filter, setFilter] = useState('last7') // last7, date, exercise
+  const [filter, setFilter] = useState('last7')
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0])
   const [selectedExercise, setSelectedExercise] = useState('')
   const [exercises, setExercises] = useState([])
@@ -23,12 +24,10 @@ export default function WorkoutHistory({ db, clientId, onBack }) {
   const ITEMS_PER_PAGE = 20
   const observerTarget = useRef(null)
   
-  // Load exercises for filter
   useEffect(() => {
     loadExerciseList()
   }, [clientId])
   
-  // Load workouts when filter changes
   useEffect(() => {
     setWorkouts([])
     setOffset(0)
@@ -36,7 +35,6 @@ export default function WorkoutHistory({ db, clientId, onBack }) {
     loadWorkouts(true)
   }, [clientId, filter, selectedDate, selectedExercise])
   
-  // Infinite scroll observer
   useEffect(() => {
     const observer = new IntersectionObserver(
       entries => {
@@ -56,7 +54,6 @@ export default function WorkoutHistory({ db, clientId, onBack }) {
   
   const loadExerciseList = async () => {
     try {
-      // Get unique exercises from recent workouts
       const { data: sessions, error: sessionsError } = await db.supabase
         .from('workout_sessions')
         .select('id')
@@ -76,7 +73,6 @@ export default function WorkoutHistory({ db, clientId, onBack }) {
         
         if (progressError) throw progressError
         
-        // Get unique exercises
         const uniqueExercises = [...new Set(progress?.map(p => p.exercise_name) || [])]
         setExercises(uniqueExercises.sort())
       }
@@ -114,7 +110,6 @@ export default function WorkoutHistory({ db, clientId, onBack }) {
         .order('workout_date', { ascending: false })
         .range(isInitial ? 0 : offset, isInitial ? ITEMS_PER_PAGE - 1 : offset + ITEMS_PER_PAGE - 1)
       
-      // Apply filters
       if (filter === 'last7') {
         const weekAgo = new Date()
         weekAgo.setDate(weekAgo.getDate() - 7)
@@ -129,13 +124,11 @@ export default function WorkoutHistory({ db, clientId, onBack }) {
       
       let filteredData = data || []
       
-      // Filter by exercise if selected
       if (filter === 'exercise' && selectedExercise) {
         filteredData = filteredData.filter(session => 
           session.workout_progress?.some(p => p.exercise_name === selectedExercise)
         )
         
-        // Keep only the selected exercise in progress
         filteredData = filteredData.map(session => ({
           ...session,
           workout_progress: session.workout_progress.filter(p => 
@@ -144,7 +137,6 @@ export default function WorkoutHistory({ db, clientId, onBack }) {
         }))
       }
       
-      // Remove empty sessions
       filteredData = filteredData.filter(session => 
         session.workout_progress && session.workout_progress.length > 0
       )
@@ -214,464 +206,545 @@ export default function WorkoutHistory({ db, clientId, onBack }) {
   )
   
   // Group workouts by date
-  const groupedWorkouts = workouts.reduce((groups, session) => {
-    const date = session.workout_date
-    if (!groups[date]) {
-      groups[date] = []
+  const workoutsByDate = workouts.reduce((acc, workout) => {
+    const date = workout.workout_date
+    if (!acc[date]) {
+      acc[date] = []
     }
-    groups[date].push(session)
-    return groups
+    acc[date].push(workout)
+    return acc
   }, {})
+  
+  // Calculate stats
+  const totalWorkouts = workouts.length
+  const totalExercises = workouts.reduce((sum, w) => sum + (w.workout_progress?.length || 0), 0)
+  const totalVolume = workouts.reduce((sum, w) => {
+    return sum + (w.workout_progress?.reduce((s, p) => s + calculateVolume(p.sets), 0) || 0)
+  }, 0)
+  
+  if (loading) {
+    return (
+      <div style={{
+        minHeight: '60vh',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center'
+      }}>
+        <div style={{
+          width: isMobile ? '40px' : '48px',
+          height: isMobile ? '40px' : '48px',
+          border: '3px solid rgba(249, 115, 22, 0.2)',
+          borderTopColor: '#f97316',
+          borderRadius: '50%',
+          animation: 'spin 1s linear infinite'
+        }} />
+      </div>
+    )
+  }
   
   return (
     <div style={{
-      background: 'linear-gradient(135deg, rgba(17, 17, 17, 0.95) 0%, rgba(10, 10, 10, 0.95) 100%)',
+      position: 'relative',
+      background: 'linear-gradient(135deg, rgba(23, 23, 23, 0.95) 0%, rgba(10, 10, 10, 0.9) 100%)',
       borderRadius: isMobile ? '16px' : '20px',
-      border: '1px solid rgba(249, 115, 22, 0.15)',
+      border: '1px solid rgba(249, 115, 22, 0.25)',
+      backdropFilter: 'blur(12px)',
       overflow: 'hidden',
-      minHeight: isMobile ? '500px' : '600px'
+      boxShadow: '0 4px 16px rgba(249, 115, 22, 0.15)'
     }}>
-      {/* Header */}
+      {/* Top accent glow */}
       <div style={{
-        padding: isMobile ? '1rem' : '1.25rem',
-        background: 'linear-gradient(135deg, rgba(249, 115, 22, 0.08) 0%, rgba(234, 88, 12, 0.04) 100%)',
-        borderBottom: '1px solid rgba(249, 115, 22, 0.1)'
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        height: '2px',
+        background: 'linear-gradient(90deg, transparent 0%, #f97316 50%, transparent 100%)',
+        opacity: 0.6,
+        zIndex: 10
+      }} />
+      
+      {/* HEADER - COMPACT */}
+      <div style={{
+        padding: isMobile ? '0.875rem 1rem' : '1rem 1.25rem',
+        borderBottom: '1px solid rgba(249, 115, 22, 0.15)',
+        background: 'linear-gradient(135deg, rgba(249, 115, 22, 0.08) 0%, rgba(23, 23, 23, 0.6) 100%)'
       }}>
         <div style={{
           display: 'flex',
-          justifyContent: 'space-between',
           alignItems: 'center',
-          marginBottom: '1rem'
+          justifyContent: 'space-between',
+          marginBottom: isMobile ? '0.75rem' : '0.875rem'
         }}>
-          <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.75rem'
-          }}>
-            {onBack && (
-              <button
-                onClick={onBack}
-                style={{
-                  width: '36px',
-                  height: '36px',
-                  borderRadius: '8px',
-                  background: 'rgba(249, 115, 22, 0.1)',
-                  border: '1px solid rgba(249, 115, 22, 0.2)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  cursor: 'pointer',
-                  transition: 'all 0.2s ease',
-                  touchAction: 'manipulation',
-                  WebkitTapHighlightColor: 'transparent'
-                }}
-              >
-                <ChevronLeft size={18} color="#f97316" />
-              </button>
-            )}
-            <h3 style={{
-              fontSize: isMobile ? '1.1rem' : '1.3rem',
-              fontWeight: '800',
-              background: 'linear-gradient(135deg, #f97316 0%, #ea580c 100%)',
-              WebkitBackgroundClip: 'text',
-              WebkitTextFillColor: 'transparent',
-              margin: 0,
+          <button
+            onClick={onBack}
+            style={{
               display: 'flex',
               alignItems: 'center',
-              gap: '0.5rem'
-            }}>
-              <Clock size={isMobile ? 18 : 22} color="#f97316" />
-              Trainingsgeschiedenis
-            </h3>
-          </div>
-          
-          <div style={{
-            fontSize: isMobile ? '0.75rem' : '0.85rem',
-            color: 'rgba(255, 255, 255, 0.5)',
-            fontWeight: '600'
-          }}>
-            {workouts.length} trainingen
-          </div>
-        </div>
-        
-        {/* Filter Selector */}
-        <div style={{ position: 'relative' }}>
-          <button
-            onClick={() => setShowFilterDropdown(!showFilterDropdown)}
-            style={{
-              width: '100%',
-              padding: isMobile ? '0.625rem 0.875rem' : '0.75rem 1rem',
-              background: 'rgba(249, 115, 22, 0.1)',
-              border: '1px solid rgba(249, 115, 22, 0.2)',
-              borderRadius: '10px',
+              gap: '0.375rem',
+              padding: isMobile ? '0.5rem 0.75rem' : '0.625rem 0.875rem',
+              background: 'linear-gradient(135deg, rgba(249, 115, 22, 0.12) 0%, rgba(249, 115, 22, 0.06) 100%)',
+              border: '1px solid rgba(249, 115, 22, 0.25)',
+              borderRadius: isMobile ? '8px' : '10px',
               color: '#f97316',
-              fontSize: isMobile ? '0.85rem' : '0.9rem',
+              fontSize: isMobile ? '0.775rem' : '0.825rem',
               fontWeight: '600',
               cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              transition: 'all 0.2s ease',
+              transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
               touchAction: 'manipulation',
               WebkitTapHighlightColor: 'transparent',
-              minHeight: '44px'
+              backdropFilter: 'blur(8px)'
             }}
           >
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <Filter size={16} />
-              <span>
-                {filter === 'last7' ? 'Laatste 7 Dagen' : 
-                 filter === 'date' ? `Datum: ${formatDate(selectedDate)}` :
-                 filter === 'exercise' ? `Oefening: ${selectedExercise || 'Selecteer'}` : 'Filter'}
-              </span>
-            </div>
-            <ChevronDown 
-              size={16} 
-              style={{ 
-                transform: showFilterDropdown ? 'rotate(180deg)' : 'rotate(0deg)',
-                transition: 'transform 0.2s ease'
-              }} 
-            />
+            <ChevronLeft size={isMobile ? 14 : 16} />
+            Terug
           </button>
           
-          {/* Filter Dropdown */}
-          {showFilterDropdown && (
-            <div style={{
-              position: 'absolute',
-              top: '100%',
-              left: 0,
-              right: 0,
-              marginTop: '0.5rem',
-              background: 'rgba(15, 23, 42, 0.98)',
-              border: '1px solid rgba(249, 115, 22, 0.2)',
-              borderRadius: '12px',
-              backdropFilter: 'blur(20px)',
-              zIndex: 20,
-              boxShadow: '0 10px 30px rgba(0,0,0,0.5)',
-              padding: '0.5rem'
-            }}>
-              <button
-                onClick={() => {
-                  setFilter('last7')
-                  setShowFilterDropdown(false)
-                }}
-                style={{
-                  width: '100%',
-                  padding: isMobile ? '0.75rem' : '0.625rem 0.75rem',
-                  background: filter === 'last7' ? 'rgba(249, 115, 22, 0.2)' : 'transparent',
-                  border: 'none',
-                  borderRadius: '8px',
-                  color: filter === 'last7' ? '#f97316' : 'rgba(255, 255, 255, 0.8)',
-                  fontSize: isMobile ? '0.9rem' : '0.85rem',
-                  fontWeight: '500',
-                  cursor: 'pointer',
-                  textAlign: 'left',
-                  transition: 'all 0.2s ease',
-                  minHeight: '44px'
-                }}
-              >
-                Laatste 7 Dagen
-              </button>
-              
-              <button
-                onClick={() => {
-                  setFilter('date')
-                  setShowFilterDropdown(false)
-                }}
-                style={{
-                  width: '100%',
-                  padding: isMobile ? '0.75rem' : '0.625rem 0.75rem',
-                  background: filter === 'date' ? 'rgba(249, 115, 22, 0.2)' : 'transparent',
-                  border: 'none',
-                  borderRadius: '8px',
-                  color: filter === 'date' ? '#f97316' : 'rgba(255, 255, 255, 0.8)',
-                  fontSize: isMobile ? '0.9rem' : '0.85rem',
-                  fontWeight: '500',
-                  cursor: 'pointer',
-                  textAlign: 'left',
-                  transition: 'all 0.2s ease',
-                  minHeight: '44px'
-                }}
-              >
-                Selecteer Datum
-              </button>
-              
-              <button
-                onClick={() => {
-                  setFilter('exercise')
-                  setShowFilterDropdown(false)
-                  setShowExerciseDropdown(true)
-                }}
-                style={{
-                  width: '100%',
-                  padding: isMobile ? '0.75rem' : '0.625rem 0.75rem',
-                  background: filter === 'exercise' ? 'rgba(249, 115, 22, 0.2)' : 'transparent',
-                  border: 'none',
-                  borderRadius: '8px',
-                  color: filter === 'exercise' ? '#f97316' : 'rgba(255, 255, 255, 0.8)',
-                  fontSize: isMobile ? '0.9rem' : '0.85rem',
-                  fontWeight: '500',
-                  cursor: 'pointer',
-                  textAlign: 'left',
-                  transition: 'all 0.2s ease',
-                  minHeight: '44px'
-                }}
-              >
-                Filter op Oefening
-              </button>
-            </div>
-          )}
+          <h3 style={{
+            fontSize: isMobile ? '0.95rem' : '1.1rem',
+            fontWeight: '800',
+            color: '#fff',
+            margin: 0,
+            letterSpacing: '-0.02em'
+          }}>
+            Trainingsgeschiedenis
+          </h3>
         </div>
         
-        {/* Date Picker (when date filter is selected) */}
-        {filter === 'date' && (
-          <div style={{ marginTop: '0.75rem' }}>
-            <input
-              type="date"
-              value={selectedDate}
-              onChange={(e) => setSelectedDate(e.target.value)}
-              max={new Date().toISOString().split('T')[0]}
-              style={{
-                width: '100%',
-                padding: isMobile ? '0.625rem 0.875rem' : '0.75rem 1rem',
-                background: 'rgba(255, 255, 255, 0.05)',
-                border: '1px solid rgba(255, 255, 255, 0.1)',
-                borderRadius: '10px',
-                color: '#fff',
-                fontSize: isMobile ? '16px' : '0.9rem', // 16px prevents zoom on iOS
-                outline: 'none'
-              }}
-            />
-          </div>
-        )}
-        
-        {/* Exercise Selector (when exercise filter is selected) */}
-        {filter === 'exercise' && (
-          <div style={{ marginTop: '0.75rem', position: 'relative' }}>
+        {/* FILTERS - COMPACT GRID */}
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: filter === 'exercise' 
+            ? (isMobile ? '1fr' : '200px 1fr') 
+            : '1fr',
+          gap: isMobile ? '0.5rem' : '0.625rem'
+        }}>
+          {/* Filter Type Dropdown */}
+          <div style={{ position: 'relative' }}>
             <button
-              onClick={() => setShowExerciseDropdown(!showExerciseDropdown)}
+              onClick={() => {
+                setShowFilterDropdown(!showFilterDropdown)
+                setShowExerciseDropdown(false)
+              }}
               style={{
                 width: '100%',
-                padding: isMobile ? '0.625rem 0.875rem' : '0.75rem 1rem',
-                background: 'rgba(255, 255, 255, 0.05)',
-                border: '1px solid rgba(255, 255, 255, 0.1)',
-                borderRadius: '10px',
-                color: selectedExercise ? '#fff' : 'rgba(255, 255, 255, 0.5)',
-                fontSize: isMobile ? '0.85rem' : '0.9rem',
-                fontWeight: '500',
+                padding: isMobile ? '0.625rem 0.75rem' : '0.75rem 0.875rem',
+                background: 'linear-gradient(135deg, rgba(249, 115, 22, 0.12) 0%, rgba(249, 115, 22, 0.06) 100%)',
+                border: '1px solid rgba(249, 115, 22, 0.25)',
+                borderRadius: isMobile ? '8px' : '10px',
+                color: '#fff',
+                fontSize: isMobile ? '0.775rem' : '0.825rem',
+                fontWeight: '600',
                 cursor: 'pointer',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'space-between',
-                transition: 'all 0.2s ease',
+                transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
                 touchAction: 'manipulation',
                 WebkitTapHighlightColor: 'transparent',
-                minHeight: '44px'
+                minHeight: '44px',
+                backdropFilter: 'blur(8px)'
               }}
             >
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <Dumbbell size={16} />
-                <span>{selectedExercise || 'Selecteer Oefening'}</span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                <Filter size={isMobile ? 13 : 14} color="#f97316" />
+                <span>
+                  {filter === 'last7' && 'Laatste 7 dagen'}
+                  {filter === 'date' && 'Specifieke datum'}
+                  {filter === 'exercise' && 'Per oefening'}
+                </span>
               </div>
               <ChevronDown 
-                size={16} 
+                size={isMobile ? 13 : 14}
+                color="#f97316"
                 style={{ 
-                  transform: showExerciseDropdown ? 'rotate(180deg)' : 'rotate(0deg)',
-                  transition: 'transform 0.2s ease'
+                  transform: showFilterDropdown ? 'rotate(180deg)' : 'rotate(0deg)',
+                  transition: 'transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
                 }} 
               />
             </button>
             
-            {/* Exercise Dropdown */}
-            {showExerciseDropdown && (
+            {showFilterDropdown && (
               <div style={{
                 position: 'absolute',
                 top: '100%',
                 left: 0,
                 right: 0,
-                marginTop: '0.5rem',
-                background: 'rgba(15, 23, 42, 0.98)',
-                border: '1px solid rgba(249, 115, 22, 0.2)',
-                borderRadius: '12px',
+                marginTop: '0.4rem',
+                background: 'rgba(23, 23, 23, 0.98)',
+                border: '1px solid rgba(249, 115, 22, 0.25)',
+                borderRadius: isMobile ? '8px' : '10px',
                 backdropFilter: 'blur(20px)',
                 zIndex: 30,
-                maxHeight: isMobile ? '50vh' : '300px',
                 overflow: 'hidden',
-                boxShadow: '0 10px 30px rgba(0,0,0,0.5)'
+                boxShadow: '0 6px 20px rgba(0, 0, 0, 0.6)'
               }}>
-                {/* Search */}
-                <div style={{
-                  padding: '0.75rem',
-                  borderBottom: '1px solid rgba(249, 115, 22, 0.1)'
-                }}>
-                  <div style={{ position: 'relative' }}>
-                    <Search 
-                      size={14} 
-                      style={{
-                        position: 'absolute',
-                        left: '0.75rem',
-                        top: '50%',
-                        transform: 'translateY(-50%)',
-                        color: 'rgba(148, 163, 184, 0.5)'
-                      }}
-                    />
-                    <input
-                      type="text"
-                      placeholder="Zoek oefening..."
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                      onClick={(e) => e.stopPropagation()}
-                      style={{
-                        width: '100%',
-                        padding: '0.5rem 0.75rem 0.5rem 2rem',
-                        background: 'rgba(255, 255, 255, 0.05)',
-                        border: '1px solid rgba(255, 255, 255, 0.1)',
-                        borderRadius: '8px',
-                        color: '#fff',
-                        fontSize: '16px', // Prevents zoom on iOS
-                        outline: 'none'
-                      }}
-                    />
-                  </div>
-                </div>
-                
-                {/* Exercise List */}
-                <div style={{
-                  maxHeight: isMobile ? 'calc(50vh - 80px)' : '200px',
-                  overflowY: 'auto',
-                  WebkitOverflowScrolling: 'touch'
-                }}>
-                  {filteredExercises.map(exercise => (
-                    <button
-                      key={exercise}
-                      onClick={() => {
-                        setSelectedExercise(exercise)
-                        setShowExerciseDropdown(false)
-                        setSearchQuery('')
-                      }}
-                      style={{
-                        width: '100%',
-                        padding: isMobile ? '0.875rem 1rem' : '0.75rem 1rem',
-                        background: selectedExercise === exercise 
-                          ? 'rgba(249, 115, 22, 0.2)' 
-                          : 'transparent',
-                        border: 'none',
-                        color: selectedExercise === exercise ? '#f97316' : 'rgba(255,255,255,0.8)',
-                        fontSize: isMobile ? '0.9rem' : '0.85rem',
-                        fontWeight: '500',
-                        cursor: 'pointer',
-                        textAlign: 'left',
-                        transition: 'all 0.2s ease',
-                        minHeight: '44px',
-                        touchAction: 'manipulation',
-                        WebkitTapHighlightColor: 'transparent'
-                      }}
-                    >
-                      {exercise}
-                    </button>
-                  ))}
-                  
-                  {filteredExercises.length === 0 && (
-                    <div style={{
-                      padding: '1rem',
-                      textAlign: 'center',
-                      color: 'rgba(255,255,255,0.4)',
-                      fontSize: '0.85rem'
-                    }}>
-                      Geen oefeningen gevonden
-                    </div>
-                  )}
-                </div>
+                {['last7', 'date', 'exercise'].map(f => (
+                  <button
+                    key={f}
+                    onClick={() => {
+                      setFilter(f)
+                      setShowFilterDropdown(false)
+                    }}
+                    style={{
+                      width: '100%',
+                      padding: isMobile ? '0.75rem' : '0.875rem 1rem',
+                      background: filter === f ? 'rgba(249, 115, 22, 0.15)' : 'transparent',
+                      border: 'none',
+                      color: filter === f ? '#f97316' : 'rgba(255,255,255,0.7)',
+                      fontSize: isMobile ? '0.775rem' : '0.825rem',
+                      fontWeight: '600',
+                      cursor: 'pointer',
+                      textAlign: 'left',
+                      transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+                      minHeight: '44px',
+                      touchAction: 'manipulation',
+                      WebkitTapHighlightColor: 'transparent'
+                    }}
+                  >
+                    {f === 'last7' && 'Laatste 7 dagen'}
+                    {f === 'date' && 'Specifieke datum'}
+                    {f === 'exercise' && 'Per oefening'}
+                  </button>
+                ))}
               </div>
             )}
           </div>
-        )}
+          
+          {/* Exercise Selector (if filter = exercise) */}
+          {filter === 'exercise' && (
+            <div style={{ position: 'relative' }}>
+              <button
+                onClick={() => {
+                  setShowExerciseDropdown(!showExerciseDropdown)
+                  setShowFilterDropdown(false)
+                }}
+                style={{
+                  width: '100%',
+                  padding: isMobile ? '0.625rem 0.75rem' : '0.75rem 0.875rem',
+                  background: 'linear-gradient(135deg, rgba(249, 115, 22, 0.12) 0%, rgba(249, 115, 22, 0.06) 100%)',
+                  border: '1px solid rgba(249, 115, 22, 0.25)',
+                  borderRadius: isMobile ? '8px' : '10px',
+                  color: selectedExercise ? '#fff' : 'rgba(255,255,255,0.6)',
+                  fontSize: isMobile ? '0.775rem' : '0.825rem',
+                  fontWeight: '600',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                  touchAction: 'manipulation',
+                  WebkitTapHighlightColor: 'transparent',
+                  minHeight: '44px',
+                  backdropFilter: 'blur(8px)'
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                  <Dumbbell size={isMobile ? 13 : 14} color="#f97316" />
+                  <span>{selectedExercise || 'Selecteer oefening'}</span>
+                </div>
+                <ChevronDown 
+                  size={isMobile ? 13 : 14}
+                  color="#f97316"
+                  style={{ 
+                    transform: showExerciseDropdown ? 'rotate(180deg)' : 'rotate(0deg)',
+                    transition: 'transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
+                  }} 
+                />
+              </button>
+              
+              {showExerciseDropdown && (
+                <div style={{
+                  position: 'absolute',
+                  top: '100%',
+                  left: 0,
+                  right: 0,
+                  marginTop: '0.4rem',
+                  background: 'rgba(23, 23, 23, 0.98)',
+                  border: '1px solid rgba(249, 115, 22, 0.25)',
+                  borderRadius: isMobile ? '8px' : '10px',
+                  backdropFilter: 'blur(20px)',
+                  zIndex: 30,
+                  maxHeight: isMobile ? '60vh' : '300px',
+                  overflow: 'hidden',
+                  boxShadow: '0 6px 20px rgba(0, 0, 0, 0.6)'
+                }}>
+                  {/* Search */}
+                  <div style={{
+                    padding: isMobile ? '0.625rem' : '0.75rem',
+                    borderBottom: '1px solid rgba(249, 115, 22, 0.1)'
+                  }}>
+                    <div style={{ position: 'relative' }}>
+                      <Search 
+                        size={isMobile ? 12 : 13} 
+                        style={{
+                          position: 'absolute',
+                          left: '0.75rem',
+                          top: '50%',
+                          transform: 'translateY(-50%)',
+                          color: 'rgba(249, 115, 22, 0.5)'
+                        }}
+                      />
+                      <input
+                        type="text"
+                        placeholder="Zoek oefening..."
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        onClick={(e) => e.stopPropagation()}
+                        style={{
+                          width: '100%',
+                          padding: isMobile ? '0.5rem 0.625rem 0.5rem 2rem' : '0.5rem 0.75rem 0.5rem 2.25rem',
+                          background: 'rgba(249, 115, 22, 0.06)',
+                          border: '1px solid rgba(249, 115, 22, 0.15)',
+                          borderRadius: '8px',
+                          color: '#fff',
+                          fontSize: isMobile ? '16px' : '0.8rem',
+                          outline: 'none'
+                        }}
+                      />
+                    </div>
+                  </div>
+                  
+                  <div style={{
+                    maxHeight: isMobile ? 'calc(60vh - 70px)' : '200px',
+                    overflowY: 'auto',
+                    WebkitOverflowScrolling: 'touch'
+                  }}>
+                    {filteredExercises.map(ex => (
+                      <button
+                        key={ex}
+                        onClick={() => {
+                          setSelectedExercise(ex)
+                          setShowExerciseDropdown(false)
+                          setSearchQuery('')
+                        }}
+                        style={{
+                          width: '100%',
+                          padding: isMobile ? '0.75rem' : '0.875rem 1rem',
+                          background: selectedExercise === ex ? 'rgba(249, 115, 22, 0.15)' : 'transparent',
+                          border: 'none',
+                          color: selectedExercise === ex ? '#f97316' : 'rgba(255,255,255,0.7)',
+                          fontSize: isMobile ? '0.775rem' : '0.825rem',
+                          fontWeight: '600',
+                          cursor: 'pointer',
+                          textAlign: 'left',
+                          transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+                          minHeight: '44px',
+                          touchAction: 'manipulation',
+                          WebkitTapHighlightColor: 'transparent'
+                        }}
+                      >
+                        {ex}
+                      </button>
+                    ))}
+                    
+                    {filteredExercises.length === 0 && (
+                      <div style={{
+                        padding: '1.5rem 1rem',
+                        textAlign: 'center',
+                        color: 'rgba(255,255,255,0.4)',
+                        fontSize: isMobile ? '0.75rem' : '0.8rem'
+                      }}>
+                        Geen oefeningen gevonden
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+          
+          {/* Date Picker (if filter = date) */}
+          {filter === 'date' && (
+            <input
+              type="date"
+              value={selectedDate}
+              onChange={(e) => setSelectedDate(e.target.value)}
+              style={{
+                padding: isMobile ? '0.625rem 0.75rem' : '0.75rem 0.875rem',
+                background: 'linear-gradient(135deg, rgba(249, 115, 22, 0.12) 0%, rgba(249, 115, 22, 0.06) 100%)',
+                border: '1px solid rgba(249, 115, 22, 0.25)',
+                borderRadius: isMobile ? '8px' : '10px',
+                color: '#fff',
+                fontSize: isMobile ? '0.775rem' : '0.825rem',
+                fontWeight: '600',
+                backdropFilter: 'blur(8px)',
+                outline: 'none',
+                minHeight: '44px'
+              }}
+            />
+          )}
+        </div>
       </div>
       
-      {/* Workout List */}
+      {/* STATS - COMPACT */}
+      {workouts.length > 0 && (
+        <div style={{
+          padding: isMobile ? '0.875rem 1rem' : '1rem 1.25rem',
+          borderBottom: '1px solid rgba(249, 115, 22, 0.1)',
+          background: 'rgba(249, 115, 22, 0.04)'
+        }}>
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: isMobile ? 'repeat(3, 1fr)' : 'repeat(3, 1fr)',
+            gap: isMobile ? '0.5rem' : '0.625rem'
+          }}>
+            <div style={{
+              background: 'rgba(23, 23, 23, 0.6)',
+              borderRadius: isMobile ? '8px' : '10px',
+              padding: isMobile ? '0.5rem' : '0.625rem',
+              border: '1px solid rgba(249, 115, 22, 0.2)',
+              backdropFilter: 'blur(8px)',
+              textAlign: 'center'
+            }}>
+              <div style={{
+                fontSize: isMobile ? '1rem' : '1.15rem',
+                fontWeight: '800',
+                color: '#f97316',
+                marginBottom: '0.125rem'
+              }}>
+                {totalWorkouts}
+              </div>
+              <div style={{
+                fontSize: isMobile ? '0.625rem' : '0.675rem',
+                color: 'rgba(255, 255, 255, 0.5)',
+                textTransform: 'uppercase',
+                letterSpacing: '0.03em',
+                fontWeight: '600'
+              }}>
+                Workouts
+              </div>
+            </div>
+            
+            <div style={{
+              background: 'rgba(23, 23, 23, 0.6)',
+              borderRadius: isMobile ? '8px' : '10px',
+              padding: isMobile ? '0.5rem' : '0.625rem',
+              border: '1px solid rgba(16, 185, 129, 0.2)',
+              backdropFilter: 'blur(8px)',
+              textAlign: 'center'
+            }}>
+              <div style={{
+                fontSize: isMobile ? '1rem' : '1.15rem',
+                fontWeight: '800',
+                color: '#10b981',
+                marginBottom: '0.125rem'
+              }}>
+                {totalExercises}
+              </div>
+              <div style={{
+                fontSize: isMobile ? '0.625rem' : '0.675rem',
+                color: 'rgba(255, 255, 255, 0.5)',
+                textTransform: 'uppercase',
+                letterSpacing: '0.03em',
+                fontWeight: '600'
+              }}>
+                Oefeningen
+              </div>
+            </div>
+            
+            <div style={{
+              background: 'rgba(23, 23, 23, 0.6)',
+              borderRadius: isMobile ? '8px' : '10px',
+              padding: isMobile ? '0.5rem' : '0.625rem',
+              border: '1px solid rgba(59, 130, 246, 0.2)',
+              backdropFilter: 'blur(8px)',
+              textAlign: 'center'
+            }}>
+              <div style={{
+                fontSize: isMobile ? '1rem' : '1.15rem',
+                fontWeight: '800',
+                color: '#3b82f6',
+                marginBottom: '0.125rem'
+              }}>
+                {Math.round(totalVolume / 1000)}k
+              </div>
+              <div style={{
+                fontSize: isMobile ? '0.625rem' : '0.675rem',
+                color: 'rgba(255, 255, 255, 0.5)',
+                textTransform: 'uppercase',
+                letterSpacing: '0.03em',
+                fontWeight: '600'
+              }}>
+                Volume
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+      
+      {/* WORKOUT LIST */}
       <div style={{
-        maxHeight: isMobile ? '400px' : '500px',
+        padding: isMobile ? '0.875rem 1rem' : '1rem 1.25rem',
+        maxHeight: '60vh',
         overflowY: 'auto',
         WebkitOverflowScrolling: 'touch'
       }}>
-        {loading ? (
-          <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            padding: '3rem'
-          }}>
-            <div style={{
-              width: '40px',
-              height: '40px',
-              border: '3px solid rgba(249, 115, 22, 0.2)',
-              borderTopColor: '#f97316',
-              borderRadius: '50%',
-              animation: 'spin 1s linear infinite'
-            }} />
-          </div>
-        ) : Object.keys(groupedWorkouts).length > 0 ? (
+        {workouts.length > 0 ? (
           <>
-            {Object.entries(groupedWorkouts).map(([date, sessions]) => (
-              <div key={date} style={{
-                borderBottom: '1px solid rgba(255, 255, 255, 0.05)'
-              }}>
-                {/* Date Header */}
+            {Object.entries(workoutsByDate).map(([date, sessions]) => (
+              <div
+                key={date}
+                style={{
+                  background: 'rgba(23, 23, 23, 0.4)',
+                  borderRadius: isMobile ? '10px' : '12px',
+                  border: '1px solid rgba(249, 115, 22, 0.15)',
+                  marginBottom: isMobile ? '0.625rem' : '0.75rem',
+                  overflow: 'hidden',
+                  backdropFilter: 'blur(8px)'
+                }}
+              >
+                {/* Day Header */}
                 <button
                   onClick={() => toggleDay(date)}
                   style={{
                     width: '100%',
-                    padding: isMobile ? '0.875rem 1rem' : '1rem 1.25rem',
+                    padding: isMobile ? '0.75rem' : '0.875rem 1rem',
                     background: expandedDays[date] 
-                      ? 'rgba(249, 115, 22, 0.05)' 
+                      ? 'rgba(249, 115, 22, 0.08)' 
                       : 'transparent',
                     border: 'none',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'space-between',
                     cursor: 'pointer',
-                    transition: 'all 0.2s ease',
+                    transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
                     touchAction: 'manipulation',
                     WebkitTapHighlightColor: 'transparent'
                   }}
                 >
-                  <div style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '0.75rem'
-                  }}>
-                    <Calendar size={isMobile ? 16 : 18} color="#f97316" />
-                    <div style={{ textAlign: 'left' }}>
-                      <div style={{
-                        fontSize: isMobile ? '0.9rem' : '0.95rem',
-                        fontWeight: '600',
-                        color: '#fff',
-                        marginBottom: '0.125rem'
-                      }}>
-                        {formatDate(date)}
-                      </div>
-                      <div style={{
-                        fontSize: isMobile ? '0.7rem' : '0.75rem',
-                        color: 'rgba(255, 255, 255, 0.5)'
-                      }}>
-                        {sessions.reduce((total, s) => 
-                          total + (s.workout_progress?.length || 0), 0
-                        )} oefeningen gelogd
-                      </div>
+                  <div>
+                    <div style={{
+                      fontSize: isMobile ? '0.85rem' : '0.95rem',
+                      fontWeight: '700',
+                      color: '#f97316',
+                      marginBottom: '0.125rem',
+                      textAlign: 'left'
+                    }}>
+                      {formatDate(date)}
+                    </div>
+                    <div style={{
+                      fontSize: isMobile ? '0.65rem' : '0.7rem',
+                      color: 'rgba(255, 255, 255, 0.5)',
+                      textAlign: 'left'
+                    }}>
+                      {sessions.reduce((total, s) => 
+                        total + (s.workout_progress?.length || 0), 0
+                      )} oefeningen
                     </div>
                   </div>
                   
                   {expandedDays[date] ? (
-                    <ChevronUp size={16} color="rgba(255, 255, 255, 0.5)" />
+                    <ChevronUp size={isMobile ? 14 : 16} color="rgba(249, 115, 22, 0.7)" />
                   ) : (
-                    <ChevronDown size={16} color="rgba(255, 255, 255, 0.5)" />
+                    <ChevronDown size={isMobile ? 14 : 16} color="rgba(249, 115, 22, 0.7)" />
                   )}
                 </button>
                 
                 {/* Expanded Content */}
                 {expandedDays[date] && (
                   <div style={{
-                    padding: isMobile ? '0 1rem 1rem' : '0 1.25rem 1.25rem',
+                    padding: isMobile ? '0 0.75rem 0.75rem' : '0 1rem 1rem',
                     animation: 'slideDown 0.2s ease'
                   }}>
                     {sessions.map(session => (
@@ -682,8 +755,8 @@ export default function WorkoutHistory({ db, clientId, onBack }) {
                             style={{
                               background: 'rgba(255, 255, 255, 0.02)',
                               border: '1px solid rgba(255, 255, 255, 0.05)',
-                              borderRadius: '10px',
-                              padding: isMobile ? '0.75rem' : '1rem',
+                              borderRadius: isMobile ? '8px' : '10px',
+                              padding: isMobile ? '0.625rem' : '0.75rem',
                               marginBottom: idx < session.workout_progress.length - 1 ? '0.5rem' : 0
                             }}
                           >
@@ -695,23 +768,27 @@ export default function WorkoutHistory({ db, clientId, onBack }) {
                               marginBottom: '0.5rem'
                             }}>
                               <div style={{
-                                fontSize: isMobile ? '0.9rem' : '0.95rem',
-                                fontWeight: '600',
+                                fontSize: isMobile ? '0.8rem' : '0.875rem',
+                                fontWeight: '700',
                                 color: '#f97316'
                               }}>
                                 {progress.exercise_name}
                               </div>
                               {progress.created_at && (
                                 <div style={{
-                                  fontSize: isMobile ? '0.7rem' : '0.75rem',
-                                  color: 'rgba(255, 255, 255, 0.4)'
+                                  fontSize: isMobile ? '0.65rem' : '0.7rem',
+                                  color: 'rgba(255, 255, 255, 0.4)',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '0.25rem'
                                 }}>
+                                  <Clock size={10} style={{ opacity: 0.5 }} />
                                   {formatTime(progress.created_at)}
                                 </div>
                               )}
                             </div>
                             
-                            {/* Sets Display */}
+                            {/* Sets Display - COMPACT */}
                             {progress.sets && Array.isArray(progress.sets) && (
                               <div style={{
                                 display: 'flex',
@@ -724,36 +801,37 @@ export default function WorkoutHistory({ db, clientId, onBack }) {
                                     style={{
                                       display: 'flex',
                                       alignItems: 'center',
-                                      gap: '0.5rem',
-                                      fontSize: isMobile ? '0.8rem' : '0.85rem',
+                                      gap: '0.4rem',
+                                      fontSize: isMobile ? '0.725rem' : '0.775rem',
                                       color: 'rgba(255, 255, 255, 0.7)'
                                     }}
                                   >
                                     <span style={{
-                                      background: 'rgba(249, 115, 22, 0.1)',
+                                      background: 'rgba(249, 115, 22, 0.12)',
                                       borderRadius: '4px',
                                       padding: '0.125rem 0.375rem',
-                                      fontSize: isMobile ? '0.7rem' : '0.75rem',
+                                      fontSize: isMobile ? '0.65rem' : '0.7rem',
                                       color: '#f97316',
-                                      fontWeight: '600',
-                                      minWidth: '28px',
+                                      fontWeight: '700',
+                                      minWidth: '24px',
                                       textAlign: 'center'
                                     }}>
                                       {setIdx + 1}
                                     </span>
-                                    <span style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-                                      <Weight size={12} style={{ opacity: 0.5 }} />
+                                    <span style={{ display: 'flex', alignItems: 'center', gap: '0.2rem' }}>
+                                      <Weight size={11} style={{ opacity: 0.5 }} />
                                       {set.weight || 0}kg
                                     </span>
-                                    <span style={{ color: 'rgba(255, 255, 255, 0.4)' }}>×</span>
-                                    <span style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-                                      <Hash size={12} style={{ opacity: 0.5 }} />
-                                      {set.reps || 0} reps
+                                    <span style={{ color: 'rgba(255, 255, 255, 0.3)' }}>×</span>
+                                    <span style={{ display: 'flex', alignItems: 'center', gap: '0.2rem' }}>
+                                      <Hash size={11} style={{ opacity: 0.5 }} />
+                                      {set.reps || 0}
                                     </span>
                                     {set.completed && (
                                       <span style={{
                                         color: '#10b981',
-                                        fontSize: isMobile ? '0.7rem' : '0.75rem'
+                                        fontSize: isMobile ? '0.65rem' : '0.7rem',
+                                        marginLeft: 'auto'
                                       }}>
                                         ✓
                                       </span>
@@ -761,18 +839,18 @@ export default function WorkoutHistory({ db, clientId, onBack }) {
                                   </div>
                                 ))}
                                 
-                                {/* Volume Total */}
+                                {/* Volume Total - COMPACT */}
                                 <div style={{
                                   marginTop: '0.25rem',
                                   paddingTop: '0.25rem',
                                   borderTop: '1px solid rgba(255, 255, 255, 0.05)',
-                                  fontSize: isMobile ? '0.7rem' : '0.75rem',
+                                  fontSize: isMobile ? '0.65rem' : '0.7rem',
                                   color: 'rgba(255, 255, 255, 0.5)',
                                   display: 'flex',
                                   justifyContent: 'space-between'
                                 }}>
-                                  <span>Totaal Volume:</span>
-                                  <span style={{ color: '#3b82f6', fontWeight: '600' }}>
+                                  <span>Volume:</span>
+                                  <span style={{ color: '#3b82f6', fontWeight: '700' }}>
                                     {calculateVolume(progress.sets)}kg
                                   </span>
                                 </div>
@@ -786,11 +864,12 @@ export default function WorkoutHistory({ db, clientId, onBack }) {
                                 padding: '0.5rem',
                                 background: 'rgba(255, 255, 255, 0.02)',
                                 borderRadius: '6px',
-                                fontSize: isMobile ? '0.75rem' : '0.8rem',
+                                fontSize: isMobile ? '0.7rem' : '0.75rem',
                                 color: 'rgba(255, 255, 255, 0.6)',
-                                fontStyle: 'italic'
+                                fontStyle: 'italic',
+                                lineHeight: '1.4'
                               }}>
-                                {progress.notes}
+                                💭 {progress.notes}
                               </div>
                             )}
                           </div>
@@ -807,15 +886,15 @@ export default function WorkoutHistory({ db, clientId, onBack }) {
               <div 
                 ref={observerTarget}
                 style={{
-                  padding: '2rem',
+                  padding: isMobile ? '1.5rem' : '2rem',
                   display: 'flex',
                   justifyContent: 'center'
                 }}
               >
                 {loadingMore && (
                   <div style={{
-                    width: '30px',
-                    height: '30px',
+                    width: isMobile ? '24px' : '28px',
+                    height: isMobile ? '24px' : '28px',
                     border: '3px solid rgba(249, 115, 22, 0.2)',
                     borderTopColor: '#f97316',
                     borderRadius: '50%',
@@ -827,23 +906,36 @@ export default function WorkoutHistory({ db, clientId, onBack }) {
           </>
         ) : (
           <div style={{
-            padding: '3rem',
+            padding: isMobile ? '2.5rem 1rem' : '3rem',
             textAlign: 'center'
           }}>
-            <Dumbbell size={48} color="rgba(249, 115, 22, 0.2)" />
+            <div style={{
+              width: isMobile ? '44px' : '52px',
+              height: isMobile ? '44px' : '52px',
+              margin: '0 auto',
+              borderRadius: '50%',
+              background: 'rgba(249, 115, 22, 0.12)',
+              border: '1px solid rgba(249, 115, 22, 0.25)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              marginBottom: '1rem'
+            }}>
+              <Dumbbell size={isMobile ? 24 : 28} color="rgba(249, 115, 22, 0.5)" />
+            </div>
             <p style={{
-              marginTop: '1rem',
-              color: 'rgba(255, 255, 255, 0.4)',
-              fontSize: isMobile ? '0.85rem' : '0.95rem'
+              color: 'rgba(255, 255, 255, 0.5)',
+              fontSize: isMobile ? '0.8rem' : '0.9rem',
+              fontWeight: '600',
+              marginBottom: '0.5rem'
             }}>
               Geen trainingsgeschiedenis gevonden
             </p>
             <p style={{
-              marginTop: '0.5rem',
-              color: 'rgba(255, 255, 255, 0.3)',
-              fontSize: isMobile ? '0.75rem' : '0.85rem'
+              color: 'rgba(255, 255, 255, 0.35)',
+              fontSize: isMobile ? '0.7rem' : '0.775rem'
             }}>
-              Start met het loggen van trainingen om je geschiedenis te zien
+              Log trainingen om je geschiedenis te zien
             </p>
           </div>
         )}

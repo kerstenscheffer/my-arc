@@ -1,303 +1,675 @@
 // src/modules/client-meal-base/components/ApplyTemplateModal.jsx
-import { X, Calendar, ArrowRight } from 'lucide-react'
-import { useState } from 'react'
+// ✅ PREMIUM v2.0 - ULTRA-CLEAN GLASSMORPHIC MODAL
+// 🎯 WorkoutPhotoSlider Norm Applied
+import React, { useState } from 'react'
+import { X, CheckCircle, FileCheck } from 'lucide-react'
 
-export default function ApplyTemplateModal({
-  isOpen,
-  onClose,
-  templates,
-  onApply,
-  currentDay,
-  isMobile
+export default function ApplyTemplateModal({ 
+  template, 
+  activePlan, 
+  db, 
+  onClose, 
+  onSuccess,
+  clientId,
+  isMobile 
 }) {
-  // ALL HOOKS BEFORE ANY CONDITIONAL RETURNS
-  const [selectedTemplate, setSelectedTemplate] = useState(null)
-  const [selectedDay, setSelectedDay] = useState(currentDay || 'monday')
-  
-  const daysOfWeek = [
-    { key: 'monday', label: 'Maandag' },
-    { key: 'tuesday', label: 'Dinsdag' },
-    { key: 'wednesday', label: 'Woensdag' },
-    { key: 'thursday', label: 'Donderdag' },
-    { key: 'friday', label: 'Vrijdag' },
-    { key: 'saturday', label: 'Zaterdag' },
-    { key: 'sunday', label: 'Zondag' }
+  const [selectedDay, setSelectedDay] = useState(null)
+  const [applying, setApplying] = useState(false)
+
+  const days = [
+    { key: 'monday', label: 'Ma', emoji: '📅', fullName: 'Maandag' },
+    { key: 'tuesday', label: 'Di', emoji: '📅', fullName: 'Dinsdag' },
+    { key: 'wednesday', label: 'Wo', emoji: '📅', fullName: 'Woensdag' },
+    { key: 'thursday', label: 'Do', emoji: '📅', fullName: 'Donderdag' },
+    { key: 'friday', label: 'Vr', emoji: '📅', fullName: 'Vrijdag' },
+    { key: 'saturday', label: 'Za', emoji: '🎉', fullName: 'Zaterdag' },
+    { key: 'sunday', label: 'Zo', emoji: '☀️', fullName: 'Zondag' }
   ]
-  
-  // NOW THE CONDITIONAL RETURN
-  if (!isOpen) return null
-  
-  const handleApply = () => {
-    if (!selectedTemplate || !selectedDay) {
-      alert('Selecteer een template en dag')
+
+  const handleApply = async () => {
+    if (!selectedDay) {
+      alert('⚠️ Selecteer eerst een dag!')
       return
     }
-    
-    onApply(selectedTemplate, selectedDay)
+
+    if (!activePlan) {
+      alert('❌ Geen actief meal plan gevonden!')
+      return
+    }
+
+    setApplying(true)
+    try {
+      await db.applyDayTemplateToWeek(clientId, activePlan.id, selectedDay, template.id)
+      
+      const dayInfo = days.find(d => d.key === selectedDay)
+      alert(`✅ Template "${template.name}" toegepast op ${dayInfo.fullName}!`)
+      
+      if (onSuccess) {
+        onSuccess(selectedDay)
+      }
+      onClose()
+    } catch (error) {
+      console.error('Failed to apply template:', error)
+      alert('❌ Toepassen mislukt. Probeer opnieuw.')
+    } finally {
+      setApplying(false)
+    }
   }
-  
+
   return (
-    <div style={{
-      position: 'fixed',
-      top: 0,
-      left: 0,
-      right: 0,
-      bottom: 0,
-      background: 'rgba(0, 0, 0, 0.85)',
-      backdropFilter: 'blur(10px)',
-      zIndex: 1000,
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      padding: isMobile ? '1rem' : '2rem'
-    }}>
-      <div style={{
-        width: '100%',
-        maxWidth: '600px',
-        maxHeight: '85vh',
-        background: 'linear-gradient(180deg, #1a1a1a 0%, #0f0f0f 100%)',
-        borderRadius: '20px',
-        border: '1px solid rgba(139, 92, 246, 0.3)',
-        overflow: 'hidden',
+    <div
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose()
+      }}
+      style={{
+        position: 'fixed',
+        inset: 0,
+        background: 'rgba(0, 0, 0, 0.92)',
+        backdropFilter: 'blur(12px)',
+        zIndex: 11000,
         display: 'flex',
-        flexDirection: 'column'
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: isMobile ? '1rem' : '2rem',
+        animation: 'fadeIn 0.3s ease',
+        overflowY: 'auto'
+      }}
+    >
+      <div style={{
+        position: 'relative',
+        width: '100%',
+        maxWidth: isMobile ? '100%' : '600px',
+        background: '#0a0a0a',
+        border: '1px solid rgba(139, 92, 246, 0.3)',
+        borderRadius: isMobile ? '16px' : '24px',
+        boxShadow: '0 25px 80px rgba(0, 0, 0, 0.8), 0 0 0 1px rgba(139, 92, 246, 0.2)',
+        animation: 'slideUp 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+        overflow: 'hidden',
+        maxHeight: '90vh'
       }}>
-        {/* Header */}
+        {/* Header gradient */}
         <div style={{
-          padding: isMobile ? '1.25rem' : '1.5rem',
-          borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between'
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          height: '4px',
+          background: 'linear-gradient(90deg, #8b5cf6 0%, #7c3aed 100%)',
+          opacity: 0.8
+        }} />
+
+        {/* Close button */}
+        <button
+          onClick={onClose}
+          style={{
+            position: 'absolute',
+            top: isMobile ? '1rem' : '1.5rem',
+            right: isMobile ? '1rem' : '1.5rem',
+            width: isMobile ? '36px' : '40px',
+            height: isMobile ? '36px' : '40px',
+            borderRadius: '12px',
+            background: 'linear-gradient(135deg, rgba(23, 23, 23, 0.8) 0%, rgba(23, 23, 23, 0.6) 100%)',
+            backdropFilter: 'blur(12px)',
+            border: '1px solid rgba(139, 92, 246, 0.3)',
+            color: '#8b5cf6',
+            fontSize: isMobile ? '1.25rem' : '1.5rem',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            cursor: 'pointer',
+            transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+            zIndex: 10,
+            touchAction: 'manipulation',
+            WebkitTapHighlightColor: 'transparent',
+            boxShadow: '0 4px 16px rgba(139, 92, 246, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.03)'
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.background = 'linear-gradient(135deg, rgba(139, 92, 246, 0.2) 0%, rgba(124, 58, 237, 0.15) 100%)'
+            e.currentTarget.style.transform = 'rotate(90deg) scale(1.05)'
+            e.currentTarget.style.boxShadow = '0 6px 20px rgba(139, 92, 246, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.05)'
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.background = 'linear-gradient(135deg, rgba(23, 23, 23, 0.8) 0%, rgba(23, 23, 23, 0.6) 100%)'
+            e.currentTarget.style.transform = 'rotate(0deg) scale(1)'
+            e.currentTarget.style.boxShadow = '0 4px 16px rgba(139, 92, 246, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.03)'
+          }}
+        >
+          ×
+        </button>
+
+        {/* Content */}
+        <div style={{
+          padding: isMobile ? '1.5rem 1rem' : '2rem 1.5rem',
+          overflowY: 'auto',
+          maxHeight: '85vh'
         }}>
-          <h2 style={{
-            fontSize: isMobile ? '1.125rem' : '1.25rem',
-            fontWeight: '700',
-            color: '#fff',
-            margin: 0
+          {/* 🔥 PREMIUM HEADER */}
+          <div style={{
+            marginBottom: isMobile ? '1.5rem' : '2rem',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            gap: isMobile ? '0.75rem' : '1rem'
           }}>
-            📅 Template Toepassen
-          </h2>
-          
-          <button
-            onClick={onClose}
-            style={{
-              width: '40px',
-              height: '40px',
-              borderRadius: '10px',
-              background: 'rgba(255, 255, 255, 0.05)',
-              border: '1px solid rgba(255, 255, 255, 0.1)',
+            {/* Icon container with glow */}
+            <div style={{
+              width: isMobile ? '56px' : '64px',
+              height: isMobile ? '56px' : '64px',
+              borderRadius: isMobile ? '14px' : '16px',
+              background: 'linear-gradient(135deg, rgba(139, 92, 246, 0.15) 0%, rgba(124, 58, 237, 0.08) 100%)',
+              border: '1px solid rgba(139, 92, 246, 0.3)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              cursor: 'pointer',
-              touchAction: 'manipulation',
-              WebkitTapHighlightColor: 'transparent'
-            }}
-          >
-            <X size={20} color="#fff" />
-          </button>
-        </div>
-        
-        {/* Content */}
-        <div style={{
-          flex: 1,
-          overflowY: 'auto',
-          padding: isMobile ? '1.25rem' : '1.5rem'
-        }}>
-          {/* Step 1: Select Template */}
-          <div style={{ marginBottom: '1.5rem' }}>
-            <h3 style={{
-              fontSize: isMobile ? '0.95rem' : '1rem',
-              fontWeight: '600',
-              color: 'rgba(255, 255, 255, 0.8)',
-              marginBottom: '0.75rem'
+              backdropFilter: 'blur(12px)',
+              boxShadow: '0 0 24px rgba(139, 92, 246, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.05)',
+              position: 'relative',
+              overflow: 'hidden'
             }}>
-              1. Kies Template
+              {/* Shine effect */}
+              <div style={{
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                right: 0,
+                height: '40%',
+                background: 'linear-gradient(180deg, rgba(255, 255, 255, 0.08) 0%, transparent 100%)',
+                pointerEvents: 'none'
+              }} />
+              
+              <FileCheck 
+                size={isMobile ? 24 : 28} 
+                color="#8b5cf6"
+                strokeWidth={2.5}
+                style={{ 
+                  filter: 'drop-shadow(0 0 8px rgba(139, 92, 246, 0.6))',
+                  position: 'relative',
+                  zIndex: 1
+                }}
+              />
+            </div>
+
+            <div style={{ textAlign: 'center' }}>
+              <h2 style={{
+                fontSize: isMobile ? '1.5rem' : '1.75rem',
+                fontWeight: '800',
+                color: 'white',
+                marginBottom: '0.5rem',
+                letterSpacing: '-0.02em',
+                textTransform: 'uppercase',
+                textShadow: '0 2px 12px rgba(139, 92, 246, 0.4)'
+              }}>
+                Template Toepassen
+              </h2>
+              <p style={{
+                fontSize: isMobile ? '0.875rem' : '0.95rem',
+                color: 'rgba(255, 255, 255, 0.5)',
+                lineHeight: 1.5,
+                fontWeight: '600',
+                margin: 0
+              }}>
+                Kies op welke dag je deze template wilt toepassen
+              </p>
+            </div>
+          </div>
+
+          {/* 🔥 PREMIUM TEMPLATE INFO CARD */}
+          <div style={{
+            background: 'linear-gradient(135deg, rgba(23, 23, 23, 0.8) 0%, rgba(23, 23, 23, 0.6) 100%)',
+            backdropFilter: 'blur(12px)',
+            border: '1px solid rgba(139, 92, 246, 0.3)',
+            borderRadius: isMobile ? '12px' : '14px',
+            padding: isMobile ? '1rem' : '1.25rem',
+            marginBottom: isMobile ? '1.5rem' : '2rem',
+            boxShadow: '0 4px 16px rgba(139, 92, 246, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.03)',
+            position: 'relative',
+            overflow: 'hidden'
+          }}>
+            {/* Top accent */}
+            <div style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              height: '2px',
+              background: 'linear-gradient(90deg, #8b5cf6 0%, #7c3aed 100%)',
+              opacity: 0.6
+            }} />
+
+            {/* Shine overlay */}
+            <div style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              height: '40%',
+              background: 'linear-gradient(180deg, rgba(255, 255, 255, 0.04) 0%, transparent 100%)',
+              pointerEvents: 'none'
+            }} />
+            
+            <h3 style={{
+              fontSize: isMobile ? '1rem' : '1.125rem',
+              fontWeight: '800',
+              color: '#fff',
+              marginBottom: isMobile ? '0.875rem' : '1rem',
+              letterSpacing: '-0.01em',
+              position: 'relative',
+              zIndex: 1
+            }}>
+              {template.name}
             </h3>
             
-            {templates.length === 0 ? (
-              <div style={{
-                padding: '1.5rem',
-                background: 'rgba(255, 255, 255, 0.03)',
-                borderRadius: '12px',
-                textAlign: 'center',
-                color: 'rgba(255, 255, 255, 0.5)',
-                fontSize: isMobile ? '0.875rem' : '0.95rem'
-              }}>
-                Nog geen templates. Maak eerst een template!
-              </div>
-            ) : (
-              <div style={{
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '0.75rem'
-              }}>
-                {templates.map(template => (
-                  <button
-                    key={template.id}
-                    onClick={() => setSelectedTemplate(template.id)}
-                    style={{
-                      padding: isMobile ? '1rem' : '1.25rem',
-                      background: selectedTemplate === template.id
-                        ? 'linear-gradient(135deg, rgba(139, 92, 246, 0.2) 0%, rgba(139, 92, 246, 0.1) 100%)'
-                        : 'rgba(255, 255, 255, 0.03)',
-                      border: `1px solid ${selectedTemplate === template.id 
-                        ? 'rgba(139, 92, 246, 0.4)' 
-                        : 'rgba(255, 255, 255, 0.1)'}`,
-                      borderRadius: '12px',
-                      cursor: 'pointer',
-                      textAlign: 'left',
-                      transition: 'all 0.3s ease',
-                      touchAction: 'manipulation',
-                      WebkitTapHighlightColor: 'transparent'
-                    }}
-                  >
-                    <div style={{
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'center',
-                      marginBottom: '0.5rem'
-                    }}>
-                      <div style={{
-                        fontSize: isMobile ? '1rem' : '1.125rem',
-                        fontWeight: '600',
-                        color: selectedTemplate === template.id ? '#8b5cf6' : '#fff'
-                      }}>
-                        {template.name}
-                      </div>
-                      
-                      {selectedTemplate === template.id && (
-                        <div style={{
-                          width: '24px',
-                          height: '24px',
-                          borderRadius: '50%',
-                          background: '#8b5cf6',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center'
-                        }}>
-                          <span style={{ fontSize: '14px' }}>✓</span>
-                        </div>
-                      )}
-                    </div>
-                    
-                    <div style={{
-                      display: 'flex',
-                      gap: '1rem',
-                      fontSize: isMobile ? '0.8rem' : '0.875rem',
-                      color: 'rgba(255, 255, 255, 0.6)'
-                    }}>
-                      <span>{template.total_calories} kcal</span>
-                      <span>{Math.round(template.total_protein)}g P</span>
-                      <span>{Math.round(template.total_carbs)}g C</span>
-                      <span>{Math.round(template.total_fat)}g F</span>
-                    </div>
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-          
-          {/* Step 2: Select Day */}
-          <div>
-            <h3 style={{
-              fontSize: isMobile ? '0.95rem' : '1rem',
-              fontWeight: '600',
-              color: 'rgba(255, 255, 255, 0.8)',
-              marginBottom: '0.75rem'
+            {/* Totals - Premium Pills */}
+            <div style={{
+              display: 'flex',
+              gap: isMobile ? '0.5rem' : '0.625rem',
+              marginBottom: isMobile ? '0.875rem' : '1rem',
+              flexWrap: 'wrap',
+              position: 'relative',
+              zIndex: 1
             }}>
-              2. Kies Dag
-            </h3>
+              <div style={{
+                padding: isMobile ? '0.375rem 0.75rem' : '0.4rem 0.875rem',
+                background: 'rgba(139, 92, 246, 0.15)',
+                border: '1px solid rgba(139, 92, 246, 0.3)',
+                borderRadius: '8px',
+                fontSize: isMobile ? '0.8rem' : '0.875rem',
+                color: '#8b5cf6',
+                fontWeight: '700',
+                backdropFilter: 'blur(8px)',
+                boxShadow: '0 0 8px rgba(139, 92, 246, 0.2)'
+              }}>
+                {template.total_calories} kcal
+              </div>
+              
+              <div style={{
+                padding: isMobile ? '0.375rem 0.625rem' : '0.4rem 0.75rem',
+                background: 'rgba(255, 255, 255, 0.05)',
+                border: '1px solid rgba(255, 255, 255, 0.1)',
+                borderRadius: '8px',
+                fontSize: isMobile ? '0.8rem' : '0.875rem',
+                color: 'rgba(255, 255, 255, 0.7)',
+                fontWeight: '700',
+                backdropFilter: 'blur(8px)',
+                display: 'inline-flex',
+                gap: '0.25rem'
+              }}>
+                <span style={{ opacity: 0.6 }}>P</span>
+                {Math.round(template.total_protein)}g
+              </div>
+              
+              <div style={{
+                padding: isMobile ? '0.375rem 0.625rem' : '0.4rem 0.75rem',
+                background: 'rgba(255, 255, 255, 0.05)',
+                border: '1px solid rgba(255, 255, 255, 0.1)',
+                borderRadius: '8px',
+                fontSize: isMobile ? '0.8rem' : '0.875rem',
+                color: 'rgba(255, 255, 255, 0.7)',
+                fontWeight: '700',
+                backdropFilter: 'blur(8px)',
+                display: 'inline-flex',
+                gap: '0.25rem'
+              }}>
+                <span style={{ opacity: 0.6 }}>C</span>
+                {Math.round(template.total_carbs)}g
+              </div>
+              
+              <div style={{
+                padding: isMobile ? '0.375rem 0.625rem' : '0.4rem 0.75rem',
+                background: 'rgba(255, 255, 255, 0.05)',
+                border: '1px solid rgba(255, 255, 255, 0.1)',
+                borderRadius: '8px',
+                fontSize: isMobile ? '0.8rem' : '0.875rem',
+                color: 'rgba(255, 255, 255, 0.7)',
+                fontWeight: '700',
+                backdropFilter: 'blur(8px)',
+                display: 'inline-flex',
+                gap: '0.25rem'
+              }}>
+                <span style={{ opacity: 0.6 }}>F</span>
+                {Math.round(template.total_fat)}g
+              </div>
+            </div>
+
+            {/* Meals preview */}
+            <div style={{
+              display: 'flex',
+              flexWrap: 'wrap',
+              gap: isMobile ? '0.5rem' : '0.625rem',
+              fontSize: isMobile ? '0.7rem' : '0.75rem',
+              position: 'relative',
+              zIndex: 1
+            }}>
+              {template.meals.breakfast && (
+                <span style={{
+                  padding: '0.25rem 0.5rem',
+                  background: 'rgba(255, 255, 255, 0.05)',
+                  borderRadius: '6px',
+                  color: 'rgba(255, 255, 255, 0.5)',
+                  fontWeight: '600'
+                }}>
+                  🍳 Ontbijt
+                </span>
+              )}
+              {template.meals.lunch && (
+                <span style={{
+                  padding: '0.25rem 0.5rem',
+                  background: 'rgba(255, 255, 255, 0.05)',
+                  borderRadius: '6px',
+                  color: 'rgba(255, 255, 255, 0.5)',
+                  fontWeight: '600'
+                }}>
+                  🥗 Lunch
+                </span>
+              )}
+              {template.meals.dinner && (
+                <span style={{
+                  padding: '0.25rem 0.5rem',
+                  background: 'rgba(255, 255, 255, 0.05)',
+                  borderRadius: '6px',
+                  color: 'rgba(255, 255, 255, 0.5)',
+                  fontWeight: '600'
+                }}>
+                  🍽️ Diner
+                </span>
+              )}
+              {template.meals.snacks?.length > 0 && (
+                <span style={{
+                  padding: '0.25rem 0.5rem',
+                  background: 'rgba(255, 255, 255, 0.05)',
+                  borderRadius: '6px',
+                  color: 'rgba(255, 255, 255, 0.5)',
+                  fontWeight: '600'
+                }}>
+                  🍪 {template.meals.snacks.length} snack(s)
+                </span>
+              )}
+            </div>
+          </div>
+
+          {/* Day selector */}
+          <div style={{
+            marginBottom: isMobile ? '1.5rem' : '2rem'
+          }}>
+            <h4 style={{
+              fontSize: isMobile ? '0.95rem' : '1rem',
+              fontWeight: '700',
+              color: 'rgba(255, 255, 255, 0.8)',
+              marginBottom: '1rem',
+              textAlign: 'center',
+              letterSpacing: '-0.01em'
+            }}>
+              Selecteer dag:
+            </h4>
             
             <div style={{
               display: 'grid',
-              gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(3, 1fr)',
-              gap: '0.75rem'
+              gridTemplateColumns: 'repeat(7, 1fr)',
+              gap: isMobile ? '0.5rem' : '0.625rem'
             }}>
-              {daysOfWeek.map(day => (
-                <button
-                  key={day.key}
-                  onClick={() => setSelectedDay(day.key)}
-                  style={{
-                    padding: isMobile ? '0.875rem' : '1rem',
-                    background: selectedDay === day.key
-                      ? 'linear-gradient(135deg, rgba(16, 185, 129, 0.2) 0%, rgba(16, 185, 129, 0.1) 100%)'
-                      : 'rgba(255, 255, 255, 0.03)',
-                    border: `1px solid ${selectedDay === day.key 
-                      ? 'rgba(16, 185, 129, 0.4)' 
-                      : 'rgba(255, 255, 255, 0.1)'}`,
-                    borderRadius: '10px',
-                    color: selectedDay === day.key ? '#10b981' : 'rgba(255, 255, 255, 0.7)',
-                    fontSize: isMobile ? '0.875rem' : '0.95rem',
-                    fontWeight: '600',
-                    cursor: 'pointer',
-                    transition: 'all 0.3s ease',
-                    touchAction: 'manipulation',
-                    WebkitTapHighlightColor: 'transparent'
-                  }}
-                >
-                  {day.label}
-                </button>
-              ))}
+              {days.map(day => {
+                const isSelected = selectedDay === day.key
+                return (
+                  <button
+                    key={day.key}
+                    onClick={() => setSelectedDay(day.key)}
+                    style={{
+                      padding: isMobile ? '0.75rem 0.25rem' : '1rem 0.5rem',
+                      background: isSelected 
+                        ? 'linear-gradient(135deg, rgba(139, 92, 246, 0.25) 0%, rgba(124, 58, 237, 0.15) 100%)'
+                        : 'linear-gradient(135deg, rgba(23, 23, 23, 0.8) 0%, rgba(23, 23, 23, 0.6) 100%)',
+                      backdropFilter: 'blur(12px)',
+                      border: isSelected
+                        ? '2px solid rgba(139, 92, 246, 0.5)'
+                        : '1px solid rgba(139, 92, 246, 0.2)',
+                      borderRadius: isMobile ? '10px' : '12px',
+                      cursor: 'pointer',
+                      transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                      touchAction: 'manipulation',
+                      WebkitTapHighlightColor: 'transparent',
+                      minHeight: '44px',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '0.25rem',
+                      boxShadow: isSelected
+                        ? '0 4px 16px rgba(139, 92, 246, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.05)'
+                        : '0 2px 8px rgba(0, 0, 0, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.02)',
+                      position: 'relative',
+                      overflow: 'hidden'
+                    }}
+                    onMouseEnter={(e) => {
+                      if (!isSelected) {
+                        e.currentTarget.style.background = 'linear-gradient(135deg, rgba(139, 92, 246, 0.15) 0%, rgba(124, 58, 237, 0.08) 100%)'
+                        e.currentTarget.style.transform = 'translateY(-2px) scale(1.05)'
+                        e.currentTarget.style.boxShadow = '0 6px 20px rgba(139, 92, 246, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.04)'
+                      }
+                    }}
+                    onMouseLeave={(e) => {
+                      if (!isSelected) {
+                        e.currentTarget.style.background = 'linear-gradient(135deg, rgba(23, 23, 23, 0.8) 0%, rgba(23, 23, 23, 0.6) 100%)'
+                        e.currentTarget.style.transform = 'translateY(0) scale(1)'
+                        e.currentTarget.style.boxShadow = '0 2px 8px rgba(0, 0, 0, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.02)'
+                      }
+                    }}
+                    onTouchStart={(e) => {
+                      if (isMobile && !isSelected) {
+                        e.currentTarget.style.transform = 'scale(0.95)'
+                      }
+                    }}
+                    onTouchEnd={(e) => {
+                      if (isMobile && !isSelected) {
+                        e.currentTarget.style.transform = 'scale(1)'
+                      }
+                    }}
+                  >
+                    {/* Shine overlay for selected */}
+                    {isSelected && (
+                      <div style={{
+                        position: 'absolute',
+                        top: 0,
+                        left: 0,
+                        right: 0,
+                        height: '40%',
+                        background: 'linear-gradient(180deg, rgba(255, 255, 255, 0.06) 0%, transparent 100%)',
+                        pointerEvents: 'none'
+                      }} />
+                    )}
+                    
+                    <span style={{ 
+                      fontSize: isMobile ? '1rem' : '1.25rem',
+                      position: 'relative',
+                      zIndex: 1
+                    }}>
+                      {day.emoji}
+                    </span>
+                    <span style={{
+                      fontSize: isMobile ? '0.7rem' : '0.8rem',
+                      fontWeight: '700',
+                      color: isSelected ? '#8b5cf6' : 'rgba(255, 255, 255, 0.6)',
+                      position: 'relative',
+                      zIndex: 1,
+                      letterSpacing: '-0.01em'
+                    }}>
+                      {day.label}
+                    </span>
+                  </button>
+                )
+              })}
             </div>
           </div>
-        </div>
-        
-        {/* Footer */}
-        <div style={{
-          padding: isMobile ? '1.25rem' : '1.5rem',
-          borderTop: '1px solid rgba(255, 255, 255, 0.1)',
-          display: 'flex',
-          gap: '1rem'
-        }}>
-          <button
-            onClick={onClose}
-            style={{
-              flex: 1,
-              padding: isMobile ? '0.75rem' : '0.875rem',
-              background: 'rgba(255, 255, 255, 0.05)',
-              border: '1px solid rgba(255, 255, 255, 0.1)',
-              borderRadius: '10px',
-              color: '#fff',
-              fontSize: isMobile ? '0.875rem' : '0.95rem',
-              fontWeight: '600',
-              cursor: 'pointer',
-              touchAction: 'manipulation',
-              WebkitTapHighlightColor: 'transparent'
-            }}
-          >
-            Annuleer
-          </button>
-          
+
+          {/* 🔥 PREMIUM APPLY BUTTON */}
           <button
             onClick={handleApply}
-            disabled={!selectedTemplate}
+            disabled={!selectedDay || applying}
             style={{
-              flex: 1,
-              padding: isMobile ? '0.75rem' : '0.875rem',
-              background: selectedTemplate
-                ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)'
-                : 'rgba(255, 255, 255, 0.1)',
-              border: 'none',
-              borderRadius: '10px',
-              color: selectedTemplate ? '#fff' : 'rgba(255, 255, 255, 0.3)',
-              fontSize: isMobile ? '0.875rem' : '0.95rem',
-              fontWeight: '600',
-              cursor: selectedTemplate ? 'pointer' : 'not-allowed',
+              width: '100%',
+              padding: isMobile ? '1rem 1.25rem' : '1.125rem 1.5rem',
+              background: (!selectedDay || applying)
+                ? 'rgba(139, 92, 246, 0.2)'
+                : 'linear-gradient(135deg, rgba(23, 23, 23, 0.8) 0%, rgba(23, 23, 23, 0.6) 100%)',
+              backdropFilter: 'blur(12px)',
+              border: (!selectedDay || applying)
+                ? '1px solid rgba(139, 92, 246, 0.2)'
+                : '1px solid rgba(139, 92, 246, 0.3)',
+              borderRadius: isMobile ? '12px' : '14px',
+              color: '#fff',
+              fontSize: isMobile ? '0.95rem' : '1rem',
+              fontWeight: '800',
+              cursor: (!selectedDay || applying) ? 'not-allowed' : 'pointer',
+              transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+              touchAction: 'manipulation',
+              WebkitTapHighlightColor: 'transparent',
+              minHeight: '44px',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              gap: '0.5rem',
-              touchAction: 'manipulation',
-              WebkitTapHighlightColor: 'transparent'
+              gap: isMobile ? '0.5rem' : '0.625rem',
+              opacity: (!selectedDay || applying) ? 0.5 : 1,
+              boxShadow: (!selectedDay || applying) 
+                ? 'none'
+                : '0 4px 16px rgba(139, 92, 246, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.03)',
+              position: 'relative',
+              overflow: 'hidden',
+              textTransform: 'uppercase',
+              letterSpacing: '-0.02em'
+            }}
+            onMouseEnter={(e) => {
+              if (selectedDay && !applying) {
+                e.currentTarget.style.background = 'linear-gradient(135deg, rgba(139, 92, 246, 0.15) 0%, rgba(124, 58, 237, 0.08) 100%)'
+                e.currentTarget.style.transform = 'translateY(-2px) scale(1.02)'
+                e.currentTarget.style.boxShadow = '0 8px 24px rgba(139, 92, 246, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.05)'
+              }
+            }}
+            onMouseLeave={(e) => {
+              if (selectedDay && !applying) {
+                e.currentTarget.style.background = 'linear-gradient(135deg, rgba(23, 23, 23, 0.8) 0%, rgba(23, 23, 23, 0.6) 100%)'
+                e.currentTarget.style.transform = 'translateY(0) scale(1)'
+                e.currentTarget.style.boxShadow = '0 4px 16px rgba(139, 92, 246, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.03)'
+              }
+            }}
+            onTouchStart={(e) => {
+              if (isMobile && selectedDay && !applying) {
+                e.currentTarget.style.transform = 'scale(0.98)'
+              }
+            }}
+            onTouchEnd={(e) => {
+              if (isMobile && selectedDay && !applying) {
+                e.currentTarget.style.transform = 'scale(1)'
+              }
             }}
           >
-            Toepassen
-            <ArrowRight size={16} />
+            {/* Shine overlay */}
+            {selectedDay && !applying && (
+              <div style={{
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                right: 0,
+                height: '40%',
+                background: 'linear-gradient(180deg, rgba(255, 255, 255, 0.06) 0%, transparent 100%)',
+                pointerEvents: 'none',
+                zIndex: 1
+              }} />
+            )}
+
+            {applying ? (
+              <>
+                <div style={{
+                  width: '18px',
+                  height: '18px',
+                  border: '2px solid rgba(139, 92, 246, 0.3)',
+                  borderTopColor: '#8b5cf6',
+                  borderRadius: '50%',
+                  animation: 'spin 1s linear infinite',
+                  boxShadow: '0 0 12px rgba(139, 92, 246, 0.4)',
+                  position: 'relative',
+                  zIndex: 2
+                }} />
+                <span style={{ position: 'relative', zIndex: 2 }}>
+                  Bezig met toepassen...
+                </span>
+              </>
+            ) : (
+              <>
+                {/* Icon container */}
+                <div style={{
+                  width: isMobile ? '24px' : '28px',
+                  height: isMobile ? '24px' : '28px',
+                  borderRadius: '6px',
+                  background: 'rgba(139, 92, 246, 0.2)',
+                  border: '1px solid rgba(139, 92, 246, 0.4)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  boxShadow: '0 0 12px rgba(139, 92, 246, 0.3)',
+                  position: 'relative',
+                  zIndex: 2
+                }}>
+                  <CheckCircle 
+                    size={isMobile ? 14 : 16} 
+                    color="#8b5cf6"
+                    strokeWidth={2.5}
+                    style={{ filter: 'drop-shadow(0 0 4px rgba(139, 92, 246, 0.6))' }}
+                  />
+                </div>
+                <span style={{ position: 'relative', zIndex: 2 }}>
+                  Template Toepassen
+                </span>
+              </>
+            )}
           </button>
+
+          {/* Warning message */}
+          {!activePlan && (
+            <div style={{
+              marginTop: '1rem',
+              padding: isMobile ? '0.875rem' : '1rem',
+              background: 'linear-gradient(135deg, rgba(239, 68, 68, 0.1) 0%, rgba(239, 68, 68, 0.05) 100%)',
+              backdropFilter: 'blur(8px)',
+              border: '1px solid rgba(239, 68, 68, 0.3)',
+              borderRadius: '10px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.75rem',
+              boxShadow: '0 2px 12px rgba(239, 68, 68, 0.15)'
+            }}>
+              <span style={{ fontSize: '1.25rem' }}>⚠️</span>
+              <p style={{
+                fontSize: isMobile ? '0.8rem' : '0.875rem',
+                color: 'rgba(239, 68, 68, 0.9)',
+                fontWeight: '600',
+                margin: 0,
+                lineHeight: 1.4
+              }}>
+                Geen actief meal plan gevonden
+              </p>
+            </div>
+          )}
         </div>
       </div>
+
+      <style>{`
+        @keyframes fadeIn {
+          from { opacity: 0; }
+          to { opacity: 1; }
+        }
+        @keyframes slideUp {
+          from {
+            opacity: 0;
+            transform: translateY(30px) scale(0.95);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0) scale(1);
+          }
+        }
+        @keyframes spin {
+          to { transform: rotate(360deg); }
+        }
+      `}</style>
     </div>
   )
 }

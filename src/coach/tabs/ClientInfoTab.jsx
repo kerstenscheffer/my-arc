@@ -1,6 +1,6 @@
 // src/coach/tabs/ClientInfoTab.jsx - RLS FIX VERSION
 import { useState, useEffect } from 'react'
-import { User, Weight, Target, Activity, Heart, Brain, FileText, Ruler, Plus, X, Save, AlertCircle, Shield } from 'lucide-react'
+import { User, Weight, Target, Activity, Heart, Brain, FileText, Ruler, Plus, X, Save, AlertCircle, Shield, Trash2 } from 'lucide-react'
 
 // Import sub-tabs
 import BasicInfoTab from './client-info/BasicInfoTab'
@@ -22,6 +22,8 @@ export default function ClientInfoTab({ db, isMobile }) {
   const [showAddClient, setShowAddClient] = useState(false)
   const [addClientLoading, setAddClientLoading] = useState(false)
   const [showDiagnostics, setShowDiagnostics] = useState(false)
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const [deleteLoading, setDeleteLoading] = useState(false)
   const [newClientData, setNewClientData] = useState({
     firstName: '',
     lastName: '',
@@ -54,8 +56,11 @@ export default function ClientInfoTab({ db, isMobile }) {
   const loadClients = async () => {
     setLoadingClients(true)
     try {
+      // Clear cache to ensure fresh data
+      db.clearCache('clients')
+      
       const clientsData = await db.getClients()
-      console.log('📋 Loaded clients:', clientsData)
+      console.log('📋 Loaded clients:', clientsData?.length || 0)
       setClients(clientsData || [])
       
       // Auto-select first client if available
@@ -99,6 +104,60 @@ export default function ClientInfoTab({ db, isMobile }) {
     } catch (error) {
       console.error('❌ RLS Check error:', error)
       return false
+    }
+  }
+
+  // 🗑️ DELETE CLIENT HANDLER
+  const handleDeleteClient = async () => {
+    if (!selectedClient) return
+    
+    try {
+      setDeleteLoading(true)
+      console.log('🗑️ Deleting client:', selectedClient.id)
+      
+      // Store client info for next selection
+      const clientToDelete = selectedClient
+      const currentIndex = clients.findIndex(c => c.id === clientToDelete.id)
+      const nextClientEmail = clients[currentIndex + 1]?.email || clients[currentIndex - 1]?.email
+      
+      // Clear caches before delete
+      db.clearCache('clients')
+      db.clearCache(`client_${clientToDelete.id}`)
+      
+      // Call DatabaseService deleteClient method
+      await db.deleteClient(clientToDelete.id)
+      
+      console.log('✅ Client deleted successfully')
+      
+      // Clear cache again after delete
+      db.clearCache('clients')
+      
+      // Close confirmation dialog
+      setShowDeleteConfirm(false)
+      
+      // 🎯 INSTANT UI UPDATE: Filter client from state
+      console.log('🎯 Updating UI state...')
+      const updatedClients = clients.filter(c => c.id !== clientToDelete.id)
+      setClients(updatedClients)
+      console.log('✅ Clients updated:', updatedClients.length)
+      
+      // Select next client from filtered list
+      if (updatedClients.length > 0) {
+        const nextClient = updatedClients.find(c => c.email === nextClientEmail) || updatedClients[0]
+        setSelectedClient(nextClient)
+        console.log('✅ Selected next client:', nextClient.email)
+      } else {
+        setSelectedClient(null)
+        console.log('📋 No clients remaining')
+      }
+      
+      alert(`✅ ${clientToDelete.first_name} ${clientToDelete.last_name} has been removed from your system`)
+      
+    } catch (error) {
+      console.error('❌ Delete client failed:', error)
+      alert(`❌ Failed to delete client: ${error.message}`)
+    } finally {
+      setDeleteLoading(false)
     }
   }
 
@@ -606,6 +665,50 @@ export default function ClientInfoTab({ db, isMobile }) {
             Add New Client
           </button>
           
+          {/* 🗑️ DELETE CLIENT BUTTON */}
+          {selectedClient && (
+            <button
+              onClick={() => setShowDeleteConfirm(true)}
+              disabled={deleteLoading}
+              style={{
+                flex: 1,
+                padding: isMobile ? '0.75rem 1rem' : '0.875rem 1.25rem',
+                background: deleteLoading 
+                  ? 'rgba(239, 68, 68, 0.3)' 
+                  : 'linear-gradient(135deg, #ef4444, #dc2626)',
+                border: 'none',
+                borderRadius: '10px',
+                color: '#fff',
+                fontSize: isMobile ? '0.85rem' : '0.9rem',
+                fontWeight: '600',
+                cursor: deleteLoading ? 'not-allowed' : 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '0.5rem',
+                minHeight: '44px',
+                touchAction: 'manipulation',
+                WebkitTapHighlightColor: 'transparent',
+                transition: 'all 0.3s ease',
+                transform: 'translateZ(0)',
+                opacity: deleteLoading ? 0.7 : 1
+              }}
+              onTouchStart={(e) => {
+                if (isMobile && !deleteLoading) {
+                  e.currentTarget.style.transform = 'scale(0.98)'
+                }
+              }}
+              onTouchEnd={(e) => {
+                if (isMobile && !deleteLoading) {
+                  e.currentTarget.style.transform = 'scale(1)'
+                }
+              }}
+            >
+              <Trash2 size={16} />
+              {deleteLoading ? 'Deleting...' : 'Delete'}
+            </button>
+          )}
+          
           <button
             onClick={runDiagnostics}
             style={{
@@ -957,6 +1060,153 @@ export default function ClientInfoTab({ db, isMobile }) {
                 }}
               >
                 {addClientLoading ? 'Creating Client...' : 'Create Client'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      
+      {/* 🗑️ DELETE CONFIRMATION MODAL */}
+      {showDeleteConfirm && selectedClient && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(0, 0, 0, 0.8)',
+          backdropFilter: 'blur(4px)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 9999,
+          padding: '1rem',
+          animation: 'fadeIn 0.2s ease'
+        }}>
+          <div style={{
+            background: '#111',
+            borderRadius: '16px',
+            border: '1px solid rgba(239, 68, 68, 0.3)',
+            maxWidth: '500px',
+            width: '100%',
+            padding: isMobile ? '1.5rem' : '2rem',
+            animation: 'fadeIn 0.3s ease',
+            boxShadow: '0 20px 40px rgba(0, 0, 0, 0.5)'
+          }}>
+            {/* Warning Icon */}
+            <div style={{
+              width: isMobile ? '60px' : '70px',
+              height: isMobile ? '60px' : '70px',
+              borderRadius: '50%',
+              background: 'rgba(239, 68, 68, 0.1)',
+              border: '2px solid rgba(239, 68, 68, 0.3)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              margin: '0 auto 1.5rem'
+            }}>
+              <AlertCircle size={isMobile ? 32 : 40} color="#ef4444" />
+            </div>
+
+            <h2 style={{
+              fontSize: isMobile ? '1.25rem' : '1.5rem',
+              fontWeight: 'bold',
+              color: '#fff',
+              textAlign: 'center',
+              marginBottom: '0.75rem'
+            }}>
+              Delete Client?
+            </h2>
+
+            <p style={{
+              color: 'rgba(255, 255, 255, 0.7)',
+              fontSize: isMobile ? '0.9rem' : '0.95rem',
+              textAlign: 'center',
+              lineHeight: '1.6',
+              marginBottom: '1.5rem'
+            }}>
+              Are you sure you want to remove{' '}
+              <strong style={{ color: '#10b981' }}>
+                {selectedClient.first_name} {selectedClient.last_name}
+              </strong>{' '}
+              from your system?
+              <br /><br />
+              <strong style={{ color: '#ef4444' }}>This action cannot be undone.</strong>
+              <br />
+              All data associated with this client will be permanently deleted.
+            </p>
+
+            <div style={{
+              display: 'flex',
+              gap: '0.75rem',
+              marginTop: '2rem'
+            }}>
+              <button
+                onClick={() => setShowDeleteConfirm(false)}
+                disabled={deleteLoading}
+                style={{
+                  flex: 1,
+                  padding: isMobile ? '0.875rem' : '1rem',
+                  background: 'rgba(255, 255, 255, 0.05)',
+                  border: '1px solid rgba(255, 255, 255, 0.1)',
+                  borderRadius: '10px',
+                  color: '#fff',
+                  fontSize: isMobile ? '0.9rem' : '0.95rem',
+                  fontWeight: '600',
+                  cursor: deleteLoading ? 'not-allowed' : 'pointer',
+                  minHeight: '44px',
+                  touchAction: 'manipulation',
+                  WebkitTapHighlightColor: 'transparent',
+                  transition: 'all 0.3s ease',
+                  opacity: deleteLoading ? 0.5 : 1
+                }}
+                onTouchStart={(e) => {
+                  if (isMobile && !deleteLoading) {
+                    e.currentTarget.style.transform = 'scale(0.98)'
+                  }
+                }}
+                onTouchEnd={(e) => {
+                  if (isMobile && !deleteLoading) {
+                    e.currentTarget.style.transform = 'scale(1)'
+                  }
+                }}
+              >
+                Cancel
+              </button>
+
+              <button
+                onClick={handleDeleteClient}
+                disabled={deleteLoading}
+                style={{
+                  flex: 1,
+                  padding: isMobile ? '0.875rem' : '1rem',
+                  background: deleteLoading 
+                    ? 'rgba(239, 68, 68, 0.5)' 
+                    : 'linear-gradient(135deg, #ef4444, #dc2626)',
+                  border: 'none',
+                  borderRadius: '10px',
+                  color: '#fff',
+                  fontSize: isMobile ? '0.9rem' : '0.95rem',
+                  fontWeight: '600',
+                  cursor: deleteLoading ? 'not-allowed' : 'pointer',
+                  minHeight: '44px',
+                  touchAction: 'manipulation',
+                  WebkitTapHighlightColor: 'transparent',
+                  transition: 'all 0.3s ease',
+                  opacity: deleteLoading ? 0.7 : 1
+                }}
+                onTouchStart={(e) => {
+                  if (isMobile && !deleteLoading) {
+                    e.currentTarget.style.transform = 'scale(0.98)'
+                  }
+                }}
+                onTouchEnd={(e) => {
+                  if (isMobile && !deleteLoading) {
+                    e.currentTarget.style.transform = 'scale(1)'
+                  }
+                }}
+              >
+                {deleteLoading ? 'Deleting...' : 'Yes, Delete Client'}
               </button>
             </div>
           </div>

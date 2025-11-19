@@ -1,5 +1,5 @@
 // src/modules/meal-plan/components/wizard/shared/CoachBubble.jsx
-// Speech bubble met Kersten foto + coach bericht
+// ULTRA-COMPACT Speech bubble met Kersten foto + coach bericht
 
 import { COACH_INFO } from '../utils/wizardData'
 
@@ -11,17 +11,17 @@ export default function CoachBubble({ message, variant = 'default' }) {
     default: {
       bg: 'linear-gradient(135deg, rgba(16, 185, 129, 0.15) 0%, rgba(16, 185, 129, 0.05) 100%)',
       border: 'rgba(16, 185, 129, 0.3)',
-      glow: '0 8px 25px rgba(16, 185, 129, 0.2)'
+      glow: '0 4px 12px rgba(16, 185, 129, 0.15)'
     },
     info: {
       bg: 'linear-gradient(135deg, rgba(59, 130, 246, 0.15) 0%, rgba(59, 130, 246, 0.05) 100%)',
       border: 'rgba(59, 130, 246, 0.3)',
-      glow: '0 8px 25px rgba(59, 130, 246, 0.2)'
+      glow: '0 4px 12px rgba(59, 130, 246, 0.15)'
     },
     warning: {
       bg: 'linear-gradient(135deg, rgba(249, 115, 22, 0.15) 0%, rgba(249, 115, 22, 0.05) 100%)',
       border: 'rgba(249, 115, 22, 0.3)',
-      glow: '0 8px 25px rgba(249, 115, 22, 0.2)'
+      glow: '0 4px 12px rgba(249, 115, 22, 0.15)'
     }
   }
   
@@ -30,30 +30,25 @@ export default function CoachBubble({ message, variant = 'default' }) {
   return (
     <div style={{
       display: 'flex',
-      alignItems: isMobile ? 'flex-start' : 'center',
-      gap: isMobile ? '0.875rem' : '1.25rem',
-      padding: isMobile ? '1rem' : '1.5rem',
-      marginBottom: isMobile ? '1.5rem' : '2rem',
-      flexDirection: isMobile ? 'column' : 'row'
+      alignItems: 'flex-start',
+      gap: isMobile ? '0.75rem' : '1rem',
+      padding: '0',
+      marginBottom: '0'
     }}>
-      {/* Kersten Photo */}
+      {/* Kersten Photo - COMPACT */}
       <div style={{
         position: 'relative',
-        flexShrink: 0,
-        alignSelf: isMobile ? 'center' : 'flex-start'
+        flexShrink: 0
       }}>
         <div style={{
-          width: isMobile ? '60px' : '80px',
-          height: isMobile ? '60px' : '80px',
+          width: isMobile ? '44px' : '52px',
+          height: isMobile ? '44px' : '52px',
           borderRadius: '50%',
           overflow: 'hidden',
-          border: '3px solid #10b981',
-          boxShadow: '0 8px 25px rgba(16, 185, 129, 0.3)',
+          border: '2px solid #10b981',
+          boxShadow: '0 4px 12px rgba(16, 185, 129, 0.25)',
           background: '#000',
-          
-          // Hardware acceleration
-          transform: 'translateZ(0)',
-          transition: 'all 0.3s ease'
+          transform: 'translateZ(0)'
         }}>
           <img 
             src={COACH_INFO.photoUrl}
@@ -64,7 +59,6 @@ export default function CoachBubble({ message, variant = 'default' }) {
               objectFit: 'cover'
             }}
             onError={(e) => {
-              // Fallback bij image load error
               e.currentTarget.style.display = 'none'
               e.currentTarget.parentElement.innerHTML = `
                 <div style="
@@ -73,7 +67,7 @@ export default function CoachBubble({ message, variant = 'default' }) {
                   display: flex;
                   align-items: center;
                   justify-content: center;
-                  font-size: ${isMobile ? '1.5rem' : '2rem'};
+                  font-size: ${isMobile ? '1.25rem' : '1.5rem'};
                   background: linear-gradient(135deg, #10b981 0%, #059669 100%);
                 ">
                   👨‍💼
@@ -83,73 +77,59 @@ export default function CoachBubble({ message, variant = 'default' }) {
           />
         </div>
         
-        {/* Pulse ring */}
+        {/* Active indicator dot - KLEINER */}
         <div style={{
           position: 'absolute',
-          inset: '-6px',
-          borderRadius: '50%',
-          border: '2px solid rgba(16, 185, 129, 0.3)',
-          animation: 'pulse-ring 2s ease-out infinite',
-          pointerEvents: 'none'
-        }} />
-        
-        {/* Active indicator dot */}
-        <div style={{
-          position: 'absolute',
-          bottom: '4px',
-          right: '4px',
-          width: '12px',
-          height: '12px',
+          bottom: '2px',
+          right: '2px',
+          width: '10px',
+          height: '10px',
           borderRadius: '50%',
           background: '#10b981',
           border: '2px solid #000',
-          boxShadow: '0 0 8px rgba(16, 185, 129, 0.6)',
-          animation: 'pulse 2s ease-in-out infinite'
+          boxShadow: '0 0 6px rgba(16, 185, 129, 0.5)'
         }} />
       </div>
       
-      {/* Speech Bubble */}
+      {/* Speech Bubble - COMPACT */}
       <div style={{
         position: 'relative',
         flex: 1,
         width: isMobile ? '100%' : 'auto'
       }}>
-        {/* Speech bubble arrow - only on desktop */}
+        {/* Speech bubble arrow - KLEINER */}
         {!isMobile && (
           <div style={{
             position: 'absolute',
-            left: '-8px',
-            top: '20px',
+            left: '-6px',
+            top: '12px',
             width: 0,
             height: 0,
-            borderTop: '8px solid transparent',
-            borderBottom: '8px solid transparent',
-            borderRight: `8px solid ${currentVariant.border}`,
+            borderTop: '6px solid transparent',
+            borderBottom: '6px solid transparent',
+            borderRight: `6px solid ${currentVariant.border}`
           }} />
         )}
         
-        {/* Bubble content */}
+        {/* Bubble content - COMPACT */}
         <div style={{
           background: currentVariant.bg,
           backdropFilter: 'blur(20px)',
           border: `1px solid ${currentVariant.border}`,
-          borderRadius: isMobile ? '16px' : '20px',
-          padding: isMobile ? '1rem 1.25rem' : '1.25rem 1.5rem',
+          borderRadius: isMobile ? '12px' : '14px',
+          padding: isMobile ? '0.75rem 1rem' : '0.875rem 1.125rem',
           boxShadow: currentVariant.glow,
-          
-          // Hardware acceleration
-          transform: 'translateZ(0)',
-          transition: 'all 0.3s ease'
+          transform: 'translateZ(0)'
         }}>
-          {/* Coach name badge */}
+          {/* Coach name badge - COMPACT */}
           <div style={{
             display: 'flex',
             alignItems: 'center',
-            gap: '0.5rem',
-            marginBottom: '0.625rem'
+            gap: '0.375rem',
+            marginBottom: '0.375rem'
           }}>
             <span style={{
-              fontSize: isMobile ? '0.7rem' : '0.75rem',
+              fontSize: isMobile ? '0.65rem' : '0.7rem',
               fontWeight: '700',
               color: '#10b981',
               textTransform: 'uppercase',
@@ -158,13 +138,13 @@ export default function CoachBubble({ message, variant = 'default' }) {
               {COACH_INFO.name}
             </span>
             <div style={{
-              width: '4px',
-              height: '4px',
+              width: '3px',
+              height: '3px',
               borderRadius: '50%',
               background: 'rgba(255, 255, 255, 0.3)'
             }} />
             <span style={{
-              fontSize: isMobile ? '0.65rem' : '0.7rem',
+              fontSize: isMobile ? '0.6rem' : '0.65rem',
               color: 'rgba(255, 255, 255, 0.5)',
               fontWeight: '500'
             }}>
@@ -172,10 +152,10 @@ export default function CoachBubble({ message, variant = 'default' }) {
             </span>
           </div>
           
-          {/* Coach message */}
+          {/* Coach message - COMPACT */}
           <p style={{
-            fontSize: isMobile ? '0.9rem' : '1rem',
-            lineHeight: '1.6',
+            fontSize: isMobile ? '0.85rem' : '0.925rem',
+            lineHeight: '1.5',
             color: 'rgba(255, 255, 255, 0.9)',
             margin: 0,
             fontWeight: '500'
@@ -184,28 +164,6 @@ export default function CoachBubble({ message, variant = 'default' }) {
           </p>
         </div>
       </div>
-      
-      <style>{`
-        @keyframes pulse-ring {
-          0% {
-            transform: scale(1);
-            opacity: 1;
-          }
-          100% {
-            transform: scale(1.3);
-            opacity: 0;
-          }
-        }
-        
-        @keyframes pulse {
-          0%, 100% {
-            opacity: 1;
-          }
-          50% {
-            opacity: 0.6;
-          }
-        }
-      `}</style>
     </div>
   )
 }

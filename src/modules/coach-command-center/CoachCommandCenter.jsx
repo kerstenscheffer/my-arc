@@ -1,262 +1,377 @@
-import { useState, useEffect } from 'react'
-
-// Module imports - ADD NEW MODULES HERE
- import NowActions from './modules/now-actions/NowActions'
-// import TodayWins from './modules/today-wins/TodayWins'
-// import ClientPulse from './modules/client-pulse/ClientPulse'
-// import SmartInsights from './modules/smart-insights/SmartInsights'
+import React, { useState, useEffect } from 'react'
+import CoachCommandService from './CoachCommandService'
+import ClientCard from './modules/ClientCard'
 
 export default function CoachCommandCenter({ db, clients }) {
-  const isMobile = window.innerWidth <= 768
-  const [loading, setLoading] = useState(true)
-  const [lastUpdate, setLastUpdate] = useState(new Date())
-  const [moduleData, setModuleData] = useState({})
+  console.log('🎯 [CommandCenter] Component mounted')
+  console.log('  Clients received:', clients?.length)
   
-  // Auto-refresh every 30 seconds
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setLastUpdate(new Date())
-    }, 30000)
-    
-    return () => clearInterval(interval)
-  }, [])
+  const isMobile = window.innerWidth <= 768
+  const [clientsStatus, setClientsStatus] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [filter, setFilter] = useState('all')
+  const [pinnedIds, setPinnedIds] = useState([])
+  const [searchQuery, setSearchQuery] = useState('')
 
-  // Initial load
   useEffect(() => {
-    loadDashboardData()
+    console.log('🔄 [CommandCenter] Clients changed, reloading status...')
+    loadClientsStatus()
   }, [clients])
 
-  const loadDashboardData = async () => {
+  const loadClientsStatus = async () => {
+    console.log('📡 [CommandCenter] Loading client statuses...')
+    setLoading(true)
+    
     try {
-      setLoading(true)
-      // Central data loading if needed
-      // const data = await db.getCoachDashboardData()
-      // setModuleData(data)
-      setLoading(false)
+      if (!clients || clients.length === 0) {
+        console.warn('⚠️ [CommandCenter] No clients provided')
+        setLoading(false)
+        return
+      }
+
+      console.log('  Calculating status for', clients.length, 'clients...')
+      const statuses = await CoachCommandService.getAllClientsStatus(clients)
+      console.log('✅ [CommandCenter] Statuses calculated:', statuses.length)
+      
+      console.log('  Loading pinned clients...')
+      const pinned = await CoachCommandService.getPinnedClients()
+      console.log('  Pinned clients:', pinned.length)
+      
+      setClientsStatus(statuses)
+      setPinnedIds(pinned)
+      console.log('✅ [CommandCenter] State updated successfully')
     } catch (error) {
-      console.error('Dashboard load error:', error)
-      setLoading(false)
+      console.error('❌ [CommandCenter] Error loading statuses:', error)
+    }
+    
+    setLoading(false)
+  }
+
+  const togglePin = async (clientId) => {
+    console.log('📌 [CommandCenter] Toggling pin for:', clientId)
+    const isPinned = await CoachCommandService.togglePin(clientId)
+    if (isPinned) {
+      setPinnedIds([...pinnedIds, clientId])
+    } else {
+      setPinnedIds(pinnedIds.filter(id => id !== clientId))
     }
   }
 
+  // FILTER LOGIC
+  const filteredClients = clientsStatus.filter(c => {
+    // Status filter
+    if (filter !== 'all' && c.status !== filter) return false
+    
+    // Search filter
+    if (searchQuery) {
+      const query = searchQuery.toLowerCase()
+      const fullName = `${c.client.first_name} ${c.client.last_name}`.toLowerCase()
+      if (!fullName.includes(query)) return false
+    }
+    
+    return true
+  })
+
+  // SORT: Pinned first, then by priority
+  const sortedClients = [...filteredClients].sort((a, b) => {
+    const aPin = pinnedIds.includes(a.client.id) ? 1 : 0
+    const bPin = pinnedIds.includes(b.client.id) ? 1 : 0
+    if (aPin !== bPin) return bPin - aPin
+    return b.priority - a.priority
+  })
+
+  // COUNT PER STATUS
+  const redCount = clientsStatus.filter(c => c.status === 'red').length
+  const yellowCount = clientsStatus.filter(c => c.status === 'yellow').length
+  const greenCount = clientsStatus.filter(c => c.status === 'green').length
+
   if (loading) {
     return (
-      <div style={styles.loadingContainer}>
-        <div style={styles.spinner} />
-        <p style={styles.loadingText}>Command Center laden...</p>
+      <div style={{
+        padding: isMobile ? '2rem 1rem' : '3rem',
+        textAlign: 'center'
+      }}>
+        <div style={{
+          fontSize: isMobile ? '2rem' : '3rem',
+          marginBottom: '1rem',
+          animation: 'pulse 2s ease-in-out infinite'
+        }}>
+          ⚡
+        </div>
+        <div style={{
+          fontSize: isMobile ? '1rem' : '1.2rem',
+          color: '#10b981',
+          fontWeight: '500'
+        }}>
+          Calculating client status...
+        </div>
+        <div style={{
+          fontSize: isMobile ? '0.85rem' : '0.95rem',
+          color: 'rgba(255,255,255,0.5)',
+          marginTop: '0.5rem'
+        }}>
+          Analyzing {clients?.length || 0} clients
+        </div>
       </div>
     )
   }
 
   return (
-    <div style={styles.container}>
-      {/* Header */}
-      <div style={styles.header}>
-        <div>
-          <h1 style={{
-            ...styles.title,
-            fontSize: isMobile ? '1.5rem' : '2rem'
-          }}>
-            Coach Command Center
-          </h1>
-          <p style={styles.subtitle}>
-            {clients?.length || 0} clients • Laatste update: {lastUpdate.toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit' })}
-          </p>
-        </div>
-        <button 
-          onClick={loadDashboardData}
-          style={styles.refreshButton}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.transform = 'rotate(180deg) scale(1.1)'
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.transform = 'rotate(0deg) scale(1)'
-          }}
-        >
-          🔄
-        </button>
-      </div>
+    <div style={{
+      padding: isMobile ? '1rem' : '2rem',
+      maxWidth: '1400px',
+      margin: '0 auto'
+    }}>
+      
+      {/* HEADER */}
+      <div style={{
+        marginBottom: isMobile ? '1.5rem' : '2rem'
+      }}>
+        <h1 style={{
+          fontSize: isMobile ? '1.75rem' : '2.5rem',
+          fontWeight: '700',
+          color: '#fff',
+          marginBottom: '0.5rem'
+        }}>
+          🎯 Command Center
+        </h1>
+        <p style={{
+          fontSize: isMobile ? '0.9rem' : '1rem',
+          color: 'rgba(255,255,255,0.6)',
+          marginBottom: '1.5rem'
+        }}>
+          Real-time client overview · {clients?.length || 0} total · {clientsStatus.length} with status
+        </p>
 
-      {/* Module Grid - MODULES RENDER HERE */}
-      <div style={styles.moduleGrid}>
-        
-        {/* NOW ACTIONS MODULE */}
-        <div style={styles.moduleSection}>
-          <NowActions 
-            db={db} 
-            clients={clients}
-            isMobile={isMobile}
-            onActionComplete={loadDashboardData}
+        {/* SEARCH BAR */}
+        <div style={{
+          marginBottom: '1rem'
+        }}>
+          <input
+            type="text"
+            placeholder="🔍 Search client name..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            style={{
+              width: '100%',
+              padding: isMobile ? '0.75rem 1rem' : '0.875rem 1.25rem',
+              background: 'rgba(255, 255, 255, 0.05)',
+              border: '1px solid rgba(255, 255, 255, 0.1)',
+              borderRadius: '12px',
+              color: '#fff',
+              fontSize: isMobile ? '0.9rem' : '1rem',
+              outline: 'none',
+              transition: 'all 0.2s',
+              touchAction: 'manipulation',
+              WebkitTapHighlightColor: 'transparent'
+            }}
+            onFocus={(e) => {
+              e.target.style.border = '1px solid #10b981'
+              e.target.style.background = 'rgba(255, 255, 255, 0.08)'
+            }}
+            onBlur={(e) => {
+              e.target.style.border = '1px solid rgba(255, 255, 255, 0.1)'
+              e.target.style.background = 'rgba(255, 255, 255, 0.05)'
+            }}
           />
         </div>
 
-        {/* MAIN GRID - Client Pulse + Today Wins */}
+        {/* FILTER TABS */}
         <div style={{
-          ...styles.mainGrid,
-          gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr'
+          display: 'flex',
+          gap: isMobile ? '0.5rem' : '0.75rem',
+          overflowX: 'auto',
+          paddingBottom: '0.5rem',
+          WebkitOverflowScrolling: 'touch'
         }}>
-          {/* CLIENT PULSE MODULE */}
-          <div style={styles.moduleCard}>
-            {/* <ClientPulse 
-              db={db} 
-              clients={clients}
-              isMobile={isMobile}
-            /> */}
-            <div style={styles.placeholderModule}>
-              <h2 style={styles.moduleTitle}>💓 CLIENT PULSE</h2>
-              <p style={styles.placeholderText}>Module wordt geladen...</p>
-            </div>
-          </div>
-
-          {/* TODAY WINS MODULE */}
-          <div style={styles.moduleCard}>
-            {/* <TodayWins 
-              db={db} 
-              clients={clients}
-              isMobile={isMobile}
-            /> */}
-            <div style={styles.placeholderModule}>
-              <h2 style={styles.moduleTitle}>✨ TODAY'S WINS</h2>
-              <p style={styles.placeholderText}>Module wordt geladen...</p>
-            </div>
-          </div>
+          {[
+            { id: 'all', label: 'Alles', count: clientsStatus.length },
+            { id: 'red', label: '🔴 Urgent', count: redCount },
+            { id: 'yellow', label: '🟡 Check-in', count: yellowCount },
+            { id: 'green', label: '🟢 On Track', count: greenCount }
+          ].map(tab => (
+            <button
+              key={tab.id}
+              onClick={() => setFilter(tab.id)}
+              style={{
+                padding: isMobile ? '0.6rem 1rem' : '0.75rem 1.5rem',
+                background: filter === tab.id ? '#10b981' : 'rgba(255,255,255,0.05)',
+                border: filter === tab.id ? '2px solid #10b981' : '1px solid rgba(255,255,255,0.1)',
+                borderRadius: '12px',
+                color: filter === tab.id ? '#000' : '#fff',
+                fontSize: isMobile ? '0.85rem' : '0.95rem',
+                fontWeight: filter === tab.id ? '600' : '500',
+                cursor: 'pointer',
+                transition: 'all 0.2s',
+                whiteSpace: 'nowrap',
+                touchAction: 'manipulation',
+                WebkitTapHighlightColor: 'transparent',
+                minHeight: '44px'
+              }}
+            >
+              {tab.label} ({tab.count})
+            </button>
+          ))}
         </div>
-
-        {/* SMART INSIGHTS MODULE */}
-        <div style={styles.moduleSection}>
-          {/* <SmartInsights 
-            db={db} 
-            clients={clients}
-            isMobile={isMobile}
-          /> */}
-          <div style={styles.placeholderModule}>
-            <h2 style={styles.moduleTitle}>📊 SMART INSIGHTS</h2>
-            <p style={styles.placeholderText}>Module wordt geladen...</p>
-          </div>
-        </div>
-
-        {/* ADD MORE MODULES HERE */}
-        {/* Just uncomment and import when ready:
-        <div style={styles.moduleSection}>
-          <NewModule db={db} clients={clients} isMobile={isMobile} />
-        </div>
-        */}
       </div>
+
+      {/* RESULTS COUNT */}
+      {(filter !== 'all' || searchQuery) && (
+        <div style={{
+          marginBottom: '1rem',
+          fontSize: isMobile ? '0.85rem' : '0.9rem',
+          color: 'rgba(255,255,255,0.6)'
+        }}>
+          Showing {sortedClients.length} of {clientsStatus.length} clients
+          {searchQuery && ` matching "${searchQuery}"`}
+        </div>
+      )}
+
+      {/* CLIENT CARDS GRID */}
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fill, minmax(400px, 1fr))',
+        gap: isMobile ? '1rem' : '1.5rem'
+      }}>
+        {sortedClients.map(({ client, status, issues, actions, metrics }) => (
+          <ClientCard
+            key={client.id}
+            client={client}
+            status={status}
+            issues={issues}
+            metrics={metrics}
+            isPinned={pinnedIds.includes(client.id)}
+            onTogglePin={togglePin}
+            isMobile={isMobile}
+          />
+        ))}
+      </div>
+
+      {/* EMPTY STATE */}
+      {sortedClients.length === 0 && !loading && (
+        <div style={{
+          padding: isMobile ? '3rem 1rem' : '4rem 2rem',
+          textAlign: 'center',
+          background: 'rgba(17, 17, 17, 0.5)',
+          borderRadius: '16px',
+          border: '1px solid rgba(255,255,255,0.1)'
+        }}>
+          <div style={{
+            fontSize: isMobile ? '2rem' : '3rem',
+            marginBottom: '1rem'
+          }}>
+            {searchQuery ? '🔍' : '🎯'}
+          </div>
+          <h3 style={{
+            fontSize: isMobile ? '1.1rem' : '1.3rem',
+            color: '#fff',
+            marginBottom: '0.5rem'
+          }}>
+            {searchQuery 
+              ? `Geen clients gevonden voor "${searchQuery}"`
+              : 'Geen clients in deze categorie'
+            }
+          </h3>
+          <p style={{
+            fontSize: isMobile ? '0.85rem' : '0.95rem',
+            color: 'rgba(255,255,255,0.6)'
+          }}>
+            {searchQuery 
+              ? 'Probeer een andere zoekopdracht'
+              : 'Probeer een ander filter'
+            }
+          </p>
+          {(searchQuery || filter !== 'all') && (
+            <button
+              onClick={() => {
+                setSearchQuery('')
+                setFilter('all')
+              }}
+              style={{
+                marginTop: '1rem',
+                padding: isMobile ? '0.6rem 1.25rem' : '0.75rem 1.5rem',
+                background: '#10b981',
+                border: 'none',
+                borderRadius: '8px',
+                color: '#000',
+                fontSize: isMobile ? '0.85rem' : '0.9rem',
+                fontWeight: '600',
+                cursor: 'pointer',
+                transition: 'all 0.2s',
+                minHeight: '44px',
+                touchAction: 'manipulation',
+                WebkitTapHighlightColor: 'transparent'
+              }}
+            >
+              Reset Filters
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* FOOTER STATS */}
+      {sortedClients.length > 0 && (
+        <div style={{
+          marginTop: isMobile ? '2rem' : '3rem',
+          padding: isMobile ? '1rem' : '1.5rem',
+          background: 'rgba(255, 255, 255, 0.03)',
+          border: '1px solid rgba(255,255,255,0.1)',
+          borderRadius: '12px',
+          display: 'grid',
+          gridTemplateColumns: isMobile ? '1fr' : 'repeat(3, 1fr)',
+          gap: isMobile ? '1rem' : '1.5rem',
+          textAlign: 'center'
+        }}>
+          <div>
+            <div style={{
+              fontSize: isMobile ? '1.5rem' : '2rem',
+              fontWeight: '700',
+              color: '#ef4444',
+              marginBottom: '0.25rem'
+            }}>
+              {redCount}
+            </div>
+            <div style={{
+              fontSize: isMobile ? '0.8rem' : '0.85rem',
+              color: 'rgba(255,255,255,0.6)'
+            }}>
+              Urgent Attention
+            </div>
+          </div>
+          <div>
+            <div style={{
+              fontSize: isMobile ? '1.5rem' : '2rem',
+              fontWeight: '700',
+              color: '#f59e0b',
+              marginBottom: '0.25rem'
+            }}>
+              {yellowCount}
+            </div>
+            <div style={{
+              fontSize: isMobile ? '0.8rem' : '0.85rem',
+              color: 'rgba(255,255,255,0.6)'
+            }}>
+              Need Check-in
+            </div>
+          </div>
+          <div>
+            <div style={{
+              fontSize: isMobile ? '1.5rem' : '2rem',
+              fontWeight: '700',
+              color: '#10b981',
+              marginBottom: '0.25rem'
+            }}>
+              {greenCount}
+            </div>
+            <div style={{
+              fontSize: isMobile ? '0.8rem' : '0.85rem',
+              color: 'rgba(255,255,255,0.6)'
+            }}>
+              On Track
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
-}
-
-// Styles
-const styles = {
-  container: {
-    width: '100%',
-    maxWidth: '1400px',
-    margin: '0 auto',
-    padding: '20px'
-  },
-  
-  header: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: '30px',
-    padding: '20px',
-    background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.1) 0%, rgba(16, 185, 129, 0.05) 100%)',
-    borderRadius: '16px',
-    border: '1px solid rgba(16, 185, 129, 0.2)'
-  },
-  
-  title: {
-    fontWeight: '800',
-    background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-    WebkitBackgroundClip: 'text',
-    WebkitTextFillColor: 'transparent',
-    backgroundClip: 'text',
-    margin: 0
-  },
-  
-  subtitle: {
-    color: 'rgba(255, 255, 255, 0.6)',
-    fontSize: '0.9rem',
-    marginTop: '5px'
-  },
-  
-  refreshButton: {
-    width: '40px',
-    height: '40px',
-    borderRadius: '12px',
-    background: 'rgba(16, 185, 129, 0.1)',
-    border: '1px solid rgba(16, 185, 129, 0.3)',
-    color: '#10b981',
-    fontSize: '1.2rem',
-    cursor: 'pointer',
-    transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center'
-  },
-  
-  moduleGrid: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '20px'
-  },
-  
-  moduleSection: {
-    width: '100%'
-  },
-  
-  mainGrid: {
-    display: 'grid',
-    gap: '20px'
-  },
-  
-  moduleCard: {
-    background: 'rgba(17, 17, 17, 0.8)',
-    borderRadius: '16px',
-    border: '1px solid rgba(255, 255, 255, 0.1)',
-    backdropFilter: 'blur(10px)'
-  },
-  
-  // Placeholder styles - Remove when modules are ready
-  placeholderModule: {
-    padding: '20px',
-    background: 'rgba(17, 17, 17, 0.8)',
-    borderRadius: '16px',
-    border: '1px solid rgba(255, 255, 255, 0.1)'
-  },
-  
-  moduleTitle: {
-    fontSize: '1.1rem',
-    color: '#10b981',
-    marginBottom: '10px'
-  },
-  
-  placeholderText: {
-    color: 'rgba(255, 255, 255, 0.4)',
-    fontSize: '0.9rem'
-  },
-  
-  // Loading states
-  loadingContainer: {
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'center',
-    justifyContent: 'center',
-    minHeight: '400px'
-  },
-  
-  spinner: {
-    width: '40px',
-    height: '40px',
-    border: '3px solid rgba(16, 185, 129, 0.2)',
-    borderTopColor: '#10b981',
-    borderRadius: '50%',
-    animation: 'spin 1s linear infinite'
-  },
-  
-  loadingText: {
-    marginTop: '20px',
-    color: 'rgba(255, 255, 255, 0.6)'
-  }
 }

@@ -7,7 +7,7 @@ import { weightConfig, loadWeightData, addWeight, removeWeight } from './adjustm
 import { callsConfig, loadCallsData, addCall, removeCall } from './adjustments/CallsAdjustment'
 import { photosConfig, loadPhotosData, addPhoto, removePhoto } from './adjustments/PhotosAdjustment'
 
-export default function ChallengeAdjustments({ client, db, challengeData }) {
+export default function ChallengeAdjustments({ client, db, challengeData, onDataUpdate }) {
   const isMobile = window.innerWidth <= 768
   
   const [loading, setLoading] = useState(true)
@@ -88,6 +88,12 @@ export default function ChallengeAdjustments({ client, db, challengeData }) {
         await loadAllData()
         setSuccess(`✅ ${result.message}`)
         setTimeout(() => setSuccess(''), 3000)
+        
+        // 🔥 CRITICAL FIX: Notify parent to refresh challenge banner
+        if (onDataUpdate) {
+          console.log('🔄 Triggering parent refresh after add:', type)
+          onDataUpdate()
+        }
       }
     } catch (err) {
       console.error(`Error adding ${type}:`, err)
@@ -158,6 +164,12 @@ export default function ChallengeAdjustments({ client, db, challengeData }) {
         await loadAllData()
         setSuccess(`✅ ${result.message}`)
         setTimeout(() => setSuccess(''), 3000)
+        
+        // 🔥 CRITICAL FIX: Notify parent to refresh challenge banner
+        if (onDataUpdate) {
+          console.log('🔄 Triggering parent refresh after remove:', type)
+          onDataUpdate()
+        }
       }
     } catch (err) {
       console.error(`Error removing ${type}:`, err)

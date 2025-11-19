@@ -8,8 +8,10 @@ import YourArcFunnel from './modules/funnel-pages/your-arc/YourArcFunnel'
 import MyArcFunnel from './modules/funnel-pages/my-arc/MyArcFunnelMain'
 import CheckoutPage from './pages/CheckoutPage'
 import EightWeekCheckout from './pages/EightWeekCheckout'
+import TwelveWeekCheckout from './pages/TwelveWeekCheckout'
 import Homepage from './pages/Homepage'
 import LeadPicGenerator from './modules/lead-pic-generator/LeadPicGenerator'
+import LeadMessageFlow from './modules/lead-magnet/LeadMessageFlow'
 import { useState, useEffect } from 'react'
 import Login from './components/Login'
 import ResetPassword from './components/ResetPassword'
@@ -65,8 +67,8 @@ function App() {
   // PUBLIC ROUTES (No Authentication Required)
   // ==============================================
 
-  // Main page - InfoPage (link-in-bio)
-  if (currentPath === '/' || currentPath === '/home' || currentPath === '/info') {
+  // InfoPage moved to /info and /home only (link-in-bio page)
+  if (currentPath === '/info' || currentPath === '/home') {
     return <InfoPage />
   }
 
@@ -82,6 +84,10 @@ function App() {
 
   if (currentPath === '/8-week-checkout') {
     return <EightWeekCheckout />
+  }
+
+  if (currentPath === '/12-week-checkout') {
+    return <TwelveWeekCheckout />
   }
 
   // Success page after payment
@@ -165,6 +171,11 @@ function App() {
     return <LeadPicGenerator />
   }
 
+  // Lead message flow
+  if (currentPath === '/leadmessage') {
+    return <LeadMessageFlow />
+  }
+
   // Client onboarding (public for new clients)
   if (currentPath === '/onboarding') {
     return (
@@ -184,17 +195,15 @@ function App() {
     return <YourArcFunnel />
   }
 
+  // My Arc funnel
+  if (currentPath === '/my-arc') {
+    return <MyArcFunnel />
+  }
 
-// My Arc funnel - NIEUW
-if (currentPath === '/my-arc') {
-  return <MyArcFunnel />
-}
-
-// Till The Goal funnel - NIEUW
-if (currentPath === '/till-the-goal') {
-  return <TillTheGoalPage />
-}
-
+  // Till The Goal funnel
+  if (currentPath === '/till-the-goal') {
+    return <TillTheGoalPage />
+  }
 
   if (isFunnelRoute) {
     const slug = currentPath.replace('/funnel/', '')
@@ -227,9 +236,12 @@ if (currentPath === '/till-the-goal') {
     )
   }
 
-  // Client login route
-  if (currentPath === '/client-login') {
+  // ==============================================
+  // MAIN ROUTE - CLIENT LOGIN AS DEFAULT (/)
+  // ==============================================
+  if (currentPath === '/' || currentPath === '/client-login') {
     if (!user) {
+      // Not logged in → Show client login
       return (
         <LanguageProvider>
           <Login onLogin={() => {
@@ -241,10 +253,43 @@ if (currentPath === '/till-the-goal') {
           <UpdateModal db={db} />
         </LanguageProvider>
       )
+    } else {
+      // Already logged in → Route to correct dashboard
+      if (isClientMode) {
+        return (
+          <LanguageProvider>
+            <ClientDashboard onLogout={handleLogout} />
+            <PWAInstaller />
+            <UpdateModal db={db} />
+          </LanguageProvider>
+        )
+      } else {
+        return (
+          <LanguageProvider>
+            {useV2CoachHub ? (
+              <>
+                <CoachHubV2 onLogout={handleLogout} />
+                <PWAInstaller />
+                <UpdateModal db={db} />
+              </>
+            ) : (
+              <>
+                <CoachHub onLogout={handleLogout} />
+                <PWAInstaller />
+                <UpdateModal db={db} />
+              </>
+            )}
+          </LanguageProvider>
+        )
+      }
     }
   }
 
-  // Show regular login if no user
+  // ==============================================
+  // FALLBACK - FOR ANY OTHER ROUTE
+  // ==============================================
+  
+  // Show regular login if no user (for coach access via other routes)
   if (!user) {
     return (
       <LanguageProvider>
@@ -259,7 +304,7 @@ if (currentPath === '/till-the-goal') {
     )
   }
 
-  // Dashboard routing based on mode
+  // Dashboard routing based on mode (fallback for authenticated users)
   if (isClientMode) {
     return (
       <LanguageProvider>

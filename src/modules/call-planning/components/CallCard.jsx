@@ -20,11 +20,31 @@ export default function CallCard({ call, index, handleBookCall }) {
   
   const getStatusColor = (status) => {
     switch(status) {
-      case 'completed': return '#10b981';
-      case 'scheduled': return '#3b82f6';
-      case 'available': return '#fbbf24';
-      case 'locked': return '#6b7280';
+      case 'completed': return '#10b981';      // Green (success)
+      case 'scheduled': return '#2563eb';       // Blue (primary)
+      case 'available': return '#f97316';       // Orange (warning/important)
+      case 'locked': return '#6b7280';          // Gray (disabled)
       default: return '#6b7280';
+    }
+  };
+  
+  const getStatusBg = (status) => {
+    switch(status) {
+      case 'completed': return 'rgba(16, 185, 129, 0.12)';
+      case 'scheduled': return 'rgba(37, 99, 235, 0.15)';
+      case 'available': return 'rgba(249, 115, 22, 0.12)';
+      case 'locked': return 'rgba(107, 114, 128, 0.1)';
+      default: return 'rgba(107, 114, 128, 0.1)';
+    }
+  };
+  
+  const getStatusBorder = (status) => {
+    switch(status) {
+      case 'completed': return 'rgba(16, 185, 129, 0.25)';
+      case 'scheduled': return 'rgba(37, 99, 235, 0.3)';
+      case 'available': return 'rgba(249, 115, 22, 0.25)';
+      case 'locked': return 'rgba(107, 114, 128, 0.2)';
+      default: return 'rgba(107, 114, 128, 0.2)';
     }
   };
   
@@ -45,16 +65,16 @@ export default function CallCard({ call, index, handleBookCall }) {
     <div
       className={`call-card-${index}`}
       style={{
-        background: isBonusCall
-          ? 'linear-gradient(135deg, rgba(139, 92, 246, 0.12) 0%, rgba(124, 58, 237, 0.06) 100%)'
-          : 'linear-gradient(135deg, rgba(59, 130, 246, 0.14) 0%, rgba(37, 99, 235, 0.06) 100%)',
-        backdropFilter: 'blur(20px)',
-        border: isBonusCall
-          ? '1px solid rgba(139, 92, 246, 0.3)'
-          : '1px solid rgba(59, 130, 246, 0.25)',
-        borderRadius: isMobile ? '18px' : '22px',
-        padding: isMobile ? '1.5rem 1.25rem' : '1.75rem',
         position: 'relative',
+        background: isBonusCall
+          ? 'linear-gradient(135deg, rgba(168, 85, 247, 0.12) 0%, rgba(168, 85, 247, 0.06) 100%)'
+          : 'linear-gradient(135deg, rgba(37, 99, 235, 0.1) 0%, rgba(23, 23, 23, 0.8) 100%)',
+        backdropFilter: 'blur(12px)',
+        border: isBonusCall
+          ? '1px solid rgba(168, 85, 247, 0.3)'
+          : '1px solid rgba(37, 99, 235, 0.25)',
+        borderRadius: isMobile ? '12px' : '14px',
+        padding: isMobile ? '1.25rem' : '1.5rem',
         overflow: 'hidden',
         transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
         cursor: canBook ? 'pointer' : 'default',
@@ -63,71 +83,88 @@ export default function CallCard({ call, index, handleBookCall }) {
         touchAction: 'manipulation',
         WebkitTapHighlightColor: 'transparent',
         boxShadow: isBonusCall
-          ? '0 10px 30px rgba(139, 92, 246, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.05)'
-          : '0 10px 30px rgba(59, 130, 246, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.05)',
-        minHeight: isMobile ? '200px' : '220px'
+          ? '0 4px 16px rgba(168, 85, 247, 0.15)'
+          : '0 4px 16px rgba(37, 99, 235, 0.15)',
+        minHeight: isMobile ? '200px' : '220px',
+        transform: 'translateZ(0)'
       }}
       onClick={() => canBook && handleBookCall(call)}
       onTouchStart={(e) => {
         if (isMobile && canBook) {
           e.currentTarget.style.transform = 'scale(0.98)';
           e.currentTarget.style.boxShadow = isBonusCall
-            ? '0 5px 20px rgba(139, 92, 246, 0.2)'
-            : '0 5px 20px rgba(59, 130, 246, 0.2)';
+            ? '0 2px 12px rgba(168, 85, 247, 0.2)'
+            : '0 2px 12px rgba(37, 99, 235, 0.2)';
         }
       }}
       onTouchEnd={(e) => {
         if (isMobile && canBook) {
           e.currentTarget.style.transform = 'scale(1)';
           e.currentTarget.style.boxShadow = isBonusCall
-            ? '0 10px 30px rgba(139, 92, 246, 0.15)'
-            : '0 10px 30px rgba(59, 130, 246, 0.15)';
+            ? '0 4px 16px rgba(168, 85, 247, 0.15)'
+            : '0 4px 16px rgba(37, 99, 235, 0.15)';
         }
       }}
       onMouseEnter={(e) => {
         if (!isMobile && canBook) {
           e.currentTarget.style.transform = 'translateY(-4px)';
           e.currentTarget.style.boxShadow = isBonusCall
-            ? '0 20px 40px rgba(139, 92, 246, 0.3)'
-            : '0 20px 40px rgba(59, 130, 246, 0.3)';
+            ? '0 8px 32px rgba(168, 85, 247, 0.25)'
+            : '0 8px 32px rgba(37, 99, 235, 0.25)';
           e.currentTarget.style.borderColor = isBonusCall
-            ? 'rgba(139, 92, 246, 0.4)'
-            : 'rgba(59, 130, 246, 0.4)';
+            ? 'rgba(168, 85, 247, 0.4)'
+            : 'rgba(37, 99, 235, 0.35)';
         }
       }}
       onMouseLeave={(e) => {
         if (!isMobile) {
           e.currentTarget.style.transform = 'translateY(0)';
           e.currentTarget.style.boxShadow = isBonusCall
-            ? '0 10px 30px rgba(139, 92, 246, 0.15)'
-            : '0 10px 30px rgba(59, 130, 246, 0.15)';
+            ? '0 4px 16px rgba(168, 85, 247, 0.15)'
+            : '0 4px 16px rgba(37, 99, 235, 0.15)';
           e.currentTarget.style.borderColor = isBonusCall
-            ? 'rgba(139, 92, 246, 0.3)'
-            : 'rgba(59, 130, 246, 0.25)';
+            ? 'rgba(168, 85, 247, 0.3)'
+            : 'rgba(37, 99, 235, 0.25)';
         }
       }}
     >
+      {/* Top Accent Glow Line */}
+      <div style={{
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        height: '2px',
+        background: isBonusCall
+          ? 'linear-gradient(90deg, transparent 0%, #a855f7 50%, transparent 100%)'
+          : 'linear-gradient(90deg, transparent 0%, #2563eb 50%, transparent 100%)',
+        opacity: 0.6,
+        zIndex: 10
+      }} />
+
       {/* Bonus Call Badge */}
       {isBonusCall && (
         <div style={{
           position: 'absolute',
           top: isMobile ? '1rem' : '1.25rem',
           right: isMobile ? '1rem' : '1.25rem',
-          background: 'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)',
-          padding: isMobile ? '0.4rem 0.75rem' : '0.45rem 0.9rem',
-          borderRadius: '20px',
+          background: 'linear-gradient(135deg, rgba(168, 85, 247, 0.2) 0%, rgba(168, 85, 247, 0.12) 100%)',
+          padding: isMobile ? '0.375rem 0.625rem' : '0.4rem 0.75rem',
+          borderRadius: isMobile ? '18px' : '20px',
           display: 'flex',
           alignItems: 'center',
           gap: '0.4rem',
-          boxShadow: '0 4px 12px rgba(139, 92, 246, 0.3)',
-          minHeight: '28px'
+          border: '1px solid rgba(168, 85, 247, 0.3)',
+          boxShadow: '0 4px 12px rgba(168, 85, 247, 0.15)',
+          minHeight: '28px',
+          backdropFilter: 'blur(8px)'
         }}>
-          <Gift size={isMobile ? 14 : 16} style={{ color: '#fff' }} />
+          <Gift size={isMobile ? 14 : 16} style={{ color: '#a855f7' }} />
           <span style={{
-            fontSize: isMobile ? '0.75rem' : '0.8rem',
-            fontWeight: '700',
-            color: '#fff',
-            letterSpacing: '0.05em'
+            fontSize: isMobile ? '0.65rem' : '0.7rem',
+            fontWeight: '800',
+            color: '#a855f7',
+            letterSpacing: '0.06em'
           }}>
             BONUS
           </span>
@@ -143,8 +180,8 @@ export default function CallCard({ call, index, handleBookCall }) {
         height: isMobile ? '120px' : '150px',
         borderRadius: '50%',
         background: isBonusCall
-          ? 'radial-gradient(circle, rgba(139, 92, 246, 0.2) 0%, transparent 70%)'
-          : 'radial-gradient(circle, rgba(59, 130, 246, 0.25) 0%, transparent 70%)',
+          ? 'radial-gradient(circle, rgba(168, 85, 247, 0.2) 0%, transparent 70%)'
+          : 'radial-gradient(circle, rgba(37, 99, 235, 0.25) 0%, transparent 70%)',
         pointerEvents: 'none'
       }} />
       
@@ -173,24 +210,28 @@ export default function CallCard({ call, index, handleBookCall }) {
         <div style={{
           width: isMobile ? '48px' : '54px',
           height: isMobile ? '48px' : '54px',
-          borderRadius: '16px',
+          borderRadius: isMobile ? '12px' : '14px',
           background: isBonusCall 
-            ? `linear-gradient(135deg, ${getStatusColor(call.status)}30 0%, ${getStatusColor(call.status)}10 100%)`
-            : 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
+            ? 'linear-gradient(135deg, rgba(168, 85, 247, 0.2) 0%, rgba(168, 85, 247, 0.1) 100%)'
+            : 'linear-gradient(135deg, rgba(37, 99, 235, 0.2) 0%, rgba(37, 99, 235, 0.12) 100%)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
           fontSize: isMobile ? '1.25rem' : '1.4rem',
           fontWeight: '800',
-          color: isBonusCall ? getStatusColor(call.status) : '#fff',
+          color: isBonusCall ? '#a855f7' : '#3b82f6',
           boxShadow: isBonusCall 
-            ? 'inset 0 1px 2px rgba(255, 255, 255, 0.1)'
-            : '0 4px 12px rgba(59, 130, 246, 0.4), inset 0 1px 2px rgba(255, 255, 255, 0.2)',
+            ? '0 4px 12px rgba(168, 85, 247, 0.2)'
+            : '0 4px 12px rgba(37, 99, 235, 0.2)',
           border: isBonusCall
-            ? `2px solid ${getStatusColor(call.status)}20`
-            : '1px solid rgba(255, 255, 255, 0.15)',
+            ? '1px solid rgba(168, 85, 247, 0.3)'
+            : '1px solid rgba(37, 99, 235, 0.25)',
           minWidth: '48px',
-          minHeight: '48px'
+          minHeight: '48px',
+          backdropFilter: 'blur(8px)',
+          textShadow: isBonusCall
+            ? '0 0 12px rgba(168, 85, 247, 0.4)'
+            : '0 0 12px rgba(37, 99, 235, 0.4)'
         }}>
           {isBonusCall ? (
             <Star size={isMobile ? 24 : 26} />
@@ -210,11 +251,12 @@ export default function CallCard({ call, index, handleBookCall }) {
             {displayTitle}
           </h3>
           <p style={{
-            fontSize: isMobile ? '0.9rem' : '0.95rem',
+            fontSize: isMobile ? '0.875rem' : '0.95rem',
             color: isBonusCall
               ? 'rgba(255, 255, 255, 0.7)'
-              : 'rgba(147, 197, 253, 0.9)',
-            lineHeight: '1.4'
+              : 'rgba(255, 255, 255, 0.75)',
+            lineHeight: '1.4',
+            margin: 0
           }}>
             {displaySubject}
           </p>
@@ -226,16 +268,13 @@ export default function CallCard({ call, index, handleBookCall }) {
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
-        marginBottom: isMobile ? '1.25rem' : '1.5rem',
-        padding: isMobile ? '0.9rem' : '1rem',
-        background: isBonusCall
-          ? 'rgba(139, 92, 246, 0.06)'
-          : 'rgba(59, 130, 246, 0.08)',
-        borderRadius: '12px',
-        border: isBonusCall
-          ? '1px solid rgba(139, 92, 246, 0.12)'
-          : '1px solid rgba(59, 130, 246, 0.15)',
-        minHeight: '44px'
+        marginBottom: isMobile ? '1rem' : '1.25rem',
+        padding: isMobile ? '0.75rem 0.875rem' : '0.875rem 1rem',
+        background: getStatusBg(call.status),
+        borderRadius: isMobile ? '10px' : '12px',
+        border: `1px solid ${getStatusBorder(call.status)}`,
+        minHeight: '44px',
+        backdropFilter: 'blur(8px)'
       }}>
         <div style={{
           display: 'flex',
@@ -244,8 +283,8 @@ export default function CallCard({ call, index, handleBookCall }) {
         }}>
           <StatusIcon size={isMobile ? 18 : 20} style={{ color: getStatusColor(call.status) }} />
           <span style={{
-            fontSize: isMobile ? '0.9rem' : '0.95rem',
-            color: 'rgba(255, 255, 255, 0.85)',
+            fontSize: isMobile ? '0.875rem' : '0.95rem',
+            color: 'rgba(255, 255, 255, 0.9)',
             fontWeight: '600'
           }}>
             {call.status === 'completed' && 'Voltooid'}
@@ -257,7 +296,7 @@ export default function CallCard({ call, index, handleBookCall }) {
         
         {call.scheduled_date && (
           <span style={{
-            fontSize: isMobile ? '0.85rem' : '0.9rem',
+            fontSize: isMobile ? '0.8rem' : '0.875rem',
             color: 'rgba(255, 255, 255, 0.6)',
             fontWeight: '500'
           }}>
@@ -275,18 +314,20 @@ export default function CallCard({ call, index, handleBookCall }) {
           }}
           style={{
             width: '100%',
-            padding: isMobile ? '0.95rem' : '1.05rem',
+            padding: isMobile ? '0.875rem' : '1rem',
             background: call.status === 'scheduled' 
-              ? 'linear-gradient(135deg, rgba(59, 130, 246, 0.2) 0%, rgba(30, 64, 175, 0.15) 100%)'
+              ? 'linear-gradient(135deg, rgba(37, 99, 235, 0.2) 0%, rgba(37, 99, 235, 0.12) 100%)'
               : isBonusCall
-                ? 'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)'
-                : 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
+                ? 'linear-gradient(135deg, rgba(168, 85, 247, 0.2) 0%, rgba(168, 85, 247, 0.12) 100%)'
+                : 'linear-gradient(135deg, rgba(37, 99, 235, 0.2) 0%, rgba(37, 99, 235, 0.12) 100%)',
             border: call.status === 'scheduled' 
-              ? '1px solid rgba(59, 130, 246, 0.3)'
-              : 'none',
-            borderRadius: isMobile ? '12px' : '14px',
-            color: call.status === 'scheduled' ? '#3b82f6' : '#fff',
-            fontSize: isMobile ? '0.95rem' : '1rem',
+              ? '1px solid rgba(37, 99, 235, 0.35)'
+              : isBonusCall
+                ? '1px solid rgba(168, 85, 247, 0.35)'
+                : '1px solid rgba(37, 99, 235, 0.35)',
+            borderRadius: isMobile ? '10px' : '12px',
+            color: isBonusCall ? '#a855f7' : '#3b82f6',
+            fontSize: isMobile ? '0.875rem' : '0.95rem',
             fontWeight: '700',
             cursor: 'pointer',
             transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
@@ -297,38 +338,42 @@ export default function CallCard({ call, index, handleBookCall }) {
             minHeight: '48px',
             touchAction: 'manipulation',
             WebkitTapHighlightColor: 'transparent',
-            boxShadow: call.status === 'available' 
-              ? isBonusCall
-                ? '0 4px 12px rgba(139, 92, 246, 0.2)'
-                : '0 4px 12px rgba(59, 130, 246, 0.2)'
-              : 'none'
+            backdropFilter: 'blur(10px)',
+            boxShadow: isBonusCall
+              ? '0 4px 16px rgba(168, 85, 247, 0.15)'
+              : '0 4px 16px rgba(37, 99, 235, 0.15)',
+            letterSpacing: '0.02em'
           }}
           onTouchStart={(e) => {
             if (isMobile) {
               e.currentTarget.style.transform = 'scale(0.98)';
+              e.currentTarget.style.background = isBonusCall
+                ? 'rgba(168, 85, 247, 0.25)'
+                : 'rgba(37, 99, 235, 0.25)';
             }
           }}
           onTouchEnd={(e) => {
             if (isMobile) {
               e.currentTarget.style.transform = 'scale(1)';
+              e.currentTarget.style.background = isBonusCall
+                ? 'linear-gradient(135deg, rgba(168, 85, 247, 0.2) 0%, rgba(168, 85, 247, 0.12) 100%)'
+                : 'linear-gradient(135deg, rgba(37, 99, 235, 0.2) 0%, rgba(37, 99, 235, 0.12) 100%)';
             }
           }}
           onMouseEnter={(e) => {
             if (!isMobile) {
               e.currentTarget.style.transform = 'translateY(-2px)';
               e.currentTarget.style.boxShadow = isBonusCall
-                ? '0 8px 25px rgba(139, 92, 246, 0.4)'
-                : '0 8px 25px rgba(59, 130, 246, 0.5)';
+                ? '0 6px 20px rgba(168, 85, 247, 0.25)'
+                : '0 6px 20px rgba(37, 99, 235, 0.25)';
             }
           }}
           onMouseLeave={(e) => {
             if (!isMobile) {
               e.currentTarget.style.transform = 'translateY(0)';
-              e.currentTarget.style.boxShadow = call.status === 'available'
-                ? isBonusCall
-                  ? '0 4px 15px rgba(139, 92, 246, 0.3)'
-                  : '0 4px 15px rgba(59, 130, 246, 0.4)'
-                : 'none';
+              e.currentTarget.style.boxShadow = isBonusCall
+                ? '0 4px 16px rgba(168, 85, 247, 0.15)'
+                : '0 4px 16px rgba(37, 99, 235, 0.15)';
             }
           }}
         >
@@ -340,18 +385,19 @@ export default function CallCard({ call, index, handleBookCall }) {
       {/* Locked message */}
       {call.status === 'locked' && (
         <div style={{
-          padding: isMobile ? '0.95rem' : '1.1rem',
+          padding: isMobile ? '0.875rem' : '1rem',
           background: 'rgba(107, 114, 128, 0.1)',
-          borderRadius: isMobile ? '12px' : '14px',
+          borderRadius: isMobile ? '10px' : '12px',
           border: '1px solid rgba(107, 114, 128, 0.2)',
           textAlign: 'center',
           minHeight: '48px',
           display: 'flex',
           alignItems: 'center',
-          justifyContent: 'center'
+          justifyContent: 'center',
+          backdropFilter: 'blur(8px)'
         }}>
           <p style={{
-            fontSize: isMobile ? '0.85rem' : '0.9rem',
+            fontSize: isMobile ? '0.8rem' : '0.875rem',
             color: 'rgba(255, 255, 255, 0.6)',
             margin: 0
           }}>
@@ -363,19 +409,21 @@ export default function CallCard({ call, index, handleBookCall }) {
       {/* Completed message */}
       {call.status === 'completed' && (
         <div style={{
-          padding: isMobile ? '0.95rem' : '1.1rem',
-          background: 'rgba(16, 185, 129, 0.1)',
-          borderRadius: isMobile ? '12px' : '14px',
-          border: '1px solid rgba(16, 185, 129, 0.2)',
+          padding: isMobile ? '0.875rem' : '1rem',
+          background: 'rgba(16, 185, 129, 0.12)',
+          borderRadius: isMobile ? '10px' : '12px',
+          border: '1px solid rgba(16, 185, 129, 0.25)',
           textAlign: 'center',
           minHeight: '48px',
           display: 'flex',
           alignItems: 'center',
-          justifyContent: 'center'
+          justifyContent: 'center',
+          backdropFilter: 'blur(8px)',
+          boxShadow: '0 4px 12px rgba(16, 185, 129, 0.15)'
         }}>
           <p style={{
-            fontSize: isMobile ? '0.85rem' : '0.9rem',
-            color: 'rgba(16, 185, 129, 0.9)',
+            fontSize: isMobile ? '0.8rem' : '0.875rem',
+            color: '#10b981',
             margin: 0,
             display: 'flex',
             alignItems: 'center',

@@ -1,4 +1,5 @@
 // src/modules/meal-plan/components/AIQuickActions.jsx
+// ✅ FIXED v2.0 - Better error handling + responsive grid
 import React, { useState } from 'react'
 import { 
   Star, PlusCircle, Clock, BookOpen, 
@@ -30,26 +31,40 @@ export default function AIQuickActions({
       label: 'Meal Setup',
       icon: Sparkles,
       color: '#8b5cf6',
-      gradient: 'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)',
-      lightGradient: 'linear-gradient(135deg, rgba(139, 92, 246, 0.12) 0%, rgba(124, 58, 237, 0.04) 100%)',
-      onClick: () => onOpenWizard?.()
+      gradient: 'linear-gradient(135deg, rgba(139, 92, 246, 0.25) 0%, rgba(124, 58, 237, 0.15) 100%)',
+      hoverGradient: 'linear-gradient(135deg, rgba(139, 92, 246, 0.35) 0%, rgba(124, 58, 237, 0.25) 100%)',
+      onClick: () => {
+        if (onOpenWizard) {
+          onOpenWizard()
+        } else {
+          console.warn('⚠️ onOpenWizard handler not provided')
+          alert('Meal Setup wizard is not available')
+        }
+      }
     },
     {
       id: 'week-planner',
       label: 'Week Planner',
       icon: Calendar,
       color: '#3b82f6',
-      gradient: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
-      lightGradient: 'linear-gradient(135deg, rgba(59, 130, 246, 0.12) 0%, rgba(59, 130, 246, 0.04) 100%)',
-      onClick: () => onOpenWeekPlanner?.()
+      gradient: 'linear-gradient(135deg, rgba(59, 130, 246, 0.25) 0%, rgba(37, 99, 235, 0.15) 100%)',
+      hoverGradient: 'linear-gradient(135deg, rgba(59, 130, 246, 0.35) 0%, rgba(37, 99, 235, 0.25) 100%)',
+      onClick: () => {
+        if (onOpenWeekPlanner) {
+          onOpenWeekPlanner()
+        } else {
+          console.warn('⚠️ onOpenWeekPlanner handler not provided')
+          alert('Week Planner is not available')
+        }
+      }
     },
     {
       id: 'favorites',
       label: 'Favorieten',
       icon: Star,
       color: '#fbbf24',
-      gradient: 'linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%)',
-      lightGradient: 'linear-gradient(135deg, rgba(251, 191, 36, 0.12) 0%, rgba(251, 191, 36, 0.04) 100%)',
+      gradient: 'linear-gradient(135deg, rgba(251, 191, 36, 0.25) 0%, rgba(245, 158, 11, 0.15) 100%)',
+      hoverGradient: 'linear-gradient(135deg, rgba(251, 191, 36, 0.35) 0%, rgba(245, 158, 11, 0.25) 100%)',
       onClick: () => setShowFavoritesModal(true)
     },
     {
@@ -57,8 +72,8 @@ export default function AIQuickActions({
       label: 'Eigen Meal',
       icon: PlusCircle,
       color: '#10b981',
-      gradient: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-      lightGradient: 'linear-gradient(135deg, rgba(16, 185, 129, 0.12) 0%, rgba(16, 185, 129, 0.04) 100%)',
+      gradient: 'linear-gradient(135deg, rgba(16, 185, 129, 0.25) 0%, rgba(5, 150, 105, 0.15) 100%)',
+      hoverGradient: 'linear-gradient(135deg, rgba(16, 185, 129, 0.35) 0%, rgba(5, 150, 105, 0.25) 100%)',
       onClick: () => setShowCustomMealBuilder(true)
     },
     {
@@ -66,41 +81,37 @@ export default function AIQuickActions({
       label: 'Historie',
       icon: Clock,
       color: '#3b82f6',
-      gradient: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
-      lightGradient: 'linear-gradient(135deg, rgba(59, 130, 246, 0.12) 0%, rgba(59, 130, 246, 0.04) 100%)',
-      onClick: onOpenHistory
-    },
-    {
-      id: 'mealbase',
-      label: 'Meal Base',
-      icon: BookOpen,
-      color: '#8b5cf6',
-      gradient: 'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)',
-      lightGradient: 'linear-gradient(135deg, rgba(139, 92, 246, 0.12) 0%, rgba(139, 92, 246, 0.04) 100%)',
-      onClick: onOpenMealBase
+      gradient: 'linear-gradient(135deg, rgba(59, 130, 246, 0.25) 0%, rgba(37, 99, 235, 0.15) 100%)',
+      hoverGradient: 'linear-gradient(135deg, rgba(59, 130, 246, 0.35) 0%, rgba(37, 99, 235, 0.25) 100%)',
+      onClick: () => {
+        if (onOpenHistory) {
+          onOpenHistory()
+        } else {
+          console.warn('⚠️ onOpenHistory handler not provided')
+          alert('History is not available')
+        }
+      }
     },
     {
       id: 'shopping',
       label: 'Boodschappen',
       icon: ShoppingCart,
       color: '#ef4444',
-      gradient: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
-      lightGradient: 'linear-gradient(135deg, rgba(239, 68, 68, 0.12) 0%, rgba(239, 68, 68, 0.04) 100%)',
-      onClick: onOpenShopping
-    },
-    {
-      id: 'recipes',
-      label: 'Recepten',
-      icon: ChefHat,
-      color: '#ec4899',
-      gradient: 'linear-gradient(135deg, #ec4899 0%, #db2777 100%)',
-      lightGradient: 'linear-gradient(135deg, rgba(236, 72, 153, 0.12) 0%, rgba(236, 72, 153, 0.04) 100%)',
-      onClick: onOpenRecipes
+      gradient: 'linear-gradient(135deg, rgba(239, 68, 68, 0.25) 0%, rgba(220, 38, 38, 0.15) 100%)',
+      hoverGradient: 'linear-gradient(135deg, rgba(239, 68, 68, 0.35) 0%, rgba(220, 38, 38, 0.25) 100%)',
+      onClick: () => {
+        if (onOpenShopping) {
+          onOpenShopping()
+        } else {
+          console.warn('⚠️ onOpenShopping handler not provided')
+          alert('Shopping list is not available')
+        }
+      }
     }
   ]
   
   const handleFavoriteSelect = (mealId) => {
-    console.log('Favorite meal selected:', mealId)
+    console.log('✅ Favorite meal selected:', mealId)
     setShowFavoritesModal(false)
     if (onMealCreated) {
       onMealCreated({ type: 'favorite', mealId })
@@ -108,7 +119,7 @@ export default function AIQuickActions({
   }
   
   const handleCustomMealSave = (meal) => {
-    console.log('Custom meal saved:', meal)
+    console.log('✅ Custom meal saved:', meal)
     setShowCustomMealBuilder(false)
     if (onMealCreated) {
       onMealCreated({ type: 'custom', meal })
@@ -118,48 +129,64 @@ export default function AIQuickActions({
   return (
     <>
       <div style={{
-        padding: isMobile ? '0 0.75rem 1rem' : '0 1.5rem 1.5rem'
+        padding: isMobile ? '0 1rem 1rem' : '0 1.5rem 1.5rem'
       }}>
         {/* Premium Section Header */}
         <div style={{
           display: 'flex',
           alignItems: 'center',
-          gap: '0.5rem',
-          marginBottom: '1.125rem',
-          paddingLeft: '0.125rem'
+          gap: '0.625rem',
+          marginBottom: isMobile ? '1rem' : '1.25rem',
+          paddingLeft: '0.25rem'
         }}>
           <div style={{
-            width: '32px',
-            height: '32px',
-            background: 'linear-gradient(135deg, rgba(251, 191, 36, 0.15) 0%, rgba(251, 191, 36, 0.08) 100%)',
-            backdropFilter: 'blur(10px)',
-            borderRadius: '10px',
+            width: isMobile ? '36px' : '40px',
+            height: isMobile ? '36px' : '40px',
+            background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.2) 0%, rgba(5, 150, 105, 0.1) 100%)',
+            backdropFilter: 'blur(12px)',
+            borderRadius: isMobile ? '10px' : '12px',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            border: '1px solid rgba(251, 191, 36, 0.2)'
+            border: '1px solid rgba(16, 185, 129, 0.3)',
+            boxShadow: '0 4px 16px rgba(16, 185, 129, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.05)',
+            flexShrink: 0
           }}>
-            <Sparkles size={18} color="#fbbf24" />
+            <Sparkles size={isMobile ? 18 : 20} color="#10b981" style={{
+              filter: 'drop-shadow(0 0 6px rgba(16, 185, 129, 0.6))'
+            }} />
           </div>
-          <h3 style={{
-            fontSize: isMobile ? '1rem' : '1.25rem',
-            fontWeight: '700',
-            background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-            WebkitBackgroundClip: 'text',
-            WebkitTextFillColor: 'transparent',
-            backgroundClip: 'text',
-            margin: 0,
-            letterSpacing: '-0.02em'
-          }}>
-            Quick Actions
-          </h3>
+          <div>
+            <h3 style={{
+              fontSize: isMobile ? '1.1rem' : '1.35rem',
+              fontWeight: '800',
+              background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+              WebkitBackgroundClip: 'text',
+              WebkitTextFillColor: 'transparent',
+              backgroundClip: 'text',
+              margin: 0,
+              letterSpacing: '-0.02em',
+              lineHeight: 1.2
+            }}>
+              Quick Actions
+            </h3>
+            <p style={{
+              fontSize: isMobile ? '0.7rem' : '0.75rem',
+              color: 'rgba(16, 185, 129, 0.6)',
+              margin: '0.125rem 0 0 0',
+              fontWeight: '600',
+              letterSpacing: '0.02em'
+            }}>
+              Snel toegang tot je tools
+            </p>
+          </div>
         </div>
         
-        {/* Premium Actions Grid */}
+        {/* ✅ RESPONSIVE GRID: 2 cols mobile, 3 cols desktop */}
         <div style={{
           display: 'grid',
-          gridTemplateColumns: 'repeat(3, 1fr)',
-          gap: isMobile ? '0.625rem' : '0.875rem'
+          gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(3, 1fr)',
+          gap: isMobile ? '0.75rem' : '1rem'
         }}>
           {actions.map(action => (
             <ActionCard
@@ -174,25 +201,38 @@ export default function AIQuickActions({
         
         {/* Premium Motivational Card */}
         <div style={{
-          marginTop: '1.5rem',
+          marginTop: isMobile ? '1.25rem' : '1.5rem',
           padding: isMobile ? '1rem' : '1.25rem',
-          background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.08) 0%, rgba(16, 185, 129, 0.02) 100%)',
+          background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.15) 0%, rgba(5, 150, 105, 0.08) 100%)',
           backdropFilter: 'blur(20px)',
-          borderRadius: isMobile ? '14px' : '16px',
-          border: '1px solid rgba(16, 185, 129, 0.08)',
+          borderRadius: isMobile ? '16px' : '18px',
+          border: '1px solid rgba(16, 185, 129, 0.3)',
           position: 'relative',
           overflow: 'hidden',
-          boxShadow: '0 8px 32px rgba(16, 185, 129, 0.05), inset 0 1px 0 rgba(255, 255, 255, 0.03)'
+          boxShadow: '0 8px 32px rgba(16, 185, 129, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.05)'
         }}>
+          {/* Top accent glow */}
+          <div style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            height: '2px',
+            background: 'linear-gradient(90deg, transparent 0%, #10b981 50%, transparent 100%)',
+            opacity: 0.6
+          }} />
+          
+          {/* Floating orbs */}
           <div style={{
             position: 'absolute',
             top: '-40px',
             right: '-40px',
             width: '120px',
             height: '120px',
-            background: 'radial-gradient(circle, rgba(16, 185, 129, 0.08) 0%, transparent 70%)',
+            background: 'radial-gradient(circle, rgba(16, 185, 129, 0.15) 0%, transparent 70%)',
             borderRadius: '50%',
-            animation: 'float 8s ease-in-out infinite'
+            animation: 'float 8s ease-in-out infinite',
+            pointerEvents: 'none'
           }} />
           <div style={{
             position: 'absolute',
@@ -200,48 +240,70 @@ export default function AIQuickActions({
             left: '-30px',
             width: '80px',
             height: '80px',
-            background: 'radial-gradient(circle, rgba(16, 185, 129, 0.06) 0%, transparent 70%)',
+            background: 'radial-gradient(circle, rgba(16, 185, 129, 0.12) 0%, transparent 70%)',
             borderRadius: '50%',
-            animation: 'float 6s ease-in-out infinite 1s'
+            animation: 'float 6s ease-in-out infinite 1s',
+            pointerEvents: 'none'
           }} />
           
           <div style={{
             display: 'flex',
             alignItems: 'center',
-            gap: '0.875rem',
+            gap: isMobile ? '0.875rem' : '1rem',
             position: 'relative',
             zIndex: 1
           }}>
             <div style={{
-              width: '40px',
-              height: '40px',
-              background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-              borderRadius: '12px',
+              width: isMobile ? '44px' : '48px',
+              height: isMobile ? '44px' : '48px',
+              background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.3) 0%, rgba(5, 150, 105, 0.2) 100%)',
+              backdropFilter: 'blur(10px)',
+              borderRadius: '14px',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               flexShrink: 0,
-              boxShadow: '0 6px 20px rgba(16, 185, 129, 0.3)'
+              border: '1px solid rgba(16, 185, 129, 0.4)',
+              boxShadow: '0 8px 24px rgba(16, 185, 129, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.1)',
+              position: 'relative'
             }}>
-              <TrendingUp size={20} color="white" />
+              <TrendingUp 
+                size={isMobile ? 22 : 24} 
+                color="#10b981"
+                style={{
+                  filter: 'drop-shadow(0 2px 8px rgba(16, 185, 129, 0.6))'
+                }}
+              />
+              {/* Glow effect */}
+              <div style={{
+                position: 'absolute',
+                inset: '-2px',
+                background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.4), transparent)',
+                borderRadius: '16px',
+                opacity: 0.5,
+                filter: 'blur(8px)',
+                zIndex: -1
+              }} />
             </div>
-            <div>
+            <div style={{ flex: 1 }}>
               <p style={{
-                fontSize: isMobile ? '0.875rem' : '0.95rem',
-                color: 'rgba(255, 255, 255, 0.9)',
-                margin: '0 0 0.125rem 0',
-                fontWeight: '600',
-                letterSpacing: '-0.01em'
+                fontSize: isMobile ? '0.95rem' : '1.05rem',
+                color: 'white',
+                margin: '0 0 0.25rem 0',
+                fontWeight: '800',
+                letterSpacing: '-0.02em',
+                textShadow: '0 2px 8px rgba(0, 0, 0, 0.3)'
               }}>
                 Je bent op de goede weg!
               </p>
               <p style={{
                 fontSize: isMobile ? '0.75rem' : '0.825rem',
-                color: 'rgba(16, 185, 129, 0.7)',
+                color: 'rgba(16, 185, 129, 0.8)',
                 margin: 0,
-                fontWeight: '500'
+                fontWeight: '600',
+                letterSpacing: '0.01em'
               }}>
-                Blijf consistent voor de beste resultaten
+                Blijf consistent voor de beste resultaten 💪
               </p>
             </div>
           </div>
@@ -274,8 +336,19 @@ export default function AIQuickActions({
               opacity: 1;
             }
             50% {
-              transform: scale(1.05);
+              transform: scale(1.08);
               opacity: 0.9;
+            }
+          }
+          
+          @keyframes glow {
+            0%, 100% {
+              box-shadow: 0 0 15px currentColor;
+              opacity: 0.6;
+            }
+            50% {
+              box-shadow: 0 0 25px currentColor;
+              opacity: 1;
             }
           }
         `}</style>
@@ -289,7 +362,7 @@ export default function AIQuickActions({
         currentMeal={null}
         db={db}
         service={null}
-        clientId={clientId}
+        client={client}
       />
       
       {/* Client Meal Builder Modal */}
@@ -315,27 +388,27 @@ function ActionCard({ action, isHovered, onHover, isMobile }) {
       onMouseLeave={() => onHover(null)}
       onClick={action.onClick}
       style={{
-        background: isHovered
-          ? action.gradient
-          : action.lightGradient,
-        backdropFilter: 'blur(10px)',
-        borderRadius: isMobile ? '12px' : '14px',
-        padding: isMobile ? '0.875rem' : '1rem',
-        border: `1px solid ${isHovered ? action.color + '25' : 'rgba(16, 185, 129, 0.08)'}`,
+        background: isHovered ? action.hoverGradient : action.gradient,
+        backdropFilter: 'blur(12px)',
+        borderRadius: isMobile ? '14px' : '16px',
+        padding: isMobile ? '1rem 0.75rem' : '1.125rem 0.875rem',
+        border: `1px solid ${action.color}${isHovered ? '40' : '30'}`,
         cursor: 'pointer',
         transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-        transform: isHovered ? 'translateY(-4px) scale(1.03)' : 'translateY(0) scale(1)',
+        transform: isHovered 
+          ? 'translateY(-4px) scale(1.03)' 
+          : 'translateY(0) scale(1)',
         boxShadow: isHovered
-          ? `0 20px 40px ${action.color}20, 0 0 30px ${action.color}10, inset 0 1px 0 rgba(255,255,255,0.1)`
-          : '0 4px 16px rgba(16, 185, 129, 0.05)',
+          ? `0 12px 32px ${action.color}35, 0 0 20px ${action.color}20, inset 0 1px 0 rgba(255,255,255,0.1)`
+          : `0 4px 16px ${action.color}15, inset 0 1px 0 rgba(255,255,255,0.03)`,
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
         justifyContent: 'center',
-        gap: isMobile ? '0.5rem' : '0.625rem',
+        gap: isMobile ? '0.625rem' : '0.75rem',
         position: 'relative',
         overflow: 'hidden',
-        minHeight: isMobile ? '90px' : '110px',
+        minHeight: isMobile ? '100px' : '115px',
         touchAction: 'manipulation',
         WebkitTapHighlightColor: 'transparent',
         aspectRatio: '1 / 1.1'
@@ -343,16 +416,17 @@ function ActionCard({ action, isHovered, onHover, isMobile }) {
       onTouchStart={(e) => {
         if (isMobile) {
           e.currentTarget.style.transform = 'scale(0.97)'
-          e.currentTarget.style.background = action.gradient
+          e.currentTarget.style.background = action.hoverGradient
         }
       }}
       onTouchEnd={(e) => {
         if (isMobile) {
           e.currentTarget.style.transform = 'scale(1)'
-          e.currentTarget.style.background = action.lightGradient
+          e.currentTarget.style.background = action.gradient
         }
       }}
     >
+      {/* Shimmer effect on hover */}
       {isHovered && (
         <div style={{
           position: 'absolute',
@@ -360,75 +434,98 @@ function ActionCard({ action, isHovered, onHover, isMobile }) {
           left: '-100%',
           width: '100%',
           height: '100%',
-          background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.15), transparent)',
-          animation: 'shimmer 0.6s ease'
+          background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent)',
+          animation: 'shimmer 0.8s ease'
         }} />
       )}
       
+      {/* Top gradient overlay */}
       <div style={{
         position: 'absolute',
         inset: 0,
         background: isHovered 
-          ? 'linear-gradient(135deg, rgba(255,255,255,0.1) 0%, transparent 50%)'
-          : 'linear-gradient(135deg, rgba(255,255,255,0.05) 0%, transparent 50%)',
+          ? 'linear-gradient(135deg, rgba(255,255,255,0.12) 0%, transparent 50%)'
+          : 'linear-gradient(135deg, rgba(255,255,255,0.06) 0%, transparent 50%)',
         borderRadius: 'inherit',
-        pointerEvents: 'none'
+        pointerEvents: 'none',
+        transition: 'all 0.3s ease'
       }} />
       
+      {/* Icon container */}
       <div style={{
-        width: isMobile ? '36px' : '42px',
-        height: isMobile ? '36px' : '42px',
+        width: isMobile ? '40px' : '44px',
+        height: isMobile ? '40px' : '44px',
         background: isHovered 
-          ? 'rgba(255, 255, 255, 0.15)'
-          : 'rgba(17, 17, 17, 0.3)',
+          ? `linear-gradient(135deg, ${action.color}30, ${action.color}20)`
+          : 'rgba(17, 17, 17, 0.4)',
         backdropFilter: 'blur(10px)',
-        borderRadius: '10px',
+        borderRadius: isMobile ? '11px' : '12px',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        border: `1px solid ${isHovered ? 'rgba(255, 255, 255, 0.2)' : 'rgba(16, 185, 129, 0.1)'}`,
+        border: `1px solid ${isHovered ? action.color + '40' : 'rgba(255, 255, 255, 0.08)'}`,
         transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
         boxShadow: isHovered 
-          ? `0 8px 20px ${action.color}30, inset 0 1px 0 rgba(255,255,255,0.2)`
+          ? `0 8px 24px ${action.color}40, inset 0 1px 0 rgba(255,255,255,0.15)`
           : 'inset 0 1px 0 rgba(255,255,255,0.03)',
         position: 'relative',
         zIndex: 1,
         animation: isHovered ? 'pulse 2s infinite' : 'none'
       }}>
         <Icon 
-          size={isMobile ? 18 : 22} 
+          size={isMobile ? 20 : 22} 
           color={isHovered ? 'white' : action.color}
           style={{
-            filter: isHovered ? 'drop-shadow(0 2px 4px rgba(0,0,0,0.2))' : 'none',
+            filter: isHovered 
+              ? `drop-shadow(0 0 8px ${action.color})` 
+              : `drop-shadow(0 0 4px ${action.color}60)`,
             transition: 'all 0.3s ease'
           }}
         />
+        
+        {/* Icon glow ring */}
+        {isHovered && (
+          <div style={{
+            position: 'absolute',
+            inset: '-3px',
+            borderRadius: 'inherit',
+            background: `linear-gradient(135deg, ${action.color}40, transparent)`,
+            filter: 'blur(6px)',
+            opacity: 0.6,
+            animation: 'glow 2s infinite',
+            zIndex: -1
+          }} />
+        )}
       </div>
       
+      {/* Label */}
       <span style={{
-        fontSize: isMobile ? '0.75rem' : '0.85rem',
-        fontWeight: '700',
-        color: isHovered ? 'white' : 'rgba(255, 255, 255, 0.7)',
+        fontSize: isMobile ? '0.8rem' : '0.875rem',
+        fontWeight: '800',
+        color: isHovered ? 'white' : 'rgba(255, 255, 255, 0.8)',
         letterSpacing: '-0.01em',
         position: 'relative',
         zIndex: 1,
-        textShadow: isHovered ? '0 2px 8px rgba(0,0,0,0.3)' : 'none',
-        transition: 'all 0.3s ease'
+        textShadow: isHovered ? '0 2px 12px rgba(0,0,0,0.4)' : '0 1px 4px rgba(0,0,0,0.2)',
+        transition: 'all 0.3s ease',
+        textAlign: 'center',
+        lineHeight: 1.2
       }}>
         {action.label}
       </span>
       
+      {/* Bottom accent line */}
       {isHovered && (
         <div style={{
           position: 'absolute',
-          bottom: '-2px',
+          bottom: 0,
           left: '50%',
           transform: 'translateX(-50%)',
-          width: '40%',
-          height: '4px',
-          background: action.color,
-          borderRadius: '2px',
-          boxShadow: `0 0 12px ${action.color}`,
+          width: '50%',
+          height: '3px',
+          background: `linear-gradient(90deg, transparent, ${action.color}, transparent)`,
+          borderRadius: '2px 2px 0 0',
+          boxShadow: `0 -2px 12px ${action.color}80`,
           opacity: 0.8
         }} />
       )}

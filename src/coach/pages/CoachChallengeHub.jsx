@@ -1,4 +1,4 @@
-// src/coach/pages/CoachChallengeHub.jsx - UPDATED VERSION
+// src/coach/pages/CoachChallengeHub.jsx - WITH ACTIVITY TAB + BANNER REFRESH FIX
 import { useState, useEffect } from 'react'
 import { Trophy, ChevronDown, RefreshCw, Users, AlertCircle, Target, Pause, Play } from 'lucide-react'
 
@@ -10,6 +10,7 @@ import MealProgressView from './challenge-monitor/MealProgressView'
 import WeightProgressView from './challenge-monitor/WeightProgressView'
 import PhotoProgressView from './challenge-monitor/PhotoProgressView'
 import ChallengeAdjustments from './challenge-monitor/ChallengeAdjustments'
+import LastActivityView from './challenge-monitor/LastActivityView'
 
 export default function CoachChallengeHub({ db, clients }) {
   const isMobile = window.innerWidth <= 768
@@ -29,6 +30,9 @@ export default function CoachChallengeHub({ db, clients }) {
   
   // PAUSE STATE
   const [pauseLoading, setPauseLoading] = useState(false)
+  
+  // 🔥 FIX 1: Banner refresh key
+  const [refreshKey, setRefreshKey] = useState(0)
 
   useEffect(() => {
     loadAssignments()
@@ -183,6 +187,10 @@ export default function CoachChallengeHub({ db, clients }) {
           dayNumber: daysSinceStart + 1,
           totalDays: 56
         })
+        
+        // 🔥 FIX 2: Force banner refresh when challenge data updates
+        setRefreshKey(prev => prev + 1)
+        console.log('🔄 Challenge data refreshed, banner will update')
       }
     } catch (error) {
       console.error('Error loading challenge data:', error)
@@ -236,15 +244,16 @@ export default function CoachChallengeHub({ db, clients }) {
     }
   }
 
-  // VIEW TABS
+  // VIEW TABS - MET ACTIVITY TOEGEVOEGD
   const viewTabs = [
-    { id: 'overview', label: 'Overview', icon: Trophy, color: '#dc2626' },
+    { id: 'overview', label: 'Overview', icon: '📊', color: '#3b82f6' },
     { id: 'goals', label: 'Goals', icon: Target, color: '#10b981' },
     { id: 'workouts', label: 'Workouts', icon: '💪', color: '#f97316' },
     { id: 'meals', label: 'Meals', icon: '🍽️', color: '#10b981' },
-    { id: 'weight', label: 'Weight', icon: '⚖️', color: '#3b82f6' },
-    { id: 'photos', label: 'Photos', icon: '📸', color: '#8b5cf6' },
-    { id: 'adjustments', label: 'Adjustments', icon: '⚙️', color: '#ef4444' }
+    { id: 'weight', label: 'Weight', icon: '⚖️', color: '#a855f7' },
+    { id: 'photos', label: 'Photos', icon: '📸', color: '#ec4899' },
+    { id: 'activity', label: 'Activity', icon: '⏱️', color: '#06b6d4' },
+    { id: 'adjustments', label: 'Adjust', icon: '⚙️', color: '#ef4444' }
   ]
 
   if (loading) {
@@ -262,151 +271,180 @@ export default function CoachChallengeHub({ db, clients }) {
   }
 
   return (
-    <div>
-      {/* Toggle Assignment Widget Button */}
+    <div style={{
+      minHeight: '100vh',
+      padding: isMobile ? '1rem' : '2rem'
+    }}>
+      {/* Assignment Widget Toggle */}
       <button
         onClick={() => setShowAssignment(!showAssignment)}
         style={{
-          width: '100%',
-          padding: isMobile ? '1rem' : '1.25rem',
-          background: 'linear-gradient(135deg, rgba(220, 38, 38, 0.2) 0%, rgba(220, 38, 38, 0.1) 100%)',
+          marginBottom: '1.5rem',
+          padding: isMobile ? '0.875rem 1.25rem' : '1rem 1.5rem',
+          background: 'linear-gradient(135deg, #dc2626 0%, #991b1b 100%)',
           border: '1px solid rgba(220, 38, 38, 0.3)',
           borderRadius: '12px',
           color: '#fff',
-          fontSize: isMobile ? '0.9rem' : '0.95rem',
+          fontSize: isMobile ? '0.9rem' : '1rem',
           fontWeight: '600',
           cursor: 'pointer',
           display: 'flex',
-          justifyContent: 'space-between',
           alignItems: 'center',
-          marginBottom: '1rem',
-          transition: 'all 0.3s ease',
+          gap: '0.75rem',
+          minHeight: '44px',
           touchAction: 'manipulation',
-          WebkitTapHighlightColor: 'transparent'
+          WebkitTapHighlightColor: 'transparent',
+          transition: 'all 0.3s ease',
+          boxShadow: '0 4px 15px rgba(220, 38, 38, 0.3)'
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-          <span>🏆</span>
-          <span>Challenge Assignment ({assignedClients.length}/{clients.length} clients)</span>
-        </div>
+        <Trophy size={20} />
+        <span>Assign Challenge to Client</span>
         <ChevronDown 
-          size={20} 
+          size={18} 
           style={{
-            transform: showAssignment ? 'rotate(180deg)' : 'rotate(0deg)',
+            marginLeft: 'auto',
+            transform: showAssignment ? 'rotate(180deg)' : 'rotate(0)',
             transition: 'transform 0.3s ease'
           }}
         />
       </button>
 
-      {/* Assignment Widget (Collapsible) */}
+      {/* Assignment Widget */}
       {showAssignment && (
         <div style={{
-          background: 'linear-gradient(135deg, rgba(220, 38, 38, 0.1) 0%, rgba(220, 38, 38, 0.05) 100%)',
-          borderRadius: '16px',
-          padding: isMobile ? '1rem' : '1.5rem',
+          background: 'linear-gradient(135deg, rgba(220, 38, 38, 0.1) 0%, rgba(153, 27, 27, 0.05) 100%)',
           border: '1px solid rgba(220, 38, 38, 0.2)',
-          marginBottom: '1.5rem',
+          borderRadius: '16px',
+          padding: isMobile ? '1.25rem' : '1.5rem',
+          marginBottom: '2rem',
           animation: 'slideDown 0.3s ease'
         }}>
-          <div style={{
+          <h3 style={{
+            fontSize: isMobile ? '1rem' : '1.1rem',
+            fontWeight: '700',
+            color: '#fff',
+            marginBottom: '1rem',
             display: 'flex',
-            flexDirection: 'column',
-            gap: '0.5rem',
-            maxHeight: '400px',
-            overflowY: 'auto'
+            alignItems: 'center',
+            gap: '0.5rem'
           }}>
-            {clients.map(client => {
-              const isAssigned = assignedClients.includes(client.id)
-              
-              return (
-                <div
-                  key={client.id}
-                  style={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                    padding: isMobile ? '0.75rem' : '1rem',
-                    background: isAssigned 
-                      ? 'linear-gradient(135deg, rgba(16, 185, 129, 0.2) 0%, rgba(16, 185, 129, 0.1) 100%)'
-                      : 'rgba(255, 255, 255, 0.03)',
-                    borderRadius: '12px',
-                    border: `1px solid ${isAssigned ? 'rgba(16, 185, 129, 0.3)' : 'rgba(255, 255, 255, 0.1)'}`,
-                    transition: 'all 0.3s ease'
-                  }}
-                >
-                  <div style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '0.75rem'
-                  }}>
-                    <div style={{
-                      width: '8px',
-                      height: '8px',
-                      borderRadius: '50%',
-                      background: isAssigned ? '#10b981' : '#6b7280'
-                    }} />
-                    <div>
+            <Users size={20} color="#dc2626" />
+            Available Clients
+          </h3>
+
+          {clients.length === 0 ? (
+            <p style={{
+              color: 'rgba(255, 255, 255, 0.6)',
+              fontSize: '0.9rem',
+              textAlign: 'center',
+              padding: '2rem'
+            }}>
+              No clients available
+            </p>
+          ) : (
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fill, minmax(280px, 1fr))',
+              gap: '1rem'
+            }}>
+              {clients.map(client => {
+                const isAssigned = assignedClients.includes(client.id)
+                
+                return (
+                  <div
+                    key={client.id}
+                    style={{
+                      background: 'rgba(17, 17, 17, 0.5)',
+                      border: `1px solid ${isAssigned ? 'rgba(16, 185, 129, 0.3)' : 'rgba(255, 255, 255, 0.1)'}`,
+                      borderRadius: '12px',
+                      padding: '1rem',
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      gap: '1rem'
+                    }}
+                  >
+                    <div style={{ flex: 1 }}>
                       <div style={{
-                        fontSize: isMobile ? '0.9rem' : '0.95rem',
+                        fontSize: '0.95rem',
                         fontWeight: '600',
-                        color: '#fff'
+                        color: '#fff',
+                        marginBottom: '0.25rem'
                       }}>
                         {client.first_name} {client.last_name}
                       </div>
-                      {isAssigned && (
-                        <div style={{
-                          fontSize: '0.75rem',
-                          color: 'rgba(255, 255, 255, 0.6)',
-                          marginTop: '0.25rem'
-                        }}>
-                          Challenge Active
-                        </div>
-                      )}
+                      <div style={{
+                        fontSize: '0.8rem',
+                        color: 'rgba(255, 255, 255, 0.5)'
+                      }}>
+                        {client.email}
+                      </div>
                     </div>
-                  </div>
 
-                  <button
-                    onClick={() => isAssigned ? removeChallenge(client.id) : assignChallenge(client.id)}
-                    disabled={assignLoading}
-                    style={{
-                      padding: isMobile ? '0.5rem 0.75rem' : '0.5rem 1rem',
-                      background: isAssigned
-                        ? 'linear-gradient(135deg, rgba(239, 68, 68, 0.2) 0%, rgba(239, 68, 68, 0.1) 100%)'
-                        : 'linear-gradient(135deg, #dc2626 0%, #991b1b 100%)',
-                      border: `1px solid ${isAssigned ? 'rgba(239, 68, 68, 0.3)' : 'rgba(220, 38, 38, 0.3)'}`,
-                      borderRadius: '8px',
-                      color: '#fff',
-                      fontSize: isMobile ? '0.8rem' : '0.85rem',
-                      fontWeight: '600',
-                      cursor: assignLoading ? 'wait' : 'pointer',
-                      opacity: assignLoading ? 0.5 : 1,
-                      transition: 'all 0.3s ease',
-                      minWidth: isMobile ? '80px' : '100px',
-                      touchAction: 'manipulation',
-                      WebkitTapHighlightColor: 'transparent'
-                    }}
-                  >
-                    {isAssigned ? 'Remove' : 'Assign'}
-                  </button>
-                </div>
-              )
-            })}
-          </div>
+                    {isAssigned ? (
+                      <button
+                        onClick={() => removeChallenge(client.id)}
+                        disabled={assignLoading}
+                        style={{
+                          padding: '0.5rem 1rem',
+                          background: 'rgba(239, 68, 68, 0.1)',
+                          border: '1px solid rgba(239, 68, 68, 0.3)',
+                          borderRadius: '8px',
+                          color: '#ef4444',
+                          fontSize: '0.85rem',
+                          fontWeight: '500',
+                          cursor: assignLoading ? 'wait' : 'pointer',
+                          minHeight: '36px',
+                          touchAction: 'manipulation',
+                          WebkitTapHighlightColor: 'transparent',
+                          whiteSpace: 'nowrap'
+                        }}
+                      >
+                        Remove
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => assignChallenge(client.id)}
+                        disabled={assignLoading}
+                        style={{
+                          padding: '0.5rem 1rem',
+                          background: 'linear-gradient(135deg, #dc2626 0%, #991b1b 100%)',
+                          border: '1px solid rgba(220, 38, 38, 0.3)',
+                          borderRadius: '8px',
+                          color: '#fff',
+                          fontSize: '0.85rem',
+                          fontWeight: '500',
+                          cursor: assignLoading ? 'wait' : 'pointer',
+                          minHeight: '36px',
+                          touchAction: 'manipulation',
+                          WebkitTapHighlightColor: 'transparent',
+                          whiteSpace: 'nowrap'
+                        }}
+                      >
+                        Assign
+                      </button>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+          )}
         </div>
       )}
 
-      {/* Monitor Section */}
+      {/* Challenge Monitor */}
       {challengeClients.length === 0 ? (
         <div style={{
-          background: 'linear-gradient(135deg, rgba(220, 38, 38, 0.1) 0%, rgba(220, 38, 38, 0.05) 100%)',
-          borderRadius: '16px',
-          padding: isMobile ? '1.5rem' : '2rem',
+          background: 'linear-gradient(135deg, rgba(220, 38, 38, 0.1) 0%, rgba(153, 27, 27, 0.05) 100%)',
           border: '1px solid rgba(220, 38, 38, 0.2)',
+          borderRadius: '16px',
+          padding: '3rem 2rem',
           textAlign: 'center'
         }}>
-          <AlertCircle size={48} color="#dc2626" style={{ marginBottom: '1rem' }} />
+          <AlertCircle size={48} color="#dc2626" style={{ margin: '0 auto 1rem' }} />
           <h3 style={{
-            fontSize: isMobile ? '1.1rem' : '1.25rem',
+            fontSize: '1.25rem',
             fontWeight: '700',
             color: '#fff',
             marginBottom: '0.5rem'
@@ -415,172 +453,136 @@ export default function CoachChallengeHub({ db, clients }) {
           </h3>
           <p style={{
             color: 'rgba(255, 255, 255, 0.6)',
-            fontSize: isMobile ? '0.9rem' : '0.95rem'
+            fontSize: '0.95rem'
           }}>
-            Assign challenges to clients using the assignment widget above
+            Assign clients to the 8-week challenge to start monitoring their progress
           </p>
         </div>
       ) : (
         <>
-          {/* Monitor Header */}
+          {/* Client Selector + Controls */}
           <div style={{
-            background: challengeData?.is_paused 
-              ? 'linear-gradient(135deg, rgba(249, 115, 22, 0.1) 0%, rgba(249, 115, 22, 0.05) 100%)'
-              : 'linear-gradient(135deg, rgba(220, 38, 38, 0.1) 0%, rgba(220, 38, 38, 0.05) 100%)',
+            background: 'linear-gradient(135deg, rgba(220, 38, 38, 0.1) 0%, rgba(153, 27, 27, 0.05) 100%)',
+            border: '1px solid rgba(220, 38, 38, 0.2)',
             borderRadius: '16px',
-            padding: isMobile ? '1rem' : '1.5rem',
-            border: challengeData?.is_paused 
-              ? '1px solid rgba(249, 115, 22, 0.3)'
-              : '1px solid rgba(220, 38, 38, 0.2)',
+            padding: isMobile ? '1.25rem' : '1.5rem',
             marginBottom: '1.5rem'
           }}>
             <div style={{
               display: 'flex',
-              flexDirection: isMobile ? 'column' : 'row',
-              gap: '1rem',
-              alignItems: isMobile ? 'stretch' : 'center',
-              justifyContent: 'space-between'
+              gap: isMobile ? '0.75rem' : '1rem',
+              alignItems: 'center',
+              flexWrap: 'wrap'
             }}>
-              <div style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.75rem'
-              }}>
-                <Trophy size={24} color={challengeData?.is_paused ? '#f97316' : '#dc2626'} />
-                <h2 style={{
-                  fontSize: isMobile ? '1.1rem' : '1.25rem',
-                  fontWeight: '700',
-                  color: '#fff',
-                  margin: 0
-                }}>
-                  Challenge Monitor
-                  {challengeData?.is_paused && (
-                    <span style={{
-                      fontSize: '0.75rem',
-                      marginLeft: '0.75rem',
-                      color: '#f97316',
-                      fontWeight: '600'
-                    }}>
-                      ⏸️ GEPAUZEERD
-                    </span>
-                  )}
-                </h2>
-              </div>
-
-              <div style={{
-                display: 'flex',
-                gap: '0.75rem',
-                alignItems: 'center',
-                flex: 1,
-                maxWidth: isMobile ? '100%' : '500px'
-              }}>
-                <div style={{ position: 'relative', flex: 1 }}>
-                  <select
-                    value={selectedClient?.id || ''}
-                    onChange={(e) => {
-                      const client = challengeClients.find(c => c.id === e.target.value)
-                      setSelectedClient(client)
-                    }}
-                    style={{
-                      width: '100%',
-                      padding: isMobile ? '0.75rem 2.5rem 0.75rem 0.75rem' : '0.875rem 2.5rem 0.875rem 0.875rem',
-                      background: 'rgba(255, 255, 255, 0.05)',
-                      border: '1px solid rgba(255, 255, 255, 0.1)',
-                      borderRadius: '10px',
-                      color: '#fff',
-                      fontSize: isMobile ? '0.9rem' : '0.95rem',
-                      fontWeight: '500',
-                      cursor: 'pointer',
-                      appearance: 'none',
-                      outline: 'none'
-                    }}
-                  >
-                    {challengeClients.map(client => (
-                      <option key={client.id} value={client.id}>
-                        {client.first_name} {client.last_name} {client.isPaused ? '⏸️' : ''}
-                      </option>
-                    ))}
-                  </select>
-                  <ChevronDown 
-                    size={20} 
-                    color="rgba(255, 255, 255, 0.5)"
-                    style={{
-                      position: 'absolute',
-                      right: '0.875rem',
-                      top: '50%',
-                      transform: 'translateY(-50%)',
-                      pointerEvents: 'none'
-                    }}
-                  />
-                </div>
-
-                {/* PAUSE/RESUME BUTTON */}
-                <button
-                  onClick={handlePauseToggle}
-                  disabled={pauseLoading}
-                  style={{
-                    padding: isMobile ? '0.75rem' : '0.75rem 1rem',
-                    background: challengeData?.is_paused
-                      ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)'
-                      : 'linear-gradient(135deg, #f97316 0%, #ea580c 100%)',
-                    border: `1px solid ${challengeData?.is_paused ? 'rgba(16, 185, 129, 0.3)' : 'rgba(249, 115, 22, 0.3)'}`,
-                    borderRadius: '10px',
-                    color: '#fff',
-                    fontSize: isMobile ? '0.85rem' : '0.9rem',
-                    fontWeight: '600',
-                    cursor: pauseLoading ? 'wait' : 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '0.5rem',
-                    minHeight: '44px',
-                    opacity: pauseLoading ? 0.5 : 1,
-                    touchAction: 'manipulation',
-                    WebkitTapHighlightColor: 'transparent',
-                    transition: 'all 0.3s ease',
-                    whiteSpace: 'nowrap'
+              <div style={{ position: 'relative', flex: isMobile ? '1 1 100%' : '1' }}>
+                <select
+                  value={selectedClient?.id || ''}
+                  onChange={(e) => {
+                    const client = challengeClients.find(c => c.id === e.target.value)
+                    setSelectedClient(client)
                   }}
-                >
-                  {challengeData?.is_paused ? (
-                    <>
-                      <Play size={16} />
-                      {!isMobile && 'Resume'}
-                    </>
-                  ) : (
-                    <>
-                      <Pause size={16} />
-                      {!isMobile && 'Pause'}
-                    </>
-                  )}
-                </button>
-
-                <button
-                  onClick={handleRefresh}
-                  disabled={refreshing}
                   style={{
-                    padding: '0.75rem',
-                    background: 'rgba(255, 255, 255, 0.05)',
+                    width: '100%',
+                    padding: isMobile ? '0.875rem 2.5rem 0.875rem 1rem' : '1rem 2.5rem 1rem 1.25rem',
+                    background: 'rgba(17, 17, 17, 0.5)',
                     border: '1px solid rgba(255, 255, 255, 0.1)',
                     borderRadius: '10px',
                     color: '#fff',
-                    cursor: refreshing ? 'wait' : 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    minWidth: '44px',
+                    fontSize: isMobile ? '0.9rem' : '1rem',
+                    fontWeight: '500',
+                    cursor: 'pointer',
+                    appearance: 'none',
                     minHeight: '44px',
                     touchAction: 'manipulation',
                     WebkitTapHighlightColor: 'transparent'
                   }}
                 >
-                  <RefreshCw 
-                    size={18} 
-                    color="rgba(255, 255, 255, 0.7)"
-                    style={{
-                      animation: refreshing ? 'spin 1s linear infinite' : 'none'
-                    }}
-                  />
-                </button>
+                  {challengeClients.map(client => (
+                    <option key={client.id} value={client.id}>
+                      {client.first_name} {client.last_name}
+                      {client.isPaused ? ' (Paused)' : ''}
+                    </option>
+                  ))}
+                </select>
+                <ChevronDown 
+                  size={20} 
+                  color="rgba(255, 255, 255, 0.5)"
+                  style={{
+                    position: 'absolute',
+                    right: '0.875rem',
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    pointerEvents: 'none'
+                  }}
+                />
               </div>
+
+              {/* PAUSE/RESUME BUTTON */}
+              <button
+                onClick={handlePauseToggle}
+                disabled={pauseLoading}
+                style={{
+                  padding: isMobile ? '0.75rem' : '0.75rem 1rem',
+                  background: challengeData?.is_paused
+                    ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)'
+                    : 'linear-gradient(135deg, #f97316 0%, #ea580c 100%)',
+                  border: `1px solid ${challengeData?.is_paused ? 'rgba(16, 185, 129, 0.3)' : 'rgba(249, 115, 22, 0.3)'}`,
+                  borderRadius: '10px',
+                  color: '#fff',
+                  fontSize: isMobile ? '0.85rem' : '0.9rem',
+                  fontWeight: '600',
+                  cursor: pauseLoading ? 'wait' : 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem',
+                  minHeight: '44px',
+                  opacity: pauseLoading ? 0.5 : 1,
+                  touchAction: 'manipulation',
+                  WebkitTapHighlightColor: 'transparent',
+                  transition: 'all 0.3s ease',
+                  whiteSpace: 'nowrap'
+                }}
+              >
+                {challengeData?.is_paused ? (
+                  <>
+                    <Play size={16} />
+                    {!isMobile && 'Resume'}
+                  </>
+                ) : (
+                  <>
+                    <Pause size={16} />
+                    {!isMobile && 'Pause'}
+                  </>
+                )}
+              </button>
+
+              <button
+                onClick={handleRefresh}
+                disabled={refreshing}
+                style={{
+                  padding: '0.75rem',
+                  background: 'rgba(255, 255, 255, 0.05)',
+                  border: '1px solid rgba(255, 255, 255, 0.1)',
+                  borderRadius: '10px',
+                  color: '#fff',
+                  cursor: refreshing ? 'wait' : 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  minWidth: '44px',
+                  minHeight: '44px',
+                  touchAction: 'manipulation',
+                  WebkitTapHighlightColor: 'transparent'
+                }}
+              >
+                <RefreshCw 
+                  size={18} 
+                  color="rgba(255, 255, 255, 0.7)"
+                  style={{
+                    animation: refreshing ? 'spin 1s linear infinite' : 'none'
+                  }}
+                />
+              </button>
             </div>
 
             {selectedClient && challengeData && (
@@ -657,6 +659,7 @@ export default function CoachChallengeHub({ db, clients }) {
             <>
               {activeView === 'overview' && (
                 <ChallengeHomeBanner 
+                  key={refreshKey}  // 🔥 FIX 3: Force re-render on data update
                   client={selectedClient}
                   db={db}
                   isCoachView={true}
@@ -702,11 +705,20 @@ export default function CoachChallengeHub({ db, clients }) {
                 />
               )}
               
+              {activeView === 'activity' && (
+                <LastActivityView 
+                  client={selectedClient}
+                  db={db}
+                  challengeData={challengeData}
+                />
+              )}
+              
               {activeView === 'adjustments' && (
                 <ChallengeAdjustments 
                   client={selectedClient}
                   db={db}
                   challengeData={challengeData}
+                  onDataUpdate={loadClientChallengeData}  // 🔥 FIX 4: Callback to refresh
                 />
               )}
             </>

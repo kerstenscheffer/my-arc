@@ -1,12 +1,10 @@
 // src/modules/meal-plan/AIMealPlanService.js
 // Complete service layer voor AI Meal Dashboard - WATER TRACKING FIXED
-
 export default class AIMealPlanService {
   constructor(db) {
     this.db = db
     this.supabase = db.supabase
   }
-
   // ========================================
   // MAIN DASHBOARD DATA LOADING
   // ========================================
@@ -37,7 +35,7 @@ async loadAIDashboardData(clientId) {
       
     const todayMeals = await this.getTodayFromWeekStructure(activePlan, todayProgress)
     const nextMeal = this.calculateNextMeal(todayMeals, todayProgress?.consumed_meals)
-    const dailyTotals = this.calculateDailyTotals(todayMeals, todayProgress, activePlan)
+const dailyTotals = await this.calculateDailyTotals(clientId, todayMeals, todayProgress, activePlan)
     
     console.log('✅ AI Dashboard loaded:', {
       hasPlan: !!activePlan,
@@ -84,7 +82,6 @@ async loadAIDashboardData(clientId) {
       return null
     }
   }
-
   async getTodayFromWeekStructure(plan, todayProgress) {
     if (!plan?.week_structure) return []
     
@@ -263,7 +260,6 @@ async loadAIDashboardData(clientId) {
       return []
     }
   }
-
   async getMealById(mealId) {
     try {
       // Clean all possible suffixes
@@ -304,7 +300,6 @@ async loadAIDashboardData(clientId) {
       return null
     }
   }
-
   // ========================================
   // PROGRESS TRACKING - FIXED INTEGER ISSUES
   // ========================================
@@ -328,7 +323,6 @@ async loadAIDashboardData(clientId) {
       return this.createEmptyProgress(clientId, date)
     }
   }
-
   async checkAIMeal(clientId, planId, slot, mealData) {
     try {
       const today = new Date().toISOString().split('T')[0]
@@ -395,7 +389,6 @@ async loadAIDashboardData(clientId) {
       return null
     }
   }
-
   async uncheckAIMeal(clientId, planId, slot) {
     try {
       const today = new Date().toISOString().split('T')[0]
@@ -458,7 +451,6 @@ async loadAIDashboardData(clientId) {
       return null
     }
   }
-
   async logManualIntake(clientId, planId, intakeData) {
     try {
       const today = new Date().toISOString().split('T')[0]
@@ -517,7 +509,6 @@ async loadAIDashboardData(clientId) {
       return null
     }
   }
-
 // ========================================
 // WATER TRACKING - DEFINITIEVE WERKENDE VERSIE
 // ========================================
@@ -561,7 +552,6 @@ async getAIWaterIntake(clientId, date) {
     return 0
   }
 }
-
 async updateAIWaterIntake(clientId, milliliters) {
   try {
     const today = new Date().toISOString().split('T')[0]
@@ -650,15 +640,10 @@ async updateAIWaterIntake(clientId, milliliters) {
       return null
     }
   }
-
-
-
 // Fix voor logAIMood method in AIMealPlanService.js
 // Vervang de bestaande logAIMood method met deze:
-
 // Fix voor logAIMood in AIMealPlanService.js
 // Vervang de hele logAIMood method met deze:
-
 async logAIMood(clientId, moodData) {
   try {
     const today = new Date().toISOString().split('T')[0]
@@ -716,10 +701,6 @@ async logAIMood(clientId, moodData) {
     return null
   }
 }
-
-
-
-
   // ========================================
   // ALTERNATIVES & SWAPS - COMPLETELY FIXED
   // ========================================
@@ -792,7 +773,6 @@ async logAIMood(clientId, moodData) {
       return []
     }
   }
-
   async swapAIMeal(clientId, planId, day, slot, newMealId) {
     try {
       const today = new Date().toISOString().split('T')[0]
@@ -862,7 +842,6 @@ async logAIMood(clientId, moodData) {
       return null
     }
   }
-
   // ========================================
   // FAVORITES
   // ========================================
@@ -881,7 +860,6 @@ async logAIMood(clientId, moodData) {
       return []
     }
   }
-
   async toggleAIFavorite(clientId, mealId, mealData) {
     try {
       const { data: existing } = await this.supabase
@@ -922,7 +900,6 @@ async logAIMood(clientId, moodData) {
       return null
     }
   }
-
   // ========================================
   // CUSTOM MEALS
   // ========================================
@@ -942,7 +919,6 @@ async logAIMood(clientId, moodData) {
       return []
     }
   }
-
   async saveAICustomMeal(clientId, mealData) {
     try {
       const { data, error } = await this.supabase
@@ -971,7 +947,6 @@ async logAIMood(clientId, moodData) {
       return null
     }
   }
-
   // ========================================
   // HISTORY
   // ========================================
@@ -997,7 +972,6 @@ async logAIMood(clientId, moodData) {
       return []
     }
   }
-
   async logToAIHistory(clientId, slot, mealData) {
     try {
       const now = new Date()
@@ -1028,7 +1002,6 @@ async logAIMood(clientId, moodData) {
       return null
     }
   }
-
   // ========================================
   // HELPER METHODS
   // ========================================
@@ -1036,7 +1009,6 @@ async logAIMood(clientId, moodData) {
     const days = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday']
     return days[date.getDay()]
   }
-
   getTimeCategory(timeSlot) {
     if (!timeSlot) return null
     const slot = String(timeSlot).toLowerCase()
@@ -1052,7 +1024,6 @@ async logAIMood(clientId, moodData) {
     if (hour < 18) return 'snack'
     return 'dinner'
   }
-
   getPlannedTime(slot) {
     const times = {
       breakfast: 8,
@@ -1063,7 +1034,6 @@ async logAIMood(clientId, moodData) {
     }
     return times[slot] || 12
   }
-
   formatSlotName(slot) {
     const names = {
       breakfast: 'Ontbijt',
@@ -1074,7 +1044,6 @@ async logAIMood(clientId, moodData) {
     }
     return names[slot] || slot
   }
-
   calculateNextMeal(meals, consumedMeals) {
     if (!meals || meals.length === 0) return null
     
@@ -1105,38 +1074,178 @@ async logAIMood(clientId, moodData) {
     
     return null
   }
+  
 
-  calculateDailyTotals(meals, progress, activePlan) {
-    // Use active plan targets if available
-    const targets = {
-      calories: activePlan?.daily_calories || 2200,
-      protein: activePlan?.daily_protein || 165,
-      carbs: activePlan?.daily_carbs || 220,
-      fat: activePlan?.daily_fat || 73
-    }
-    
-    const consumed = {
-      calories: Math.round(progress?.total_calories || 0),  // ROUNDED
-      protein: Math.round(progress?.total_protein || 0),    // ROUNDED
-      carbs: Math.round(progress?.total_carbs || 0),        // ROUNDED
-      fat: Math.round(progress?.total_fat || 0)            // ROUNDED
-    }
-    
-    const percentages = {
-      calories: Math.round((consumed.calories / targets.calories) * 100),
-      protein: Math.round((consumed.protein / targets.protein) * 100),
-      carbs: Math.round((consumed.carbs / targets.carbs) * 100),
-      fat: Math.round((consumed.fat / targets.fat) * 100)
-    }
-    
-    return {
-      targets,
-      consumed,
-      percentages,
-      mealsConsumed: progress?.meals_consumed || 0,
-      mealsPlanned: meals.length
-    }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+async calculateDailyTotals(clientId, meals, progress, activePlan) {
+  const targets = {
+    calories: activePlan?.daily_calories || 2200,
+    protein: activePlan?.daily_protein || 165,
+    carbs: activePlan?.daily_carbs || 220,
+    fat: activePlan?.daily_fat || 73
   }
+  
+  let consumed = { calories: 0, protein: 0, carbs: 0, fat: 0 }
+  let sourceType = 'none'
+  
+  try {
+    const today = new Date().toISOString().split('T')[0]
+    console.log('🔍 [calculateDailyTotals] Today:', today)
+    
+    let quickIntakeTime = null
+    if (progress?.manual_intake?.logged_at) {
+      const [hours, minutes, seconds] = progress.manual_intake.logged_at.split(':')
+      quickIntakeTime = new Date()
+      quickIntakeTime.setHours(hours, minutes, seconds, 0)
+      console.log('🕐 Quick Intake exists')
+      console.log('🕐 Quick Intake logged_at string:', progress.manual_intake.logged_at)
+      console.log('🕐 Quick Intake time object:', quickIntakeTime.toISOString())
+    } else {
+      console.log('⚠️ No Quick Intake found')
+    }
+    
+    const startOfToday = new Date(today)
+    startOfToday.setHours(0, 0, 0, 0)
+    
+    const endOfToday = new Date(today)
+    endOfToday.setHours(23, 59, 59, 999)
+    
+    console.log('🔍 Querying consumed_meals for client:', clientId)
+    console.log('🔍 Date range:', startOfToday.toISOString(), 'to', endOfToday.toISOString())
+    
+    const { data: loggedMeals, error } = await this.supabase
+      .from('consumed_meals')
+      .select('calories, protein, carbs, fat, consumed_at')
+      .eq('client_id', clientId)
+      .gte('consumed_at', startOfToday.toISOString())
+      .lte('consumed_at', endOfToday.toISOString())
+      .order('consumed_at', { ascending: false })
+    
+    if (error) {
+      console.error('❌ Error fetching logged meals:', error)
+      throw error
+    }
+    
+    console.log('📊 Query result - Logged meals found:', loggedMeals?.length || 0)
+    
+    let latestMealTime = null
+    if (loggedMeals && loggedMeals.length > 0) {
+      latestMealTime = new Date(loggedMeals[0].consumed_at)
+      console.log('🕐 Latest meal exists')
+      console.log('🕐 Latest meal consumed_at string:', loggedMeals[0].consumed_at)
+      console.log('🕐 Latest meal time object:', latestMealTime.toISOString())
+      console.log('📋 All logged meals:', loggedMeals.map(m => ({
+        consumed_at: m.consumed_at,
+        calories: m.calories,
+        protein: m.protein
+      })))
+    } else {
+      console.log('⚠️ No logged meals found')
+    }
+    
+    console.log('⚖️ === DECISION TIME ===')
+    console.log('Quick Intake exists?', !!quickIntakeTime)
+    console.log('Logged Meals exist?', !!latestMealTime)
+    
+    if (quickIntakeTime && latestMealTime) {
+      console.log('🔍 Both exist - comparing timestamps...')
+      console.log('Quick Intake:', quickIntakeTime.getTime())
+      console.log('Latest Meal:', latestMealTime.getTime())
+      console.log('Difference (ms):', latestMealTime.getTime() - quickIntakeTime.getTime())
+      
+      if (quickIntakeTime > latestMealTime) {
+        consumed = {
+          calories: Math.round(progress.manual_intake.calories || 0),
+          protein: Math.round(progress.manual_intake.protein || 0),
+          carbs: Math.round(progress.manual_intake.carbs || 0),
+          fat: Math.round(progress.manual_intake.fat || 0)
+        }
+        sourceType = 'quick_intake'
+        console.log('✅ Using Quick Intake (most recent):', consumed)
+      } else {
+        consumed = loggedMeals.reduce((sum, meal) => ({
+          calories: sum.calories + (meal.calories || 0),
+          protein: sum.protein + (meal.protein || 0),
+          carbs: sum.carbs + (meal.carbs || 0),
+          fat: sum.fat + (meal.fat || 0)
+        }), { calories: 0, protein: 0, carbs: 0, fat: 0 })
+        
+        consumed.calories = Math.round(consumed.calories)
+        consumed.protein = Math.round(consumed.protein)
+        consumed.carbs = Math.round(consumed.carbs)
+        consumed.fat = Math.round(consumed.fat)
+        
+        sourceType = 'logged_meals'
+        console.log(`✅ Using Logged Meals (most recent, ${loggedMeals.length} meals):`, consumed)
+      }
+    } else if (quickIntakeTime) {
+      consumed = {
+        calories: Math.round(progress.manual_intake.calories || 0),
+        protein: Math.round(progress.manual_intake.protein || 0),
+        carbs: Math.round(progress.manual_intake.carbs || 0),
+        fat: Math.round(progress.manual_intake.fat || 0)
+      }
+      sourceType = 'quick_intake'
+      console.log('✅ Using Quick Intake (only source):', consumed)
+    } else if (latestMealTime) {
+      consumed = loggedMeals.reduce((sum, meal) => ({
+        calories: sum.calories + (meal.calories || 0),
+        protein: sum.protein + (meal.protein || 0),
+        carbs: sum.carbs + (meal.carbs || 0),
+        fat: sum.fat + (meal.fat || 0)
+      }), { calories: 0, protein: 0, carbs: 0, fat: 0 })
+      
+      consumed.calories = Math.round(consumed.calories)
+      consumed.protein = Math.round(consumed.protein)
+      consumed.carbs = Math.round(consumed.carbs)
+      consumed.fat = Math.round(consumed.fat)
+      
+      sourceType = 'logged_meals'
+      console.log(`✅ Using Logged Meals (only source, ${loggedMeals.length} meals):`, consumed)
+    } else {
+      sourceType = 'none'
+      console.log('⚠️ No intake data found for today')
+    }
+  } catch (error) {
+    console.error('❌ Error calculating daily totals:', error)
+  }
+  
+  const percentages = {
+    calories: targets.calories > 0 ? Math.round((consumed.calories / targets.calories) * 100) : 0,
+    protein: targets.protein > 0 ? Math.round((consumed.protein / targets.protein) * 100) : 0,
+    carbs: targets.carbs > 0 ? Math.round((consumed.carbs / targets.carbs) * 100) : 0,
+    fat: targets.fat > 0 ? Math.round((consumed.fat / targets.fat) * 100) : 0
+  }
+  
+  console.log('📊 Final result - sourceType:', sourceType, 'consumed:', consumed)
+  
+  return {
+    targets,
+    consumed,
+    percentages,
+    mealsConsumed: progress?.meals_consumed || 0,
+    mealsPlanned: meals.length,
+    sourceType
+  }
+}
 
   createEmptyProgress(clientId, date) {
     return {
@@ -1154,7 +1263,6 @@ async logAIMood(clientId, moodData) {
       meals_planned: 0
     }
   }
-
   getEmptyDashboardData() {
     return {
       activePlan: null,
@@ -1172,3 +1280,4 @@ async logAIMood(clientId, moodData) {
     }
   }
 }
+

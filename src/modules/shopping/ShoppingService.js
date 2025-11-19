@@ -89,20 +89,30 @@ export default class ShoppingService {
                   // Get ingredient details
                   const ingredient = await this.getIngredientDetails(ing.ingredient_id)
                   
+                  // 🔥 FIX: Use fallback for missing ingredients
                   if (!ingredient) {
-                    console.log('⚠️ Could not load ingredient:', ing.ingredient_id)
-                    continue
-                  }
-                  
-                  ingredientMap[key] = {
-                    id: ing.ingredient_id,
-                    name: ingredient.name || 'Unknown',
-                    category: ingredient.category || 'other',
-                    totalAmount: 0,
-                    unit: ing.unit || 'gram',
-                    instances: [],
-                    pricePerUnit: ingredient.price_per_unit || 0,
-                    unitType: ingredient.unit_type || 'kg'
+                    console.log('⚠️ Missing ingredient, using fallback:', ing.ingredient_id)
+                    ingredientMap[key] = {
+                      id: ing.ingredient_id,
+                      name: ing.ingredient_name || ing.name || 'Unknown Ingredient',
+                      category: 'other',
+                      totalAmount: 0,
+                      unit: ing.unit || 'gram',
+                      instances: [],
+                      pricePerUnit: 0,
+                      unitType: 'kg'
+                    }
+                  } else {
+                    ingredientMap[key] = {
+                      id: ing.ingredient_id,
+                      name: ingredient.name || 'Unknown',
+                      category: ingredient.category || 'other',
+                      totalAmount: 0,
+                      unit: ing.unit || 'gram',
+                      instances: [],
+                      pricePerUnit: ingredient.price_per_unit || 0,
+                      unitType: ingredient.unit_type || 'kg'
+                    }
                   }
                 }
                 
@@ -267,7 +277,10 @@ export default class ShoppingService {
         .eq('id', ingredientId)
         .single()
       
-      if (error) throw error
+      if (error) {
+        // Don't throw, return null for graceful fallback
+        return null
+      }
       return data
     } catch (error) {
       console.error('❌ Failed to get ingredient:', error)

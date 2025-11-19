@@ -1,4 +1,4 @@
-// src/modules/progress/ProgressInsightsSection.jsx - MAIN ORCHESTRATOR
+// src/modules/progress/ProgressInsightsSection.jsx
 import { useState, useEffect } from 'react'
 import { TrendingUp, Flame, Target, Zap, Trophy } from 'lucide-react'
 import HeroInsightCard from './components/HeroInsightCard'
@@ -19,25 +19,10 @@ export default function ProgressInsightsSection({ db, clientId, onSelectExercise
   }, [clientId, db])
 
   const handleExerciseClick = (exerciseName, metric = '1rm') => {
-    // 1. Scroll to chart section
-    const chartElement = document.getElementById('workout-charts-section')
-    if (chartElement) {
-      const offset = isMobile ? 100 : 150
-      const elementPosition = chartElement.getBoundingClientRect().top + window.pageYOffset
-      const offsetPosition = elementPosition - offset
-
-      window.scrollTo({
-        top: offsetPosition,
-        behavior: 'smooth'
-      })
+    // Let parent handle scroll + chart opening
+    if (onSelectExercise) {
+      onSelectExercise(exerciseName, metric)
     }
-
-    // 2. After scroll, open exercise in chart
-    setTimeout(() => {
-      if (onSelectExercise) {
-        onSelectExercise(exerciseName, metric)
-      }
-    }, 400)
   }
 
   const analyzeProgress = async () => {
@@ -225,25 +210,81 @@ export default function ProgressInsightsSection({ db, clientId, onSelectExercise
   if (loading) {
     return (
       <div style={{
-        background: 'rgba(23, 23, 23, 0.6)',
+        position: 'relative',
+        background: 'linear-gradient(135deg, rgba(23, 23, 23, 0.95) 0%, rgba(10, 10, 10, 0.9) 100%)',
         borderRadius: isMobile ? '14px' : '16px',
-        border: '1px solid rgba(249, 115, 22, 0.2)',
-        padding: isMobile ? '1.5rem' : '2rem',
-        marginBottom: isMobile ? '1rem' : '1.5rem',
-        backdropFilter: 'blur(10px)',
+        border: '1px solid rgba(249, 115, 22, 0.25)',
+        padding: isMobile ? '1.25rem' : '1.5rem',
+        marginBottom: isMobile ? '0.75rem' : '1rem',
+        backdropFilter: 'blur(12px)',
         display: 'flex',
+        flexDirection: 'column',
         alignItems: 'center',
         justifyContent: 'center',
-        minHeight: '120px'
+        minHeight: isMobile ? '100px' : '120px',
+        overflow: 'hidden',
+        boxShadow: '0 4px 16px rgba(249, 115, 22, 0.15)',
+        touchAction: 'manipulation',
+        WebkitTapHighlightColor: 'transparent'
       }}>
+        {/* Top accent glow line */}
         <div style={{
-          width: isMobile ? '32px' : '40px',
-          height: isMobile ? '32px' : '40px',
-          border: '3px solid rgba(249, 115, 22, 0.2)',
-          borderTopColor: '#f97316',
-          borderRadius: '50%',
-          animation: 'spin 1s linear infinite'
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          height: '2px',
+          background: 'linear-gradient(90deg, transparent 0%, #f97316 50%, transparent 100%)',
+          opacity: 0.6
         }} />
+        
+        {/* Compact spinner */}
+        <div style={{ 
+          position: 'relative', 
+          width: isMobile ? '44px' : '52px', 
+          height: isMobile ? '44px' : '52px' 
+        }}>
+          <div style={{
+            position: 'absolute',
+            inset: 0,
+            border: '3px solid rgba(249, 115, 22, 0.1)',
+            borderTopColor: '#f97316',
+            borderRadius: '50%',
+            animation: 'spin 1.2s cubic-bezier(0.4, 0, 0.2, 1) infinite',
+            transform: 'translateZ(0)'
+          }} />
+          <div style={{
+            position: 'absolute',
+            inset: '8px',
+            border: '3px solid rgba(249, 115, 22, 0.15)',
+            borderBottomColor: '#f97316',
+            borderRadius: '50%',
+            animation: 'spin-reverse 1s cubic-bezier(0.4, 0, 0.2, 1) infinite',
+            transform: 'translateZ(0)'
+          }} />
+          <div style={{
+            position: 'absolute',
+            top: '50%',
+            left: '50%',
+            transform: 'translate(-50%, -50%)',
+            width: isMobile ? '6px' : '8px',
+            height: isMobile ? '6px' : '8px',
+            background: '#f97316',
+            borderRadius: '50%',
+            animation: 'pulse 1.5s ease-in-out infinite',
+            boxShadow: '0 0 12px rgba(249, 115, 22, 0.6)'
+          }} />
+        </div>
+        
+        <p style={{
+          marginTop: '1rem',
+          fontSize: isMobile ? '0.75rem' : '0.8rem',
+          color: 'rgba(249, 115, 22, 0.8)',
+          fontWeight: '600',
+          letterSpacing: '0.03em'
+        }}>
+          Analyseren van progressie...
+        </p>
       </div>
     )
   }
@@ -254,22 +295,26 @@ export default function ProgressInsightsSection({ db, clientId, onSelectExercise
 
   return (
     <div style={{
-      marginBottom: isMobile ? '1rem' : '1.5rem'
+      marginBottom: isMobile ? '0.75rem' : '1rem'
     }}>
       {/* HERO CARD */}
-      <HeroInsightCard 
-        insight={heroInsight}
-        onClick={() => handleExerciseClick(heroInsight?.exercise, heroInsight?.metric)}
-        isMobile={isMobile}
-      />
+      {heroInsight && (
+        <HeroInsightCard 
+          insight={heroInsight}
+          onClick={() => handleExerciseClick(heroInsight?.exercise, heroInsight?.metric)}
+          isMobile={isMobile}
+        />
+      )}
 
       {/* REGULAR INSIGHTS */}
       {insights.length > 0 && (
         <div style={{
           display: 'grid',
-          gridTemplateColumns: isMobile ? '1fr' : insights.length === 1 ? '1fr' : 'repeat(2, 1fr)',
-          gap: isMobile ? '0.75rem' : '1rem',
-          marginBottom: isMobile ? '0.75rem' : '1rem'
+          gridTemplateColumns: isMobile 
+            ? '1fr' 
+            : insights.length === 1 ? '1fr' : 'repeat(2, 1fr)',
+          gap: isMobile ? '0.625rem' : '0.75rem',
+          marginBottom: isMobile ? '0.625rem' : '0.75rem'
         }}>
           {insights.map((insight, idx) => (
             <RegularInsightCard
@@ -287,15 +332,30 @@ export default function ProgressInsightsSection({ db, clientId, onSelectExercise
       )}
 
       {/* TOP EXERCISES STRIP */}
-      <TopExercisesStrip 
-        exercises={topExercises}
-        onExerciseClick={handleExerciseClick}
-        isMobile={isMobile}
-      />
+      {topExercises.length > 0 && (
+        <TopExercisesStrip 
+          exercises={topExercises}
+          onExerciseClick={handleExerciseClick}
+          isMobile={isMobile}
+        />
+      )}
 
       <style>{`
         @keyframes spin {
           to { transform: rotate(360deg); }
+        }
+        @keyframes spin-reverse {
+          to { transform: rotate(-360deg); }
+        }
+        @keyframes pulse {
+          0%, 100% { 
+            opacity: 1; 
+            transform: translate(-50%, -50%) scale(1); 
+          }
+          50% { 
+            opacity: 0.8; 
+            transform: translate(-50%, -50%) scale(1.15); 
+          }
         }
       `}</style>
     </div>

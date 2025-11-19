@@ -1,8 +1,9 @@
 // src/modules/ai-meal-generator/tabs/ClientSelector.jsx
-// TAB 1: Client Selection & Macro Targets
+// TAB 1: Client Selection & Macro Targets - WITH MACRO CALCULATOR MODAL
 
 import { useState, useEffect } from 'react'
 import { User, Activity, Target, Calculator, Info } from 'lucide-react'
+import MacroCalculatorModal from '../components/MacroCalculatorModal'
 
 export default function ClientSelector({
   db,
@@ -17,7 +18,7 @@ export default function ClientSelector({
   isMobile
 }) {
   const [searchTerm, setSearchTerm] = useState('')
-  const [tdeeCalculator, setTdeeCalculator] = useState(false)
+  const [showMacroModal, setShowMacroModal] = useState(false)
   
   // Filter clients based on search
   const filteredClients = clients.filter(client => {
@@ -25,50 +26,15 @@ export default function ClientSelector({
     return fullName.includes(searchTerm.toLowerCase())
   })
   
-  // Calculate TDEE
-  const calculateTDEE = () => {
-    if (!selectedClient) return
-    
-    const weight = selectedClient.current_weight || 75
-    const height = selectedClient.height || 180
-    const age = selectedClient.age || 30
-    const gender = selectedClient.gender || 'male'
-    const activityLevel = selectedClient.activity_level || 'moderate'
-    
-    // Mifflin-St Jeor Formula
-    let bmr = gender === 'male'
-      ? (10 * weight) + (6.25 * height) - (5 * age) + 5
-      : (10 * weight) + (6.25 * height) - (5 * age) - 161
-    
-    // Activity multipliers
-    const activityMultipliers = {
-      sedentary: 1.2,
-      light: 1.375,
-      moderate: 1.55,
-      very_active: 1.725,
-      extreme: 1.9
-    }
-    
-    const tdee = Math.round(bmr * (activityMultipliers[activityLevel] || 1.55))
-    
-    // Set macros based on goal
-    const goal = selectedClient.primary_goal || 'maintain'
-    let targetCalories = tdee
-    
-    if (goal === 'fat_loss') targetCalories = tdee - 500
-    if (goal === 'muscle_gain') targetCalories = tdee + 300
-    
-    // Calculate macros (40/30/30 split)
-    const protein = Math.round((targetCalories * 0.30) / 4)
-    const carbs = Math.round((targetCalories * 0.40) / 4)
-    const fat = Math.round((targetCalories * 0.30) / 9)
-    
+  // Handle macro calculator save
+  const handleMacroSave = (calculatedMacros) => {
     setDailyTargets({
-      calories: targetCalories,
-      protein,
-      carbs,
-      fat
+      calories: calculatedMacros.calories,
+      protein: calculatedMacros.protein,
+      carbs: calculatedMacros.carbs,
+      fat: calculatedMacros.fat
     })
+    setShowMacroModal(false)
   }
   
   // Load existing targets when client selected
@@ -82,7 +48,13 @@ export default function ClientSelector({
           fat: selectedClient.target_fat || 67
         })
       } else {
-        calculateTDEE()
+        // Default fallback values
+        setDailyTargets({
+          calories: 2500,
+          protein: 180,
+          carbs: 280,
+          fat: 70
+        })
       }
     }
   }, [selectedClient])
@@ -247,68 +219,38 @@ export default function ClientSelector({
               </div>
               
               <button
-                onClick={() => setTdeeCalculator(!tdeeCalculator)}
+                onClick={() => setShowMacroModal(true)}
                 style={{
-                  padding: '0.5rem',
-                  background: 'rgba(139, 92, 246, 0.1)',
-                  border: '1px solid rgba(139, 92, 246, 0.3)',
-                  borderRadius: '8px',
-                  color: '#8b5cf6',
-                  cursor: 'pointer'
-                }}
-              >
-                <Calculator size={20} />
-              </button>
-            </div>
-            
-            {/* TDEE Calculator */}
-            {tdeeCalculator && (
-              <div style={{
-                padding: '1rem',
-                background: 'rgba(139, 92, 246, 0.05)',
-                borderRadius: '8px',
-                border: '1px solid rgba(139, 92, 246, 0.2)',
-                marginBottom: '1rem'
-              }}>
-                <div style={{
+                  padding: isMobile ? '0.625rem' : '0.75rem',
+                  background: 'linear-gradient(135deg, #a855f7 0%, #7c3aed 100%)',
+                  border: 'none',
+                  borderRadius: '10px',
+                  color: '#fff',
+                  cursor: 'pointer',
                   display: 'flex',
                   alignItems: 'center',
                   gap: '0.5rem',
-                  marginBottom: '0.75rem',
-                  color: '#8b5cf6'
-                }}>
-                  <Info size={18} />
-                  <span style={{ fontSize: '0.9rem', fontWeight: '600' }}>
-                    TDEE Calculator
-                  </span>
-                </div>
-                
-                <p style={{
-                  fontSize: '0.85rem',
-                  color: 'rgba(255,255,255,0.6)',
-                  marginBottom: '1rem'
-                }}>
-                  Gebaseerd op client data:
-                  BMR × {selectedClient.activity_level || 'moderate'} activiteit
-                </p>
-                
-                <button
-                  onClick={calculateTDEE}
-                  style={{
-                    width: '100%',
-                    padding: '0.75rem',
-                    background: 'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)',
-                    border: 'none',
-                    borderRadius: '8px',
-                    color: '#fff',
-                    fontWeight: '600',
-                    cursor: 'pointer'
-                  }}
-                >
-                  Bereken & Pas Toe
-                </button>
-              </div>
-            )}
+                  fontWeight: '600',
+                  fontSize: isMobile ? '0.85rem' : '0.9rem',
+                  boxShadow: '0 4px 12px rgba(139, 92, 246, 0.3)',
+                  transition: 'all 0.3s ease',
+                  minHeight: '44px',
+                  touchAction: 'manipulation',
+                  WebkitTapHighlightColor: 'transparent'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.transform = 'translateY(-2px)'
+                  e.currentTarget.style.boxShadow = '0 6px 16px rgba(139, 92, 246, 0.4)'
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.transform = 'translateY(0)'
+                  e.currentTarget.style.boxShadow = '0 4px 12px rgba(139, 92, 246, 0.3)'
+                }}
+              >
+                <Calculator size={isMobile ? 16 : 18} />
+                {!isMobile && 'Macro Calculator'}
+              </button>
+            </div>
             
             {/* Macro Targets */}
             <div style={{
@@ -465,7 +407,10 @@ export default function ClientSelector({
                       color: '#fff',
                       fontWeight: mealsPerDay === num ? '600' : '400',
                       cursor: 'pointer',
-                      transition: 'all 0.3s ease'
+                      transition: 'all 0.3s ease',
+                      minHeight: '44px',
+                      touchAction: 'manipulation',
+                      WebkitTapHighlightColor: 'transparent'
                     }}
                   >
                     {num}
@@ -490,7 +435,17 @@ export default function ClientSelector({
                   fontWeight: '600',
                   cursor: 'pointer',
                   minHeight: '44px',
-                  touchAction: 'manipulation'
+                  touchAction: 'manipulation',
+                  WebkitTapHighlightColor: 'transparent',
+                  transition: 'all 0.3s ease'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.transform = 'translateY(-2px)'
+                  e.currentTarget.style.boxShadow = '0 8px 20px rgba(16, 185, 129, 0.3)'
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.transform = 'translateY(0)'
+                  e.currentTarget.style.boxShadow = 'none'
                 }}
               >
                 Targets Opslaan in Profiel
@@ -534,10 +489,20 @@ export default function ClientSelector({
           <Info size={20} style={{ color: '#8b5cf6', flexShrink: 0, marginTop: '0.1rem' }} />
           <div style={{ fontSize: isMobile ? '0.85rem' : '0.9rem', color: 'rgba(255,255,255,0.7)' }}>
             <strong>Tip:</strong> De AI gebruikt deze targets om maaltijden te selecteren die perfect passen bij de doelen van {selectedClient?.first_name || 'de client'}.
-            Gebruik de TDEE calculator voor een wetenschappelijke basis.
+            Gebruik de Macro Calculator voor een wetenschappelijke basis met body fat %, activiteit en goal-specifieke formules.
           </div>
         </div>
       </div>
+      
+      {/* Macro Calculator Modal */}
+      {showMacroModal && selectedClient && (
+        <MacroCalculatorModal
+          client={selectedClient}
+          onClose={() => setShowMacroModal(false)}
+          onSave={handleMacroSave}
+          isMobile={isMobile}
+        />
+      )}
     </div>
   )
 }
