@@ -1,11 +1,12 @@
 // src/modules/progress/components/EnhancedChart.jsx
+// 🏆 GOLD THEME
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceDot } from 'recharts'
 import { Trophy } from 'lucide-react'
 
 export default function EnhancedChart({ 
   data, 
   dataKey, 
-  color = '#f97316',
+  color = '#FFD700', // GOLD default
   unit = '',
   loading = false,
   showPRMarkers = false
@@ -20,7 +21,7 @@ export default function EnhancedChart({
     , null)
   }
 
-  // Custom tooltip
+  // Custom tooltip - GOLD
   const CustomTooltip = ({ active, payload }) => {
     if (!active || !payload || !payload.length) return null
 
@@ -113,13 +114,13 @@ export default function EnhancedChart({
         justifyContent: 'center',
         background: 'rgba(23, 23, 23, 0.4)',
         borderRadius: isMobile ? '10px' : '12px',
-        border: '1px solid rgba(249, 115, 22, 0.15)'
+        border: '1px solid rgba(255, 215, 0, 0.15)' // GOLD
       }}>
         <div style={{
           width: isMobile ? '28px' : '36px',
           height: isMobile ? '28px' : '36px',
-          border: `3px solid rgba(249, 115, 22, 0.2)`,
-          borderTopColor: '#f97316',
+          border: `3px solid rgba(255, 215, 0, 0.2)`, // GOLD
+          borderTopColor: '#FFD700', // GOLD
           borderRadius: '50%',
           animation: 'spin 1s linear infinite'
         }} />
@@ -137,15 +138,15 @@ export default function EnhancedChart({
         justifyContent: 'center',
         background: 'rgba(23, 23, 23, 0.4)',
         borderRadius: isMobile ? '10px' : '12px',
-        border: '1px solid rgba(249, 115, 22, 0.15)',
+        border: '1px solid rgba(255, 215, 0, 0.15)', // GOLD
         gap: isMobile ? '0.625rem' : '0.75rem'
       }}>
         <div style={{
           width: isMobile ? '44px' : '52px',
           height: isMobile ? '44px' : '52px',
           borderRadius: '50%',
-          background: 'rgba(249, 115, 22, 0.12)',
-          border: '1px solid rgba(249, 115, 22, 0.25)',
+          background: 'rgba(255, 215, 0, 0.12)', // GOLD
+          border: '1px solid rgba(255, 215, 0, 0.25)', // GOLD
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center'

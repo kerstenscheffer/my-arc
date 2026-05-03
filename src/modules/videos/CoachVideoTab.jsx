@@ -1,14 +1,12 @@
-// src/modules/videos/CoachVideoTab.jsx - MAIN (MODULAR)
+// src/modules/videos/CoachVideoTab.jsx
+// v3.0 — Netflix categorie rijen + nieuwe filters (custom categorie + page filter)
 import React, { useState, useEffect } from 'react'
-import { Video, Plus } from 'lucide-react'
-import { 
-  Zap, Target, Heart, Brain, Activity, Sparkles 
-} from 'lucide-react'
+import { Video, Plus, FolderPlus, ChevronRight } from 'lucide-react'
 import useIsMobile from '../../hooks/useIsMobile'
 import videoService from './VideoService'
 import ManageAssignmentsModal from './ManageAssignmentsModal'
+import CategoryManagerModal from './CategoryManagerModal'
 
-// Modular Components
 import VideoStatsCards from './video-tab-components/VideoStatsCards'
 import VideoSearchFilters from './video-tab-components/VideoSearchFilters'
 import VideoCard from './video-tab-components/VideoCard'
@@ -16,42 +14,65 @@ import VideoUploadModal from './video-tab-components/VideoUploadModal'
 import VideoAssignModal from './video-tab-components/VideoAssignModal'
 import VideoEditModal from './video-tab-components/VideoEditModal'
 
-const CATEGORIES = [
-  { value: 'motivation', label: 'Motivatie', icon: Zap, color: '#ef4444' },
-  { value: 'technique', label: 'Techniek', icon: Target, color: '#3b82f6' },
-  { value: 'nutrition', label: 'Voeding', icon: Heart, color: '#10b981' },
-  { value: 'mindset', label: 'Mindset', icon: Brain, color: '#8b5cf6' },
-  { value: 'recovery', label: 'Herstel', icon: Activity, color: '#06b6d4' },
-  { value: 'onboarding', label: 'Onboarding', icon: Sparkles, color: '#f59e0b' }
-]
+const GOLD = '#FFD700'
+
+// Legacy categories — alleen nog voor VideoCard categoryConfig fallback
+const LEGACY_TAG_LOOKUP = {
+  motivation: { label: 'Motivatie', color: '#ef4444' },
+  technique:  { label: 'Techniek',  color: '#3b82f6' },
+  nutrition:  { label: 'Voeding',   color: '#10b981' },
+  mindset:    { label: 'Mindset',   color: '#8b5cf6' },
+  recovery:   { label: 'Herstel',   color: '#06b6d4' },
+  onboarding: { label: 'Onboarding', color: '#f59e0b' }
+}
 
 export default function CoachVideoTab({ clients = [], db }) {
   const [videos, setVideos] = useState([])
   const [loading, setLoading] = useState(true)
-  const [selectedCategory, setSelectedCategory] = useState('all')
+  const [searchQuery, setSearchQuery] = useState('')
+  const [selectedCategoryId, setSelectedCategoryId] = useState('all')
+  const [selectedPage, setSelectedPage] = useState('all')
+
   const [showUploadModal, setShowUploadModal] = useState(false)
   const [showAssignModal, setShowAssignModal] = useState(false)
   const [selectedVideo, setSelectedVideo] = useState(null)
-  const [searchQuery, setSearchQuery] = useState('')
   const [clientsLoading, setClientsLoading] = useState(true)
   const [localClients, setLocalClients] = useState([])
   const [showManageModal, setShowManageModal] = useState(false)
   const [managingVideo, setManagingVideo] = useState(null)
   const [showEditModal, setShowEditModal] = useState(false)
   const [editingVideo, setEditingVideo] = useState(null)
-  
+
+  // Custom categories
+  const [customCategories, setCustomCategories] = useState([])
+  const [coachId, setCoachId] = useState(null)
+  const [showCategoryModal, setShowCategoryModal] = useState(false)
+
   const isMobile = useIsMobile()
-  
+
   useEffect(() => {
-    loadVideos()
-    loadClients()
+    initData()
   }, [])
-  
-  const loadVideos = async () => {
-    setLoading(true)
+
+  const initData = async () => {
     try {
       const user = await db.getCurrentUser()
-      const data = await videoService.getCoachVideos(user.id)
+      setCoachId(user.id)
+      await Promise.all([
+        loadVideos(user.id),
+        loadClients(),
+        loadCategories(user.id)
+      ])
+    } catch (e) {
+      console.error('Init failed:', e)
+    }
+  }
+
+  const loadVideos = async (userId) => {
+    setLoading(true)
+    try {
+      const uid = userId || coachId || (await db.getCurrentUser()).id
+      const data = await videoService.getCoachVideos(uid)
       setVideos(data)
     } catch (error) {
       console.error('Error loading videos:', error)
@@ -59,7 +80,7 @@ export default function CoachVideoTab({ clients = [], db }) {
       setLoading(false)
     }
   }
-  
+
   const loadClients = async () => {
     setClientsLoading(true)
     try {
@@ -76,171 +97,346 @@ export default function CoachVideoTab({ clients = [], db }) {
       setClientsLoading(false)
     }
   }
-  
-  const filteredVideos = videos.filter(video => {
-    const matchesCategory = selectedCategory === 'all' || video.category === selectedCategory
-    const matchesSearch = video.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                          video.description?.toLowerCase().includes(searchQuery.toLowerCase())
-    return matchesCategory && matchesSearch
+
+  const loadCategories = async (userId) => {
+    try {
+      const uid = userId || coachId || (await db.getCurrentUser()).id
+      const data = await videoService.getCategories(uid)
+      setCustomCategories(data)
+    } catch (error) {
+      console.error('Error loading categories:', error)
+    }
+  }
+
+  // ── FILTER LOGIC ──
+  const matchesSearch = (video) => {
+    if (!searchQuery) return true
+    const q = searchQuery.toLowerCase()
+    return (
+      video.title?.toLowerCase().includes(q) ||
+      video.description?.toLowerCase().includes(q)
+    )
+  }
+
+  const matchesCategory = (video) => {
+    if (selectedCategoryId === 'all') return true
+    if (selectedCategoryId === 'uncategorized') return !video.category_id
+    return video.category_id === selectedCategoryId
+  }
+
+  const matchesPage = (video) => {
+    if (selectedPage === 'all') return true
+    return Array.isArray(video.default_pages) && video.default_pages.includes(selectedPage)
+  }
+
+  const filteredVideos = videos.filter(v =>
+    matchesSearch(v) && matchesCategory(v) && matchesPage(v)
+  )
+
+  // ── GROUP BY CATEGORY ──
+  const grouped = {}
+  const uncategorized = []
+
+  filteredVideos.forEach(video => {
+    const catId = video.category_id
+    if (catId && customCategories.find(c => c.id === catId)) {
+      if (!grouped[catId]) grouped[catId] = []
+      grouped[catId].push(video)
+    } else {
+      uncategorized.push(video)
+    }
   })
-  
-  const getCategoryConfig = (category) => {
-    return CATEGORIES.find(c => c.value === category) || CATEGORIES[0]
+
+  // Order categories by order_index, only those with videos
+  const orderedCategories = customCategories
+    .filter(cat => grouped[cat.id] && grouped[cat.id].length > 0)
+    .sort((a, b) => (a.order_index ?? 0) - (b.order_index ?? 0))
+
+  const getCategoryConfig = (video) => {
+    // Try custom category first
+    const customCat = customCategories.find(c => c.id === video.category_id)
+    if (customCat) {
+      return { label: customCat.name, color: customCat.color || GOLD }
+    }
+    // Fallback to legacy tag
+    return LEGACY_TAG_LOOKUP[video.category] || { label: video.category || 'Video', color: 'rgba(255,255,255,0.4)' }
   }
 
   const handleDeleteVideo = async (video) => {
     const confirmMessage = video.is_default
       ? `Weet je zeker dat je "${video.title}" wilt verwijderen? Deze video is standaard zichtbaar voor alle clients!`
       : `Weet je zeker dat je "${video.title}" wilt verwijderen?`
-    
+
     if (confirm(confirmMessage)) {
       const result = await videoService.deleteVideo(video.id)
       if (result.success) {
-        alert('Video succesvol verwijderd')
         await loadVideos()
       } else {
         alert('Er ging iets mis: ' + (result.error || 'Onbekende fout'))
       }
     }
   }
-  
+
+  const totalCount = filteredVideos.length
+  const isFilteringActive = searchQuery || selectedCategoryId !== 'all' || selectedPage !== 'all'
+
   return (
     <div style={{
       padding: isMobile ? '1rem' : '1.5rem',
-      background: '#0a0f0d',
+      background: '#0a0a0a',
       minHeight: '100vh'
     }}>
-      {/* Header */}
+      {/* ── HEADER ── */}
       <div style={{
-        marginBottom: '1.5rem',
+        marginBottom: '1rem',
         display: 'flex',
         flexDirection: isMobile ? 'column' : 'row',
-        gap: '1rem',
+        gap: '0.75rem',
         alignItems: isMobile ? 'stretch' : 'center',
         justifyContent: 'space-between'
       }}>
-        <h2 style={{
-          fontSize: isMobile ? '1.5rem' : '2rem',
-          fontWeight: 'bold',
-          color: '#fff',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '0.5rem'
-        }}>
-          <Video size={24} style={{ color: '#10b981' }} />
-          Video Library
-        </h2>
-        
-        <button
-          onClick={() => setShowUploadModal(true)}
-          style={{
-            padding: isMobile ? '0.6rem 1rem' : '0.75rem 1.5rem',
-            background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.9) 0%, rgba(5, 150, 105, 0.9) 100%)',
-            border: 'none',
-            borderRadius: '10px',
+        <div>
+          <div style={{
+            fontSize: isMobile ? '0.4rem' : '0.45rem',
+            fontWeight: '700',
+            color: 'rgba(255, 255, 255, 0.2)',
+            textTransform: 'uppercase',
+            letterSpacing: '0.08em',
+            marginBottom: '0.2rem'
+          }}>
+            Coach Studio
+          </div>
+          <h2 style={{
+            fontSize: isMobile ? '1.2rem' : '1.4rem',
+            fontWeight: '800',
             color: '#fff',
-            fontSize: isMobile ? '0.85rem' : '0.95rem',
-            fontWeight: '600',
-            cursor: 'pointer',
+            margin: 0,
             display: 'flex',
             alignItems: 'center',
             gap: '0.5rem',
-            transition: 'all 0.3s ease',
-            opacity: 0.95,
-            touchAction: 'manipulation',
-            WebkitTapHighlightColor: 'transparent',
-            minHeight: '44px'
-          }}
-        >
-          <Plus size={18} />
-          Nieuwe Video
-        </button>
+            letterSpacing: '-0.02em'
+          }}>
+            <Video size={20} color={GOLD} />
+            Video Library
+            <span style={{
+              fontSize: '0.7rem',
+              color: 'rgba(255, 255, 255, 0.3)',
+              fontWeight: '700',
+              marginLeft: '0.2rem'
+            }}>
+              {videos.length}
+            </span>
+          </h2>
+        </div>
+
+        {/* Action buttons */}
+        <div style={{
+          display: 'flex',
+          gap: '0.4rem',
+          flexDirection: isMobile ? 'row' : 'row'
+        }}>
+          <button
+            onClick={() => setShowCategoryModal(true)}
+            style={{
+              flex: isMobile ? 1 : '0 0 auto',
+              padding: '0.55rem 0.875rem',
+              background: '#0a0a0a',
+              border: `1px solid ${GOLD}`,
+              borderRadius: '8px',
+              color: GOLD,
+              fontSize: '0.7rem',
+              fontWeight: '800',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '0.4rem',
+              touchAction: 'manipulation',
+              WebkitTapHighlightColor: 'transparent',
+              minHeight: '40px',
+              textTransform: 'uppercase',
+              letterSpacing: '0.04em'
+            }}
+          >
+            <FolderPlus size={13} />
+            Categorieën
+            {customCategories.length > 0 && (
+              <span style={{
+                padding: '0.1rem 0.35rem',
+                background: GOLD,
+                color: '#000',
+                borderRadius: '8px',
+                fontSize: '0.55rem',
+                fontWeight: '800'
+              }}>
+                {customCategories.length}
+              </span>
+            )}
+          </button>
+
+          <button
+            onClick={() => setShowUploadModal(true)}
+            style={{
+              flex: isMobile ? 1 : '0 0 auto',
+              padding: '0.55rem 1rem',
+              background: GOLD,
+              border: 'none',
+              borderRadius: '8px',
+              color: '#000',
+              fontSize: '0.7rem',
+              fontWeight: '800',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '0.4rem',
+              touchAction: 'manipulation',
+              WebkitTapHighlightColor: 'transparent',
+              minHeight: '40px',
+              textTransform: 'uppercase',
+              letterSpacing: '0.04em'
+            }}
+          >
+            <Plus size={14} />
+            Nieuwe video
+          </button>
+        </div>
       </div>
-      
+
       {/* Stats Cards */}
-      <VideoStatsCards 
-        videos={videos} 
-        clientsCount={localClients.length} 
+      <VideoStatsCards
+        videos={videos}
+        clientsCount={localClients.length}
       />
-      
-      {/* Search and Filters */}
+
+      {/* Search + Filters */}
       <VideoSearchFilters
         searchQuery={searchQuery}
         setSearchQuery={setSearchQuery}
-        selectedCategory={selectedCategory}
-        setSelectedCategory={setSelectedCategory}
-        categories={CATEGORIES}
+        customCategories={customCategories}
+        selectedCategoryId={selectedCategoryId}
+        setSelectedCategoryId={setSelectedCategoryId}
+        selectedPage={selectedPage}
+        setSelectedPage={setSelectedPage}
       />
-      
-      {/* Video Grid */}
+
+      {/* Result count */}
+      {!loading && (
+        <div style={{
+          display: 'flex',
+          alignItems: 'baseline',
+          gap: '0.4rem',
+          marginBottom: '0.75rem',
+          padding: '0 0.25rem'
+        }}>
+          <div style={{
+            fontSize: isMobile ? '0.7rem' : '0.75rem',
+            fontWeight: '800',
+            color: '#fff',
+            letterSpacing: '-0.01em'
+          }}>
+            {totalCount}
+          </div>
+          <div style={{
+            fontSize: '0.6rem',
+            fontWeight: '700',
+            color: 'rgba(255, 255, 255, 0.3)',
+            textTransform: 'uppercase',
+            letterSpacing: '0.06em'
+          }}>
+            {totalCount === 1 ? 'video' : "video's"}
+            {isFilteringActive && ' gevonden'}
+          </div>
+          {isFilteringActive && (
+            <button
+              onClick={() => {
+                setSearchQuery('')
+                setSelectedCategoryId('all')
+                setSelectedPage('all')
+              }}
+              style={{
+                marginLeft: 'auto',
+                padding: '0.25rem 0.5rem',
+                background: 'transparent',
+                border: '1px solid rgba(255, 255, 255, 0.08)',
+                borderRadius: '4px',
+                color: 'rgba(255, 255, 255, 0.5)',
+                fontSize: '0.55rem',
+                fontWeight: '800',
+                cursor: 'pointer',
+                touchAction: 'manipulation',
+                WebkitTapHighlightColor: 'transparent',
+                textTransform: 'uppercase',
+                letterSpacing: '0.04em'
+              }}
+            >
+              Reset filters
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* ── CONTENT ── */}
       {loading ? (
         <div style={{
           textAlign: 'center',
           padding: '3rem',
-          color: 'rgba(255,255,255,0.4)'
+          color: 'rgba(255, 255, 255, 0.3)',
+          fontSize: '0.7rem',
+          fontWeight: '700',
+          textTransform: 'uppercase',
+          letterSpacing: '0.08em'
         }}>
           Videos laden...
         </div>
       ) : filteredVideos.length === 0 ? (
-        <div style={{
-          textAlign: 'center',
-          padding: '3rem',
-          background: 'rgba(255,255,255,0.03)',
-          borderRadius: '12px',
-          border: '1px solid rgba(255,255,255,0.08)'
-        }}>
-          <Video size={48} style={{ color: 'rgba(255,255,255,0.2)', margin: '0 auto 1rem' }} />
-          <div style={{ color: 'rgba(255,255,255,0.4)', marginBottom: '1rem' }}>
-            {searchQuery || selectedCategory !== 'all' 
-              ? 'Geen videos gevonden'
-              : 'Nog geen videos toegevoegd'}
-          </div>
-          <button
-            onClick={() => setShowUploadModal(true)}
-            style={{
-              padding: '0.75rem 1.5rem',
-              background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.9) 0%, rgba(5, 150, 105, 0.9) 100%)',
-              border: 'none',
-              borderRadius: '10px',
-              color: '#fff',
-              fontWeight: '600',
-              cursor: 'pointer',
-              opacity: 0.95
-            }}
-          >
-            Upload je eerste video
-          </button>
-        </div>
+        <EmptyState
+          isFiltering={isFilteringActive}
+          onUpload={() => setShowUploadModal(true)}
+          onResetFilters={() => {
+            setSearchQuery('')
+            setSelectedCategoryId('all')
+            setSelectedPage('all')
+          }}
+          isMobile={isMobile}
+        />
       ) : (
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fill, minmax(320px, 1fr))',
-          gap: '1.5rem'
-        }}>
-          {filteredVideos.map(video => (
-            <VideoCard
-              key={video.id}
-              video={video}
-              categoryConfig={getCategoryConfig(video.category)}
-              onAssign={() => {
-                setSelectedVideo(video)
-                setShowAssignModal(true)
-              }}
-              onManage={() => {
-                setManagingVideo(video)
-                setShowManageModal(true)
-              }}
-              onEdit={() => {
-                setEditingVideo(video)
-                setShowEditModal(true)
-              }}
-              onDelete={() => handleDeleteVideo(video)}
+        <div>
+          {/* Custom categories with videos */}
+          {orderedCategories.map(cat => (
+            <CategoryRow
+              key={cat.id}
+              title={cat.name}
+              color={cat.color || GOLD}
+              videos={grouped[cat.id]}
+              onAssign={(v) => { setSelectedVideo(v); setShowAssignModal(true) }}
+              onManage={(v) => { setManagingVideo(v); setShowManageModal(true) }}
+              onEdit={(v) => { setEditingVideo(v); setShowEditModal(true) }}
+              onDelete={handleDeleteVideo}
+              getCategoryConfig={getCategoryConfig}
+              isMobile={isMobile}
             />
           ))}
+
+          {/* Uncategorized */}
+          {uncategorized.length > 0 && (
+            <CategoryRow
+              title="Zonder Categorie"
+              color="rgba(255, 255, 255, 0.3)"
+              videos={uncategorized}
+              onAssign={(v) => { setSelectedVideo(v); setShowAssignModal(true) }}
+              onManage={(v) => { setManagingVideo(v); setShowManageModal(true) }}
+              onEdit={(v) => { setEditingVideo(v); setShowEditModal(true) }}
+              onDelete={handleDeleteVideo}
+              getCategoryConfig={getCategoryConfig}
+              isMobile={isMobile}
+              isUncategorized
+            />
+          )}
         </div>
       )}
-      
-      {/* Upload Modal */}
+
+      {/* ── MODALS ── */}
       {showUploadModal && (
         <VideoUploadModal
           onClose={() => setShowUploadModal(false)}
@@ -255,12 +451,11 @@ export default function CoachVideoTab({ clients = [], db }) {
               setShowUploadModal(false)
             }
           }}
-          categories={CATEGORIES}
+          customCategories={customCategories}
           db={db}
         />
       )}
-      
-      {/* Assign Modal */}
+
       {showAssignModal && selectedVideo && (
         <VideoAssignModal
           video={selectedVideo}
@@ -277,15 +472,14 @@ export default function CoachVideoTab({ clients = [], db }) {
               assignmentData
             )
             if (result.success) {
-              alert(`Video assigned aan ${clientIds.length} client(s)!`)
+              alert(`Video toegewezen aan ${clientIds.length} client(s)!`)
               setShowAssignModal(false)
               setSelectedVideo(null)
             }
           }}
         />
       )}
-      
-      {/* Manage Assignments Modal */}
+
       {showManageModal && managingVideo && (
         <ManageAssignmentsModal
           video={managingVideo}
@@ -293,13 +487,10 @@ export default function CoachVideoTab({ clients = [], db }) {
             setShowManageModal(false)
             setManagingVideo(null)
           }}
-          onUpdate={() => {
-            loadVideos()
-          }}
+          onUpdate={() => loadVideos()}
         />
       )}
-      
-      {/* Edit Default Pages Modal */}
+
       {showEditModal && editingVideo && (
         <VideoEditModal
           video={editingVideo}
@@ -307,10 +498,188 @@ export default function CoachVideoTab({ clients = [], db }) {
             setShowEditModal(false)
             setEditingVideo(null)
           }}
-          onSave={() => {
-            loadVideos()
-          }}
+          onSave={() => loadVideos()}
+          customCategories={customCategories}
+          db={db}
         />
+      )}
+
+      <CategoryManagerModal
+        isOpen={showCategoryModal}
+        onClose={() => setShowCategoryModal(false)}
+        coachId={coachId}
+        onChange={() => loadCategories()}
+      />
+    </div>
+  )
+}
+
+// ============================================
+// CATEGORY ROW — horizontal scroll van VideoCards
+// ============================================
+function CategoryRow({
+  title,
+  color,
+  videos,
+  onAssign,
+  onManage,
+  onEdit,
+  onDelete,
+  getCategoryConfig,
+  isMobile,
+  isUncategorized
+}) {
+  return (
+    <div style={{
+      marginBottom: '1.25rem'
+    }}>
+      {/* Header */}
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: '0.5rem',
+        marginBottom: '0.625rem',
+        padding: '0 0.25rem'
+      }}>
+        <div style={{
+          width: '3px',
+          height: '14px',
+          background: color,
+          borderRadius: '2px',
+          opacity: isUncategorized ? 0.5 : 1
+        }} />
+        <div style={{
+          fontSize: isMobile ? '0.7rem' : '0.78rem',
+          fontWeight: '800',
+          color: '#fff',
+          textTransform: 'uppercase',
+          letterSpacing: '0.06em'
+        }}>
+          {title}
+        </div>
+        <div style={{
+          fontSize: '0.6rem',
+          color: 'rgba(255, 255, 255, 0.3)',
+          fontWeight: '700'
+        }}>
+          · {videos.length}
+        </div>
+      </div>
+
+      {/* Horizontal scroll */}
+      <div
+        className="cvt-row"
+        style={{
+          display: 'flex',
+          gap: '0.625rem',
+          overflowX: 'auto',
+          WebkitOverflowScrolling: 'touch',
+          scrollbarWidth: 'none',
+          paddingBottom: '0.25rem'
+        }}
+      >
+        {videos.map(video => (
+          <div
+            key={video.id}
+            style={{
+              flexShrink: 0,
+              width: isMobile ? '220px' : '260px'
+            }}
+          >
+            <VideoCard
+              video={video}
+              categoryConfig={getCategoryConfig(video)}
+              onAssign={() => onAssign(video)}
+              onManage={() => onManage(video)}
+              onEdit={() => onEdit(video)}
+              onDelete={() => onDelete(video)}
+            />
+          </div>
+        ))}
+      </div>
+
+      <style>{`.cvt-row::-webkit-scrollbar { display: none; }`}</style>
+    </div>
+  )
+}
+
+// ============================================
+// EMPTY STATE
+// ============================================
+function EmptyState({ isFiltering, onUpload, onResetFilters, isMobile }) {
+  return (
+    <div style={{
+      background: '#0a0a0a',
+      border: '1px solid rgba(255, 255, 255, 0.06)',
+      borderRadius: '8px',
+      padding: isMobile ? '2rem 1rem' : '3rem',
+      textAlign: 'center'
+    }}>
+      <Video size={36} style={{ color: 'rgba(255, 255, 255, 0.1)', margin: '0 auto 1rem' }} />
+      <div style={{
+        fontSize: isMobile ? '0.95rem' : '1.05rem',
+        fontWeight: '800',
+        color: '#fff',
+        marginBottom: '0.4rem',
+        letterSpacing: '-0.01em'
+      }}>
+        {isFiltering ? 'Geen video\'s gevonden' : 'Nog geen video\'s'}
+      </div>
+      <div style={{
+        fontSize: '0.7rem',
+        color: 'rgba(255, 255, 255, 0.3)',
+        marginBottom: '1.25rem'
+      }}>
+        {isFiltering
+          ? 'Probeer andere filters of reset alles.'
+          : 'Upload je eerste video om te beginnen.'}
+      </div>
+      {isFiltering ? (
+        <button
+          onClick={onResetFilters}
+          style={{
+            padding: '0.55rem 1rem',
+            background: GOLD,
+            border: 'none',
+            borderRadius: '6px',
+            color: '#000',
+            fontSize: '0.7rem',
+            fontWeight: '800',
+            cursor: 'pointer',
+            textTransform: 'uppercase',
+            letterSpacing: '0.04em',
+            touchAction: 'manipulation',
+            WebkitTapHighlightColor: 'transparent',
+            minHeight: '38px'
+          }}
+        >
+          Reset filters
+        </button>
+      ) : (
+        <button
+          onClick={onUpload}
+          style={{
+            padding: '0.55rem 1rem',
+            background: GOLD,
+            border: 'none',
+            borderRadius: '6px',
+            color: '#000',
+            fontSize: '0.7rem',
+            fontWeight: '800',
+            cursor: 'pointer',
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '0.4rem',
+            textTransform: 'uppercase',
+            letterSpacing: '0.04em',
+            touchAction: 'manipulation',
+            WebkitTapHighlightColor: 'transparent',
+            minHeight: '38px'
+          }}
+        >
+          <Plus size={13} />
+          Upload eerste video
+        </button>
       )}
     </div>
   )

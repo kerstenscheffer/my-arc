@@ -1,8 +1,68 @@
-// src/modules/shopping/ShoppingService.js
+// src/modules/shopping/ShoppingService.js - V3 UNIT CONVERSION SYSTEM
 export default class ShoppingService {
   constructor(db) {
     this.db = db
     this.supabase = db.supabase
+    
+    // ── UNIT CONVERSION TABLE ──
+    // Ingredients stored in grams but sold per piece
+    // gram_per_piece = average weight of 1 unit
+    this.PIECE_CONVERSIONS = {
+      'eieren':    { gramPerPiece: 60,  displayUnit: 'stuks', packSizes: [6, 10, 12, 20, 30] },
+      'ei':        { gramPerPiece: 60,  displayUnit: 'stuks', packSizes: [6, 10, 12, 20, 30] },
+      'banaan':    { gramPerPiece: 120, displayUnit: 'stuks', packSizes: null },
+      'bananen':   { gramPerPiece: 120, displayUnit: 'stuks', packSizes: null },
+      'appel':     { gramPerPiece: 180, displayUnit: 'stuks', packSizes: null },
+      'appels':    { gramPerPiece: 180, displayUnit: 'stuks', packSizes: null },
+      'avocado':   { gramPerPiece: 150, displayUnit: 'stuks', packSizes: null },
+      'peer':      { gramPerPiece: 170, displayUnit: 'stuks', packSizes: null },
+      'kiwi':      { gramPerPiece: 80,  displayUnit: 'stuks', packSizes: null },
+      'citroen':   { gramPerPiece: 80,  displayUnit: 'stuks', packSizes: null },
+      'limoen':    { gramPerPiece: 60,  displayUnit: 'stuks', packSizes: null },
+      'mango':     { gramPerPiece: 300, displayUnit: 'stuks', packSizes: null },
+      'sinaasappel': { gramPerPiece: 200, displayUnit: 'stuks', packSizes: null },
+      'rijstwafels': { gramPerPiece: 8, displayUnit: 'stuks', packSizes: null },
+    }
+  }
+  
+  // ── CHECK IF INGREDIENT NEEDS PIECE CONVERSION ──
+  getConversionInfo(ingredientName, dbUnitType) {
+    if (!ingredientName) return null
+    const nameLower = ingredientName.toLowerCase().trim()
+    
+    // Check exact match first, then partial match
+    if (this.PIECE_CONVERSIONS[nameLower]) {
+      return this.PIECE_CONVERSIONS[nameLower]
+    }
+    
+    // Partial match
+    for (const [key, conv] of Object.entries(this.PIECE_CONVERSIONS)) {
+      if (nameLower.includes(key)) return conv
+    }
+    
+    // If DB says piece but we don't have a conversion, flag it
+    if (dbUnitType === 'piece' || dbUnitType === 'stuks') {
+      console.warn(`⚠️ Ingredient "${ingredientName}" is sold per piece but has no conversion entry`)
+      return null
+    }
+    
+    return null
+  }
+  
+  // ── CONVERT GRAMS TO PIECES ──
+  convertToPieces(totalGrams, conversionInfo) {
+    if (!conversionInfo) return null
+    
+    const rawCount = totalGrams / conversionInfo.gramPerPiece
+    const roundedCount = Math.ceil(rawCount)
+    
+    // Round to nearest pack size if available
+    if (conversionInfo.packSizes && conversionInfo.packSizes.length > 0) {
+      const pack = conversionInfo.packSizes.find(size => size >= roundedCount)
+      return pack || Math.ceil(roundedCount / conversionInfo.packSizes[conversionInfo.packSizes.length - 1]) * conversionInfo.packSizes[conversionInfo.packSizes.length - 1]
+    }
+    
+    return roundedCount
   }
   
   // Get active meal plan with shopping list
@@ -16,7 +76,6 @@ export default class ShoppingService {
         .single()
       
       if (error && error.code !== 'PGRST116') throw error
-      
       console.log('✅ Active meal plan loaded:', data?.template_name)
       return data
     } catch (error) {
@@ -29,8 +88,6 @@ export default class ShoppingService {
   async generateShoppingList(weekStructure) {
     try {
       const ingredientMap = {}
-      
-      // Loop through all days and meals
       const days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday']
       
       for (const day of days) {
@@ -38,92 +95,87 @@ export default class ShoppingService {
         if (!dayMeals) continue
         
         console.log(`🔍 Processing ${day}`)
-        
-        // Process each meal slot
-        const slots = ['breakfast', 'lunch', 'dinner', 'snacks']
+        const slots = ['breakfast', 'lunch', 'dinner', 'snack1', 'snack2', 'snack3', 'snacks']
         
         for (const slot of slots) {
           const mealData = dayMeals[slot]
           if (!mealData) continue
           
-          // Handle snacks array or single meal
           const meals = Array.isArray(mealData) ? mealData : [mealData]
           
           for (const mealItem of meals) {
-            // Get meal ID - week_structure stores IDs as strings directly
             let mealId = null
-            
             if (typeof mealItem === 'string') {
-              // Direct ID string - clean it from any suffixes
-              mealId = mealItem.split('_')[0] // Remove _xl, _large, etc.
+              mealId = mealItem.split('_')[0]
             } else if (typeof mealItem === 'object') {
-              // Object with meal_id or id property
               mealId = mealItem?.meal_id || mealItem?.id
-              if (mealId) {
-                mealId = mealId.split('_')[0] // Clean this too
-              }
+              if (mealId) mealId = mealId.split('_')[0]
             }
             
-            if (!mealId) {
-              console.log('⚠️ No meal ID found for:', mealItem)
-              continue
-            }
+            if (!mealId) continue
             
             console.log(`📦 Loading meal with ID: ${mealId}`)
             
-            // Get full meal data with ingredients
-            const fullMealData = await this.getMealWithIngredients(mealId)
-            if (!fullMealData) {
-              console.log('❌ Could not load meal data for ID:', mealId)
-              continue
+            const inlineIngredients = (typeof mealItem === 'object' && mealItem?.ingredients_list) 
+              ? mealItem.ingredients_list : null
+            
+            let fullMealData
+            if (inlineIngredients && Array.isArray(inlineIngredients) && inlineIngredients.length > 0) {
+              const dbMeal = await this.getMealWithIngredients(mealId)
+              fullMealData = {
+                name: dbMeal?.name || mealItem?.meal_name || mealItem?.name || 'Unknown',
+                ingredients_list: inlineIngredients
+              }
+              console.log(`✅ Using scaled ingredients from plan: ${fullMealData.name}, Ingredients:`, inlineIngredients.length)
+            } else {
+              fullMealData = await this.getMealWithIngredients(mealId)
+              if (!fullMealData) continue
+              console.log(`✅ Loaded from DB: ${fullMealData.name}, Ingredients:`, fullMealData.ingredients_list?.length || 0)
             }
             
-            console.log(`✅ Loaded meal: ${fullMealData.name}, Ingredients:`, fullMealData.ingredients_list?.length || 0)
-            
-            // Process each ingredient
             if (fullMealData.ingredients_list && Array.isArray(fullMealData.ingredients_list)) {
               for (const ing of fullMealData.ingredients_list) {
                 const key = ing.ingredient_id
                 
                 if (!ingredientMap[key]) {
-                  // Get ingredient details
                   const ingredient = await this.getIngredientDetails(ing.ingredient_id)
                   
-                  // 🔥 FIX: Use fallback for missing ingredients
                   if (!ingredient) {
-                    console.log('⚠️ Missing ingredient, using fallback:', ing.ingredient_id)
                     ingredientMap[key] = {
                       id: ing.ingredient_id,
                       name: ing.ingredient_name || ing.name || 'Unknown Ingredient',
                       category: 'other',
-                      totalAmount: 0,
+                      totalGrams: 0,
+                      originalUnit: ing.unit || 'gram',
                       unit: ing.unit || 'gram',
                       instances: [],
                       pricePerUnit: 0,
-                      unitType: 'kg'
+                      unitType: 'kg',
+                      conversionInfo: null
                     }
                   } else {
+                    // Check if this ingredient needs piece conversion
+                    const convInfo = this.getConversionInfo(ingredient.name, ingredient.unit_type)
+                    
                     ingredientMap[key] = {
                       id: ing.ingredient_id,
                       name: ingredient.name || 'Unknown',
                       category: ingredient.category || 'other',
-                      totalAmount: 0,
-                      unit: ing.unit || 'gram',
+                      totalGrams: 0,
+                      originalUnit: ing.unit || 'gram',
+                      unit: convInfo ? convInfo.displayUnit : (ing.unit || 'gram'),
                       instances: [],
                       pricePerUnit: ingredient.price_per_unit || 0,
-                      unitType: ingredient.unit_type || 'kg'
+                      unitType: ingredient.unit_type || 'kg',
+                      conversionInfo: convInfo
                     }
                   }
                 }
                 
-                // Add this instance
                 const amount = ing.amount || 0
-                ingredientMap[key].totalAmount += amount
+                ingredientMap[key].totalGrams += amount
                 ingredientMap[key].instances.push({
-                  day,
-                  meal: slot,
-                  mealName: fullMealData.name,
-                  amount: amount
+                  day, meal: slot, mealName: fullMealData.name, amount
                 })
               }
             }
@@ -131,25 +183,54 @@ export default class ShoppingService {
         }
       }
       
-      // Convert to array and calculate realistic purchase amounts
+      // ── BUILD FINAL LIST WITH CONVERSIONS ──
       const shoppingList = Object.values(ingredientMap).map(item => {
-        // Calculate realistic purchase amount
-        const purchaseAmount = this.calculateRealisticPurchase(item)
+        let displayAmount, totalAmount, unit, estimatedCost
+        
+        if (item.conversionInfo) {
+          // PIECE CONVERSION: grams → stuks
+          const pieces = this.convertToPieces(item.totalGrams, item.conversionInfo)
+          displayAmount = pieces
+          totalAmount = pieces
+          unit = item.conversionInfo.displayUnit
+          
+          // Price: price_per_unit is per piece
+          if (item.unitType === 'piece' || item.unitType === 'stuks') {
+            estimatedCost = pieces * parseFloat(item.pricePerUnit || 0)
+          } else {
+            // Fallback: estimate from gram cost
+            estimatedCost = this.calculateCost(item.totalGrams, item.pricePerUnit, item.originalUnit, item.unitType)
+          }
+          
+          console.log(`🔄 Converted: ${item.name} ${item.totalGrams}g → ${pieces} ${unit} (€${estimatedCost.toFixed(2)})`)
+        } else {
+          // NORMAL: keep in grams/ml, apply realistic purchase rounding
+          const purchaseAmount = this.calculateRealisticPurchase(item)
+          displayAmount = purchaseAmount
+          totalAmount = item.totalGrams
+          unit = item.originalUnit
+          estimatedCost = this.calculateCost(purchaseAmount, item.pricePerUnit, item.originalUnit, item.unitType)
+        }
         
         return {
-          ...item,
-          displayAmount: purchaseAmount,
-          estimatedCost: this.calculateCost(purchaseAmount, item.pricePerUnit, item.unit, item.unitType)
+          id: item.id,
+          name: item.name,
+          category: item.category,
+          totalAmount,
+          displayAmount,
+          unit,
+          estimatedCost: Math.round(estimatedCost * 100) / 100,
+          instances: item.instances,
+          totalGrams: item.totalGrams
         }
       })
       
       // Sort by category
       shoppingList.sort((a, b) => {
         const categoryOrder = ['protein', 'carbs', 'vegetables', 'fats', 'dairy', 'fruit', 'other']
-        const aIndex = categoryOrder.indexOf(a.category) !== -1 ? categoryOrder.indexOf(a.category) : 999
-        const bIndex = categoryOrder.indexOf(b.category) !== -1 ? categoryOrder.indexOf(b.category) : 999
-        
-        if (aIndex !== bIndex) return aIndex - bIndex
+        const aIdx = categoryOrder.indexOf(a.category) !== -1 ? categoryOrder.indexOf(a.category) : 999
+        const bIdx = categoryOrder.indexOf(b.category) !== -1 ? categoryOrder.indexOf(b.category) : 999
+        if (aIdx !== bIdx) return aIdx - bIdx
         return a.name.localeCompare(b.name)
       })
       
@@ -163,33 +244,14 @@ export default class ShoppingService {
       }
     } catch (error) {
       console.error('❌ Failed to generate shopping list:', error)
-      return {
-        items: [],
-        totalCost: 0,
-        itemCount: 0,
-        generatedAt: new Date().toISOString()
-      }
+      return { items: [], totalCost: 0, itemCount: 0, generatedAt: new Date().toISOString() }
     }
   }
   
-  // Calculate realistic purchase amount based on typical packages
+  // Realistic purchase amounts (only for NON-piece items now)
   calculateRealisticPurchase(item) {
-    const amount = item.totalAmount
+    const amount = item.totalGrams || item.totalAmount || 0
     
-    // Special handling for common items
-    const specialCases = {
-      'Eieren': () => Math.ceil(amount / 6) * 6,  // 6-pack
-      'Avocado': () => Math.ceil(amount),         // Per stuk
-      'Banaan': () => Math.ceil(amount),          // Per stuk
-      'Appel': () => Math.ceil(amount),           // Per stuk
-    }
-    
-    // Check special cases first
-    if (specialCases[item.name]) {
-      return specialCases[item.name]()
-    }
-    
-    // For proteins (usually sold in 200-500g packages)
     if (item.category === 'protein') {
       if (amount <= 200) return 200
       if (amount <= 400) return 400
@@ -199,7 +261,6 @@ export default class ShoppingService {
       return Math.ceil(amount / 500) * 500
     }
     
-    // For vegetables (often ~500g per piece/package)
     if (item.category === 'vegetables') {
       if (amount <= 250) return 250
       if (amount <= 500) return 500
@@ -207,60 +268,46 @@ export default class ShoppingService {
       return Math.ceil(amount / 500) * 500
     }
     
-    // For grains/pasta (usually 500g or 1kg packages)
     if (item.category === 'carbs') {
       if (amount <= 500) return 500
       if (amount <= 1000) return 1000
       return Math.ceil(amount / 1000) * 1000
     }
     
-    // Default: round to sensible amounts
     if (amount <= 100) return 100
     if (amount <= 250) return 250
     if (amount <= 500) return 500
     if (amount <= 750) return 750
     if (amount <= 1000) return 1000
-    
     return Math.ceil(amount / 500) * 500
   }
   
-  // Calculate cost based on amount and price
+  // Calculate cost for gram/ml based items
   calculateCost(amount, pricePerUnit, unit, unitType) {
     if (!pricePerUnit) return 0
+    const price = parseFloat(pricePerUnit)
     
-    let cost = 0
-    
-    // Convert units if needed
     if (unit === 'gram' && unitType === 'kg') {
-      cost = (amount / 1000) * pricePerUnit
-    } else if (unit === 'ml' && unitType === 'liter') {
-      cost = (amount / 1000) * pricePerUnit
-    } else if (unitType === 'piece' || unitType === 'stuks') {
-      cost = Math.ceil(amount) * pricePerUnit
-    } else {
-      cost = amount * pricePerUnit
+      return (amount / 1000) * price
     }
-    
-    return Math.round(cost * 100) / 100
+    if (unit === 'ml' && unitType === 'liter') {
+      return (amount / 1000) * price
+    }
+    if (unitType === 'piece' || unitType === 'stuks') {
+      return Math.ceil(amount) * price
+    }
+    return amount * price
   }
   
   // Get meal with ingredients
   async getMealWithIngredients(mealId) {
     try {
-      // Ensure clean ID
-      const cleanId = mealId.trim()
-      
       const { data, error } = await this.supabase
         .from('ai_meals')
         .select('*')
-        .eq('id', cleanId)
+        .eq('id', mealId.trim())
         .single()
-      
-      if (error) {
-        console.error(`❌ Error fetching meal ${cleanId}:`, error)
-        return null
-      }
-      
+      if (error) return null
       return data
     } catch (error) {
       console.error('❌ Failed to get meal:', error)
@@ -276,19 +323,14 @@ export default class ShoppingService {
         .select('*')
         .eq('id', ingredientId)
         .single()
-      
-      if (error) {
-        // Don't throw, return null for graceful fallback
-        return null
-      }
+      if (error) return null
       return data
     } catch (error) {
-      console.error('❌ Failed to get ingredient:', error)
       return null
     }
   }
   
-  // Save/update shopping progress
+  // Save shopping progress (week_end fix included)
   async saveShoppingProgress(clientId, planId, progress) {
     try {
       const { data: existing } = await this.supabase
@@ -298,29 +340,41 @@ export default class ShoppingService {
         .eq('plan_id', planId)
         .single()
       
+      const now = new Date()
+      const purchasedCount = Object.values(progress.checkedItems || {}).filter(Boolean).length
+      
       if (existing) {
         const { error } = await this.supabase
           .from('ai_shopping_progress')
           .update({
             purchased_items: progress.checkedItems,
-            purchased_count: Object.values(progress.checkedItems || {}).filter(Boolean).length,
-            updated_at: new Date().toISOString()
+            purchased_count: purchasedCount,
+            updated_at: now.toISOString()
           })
           .eq('id', existing.id)
-        
         if (error) throw error
       } else {
+        const weekStart = new Date(now)
+        const dayOfWeek = weekStart.getDay()
+        const diffToMonday = dayOfWeek === 0 ? -6 : 1 - dayOfWeek
+        weekStart.setDate(weekStart.getDate() + diffToMonday)
+        weekStart.setHours(0, 0, 0, 0)
+        
+        const weekEnd = new Date(weekStart)
+        weekEnd.setDate(weekEnd.getDate() + 6)
+        weekEnd.setHours(23, 59, 59, 999)
+        
         const { error } = await this.supabase
           .from('ai_shopping_progress')
           .insert({
             client_id: clientId,
             plan_id: planId,
             purchased_items: progress.checkedItems,
-            purchased_count: Object.values(progress.checkedItems || {}).filter(Boolean).length,
-            week_start: new Date().toISOString(),
-            created_at: new Date().toISOString()
+            purchased_count: purchasedCount,
+            week_start: weekStart.toISOString(),
+            week_end: weekEnd.toISOString(),
+            created_at: now.toISOString()
           })
-        
         if (error) throw error
       }
       
@@ -335,7 +389,6 @@ export default class ShoppingService {
   // Get shopping progress
   async getShoppingProgress(clientId, planId) {
     if (!planId) return null
-    
     try {
       const { data, error } = await this.supabase
         .from('ai_shopping_progress')
@@ -343,36 +396,24 @@ export default class ShoppingService {
         .eq('client_id', clientId)
         .eq('plan_id', planId)
         .single()
-      
       if (error && error.code !== 'PGRST116') throw error
-      
       return data
     } catch (error) {
-      console.error('❌ Failed to get shopping progress:', error)
       return null
     }
   }
   
   // Format amount for display
   formatAmount(amount, unit) {
-    if (unit === 'gram') {
-      if (amount >= 1000) {
-        return `${(amount / 1000).toFixed(1)}kg`
-      }
+    if (unit === 'stuks' || unit === 'pieces') return `${Math.round(amount)} stuks`
+    if (unit === 'gram' || unit === 'g') {
+      if (amount >= 1000) return `${(amount / 1000).toFixed(1)}kg`
       return `${Math.round(amount)}g`
     }
-    
     if (unit === 'ml') {
-      if (amount >= 1000) {
-        return `${(amount / 1000).toFixed(1)}L`
-      }
+      if (amount >= 1000) return `${(amount / 1000).toFixed(1)}L`
       return `${Math.round(amount)}ml`
     }
-    
-    if (unit === 'stuks' || unit === 'pieces') {
-      return `${Math.round(amount)} stuks`
-    }
-    
     return `${Math.round(amount)} ${unit}`
   }
   
@@ -380,66 +421,43 @@ export default class ShoppingService {
   generateExportText(shoppingList) {
     if (!shoppingList?.items) return ''
     
-    let text = '🛒 MY ARC BOODSCHAPPENLIJST\n'
-    text += '━━━━━━━━━━━━━━━━━━━\n\n'
-    
-    // Category names in Dutch
+    let text = 'MY ARC BOODSCHAPPENLIJST\n\n'
     const categoryNames = {
-      'protein': '🥩 EIWITTEN',
-      'carbs': '🌾 KOOLHYDRATEN', 
-      'vegetables': '🥬 GROENTEN',
-      'fats': '🥑 VETTEN',
-      'dairy': '🥛 ZUIVEL',
-      'fruit': '🍎 FRUIT',
-      'other': '📦 OVERIG'
+      'protein': '🥩 EIWITTEN', 'carbs': '🌾 KOOLHYDRATEN',
+      'vegetables': '🥬 GROENTEN', 'fats': '🥑 VETTEN',
+      'dairy': '🥛 ZUIVEL', 'fruit': '🍎 FRUIT',
+      'sauces': '🧂 SAUZEN & KRUIDEN', 'other': '📦 OVERIG'
     }
     
-    // Group by category
     const categories = {}
     shoppingList.items.forEach(item => {
       const cat = item.category || 'other'
-      if (!categories[cat]) {
-        categories[cat] = []
-      }
+      if (!categories[cat]) categories[cat] = []
       categories[cat].push(item)
     })
     
-    // Generate text per category
     Object.keys(categoryNames).forEach(catKey => {
       if (categories[catKey]) {
         text += `${categoryNames[catKey]}\n`
         categories[catKey].forEach(item => {
           const amount = this.formatAmount(item.displayAmount || item.totalAmount, item.unit)
-          const price = item.estimatedCost ? ` (€${item.estimatedCost.toFixed(2)})` : ''
-          text += `□ ${item.name} - ${amount}${price}\n`
+          text += `- ${item.name} ${amount}\n`
         })
         text += '\n'
       }
     })
     
-    text += '━━━━━━━━━━━━━━━━━━━\n'
-    text += `💰 Geschat totaal: €${shoppingList.totalCost?.toFixed(2) || '0.00'}\n`
-    text += `📊 Totaal items: ${shoppingList.itemCount || 0}\n`
-    text += `📅 Gegenereerd: ${new Date().toLocaleDateString('nl-NL')}`
-    
+    text += `Totaal: €${shoppingList.totalCost?.toFixed(2) || '0.00'} · ${shoppingList.itemCount || 0} items\n`
+    text += `${new Date().toLocaleDateString('nl-NL')}`
     return text
   }
   
-  // Share via WhatsApp
   shareViaWhatsApp(text) {
-    const encoded = encodeURIComponent(text)
-    const url = `https://wa.me/?text=${encoded}`
-    window.open(url, '_blank')
+    window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank')
   }
   
-  // Copy to clipboard
   async copyToClipboard(text) {
-    try {
-      await navigator.clipboard.writeText(text)
-      return true
-    } catch (error) {
-      console.error('Failed to copy:', error)
-      return false
-    }
+    try { await navigator.clipboard.writeText(text); return true }
+    catch { return false }
   }
 }

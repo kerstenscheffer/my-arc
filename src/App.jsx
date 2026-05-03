@@ -1,7 +1,17 @@
 // src/App.jsx
 import InfoPage from './pages/InfoPage'
+import SalesInfoPage from './pages/SalesInfoPage'
+import SalesSlider from './pages/SalesSlider'
+import SalesScrollPage from './pages/SalesScrollPageClean'
+import PrivacyPolicy from './pages/PrivacyPolicy'
+import CoachingGuidePage from './pages/CoachingGuidePage'
+import MyArcInfo from './pages/myarcinfo/MyArcInfo'
+import IntakePage from './intake/IntakePage'
+import ThankYouPage from './intake/ThankYouPage'
 import ClientOnboarding from './client/pages/ClientOnboarding'
 import FunnelPage from './funnel/FunnelPage'
+import NinetyDaysFunnelPage from './funnel/90days/page'
+import FivePillarPage from './funnel/five-pilar/FivePillarPage'
 import TillTheGoalPage from './till-the-goal/TillTheGoalPage'
 
 import YourArcFunnel from './modules/funnel-pages/your-arc/YourArcFunnel'
@@ -9,9 +19,20 @@ import MyArcFunnel from './modules/funnel-pages/my-arc/MyArcFunnelMain'
 import CheckoutPage from './pages/CheckoutPage'
 import EightWeekCheckout from './pages/EightWeekCheckout'
 import TwelveWeekCheckout from './pages/TwelveWeekCheckout'
+import MonthlySubscriptionCheckout from './pages/MonthlySubscriptionCheckout'
+import SixMonthSubscriptionCheckout from './pages/SixMonthSubscriptionCheckout'
 import Homepage from './pages/Homepage'
 import LeadPicGenerator from './modules/lead-pic-generator/LeadPicGenerator'
 import LeadMessageFlow from './modules/lead-magnet/LeadMessageFlow'
+import QuizPage from './lead-magnet/QuizPage'
+import ResultPage from './lead-magnet/ResultPage'
+import SevenSecretsFunnel from './lead-magnet/7secretsfunnel/7SecretsFunnel'
+import GiveawayPage from './lead-magnet/7secretsfunnel/GiveawayPage'
+import SalesCallPage from './sales-call/SalesCallPage'
+import NutritionIntakePage from './modules/nutrition-intake/NutritionIntakePage'
+import PublicIntakePage from './modules/public-intake/PublicIntakePage'
+import HubRouter from './modules/resource-hub/HubRouter'
+import QualificationFunnelPage from './modules/qualification-funnel'
 import { useState, useEffect } from 'react'
 import Login from './components/Login'
 import ResetPassword from './components/ResetPassword'
@@ -72,6 +93,26 @@ function App() {
     return <InfoPage />
   }
 
+  // Sales info page for 12-week program
+  if (currentPath === '/12-week-info') {
+    return <SalesInfoPage />
+  }
+
+  // Sales slider presentation
+  if (currentPath === '/myarcslide') {
+    return <SalesSlider />
+  }
+
+  // Sales scroll page
+  if (currentPath === '/salepage') {
+    return <SalesScrollPage />
+  }
+
+  // Sales call booking page
+  if (currentPath === '/sales') {
+    return <SalesCallPage />
+  }
+
   // Call booking funnel (moved to /fitworden)
   if (currentPath === '/fitworden') {
     return <Homepage />
@@ -88,6 +129,14 @@ function App() {
 
   if (currentPath === '/12-week-checkout') {
     return <TwelveWeekCheckout />
+  }
+
+  if (currentPath === '/monthly-checkout') {
+    return <MonthlySubscriptionCheckout />
+  }
+
+  if (currentPath === '/6month-checkout') {
+    return <SixMonthSubscriptionCheckout />
   }
 
   // Success page after payment
@@ -176,6 +225,50 @@ function App() {
     return <LeadMessageFlow />
   }
 
+  // Quiz lead magnet
+  if (currentPath === '/ontdek-jouw-route') {
+    return <QuizPage />
+  }
+
+  if (currentPath === '/ontdek-jouw-route/resultaat') {
+    return <ResultPage />
+  }
+
+  // 7 Secrets funnel
+  if (currentPath === '/7secrets') {
+    return <SevenSecretsFunnel />
+  }
+
+  // Giveaway page
+  if (currentPath === '/giveaway') {
+    return <GiveawayPage />
+  }
+
+  // Nutrition intake form
+  if (currentPath === '/nutritionintake') {
+    return <NutritionIntakePage />
+  }
+
+  // Client intake form
+  if (currentPath === '/intake') {
+    return <IntakePage />
+  }
+
+  // Public intake form (no auth required)
+  if (currentPath === '/myintake') {
+    return <PublicIntakePage />
+  }
+
+  // Thank you page after intake submit
+  if (currentPath === '/bedankt') {
+    return <ThankYouPage />
+  }
+
+  // Qualification funnel - NEW
+  if (currentPath === '/start') {
+    return <QualificationFunnelPage />
+  }
+
   // Client onboarding (public for new clients)
   if (currentPath === '/onboarding') {
     return (
@@ -189,6 +282,19 @@ function App() {
   // Funnel pages
   if (currentPath === '/funnel') {
     return <FunnelPage />
+  }
+
+  if (currentPath === '/90days') {
+    return <NinetyDaysFunnelPage />
+  }
+
+  if (currentPath === '/5pilar') {
+    return <FivePillarPage />
+  }
+
+  // Resource Hub pages (public - auth optional)
+  if (currentPath.startsWith('/hub')) {
+    return <HubRouter db={db} />
   }
 
   if (currentPath === '/your-arc') {
@@ -222,6 +328,21 @@ function App() {
         <PWAInstaller />
       </LanguageProvider>
     )
+  }
+
+  // Privacy Policy
+  if (currentPath === '/privacy') {
+    return <PrivacyPolicy />
+  }
+
+  // Coaching Guide
+  if (currentPath === '/coaching-guide') {
+    return <CoachingGuidePage />
+  }
+
+  // MY ARC Info page
+  if (currentPath === '/myarcinfo') {
+    return <MyArcInfo />
   }
 
   // ==============================================

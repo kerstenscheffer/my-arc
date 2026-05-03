@@ -1955,42 +1955,47 @@ export default function ClientMealPlan({ client, onNavigate, db }) {
       if (clientPlan) {
         setPlan(clientPlan)
         
-        // Set targets from plan
-        if (clientPlan.targets) {
+// Set targets from plan
+        if (clientPlan.daily_calories) {
+          setTargets({
+            kcal: clientPlan.daily_calories,
+            protein: clientPlan.daily_protein || 150,
+            carbs: clientPlan.daily_carbs || 200,
+            fat: clientPlan.daily_fat || 70
+          })
+        } else if (clientPlan.targets) {
           setTargets(clientPlan.targets)
-        }
-        
-        // Process week structure to get today's meals
-        const today = new Date()
-        const startDate = clientPlan.start_date ? new Date(clientPlan.start_date) : new Date()
-        const dayIndex = Math.floor((today - startDate) / (1000 * 60 * 60 * 24))
-        const todayMeals = clientPlan.week_structure?.[dayIndex % 7]?.meals || []
-        
-        // Get meal details
-        const mealIds = todayMeals.map(m => m.meal_id).filter(Boolean)
-        if (mealIds.length > 0) {
-          const mealDetails = await db.getMealsByIds(mealIds)
-          
-          // Combine meal data with time slots
-          const mealsWithTiming = todayMeals.map((slot, idx) => {
-            const meal = mealDetails.find(m => m.id === slot.meal_id)
-            if (!meal) return null
-            
-            // Extract time from slot or use default
-            const timeSlot = slot.time_slot || `Meal ${idx + 1}`
-            const plannedTime = extractTimeFromSlot(timeSlot)
-            
+        }        
+
+
+// Process week structure to get today's meals
+        const DAY_KEYS = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday']
+        const todayKey = DAY_KEYS[new Date().getDay()]
+        const todayData = clientPlan.week_structure?.[todayKey] || {}
+
+        const SLOT_ORDER = ['breakfast', 'snack1', 'lunch', 'snack2', 'dinner', 'snack3']
+        const SLOT_LABELS = { breakfast: 'Ontbijt', snack1: 'Snack 1', lunch: 'Lunch', snack2: 'Snack 2', dinner: 'Diner', snack3: 'Snack 3' }
+        const SLOT_TIMES = { breakfast: 7, snack1: 10, lunch: 12.5, snack2: 15.5, dinner: 18, snack3: 21 }
+
+        const mealsWithTiming = SLOT_ORDER
+          .filter(slot => todayData[slot] && typeof todayData[slot] === 'object' && todayData[slot].name)
+          .map(slot => {
+            const meal = todayData[slot]
             return {
-              ...meal,
-              timeSlot,
-              plannedTime,
-              targetKcal: slot.target_kcal
+              id: meal.id,
+              name: meal.name,
+              kcal: meal.calories,
+              protein: meal.protein,
+              carbs: meal.carbs,
+              fat: meal.fat,
+              image_url: meal.image_url || null,
+              timeSlot: SLOT_LABELS[slot],
+              plannedTime: SLOT_TIMES[slot]
             }
-          }).filter(Boolean)
-          
-          setMeals(mealsWithTiming)
-        }
-      }
+          })
+
+        setMeals(mealsWithTiming)
+
       
       // Load all meals for swap functionality
       const allMealsList = await db.getAllMeals()

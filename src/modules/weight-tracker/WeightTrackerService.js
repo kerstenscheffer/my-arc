@@ -1,12 +1,17 @@
-// WeightTrackerService.js - Service voor 8-week challenge weight tracking
+// WeightTrackerService.js - EXTENDED VERSION
+// Weight + Circumference tracking voor 8-week challenge
 export default class WeightTrackerService {
   constructor(db) {
     this.db = db
     this.supabase = db.supabase
-    this.tableName = 'weight_challenge_logs'
+    this.weightTable = 'weight_challenge_logs'
+    this.circumferenceTable = 'circumference_tracking'
   }
 
-  // Save or update weight entry (one per day)
+  // ============================================
+  // WEIGHT TRACKING METHODS (EXISTING)
+  // ============================================
+  
   async saveWeight(clientId, weight, date = null) {
     try {
       const targetDate = date || new Date().toISOString().split('T')[0]
@@ -14,7 +19,7 @@ export default class WeightTrackerService {
       const isFriday = dateObj.getDay() === 5
       
       const { data, error } = await this.supabase
-        .from(this.tableName)
+        .from(this.weightTable)
         .upsert({
           client_id: clientId,
           date: targetDate,
@@ -43,14 +48,13 @@ export default class WeightTrackerService {
     }
   }
   
-  // Get weight history for client
   async getWeightHistory(clientId, days = 56) {
     try {
       const startDate = new Date()
       startDate.setDate(startDate.getDate() - days)
       
       const { data, error } = await this.supabase
-        .from(this.tableName)
+        .from(this.weightTable)
         .select('*')
         .eq('client_id', clientId)
         .gte('date', startDate.toISOString().split('T')[0])
@@ -65,15 +69,13 @@ export default class WeightTrackerService {
     }
   }
   
-  // Get Friday compliance for 8-week challenge
   async getFridayCompliance(clientId) {
     try {
       const eightWeeksAgo = new Date()
-      eightWeeksAgo.setDate(eightWeeksAgo.getDate() - 55) // 8 weeks = 56 days - 1
+      eightWeeksAgo.setDate(eightWeeksAgo.getDate() - 55)
       
-      // Get all Friday entries
       const { data, error } = await this.supabase
-        .from(this.tableName)
+        .from(this.weightTable)
         .select('date, weight')
         .eq('client_id', clientId)
         .eq('is_friday_weighin', true)
@@ -82,13 +84,12 @@ export default class WeightTrackerService {
       
       if (error) throw error
       
-      // Calculate all Fridays in period
       const allFridays = []
       const tempDate = new Date(eightWeeksAgo)
       const today = new Date()
       
       while (tempDate <= today) {
-        if (tempDate.getDay() === 5) { // Friday
+        if (tempDate.getDay() === 5) {
           allFridays.push(tempDate.toISOString().split('T')[0])
         }
         tempDate.setDate(tempDate.getDate() + 1)
@@ -120,7 +121,6 @@ export default class WeightTrackerService {
     }
   }
   
-  // Get weight statistics
   async getWeightStats(clientId) {
     try {
       const history = await this.getWeightHistory(clientId, 56)
@@ -137,20 +137,17 @@ export default class WeightTrackerService {
         }
       }
       
-      // Sort by date (newest first)
       history.sort((a, b) => new Date(b.date) - new Date(a.date))
       
       const current = history[0].weight
       const weights = history.map(h => h.weight)
       
-      // Week change
       const oneWeekAgo = new Date()
       oneWeekAgo.setDate(oneWeekAgo.getDate() - 7)
       const weekEntry = history.find(entry => 
         new Date(entry.date) <= oneWeekAgo
       )
       
-      // Month change
       const oneMonthAgo = new Date()
       oneMonthAgo.setDate(oneMonthAgo.getDate() - 30)
       const monthEntry = history.find(entry => 
@@ -181,13 +178,12 @@ export default class WeightTrackerService {
     }
   }
   
-  // Check if today's weight is logged
   async getTodayEntry(clientId) {
     try {
       const today = new Date().toISOString().split('T')[0]
       
       const { data, error } = await this.supabase
-        .from(this.tableName)
+        .from(this.weightTable)
         .select('*')
         .eq('client_id', clientId)
         .eq('date', today)
@@ -202,11 +198,10 @@ export default class WeightTrackerService {
     }
   }
   
-  // Delete weight entry
   async deleteEntry(clientId, date) {
     try {
       const { error } = await this.supabase
-        .from(this.tableName)
+        .from(this.weightTable)
         .delete()
         .eq('client_id', clientId)
         .eq('date', date)
@@ -220,8 +215,262 @@ export default class WeightTrackerService {
       return { success: false, error: error.message }
     }
   }
+
+  // ============================================
+  // CIRCUMFERENCE TRACKING METHODS (NEW)
+  // ============================================
   
-  // Get next Friday date
+  /**
+   * Save circumference measurements
+   * @param {string} clientId - Client UUID
+   * @param {object} measurements - { waist_cm, bicep_cm, chest_cm, thigh_cm }
+   * @param {string} date - ISO date string (optional, defaults to today)
+   */
+  async saveCircumference(clientId, measurements, date = null) {
+    try {
+      const targetDate = date || new Date().toISOString().split('T')[0]
+      const dateObj = new Date(targetDate)
+      const isFriday = dateObj.getDay() === 5
+      
+      // Validate measurements
+      const validMeasurements = {}
+      if (measurements.waist_cm) validMeasurements.waist_cm = parseFloat(measurements.waist_cm)
+      if (measurements.bicep_cm) validMeasurements.bicep_cm = parseFloat(measurements.bicep_cm)
+      if (measurements.chest_cm) validMeasurements.chest_cm = parseFloat(measurements.chest_cm)
+      if (measurements.thigh_cm) validMeasurements.thigh_cm = parseFloat(measurements.thigh_cm)
+      
+      const { data, error } = await this.supabase
+        .from(this.circumferenceTable)
+        .upsert({
+          client_id: clientId,
+          measurement_date: targetDate,
+          ...validMeasurements,
+          is_friday_entry: isFriday,
+          notes: measurements.notes || null,
+          updated_at: new Date().toISOString()
+        }, {
+          onConflict: 'client_id,measurement_date'
+        })
+        .select()
+        .single()
+      
+      if (error) throw error
+      
+      console.log('✅ Circumference saved:', { 
+        date: targetDate, 
+        measurements: validMeasurements,
+        isFriday 
+      })
+      
+      return { success: true, data, isFriday }
+    } catch (error) {
+      console.error('❌ Save circumference failed:', error)
+      return { success: false, error: error.message }
+    }
+  }
+  
+  /**
+   * Get circumference history
+   */
+  async getCircumferenceHistory(clientId, days = 56) {
+    try {
+      const startDate = new Date()
+      startDate.setDate(startDate.getDate() - days)
+      
+      const { data, error } = await this.supabase
+        .from(this.circumferenceTable)
+        .select('*')
+        .eq('client_id', clientId)
+        .gte('measurement_date', startDate.toISOString().split('T')[0])
+        .order('measurement_date', { ascending: false })
+      
+      if (error) throw error
+      
+      return data || []
+    } catch (error) {
+      console.error('❌ Get circumference history failed:', error)
+      return []
+    }
+  }
+  
+  /**
+   * Get today's circumference entry
+   */
+  async getTodayCircumference(clientId) {
+    try {
+      const today = new Date().toISOString().split('T')[0]
+      
+      const { data, error } = await this.supabase
+        .from(this.circumferenceTable)
+        .select('*')
+        .eq('client_id', clientId)
+        .eq('measurement_date', today)
+        .single()
+      
+      if (error && error.code !== 'PGRST116') throw error
+      
+      return data || null
+    } catch (error) {
+      console.error('❌ Get today circumference failed:', error)
+      return null
+    }
+  }
+  
+  /**
+   * Get previous circumference entry (for comparison)
+   */
+  async getPreviousCircumference(clientId, currentDate = null) {
+    try {
+      const targetDate = currentDate || new Date().toISOString().split('T')[0]
+      
+      const { data, error } = await this.supabase
+        .from(this.circumferenceTable)
+        .select('*')
+        .eq('client_id', clientId)
+        .lt('measurement_date', targetDate)
+        .order('measurement_date', { ascending: false })
+        .limit(1)
+        .single()
+      
+      if (error && error.code !== 'PGRST116') throw error
+      
+      return data || null
+    } catch (error) {
+      console.error('❌ Get previous circumference failed:', error)
+      return null
+    }
+  }
+  
+  /**
+   * Calculate 7-day averages for all metrics
+   */
+  async get7DayAverages(clientId) {
+    try {
+      const sevenDaysAgo = new Date()
+      sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7)
+      
+      const { data, error } = await this.supabase
+        .from(this.circumferenceTable)
+        .select('*')
+        .eq('client_id', clientId)
+        .gte('measurement_date', sevenDaysAgo.toISOString().split('T')[0])
+        .order('measurement_date', { ascending: false })
+      
+      if (error) throw error
+      
+      if (!data || data.length === 0) {
+        return {
+          waist_avg: null,
+          bicep_avg: null,
+          chest_avg: null,
+          thigh_avg: null,
+          count: 0
+        }
+      }
+      
+      // Calculate averages (only for non-null values)
+      const calculateAvg = (metric) => {
+        const values = data.map(d => d[metric]).filter(v => v !== null)
+        return values.length > 0 
+          ? parseFloat((values.reduce((a, b) => a + b, 0) / values.length).toFixed(1))
+          : null
+      }
+      
+      return {
+        waist_avg: calculateAvg('waist_cm'),
+        bicep_avg: calculateAvg('bicep_cm'),
+        chest_avg: calculateAvg('chest_cm'),
+        thigh_avg: calculateAvg('thigh_cm'),
+        count: data.length
+      }
+    } catch (error) {
+      console.error('❌ Get 7-day averages failed:', error)
+      return {
+        waist_avg: null,
+        bicep_avg: null,
+        chest_avg: null,
+        thigh_avg: null,
+        count: 0
+      }
+    }
+  }
+  
+  /**
+   * Get weekly comparison (last 2 Fridays)
+   */
+  async getWeeklyCircumferenceComparison(clientId) {
+    try {
+      const { data, error } = await this.supabase
+        .from(this.circumferenceTable)
+        .select('*')
+        .eq('client_id', clientId)
+        .eq('is_friday_entry', true)
+        .order('measurement_date', { ascending: false })
+        .limit(2)
+      
+      if (error) throw error
+      
+      if (!data || data.length < 2) {
+        return {
+          current: data?.[0] || null,
+          previous: null,
+          changes: null
+        }
+      }
+      
+      const current = data[0]
+      const previous = data[1]
+      
+      const calculateChange = (curr, prev) => {
+        if (curr === null || prev === null) return null
+        return parseFloat((curr - prev).toFixed(1))
+      }
+      
+      return {
+        current,
+        previous,
+        changes: {
+          waist: calculateChange(current.waist_cm, previous.waist_cm),
+          bicep: calculateChange(current.bicep_cm, previous.bicep_cm),
+          chest: calculateChange(current.chest_cm, previous.chest_cm),
+          thigh: calculateChange(current.thigh_cm, previous.thigh_cm)
+        }
+      }
+    } catch (error) {
+      console.error('❌ Get weekly comparison failed:', error)
+      return {
+        current: null,
+        previous: null,
+        changes: null
+      }
+    }
+  }
+  
+  /**
+   * Delete circumference entry
+   */
+  async deleteCircumferenceEntry(clientId, date) {
+    try {
+      const { error } = await this.supabase
+        .from(this.circumferenceTable)
+        .delete()
+        .eq('client_id', clientId)
+        .eq('measurement_date', date)
+      
+      if (error) throw error
+      
+      console.log('✅ Circumference entry deleted')
+      return { success: true }
+    } catch (error) {
+      console.error('❌ Delete circumference entry failed:', error)
+      return { success: false, error: error.message }
+    }
+  }
+
+  // ============================================
+  // HELPER FUNCTIONS
+  // ============================================
+  
   getNextFriday() {
     const today = new Date()
     const dayOfWeek = today.getDay()
@@ -231,9 +480,7 @@ export default class WeightTrackerService {
     return nextFriday
   }
   
-  // Check if date is Friday
   isFriday(date = new Date()) {
     return date.getDay() === 5
   }
 }
-

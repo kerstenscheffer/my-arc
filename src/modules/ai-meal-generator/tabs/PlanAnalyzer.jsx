@@ -1,1240 +1,659 @@
 // src/modules/ai-meal-generator/tabs/PlanAnalyzer.jsx
-// TAB 4: Analyze & Edit Generated Plan - FIXED VERSION
+// v4.0 — Sidebar layout: linker icon nav + compacte builder rechts
 
-import { useState, useEffect } from 'react'
-import { 
-  BarChart3, TrendingUp, AlertTriangle, CheckCircle,
-  Edit3, Shuffle, DollarSign, ShoppingCart, Info,
-  Target, Activity, Clock, ChevronDown, ChevronUp,
-  ChevronLeft, ChevronRight, X, Percent, Scale
-} from 'lucide-react'
+import React, { useState, useEffect, useCallback, useRef } from 'react'
+import { BarChart3, FileText, ChevronRight, AlertTriangle, Zap, Grid3X3, Calendar, List, Download, MessageSquare, Play, Check, Loader, Clock, RotateCcw, RotateCw } from 'lucide-react'
+import DayNavigator, { DAYS } from './plan-analyzer/DayNavigator'
+import DayMacroBar from './plan-analyzer/DayMacroBar'
+import MealCard from './plan-analyzer/MealCard'
+import SwapModal from './plan-analyzer/SwapModal'
+import ClientContextPanel from './plan-analyzer/ClientContextPanel'
+import AutoBalancer from './plan-analyzer/AutoBalancer'
+import WeekBalancer from './plan-analyzer/WeekBalancer'
+import WeekOverview from './plan-analyzer/WeekOverview'
+import PlanSwitcherModal from './plan-analyzer/PlanSwitcherModal'
+import TimingModal from './plan-analyzer/TimingModal'
+import { checkMealConflicts, buildConflictClientData } from './plan-analyzer/ConflictChecker'
+import { openMealPlanForPrint, openCoachingGuideForPrint } from '../mealplanhtmlgenerator'
+
+const SLOTS = ['breakfast', 'snack1', 'lunch', 'snack2', 'dinner', 'snack3']
+const SLOT_DEFAULT_TIMES = {
+  breakfast: '07:30', snack1: '10:30', lunch: '13:00',
+  snack2: '15:30', dinner: '19:00', snack3: '21:30'
+}
+const MAX_HISTORY = 50
 
 export default function PlanAnalyzer({
-  db,
-  generatedPlan,
-  planModifications,
-  setPlanModifications,
-  dailyTargets,
-  isMobile
+  db, generatedPlan, planModifications, setPlanModifications,
+  dailyTargets, isMobile, conceptPlanId, clientId, onPlanActivated,
+  onConceptLoaded, coachId
 }) {
-  // States
   const [activeDay, setActiveDay] = useState(0)
-  const [weekAnalysis, setWeekAnalysis] = useState(null)
-  const [editMode, setEditMode] = useState(false)
-  const [selectedSlot, setSelectedSlot] = useState(null)
-  const [replacementMeals, setReplacementMeals] = useState([])
-  const [loadingReplacements, setLoadingReplacements] = useState(false)
-  const [showDetails, setShowDetails] = useState({
-    macros: true,
-    costs: false,
-    shopping: false,
-    warnings: true
-  })
-  
-  const weekDays = [
-    { id: 'monday', label: 'Ma', fullLabel: 'Maandag' },
-    { id: 'tuesday', label: 'Di', fullLabel: 'Dinsdag' },
-    { id: 'wednesday', label: 'Wo', fullLabel: 'Woensdag' },
-    { id: 'thursday', label: 'Do', fullLabel: 'Donderdag' },
-    { id: 'friday', label: 'Vr', fullLabel: 'Vrijdag' },
-    { id: 'saturday', label: 'Za', fullLabel: 'Zaterdag' },
-    { id: 'sunday', label: 'Zo', fullLabel: 'Zondag' }
-  ]
-  
-  // Analyze plan when loaded or modified
+  const [weekData, setWeekData] = useState(null)
+  const [targets, setTargets] = useState(dailyTargets || null)
+  const [planMeta, setPlanMeta] = useState(null)
+  const [conceptPlans, setConceptPlans] = useState([])
+  const [loadingConcepts, setLoadingConcepts] = useState(false)
+  const [selectedConceptId, setSelectedConceptId] = useState(conceptPlanId || null)
+  const [swapState, setSwapState] = useState(null)
+  const [clientIntake, setClientIntake] = useState(null)
+  const [clientRecord, setClientRecord] = useState(null)
+  const [viewMode, setViewMode] = useState('day')
+  const [showPlanSwitcher, setShowPlanSwitcher] = useState(false)
+  const [showTimingModal, setShowTimingModal] = useState(false)
+  const [showBalancer, setShowBalancer] = useState(false)
+  const [showWeekBalancer, setShowWeekBalancer] = useState(false)
+  const [showFloatingClient, setShowFloatingClient] = useState(false)
+  const [allClientPlans, setAllClientPlans] = useState([])
+  const [resolvedClientId, setResolvedClientId] = useState(clientId || null)
+
+  // Activate/PDF state
+  const [activating, setActivating] = useState(false)
+  const [activated, setActivated] = useState(false)
+  const [loadingPdf, setLoadingPdf] = useState(false)
+
+  const m = isMobile
+
+  // History
+  const [history, setHistory] = useState([])
+  const [historyIndex, setHistoryIndex] = useState(-1)
+  const [lastAction, setLastAction] = useState('')
+  const isUndoRedo = useRef(false)
+  const canUndo = historyIndex > 0
+  const canRedo = historyIndex < history.length - 1
+
+  useEffect(() => { if (clientId) setResolvedClientId(clientId) }, [clientId])
+
+  const pushHistory = useCallback((newWeekData, actionDescription) => {
+    if (isUndoRedo.current) { isUndoRedo.current = false; return }
+    setHistory(prev => {
+      const trimmed = prev.slice(0, historyIndex + 1)
+      const next = [...trimmed, JSON.parse(JSON.stringify(newWeekData))]
+      if (next.length > MAX_HISTORY) next.shift()
+      return next
+    })
+    setHistoryIndex(prev => Math.min(prev + 1, MAX_HISTORY - 1))
+    setLastAction(actionDescription)
+  }, [historyIndex])
+
+  const handleUndo = useCallback(() => {
+    if (!canUndo) return
+    isUndoRedo.current = true
+    const prevData = history[historyIndex - 1]
+    setWeekData(JSON.parse(JSON.stringify(prevData)))
+    setHistoryIndex(prev => prev - 1)
+    setLastAction('Ongedaan gemaakt')
+    persistWeekData(prevData)
+  }, [canUndo, history, historyIndex])
+
+  const handleRedo = useCallback(() => {
+    if (!canRedo) return
+    isUndoRedo.current = true
+    const nextData = history[historyIndex + 1]
+    setWeekData(JSON.parse(JSON.stringify(nextData)))
+    setHistoryIndex(prev => prev + 1)
+    setLastAction('Opnieuw uitgevoerd')
+    persistWeekData(nextData)
+  }, [canRedo, history, historyIndex])
+
   useEffect(() => {
-    if (generatedPlan?.weekPlan) {
-      analyzePlan()
+    const handler = (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'z') { e.preventDefault(); handleUndo() }
+      if ((e.ctrlKey || e.metaKey) && (e.key === 'y' || (e.shiftKey && e.key === 'z'))) { e.preventDefault(); handleRedo() }
     }
-  }, [generatedPlan, planModifications])
-  
-  const analyzePlan = () => {
-    if (!generatedPlan?.weekPlan) return
-    
-    const analysis = {
-      dailyTotals: [],
-      weekTotal: { calories: 0, protein: 0, carbs: 0, fat: 0, cost: 0 },
-      warnings: [],
-      shoppingList: generatedPlan.aiAnalysis?.shoppingList || {},
-      mealFrequency: {},
-      ingredientUsage: {}
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [handleUndo, handleRedo])
+
+  const conflictClientData = clientRecord && clientIntake
+    ? buildConflictClientData(clientRecord, clientIntake)
+    : null
+
+  // ════════════ DATA LOADING ════════════
+
+  useEffect(() => {
+    if (generatedPlan?.weekPlan) loadFromGeneratedPlan(generatedPlan)
+    else if (selectedConceptId) loadConceptPlan(selectedConceptId)
+    else if (resolvedClientId) loadConceptPlansForClient(resolvedClientId)
+  }, [generatedPlan, selectedConceptId, resolvedClientId])
+
+  useEffect(() => {
+    if (resolvedClientId && db?.supabase) {
+      loadIntakeData(resolvedClientId)
+      loadClientRecord(resolvedClientId)
+      loadAllPlanCount(resolvedClientId)
     }
-    
-    // Get current plan (with modifications if any)
-    const currentPlan = getModifiedPlan()
-    
-    // Analyze each day
-    currentPlan.forEach((day, dayIndex) => {
-      const dayTotal = { 
-        calories: day.totals?.kcal || 0,
-        protein: day.totals?.protein || 0,
-        carbs: day.totals?.carbs || 0,
-        fat: day.totals?.fat || 0,
-        cost: 0,
-        accuracy: day.accuracy?.total || 0
+  }, [resolvedClientId])
+
+  useEffect(() => {
+    if (clientRecord?.target_calories) {
+      setTargets({ calories: clientRecord.target_calories, protein: clientRecord.target_protein || 150, carbs: clientRecord.target_carbs || 300, fat: clientRecord.target_fat || 80 })
+    }
+  }, [clientRecord])
+
+  const loadAllPlanCount = async (cId) => {
+    try { const { data } = await db.supabase.from('client_meal_plans').select('id, is_active').eq('client_id', cId); setAllClientPlans(data || []) } catch {}
+  }
+
+  const loadIntakeData = async (cId) => {
+    try { const { data } = await db.supabase.from('nutrition_preferences').select('*').eq('client_id', cId).order('updated_at', { ascending: false }).limit(1); if (data?.[0]) setClientIntake(data[0]) } catch {}
+  }
+
+  const loadClientRecord = async (cId) => {
+    try { const { data } = await db.supabase.from('clients').select('*').eq('id', cId).single(); if (data) setClientRecord(data) } catch {}
+  }
+
+  const loadFromGeneratedPlan = (plan) => {
+    const days = plan.weekPlan.map((day, i) => {
+      const meals = {}
+      if (day.breakfast) meals.breakfast = day.breakfast
+      if (day.lunch) meals.lunch = day.lunch
+      if (day.dinner) meals.dinner = day.dinner
+      if (day.snacks) day.snacks.forEach((s, si) => { if (s) meals[`snack${si + 1}`] = s })
+      SLOTS.filter(s => s.startsWith('snack')).forEach(s => { if (day[s]) meals[s] = day[s] })
+      return { dayId: DAYS[i].id, meals, totals: day.totals || calculateTotals(meals), is_training_day: day.is_training_day || false }
+    })
+    setWeekData(days); setTargets(dailyTargets); setPlanMeta(null)
+    setHistory([JSON.parse(JSON.stringify(days))]); setHistoryIndex(0)
+  }
+
+  const loadConceptPlan = async (planId) => {
+    try {
+      const { data, error } = await db.supabase.from('client_meal_plans').select('*').eq('id', planId).single()
+      if (error || !data?.week_structure) return
+      if (data.client_id) { setResolvedClientId(data.client_id); if (onConceptLoaded) onConceptLoaded(data.client_id) }
+      const ws = data.week_structure
+      const mealIds = new Set()
+      Object.values(ws).forEach(dd => {
+        if (!dd) return
+        SLOTS.forEach(s => { if (dd[s]?.meal_id) mealIds.add(dd[s].meal_id); if (dd[s]?.id) mealIds.add(dd[s].id) })
+      })
+      const mealDataMap = {}
+      if (mealIds.size > 0) {
+        const { data: mealRows, error: mealError } = await db.supabase
+          .from('ai_meals')
+          .select('id, name, internal_name, calories, protein, carbs, fat, image_url, ingredients_list, preparation_steps, tips, allergens, scalable, difficulty, labels, timing, icon')
+          .in('id', [...mealIds])
+        if (mealError) console.error('❌ ai_meals query error:', mealError)
+        mealRows?.forEach(m => { mealDataMap[m.id] = m })
       }
-      
-      // Get all meals for the day
-      const meals = [day.breakfast, day.lunch, day.dinner, ...day.snacks].filter(Boolean)
-      
-      meals.forEach(meal => {
-        // Track meal frequency
-        const mealName = meal.name
-        analysis.mealFrequency[mealName] = (analysis.mealFrequency[mealName] || 0) + 1
-        
-        // Calculate cost (estimate if not provided)
-        const mealCost = meal.total_cost || 5
-        dayTotal.cost += mealCost
-        
-        // Track ingredient usage
-        if (meal.ingredients_list && typeof meal.ingredients_list === 'object') {
-          Object.keys(meal.ingredients_list).forEach(ing => {
-            analysis.ingredientUsage[ing] = (analysis.ingredientUsage[ing] || 0) + 1
-          })
+      const days = DAYS.map(day => {
+        const dd = ws[day.id]
+        if (!dd) return { dayId: day.id, meals: {}, totals: {}, is_training_day: false }
+        const meals = {}
+        SLOTS.forEach(s => {
+          if (!dd[s]) return
+          const slot = dd[s]
+          const fullMeal = mealDataMap[slot.meal_id] || mealDataMap[slot.id] || null
+          meals[s] = {
+            ...slot,
+            ...(fullMeal ? { name: fullMeal.name, internal_name: fullMeal.internal_name, image_url: fullMeal.image_url, ingredients_list: slot.ingredients_list || fullMeal.ingredients_list, preparation_steps: fullMeal.preparation_steps, tips: fullMeal.tips, allergens: fullMeal.allergens, scalable: fullMeal.scalable, difficulty: fullMeal.difficulty, labels: fullMeal.labels } : {}),
+            name: fullMeal?.name || slot.name || slot.meal_name || slot.title || undefined,
+            meal_id: slot.meal_id || slot.id || null,
+            original_calories: slot.original_calories || slot.calories,
+            original_protein: slot.original_protein || slot.protein,
+            original_carbs: slot.original_carbs || slot.carbs,
+            original_fat: slot.original_fat || slot.fat,
+          }
+        })
+        return { dayId: day.id, meals, totals: dd.totals || calculateTotals(meals), is_training_day: dd.is_training_day || false }
+      })
+      setWeekData(days)
+      setTargets({ calories: data.daily_calories || 2500, protein: data.daily_protein || 150, carbs: data.daily_carbs || 300, fat: data.daily_fat || 80 })
+      setPlanMeta({ id: data.id, name: data.template_name, isActive: data.is_active, clientId: data.client_id, createdAt: data.created_at, stats: data.stats, aiGenerated: data.ai_generated })
+      setActivated(data.is_active || false)
+      setHistory([JSON.parse(JSON.stringify(days))]); setHistoryIndex(0)
+    } catch (err) { console.error('Concept load error:', err) }
+  }
+
+  const loadConceptPlansForClient = async (cId) => {
+    setLoadingConcepts(true)
+    try { const { data } = await db.supabase.from('client_meal_plans').select('id, template_name, daily_calories, daily_protein, is_active, ai_generated, created_at, stats').eq('client_id', cId).eq('is_active', false).order('created_at', { ascending: false }).limit(10); setConceptPlans(data || []) } catch {}
+    setLoadingConcepts(false)
+  }
+
+  // ════════════ HELPERS ════════════
+
+  const calculateTotals = (meals) => {
+    const t = { kcal: 0, protein: 0, carbs: 0, fat: 0 }
+    Object.values(meals).forEach(meal => { if (!meal) return; t.kcal += meal.calories || 0; t.protein += meal.protein || 0; t.carbs += meal.carbs || 0; t.fat += meal.fat || 0 })
+    return t
+  }
+
+  const getSortedSlots = (meals) => {
+    return [...SLOTS].sort((a, b) => {
+      const rawA = meals[a]?.timing; const rawB = meals[b]?.timing
+      const timeA = (typeof rawA === 'string' && rawA.length > 0) ? rawA : (SLOT_DEFAULT_TIMES[a] || '12:00')
+      const timeB = (typeof rawB === 'string' && rawB.length > 0) ? rawB : (SLOT_DEFAULT_TIMES[b] || '12:00')
+      return timeA.localeCompare(timeB)
+    })
+  }
+
+  const EN_TO_NL = { Monday: 'ma', Tuesday: 'di', Wednesday: 'wo', Thursday: 'do', Friday: 'vr', Saturday: 'za', Sunday: 'zo' }
+  const workoutSchedule = clientRecord?.workout_schedule || null
+  const trainingDaysFromSchedule = workoutSchedule ? Object.keys(workoutSchedule).map(k => EN_TO_NL[k]).filter(Boolean) : null
+  const trainingDays = trainingDaysFromSchedule?.length ? trainingDaysFromSchedule : (clientIntake?.training?.training_days?.length > 0 ? clientIntake.training.training_days : ['ma', 'di', 'wo', 'vr', 'za'])
+  const mealSchedule = clientIntake?.meal_schedule || null
+  const trainingTime = clientIntake?.training?.default_time || null
+
+  const getPreWorkoutSlot = (dayIndex) => {
+    const dayMap = { 0: 'ma', 1: 'di', 2: 'wo', 3: 'do', 4: 'vr', 5: 'za', 6: 'zo' }
+    if (!trainingDays.includes(dayMap[dayIndex]) || !trainingTime) return null
+    const timeMap = { vroege_ochtend: 'breakfast', late_ochtend: 'snack1', vroege_middag: 'lunch', late_middag: 'snack2', vroege_avond: 'dinner', late_avond: 'snack3', ochtend: 'breakfast', middag: 'lunch', einde_werkdag: 'snack2', avond: 'dinner' }
+    const slotOrder = ['breakfast', 'snack1', 'lunch', 'snack2', 'dinner', 'snack3']
+    const trainingSlot = timeMap[trainingTime] || 'dinner'
+    const idx = slotOrder.indexOf(trainingSlot)
+    return idx > 0 ? slotOrder[idx - 1] : null
+  }
+
+  const getMealConflicts = (meal) => {
+    if (!meal || !conflictClientData) return []
+    return checkMealConflicts(meal, conflictClientData)
+  }
+
+  // ════════════ PERSIST ════════════
+
+  const persistWeekData = async (updated) => {
+    if (planMeta?.id) {
+      const ws = {}
+      updated.forEach(d => { ws[d.dayId] = { ...d.meals, totals: d.totals, is_training_day: d.is_training_day } })
+      await db.supabase.from('client_meal_plans').update({ week_structure: ws }).eq('id', planMeta.id)
+    }
+    if (setPlanModifications) { const mods = {}; updated.forEach((d, i) => { mods[i] = d }); setPlanModifications(mods) }
+  }
+
+  const applyWeekUpdate = async (updated, actionDesc) => {
+    setWeekData(updated); pushHistory(updated, actionDesc); await persistWeekData(updated)
+  }
+
+  // ════════════ MEAL EDITING ════════════
+
+  const handleSwap = (dayIndex, slot, meal) => setSwapState({ dayIndex, slot, meal })
+  const handleSwapSelect = async (newMeal) => {
+    if (!swapState || !weekData) return
+    const updated = [...weekData]
+    updated[swapState.dayIndex] = { ...updated[swapState.dayIndex], meals: { ...updated[swapState.dayIndex].meals, [swapState.slot]: newMeal } }
+    updated[swapState.dayIndex].totals = calculateTotals(updated[swapState.dayIndex].meals)
+    await applyWeekUpdate(updated, `Swap ${DAYS[swapState.dayIndex].full}: ${swapState.meal?.name || 'leeg'} → ${newMeal.name || '?'}`)
+    setSwapState(null)
+  }
+  const handleMultiDaySelect = async (newMeal, slot, dayIndices) => {
+    if (!weekData) return
+    const updated = [...weekData]
+    dayIndices.forEach(di => { updated[di] = { ...updated[di], meals: { ...updated[di].meals, [slot]: newMeal } }; updated[di].totals = calculateTotals(updated[di].meals) })
+    await applyWeekUpdate(updated, `Swap ${slot} op ${dayIndices.length} dagen → ${newMeal.name}`)
+    setSwapState(null)
+  }
+  const handleDelete = async (dayIndex, slot) => {
+    if (!weekData) return
+    const mealName = weekData[dayIndex].meals[slot]?.name || 'maaltijd'
+    const updated = [...weekData]; const meals = { ...updated[dayIndex].meals }; delete meals[slot]
+    updated[dayIndex] = { ...updated[dayIndex], meals }; updated[dayIndex].totals = calculateTotals(meals)
+    await applyWeekUpdate(updated, `Verwijderd: ${mealName} (${DAYS[dayIndex].full})`)
+  }
+  const handleAdd = (dayIndex, slot) => setSwapState({ dayIndex, slot, meal: null })
+  const handleUpdateMeal = async (dayIndex, slot, updatedMeal) => {
+    if (!weekData) return
+    const updated = [...weekData]
+    const matchingMealId = updatedMeal.meal_id || updatedMeal.id
+
+    // Update alle slots in de hele week die dezelfde meal_id hebben
+    updated.forEach((day, di) => {
+      Object.entries(day.meals).forEach(([s, m]) => {
+        if (!m) return
+        const slotMealId = m.meal_id || m.id
+        if (slotMealId && slotMealId === matchingMealId) {
+          updated[di] = {
+            ...updated[di],
+            meals: { ...updated[di].meals, [s]: { ...m, ...updatedMeal } }
+          }
+          updated[di].totals = calculateTotals(updated[di].meals)
         }
       })
-      
-      analysis.dailyTotals.push(dayTotal)
-      
-      // Add to week total
-      analysis.weekTotal.calories += dayTotal.calories
-      analysis.weekTotal.protein += dayTotal.protein
-      analysis.weekTotal.carbs += dayTotal.carbs
-      analysis.weekTotal.fat += dayTotal.fat
-      analysis.weekTotal.cost += dayTotal.cost
-      
-      // Check for warnings
-      const calorieDiff = Math.abs(dayTotal.calories - dailyTargets.calories)
-      const proteinDiff = Math.abs(dayTotal.protein - dailyTargets.protein)
-      
-      if (calorieDiff > dailyTargets.calories * 0.15) {
-        analysis.warnings.push({
-          type: 'calories',
-          day: dayIndex,
-          message: `${weekDays[dayIndex].fullLabel}: ${dayTotal.calories < dailyTargets.calories ? 'Te weinig' : 'Te veel'} calorieën (${Math.round(dayTotal.calories)} vs ${dailyTargets.calories})`,
-          severity: calorieDiff > dailyTargets.calories * 0.25 ? 'high' : 'medium'
-        })
-      }
-      
-      if (proteinDiff > dailyTargets.protein * 0.15) {
-        analysis.warnings.push({
-          type: 'protein',
-          day: dayIndex,
-          message: `${weekDays[dayIndex].fullLabel}: ${dayTotal.protein < dailyTargets.protein ? 'Te weinig' : 'Te veel'} eiwit (${Math.round(dayTotal.protein)}g vs ${dailyTargets.protein}g)`,
-          severity: proteinDiff > dailyTargets.protein * 0.25 ? 'high' : 'medium'
-        })
-      }
     })
-    
-    // Check for meal repetition warnings
-    Object.entries(analysis.mealFrequency).forEach(([meal, count]) => {
-      if (count > 3) {
-        analysis.warnings.push({
-          type: 'variety',
-          message: `"${meal}" komt ${count}x voor in de week`,
-          severity: count > 4 ? 'medium' : 'low'
-        })
-      }
-    })
-    
-    // Calculate averages
-    analysis.dailyAverage = {
-      calories: Math.round(analysis.weekTotal.calories / 7),
-      protein: Math.round(analysis.weekTotal.protein / 7),
-      carbs: Math.round(analysis.weekTotal.carbs / 7),
-      fat: Math.round(analysis.weekTotal.fat / 7),
-      cost: (analysis.weekTotal.cost / 7).toFixed(2)
-    }
-    
-    // Add shopping list from AI analysis if available
-    if (generatedPlan.stats?.shoppingList) {
-      analysis.shoppingList = generatedPlan.stats.shoppingList
-    }
-    
-    setWeekAnalysis(analysis)
+
+    await applyWeekUpdate(updated, `Aangepast: ${updatedMeal.name} (alle dagen)`)
   }
-  
-  // Get plan with modifications applied
-  const getModifiedPlan = () => {
-    if (!generatedPlan?.weekPlan) return []
-    
-    return generatedPlan.weekPlan.map((day, index) => {
-      if (planModifications && planModifications[index]) {
-        return planModifications[index]
-      }
-      return day
-    })
+  const handleAutoBalance = async (dayIndex, updatedMeals) => {
+    if (!weekData) return
+    const updated = [...weekData]; updated[dayIndex] = { ...updated[dayIndex], meals: updatedMeals }; updated[dayIndex].totals = calculateTotals(updatedMeals)
+    await applyWeekUpdate(updated, `Auto-balance: ${DAYS[dayIndex].full}`); setShowBalancer(false)
   }
-  
-  // Load replacement meals using AI service
-  const loadReplacementMeals = async (dayIndex, slotType) => {
-    if (!db) return
-    
-    setLoadingReplacements(true)
+  const handleWeekBalance = async (updatedWeekData, shouldClose = true) => {
+    await applyWeekUpdate(updatedWeekData, 'Week gebalanceerd'); if (shouldClose) setShowWeekBalancer(false)
+  }
+  const handleMoveMeal = async (fromDay, fromSlot, toDay, toSlot) => {
+    if (!weekData) return
+    const updated = [...weekData]
+    const sourceMeal = updated[fromDay].meals[fromSlot]; const targetMeal = updated[toDay].meals[toSlot]
+    if (!sourceMeal) return
+    const newSourceMeals = { ...updated[fromDay].meals }; const newTargetMeals = fromDay === toDay ? newSourceMeals : { ...updated[toDay].meals }
+    newTargetMeals[toSlot] = sourceMeal; newSourceMeals[fromSlot] = targetMeal || null
+    if (!newSourceMeals[fromSlot]) delete newSourceMeals[fromSlot]
+    updated[fromDay] = { ...updated[fromDay], meals: newSourceMeals }; updated[fromDay].totals = calculateTotals(newSourceMeals)
+    if (fromDay !== toDay) { updated[toDay] = { ...updated[toDay], meals: newTargetMeals }; updated[toDay].totals = calculateTotals(newTargetMeals) }
+    await applyWeekUpdate(updated, `Verplaatst: ${sourceMeal.name}`)
+  }
+
+  // ════════════ ACTIONS ════════════
+
+  const handleActivate = async () => {
+    if (!planMeta?.id) return
+    setActivating(true)
     try {
-      // Get AI service
-      const aiService = await db.getAIMealPlanningService()
-      
-      // Load all meals
-      const allMeals = await aiService.loadAIMeals()
-      
-      // Filter by meal type
-      const filteredMeals = allMeals.filter(meal => {
-        if (slotType === 'breakfast' && meal.timing?.includes('breakfast')) return true
-        if (slotType === 'lunch' && meal.timing?.includes('lunch')) return true
-        if (slotType === 'dinner' && meal.timing?.includes('dinner')) return true
-        if (slotType === 'snack' && meal.timing?.includes('snack')) return true
-        return false
-      })
-      
-      // Score and sort meals
-      if (generatedPlan?.clientProfile) {
-        const scoredMeals = aiService.scoreAllMeals(
-          filteredMeals,
-          generatedPlan.clientProfile,
-          generatedPlan.ingredientPreferences?.excluded || [],
-          generatedPlan.ingredientPreferences?.selected || []
-        )
-        
-        // Get top 10 alternatives
-        setReplacementMeals(scoredMeals.slice(0, 10))
-      } else {
-        // Fallback: just take first 10
-        setReplacementMeals(filteredMeals.slice(0, 10))
+      await db.supabase.from('client_meal_plans').update({ is_active: false }).eq('client_id', planMeta.clientId).eq('is_active', true)
+      const { error } = await db.supabase.from('client_meal_plans').update({ is_active: true }).eq('id', planMeta.id)
+      if (error) throw error
+      setActivated(true); setPlanMeta(p => ({ ...p, isActive: true }))
+      if (onPlanActivated) onPlanActivated(planMeta.id)
+
+      // ✅ Coaching guide automatisch toewijzen als document
+      const clientName = clientRecord?.first_name || 'Client'
+      const guideUrl = `${window.location.origin}/coaching-guide?name=${encodeURIComponent(clientName)}`
+      // Controleer of er al een coaching guide staat
+      const { data: existing } = await db.supabase
+        .from('client_documents')
+        .select('id')
+        .eq('client_id', planMeta.clientId)
+        .eq('file_type', 'coaching_guide')
+        .limit(1)
+      if (!existing?.length) {
+        await db.supabase.from('client_documents').insert({
+          client_id: planMeta.clientId,
+          coach_id: coachId,
+          name: 'Coaching Guide — Timing & Supplementen',
+          file_url: guideUrl,
+          file_type: 'coaching_guide'
+        })
       }
-    } catch (error) {
-      console.error('Error loading replacement meals:', error)
-      setReplacementMeals([])
-    } finally {
-      setLoadingReplacements(false)
-    }
+    } catch (err) { alert('Activeren mislukt: ' + err.message) }
+    setActivating(false)
   }
-  
-  // Replace meal in plan
-  const replaceMeal = (dayIndex, slotType, newMeal) => {
-    const currentPlan = getModifiedPlan()
-    const modifiedDay = { ...currentPlan[dayIndex] }
-    
-    // Replace the meal
-    if (slotType === 'breakfast') {
-      modifiedDay.breakfast = newMeal
-    } else if (slotType === 'lunch') {
-      modifiedDay.lunch = newMeal
-    } else if (slotType === 'dinner') {
-      modifiedDay.dinner = newMeal
-    } else if (slotType.startsWith('snack')) {
-      const snackIndex = parseInt(slotType.replace('snack', '')) - 1
-      if (!modifiedDay.snacks) modifiedDay.snacks = []
-      modifiedDay.snacks[snackIndex] = newMeal
-    }
-    
-    // Recalculate totals
-    const meals = [modifiedDay.breakfast, modifiedDay.lunch, modifiedDay.dinner, ...modifiedDay.snacks].filter(Boolean)
-    modifiedDay.totals = {
-      kcal: 0,
-      protein: 0,
-      carbs: 0,
-      fat: 0
-    }
-    
-    meals.forEach(meal => {
-      modifiedDay.totals.kcal += meal.calories || 0
-      modifiedDay.totals.protein += meal.protein || 0
-      modifiedDay.totals.carbs += meal.carbs || 0
-      modifiedDay.totals.fat += meal.fat || 0
-    })
-    
-    // Recalculate accuracy
-    const calAccuracy = 100 - Math.min(20, Math.abs(100 - (modifiedDay.totals.kcal / dailyTargets.calories * 100)))
-    const protAccuracy = 100 - Math.min(20, Math.abs(100 - (modifiedDay.totals.protein / dailyTargets.protein * 100)))
-    
-    modifiedDay.accuracy = {
-      total: Math.round((calAccuracy + protAccuracy) / 2),
-      calories: Math.round(calAccuracy),
-      protein: Math.round(protAccuracy)
-    }
-    
-    // Update modifications
-    const newModifications = { ...planModifications }
-    newModifications[dayIndex] = modifiedDay
-    setPlanModifications(newModifications)
-    
-    // Close edit mode
-    setEditMode(false)
-    setSelectedSlot(null)
-    setReplacementMeals([])
+
+  const handlePDF = async () => {
+    if (!planMeta?.id) return
+    setLoadingPdf(true)
+    try {
+      const { data, error } = await db.supabase.from('client_meal_plans').select('*').eq('id', planMeta.id).single()
+      if (error || !data) throw new Error('Plan laden mislukt')
+      const clientName = clientRecord?.first_name || 'Client'
+      const today = new Date(); const nextWeek = new Date(today.getTime() + 7 * 24 * 60 * 60 * 1000)
+      const weekRange = `${today.toLocaleDateString('nl-NL')} - ${nextWeek.toLocaleDateString('nl-NL')}`
+      await openMealPlanForPrint(data, clientName, weekRange)
+    } catch (err) { alert('PDF maken mislukt. Probeer opnieuw.') }
+    setLoadingPdf(false)
   }
-  
-  // Get current day's data
-  const getCurrentDayData = () => {
-    const plan = getModifiedPlan()
-    return plan[activeDay] || null
+
+  const handleWhatsApp = () => {
+    const name = clientRecord?.first_name || 'je'; const phone = clientRecord?.phone || ''; const planName = planMeta?.name || 'je nieuwe weekplan'
+    const message = `Hey ${name}! Je nieuwe voedingsplan staat klaar in de MY ARC app: "${planName}". Open de app om het te bekijken. Vragen? Stuur me een berichtje! 💪`
+    window.open(`https://wa.me/${phone.replace(/\D/g, '')}?text=${encodeURIComponent(message)}`, '_blank')
   }
-  
-  // Get macro comparison
-  const getMacroComparison = (actual, target) => {
-    const percentage = (actual / target) * 100
-    return {
-      percentage: Math.round(percentage),
-      color: percentage < 85 ? '#ef4444' : percentage > 115 ? '#f59e0b' : '#10b981',
-      status: percentage < 85 ? 'Te laag' : percentage > 115 ? 'Te hoog' : 'Perfect'
-    }
-  }
-  
-  if (!generatedPlan?.weekPlan) {
+
+  // ════════════ RENDER: NO DATA ════════════
+
+  if (!weekData && !generatedPlan?.weekPlan) {
     return (
-      <div style={{
-        textAlign: 'center',
-        padding: '3rem',
-        color: 'rgba(255,255,255,0.5)'
-      }}>
-        <BarChart3 size={48} style={{ marginBottom: '1rem', opacity: 0.3 }} />
-        <p>Genereer eerst een weekplan in Tab 3</p>
+      <div style={{ padding: m ? '1rem' : '1.5rem' }}>
+        <div style={{ textAlign: 'center', marginBottom: '1.5rem' }}>
+          <BarChart3 size={28} style={{ color: 'rgba(255,255,255,0.1)', marginBottom: '0.5rem' }} />
+          <div style={{ fontSize: '1rem', fontWeight: 800, color: '#fff' }}>Plan Analyzer</div>
+          <div style={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.3)', marginTop: '0.15rem' }}>
+            {conceptPlans.length > 0 ? 'Selecteer een concept plan' : 'Genereer eerst een plan of selecteer een client'}
+          </div>
+        </div>
+        {resolvedClientId && allClientPlans.length > 0 && (
+          <button onClick={() => setShowPlanSwitcher(true)} style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem', padding: '0.625rem 1rem', marginBottom: '1rem', background: 'rgba(255,215,0,0.05)', border: '1px solid rgba(255,215,0,0.15)', borderRadius: '6px', cursor: 'pointer', color: '#FFD700', fontSize: '0.65rem', fontWeight: 700, touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}>
+            <List size={14} /> Alle plannen bekijken ({allClientPlans.length})
+          </button>
+        )}
+        {loadingConcepts && <div style={{ textAlign: 'center', padding: '2rem', color: 'rgba(255,255,255,0.2)', fontSize: '0.65rem' }}>Laden...</div>}
+        {conceptPlans.map(plan => (
+          <button key={plan.id} onClick={() => setSelectedConceptId(plan.id)} style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '0.6rem', padding: m ? '0.625rem 0.75rem' : '0.75rem 1rem', background: 'rgba(255,255,255,0.02)', border: 'none', borderBottom: '1px solid rgba(255,255,255,0.04)', cursor: 'pointer', textAlign: 'left', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}>
+            <FileText size={16} color={plan.ai_generated ? '#FFD700' : '#10b981'} style={{ flexShrink: 0 }} />
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{plan.template_name}</div>
+              <div style={{ fontSize: '0.55rem', color: 'rgba(255,255,255,0.25)' }}>{plan.daily_calories} kcal · {plan.daily_protein}g eiwit · {new Date(plan.created_at).toLocaleDateString('nl-NL')}</div>
+            </div>
+            <ChevronRight size={14} color="rgba(255,255,255,0.1)" />
+          </button>
+        ))}
+        {showPlanSwitcher && resolvedClientId && (
+          <PlanSwitcherModal db={db} clientId={resolvedClientId} coachId={coachId} activePlanId={planMeta?.id}
+            onSelect={(planId) => { setSelectedConceptId(planId); setShowPlanSwitcher(false); loadAllPlanCount(resolvedClientId) }}
+            onClose={() => setShowPlanSwitcher(false)} isMobile={m} />
+        )}
       </div>
     )
   }
-  
-  const currentDay = getCurrentDayData()
-  
-  return (
-    <div style={{
-      display: 'flex',
-      flexDirection: 'column',
-      gap: isMobile ? '1rem' : '1.5rem'
-    }}>
-      {/* Header */}
-      <div>
-        <h2 style={{
-          fontSize: isMobile ? '1.25rem' : '1.5rem',
-          fontWeight: '700',
-          color: '#fff',
-          marginBottom: '0.5rem',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '0.5rem'
-        }}>
-          <BarChart3 size={24} style={{ color: '#3b82f6' }} />
-          Plan Analyse & Aanpassingen
-        </h2>
-        <p style={{
-          fontSize: isMobile ? '0.875rem' : '0.95rem',
-          color: 'rgba(255,255,255,0.6)'
-        }}>
-          Analyseer het gegenereerde plan en maak aanpassingen waar nodig
-        </p>
-      </div>
-      
-      {/* Quick Stats */}
-      {weekAnalysis && (
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(5, 1fr)',
-          gap: isMobile ? '0.75rem' : '1rem'
-        }}>
-          {/* Daily Average Calories */}
-          <div style={{
-            background: 'linear-gradient(135deg, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0.02) 100%)',
-            borderRadius: '10px',
-            border: '1px solid rgba(255,255,255,0.1)',
-            padding: isMobile ? '0.75rem' : '1rem'
-          }}>
-            <div style={{
-              fontSize: '0.7rem',
-              color: 'rgba(255,255,255,0.5)',
-              marginBottom: '0.25rem'
-            }}>
-              Gem. Calorieën
-            </div>
-            <div style={{
-              fontSize: isMobile ? '1.25rem' : '1.5rem',
-              fontWeight: '700',
-              color: getMacroComparison(weekAnalysis.dailyAverage.calories, dailyTargets.calories).color
-            }}>
-              {weekAnalysis.dailyAverage.calories}
-            </div>
-            <div style={{
-              fontSize: '0.75rem',
-              color: 'rgba(255,255,255,0.5)'
-            }}>
-              Target: {dailyTargets.calories}
-            </div>
-          </div>
-          
-          {/* Daily Average Protein */}
-          <div style={{
-            background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.05) 0%, rgba(16, 185, 129, 0.02) 100%)',
-            borderRadius: '10px',
-            border: '1px solid rgba(16, 185, 129, 0.2)',
-            padding: isMobile ? '0.75rem' : '1rem'
-          }}>
-            <div style={{
-              fontSize: '0.7rem',
-              color: 'rgba(255,255,255,0.5)',
-              marginBottom: '0.25rem'
-            }}>
-              Gem. Eiwit
-            </div>
-            <div style={{
-              fontSize: isMobile ? '1.25rem' : '1.5rem',
-              fontWeight: '700',
-              color: '#10b981'
-            }}>
-              {weekAnalysis.dailyAverage.protein}g
-            </div>
-            <div style={{
-              fontSize: '0.75rem',
-              color: getMacroComparison(weekAnalysis.dailyAverage.protein, dailyTargets.protein).color
-            }}>
-              {getMacroComparison(weekAnalysis.dailyAverage.protein, dailyTargets.protein).percentage}%
-            </div>
-          </div>
-          
-          {/* Week Cost */}
-          <div style={{
-            background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.05) 0%, rgba(245, 158, 11, 0.02) 100%)',
-            borderRadius: '10px',
-            border: '1px solid rgba(245, 158, 11, 0.2)',
-            padding: isMobile ? '0.75rem' : '1rem'
-          }}>
-            <div style={{
-              fontSize: '0.7rem',
-              color: 'rgba(255,255,255,0.5)',
-              marginBottom: '0.25rem'
-            }}>
-              Week Kosten
-            </div>
-            <div style={{
-              fontSize: isMobile ? '1.25rem' : '1.5rem',
-              fontWeight: '700',
-              color: '#f59e0b'
-            }}>
-              €{weekAnalysis.weekTotal.cost.toFixed(0)}
-            </div>
-            <div style={{
-              fontSize: '0.75rem',
-              color: 'rgba(255,255,255,0.5)'
-            }}>
-              €{weekAnalysis.dailyAverage.cost}/dag
-            </div>
-          </div>
-          
-          {/* Unique Meals */}
-          <div style={{
-            background: 'linear-gradient(135deg, rgba(139, 92, 246, 0.05) 0%, rgba(139, 92, 246, 0.02) 100%)',
-            borderRadius: '10px',
-            border: '1px solid rgba(139, 92, 246, 0.2)',
-            padding: isMobile ? '0.75rem' : '1rem'
-          }}>
-            <div style={{
-              fontSize: '0.7rem',
-              color: 'rgba(255,255,255,0.5)',
-              marginBottom: '0.25rem'
-            }}>
-              Unieke Meals
-            </div>
-            <div style={{
-              fontSize: isMobile ? '1.25rem' : '1.5rem',
-              fontWeight: '700',
-              color: '#8b5cf6'
-            }}>
-              {Object.keys(weekAnalysis.mealFrequency).length}
-            </div>
-            <div style={{
-              fontSize: '0.75rem',
-              color: 'rgba(255,255,255,0.5)'
-            }}>
-              Variatie
-            </div>
-          </div>
-          
-          {/* Warnings */}
-          <div style={{
-            background: weekAnalysis.warnings.length > 0 
-              ? 'linear-gradient(135deg, rgba(239, 68, 68, 0.05) 0%, rgba(239, 68, 68, 0.02) 100%)'
-              : 'linear-gradient(135deg, rgba(16, 185, 129, 0.05) 0%, rgba(16, 185, 129, 0.02) 100%)',
-            borderRadius: '10px',
-            border: weekAnalysis.warnings.length > 0
-              ? '1px solid rgba(239, 68, 68, 0.2)'
-              : '1px solid rgba(16, 185, 129, 0.2)',
-            padding: isMobile ? '0.75rem' : '1rem'
-          }}>
-            <div style={{
-              fontSize: '0.7rem',
-              color: 'rgba(255,255,255,0.5)',
-              marginBottom: '0.25rem'
-            }}>
-              Meldingen
-            </div>
-            <div style={{
-              fontSize: isMobile ? '1.25rem' : '1.5rem',
-              fontWeight: '700',
-              color: weekAnalysis.warnings.length > 0 ? '#ef4444' : '#10b981'
-            }}>
-              {weekAnalysis.warnings.length}
-            </div>
-            <div style={{
-              fontSize: '0.75rem',
-              color: 'rgba(255,255,255,0.5)'
-            }}>
-              {weekAnalysis.warnings.length > 0 ? 'Check' : 'OK'}
-            </div>
-          </div>
-        </div>
-      )}
-      
-      {/* Day Navigation */}
-      <div style={{
-        background: 'rgba(255,255,255,0.03)',
-        borderRadius: '12px',
-        border: '1px solid rgba(255,255,255,0.1)',
-        padding: isMobile ? '0.75rem' : '1rem'
-      }}>
-        <div style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          marginBottom: '1rem'
-        }}>
-          <button
-            onClick={() => setActiveDay(Math.max(0, activeDay - 1))}
-            disabled={activeDay === 0}
-            style={{
-              padding: '0.5rem',
-              background: activeDay === 0 ? 'transparent' : 'rgba(255,255,255,0.05)',
-              border: '1px solid rgba(255,255,255,0.1)',
-              borderRadius: '8px',
-              color: activeDay === 0 ? 'rgba(255,255,255,0.3)' : '#fff',
-              cursor: activeDay === 0 ? 'not-allowed' : 'pointer',
-              minHeight: '44px',
-              minWidth: '44px',
-              touchAction: 'manipulation'
-            }}
-          >
-            <ChevronLeft size={20} />
-          </button>
-          
-          <h3 style={{
-            fontSize: isMobile ? '1.1rem' : '1.25rem',
-            fontWeight: '600',
-            color: '#fff'
-          }}>
-            {weekDays[activeDay].fullLabel}
-          </h3>
-          
-          <button
-            onClick={() => setActiveDay(Math.min(6, activeDay + 1))}
-            disabled={activeDay === 6}
-            style={{
-              padding: '0.5rem',
-              background: activeDay === 6 ? 'transparent' : 'rgba(255,255,255,0.05)',
-              border: '1px solid rgba(255,255,255,0.1)',
-              borderRadius: '8px',
-              color: activeDay === 6 ? 'rgba(255,255,255,0.3)' : '#fff',
-              cursor: activeDay === 6 ? 'not-allowed' : 'pointer',
-              minHeight: '44px',
-              minWidth: '44px',
-              touchAction: 'manipulation'
-            }}
-          >
-            <ChevronRight size={20} />
-          </button>
-        </div>
-        
-        {/* Day Dots */}
-        <div style={{
-          display: 'flex',
-          justifyContent: 'center',
-          gap: '0.5rem'
-        }}>
-          {weekDays.map((_, index) => (
-            <button
-              key={index}
-              onClick={() => setActiveDay(index)}
-              style={{
-                width: '8px',
-                height: '8px',
-                borderRadius: '50%',
-                background: index === activeDay 
-                  ? '#10b981' 
-                  : 'rgba(255,255,255,0.2)',
-                border: 'none',
-                cursor: 'pointer',
-                transition: 'all 0.3s ease'
-              }}
-            />
-          ))}
-        </div>
-      </div>
-      
-      {/* Current Day Meals */}
-      {currentDay && (
-        <>
-          <div style={{
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '0.75rem'
-          }}>
-            {/* Breakfast */}
-            {currentDay.breakfast && (
-              <MealSlot
-                meal={currentDay.breakfast}
-                slotType="breakfast"
-                slotLabel="🌅 Ontbijt"
-                onReplace={() => {
-                  setEditMode(true)
-                  setSelectedSlot('breakfast')
-                  loadReplacementMeals(activeDay, 'breakfast')
-                }}
-                isMobile={isMobile}
-              />
-            )}
-            
-            {/* Lunch */}
-            {currentDay.lunch && (
-              <MealSlot
-                meal={currentDay.lunch}
-                slotType="lunch"
-                slotLabel="🥗 Lunch"
-                onReplace={() => {
-                  setEditMode(true)
-                  setSelectedSlot('lunch')
-                  loadReplacementMeals(activeDay, 'lunch')
-                }}
-                isMobile={isMobile}
-              />
-            )}
-            
-            {/* Dinner */}
-            {currentDay.dinner && (
-              <MealSlot
-                meal={currentDay.dinner}
-                slotType="dinner"
-                slotLabel="🍽️ Diner"
-                onReplace={() => {
-                  setEditMode(true)
-                  setSelectedSlot('dinner')
-                  loadReplacementMeals(activeDay, 'dinner')
-                }}
-                isMobile={isMobile}
-              />
-            )}
-            
-            {/* Snacks */}
-            {currentDay.snacks?.map((snack, index) => (
-              snack && (
-                <MealSlot
-                  key={index}
-                  meal={snack}
-                  slotType={`snack${index + 1}`}
-                  slotLabel={`🥜 Snack ${index + 1}`}
-                  onReplace={() => {
-                    setEditMode(true)
-                    setSelectedSlot(`snack${index + 1}`)
-                    loadReplacementMeals(activeDay, 'snack')
-                  }}
-                  isMobile={isMobile}
-                />
-              )
-            ))}
-          </div>
-          
-          {/* Day Totals */}
-          <div style={{
-            padding: '1rem',
-            background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.05) 0%, rgba(16, 185, 129, 0.02) 100%)',
-            borderRadius: '10px',
-            border: '1px solid rgba(16, 185, 129, 0.2)'
-          }}>
-            <h4 style={{
-              fontSize: '0.9rem',
-              fontWeight: '600',
-              color: '#10b981',
-              marginBottom: '0.75rem',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.5rem'
-            }}>
-              <Target size={16} />
-              Dag Totalen & Accuracy
-            </h4>
-            
-            <div style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(2, 1fr)',
-              gap: '1rem'
-            }}>
-              <div>
-                <div style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.5)', marginBottom: '0.5rem' }}>
-                  Macros
-                </div>
-                <div style={{
-                  display: 'grid',
-                  gridTemplateColumns: 'repeat(2, 1fr)',
-                  gap: '0.5rem',
-                  fontSize: '0.8rem'
-                }}>
-                  <div>
-                    <span style={{ color: 'rgba(255,255,255,0.5)' }}>kcal: </span>
-                    <strong style={{ 
-                      color: getMacroComparison(currentDay.totals?.kcal || 0, dailyTargets.calories).color
-                    }}>
-                      {Math.round(currentDay.totals?.kcal || 0)}
-                    </strong>
-                  </div>
-                  <div>
-                    <span style={{ color: 'rgba(255,255,255,0.5)' }}>P: </span>
-                    <strong style={{ 
-                      color: getMacroComparison(currentDay.totals?.protein || 0, dailyTargets.protein).color
-                    }}>
-                      {Math.round(currentDay.totals?.protein || 0)}g
-                    </strong>
-                  </div>
-                  <div>
-                    <span style={{ color: 'rgba(255,255,255,0.5)' }}>C: </span>
-                    <strong style={{ color: '#3b82f6' }}>
-                      {Math.round(currentDay.totals?.carbs || 0)}g
-                    </strong>
-                  </div>
-                  <div>
-                    <span style={{ color: 'rgba(255,255,255,0.5)' }}>F: </span>
-                    <strong style={{ color: '#f59e0b' }}>
-                      {Math.round(currentDay.totals?.fat || 0)}g
-                    </strong>
-                  </div>
-                </div>
-              </div>
-              
-              <div>
-                <div style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.5)', marginBottom: '0.5rem' }}>
-                  Nauwkeurigheid
-                </div>
-                <div style={{
-                  fontSize: '1.5rem',
-                  fontWeight: '700',
-                  color: currentDay.accuracy?.total >= 90 ? '#10b981' :
-                         currentDay.accuracy?.total >= 75 ? '#f59e0b' : '#ef4444'
-                }}>
-                  {currentDay.accuracy?.total || 0}%
-                </div>
-                <div style={{
-                  fontSize: '0.7rem',
-                  color: 'rgba(255,255,255,0.5)'
-                }}>
-                  Cal: {currentDay.accuracy?.calories || 0}% | 
-                  Prot: {currentDay.accuracy?.protein || 0}%
-                </div>
-              </div>
-            </div>
-          </div>
-        </>
-      )}
-      
-      {/* Section Toggles */}
-      <div style={{
-        display: 'flex',
-        gap: '0.5rem',
-        flexWrap: 'wrap'
-      }}>
-        {Object.entries({
-          warnings: { label: 'Waarschuwingen', icon: AlertTriangle, count: weekAnalysis?.warnings.length },
-          shopping: { label: 'Boodschappen', icon: ShoppingCart },
-          costs: { label: 'Kosten', icon: DollarSign }
-        }).map(([key, section]) => {
-          const Icon = section.icon
-          return (
-            <button
-              key={key}
-              onClick={() => setShowDetails(prev => ({ ...prev, [key]: !prev[key] }))}
-              style={{
-                padding: '0.5rem 0.75rem',
-                background: showDetails[key]
-                  ? 'rgba(16, 185, 129, 0.1)'
-                  : 'rgba(255,255,255,0.05)',
-                border: `1px solid ${showDetails[key] ? '#10b981' : 'rgba(255,255,255,0.1)'}`,
-                borderRadius: '8px',
-                color: showDetails[key] ? '#10b981' : 'rgba(255,255,255,0.6)',
-                fontSize: isMobile ? '0.8rem' : '0.875rem',
-                fontWeight: showDetails[key] ? '600' : '400',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.5rem',
-                minHeight: '44px',
-                touchAction: 'manipulation'
-              }}
-            >
-              <Icon size={16} />
-              {section.label}
-              {section.count !== undefined && section.count > 0 && (
-                <span style={{
-                  background: '#ef4444',
-                  borderRadius: '10px',
-                  padding: '0 6px',
-                  fontSize: '0.7rem',
-                  color: '#fff'
-                }}>
-                  {section.count}
-                </span>
-              )}
-              {showDetails[key] ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-            </button>
-          )
-        })}
-      </div>
-      
-      {/* Warnings Section */}
-      {showDetails.warnings && weekAnalysis?.warnings.length > 0 && (
-        <div style={{
-          background: 'rgba(239, 68, 68, 0.03)',
-          borderRadius: '12px',
-          border: '1px solid rgba(239, 68, 68, 0.2)',
-          padding: isMobile ? '1rem' : '1.25rem'
-        }}>
-          <h3 style={{
-            fontSize: isMobile ? '1rem' : '1.1rem',
-            fontWeight: '600',
-            color: '#ef4444',
-            marginBottom: '1rem',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.5rem'
-          }}>
-            <AlertTriangle size={20} />
-            Waarschuwingen & Suggesties
-          </h3>
-          
-          <div style={{
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '0.75rem'
-          }}>
-            {weekAnalysis.warnings.map((warning, index) => (
-              <div key={index} style={{
-                padding: '0.75rem',
-                background: warning.severity === 'high' 
-                  ? 'rgba(239, 68, 68, 0.05)'
-                  : warning.severity === 'medium'
-                    ? 'rgba(245, 158, 11, 0.05)'
-                    : 'rgba(255,255,255,0.03)',
-                borderRadius: '8px',
-                border: `1px solid ${
-                  warning.severity === 'high' ? 'rgba(239, 68, 68, 0.3)' :
-                  warning.severity === 'medium' ? 'rgba(245, 158, 11, 0.3)' :
-                  'rgba(255,255,255,0.1)'
-                }`,
-                fontSize: '0.875rem',
-                color: '#fff'
-              }}>
-                {warning.message}
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-      
-      {/* Shopping List */}
-      {showDetails.shopping && weekAnalysis?.shoppingList && (
-        <div style={{
-          background: 'rgba(255,255,255,0.03)',
-          borderRadius: '12px',
-          border: '1px solid rgba(255,255,255,0.1)',
-          padding: isMobile ? '1rem' : '1.25rem'
-        }}>
-          <h3 style={{
-            fontSize: isMobile ? '1rem' : '1.1rem',
-            fontWeight: '600',
-            color: '#3b82f6',
-            marginBottom: '1rem',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.5rem'
-          }}>
-            <ShoppingCart size={20} />
-            Boodschappenlijst
-          </h3>
-          
-          {weekAnalysis.shoppingList.ingredients ? (
-            <div style={{
-              display: 'grid',
-              gridTemplateColumns: isMobile ? '1fr' : 'repeat(2, 1fr)',
-              gap: '0.5rem',
-              maxHeight: '300px',
-              overflowY: 'auto'
-            }}>
-              {weekAnalysis.shoppingList.ingredients
-                .sort((a, b) => a.name.localeCompare(b.name))
-                .map((item, index) => (
-                  <div key={index} style={{
-                    padding: '0.5rem',
-                    background: 'rgba(255,255,255,0.02)',
-                    borderRadius: '6px',
-                    border: '1px solid rgba(255,255,255,0.1)',
-                    fontSize: '0.85rem',
-                    color: '#fff',
-                    display: 'flex',
-                    justifyContent: 'space-between'
-                  }}>
-                    <span>{item.name}</span>
-                    <span style={{ color: 'rgba(255,255,255,0.6)' }}>
-                      {Math.round(item.totalAmount)}{item.unit || 'g'}
-                    </span>
-                  </div>
-                ))}
-            </div>
-          ) : (
-            <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: '0.9rem' }}>
-              Genereer eerst een shopping list in tab 3
-            </p>
-          )}
-        </div>
-      )}
-      
-      {/* Costs Overview */}
-      {showDetails.costs && weekAnalysis && (
-        <div style={{
-          background: 'rgba(245, 158, 11, 0.03)',
-          borderRadius: '12px',
-          border: '1px solid rgba(245, 158, 11, 0.2)',
-          padding: isMobile ? '1rem' : '1.25rem'
-        }}>
-          <h3 style={{
-            fontSize: isMobile ? '1rem' : '1.1rem',
-            fontWeight: '600',
-            color: '#f59e0b',
-            marginBottom: '1rem',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.5rem'
-          }}>
-            <DollarSign size={20} />
-            Kosten Overzicht
-          </h3>
-          
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: isMobile ? '1fr' : 'repeat(3, 1fr)',
-            gap: '1rem'
-          }}>
-            <div style={{
-              padding: '0.75rem',
-              background: 'rgba(255,255,255,0.03)',
-              borderRadius: '8px',
-              border: '1px solid rgba(255,255,255,0.1)'
-            }}>
-              <div style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.5)' }}>
-                Week Totaal
-              </div>
-              <div style={{ fontSize: '1.5rem', fontWeight: '700', color: '#f59e0b' }}>
-                €{weekAnalysis.weekTotal.cost.toFixed(2)}
-              </div>
-            </div>
-            
-            <div style={{
-              padding: '0.75rem',
-              background: 'rgba(255,255,255,0.03)',
-              borderRadius: '8px',
-              border: '1px solid rgba(255,255,255,0.1)'
-            }}>
-              <div style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.5)' }}>
-                Per Dag
-              </div>
-              <div style={{ fontSize: '1.5rem', fontWeight: '700', color: '#fff' }}>
-                €{weekAnalysis.dailyAverage.cost}
-              </div>
-            </div>
-            
-            <div style={{
-              padding: '0.75rem',
-              background: 'rgba(255,255,255,0.03)',
-              borderRadius: '8px',
-              border: '1px solid rgba(255,255,255,0.1)'
-            }}>
-              <div style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.5)' }}>
-                Per Maaltijd
-              </div>
-              <div style={{ fontSize: '1.5rem', fontWeight: '700', color: '#10b981' }}>
-                €{(weekAnalysis.weekTotal.cost / (7 * 4)).toFixed(2)}
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-      
-      {/* Replacement Modal */}
-      {editMode && selectedSlot && (
-        <div style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          background: 'rgba(0,0,0,0.8)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 1000,
-          padding: '1rem'
-        }}>
-          <div style={{
-            background: '#111',
-            borderRadius: '16px',
-            border: '1px solid #333',
-            padding: isMobile ? '1.5rem' : '2rem',
-            maxWidth: '600px',
-            width: '100%',
-            maxHeight: '80vh',
-            overflowY: 'auto'
-          }}>
-            <div style={{
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              marginBottom: '1.5rem'
-            }}>
-              <h3 style={{
-                fontSize: '1.25rem',
-                fontWeight: '700',
-                color: '#fff'
-              }}>
-                Vervang {selectedSlot === 'breakfast' ? 'Ontbijt' :
-                         selectedSlot === 'lunch' ? 'Lunch' :
-                         selectedSlot === 'dinner' ? 'Diner' :
-                         selectedSlot.startsWith('snack') ? 'Snack' : ''}
-              </h3>
-              
-              <button
-                onClick={() => {
-                  setEditMode(false)
-                  setSelectedSlot(null)
-                  setReplacementMeals([])
-                }}
-                style={{
-                  background: 'transparent',
-                  border: 'none',
-                  color: '#ef4444',
-                  cursor: 'pointer',
-                  padding: '0.5rem'
-                }}
-              >
-                <X size={24} />
-              </button>
-            </div>
-            
-            {loadingReplacements ? (
-              <div style={{
-                textAlign: 'center',
-                padding: '3rem',
-                color: 'rgba(255,255,255,0.5)'
-              }}>
-                <div style={{
-                  width: '40px',
-                  height: '40px',
-                  border: '3px solid rgba(16, 185, 129, 0.2)',
-                  borderTopColor: '#10b981',
-                  borderRadius: '50%',
-                  animation: 'spin 1s linear infinite',
-                  margin: '0 auto 1rem'
-                }} />
-                <p>Laden van alternatieven...</p>
-              </div>
-            ) : (
-              <div style={{
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '0.75rem'
-              }}>
-                {replacementMeals.map(meal => (
-                  <button
-                    key={meal.id}
-                    onClick={() => replaceMeal(activeDay, selectedSlot, meal)}
-                    style={{
-                      padding: '1rem',
-                      background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.05) 0%, rgba(16, 185, 129, 0.02) 100%)',
-                      border: '1px solid rgba(16, 185, 129, 0.2)',
-                      borderRadius: '10px',
-                      color: '#fff',
-                      textAlign: 'left',
-                      cursor: 'pointer',
-                      transition: 'all 0.3s ease'
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.background = 'linear-gradient(135deg, rgba(16, 185, 129, 0.1) 0%, rgba(16, 185, 129, 0.05) 100%)'
-                      e.currentTarget.style.transform = 'translateX(4px)'
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.background = 'linear-gradient(135deg, rgba(16, 185, 129, 0.05) 0%, rgba(16, 185, 129, 0.02) 100%)'
-                      e.currentTarget.style.transform = 'translateX(0)'
-                    }}
-                  >
-                    <div style={{
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'start',
-                      marginBottom: '0.5rem'
-                    }}>
-                      <div style={{ fontWeight: '600', fontSize: '0.95rem' }}>
-                        {meal.name}
-                      </div>
-                      {meal.aiScore && (
-                        <span style={{
-                          background: 'linear-gradient(135deg, #10b981, #059669)',
-                          borderRadius: '4px',
-                          padding: '2px 6px',
-                          fontSize: '0.65rem',
-                          fontWeight: '600',
-                          color: '#fff'
-                        }}>
-                          AI: {meal.aiScore}
-                        </span>
-                      )}
-                    </div>
-                    <div style={{
-                      fontSize: '0.8rem',
-                      color: 'rgba(255,255,255,0.6)',
-                      display: 'grid',
-                      gridTemplateColumns: 'repeat(4, 1fr)',
-                      gap: '0.5rem'
-                    }}>
-                      <span>{Math.round(meal.calories)} kcal</span>
-                      <span style={{ color: '#10b981' }}>{Math.round(meal.protein)}g P</span>
-                      <span style={{ color: '#3b82f6' }}>{Math.round(meal.carbs)}g C</span>
-                      <span style={{ color: '#f59e0b' }}>{Math.round(meal.fat)}g F</span>
-                    </div>
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-      
-      {/* CSS */}
-      <style>{`
-        @keyframes spin {
-          to { transform: rotate(360deg); }
-        }
-      `}</style>
-    </div>
-  )
-}
 
-// Meal Slot Component
-function MealSlot({ meal, slotType, slotLabel, onReplace, isMobile }) {
-  return (
-    <div style={{
-      background: 'rgba(255,255,255,0.03)',
-      borderRadius: '10px',
-      border: '1px solid rgba(255,255,255,0.1)',
-      padding: isMobile ? '0.75rem' : '1rem',
-      position: 'relative'
-    }}>
-      {/* AI Score Badge */}
-      {meal.aiScore > 0 && (
-        <div style={{
-          position: 'absolute',
-          top: '-8px',
-          left: '10px',
-          background: 'linear-gradient(135deg, #10b981, #059669)',
-          borderRadius: '4px',
-          padding: '2px 6px',
-          fontSize: '0.65rem',
-          fontWeight: '600',
-          color: '#fff'
+  // ════════════ RENDER: MAIN ════════════
+
+  const currentDay = weekData?.[activeDay]
+  const preWorkoutSlot = getPreWorkoutSlot(activeDay)
+  const sortedSlots = currentDay ? getSortedSlots(currentDay.meals) : SLOTS
+  const warningCount = weekData?.reduce((count, day) => {
+    if (!targets?.calories) return count
+    const cal = day.totals?.kcal || day.totals?.calories || 0
+    const pct = targets.calories ? cal / targets.calories : 1
+    return count + (pct < 0.85 || pct > 1.15 ? 1 : 0)
+  }, 0) || 0
+  const activePlanCount = allClientPlans.filter(p => p.is_active).length
+
+  // ── Sidebar knoppen definitie ──
+  const sidebarTop = [
+    {
+      id: 'activate',
+      render: () => (
+        <button onClick={handleActivate} disabled={activating || activated || planMeta?.isActive} style={{
+          width: '44px', padding: '6px 0', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px',
+          background: (activated || planMeta?.isActive) ? 'rgba(16,185,129,0.12)' : 'rgba(16,185,129,0.08)',
+          border: `1px solid ${(activated || planMeta?.isActive) ? 'rgba(16,185,129,0.4)' : 'rgba(16,185,129,0.2)'}`,
+          borderRadius: '7px', cursor: (activated || planMeta?.isActive) ? 'default' : 'pointer',
+          touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent'
         }}>
-          AI: {meal.aiScore}
-        </div>
-      )}
-      
-      <div style={{
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        marginBottom: '0.5rem'
-      }}>
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '0.5rem'
-        }}>
-          <span style={{
-            fontSize: '0.9rem',
-            fontWeight: '600',
-            color: 'rgba(255,255,255,0.7)'
-          }}>
-            {slotLabel}
-          </span>
-        </div>
-        
-        <button
-          onClick={onReplace}
-          style={{
-            padding: '0.25rem 0.5rem',
-            background: 'rgba(16, 185, 129, 0.1)',
-            border: '1px solid rgba(16, 185, 129, 0.3)',
-            borderRadius: '6px',
-            color: '#10b981',
-            fontSize: '0.75rem',
-            fontWeight: '600',
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.25rem',
-            transition: 'all 0.3s ease'
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.background = 'rgba(16, 185, 129, 0.2)'
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.background = 'rgba(16, 185, 129, 0.1)'
-          }}
-        >
-          <Shuffle size={12} />
-          Vervang
+          {activating ? <Loader size={13} color="#10b981" style={{ animation: 'spin 1s linear infinite' }} /> : <Check size={13} color="#10b981" />}
+          <span style={{ fontSize: '0.38rem', fontWeight: 700, color: '#10b981' }}>{(activated || planMeta?.isActive) ? 'Actief' : 'Activeer'}</span>
         </button>
-      </div>
-      
-      <h4 style={{
-        fontSize: isMobile ? '0.95rem' : '1.05rem',
-        fontWeight: '600',
-        color: '#fff',
-        marginBottom: '0.5rem'
-      }}>
-        {meal.name}
-      </h4>
-      
+      )
+    },
+  ]
+
+  const sidebarNav = [
+    { id: 'plans',  icon: <List size={14} />,      label: 'Plannen', active: showPlanSwitcher,     onClick: () => setShowPlanSwitcher(true),        badge: allClientPlans.length > 0 ? allClientPlans.length : null },
+    { id: 'client', icon: '👤',                    label: 'Client',  active: showFloatingClient,   onClick: () => setShowFloatingClient(p => !p) },
+    { id: 'timing', icon: <Clock size={14} />,     label: 'Tijden',  active: showTimingModal,      onClick: () => setShowTimingModal(true) },
+    { id: 'dag',    icon: <Zap size={14} />,       label: 'Dag',     active: showBalancer,         onClick: () => setShowBalancer(true) },
+    { id: 'week',   icon: <Grid3X3 size={14} />,   label: 'Week',    active: viewMode === 'week',  onClick: () => setViewMode(v => v === 'week' ? 'day' : 'week') },
+  ]
+
+  const sidebarBottom = [
+    { id: 'pdf',     icon: loadingPdf ? <Loader size={13} style={{ animation: 'spin 1s linear infinite' }} /> : <Download size={13} />, label: 'PDF',    onClick: handlePDF,                                                     color: '#FFD700' },
+    { id: 'guide',   icon: <FileText size={13} />,    label: 'Guide',  onClick: () => openCoachingGuideForPrint(clientRecord?.first_name || 'Client'), color: '#6366f1' },
+    { id: 'wa',      icon: <MessageSquare size={13} />, label: 'WA',   onClick: handleWhatsApp,  color: '#10b981' },
+    { id: 'undo',    icon: <RotateCcw size={13} />,   label: 'Undo',   onClick: handleUndo,      color: canUndo ? 'rgba(255,255,255,0.4)' : 'rgba(255,255,255,0.1)', disabled: !canUndo },
+    { id: 'redo',    icon: <RotateCw size={13} />,    label: 'Redo',   onClick: handleRedo,      color: canRedo ? 'rgba(255,255,255,0.4)' : 'rgba(255,255,255,0.1)', disabled: !canRedo },
+  ]
+
+  return (
+    <div style={{ display: 'flex', height: '100%', minHeight: '400px', background: '#0a0a0a' }}>
+
+      {/* ════════════ SIDEBAR ════════════ */}
       <div style={{
-        display: 'grid',
-        gridTemplateColumns: 'repeat(4, 1fr)',
-        gap: '0.5rem',
-        fontSize: '0.75rem',
-        paddingTop: '0.5rem',
-        borderTop: '1px solid rgba(255,255,255,0.05)'
+        width: m ? '56px' : '80px', flexShrink: 0,
+        background: '#080808',
+        borderRight: '1px solid rgba(255,255,255,0.05)',
+        display: 'flex', flexDirection: 'column', alignItems: 'center',
+        padding: '8px 0', gap: '4px',
+        overflowY: 'auto', WebkitOverflowScrolling: 'touch'
       }}>
-        <div>
-          <div style={{ color: 'rgba(255,255,255,0.4)' }}>kcal</div>
-          <strong style={{ color: '#fff' }}>
-            {Math.round(meal.calories || 0)}
-          </strong>
-        </div>
-        <div>
-          <div style={{ color: 'rgba(255,255,255,0.4)' }}>eiwit</div>
-          <strong style={{ color: '#10b981' }}>
-            {Math.round(meal.protein || 0)}g
-          </strong>
-        </div>
-        <div>
-          <div style={{ color: 'rgba(255,255,255,0.4)' }}>carbs</div>
-          <strong style={{ color: '#3b82f6' }}>
-            {Math.round(meal.carbs || 0)}g
-          </strong>
-        </div>
-        <div>
-          <div style={{ color: 'rgba(255,255,255,0.4)' }}>vet</div>
-          <strong style={{ color: '#f59e0b' }}>
-            {Math.round(meal.fat || 0)}g
-          </strong>
-        </div>
+        {/* Activeer knop */}
+        {planMeta && (
+          <button onClick={handleActivate} disabled={activating || activated || planMeta?.isActive} style={{
+            width: m ? '44px' : '68px', padding: '6px 0',
+          }}>
+            {activating ? <Loader size={14} color="#10b981" style={{ animation: 'spin 1s linear infinite' }} /> : <Check size={14} color="#10b981" />}
+            <span style={{ fontSize: '0.42rem', fontWeight: 700, color: '#10b981' }}>{(activated || planMeta?.isActive) ? 'Actief' : 'Activeer'}</span>
+          </button>
+        )}
+
+        <div style={{ width: '32px', height: '1px', background: 'rgba(255,255,255,0.06)', margin: '2px 0' }} />
+
+        {/* Nav knoppen */}
+        {sidebarNav.map(btn => (
+          <button key={btn.id} onClick={btn.onClick} title={btn.label} style={{
+            width: m ? '44px' : '68px', padding: '6px 0',
+            display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px',
+            background: btn.active ? 'rgba(255,215,0,0.08)' : 'transparent',
+            border: `1px solid ${btn.active ? 'rgba(255,215,0,0.2)' : 'transparent'}`,
+            borderRadius: '7px', cursor: 'pointer',
+            touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+            position: 'relative', transition: 'all 0.15s ease'
+          }}>
+            <span style={{ color: btn.active ? '#FFD700' : 'rgba(255,255,255,0.35)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: typeof btn.icon === 'string' ? '13px' : undefined }}>
+              {btn.icon}
+            </span>
+            <span style={{ fontSize: '0.42rem', fontWeight: 700, color: btn.active ? '#FFD700' : 'rgba(255,255,255,0.25)' }}>{btn.label}</span>
+            {btn.badge && (
+              <span style={{ position: 'absolute', top: '2px', right: '2px', fontSize: '0.32rem', fontWeight: 800, background: 'rgba(255,215,0,0.15)', color: '#FFD700', borderRadius: '3px', padding: '0 2px', lineHeight: '1.4' }}>{btn.badge}</span>
+            )}
+          </button>
+        ))}
+
+        {/* Waarschuwing indicator */}
+        {warningCount > 0 && (
+          <div style={{ width: m ? '36px' : '40px', padding: '3px 0', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px' }}>
+            <AlertTriangle size={12} color="#ef4444" />
+            <span style={{ fontSize: '0.35rem', fontWeight: 700, color: '#ef4444' }}>{warningCount}d</span>
+          </div>
+        )}
+
+        <div style={{ flex: 1 }} />
+
+        <div style={{ width: '32px', height: '1px', background: 'rgba(255,255,255,0.06)', margin: '2px 0' }} />
+
+        {/* Bottom acties */}
+        {sidebarBottom.map(btn => (
+          <button key={btn.id} onClick={btn.onClick} disabled={btn.disabled} title={btn.label} style={{
+            width: m ? '44px' : '68px', padding: '6px 0',
+            display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px',
+            background: 'transparent', border: '1px solid transparent',
+            borderRadius: '7px', cursor: btn.disabled ? 'not-allowed' : 'pointer',
+            touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+            opacity: btn.disabled ? 0.35 : 1
+          }}>
+            <span style={{ color: btn.color || 'rgba(255,255,255,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{btn.icon}</span>
+            <span style={{ fontSize: '0.42rem', fontWeight: 700, color: btn.disabled ? 'rgba(255,255,255,0.15)' : 'rgba(255,255,255,0.3)' }}>{btn.label}</span>
+          </button>
+        ))}
       </div>
+
+      {/* ════════════ MAIN BUILDER ════════════ */}
+      <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+
+        {/* Plan naam + dag header */}
+        <div style={{ flexShrink: 0, borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+          {/* Plan naam */}
+          {planMeta && (
+            <div style={{ padding: '0.25rem 0.75rem', background: (activated || planMeta?.isActive) ? 'rgba(16,185,129,0.03)' : 'rgba(255,215,0,0.02)', borderBottom: '1px solid rgba(255,255,255,0.03)', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+              <span style={{ fontSize: '0.38rem', fontWeight: 700, color: (activated || planMeta?.isActive) ? '#10b981' : '#FFD700', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                {(activated || planMeta?.isActive) ? '✓ ACTIEF' : '⏳ CONCEPT'}
+              </span>
+              <span style={{ fontSize: '0.7rem', fontWeight: 800, color: '#fff', flex: 1, minWidth: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{planMeta.name}</span>
+              {planMeta.stats?.smartScaling && (
+                <span style={{ fontSize: '0.38rem', color: 'rgba(255,255,255,0.2)', flexShrink: 0 }}>{planMeta.stats.smartScaling.replacements} vervangingen</span>
+              )}
+            </div>
+          )}
+
+          {/* Macro bar */}
+          <DayMacroBar dayTotals={currentDay?.totals} targets={targets} isMobile={m} />
+
+          {/* Dag navigator */}
+          <div style={{ padding: m ? '0.25rem 0.5rem' : '0.3rem 0.75rem' }}>
+            <DayNavigator activeDay={activeDay} setActiveDay={setActiveDay} weekData={weekData} targets={targets} trainingDays={trainingDays} isMobile={m} />
+          </div>
+
+          {/* Dag naam + training badge */}
+          <div style={{ padding: '0.2rem 0.75rem 0.25rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+            <span style={{ fontSize: m ? '0.85rem' : '0.95rem', fontWeight: 800, color: '#fff' }}>{DAYS[activeDay]?.full || ''}</span>
+            {currentDay?.is_training_day && (
+              <span style={{ fontSize: '0.38rem', fontWeight: 700, color: '#f97316', background: 'rgba(249,115,22,0.1)', padding: '0.08rem 0.3rem', borderRadius: '3px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>TRAININGSDAG</span>
+            )}
+            {lastAction && (
+              <span style={{ fontSize: '0.38rem', color: 'rgba(255,255,255,0.15)', marginLeft: 'auto' }}>{lastAction}</span>
+            )}
+          </div>
+        </div>
+
+        {/* ── WEEK VIEW ── */}
+        {viewMode === 'week' && (
+          <div style={{ flex: 1, overflow: 'auto' }}>
+            <WeekOverview weekData={weekData} targets={targets} trainingDays={trainingDays} activeDay={activeDay}
+              onSelectDay={(i) => { setActiveDay(i); setViewMode('day') }}
+              onMoveMeal={handleMoveMeal} onAddMeal={handleAdd} isMobile={m} />
+          </div>
+        )}
+
+        {/* ── DAG VIEW ── */}
+        {viewMode === 'day' && (
+          <div style={{ flex: 1, overflowY: 'auto', WebkitOverflowScrolling: 'touch' }}>
+            {currentDay && sortedSlots.map(slot => {
+              const meal = currentDay.meals[slot]
+              const isPreWorkout = slot === preWorkoutSlot
+              const expectedSlots = mealSchedule?.num_meals
+                ? SLOTS.slice(0, Math.min(mealSchedule.num_meals, SLOTS.length))
+                : SLOTS.slice(0, 4)
+              if (!meal && !expectedSlots.includes(slot)) return null
+              const conflicts = getMealConflicts(meal)
+              return (
+                <MealCard key={slot} db={db} meal={meal} slot={slot} dayIndex={activeDay}
+                  mealSchedule={mealSchedule} isPreWorkout={isPreWorkout}
+                  isEmpty={!meal} onSwap={handleSwap} onDelete={handleDelete}
+                  onAdd={handleAdd} onUpdateMeal={handleUpdateMeal}
+                  conflicts={conflicts} isMobile={m} />
+              )
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* ════════════ MODALS ════════════ */}
+      {swapState && (
+        <SwapModal db={db} slot={swapState.slot} currentMeal={swapState.meal}
+          dayIndex={swapState.dayIndex} dayTotals={currentDay?.totals}
+          targets={targets} onSelect={handleSwapSelect}
+          onMultiDaySelect={handleMultiDaySelect}
+          onClose={() => setSwapState(null)} isMobile={m} />
+      )}
+
+      {showBalancer && currentDay && (
+        <AutoBalancer dayData={currentDay} targets={targets} dayIndex={activeDay}
+          onApply={handleAutoBalance} onClose={() => setShowBalancer(false)} isMobile={m} />
+      )}
+
+      {showWeekBalancer && weekData && (
+        <WeekBalancer weekData={weekData} targets={targets}
+          onApply={handleWeekBalance} onClose={() => setShowWeekBalancer(false)} isMobile={m} />
+      )}
+
+      {showTimingModal && weekData && (
+        <TimingModal weekData={weekData}
+          onApply={async (updated) => { await applyWeekUpdate(updated, 'Tijden bijgewerkt'); setShowTimingModal(false) }}
+          onClose={() => setShowTimingModal(false)} isMobile={m} />
+      )}
+
+      {showFloatingClient && resolvedClientId && (
+        <ClientContextPanel db={db} clientId={resolvedClientId} isMobile={m} isFloating={true} />
+      )}
+
+      {showPlanSwitcher && resolvedClientId && (
+        <PlanSwitcherModal db={db} clientId={resolvedClientId} coachId={coachId} activePlanId={planMeta?.id}
+          onSelect={(planId) => { setSelectedConceptId(planId); setShowPlanSwitcher(false); loadAllPlanCount(resolvedClientId) }}
+          onClose={() => setShowPlanSwitcher(false)} isMobile={m} />
+      )}
+
+      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
     </div>
   )
 }

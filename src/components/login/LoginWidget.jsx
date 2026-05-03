@@ -1,307 +1,302 @@
-// src/components/login/LoginWidget.jsx
-import { useState, useEffect } from 'react'
-import { 
-  User, Lock, Mail, ArrowRight, 
-  Loader, AlertCircle, CheckCircle, Eye, EyeOff
-} from 'lucide-react'
+// src/components/login/LoginWidget.jsx - FIXED VERSION THAT USES ONLOGIN CALLBACK
+import { useState } from 'react'
+import { Mail, Lock, Eye, EyeOff, LogIn, Sparkles, Crown, Shield } from 'lucide-react'
 
-export default function LoginWidget({ 
-  onLogin, 
-  onPasswordReset,
-  loginMode = 'client',
-  isVisible = false
-}) {
+export default function LoginWidget({ loginMode, onLogin, onPasswordReset }) {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
-  const [loading, setLoading] = useState(false)
-  const [message, setMessage] = useState(null)
   const [rememberMe, setRememberMe] = useState(false)
+  const [error, setError] = useState('')
+  const [isLoading, setIsLoading] = useState(false)
   
   const isMobile = window.innerWidth <= 768
   
-  // Load remembered email
-  useEffect(() => {
-    const rememberedEmail = localStorage.getItem('rememberEmail')
-    if (rememberedEmail) {
-      setEmail(rememberedEmail)
-      setRememberMe(true)
-    }
-  }, [])
-  
   const handleSubmit = async (e) => {
     e.preventDefault()
-    setMessage(null)
-    setLoading(true)
+    setError('')
+    setIsLoading(true)
+    
+    console.log('🔥 LoginWidget handleSubmit called')
+    console.log('🔥 Email:', email)
+    console.log('🔥 Calling onLogin callback...')
     
     try {
+      // Call the onLogin callback from LoginMain
       const result = await onLogin(email, password, rememberMe)
       
-      if (result.success) {
-        setMessage({
-          type: 'success',
-          text: 'Welkom terug! Je wordt doorgestuurd...'
-        })
-      } else {
-        setMessage({
-          type: 'error',
-          text: result.error || 'Onjuist email of wachtwoord'
-        })
-        setLoading(false)
+      console.log('🔥 onLogin result:', result)
+      
+      if (!result.success) {
+        setError(result.error || 'Login mislukt')
       }
+      // If success, LoginMain handles redirect
     } catch (error) {
-      setMessage({
-        type: 'error',
-        text: 'Er ging iets mis. Probeer het opnieuw.'
-      })
-      setLoading(false)
+      console.error('❌ LoginWidget error:', error)
+      setError(error.message || 'Er ging iets mis')
+    } finally {
+      setIsLoading(false)
     }
   }
   
-  if (!isVisible) return null
+  const isCoach = loginMode === 'coach'
   
   return (
     <div style={{
       position: 'fixed',
-      bottom: isMobile ? '20px' : '50px',
-      right: isMobile ? '50%' : '50px',
-      transform: isMobile ? 'translateX(50%)' : 'none',
-      width: isMobile ? '85%' : '360px',
-      maxWidth: '360px',
+      top: isMobile ? '8%' : '12%',
+      left: '50%',
+      transform: 'translateX(-50%)',
+      width: '90%',
+      maxWidth: '380px',
       zIndex: 40,
-      animation: 'slideUp 0.5s ease-out'
+      animation: 'fadeInUp 0.5s ease-out'
     }}>
+      {/* Main Card - Golden Premium */}
       <div style={{
-        background: 'rgba(17, 17, 17, 0.98)',
+        background: 'linear-gradient(135deg, rgba(23, 23, 23, 0.92) 0%, rgba(17, 17, 17, 0.95) 100%)',
         backdropFilter: 'blur(20px)',
-        border: '1px solid rgba(255, 255, 255, 0.15)',
+        border: '1px solid rgba(255, 215, 0, 0.25)',
         borderRadius: '18px',
-        padding: isMobile ? '1.25rem' : '1.5rem',
-        boxShadow: '0 20px 40px rgba(0, 0, 0, 0.9)',
+        padding: isMobile ? '1.5rem' : '1.75rem',
         position: 'relative',
-        overflow: 'hidden'
+        overflow: 'hidden',
+        boxShadow: '0 12px 40px rgba(255, 215, 0, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.03)'
       }}>
-        {/* Top accent */}
+        {/* Top accent line */}
         <div style={{
           position: 'absolute',
           top: 0,
           left: 0,
           right: 0,
           height: '2px',
-          background: loginMode === 'coach' 
-            ? 'linear-gradient(90deg, #3b82f6 0%, #2563eb 100%)'
-            : 'linear-gradient(90deg, #10b981 0%, #059669 100%)'
+          background: 'linear-gradient(90deg, #FFD700 0%, #FFA500 100%)',
+          opacity: 0.6,
+          zIndex: 2
         }} />
         
-        {/* Header */}
+        {/* Shine overlay */}
         <div style={{
-          textAlign: 'center',
-          marginBottom: '1.25rem'
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          height: '40%',
+          background: 'linear-gradient(180deg, rgba(255, 215, 0, 0.04) 0%, transparent 100%)',
+          pointerEvents: 'none',
+          zIndex: 1
+        }} />
+        
+        {/* Icon Container */}
+        <div style={{
+          width: isMobile ? '56px' : '60px',
+          height: isMobile ? '56px' : '60px',
+          borderRadius: '14px',
+          background: 'linear-gradient(135deg, #FFD700 0%, #FFA500 100%)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          margin: '0 auto 1.125rem',
+          boxShadow: '0 6px 20px rgba(255, 215, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.15)',
+          position: 'relative',
+          overflow: 'hidden',
+          zIndex: 2
         }}>
           <div style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            width: '42px',
-            height: '42px',
-            borderRadius: '10px',
-            background: loginMode === 'coach'
-              ? 'linear-gradient(135deg, rgba(59,130,246,0.2) 0%, rgba(37,99,235,0.1) 100%)'
-              : 'linear-gradient(135deg, rgba(16,185,129,0.2) 0%, rgba(5,150,105,0.1) 100%)',
-            border: loginMode === 'coach'
-              ? '1px solid rgba(59,130,246,0.3)'
-              : '1px solid rgba(16,185,129,0.3)',
-            marginBottom: '0.75rem'
-          }}>
-            <User size={20} color={loginMode === 'coach' ? '#3b82f6' : '#10b981'} />
-          </div>
-          
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            height: '40%',
+            background: 'linear-gradient(180deg, rgba(255,255,255,0.2) 0%, transparent 100%)',
+            borderRadius: '14px 14px 0 0',
+            pointerEvents: 'none'
+          }} />
+          {isCoach ? (
+            <Crown size={isMobile ? 26 : 28} color="#000" strokeWidth={2.5} />
+          ) : (
+            <Sparkles size={isMobile ? 26 : 28} color="#000" strokeWidth={2.5} />
+          )}
+        </div>
+        
+        {/* Header */}
+        <div style={{ 
+          textAlign: 'center', 
+          marginBottom: '1.5rem',
+          position: 'relative',
+          zIndex: 2
+        }}>
           <h2 style={{
-            fontSize: isMobile ? '1.1rem' : '1.25rem',
-            fontWeight: '700',
-            color: '#fff',
-            marginBottom: '0.25rem'
+            fontSize: isMobile ? '1.35rem' : '1.5rem',
+            fontWeight: '800',
+            marginBottom: '0.375rem',
+            backgroundImage: 'linear-gradient(135deg, #FFD700 0%, #FFA500 100%)',
+            WebkitBackgroundClip: 'text',
+            WebkitTextFillColor: 'transparent',
+            backgroundClip: 'text',
+            color: '#FFD700',
+            letterSpacing: '-0.01em'
           }}>
-            Welkom terug
+            Welkom Terug
           </h2>
-          
           <p style={{
-            fontSize: '0.8rem',
-            color: 'rgba(255,255,255,0.5)'
+            color: 'rgba(255, 255, 255, 0.5)',
+            fontSize: isMobile ? '0.8rem' : '0.85rem',
+            fontWeight: '500'
           }}>
-            {loginMode === 'coach' ? 'Coach Dashboard' : 'Client Portal'}
+            {isCoach ? 'Coach Portal' : 'Cliënt Dashboard'}
           </p>
         </div>
         
-        {/* Message */}
-        {message && (
-          <div style={{
-            background: message.type === 'error'
-              ? 'rgba(239, 68, 68, 0.1)'
-              : 'rgba(16, 185, 129, 0.1)',
-            border: `1px solid ${message.type === 'error'
-              ? 'rgba(239, 68, 68, 0.3)'
-              : 'rgba(16, 185, 129, 0.3)'}`,
-            borderRadius: '8px',
-            padding: '0.625rem',
-            marginBottom: '0.75rem',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.5rem',
-            fontSize: '0.8rem',
-            color: message.type === 'error' ? '#ef4444' : '#10b981'
-          }}>
-            {message.type === 'error' ? <AlertCircle size={14} /> : <CheckCircle size={14} />}
-            {message.text}
-          </div>
-        )}
-        
         {/* Form */}
-        <form onSubmit={handleSubmit}>
-          {/* Email */}
-          <div style={{ marginBottom: '0.875rem' }}>
-            <label style={{
-              display: 'block',
-              marginBottom: '0.375rem',
-              color: 'rgba(255,255,255,0.7)',
-              fontSize: '0.8rem',
-              fontWeight: '500'
+        <form onSubmit={handleSubmit} style={{ position: 'relative', zIndex: 2 }}>
+          {/* Email Input */}
+          <div style={{ marginBottom: '1rem' }}>
+            <div style={{
+              position: 'relative',
+              display: 'flex',
+              alignItems: 'center'
             }}>
-              Email
-            </label>
-            <div style={{ position: 'relative' }}>
+              <div style={{
+                position: 'absolute',
+                left: '1rem',
+                width: '18px',
+                height: '18px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                pointerEvents: 'none',
+                zIndex: 2
+              }}>
+                <Mail size={18} color="rgba(255, 215, 0, 0.5)" strokeWidth={2.5} />
+              </div>
               <input
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
+                placeholder="je@email.com"
                 required
-                placeholder="jouw@email.nl"
-                disabled={loading}
                 style={{
                   width: '100%',
-                  padding: '0.625rem 0.875rem 0.625rem 2.25rem',
-                  background: 'rgba(255, 255, 255, 0.05)',
-                  border: '1px solid rgba(255, 255, 255, 0.1)',
-                  borderRadius: '8px',
+                  padding: '0.875rem 1rem 0.875rem 2.75rem',
+                  background: 'rgba(255, 215, 0, 0.05)',
+                  border: '1px solid rgba(255, 215, 0, 0.2)',
+                  borderRadius: '12px',
                   color: '#fff',
-                  fontSize: '0.9rem',
+                  fontSize: '0.95rem',
                   outline: 'none',
-                  transition: 'all 0.3s'
+                  transition: 'all 0.3s',
+                  fontFamily: 'inherit'
                 }}
                 onFocus={(e) => {
-                  e.currentTarget.style.borderColor = loginMode === 'coach' 
-                    ? 'rgba(59,130,246,0.5)' 
-                    : 'rgba(16,185,129,0.5)'
-                  e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)'
+                  e.target.style.borderColor = 'rgba(255, 215, 0, 0.4)'
+                  e.target.style.background = 'rgba(255, 215, 0, 0.08)'
                 }}
                 onBlur={(e) => {
-                  e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.1)'
-                  e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)'
+                  e.target.style.borderColor = 'rgba(255, 215, 0, 0.2)'
+                  e.target.style.background = 'rgba(255, 215, 0, 0.05)'
                 }}
               />
-              <Mail size={16} style={{
-                position: 'absolute',
-                left: '0.75rem',
-                top: '50%',
-                transform: 'translateY(-50%)',
-                color: 'rgba(255,255,255,0.3)'
-              }} />
             </div>
           </div>
           
-          {/* Password */}
-          <div style={{ marginBottom: '0.875rem' }}>
-            <label style={{
-              display: 'block',
-              marginBottom: '0.375rem',
-              color: 'rgba(255,255,255,0.7)',
-              fontSize: '0.8rem',
-              fontWeight: '500'
+          {/* Password Input */}
+          <div style={{ marginBottom: '1rem' }}>
+            <div style={{
+              position: 'relative',
+              display: 'flex',
+              alignItems: 'center'
             }}>
-              Wachtwoord
-            </label>
-            <div style={{ position: 'relative' }}>
+              <div style={{
+                position: 'absolute',
+                left: '1rem',
+                width: '18px',
+                height: '18px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                pointerEvents: 'none',
+                zIndex: 2
+              }}>
+                <Lock size={18} color="rgba(255, 215, 0, 0.5)" strokeWidth={2.5} />
+              </div>
               <input
                 type={showPassword ? 'text' : 'password'}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                required
                 placeholder="••••••••"
-                disabled={loading}
+                required
                 style={{
                   width: '100%',
-                  padding: '0.625rem 2.5rem 0.625rem 2.25rem',
-                  background: 'rgba(255, 255, 255, 0.05)',
-                  border: '1px solid rgba(255, 255, 255, 0.1)',
-                  borderRadius: '8px',
+                  padding: '0.875rem 2.75rem 0.875rem 2.75rem',
+                  background: 'rgba(255, 215, 0, 0.05)',
+                  border: '1px solid rgba(255, 215, 0, 0.2)',
+                  borderRadius: '12px',
                   color: '#fff',
-                  fontSize: '0.9rem',
+                  fontSize: '0.95rem',
                   outline: 'none',
-                  transition: 'all 0.3s'
+                  transition: 'all 0.3s',
+                  fontFamily: 'inherit'
                 }}
                 onFocus={(e) => {
-                  e.currentTarget.style.borderColor = loginMode === 'coach' 
-                    ? 'rgba(59,130,246,0.5)' 
-                    : 'rgba(16,185,129,0.5)'
-                  e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)'
+                  e.target.style.borderColor = 'rgba(255, 215, 0, 0.4)'
+                  e.target.style.background = 'rgba(255, 215, 0, 0.08)'
                 }}
                 onBlur={(e) => {
-                  e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.1)'
-                  e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)'
+                  e.target.style.borderColor = 'rgba(255, 215, 0, 0.2)'
+                  e.target.style.background = 'rgba(255, 215, 0, 0.05)'
                 }}
               />
-              <Lock size={16} style={{
-                position: 'absolute',
-                left: '0.75rem',
-                top: '50%',
-                transform: 'translateY(-50%)',
-                color: 'rgba(255,255,255,0.3)'
-              }} />
               <button
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
                 style={{
                   position: 'absolute',
-                  right: '0.75rem',
-                  top: '50%',
-                  transform: 'translateY(-50%)',
+                  right: '1rem',
+                  width: '32px',
+                  height: '32px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
                   background: 'transparent',
                   border: 'none',
-                  color: 'rgba(255,255,255,0.5)',
                   cursor: 'pointer',
-                  padding: '0.25rem',
-                  display: 'flex',
-                  alignItems: 'center'
+                  color: 'rgba(255, 215, 0, 0.5)',
+                  transition: 'color 0.3s',
+                  zIndex: 2,
+                  touchAction: 'manipulation',
+                  WebkitTapHighlightColor: 'transparent'
                 }}
+                onMouseEnter={(e) => e.currentTarget.style.color = '#FFD700'}
+                onMouseLeave={(e) => e.currentTarget.style.color = 'rgba(255, 215, 0, 0.5)'}
               >
-                {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
               </button>
             </div>
           </div>
           
-          {/* Remember & Forgot */}
+          {/* Remember Me & Forgot Password */}
           <div style={{
             display: 'flex',
-            justifyContent: 'space-between',
             alignItems: 'center',
-            marginBottom: '1rem',
-            fontSize: '0.75rem'
+            justifyContent: 'space-between',
+            marginBottom: '1.25rem'
           }}>
             <label style={{
               display: 'flex',
               alignItems: 'center',
-              gap: '0.375rem',
+              gap: '0.5rem',
               cursor: 'pointer',
-              color: 'rgba(255,255,255,0.6)'
+              color: 'rgba(255, 255, 255, 0.6)',
+              fontSize: '0.8rem'
             }}>
               <input
                 type="checkbox"
                 checked={rememberMe}
                 onChange={(e) => setRememberMe(e.target.checked)}
                 style={{
-                  width: '14px',
-                  height: '14px',
-                  accentColor: loginMode === 'coach' ? '#3b82f6' : '#10b981'
+                  cursor: 'pointer',
+                  accentColor: '#FFD700'
                 }}
               />
               Onthoud mij
@@ -311,104 +306,169 @@ export default function LoginWidget({
               type="button"
               onClick={onPasswordReset}
               style={{
-                background: 'transparent',
+                background: 'none',
                 border: 'none',
-                color: 'rgba(255,255,255,0.6)',
-                fontSize: '0.75rem',
+                color: 'rgba(255, 215, 0, 0.7)',
+                fontSize: '0.8rem',
                 cursor: 'pointer',
-                textDecoration: 'underline',
-                transition: 'color 0.2s'
+                padding: 0,
+                textDecoration: 'none',
+                transition: 'color 0.3s',
+                touchAction: 'manipulation',
+                WebkitTapHighlightColor: 'transparent'
               }}
               onMouseEnter={(e) => {
-                e.currentTarget.style.color = loginMode === 'coach' ? '#3b82f6' : '#10b981'
+                e.currentTarget.style.color = '#FFD700'
+                e.currentTarget.style.textDecoration = 'underline'
               }}
               onMouseLeave={(e) => {
-                e.currentTarget.style.color = 'rgba(255,255,255,0.6)'
+                e.currentTarget.style.color = 'rgba(255, 215, 0, 0.7)'
+                e.currentTarget.style.textDecoration = 'none'
               }}
             >
               Wachtwoord vergeten?
             </button>
           </div>
           
-          {/* Submit */}
+          {/* Error Message */}
+          {error && (
+            <div style={{
+              padding: '0.75rem',
+              background: 'rgba(239, 68, 68, 0.1)',
+              border: '1px solid rgba(239, 68, 68, 0.3)',
+              borderRadius: '10px',
+              color: '#ef4444',
+              fontSize: '0.8rem',
+              marginBottom: '1rem',
+              textAlign: 'center'
+            }}>
+              {error}
+            </div>
+          )}
+          
+          {/* Submit Button */}
           <button
             type="submit"
-            disabled={loading || !email || !password}
+            disabled={isLoading}
             style={{
               width: '100%',
-              padding: '0.75rem',
-              background: loginMode === 'coach'
-                ? 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)'
-                : 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+              padding: '0.95rem',
+              background: isLoading 
+                ? 'rgba(255, 215, 0, 0.3)' 
+                : 'linear-gradient(135deg, #FFD700 0%, #FFA500 100%)',
               border: 'none',
-              borderRadius: '8px',
-              color: '#fff',
-              fontSize: '0.9rem',
-              fontWeight: '600',
-              cursor: loading || !email || !password ? 'not-allowed' : 'pointer',
-              opacity: loading || !email || !password ? 0.6 : 1,
-              transition: 'all 0.3s',
+              borderRadius: '12px',
+              color: '#000',
+              fontSize: '1rem',
+              fontWeight: '700',
+              cursor: isLoading ? 'not-allowed' : 'pointer',
+              transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+              boxShadow: '0 4px 16px rgba(255, 215, 0, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.15)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               gap: '0.5rem',
-              boxShadow: loginMode === 'coach'
-                ? '0 4px 15px rgba(59,130,246,0.3)'
-                : '0 4px 15px rgba(16,185,129,0.3)'
+              position: 'relative',
+              overflow: 'hidden',
+              opacity: isLoading ? 0.7 : 1,
+              touchAction: 'manipulation',
+              WebkitTapHighlightColor: 'transparent',
+              transform: 'translateZ(0)'
             }}
             onMouseEnter={(e) => {
-              if (!loading && email && password) {
-                e.currentTarget.style.transform = 'translateY(-1px)'
+              if (!isLoading) {
+                e.currentTarget.style.transform = 'translateY(-2px)'
+                e.currentTarget.style.boxShadow = '0 8px 24px rgba(255, 215, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.2)'
               }
             }}
             onMouseLeave={(e) => {
-              e.currentTarget.style.transform = 'translateY(0)'
+              if (!isLoading) {
+                e.currentTarget.style.transform = 'translateY(0)'
+                e.currentTarget.style.boxShadow = '0 4px 16px rgba(255, 215, 0, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.15)'
+              }
+            }}
+            onTouchStart={(e) => {
+              if (isMobile && !isLoading) {
+                e.currentTarget.style.transform = 'scale(0.98)'
+              }
+            }}
+            onTouchEnd={(e) => {
+              if (isMobile && !isLoading) {
+                e.currentTarget.style.transform = 'scale(1)'
+              }
             }}
           >
-            {loading ? (
+            {/* Top gloss */}
+            <div style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              height: '40%',
+              background: 'linear-gradient(180deg, rgba(255,255,255,0.12) 0%, transparent 100%)',
+              borderRadius: '12px 12px 0 0',
+              pointerEvents: 'none'
+            }} />
+            
+            {isLoading ? (
               <>
-                <Loader size={16} style={{ animation: 'spin 1s linear infinite' }} />
-                Inloggen...
+                <div style={{
+                  width: '16px',
+                  height: '16px',
+                  border: '2px solid rgba(0,0,0,0.2)',
+                  borderTopColor: '#000',
+                  borderRadius: '50%',
+                  animation: 'spin 0.8s linear infinite'
+                }} />
+                Bezig met inloggen...
               </>
             ) : (
               <>
                 Inloggen
-                <ArrowRight size={16} />
+                <LogIn size={18} strokeWidth={2.5} />
               </>
             )}
           </button>
         </form>
         
-        {/* Security note */}
+        {/* Security Note */}
         <div style={{
-          marginTop: '1rem',
-          paddingTop: '1rem',
-          borderTop: '1px solid rgba(255,255,255,0.05)',
-          textAlign: 'center'
+          marginTop: '1.25rem',
+          padding: '0.75rem',
+          background: 'rgba(255, 215, 0, 0.05)',
+          border: '1px solid rgba(255, 215, 0, 0.15)',
+          borderRadius: '10px',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '0.5rem',
+          position: 'relative',
+          zIndex: 2
         }}>
+          <Shield size={14} color="rgba(255, 215, 0, 0.6)" />
           <p style={{
+            color: 'rgba(255, 215, 0, 0.6)',
             fontSize: '0.7rem',
-            color: 'rgba(255,255,255,0.3)'
+            margin: 0,
+            fontWeight: '500'
           }}>
-            🔒 Beveiligde verbinding
+            Beveiligde Verbinding
           </p>
         </div>
       </div>
       
       <style>{`
-        @keyframes slideUp {
+        @keyframes fadeInUp {
           from {
             opacity: 0;
-            transform: ${isMobile ? 'translateX(50%) translateY(20px)' : 'translateY(20px)'};
+            transform: translate(-50%, 20px);
           }
           to {
             opacity: 1;
-            transform: ${isMobile ? 'translateX(50%) translateY(0)' : 'translateY(0)'};
+            transform: translate(-50%, 0);
           }
         }
         
         @keyframes spin {
-          from { transform: rotate(0deg); }
           to { transform: rotate(360deg); }
         }
       `}</style>

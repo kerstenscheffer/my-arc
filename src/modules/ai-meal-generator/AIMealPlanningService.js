@@ -1,14 +1,15 @@
 // src/modules/ai-meal-generator/AIMealPlanningService.js
-// 🔥 VERSION 5.0 - KERSTEN'S COMPLETE OVERHAUL
+// 🔥 VERSION 5.1 - KERSTEN'S COMPLETE OVERHAUL + FIXED SAVE
 /**
  * MY ARC - AI MEAL PLANNING SERVICE
  * 
- * FIXED STRATEGY (v5.0):
+ * FIXED STRATEGY (v5.1):
  * ✅ Parse meals + snacks APART (niet totaal)
  * ✅ Realistische schaling (95-105% target OK)
  * ✅ 2 rotating sets + weekend (Optie C)
  * ✅ UUID → ingredient name mapping FIXED
  * ✅ 6-factor AI scoring
+ * ✅ savePlan() FIXED - meal IDs direct on day object
  * 
  * WEEK PATROON:
  * - Ma, Di, Do, Vr: SET A (4 dagen primary)
@@ -23,7 +24,7 @@ class AIMealPlanningService {
     this.cache = new Map()
     this.cacheTimeout = 5 * 60 * 1000
     this.ingredientLookup = new Map()
- this.formatter = getShoppingListFormatter()
+    this.formatter = getShoppingListFormatter()
   }
 
   POPULAR_PROTEINS = ['kwark', 'eieren', 'whey', 'hüttenkäse', 'kipfilet', 'zalm', 'tonijn', 'kip', 'greek yogurt', 'skyr']
@@ -484,7 +485,7 @@ class AIMealPlanningService {
         4: { meals: [0.22, 0.28, 0.30], snacks: [0.20] },
         5: { meals: [0.18, 0.22, 0.25], snacks: [0.17, 0.18] },
         6: { meals: [0.16, 0.18, 0.20, 0.16], snacks: [0.15, 0.15] },
-        7: { meals: [0.18, 0.22, 0.24, 0.18, 0.08], snacks: [0.05, 0.05] }  // 🔥 SNACKS=200kcal, meals=rest
+        7: { meals: [0.18, 0.22, 0.24, 0.18, 0.08], snacks: [0.05, 0.05] }
       },
       'fat_loss': {
         3: { meals: [0.30, 0.35, 0.35], snacks: [] },
@@ -545,11 +546,8 @@ class AIMealPlanningService {
   // 🔥 7. EXACT SCALING - NO LIMITS
   // ========================================
   scaleMealToTarget(meal, targetCalories, targetProtein) {
-    // 🔥 CRITICAL: Use ONLY calorie-based scaling
-    // Protein will scale proportionally with calories
     const finalScaleFactor = targetCalories / meal.calories
     
-    // 🔥 DEBUG LOGGING
     console.log(`   🎯 SCALING: "${meal.name}" (${meal.calories} kcal) → ${targetCalories} kcal target`)
     console.log(`      Factor: ${finalScaleFactor.toFixed(2)}x → Result: ${Math.round(meal.calories * finalScaleFactor)} kcal`)
     
@@ -583,7 +581,6 @@ class AIMealPlanningService {
       const isSnack = distribution[slot].isSnack
       const targetCal = distribution[slot].targetCalories
       
-      // 🔥 CALORIE RANGE: 75% - 125% van target
       const minCal = targetCal * 0.75
       const maxCal = targetCal * 1.25
       
@@ -595,7 +592,6 @@ class AIMealPlanningService {
         timingKeyword = 'snack'
       }
       
-      // 🔥 STEP 1: Find meals with correct timing AND calorie range
       let candidates = scoredMeals.filter(m => 
         m.timing?.includes(timingKeyword) &&
         m.calories >= minCal &&
@@ -604,7 +600,6 @@ class AIMealPlanningService {
       
       console.log(`   ${slot} (${targetCal} kcal): ${candidates.length} in range ${Math.round(minCal)}-${Math.round(maxCal)}`)
       
-      // 🔥 FALLBACK 1: Relax calorie range (50% - 150%)
       if (candidates.length < 3) {
         console.log(`   🔄 FALLBACK: Relaxing calorie range for ${slot}`)
         candidates = scoredMeals.filter(m =>
@@ -615,12 +610,10 @@ class AIMealPlanningService {
         console.log(`   Found ${candidates.length} with relaxed range`)
       }
       
-      // 🔥 FALLBACK 2: Ignore calorie, just timing
       if (candidates.length === 0) {
         console.log(`   🔄 FALLBACK: Ignoring calorie range for ${slot}`)
         candidates = scoredMeals.filter(m => m.timing?.includes(timingKeyword))
         
-        // FALLBACK 3: Use any-time meals or all meals
         if (candidates.length === 0) {
           if (isSnack) {
             candidates = scoredMeals.filter(m => m.calories < targetCal * 1.5).slice(0, 10)
@@ -726,7 +719,6 @@ class AIMealPlanningService {
     console.log(`   Selected ingredients: ${selectedIngredients.length}`)
     console.log(`   Meal structure:`, mealStructure)
 
-    // STEP 1: Load meals + ingredients
     const [allMeals, ingredients] = await Promise.all([
       this.loadAIMeals(),
       this.loadAIIngredients()
@@ -736,7 +728,6 @@ class AIMealPlanningService {
       throw new Error('No meals available in database')
     }
 
-    // STEP 2: Filter by selected ingredients
     const eligibleMeals = this.filterMealsBySelectedIngredients(
       allMeals, 
       selectedIngredients, 
@@ -747,28 +738,18 @@ class AIMealPlanningService {
       throw new Error('No meals match your selected ingredients')
     }
 
-    // STEP 3: Score all eligible meals
     const scoredMeals = this.scoreAllMeals(eligibleMeals, clientProfile, selectedIngredients)
-
-    // STEP 4: Calculate distribution (meals + snacks)
     const distribution = this.calculateMealDistribution(clientProfile, { 
       ...options,
       mealStructure 
     })
-
-    // STEP 5: Group meals by slot
     const groupedMeals = this.groupMealsBySlot(scoredMeals, distribution)
-
-    // STEP 6: Select 3 meal sets
     const setA = this.selectSetA(groupedMeals)
     const setB = this.selectSetB(groupedMeals, setA)
     const weekendAlt = this.selectWeekendAlt(groupedMeals, setA, setB)
 
-    // STEP 7: Build week structure (Optie C patroon)
     const weekPlan = []
     const dayNames = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
-    
-    // Patroon: Ma(A), Di(A), Wo(B), Do(A), Vr(A), Za(ALT), Zo(ALT)
     const setAssignment = [setA, setA, setB, setA, setA, weekendAlt, weekendAlt]
     
     dayNames.forEach((dayName, dayIndex) => {
@@ -779,7 +760,6 @@ class AIMealPlanningService {
         totals: { kcal: 0, protein: 0, carbs: 0, fat: 0 }
       }
       
-      // Add all slots
       Object.entries(distribution).forEach(([slot, targets]) => {
         const meal = mealsToUse[slot]
         if (!meal) return
@@ -804,25 +784,13 @@ class AIMealPlanningService {
       console.log(`📅 ${dayName} (${setName}): ${Math.round(dayPlan.totals.kcal)} kcal, ${Math.round(dayPlan.totals.protein)}g protein`)
     })
 
+    const stats = await this.calculatePlanStatistics(weekPlan, clientProfile)
+    const aiAnalysis = this.analyzePlan(weekPlan, clientProfile, selectedIngredients, excludedIngredients)
 
+    console.log('✅ Week plan V5 generated successfully')
 
-
-
-// STEP 8: Stats & analysis
-const stats = this.calculatePlanStatistics(weekPlan, clientProfile)
-const aiAnalysis = this.analyzePlan(weekPlan, clientProfile, selectedIngredients, excludedIngredients)
-
-// STEP 9: Generate shopping list for PDF export
-console.log('🛒 Generating shopping list for week plan...')
-const shoppingList = this.generateShoppingListFromWeekPlan(weekPlan)
-console.log(`✅ Shopping list: ${shoppingList.ingredients.length} items, €${shoppingList.totalCost}`)
-
-// Add shopping list to stats
-stats.shoppingList = shoppingList
-
-console.log('✅ Week plan V5 generated successfully')
-
-return {      weekPlan,
+    return {
+      weekPlan,
       dailyTargets: {
         kcal: clientProfile.target_calories,
         protein: clientProfile.target_protein_g,
@@ -853,505 +821,607 @@ return {      weekPlan,
     }
   }
 
-// ========================================
-// 10. STATISTICS & ANALYSIS - COMPLETE REPLACEMENT
-// ========================================
-// VERWIJDER de oude calculatePlanStatistics methode VOLLEDIG
-// PLAK deze nieuwe versie in plaats daarvan:
-
-// ========================================
-// FIX: calculatePlanStatistics - Dynamic Meal Structure
-// Replace in AIMealPlanningService.js (around line 870-920)
-// ========================================
-
-async calculatePlanStatistics(weekPlan, profile) {
-  const stats = {
-    averageAccuracy: 0,
-    weekAverages: { kcal: 0, protein: 0, carbs: 0, fat: 0 },
-    mealVariety: new Set(),
-    complianceScore: 0,
-    varietyScore: 0,
-    scalingUsed: false,
-    averageScaleFactor: 0,
-    shoppingList: null
-  }
-  
-  let totalAccuracy = 0
-  let totalScaleFactor = 0
-  let scaledMealsCount = 0
-  
-  weekPlan.forEach(day => {
-    totalAccuracy += day.accuracy?.total || 0
-    
-    stats.weekAverages.kcal += day.totals.kcal
-    stats.weekAverages.protein += day.totals.protein
-    stats.weekAverages.carbs += day.totals.carbs
-    stats.weekAverages.fat += day.totals.fat
-    
-    // ✅ DYNAMIC MEAL COLLECTION - Works with ANY slot structure
-    const meals = []
-    Object.keys(day).forEach(key => {
-      // Skip metadata keys
-      if (key === 'totals' || key === 'accuracy') return
-      
-      const meal = day[key]
-      // Check if it's a valid meal object
-      if (meal && typeof meal === 'object' && (meal.id || meal.name)) {
-        meals.push(meal)
-      }
-    })
-    
-    // Process collected meals
-    meals.forEach(meal => {
-      const baseId = meal.baseId || meal.id
-      stats.mealVariety.add(baseId)
-      
-      if (meal.scaleFactor) {
-        totalScaleFactor += meal.scaleFactor
-        scaledMealsCount++
-        stats.scalingUsed = true
-      }
-    })
-  })
-  
-  const days = weekPlan.length || 1
-  
-  stats.averageAccuracy = Math.round(totalAccuracy / days)
-  stats.weekAverages.kcal = Math.round(stats.weekAverages.kcal / days)
-  stats.weekAverages.protein = Math.round(stats.weekAverages.protein / days)
-  stats.weekAverages.carbs = Math.round(stats.weekAverages.carbs / days)
-  stats.weekAverages.fat = Math.round(stats.weekAverages.fat / days)
-  
-  if (scaledMealsCount > 0) {
-    stats.averageScaleFactor = (totalScaleFactor / scaledMealsCount).toFixed(2)
-  }
-  
-  const totalMealSlots = days * (profile.meals_per_day || 4)
-  stats.varietyScore = Math.round((stats.mealVariety.size / Math.min(totalMealSlots, 20)) * 100)
-  
-  const calCompliance = 100 - Math.min(10, Math.abs(100 - (stats.weekAverages.kcal / profile.target_calories * 100)))
-  const protCompliance = 100 - Math.min(10, Math.abs(100 - (stats.weekAverages.protein / profile.target_protein_g * 100)))
-  stats.complianceScore = Math.round((calCompliance + protCompliance) / 2)
-  
-  // ✅ GENERATE SHOPPING LIST
-  console.log('📊 Generating shopping list in calculatePlanStatistics...')
-  try {
-    stats.shoppingList = await this.generateShoppingListFromWeekPlan(weekPlan)
-    console.log(`✅ Shopping list generated: ${stats.shoppingList?.itemCount || 0} items`)
-  } catch (error) {
-    console.error('❌ Shopping list generation failed:', error)
-    stats.shoppingList = {
-      ingredients: [],
-      totalCost: '0.00',
-      dailyCost: '0.00',
-      itemCount: 0,
-      weekDays: weekPlan.length,
-      generatedAt: new Date().toISOString()
+  // ========================================
+  // 10. STATISTICS & ANALYSIS
+  // ========================================
+  async calculatePlanStatistics(weekPlan, profile) {
+    const stats = {
+      averageAccuracy: 0,
+      weekAverages: { kcal: 0, protein: 0, carbs: 0, fat: 0 },
+      mealVariety: new Set(),
+      complianceScore: 0,
+      varietyScore: 0,
+      scalingUsed: false,
+      averageScaleFactor: 0,
+      shoppingList: null
     }
-  }
-  
-  return stats
-}
-
-// ========================================
-// SHOPPING LIST GENERATION - COMPLETE CODE
-// Add these methods to AIMealPlanningService class
-// ========================================
-
-/**
- * Generate shopping list from week plan (MAIN METHOD)
- */
-
-// ========================================
-// FIX: Ingredient Name Resolution in Shopping List
-// Add to AIMealPlanningService.js
-// ========================================
-
-/**
- * Enhanced shopping list generation WITH ingredient name lookup
- */
-async generateShoppingListFromWeekPlan(weekPlan) {
-  console.log('🛒 === SHOPPING LIST GENERATION START (WITH NAME LOOKUP) ===')
-  console.log(`📊 Week plan received: ${weekPlan?.length || 0} days`)
-  
-  const ingredients = new Map()
-  let totalCost = 0
-  let mealCount = 0
-  let mealsWithIngredients = 0
-  let mealsWithoutIngredients = 0
-  
-  // ✅ LOAD ALL INGREDIENTS FROM DATABASE FOR NAME LOOKUP
-  let ingredientLookup = new Map()
-  try {
-    const { data: allIngredients } = await this.supabase
-      .from('ai_ingredients')
-      .select('id, name, name_en')
     
-    if (allIngredients) {
-      allIngredients.forEach(ing => {
-        ingredientLookup.set(ing.id, ing.name || ing.name_en || ing.id)
+    let totalAccuracy = 0
+    let totalScaleFactor = 0
+    let scaledMealsCount = 0
+    
+    weekPlan.forEach(day => {
+      totalAccuracy += day.accuracy?.total || 0
+      
+      stats.weekAverages.kcal += day.totals.kcal
+      stats.weekAverages.protein += day.totals.protein
+      stats.weekAverages.carbs += day.totals.carbs
+      stats.weekAverages.fat += day.totals.fat
+      
+      const meals = []
+      Object.keys(day).forEach(key => {
+        if (key === 'totals' || key === 'accuracy') return
+        
+        const meal = day[key]
+        if (meal && typeof meal === 'object' && (meal.id || meal.name)) {
+          meals.push(meal)
+        }
       })
-      console.log(`✅ Loaded ${ingredientLookup.size} ingredient names for lookup`)
+      
+      meals.forEach(meal => {
+        const baseId = meal.baseId || meal.id
+        stats.mealVariety.add(baseId)
+        
+        if (meal.scaleFactor) {
+          totalScaleFactor += meal.scaleFactor
+          scaledMealsCount++
+          stats.scalingUsed = true
+        }
+      })
+    })
+    
+    const days = weekPlan.length || 1
+    
+    stats.averageAccuracy = Math.round(totalAccuracy / days)
+    stats.weekAverages.kcal = Math.round(stats.weekAverages.kcal / days)
+    stats.weekAverages.protein = Math.round(stats.weekAverages.protein / days)
+    stats.weekAverages.carbs = Math.round(stats.weekAverages.carbs / days)
+    stats.weekAverages.fat = Math.round(stats.weekAverages.fat / days)
+    
+    if (scaledMealsCount > 0) {
+      stats.averageScaleFactor = (totalScaleFactor / scaledMealsCount).toFixed(2)
     }
-  } catch (error) {
-    console.warn('⚠️ Could not load ingredient lookup table:', error)
+    
+    const totalMealSlots = days * (profile.meals_per_day || 4)
+    stats.varietyScore = Math.round((stats.mealVariety.size / Math.min(totalMealSlots, 20)) * 100)
+    
+    const calCompliance = 100 - Math.min(10, Math.abs(100 - (stats.weekAverages.kcal / profile.target_calories * 100)))
+    const protCompliance = 100 - Math.min(10, Math.abs(100 - (stats.weekAverages.protein / profile.target_protein_g * 100)))
+    stats.complianceScore = Math.round((calCompliance + protCompliance) / 2)
+    
+    console.log('📊 Generating shopping list in calculatePlanStatistics...')
+    try {
+      stats.shoppingList = await this.generateShoppingListFromWeekPlan(weekPlan)
+      console.log(`✅ Shopping list generated: ${stats.shoppingList?.itemCount || 0} items`)
+    } catch (error) {
+      console.error('❌ Shopping list generation failed:', error)
+      stats.shoppingList = {
+        ingredients: [],
+        totalCost: '0.00',
+        dailyCost: '0.00',
+        itemCount: 0,
+        weekDays: weekPlan.length,
+        generatedAt: new Date().toISOString()
+      }
+    }
+    
+    return stats
   }
-  
-  if (!weekPlan || weekPlan.length === 0) {
-    console.error('❌ Empty or null week plan provided')
-    return {
-      ingredients: [],
-      totalCost: '0.00',
-      dailyCost: '0.00',
-      itemCount: 0,
-      weekDays: 0,
-      generatedAt: new Date().toISOString()
+
+  analyzePlan(weekPlan, profile, selectedIngredients, excludedIngredients) {
+    const analysis = {
+      averageScore: 0,
+      labelDistribution: {},
+      budgetAnalysis: { total: 0, daily: 0 },
+      portionCompliance: 100,
+      recommendations: [],
+      scalingAnalysis: {
+        used: false,
+        averageFactor: 1,
+        message: ''
+      },
+      ingredientAnalysis: {
+        selectedUsed: 0,
+        excludedAvoided: excludedIngredients.length,
+        message: ''
+      }
     }
+    
+    let totalScore = 0
+    let mealCount = 0
+    let totalCost = 0
+    let totalScaling = 0
+    let scaledCount = 0
+    let mealsWithSelectedIngredients = 0
+    
+    weekPlan.forEach(day => {
+      const meals = day.meals || []
+      
+      meals.forEach(({ meal }) => {
+        totalScore += meal.ai_score || 0
+        mealCount++
+        totalCost += (meal.total_cost || 5) * (meal.scaleFactor || 1)
+        
+        if (meal.scaleFactor) {
+          totalScaling += meal.scaleFactor
+          scaledCount++
+        }
+        
+        if (selectedIngredients.length > 0 && meal.score_breakdown?.selectedIngredientBonus > 0) {
+          mealsWithSelectedIngredients++
+        }
+        
+        const labels = meal.labels || []
+        labels.forEach(label => {
+          analysis.labelDistribution[label] = (analysis.labelDistribution[label] || 0) + 1
+        })
+      })
+    })
+    
+    analysis.averageScore = mealCount > 0 ? Math.round(totalScore / mealCount) : 0
+    analysis.budgetAnalysis.total = totalCost.toFixed(2)
+    analysis.budgetAnalysis.daily = (totalCost / weekPlan.length).toFixed(2)
+    
+    if (selectedIngredients.length > 0) {
+      analysis.ingredientAnalysis.selectedUsed = mealsWithSelectedIngredients
+      const percentage = Math.round((mealsWithSelectedIngredients / mealCount) * 100)
+      analysis.ingredientAnalysis.message = `${percentage}% van de maaltijden bevatten gewenste ingrediënten`
+      
+      if (percentage > 50) {
+        analysis.recommendations.push('✅ Uitstekend! Meer dan de helft van je maaltijden bevatten gewenste ingrediënten')
+      } else if (percentage > 25) {
+        analysis.recommendations.push('👍 Goed! Veel maaltijden bevatten je favoriete ingrediënten')
+      } else {
+        analysis.recommendations.push('💡 Tip: Overweeg meer gewenste ingrediënten te selecteren voor betere personalisatie')
+      }
+    }
+    
+    if (scaledCount > 0) {
+      const avgScale = totalScaling / scaledCount
+      analysis.scalingAnalysis.used = true
+      analysis.scalingAnalysis.averageFactor = avgScale.toFixed(2)
+      
+      if (avgScale > 1.5) {
+        analysis.scalingAnalysis.message = `Porties zijn vergroot (gem. ${Math.round(avgScale * 100)}%) om je hoge calorie doel te halen`
+        analysis.recommendations.push('Grote porties nodig voor je doelen - overweeg meal prep')
+      } else if (avgScale < 0.75) {
+        analysis.scalingAnalysis.message = `Porties zijn verkleind (gem. ${Math.round(avgScale * 100)}%) voor je calorie doel`
+        analysis.recommendations.push('Kleinere porties toegepast - perfect voor cut fase')
+      }
+    }
+    
+    if (profile.target_calories > 3000) {
+      analysis.recommendations.push('Bodybuilder modus: Focus op volume en frequentie')
+    }
+    
+    if (profile.target_calories < 1500) {
+      analysis.recommendations.push('Kleine porties strategie: Focus op nutriënt dichtheid')
+    }
+    
+    const proteinHits = analysis.labelDistribution['high_protein'] || 0
+    if (profile.primary_goal === 'muscle_gain' && proteinHits < mealCount / 2) {
+      analysis.recommendations.push('Voeg meer high-protein meals toe voor spiergroei')
+    }
+    
+    return analysis
   }
-  
-  // Process each day
-  weekPlan.forEach((day, dayIndex) => {
-    if (!day) {
-      console.warn(`⚠️ Day ${dayIndex + 1} is null/undefined`)
-      return
+
+  // ========================================
+  // SHOPPING LIST GENERATION
+  // ========================================
+  async generateShoppingListFromWeekPlan(weekPlan) {
+    console.log('🛒 === SHOPPING LIST GENERATION START (WITH NAME LOOKUP) ===')
+    console.log(`📊 Week plan received: ${weekPlan?.length || 0} days`)
+    
+    const ingredients = new Map()
+    let totalCost = 0
+    let mealCount = 0
+    let mealsWithIngredients = 0
+    let mealsWithoutIngredients = 0
+    
+    let ingredientLookup = new Map()
+    try {
+      const { data: allIngredients } = await this.supabase
+        .from('ai_ingredients')
+        .select('id, name, name_en')
+      
+      if (allIngredients) {
+        allIngredients.forEach(ing => {
+          ingredientLookup.set(ing.id, ing.name || ing.name_en || ing.id)
+        })
+        console.log(`✅ Loaded ${ingredientLookup.size} ingredient names for lookup`)
+      }
+    } catch (error) {
+      console.warn('⚠️ Could not load ingredient lookup table:', error)
     }
     
-    console.log(`\n📅 Processing Day ${dayIndex + 1}:`)
+    if (!weekPlan || weekPlan.length === 0) {
+      console.error('❌ Empty or null week plan provided')
+      return {
+        ingredients: [],
+        totalCost: '0.00',
+        dailyCost: '0.00',
+        itemCount: 0,
+        weekDays: 0,
+        generatedAt: new Date().toISOString()
+      }
+    }
     
-    // Get all slot keys
-    const slotKeys = Object.keys(day).filter(key => 
-      key !== 'totals' && 
-      key !== 'accuracy' && 
-      key !== 'snacks'
-    )
-    
-    console.log(`   Slots found: ${slotKeys.join(', ')}`)
-    
-    slotKeys.forEach(slotKey => {
-      const meal = day[slotKey]
-      
-      if (!meal || typeof meal !== 'object') {
-        console.log(`   ${slotKey}: Empty slot`)
+    weekPlan.forEach((day, dayIndex) => {
+      if (!day) {
+        console.warn(`⚠️ Day ${dayIndex + 1} is null/undefined`)
         return
       }
       
-      if (!meal.id && !meal.name) {
-        console.warn(`   ${slotKey}: Invalid meal object`)
-        return
-      }
+      console.log(`\n📅 Processing Day ${dayIndex + 1}:`)
       
-      mealCount++
-      console.log(`   ${slotKey}: "${meal.name}" (ID: ${meal.id})`)
+      const slotKeys = Object.keys(day).filter(key => 
+        key !== 'totals' && 
+        key !== 'accuracy' && 
+        key !== 'snacks'
+      )
       
-      const scaleFactor = meal.scaleFactor || meal.scale_factor || meal.finalScale || 1
-      if (scaleFactor !== 1) {
-        console.log(`      Scale factor: ${scaleFactor}`)
-      }
+      console.log(`   Slots found: ${slotKeys.join(', ')}`)
       
-      const mealCost = (meal.total_cost || meal.totalCost || 5) * scaleFactor
-      totalCost += mealCost
-      
-      // Extract ingredients
-      const ingredientsList = meal.ingredients_list || meal.ingredientsList || meal.ingredients
-      
-      if (!ingredientsList) {
-        console.warn(`      ⚠️ No ingredients_list found`)
-        mealsWithoutIngredients++
-        return
-      }
-      
-      // Parse if string
-      let parsedIngredients = ingredientsList
-      if (typeof ingredientsList === 'string') {
-        try {
-          parsedIngredients = JSON.parse(ingredientsList)
-          console.log(`      Parsed string ingredients`)
-        } catch (e) {
-          console.error(`      ❌ Failed to parse ingredients:`, e.message)
+      slotKeys.forEach(slotKey => {
+        const meal = day[slotKey]
+        
+        if (!meal || typeof meal !== 'object') {
+          console.log(`   ${slotKey}: Empty slot`)
+          return
+        }
+        
+        if (!meal.id && !meal.name) {
+          console.warn(`   ${slotKey}: Invalid meal object`)
+          return
+        }
+        
+        mealCount++
+        console.log(`   ${slotKey}: "${meal.name}" (ID: ${meal.id})`)
+        
+        const scaleFactor = meal.scaleFactor || meal.scale_factor || meal.finalScale || 1
+        if (scaleFactor !== 1) {
+          console.log(`      Scale factor: ${scaleFactor}`)
+        }
+        
+        const mealCost = (meal.total_cost || meal.totalCost || 5) * scaleFactor
+        totalCost += mealCost
+        
+        const ingredientsList = meal.ingredients_list || meal.ingredientsList || meal.ingredients
+        
+        if (!ingredientsList) {
+          console.warn(`      ⚠️ No ingredients_list found`)
           mealsWithoutIngredients++
           return
         }
-      }
-      
-      // Check if empty
-      if (Array.isArray(parsedIngredients) && parsedIngredients.length === 0) {
-        console.warn(`      ⚠️ Empty ingredients array`)
-        mealsWithoutIngredients++
-        return
-      }
-      
-      if (typeof parsedIngredients === 'object' && Object.keys(parsedIngredients).length === 0) {
-        console.warn(`      ⚠️ Empty ingredients object`)
-        mealsWithoutIngredients++
-        return
-      }
-      
-      mealsWithIngredients++
-      
-      // Process ingredients based on format
-      if (Array.isArray(parsedIngredients)) {
-        console.log(`      Processing ${parsedIngredients.length} ingredients (array format)`)
         
-        parsedIngredients.forEach(item => {
-          // Try to get name, fallback to lookup by ID
-          let name = item.name || item.ingredient_name
-          
-          if (!name && item.ingredient_id && ingredientLookup.has(item.ingredient_id)) {
-            name = ingredientLookup.get(item.ingredient_id)
-            console.log(`      ✅ Resolved ID ${item.ingredient_id.substring(0, 8)}... → "${name}"`)
-          }
-          
-          if (!name) {
-            name = item.ingredient_id || 'Unknown'
-            console.warn(`      ⚠️ Could not resolve ingredient name for: ${name}`)
-          }
-          
-          const amount = parseFloat(item.amount) || 100
-          const unit = item.unit || 'g'
-          
-          this.addIngredientToMap(ingredients, name, amount, unit, scaleFactor, meal.name, dayIndex + 1, slotKey)
-        })
-        
-      } else if (typeof parsedIngredients === 'object') {
-        const ingredientKeys = Object.keys(parsedIngredients)
-        console.log(`      Processing ${ingredientKeys.length} ingredients (object format)`)
-        
-        ingredientKeys.forEach(key => {
-          // Check if key is UUID (ingredient ID) or actual name
-          let name = key
-          const isUUID = key.length === 36 && key.includes('-')
-          
-          if (isUUID && ingredientLookup.has(key)) {
-            name = ingredientLookup.get(key)
-            console.log(`      ✅ Resolved UUID ${key.substring(0, 8)}... → "${name}"`)
-          } else if (isUUID) {
-            console.warn(`      ⚠️ UUID not found in lookup: ${key}`)
-          }
-          
-          const value = parsedIngredients[key]
-          let amount, unit
-          
-          if (typeof value === 'object' && value !== null) {
-            amount = parseFloat(value.amount || value.value) || 100
-            unit = value.unit || 'g'
-          } else {
-            amount = parseFloat(value) || 100
-            unit = 'g'
-          }
-          
-          this.addIngredientToMap(ingredients, name, amount, unit, scaleFactor, meal.name, dayIndex + 1, slotKey)
-        })
-      }
-    })
-  })
-  
-  // Sort ingredients alphabetically
-  const sortedIngredients = Array.from(ingredients.values()).sort((a, b) => 
-    a.name.localeCompare(b.name)
-  )
-  
-
-  // ✅ ENRICH WITH DATABASE INFO
-  console.log('📦 Enriching ingredients with purchase info...')
-  const ingredientNames = sortedIngredients.map(ing => ing.name)
-  
-  let enrichedIngredients = sortedIngredients
-  try {
-    const { data: ingredientDetails } = await this.supabase
-      .from('ai_ingredients')
-      .select('name, purchase_unit, purchase_price, unit_type, default_portion_gram')
-      .in('name', ingredientNames)
-    
-    if (ingredientDetails && ingredientDetails.length > 0) {
-      enrichedIngredients = sortedIngredients.map(ing => {
-        const details = ingredientDetails.find(d => 
-          d.name.toLowerCase() === ing.name.toLowerCase()
-        )
-        
-        if (details) {
-          return {
-            ...ing,
-            purchase_unit: details.purchase_unit,
-            purchase_price: details.purchase_price,
-            db_unit_type: details.unit_type,
-            default_portion: details.default_portion_gram
+        let parsedIngredients = ingredientsList
+        if (typeof ingredientsList === 'string') {
+          try {
+            parsedIngredients = JSON.parse(ingredientsList)
+            console.log(`      Parsed string ingredients`)
+          } catch (e) {
+            console.error(`      ❌ Failed to parse ingredients:`, e.message)
+            mealsWithoutIngredients++
+            return
           }
         }
-        return ing
+        
+        if (Array.isArray(parsedIngredients) && parsedIngredients.length === 0) {
+          console.warn(`      ⚠️ Empty ingredients array`)
+          mealsWithoutIngredients++
+          return
+        }
+        
+        if (typeof parsedIngredients === 'object' && Object.keys(parsedIngredients).length === 0) {
+          console.warn(`      ⚠️ Empty ingredients object`)
+          mealsWithoutIngredients++
+          return
+        }
+        
+        mealsWithIngredients++
+        
+        if (Array.isArray(parsedIngredients)) {
+          console.log(`      Processing ${parsedIngredients.length} ingredients (array format)`)
+          
+          parsedIngredients.forEach(item => {
+            let name = item.name || item.ingredient_name
+            
+            if (!name && item.ingredient_id && ingredientLookup.has(item.ingredient_id)) {
+              name = ingredientLookup.get(item.ingredient_id)
+              console.log(`      ✅ Resolved ID ${item.ingredient_id.substring(0, 8)}... → "${name}"`)
+            }
+            
+            if (!name) {
+              name = item.ingredient_id || 'Unknown'
+              console.warn(`      ⚠️ Could not resolve ingredient name for: ${name}`)
+            }
+            
+            const amount = parseFloat(item.amount) || 100
+            const unit = item.unit || 'g'
+            
+            this.addIngredientToMap(ingredients, name, amount, unit, scaleFactor, meal.name, dayIndex + 1, slotKey)
+          })
+          
+        } else if (typeof parsedIngredients === 'object') {
+          const ingredientKeys = Object.keys(parsedIngredients)
+          console.log(`      Processing ${ingredientKeys.length} ingredients (object format)`)
+          
+          ingredientKeys.forEach(key => {
+            let name = key
+            const isUUID = key.length === 36 && key.includes('-')
+            
+            if (isUUID && ingredientLookup.has(key)) {
+              name = ingredientLookup.get(key)
+              console.log(`      ✅ Resolved UUID ${key.substring(0, 8)}... → "${name}"`)
+            } else if (isUUID) {
+              console.warn(`      ⚠️ UUID not found in lookup: ${key}`)
+            }
+            
+            const value = parsedIngredients[key]
+            let amount, unit
+            
+            if (typeof value === 'object' && value !== null) {
+              amount = parseFloat(value.amount || value.value) || 100
+              unit = value.unit || 'g'
+            } else {
+              amount = parseFloat(value) || 100
+              unit = 'g'
+            }
+            
+            this.addIngredientToMap(ingredients, name, amount, unit, scaleFactor, meal.name, dayIndex + 1, slotKey)
+          })
+        }
       })
-      console.log(`✅ Enriched ${ingredientDetails.length} ingredients with purchase info`)
+    })
+    
+    const sortedIngredients = Array.from(ingredients.values()).sort((a, b) => 
+      a.name.localeCompare(b.name)
+    )
+    
+    console.log('📦 Enriching ingredients with purchase info...')
+    const ingredientNames = sortedIngredients.map(ing => ing.name)
+    
+    let enrichedIngredients = sortedIngredients
+    try {
+      const { data: ingredientDetails } = await this.supabase
+        .from('ai_ingredients')
+        .select('name, purchase_unit, purchase_price, unit_type, default_portion_gram')
+        .in('name', ingredientNames)
+      
+      if (ingredientDetails && ingredientDetails.length > 0) {
+        enrichedIngredients = sortedIngredients.map(ing => {
+          const details = ingredientDetails.find(d => 
+            d.name.toLowerCase() === ing.name.toLowerCase()
+          )
+          
+          if (details) {
+            return {
+              ...ing,
+              purchase_unit: details.purchase_unit,
+              purchase_price: details.purchase_price,
+              db_unit_type: details.unit_type,
+              default_portion: details.default_portion_gram
+            }
+          }
+          return ing
+        })
+        console.log(`✅ Enriched ${ingredientDetails.length} ingredients with purchase info`)
+      }
+    } catch (error) {
+      console.warn('⚠️ Could not enrich ingredients:', error)
     }
-  } catch (error) {
-    console.warn('⚠️ Could not enrich ingredients:', error)
+
+    console.log('\n✅ === SHOPPING LIST GENERATION COMPLETE ===')
+    console.log(`📊 Total meals processed: ${mealCount}`)
+    console.log(`✅ Meals with ingredients: ${mealsWithIngredients}`)
+    console.log(`⚠️ Meals without ingredients: ${mealsWithoutIngredients}`)
+    console.log(`🛒 Unique ingredients: ${enrichedIngredients.length}`)
+    console.log(`💰 Estimated total cost: €${totalCost.toFixed(2)}`)
+    
+    const rawList = {
+      ingredients: enrichedIngredients,
+      totalCost: totalCost.toFixed(2),
+      dailyCost: (totalCost / weekPlan.length).toFixed(2),
+      itemCount: enrichedIngredients.length,
+      weekDays: weekPlan.length,
+      mealsProcessed: mealCount,
+      mealsWithIngredients: mealsWithIngredients,
+      mealsWithoutIngredients: mealsWithoutIngredients,
+      generatedAt: new Date().toISOString()
+    }
+    
+    const formattedList = this.formatter.formatShoppingList(rawList)
+    const tips = this.formatter.generateShoppingTips(formattedList)
+    
+    return {
+      raw: rawList,
+      formatted: formattedList,
+      tips: tips
+    }
   }
 
-  console.log('\n✅ === SHOPPING LIST GENERATION COMPLETE ===')
-  console.log(`📊 Total meals processed: ${mealCount}`)
-  console.log(`✅ Meals with ingredients: ${mealsWithIngredients}`)
-  console.log(`⚠️ Meals without ingredients: ${mealsWithoutIngredients}`)
-  console.log(`🛒 Unique ingredients: ${enrichedIngredients.length}`)
-  console.log(`💰 Estimated total cost: €${totalCost.toFixed(2)}`)
-  
-  // ✅ APPLY FORMATTER
-  const rawList = {
-    ingredients: enrichedIngredients,  // ← CHANGED!
-    totalCost: totalCost.toFixed(2),
-    dailyCost: (totalCost / weekPlan.length).toFixed(2),
-    itemCount: enrichedIngredients.length,  // ← CHANGED!
-    weekDays: weekPlan.length,
-    mealsProcessed: mealCount,
-    mealsWithIngredients: mealsWithIngredients,
-    mealsWithoutIngredients: mealsWithoutIngredients,
-    generatedAt: new Date().toISOString()
+  generateShoppingList(weekPlan) {
+    return this.generateShoppingListFromWeekPlan(weekPlan)
   }
-  
-  const formattedList = this.formatter.formatShoppingList(rawList)
-  const tips = this.formatter.generateShoppingTips(formattedList)
-  
-  return {
-    raw: rawList,
-    formatted: formattedList,
-    tips: tips
-  }
-}
 
-/**
- * Alias for backward compatibility
- */
-generateShoppingList(weekPlan) {
-  return this.generateShoppingListFromWeekPlan(weekPlan)
-}
-
-/**
- * Helper to add ingredient to shopping map
- */
-addIngredientToMap(ingredients, name, amount, unit, scaleFactor, mealName, day, slot) {
-  const key = name.toLowerCase().trim()
-  
-  if (!ingredients.has(key)) {
-    ingredients.set(key, {
-      id: key,
-      name: name.trim(),
-      totalAmount: 0,
-      unit: unit || 'g',
-      usedIn: [],
-      category: this.categorizeIngredient(name)
+  addIngredientToMap(ingredients, name, amount, unit, scaleFactor, mealName, day, slot) {
+    const key = name.toLowerCase().trim()
+    
+    if (!ingredients.has(key)) {
+      ingredients.set(key, {
+        id: key,
+        name: name.trim(),
+        totalAmount: 0,
+        unit: unit || 'g',
+        usedIn: [],
+        category: this.categorizeIngredient(name)
+      })
+    }
+    
+    const ing = ingredients.get(key)
+    const scaledAmount = amount * scaleFactor
+    
+    ing.totalAmount += scaledAmount
+    ing.usedIn.push({
+      meal: mealName,
+      day: day,
+      slot: slot,
+      amount: scaledAmount,
+      originalAmount: amount,
+      scaled: scaleFactor !== 1
     })
   }
-  
-  const ing = ingredients.get(key)
-  const scaledAmount = amount * scaleFactor
-  
-  ing.totalAmount += scaledAmount
-  ing.usedIn.push({
-    meal: mealName,
-    day: day,
-    slot: slot,
-    amount: scaledAmount,
-    originalAmount: amount,
-    scaled: scaleFactor !== 1
-  })
-}
 
-/**
- * Categorize ingredient for shopping list organization
- */
-categorizeIngredient(name) {
-  const n = name.toLowerCase()
-  
-  // Protein
-  if (n.includes('kip') || n.includes('chicken') || n.includes('vlees') || n.includes('beef') ||
-      n.includes('varken') || n.includes('pork') || n.includes('vis') || n.includes('fish') ||
-      n.includes('zalm') || n.includes('salmon') || n.includes('tonijn') || n.includes('tuna') ||
-      n.includes('ei') || n.includes('egg') || n.includes('protein')) {
-    return 'Eiwitten'
+  categorizeIngredient(name) {
+    const n = name.toLowerCase()
+    
+    if (n.includes('kip') || n.includes('chicken') || n.includes('vlees') || n.includes('beef') ||
+        n.includes('varken') || n.includes('pork') || n.includes('vis') || n.includes('fish') ||
+        n.includes('zalm') || n.includes('salmon') || n.includes('tonijn') || n.includes('tuna') ||
+        n.includes('ei') || n.includes('egg') || n.includes('protein')) {
+      return 'Eiwitten'
+    }
+    
+    if (n.includes('broccoli') || n.includes('spinazie') || n.includes('spinach') ||
+        n.includes('sla') || n.includes('lettuce') || n.includes('tomaat') || n.includes('tomato') ||
+        n.includes('wortel') || n.includes('carrot') || n.includes('paprika') || n.includes('pepper') ||
+        n.includes('ui') || n.includes('onion') || n.includes('knoflook') || n.includes('garlic') ||
+        n.includes('komkommer') || n.includes('cucumber')) {
+      return 'Groenten'
+    }
+    
+    if (n.includes('rijst') || n.includes('rice') || n.includes('pasta') || n.includes('brood') ||
+        n.includes('bread') || n.includes('aardappel') || n.includes('potato') ||
+        n.includes('haver') || n.includes('oats') || n.includes('quinoa')) {
+      return 'Koolhydraten'
+    }
+    
+    if (n.includes('melk') || n.includes('milk') || n.includes('kaas') || n.includes('cheese') ||
+        n.includes('yoghurt') || n.includes('yogurt') || n.includes('kwark') || n.includes('quark') ||
+        n.includes('boter') || n.includes('butter')) {
+      return 'Zuivel'
+    }
+    
+    if (n.includes('appel') || n.includes('apple') || n.includes('banaan') || n.includes('banana') ||
+        n.includes('sinaasappel') || n.includes('orange') || n.includes('bes') || n.includes('berry') ||
+        n.includes('fruit')) {
+      return 'Fruit'
+    }
+    
+    if (n.includes('olie') || n.includes('oil') || n.includes('olijf') || n.includes('olive') ||
+        n.includes('avocado') || n.includes('noten') || n.includes('nuts') ||
+        n.includes('pinda') || n.includes('peanut')) {
+      return 'Vetten & Oliën'
+    }
+    
+    if (n.includes('zout') || n.includes('salt') || n.includes('peper') || n.includes('pepper') ||
+        n.includes('kruid') || n.includes('spice') || n.includes('herb')) {
+      return 'Kruiden & Specerijen'
+    }
+    
+    return 'Overig'
   }
-  
-  // Vegetables
-  if (n.includes('broccoli') || n.includes('spinazie') || n.includes('spinach') ||
-      n.includes('sla') || n.includes('lettuce') || n.includes('tomaat') || n.includes('tomato') ||
-      n.includes('wortel') || n.includes('carrot') || n.includes('paprika') || n.includes('pepper') ||
-      n.includes('ui') || n.includes('onion') || n.includes('knoflook') || n.includes('garlic') ||
-      n.includes('komkommer') || n.includes('cucumber')) {
-    return 'Groenten'
-  }
-  
-  // Carbs
-  if (n.includes('rijst') || n.includes('rice') || n.includes('pasta') || n.includes('brood') ||
-      n.includes('bread') || n.includes('aardappel') || n.includes('potato') ||
-      n.includes('haver') || n.includes('oats') || n.includes('quinoa')) {
-    return 'Koolhydraten'
-  }
-  
-  // Dairy
-  if (n.includes('melk') || n.includes('milk') || n.includes('kaas') || n.includes('cheese') ||
-      n.includes('yoghurt') || n.includes('yogurt') || n.includes('kwark') || n.includes('quark') ||
-      n.includes('boter') || n.includes('butter')) {
-    return 'Zuivel'
-  }
-  
-  // Fruit
-  if (n.includes('appel') || n.includes('apple') || n.includes('banaan') || n.includes('banana') ||
-      n.includes('sinaasappel') || n.includes('orange') || n.includes('bes') || n.includes('berry') ||
-      n.includes('fruit')) {
-    return 'Fruit'
-  }
-  
-  // Fats
-  if (n.includes('olie') || n.includes('oil') || n.includes('olijf') || n.includes('olive') ||
-      n.includes('avocado') || n.includes('noten') || n.includes('nuts') ||
-      n.includes('pinda') || n.includes('peanut')) {
-    return 'Vetten & Oliën'
-  }
-  
-  // Spices
-  if (n.includes('zout') || n.includes('salt') || n.includes('peper') || n.includes('pepper') ||
-      n.includes('kruid') || n.includes('spice') || n.includes('herb')) {
-    return 'Kruiden & Specerijen'
-  }
-  
-  return 'Overig'
-}
-
-
-
-
-
-
-
-
 
   // ========================================
-  
-// 11. PLAN MANAGEMENT
+  // 11. PLAN MANAGEMENT - FIXED v5.1
   // ========================================
   async savePlan(plan, clientId, name) {
     try {
       const days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday']
       const weekStructure = {}
       
+      console.log('💾 === SAVING PLAN V5.1 (FIXED STRUCTURE) ===')
+      console.log(`   Client: ${clientId}`)
+      console.log(`   Plan name: ${name || 'Auto-generated'}`)
+      console.log(`   Days in plan: ${plan.weekPlan?.length || 0}`)
+      
       plan.weekPlan.forEach((day, index) => {
+        const dayName = days[index]
+        
+        // ✅ FIX: Save meal IDs DIRECTLY on day object (not nested in 'meals')
+        // Database expects: { breakfast: "uuid", lunch: "uuid", dinner: "uuid" }
+        // NOT: { meals: { breakfast: "uuid" } }
         const dayData = {
-          meals: {},
+          breakfast: null,
+          lunch: null,
+          dinner: null,
           snacks: [],
-          totals: day.totals,
-          scaling: {}
+          totals: day.totals || { kcal: 0, protein: 0, carbs: 0, fat: 0 },
+          scaling: {
+            breakfast: 1,
+            lunch: 1,
+            dinner: 1,
+            snacks: []
+          }
         }
         
-        day.meals?.forEach(({ slot, meal, isSnack }) => {
-          if (isSnack) {
-            dayData.snacks.push(meal.id)
-            dayData.scaling[slot] = meal.scaleFactor || 1
-          } else {
-            dayData.meals[slot] = meal.id
-            dayData.scaling[slot] = meal.scaleFactor || 1
-          }
-        })
+        // ✅ Process meals array (new format from generateWeekPlan v5)
+        if (day.meals && Array.isArray(day.meals)) {
+          day.meals.forEach(({ slot, meal, isSnack }) => {
+            if (!meal || !meal.id) {
+              console.warn(`   ⚠️ ${dayName}.${slot}: No meal ID found`)
+              return
+            }
+            
+            const scaleFactor = meal.scaleFactor || meal.scale_factor || 1
+            
+            if (isSnack) {
+              dayData.snacks.push(meal.id)
+              dayData.scaling.snacks.push(scaleFactor)
+            } else {
+              if (slot === 'breakfast') {
+                dayData.breakfast = meal.id
+                dayData.scaling.breakfast = scaleFactor
+              } else if (slot === 'lunch') {
+                dayData.lunch = meal.id
+                dayData.scaling.lunch = scaleFactor
+              } else if (slot === 'dinner') {
+                dayData.dinner = meal.id
+                dayData.scaling.dinner = scaleFactor
+              } else if (slot.startsWith('snack')) {
+                dayData.snacks.push(meal.id)
+                dayData.scaling.snacks.push(scaleFactor)
+              } else if (slot.startsWith('meal')) {
+                dayData[slot] = meal.id
+                dayData.scaling[slot] = scaleFactor
+              }
+            }
+          })
+        }
         
-        weekStructure[days[index]] = dayData
+        // ✅ FALLBACK: Handle old format (direct meal properties on day)
+        if (!day.meals) {
+          console.log(`   ${dayName}: Using fallback format (direct properties)`)
+          
+          if (day.breakfast?.id) {
+            dayData.breakfast = day.breakfast.id
+            dayData.scaling.breakfast = day.breakfast.scaleFactor || 1
+          }
+          if (day.lunch?.id) {
+            dayData.lunch = day.lunch.id
+            dayData.scaling.lunch = day.lunch.scaleFactor || 1
+          }
+          if (day.dinner?.id) {
+            dayData.dinner = day.dinner.id
+            dayData.scaling.dinner = day.dinner.scaleFactor || 1
+          }
+          if (day.snacks && Array.isArray(day.snacks)) {
+            day.snacks.forEach(snack => {
+              if (snack?.id) {
+                dayData.snacks.push(snack.id)
+                dayData.scaling.snacks.push(snack.scaleFactor || 1)
+              }
+            })
+          }
+        }
+        
+        weekStructure[dayName] = dayData
+        
+        console.log(`   ${dayName}: B=${dayData.breakfast ? '✓' : '✗'} L=${dayData.lunch ? '✓' : '✗'} D=${dayData.dinner ? '✓' : '✗'} S=${dayData.snacks.length}`)
       })
 
-      console.log('🛒 Auto-generating shopping list...')
+      console.log('\n🛒 Auto-generating shopping list...')
       
       let shoppingList = null
       try {
@@ -1381,28 +1451,40 @@ categorizeIngredient(name) {
         daily_fat: plan.dailyTargets?.fat || 70,
         is_active: true,
         ai_generated: true,
-        ai_version: 'v5_rotating_sets',
+        ai_version: 'v5.1_rotating_sets_fixed',
         stats: plan.stats,
         start_date: new Date().toISOString().split('T')[0],
         created_at: new Date().toISOString()
       }
+      
+      console.log('\n💾 Inserting into database...')
+      console.log(`   Table: client_meal_plans`)
+      console.log(`   Structure keys: ${Object.keys(weekStructure).join(', ')}`)
       
       const { data, error } = await this.supabase
         .from('client_meal_plans')
         .insert([planData])
         .select()
       
-      if (error) throw error
+      if (error) {
+        console.error('❌ Database insert failed:', error)
+        throw error
+      }
       
       if (data && data[0]) {
+        console.log(`✅ Plan saved with ID: ${data[0].id}`)
+        
+        console.log('🔄 Deactivating other plans...')
         await this.supabase
           .from('client_meal_plans')
           .update({ is_active: false })
           .eq('client_id', clientId)
           .neq('id', data[0].id)
+        
+        console.log('✅ Other plans deactivated')
       }
       
-      console.log('✅ Plan saved successfully')
+      console.log('✅ === PLAN SAVE COMPLETE ===\n')
       return data[0]
       
     } catch (error) {

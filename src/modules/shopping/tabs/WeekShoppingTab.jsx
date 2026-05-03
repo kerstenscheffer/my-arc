@@ -1,359 +1,345 @@
-// src/modules/shopping/tabs/WeekShoppingTab.jsx - OPTIMIZED
+// src/modules/shopping/tabs/WeekShoppingTab.jsx - V8 FULL WIDTH
 import React, { useState, useEffect } from 'react'
-import ShoppingActions from './components/ShoppingActions'
-import ShoppingCategoryCard from './components/ShoppingCategoryCard'
-import ShoppingEmpty from './components/ShoppingEmpty'
-import ShoppingExportMenu from './components/ShoppingExportMenu'
-import { ShoppingCart, AlertCircle, RefreshCw, Save, Check } from 'lucide-react'
-import { CATEGORY_CONFIG } from '../constants/shoppingConstants'
-import { getGroupedItems, calculateShoppingStats, simplifyShoppingList } from '../utils/shoppingHelpers'
+import { AlertCircle } from 'lucide-react'
+
+// Layout components
+import ShoppingTabButtons from './components/ShoppingTabButtons'
+import WeekMultiplierTabs from './components/WeekMultiplierTabs'
+import ShoppingDailyStats from './components/ShoppingDailyStats'
+import CompactShoppingCategory from './components/CompactShoppingCategory'
+import FloatingActionButtons from './components/FloatingActionButtons'
+
+// Budget components
+import SavingsBar from '../components/SavingsBar'
+import BudgetTab from '../components/BudgetTab'
+import BudgetService from '../BudgetService'
+
+// Categorization
+let categorizeIngredient
+try {
+  const shoppingConstants = require('../constants/shoppingConstants')
+  categorizeIngredient = shoppingConstants.categorizeIngredient
+} catch (e) {
+  categorizeIngredient = (name) => {
+    if (!name) return 'other'
+    const n = name.toLowerCase()
+    if (n.includes('kip') || n.includes('whey') || n.includes('protein') || n.includes('ei')) return 'protein'
+    if (n.includes('rijst') || n.includes('haver') || n.includes('pasta')) return 'carbs'
+    if (n.includes('broccoli') || n.includes('spinazie') || n.includes('groente')) return 'vegetables'
+    if (n.includes('bes') || n.includes('appel') || n.includes('banaan')) return 'fruit'
+    if (n.includes('melk') || n.includes('yoghurt') || n.includes('kaas')) return 'dairy'
+    if (n.includes('olie') || n.includes('avocado') || n.includes('noten')) return 'fats'
+    if (n.includes('saus') || n.includes('bbq') || n.includes('teriyaki')) return 'sauces'
+    return 'other'
+  }
+}
 
 export default function WeekShoppingTab({ shoppingData, service, client, onRefresh, db }) {
   const isMobile = window.innerWidth <= 768
-  
-  // State management
+
+  const [activeTab, setActiveTab] = useState('weekplan')
+  const [weekMultiplier, setWeekMultiplier] = useState(1)
   const [checkedItems, setCheckedItems] = useState({})
-  const [expandedCategories, setExpandedCategories] = useState({})
-  const [showExportMenu, setShowExportMenu] = useState(false)
-  const [shoppingList, setShoppingList] = useState(null)
-  const [generating, setGenerating] = useState(false)
-  const [saving, setSaving] = useState(false)
-  const [saveSuccess, setSaveSuccess] = useState(false)
-  const [hasChanges, setHasChanges] = useState(false)
-  const [animateCards, setAnimateCards] = useState(false)
-  
-  // Load shopping data on mount and when data changes
+  const [editModeCategories, setEditModeCategories] = useState({})
+  const [editedAmounts, setEditedAmounts] = useState({})
+  const [deletedItems, setDeletedItems] = useState([])
+
+  // Budget state
+  const [budgetService] = useState(() => new BudgetService(db))
+  const [savingsData, setSavingsData] = useState(null)
+
   useEffect(() => {
-    loadShoppingData()
-  }, [shoppingData])
-  
-  // Trigger animation after list loads
-  useEffect(() => {
-    if (shoppingList?.items?.length > 0) {
-      setTimeout(() => setAnimateCards(true), 100)
-    }
-  }, [shoppingList])
-  
-  // 🔥 Auto-expand only first category
-  useEffect(() => {
-    if (shoppingList?.items?.length > 0) {
-      const grouped = getGroupedItems(shoppingList.items)
-      const firstCategory = Object.keys(grouped)[0]
-      if (firstCategory) {
-        setExpandedCategories({ [firstCategory]: true })
-      }
-    }
-  }, [shoppingList])
-  
-  // Load shopping data from props or generate if needed
-  const loadShoppingData = async () => {
-    if (shoppingData?.activePlan?.shopping_list) {
-      setShoppingList(shoppingData.activePlan.shopping_list)
-    } else if (shoppingData?.weekStructure && !generating && !shoppingList) {
-      await generateShoppingList()
-    }
-    
     if (shoppingData?.progress?.purchased_items) {
       setCheckedItems(shoppingData.progress.purchased_items)
     }
-  }
-  
-  // Generate new shopping list from week structure
-  const generateShoppingList = async () => {
-    if (!shoppingData?.weekStructure) return
-    
-    setGenerating(true)
-    setHasChanges(false)
-    
+  }, [shoppingData?.progress])
+
+  useEffect(() => {
+    if (client?.id && shoppingData?.shoppingList?.totalCost) {
+      loadBudgetData()
+    }
+  }, [client?.id, shoppingData?.shoppingList?.totalCost])
+
+  const loadBudgetData = async () => {
     try {
-      const list = await service.generateShoppingList(shoppingData.weekStructure)
-      
-      if (list && list.items.length > 0) {
-        setShoppingList(list)
-        setHasChanges(true)
-        setAnimateCards(false)
-        setTimeout(() => setAnimateCards(true), 100)
+      const baseline = await budgetService.getBudgetBaseline(client.id)
+      if (baseline?.budget_total_baseline) {
+        const planCost = shoppingData.shoppingList.totalCost
+        const savings = budgetService.calculateSavings(
+          parseFloat(baseline.budget_total_baseline),
+          planCost
+        )
+        setSavingsData(savings)
+        await budgetService.recordWeeklySavings(client.id, planCost)
       }
     } catch (error) {
-      console.error('Failed to generate shopping list:', error)
-    } finally {
-      setGenerating(false)
+      console.error('❌ Budget data load failed:', error)
     }
   }
-  
-  // Save shopping list to database
-  const saveShoppingList = async () => {
-    if (!shoppingList || !shoppingData?.activePlan?.id) return
-    
-    setSaving(true)
-    setSaveSuccess(false)
-    
-    try {
-      const simplifiedList = simplifyShoppingList(shoppingList)
-      
-      const { error } = await db.supabase
-        .from('client_meal_plans')
-        .update({ 
-          shopping_list: simplifiedList,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', shoppingData.activePlan.id)
-      
-      if (!error) {
-        setSaveSuccess(true)
-        setHasChanges(false)
-        setTimeout(() => setSaveSuccess(false), 3000)
-        
-        await service.saveShoppingProgress(client.id, shoppingData.activePlan.id, {
-          checkedItems
-        })
-        
-        if (onRefresh) onRefresh()
-      }
-    } catch (error) {
-      console.error('Failed to save shopping list:', error)
-    } finally {
-      setSaving(false)
-    }
-  }
-  
-  // Toggle individual item checked state
+
+  // ── HANDLERS ──
   const handleCheckItem = async (itemId) => {
-    const newCheckedItems = {
-      ...checkedItems,
-      [itemId]: !checkedItems[itemId]
-    }
-    setCheckedItems(newCheckedItems)
-    
-    if (shoppingData?.activePlan?.id) {
-      await service.saveShoppingProgress(client.id, shoppingData.activePlan.id, {
-        checkedItems: newCheckedItems
-      })
+    const newChecked = { ...checkedItems, [itemId]: !checkedItems[itemId] }
+    setCheckedItems(newChecked)
+    try {
+      await service.saveShoppingProgress(client.id, shoppingData?.activePlan?.id, { checkedItems: newChecked })
+    } catch (error) {
+      console.error('❌ Failed to save:', error)
+      setCheckedItems(checkedItems)
     }
   }
-  
-  // Check/uncheck all items in a category
+
   const handleCheckCategory = async (category, items) => {
     if (!items || !Array.isArray(items)) return
-    
     const allChecked = items.every(item => checkedItems[item?.id])
-    const newCheckedItems = { ...checkedItems }
-    
-    items.forEach(item => {
-      if (item?.id) {
-        newCheckedItems[item.id] = !allChecked
-      }
-    })
-    
-    setCheckedItems(newCheckedItems)
-    
-    if (shoppingData?.activePlan?.id) {
-      await service.saveShoppingProgress(client.id, shoppingData.activePlan.id, {
-        checkedItems: newCheckedItems
-      })
+    const newChecked = { ...checkedItems }
+    items.forEach(item => { if (item?.id) newChecked[item.id] = !allChecked })
+    setCheckedItems(newChecked)
+    try {
+      await service.saveShoppingProgress(client.id, shoppingData?.activePlan?.id, { checkedItems: newChecked })
+    } catch (error) {
+      console.error('❌ Failed to save:', error)
+      setCheckedItems(checkedItems)
     }
   }
-  
-  // Toggle category expanded/collapsed state
-  const toggleCategory = (category) => {
-    setExpandedCategories(prev => ({
-      ...prev,
-      [category]: !prev[category]
-    }))
+
+  const toggleEditMode = (category) => {
+    setEditModeCategories(prev => ({ ...prev, [category]: !prev[category] }))
   }
-  
-  // Share shopping list via WhatsApp
-  const handleShare = () => {
-    if (!shoppingList) return
-    const text = service.generateExportText(shoppingList)
-    service.shareViaWhatsApp(text)
-    setShowExportMenu(false)
+
+  const handleAmountChange = (itemId, newAmount) => {
+    setEditedAmounts(prev => ({ ...prev, [itemId]: newAmount }))
   }
-  
-  // Copy shopping list to clipboard
-  const handleCopy = async () => {
-    if (!shoppingList) return
-    const text = service.generateExportText(shoppingList)
-    const success = await service.copyToClipboard(text)
-    setShowExportMenu(false)
+
+  const handleDeleteItem = (itemId) => {
+    setDeletedItems(prev => [...prev, itemId])
   }
-  
-  // Calculate statistics
-  const groupedItems = getGroupedItems(shoppingList?.items)
-  const stats = calculateShoppingStats(shoppingList?.items, checkedItems)
-  
-  // Empty states
-  if (!shoppingData?.activePlan) {
+
+  // ── CATEGORY NORMALIZER ──
+  const normalizeCategory = (cat) => {
+    const aliases = {
+      'fruits': 'fruit',
+      'proteins': 'protein',
+      'vegetables': 'vegetables',
+      'grains': 'carbs',
+      'oils': 'fats',
+      'spices': 'sauces',
+      'seasonings': 'sauces',
+      'condiments': 'sauces'
+    }
+    return aliases[cat] || cat
+  }
+
+  // ── GROUPING ──
+  const getGroupedItems = () => {
+    if (!shoppingData?.shoppingList?.items) return {}
+    const grouped = {}
+    shoppingData.shoppingList.items.forEach(item => {
+      const displayName = item.name || 'Onbekend Product'
+      const dbCategory = normalizeCategory(item.category)
+      const cat = (dbCategory && dbCategory !== 'other')
+        ? dbCategory
+        : (categorizeIngredient(displayName) || 'other')
+      if (!grouped[cat]) grouped[cat] = []
+      const displayAmount = editedAmounts[item.id] !== undefined
+        ? editedAmounts[item.id]
+        : (item.displayAmount || item.totalAmount) * weekMultiplier
+      grouped[cat].push({
+        ...item,
+        category: cat,
+        displayAmount,
+        estimatedCost: editedAmounts[item.id] !== undefined
+          ? (editedAmounts[item.id] / (item.displayAmount || item.totalAmount)) * (item.estimatedCost || 0)
+          : (item.estimatedCost || 0) * weekMultiplier
+      })
+    })
+    return grouped
+  }
+
+  const calculateStats = () => {
+    const items = shoppingData?.shoppingList?.items || []
+    const visibleItems = items.filter(item => !deletedItems.includes(item.id))
+    const totalItems = visibleItems.length
+    const checkedCount = Object.keys(checkedItems).filter(id =>
+      checkedItems[id] && !deletedItems.includes(id)
+    ).length
+    const totalCost = visibleItems.reduce((sum, item) => {
+      const amount = editedAmounts[item.id] !== undefined
+        ? editedAmounts[item.id]
+        : (item.displayAmount || item.totalAmount) * weekMultiplier
+      const originalAmount = item.displayAmount || item.totalAmount
+      const costPerUnit = (item.estimatedCost || 0) / originalAmount
+      return sum + (amount * costPerUnit)
+    }, 0)
+    const progress = totalItems > 0 ? Math.round((checkedCount / totalItems) * 100) : 0
+    const groupedItems = getGroupedItems()
+    const categoriesCount = Object.keys(groupedItems).filter(cat =>
+      groupedItems[cat].some(item => !deletedItems.includes(item.id))
+    ).length
+    return { totalItems, checkedCount, totalCost, progress, categoriesCount }
+  }
+
+  const handleExport = () => {
+    const text = service.generateExportText(shoppingData.shoppingList)
+    if (navigator.share) {
+      navigator.share({ title: 'MY ARC Boodschappenlijst', text }).catch(err => console.log('Share failed:', err))
+    } else {
+      service.copyToClipboard(text)
+      showToast('Gekopieerd naar klembord')
+    }
+  }
+
+  const handleAddItem = () => {
+    showToast('Ingredient toevoegen komt binnenkort')
+  }
+
+  const showToast = (message) => {
+    const toast = document.createElement('div')
+    toast.textContent = message
+    Object.assign(toast.style, {
+      position: 'fixed',
+      bottom: isMobile ? '90px' : '20px',
+      left: '50%',
+      transform: 'translateX(-50%)',
+      background: '#10b981',
+      color: 'white',
+      padding: '0.625rem 1rem',
+      borderRadius: '6px',
+      fontWeight: '700',
+      fontSize: isMobile ? '0.75rem' : '0.85rem',
+      zIndex: '9999'
+    })
+    document.body.appendChild(toast)
+    setTimeout(() => toast.remove(), 2500)
+  }
+
+  const groupedItems = getGroupedItems()
+  const stats = calculateStats()
+
+  // ── EMPTY STATE ──
+  if (!shoppingData?.shoppingList?.items?.length) {
     return (
-      <ShoppingEmpty 
-        icon={ShoppingCart}
-        title="Geen actief meal plan"
-        message="Je hebt een actief AI meal plan nodig om de boodschappenlijst te gebruiken."
-        isMobile={isMobile}
-      />
+      <div style={{
+        padding: '3rem 1rem',
+        textAlign: 'center',
+        color: 'rgba(255, 255, 255, 0.2)',
+        fontSize: '0.75rem'
+      }}>
+        <AlertCircle size={18} color="rgba(255, 255, 255, 0.2)" style={{ marginBottom: '0.75rem' }} />
+        <div style={{ fontSize: isMobile ? '0.9rem' : '1rem', fontWeight: '700', color: 'rgba(255, 255, 255, 0.4)', marginBottom: '0.375rem' }}>
+          Geen boodschappenlijst
+        </div>
+        <div style={{ fontSize: '0.7rem', color: 'rgba(255, 255, 255, 0.2)' }}>
+          Genereer eerst een AI meal plan
+        </div>
+      </div>
     )
   }
-  
-  if (generating) {
-    return (
-      <ShoppingEmpty 
-        loading={true}
-        message="Slimme boodschappenlijst genereren..."
-        subMessage="Ingrediënten optimaliseren voor beste prijzen"
-        isMobile={isMobile}
-      />
-    )
-  }
-  
-  if (!shoppingList || shoppingList.items?.length === 0) {
-    return (
-      <ShoppingEmpty 
-        icon={AlertCircle}
-        title="Geen boodschappen gevonden"
-        message="Er zijn geen ingrediënten gevonden in je meal plan."
-        action={{
-          label: 'Opnieuw genereren',
-          onClick: generateShoppingList,
-          icon: RefreshCw
-        }}
-        isMobile={isMobile}
-      />
-    )
-  }
-  
-  // Main render - COMPACT VERSION
+
   return (
-    <div style={{
-      padding: isMobile ? '0.5rem' : '0.75rem',
-      maxWidth: '1200px',
-      margin: '0 auto',
-      position: 'relative'
-    }}>
-      {/* 🔥 COMPACT: Inline actions (geen aparte rij) */}
-      <ShoppingActions
-        onSave={saveShoppingList}
-        onShare={() => setShowExportMenu(!showExportMenu)}
-        onRefresh={() => {
-          setShoppingList(null)
-          generateShoppingList()
-        }}
-        saving={saving}
-        hasChanges={hasChanges}
-        saveSuccess={saveSuccess}
+    <div>
+      {/* 1. COMPACT HEADER */}
+      <div style={{
+        padding: isMobile ? '0.75rem 1rem' : '1rem 1.5rem',
+        borderBottom: '1px solid rgba(255, 255, 255, 0.06)',
+        display: 'flex',
+        alignItems: 'center',
+        gap: isMobile ? '0.5rem' : '0.75rem'
+      }}>
+        <h1 style={{
+          fontSize: isMobile ? '1.1rem' : '1.35rem',
+          fontWeight: '800',
+          color: '#10b981',
+          margin: 0,
+          whiteSpace: 'nowrap',
+          flexShrink: 0,
+          letterSpacing: '-0.02em'
+        }}>
+          Boodschappen
+        </h1>
+        <span style={{
+          fontSize: '0.6rem',
+          color: 'rgba(16, 185, 129, 0.5)',
+          fontWeight: '600'
+        }}>
+          {stats.checkedCount}/{stats.totalItems}
+        </span>
+        <div style={{ flex: 1 }} />
+        <WeekMultiplierTabs
+          selectedWeeks={weekMultiplier}
+          onSelect={setWeekMultiplier}
+          isMobile={isMobile}
+        />
+      </div>
+
+      {/* 2. FILTER STRIP */}
+      <ShoppingTabButtons
+        activeTab={activeTab}
+        onTabChange={setActiveTab}
         isMobile={isMobile}
       />
-      
-      {/* Export Menu Dropdown */}
-      {showExportMenu && (
-        <ShoppingExportMenu
-          onShare={handleShare}
-          onCopy={handleCopy}
-          onClose={() => setShowExportMenu(false)}
+
+      {/* 3. WEEKPLAN TAB */}
+      {activeTab === 'weekplan' && (
+        <div>
+          <SavingsBar savings={savingsData} isMobile={isMobile} />
+
+          <ShoppingDailyStats
+            totalCost={stats.totalCost}
+            totalItems={stats.totalItems}
+            checkedPercentage={stats.progress}
+            categoriesCount={stats.categoriesCount}
+            isMobile={isMobile}
+          />
+
+          {Object.entries(groupedItems).map(([category, items], index) => (
+            <CompactShoppingCategory
+              key={category}
+              category={category}
+              items={items}
+              checkedItems={checkedItems}
+              editedAmounts={editedAmounts}
+              deletedItems={deletedItems}
+              editMode={editModeCategories[category] === true}
+              onCheckItem={handleCheckItem}
+              onCheckAll={() => handleCheckCategory(category, items)}
+              onAmountChange={handleAmountChange}
+              onDeleteItem={handleDeleteItem}
+              onToggleEditMode={toggleEditMode}
+              service={service}
+              isMobile={isMobile}
+              delay={index * 0.02}
+            />
+          ))}
+        </div>
+      )}
+
+      {/* 4. BUDGET TAB */}
+      {activeTab === 'budget' && (
+        <BudgetTab
+          client={client}
+          db={db}
+          planCost={shoppingData?.shoppingList?.totalCost || 0}
           isMobile={isMobile}
         />
       )}
-      
-      {/* 🔥 COMPACT: Category Cards - tighter spacing */}
-      <div style={{ marginTop: isMobile ? '0.5rem' : '0.75rem' }}>
-        {Object.entries(groupedItems).map(([category, items], index) => (
-          <ShoppingCategoryCard
-            key={category}
-            category={category}
-            config={CATEGORY_CONFIG[category] || CATEGORY_CONFIG.other}
-            items={items || []}
-            checkedItems={checkedItems}
-            expanded={expandedCategories[category] === true}
-            onToggle={() => toggleCategory(category)}
-            onCheckItem={handleCheckItem}
-            onCheckAll={() => handleCheckCategory(category, items)}
-            service={service}
-            isMobile={isMobile}
-            delay={index * 0.03}
-            animate={animateCards}
-          />
-        ))}
-      </div>
-      
-      {/* 🔥 FLOATING SAVE BUTTON (primary action) */}
-      {hasChanges && (
-        <button
-          onClick={saveShoppingList}
-          disabled={saving}
-          style={{
-            position: 'fixed',
-            bottom: isMobile ? '80px' : '2rem',
-            right: isMobile ? '1rem' : '2rem',
-            width: isMobile ? '56px' : '64px',
-            height: isMobile ? '56px' : '64px',
-            borderRadius: '50%',
-            background: saveSuccess 
-              ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)'
-              : 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-            border: '2px solid rgba(16, 185, 129, 0.3)',
-            boxShadow: '0 8px 32px rgba(16, 185, 129, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.1)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            cursor: saving ? 'not-allowed' : 'pointer',
-            touchAction: 'manipulation',
-            WebkitTapHighlightColor: 'transparent',
-            transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-            zIndex: 100,
-            animation: 'float 3s ease-in-out infinite',
-            outline: 'none'
-          }}
-          onMouseEnter={(e) => {
-            if (!isMobile && !saving) {
-              e.currentTarget.style.transform = 'scale(1.1)'
-              e.currentTarget.style.boxShadow = '0 12px 40px rgba(16, 185, 129, 0.5)'
-            }
-          }}
-          onMouseLeave={(e) => {
-            if (!isMobile && !saving) {
-              e.currentTarget.style.transform = 'scale(1)'
-              e.currentTarget.style.boxShadow = '0 8px 32px rgba(16, 185, 129, 0.4)'
-            }
-          }}
-          onTouchStart={(e) => {
-            if (isMobile && !saving) {
-              e.currentTarget.style.transform = 'scale(0.95)'
-            }
-          }}
-          onTouchEnd={(e) => {
-            if (isMobile && !saving) {
-              e.currentTarget.style.transform = 'scale(1)'
-            }
-          }}
-        >
-          {saveSuccess ? (
-            <Check size={isMobile ? 24 : 28} color="white" strokeWidth={3} />
-          ) : saving ? (
-            <RefreshCw 
-              size={isMobile ? 24 : 28} 
-              color="white" 
-              strokeWidth={3}
-              style={{ animation: 'spin 1s linear infinite' }}
-            />
-          ) : (
-            <Save size={isMobile ? 24 : 28} color="white" strokeWidth={3} />
-          )}
-        </button>
+
+      {/* 5. TIPS TAB */}
+      {activeTab === 'shoptips' && (
+        <div style={{ padding: '2rem 1rem', textAlign: 'center', color: 'rgba(255, 255, 255, 0.2)', fontSize: '0.75rem' }}>
+          Shop Tips — coming soon
+        </div>
       )}
-      
-      {/* Animations */}
-      <style>
-        {`
-          @keyframes spin {
-            from { transform: rotate(0deg); }
-            to { transform: rotate(360deg); }
-          }
-          
-          @keyframes float {
-            0%, 100% { transform: translateY(0) scale(1); }
-            50% { transform: translateY(-8px) scale(1.02); }
-          }
-        `}
-      </style>
+
+      {/* FLOATING ACTIONS */}
+      {activeTab === 'weekplan' && (
+        <FloatingActionButtons
+          shoppingData={{ items: Object.values(groupedItems).flat() }}
+          weekMultiplier={weekMultiplier}
+          onAddItem={handleAddItem}
+          isMobile={isMobile}
+        />
+      )}
     </div>
   )
 }

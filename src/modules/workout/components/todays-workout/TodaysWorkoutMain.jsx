@@ -1,306 +1,170 @@
 // src/modules/workout/components/todays-workout/TodaysWorkoutMain.jsx
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
+import { Plus } from 'lucide-react'
 import TodaysWorkoutCard from './TodaysWorkoutCard'
 import LogModal from './LogModal'
+import CustomExerciseModal from './components/CustomExerciseModal'
+import WorkoutServiceNew from '../../services/WorkoutServiceNew'
 
-export default function TodaysWorkoutMain({ client, schema, db, workoutService }) {
+export default function TodaysWorkoutMain({ client, schema, db, workoutService, onWorkoutCompleted, onSchemaUpdate, scheduleReloadKey }) {
   const isMobile = window.innerWidth <= 768
   const [showLogModal, setShowLogModal] = useState(false)
+  const [showCustomModal, setShowCustomModal] = useState(false)
   const [todaysWorkout, setTodaysWorkout] = useState(null)
   const [todaysLogs, setTodaysLogs] = useState([])
   const [loading, setLoading] = useState(true)
   const [reloadKey, setReloadKey] = useState(0)
-  
-  // Get today's day index (0 = Monday, 6 = Sunday)
+  const [freshSchema, setFreshSchema] = useState(schema)
+
+  const lastReportedSchemaUpdatedAt = useRef(null)
+
   const currentDate = new Date()
   const todayIndex = (currentDate.getDay() + 6) % 7
   const weekDays = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
-  
+
   useEffect(() => {
     if (schema && client?.id) {
       loadTodaysWorkout()
       loadTodaysLogs()
     }
-  }, [schema, client?.id, reloadKey])
-  
-  // Load today's workout - WITH CUSTOM SUPPORT
+  }, [schema?.id, client?.id, reloadKey, scheduleReloadKey])
+
   const loadTodaysWorkout = async () => {
-    if (!client?.id || !db) {
-      console.log('ℹ️ No client or db')
-      setLoading(false)
-      return
-    }
-    
+    if (!client?.id || !db) { setLoading(false); return }
+    console.log('🏋️ loadTodaysWorkout START')
     try {
-      // STAP 1: Laad FRESH schema
-      let freshSchema = schema
-      
+      let latestSchema = schema
+
       if (client.assigned_schema_id) {
-        console.log('🔄 Loading FRESH schema from database...')
-        const { data: schemaData, error: schemaError } = await db.supabase
-          .from('workout_schemas')
-          .select('*')
-          .eq('id', client.assigned_schema_id)
-          .single()
-        
-        if (schemaError) {
-          console.error('❌ Error loading fresh schema:', schemaError)
-          freshSchema = schema
-        } else {
-          freshSchema = schemaData
-          console.log('✅ Fresh schema loaded from database')
-        }
-      }
-      
-      if (!freshSchema?.week_structure) {
-        console.log('ℹ️ No schema structure')
-        setLoading(false)
-        return
-      }
-      
-      // STAP 2: Laad opgeslagen schedule
-      const savedSchedule = await db.getClientWorkoutSchedule(client.id)
-      console.log('📅 Saved schedule from database:', savedSchedule)
-      
-      // STAP 3: Bepaal vandaag
-      const todayName = weekDays[todayIndex]
-      console.log('📅 Today is:', todayName)
-      
-      // STAP 4: Check welke workout KEY er staat
-      const workoutKey = savedSchedule && savedSchedule[todayName]
-        ? savedSchedule[todayName]
-        : null
-      
-      console.log('📅 Workout KEY for today:', workoutKey)
-      
-      // ⭐ STAP 5: CHECK OF HET CUSTOM IS
-      if (workoutKey && workoutKey.startsWith('custom_')) {
-        console.log('🎯 Custom workout detected!')
-        
-        const customId = workoutKey.replace('custom_', '')
-        console.log('🔍 Custom workout ID:', customId)
-        
-        try {
-          // Laad custom workout via WorkoutService
-          const customWorkout = await workoutService.getCustomWorkoutById(customId)
-          
-          if (customWorkout) {
-            console.log('✅ Custom workout loaded:', customWorkout.name)
-            
-            // Format naar TodaysWorkoutCard format
-            setTodaysWorkout({
-              name: customWorkout.name,
-              focus: getCustomWorkoutTypeLabel(customWorkout.type),
-              geschatteTijd: `${customWorkout.duration} min`,
-              exercises: [], // Custom workouts hebben geen exercises
-              workoutKey: workoutKey,
-              dayKey: workoutKey,
-              dayName: todayName,
-              isCustom: true,
-              customData: customWorkout // Extra data
-            })
-          } else {
-            console.log('⚠️ Custom workout not found (deleted?)')
-            setTodaysWorkout(null)
+        const { data: schemaData, error } = await db.supabase
+          .from('workout_schemas').select('*').eq('id', client.assigned_schema_id).single()
+        if (!error && schemaData) {
+          latestSchema = schemaData
+          setFreshSchema(schemaData)
+          console.log('🏋️ Schema geladen:', latestSchema.id)
+          if (onSchemaUpdate && schemaData.updated_at !== lastReportedSchemaUpdatedAt.current) {
+            lastReportedSchemaUpdatedAt.current = schemaData.updated_at
+            onSchemaUpdate(schemaData)
           }
-        } catch (error) {
-          console.error('❌ Error loading custom workout:', error)
-          setTodaysWorkout(null)
         }
       }
-      // STAP 6: Check schema workout
-      else if (workoutKey && freshSchema.week_structure[workoutKey]) {
-        const workout = freshSchema.week_structure[workoutKey]
-        console.log('✅ Schema workout loaded:', workout.name)
-        console.log('✅ Exercises:', workout.exercises?.map(e => e.name).join(', '))
-        
+
+      if (!latestSchema?.week_structure) { setLoading(false); return }
+
+      console.log('🏋️ Week structure keys:', Object.keys(latestSchema.week_structure))
+
+      const schemaWithOverrides = await WorkoutServiceNew.getSchemaWithOverrides(client.id, latestSchema, db)
+
+      const savedSchedule = await db.getClientWorkoutSchedule(client.id)
+      const todayName = weekDays[todayIndex]
+      const workoutKey = savedSchedule?.[todayName] || null
+
+      console.log('🏋️ todayName:', todayName, '| workoutKey:', workoutKey)
+
+      if (workoutKey && schemaWithOverrides.week_structure[workoutKey]) {
+        const dayData = schemaWithOverrides.week_structure[workoutKey]
+        console.log('🏋️ Dag exercises:', dayData.exercises?.map(e => e.name))
         setTodaysWorkout({
-          ...workout,
-          workoutKey: workoutKey,
+          ...dayData,
+          workoutKey,
           dayKey: workoutKey,
           dayName: todayName,
-          isCustom: false
+          isCustom: false,
+          schemaId: latestSchema.id
         })
+      } else if (workoutKey && workoutKey.startsWith('custom_')) {
+        const customId = workoutKey.replace('custom_', '')
+        try {
+          const customWorkout = await workoutService.getCustomWorkoutById(customId)
+          if (customWorkout) {
+            setTodaysWorkout({ name: customWorkout.name, focus: getLabel(customWorkout.type), geschatteTijd: `${customWorkout.duration} min`, exercises: [], workoutKey, dayKey: workoutKey, dayName: todayName, isCustom: true, customData: customWorkout })
+          } else setTodaysWorkout(null)
+        } catch { setTodaysWorkout(null) }
       } else {
-        console.log('ℹ️ No workout scheduled for today (rest day)')
+        console.log('🏋️ Geen workout voor vandaag')
         setTodaysWorkout(null)
       }
     } catch (error) {
-      console.error('❌ Error loading today\'s workout:', error)
+      console.error('❌ Error loading workout:', error)
       setTodaysWorkout(null)
     }
-    
     setLoading(false)
   }
-  
-  // Helper: Get type label
-  const getCustomWorkoutTypeLabel = (type) => {
-    const labels = {
-      cardio: 'Cardio',
-      cycling: 'Fietsen',
-      running: 'Hardlopen',
-      swimming: 'Zwemmen',
-      hiking: 'Wandelen',
-      yoga: 'Yoga',
-      sports: 'Sport',
-      custom: 'Custom'
-    }
-    return labels[type] || type
-  }
-  
-  // Load today's logs
+
+  const getLabel = (type) => ({ cardio: 'Cardio', cycling: 'Fietsen', running: 'Hardlopen', swimming: 'Zwemmen', hiking: 'Wandelen', yoga: 'Yoga', sports: 'Sport', custom: 'Custom' }[type] || type)
+
   const loadTodaysLogs = async () => {
     if (!client?.id || !db) return
-    
-    try {
-      const logs = await db.getTodaysWorkoutLogs(client.id)
-      console.log('✅ Today\'s logs loaded:', logs.length)
-      setTodaysLogs(logs)
-    } catch (error) {
-      console.error('❌ Error loading today\'s logs:', error)
-      setTodaysLogs([])
-    }
+    try { setTodaysLogs(await db.getTodaysWorkoutLogs(client.id)) } catch { setTodaysLogs([]) }
   }
-  
-  // Handle open log modal
-  const handleOpenLog = () => {
-    setShowLogModal(true)
-    loadTodaysLogs()
-  }
-  
-  // Handle close log modal
-  const handleCloseLog = () => {
-    setShowLogModal(false)
-    loadTodaysLogs()
-  }
-  
-  // Handle logs update
+
+  const triggerReload = () => setReloadKey(prev => prev + 1)
+
   const handleLogsUpdate = async (options) => {
-    console.log('🔄 handleLogsUpdate called with options:', options)
-    
     if (options?.reloadSchema) {
-      console.log('🔄 SWAP DETECTED - Full reload triggered')
-      console.log('🔄 Forcing schema reload...')
-      setReloadKey(prev => prev + 1)
-      
+      triggerReload()
       if (navigator.vibrate) navigator.vibrate([50, 100, 50])
     } else {
       await loadTodaysLogs()
     }
+    if (options?.workoutCompleted && onWorkoutCompleted) onWorkoutCompleted()
   }
-  
-  // If no schema
-  if (!schema) {
-    return (
-      <div style={{
-        padding: isMobile ? '1rem' : '1.5rem',
-        marginBottom: isMobile ? '1rem' : '1.5rem'
-      }}>
-        <div style={{
-          background: 'rgba(0, 0, 0, 0.8)',
-          border: '1px solid rgba(249, 115, 22, 0.2)',
-          borderRadius: '0',
-          padding: isMobile ? '1.5rem' : '2rem',
-          textAlign: 'center'
-        }}>
-          <p style={{
-            color: 'rgba(255, 255, 255, 0.6)',
-            margin: 0,
-            fontSize: isMobile ? '0.9rem' : '1rem',
-            fontWeight: '600'
-          }}>
-            Nog geen workout schema toegewezen
-          </p>
-        </div>
+
+  const handleCustomExerciseSave = (newExercise) => {
+    setTodaysWorkout(prev => {
+      if (!prev) return prev
+      return { ...prev, exercises: [...(prev.exercises || []), { name: newExercise.name, sets: newExercise.sets, reps: newExercise.reps, rust: newExercise.rust, primairSpieren: newExercise.primairSpieren, equipment: newExercise.equipment, image_url: newExercise.image_url, type: 'custom' }] }
+    })
+    if (newExercise._addedToDay) triggerReload()
+    setShowCustomModal(false)
+  }
+
+  if (!schema) return (
+    <div style={{ padding: isMobile ? '1rem' : '1.5rem' }}>
+      <div style={{ background: 'rgba(0,0,0,0.8)', border: '1px solid rgba(249,115,22,0.2)', padding: isMobile ? '1.5rem' : '2rem', textAlign: 'center' }}>
+        <p style={{ color: 'rgba(255,255,255,0.6)', margin: 0, fontSize: isMobile ? '0.9rem' : '1rem', fontWeight: '600' }}>Nog geen workout schema toegewezen</p>
       </div>
-    )
-  }
-  
-  // If loading
-  if (loading) {
-    return (
-      <div style={{
-        padding: isMobile ? '1rem' : '1.5rem',
-        marginBottom: isMobile ? '1rem' : '1.5rem'
-      }}>
-        <div style={{
-          background: 'rgba(0, 0, 0, 0.8)',
-          border: '1px solid rgba(249, 115, 22, 0.2)',
-          borderRadius: '0',
-          padding: isMobile ? '1.5rem' : '2rem',
-          textAlign: 'center'
-        }}>
-          <div style={{
-            width: '40px',
-            height: '40px',
-            border: '3px solid rgba(249, 115, 22, 0.2)',
-            borderTopColor: '#f97316',
-            borderRadius: '50%',
-            margin: '0 auto',
-            animation: 'spin 1s linear infinite'
-          }} />
-        </div>
+    </div>
+  )
+
+  if (loading) return (
+    <div style={{ padding: isMobile ? '1rem' : '1.5rem' }}>
+      <div style={{ background: 'rgba(0,0,0,0.8)', border: '1px solid rgba(249,115,22,0.2)', padding: '2rem', textAlign: 'center' }}>
+        <div style={{ width: '40px', height: '40px', border: '3px solid rgba(249,115,22,0.2)', borderTopColor: '#f97316', borderRadius: '50%', margin: '0 auto', animation: 'spin 1s linear infinite' }} />
       </div>
-    )
-  }
-  
-  // If no workout today (rest day)
-  if (!todaysWorkout) {
-    return (
-      <div style={{
-        padding: isMobile ? '1rem' : '1.5rem',
-        marginBottom: isMobile ? '1rem' : '1.5rem'
-      }}>
-        <div style={{
-          background: 'rgba(0, 0, 0, 0.8)',
-          border: '1px solid rgba(249, 115, 22, 0.2)',
-          borderRadius: '0',
-          padding: isMobile ? '1.5rem' : '2rem',
-          textAlign: 'center'
-        }}>
-          <p style={{
-            color: 'rgba(255, 255, 255, 0.6)',
-            margin: 0,
-            fontSize: isMobile ? '0.9rem' : '1rem',
-            fontWeight: '600'
-          }}>
-            🌙 Rustdag - Geen workout vandaag
-          </p>
-        </div>
+    </div>
+  )
+
+  if (!todaysWorkout) return (
+    <div style={{ padding: isMobile ? '1rem' : '1.5rem' }}>
+      <div style={{ background: 'rgba(0,0,0,0.8)', border: '1px solid rgba(249,115,22,0.2)', padding: isMobile ? '1.5rem' : '2rem', textAlign: 'center' }}>
+        <p style={{ color: 'rgba(255,255,255,0.6)', margin: 0, fontSize: isMobile ? '0.9rem' : '1rem', fontWeight: '600' }}>🌙 Rustdag — geen workout vandaag</p>
       </div>
-    )
-  }
-  
+    </div>
+  )
+
   return (
     <>
-      {/* Today's Workout Card */}
-      <TodaysWorkoutCard
-        workout={todaysWorkout}
-        onLogClick={handleOpenLog}
-        logsCount={todaysLogs.length}
-        client={client}
-        db={db}
-      />
-      
-      {/* Log Modal (Overlay) */}
+      <TodaysWorkoutCard workout={todaysWorkout} onLogClick={() => { setShowLogModal(true); loadTodaysLogs() }} logsCount={todaysLogs.length} client={client} db={db} />
+
+      <div style={{ display: 'flex', justifyContent: 'flex-end', padding: isMobile ? '0.5rem 0.75rem' : '0.5rem 1rem', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+        <button onClick={() => setShowCustomModal(true)} style={{ display: 'flex', alignItems: 'center', gap: '0.375rem', padding: '0.375rem 0.75rem', background: 'transparent', border: '1px solid rgba(255,215,0,0.2)', borderRadius: '6px', color: 'rgba(255,215,0,0.7)', fontSize: isMobile ? '0.72rem' : '0.75rem', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.04em', cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', minHeight: '32px' }}
+          onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255,215,0,0.05)'}
+          onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}>
+          <Plus size={13} strokeWidth={2.5} />
+          Eigen Oefening
+        </button>
+      </div>
+
       {showLogModal && (
-        <LogModal
-          workout={todaysWorkout}
-          todaysLogs={todaysLogs}
-          onClose={handleCloseLog}
-          onLogsUpdate={handleLogsUpdate}
-          client={client}
-          schema={schema}
-          db={db}
-        />
+        <LogModal workout={todaysWorkout} todaysLogs={todaysLogs} onClose={() => { setShowLogModal(false); loadTodaysLogs() }} onLogsUpdate={handleLogsUpdate} client={client} schema={freshSchema} db={db} />
       )}
-      
-      {/* CSS Animation */}
-      <style>{`
-        @keyframes spin {
-          to { transform: rotate(360deg); }
-        }
-      `}</style>
+
+      {showCustomModal && (
+        <CustomExerciseModal onClose={() => setShowCustomModal(false)} onSave={handleCustomExerciseSave} client={client} db={db} schema={freshSchema} />
+      )}
+
+      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
     </>
   )
 }

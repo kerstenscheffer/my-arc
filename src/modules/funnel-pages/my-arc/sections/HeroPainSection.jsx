@@ -117,7 +117,6 @@ export default function HeroPainSection({ isMobile, onScrollNext, isCurrentSecti
           opacity: showButton ? 1 : 0,
           transform: showButton ? 'translateY(0)' : 'translateY(20px)',
           transition: 'all 1s cubic-bezier(0.4, 0, 0.2, 1)',
-          transition: '0.5s',
           fontWeight: '400',
           letterSpacing: '0.02em'
         }}>
@@ -191,7 +190,6 @@ export default function HeroPainSection({ isMobile, onScrollNext, isCurrentSecti
           marginTop: isMobile ? '3rem' : '4rem',
           opacity: showButton ? 1 : 0,
           transition: 'opacity 1s ease',
-          transition: '1s',
           letterSpacing: '0.05em'
         }}>
           8 weken verwijderd van "fuck, goed bezig man"

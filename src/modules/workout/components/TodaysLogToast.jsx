@@ -1,4 +1,5 @@
 // src/modules/workout/components/TodaysLogToast.jsx
+// 🏆 GOLD THEME - Compact today's workout toast
 import { useState, useEffect } from 'react'
 import { Zap, X, Trophy, Dumbbell } from 'lucide-react'
 
@@ -123,75 +124,91 @@ export default function TodaysLogToast({ client, db }) {
         left: '50%',
         transform: 'translateX(-50%)',
         width: isMobile ? 'calc(100% - 2rem)' : 'auto',
-        minWidth: isMobile ? 'auto' : '380px',
-        maxWidth: isMobile ? '100%' : '420px',
-        background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.25) 0%, rgba(5, 150, 105, 0.15) 100%)',
-        backdropFilter: 'blur(20px)',
-        border: '1px solid rgba(16, 185, 129, 0.4)',
-        borderRadius: '14px',
-        padding: isMobile ? '0.875rem 1rem' : '1rem 1.25rem',
-        boxShadow: '0 8px 30px rgba(16, 185, 129, 0.3), 0 0 0 1px rgba(16, 185, 129, 0.2)',
+        minWidth: isMobile ? 'auto' : '360px',
+        maxWidth: isMobile ? '100%' : '400px',
+        background: 'linear-gradient(135deg, rgba(23, 23, 23, 0.95) 0%, rgba(10, 10, 10, 0.9) 100%)', // Dark glassmorphic
+        backdropFilter: 'blur(16px)',
+        border: '1px solid rgba(255, 215, 0, 0.3)', // GOLD
+        borderRadius: isMobile ? '12px' : '14px',
+        padding: isMobile ? '0.75rem 0.875rem' : '0.875rem 1rem',
+        boxShadow: '0 8px 32px rgba(255, 215, 0, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.03)', // GOLD
         zIndex: 94,
         transition: 'all 0.5s cubic-bezier(0.4, 0, 0.2, 1)',
-        animation: visible ? 'slideDown 0.5s ease-out' : 'none'
+        animation: visible ? 'slideDown 0.5s ease-out' : 'none',
+        overflow: 'hidden'
       }}
     >
-      {/* Glow effect */}
+      {/* Top GOLD accent line */}
       <div style={{
         position: 'absolute',
         top: 0,
         left: 0,
         right: 0,
-        height: '3px',
-        background: 'linear-gradient(90deg, transparent 0%, #10b981 50%, transparent 100%)',
-        borderRadius: '14px 14px 0 0',
-        filter: 'blur(1px)',
+        height: '2px',
+        background: 'linear-gradient(90deg, transparent 0%, #FFD700 50%, transparent 100%)',
         opacity: 0.6
+      }} />
+
+      {/* Shine overlay */}
+      <div style={{
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        height: '40%',
+        background: 'linear-gradient(180deg, rgba(255, 255, 255, 0.04) 0%, transparent 100%)',
+        pointerEvents: 'none'
       }} />
 
       <div style={{
         display: 'flex',
         alignItems: 'center',
-        gap: isMobile ? '0.75rem' : '1rem'
+        gap: isMobile ? '0.625rem' : '0.75rem',
+        position: 'relative',
+        zIndex: 2
       }}>
-        {/* Icon */}
+        {/* Icon - GOLD */}
         <div style={{
-          width: isMobile ? '42px' : '48px',
-          height: isMobile ? '42px' : '48px',
-          borderRadius: '12px',
-          background: 'rgba(16, 185, 129, 0.2)',
-          border: '1px solid rgba(16, 185, 129, 0.3)',
+          width: isMobile ? '36px' : '40px',
+          height: isMobile ? '36px' : '40px',
+          borderRadius: '10px',
+          background: 'rgba(255, 215, 0, 0.15)', // GOLD
+          border: '1px solid rgba(255, 215, 0, 0.3)', // GOLD
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
           flexShrink: 0,
-          boxShadow: '0 0 20px rgba(16, 185, 129, 0.3)'
+          boxShadow: '0 0 16px rgba(255, 215, 0, 0.25)' // GOLD glow
         }}>
           <Dumbbell 
-            size={isMobile ? 22 : 26} 
-            color="#10b981"
+            size={isMobile ? 18 : 20} 
+            color="#FFD700" // GOLD
+            strokeWidth={2.5}
             style={{
-              filter: 'drop-shadow(0 0 8px rgba(16, 185, 129, 0.6))'
+              filter: 'drop-shadow(0 0 6px rgba(255, 215, 0, 0.5))' // GOLD glow
             }}
           />
         </div>
 
-        {/* Content */}
+        {/* Content - COMPACT */}
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{
-            fontSize: isMobile ? '0.95rem' : '1.05rem',
+            fontSize: isMobile ? '0.85rem' : '0.95rem',
             fontWeight: '800',
-            color: '#10b981',
-            marginBottom: '0.15rem',
-            letterSpacing: '-0.02em',
-            textShadow: '0 0 20px rgba(16, 185, 129, 0.4)'
+            color: '#FFD700', // GOLD
+            marginBottom: '0.125rem',
+            letterSpacing: '-0.01em',
+            textShadow: '0 0 12px rgba(255, 215, 0, 0.3)',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap'
           }}>
             Vandaag {logData.weight}kg {logData.exercise}!
           </div>
           <div style={{
-            fontSize: isMobile ? '0.75rem' : '0.8rem',
-            color: 'rgba(255, 255, 255, 0.7)',
-            fontWeight: '500'
+            fontSize: isMobile ? '0.7rem' : '0.75rem',
+            color: 'rgba(255, 255, 255, 0.6)',
+            fontWeight: '600'
           }}>
             Lekker bezig! 🔥
           </div>
@@ -201,9 +218,9 @@ export default function TodaysLogToast({ client, db }) {
         <button
           onClick={handleDismiss}
           style={{
-            width: isMobile ? '32px' : '36px',
-            height: isMobile ? '32px' : '36px',
-            borderRadius: '10px',
+            width: isMobile ? '28px' : '32px',
+            height: isMobile ? '28px' : '32px',
+            borderRadius: '8px',
             background: 'rgba(255, 255, 255, 0.05)',
             border: '1px solid rgba(255, 255, 255, 0.1)',
             display: 'flex',
@@ -229,27 +246,29 @@ export default function TodaysLogToast({ client, db }) {
             }
           }}
         >
-          <X size={isMobile ? 16 : 18} color="rgba(255, 255, 255, 0.7)" />
+          <X size={isMobile ? 14 : 16} color="rgba(255, 255, 255, 0.6)" strokeWidth={2.5} />
         </button>
       </div>
 
-      {/* Extra stats - subtle */}
+      {/* Extra stats - subtle & compact */}
       {logData.totalExercises > 1 && (
         <div style={{
-          marginTop: '0.75rem',
-          paddingTop: '0.75rem',
-          borderTop: '1px solid rgba(16, 185, 129, 0.15)',
+          marginTop: '0.625rem',
+          paddingTop: '0.625rem',
+          borderTop: '1px solid rgba(255, 215, 0, 0.1)', // GOLD divider
           display: 'flex',
-          gap: '1rem',
-          fontSize: isMobile ? '0.7rem' : '0.75rem',
-          color: 'rgba(255, 255, 255, 0.6)'
+          gap: '0.875rem',
+          fontSize: isMobile ? '0.65rem' : '0.7rem',
+          color: 'rgba(255, 255, 255, 0.5)',
+          position: 'relative',
+          zIndex: 2
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
-            <Trophy size={12} color="rgba(16, 185, 129, 0.6)" />
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+            <Trophy size={11} color="rgba(255, 215, 0, 0.6)" strokeWidth={2.5} />
             <span>{logData.totalExercises} oefeningen</span>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
-            <Zap size={12} color="rgba(16, 185, 129, 0.6)" />
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+            <Zap size={11} color="rgba(255, 215, 0, 0.6)" strokeWidth={2.5} />
             <span>{(logData.totalVolume / 1000).toFixed(1)}k volume</span>
           </div>
         </div>

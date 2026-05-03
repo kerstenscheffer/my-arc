@@ -1,4 +1,4 @@
-// src/components/login/QuoteSlider.jsx
+// src/components/login/QuoteSlider.jsx - ELEGANT GOLDEN VERSION
 import { useState, useEffect } from 'react'
 
 const MOTIVATIONAL_QUOTES = [
@@ -21,7 +21,7 @@ export default function QuoteSlider() {
   useEffect(() => {
     const interval = setInterval(() => {
       setCurrentIndex((prev) => (prev + 1) % MOTIVATIONAL_QUOTES.length)
-    }, 7000) // Sync with background slideshow
+    }, 7000)
     
     return () => clearInterval(interval)
   }, [])
@@ -31,7 +31,7 @@ export default function QuoteSlider() {
   return (
     <div style={{
       position: 'fixed',
-      bottom: isMobile ? '25px' : '35px', // AANGEPAST: Iets hoger voor betere spacing
+      bottom: isMobile ? '25px' : '35px',
       left: '50%',
       transform: 'translateX(-50%)',
       textAlign: 'center',
@@ -46,47 +46,49 @@ export default function QuoteSlider() {
         animation: 'fadeInOut 7s ease-in-out infinite'
       }}>
         <p style={{
-          fontSize: isMobile ? '0.9rem' : '1.05rem', // AANGEPAST: Iets kleiner
+          fontSize: isMobile ? '0.85rem' : '0.95rem',
           fontWeight: '300',
-          color: 'rgba(255, 255, 255, 0.5)',
-          marginBottom: '0.25rem', // AANGEPAST: Kleinere margin
+          color: 'rgba(255, 255, 255, 0.45)',
+          marginBottom: '0.25rem',
           fontStyle: 'italic',
           letterSpacing: '0.02em',
           textShadow: '0 2px 15px rgba(0,0,0,0.8)',
-          lineHeight: 1.2 // AANGEPAST: Compactere line height
+          lineHeight: 1.2
         }}>
           "{currentQuote.text}"
         </p>
         <cite style={{
-          fontSize: isMobile ? '0.65rem' : '0.75rem', // AANGEPAST: Kleiner
-          color: '#10b981',
+          fontSize: isMobile ? '0.625rem' : '0.7rem',
+          color: 'rgba(255, 215, 0, 0.6)',
           fontStyle: 'normal',
           fontWeight: '500',
-          opacity: 0.6
+          opacity: 0.7,
+          textShadow: '0 0 8px rgba(255, 215, 0, 0.2)'
         }}>
           — {currentQuote.author}
         </cite>
       </blockquote>
       
-      {/* Progress dots */}
+      {/* Progress dots - Golden */}
       <div style={{
         display: 'flex',
-        gap: '0.3rem', // AANGEPAST: Kleinere gap
+        gap: '0.3rem',
         justifyContent: 'center',
-        marginTop: '0.5rem' // AANGEPAST: Kleinere margin
+        marginTop: '0.5rem'
       }}>
         {MOTIVATIONAL_QUOTES.map((_, index) => (
           <div
             key={index}
             style={{
-              width: index === currentIndex ? '12px' : '3px', // AANGEPAST: Kleiner
+              width: index === currentIndex ? '12px' : '3px',
               height: '2px',
               background: index === currentIndex 
-                ? 'rgba(16, 185, 129, 0.6)' 
+                ? 'rgba(255, 215, 0, 0.5)' 
                 : 'rgba(255,255,255,0.1)',
               borderRadius: '1px',
               transition: 'all 0.5s ease',
-              opacity: index === currentIndex ? 0.6 : 0.3
+              opacity: index === currentIndex ? 0.6 : 0.3,
+              boxShadow: index === currentIndex ? '0 0 6px rgba(255, 215, 0, 0.3)' : 'none'
             }}
           />
         ))}

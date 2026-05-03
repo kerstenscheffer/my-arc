@@ -1,17 +1,59 @@
-import { useState, useEffect } from 'react'
-import { Users, BarChart3, Settings, RefreshCw, Download, LayoutGrid } from 'lucide-react'
+// src/modules/lead-management/LeadManagement.jsx
+// VERSION 5.0 - COMPACT HEADER + PILL STRIP + ZERO BLOAT
+// Follows MY ARC Styling Guide v2 — compact, data-driven, zero bullshit
+
+import { useState, useEffect, useRef } from 'react'
+import { 
+  Users, BarChart3, Settings, RefreshCw, Download, LayoutGrid, 
+  Target, MessageCircle, TrendingUp, ClipboardList, ChevronDown,
+  Flame
+} from 'lucide-react'
 import LeadOverview from './components/LeadOverview'
 import LeadManagementService from './LeadManagementService'
 import KanbanBoard from './components/kanban/KanbanBoard'
 import OutreachAnalytics from './components/analytics/OutreachAnalytics'
+import CampaignTracker from './components/CampaignTracker'
+import campaignTrackingService from './CampaignTrackingService'
+import DMBibleModal from './components/DMBibleModal'
+import LeadAnalyticsDashboard from '../lead-analytics/LeadAnalyticsDashboard'
+import IntakeTab from './components/IntakeTab'
+
+// GOLD THEME (consistent with CoachHub)
+const G = {
+  primary: '#FFD700',
+  secondary: '#D4AF37',
+  dark: '#B8860B',
+  bg: 'rgba(255, 215, 0, 0.08)',
+  bgStrong: 'rgba(255, 215, 0, 0.14)',
+  border: 'rgba(255, 215, 0, 0.15)',
+  borderActive: 'rgba(255, 215, 0, 0.4)',
+  text: 'rgba(255, 215, 0, 0.6)',
+}
+
+// ============================================
+// TAB CONFIG
+// ============================================
+const TABS = [
+  { id: 'kanban', label: 'Kanban', icon: LayoutGrid },
+  { id: 'intake', label: 'Intake', icon: ClipboardList },
+  { id: 'dm-flow', label: 'DM Flow', icon: MessageCircle },
+  { id: 'overview', label: 'Overzicht', icon: Users },
+  { id: 'campaigns', label: 'Campaigns', icon: Target },
+  { id: 'analytics', label: 'Analytics', icon: BarChart3 },
+  { id: 'lead-analytics', label: 'Lead Analytics', icon: TrendingUp },
+  { id: 'settings', label: 'Settings', icon: Settings }
+]
 
 export default function LeadManagement({ db, isMobile, coachId, user }) {
-  const [activeView, setActiveView] = useState('overview')
+  const [activeView, setActiveView] = useState('kanban')
   const [leads, setLeads] = useState([])
   const [selectedLeads, setSelectedLeads] = useState([])
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [leadService, setLeadService] = useState(null)
+
+  const [campaigns, setCampaigns] = useState([])
+  const [activeCampaign, setActiveCampaign] = useState(null)
 
   const [filters, setFilters] = useState({
     status: 'all',
@@ -37,47 +79,30 @@ export default function LeadManagement({ db, isMobile, coachId, user }) {
   })
 
   const [subscription, setSubscription] = useState(null)
+  const scrollRef = useRef(null)
 
+  // ============================================
+  // LIFECYCLE (unchanged logic)
+  // ============================================
   useEffect(() => {
-    if (coachId) {
-      initializeLeadManagement()
-    }
-    
-    return () => {
-      if (subscription) {
-        subscription.unsubscribe()
-      }
-    }
+    if (coachId) initializeLeadManagement()
+    return () => { if (subscription) subscription.unsubscribe() }
   }, [coachId])
 
   useEffect(() => {
-    if (leadService) {
-      loadLeads()
-      loadStats()
-    }
+    if (leadService) { loadLeads(); loadStats() }
   }, [leadService, filters, pagination.page])
 
   const initializeLeadManagement = async () => {
     try {
-      console.log('🔄 Initializing Lead Management...')
-      console.log('📍 CoachId:', coachId)
-      
-      if (!coachId) {
-        console.warn('⚠️ No coachId provided, waiting...')
-        setLoading(false)
-        return
-      }
-      
+      if (!coachId) { setLoading(false); return }
       const service = new LeadManagementService()
       setLeadService(service)
-
+      await loadCampaigns()
       const sub = service.subscribeToLeadUpdates(coachId, (payload) => {
-        console.log('📡 Real-time lead update:', payload.eventType)
         handleRealtimeUpdate(payload)
       })
       setSubscription(sub)
-
-      console.log('✅ Lead Management initialized')
     } catch (error) {
       console.error('❌ Lead Management initialization failed:', error)
     } finally {
@@ -85,27 +110,39 @@ export default function LeadManagement({ db, isMobile, coachId, user }) {
     }
   }
 
+  const loadCampaigns = async () => {
+    try {
+      const [campaignsData, active] = await Promise.all([
+        campaignTrackingService.getCampaigns(coachId),
+        campaignTrackingService.getActiveCampaign(coachId)
+      ])
+      setCampaigns(campaignsData)
+      setActiveCampaign(active)
+    } catch (error) {
+      console.error('❌ Load campaigns failed:', error)
+    }
+  }
+
+  const handleCampaignChange = (active, allCampaigns) => {
+    setActiveCampaign(active)
+    if (allCampaigns) setCampaigns(allCampaigns)
+  }
+
   const loadLeads = async (showLoader = true) => {
     if (!leadService || !coachId) return
-
     try {
       if (showLoader) setLoading(true)
-
       const filterParams = {
         ...filters,
         limit: pagination.limit,
         offset: (pagination.page - 1) * pagination.limit
       }
-
       const data = await leadService.getLeads(coachId, filterParams)
       setLeads(data)
-      
       if (pagination.page === 1) {
         const newTotal = data.length < pagination.limit ? data.length : Math.max(data.length, pagination.total)
         setPagination(prev => ({ ...prev, total: newTotal }))
       }
-
-      console.log('✅ Leads loaded:', data.length)
     } catch (error) {
       console.error('❌ Load leads failed:', error)
       setLeads([])
@@ -116,21 +153,10 @@ export default function LeadManagement({ db, isMobile, coachId, user }) {
 
   const loadStats = async () => {
     if (!leadService || !coachId) return
-
     try {
-      const dateRangeMap = {
-        'today': 1,
-        'week': 7,
-        'month': 30,
-        'quarter': 90
-      }
-      
+      const dateRangeMap = { 'today': 1, 'week': 7, 'month': 30, 'quarter': 90 }
       const days = dateRangeMap[filters.dateRange] || 30
       const statsData = await leadService.getLeadStats(coachId, days)
-      
-      console.log('📊 Stats data received:', statsData)
-      console.log('📊 total_leads value:', statsData?.total_leads)
-      
       setStats(statsData)
     } catch (error) {
       console.error('❌ Load stats failed:', error)
@@ -139,28 +165,20 @@ export default function LeadManagement({ db, isMobile, coachId, user }) {
 
   const handleRefresh = async () => {
     setRefreshing(true)
-    await Promise.all([loadLeads(false), loadStats()])
+    await Promise.all([loadLeads(false), loadStats(), loadCampaigns()])
     setRefreshing(false)
   }
 
   const handleRealtimeUpdate = (payload) => {
     const { eventType, new: newRecord, old: oldRecord } = payload
-
     setLeads(currentLeads => {
       switch (eventType) {
-        case 'INSERT':
-          return [newRecord, ...currentLeads]
-        case 'UPDATE':
-          return currentLeads.map(lead => 
-            lead.id === newRecord.id ? newRecord : lead
-          )
-        case 'DELETE':
-          return currentLeads.filter(lead => lead.id !== oldRecord.id)
-        default:
-          return currentLeads
+        case 'INSERT': return [newRecord, ...currentLeads]
+        case 'UPDATE': return currentLeads.map(lead => lead.id === newRecord.id ? newRecord : lead)
+        case 'DELETE': return currentLeads.filter(lead => lead.id !== oldRecord.id)
+        default: return currentLeads
       }
     })
-
     loadStats()
   }
 
@@ -176,26 +194,14 @@ export default function LeadManagement({ db, isMobile, coachId, user }) {
   }
 
   const handleLeadSelect = (leadId, isSelected) => {
-    setSelectedLeads(prev => {
-      if (isSelected) {
-        return [...prev, leadId]
-      } else {
-        return prev.filter(id => id !== leadId)
-      }
-    })
+    setSelectedLeads(prev => isSelected ? [...prev, leadId] : prev.filter(id => id !== leadId))
   }
 
-  const handleSelectAll = () => {
-    setSelectedLeads(leads.map(lead => lead.id))
-  }
-
-  const handleDeselectAll = () => {
-    setSelectedLeads([])
-  }
+  const handleSelectAll = () => setSelectedLeads(leads.map(lead => lead.id))
+  const handleDeselectAll = () => setSelectedLeads([])
 
   const handleBulkStatusUpdate = async (newStatus) => {
     if (!leadService || selectedLeads.length === 0) return
-
     try {
       await leadService.bulkUpdateStatus(selectedLeads, newStatus, coachId)
       await Promise.all([loadLeads(false), loadStats()])
@@ -207,11 +213,7 @@ export default function LeadManagement({ db, isMobile, coachId, user }) {
 
   const handleBulkDelete = async () => {
     if (!leadService || selectedLeads.length === 0) return
-
-    const confirmed = window.confirm(
-      `Weet je zeker dat je ${selectedLeads.length} lead${selectedLeads.length > 1 ? 's' : ''} wilt verwijderen?`
-    )
-
+    const confirmed = window.confirm(`Weet je zeker dat je ${selectedLeads.length} lead${selectedLeads.length > 1 ? 's' : ''} wilt verwijderen?`)
     if (confirmed) {
       try {
         await leadService.bulkDeleteLeads(selectedLeads, true)
@@ -225,10 +227,8 @@ export default function LeadManagement({ db, isMobile, coachId, user }) {
 
   const handleExport = async () => {
     if (!leadService) return
-
     try {
       const csvContent = await leadService.exportLeadsCSV(filters, coachId)
-      
       const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
       const link = document.createElement('a')
       const url = URL.createObjectURL(blob)
@@ -245,7 +245,6 @@ export default function LeadManagement({ db, isMobile, coachId, user }) {
 
   const handleLeadStatusUpdate = async (leadId, newStatus) => {
     if (!leadService) return
-
     try {
       await leadService.updateLeadStatus(leadId, newStatus, coachId)
       await Promise.all([loadLeads(false), loadStats()])
@@ -256,7 +255,6 @@ export default function LeadManagement({ db, isMobile, coachId, user }) {
 
   const handleAddNote = async (leadId, noteData) => {
     if (!leadService) return
-
     try {
       await leadService.addLeadNote(leadId, noteData, coachId)
     } catch (error) {
@@ -269,204 +267,235 @@ export default function LeadManagement({ db, isMobile, coachId, user }) {
     window.scrollTo(0, 0)
   }
 
-  const tabs = [
-    { id: 'overview', label: 'Overzicht', icon: Users, badge: stats.total_leads },
-    { id: 'kanban', label: 'Kanban', icon: LayoutGrid, badge: null },
-    { id: 'analytics', label: 'Analytics', icon: BarChart3, badge: null },
-    { id: 'settings', label: 'Instellingen', icon: Settings, badge: null }
-  ]
-
+  // ============================================
+  // LOADING STATE
+  // ============================================
   if (loading && leads.length === 0) {
     return (
       <div style={{
         minHeight: '400px',
         display: 'flex',
         alignItems: 'center',
-        justifyContent: 'center',
-        background: 'rgba(17, 17, 17, 0.5)',
-        backdropFilter: 'blur(10px)',
-        borderRadius: '16px',
-        margin: isMobile ? '1rem' : '2rem'
+        justifyContent: 'center'
       }}>
-        <div style={{ textAlign: 'center' }}>
-          <div style={{
-            width: '48px',
-            height: '48px',
-            border: '3px solid rgba(16, 185, 129, 0.2)',
-            borderTopColor: '#10b981',
-            borderRadius: '50%',
-            animation: 'spin 1s linear infinite',
-            margin: '0 auto 1rem'
-          }} />
-          <p style={{
-            color: 'rgba(255, 255, 255, 0.7)',
-            fontSize: '1rem',
-            fontWeight: '500'
-          }}>
-            Lead Management laden...
-          </p>
-        </div>
+        <div style={{
+          width: '40px',
+          height: '40px',
+          border: `2px solid ${G.border}`,
+          borderTopColor: G.primary,
+          borderRadius: '50%',
+          animation: 'lmSpin 0.8s linear infinite'
+        }} />
       </div>
     )
   }
 
+  // ============================================
+  // RENDER
+  // ============================================
   return (
     <div style={{
-      padding: isMobile ? '1rem' : '2rem',
       maxWidth: '1400px',
-      margin: '0 auto'
+      margin: '0 auto',
+      transform: 'translateZ(0)'
     }}>
+      {/* ═══ ROW 1: COMPACT HEADER — title left, actions right ═══ */}
       <div style={{
+        padding: isMobile ? '0.75rem 1rem' : '0.75rem 1.5rem',
+        borderBottom: '1px solid rgba(255, 255, 255, 0.06)',
         display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: isMobile ? 'flex-start' : 'center',
-        flexDirection: isMobile ? 'column' : 'row',
-        gap: isMobile ? '1rem' : '2rem',
-        marginBottom: '2rem'
+        alignItems: 'center',
+        gap: isMobile ? '0.5rem' : '0.75rem'
       }}>
-        <div>
-          <h1 style={{
-            fontSize: isMobile ? '1.75rem' : '2.25rem',
-            fontWeight: '700',
-            background: 'linear-gradient(135deg, #10b981 0%, #3b82f6 100%)',
-            WebkitBackgroundClip: 'text',
-            WebkitTextFillColor: 'transparent',
-            backgroundClip: 'text',
-            marginBottom: '0.5rem'
-          }}>
-            Lead Management
-          </h1>
-          <p style={{
-            color: 'rgba(255, 255, 255, 0.7)',
-            fontSize: isMobile ? '0.9rem' : '1rem',
-            margin: 0
-          }}>
-            Beheer en volg al je leads vanaf één plek
-          </p>
-        </div>
-
-        <div style={{
-          display: 'flex',
-          gap: '0.75rem',
-          flexWrap: 'wrap'
+        <Flame size={isMobile ? 16 : 18} color={G.primary} />
+        <h1 style={{
+          fontSize: isMobile ? '1.1rem' : '1.35rem',
+          fontWeight: '800',
+          color: G.primary,
+          margin: 0,
+          whiteSpace: 'nowrap',
+          flexShrink: 0,
+          letterSpacing: '-0.02em'
         }}>
+          Leads
+        </h1>
+
+        {/* Lead count */}
+        <span style={{
+          fontSize: isMobile ? '0.65rem' : '0.7rem',
+          fontWeight: '700',
+          color: 'rgba(255, 255, 255, 0.25)',
+        }}>
+          {stats.total_leads}
+        </span>
+
+        {/* Active campaign indicator */}
+        {activeCampaign && activeView !== 'campaigns' && (
           <button
-            onClick={handleRefresh}
-            disabled={refreshing}
+            onClick={() => setActiveView('campaigns')}
             style={{
-              padding: isMobile ? '0.6rem' : '0.75rem 1rem',
-              background: 'rgba(255, 255, 255, 0.05)',
-              border: '1px solid rgba(255, 255, 255, 0.15)',
-              borderRadius: '10px',
-              color: 'rgba(255, 255, 255, 0.7)',
-              cursor: refreshing ? 'not-allowed' : 'pointer',
               display: 'flex',
               alignItems: 'center',
-              gap: '0.5rem',
-              fontSize: isMobile ? '0.85rem' : '0.9rem',
-              fontWeight: '500',
-              transition: 'all 0.2s ease',
-              opacity: refreshing ? 0.6 : 1,
+              gap: '0.35rem',
+              padding: '0.2rem 0.5rem',
+              background: G.bg,
+              border: `1px solid ${G.border}`,
+              borderRadius: '6px',
+              color: G.text,
+              fontSize: isMobile ? '0.6rem' : '0.65rem',
+              fontWeight: '600',
+              cursor: 'pointer',
               touchAction: 'manipulation',
               WebkitTapHighlightColor: 'transparent',
-              minHeight: '44px'
-            }}
-          >
-            <RefreshCw size={isMobile ? 14 : 16} style={{
-              animation: refreshing ? 'spin 1s linear infinite' : 'none'
-            }} />
-            {!isMobile && 'Vernieuwen'}
-          </button>
-
-          <button
-            onClick={handleExport}
-            style={{
-              padding: isMobile ? '0.6rem' : '0.75rem 1rem',
-              background: 'rgba(255, 255, 255, 0.05)',
-              border: '1px solid rgba(255, 255, 255, 0.15)',
-              borderRadius: '10px',
-              color: 'rgba(255, 255, 255, 0.7)',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.5rem',
-              fontSize: isMobile ? '0.85rem' : '0.9rem',
-              fontWeight: '500',
-              transition: 'all 0.2s ease',
-              touchAction: 'manipulation',
-              WebkitTapHighlightColor: 'transparent',
-              minHeight: '44px'
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)'
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)'
-            }}
-          >
-            <Download size={isMobile ? 14 : 16} />
-            {!isMobile && 'Export'}
-          </button>
-        </div>
-      </div>
-
-      <div style={{
-        display: 'flex',
-        gap: '0.5rem',
-        marginBottom: '2rem',
-        overflowX: isMobile ? 'auto' : 'visible',
-        paddingBottom: isMobile ? '0.5rem' : '0'
-      }}>
-        {tabs.map(tab => (
-          <button
-            key={tab.id}
-            onClick={() => setActiveView(tab.id)}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.5rem',
-              padding: isMobile ? '0.875rem 1rem' : '1rem 1.25rem',
-              background: activeView === tab.id 
-                ? 'linear-gradient(135deg, rgba(16, 185, 129, 0.15) 0%, rgba(59, 130, 246, 0.15) 100%)'
-                : 'rgba(255, 255, 255, 0.05)',
-              border: activeView === tab.id
-                ? '1px solid rgba(16, 185, 129, 0.3)'
-                : '1px solid rgba(255, 255, 255, 0.1)',
-              borderRadius: '12px',
-              color: activeView === tab.id ? '#10b981' : 'rgba(255, 255, 255, 0.7)',
-              cursor: 'pointer',
-              fontSize: isMobile ? '0.85rem' : '0.9rem',
-              fontWeight: activeView === tab.id ? '600' : '500',
-              transition: 'all 0.2s ease',
+              minHeight: '28px',
               whiteSpace: 'nowrap',
-              minWidth: 'fit-content',
-              touchAction: 'manipulation',
-              WebkitTapHighlightColor: 'transparent',
-              minHeight: '44px'
+              overflow: 'hidden',
+              maxWidth: isMobile ? '120px' : '200px'
             }}
           >
-            <tab.icon size={isMobile ? 16 : 18} />
-            {tab.label}
-            {tab.badge !== null && (
-              <span style={{
-                background: activeView === tab.id 
-                  ? 'rgba(16, 185, 129, 0.2)' 
-                  : 'rgba(255, 255, 255, 0.1)',
-                padding: '0.2rem 0.5rem',
-                borderRadius: '12px',
-                fontSize: '0.75rem',
-                fontWeight: '600',
-                minWidth: '20px',
-                textAlign: 'center'
-              }}>
-                {tab.badge}
-              </span>
-            )}
+            <span style={{
+              width: '6px',
+              height: '6px',
+              borderRadius: '50%',
+              background: G.primary,
+              flexShrink: 0
+            }} />
+            <span style={{
+              overflow: 'hidden',
+              textOverflow: 'ellipsis'
+            }}>
+              {activeCampaign.name}
+            </span>
           </button>
-        ))}
+        )}
+
+        <div style={{ flex: 1 }} />
+
+        {/* Refresh */}
+        <button
+          onClick={handleRefresh}
+          disabled={refreshing}
+          style={{
+            width: '32px',
+            height: '32px',
+            borderRadius: '6px',
+            background: 'transparent',
+            border: '1px solid rgba(255, 255, 255, 0.06)',
+            color: refreshing ? G.primary : 'rgba(255, 255, 255, 0.3)',
+            cursor: refreshing ? 'not-allowed' : 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            touchAction: 'manipulation',
+            WebkitTapHighlightColor: 'transparent',
+            transition: 'all 0.2s ease',
+            opacity: refreshing ? 0.5 : 1
+          }}
+        >
+          <RefreshCw size={13} style={{
+            animation: refreshing ? 'lmSpin 1s linear infinite' : 'none'
+          }} />
+        </button>
+
+        {/* Export */}
+        <button
+          onClick={handleExport}
+          style={{
+            width: '32px',
+            height: '32px',
+            borderRadius: '6px',
+            background: 'transparent',
+            border: '1px solid rgba(255, 255, 255, 0.06)',
+            color: 'rgba(255, 255, 255, 0.3)',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            touchAction: 'manipulation',
+            WebkitTapHighlightColor: 'transparent',
+            transition: 'all 0.2s ease'
+          }}
+        >
+          <Download size={13} />
+        </button>
       </div>
 
-      <div>
+      {/* ═══ ROW 2: PILL FILTER STRIP ═══ */}
+      <div 
+        ref={scrollRef}
+        style={{
+          padding: isMobile ? '0.5rem 1rem' : '0.5rem 1.5rem',
+          borderBottom: '1px solid rgba(255, 255, 255, 0.04)',
+          display: 'flex',
+          gap: isMobile ? '0.25rem' : '0.375rem',
+          overflowX: 'auto',
+          WebkitOverflowScrolling: 'touch'
+        }}
+      >
+        {TABS.map(tab => {
+          const Icon = tab.icon
+          const isActive = activeView === tab.id
+          return (
+            <button
+              key={tab.id}
+              onClick={() => setActiveView(tab.id)}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.3rem',
+                padding: isMobile ? '0.3rem 0.5rem' : '0.35rem 0.625rem',
+                background: isActive ? `${G.primary}18` : 'transparent',
+                border: isActive ? `1px solid ${G.borderActive}` : '1px solid transparent',
+                borderRadius: '6px',
+                color: isActive ? G.primary : 'rgba(255, 255, 255, 0.35)',
+                fontSize: isMobile ? '0.65rem' : '0.7rem',
+                fontWeight: isActive ? '700' : '600',
+                cursor: 'pointer',
+                whiteSpace: 'nowrap',
+                minHeight: '28px',
+                touchAction: 'manipulation',
+                WebkitTapHighlightColor: 'transparent',
+                transition: 'all 0.15s ease',
+                flexShrink: 0
+              }}
+            >
+              <Icon size={12} />
+              {tab.label}
+            </button>
+          )
+        })}
+      </div>
+
+      {/* ═══ CONTENT ═══ */}
+      <div style={{
+        padding: isMobile ? '1rem' : '1.5rem'
+      }}>
+        {activeView === 'kanban' && (
+          <KanbanBoard
+            leadService={leadService}
+            db={db}
+            coachId={coachId}
+            isMobile={isMobile}
+            campaigns={campaigns}
+            activeCampaign={activeCampaign}
+            onCampaignChange={handleCampaignChange}
+          />
+        )}
+
+        {activeView === 'intake' && (
+          <IntakeTab isMobile={isMobile} />
+        )}
+
+        {activeView === 'dm-flow' && (
+          <PlaceholderSection
+            icon={MessageCircle}
+            title="DM Flow Dashboard"
+            subtitle="Wordt gebouwd in volgende fase"
+            color="#8b5cf6"
+            isMobile={isMobile}
+          />
+        )}
+
         {activeView === 'overview' && (
           <LeadOverview
             leads={leads}
@@ -490,11 +519,11 @@ export default function LeadManagement({ db, isMobile, coachId, user }) {
           />
         )}
 
-        {activeView === 'kanban' && (
-          <KanbanBoard
-            leadService={leadService}
+        {activeView === 'campaigns' && (
+          <CampaignTracker
             coachId={coachId}
             isMobile={isMobile}
+            onCampaignChange={handleCampaignChange}
           />
         )}
 
@@ -506,61 +535,66 @@ export default function LeadManagement({ db, isMobile, coachId, user }) {
           />
         )}
 
+        {activeView === 'lead-analytics' && (
+          <LeadAnalyticsDashboard
+            db={db}
+            coachId={coachId}
+            isMobile={isMobile}
+          />
+        )}
+
         {activeView === 'settings' && (
-          <div style={{
-            minHeight: '400px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            background: 'rgba(17, 17, 17, 0.5)',
-            backdropFilter: 'blur(10px)',
-            borderRadius: '16px',
-            padding: '2rem',
-            textAlign: 'center'
-          }}>
-            <div>
-              <Settings size={48} color="rgba(139, 92, 246, 0.5)" style={{ margin: '0 auto 1rem' }} />
-              <h3 style={{
-                fontSize: '1.25rem',
-                fontWeight: '600',
-                color: '#fff',
-                marginBottom: '0.5rem'
-              }}>
-                Instellingen
-              </h3>
-              <p style={{
-                color: 'rgba(255, 255, 255, 0.7)',
-                fontSize: '0.95rem'
-              }}>
-                Wordt gebouwd in Fase 3
-              </p>
-            </div>
-          </div>
+          <PlaceholderSection
+            icon={Settings}
+            title="Instellingen"
+            subtitle="Wordt gebouwd in Fase 3"
+            color={G.secondary}
+            isMobile={isMobile}
+          />
         )}
       </div>
 
+      <DMBibleModal isMobile={isMobile} />
+
       <style>{`
-        @keyframes spin {
+        @keyframes lmSpin {
           to { transform: rotate(360deg); }
         }
-        
-        div::-webkit-scrollbar {
-          height: 4px;
-        }
-        
-        div::-webkit-scrollbar-track {
-          background: rgba(255, 255, 255, 0.05);
-        }
-        
-        div::-webkit-scrollbar-thumb {
-          background: rgba(16, 185, 129, 0.3);
-          border-radius: 2px;
-        }
-        
-        div::-webkit-scrollbar-thumb:hover {
-          background: rgba(16, 185, 129, 0.5);
-        }
+        div::-webkit-scrollbar { height: 0px; width: 0px; }
       `}</style>
+    </div>
+  )
+}
+
+// ============================================
+// PLACEHOLDER (for unbuilt tabs)
+// ============================================
+function PlaceholderSection({ icon: Icon, title, subtitle, color, isMobile }) {
+  return (
+    <div style={{
+      padding: isMobile ? '3rem 1.5rem' : '4rem 2rem',
+      textAlign: 'center'
+    }}>
+      <Icon 
+        size={28} 
+        color={color} 
+        style={{ opacity: 0.5, marginBottom: '0.75rem' }} 
+      />
+      <h3 style={{
+        fontSize: isMobile ? '0.95rem' : '1.05rem',
+        fontWeight: '700',
+        color: color,
+        margin: '0 0 0.25rem 0'
+      }}>
+        {title}
+      </h3>
+      <p style={{
+        color: 'rgba(255, 255, 255, 0.3)',
+        fontSize: isMobile ? '0.75rem' : '0.8rem',
+        margin: 0
+      }}>
+        {subtitle}
+      </p>
     </div>
   )
 }

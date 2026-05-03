@@ -1,77 +1,91 @@
-// src/modules/ai-meal-generator/ShoppingListHTMLGenerator.js
-// Premium GOLDEN HTML-based Shopping List PDF Generator voor MY ARC
+// MY ARC SHOPPING LIST HTML GENERATOR - COACH EDITION
+// Met coach bubble, Nederlandse tips en winkel-georganiseerde lijst
 
 /**
- * Generate HTML shopping list for PDF export with GOLDEN LUXURY THEME
- * @param {Object} shoppingListData - From ShoppingListFormatter.js
- * @param {string} clientName - Client's name
- * @param {string} weekRange - Week date range
- * @returns {string} HTML content ready for print/PDF
+ * Generate shopping list HTML met coach introductie
+ * @param {Object} shoppingListData - Shopping data
+ * @param {string} clientName - Client naam
+ * @param {string} weekRange - Week range
+ * @returns {string} HTML voor print/PDF
  */
 export const generateShoppingListHTML = (shoppingListData, clientName = 'Client', weekRange = 'Week Plan') => {
-  // Helper: Group ingredients by category
-  const groupByCategory = (ingredients) => {
-    return ingredients.reduce((acc, item) => {
-      const cat = item.category || 'Overig'
-      if (!acc[cat]) acc[cat] = []
-      acc[cat].push(item)
-      return acc
-    }, {})
-  }
-  
-  // Helper: Generate smart shopping tips
-  const generateSmartTips = (shoppingListData) => {
-    const ingredients = shoppingListData.ingredients || []
-    const tips = []
-    
-    // Fresh items tip
-    const fresh = ingredients.filter(i => 
-      i.category === 'Groenten' || i.category === 'Fruit'
-    )
-    if (fresh.length > 0) {
-      tips.push('Begin bij verse producten - die blijven het minst lang goed')
-    }
-    
-    // Bulk tip
-    const bulk = ingredients.filter(i => i.packagesNeeded && i.packagesNeeded > 5)
-    if (bulk.length > 0) {
-      tips.push(`Let op grote hoeveelheden: ${bulk[0].name} (${bulk[0].packagesNeeded}x)`)
-    }
-    
-    // Expensive items
-    const expensive = ingredients.filter(i => i.estimatedCost && i.estimatedCost > 10)
-    if (expensive.length > 0) {
-      tips.push(`Check aanbiedingen bij: ${expensive.map(i => i.name).slice(0,2).join(', ')}`)
-    }
-    
-    // Always add these golden tips
-    tips.push('Lidl/Aldi vaak 30-40% goedkoper op basis producten')
-    tips.push('Hele kip kopen = €4-6/kg besparing t.o.v. kipfilet')
-    
-    return tips.slice(0, 5)
-  }
-  
-  // Group ingredients by category
-  const grouped = groupByCategory(shoppingListData.ingredients || [])
-  const categoryOrder = ['Eiwitten', 'Groenten', 'Koolhydraten', 'Zuivel', 'Vetten & Oliën', 'Fruit', 'Overig']
-  
-  // Generate shopping tips
-  const smartTips = generateSmartTips(shoppingListData)
-  
-  // Calculate stats
-  const itemCount = shoppingListData.itemCount || shoppingListData.ingredients?.length || 0
+  // Extract data
+  const ingredients = shoppingListData.ingredients || []
+  const itemCount = shoppingListData.itemCount || ingredients.length || 0
   const totalCost = shoppingListData.totalCost || '0.00'
   const weekDays = shoppingListData.weekDays || 7
   const dailyCost = (parseFloat(totalCost) / weekDays).toFixed(2)
   
-  // Build HTML with GOLDEN LUXURY THEME
+  // Organiseer ingrediënten per winkel categorie
+  const winkelCategories = {
+    'Groenten & Fruit': { items: [], color: '#10b981' },
+    'Vlees & Vis': { items: [], color: '#dc2626' },
+    'Zuivel & Eieren': { items: [], color: '#3b82f6' },
+    'Brood & Granen': { items: [], color: '#f59e0b' },
+    'Conserven & Potten': { items: [], color: '#8b5cf6' },
+    'Vriezer': { items: [], color: '#06b6d4' },
+    'Overig': { items: [], color: '#6b7280' }
+  }
+  
+  // Sorteer items in winkel categorieën
+  ingredients.forEach(item => {
+    let assigned = false
+    const name = item.name.toLowerCase()
+    
+    // Groenten & Fruit
+    if (name.includes('groente') || name.includes('fruit') || name.includes('sla') || 
+        name.includes('tomaat') || name.includes('komkommer') || name.includes('appel') ||
+        name.includes('banaan') || name.includes('ui') || name.includes('paprika')) {
+      winkelCategories['Groenten & Fruit'].items.push(item)
+      assigned = true
+    }
+    // Vlees & Vis
+    else if (name.includes('kip') || name.includes('vlees') || name.includes('vis') || 
+             name.includes('zalm') || name.includes('gehakt')) {
+      winkelCategories['Vlees & Vis'].items.push(item)
+      assigned = true
+    }
+    // Zuivel & Eieren
+    else if (name.includes('melk') || name.includes('kaas') || name.includes('yoghurt') || 
+             name.includes('kwark') || name.includes('eier') || name.includes('zuivel')) {
+      winkelCategories['Zuivel & Eieren'].items.push(item)
+      assigned = true
+    }
+    // Brood & Granen
+    else if (name.includes('brood') || name.includes('rijst') || name.includes('pasta') || 
+             name.includes('havermout') || name.includes('meel')) {
+      winkelCategories['Brood & Granen'].items.push(item)
+      assigned = true
+    }
+    // Conserven
+    else if (name.includes('blik') || name.includes('pot') || name.includes('bonen')) {
+      winkelCategories['Conserven & Potten'].items.push(item)
+      assigned = true
+    }
+    // Vriezer
+    else if (name.includes('bevroren') || name.includes('diepvries')) {
+      winkelCategories['Vriezer'].items.push(item)
+      assigned = true
+    }
+    
+    if (!assigned) {
+      winkelCategories['Overig'].items.push(item)
+    }
+  })
+  
+  // Remove empty categories
+  Object.keys(winkelCategories).forEach(cat => {
+    if (winkelCategories[cat].items.length === 0) delete winkelCategories[cat]
+  })
+  
+  // Build HTML
   const html = `
 <!DOCTYPE html>
 <html lang="nl">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MY ARC Boodschappenlijst - ${clientName}</title>
+    <title>${clientName} - Boodschappenlijst</title>
     <style>
         * {
             margin: 0;
@@ -81,8 +95,10 @@ export const generateShoppingListHTML = (shoppingListData, clientName = 'Client'
 
         body {
             background: #0a0a0a;
-            color: #ffffff;
+            color: #fff;
             font-family: Arial, sans-serif;
+            font-size: 12px;
+            line-height: 1.4;
             -webkit-print-color-adjust: exact;
             print-color-adjust: exact;
         }
@@ -106,389 +122,253 @@ export const generateShoppingListHTML = (shoppingListData, clientName = 'Client'
             page-break-after: avoid;
         }
 
-        /* BACKGROUND */
-        .page-bg {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-            opacity: 0.25;
-            filter: grayscale(40%) blur(0.5px);
-        }
-
-        .page-overlay {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: linear-gradient(135deg, rgba(10,10,10,0.95) 0%, rgba(255,215,0,0.03) 50%, rgba(10,10,10,0.95) 100%);
-        }
-
         /* HEADER */
-        .page-header {
-            position: relative;
-            background: linear-gradient(135deg, rgba(26,26,26,0.95) 0%, rgba(10,10,10,0.95) 100%);
-            backdrop-filter: blur(10px);
-            padding: 45px 40px 40px 40px;
+        .header {
+            background: #1a1a1a;
+            padding: 20px 30px 18px 30px;
             text-align: center;
-            z-index: 1;
-        }
-
-        .page-header-small {
-            position: relative;
-            background: linear-gradient(135deg, rgba(26,26,26,0.95) 0%, rgba(10,10,10,0.95) 100%);
-            backdrop-filter: blur(10px);
-            padding: 28px 40px 24px 40px;
-            text-align: center;
-            z-index: 1;
-        }
-
-        .header-border {
-            position: absolute;
-            bottom: 0;
-            left: 0;
-            right: 0;
-            height: 4px;
-            background: linear-gradient(90deg, #FFD700, #FFA500, #FFD700);
+            border-bottom: 3px solid #FFD700;
         }
 
         .badge {
             background: linear-gradient(135deg, #FFD700, #FFA500);
             color: #0a0a0a;
-            font-size: 12px;
-            font-weight: 900;
-            padding: 7px 20px;
-            border-radius: 20px;
+            font-size: 11px;
+            font-weight: 800;
+            padding: 5px 15px;
+            border-radius: 15px;
             display: inline-block;
-            margin-bottom: 16px;
+            margin-bottom: 10px;
             text-transform: uppercase;
-            letter-spacing: 2px;
+            letter-spacing: 1.5px;
         }
 
-        .main-title {
-            font-size: 52px;
+        .title {
+            font-size: 32px;
             font-weight: 900;
             color: #FFD700;
             text-transform: uppercase;
             letter-spacing: 2px;
-            margin-bottom: 14px;
-            line-height: 1.1;
-        }
-
-        .main-title-small {
-            font-size: 44px;
-            font-weight: 900;
-            color: #FFD700;
-            text-transform: uppercase;
-            letter-spacing: 2px;
+            line-height: 1;
             margin-bottom: 8px;
-            line-height: 1.1;
         }
 
         .subtitle {
-            font-size: 20px;
-            color: #cccccc;
-            margin-bottom: 12px;
-        }
-
-        .author {
-            font-size: 18px;
-            color: #FFD700;
-            font-weight: 700;
+            font-size: 14px;
+            color: #ccc;
         }
 
         /* CONTENT */
         .content {
-            position: relative;
-            padding: 32px 48px 65px 48px;
-            z-index: 1;
+            padding: 25px 35px;
         }
 
-        /* STATS CONTAINERS */
-        .stats-container {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 20px;
-            margin: 0 0 24px 0;
+        /* COACH BUBBLE */
+        .coach-section {
+            margin-bottom: 30px;
         }
 
-        .stat-box {
-            background: linear-gradient(135deg, rgba(255,215,0,0.15) 0%, rgba(26,26,26,0.9) 100%);
-            backdrop-filter: blur(10px);
-            border: 2px solid #FFD700;
-            border-radius: 12px;
-            padding: 20px;
-            text-align: center;
-            position: relative;
-            overflow: hidden;
-        }
-
-        .stat-icon {
-            font-size: 32px;
-            margin-bottom: 8px;
-        }
-
-        .stat-value {
-            font-size: 32px;
-            font-weight: 900;
-            color: #FFD700;
-            margin-bottom: 4px;
-        }
-
-        .stat-label {
-            font-size: 13px;
-            color: rgba(255, 255, 255, 0.6);
-            text-transform: uppercase;
-            letter-spacing: 1px;
-        }
-
-        /* SPEECH BUBBLE */
-        .speech-bubble-container {
+        .coach-bubble-container {
             display: flex;
             align-items: flex-start;
             gap: 20px;
-            margin: 0 0 28px 0;
         }
 
         .profile-circle {
             flex-shrink: 0;
-            width: 85px;
-            height: 85px;
+            width: 80px;
+            height: 80px;
             border-radius: 50%;
-            overflow: hidden;
+            background: #333;
             border: 3px solid #FFD700;
-            box-shadow: 0 4px 12px rgba(255,215,0,0.4);
-            background: linear-gradient(135deg, #FFD700 0%, #FFA500 100%);
             display: flex;
             align-items: center;
             justify-content: center;
             font-size: 36px;
             font-weight: 900;
-            color: #0a0a0a;
-        }
-
-        .profile-circle img {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
+            color: #FFD700;
         }
 
         .speech-bubble {
             position: relative;
-            background: linear-gradient(135deg, rgba(255,215,0,0.25) 0%, rgba(255,165,0,0.15) 100%);
-            backdrop-filter: blur(10px);
+            background: rgba(255, 215, 0, 0.15);
             border: 2px solid #FFD700;
-            border-radius: 18px;
-            padding: 20px 24px;
+            border-radius: 15px;
+            padding: 18px 22px;
             flex: 1;
         }
 
         .speech-bubble::before {
             content: '';
             position: absolute;
-            left: -12px;
-            top: 25px;
+            left: -10px;
+            top: 20px;
             width: 0;
             height: 0;
             border-style: solid;
-            border-width: 10px 12px 10px 0;
+            border-width: 10px 10px 10px 0;
             border-color: transparent #FFD700 transparent transparent;
         }
 
         .speech-bubble::after {
             content: '';
             position: absolute;
-            left: -8px;
-            top: 27px;
+            left: -6px;
+            top: 22px;
             width: 0;
             height: 0;
             border-style: solid;
-            border-width: 8px 10px 8px 0;
-            border-color: transparent rgba(255,215,0,0.25) transparent transparent;
+            border-width: 8px 8px 8px 0;
+            border-color: transparent rgba(255, 215, 0, 0.15) transparent transparent;
         }
 
         .speech-text {
-            font-size: 16px;
-            color: #ffffff;
-            line-height: 1.65;
-            margin-bottom: 14px;
+            font-size: 14px;
+            color: #fff;
+            line-height: 1.6;
         }
 
         .speech-text strong {
             color: #FFD700;
         }
 
-        /* CATEGORY SECTIONS */
-        .category-section {
-            margin-bottom: 28px;
+        /* INHOUDSOPGAVE */
+        .inhoud-box {
+            background: #1a1a1a;
+            border: 2px solid #FFD700;
+            border-radius: 10px;
+            padding: 20px;
+        }
+
+        .inhoud-title {
+            font-size: 20px;
+            font-weight: 900;
+            color: #FFD700;
+            margin-bottom: 15px;
+            text-transform: uppercase;
+        }
+
+        .inhoud-list {
+            list-style: none;
+        }
+
+        .inhoud-list li {
+            font-size: 14px;
+            color: #e0e0e0;
+            margin-bottom: 10px;
+            padding-left: 25px;
+            position: relative;
+        }
+
+        .inhoud-list li::before {
+            content: '•';
+            position: absolute;
+            left: 0;
+        }
+
+        .inhoud-list strong {
+            color: #FFD700;
+        }
+
+        /* SHOPPING LIST */
+        .shop-section {
+            margin-bottom: 20px;
+        }
+
+        .shop-category {
+            margin-bottom: 20px;
         }
 
         .category-header {
             display: flex;
             align-items: center;
-            gap: 12px;
-            margin-bottom: 14px;
-            padding-bottom: 10px;
-            border-bottom: 3px solid #FFD700;
+            gap: 10px;
+            margin-bottom: 8px;
         }
 
-        .category-icon {
-            font-size: 28px;
-        }
-
-        .category-title {
-            font-size: 24px;
-            font-weight: 900;
-            color: #FFD700;
+        .category-label {
+            font-size: 16px;
+            font-weight: 800;
             text-transform: uppercase;
-            letter-spacing: 1.5px;
+            color: #fff;
+            padding: 4px 12px;
+            border-radius: 6px;
         }
 
-        /* SHOPPING ITEMS */
-        .shopping-item {
-            background: linear-gradient(135deg, rgba(255,215,0,0.08) 0%, rgba(26,26,26,0.9) 100%);
-            backdrop-filter: blur(10px);
-            border: 2px solid rgba(255,215,0,0.3);
-            border-radius: 12px;
-            padding: 16px 20px;
-            margin-bottom: 12px;
+        .item-list {
+            background: #1a1a1a;
+            border-radius: 8px;
+            padding: 10px;
+        }
+
+        .shop-item {
             display: flex;
             align-items: center;
-            gap: 15px;
-            transition: all 0.3s ease;
+            padding: 6px 8px;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
         }
 
-        .shopping-item:hover {
-            background: linear-gradient(135deg, rgba(255,215,0,0.12) 0%, rgba(26,26,26,0.9) 100%);
-            border-color: #FFD700;
-            transform: translateX(4px);
+        .shop-item:last-child {
+            border-bottom: none;
         }
 
         .checkbox {
-            width: 24px;
-            height: 24px;
+            width: 16px;
+            height: 16px;
             border: 2px solid #FFD700;
-            border-radius: 4px;
+            border-radius: 3px;
+            margin-right: 10px;
             flex-shrink: 0;
-            position: relative;
-            background: rgba(10,10,10,0.5);
-        }
-
-        .item-content {
-            flex: 1;
         }
 
         .item-name {
-            font-size: 17px;
-            font-weight: 700;
-            color: #ffffff;
-            margin-bottom: 3px;
+            flex: 1;
+            font-size: 14px;
+            font-weight: 600;
+            color: #fff;
         }
 
         .item-amount {
-            font-size: 15px;
-            color: rgba(255, 255, 255, 0.7);
+            font-size: 13px;
+            color: #FFD700;
+            font-weight: 700;
+            margin-left: 10px;
         }
 
-        .item-price {
-            background: linear-gradient(135deg, #FFD700, #FFA500);
-            color: #0a0a0a;
-            padding: 6px 14px;
-            border-radius: 8px;
-            font-size: 14px;
-            font-weight: 800;
-            white-space: nowrap;
-        }
-
-        .item-tip {
-            width: 100%;
-            margin-top: 10px;
-            padding-top: 10px;
-            border-top: 1px solid rgba(255,215,0,0.3);
-            font-size: 14px;
-            color: #FFA500;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-
-        /* INFO BOXES */
-        .box {
-            background: linear-gradient(135deg, rgba(255,215,0,0.08) 0%, rgba(26,26,26,0.9) 100%);
-            backdrop-filter: blur(10px);
+        /* TIPS */
+        .tips-box {
+            background: rgba(255, 215, 0, 0.1);
             border: 2px solid #FFD700;
-            border-radius: 12px;
+            border-radius: 10px;
             padding: 20px;
-            margin: 16px 0;
+            margin-bottom: 20px;
         }
 
-        .box-title {
-            font-size: 22px;
+        .tips-title {
+            font-size: 18px;
             font-weight: 900;
             color: #FFD700;
             margin-bottom: 12px;
             text-transform: uppercase;
         }
 
-        .box-list {
-            list-style: none;
-            padding: 0;
-        }
-
-        .box-list li {
-            font-size: 16px;
+        .tip-item {
+            font-size: 13px;
             color: #e0e0e0;
-            margin-bottom: 9px;
-            padding-left: 26px;
+            margin-bottom: 10px;
+            padding-left: 20px;
             position: relative;
             line-height: 1.5;
         }
 
-        .box-list li::before {
+        .tip-item::before {
             content: '•';
             position: absolute;
             left: 0;
-            font-size: 22px;
+        }
+
+        .tip-item strong {
             color: #FFD700;
-            font-weight: 900;
-        }
-
-        /* ROUTE BOX */
-        .route-box {
-            background: linear-gradient(135deg, rgba(255,215,0,0.15) 0%, rgba(26,26,26,0.9) 100%);
-            backdrop-filter: blur(10px);
-            border: 2px solid #FFD700;
-            border-radius: 12px;
-            padding: 22px;
-            margin-bottom: 20px;
-        }
-
-        .route-box ol {
-            margin: 0;
-            padding-left: 24px;
-        }
-
-        .route-box li {
-            font-size: 16px;
-            color: #e0e0e0;
-            margin-bottom: 10px;
-            line-height: 1.6;
-        }
-
-        .route-box li strong {
-            color: #FFD700;
-        }
-
-        /* BIG NUMBER */
-        .big {
-            font-size: 68px;
-            font-weight: 900;
-            color: #FFD700;
-            display: inline-block;
-            line-height: 1;
         }
 
         /* FOOTER */
@@ -497,14 +377,12 @@ export const generateShoppingListHTML = (shoppingListData, clientName = 'Client'
             bottom: 0;
             left: 0;
             right: 0;
-            padding: 15px;
+            padding: 12px;
             text-align: center;
-            background: linear-gradient(135deg, rgba(26,26,26,0.95) 0%, rgba(10,10,10,0.95) 100%);
-            backdrop-filter: blur(10px);
+            background: #1a1a1a;
             color: #888;
-            font-size: 12px;
-            border-top: 3px solid #FFD700;
-            z-index: 1;
+            font-size: 11px;
+            border-top: 2px solid #FFD700;
         }
 
         .footer strong {
@@ -514,302 +392,229 @@ export const generateShoppingListHTML = (shoppingListData, clientName = 'Client'
         /* PRINT BUTTON */
         .print-btn {
             position: fixed;
-            top: 30px;
-            right: 30px;
+            top: 20px;
+            right: 20px;
             background: linear-gradient(135deg, #FFD700, #FFA500);
             color: #0a0a0a;
             border: none;
-            padding: 14px 26px;
-            border-radius: 10px;
-            font-size: 15px;
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-size: 14px;
             font-weight: 700;
             cursor: pointer;
             z-index: 9999;
             text-transform: uppercase;
-            letter-spacing: 1px;
-            transition: all 0.3s ease;
-        }
-
-        .print-btn:hover {
-            transform: translateY(-2px) scale(1.02);
-            box-shadow: 0 8px 24px rgba(255,215,0,0.4);
         }
 
         @media print {
             .print-btn {
                 display: none;
             }
-        }
-
-        /* UTILITIES */
-        .center {
-            text-align: center;
-        }
-
-        .text {
-            font-size: 17px;
-            color: #e0e0e0;
-            line-height: 1.65;
-            margin-bottom: 14px;
-        }
-
-        .text strong {
-            color: #FFD700;
-        }
-
-        /* PRICE TAG */
-        .price {
-            background: linear-gradient(135deg, #FFD700, #FFA500);
-            color: #0a0a0a;
-            padding: 3px 9px;
-            border-radius: 6px;
-            font-weight: 800;
-            display: inline-block;
+            body {
+                background: #0a0a0a !important;
+            }
+            * {
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+            }
         }
     </style>
 </head>
 <body>
     <button class="print-btn" onclick="window.print()">Print PDF</button>
 
-    <!-- PAGE 1: COVER -->
+    <!-- PAGINA 1: INTRO & INHOUDSOPGAVE -->
     <div class="page">
-        <div class="page-overlay"></div>
-        
-        <div class="page-header">
-            <div class="badge">Shopping Guide</div>
-            <h1 class="main-title">MY ARC<br>BOODSCHAPPEN</h1>
-            <p class="subtitle">Slim winkelen voor maximale groei</p>
-            <p class="author">${clientName} • ${weekRange}</p>
-            <div class="header-border"></div>
+        <div class="header">
+            <div class="badge">Boodschappen</div>
+            <h1 class="title">MEAL PLAN - ${clientName}</h1>
+            <p class="subtitle">${weekRange}</p>
         </div>
 
         <div class="content">
-            <div class="speech-bubble-container">
-                <div class="profile-circle">K</div>
-                <div class="speech-bubble">
-                    <p class="speech-text">
-                        Dit is jouw gepersonaliseerde boodschappenlijst. Ik heb alles berekend voor 
-                        <strong>maximale besparing</strong> zonder in te leveren op kwaliteit. 
-                        Met mijn tips bespaar je <strong>€30-50 per maand</strong>.
-                    </p>
-                    <p class="speech-text" style="margin: 0;">
-                        Print deze lijst uit, vink af wat je hebt, en shop slim. 
-                        <strong>Lidl/Aldi eerst</strong>, dan pas de rest!
-                    </p>
+            <!-- COACH BUBBLE -->
+            <div class="coach-section">
+                <div class="coach-bubble-container">
+                    <div class="profile-circle">
+                        <img src="https://i.ibb.co/601NSR8W/IMG-4752.jpg" 
+                             alt="Kersten" 
+                             style="width: 100%; height: 100%; object-fit: cover; border-radius: 50%;">
+                    </div>
+                    <div class="speech-bubble">
+                        <p class="speech-text">
+                            Een <strong>gezonde levensstijl</strong> draait niet om discipline. Het draait om het hebben van de 
+                            <strong>juiste structuur en routines</strong> waar je op terug kunt vallen.
+                        </p>
+                        <p class="speech-text" style="margin-top: 10px; margin-bottom: 0;">
+                            Daarom maken we dit plan - zodat je <strong>zonder nadenken</strong> gezond kunt eten. 
+                            Alles wat je nodig hebt staat klaar. Je hoeft alleen maar te volgen.
+                        </p>
+                    </div>
                 </div>
             </div>
 
-            <div class="stats-container">
-                <div class="stat-box">
-                    <div class="stat-icon">📦</div>
-                    <div class="stat-value">${itemCount}</div>
-                    <div class="stat-label">items totaal</div>
-                </div>
-                <div class="stat-box">
-                    <div class="stat-icon">💰</div>
-                    <div class="stat-value">€${totalCost}</div>
-                    <div class="stat-label">week budget</div>
-                </div>
-                <div class="stat-box">
-                    <div class="stat-icon">📊</div>
-                    <div class="stat-value">€${dailyCost}</div>
-                    <div class="stat-label">per dag</div>
-                </div>
-            </div>
-
-            <div class="box">
-                <h3 class="box-title">Shopping Philosophy</h3>
-                <ul class="box-list">
-                    <li><strong>Lidl/Aldi eerst</strong> - 30-40% goedkoper op basics</li>
-                    <li><strong>Hele kip kopen</strong> - €4-6/kg besparing vs kipfilet</li>
-                    <li><strong>Kwark bij Lidl</strong> - €0,69 vs €1,50 bij AH</li>
-                    <li><strong>Seizoensgroente</strong> - Tot 50% goedkoper</li>
-                    <li><strong>Bulk waar mogelijk</strong> - Rijst, pasta, blikken</li>
+            <!-- INHOUDSOPGAVE -->
+            <div class="inhoud-box">
+                <h2 class="inhoud-title">Wat vind je in dit plan?</h2>
+                <ul class="inhoud-list">
+                    <li><strong>Pagina 1:</strong> Deze introductie - waarom structuur belangrijker is dan wilskracht</li>
+                    <li><strong>Pagina 2:</strong> Complete boodschappenlijst georganiseerd per winkelafdeling</li>
+                    <li><strong>Pagina 3:</strong> Praktische tips om €30-50 per week te besparen op boodschappen</li>
+                    <li><strong>Extra:</strong> Je persoonlijke weekmenu met alle maaltijden (aparte PDF)</li>
                 </ul>
+            </div>
+
+            <!-- WEEK OVERZICHT -->
+            <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin-top: 25px;">
+                <div style="background: #1a1a1a; border: 2px solid #FFD700; border-radius: 8px; padding: 15px; text-align: center;">
+                    <div style="font-size: 28px; font-weight: 900; color: #FFD700;">${itemCount}</div>
+                    <div style="font-size: 12px; color: #ccc; text-transform: uppercase;">Items totaal</div>
+                </div>
+                <div style="background: #1a1a1a; border: 2px solid #FFD700; border-radius: 8px; padding: 15px; text-align: center;">
+                    <div style="font-size: 28px; font-weight: 900; color: #FFD700;">€${totalCost}</div>
+                    <div style="font-size: 12px; color: #ccc; text-transform: uppercase;">Week budget</div>
+                </div>
+                <div style="background: #1a1a1a; border: 2px solid #FFD700; border-radius: 8px; padding: 15px; text-align: center;">
+                    <div style="font-size: 28px; font-weight: 900; color: #FFD700;">€${dailyCost}</div>
+                    <div style="font-size: 12px; color: #ccc; text-transform: uppercase;">Per dag</div>
+                </div>
+            </div>
+
+            <div style="background: linear-gradient(135deg, #FFD700, #FFA500); border-radius: 10px; padding: 20px; margin-top: 25px; text-align: center;">
+                <p style="font-size: 18px; font-weight: 900; color: #0a0a0a; margin: 0;">
+                    Klaar om te beginnen? Pak deze lijst en ga shoppen!
+                </p>
             </div>
         </div>
 
         <div class="footer">
-            <strong>MY ARC</strong> | Jouw Personal Training Partner | Pagina 1
+            <strong>MY ARC</strong> | Transform Your Life | Pagina 1/3
         </div>
     </div>
 
-    <!-- PAGES 2+: SHOPPING LIST -->
-    ${(() => {
-        let pageContent = ''
-        let currentPage = []
-        let pageNum = 2
-        
-        categoryOrder.forEach(category => {
-            if (!grouped[category] || grouped[category].length === 0) return
-            
-            const categoryEmoji = {
-                'Eiwitten': '🥚',
-                'Groenten': '🥦', 
-                'Koolhydraten': '🍚',
-                'Zuivel': '🥛',
-                'Vetten & Oliën': '🫒',
-                'Fruit': '🍎',
-                'Overig': '📦'
-            }[category] || '📦'
-            
-            const categoryHTML = `
-                <div class="category-section">
-                    <div class="category-header">
-                        <span class="category-icon">${categoryEmoji}</span>
-                        <h2 class="category-title">${category}</h2>
-                    </div>
-                    
-                    ${grouped[category].map(item => {
-                        // Safe amount display
-                        let displayAmount = ''
-                        if (item.displayAmount) {
-                            displayAmount = item.displayAmount
-                        } else if (item.amount !== undefined && item.amount !== null) {
-                            displayAmount = `${item.amount}${item.unit || ''}`
-                        } else if (item.totalAmount !== undefined && item.totalAmount !== null) {
-                            displayAmount = `${item.totalAmount}${item.unit || ''}`
-                        }
-                        
-                        // Safe price display
-                        let priceDisplay = ''
-                        if (item.estimatedCost !== undefined && item.estimatedCost > 0) {
-                            priceDisplay = `€${item.estimatedCost.toFixed(2)}`
-                        }
-                        
-                        return `
-                            <div class="shopping-item">
-                                <div class="checkbox"></div>
-                                <div class="item-content">
-                                    <div class="item-name">${item.name}</div>
-                                    <div class="item-amount">${displayAmount}</div>
-                                    ${item.shoppingTip ? `
-                                        <div class="item-tip">
-                                            <span>💡</span>
-                                            ${item.shoppingTip}
-                                        </div>
-                                    ` : ''}
-                                </div>
-                                ${priceDisplay ? `<div class="item-price">${priceDisplay}</div>` : ''}
+    <!-- PAGINA 2: BOODSCHAPPENLIJST -->
+    <div class="page">
+        <div class="header">
+            <div class="badge">Shopping</div>
+            <h1 class="title">BOODSCHAPPENLIJST</h1>
+            <p class="subtitle">Georganiseerd per winkelafdeling</p>
+        </div>
+
+        <div class="content" style="padding: 20px 30px;">
+            ${Object.entries(winkelCategories).map(([category, data]) => {
+                if (data.items.length === 0) return ''
+                
+                return `
+                    <div class="shop-category">
+                        <div class="category-header">
+                            <div class="category-label" style="background: ${data.color};">
+                                ${category}
                             </div>
-                        `
-                    }).join('')}
-                </div>
-            `
-            
-            currentPage.push(categoryHTML)
-            
-            // Check if we need a new page (rough estimate)
-            if (currentPage.join('').length > 3000) {
-                pageContent += `
-                    <div class="page">
-                        <div class="page-overlay"></div>
-                        
-                        <div class="page-header-small">
-                            <div class="badge">Boodschappenlijst</div>
-                            <h1 class="main-title-small">SHOPPING LIST</h1>
-                            <div class="header-border"></div>
                         </div>
-
-                        <div class="content">
-                            ${currentPage.join('')}
-                        </div>
-
-                        <div class="footer">
-                            <strong>MY ARC</strong> | Jouw Personal Training Partner | Pagina ${pageNum}
+                        <div class="item-list">
+                            ${data.items.map(item => {
+                                // Format amount
+                                let displayAmount = ''
+                                if (item.displayAmount) {
+                                    displayAmount = item.displayAmount
+                                } else if (item.totalAmount !== undefined) {
+                                    displayAmount = `${Math.round(item.totalAmount)}${item.unit || 'g'}`
+                                }
+                                
+                                return `
+                                    <div class="shop-item">
+                                        <div class="checkbox"></div>
+                                        <div class="item-name">${item.name}</div>
+                                        <div class="item-amount">${displayAmount}</div>
+                                    </div>
+                                `
+                            }).join('')}
                         </div>
                     </div>
                 `
-                currentPage = []
-                pageNum++
-            }
-        })
-        
-        // Add remaining content
-        if (currentPage.length > 0) {
-            pageContent += `
-                <div class="page">
-                    <div class="page-overlay"></div>
-                    
-                    <div class="page-header-small">
-                        <div class="badge">Boodschappenlijst</div>
-                        <h1 class="main-title-small">SHOPPING LIST</h1>
-                        <div class="header-border"></div>
-                    </div>
+            }).join('')}
 
-                    <div class="content">
-                        ${currentPage.join('')}
-                    </div>
-
-                    <div class="footer">
-                        <strong>MY ARC</strong> | Jouw Personal Training Partner | Pagina ${pageNum}
-                    </div>
-                </div>
-            `
-        }
-        
-        return pageContent
-    })()}
-
-    <!-- LAST PAGE: SMART TIPS -->
-    <div class="page">
-        <div class="page-overlay"></div>
-        
-        <div class="page-header-small">
-            <div class="badge">Bespaar Tips</div>
-            <h1 class="main-title-small">SHOP SLIM<br>GROEI GROOT</h1>
-            <div class="header-border"></div>
-        </div>
-
-        <div class="content">
-            <div class="route-box">
-                <h3 class="box-title">Optimale Winkel Route</h3>
-                <ol>
-                    <li><strong>Start bij Lidl/Aldi</strong> voor basics (80% van je lijst)</li>
-                    <li><strong>Groente & fruit</strong> → Turkse supermarkt of markt</li>
-                    <li><strong>Specifieke items</strong> → AH/Jumbo alleen indien nodig</li>
-                    <li><strong>Diepvries als laatste</strong> (blijft koud tijdens transport)</li>
-                </ol>
-            </div>
-
-            ${smartTips.length > 0 ? `
-                <div class="box">
-                    <h3 class="box-title">Quick Tips Deze Week</h3>
-                    <ul class="box-list">
-                        ${smartTips.map(tip => `<li>${tip}</li>`).join('')}
-                    </ul>
-                </div>
-            ` : ''}
-
-            <div class="box">
-                <h3 class="box-title">Kersten's Budget Hacks</h3>
-                <ul class="box-list">
-                    <li><strong>Hele kip:</strong> €8,50/kg vs Kipfilet: €12-15/kg</li>
-                    <li><strong>Lidl kwark:</strong> €0,69 vs AH/Jumbo: €1,20-1,50</li>
-                    <li><strong>Whey online:</strong> €20-25/kg vs Winkel: €35-40/kg</li>
-                    <li><strong>Eieren bulk:</strong> 30 stuks voor €0,25/stuk</li>
-                </ul>
-            </div>
-
-            <div class="center" style="margin: 28px 0;">
-                <div class="big">€30-50</div>
-                <p class="text" style="font-size: 20px; margin-top: 16px;">
-                    <strong>Besparing per maand</strong><br>
-                    Dat is €400+ per jaar extra gains!
-                </p>
-            </div>
-
-            <div class="box" style="text-align: center;">
-                <h3 class="box-title">Groei Elke Dag</h3>
-                <p class="text" style="font-size: 16px; margin: 0;">
-                    Met deze lijst en tips shop je <strong>slimmer</strong>, niet harder.<br>
-                    Meer geld over = meer gains. Let's go! 💪
+            <div style="background: rgba(255, 215, 0, 0.1); border: 2px solid #FFD700; border-radius: 10px; padding: 15px; margin-top: 20px; text-align: center;">
+                <p style="font-size: 14px; color: #FFD700; font-weight: 700; margin: 0;">
+                    💡 Tip: Kruis af wat je al hebt gepakt - zo vergeet je niks!
                 </p>
             </div>
         </div>
 
         <div class="footer">
-            <strong>MY ARC</strong> | Transform Your Life | Groei! 💪
+            <strong>MY ARC</strong> | Transform Your Life | Pagina 2/3
+        </div>
+    </div>
+
+    <!-- PAGINA 3: BESPAARTIPS -->
+    <div class="page">
+        <div class="header">
+            <div class="badge">Budget Tips</div>
+            <h1 class="title">SLIM BOODSCHAPPEN DOEN</h1>
+            <p class="subtitle">Bespaar €30-50 per week</p>
+        </div>
+
+        <div class="content">
+            <!-- WINKELROUTE -->
+            <div class="tips-box">
+                <h3 class="tips-title">Slimme Winkelroute</h3>
+                <div class="tip-item">
+                    <strong>Start bij Lidl/Aldi:</strong> Hier haal je 80% van je lijst. Basics zoals zuivel, vlees, groenten zijn hier het goedkoopst.
+                </div>
+                <div class="tip-item">
+                    <strong>Dan naar de markt:</strong> Voor verse groenten en fruit. Vaak 50% goedkoper dan supermarkt, zeker aan het einde van de dag.
+                </div>
+                <div class="tip-item">
+                    <strong>Turkse supermarkt:</strong> Voor kruiden, peulvruchten en groenten. Veel groter en goedkoper dan reguliere super.
+                </div>
+                <div class="tip-item">
+                    <strong>AH/Jumbo alleen voor specials:</strong> Kijk de bonus, maar ga niet zomaar shoppen. Te duur voor dagelijkse boodschappen.
+                </div>
+            </div>
+
+            <!-- BULK TIPS -->
+            <div class="tips-box">
+                <h3 class="tips-title">Voorraad Aanleggen</h3>
+                <div class="tip-item">
+                    <strong>Koop heel vlees:</strong> Hele kip is €8/kg versus kipfilet €15/kg. 10 minuten werk scheelt €7 per kilo.
+                </div>
+                <div class="tip-item">
+                    <strong>Vriezen is je vriend:</strong> Koop brood, vlees en groenten in bulk. Portioneer direct en vries in.
+                </div>
+                <div class="tip-item">
+                    <strong>Seizoensgroenten:</strong> Koop wat in het seizoen is. Broccoli in winter, courgette in zomer = halve prijs.
+                </div>
+                <div class="tip-item">
+                    <strong>Huismerk regelt:</strong> Voor basis producten (rijst, pasta, zuivel) is huismerk perfect. Scheelt 30-40%.
+                </div>
+            </div>
+
+            <!-- MEAL PREP -->
+            <div class="tips-box">
+                <h3 class="tips-title">Tijd = Geld</h3>
+                <div class="tip-item">
+                    <strong>Prep op zondag:</strong> 2 uur werk = hele week klaar. Geen dure impulse aankopen meer.
+                </div>
+                <div class="tip-item">
+                    <strong>Dubbel koken:</strong> Maak altijd dubbele porties. Eten voor morgen of invriezen voor volgende week.
+                </div>
+                <div class="tip-item">
+                    <strong>Bakjes systeem:</strong> Investeer in goede bakjes. Alles voorgeportioneerd = nooit meer twijfelen.
+                </div>
+            </div>
+
+            <!-- TOTALE BESPARING -->
+            <div style="background: linear-gradient(135deg, #FFD700, #FFA500); border-radius: 10px; padding: 25px; text-align: center; margin-top: 25px;">
+                <div style="font-size: 48px; font-weight: 900; color: #0a0a0a; line-height: 1;">€150-200</div>
+                <p style="font-size: 16px; color: #0a0a0a; font-weight: 700; margin-top: 10px;">
+                    Maandelijkse besparing met deze tips<br>
+                    Dat is €2000+ per jaar extra in je zak!
+                </p>
+            </div>
+        </div>
+
+        <div class="footer">
+            <strong>MY ARC</strong> | Transform Your Life | Pagina 3/3
         </div>
     </div>
 
@@ -821,54 +626,43 @@ export const generateShoppingListHTML = (shoppingListData, clientName = 'Client'
 }
 
 /**
- * Open shopping list directly in print dialog
+ * Open shopping list voor print/PDF
  */
 export const openShoppingListForPrint = (shoppingListData, clientName, weekRange) => {
   const html = generateShoppingListHTML(shoppingListData, clientName, weekRange)
   
-  // Remove any existing print iframe
-  const existingFrame = document.getElementById('shopping-list-print-frame')
-  if (existingFrame) {
-    existingFrame.remove()
-  }
+  // Open print window
+  const printWindow = window.open('', '_blank', 'width=900,height=700')
   
-  // Create hidden iframe for printing
-  const printFrame = document.createElement('iframe')
-  printFrame.id = 'shopping-list-print-frame'
-  printFrame.style.cssText = `
-    position: absolute;
-    top: -10000px;
-    left: -10000px;
-    width: 0;
-    height: 0;
-    border: none;
-  `
-  
-  // Append to body
-  document.body.appendChild(printFrame)
-  
-  // Write HTML to iframe and trigger print
-  printFrame.onload = () => {
-    // Remove the print button from the content
-    const printHTML = html.replace('<button class="print-btn" onclick="window.print()">Print PDF</button>', '')
+  if (printWindow) {
+    printWindow.document.write(html)
+    printWindow.document.close()
     
-    printFrame.contentDocument.write(printHTML)
-    printFrame.contentDocument.close()
+    printWindow.onload = () => {
+      setTimeout(() => {
+        printWindow.print()
+      }, 500)
+    }
+  } else {
+    // Iframe fallback
+    const printFrame = document.createElement('iframe')
+    printFrame.style.cssText = 'position: fixed; width: 0; height: 0; border: 0;'
+    document.body.appendChild(printFrame)
     
-    // Small delay to ensure content is rendered
+    const frameDoc = printFrame.contentDocument || printFrame.contentWindow.document
+    frameDoc.open()
+    frameDoc.write(html)
+    frameDoc.close()
+    
     setTimeout(() => {
+      printFrame.contentWindow.focus()
       printFrame.contentWindow.print()
       
-      // Clean up iframe after print dialog closes
-      // Note: onafterprint doesn't work reliably across browsers
       setTimeout(() => {
-        printFrame.remove()
+        document.body.removeChild(printFrame)
       }, 1000)
-    }, 250)
+    }, 500)
   }
-  
-  // Trigger load
-  printFrame.src = 'about:blank'
 }
 
 export default { generateShoppingListHTML, openShoppingListForPrint }

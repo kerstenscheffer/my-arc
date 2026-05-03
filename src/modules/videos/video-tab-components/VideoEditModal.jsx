@@ -1,41 +1,126 @@
 // src/modules/videos/video-tab-components/VideoEditModal.jsx
-import React, { useState } from 'react'
-import { Edit, X, Globe, Home, Dumbbell, Apple, Phone, Trophy, TrendingUp } from 'lucide-react'
+// v2.0 — Volledige editor (titel, beschrijving, URL, categorie, thumbnail, default_pages)
+// Brand styling, createPortal, correcte page_context keys
+import React, { useState, useEffect } from 'react'
+import { createPortal } from 'react-dom'
+import {
+  Edit, X, Globe, Camera, Image as ImageIcon, Check, Youtube,
+  Home, Dumbbell, Utensils, ShoppingCart, Camera as TrackingIcon, Phone, User
+} from 'lucide-react'
 import useIsMobile from '../../../hooks/useIsMobile'
 import videoService from '../VideoService'
 
+const GOLD = '#FFD700'
+
+// ── Page keys matchen ClientDashboard ──
 const PAGE_OPTIONS = [
-  { value: 'home', label: 'Home', icon: Home, color: '#3b82f6' },
-  { value: 'workout', label: 'Workout', icon: Dumbbell, color: '#f97316' },
-  { value: 'meals', label: 'Meals', icon: Apple, color: '#10b981' },
-  { value: 'calls', label: 'Calls', icon: Phone, color: '#3b82f6' },
-  { value: 'challenges', label: 'Challenges', icon: Trophy, color: '#dc2626' },
-  { value: 'progress', label: 'Progress', icon: TrendingUp, color: '#8b5cf6' }
+  { value: 'home',         label: 'Home',         icon: Home },
+  { value: 'workout',      label: 'Workout',      icon: Dumbbell },
+  { value: 'meal',         label: 'Meal',         icon: Utensils },
+  { value: 'boodschappen', label: 'Boodschappen', icon: ShoppingCart },
+  { value: 'tracking',     label: 'Tracking',     icon: TrackingIcon },
+  { value: 'calls',        label: 'Calls',        icon: Phone },
+  { value: 'profile',      label: 'Profile',      icon: User }
 ]
 
-export default function VideoEditModal({ video, onClose, onSave }) {
-  const [defaultPages, setDefaultPages] = useState(video.default_pages || [])
+export default function VideoEditModal({ 
+  video, 
+  onClose, 
+  onSave,
+  customCategories = [],
+  db
+}) {
+  const [formData, setFormData] = useState({
+    title: video.title || '',
+    description: video.description || '',
+    video_url: video.video_url || '',
+    category_id: video.category_id || null,
+    default_pages: video.default_pages || []
+  })
+  const [thumbnailFile, setThumbnailFile] = useState(null)
+  const [thumbnailPreview, setThumbnailPreview] = useState(video.thumbnail_url || null)
+  const [thumbnailChanged, setThumbnailChanged] = useState(false)
   const [saving, setSaving] = useState(false)
-  
+
   const isMobile = useIsMobile()
-  
+
+  // Lock body scroll
+  useEffect(() => {
+    const orig = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => { document.body.style.overflow = orig }
+  }, [])
+
   const togglePage = (pageValue) => {
-    if (defaultPages.includes(pageValue)) {
-      setDefaultPages(defaultPages.filter(p => p !== pageValue))
+    if (formData.default_pages.includes(pageValue)) {
+      setFormData({
+        ...formData,
+        default_pages: formData.default_pages.filter(p => p !== pageValue)
+      })
     } else {
-      setDefaultPages([...defaultPages, pageValue])
+      setFormData({
+        ...formData,
+        default_pages: [...formData.default_pages, pageValue]
+      })
     }
   }
-  
+
+  const handleThumbnailChange = (e) => {
+    const file = e.target.files[0]
+    if (file) {
+      setThumbnailFile(file)
+      setThumbnailChanged(true)
+      const reader = new FileReader()
+      reader.onload = (e) => setThumbnailPreview(e.target.result)
+      reader.readAsDataURL(file)
+    }
+  }
+
+  const removeThumbnail = () => {
+    setThumbnailFile(null)
+    setThumbnailPreview(null)
+    setThumbnailChanged(true)
+  }
+
   const handleSave = async () => {
+    if (!formData.title.trim() || !formData.video_url.trim()) {
+      alert('Titel en URL zijn verplicht')
+      return
+    }
+
     setSaving(true)
     try {
-      const result = await videoService.updateVideo(video.id, {
-        default_pages: defaultPages
-      })
-      
+      const updates = {
+        title: formData.title.trim(),
+        description: formData.description.trim(),
+        video_url: formData.video_url.trim(),
+        category_id: formData.category_id || null,
+        default_pages: formData.default_pages
+      }
+
+      // Handle thumbnail upload if changed
+      if (thumbnailChanged) {
+        if (thumbnailFile) {
+          const user = await db?.getCurrentUser?.()
+          const coachId = user?.id || video.coach_id
+          const uploadResult = await videoService.uploadThumbnail(thumbnailFile, coachId)
+          if (uploadResult.success) {
+            updates.thumbnail_url = uploadResult.thumbnailUrl
+          } else {
+            alert('Thumbnail upload mislukt: ' + uploadResult.error)
+            setSaving(false)
+            return
+          }
+        } else {
+          // User verwijderde thumbnail
+          updates.thumbnail_url = null
+        }
+      }
+
+      const result = await videoService.updateVideo(video.id, updates)
+
       if (result.success) {
-        await onSave()
+        if (onSave) await onSave()
         onClose()
       } else {
         alert('Fout bij opslaan: ' + (result.error || 'Onbekend'))
@@ -47,332 +132,541 @@ export default function VideoEditModal({ video, onClose, onSave }) {
       setSaving(false)
     }
   }
-  
-  return (
-    <div style={{
-      position: 'fixed',
-      top: 0,
-      left: 0,
-      right: 0,
-      bottom: 0,
-      background: 'rgba(0,0,0,0.8)',
-      zIndex: 10001,
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      padding: '1rem'
-    }}>
-      <div style={{
-        background: '#1a1a1a',
-        borderRadius: '16px',
-        padding: isMobile ? '1.5rem' : '2rem',
-        maxWidth: '500px',
-        width: '100%',
-        border: '1px solid rgba(255,255,255,0.08)'
-      }}>
-        {/* Header */}
+
+  // Shared styles
+  const labelStyle = {
+    display: 'block',
+    fontSize: '0.4rem',
+    fontWeight: '700',
+    color: 'rgba(255, 255, 255, 0.3)',
+    textTransform: 'uppercase',
+    letterSpacing: '0.08em',
+    marginBottom: '0.4rem'
+  }
+
+  const inputStyle = {
+    width: '100%',
+    padding: '0.6rem 0.75rem',
+    background: '#000',
+    border: '1px solid rgba(255, 255, 255, 0.08)',
+    borderRadius: '6px',
+    color: '#fff',
+    fontSize: isMobile ? '0.85rem' : '0.9rem',
+    fontWeight: '600',
+    outline: 'none'
+  }
+
+  return createPortal(
+    <div
+      onClick={onClose}
+      style={{
+        position: 'fixed',
+        inset: 0,
+        background: 'rgba(0, 0, 0, 0.85)',
+        zIndex: 10001,
+        display: 'flex',
+        alignItems: isMobile ? 'flex-end' : 'center',
+        justifyContent: 'center',
+        padding: isMobile ? '0' : '1rem'
+      }}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          background: '#0a0a0a',
+          width: '100%',
+          maxWidth: isMobile ? '100%' : '560px',
+          maxHeight: isMobile ? '92vh' : '88vh',
+          borderRadius: isMobile ? '12px 12px 0 0' : '12px',
+          border: '1px solid rgba(255, 255, 255, 0.06)',
+          overflow: 'hidden',
+          display: 'flex',
+          flexDirection: 'column',
+          transform: 'translateZ(0)'
+        }}
+      >
+        {/* HEADER */}
         <div style={{
           display: 'flex',
           alignItems: 'center',
-          justifyContent: 'space-between',
-          marginBottom: '1.5rem'
+          padding: isMobile ? '0.75rem 0.875rem' : '0.875rem 1.125rem',
+          borderBottom: '1px solid rgba(255, 255, 255, 0.06)',
+          flexShrink: 0
         }}>
-          <h3 style={{
-            fontSize: '1.25rem',
-            fontWeight: 'bold',
-            color: '#fff',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.5rem'
-          }}>
-            <Edit size={20} style={{ color: '#10b981' }} />
-            Standaard Pagina's
-          </h3>
+          <div style={{ flex: 1 }}>
+            <div style={{
+              fontSize: isMobile ? '0.4rem' : '0.45rem',
+              fontWeight: '700',
+              color: 'rgba(255, 255, 255, 0.2)',
+              textTransform: 'uppercase',
+              letterSpacing: '0.08em',
+              marginBottom: '0.2rem'
+            }}>
+              Video bewerken
+            </div>
+            <div style={{
+              fontSize: isMobile ? '0.95rem' : '1.05rem',
+              fontWeight: '800',
+              color: '#fff',
+              letterSpacing: '-0.01em',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap'
+            }}>
+              {video.title}
+            </div>
+          </div>
           <button
             onClick={onClose}
             style={{
-              background: 'rgba(255,255,255,0.05)',
-              border: '1px solid rgba(255,255,255,0.08)',
-              borderRadius: '8px',
               width: '32px',
               height: '32px',
-              cursor: 'pointer',
+              background: 'rgba(255, 255, 255, 0.04)',
+              border: '1px solid rgba(255, 255, 255, 0.06)',
+              borderRadius: '8px',
+              color: 'rgba(255, 255, 255, 0.4)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              transition: 'all 0.3s ease'
+              cursor: 'pointer',
+              touchAction: 'manipulation',
+              WebkitTapHighlightColor: 'transparent',
+              flexShrink: 0
             }}
           >
-            <X size={18} color="rgba(255,255,255,0.5)" />
+            <X size={16} />
           </button>
         </div>
-        
-        {/* Video Info */}
-        <div style={{
-          background: 'rgba(255,255,255,0.03)',
-          borderRadius: '8px',
-          padding: '1rem',
-          marginBottom: '1.5rem',
-          border: '1px solid rgba(255,255,255,0.08)'
-        }}>
-          <h4 style={{
-            fontSize: '1rem',
-            fontWeight: '600',
-            color: '#fff',
-            marginBottom: '0.25rem'
-          }}>
-            {video.title}
-          </h4>
-          {video.description && (
-            <p style={{
-              fontSize: '0.85rem',
-              color: 'rgba(255,255,255,0.4)'
-            }}>
-              {video.description}
-            </p>
-          )}
-        </div>
-        
-        {/* Explanation */}
-        <div style={{
-          background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.1) 0%, rgba(5, 150, 105, 0.05) 100%)',
-          border: '1px solid rgba(16, 185, 129, 0.2)',
-          borderRadius: '10px',
-          padding: '1rem',
-          marginBottom: '1.5rem'
-        }}>
+
+        {/* BODY */}
+        <div
+          className="edit-modal-body"
+          style={{
+            flex: 1,
+            overflowY: 'auto',
+            WebkitOverflowScrolling: 'touch'
+          }}
+        >
+          {/* ── TITEL ── */}
           <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.5rem',
-            marginBottom: '0.5rem'
+            padding: isMobile ? '0.75rem 0.875rem' : '0.875rem 1.125rem',
+            borderBottom: '1px solid rgba(255, 255, 255, 0.04)'
           }}>
-            <Globe size={16} color="#10b981" />
-            <span style={{
-              fontSize: '0.9rem',
-              fontWeight: '700',
-              color: '#10b981'
-            }}>
-              Standaard Video's
-            </span>
+            <label style={labelStyle}>Titel *</label>
+            <input
+              type="text"
+              value={formData.title}
+              onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+              style={inputStyle}
+            />
           </div>
-          <p style={{
-            fontSize: '0.85rem',
-            color: 'rgba(255,255,255,0.6)',
-            lineHeight: '1.4',
-            margin: 0
-          }}>
-            Selecteer op welke pagina's deze video automatisch zichtbaar moet zijn voor alle clients. Ideaal voor uitleg/onboarding video's.
-          </p>
-        </div>
-        
-        {/* Page Selection */}
-        <div style={{ marginBottom: '1.5rem' }}>
-          <label style={{
-            display: 'block',
-            fontSize: '0.9rem',
-            color: 'rgba(255,255,255,0.6)',
-            marginBottom: '0.75rem'
-          }}>
-            Standaard zichtbaar op:
-          </label>
-          
+
+          {/* ── YOUTUBE URL ── */}
           <div style={{
-            display: 'grid',
-            gridTemplateColumns: isMobile ? '1fr' : 'repeat(2, 1fr)',
-            gap: '0.75rem'
+            padding: isMobile ? '0.75rem 0.875rem' : '0.875rem 1.125rem',
+            borderBottom: '1px solid rgba(255, 255, 255, 0.04)'
           }}>
-            {PAGE_OPTIONS.map(page => {
-              const isSelected = defaultPages.includes(page.value)
-              const PageIcon = page.icon
-              
-              return (
-                <button
-                  key={page.value}
-                  onClick={() => togglePage(page.value)}
-                  style={{
-                    padding: '0.875rem',
-                    background: isSelected
-                      ? `linear-gradient(135deg, ${page.color}25 0%, ${page.color}10 100%)`
-                      : 'rgba(255,255,255,0.03)',
-                    border: `1px solid ${isSelected ? page.color + '60' : 'rgba(255,255,255,0.08)'}`,
-                    borderRadius: '10px',
-                    cursor: 'pointer',
-                    transition: 'all 0.3s ease',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '0.75rem',
-                    touchAction: 'manipulation',
-                    WebkitTapHighlightColor: 'transparent',
-                    minHeight: '44px'
-                  }}
-                  onMouseEnter={(e) => {
-                    if (!isMobile && !isSelected) {
-                      e.currentTarget.style.background = 'rgba(255,255,255,0.05)'
-                    }
-                  }}
-                  onMouseLeave={(e) => {
-                    if (!isMobile && !isSelected) {
-                      e.currentTarget.style.background = 'rgba(255,255,255,0.03)'
-                    }
-                  }}
-                >
-                  {/* Checkbox */}
-                  <div style={{
-                    width: '20px',
-                    height: '20px',
-                    borderRadius: '4px',
-                    background: isSelected 
-                      ? `linear-gradient(135deg, ${page.color} 0%, ${page.color}dd 100%)`
-                      : 'rgba(255,255,255,0.05)',
-                    border: `1px solid ${isSelected ? page.color : 'rgba(255,255,255,0.2)'}`,
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    transition: 'all 0.3s ease',
-                    flexShrink: 0
-                  }}>
-                    {isSelected && (
-                      <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-                        <path 
-                          d="M2 6L5 9L10 3" 
-                          stroke="white" 
-                          strokeWidth="2" 
-                          strokeLinecap="round" 
-                          strokeLinejoin="round"
-                        />
-                      </svg>
-                    )}
-                  </div>
-                  
-                  {/* Icon */}
-                  <div style={{
-                    width: '32px',
-                    height: '32px',
-                    borderRadius: '8px',
-                    background: isSelected 
-                      ? `${page.color}20`
-                      : 'rgba(255,255,255,0.05)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    transition: 'all 0.3s ease'
-                  }}>
-                    <PageIcon 
-                      size={16} 
-                      color={isSelected ? page.color : 'rgba(255,255,255,0.4)'}
-                    />
-                  </div>
-                  
-                  {/* Label */}
-                  <span style={{
-                    fontSize: '0.9rem',
-                    fontWeight: '600',
-                    color: isSelected ? page.color : 'rgba(255,255,255,0.7)',
-                    transition: 'all 0.3s ease',
-                    flex: 1,
-                    textAlign: 'left'
-                  }}>
-                    {page.label}
-                  </span>
-                </button>
-              )
-            })}
-          </div>
-          
-          {/* Selected count */}
-          {defaultPages.length > 0 && (
-            <div style={{
-              marginTop: '0.75rem',
-              padding: '0.5rem 0.75rem',
-              background: 'rgba(16, 185, 129, 0.1)',
-              border: '1px solid rgba(16, 185, 129, 0.2)',
-              borderRadius: '8px',
-              fontSize: '0.85rem',
-              color: '#10b981',
+            <label style={{
+              ...labelStyle,
               display: 'flex',
               alignItems: 'center',
-              gap: '0.5rem'
+              gap: '0.3rem'
             }}>
-              <Globe size={14} />
-              Standaard op {defaultPages.length} pagina{defaultPages.length !== 1 ? "'s" : ''}
+              <Youtube size={10} />
+              YouTube URL *
+            </label>
+            <input
+              type="url"
+              value={formData.video_url}
+              onChange={(e) => setFormData({ ...formData, video_url: e.target.value })}
+              placeholder="https://youtube.com/watch?v=... of /shorts/..."
+              style={inputStyle}
+            />
+          </div>
+
+          {/* ── BESCHRIJVING ── */}
+          <div style={{
+            padding: isMobile ? '0.75rem 0.875rem' : '0.875rem 1.125rem',
+            borderBottom: '1px solid rgba(255, 255, 255, 0.04)'
+          }}>
+            <label style={labelStyle}>Beschrijving</label>
+            <textarea
+              value={formData.description}
+              onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+              rows={3}
+              style={{
+                ...inputStyle,
+                resize: 'vertical',
+                fontFamily: 'inherit',
+                lineHeight: 1.4
+              }}
+            />
+          </div>
+
+          {/* ── CATEGORIE ── */}
+          <div style={{
+            padding: isMobile ? '0.75rem 0.875rem' : '0.875rem 1.125rem',
+            borderBottom: '1px solid rgba(255, 255, 255, 0.04)'
+          }}>
+            <label style={{
+              ...labelStyle,
+              color: customCategories.length > 0 ? GOLD : 'rgba(255, 255, 255, 0.3)'
+            }}>
+              Categorie
+              {customCategories.length === 0 && (
+                <span style={{
+                  marginLeft: '0.4rem',
+                  color: 'rgba(255, 255, 255, 0.25)',
+                  fontWeight: '600',
+                  textTransform: 'none',
+                  letterSpacing: 0
+                }}>
+                  — maak er eerst één aan
+                </span>
+              )}
+            </label>
+            <select
+              value={formData.category_id || ''}
+              onChange={(e) => setFormData({
+                ...formData,
+                category_id: e.target.value || null
+              })}
+              disabled={customCategories.length === 0}
+              style={{
+                ...inputStyle,
+                cursor: customCategories.length === 0 ? 'not-allowed' : 'pointer',
+                opacity: customCategories.length === 0 ? 0.4 : 1
+              }}
+            >
+              <option value="" style={{ background: '#0a0a0a' }}>
+                — Geen categorie —
+              </option>
+              {customCategories.map(cat => (
+                <option key={cat.id} value={cat.id} style={{ background: '#0a0a0a' }}>
+                  {cat.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* ── THUMBNAIL ── */}
+          <div style={{
+            padding: isMobile ? '0.75rem 0.875rem' : '0.875rem 1.125rem',
+            borderBottom: '1px solid rgba(255, 255, 255, 0.04)'
+          }}>
+            <label style={{
+              ...labelStyle,
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.3rem'
+            }}>
+              <Camera size={10} />
+              Thumbnail
+            </label>
+
+            {thumbnailPreview ? (
+              <div style={{
+                position: 'relative',
+                borderRadius: '8px',
+                overflow: 'hidden',
+                aspectRatio: '16 / 9',
+                background: '#000'
+              }}>
+                <img
+                  src={thumbnailPreview}
+                  alt="Thumbnail"
+                  style={{
+                    width: '100%',
+                    height: '100%',
+                    objectFit: 'cover'
+                  }}
+                />
+                <div style={{
+                  position: 'absolute',
+                  top: '0.4rem',
+                  right: '0.4rem',
+                  display: 'flex',
+                  gap: '0.3rem'
+                }}>
+                  <label
+                    htmlFor="thumbnail-replace"
+                    style={{
+                      padding: '0.35rem 0.55rem',
+                      background: 'rgba(0, 0, 0, 0.75)',
+                      border: '1px solid rgba(255, 255, 255, 0.15)',
+                      borderRadius: '6px',
+                      color: '#fff',
+                      fontSize: '0.55rem',
+                      fontWeight: '800',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.04em',
+                      cursor: 'pointer',
+                      touchAction: 'manipulation',
+                      WebkitTapHighlightColor: 'transparent'
+                    }}
+                  >
+                    Vervang
+                  </label>
+                  <button
+                    onClick={removeThumbnail}
+                    style={{
+                      width: '28px',
+                      height: '28px',
+                      background: 'rgba(239, 68, 68, 0.85)',
+                      border: '1px solid rgba(239, 68, 68, 0.4)',
+                      borderRadius: '6px',
+                      color: '#fff',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      cursor: 'pointer',
+                      touchAction: 'manipulation',
+                      WebkitTapHighlightColor: 'transparent'
+                    }}
+                  >
+                    <X size={14} />
+                  </button>
+                </div>
+                {thumbnailChanged && thumbnailFile && (
+                  <div style={{
+                    position: 'absolute',
+                    bottom: '0.4rem',
+                    left: '0.4rem',
+                    padding: '0.2rem 0.45rem',
+                    background: GOLD,
+                    borderRadius: '4px',
+                    fontSize: '0.55rem',
+                    fontWeight: '800',
+                    color: '#000',
+                    letterSpacing: '0.05em',
+                    textTransform: 'uppercase',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.2rem'
+                  }}>
+                    <Check size={10} strokeWidth={3} />
+                    Nieuwe afbeelding
+                  </div>
+                )}
+              </div>
+            ) : (
+              <label
+                htmlFor="thumbnail-replace"
+                style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '0.4rem',
+                  padding: '1.25rem',
+                  background: '#000',
+                  border: '1px dashed rgba(255, 255, 255, 0.12)',
+                  borderRadius: '8px',
+                  cursor: 'pointer',
+                  touchAction: 'manipulation',
+                  WebkitTapHighlightColor: 'transparent',
+                  minHeight: '88px'
+                }}
+              >
+                <ImageIcon size={22} color="rgba(255, 255, 255, 0.2)" />
+                <div style={{
+                  fontSize: '0.7rem',
+                  fontWeight: '700',
+                  color: 'rgba(255, 255, 255, 0.5)',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.04em'
+                }}>
+                  Kies afbeelding
+                </div>
+                <div style={{
+                  fontSize: '0.6rem',
+                  color: 'rgba(255, 255, 255, 0.25)'
+                }}>
+                  JPG of PNG — max 5MB
+                </div>
+              </label>
+            )}
+
+            <input
+              id="thumbnail-replace"
+              type="file"
+              accept="image/jpeg,image/png,image/jpg"
+              onChange={handleThumbnailChange}
+              style={{ display: 'none' }}
+            />
+          </div>
+
+          {/* ── STANDAARD PAGINA'S ── */}
+          <div style={{
+            padding: isMobile ? '0.75rem 0.875rem' : '0.875rem 1.125rem',
+            borderBottom: '1px solid rgba(255, 255, 255, 0.04)'
+          }}>
+            <label style={{
+              ...labelStyle,
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.3rem'
+            }}>
+              <Globe size={10} />
+              Standaard zichtbaar op
+              {formData.default_pages.length > 0 && (
+                <span style={{
+                  marginLeft: '0.3rem',
+                  padding: '0.1rem 0.35rem',
+                  background: GOLD,
+                  color: '#000',
+                  borderRadius: '3px',
+                  fontSize: '0.5rem',
+                  fontWeight: '800',
+                  letterSpacing: 0
+                }}>
+                  {formData.default_pages.length}
+                </span>
+              )}
+            </label>
+            <div style={{
+              fontSize: '0.65rem',
+              color: 'rgba(255, 255, 255, 0.4)',
+              lineHeight: 1.4,
+              marginBottom: '0.5rem'
+            }}>
+              Video automatisch zichtbaar bij alle clients op deze pagina's.
             </div>
-          )}
+
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: isMobile ? '1fr 1fr' : 'repeat(3, 1fr)',
+              gap: '0.3rem'
+            }}>
+              {PAGE_OPTIONS.map(page => {
+                const Icon = page.icon
+                const isSelected = formData.default_pages.includes(page.value)
+                return (
+                  <button
+                    key={page.value}
+                    onClick={() => togglePage(page.value)}
+                    style={{
+                      padding: '0.55rem 0.4rem',
+                      background: isSelected ? GOLD : 'transparent',
+                      border: isSelected
+                        ? `1px solid ${GOLD}`
+                        : '1px solid rgba(255, 255, 255, 0.08)',
+                      borderRadius: '6px',
+                      color: isSelected ? '#000' : 'rgba(255, 255, 255, 0.5)',
+                      fontSize: '0.65rem',
+                      fontWeight: '800',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '0.3rem',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.03em',
+                      touchAction: 'manipulation',
+                      WebkitTapHighlightColor: 'transparent',
+                      minHeight: '40px',
+                      transition: 'all 0.15s ease'
+                    }}
+                  >
+                    <Icon size={12} />
+                    {page.label}
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+
+          <div style={{ height: '0.5rem' }} />
         </div>
-        
-        {/* Buttons */}
+
+        {/* ── ACTIONS ── */}
         <div style={{
           display: 'flex',
-          gap: '1rem'
+          gap: '0.4rem',
+          padding: isMobile ? '0.625rem 0.875rem' : '0.75rem 1.125rem',
+          borderTop: '1px solid rgba(255, 255, 255, 0.06)',
+          flexShrink: 0,
+          background: '#0a0a0a'
         }}>
           <button
             onClick={onClose}
             disabled={saving}
             style={{
               flex: 1,
-              padding: '0.75rem',
-              background: 'rgba(255,255,255,0.03)',
-              border: '1px solid rgba(255,255,255,0.08)',
-              borderRadius: '8px',
-              color: 'rgba(255,255,255,0.6)',
-              fontSize: '0.95rem',
-              fontWeight: '600',
+              padding: '0.625rem',
+              background: 'transparent',
+              border: '1px solid rgba(255, 255, 255, 0.08)',
+              borderRadius: '6px',
+              color: 'rgba(255, 255, 255, 0.5)',
+              fontSize: '0.7rem',
+              fontWeight: '700',
               cursor: saving ? 'not-allowed' : 'pointer',
-              transition: 'all 0.3s ease',
-              opacity: saving ? 0.5 : 1,
-              minHeight: '44px'
+              touchAction: 'manipulation',
+              WebkitTapHighlightColor: 'transparent',
+              minHeight: '42px',
+              textTransform: 'uppercase',
+              letterSpacing: '0.04em'
             }}
           >
-            Annuleren
+            Annuleer
           </button>
           <button
             onClick={handleSave}
-            disabled={saving}
+            disabled={saving || !formData.title.trim() || !formData.video_url.trim()}
             style={{
-              flex: 1,
-              padding: '0.75rem',
-              background: saving
-                ? 'rgba(255,255,255,0.03)'
-                : 'linear-gradient(135deg, rgba(16, 185, 129, 0.9) 0%, rgba(5, 150, 105, 0.9) 100%)',
+              flex: 2,
+              padding: '0.625rem',
+              background: saving || !formData.title.trim() || !formData.video_url.trim()
+                ? 'rgba(255, 215, 0, 0.2)'
+                : GOLD,
               border: 'none',
-              borderRadius: '8px',
-              color: saving ? 'rgba(255,255,255,0.4)' : '#fff',
-              fontSize: '0.95rem',
-              fontWeight: '600',
-              cursor: saving ? 'not-allowed' : 'pointer',
-              opacity: saving ? 0.5 : 0.95,
-              transition: 'all 0.3s ease',
+              borderRadius: '6px',
+              color: saving || !formData.title.trim() || !formData.video_url.trim()
+                ? 'rgba(0, 0, 0, 0.4)'
+                : '#000',
+              fontSize: '0.7rem',
+              fontWeight: '800',
+              cursor: saving || !formData.title.trim() || !formData.video_url.trim()
+                ? 'not-allowed'
+                : 'pointer',
+              touchAction: 'manipulation',
+              WebkitTapHighlightColor: 'transparent',
+              minHeight: '42px',
+              textTransform: 'uppercase',
+              letterSpacing: '0.04em',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              gap: '0.5rem',
-              minHeight: '44px'
+              gap: '0.4rem'
             }}
           >
             {saving ? (
               <>
                 <div style={{
-                  width: '16px',
-                  height: '16px',
-                  border: '2px solid rgba(255,255,255,0.3)',
-                  borderTopColor: '#fff',
+                  width: '12px',
+                  height: '12px',
+                  border: '2px solid rgba(0, 0, 0, 0.3)',
+                  borderTopColor: '#000',
                   borderRadius: '50%',
-                  animation: 'spin 1s linear infinite'
+                  animation: 'vm-spin 0.8s linear infinite'
                 }} />
                 Opslaan...
               </>
             ) : (
-              'Opslaan'
+              <>
+                <Edit size={13} />
+                Opslaan
+              </>
             )}
           </button>
         </div>
       </div>
-      
+
       <style>{`
-        @keyframes spin {
-          to { transform: rotate(360deg); }
-        }
+        .edit-modal-body::-webkit-scrollbar { display: none; }
+        @keyframes vm-spin { to { transform: rotate(360deg); } }
       `}</style>
-    </div>
+    </div>,
+    document.body
   )
 }

@@ -1,497 +1,560 @@
+// ========================================
 // src/pages/CheckoutPage.jsx
-import { useState } from 'react';
-import { loadStripe } from '@stripe/stripe-js';
+// TRANSFORMATIE TRAJECT — CHECKOUT PAGE
+// Dark/gold theme · €300 eenmalig
+// ========================================
+import { useState, useEffect, useRef } from 'react'
+import { loadStripe } from '@stripe/stripe-js'
 
 // Initialize Stripe met LIVE key
-const stripePromise = loadStripe('pk_live_51Px383J3V4uXn1OktbtpW48KdDUq1ELqW9nfG19weDGHZ4qDOw8wE7jxEbNkA22T18lLJX9PFG755iWZWeAOYpd300oec67m54');
+const stripePromise = loadStripe('pk_live_51Px383J3V4uXn1OktbtpW48KdDUq1ELqW9nfG19weDGHZ4qDOw8wE7jxEbNkA22T18lLJX9PFG755iWZWeAOYpd300oec67m54')
 
-function CheckoutPage() {
-  const [loading, setLoading] = useState(false);
-  const [selectedPlan, setSelectedPlan] = useState('standard');
-  const [email, setEmail] = useState('');
-  const [name, setName] = useState('');
-  const [phone, setPhone] = useState('');
-  const [error, setError] = useState('');
-  const isMobile = window.innerWidth <= 768;
+const GOLD = '#ffba09'
+const GOLD_DARK = '#e8a800'
 
-  // Pricing plans
-  const plans = {
-    trial: {
-      name: 'Trial',
-      price: 49,
-      features: [
-        '2 weken begeleiding',
-        'Basis meal plan',
-        'Email support',
-        'Workout schema'
-      ],
-      color: '#6b7280',
-      gradient: 'linear-gradient(135deg, #6b7280 0%, #4b5563 100%)'
-    },
-    standard: {
-      name: 'Standard',
-      price: 299,
-      popular: true,
-      features: [
-        '12 weken transformatie',
-        'Gepersonaliseerd meal plan',
-        'Wekelijkse check-ins',
-        'WhatsApp support',
-        'Custom workouts',
-        'Progress tracking'
-      ],
-      color: '#10b981',
-      gradient: 'linear-gradient(135deg, #10b981 0%, #059669 100%)'
-    },
-    premium: {
-      name: 'Premium',
-      price: 599,
-      features: [
-        '24 weken complete transformatie',
-        'AI-powered meal planning',
-        'Dagelijkse coaching',
-        '24/7 WhatsApp support',
-        'Video check-ins',
-        'Supplement advies',
-        'Shopping lists',
-        'Geld-terug garantie*'
-      ],
-      color: '#8b5cf6',
-      gradient: 'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)'
+const REVIEWS = [
+  { name: 'Hessel', date: 'dec 2025', text: 'Kersten begreep het meteen! Na een uitgebreide 0-meting kreeg ik een plan op maat. Van 79,8 naar 74,4 in 8 weken. Als jij je aan het plan houdt geeft Kersten altijd de volle 100%!' },
+  { name: 'Me', date: 'dec 2025', text: 'Als je hulp nodig hebt met sporten raad ik Myarc echt aan. Je krijgt een goed schema om je doel te halen en je hebt wekelijkse calls.' },
+  { name: 'Indi', date: 'dec 2025', text: 'Myarc is super! Kersten helpt me iedere week met mijn maaltijden. Professioneel, persoonlijk, betrouwbaar. Ik kan Myarc aan iedereen aanraden!' },
+  { name: 'Toon', date: 'nov 2025', text: 'Super Coach, leuke gesprekken en altijd enthousiast. Heeft me goed geholpen in mijn traject. Zeker een aanrader!' },
+  { name: 'Sassus', date: 'nov 2025', text: 'Na 100 mislukte pogingen is het mij met Kersten gelukt een routine te creëren die ik kan continueren. Hij laat je jezelf verbazen over wat je kan bereiken.' },
+  { name: 'Consumer', date: 'nov 2025', text: 'Zeer professionele aanpak! Alles duidelijk en gestructureerd in een overzichtelijke app. Feedback en motivatie op de juiste momenten. Absolute aanrader!' },
+  { name: 'Client', date: 'mrt 2026', text: 'Kersten heeft mij uitstekend geholpen met het process van 8 weken, ben hierin goed aangekomen en heb discipline om consistent te blijven gymmen.' }
+]
+
+const PILLARS = [
+  {
+    icon: (
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={GOLD} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M3 2v7c0 1.1.9 2 2 2h4a2 2 0 0 0 2-2V2"/><path d="M7 2v20"/><path d="M21 15V2v0a5 5 0 0 0-5 5v6c0 1.1.9 2 2 2h3Zm0 0v7"/>
+      </svg>
+    ),
+    text: 'Maaltijd systeem dat bij jou en je doelen past'
+  },
+  {
+    icon: (
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={GOLD} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="m6.5 6.5 11 11"/><path d="m21 21-1-1"/><path d="m3 3 1 1"/><path d="m18 22 4-4"/><path d="m2 6 4-4"/><path d="m3 10 7-7"/><path d="m14 21 7-7"/>
+      </svg>
+    ),
+    text: 'Persoonlijk trainingsplan voor optimaal resultaat'
+  },
+  {
+    icon: (
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={GOLD} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/>
+      </svg>
+    ),
+    text: 'Coaching calls & 24/7 Support'
+  },
+  {
+    icon: (
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={GOLD} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <line x1="12" x2="12" y1="20" y2="10"/><line x1="18" x2="18" y1="20" y2="4"/><line x1="6" x2="6" y1="20" y2="16"/>
+      </svg>
+    ),
+    text: 'Progressie tracking'
+  },
+  {
+    icon: (
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={GOLD} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/>
+      </svg>
+    ),
+    text: 'Herstel & Energie verbetering'
+  }
+]
+
+export default function CheckoutPage() {
+  const [name, setName] = useState('')
+  const [email, setEmail] = useState('')
+  const [phone, setPhone] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
+  const isMobile = window.innerWidth <= 768
+  const scrollRef = useRef(null)
+  const formRef = useRef(null)
+
+  // Auto-scroll reviews
+  useEffect(() => {
+    const el = scrollRef.current
+    if (!el) return
+    let animId, pos = 0
+    const speed = 0.4
+    const scroll = () => {
+      pos += speed
+      if (pos >= el.scrollWidth / 2) pos = 0
+      el.scrollLeft = pos
+      animId = requestAnimationFrame(scroll)
     }
-  };
+    const pause = () => cancelAnimationFrame(animId)
+    const resume = () => { animId = requestAnimationFrame(scroll) }
+    animId = requestAnimationFrame(scroll)
+    el.addEventListener('mouseenter', pause)
+    el.addEventListener('mouseleave', resume)
+    el.addEventListener('touchstart', pause, { passive: true })
+    el.addEventListener('touchend', resume)
+    return () => {
+      cancelAnimationFrame(animId)
+      el.removeEventListener('mouseenter', pause)
+      el.removeEventListener('mouseleave', resume)
+      el.removeEventListener('touchstart', pause)
+      el.removeEventListener('touchend', resume)
+    }
+  }, [])
 
   const handleCheckout = async () => {
-    setLoading(true);
-    setError('');
+    if (!name || !email) {
+      setError('Vul je naam en e-mail in')
+      return
+    }
+    setLoading(true)
+    setError('')
 
     try {
-      // Validate form
-      if (!email || !name) {
-        setError('Vul alle verplichte velden in');
-        setLoading(false);
-        return;
-      }
-
-      // Call API om checkout session te maken
       const response = await fetch('/api/create-checkout-session', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          plan: selectedPlan,
-          price: plans[selectedPlan].price,
+          plan: 'transformatie-traject',
+          price: 300,
           email: email.trim(),
           name: name.trim(),
           phone: phone.trim()
         })
-      });
+      })
 
-      const data = await response.json();
+      const data = await response.json()
 
       if (!response.ok) {
-        throw new Error(data.error || 'Er ging iets mis');
+        throw new Error(data.error || 'Er ging iets mis')
       }
 
       if (data.sessionId) {
-        // Redirect naar Stripe Checkout
-        const stripe = await stripePromise;
-        const { error: stripeError } = await stripe.redirectToCheckout({ 
-          sessionId: data.sessionId 
-        });
-
+        const stripe = await stripePromise
+        const { error: stripeError } = await stripe.redirectToCheckout({
+          sessionId: data.sessionId
+        })
         if (stripeError) {
-          throw new Error(stripeError.message);
+          throw new Error(stripeError.message)
         }
       } else {
-        throw new Error('Geen sessie ID ontvangen');
+        throw new Error('Geen sessie ID ontvangen')
       }
     } catch (err) {
-      console.error('Checkout error:', err);
-      setError(err.message || 'Verbindingsfout. Probeer opnieuw.');
-      setLoading(false);
+      console.error('Checkout error:', err)
+      setError(err.message || 'Er ging iets mis. Probeer opnieuw.')
+    } finally {
+      setLoading(false)
     }
-  };
+  }
+
+  const doubledReviews = [...REVIEWS, ...REVIEWS]
 
   return (
     <div style={{
       minHeight: '100vh',
-      background: 'linear-gradient(180deg, #0a0a0a 0%, #171717 100%)',
-      padding: isMobile ? '1rem' : '2rem',
-      paddingBottom: '4rem'
+      background: '#000',
+      color: '#fff',
+      fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
     }}>
-      {/* Header */}
       <div style={{
-        textAlign: 'center',
-        marginBottom: isMobile ? '2rem' : '3rem'
-      }}>
-        <h1 style={{
-          fontSize: isMobile ? '2rem' : '3rem',
-          fontWeight: '900',
-          background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-          WebkitBackgroundClip: 'text',
-          WebkitTextFillColor: 'transparent',
-          backgroundClip: 'text',
-          marginBottom: '0.5rem'
-        }}>
-          Start Jouw Transformatie
-        </h1>
-        <p style={{
-          fontSize: isMobile ? '1rem' : '1.25rem',
-          color: 'rgba(255, 255, 255, 0.7)'
-        }}>
-          Kies het plan dat bij jouw doelen past
-        </p>
-      </div>
-
-      {/* Error message */}
-      {error && (
-        <div style={{
-          maxWidth: '500px',
-          margin: '0 auto 2rem',
-          padding: '1rem',
-          background: 'rgba(239, 68, 68, 0.1)',
-          border: '1px solid rgba(239, 68, 68, 0.3)',
-          borderRadius: '10px',
-          color: '#ef4444',
-          fontSize: '0.9rem',
-          textAlign: 'center'
-        }}>
-          {error}
-        </div>
-      )}
-
-      {/* Pricing Cards */}
-      <div style={{
-        display: 'grid',
-        gridTemplateColumns: isMobile ? '1fr' : 'repeat(3, 1fr)',
-        gap: isMobile ? '1rem' : '1.5rem',
-        maxWidth: '1200px',
+        maxWidth: '520px',
         margin: '0 auto',
-        marginBottom: '3rem'
+        padding: isMobile ? '2rem 1.25rem 3rem' : '3rem 2rem 4rem'
       }}>
-        {Object.entries(plans).map(([key, plan]) => (
-          <div
-            key={key}
-            onClick={() => setSelectedPlan(key)}
-            style={{
-              background: selectedPlan === key 
-                ? `linear-gradient(135deg, ${plan.color}22 0%, ${plan.color}11 100%)`
-                : 'rgba(17, 17, 17, 0.8)',
-              backdropFilter: 'blur(10px)',
-              border: selectedPlan === key 
-                ? `2px solid ${plan.color}`
-                : '1px solid rgba(255, 255, 255, 0.1)',
-              borderRadius: '20px',
-              padding: isMobile ? '1.5rem' : '2rem',
-              cursor: 'pointer',
-              position: 'relative',
-              transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-              transform: selectedPlan === key ? 'scale(1.02)' : 'scale(1)',
-              boxShadow: selectedPlan === key 
-                ? `0 20px 40px ${plan.color}33`
-                : '0 10px 30px rgba(0, 0, 0, 0.3)',
-              touchAction: 'manipulation',
-              WebkitTapHighlightColor: 'transparent'
-            }}
-          >
-            {/* Popular badge */}
-            {plan.popular && (
-              <div style={{
-                position: 'absolute',
-                top: '-12px',
-                left: '50%',
-                transform: 'translateX(-50%)',
-                background: plan.gradient,
-                padding: '0.25rem 1rem',
-                borderRadius: '20px',
-                fontSize: '0.75rem',
-                fontWeight: '700',
-                color: '#fff',
-                textTransform: 'uppercase',
-                letterSpacing: '0.05em'
-              }}>
-                Meest Gekozen
-              </div>
-            )}
 
-            {/* Plan name */}
-            <h3 style={{
-              fontSize: isMobile ? '1.25rem' : '1.5rem',
-              fontWeight: '700',
-              color: plan.color,
-              marginBottom: '0.5rem'
-            }}>
-              {plan.name}
-            </h3>
+        {/* ══════ HEADER ══════ */}
+        <div style={{ textAlign: 'center', marginBottom: isMobile ? '2rem' : '2.5rem' }}>
+          <div style={{
+            fontSize: isMobile ? '0.6rem' : '0.65rem',
+            fontWeight: '800',
+            color: 'rgba(255,186,9,0.5)',
+            letterSpacing: '0.15em',
+            textTransform: 'uppercase',
+            marginBottom: '0.5rem'
+          }}>MY ARC FITNESS</div>
+          <h1 style={{
+            fontSize: isMobile ? '1.75rem' : '2.5rem',
+            fontWeight: '900',
+            lineHeight: 1.1,
+            letterSpacing: '-0.02em',
+            marginBottom: '0.5rem',
+            margin: 0
+          }}>
+            <span style={{
+              background: `linear-gradient(135deg, ${GOLD}, ${GOLD_DARK})`,
+              WebkitBackgroundClip: 'text',
+              WebkitTextFillColor: 'transparent'
+            }}>Transformatie Traject</span>
+          </h1>
+          <p style={{
+            fontSize: isMobile ? '0.85rem' : '0.95rem',
+            color: 'rgba(255,255,255,0.4)',
+            fontWeight: '500',
+            marginTop: '0.5rem'
+          }}>
+            Jouw route naar resultaat. Persoonlijk, bewezen, compleet.
+          </p>
+        </div>
 
-            {/* Price */}
+        {/* ══════ PRICING CARD ══════ */}
+        <div style={{
+          borderRadius: isMobile ? '18px' : '22px',
+          border: '1px solid rgba(255,186,9,0.3)',
+          background: 'rgba(255,255,255,0.02)',
+          overflow: 'hidden',
+          position: 'relative',
+          marginBottom: isMobile ? '1.5rem' : '2rem'
+        }}>
+          {/* Gold top accent */}
+          <div style={{
+            position: 'absolute', top: 0, left: 0, right: 0, height: '3px',
+            background: `linear-gradient(90deg, ${GOLD}, ${GOLD_DARK}, ${GOLD})`
+          }} />
+
+          {/* What you get */}
+          <div style={{ padding: isMobile ? '1.75rem 1.5rem 1.25rem' : '2rem 2rem 1.5rem' }}>
+            <span style={{
+              fontSize: isMobile ? '0.6rem' : '0.65rem',
+              fontWeight: '800', color: 'rgba(255,186,9,0.5)',
+              letterSpacing: '0.12em', textTransform: 'uppercase',
+              display: 'block', marginBottom: isMobile ? '0.85rem' : '1rem'
+            }}>WAT JE KRIJGT</span>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: isMobile ? '0.55rem' : '0.65rem' }}>
+              {PILLARS.map((item, idx) => (
+                <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                  <div style={{
+                    width: isMobile ? '26px' : '30px', height: isMobile ? '26px' : '30px',
+                    borderRadius: '50%', background: 'rgba(255,186,9,0.08)',
+                    border: '1px solid rgba(255,186,9,0.2)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0
+                  }}>
+                    {item.icon}
+                  </div>
+                  <span style={{ fontSize: isMobile ? '0.82rem' : '0.88rem', color: 'rgba(255,255,255,0.65)', fontWeight: '500' }}>
+                    {item.text}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Divider */}
+          <div style={{ height: '1px', background: `linear-gradient(90deg, transparent, rgba(255,186,9,0.15), transparent)`, margin: '0 1.5rem' }} />
+
+          {/* Guarantees */}
+          <div style={{
+            padding: isMobile ? '1rem 1.5rem 0' : '1.15rem 2rem 0',
+            display: 'flex', gap: isMobile ? '0.75rem' : '1rem'
+          }}>
             <div style={{
-              fontSize: isMobile ? '2rem' : '2.5rem',
-              fontWeight: '800',
-              color: '#fff',
-              marginBottom: '1.5rem'
+              flex: 1, display: 'flex', alignItems: 'center', gap: '0.45rem',
+              padding: isMobile ? '0.55rem 0.65rem' : '0.6rem 0.75rem',
+              borderRadius: '10px', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)'
             }}>
-              €{plan.price}
-              <span style={{
-                fontSize: '0.875rem',
-                color: 'rgba(255, 255, 255, 0.5)',
-                marginLeft: '0.5rem'
-              }}>
-                eenmalig
+              <span style={{ flexShrink: 0 }}>
+                <svg xmlns="http://www.w3.org/2000/svg" width={isMobile ? 16 : 18} height={isMobile ? 16 : 18} viewBox="0 0 24 24" fill="none" stroke={GOLD} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/><path d="m9 12 2 2 4-4"/></svg>
               </span>
+              <div>
+                <div style={{ fontSize: isMobile ? '0.65rem' : '0.7rem', fontWeight: '800', color: 'rgba(255,255,255,0.6)' }}>Geen Resultaat? Geld Terug.</div>
+                <div style={{ fontSize: isMobile ? '0.55rem' : '0.58rem', color: 'rgba(255,255,255,0.25)', fontWeight: '500' }}>Volg het plan — geen resultaat? Je krijgt je geld terug.</div>
+              </div>
+            </div>
+            <div style={{
+              flex: 1, display: 'flex', alignItems: 'center', gap: '0.45rem',
+              padding: isMobile ? '0.55rem 0.65rem' : '0.6rem 0.75rem',
+              borderRadius: '10px', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)'
+            }}>
+              <span style={{ flexShrink: 0 }}>
+                <svg xmlns="http://www.w3.org/2000/svg" width={isMobile ? 16 : 18} height={isMobile ? 16 : 18} viewBox="0 0 24 24" fill="none" stroke={GOLD} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+              </span>
+              <div>
+                <div style={{ fontSize: isMobile ? '0.65rem' : '0.7rem', fontWeight: '800', color: 'rgba(255,255,255,0.6)' }}>28 Dagen Risicovrij</div>
+                <div style={{ fontSize: isMobile ? '0.55rem' : '0.58rem', color: 'rgba(255,255,255,0.25)', fontWeight: '500' }}>Niet tevreden? Je krijgt je geld terug.</div>
+              </div>
+            </div>
+          </div>
+
+          {/* Price display */}
+          <div style={{
+            padding: isMobile ? '1.25rem 1.5rem 1.5rem' : '1.5rem 2rem 1.75rem',
+            textAlign: 'center'
+          }}>
+            <div style={{
+              display: 'flex', alignItems: 'baseline', justifyContent: 'center', gap: '0.2rem'
+            }}>
+              <span style={{
+                fontSize: isMobile ? '2.5rem' : '3rem',
+                fontWeight: '900', color: '#fff', lineHeight: 1
+              }}>€300</span>
+              <span style={{
+                fontSize: isMobile ? '0.9rem' : '1rem',
+                color: 'rgba(255,255,255,0.3)', fontWeight: '600'
+              }}>eenmalig</span>
+            </div>
+            <div style={{
+              fontSize: isMobile ? '0.75rem' : '0.8rem',
+              color: GOLD, fontWeight: '700', marginTop: '0.3rem'
+            }}>
+              Persoonlijke coaching & complete begeleiding
             </div>
 
-            {/* Features */}
-            <ul style={{
-              listStyle: 'none',
-              padding: 0,
-              margin: 0
-            }}>
-              {plan.features.map((feature, idx) => (
-                <li key={idx} style={{
-                  display: 'flex',
-                  alignItems: 'flex-start',
-                  gap: '0.5rem',
-                  marginBottom: '0.75rem',
-                  fontSize: isMobile ? '0.875rem' : '0.95rem',
-                  color: 'rgba(255, 255, 255, 0.8)'
-                }}>
-                  <span style={{
-                    color: plan.color,
-                    fontSize: '1.25rem',
-                    lineHeight: '1'
-                  }}>✓</span>
-                  {feature}
-                </li>
-              ))}
-            </ul>
-
-            {/* Selected indicator */}
-            {selectedPlan === key && (
-              <div style={{
-                position: 'absolute',
-                top: '1rem',
-                right: '1rem',
-                width: '24px',
-                height: '24px',
-                borderRadius: '50%',
-                background: plan.gradient,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: '#fff',
-                fontSize: '14px',
-                fontWeight: 'bold'
-              }}>
-                ✓
-              </div>
-            )}
+            {/* Start Nu scroll button */}
+            <button
+              onClick={() => formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })}
+              style={{
+                width: '100%',
+                padding: isMobile ? '0.85rem' : '0.95rem',
+                borderRadius: '12px',
+                border: 'none',
+                background: `linear-gradient(135deg, ${GOLD}, ${GOLD_DARK})`,
+                color: '#000',
+                fontSize: isMobile ? '0.85rem' : '0.9rem',
+                fontWeight: '900',
+                cursor: 'pointer',
+                transition: 'all 0.2s ease',
+                marginTop: '1rem',
+                minHeight: '48px',
+                boxShadow: `0 4px 20px rgba(255,186,9,0.3)`,
+                touchAction: 'manipulation',
+                WebkitTapHighlightColor: 'transparent',
+                transform: 'translateZ(0)'
+              }}
+            >
+              Start Nu
+            </button>
           </div>
-        ))}
-      </div>
+        </div>
 
-      {/* Checkout Form */}
-      <div style={{
-        maxWidth: '500px',
-        margin: '0 auto',
-        background: 'rgba(17, 17, 17, 0.8)',
-        backdropFilter: 'blur(10px)',
-        borderRadius: '20px',
-        padding: isMobile ? '1.5rem' : '2rem',
-        border: '1px solid rgba(255, 255, 255, 0.1)'
-      }}>
-        <h3 style={{
-          fontSize: isMobile ? '1.25rem' : '1.5rem',
-          fontWeight: '700',
-          color: '#fff',
-          marginBottom: '1.5rem',
-          textAlign: 'center'
+        {/* ══════ REVIEW SLIDER ══════ */}
+        <div style={{ marginBottom: isMobile ? '1.5rem' : '2rem' }}>
+          <div style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            gap: '0.5rem', marginBottom: isMobile ? '0.85rem' : '1rem'
+          }}>
+            <div style={{ display: 'flex', gap: '2px' }}>
+              {[1,2,3,4,5].map(i => (
+                <svg key={i} width={isMobile ? 14 : 16} height={isMobile ? 14 : 16} viewBox="0 0 24 24">
+                  <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" fill={GOLD} stroke="none"/>
+                </svg>
+              ))}
+            </div>
+            <span style={{
+              fontSize: isMobile ? '0.7rem' : '0.75rem',
+              color: 'rgba(255,255,255,0.35)', fontWeight: '600'
+            }}>Beoordeeld op Trustpilot</span>
+          </div>
+
+          <div
+            ref={scrollRef}
+            style={{
+              display: 'flex', gap: isMobile ? '0.75rem' : '1rem',
+              overflow: 'hidden', cursor: 'grab',
+              marginLeft: isMobile ? '-1.25rem' : '-2rem',
+              marginRight: isMobile ? '-1.25rem' : '-2rem',
+              paddingLeft: isMobile ? '1.25rem' : '2rem',
+              paddingRight: isMobile ? '1.25rem' : '2rem'
+            }}
+          >
+            {doubledReviews.map((review, idx) => (
+              <div key={idx} style={{
+                minWidth: isMobile ? '240px' : '280px',
+                maxWidth: isMobile ? '240px' : '280px',
+                padding: isMobile ? '0.85rem 1rem' : '1rem 1.15rem',
+                borderRadius: '12px',
+                border: '1px solid rgba(255,255,255,0.06)',
+                background: 'rgba(255,255,255,0.02)',
+                flexShrink: 0
+              }}>
+                <div style={{ display: 'flex', gap: '2px', marginBottom: '0.5rem' }}>
+                  {[1,2,3,4,5].map(s => (
+                    <svg key={s} width="11" height="11" viewBox="0 0 24 24">
+                      <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" fill={GOLD} stroke="none"/>
+                    </svg>
+                  ))}
+                </div>
+                <p style={{
+                  fontSize: isMobile ? '0.7rem' : '0.75rem',
+                  color: 'rgba(255,255,255,0.45)', fontWeight: '500',
+                  lineHeight: 1.5,
+                  display: '-webkit-box', WebkitLineClamp: 3,
+                  WebkitBoxOrient: 'vertical', overflow: 'hidden',
+                  margin: '0 0 0.6rem 0'
+                }}>{review.text}</p>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                    <div style={{
+                      width: '24px', height: '24px', borderRadius: '50%',
+                      background: 'rgba(255,186,9,0.1)', border: '1px solid rgba(255,186,9,0.2)',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      fontSize: '0.6rem', fontWeight: '800', color: GOLD
+                    }}>{review.name.charAt(0)}</div>
+                    <span style={{ fontSize: isMobile ? '0.65rem' : '0.7rem', fontWeight: '700', color: 'rgba(255,255,255,0.5)' }}>
+                      {review.name}
+                    </span>
+                  </div>
+                  <span style={{ fontSize: '0.55rem', color: 'rgba(255,255,255,0.2)' }}>{review.date}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* ══════ CHECKOUT FORM ══════ */}
+        <div ref={formRef} style={{
+          borderRadius: isMobile ? '16px' : '18px',
+          border: '1px solid rgba(255,255,255,0.08)',
+          background: 'rgba(255,255,255,0.02)',
+          padding: isMobile ? '1.5rem 1.25rem' : '1.75rem 1.5rem',
+          marginBottom: isMobile ? '1.5rem' : '2rem'
         }}>
-          Jouw Gegevens
-        </h3>
+          <div style={{
+            fontSize: isMobile ? '0.85rem' : '0.9rem',
+            fontWeight: '800', color: '#fff',
+            marginBottom: '1rem'
+          }}>Jouw gegevens</div>
 
-        {/* Name field */}
-        <div style={{ marginBottom: '1rem' }}>
-          <label style={{
-            display: 'block',
-            marginBottom: '0.5rem',
-            fontSize: '0.875rem',
-            color: 'rgba(255, 255, 255, 0.7)',
-            textTransform: 'uppercase',
-            letterSpacing: '0.05em'
-          }}>
-            Naam *
-          </label>
-          <input
-            type="text"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            placeholder="John Doe"
-            required
-            style={{
-              width: '100%',
-              padding: '0.75rem',
-              background: 'rgba(0, 0, 0, 0.5)',
-              border: '1px solid rgba(255, 255, 255, 0.2)',
-              borderRadius: '10px',
-              color: '#fff',
-              fontSize: '1rem',
-              outline: 'none',
-              transition: 'all 0.3s ease',
-              WebkitAppearance: 'none',
-              MozAppearance: 'none',
-              appearance: 'none'
-            }}
-            onFocus={(e) => {
-              e.target.style.borderColor = '#10b981';
-              e.target.style.boxShadow = '0 0 0 3px rgba(16, 185, 129, 0.1)';
-            }}
-            onBlur={(e) => {
-              e.target.style.borderColor = 'rgba(255, 255, 255, 0.2)';
-              e.target.style.boxShadow = 'none';
-            }}
-          />
-        </div>
-
-        {/* Email field */}
-        <div style={{ marginBottom: '1rem' }}>
-          <label style={{
-            display: 'block',
-            marginBottom: '0.5rem',
-            fontSize: '0.875rem',
-            color: 'rgba(255, 255, 255, 0.7)',
-            textTransform: 'uppercase',
-            letterSpacing: '0.05em'
-          }}>
-            Email *
-          </label>
-          <input
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            placeholder="john@example.com"
-            required
-            style={{
-              width: '100%',
-              padding: '0.75rem',
-              background: 'rgba(0, 0, 0, 0.5)',
-              border: '1px solid rgba(255, 255, 255, 0.2)',
-              borderRadius: '10px',
-              color: '#fff',
-              fontSize: '1rem',
-              outline: 'none',
-              transition: 'all 0.3s ease',
-              WebkitAppearance: 'none',
-              MozAppearance: 'none',
-              appearance: 'none'
-            }}
-            onFocus={(e) => {
-              e.target.style.borderColor = '#10b981';
-              e.target.style.boxShadow = '0 0 0 3px rgba(16, 185, 129, 0.1)';
-            }}
-            onBlur={(e) => {
-              e.target.style.borderColor = 'rgba(255, 255, 255, 0.2)';
-              e.target.style.boxShadow = 'none';
-            }}
-          />
-        </div>
-
-        {/* Phone field */}
-        <div style={{ marginBottom: '2rem' }}>
-          <label style={{
-            display: 'block',
-            marginBottom: '0.5rem',
-            fontSize: '0.875rem',
-            color: 'rgba(255, 255, 255, 0.7)',
-            textTransform: 'uppercase',
-            letterSpacing: '0.05em'
-          }}>
-            Telefoon (optioneel)
-          </label>
-          <input
-            type="tel"
-            value={phone}
-            onChange={(e) => setPhone(e.target.value)}
-            placeholder="+31 6 12345678"
-            style={{
-              width: '100%',
-              padding: '0.75rem',
-              background: 'rgba(0, 0, 0, 0.5)',
-              border: '1px solid rgba(255, 255, 255, 0.2)',
-              borderRadius: '10px',
-              color: '#fff',
-              fontSize: '1rem',
-              outline: 'none',
-              transition: 'all 0.3s ease',
-              WebkitAppearance: 'none',
-              MozAppearance: 'none',
-              appearance: 'none'
-            }}
-            onFocus={(e) => {
-              e.target.style.borderColor = '#10b981';
-              e.target.style.boxShadow = '0 0 0 3px rgba(16, 185, 129, 0.1)';
-            }}
-            onBlur={(e) => {
-              e.target.style.borderColor = 'rgba(255, 255, 255, 0.2)';
-              e.target.style.boxShadow = 'none';
-            }}
-          />
-        </div>
-
-        {/* Checkout button */}
-        <button
-          onClick={handleCheckout}
-          disabled={loading || !email || !name}
-          style={{
-            width: '100%',
-            padding: isMobile ? '1rem' : '1.25rem',
-            background: loading || !email || !name
-              ? 'rgba(107, 114, 128, 0.5)'
-              : plans[selectedPlan].gradient,
-            border: 'none',
+          {/* Name */}
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: '0.6rem',
+            padding: isMobile ? '0.7rem 0.85rem' : '0.8rem 1rem',
             borderRadius: '12px',
-            color: '#fff',
-            fontSize: isMobile ? '1rem' : '1.125rem',
-            fontWeight: '700',
-            cursor: loading || !email || !name ? 'not-allowed' : 'pointer',
-            transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-            transform: 'translateY(0)',
-            boxShadow: `0 10px 30px ${plans[selectedPlan].color}44`,
-            touchAction: 'manipulation',
-            WebkitTapHighlightColor: 'transparent',
-            minHeight: '44px'
-          }}
-          onMouseEnter={(e) => {
-            if (!loading && email && name) {
-              e.target.style.transform = 'translateY(-2px)';
-              e.target.style.boxShadow = `0 15px 40px ${plans[selectedPlan].color}66`;
-            }
-          }}
-          onMouseLeave={(e) => {
-            e.target.style.transform = 'translateY(0)';
-            e.target.style.boxShadow = `0 10px 30px ${plans[selectedPlan].color}44`;
-          }}
-        >
-          {loading ? 'Verwerken...' : `Start met ${plans[selectedPlan].name} - €${plans[selectedPlan].price}`}
-        </button>
+            border: '1px solid rgba(255,255,255,0.08)',
+            background: 'rgba(255,255,255,0.03)',
+            marginBottom: '0.6rem'
+          }}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="rgba(255,186,9,0.5)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>
+            </svg>
+            <input
+              type="text"
+              placeholder="Je naam"
+              value={name}
+              onChange={e => setName(e.target.value)}
+              style={{
+                flex: 1, background: 'none', border: 'none', outline: 'none',
+                color: '#fff', fontSize: isMobile ? '0.85rem' : '0.9rem',
+                fontWeight: '500', fontFamily: 'inherit'
+              }}
+            />
+          </div>
 
-        {/* Trust badges */}
-        <div style={{
-          display: 'flex',
-          justifyContent: 'center',
-          gap: isMobile ? '0.5rem' : '1rem',
-          marginTop: '1.5rem',
-          fontSize: isMobile ? '0.7rem' : '0.75rem',
-          color: 'rgba(255, 255, 255, 0.5)',
-          flexWrap: 'wrap'
-        }}>
-          <span>🔒 Veilig betalen</span>
-          <span>✓ Direct toegang</span>
-          <span>↩️ 14 dagen garantie</span>
+          {/* Email */}
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: '0.6rem',
+            padding: isMobile ? '0.7rem 0.85rem' : '0.8rem 1rem',
+            borderRadius: '12px',
+            border: '1px solid rgba(255,255,255,0.08)',
+            background: 'rgba(255,255,255,0.03)',
+            marginBottom: '0.6rem'
+          }}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="rgba(255,186,9,0.5)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <rect width="20" height="16" x="2" y="4" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/>
+            </svg>
+            <input
+              type="email"
+              placeholder="Je e-mailadres"
+              value={email}
+              onChange={e => setEmail(e.target.value)}
+              style={{
+                flex: 1, background: 'none', border: 'none', outline: 'none',
+                color: '#fff', fontSize: isMobile ? '0.85rem' : '0.9rem',
+                fontWeight: '500', fontFamily: 'inherit'
+              }}
+            />
+          </div>
+
+          {/* Phone */}
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: '0.6rem',
+            padding: isMobile ? '0.7rem 0.85rem' : '0.8rem 1rem',
+            borderRadius: '12px',
+            border: '1px solid rgba(255,255,255,0.08)',
+            background: 'rgba(255,255,255,0.03)',
+            marginBottom: '0.6rem'
+          }}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="rgba(255,186,9,0.5)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/>
+            </svg>
+            <input
+              type="tel"
+              placeholder="Je telefoonnummer (optioneel)"
+              value={phone}
+              onChange={e => setPhone(e.target.value)}
+              style={{
+                flex: 1, background: 'none', border: 'none', outline: 'none',
+                color: '#fff', fontSize: isMobile ? '0.85rem' : '0.9rem',
+                fontWeight: '500', fontFamily: 'inherit'
+              }}
+            />
+          </div>
+
+          {/* Error */}
+          {error && (
+            <div style={{
+              fontSize: isMobile ? '0.75rem' : '0.8rem',
+              color: '#ef4444', fontWeight: '600',
+              marginBottom: '0.75rem', marginTop: '0.25rem'
+            }}>{error}</div>
+          )}
+
+          {/* CTA Button */}
+          <button
+            onClick={handleCheckout}
+            disabled={loading}
+            style={{
+              width: '100%',
+              padding: isMobile ? '1rem' : '1.1rem',
+              borderRadius: '12px',
+              border: 'none',
+              background: loading ? 'rgba(255,186,9,0.3)' : `linear-gradient(135deg, ${GOLD}, ${GOLD_DARK})`,
+              color: '#000',
+              fontSize: isMobile ? '0.9rem' : '0.95rem',
+              fontWeight: '900',
+              cursor: loading ? 'not-allowed' : 'pointer',
+              transition: 'all 0.2s ease',
+              marginTop: '0.5rem',
+              minHeight: '52px',
+              boxShadow: loading ? 'none' : `0 4px 20px rgba(255,186,9,0.3)`,
+              touchAction: 'manipulation',
+              WebkitTapHighlightColor: 'transparent',
+              letterSpacing: '0.01em',
+              transform: 'translateZ(0)'
+            }}
+          >
+            {loading ? 'Even geduld...' : 'Start Nu — €300'}
+          </button>
+
+          <div style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            gap: '0.4rem', marginTop: '0.85rem'
+          }}>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.25)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+            </svg>
+            <span style={{
+              fontSize: isMobile ? '0.65rem' : '0.7rem',
+              color: 'rgba(255,255,255,0.25)', fontWeight: '500'
+            }}>Veilig betalen via Stripe · SSL beveiligd</span>
+          </div>
         </div>
+
+        {/* ══════ TRUST LINE ══════ */}
+        <div style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          gap: '0.4rem', marginTop: '0.5rem'
+        }}>
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
+            <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" fill="#00B67A"/>
+          </svg>
+          <span style={{ fontSize: '0.55rem', fontWeight: '600', color: 'rgba(255,255,255,0.25)', letterSpacing: '0.03em' }}>4.8 op Trustpilot</span>
+          <span style={{ fontSize: '0.55rem', color: 'rgba(255,255,255,0.12)' }}>·</span>
+          <span style={{ fontSize: '0.55rem', fontWeight: '600', color: 'rgba(255,255,255,0.25)', letterSpacing: '0.03em' }}>100% garantie</span>
+        </div>
+
       </div>
     </div>
-  );
+  )
 }
-
-export default CheckoutPage;

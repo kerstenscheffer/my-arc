@@ -330,6 +330,52 @@ async getAIMealService() {
 // Vervang de createClient method in DatabaseService.js met deze versie:
 
 
+// Get ALL clients (including inactive) - for Command Center
+  async getAllClients(trainerId = null) {
+    try {
+      const tid = trainerId || (await this.getCurrentUser())?.id
+      if (!tid) throw new Error('No trainer ID')
+      
+      const { data, error } = await supabase
+        .from('clients')
+        .select('*')
+        .eq('trainer_id', tid)
+        .order('status', { ascending: true })
+        .order('created_at', { ascending: false })
+      
+      if (error) throw error
+      return data || []
+    } catch (error) {
+      console.error('❌ Get all clients failed:', error)
+      return []
+    }
+  }
+
+  // Toggle client active/inactive status
+  async updateClientStatus(clientId, newStatus) {
+    try {
+      const { data, error } = await supabase
+        .from('clients')
+        .update({ 
+          status: newStatus,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', clientId)
+        .select()
+        .single()
+      
+      if (error) throw error
+      this.clearCache('clients_')
+      console.log(`✅ Client status updated to: ${newStatus}`)
+      return data
+    } catch (error) {
+      console.error('❌ Update client status failed:', error)
+      throw error
+    }
+  }
+
+
+
 async createClient(clientData, trainerId) {
   try {
     console.log('📝 Creating client with data:', clientData)
@@ -612,6 +658,14 @@ async deleteClient(clientId) {
 // ========================================
 
 // Quick Log Workout - COMPLETE SAVE METHOD
+// FIXED VERSION - Add to DatabaseService.js
+
+
+
+
+// FIXED VERSION - Add to DatabaseService.js
+// Replace the entire saveQuickWorkoutLog method
+
 async saveQuickWorkoutLog(clientId, exerciseName, sets, notes = null) {
   try {
     // 1. Create or get today's workout session
@@ -631,7 +685,7 @@ async saveQuickWorkoutLog(clientId, exerciseName, sets, notes = null) {
         .from('workout_sessions')
         .insert({
           client_id: clientId,
-          user_id: clientId, // Same as client_id for now
+          user_id: clientId,
           workout_date: today,
           day_name: new Date().toLocaleDateString('en-US', { weekday: 'long' }),
           day_display_name: `Quick Log - ${new Date().toLocaleDateString()}`,
@@ -643,62 +697,76 @@ async saveQuickWorkoutLog(clientId, exerciseName, sets, notes = null) {
         .single()
       
       if (createError) {
-        console.error('Failed to create workout session:', createError)
+        console.error('❌ Failed to create workout session:', createError)
         throw createError
       }
       session = newSession
     }
     
-    // 2. Save workout progress
-    const { data: progress, error: progressError } = await this.supabase
+    // 2. Check if progress entry already exists for this exercise TODAY
+    const { data: existingProgress, error: checkError } = await this.supabase
       .from('workout_progress')
-      .insert({
-        session_id: session.id,
-        exercise_name: exerciseName,
-        sets: sets, // JSONB array of {weight, reps}
-        notes: notes,
-        created_at: new Date().toISOString()
-      })
-      .select()
+      .select('*')
+      .eq('session_id', session.id)
+      .eq('exercise_name', exerciseName)
       .single()
     
-    if (progressError) {
-      console.error('Failed to save workout progress:', progressError)
-      throw progressError
-    }
+    let progress
     
-    // 3. Update session with completed exercise
-    const updatedExercises = [
-      ...(session.exercises_completed || []),
-      { 
-        name: exerciseName, 
-        sets: sets.length,
-        completed_at: new Date().toISOString()
+    if (existingProgress) {
+      // ✅ UPDATE existing entry
+      const { data: updated, error: updateError } = await this.supabase
+        .from('workout_progress')
+        .update({
+          sets: sets,           // Replace with new sets array
+          notes: notes
+          // NO updated_at - column doesn't exist in workout_progress table
+        })
+        .eq('id', existingProgress.id)
+        .select()
+        .single()
+      
+      if (updateError) {
+        console.error('❌ Failed to update workout progress:', updateError)
+        throw updateError
       }
-    ]
-    
-    const { error: updateError } = await this.supabase
-      .from('workout_sessions')
-      .update({
-        exercises_completed: updatedExercises,
-        completion_percentage: Math.min(100, (updatedExercises.length / 5) * 100),
-        is_completed: updatedExercises.length >= 3 // Mark complete after 3 exercises
-      })
-      .eq('id', session.id)
-    
-    if (updateError) {
-      console.error('Failed to update workout session:', updateError)
-      throw updateError
+      
+      progress = updated
+      console.log('✅ Updated existing workout progress:', exerciseName, sets.length, 'sets')
+      
+    } else {
+      // ✅ INSERT new entry (first time logging this exercise today)
+      const { data: inserted, error: insertError } = await this.supabase
+        .from('workout_progress')
+        .insert({
+          session_id: session.id,
+          exercise_name: exerciseName,
+          sets: sets,
+          notes: notes,
+          created_at: new Date().toISOString()
+        })
+        .select()
+        .single()
+      
+      if (insertError) {
+        console.error('❌ Failed to insert workout progress:', insertError)
+        throw insertError
+      }
+      
+      progress = inserted
+      console.log('✅ Created new workout progress:', exerciseName, sets.length, 'sets')
     }
     
-    console.log('✅ Quick workout logged successfully')
-    return { session, progress }
+    return progress
     
   } catch (error) {
-    console.error('❌ Quick workout log failed:', error)
+    console.error('❌ saveQuickWorkoutLog failed:', error)
     throw error
   }
 }
+
+
+
 
 // Get Workout Chart Data - Voor progress charts
 async getWorkoutChartData(clientId, days = 30) {
@@ -1075,6 +1143,45 @@ async getPersonalExercises(clientId) {
       return null
     }
   }
+
+async getClientSchemas(clientId) {
+  try {
+    const { data: client } = await supabase
+      .from('clients')
+      .select('assigned_schema_id')
+      .eq('id', clientId)
+      .single()
+
+    if (!client?.assigned_schema_id) return []
+
+    const { data: assigned } = await supabase
+      .from('workout_schemas')
+      .select('*')
+      .eq('id', client.assigned_schema_id)
+      .single()
+
+    if (!assigned) return []
+
+    const schemas = [{ ...assigned, _label: assigned.is_client_edited ? 'Client versie (actief)' : 'Huidig plan (actief)' }]
+
+    // Als het een fork is, laad ook het origineel
+    if (assigned.is_client_edited && assigned.original_schema_id) {
+      const { data: original } = await supabase
+        .from('workout_schemas')
+        .select('*')
+        .eq('id', assigned.original_schema_id)
+        .single()
+      if (original) schemas.push({ ...original, _label: 'Origineel coachplan' })
+    }
+
+    return schemas
+  } catch (e) {
+    console.error('❌ getClientSchemas failed:', e)
+    return []
+  }
+}
+
+
 
   // FIX: Use workout_plans table (exists!) or assigned_schema_id
   async getClientWorkoutPlan(clientId) {
@@ -2305,19 +2412,33 @@ async getCustomMeals(clientId) {
 }
 
 
+
 // Get client's active meal plan
 async getClientMealPlan(clientId) {
   try {
-    const { data, error } = await this.supabase
+    // Eerst actief plan proberen
+    const { data: activePlan } = await this.supabase
+      .from('client_meal_plans')
+      .select('*')
+      .eq('client_id', clientId)
+      .eq('is_active', true)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .single()
+
+    if (activePlan) return activePlan
+
+    // Fallback: nieuwste plan
+    const { data: latestPlan, error: latestError } = await this.supabase
       .from('client_meal_plans')
       .select('*')
       .eq('client_id', clientId)
       .order('created_at', { ascending: false })
       .limit(1)
       .single()
-    
-    if (error && error.code !== 'PGRST116') throw error
-    return data
+
+    if (latestError && latestError.code !== 'PGRST116') throw latestError
+    return latestPlan || null
   } catch (error) {
     console.error('❌ Get client meal plan failed:', error)
     return null
@@ -2795,23 +2916,38 @@ async getMealPlanTemplates() {
   }
 }
 
+
 async getClientMealPlan(clientId) {
   try {
-    const { data, error } = await supabase
+    // Eerst actief plan proberen
+    const { data: activePlan } = await supabase
+      .from('client_meal_plans')
+      .select('*')
+      .eq('client_id', clientId)
+      .eq('is_active', true)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .single()
+
+    if (activePlan) return activePlan
+
+    // Fallback: nieuwste plan
+    const { data: latestPlan, error: latestError } = await supabase
       .from('client_meal_plans')
       .select('*')
       .eq('client_id', clientId)
       .order('created_at', { ascending: false })
       .limit(1)
       .single()
-    
-    if (error && error.code !== 'PGRST116') throw error
-    return data
+
+    if (latestError && latestError.code !== 'PGRST116') throw latestError
+    return latestPlan || null
   } catch (error) {
     console.error('❌ Get client meal plan failed:', error)
     return null
   }
 }
+
 
 async saveMealPlan(clientId, planData) {
   try {
@@ -3450,23 +3586,38 @@ async getClientGoals(clientId) {
 // ===== MEAL PLAN METHODS =====
 
 // Get client's active meal plan
+// Get client's active meal plan
 async getClientMealPlan(clientId) {
   try {
-    const { data, error } = await this.supabase
+    // Eerst actief plan proberen
+    const { data: activePlan } = await this.supabase
+      .from('client_meal_plans')
+      .select('*')
+      .eq('client_id', clientId)
+      .eq('is_active', true)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .single()
+
+    if (activePlan) return activePlan
+
+    // Fallback: nieuwste plan
+    const { data: latestPlan, error: latestError } = await this.supabase
       .from('client_meal_plans')
       .select('*')
       .eq('client_id', clientId)
       .order('created_at', { ascending: false })
       .limit(1)
       .single()
-    
-    if (error && error.code !== 'PGRST116') throw error
-    return data
+
+    if (latestError && latestError.code !== 'PGRST116') throw latestError
+    return latestPlan || null
   } catch (error) {
     console.error('❌ Get client meal plan failed:', error)
     return null
   }
 }
+
 
 // Get all meals from catalog
 async getAllMeals() {
@@ -11348,6 +11499,318 @@ async getShoppingListWithProgress(clientId, planId) {
       shoppingList: { items: [], totalCost: 0, itemCount: 0 },
       progress: { purchased_items: {}, purchased_count: 0 }
     }
+  }
+}
+
+
+
+
+
+
+
+
+// =====================================================
+// DATABASESERVICE VIDEO EXTENSION
+// Voeg deze methods toe aan je DatabaseService.js
+// Plaats VOOR de laatste } van de class
+// =====================================================
+
+
+// Voeg toe aan DatabaseService.js VOOR laatste }
+
+async getExerciseVideo(exerciseName, muscleGroup = null) {
+  try {
+    let { data } = await this.supabase
+      .from('exercise_videos')
+      .select('*')
+      .ilike('exercise_name', exerciseName)
+      .limit(1)
+      .single()
+    
+    if (!data) {
+      const firstWord = exerciseName.split(' ')[0]
+      if (firstWord && firstWord.length > 2) {
+        const { data: fuzzyData } = await this.supabase
+          .from('exercise_videos')
+          .select('*')
+          .ilike('exercise_name', `%${firstWord}%`)
+          .limit(1)
+          .single()
+        data = fuzzyData
+      }
+    }
+    
+    if (data) {
+      const videoUrl = data.video_url
+      if (!data.youtube_id && videoUrl) {
+        const match = videoUrl.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([^&\n?#]+)/)
+        data.youtube_id = match ? match[1] : null
+      }
+      if (data.youtube_id) {
+        data.youtube_url = videoUrl
+        data.thumbnail_url = data.thumbnail_url || `https://img.youtube.com/vi/${data.youtube_id}/hqdefault.jpg`
+      }
+    }
+    return data || null
+  } catch (error) {
+    console.error('Error fetching exercise video:', error)
+    return null
+  }
+}
+
+async getAllExerciseVideos() {
+  try {
+    const { data, error } = await this.supabase
+      .from('exercise_videos')
+      .select('*')
+      .order('exercise_name')
+    if (error) throw error
+    return data || []
+  } catch (error) {
+    console.error('Error fetching all exercise videos:', error)
+    return []
+  }
+}
+
+async addExerciseVideo(videoData) {
+  try {
+    const videoUrl = videoData.video_url || videoData.youtube_url
+    let youtubeId = null
+    if (videoUrl) {
+      const match = videoUrl.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([^&\n?#]+)/)
+      youtubeId = match ? match[1] : null
+    }
+    const { data, error } = await this.supabase
+      .from('exercise_videos')
+      .insert({
+        exercise_name: videoData.exercise_name,
+        video_url: videoUrl,
+        youtube_id: youtubeId,
+        thumbnail_url: youtubeId ? `https://img.youtube.com/vi/${youtubeId}/hqdefault.jpg` : null,
+        category: videoData.category || null,
+        muscle_group: videoData.muscle_group || null,
+        instructions: videoData.instructions || null
+      })
+      .select()
+      .single()
+    if (error) throw error
+    console.log('✅ Video added:', data)
+    return data
+  } catch (error) {
+    console.error('❌ Error adding video:', error)
+    throw error
+  }
+}
+
+async updateExerciseVideo(videoId, updates) {
+  try {
+    const videoUrl = updates.video_url || updates.youtube_url
+    if (videoUrl) {
+      const match = videoUrl.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([^&\n?#]+)/)
+      updates.youtube_id = match ? match[1] : null
+      updates.video_url = videoUrl
+      updates.thumbnail_url = updates.youtube_id ? `https://img.youtube.com/vi/${updates.youtube_id}/hqdefault.jpg` : null
+    }
+    const { data, error } = await this.supabase
+      .from('exercise_videos')
+      .update(updates)
+      .eq('id', videoId)
+      .select()
+      .single()
+    if (error) throw error
+    console.log('✅ Video updated:', data)
+    return data
+  } catch (error) {
+    console.error('❌ Error updating video:', error)
+    throw error
+  }
+}
+
+async deleteExerciseVideo(videoId) {
+  try {
+    const { error } = await this.supabase
+      .from('exercise_videos')
+      .delete()
+      .eq('id', videoId)
+    if (error) throw error
+    console.log('✅ Video deleted')
+    return true
+  } catch (error) {
+    console.error('❌ Error deleting video:', error)
+    throw error
+  }
+}
+
+
+// ========================================
+// CLIENT VIDEO SUBMISSIONS
+// ========================================
+
+async submitExerciseVideo(clientId, exerciseName, videoFile, notes = '') {
+  try {
+    // 1. Upload video naar Supabase Storage
+    const fileName = `exercise-submissions/${clientId}/${Date.now()}_${exerciseName.replace(/\s+/g, '_')}.mp4`
+    
+    const { data: uploadData, error: uploadError } = await this.supabase
+      .storage
+      .from('videos')
+      .upload(fileName, videoFile)
+    
+    if (uploadError) throw uploadError
+    
+    // 2. Get public URL
+    const { data: urlData } = this.supabase
+      .storage
+      .from('videos')
+      .getPublicUrl(fileName)
+    
+    const videoUrl = urlData.publicUrl
+    
+    // 3. Save to database
+    const { data, error } = await this.supabase
+      .from('client_exercise_submissions')
+      .insert({
+        client_id: clientId,
+        exercise_name: exerciseName,
+        video_url: videoUrl,
+        notes: notes,
+        status: 'pending'
+      })
+      .select()
+      .single()
+    
+    if (error) throw error
+    console.log('✅ Video submitted:', data)
+    return data
+  } catch (error) {
+    console.error('❌ Submit video error:', error)
+    throw error
+  }
+}
+
+async getClientSubmissions(clientId) {
+  try {
+    const { data, error } = await this.supabase
+      .from('client_exercise_submissions')
+      .select('*')
+      .eq('client_id', clientId)
+      .order('created_at', { ascending: false })
+    
+    if (error) throw error
+    return data || []
+  } catch (error) {
+    console.error('❌ Get submissions error:', error)
+    return []
+  }
+}
+
+async getExerciseSubmission(clientId, exerciseName) {
+  try {
+    const { data, error } = await this.supabase
+      .from('client_exercise_submissions')
+      .select('*')
+      .eq('client_id', clientId)
+      .eq('exercise_name', exerciseName)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .single()
+    
+    if (error && error.code !== 'PGRST116') throw error
+    return data || null
+  } catch (error) {
+    console.error('❌ Get exercise submission error:', error)
+    return null
+  }
+}
+
+async getExerciseSubmissions(clientId, exerciseName) {
+  try {
+    const { data, error } = await this.supabase
+      .from('client_exercise_submissions')
+      .select('*')
+      .eq('client_id', clientId)
+      .eq('exercise_name', exerciseName)
+      .order('created_at', { ascending: false })
+    if (error) throw error
+    return data || []
+  } catch (error) {
+    console.error('❌ Get exercise submissions error:', error)
+    return []
+  }
+}
+
+async getAllPendingSubmissions() {
+  try {
+    const { data, error } = await this.supabase
+      .from('client_exercise_submissions')
+      .select(`
+        *,
+        clients:client_id (first_name, last_name, email)
+      `)
+      .eq('status', 'pending')
+      .order('created_at', { ascending: true })
+    
+    if (error) throw error
+    return data || []
+  } catch (error) {
+    console.error('❌ Get pending submissions error:', error)
+    return []
+  }
+}
+
+async getAllSubmissions() {
+  try {
+    const { data, error } = await this.supabase
+      .from('client_exercise_submissions')
+      .select('*')
+      .order('created_at', { ascending: false })
+
+    if (error) throw error
+
+    // Haal client namen op via aparte query
+    const clientIds = [...new Set((data || []).map(s => s.client_id).filter(Boolean))]
+    if (clientIds.length > 0) {
+      const { data: clients } = await this.supabase
+        .from('clients')
+        .select('id, first_name, last_name, email')
+        .in('id', clientIds)
+
+      const clientMap = {}
+      clients?.forEach(c => { clientMap[c.id] = c })
+
+      return (data || []).map(s => ({
+        ...s,
+        clients: clientMap[s.client_id] || null
+      }))
+    }
+
+    return data || []
+  } catch (error) {
+    console.error('❌ Get all submissions error:', error)
+    return []
+  }
+}
+
+async submitFeedback(submissionId, feedback, status = 'reviewed', coachId = null) {
+  try {
+    const { data, error } = await this.supabase
+      .from('client_exercise_submissions')
+      .update({
+        coach_feedback: feedback,
+        status: status,
+        coach_id: coachId,
+        reviewed_at: new Date().toISOString()
+      })
+      .eq('id', submissionId)
+      .select()
+      .single()
+    
+    if (error) throw error
+    console.log('✅ Feedback submitted:', data)
+    return data
+  } catch (error) {
+    console.error('❌ Submit feedback error:', error)
+    throw error
   }
 }
 

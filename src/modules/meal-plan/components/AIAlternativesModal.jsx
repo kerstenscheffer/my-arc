@@ -1,11 +1,8 @@
 // src/modules/meal-plan/components/AIAlternativesModal.jsx
-import React, { useState, useEffect, useRef } from 'react'
-import { 
-  X, Search, Star, Clock, Flame, Target, 
-  Filter, Check, TrendingUp, Sparkles, Zap,
-  DollarSign, Leaf, Timer, ChefHat, Award,
-  Wheat, Milk, TrendingDown, Scale, ChevronDown
-} from 'lucide-react'
+// 🎯 v2.0 - Clean swap modal with smart suggestions & compare
+// Props IDENTIEK: { isOpen, onClose, currentMeal, onSelectMeal, db, service }
+import React, { useState, useEffect } from 'react'
+import { X, Search, Check, ArrowUp, ArrowDown, Minus, Star, Flame, Beef } from 'lucide-react'
 
 export default function AIAlternativesModal({ 
   isOpen, 
@@ -16,104 +13,55 @@ export default function AIAlternativesModal({
   service
 }) {
   const isMobile = window.innerWidth <= 768
-  const [activeTab, setActiveTab] = useState('recommended')
   const [searchTerm, setSearchTerm] = useState('')
-  const [selectedFilters, setSelectedFilters] = useState([])
+  const [activeFilter, setActiveFilter] = useState('smart')
   const [alternatives, setAlternatives] = useState([])
   const [favorites, setFavorites] = useState([])
   const [allMeals, setAllMeals] = useState([])
   const [loading, setLoading] = useState(true)
   const [selectedMeal, setSelectedMeal] = useState(null)
-  const [openDropdown, setOpenDropdown] = useState(null)
-  
-  // Filter Categories organized by dropdown
-  const filterDropdowns = {
-    timing: {
-      label: 'Tijdstip',
-      icon: Clock,
-      color: '#10b981',
-      filters: [
-        { id: 'breakfast', label: 'Ontbijt', color: '#f59e0b' },
-        { id: 'lunch', label: 'Lunch', color: '#3b82f6' },
-        { id: 'dinner', label: 'Diner', color: '#8b5cf6' },
-        { id: 'snack', label: 'Snack', color: '#ec4899' }
-      ]
-    },
-    goals: {
-      label: 'Doelen',
-      icon: Target,
-      color: '#8b5cf6',
-      filters: [
-        { id: 'bulk', label: 'Bulk (600+ kcal)', color: '#10b981' },
-        { id: 'cut', label: 'Cut (<400 kcal)', color: '#ef4444' },
-        { id: 'high-protein', label: '30g+ Eiwit', color: '#8b5cf6' },
-        { id: 'low-carb', label: 'Low Carb (<20g)', color: '#f97316' },
-        { id: 'balanced', label: 'Balanced', color: '#06b6d4' }
-      ]
-    },
-    practical: {
-      label: 'Praktisch',
-      icon: ChefHat,
-      color: '#fbbf24',
-      filters: [
-        { id: 'quick', label: 'Quick (<15 min)', color: '#fbbf24' },
-        { id: 'meal-prep', label: 'Meal Prep', color: '#10b981' },
-        { id: 'no-cook', label: 'No Cook', color: '#a855f7' },
-        { id: 'budget', label: 'Budget (<€5)', color: '#84cc16' }
-      ]
-    },
-    dietary: {
-      label: 'Dieet',
-      icon: Leaf,
-      color: '#22c55e',
-      filters: [
-        { id: 'vegetarian', label: 'Vegetarisch', color: '#22c55e' },
-        { id: 'vegan', label: 'Vegan', color: '#16a34a' },
-        { id: 'gluten-free', label: 'Glutenvrij', color: '#fbbf24' },
-        { id: 'dairy-free', label: 'Zuivelvrij', color: '#60a5fa' }
-      ]
-    }
-  }
-  
-  // Load data when modal opens
+
+  const filters = [
+    { id: 'smart', label: 'Beste match' },
+    { id: 'similar-cal', label: 'Zelfde kcal' },
+    { id: 'more-protein', label: 'Meer eiwit' },
+    { id: 'less-cal', label: 'Minder kcal' },
+    { id: 'favorites', label: 'Favorieten' },
+    { id: 'all', label: 'Alles' }
+  ]
+
   useEffect(() => {
     if (isOpen && currentMeal) {
       loadAlternatives()
     }
+    return () => {
+      setSelectedMeal(null)
+      setSearchTerm('')
+      setActiveFilter('smart')
+    }
   }, [isOpen, currentMeal])
-  
-  // Close dropdown when clicking outside
-  useEffect(() => {
-    const handleClickOutside = (e) => {
-      if (!e.target.closest('.dropdown-container')) {
-        setOpenDropdown(null)
-      }
-    }
-    
-    if (openDropdown) {
-      document.addEventListener('click', handleClickOutside)
-      return () => document.removeEventListener('click', handleClickOutside)
-    }
-  }, [openDropdown])
-  
+
   const loadAlternatives = async () => {
     setLoading(true)
     try {
-      const smartAlternatives = await service.getSmartAlternatives(
+      const smartAlts = await service.getSmartAlternatives(
         currentMeal,
         currentMeal.slot || currentMeal.timeSlot
       )
       
-      const clientId = await db.getCurrentUser().then(u => u.id)
-      const favs = await service.getAIFavorites(clientId)
+      let favs = []
+      try {
+        const clientId = await db.getCurrentUser().then(u => u.id)
+        favs = await service.getAIFavorites(clientId)
+      } catch (e) { /* no favs */ }
       
       const { data: meals } = await db.supabase
         .from('ai_meals')
         .select('*')
         .limit(200)
-      
-      setAlternatives(smartAlternatives)
-      setFavorites(favs)
+
+      setAlternatives(smartAlts || [])
+      setFavorites(favs || [])
       setAllMeals(meals || [])
     } catch (error) {
       console.error('Failed to load alternatives:', error)
@@ -121,816 +69,572 @@ export default function AIAlternativesModal({
       setLoading(false)
     }
   }
-  
-  const toggleFilter = (filterId) => {
-    setSelectedFilters(prev => 
-      prev.includes(filterId)
-        ? prev.filter(f => f !== filterId)
-        : [...prev, filterId]
-    )
-  }
-  
-  const clearFilters = () => {
-    setSelectedFilters([])
-    setOpenDropdown(null)
-  }
-  
+
   const getFilteredMeals = () => {
     let meals = []
-    
-    if (activeTab === 'recommended') {
-      meals = alternatives
-    } else if (activeTab === 'favorites') {
-      meals = favorites
-        .map(fav => allMeals.find(m => m.id === fav.meal_id))
-        .filter(Boolean)
-    } else {
-      meals = allMeals
+    const currentCal = currentMeal?.calories || 0
+    const currentProt = currentMeal?.protein || 0
+
+    switch (activeFilter) {
+      case 'smart':
+        meals = alternatives
+        break
+      case 'similar-cal':
+        meals = [...allMeals]
+          .filter(m => m.id !== currentMeal?.id && m.calories > 0)
+          .sort((a, b) => Math.abs(a.calories - currentCal) - Math.abs(b.calories - currentCal))
+          .slice(0, 30)
+        break
+      case 'more-protein':
+        meals = [...allMeals]
+          .filter(m => m.id !== currentMeal?.id && m.protein > currentProt)
+          .sort((a, b) => b.protein - a.protein)
+          .slice(0, 30)
+        break
+      case 'less-cal':
+        meals = [...allMeals]
+          .filter(m => m.id !== currentMeal?.id && m.calories > 0 && m.calories < currentCal)
+          .sort((a, b) => b.calories - a.calories)
+          .slice(0, 30)
+        break
+      case 'favorites':
+        meals = favorites
+          .map(fav => allMeals.find(m => m.id === fav.meal_id))
+          .filter(Boolean)
+        break
+      case 'all':
+        meals = allMeals.filter(m => m.id !== currentMeal?.id)
+        break
+      default:
+        meals = alternatives
     }
-    
+
     if (searchTerm) {
-      meals = meals.filter(meal => 
-        meal.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        meal.name_en?.toLowerCase().includes(searchTerm.toLowerCase())
+      const term = searchTerm.toLowerCase()
+      meals = meals.filter(m =>
+        m.name?.toLowerCase().includes(term) ||
+        m.name_en?.toLowerCase().includes(term)
       )
     }
-    
-    if (selectedFilters.length > 0) {
-      meals = meals.filter(meal => {
-        const mealLabels = meal.labels || []
-        const mealTiming = meal.timing || []
-        
-        return selectedFilters.some(filter => {
-          if (['breakfast', 'lunch', 'dinner', 'snack'].includes(filter)) {
-            return mealTiming.includes(filter)
-          }
-          if (filter === 'high-protein') return meal.protein >= 30
-          if (filter === 'low-carb') return meal.carbs <= 20
-          if (filter === 'bulk') return meal.calories >= 600
-          if (filter === 'cut') return meal.calories <= 400
-          if (filter === 'quick') return (meal.prep_time_min || 0) <= 15
-          if (filter === 'budget') return meal.cost_tier === 'budget' || meal.total_cost <= 5
-          return mealLabels.includes(filter)
-        })
-      })
-    }
-    
+
     return meals
   }
-  
-  const filteredMeals = getFilteredMeals()
-  
-  const getMatchScore = (meal) => {
-    if (!currentMeal?.labels) return 0
-    const mealLabels = meal.labels || []
-    const currentLabels = currentMeal.labels || []
-    const matches = mealLabels.filter(l => currentLabels.includes(l)).length
-    return Math.round((matches / Math.max(currentLabels.length, 1)) * 100)
+
+  const getDiff = (newVal, oldVal) => {
+    const diff = Math.round((newVal || 0) - (oldVal || 0))
+    if (diff > 0) return { text: `+${diff}`, color: '#10b981', Icon: ArrowUp }
+    if (diff < 0) return { text: `${diff}`, color: '#ef4444', Icon: ArrowDown }
+    return { text: '0', color: 'rgba(255,255,255,0.3)', Icon: Minus }
   }
-  
+
+  const filteredMeals = getFilteredMeals()
+
   if (!isOpen) return null
-  
+
   return (
-    <div style={{
-      position: 'fixed',
-      inset: 0,
-      background: 'rgba(0, 0, 0, 0.85)',
-      backdropFilter: 'blur(20px)',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      zIndex: 10500,
-      padding: isMobile ? '0.75rem' : '2rem',
-      animation: 'fadeIn 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
-    }}>
-      <div style={{
-        background: 'linear-gradient(135deg, rgba(26, 26, 26, 0.98) 0%, rgba(15, 15, 15, 0.98) 100%)',
-        backdropFilter: 'blur(30px)',
-        borderRadius: isMobile ? '20px' : '28px',
-        width: '100%',
-        maxWidth: isMobile ? '100%' : '1000px',
-        maxHeight: '92vh',
+    <div
+      onClick={onClose}
+      style={{
+        position: 'fixed',
+        inset: 0,
+        background: 'rgba(0, 0, 0, 0.9)',
+        backdropFilter: 'blur(12px)',
         display: 'flex',
         flexDirection: 'column',
-        border: '1px solid rgba(16, 185, 129, 0.08)',
-        boxShadow: '0 25px 80px rgba(0, 0, 0, 0.6), 0 0 60px rgba(16, 185, 129, 0.1)',
-        overflow: 'hidden'
-      }}>
-        {/* Premium Header */}
+        zIndex: 10500,
+        animation: 'altFadeIn 0.2s ease'
+      }}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          flex: 1,
+          display: 'flex',
+          flexDirection: 'column',
+          maxWidth: isMobile ? '100%' : '600px',
+          width: '100%',
+          margin: '0 auto',
+          background: '#0a0a0a',
+          overflow: 'hidden'
+        }}
+      >
+        {/* ── Header ── */}
         <div style={{
-          padding: isMobile ? '1rem' : '1.5rem',
-          borderBottom: '1px solid rgba(16, 185, 129, 0.08)',
-          background: 'linear-gradient(180deg, rgba(16, 185, 129, 0.05) 0%, transparent 100%)'
+          padding: isMobile ? '0.75rem 1rem' : '1rem 1.5rem',
+          borderBottom: '1px solid rgba(255, 255, 255, 0.06)',
+          flexShrink: 0
         }}>
-          {/* Title Row */}
+          {/* Title row */}
           <div style={{
             display: 'flex',
-            justifyContent: 'space-between',
             alignItems: 'center',
-            marginBottom: '1rem'
+            justifyContent: 'space-between',
+            marginBottom: '0.75rem'
           }}>
-            <h2 style={{
-              fontSize: isMobile ? '1.25rem' : '1.5rem',
-              fontWeight: '800',
-              background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-              WebkitBackgroundClip: 'text',
-              WebkitTextFillColor: 'transparent',
-              backgroundClip: 'text',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.5rem',
-              letterSpacing: '-0.02em'
-            }}>
-              <Sparkles size={24} color="#10b981" />
-              Kies Alternatief
-            </h2>
+            <div>
+              <div style={{
+                fontSize: isMobile ? '0.5rem' : '0.55rem',
+                fontWeight: '700',
+                color: 'rgba(255, 255, 255, 0.25)',
+                textTransform: 'uppercase',
+                letterSpacing: '0.05em',
+                marginBottom: '0.15rem'
+              }}>
+                Wissel maaltijd
+              </div>
+              <div style={{
+                fontSize: isMobile ? '1rem' : '1.15rem',
+                fontWeight: '800',
+                color: '#fff',
+                letterSpacing: '-0.02em'
+              }}>
+                {currentMeal?.name || currentMeal?.meal_name || 'Maaltijd'}
+              </div>
+            </div>
             <button
               onClick={onClose}
               style={{
-                width: '40px',
-                height: '40px',
-                borderRadius: '12px',
-                background: 'rgba(16, 185, 129, 0.05)',
-                backdropFilter: 'blur(10px)',
-                border: '1px solid rgba(16, 185, 129, 0.08)',
+                width: '36px',
+                height: '36px',
+                background: 'rgba(255, 255, 255, 0.04)',
+                border: '1px solid rgba(255, 255, 255, 0.06)',
+                borderRadius: '10px',
+                color: 'rgba(255, 255, 255, 0.4)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
                 cursor: 'pointer',
-                transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
                 touchAction: 'manipulation',
                 WebkitTapHighlightColor: 'transparent'
               }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.background = 'rgba(16, 185, 129, 0.15)'
-                e.currentTarget.style.transform = 'scale(1.05)'
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.background = 'rgba(16, 185, 129, 0.05)'
-                e.currentTarget.style.transform = 'scale(1)'
-              }}
             >
-              <X size={20} color="#10b981" />
+              <X size={18} />
             </button>
           </div>
-          
-          {/* Current Meal Info */}
-          <div style={{
-            background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.12) 0%, rgba(16, 185, 129, 0.04) 100%)',
-            backdropFilter: 'blur(20px)',
-            borderRadius: '14px',
-            padding: isMobile ? '0.75rem' : '1rem',
-            border: '1px solid rgba(16, 185, 129, 0.15)',
-            boxShadow: '0 8px 32px rgba(16, 185, 129, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.03)',
-            marginBottom: '1rem'
-          }}>
-            <div style={{
-              fontSize: isMobile ? '0.6rem' : '0.65rem',
-              color: 'rgba(16, 185, 129, 0.5)',
-              marginBottom: '0.25rem',
-              textTransform: 'uppercase',
-              letterSpacing: '0.05em',
-              fontWeight: '700'
-            }}>
-              Huidige Maaltijd
-            </div>
-            <div style={{
-              fontSize: isMobile ? '1rem' : '1.125rem',
-              fontWeight: '700',
-              color: '#10b981',
-              letterSpacing: '-0.02em'
-            }}>
-              {currentMeal?.name || currentMeal?.meal_name}
-            </div>
-            <div style={{
-              display: 'flex',
-              gap: '1rem',
-              marginTop: '0.5rem'
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-                <Flame size={14} color="#f59e0b" style={{ opacity: 0.7 }} />
-                <span style={{ fontSize: '0.875rem', color: '#f59e0b', fontWeight: '600' }}>
-                  {currentMeal?.calories || currentMeal?.kcal} kcal
-                </span>
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-                <Target size={14} color="#8b5cf6" style={{ opacity: 0.7 }} />
-                <span style={{ fontSize: '0.875rem', color: '#8b5cf6', fontWeight: '600' }}>
-                  {currentMeal?.protein}g
-                </span>
-              </div>
-            </div>
-          </div>
-          
-          {/* Premium Tabs */}
+
+          {/* Current meal macros */}
           <div style={{
             display: 'flex',
-            gap: '0.5rem',
-            marginBottom: '1rem'
+            gap: isMobile ? '1rem' : '1.5rem',
+            marginBottom: '0.75rem'
           }}>
             {[
-              { id: 'recommended', label: 'Aanbevolen', icon: Award, count: alternatives.length },
-              { id: 'favorites', label: 'Favorieten', icon: Star, count: favorites.length },
-              { id: 'all', label: 'Alle', icon: Filter, count: allMeals.length }
-            ].map(tab => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                style={{
-                  flex: 1,
-                  padding: isMobile ? '0.75rem' : '0.875rem',
-                  background: activeTab === tab.id
-                    ? 'linear-gradient(135deg, rgba(16, 185, 129, 0.15) 0%, rgba(16, 185, 129, 0.08) 100%)'
-                    : 'rgba(17, 17, 17, 0.5)',
-                  backdropFilter: 'blur(10px)',
-                  border: `1px solid ${activeTab === tab.id ? 'rgba(16, 185, 129, 0.25)' : 'rgba(16, 185, 129, 0.08)'}`,
-                  borderRadius: '12px',
-                  color: activeTab === tab.id ? '#10b981' : 'rgba(255, 255, 255, 0.6)',
-                  fontSize: isMobile ? '0.875rem' : '0.95rem',
-                  fontWeight: '700',
-                  cursor: 'pointer',
-                  transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '0.5rem',
-                  touchAction: 'manipulation',
-                  WebkitTapHighlightColor: 'transparent',
-                  minHeight: '44px'
-                }}
-              >
-                <tab.icon size={18} />
-                <span>{tab.label}</span>
+              { val: currentMeal?.calories, label: 'kcal' },
+              { val: currentMeal?.protein, label: 'eiwit' },
+              { val: currentMeal?.carbs, label: 'koolh' },
+              { val: currentMeal?.fat, label: 'vet' }
+            ].filter(m => m.val > 0).map(m => (
+              <div key={m.label}>
                 <span style={{
-                  fontSize: '0.75rem',
-                  padding: '0.125rem 0.375rem',
-                  background: activeTab === tab.id ? '#10b981' : 'rgba(255, 255, 255, 0.1)',
-                  borderRadius: '6px',
-                  fontWeight: '600'
+                  fontSize: isMobile ? '0.85rem' : '0.95rem',
+                  fontWeight: '800',
+                  color: '#fff'
                 }}>
-                  {tab.count}
+                  {Math.round(m.val)}
                 </span>
-              </button>
+                <span style={{
+                  fontSize: isMobile ? '0.5rem' : '0.55rem',
+                  fontWeight: '600',
+                  color: 'rgba(255, 255, 255, 0.25)',
+                  marginLeft: '0.15rem',
+                  textTransform: 'uppercase'
+                }}>
+                  {m.label}
+                </span>
+              </div>
             ))}
           </div>
-          
-          {/* Search Bar */}
-          <div style={{
-            position: 'relative',
-            marginBottom: '1rem'
-          }}>
+
+          {/* Search */}
+          <div style={{ position: 'relative', marginBottom: '0.625rem' }}>
             <Search
-              size={18}
+              size={15}
               style={{
                 position: 'absolute',
-                left: '1rem',
+                left: '0.75rem',
                 top: '50%',
                 transform: 'translateY(-50%)',
-                color: 'rgba(16, 185, 129, 0.4)'
+                color: 'rgba(255, 255, 255, 0.2)'
               }}
             />
             <input
               type="text"
-              placeholder="Zoek maaltijden..."
+              placeholder="Zoek maaltijd..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               style={{
                 width: '100%',
-                padding: isMobile ? '0.875rem 1rem 0.875rem 3rem' : '1rem 1rem 1rem 3rem',
-                background: 'rgba(17, 17, 17, 0.5)',
-                backdropFilter: 'blur(10px)',
-                border: '1px solid rgba(16, 185, 129, 0.08)',
-                borderRadius: '12px',
+                padding: '0.6rem 0.75rem 0.6rem 2.25rem',
+                background: 'rgba(255, 255, 255, 0.04)',
+                border: '1px solid rgba(255, 255, 255, 0.06)',
+                borderRadius: '10px',
                 color: 'white',
-                fontSize: isMobile ? '0.95rem' : '1rem',
+                fontSize: isMobile ? '0.8rem' : '0.85rem',
                 outline: 'none',
-                transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                minHeight: '44px'
+                minHeight: '40px',
+                boxSizing: 'border-box'
               }}
-              onFocus={(e) => {
-                e.currentTarget.style.border = '1px solid rgba(16, 185, 129, 0.25)'
-                e.currentTarget.style.background = 'rgba(16, 185, 129, 0.05)'
-              }}
-              onBlur={(e) => {
-                e.currentTarget.style.border = '1px solid rgba(16, 185, 129, 0.08)'
-                e.currentTarget.style.background = 'rgba(17, 17, 17, 0.5)'
-              }}
+              onFocus={(e) => e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.12)'}
+              onBlur={(e) => e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.06)'}
             />
           </div>
-          
-          {/* Filter Dropdowns */}
+
+          {/* Filter chips — horizontal scroll */}
           <div style={{
             display: 'flex',
-            gap: '0.5rem',
-            alignItems: 'center',
-            flexWrap: 'wrap'
+            gap: '0.3rem',
+            overflowX: 'auto',
+            WebkitOverflowScrolling: 'touch',
+            scrollbarWidth: 'none',
+            msOverflowStyle: 'none',
+            paddingBottom: '0.25rem'
           }}>
-            {Object.entries(filterDropdowns).map(([key, dropdown]) => {
-              const Icon = dropdown.icon
-              const activeFilters = selectedFilters.filter(f => 
-                dropdown.filters.some(df => df.id === f)
-              )
-              
-              return (
-                <div key={key} className="dropdown-container" style={{ position: 'relative' }}>
-                  <button
-                    onClick={() => setOpenDropdown(openDropdown === key ? null : key)}
-                    style={{
-                      padding: isMobile ? '0.5rem 0.75rem' : '0.625rem 0.875rem',
-                      background: activeFilters.length > 0
-                        ? `linear-gradient(135deg, ${dropdown.color}20 0%, ${dropdown.color}10 100%)`
-                        : 'rgba(17, 17, 17, 0.5)',
-                      backdropFilter: 'blur(10px)',
-                      border: `1px solid ${activeFilters.length > 0 ? dropdown.color + '30' : 'rgba(16, 185, 129, 0.08)'}`,
-                      borderRadius: '10px',
-                      color: activeFilters.length > 0 ? dropdown.color : 'rgba(255, 255, 255, 0.7)',
-                      fontSize: isMobile ? '0.825rem' : '0.9rem',
-                      fontWeight: '600',
-                      cursor: 'pointer',
-                      transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '0.375rem',
-                      touchAction: 'manipulation',
-                      WebkitTapHighlightColor: 'transparent',
-                      minHeight: '38px'
-                    }}
-                    onMouseEnter={(e) => {
-                      if (activeFilters.length === 0) {
-                        e.currentTarget.style.background = 'rgba(16, 185, 129, 0.05)'
-                        e.currentTarget.style.border = '1px solid rgba(16, 185, 129, 0.15)'
-                      }
-                    }}
-                    onMouseLeave={(e) => {
-                      if (activeFilters.length === 0) {
-                        e.currentTarget.style.background = 'rgba(17, 17, 17, 0.5)'
-                        e.currentTarget.style.border = '1px solid rgba(16, 185, 129, 0.08)'
-                      }
-                    }}
-                  >
-                    <Icon size={16} />
-                    <span>{dropdown.label}</span>
-                    {activeFilters.length > 0 && (
-                      <span style={{
-                        padding: '0.125rem 0.375rem',
-                        background: dropdown.color,
-                        borderRadius: '4px',
-                        fontSize: '0.7rem',
-                        color: 'white',
-                        fontWeight: '700'
-                      }}>
-                        {activeFilters.length}
-                      </span>
-                    )}
-                    <ChevronDown 
-                      size={14} 
-                      style={{
-                        transform: openDropdown === key ? 'rotate(180deg)' : 'rotate(0)',
-                        transition: 'transform 0.3s ease'
-                      }}
-                    />
-                  </button>
-                  
-                  {/* Dropdown Menu */}
-                  {openDropdown === key && (
-                    <div style={{
-                      position: 'absolute',
-                      top: '100%',
-                      left: 0,
-                      marginTop: '0.375rem',
-                      background: 'linear-gradient(135deg, rgba(26, 26, 26, 0.98) 0%, rgba(20, 20, 20, 0.98) 100%)',
-                      backdropFilter: 'blur(20px)',
-                      border: '1px solid rgba(16, 185, 129, 0.15)',
-                      borderRadius: '12px',
-                      padding: '0.5rem',
-                      minWidth: '200px',
-                      maxWidth: '250px',
-                      zIndex: 10,
-                      boxShadow: '0 15px 40px rgba(0, 0, 0, 0.4), 0 0 20px rgba(16, 185, 129, 0.1)',
-                      animation: 'slideDown 0.2s ease'
-                    }}>
-                      {dropdown.filters.map(filter => {
-                        const isActive = selectedFilters.includes(filter.id)
-                        
-                        return (
-                          <button
-                            key={filter.id}
-                            onClick={() => toggleFilter(filter.id)}
-                            style={{
-                              width: '100%',
-                              padding: '0.625rem 0.875rem',
-                              background: isActive
-                                ? `linear-gradient(135deg, ${filter.color}25 0%, ${filter.color}15 100%)`
-                                : 'transparent',
-                              border: 'none',
-                              borderRadius: '8px',
-                              color: isActive ? filter.color : 'rgba(255, 255, 255, 0.7)',
-                              fontSize: '0.875rem',
-                              fontWeight: isActive ? '700' : '500',
-                              cursor: 'pointer',
-                              transition: 'all 0.2s ease',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'space-between',
-                              textAlign: 'left',
-                              marginBottom: '0.25rem'
-                            }}
-                            onMouseEnter={(e) => {
-                              e.currentTarget.style.background = isActive
-                                ? `linear-gradient(135deg, ${filter.color}30 0%, ${filter.color}20 100%)`
-                                : 'rgba(16, 185, 129, 0.05)'
-                            }}
-                            onMouseLeave={(e) => {
-                              e.currentTarget.style.background = isActive
-                                ? `linear-gradient(135deg, ${filter.color}25 0%, ${filter.color}15 100%)`
-                                : 'transparent'
-                            }}
-                          >
-                            <span>{filter.label}</span>
-                            {isActive && <Check size={16} />}
-                          </button>
-                        )
-                      })}
-                    </div>
-                  )}
-                </div>
-              )
-            })}
-            
-            {/* Clear Filters Button */}
-            {selectedFilters.length > 0 && (
+            {filters.map(f => (
               <button
-                onClick={clearFilters}
+                key={f.id}
+                onClick={() => setActiveFilter(f.id)}
                 style={{
-                  padding: isMobile ? '0.5rem 0.75rem' : '0.625rem 0.875rem',
-                  background: 'rgba(239, 68, 68, 0.1)',
-                  border: '1px solid rgba(239, 68, 68, 0.2)',
-                  borderRadius: '10px',
-                  color: '#ef4444',
-                  fontSize: isMobile ? '0.825rem' : '0.9rem',
-                  fontWeight: '600',
+                  padding: '0.35rem 0.625rem',
+                  background: activeFilter === f.id ? '#10b981' : 'transparent',
+                  border: activeFilter === f.id
+                    ? '1px solid rgba(16, 185, 129, 0.5)'
+                    : '1px solid rgba(255, 255, 255, 0.06)',
+                  borderRadius: '20px',
+                  color: activeFilter === f.id ? '#fff' : 'rgba(255, 255, 255, 0.4)',
+                  fontSize: isMobile ? '0.65rem' : '0.7rem',
+                  fontWeight: activeFilter === f.id ? '800' : '600',
                   cursor: 'pointer',
-                  transition: 'all 0.3s ease',
-                  minHeight: '38px'
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.background = 'rgba(239, 68, 68, 0.15)'
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.background = 'rgba(239, 68, 68, 0.1)'
+                  whiteSpace: 'nowrap',
+                  flexShrink: 0,
+                  touchAction: 'manipulation',
+                  WebkitTapHighlightColor: 'transparent',
+                  transition: 'all 0.15s ease',
+                  minHeight: '30px'
                 }}
               >
-                Clear ({selectedFilters.length})
+                {f.label}
               </button>
-            )}
+            ))}
           </div>
         </div>
-        
-        {/* Meals Grid - 2 Column Layout */}
+
+        {/* ── Meal List ── */}
         <div style={{
           flex: 1,
           overflowY: 'auto',
-          padding: isMobile ? '0.75rem' : '1.5rem',
-          background: 'linear-gradient(180deg, transparent 0%, rgba(16, 185, 129, 0.02) 100%)'
+          WebkitOverflowScrolling: 'touch'
         }}>
           {loading ? (
             <div style={{
               display: 'flex',
               justifyContent: 'center',
-              alignItems: 'center',
-              height: '200px'
+              padding: '3rem',
+              color: 'rgba(255, 255, 255, 0.2)'
             }}>
               <div style={{
-                width: '48px',
-                height: '48px',
-                border: '3px solid rgba(16, 185, 129, 0.15)',
-                borderTopColor: '#10b981',
+                width: '32px', height: '32px',
+                border: '2px solid rgba(255, 255, 255, 0.06)',
+                borderTopColor: 'rgba(255, 255, 255, 0.3)',
                 borderRadius: '50%',
-                animation: 'spin 1s cubic-bezier(0.4, 0, 0.2, 1) infinite'
+                animation: 'altSpin 0.8s linear infinite'
               }} />
             </div>
           ) : filteredMeals.length > 0 ? (
-            <div style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(2, 1fr)',
-              gap: isMobile ? '0.75rem' : '1rem'
-            }}>
-              {filteredMeals.map(meal => (
-                <MealCard
-                  key={meal.id}
-                  meal={meal}
-                  isSelected={selectedMeal?.id === meal.id}
-                  matchScore={activeTab === 'recommended' ? getMatchScore(meal) : null}
-                  onSelect={() => setSelectedMeal(meal)}
-                  isMobile={isMobile}
-                />
-              ))}
-            </div>
+            filteredMeals.map((meal, idx) => (
+              <SwapMealRow
+                key={meal.id || idx}
+                meal={meal}
+                currentMeal={currentMeal}
+                isSelected={selectedMeal?.id === meal.id}
+                onSelect={() => setSelectedMeal(selectedMeal?.id === meal.id ? null : meal)}
+                isMobile={isMobile}
+                getDiff={getDiff}
+              />
+            ))
           ) : (
             <div style={{
               textAlign: 'center',
-              padding: '3rem',
-              color: 'rgba(255, 255, 255, 0.5)'
+              padding: '3rem 1rem',
+              color: 'rgba(255, 255, 255, 0.25)'
             }}>
-              <Search size={48} style={{ marginBottom: '1rem', opacity: 0.2 }} />
-              <p style={{ fontSize: '1.125rem', marginBottom: '0.5rem' }}>Geen maaltijden gevonden</p>
-              <p style={{ fontSize: '0.875rem', opacity: 0.7 }}>Probeer andere filters of zoektermen</p>
+              <div style={{ fontSize: '0.85rem', marginBottom: '0.25rem' }}>
+                Geen resultaten
+              </div>
+              <div style={{ fontSize: '0.7rem' }}>
+                Probeer een ander filter of zoekterm
+              </div>
             </div>
           )}
         </div>
-        
-        {/* Premium Footer */}
+
+        {/* ── Footer — compare & confirm ── */}
         {selectedMeal && (
           <div style={{
-            padding: isMobile ? '1rem' : '1.25rem',
-            borderTop: '1px solid rgba(16, 185, 129, 0.08)',
-            background: 'linear-gradient(180deg, rgba(16, 185, 129, 0.05) 0%, transparent 100%)',
-            backdropFilter: 'blur(20px)',
-            display: 'flex',
-            gap: '1rem'
+            borderTop: '1px solid rgba(255, 255, 255, 0.06)',
+            flexShrink: 0
           }}>
-            <button
-              onClick={onClose}
-              style={{
-                flex: 1,
-                padding: isMobile ? '0.875rem' : '1rem',
-                background: 'rgba(17, 17, 17, 0.5)',
-                backdropFilter: 'blur(10px)',
-                border: '1px solid rgba(16, 185, 129, 0.08)',
-                borderRadius: '12px',
-                color: 'rgba(255, 255, 255, 0.6)',
-                fontSize: isMobile ? '0.95rem' : '1.05rem',
-                fontWeight: '600',
-                cursor: 'pointer',
-                transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                minHeight: '44px',
-                touchAction: 'manipulation',
-                WebkitTapHighlightColor: 'transparent'
-              }}
-            >
-              Annuleren
-            </button>
-            <button
-              onClick={() => onSelectMeal(selectedMeal.id)}
-              style={{
-                flex: 2,
-                padding: isMobile ? '0.875rem' : '1rem',
-                background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-                border: '1px solid rgba(16, 185, 129, 0.25)',
-                borderRadius: '12px',
-                color: 'white',
-                fontSize: isMobile ? '0.95rem' : '1.05rem',
-                fontWeight: '700',
-                cursor: 'pointer',
-                transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                boxShadow: '0 8px 32px rgba(16, 185, 129, 0.3)',
-                minHeight: '44px',
-                touchAction: 'manipulation',
-                WebkitTapHighlightColor: 'transparent',
-                letterSpacing: '-0.01em'
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.transform = 'translateY(-2px)'
-                e.currentTarget.style.boxShadow = '0 12px 40px rgba(16, 185, 129, 0.4)'
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.transform = 'translateY(0)'
-                e.currentTarget.style.boxShadow = '0 8px 32px rgba(16, 185, 129, 0.3)'
-              }}
-            >
-              Selecteer {selectedMeal.name}
-            </button>
+            {/* Compare bar */}
+            <div style={{
+              display: 'flex',
+              justifyContent: 'center',
+              gap: isMobile ? '1rem' : '1.5rem',
+              padding: '0.5rem 1rem',
+              borderBottom: '1px solid rgba(255, 255, 255, 0.04)'
+            }}>
+              {[
+                { label: 'kcal', diff: getDiff(selectedMeal.calories, currentMeal?.calories) },
+                { label: 'eiwit', diff: getDiff(selectedMeal.protein, currentMeal?.protein) },
+                { label: 'koolh', diff: getDiff(selectedMeal.carbs, currentMeal?.carbs) },
+                { label: 'vet', diff: getDiff(selectedMeal.fat, currentMeal?.fat) }
+              ].map(item => {
+                const DiffIcon = item.diff.Icon
+                return (
+                  <div key={item.label} style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.2rem'
+                  }}>
+                    <DiffIcon size={10} color={item.diff.color} />
+                    <span style={{
+                      fontSize: isMobile ? '0.65rem' : '0.7rem',
+                      fontWeight: '800',
+                      color: item.diff.color
+                    }}>
+                      {item.diff.text}
+                    </span>
+                    <span style={{
+                      fontSize: isMobile ? '0.5rem' : '0.55rem',
+                      fontWeight: '600',
+                      color: 'rgba(255, 255, 255, 0.2)',
+                      textTransform: 'uppercase'
+                    }}>
+                      {item.label}
+                    </span>
+                  </div>
+                )
+              })}
+            </div>
+
+            {/* Action buttons */}
+            <div style={{ display: 'flex' }}>
+              <button
+                onClick={onClose}
+                style={{
+                  flex: 1,
+                  background: 'transparent',
+                  border: 'none',
+                  borderRight: '1px solid rgba(255, 255, 255, 0.04)',
+                  borderRadius: 0,
+                  padding: isMobile ? '0.75rem' : '0.875rem',
+                  color: 'rgba(255, 255, 255, 0.4)',
+                  fontSize: isMobile ? '0.75rem' : '0.8rem',
+                  fontWeight: '700',
+                  cursor: 'pointer',
+                  minHeight: '44px',
+                  touchAction: 'manipulation',
+                  WebkitTapHighlightColor: 'transparent'
+                }}
+              >
+                Annuleren
+              </button>
+              <button
+                onClick={() => onSelectMeal(selectedMeal.id)}
+                style={{
+                  flex: 2,
+                  background: 'rgba(16, 185, 129, 0.12)',
+                  border: 'none',
+                  borderRadius: 0,
+                  padding: isMobile ? '0.75rem' : '0.875rem',
+                  color: '#10b981',
+                  fontSize: isMobile ? '0.75rem' : '0.8rem',
+                  fontWeight: '800',
+                  cursor: 'pointer',
+                  minHeight: '44px',
+                  touchAction: 'manipulation',
+                  WebkitTapHighlightColor: 'transparent',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '0.35rem'
+                }}
+              >
+                <Check size={15} strokeWidth={2.5} />
+                Wissel hiermee
+              </button>
+            </div>
           </div>
         )}
       </div>
-      
-      {/* Premium Animations */}
+
       <style>{`
-        @keyframes fadeIn {
-          from { 
-            opacity: 0;
-            transform: scale(0.95);
-          }
-          to { 
-            opacity: 1;
-            transform: scale(1);
-          }
+        @keyframes altFadeIn {
+          from { opacity: 0; }
+          to { opacity: 1; }
         }
-        
-        @keyframes slideDown {
-          from {
-            opacity: 0;
-            transform: translateY(-10px);
-          }
-          to {
-            opacity: 1;
-            transform: translateY(0);
-          }
-        }
-        
-        @keyframes spin {
+        @keyframes altSpin {
           to { transform: rotate(360deg); }
         }
-        
-        @keyframes pulse {
-          0%, 100% { 
-            transform: scale(1);
-            opacity: 1;
-          }
-          50% { 
-            transform: scale(1.1);
-            opacity: 0.8;
-          }
-        }
+        div::-webkit-scrollbar { display: none; }
       `}</style>
     </div>
   )
 }
 
-// Premium Meal Card Component - Optimized for 2-column grid
-function MealCard({ meal, isSelected, matchScore, onSelect, isMobile }) {
-  const [isHovered, setIsHovered] = useState(false)
-  
+// ── Single meal row in the list ──
+function SwapMealRow({ meal, currentMeal, isSelected, onSelect, isMobile, getDiff }) {
   const getMealImage = () => {
     if (meal.image_url) return meal.image_url
-    
     const fallbacks = {
-      breakfast: 'https://images.unsplash.com/photo-1525351484163-7529414344d8?w=400&h=300&fit=crop',
-      lunch: 'https://images.unsplash.com/photo-1547592166-23ac45744acd?w=400&h=300&fit=crop',
-      dinner: 'https://images.unsplash.com/photo-1555939594-58d7cb561ad1?w=400&h=300&fit=crop',
-      snack: 'https://images.unsplash.com/photo-1490474504059-bf2db5ab2348?w=400&h=300&fit=crop'
+      breakfast: 'https://images.unsplash.com/photo-1525351484163-7529414344d8?w=200&h=200&fit=crop&q=80',
+      lunch: 'https://images.unsplash.com/photo-1547592166-23ac45744acd?w=200&h=200&fit=crop&q=80',
+      dinner: 'https://images.unsplash.com/photo-1555939594-58d7cb561ad1?w=200&h=200&fit=crop&q=80',
+      snack: 'https://images.unsplash.com/photo-1490474504059-bf2db5ab2348?w=200&h=200&fit=crop&q=80'
     }
-    
-    const type = meal.timing?.[0] || meal.meal_type || 'lunch'
+    const type = meal.timing?.[0] || 'lunch'
     return fallbacks[type] || fallbacks.lunch
   }
-  
+
+  const calDiff = getDiff(meal.calories, currentMeal?.calories)
+  const protDiff = getDiff(meal.protein, currentMeal?.protein)
+
   return (
     <div
       onClick={onSelect}
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={() => setIsHovered(false)}
       style={{
-        background: isSelected
-          ? 'linear-gradient(135deg, rgba(16, 185, 129, 0.12) 0%, rgba(16, 185, 129, 0.04) 100%)'
-          : 'rgba(17, 17, 17, 0.5)',
-        backdropFilter: 'blur(10px)',
-        borderRadius: '16px',
-        overflow: 'hidden',
-        border: isSelected
-          ? '2px solid rgba(16, 185, 129, 0.25)'
-          : '1px solid rgba(16, 185, 129, 0.08)',
+        display: 'flex',
+        alignItems: 'center',
+        borderBottom: '1px solid rgba(255, 255, 255, 0.04)',
+        background: isSelected ? 'rgba(16, 185, 129, 0.06)' : 'transparent',
         cursor: 'pointer',
-        transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-        transform: isHovered ? 'translateY(-4px) scale(1.02)' : 'translateY(0) scale(1)',
-        boxShadow: isSelected
-          ? '0 20px 40px rgba(16, 185, 129, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.03)'
-          : isHovered
-            ? '0 15px 35px rgba(0, 0, 0, 0.3)'
-            : '0 4px 16px rgba(16, 185, 129, 0.05)',
+        transition: 'background 0.15s ease',
         touchAction: 'manipulation',
         WebkitTapHighlightColor: 'transparent'
       }}
     >
-      {/* Image Section - Optimized for 2-column */}
+      {/* Photo */}
       <div style={{
-        height: isMobile ? '120px' : '140px',
-        background: `linear-gradient(180deg, transparent 0%, rgba(0, 0, 0, 0.7) 100%), url(${getMealImage()}) center/cover`,
+        width: isMobile ? '56px' : '64px',
+        height: isMobile ? '56px' : '64px',
+        flexShrink: 0,
+        background: `url(${getMealImage()}) center/cover`,
         position: 'relative'
       }}>
-        {/* Match Score Badge */}
-        {matchScore !== null && matchScore > 0 && (
-          <div style={{
-            position: 'absolute',
-            top: '0.5rem',
-            right: '0.5rem',
-            background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.9) 0%, rgba(5, 150, 105, 0.9) 100%)',
-            backdropFilter: 'blur(10px)',
-            borderRadius: '8px',
-            padding: '0.25rem 0.5rem',
-            fontSize: isMobile ? '0.7rem' : '0.75rem',
-            fontWeight: '700',
-            color: 'white',
-            boxShadow: '0 4px 12px rgba(16, 185, 129, 0.3)'
-          }}>
-            {matchScore}%
-          </div>
-        )}
-        
-        {/* Selected Check */}
         {isSelected && (
           <div style={{
             position: 'absolute',
-            top: '0.5rem',
-            left: '0.5rem',
-            width: '28px',
-            height: '28px',
-            background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-            borderRadius: '50%',
+            inset: 0,
+            background: 'rgba(16, 185, 129, 0.8)',
             display: 'flex',
             alignItems: 'center',
-            justifyContent: 'center',
-            boxShadow: '0 6px 16px rgba(16, 185, 129, 0.4)',
-            animation: 'pulse 2s cubic-bezier(0.4, 0, 0.2, 1) infinite'
+            justifyContent: 'center'
           }}>
-            <Check size={16} color="white" strokeWidth={3} />
+            <Check size={20} color="white" strokeWidth={3} />
           </div>
         )}
       </div>
-      
-      {/* Content Section - Compact for 2-column */}
+
+      {/* Info */}
       <div style={{
-        padding: isMobile ? '0.75rem' : '0.875rem'
+        flex: 1,
+        minWidth: 0,
+        width: 0,
+        padding: isMobile ? '0.5rem 0.625rem' : '0.625rem 0.75rem',
+        overflow: 'hidden'
       }}>
-        {/* Meal Name */}
-        <h4 style={{
-          fontSize: isMobile ? '0.9rem' : '1rem',
+        {/* Name */}
+        <div style={{
+          fontSize: isMobile ? '0.8rem' : '0.85rem',
           fontWeight: '700',
-          color: isSelected ? '#10b981' : 'white',
-          marginBottom: '0.5rem',
+          color: isSelected ? '#fff' : 'rgba(255, 255, 255, 0.85)',
+          whiteSpace: 'nowrap',
           overflow: 'hidden',
           textOverflow: 'ellipsis',
-          whiteSpace: 'nowrap',
-          letterSpacing: '-0.02em'
+          letterSpacing: '-0.01em',
+          marginBottom: '0.2rem'
         }}>
           {meal.name}
-        </h4>
-        
-        {/* Compact Macros */}
+        </div>
+
+        {/* Macros + diff indicators */}
         <div style={{
           display: 'flex',
-          gap: '0.75rem',
-          marginBottom: '0.5rem'
+          gap: isMobile ? '0.625rem' : '0.75rem',
+          alignItems: 'center'
         }}>
-          <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.25rem'
-          }}>
-            <Flame size={12} color="#f59e0b" />
+          {/* Calories */}
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.1rem' }}>
             <span style={{
-              fontSize: isMobile ? '0.8rem' : '0.85rem',
-              fontWeight: '600',
-              color: '#f59e0b'
+              fontSize: isMobile ? '0.7rem' : '0.75rem',
+              fontWeight: '800',
+              color: 'rgba(255, 255, 255, 0.5)'
             }}>
               {Math.round(meal.calories)}
             </span>
-          </div>
-          
-          <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.25rem'
-          }}>
-            <Target size={12} color="#8b5cf6" />
             <span style={{
-              fontSize: isMobile ? '0.8rem' : '0.85rem',
+              fontSize: '0.45rem',
               fontWeight: '600',
-              color: '#8b5cf6'
+              color: 'rgba(255, 255, 255, 0.2)',
+              textTransform: 'uppercase'
             }}>
-              {Math.round(meal.protein)}g
+              kcal
             </span>
           </div>
-        </div>
-        
-        {/* Compact Labels - Max 2 */}
-        {meal.labels && meal.labels.length > 0 && (
+
+          {/* Protein */}
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.1rem' }}>
+            <span style={{
+              fontSize: isMobile ? '0.7rem' : '0.75rem',
+              fontWeight: '800',
+              color: 'rgba(255, 255, 255, 0.5)'
+            }}>
+              {Math.round(meal.protein)}
+            </span>
+            <span style={{
+              fontSize: '0.45rem',
+              fontWeight: '600',
+              color: 'rgba(255, 255, 255, 0.2)',
+              textTransform: 'uppercase'
+            }}>
+              eiwit
+            </span>
+          </div>
+
+          {/* Diff badges */}
           <div style={{
             display: 'flex',
-            gap: '0.25rem',
-            flexWrap: 'wrap'
+            gap: '0.3rem',
+            marginLeft: 'auto'
           }}>
-            {meal.labels.slice(0, 2).map((label, idx) => (
-              <span
-                key={idx}
-                style={{
-                  fontSize: '0.6rem',
-                  padding: '0.2rem 0.4rem',
-                  background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.12) 0%, rgba(16, 185, 129, 0.06) 100%)',
-                  border: '1px solid rgba(16, 185, 129, 0.2)',
-                  borderRadius: '4px',
-                  color: '#10b981',
-                  fontWeight: '700',
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.03em'
-                }}
-              >
-                {label}
-              </span>
-            ))}
-            {meal.labels.length > 2 && (
-              <span style={{
-                fontSize: '0.6rem',
-                padding: '0.2rem 0.4rem',
-                color: 'rgba(16, 185, 129, 0.5)',
-                fontWeight: '600'
-              }}>
-                +{meal.labels.length - 2}
-              </span>
-            )}
+            <DiffBadge diff={calDiff} label="kcal" isMobile={isMobile} />
+            <DiffBadge diff={protDiff} label="E" isMobile={isMobile} />
           </div>
-        )}
+        </div>
       </div>
+    </div>
+  )
+}
+
+// ── Tiny diff badge ──
+function DiffBadge({ diff, label, isMobile }) {
+  const DiffIcon = diff.Icon
+  return (
+    <div style={{
+      display: 'flex',
+      alignItems: 'center',
+      gap: '0.1rem',
+      padding: '0.15rem 0.3rem',
+      background: `${diff.color}10`,
+      borderRadius: '4px',
+      flexShrink: 0
+    }}>
+      <DiffIcon size={8} color={diff.color} />
+      <span style={{
+        fontSize: isMobile ? '0.5rem' : '0.55rem',
+        fontWeight: '800',
+        color: diff.color
+      }}>
+        {diff.text}
+      </span>
     </div>
   )
 }

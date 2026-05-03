@@ -1,14 +1,15 @@
 import useIsMobile from '../../hooks/useIsMobile'
-// src/modules/videos/ClientVideoWidget.jsx - IMPROVED VERSION
+// src/modules/videos/ClientVideoWidget.jsx
+// v2.0 - Category tabs + gallery scroll
+// FIXED: YouTube shorts URL support, removed broken getTodaysVideo call
 import React, { useState, useEffect, useRef } from 'react'
-import { 
-  Play, X, Clock, Star, ChevronRight,
-  Zap, Target, Heart, Brain, Activity,
-  Coffee, Sun, Moon, Volume2, VolumeX
+import {
+  Play, X, Zap, Target, Heart, Brain, Activity,
+  Volume2, VolumeX, CheckCircle2
 } from 'lucide-react'
 import videoService from './VideoService'
 
-// Singleton pattern
+// Singleton pattern to prevent double-load across re-mounts
 let globalVideoLoadState = {}
 
 // Page color schemes
@@ -35,21 +36,66 @@ const PAGE_THEMES = {
   }
 }
 
+const CATEGORY_META = {
+  education:  { label: 'Uitleg',     icon: Brain },
+  technique:  { label: 'Techniek',   icon: Target },
+  nutrition:  { label: 'Voeding',    icon: Heart },
+  motivation: { label: 'Motivatie',  icon: Zap },
+  mindset:    { label: 'Mindset',    icon: Brain },
+  recovery:   { label: 'Herstel',    icon: Activity },
+  challenge:  { label: 'Challenge',  icon: Zap }
+}
+
+// FIXED: YouTube ID extractor — now supports shorts + mobile URLs
+const extractYouTubeId = (url) => {
+  if (!url) return null
+  const patterns = [
+    /youtube\.com\/watch\?v=([^&\n?#]+)/,
+    /youtu\.be\/([^&\n?#]+)/,
+    /youtube\.com\/embed\/([^&\n?#]+)/,
+    /youtube\.com\/shorts\/([^&\n?#]+)/,
+    /m\.youtube\.com\/watch\?v=([^&\n?#]+)/,
+    /m\.youtube\.com\/shorts\/([^&\n?#]+)/
+  ]
+  for (const p of patterns) {
+    const m = url.match(p)
+    if (m && m[1]) return m[1]
+  }
+  return null
+}
+
+const getCategoryMeta = (category) => {
+  return CATEGORY_META[category] || { label: category || 'Video', icon: Zap }
+}
+
 export default function ClientVideoWidget({ client, db, pageContext = 'home' }) {
-  const [todaysVideo, setTodaysVideo] = useState(null)
-  const [recentVideos, setRecentVideos] = useState([])
+  const [allVideos, setAllVideos] = useState([])
+  const [selectedCategory, setSelectedCategory] = useState('all')
+  const [selectedIndex, setSelectedIndex] = useState(0)
   const [loading, setLoading] = useState(true)
   const [isPlaying, setIsPlaying] = useState(false)
-  const [isMuted, setIsMuted] = useState(true) // Start muted for autoplay
+  const [isMuted, setIsMuted] = useState(true)
   const [showControls, setShowControls] = useState(false)
-  
+
   const playerRef = useRef(null)
   const loadedRef = useRef(false)
   const mountedRef = useRef(true)
   const instanceId = useRef(Math.random().toString(36).substr(2, 9))
-  
+
   const isMobile = useIsMobile()
   const theme = PAGE_THEMES[pageContext] || PAGE_THEMES.home
+
+  // Derived: available categories from loaded videos
+  const availableCategories = [...new Set(
+    allVideos.map(v => v?.video?.category).filter(Boolean)
+  )]
+
+  // Derived: filtered list
+  const filteredVideos = selectedCategory === 'all'
+    ? allVideos
+    : allVideos.filter(v => v?.video?.category === selectedCategory)
+
+  const featured = filteredVideos[selectedIndex]
 
   useEffect(() => {
     return () => {
@@ -65,221 +111,341 @@ export default function ClientVideoWidget({ client, db, pageContext = 'home' }) 
       setLoading(false)
       return
     }
-    
+
     // Check cache
-    if (window.__videoWidgetData && window.__videoWidgetData[client.id]) {
-      const cachedData = window.__videoWidgetData[client.id]
-      const cacheAge = Date.now() - cachedData.loadedAt
-      
-      if (cacheAge < 30000) {
-        setTodaysVideo(cachedData.todaysVideo)
-        setRecentVideos(cachedData.recentVideos)
+    if (window.__videoWidgetData && window.__videoWidgetData[client.id + '_' + pageContext]) {
+      const cached = window.__videoWidgetData[client.id + '_' + pageContext]
+      const age = Date.now() - cached.loadedAt
+      if (age < 30000) {
+        setAllVideos(cached.videos)
         setLoading(false)
         return
       }
     }
-    
+
     if (globalVideoLoadState[client.id] && globalVideoLoadState[client.id] !== instanceId.current) {
       setLoading(false)
       return
     }
-    
+
     if (loadedRef.current) return
-    
+
     globalVideoLoadState[client.id] = instanceId.current
     loadedRef.current = true
     loadVideos()
-    
+
     return () => {
       loadedRef.current = false
     }
-  }, [client?.id, db])
+  }, [client?.id, db, pageContext])
 
   const loadVideos = async () => {
     if (!mountedRef.current || !db) return
-    
+
     setLoading(true)
     try {
-      const homeVideos = await videoService.getVideosForPage(client.id, pageContext, {}, db)
-      
+      const videos = await videoService.getVideosForPage(client.id, pageContext, {}, db)
+
       if (!mountedRef.current) return
-      
-      const todayVideo = await videoService.getTodaysVideo(client.id, pageContext, db)
-      
-      if (mountedRef.current) {
-        setTodaysVideo(todayVideo)
-        setRecentVideos(homeVideos.slice(0, 5))
-        
-        // Cache
-        if (!window.__videoWidgetData) {
-          window.__videoWidgetData = {}
-        }
-        window.__videoWidgetData[client.id] = {
-          todaysVideo: todayVideo,
-          recentVideos: homeVideos.slice(0, 5),
-          loadedAt: Date.now()
-        }
+
+      setAllVideos(videos || [])
+      setSelectedIndex(0)
+
+      // Cache
+      if (!window.__videoWidgetData) window.__videoWidgetData = {}
+      window.__videoWidgetData[client.id + '_' + pageContext] = {
+        videos: videos || [],
+        loadedAt: Date.now()
       }
     } catch (error) {
-      console.error('Error loading videos:', error)
+      console.error('❌ Error loading videos:', error)
     } finally {
-      if (mountedRef.current) {
-        setLoading(false)
-      }
+      if (mountedRef.current) setLoading(false)
     }
   }
 
-  const handlePlayVideo = async () => {
-    if (!todaysVideo) return
-    
+  const handleSelectCategory = (catKey) => {
+    setSelectedCategory(catKey)
+    setSelectedIndex(0)
+    setIsPlaying(false)
+  }
+
+  const handleSelectVideo = (idxInFiltered) => {
+    setSelectedIndex(idxInFiltered)
+    setIsPlaying(false)
+  }
+
+  const handlePlay = async () => {
+    if (!featured) return
     setIsPlaying(true)
-    
-    // Mark as viewed
-    await videoService.markVideoWatched(todaysVideo.id, { duration: 0 }, db)
-    
-    // Try to play
-    if (playerRef.current) {
+    if (featured.assignment_id) {
       try {
-        await playerRef.current.play()
+        await videoService.markAsViewed(featured.assignment_id)
       } catch (e) {
-        // Browser blocks autoplay
-        console.log('Autoplay blocked, user interaction required')
-        setIsMuted(true) // Ensure muted for retry
+        console.error('❌ markAsViewed failed:', e)
       }
     }
   }
 
-  const getCategoryConfig = (category) => {
-    const configs = {
-      motivation: { icon: Zap, label: 'Motivatie' },
-      technique: { icon: Target, label: 'Techniek' },
-      nutrition: { icon: Heart, label: 'Voeding' },
-      mindset: { icon: Brain, label: 'Mindset' },
-      recovery: { icon: Activity, label: 'Herstel' }
-    }
-    return configs[category] || configs.motivation
-  }
-
-  const extractYouTubeId = (url) => {
-    if (!url) return null
-    const match = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([^&\n?#]+)/)
-    return match ? match[1] : null
-  }
-
+  // LOADING
   if (loading) {
     return (
       <div style={{
-        background: `${theme.gradient}`,
+        background: theme.gradient,
         borderRadius: '16px',
         padding: isMobile ? '1rem' : '1.5rem',
-        minHeight: '200px',
+        minHeight: '180px',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
         opacity: 0.8
       }}>
-        <div style={{ textAlign: 'center', color: '#fff' }}>
+        <div style={{ textAlign: 'center', color: '#fff', fontSize: '0.85rem', fontWeight: '600' }}>
           Videos laden...
         </div>
       </div>
     )
   }
 
-  if (todaysVideo) {
-    const video = todaysVideo.video
-    const categoryConfig = getCategoryConfig(video.category)
-    const videoId = extractYouTubeId(video.video_url)
-    
+  // EMPTY
+  if (!allVideos.length) {
     return (
       <div style={{
-        background: theme.gradient,
+        background: `linear-gradient(135deg, ${theme.color}20 0%, ${theme.color}10 100%)`,
         borderRadius: '20px',
-        overflow: 'hidden',
-        boxShadow: '0 10px 40px rgba(0,0,0,0.3)',
-        position: 'relative'
+        padding: isMobile ? '1.5rem' : '2rem',
+        border: `2px solid ${theme.color}30`,
+        textAlign: 'center'
       }}>
-        {/* Header Section */}
+        <Play size={48} style={{ color: theme.color, opacity: 0.3, margin: '0 auto 1rem' }} />
+        <h3 style={{
+          fontSize: isMobile ? '1.1rem' : '1.25rem',
+          fontWeight: 'bold',
+          color: '#fff',
+          marginBottom: '0.5rem'
+        }}>
+          Nog geen videos beschikbaar
+        </h3>
+        <p style={{
+          fontSize: isMobile ? '0.85rem' : '0.9rem',
+          color: 'rgba(255,255,255,0.5)'
+        }}>
+          Je coach zal binnenkort videos met je delen!
+        </p>
+      </div>
+    )
+  }
+
+  const featuredVideo = featured?.video
+  const videoId = featuredVideo ? extractYouTubeId(featuredVideo.video_url) : null
+  const featuredCatMeta = getCategoryMeta(featuredVideo?.category)
+  const FeaturedCatIcon = featuredCatMeta.icon
+
+  return (
+    <div style={{
+      background: theme.gradient,
+      borderRadius: '20px',
+      overflow: 'hidden',
+      boxShadow: '0 10px 40px rgba(0,0,0,0.3)',
+      position: 'relative'
+    }}>
+      {/* ── HEADER ── */}
+      <div style={{
+        padding: isMobile ? '0.875rem 1rem 0' : '1.125rem 1.25rem 0'
+      }}>
         <div style={{
-          padding: isMobile ? '1rem' : '1.25rem',
-          paddingBottom: '0'
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          marginBottom: '0.625rem'
         }}>
           <div style={{
             display: 'flex',
             alignItems: 'center',
-            justifyContent: 'space-between',
-            marginBottom: '0.75rem'
+            gap: '0.5rem'
+          }}>
+            <Zap size={15} color="rgba(255,255,255,0.9)" />
+            <span style={{
+              fontSize: '0.8rem',
+              color: 'rgba(255,255,255,0.95)',
+              fontWeight: '700',
+              letterSpacing: '-0.01em'
+            }}>
+              {theme.label}
+            </span>
+          </div>
+          <div style={{
+            padding: '0.25rem 0.5rem',
+            background: 'rgba(255,255,255,0.18)',
+            borderRadius: '6px',
+            fontSize: '0.65rem',
+            fontWeight: '700',
+            color: '#fff',
+            letterSpacing: '0.02em'
+          }}>
+            {filteredVideos.length} video{filteredVideos.length !== 1 ? 's' : ''}
+          </div>
+        </div>
+      </div>
+
+      {/* ── CATEGORY TABS ── Only if >1 category */}
+      {availableCategories.length > 1 && (
+        <div
+          className="cvw-cat-row"
+          style={{
+            display: 'flex',
+            gap: '0.375rem',
+            padding: isMobile ? '0 1rem 0.75rem' : '0 1.25rem 0.875rem',
+            overflowX: 'auto',
+            WebkitOverflowScrolling: 'touch',
+            scrollbarWidth: 'none'
+          }}
+        >
+          {/* Alles tab */}
+          <button
+            onClick={() => handleSelectCategory('all')}
+            style={{
+              padding: '0.35rem 0.7rem',
+              background: selectedCategory === 'all' ? '#fff' : 'rgba(255,255,255,0.15)',
+              border: 'none',
+              borderRadius: '20px',
+              color: selectedCategory === 'all' ? theme.color : '#fff',
+              fontSize: '0.68rem',
+              fontWeight: '800',
+              cursor: 'pointer',
+              whiteSpace: 'nowrap',
+              flexShrink: 0,
+              touchAction: 'manipulation',
+              WebkitTapHighlightColor: 'transparent',
+              transition: 'all 0.15s ease',
+              minHeight: '30px',
+              textTransform: 'uppercase',
+              letterSpacing: '0.03em'
+            }}
+          >
+            Alles
+          </button>
+
+          {availableCategories.map(catKey => {
+            const meta = getCategoryMeta(catKey)
+            const Icon = meta.icon
+            const isActive = selectedCategory === catKey
+            return (
+              <button
+                key={catKey}
+                onClick={() => handleSelectCategory(catKey)}
+                style={{
+                  padding: '0.35rem 0.7rem',
+                  background: isActive ? '#fff' : 'rgba(255,255,255,0.15)',
+                  border: 'none',
+                  borderRadius: '20px',
+                  color: isActive ? theme.color : '#fff',
+                  fontSize: '0.68rem',
+                  fontWeight: '800',
+                  cursor: 'pointer',
+                  whiteSpace: 'nowrap',
+                  flexShrink: 0,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.3rem',
+                  touchAction: 'manipulation',
+                  WebkitTapHighlightColor: 'transparent',
+                  transition: 'all 0.15s ease',
+                  minHeight: '30px',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.03em'
+                }}
+              >
+                <Icon size={11} />
+                {meta.label}
+              </button>
+            )
+          })}
+        </div>
+      )}
+
+      {/* ── FEATURED VIDEO TITLE ── */}
+      {featuredVideo && (
+        <div style={{
+          padding: isMobile ? '0 1rem 0.75rem' : '0 1.25rem 0.875rem'
+        }}>
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.4rem',
+            marginBottom: '0.35rem'
           }}>
             <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.5rem'
-            }}>
-              <Zap size={16} color="rgba(255,255,255,0.9)" />
-              <span style={{
-                fontSize: '0.85rem',
-                color: 'rgba(255,255,255,0.95)',
-                fontWeight: '600'
-              }}>
-                {theme.label}
-              </span>
-            </div>
-            <div style={{
-              padding: '0.3rem 0.6rem',
+              padding: '0.2rem 0.45rem',
               background: 'rgba(255,255,255,0.2)',
-              backdropFilter: 'blur(10px)',
-              borderRadius: '6px',
-              fontSize: '0.7rem',
-              fontWeight: '600',
+              borderRadius: '4px',
+              fontSize: '0.6rem',
+              fontWeight: '700',
               color: '#fff',
               display: 'flex',
               alignItems: 'center',
-              gap: '0.3rem'
+              gap: '0.25rem',
+              letterSpacing: '0.02em'
             }}>
-              {React.createElement(categoryConfig.icon, { size: 12 })}
-              {categoryConfig.label}
+              <FeaturedCatIcon size={10} />
+              {featuredCatMeta.label}
             </div>
+            {featured?.viewed_at && (
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.2rem',
+                fontSize: '0.6rem',
+                color: 'rgba(255,255,255,0.75)',
+                fontWeight: '600'
+              }}>
+                <CheckCircle2 size={10} />
+                Bekeken
+              </div>
+            )}
           </div>
-
           <h3 style={{
-            fontSize: isMobile ? '1.1rem' : '1.25rem',
-            fontWeight: 'bold',
+            fontSize: isMobile ? '1.05rem' : '1.2rem',
+            fontWeight: '800',
             color: '#fff',
-            marginBottom: '0.5rem',
-            lineHeight: 1.2
+            margin: 0,
+            lineHeight: 1.25,
+            letterSpacing: '-0.01em'
           }}>
-            {video.title}
+            {featuredVideo.title}
           </h3>
-          
-          {video.description && (
+          {featuredVideo.description && (
             <p style={{
-              fontSize: isMobile ? '0.85rem' : '0.9rem',
-              color: 'rgba(255,255,255,0.9)',
+              fontSize: isMobile ? '0.8rem' : '0.85rem',
+              color: 'rgba(255,255,255,0.85)',
               lineHeight: 1.4,
-              marginBottom: '1rem'
+              margin: '0.4rem 0 0 0'
             }}>
-              {video.description}
+              {featuredVideo.description}
             </p>
           )}
         </div>
+      )}
 
-        {/* Video Player Section - INLINE, NO POPUP */}
-        <div style={{
-          position: 'relative',
-          width: '100%',
-          paddingBottom: isPlaying ? '0' : '56.25%',
-          background: '#000',
-          cursor: isPlaying ? 'default' : 'pointer'
-        }}
-        onClick={() => !isPlaying && handlePlayVideo()}
-        onMouseEnter={() => setShowControls(true)}
-        onMouseLeave={() => setShowControls(false)}
+      {/* ── PLAYER ── */}
+      {featuredVideo && (
+        <div
+          style={{
+            position: 'relative',
+            width: '100%',
+            paddingBottom: isPlaying ? '0' : '56.25%',
+            background: '#000',
+            cursor: isPlaying ? 'default' : 'pointer'
+          }}
+          onClick={() => !isPlaying && handlePlay()}
+          onMouseEnter={() => setShowControls(true)}
+          onMouseLeave={() => setShowControls(false)}
         >
           {!isPlaying && videoId ? (
             <>
-              {/* Thumbnail */}
               <img
                 src={`https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`}
-                alt={video.title}
+                alt={featuredVideo.title}
                 style={{
                   position: 'absolute',
                   top: 0,
@@ -292,14 +458,9 @@ export default function ClientVideoWidget({ client, db, pageContext = 'home' }) 
                   e.target.src = `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`
                 }}
               />
-              
-              {/* Play Button Overlay */}
               <div style={{
                 position: 'absolute',
-                top: 0,
-                left: 0,
-                right: 0,
-                bottom: 0,
+                inset: 0,
                 background: 'rgba(0,0,0,0.3)',
                 display: 'flex',
                 alignItems: 'center',
@@ -314,16 +475,8 @@ export default function ClientVideoWidget({ client, db, pageContext = 'home' }) 
                   alignItems: 'center',
                   justifyContent: 'center',
                   boxShadow: '0 8px 25px rgba(0,0,0,0.4)',
-                  transition: 'transform 0.2s ease',
-                  transform: 'scale(1)'
-                }}
-                onMouseEnter={(e) => {
-                  if (!isMobile) e.currentTarget.style.transform = 'scale(1.1)'
-                }}
-                onMouseLeave={(e) => {
-                  if (!isMobile) e.currentTarget.style.transform = 'scale(1)'
-                }}
-                >
+                  transition: 'transform 0.2s ease'
+                }}>
                   <Play size={28} color="#000" style={{ marginLeft: '5px' }} />
                 </div>
               </div>
@@ -348,8 +501,6 @@ export default function ClientVideoWidget({ client, db, pageContext = 'home' }) 
                 allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                 allowFullScreen
               />
-              
-              {/* Custom Controls Overlay */}
               {showControls && (
                 <div style={{
                   position: 'absolute',
@@ -363,10 +514,7 @@ export default function ClientVideoWidget({ client, db, pageContext = 'home' }) 
                   justifyContent: 'space-between'
                 }}>
                   <button
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      setIsMuted(!isMuted)
-                    }}
+                    onClick={(e) => { e.stopPropagation(); setIsMuted(!isMuted) }}
                     style={{
                       background: 'rgba(255,255,255,0.2)',
                       border: 'none',
@@ -375,17 +523,15 @@ export default function ClientVideoWidget({ client, db, pageContext = 'home' }) 
                       cursor: 'pointer',
                       display: 'flex',
                       alignItems: 'center',
-                      justifyContent: 'center'
+                      justifyContent: 'center',
+                      touchAction: 'manipulation',
+                      WebkitTapHighlightColor: 'transparent'
                     }}
                   >
                     {isMuted ? <VolumeX size={20} color="#fff" /> : <Volume2 size={20} color="#fff" />}
                   </button>
-                  
                   <button
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      setIsPlaying(false)
-                    }}
+                    onClick={(e) => { e.stopPropagation(); setIsPlaying(false) }}
                     style={{
                       background: 'rgba(255,255,255,0.2)',
                       border: 'none',
@@ -394,7 +540,9 @@ export default function ClientVideoWidget({ client, db, pageContext = 'home' }) 
                       cursor: 'pointer',
                       display: 'flex',
                       alignItems: 'center',
-                      justifyContent: 'center'
+                      justifyContent: 'center',
+                      touchAction: 'manipulation',
+                      WebkitTapHighlightColor: 'transparent'
                     }}
                   >
                     <X size={20} color="#fff" />
@@ -402,135 +550,143 @@ export default function ClientVideoWidget({ client, db, pageContext = 'home' }) 
                 </div>
               )}
             </div>
-          ) : null}
-        </div>
-
-        {/* Recent Videos Bar */}
-        {recentVideos.length > 1 && !isPlaying && (
-          <div style={{
-            padding: isMobile ? '0.75rem 1rem' : '1rem 1.25rem',
-            background: 'rgba(0,0,0,0.2)',
-            borderTop: '1px solid rgba(255,255,255,0.1)'
-          }}>
+          ) : (
             <div style={{
-              fontSize: '0.75rem',
-              color: 'rgba(255,255,255,0.8)',
-              marginBottom: '0.5rem',
+              position: 'absolute',
+              inset: 0,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: 'rgba(255,255,255,0.5)',
+              fontSize: '0.8rem',
               fontWeight: '600'
             }}>
-              Meer videos →
+              Video URL niet geldig
             </div>
-            <div style={{
+          )}
+        </div>
+      )}
+
+      {/* ── GALLERY STRIP ── Only if >1 video in current filter */}
+      {filteredVideos.length > 1 && !isPlaying && (
+        <div style={{
+          padding: isMobile ? '0.75rem 1rem' : '1rem 1.25rem',
+          background: 'rgba(0,0,0,0.22)',
+          borderTop: '1px solid rgba(255,255,255,0.1)'
+        }}>
+          <div style={{
+            fontSize: '0.6rem',
+            color: 'rgba(255,255,255,0.75)',
+            marginBottom: '0.5rem',
+            fontWeight: '800',
+            textTransform: 'uppercase',
+            letterSpacing: '0.06em'
+          }}>
+            Meer in {selectedCategory === 'all' ? 'bibliotheek' : getCategoryMeta(selectedCategory).label} →
+          </div>
+          <div
+            className="cvw-gallery"
+            style={{
               display: 'flex',
               gap: '0.5rem',
               overflowX: 'auto',
               WebkitOverflowScrolling: 'touch',
-              scrollbarWidth: 'none',
-              msOverflowStyle: 'none'
-            }}>
-              {recentVideos.slice(1, 5).map((v, i) => {
-                const vid = extractYouTubeId(v.video.video_url)
-                return (
-                  <div
-                    key={i}
-                    onClick={() => {
-                      setTodaysVideo(v)
-                      setIsPlaying(false)
-                    }}
-                    style={{
-                      minWidth: '120px',
-                      cursor: 'pointer',
-                      borderRadius: '8px',
-                      overflow: 'hidden',
-                      position: 'relative',
-                      aspectRatio: '16/9',
-                      background: '#000'
-                    }}
-                  >
-                    {vid && (
-                      <img
-                        src={`https://img.youtube.com/vi/${vid}/mqdefault.jpg`}
-                        alt={v.video.title}
-                        style={{
-                          width: '100%',
-                          height: '100%',
-                          objectFit: 'cover'
-                        }}
-                      />
-                    )}
+              scrollbarWidth: 'none'
+            }}
+          >
+            {filteredVideos.map((item, idx) => {
+              const vid = extractYouTubeId(item?.video?.video_url)
+              const isSelected = idx === selectedIndex
+              const isWatched = !!item?.viewed_at
+              return (
+                <div
+                  key={item.id || idx}
+                  onClick={() => handleSelectVideo(idx)}
+                  style={{
+                    minWidth: isMobile ? '120px' : '140px',
+                    cursor: 'pointer',
+                    borderRadius: '8px',
+                    overflow: 'hidden',
+                    position: 'relative',
+                    aspectRatio: '16/9',
+                    background: '#000',
+                    border: isSelected ? '2px solid #fff' : '2px solid transparent',
+                    transition: 'all 0.15s ease',
+                    touchAction: 'manipulation',
+                    WebkitTapHighlightColor: 'transparent',
+                    flexShrink: 0
+                  }}
+                >
+                  {vid ? (
+                    <img
+                      src={`https://img.youtube.com/vi/${vid}/mqdefault.jpg`}
+                      alt={item.video.title}
+                      style={{
+                        width: '100%',
+                        height: '100%',
+                        objectFit: 'cover'
+                      }}
+                    />
+                  ) : (
+                    <div style={{
+                      width: '100%',
+                      height: '100%',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      color: 'rgba(255,255,255,0.3)'
+                    }}>
+                      <Play size={18} />
+                    </div>
+                  )}
+
+                  {/* Watched check */}
+                  {isWatched && (
                     <div style={{
                       position: 'absolute',
-                      bottom: 0,
-                      left: 0,
-                      right: 0,
-                      padding: '0.25rem 0.5rem',
-                      background: 'linear-gradient(to top, rgba(0,0,0,0.8) 0%, transparent 100%)',
-                      fontSize: '0.65rem',
-                      color: '#fff',
-                      whiteSpace: 'nowrap',
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis'
+                      top: '0.3rem',
+                      right: '0.3rem',
+                      width: '16px',
+                      height: '16px',
+                      borderRadius: '50%',
+                      background: '#10b981',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center'
                     }}>
-                      {v.video.title}
+                      <CheckCircle2 size={10} color="#000" strokeWidth={3} />
                     </div>
-                  </div>
-                )
-              })}
-            </div>
-          </div>
-        )}
-      </div>
-    )
-  }
+                  )}
 
-  // No videos
-  return (
-    <div style={{
-      background: `linear-gradient(135deg, ${theme.color}20 0%, ${theme.color}10 100%)`,
-      borderRadius: '20px',
-      padding: isMobile ? '1.5rem' : '2rem',
-      border: `2px solid ${theme.color}30`,
-      textAlign: 'center'
-    }}>
-      <Play size={48} style={{ color: theme.color, opacity: 0.3, margin: '0 auto 1rem' }} />
-      <h3 style={{
-        fontSize: isMobile ? '1.1rem' : '1.25rem',
-        fontWeight: 'bold',
-        color: '#fff',
-        marginBottom: '0.5rem'
-      }}>
-        Nog geen videos beschikbaar
-      </h3>
-      <p style={{
-        fontSize: isMobile ? '0.85rem' : '0.9rem',
-        color: 'rgba(255,255,255,0.5)'
-      }}>
-        Je coach zal binnenkort inspirerende videos met je delen!
-      </p>
+                  {/* Title gradient bottom */}
+                  <div style={{
+                    position: 'absolute',
+                    bottom: 0,
+                    left: 0,
+                    right: 0,
+                    padding: '0.3rem 0.5rem',
+                    background: 'linear-gradient(to top, rgba(0,0,0,0.85) 0%, transparent 100%)',
+                    fontSize: '0.65rem',
+                    color: '#fff',
+                    fontWeight: '700',
+                    whiteSpace: 'nowrap',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis'
+                  }}>
+                    {item.video?.title}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Styles */}
+      <style>{`
+        .cvw-cat-row::-webkit-scrollbar,
+        .cvw-gallery::-webkit-scrollbar { display: none; }
+      `}</style>
     </div>
   )
-}
-
-// Add styles
-if (typeof document !== 'undefined' && !document.getElementById('improved-video-styles')) {
-  const style = document.createElement('style')
-  style.id = 'improved-video-styles'
-  style.textContent = `
-    @keyframes slideIn {
-      from {
-        opacity: 0;
-        transform: translateY(20px);
-      }
-      to {
-        opacity: 1;
-        transform: translateY(0);
-      }
-    }
-    
-    /* Hide scrollbar for recent videos */
-    .recent-videos::-webkit-scrollbar {
-      display: none;
-    }
-  `
-  document.head.appendChild(style)
 }

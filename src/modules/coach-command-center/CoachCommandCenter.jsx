@@ -1,376 +1,245 @@
-import React, { useState, useEffect } from 'react'
-import CoachCommandService from './CoachCommandService'
-import ClientCard from './modules/ClientCard'
+// src/modules/coach-command-center/CoachCommandCenter.jsx
+// CoachCommandCenter.jsx - v3.5
+// + onOpenWorkoutPanel prop toegevoegd voor Workout SOP widget
+import React, { useState, useEffect, useRef } from 'react'
+import { Search, Users, AlertTriangle, Loader2, ArrowLeft, Video, X } from 'lucide-react'
+import CommandCenterService from './CommandCenterService'
+import ClientWeightCard from './components/ClientWeightCard'
+import ClientJourneyTimeline from '../client-journey/ClientJourneyTimeline'
+import CoachVideoFeedback from '../video-feedback/CoachVideoFeedback'
 
-export default function CoachCommandCenter({ db, clients }) {
-  console.log('🎯 [CommandCenter] Component mounted')
-  console.log('  Clients received:', clients?.length)
-  
+export default function CoachCommandCenter({ db, onSelectClient, setActiveTab, onNavigatePlan, onNavigateWorkout, onOpenMealPanel, onOpenWorkoutPanel }) {
+  console.log('🏋️ CoachCommandCenter render — onOpenMealPanel:', typeof onOpenMealPanel, '— onOpenWorkoutPanel:', typeof onOpenWorkoutPanel)
   const isMobile = window.innerWidth <= 768
-  const [clientsStatus, setClientsStatus] = useState([])
   const [loading, setLoading] = useState(true)
-  const [filter, setFilter] = useState('all')
-  const [pinnedIds, setPinnedIds] = useState([])
+  const [clientsWithData, setClientsWithData] = useState([])
   const [searchQuery, setSearchQuery] = useState('')
+  const [searchOpen, setSearchOpen] = useState(false)
+  const [statusFilter, setStatusFilter] = useState('active')
+  const [urgencyFilter, setUrgencyFilter] = useState('all')
+  const [stats, setStats] = useState({ total: 0, active: 0, inactive: 0, urgent: 0, warning: 0, ok: 0, fridayMissing: 0 })
+  const [activeView, setActiveView] = useState('clients')
+  const [journeyClient, setJourneyClient] = useState(null)
+  const [coachId, setCoachId] = useState(null)
+  const serviceRef = useRef(new CommandCenterService(db))
+  const service = serviceRef.current
 
-  useEffect(() => {
-    console.log('🔄 [CommandCenter] Clients changed, reloading status...')
-    loadClientsStatus()
-  }, [clients])
+  useEffect(() => { loadData() }, [])
 
-  const loadClientsStatus = async () => {
-    console.log('📡 [CommandCenter] Loading client statuses...')
+  const computeStats = (sorted) => {
+    const activeClients = sorted.filter(c => c.status === 'active')
+    return {
+      total: sorted.length,
+      active: activeClients.length,
+      inactive: sorted.filter(c => c.status === 'inactive').length,
+      urgent: activeClients.filter(c => { const s = c.weightData?.weightStatus; return s === 'never' || s === 'overdue' || c.weightData?.fridayMissing }).length,
+      warning: activeClients.filter(c => c.weightData?.weightStatus === 'warning').length,
+      ok: activeClients.filter(c => { const s = c.weightData?.weightStatus; return s === 'today' || s === 'recent' }).length,
+      fridayMissing: activeClients.filter(c => c.weightData?.fridayMissing).length
+    }
+  }
+
+  const loadData = async () => {
     setLoading(true)
-    
     try {
-      if (!clients || clients.length === 0) {
-        console.warn('⚠️ [CommandCenter] No clients provided')
-        setLoading(false)
-        return
+      const user = await db.getCurrentUser().catch(() => null)
+      if (user) setCoachId(user.id)
+
+      const [clients, coachingLogDataEarly] = await Promise.all([
+        db.getAllClients(),
+        db.supabase
+          .from('client_coaching_logs')
+          .select('id, client_id, status, note, created_at')
+          .order('created_at', { ascending: false })
+          .then(r => {
+            const byClient = {}
+            r.data?.forEach(log => { if (!byClient[log.client_id]) byClient[log.client_id] = log })
+            return byClient
+          })
+      ])
+      const clientIds = clients.map(c => c.id)
+
+      const dataWithWeight = await service.getClientsWeightData(clients)
+
+      const phase1 = dataWithWeight.map(client => ({
+        ...client,
+        photoData:         { photos: [], totalCount: 0, progressCount: 0, lastPhotoDate: null, lastPhoto: null },
+        workoutData:       { workouts: [], totalWorkouts: 0, completedWorkouts: 0, lastWorkoutDate: null, daysSinceWorkout: null },
+        exerciseProgress:  {},
+        circumferenceData: { entries: [], latest: null, previous: null },
+        mealData:          { plan: null, targets: null, todayMeals: [], todayTotals: { calories: 0, protein: 0, carbs: 0, fat: 0 }, dailyLog: {}, loggingDays: 0, avgCalories: 0 },
+        coachingPlan:      null,
+        latestCoachingLog: coachingLogDataEarly[client.id] || null
+      }))
+
+      const sorted1 = service.sortByUrgency(phase1)
+      setClientsWithData(sorted1)
+      setStats(computeStats(sorted1))
+      setLoading(false)
+
+      const [photoData, workoutData, mealData, coachingPlanData, exerciseProgress, circumferenceData] = await Promise.all([
+        service.getClientsPhotoData(clientIds),
+        service.getClientsWorkoutData(clientIds),
+        service.getClientsMealData(clientIds),
+        service.getClientsCoachingPlan(clientIds),
+        service.getClientsExerciseProgress(clientIds),
+        service.getClientsCircumference(clientIds)
+      ])
+
+      setClientsWithData(prev => {
+        const updated = prev.map(client => ({
+          ...client,
+          photoData:        photoData[client.id]        || client.photoData,
+          workoutData:      workoutData[client.id]      || client.workoutData,
+          mealData:         mealData[client.id]         || client.mealData,
+          coachingPlan:     coachingPlanData[client.id] || null,
+          exerciseProgress: exerciseProgress[client.id] || {},
+          circumferenceData: circumferenceData[client.id] || { entries: [], latest: null, previous: null }
+        }))
+        setStats(computeStats(service.sortByUrgency(updated)))
+        return service.sortByUrgency(updated)
+      })
+
+    } catch (error) { console.error('❌ Error loading:', error); setLoading(false) }
+  }
+
+  const handleToggleStatus = async (clientId, currentStatus) => {
+    const newStatus = currentStatus === 'active' ? 'inactive' : 'active'
+    try {
+      await db.updateClientStatus(clientId, newStatus)
+      setClientsWithData(prev => prev.map(c => c.id === clientId ? { ...c, status: newStatus } : c))
+      setStats(prev => ({ ...prev, active: newStatus === 'active' ? prev.active + 1 : prev.active - 1, inactive: newStatus === 'inactive' ? prev.inactive + 1 : prev.inactive - 1 }))
+    } catch (error) { console.error('❌ Toggle failed:', error); alert('Kon status niet wijzigen') }
+  }
+
+  const filteredClients = clientsWithData.filter(client => {
+    if (statusFilter !== 'all' && client.status !== statusFilter) return false
+    if (searchQuery && !`${client.first_name} ${client.last_name}`.toLowerCase().includes(searchQuery.toLowerCase())) return false
+    if (urgencyFilter !== 'all' && client.status === 'active') {
+      const ws = client.weightData?.weightStatus || 'unknown'
+      const fm = client.weightData?.fridayMissing
+      switch (urgencyFilter) {
+        case 'urgent':  return ws === 'never' || ws === 'overdue' || fm
+        case 'warning': return ws === 'warning'
+        case 'ok':      return ws === 'today' || ws === 'recent'
+        default:        return true
       }
-
-      console.log('  Calculating status for', clients.length, 'clients...')
-      const statuses = await CoachCommandService.getAllClientsStatus(clients)
-      console.log('✅ [CommandCenter] Statuses calculated:', statuses.length)
-      
-      console.log('  Loading pinned clients...')
-      const pinned = await CoachCommandService.getPinnedClients()
-      console.log('  Pinned clients:', pinned.length)
-      
-      setClientsStatus(statuses)
-      setPinnedIds(pinned)
-      console.log('✅ [CommandCenter] State updated successfully')
-    } catch (error) {
-      console.error('❌ [CommandCenter] Error loading statuses:', error)
     }
-    
-    setLoading(false)
-  }
-
-  const togglePin = async (clientId) => {
-    console.log('📌 [CommandCenter] Toggling pin for:', clientId)
-    const isPinned = await CoachCommandService.togglePin(clientId)
-    if (isPinned) {
-      setPinnedIds([...pinnedIds, clientId])
-    } else {
-      setPinnedIds(pinnedIds.filter(id => id !== clientId))
-    }
-  }
-
-  // FILTER LOGIC
-  const filteredClients = clientsStatus.filter(c => {
-    // Status filter
-    if (filter !== 'all' && c.status !== filter) return false
-    
-    // Search filter
-    if (searchQuery) {
-      const query = searchQuery.toLowerCase()
-      const fullName = `${c.client.first_name} ${c.client.last_name}`.toLowerCase()
-      if (!fullName.includes(query)) return false
-    }
-    
     return true
   })
 
-  // SORT: Pinned first, then by priority
-  const sortedClients = [...filteredClients].sort((a, b) => {
-    const aPin = pinnedIds.includes(a.client.id) ? 1 : 0
-    const bPin = pinnedIds.includes(b.client.id) ? 1 : 0
-    if (aPin !== bPin) return bPin - aPin
-    return b.priority - a.priority
-  })
-
-  // COUNT PER STATUS
-  const redCount = clientsStatus.filter(c => c.status === 'red').length
-  const yellowCount = clientsStatus.filter(c => c.status === 'yellow').length
-  const greenCount = clientsStatus.filter(c => c.status === 'green').length
-
   if (loading) {
     return (
-      <div style={{
-        padding: isMobile ? '2rem 1rem' : '3rem',
-        textAlign: 'center'
-      }}>
-        <div style={{
-          fontSize: isMobile ? '2rem' : '3rem',
-          marginBottom: '1rem',
-          animation: 'pulse 2s ease-in-out infinite'
-        }}>
-          ⚡
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '60vh', gap: '0.75rem' }}>
+        <Loader2 size={28} color="#FFD700" style={{ animation: 'ccSpin 1s linear infinite' }} />
+        <span style={{ fontSize: '0.85rem', fontWeight: '600', color: 'rgba(255,215,0,0.6)' }}>Loading...</span>
+        <style>{`@keyframes ccSpin { to { transform: rotate(360deg); } }`}</style>
+      </div>
+    )
+  }
+
+  if (journeyClient) {
+    return (
+      <div style={{ paddingBottom: isMobile ? '100px' : '2rem' }}>
+        <div style={{ padding: isMobile ? '0.625rem 1rem' : '0.75rem 2rem', borderBottom: '1px solid rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <button onClick={() => setJourneyClient(null)} style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', padding: '0.4rem 0.75rem', background: 'transparent', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '6px', color: 'rgba(255,255,255,0.6)', cursor: 'pointer', fontSize: '0.8rem' }}>
+            <ArrowLeft size={14} /> Terug
+          </button>
+          <span style={{ color: '#fff', fontSize: '0.85rem', fontWeight: '600' }}>{journeyClient.first_name} {journeyClient.last_name}</span>
         </div>
-        <div style={{
-          fontSize: isMobile ? '1rem' : '1.2rem',
-          color: '#10b981',
-          fontWeight: '500'
-        }}>
-          Calculating client status...
-        </div>
-        <div style={{
-          fontSize: isMobile ? '0.85rem' : '0.95rem',
-          color: 'rgba(255,255,255,0.5)',
-          marginTop: '0.5rem'
-        }}>
-          Analyzing {clients?.length || 0} clients
-        </div>
+        <ClientJourneyTimeline
+          db={db}
+          clients={clientsWithData}
+          selectedClient={journeyClient}
+          onSelectClient={setJourneyClient}
+          coachId={coachId}
+          isMobile={isMobile}
+          onOpenMealPanel={onOpenMealPanel}
+          onOpenWorkoutPanel={onOpenWorkoutPanel}
+        />
       </div>
     )
   }
 
   return (
-    <div style={{
-      padding: isMobile ? '1rem' : '2rem',
-      maxWidth: '1400px',
-      margin: '0 auto'
-    }}>
-      
-      {/* HEADER */}
-      <div style={{
-        marginBottom: isMobile ? '1.5rem' : '2rem'
-      }}>
-        <h1 style={{
-          fontSize: isMobile ? '1.75rem' : '2.5rem',
-          fontWeight: '700',
-          color: '#fff',
-          marginBottom: '0.5rem'
-        }}>
-          🎯 Command Center
-        </h1>
-        <p style={{
-          fontSize: isMobile ? '0.9rem' : '1rem',
-          color: 'rgba(255,255,255,0.6)',
-          marginBottom: '1.5rem'
-        }}>
-          Real-time client overview · {clients?.length || 0} total · {clientsStatus.length} with status
-        </p>
-
-        {/* SEARCH BAR */}
-        <div style={{
-          marginBottom: '1rem'
-        }}>
-          <input
-            type="text"
-            placeholder="🔍 Search client name..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            style={{
-              width: '100%',
-              padding: isMobile ? '0.75rem 1rem' : '0.875rem 1.25rem',
-              background: 'rgba(255, 255, 255, 0.05)',
-              border: '1px solid rgba(255, 255, 255, 0.1)',
-              borderRadius: '12px',
-              color: '#fff',
-              fontSize: isMobile ? '0.9rem' : '1rem',
-              outline: 'none',
-              transition: 'all 0.2s',
-              touchAction: 'manipulation',
-              WebkitTapHighlightColor: 'transparent'
-            }}
-            onFocus={(e) => {
-              e.target.style.border = '1px solid #10b981'
-              e.target.style.background = 'rgba(255, 255, 255, 0.08)'
-            }}
-            onBlur={(e) => {
-              e.target.style.border = '1px solid rgba(255, 255, 255, 0.1)'
-              e.target.style.background = 'rgba(255, 255, 255, 0.05)'
-            }}
-          />
-        </div>
-
-        {/* FILTER TABS */}
-        <div style={{
-          display: 'flex',
-          gap: isMobile ? '0.5rem' : '0.75rem',
-          overflowX: 'auto',
-          paddingBottom: '0.5rem',
-          WebkitOverflowScrolling: 'touch'
-        }}>
-          {[
-            { id: 'all', label: 'Alles', count: clientsStatus.length },
-            { id: 'red', label: '🔴 Urgent', count: redCount },
-            { id: 'yellow', label: '🟡 Check-in', count: yellowCount },
-            { id: 'green', label: '🟢 On Track', count: greenCount }
-          ].map(tab => (
-            <button
-              key={tab.id}
-              onClick={() => setFilter(tab.id)}
-              style={{
-                padding: isMobile ? '0.6rem 1rem' : '0.75rem 1.5rem',
-                background: filter === tab.id ? '#10b981' : 'rgba(255,255,255,0.05)',
-                border: filter === tab.id ? '2px solid #10b981' : '1px solid rgba(255,255,255,0.1)',
-                borderRadius: '12px',
-                color: filter === tab.id ? '#000' : '#fff',
-                fontSize: isMobile ? '0.85rem' : '0.95rem',
-                fontWeight: filter === tab.id ? '600' : '500',
-                cursor: 'pointer',
-                transition: 'all 0.2s',
-                whiteSpace: 'nowrap',
-                touchAction: 'manipulation',
-                WebkitTapHighlightColor: 'transparent',
-                minHeight: '44px'
-              }}
-            >
-              {tab.label} ({tab.count})
-            </button>
-          ))}
-        </div>
+    <div style={{ maxWidth: '1400px', margin: '0 auto', paddingBottom: isMobile ? '100px' : '2rem' }}>
+      {/* COMPACT HEADER */}
+      <div style={{ padding: isMobile ? '0.75rem 1rem' : '1rem 2rem', borderBottom: '1px solid rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', gap: isMobile ? '0.5rem' : '0.75rem' }}>
+        <h1 style={{ fontSize: isMobile ? '1.1rem' : '1.35rem', fontWeight: '800', color: '#FFD700', margin: 0, letterSpacing: '-0.02em', whiteSpace: 'nowrap', flexShrink: 0 }}>⚡ Command</h1>
+        <span style={{ fontSize: '0.6rem', fontWeight: '700', color: 'rgba(255,215,0,0.5)', whiteSpace: 'nowrap', flexShrink: 0 }}>{stats.active}/{stats.total}</span>
+        <div style={{ flex: 1 }} />
+        <button onClick={() => setActiveView('clients')} style={{ padding: isMobile ? '0.35rem 0.625rem' : '0.4rem 0.75rem', background: activeView === 'clients' ? 'rgba(255,215,0,0.12)' : 'transparent', border: activeView === 'clients' ? '1px solid rgba(255,215,0,0.25)' : '1px solid transparent', borderRadius: '6px', color: activeView === 'clients' ? '#FFD700' : 'rgba(255,255,255,0.35)', fontSize: isMobile ? '0.7rem' : '0.75rem', fontWeight: '600', cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', display: 'flex', alignItems: 'center', gap: '0.25rem', minHeight: '32px' }}><Users size={13} /> Clients</button>
+        <button onClick={() => setActiveView('video')} style={{ padding: isMobile ? '0.35rem 0.5rem' : '0.4rem 0.625rem', background: activeView === 'video' ? 'rgba(255,215,0,0.12)' : 'transparent', border: activeView === 'video' ? '1px solid rgba(255,215,0,0.25)' : '1px solid transparent', borderRadius: '6px', color: activeView === 'video' ? '#FFD700' : 'rgba(255,255,255,0.25)', fontSize: isMobile ? '0.7rem' : '0.75rem', fontWeight: '600', cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', display: 'flex', alignItems: 'center', gap: '0.25rem', minHeight: '32px' }}><Video size={13} /></button>
+        <button onClick={() => { setSearchOpen(!searchOpen); if (searchOpen) setSearchQuery('') }} style={{ width: '32px', height: '32px', borderRadius: '6px', background: searchOpen ? 'rgba(255,215,0,0.12)' : 'transparent', border: searchOpen ? '1px solid rgba(255,215,0,0.25)' : '1px solid rgba(255,255,255,0.08)', color: searchOpen ? '#FFD700' : 'rgba(255,255,255,0.35)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', flexShrink: 0 }}>{searchOpen ? <X size={14} /> : <Search size={14} />}</button>
       </div>
 
-      {/* RESULTS COUNT */}
-      {(filter !== 'all' || searchQuery) && (
-        <div style={{
-          marginBottom: '1rem',
-          fontSize: isMobile ? '0.85rem' : '0.9rem',
-          color: 'rgba(255,255,255,0.6)'
-        }}>
-          Showing {sortedClients.length} of {clientsStatus.length} clients
-          {searchQuery && ` matching "${searchQuery}"`}
+      {searchOpen && (
+        <div style={{ padding: isMobile ? '0.5rem 1rem' : '0.5rem 2rem', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+          <input type="text" placeholder="Zoek client..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} autoFocus style={{ width: '100%', padding: '0.5rem 0.75rem', background: 'rgba(255,215,0,0.04)', border: '1px solid rgba(255,215,0,0.12)', borderRadius: '8px', color: '#fff', fontSize: '0.85rem', outline: 'none' }} />
         </div>
       )}
 
-      {/* CLIENT CARDS GRID */}
-      <div style={{
-        display: 'grid',
-        gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fill, minmax(400px, 1fr))',
-        gap: isMobile ? '1rem' : '1.5rem'
-      }}>
-        {sortedClients.map(({ client, status, issues, actions, metrics }) => (
-          <ClientCard
-            key={client.id}
-            client={client}
-            status={status}
-            issues={issues}
-            metrics={metrics}
-            isPinned={pinnedIds.includes(client.id)}
-            onTogglePin={togglePin}
-            isMobile={isMobile}
-          />
-        ))}
-      </div>
+      {activeView === 'video' && <div style={{ padding: isMobile ? '1rem' : '2rem' }}><CoachVideoFeedback db={db} /></div>}
 
-      {/* EMPTY STATE */}
-      {sortedClients.length === 0 && !loading && (
-        <div style={{
-          padding: isMobile ? '3rem 1rem' : '4rem 2rem',
-          textAlign: 'center',
-          background: 'rgba(17, 17, 17, 0.5)',
-          borderRadius: '16px',
-          border: '1px solid rgba(255,255,255,0.1)'
-        }}>
-          <div style={{
-            fontSize: isMobile ? '2rem' : '3rem',
-            marginBottom: '1rem'
-          }}>
-            {searchQuery ? '🔍' : '🎯'}
+      {activeView === 'clients' && (
+        <>
+          {/* FILTER BAR */}
+          <div style={{ padding: isMobile ? '0.5rem 1rem' : '0.625rem 2rem', borderBottom: '1px solid rgba(255,255,255,0.04)', display: 'flex', gap: isMobile ? '0.25rem' : '0.375rem', overflowX: 'auto', WebkitOverflowScrolling: 'touch', alignItems: 'center' }}>
+            {[{ id: 'active', label: 'Actief', count: stats.active, color: '#10b981' }, { id: 'inactive', label: 'Inactief', count: stats.inactive, color: '#6b7280' }, { id: 'all', label: 'Alle', count: stats.total, color: '#FFD700' }].map(btn => (
+              <button key={btn.id} onClick={() => { setStatusFilter(btn.id); setUrgencyFilter('all') }} style={{ padding: isMobile ? '0.3rem 0.5rem' : '0.35rem 0.625rem', background: statusFilter === btn.id ? `${btn.color}18` : 'transparent', border: statusFilter === btn.id ? `1px solid ${btn.color}40` : '1px solid transparent', borderRadius: '6px', color: statusFilter === btn.id ? btn.color : 'rgba(255,255,255,0.35)', fontSize: isMobile ? '0.65rem' : '0.7rem', fontWeight: '600', cursor: 'pointer', whiteSpace: 'nowrap', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', display: 'flex', alignItems: 'center', gap: '0.2rem', minHeight: '28px' }}>
+                {btn.label}<span style={{ fontSize: '0.55rem', fontWeight: '700', opacity: statusFilter === btn.id ? 1 : 0.5 }}>{btn.count}</span>
+              </button>
+            ))}
+            <div style={{ width: '1px', height: '16px', background: 'rgba(255,255,255,0.08)', margin: '0 0.125rem', flexShrink: 0 }} />
+            {statusFilter === 'active' && [{ id: 'all', label: 'Alle', count: stats.active, color: '#FFD700' }, { id: 'urgent', label: '🔴', count: stats.urgent, color: '#ef4444' }, { id: 'warning', label: '🟡', count: stats.warning, color: '#f59e0b' }, { id: 'ok', label: '🟢', count: stats.ok, color: '#10b981' }].map(btn => (
+              <button key={btn.id} onClick={() => setUrgencyFilter(btn.id)} style={{ padding: isMobile ? '0.3rem 0.4rem' : '0.35rem 0.5rem', background: urgencyFilter === btn.id ? `${btn.color}15` : 'transparent', border: urgencyFilter === btn.id ? `1px solid ${btn.color}35` : '1px solid transparent', borderRadius: '6px', color: urgencyFilter === btn.id ? btn.color : 'rgba(255,255,255,0.3)', fontSize: isMobile ? '0.65rem' : '0.7rem', fontWeight: '600', cursor: 'pointer', whiteSpace: 'nowrap', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', display: 'flex', alignItems: 'center', gap: '0.15rem', minHeight: '28px' }}>
+                {btn.label}<span style={{ fontSize: '0.55rem', opacity: 0.6 }}>{btn.count}</span>
+              </button>
+            ))}
           </div>
-          <h3 style={{
-            fontSize: isMobile ? '1.1rem' : '1.3rem',
-            color: '#fff',
-            marginBottom: '0.5rem'
-          }}>
-            {searchQuery 
-              ? `Geen clients gevonden voor "${searchQuery}"`
-              : 'Geen clients in deze categorie'
-            }
-          </h3>
-          <p style={{
-            fontSize: isMobile ? '0.85rem' : '0.95rem',
-            color: 'rgba(255,255,255,0.6)'
-          }}>
-            {searchQuery 
-              ? 'Probeer een andere zoekopdracht'
-              : 'Probeer een ander filter'
-            }
-          </p>
-          {(searchQuery || filter !== 'all') && (
-            <button
-              onClick={() => {
-                setSearchQuery('')
-                setFilter('all')
-              }}
-              style={{
-                marginTop: '1rem',
-                padding: isMobile ? '0.6rem 1.25rem' : '0.75rem 1.5rem',
-                background: '#10b981',
-                border: 'none',
-                borderRadius: '8px',
-                color: '#000',
-                fontSize: isMobile ? '0.85rem' : '0.9rem',
-                fontWeight: '600',
-                cursor: 'pointer',
-                transition: 'all 0.2s',
-                minHeight: '44px',
-                touchAction: 'manipulation',
-                WebkitTapHighlightColor: 'transparent'
-              }}
-            >
-              Reset Filters
-            </button>
+
+          {stats.fridayMissing > 0 && new Date().getDay() === 5 && (
+            <div style={{ padding: isMobile ? '0.4rem 1rem' : '0.5rem 2rem', background: 'rgba(255,215,0,0.06)', borderBottom: '1px solid rgba(255,215,0,0.15)', display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: isMobile ? '0.7rem' : '0.75rem', fontWeight: '600', color: '#FFD700' }}>
+              <AlertTriangle size={14} /> Vrijdag! {stats.fridayMissing} client(s) nog niet gewogen
+            </div>
           )}
-        </div>
-      )}
 
-      {/* FOOTER STATS */}
-      {sortedClients.length > 0 && (
-        <div style={{
-          marginTop: isMobile ? '2rem' : '3rem',
-          padding: isMobile ? '1rem' : '1.5rem',
-          background: 'rgba(255, 255, 255, 0.03)',
-          border: '1px solid rgba(255,255,255,0.1)',
-          borderRadius: '12px',
-          display: 'grid',
-          gridTemplateColumns: isMobile ? '1fr' : 'repeat(3, 1fr)',
-          gap: isMobile ? '1rem' : '1.5rem',
-          textAlign: 'center'
-        }}>
-          <div>
-            <div style={{
-              fontSize: isMobile ? '1.5rem' : '2rem',
-              fontWeight: '700',
-              color: '#ef4444',
-              marginBottom: '0.25rem'
-            }}>
-              {redCount}
+          {(statusFilter !== 'active' || urgencyFilter !== 'all' || searchQuery) && (
+            <div style={{ padding: isMobile ? '0.375rem 1rem' : '0.375rem 2rem', fontSize: '0.6rem', color: 'rgba(255,255,255,0.3)', borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
+              {filteredClients.length} van {stats.total}{searchQuery && ` · "${searchQuery}"`}
             </div>
-            <div style={{
-              fontSize: isMobile ? '0.8rem' : '0.85rem',
-              color: 'rgba(255,255,255,0.6)'
-            }}>
-              Urgent Attention
-            </div>
+          )}
+
+          {/* CLIENT CARDS */}
+          <div style={{ padding: isMobile ? '0.75rem' : '1rem 2rem', display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fill, minmax(400px, 1fr))', gap: isMobile ? '0.625rem' : '0.875rem' }}>
+            {filteredClients.map(client => (
+              <ClientWeightCard
+                key={client.id}
+                client={client}
+                isMobile={isMobile}
+                onToggleStatus={handleToggleStatus}
+                showStatusToggle={true}
+                onOpenJourney={() => setJourneyClient(client)}
+                onNavigatePlan={onNavigatePlan}
+                onNavigateWorkout={onNavigateWorkout}
+                db={db}
+                coachId={coachId}
+                onOpenMealPanel={onOpenMealPanel}
+                onOpenWorkoutPanel={onOpenWorkoutPanel}
+              />
+            ))}
           </div>
-          <div>
-            <div style={{
-              fontSize: isMobile ? '1.5rem' : '2rem',
-              fontWeight: '700',
-              color: '#f59e0b',
-              marginBottom: '0.25rem'
-            }}>
-              {yellowCount}
+
+          {filteredClients.length === 0 && (
+            <div style={{ padding: isMobile ? '3rem 1.5rem' : '4rem 2rem', textAlign: 'center' }}>
+              <div style={{ fontSize: '1.5rem', marginBottom: '0.5rem', opacity: 0.3 }}>{statusFilter === 'inactive' ? '👤' : '🔍'}</div>
+              <h3 style={{ fontSize: '1rem', fontWeight: '700', color: 'rgba(255,255,255,0.5)', marginBottom: '0.25rem' }}>{searchQuery ? `Geen resultaten voor "${searchQuery}"` : 'Geen clients in deze categorie'}</h3>
+              {(searchQuery || urgencyFilter !== 'all') && (
+                <button onClick={() => { setSearchQuery(''); setUrgencyFilter('all') }} style={{ marginTop: '0.75rem', padding: '0.5rem 1.25rem', background: 'rgba(255,215,0,0.1)', border: '1px solid rgba(255,215,0,0.25)', borderRadius: '8px', color: '#FFD700', fontSize: '0.8rem', fontWeight: '600', cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}>Reset filters</button>
+              )}
             </div>
-            <div style={{
-              fontSize: isMobile ? '0.8rem' : '0.85rem',
-              color: 'rgba(255,255,255,0.6)'
-            }}>
-              Need Check-in
-            </div>
-          </div>
-          <div>
-            <div style={{
-              fontSize: isMobile ? '1.5rem' : '2rem',
-              fontWeight: '700',
-              color: '#10b981',
-              marginBottom: '0.25rem'
-            }}>
-              {greenCount}
-            </div>
-            <div style={{
-              fontSize: isMobile ? '0.8rem' : '0.85rem',
-              color: 'rgba(255,255,255,0.6)'
-            }}>
-              On Track
-            </div>
-          </div>
-        </div>
+          )}
+        </>
       )}
     </div>
   )

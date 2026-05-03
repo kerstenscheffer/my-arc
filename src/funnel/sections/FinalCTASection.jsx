@@ -1,13 +1,16 @@
+// ========================================
+// 📁 src/funnel/sections/FinalCTASection.jsx
+// PRICING SECTION - Only "Vooraf Betalen" option
+// Gold-brown theme + single "Wat Nu" CTA
+// ========================================
 import React, { useState, useEffect } from 'react'
-import { Timer, Users, Calendar, ArrowRight, X } from 'lucide-react'
-import GoldenCTAButton from '../components/GoldenCTAButton'
-import CalendlyModal from '../components/CalendlyModal'
+import { CheckCircle, ArrowRight } from 'lucide-react'
 
-export default function FinalCTASection({ onScrollNext }) {
+export default function FinalCTASection({ onScrollNext, onNavigate }) {
   const [isVisible, setIsVisible] = useState(false)
   const [isMobile, setIsMobile] = useState(window.innerWidth <= 768)
-  const [hoveredChoice, setHoveredChoice] = useState(null)
-  const [showCalendlyModal, setShowCalendlyModal] = useState(false)
+  const [hoveredCard, setHoveredCard] = useState(false)
+  const [hoveredButton, setHoveredButton] = useState(false)
 
   useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth <= 768)
@@ -21,11 +24,16 @@ export default function FinalCTASection({ onScrollNext }) {
     }
   }, [])
 
-  const urgencyItems = [
-    { icon: Timer, text: "Inschrijving Sluit Na 10 Aanmeldingen", color: '#ef4444' },
-    { icon: Users, text: "Misschien Geen Nieuwe Rondes - Mis Je Kans Niet", color: '#f97316' },
-    { icon: Calendar, text: "Start Jouw Transformatie Maandag al", color: '#eab308' }
-  ]
+  const scrollToClientWelcome = () => {
+    if (onNavigate) {
+      onNavigate(6) // Go to ClientWelcomeSection
+    } else {
+      const section = document.getElementById('section-6')
+      if (section) {
+        section.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      }
+    }
+  }
 
   return (
     <>
@@ -38,185 +46,277 @@ export default function FinalCTASection({ onScrollNext }) {
           display: 'flex',
           flexDirection: 'column',
           alignItems: 'center',
+          justifyContent: 'center',
           overflow: 'hidden'
         }}
       >
-        {/* Dramatic golden orbs */}
+        {/* Subtle golden orbs */}
         <div style={{
           position: 'absolute',
-          top: '5%',
-          left: '50%',
-          transform: 'translateX(-50%)',
-          width: isMobile ? '400px' : '600px',
-          height: isMobile ? '400px' : '600px',
-          background: 'radial-gradient(circle, rgba(255, 215, 0, 0.08) 0%, transparent 60%)',
-          filter: 'blur(100px)',
-          animation: 'pulse 4s ease-in-out infinite',
+          top: '10%',
+          left: '-15%',
+          width: isMobile ? '300px' : '500px',
+          height: isMobile ? '300px' : '500px',
+          background: 'radial-gradient(circle, rgba(255, 186, 9, 0.04) 0%, transparent 70%)',
+          filter: 'blur(80px)',
+          animation: 'float 30s ease-in-out infinite',
+          pointerEvents: 'none'
+        }} />
+        
+        <div style={{
+          position: 'absolute',
+          bottom: '10%',
+          right: '-15%',
+          width: isMobile ? '350px' : '550px',
+          height: isMobile ? '350px' : '550px',
+          background: 'radial-gradient(circle, rgba(212, 160, 6, 0.03) 0%, transparent 70%)',
+          filter: 'blur(90px)',
+          animation: 'float 35s ease-in-out infinite reverse',
           pointerEvents: 'none'
         }} />
 
         {/* Header */}
         <div style={{
           textAlign: 'center',
-          marginBottom: isMobile ? '2rem' : '3rem',
+          marginBottom: isMobile ? '3rem' : '4rem',
           maxWidth: '800px',
           opacity: isVisible ? 1 : 0,
           transform: isVisible ? 'translateY(0)' : 'translateY(20px)',
-          transition: 'all 0.8s cubic-bezier(0.4, 0, 0.2, 1)'
+          transition: 'all 0.8s cubic-bezier(0.4, 0, 0.2, 1)',
+          position: 'relative',
+          zIndex: 2
         }}>
           <h2 style={{
             fontSize: isMobile ? '2rem' : '3.5rem',
             fontWeight: '900',
-            background: 'linear-gradient(135deg, #FFD700 0%, #D4AF37 50%, #FFD700 100%)',
+            background: 'linear-gradient(135deg, #ffba09 0%, #d4a006 35%, #8b6804 65%, #402400 100%)',
             WebkitBackgroundClip: 'text',
             WebkitTextFillColor: 'transparent',
             backgroundClip: 'text',
             marginBottom: '1rem',
             letterSpacing: '-0.02em',
-            filter: 'drop-shadow(0 2px 20px rgba(255, 215, 0, 0.3))'
+            filter: 'drop-shadow(0 2px 12px rgba(255, 186, 9, 0.15))'
           }}>
-            Dit Is Het Moment Van Beslissen
+            Bespaar €300
           </h2>
           
           <p style={{
             fontSize: isMobile ? '1rem' : '1.25rem',
-            color: 'rgba(212, 175, 55, 0.7)',
+            color: 'rgba(212, 160, 6, 0.7)',
             fontWeight: '300',
             letterSpacing: '0.02em'
           }}>
-            Alleen De Eerste 10 Krijgen Deze Kans
+            Vooraf betalen in plaats van in termijnen
           </p>
         </div>
 
-        {/* Urgency Box */}
+        {/* Single Pricing Card - Vooraf Betalen */}
         <div style={{
-          display: 'flex',
-          gap: isMobile ? '0.75rem' : '1.5rem',
-          flexDirection: isMobile ? 'column' : 'row',
-          marginBottom: isMobile ? '2rem' : '3rem',
-          opacity: isVisible ? 1 : 0,
-          transform: isVisible ? 'scale(1)' : 'scale(0.95)',
-          transition: 'all 0.8s cubic-bezier(0.4, 0, 0.2, 1) 0.2s'
-        }}>
-          {urgencyItems.map((item, index) => {
-            const Icon = item.icon
-            return (
-              <div
-                key={index}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.75rem',
-                  padding: isMobile ? '0.875rem 1.25rem' : '1rem 1.5rem',
-                  background: 'linear-gradient(135deg, rgba(0, 0, 0, 0.9) 0%, rgba(255, 215, 0, 0.03) 100%)',
-                  border: `1px solid ${item.color}30`,
-                  borderRadius: '14px',
-                  backdropFilter: 'blur(10px)',
-                  boxShadow: `0 10px 30px rgba(0, 0, 0, 0.5), 0 0 30px ${item.color}15`,
-                  animation: `fadeInUp 0.6s ${index * 0.1}s forwards`,
-                  opacity: 0
-                }}
-              >
-                <div style={{
-                  width: '40px',
-                  height: '40px',
-                  borderRadius: '10px',
-                  background: `linear-gradient(135deg, ${item.color}20 0%, ${item.color}10 100%)`,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  border: `1px solid ${item.color}40`,
-                  flexShrink: 0
-                }}>
-                  <Icon size={20} color={item.color} />
-                </div>
-                <span style={{
-                  fontSize: isMobile ? '0.875rem' : '1rem',
-                  color: 'rgba(255, 255, 255, 0.9)',
-                  fontWeight: '600',
-                  whiteSpace: 'nowrap'
-                }}>
-                  {item.text}
-                </span>
-              </div>
-            )
-          })}
-        </div>
-
-        {/* Kern Boodschap */}
-        <div style={{
-          maxWidth: '700px',
-          textAlign: 'center',
-          marginBottom: isMobile ? '3rem' : '4rem',
-          opacity: isVisible ? 1 : 0,
-          transform: isVisible ? 'translateY(0)' : 'translateY(20px)',
-          transition: 'all 0.8s cubic-bezier(0.4, 0, 0.2, 1) 0.4s'
-        }}>
-          <p style={{
-            fontSize: isMobile ? '1rem' : '1.25rem',
-            color: 'rgba(255, 255, 255, 0.9)',
-            lineHeight: '1.8',
-            marginBottom: '1.5rem'
-          }}>
-            Je hebt nu alles gezien. De garanties. De transformaties. Het systeem dat werkt.
-          </p>
-          
-          <p style={{
-            fontSize: isMobile ? '1.125rem' : '1.375rem',
-            color: '#FFD700',
-            fontWeight: '700',
-            lineHeight: '1.6',
-            marginBottom: '1.5rem',
-            filter: 'drop-shadow(0 0 15px rgba(255, 215, 0, 0.3))'
-          }}>
-            De vraag is simpel: Ben jij klaar om de beste versie van jezelf te worden?
-          </p>
-          
-          <p style={{
-            fontSize: isMobile ? '0.9rem' : '1.125rem',
-            color: 'rgba(255, 255, 255, 0.7)',
-            fontStyle: 'italic'
-          }}>
-            Of blijf je wachten op het 'perfecte moment' dat nooit komt?
-          </p>
-        </div>
-
-        {/* 2 Keuze Boxes */}
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: isMobile ? '1fr' : 'repeat(2, 1fr)',
-          gap: isMobile ? '1.5rem' : '2rem',
-          maxWidth: '800px',
+          maxWidth: '600px',
           width: '100%',
-          marginBottom: isMobile ? '3rem' : '4rem'
+          marginBottom: isMobile ? '3rem' : '4rem',
+          position: 'relative',
+          zIndex: 2
         }}>
-          {/* JA Box */}
           <div
-            onMouseEnter={() => setHoveredChoice('yes')}
-            onMouseLeave={() => setHoveredChoice(null)}
-            onClick={() => setShowCalendlyModal(true)}
+            onMouseEnter={() => setHoveredCard(true)}
+            onMouseLeave={() => setHoveredCard(false)}
+            onTouchStart={() => isMobile && setHoveredCard(true)}
+            onTouchEnd={() => isMobile && setTimeout(() => setHoveredCard(false), 300)}
             style={{
-              background: hoveredChoice === 'yes'
-                ? 'linear-gradient(135deg, rgba(255, 215, 0, 0.15) 0%, rgba(212, 175, 55, 0.08) 100%)'
-                : 'linear-gradient(135deg, rgba(0, 0, 0, 0.9) 0%, rgba(255, 215, 0, 0.05) 100%)',
-              border: `2px solid ${hoveredChoice === 'yes' ? '#FFD700' : 'rgba(255, 215, 0, 0.3)'}`,
+              background: 'linear-gradient(135deg, rgba(23, 23, 23, 0.95) 0%, rgba(23, 23, 23, 0.8) 100%)',
+              border: `2px solid ${hoveredCard ? 'rgba(255, 186, 9, 0.5)' : 'rgba(255, 186, 9, 0.3)'}`,
               borderRadius: '20px',
               padding: isMobile ? '2rem 1.5rem' : '2.5rem 2rem',
-              cursor: 'pointer',
-              transform: hoveredChoice === 'yes' ? 'translateY(-8px) scale(1.02)' : 'translateY(0) scale(1)',
-              transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
-              backdropFilter: 'blur(10px)',
-              boxShadow: hoveredChoice === 'yes'
-                ? '0 25px 50px rgba(255, 215, 0, 0.3), 0 0 80px rgba(255, 215, 0, 0.2)'
-                : '0 10px 30px rgba(0, 0, 0, 0.5)',
               position: 'relative',
-              overflow: 'hidden',
+              cursor: 'pointer',
+              transform: hoveredCard ? 'translateY(-12px) scale(1.03)' : 'translateY(0) scale(1)',
+              transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
+              backdropFilter: 'blur(12px)',
+              opacity: isVisible ? 1 : 0,
+              animation: 'fadeInUp 0.6s 0.2s forwards',
+              boxShadow: hoveredCard 
+                ? '0 30px 60px rgba(255, 186, 9, 0.3), 0 0 100px rgba(255, 186, 9, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.08)'
+                : '0 10px 30px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.03)',
               touchAction: 'manipulation',
-              WebkitTapHighlightColor: 'transparent'
+              WebkitTapHighlightColor: 'transparent',
+              overflow: 'hidden'
             }}
           >
-            {/* Glow effect */}
-            {hoveredChoice === 'yes' && (
+            {/* Top accent line */}
+            <div style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              height: '2px',
+              background: 'linear-gradient(90deg, #ffba09 0%, #d4a006 100%)',
+              opacity: 0.8,
+              borderRadius: '20px 20px 0 0',
+              zIndex: 3
+            }} />
+
+            {/* Shine overlay */}
+            <div style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              height: '40%',
+              background: 'linear-gradient(180deg, rgba(255, 186, 9, 0.08) 0%, transparent 100%)',
+              pointerEvents: 'none',
+              zIndex: 1
+            }} />
+
+            {/* Badge */}
+            <div style={{
+              display: 'inline-block',
+              background: 'linear-gradient(135deg, #ffba09 0%, #d4a006 100%)',
+              padding: '0.4rem 1.2rem',
+              borderRadius: '100px',
+              fontSize: isMobile ? '0.7rem' : '0.75rem',
+              fontWeight: '800',
+              color: '#000',
+              boxShadow: '0 4px 20px rgba(255, 186, 9, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.2)',
+              letterSpacing: '0.1em',
+              marginBottom: '1.5rem',
+              position: 'relative',
+              zIndex: 2
+            }}>
+              BESTE DEAL
+            </div>
+
+            {/* Title */}
+            <h3 style={{
+              fontSize: isMobile ? '1.5rem' : '1.75rem',
+              fontWeight: '800',
+              background: 'linear-gradient(135deg, #ffba09 0%, #d4a006 100%)',
+              WebkitBackgroundClip: 'text',
+              WebkitTextFillColor: 'transparent',
+              backgroundClip: 'text',
+              marginBottom: '0.5rem',
+              position: 'relative',
+              zIndex: 2
+            }}>
+              Vooraf Betalen
+            </h3>
+
+            {/* Price - LEFT ALIGNED with floating savings badge on RIGHT */}
+            <div style={{
+              marginBottom: '1.5rem',
+              paddingBottom: '1.5rem',
+              borderBottom: '1px solid rgba(255, 186, 9, 0.15)',
+              position: 'relative',
+              zIndex: 2
+            }}>
+              {/* Price with inline total */}
+              <div style={{
+                display: 'flex',
+                alignItems: 'baseline',
+                gap: '0.5rem',
+                marginBottom: '0.125rem',
+                position: 'relative'
+              }}>
+                <span style={{
+                  fontSize: isMobile ? '2.75rem' : '3.25rem',
+                  fontWeight: '900',
+                  color: '#fff',
+                  letterSpacing: '-0.02em',
+                  lineHeight: 1
+                }}>
+                  €125
+                </span>
+                <span style={{
+                  fontSize: isMobile ? '1rem' : '1.125rem',
+                  color: 'rgba(255, 255, 255, 0.5)',
+                  fontWeight: '600'
+                }}>
+                  /€750 totaal
+                </span>
+
+                {/* Savings badge - FLOATING RIGHT */}
+                <div style={{
+                  position: 'absolute',
+                  right: 0,
+                  top: '-0.25rem',
+                  padding: '0.1rem 0.4rem',
+                  background: 'rgba(16, 185, 129, 0.15)',
+                  border: '1px solid rgba(16, 185, 129, 0.4)',
+                  borderRadius: '4px',
+                  backdropFilter: 'blur(8px)',
+                  boxShadow: '0 2px 8px rgba(16, 185, 129, 0.2)',
+                  transform: 'translateY(-2px)'
+                }}>
+                  <span style={{
+                    fontSize: isMobile ? '0.55rem' : '0.6rem',
+                    color: '#10b981',
+                    fontWeight: '700',
+                    letterSpacing: '0',
+                    whiteSpace: 'nowrap',
+                    lineHeight: 1.2
+                  }}>
+                    ✓ Bespaar €300
+                  </span>
+                </div>
+              </div>
+              
+              {/* Per maand */}
+              <div style={{
+                fontSize: isMobile ? '0.95rem' : '1.05rem',
+                color: 'rgba(255, 255, 255, 0.6)',
+                fontWeight: '600'
+              }}>
+                per maand
+              </div>
+            </div>
+
+            {/* Features */}
+            <ul style={{
+              listStyle: 'none',
+              padding: 0,
+              margin: 0,
+              position: 'relative',
+              zIndex: 2
+            }}>
+              {[
+                '6 maanden volledige begeleiding',
+                '€300 goedkoper dan 6 termijnen',
+                'Direct toegang tot alles',
+                'Meeste waarde voor je geld'
+              ].map((feature, idx) => (
+                <li
+                  key={idx}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'flex-start',
+                    gap: '0.75rem',
+                    marginBottom: '0.875rem',
+                    fontSize: isMobile ? '0.875rem' : '0.95rem',
+                    color: 'rgba(255, 255, 255, 0.75)',
+                    lineHeight: 1.5
+                  }}
+                >
+                  <div style={{
+                    width: '22px',
+                    height: '22px',
+                    borderRadius: '50%',
+                    background: 'rgba(255, 186, 9, 0.1)',
+                    border: '1px solid rgba(255, 186, 9, 0.2)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    flexShrink: 0,
+                    marginTop: '2px'
+                  }}>
+                    <CheckCircle size={12} color="#ffba09" strokeWidth={2.5} />
+                  </div>
+                  {feature}
+                </li>
+              ))}
+            </ul>
+
+            {/* Hover glow */}
+            {hoveredCard && (
               <div style={{
                 position: 'absolute',
                 top: '50%',
@@ -224,149 +324,83 @@ export default function FinalCTASection({ onScrollNext }) {
                 transform: 'translate(-50%, -50%)',
                 width: '150%',
                 height: '150%',
-                background: 'radial-gradient(circle, rgba(255, 215, 0, 0.1) 0%, transparent 60%)',
+                background: 'radial-gradient(circle, rgba(255, 186, 9, 0.1) 0%, transparent 60%)',
                 filter: 'blur(40px)',
-                pointerEvents: 'none'
+                pointerEvents: 'none',
+                animation: 'pulse 2s ease-in-out infinite',
+                zIndex: 0
               }} />
             )}
-            
-            <h3 style={{
-              fontSize: isMobile ? '1.5rem' : '2rem',
-              fontWeight: '900',
-              background: 'linear-gradient(135deg, #FFD700 0%, #D4AF37 100%)',
-              WebkitBackgroundClip: 'text',
-              WebkitTextFillColor: 'transparent',
-              backgroundClip: 'text',
-              marginBottom: '1rem',
-              textAlign: 'center',
-              position: 'relative',
-              zIndex: 1
-            }}>
-              JA, Ik Ben Klaar
-            </h3>
-            
-            <ul style={{
-              listStyle: 'none',
-              padding: 0,
-              margin: 0,
-              position: 'relative',
-              zIndex: 1
-            }}>
-              <li style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.75rem',
-                marginBottom: '0.75rem',
-                fontSize: isMobile ? '0.9rem' : '1rem',
-                color: 'rgba(255, 255, 255, 0.9)'
-              }}>
-                <ArrowRight size={16} color="#FFD700" />
-                Start mijn 8-weken transformatie
-              </li>
-              <li style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.75rem',
-                fontSize: isMobile ? '0.9rem' : '1rem',
-                color: 'rgba(255, 255, 255, 0.9)'
-              }}>
-                <ArrowRight size={16} color="#FFD700" />
-                Ik wil mijn geld terugverdienen
-              </li>
-            </ul>
-          </div>
-
-          {/* NEE Box */}
-          <div
-            onMouseEnter={() => setHoveredChoice('no')}
-            onMouseLeave={() => setHoveredChoice(null)}
-            style={{
-              background: 'linear-gradient(135deg, rgba(0, 0, 0, 0.9) 0%, rgba(107, 114, 128, 0.05) 100%)',
-              border: '2px solid rgba(107, 114, 128, 0.3)',
-              borderRadius: '20px',
-              padding: isMobile ? '2rem 1.5rem' : '2.5rem 2rem',
-              cursor: 'default',
-              opacity: hoveredChoice === 'yes' ? 0.5 : 1,
-              transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
-              backdropFilter: 'blur(10px)',
-              boxShadow: '0 10px 30px rgba(0, 0, 0, 0.5)',
-              position: 'relative'
-            }}
-          >
-            <h3 style={{
-              fontSize: isMobile ? '1.5rem' : '2rem',
-              fontWeight: '900',
-              color: 'rgba(107, 114, 128, 0.8)',
-              marginBottom: '1rem',
-              textAlign: 'center'
-            }}>
-              NEE, Ik Twijfel Nog
-            </h3>
-            
-            <ul style={{
-              listStyle: 'none',
-              padding: 0,
-              margin: 0
-            }}>
-              <li style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.75rem',
-                marginBottom: '0.75rem',
-                fontSize: isMobile ? '0.9rem' : '1rem',
-                color: 'rgba(107, 114, 128, 0.7)'
-              }}>
-                <X size={16} color="rgba(107, 114, 128, 0.5)" />
-                Blijf waar ik nu ben
-              </li>
-              <li style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.75rem',
-                fontSize: isMobile ? '0.9rem' : '1rem',
-                color: 'rgba(107, 114, 128, 0.7)'
-              }}>
-                <X size={16} color="rgba(107, 114, 128, 0.5)" />
-                Misschien volgend jaar
-              </li>
-            </ul>
-            
-            <p style={{
-              fontSize: isMobile ? '0.75rem' : '0.875rem',
-              color: 'rgba(107, 114, 128, 0.5)',
-              fontStyle: 'italic',
-              textAlign: 'center',
-              marginTop: '1rem'
-            }}>
-              Respecteer je keuze, succes!
-            </p>
           </div>
         </div>
 
-        {/* PS Bottom text */}
+        {/* Single CTA Button - Wat Nu */}
         <div style={{
-          textAlign: 'center',
-          maxWidth: '600px',
+          maxWidth: '400px',
+          width: '100%',
           opacity: isVisible ? 1 : 0,
           transform: isVisible ? 'scale(1)' : 'scale(0.95)',
-          transition: 'all 0.8s cubic-bezier(0.4, 0, 0.2, 1) 0.6s'
+          transition: 'all 0.8s cubic-bezier(0.4, 0, 0.2, 1) 0.6s',
+          position: 'relative',
+          zIndex: 2
         }}>
-          <p style={{
-            fontSize: isMobile ? '0.9rem' : '1.125rem',
-            color: '#D4AF37',
-            fontWeight: '600',
-            fontStyle: 'italic',
-            filter: 'drop-shadow(0 0 15px rgba(212, 175, 55, 0.4))'
-          }}>
-            P.S. Over 8 weken ben je óf getransformeerd, heb je geld terug en heb je de kennis om levenslang fit te blijven. Wat heb je te verliezen?
-          </p>
+          <button
+            onClick={scrollToClientWelcome}
+            onMouseEnter={() => setHoveredButton(true)}
+            onMouseLeave={() => setHoveredButton(false)}
+            onTouchStart={(e) => {
+              if (isMobile) {
+                e.currentTarget.style.transform = 'scale(0.98)'
+              }
+            }}
+            onTouchEnd={(e) => {
+              if (isMobile) {
+                e.currentTarget.style.transform = 'scale(1)'
+              }
+            }}
+            style={{
+              width: '100%',
+              background: hoveredButton
+                ? 'linear-gradient(135deg, rgba(255, 186, 9, 0.2) 0%, rgba(212, 160, 6, 0.15) 100%)'
+                : 'rgba(255, 186, 9, 0.08)',
+              border: `1px solid ${hoveredButton ? 'rgba(255, 186, 9, 0.3)' : 'rgba(255, 186, 9, 0.15)'}`,
+              borderRadius: isMobile ? '12px' : '14px',
+              padding: isMobile ? '1rem 2rem' : '1.25rem 2.5rem',
+              fontSize: isMobile ? '1rem' : '1.125rem',
+              fontWeight: '700',
+              color: hoveredButton ? '#ffba09' : '#d4a006',
+              cursor: 'pointer',
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '0.625rem',
+              transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+              transform: hoveredButton ? 'translateY(-2px)' : 'translateY(0)',
+              boxShadow: hoveredButton
+                ? '0 4px 12px rgba(255, 186, 9, 0.15)'
+                : '0 2px 8px rgba(0, 0, 0, 0.2)',
+              touchAction: 'manipulation',
+              WebkitTapHighlightColor: 'transparent',
+              minHeight: '44px',
+              letterSpacing: '0.01em'
+            }}
+          >
+            <span>Wat Nu</span>
+            <ArrowRight 
+              size={isMobile ? 18 : 20} 
+              style={{
+                transition: 'transform 0.3s ease',
+                transform: hoveredButton ? 'translateX(4px)' : 'translateX(0)'
+              }}
+            />
+          </button>
         </div>
 
         {/* CSS Animations */}
         <style>{`
-          @keyframes pulse {
-            0%, 100% { opacity: 0.08; }
-            50% { opacity: 0.12; }
+          @keyframes float {
+            0%, 100% { transform: translateY(0) scale(1); }
+            50% { transform: translateY(-30px) scale(1.05); }
           }
           
           @keyframes fadeInUp {
@@ -379,15 +413,13 @@ export default function FinalCTASection({ onScrollNext }) {
               transform: translateY(0);
             }
           }
+          
+          @keyframes pulse {
+            0%, 100% { opacity: 0.5; }
+            50% { opacity: 0.8; }
+          }
         `}</style>
       </section>
-
-      {/* Calendly Modal */}
-      <CalendlyModal 
-        isOpen={showCalendlyModal}
-        onClose={() => setShowCalendlyModal(false)}
-        isMobile={isMobile}
-      />
     </>
   )
 }

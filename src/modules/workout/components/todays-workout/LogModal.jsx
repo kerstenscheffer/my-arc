@@ -1,7 +1,8 @@
 // src/modules/workout/components/todays-workout/LogModal.jsx
-import { X, CheckCircle, Dumbbell, Check } from 'lucide-react'
+import { X, CheckCircle, Dumbbell, Check, Play, MessageSquare, ChevronDown, Zap, ThumbsUp, Moon, TrendingDown, Thermometer } from 'lucide-react'
 import { useState, useEffect } from 'react'
 import ExerciseList from './components/ExerciseList'
+import WorkoutFlowWizard from './WorkoutFlowWizard'
 
 export default function LogModal({ workout, todaysLogs, onClose, onLogsUpdate, client, schema, db }) {
   const isMobile = window.innerWidth <= 768
@@ -9,553 +10,253 @@ export default function LogModal({ workout, todaysLogs, onClose, onLogsUpdate, c
   const [completedCount, setCompletedCount] = useState(0)
   const [isFinishing, setIsFinishing] = useState(false)
   const [isWorkoutCompleted, setIsWorkoutCompleted] = useState(false)
-  
-  // Progressive reveal animation
+  const [showWorkoutFlow, setShowWorkoutFlow] = useState(false)
+
+  // ✅ Live exercises state — synct met workout prop na swap + reload
+  const [liveExercises, setLiveExercises] = useState(workout.exercises || [])
+
+  const [dayFeeling, setDayFeeling] = useState(null)
+  const [dayNote, setDayNote] = useState('')
+  const [showDayNote, setShowDayNote] = useState(false)
+  const [dayNoteSaved, setDayNoteSaved] = useState(false)
+
+  // Sync als workout.exercises verandert (na swap reload)
+  useEffect(() => {
+    console.log('📋 LogModal exercises update:', workout.exercises?.map(e => e.name))
+    setLiveExercises(workout.exercises || [])
+  }, [workout.exercises])
+
   useEffect(() => {
     setTimeout(() => setVisible(true), 50)
     checkWorkoutCompletion()
-  }, [])
-  
-  // Check if workout is already completed
-  const checkWorkoutCompletion = async () => {
-    if (!client?.id || !db) return
-    
-    try {
-      const today = new Date().toISOString().split('T')[0]
-      const { data } = await db.supabase
-        .from('workout_completions')
-        .select('completed')
-        .eq('client_id', client.id)
-        .eq('workout_date', today)
-        .single()
-      
-      setIsWorkoutCompleted(data?.completed || false)
-    } catch (error) {
-      setIsWorkoutCompleted(false)
-    }
-  }
-  
-  // Count completed exercises
-  useEffect(() => {
-    if (todaysLogs && workout.exercises) {
-      const loggedExercises = new Set(todaysLogs.map(log => log.exercise_name))
-      const completed = workout.exercises.filter(ex => loggedExercises.has(ex.name)).length
-      setCompletedCount(completed)
-    }
-  }, [todaysLogs, workout.exercises])
-  
-  // Handle close with animation
-  const handleClose = () => {
-    setVisible(false)
-    setTimeout(() => {
-      onClose()
-    }, 300)
-  }
-  
-  // ⭐ FIXED: Finish Workout zonder 'notes'
-  const handleFinishWorkout = async () => {
-    if (!client?.id || !db) return
-    
-    setIsFinishing(true)
-    
-    try {
-      const today = new Date().toISOString().split('T')[0]
-      
-      // 🔥 FIX: Gebruik correcte table 'workout_completions' zonder 'notes' column
-      const { error } = await db.supabase
-        .from('workout_completions')
-        .upsert({
-          client_id: client.id,
-          workout_date: today,
-          completed: true
-        }, {
-          onConflict: 'client_id,workout_date'
-        })
-      
-      if (error) throw error
-      
-      console.log('✅ Workout marked as completed')
-      
-      // Success feedback
-      if (navigator.vibrate) navigator.vibrate([50, 100, 50, 100, 50])
-      
-      setIsWorkoutCompleted(true)
-      
-      // Close modal after 1 second
-      setTimeout(() => {
-        handleClose()
-      }, 1000)
-      
-    } catch (error) {
-      console.error('❌ Error finishing workout:', error)
-      alert('Er ging iets mis bij het voltooien. Probeer opnieuw.')
-      setIsFinishing(false)
-    }
-  }
-  
-  // Prevent body scroll when modal open
-  useEffect(() => {
+    loadDayNote()
     document.body.style.overflow = 'hidden'
-    return () => {
-      document.body.style.overflow = 'auto'
-    }
+    return () => { document.body.style.overflow = 'auto' }
   }, [])
-  
-  // Handle escape key
+
   useEffect(() => {
-    const handleEscape = (e) => {
-      if (e.key === 'Escape') handleClose()
-    }
+    const handleEscape = (e) => { if (e.key === 'Escape') handleClose() }
     window.addEventListener('keydown', handleEscape)
     return () => window.removeEventListener('keydown', handleEscape)
   }, [])
-  
-  const totalExercises = workout.exercises?.length || 0
-  const progressPercentage = totalExercises > 0 ? (completedCount / totalExercises) * 100 : 0
-  
+
+  useEffect(() => {
+    if (todaysLogs && liveExercises) {
+      const logged = new Set(todaysLogs.map(l => l.exercise_name))
+      setCompletedCount(liveExercises.filter(ex => logged.has(ex.name)).length)
+    }
+  }, [todaysLogs, liveExercises])
+
+  const loadDayNote = async () => {
+    if (!client?.id || !db) return
+    try {
+      const today = new Date().toISOString().split('T')[0]
+      const { data } = await db.supabase.from('workout_sessions').select('notes').eq('client_id', client.id).eq('workout_date', today).single()
+      if (data?.notes) {
+        const parts = data.notes.split('|')
+        if (parts.length >= 2) { setDayFeeling(parts[0]); setDayNote(parts.slice(1).join('|')) }
+        else setDayNote(data.notes)
+        setShowDayNote(true); setDayNoteSaved(true)
+      }
+    } catch {}
+  }
+
+  const saveDayNote = async (feeling, note) => {
+    if (!client?.id || !db) return
+    try {
+      const today = new Date().toISOString().split('T')[0]
+      const combined = feeling ? `${feeling}|${note}` : note
+      let { data: session } = await db.supabase.from('workout_sessions').select('id').eq('client_id', client.id).eq('workout_date', today).single()
+      if (!session) {
+        const { data: ns } = await db.supabase.from('workout_sessions').insert({ client_id: client.id, user_id: client.id, workout_date: today, day_name: new Date().toLocaleDateString('en-US', { weekday: 'long' }), day_display_name: workout?.name || 'Workout', exercises_completed: [], is_completed: false, created_at: new Date().toISOString() }).select().single()
+        session = ns
+      }
+      await db.supabase.from('workout_sessions').update({ notes: combined }).eq('client_id', client.id).eq('workout_date', today)
+      setDayNoteSaved(true)
+      if (navigator.vibrate) navigator.vibrate([20, 40, 20])
+    } catch (e) { console.error('❌ Day note save failed:', e) }
+  }
+
+  const handleFeelingSelect = (feeling) => { setDayFeeling(feeling); setShowDayNote(true); saveDayNote(feeling, dayNote) }
+  const handleNoteBlur = () => { if (dayNote || dayFeeling) saveDayNote(dayFeeling, dayNote) }
+
+  const checkWorkoutCompletion = async () => {
+    if (!client?.id || !db) return
+    try {
+      const today = new Date().toISOString().split('T')[0]
+      const { data } = await db.supabase.from('workout_completions').select('completed').eq('client_id', client.id).eq('workout_date', today).single()
+      setIsWorkoutCompleted(data?.completed || false)
+    } catch { setIsWorkoutCompleted(false) }
+  }
+
+  const handleClose = () => { setVisible(false); setTimeout(() => onClose(), 300) }
+
+  const handleFinishWorkout = async () => {
+    if (!client?.id || !db) return
+    setIsFinishing(true)
+    try {
+      const today = new Date().toISOString().split('T')[0]
+      const { error } = await db.supabase.from('workout_completions').upsert({ client_id: client.id, workout_date: today, completed: true }, { onConflict: 'client_id,workout_date' })
+      if (error) throw error
+      if (navigator.vibrate) navigator.vibrate([50, 100, 50, 100, 50])
+      setIsWorkoutCompleted(true)
+      setTimeout(() => handleClose(), 1200)
+    } catch (e) {
+      console.error('❌ Finish workout failed:', e)
+      alert('Er ging iets mis. Probeer opnieuw.')
+      setIsFinishing(false)
+    }
+  }
+
+  const handleWorkoutFlowComplete = () => { setShowWorkoutFlow(false); if (onLogsUpdate) onLogsUpdate(); handleFinishWorkout() }
+
+  if (showWorkoutFlow) {
+    return (
+      <WorkoutFlowWizard
+        exercises={liveExercises}
+        client={client}
+        db={db}
+        onComplete={handleWorkoutFlowComplete}
+        onClose={() => setShowWorkoutFlow(false)}
+      />
+    )
+  }
+
+  const totalExercises = liveExercises.length || 0
+  const progressPct = totalExercises > 0 ? (completedCount / totalExercises) * 100 : 0
+
+  const feelings = [
+    { key: 'sterk', icon: Zap, label: 'Sterk', color: '#10b981' },
+    { key: 'normaal', icon: ThumbsUp, label: 'Normaal', color: '#FFD700' },
+    { key: 'moe', icon: Moon, label: 'Moe', color: '#f59e0b' },
+    { key: 'zwak', icon: TrendingDown, label: 'Zwak', color: '#f97316' },
+    { key: 'ziek', icon: Thermometer, label: 'Ziek', color: '#ef4444' }
+  ]
+
   return (
-    <div
-      style={{
-        position: 'fixed',
-        inset: 0,
-        background: 'rgba(0, 0, 0, 0.95)',
-        backdropFilter: 'blur(20px)',
-        zIndex: 1000,
-        display: 'flex',
-        flexDirection: 'column',
-        opacity: visible ? 1 : 0,
-        transition: 'opacity 0.3s ease-out'
-      }}
-      onClick={(e) => {
-        if (e.target === e.currentTarget) handleClose()
-      }}
-    >
-      {/* Header */}
-      <div style={{
-        background: 'linear-gradient(135deg, rgba(17, 17, 17, 0.98) 0%, rgba(10, 10, 10, 0.98) 100%)',
-        backdropFilter: 'blur(20px)',
-        borderBottom: '1px solid rgba(249, 115, 22, 0.25)',
-        padding: isMobile ? '0.875rem 1rem' : '1.25rem 1.5rem',
-        position: 'sticky',
-        top: 0,
-        zIndex: 10,
-        boxShadow: '0 4px 20px rgba(0, 0, 0, 0.5), 0 0 60px rgba(249, 115, 22, 0.1)'
-      }}>
-        {/* Top glow accent */}
-        <div style={{
-          position: 'absolute',
-          top: 0,
-          left: 0,
-          right: 0,
-          height: '2px',
-          background: 'linear-gradient(90deg, transparent 0%, #f97316 50%, transparent 100%)',
-          opacity: 0.6
-        }} />
-        
-        <div style={{
-          maxWidth: '1200px',
-          margin: '0 auto',
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center'
-        }}>
-          {/* Title section */}
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.97)', zIndex: 1000, display: 'flex', flexDirection: 'column', opacity: visible ? 1 : 0, transition: 'opacity 0.3s ease-out' }}
+      onClick={(e) => { if (e.target === e.currentTarget) handleClose() }}>
+
+      {/* ── HEADER ── */}
+      <div style={{ background: '#0a0a0a', borderBottom: '1px solid rgba(255,255,255,0.06)', padding: isMobile ? '0.875rem 1rem' : '1rem 1.5rem', position: 'sticky', top: 0, zIndex: 10, flexShrink: 0 }}>
+        <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '2px', background: 'linear-gradient(90deg, transparent 0%, rgba(255,215,0,0.5) 50%, transparent 100%)' }} />
+
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '0.75rem' }}>
           <div style={{ flex: 1, minWidth: 0 }}>
-            {/* Badge */}
-            <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.4rem',
-              marginBottom: '0.4rem'
-            }}>
-              <div style={{
-                width: isMobile ? '24px' : '28px',
-                height: isMobile ? '24px' : '28px',
-                borderRadius: '8px',
-                background: isWorkoutCompleted 
-                  ? 'rgba(16, 185, 129, 0.2)' 
-                  : 'rgba(249, 115, 22, 0.2)',
-                border: isWorkoutCompleted
-                  ? '1px solid rgba(16, 185, 129, 0.3)'
-                  : '1px solid rgba(249, 115, 22, 0.3)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                boxShadow: isWorkoutCompleted
-                  ? '0 0 15px rgba(16, 185, 129, 0.3)'
-                  : '0 0 15px rgba(249, 115, 22, 0.3)'
-              }}>
-                {isWorkoutCompleted ? (
-                  <CheckCircle 
-                    size={isMobile ? 12 : 14} 
-                    color="#10b981"
-                    style={{ filter: 'drop-shadow(0 0 6px rgba(16, 185, 129, 0.6))' }}
-                  />
-                ) : (
-                  <Dumbbell 
-                    size={isMobile ? 12 : 14} 
-                    color="#f97316"
-                    style={{ filter: 'drop-shadow(0 0 6px rgba(249, 115, 22, 0.6))' }}
-                  />
-                )}
-              </div>
-              <span style={{
-                fontSize: isMobile ? '0.65rem' : '0.7rem',
-                color: isWorkoutCompleted ? '#10b981' : '#f97316',
-                fontWeight: '700',
-                textTransform: 'uppercase',
-                letterSpacing: '0.05em'
-              }}>
-                {isWorkoutCompleted ? 'VOLTOOID' : 'LOG WORKOUT'}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem', marginBottom: '0.3rem' }}>
+              <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: isWorkoutCompleted ? '#10b981' : '#FFD700', flexShrink: 0 }} />
+              <span style={{ fontSize: isMobile ? '0.6rem' : '0.65rem', fontWeight: '700', color: isWorkoutCompleted ? 'rgba(16,185,129,0.7)' : 'rgba(255,215,0,0.7)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                {isWorkoutCompleted ? 'Voltooid' : 'Log Workout'}
               </span>
             </div>
-            
-            {/* Title */}
-            <h2 style={{
-              fontSize: isMobile ? '1.1rem' : '1.3rem',
-              fontWeight: '800',
-              color: '#fff',
-              margin: '0 0 0.625rem 0',
-              letterSpacing: '-0.02em',
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
-              whiteSpace: 'nowrap'
-            }}>
+
+            <h2 style={{ fontSize: isMobile ? '1.1rem' : '1.25rem', fontWeight: '800', color: '#fff', margin: '0 0 0.5rem', letterSpacing: '-0.02em', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
               {workout.name}
             </h2>
-            
-            {/* Progress bar */}
-            <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.625rem'
-            }}>
-              <div style={{
-                flex: 1,
-                height: '6px',
-                background: 'rgba(0, 0, 0, 0.5)',
-                borderRadius: '3px',
-                overflow: 'hidden',
-                border: '1px solid rgba(249, 115, 22, 0.1)'
-              }}>
-                <div style={{
-                  height: '100%',
-                  width: `${progressPercentage}%`,
-                  background: progressPercentage >= 90
-                    ? 'linear-gradient(90deg, #10b981 0%, #34d399 100%)'
-                    : 'linear-gradient(90deg, #f97316 0%, #fb923c 100%)',
-                  transition: 'width 0.5s cubic-bezier(0.4, 0, 0.2, 1)',
-                  boxShadow: progressPercentage >= 90
-                    ? '0 0 15px rgba(16, 185, 129, 0.5)'
-                    : progressPercentage > 0 
-                      ? '0 0 10px rgba(249, 115, 22, 0.3)'
-                      : 'none'
-                }} />
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.625rem' }}>
+              <div style={{ flex: 1, height: '4px', background: 'rgba(255,255,255,0.06)', borderRadius: '2px', overflow: 'hidden' }}>
+                <div style={{ height: '100%', width: `${progressPct}%`, background: progressPct >= 90 ? '#10b981' : 'rgba(255,215,0,0.7)', transition: 'width 0.5s ease', borderRadius: '2px' }} />
               </div>
-              
-              <div style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.3rem',
-                fontSize: isMobile ? '0.7rem' : '0.75rem',
-                color: progressPercentage >= 90 ? '#10b981' : '#f97316',
-                fontWeight: '700',
-                minWidth: 'fit-content'
-              }}>
-                {completedCount > 0 && (
-                  <CheckCircle 
-                    size={isMobile ? 13 : 14} 
-                    style={{
-                      filter: progressPercentage >= 90
-                        ? 'drop-shadow(0 0 6px rgba(16, 185, 129, 0.6))'
-                        : 'drop-shadow(0 0 6px rgba(249, 115, 22, 0.4))'
-                    }}
-                  />
-                )}
+              <span style={{ fontSize: isMobile ? '0.68rem' : '0.72rem', fontWeight: '700', color: progressPct >= 90 ? '#10b981' : 'rgba(255,215,0,0.7)', flexShrink: 0 }}>
                 {completedCount}/{totalExercises}
-              </div>
+              </span>
             </div>
           </div>
-          
-          {/* Close button */}
-          <button
-            onClick={handleClose}
-            style={{
-              width: '44px',
-              height: '44px',
-              background: 'rgba(23, 23, 23, 0.6)',
-              backdropFilter: 'blur(10px)',
-              border: '1px solid rgba(249, 115, 22, 0.2)',
-              borderRadius: '10px',
-              color: '#f97316',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              cursor: 'pointer',
-              transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-              marginLeft: isMobile ? '0.75rem' : '1rem',
-              flexShrink: 0,
-              touchAction: 'manipulation',
-              WebkitTapHighlightColor: 'transparent'
-            }}
-            onMouseEnter={(e) => {
-              if (!isMobile) {
-                e.currentTarget.style.background = 'rgba(249, 115, 22, 0.15)'
-                e.currentTarget.style.borderColor = 'rgba(249, 115, 22, 0.3)'
-                e.currentTarget.style.transform = 'scale(1.05)'
-              }
-            }}
-            onMouseLeave={(e) => {
-              if (!isMobile) {
-                e.currentTarget.style.background = 'rgba(23, 23, 23, 0.6)'
-                e.currentTarget.style.borderColor = 'rgba(249, 115, 22, 0.2)'
-                e.currentTarget.style.transform = 'scale(1)'
-              }
-            }}
-            onTouchStart={(e) => {
-              if (isMobile) {
-                e.currentTarget.style.transform = 'scale(0.95)'
-              }
-            }}
-            onTouchEnd={(e) => {
-              if (isMobile) {
-                e.currentTarget.style.transform = 'scale(1)'
-              }
-            }}
-          >
-            <X size={isMobile ? 18 : 20} strokeWidth={2.5} />
+
+          <button onClick={handleClose} style={{ width: '40px', height: '40px', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '8px', color: 'rgba(255,255,255,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0, touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}
+            onTouchStart={(e) => e.currentTarget.style.transform = 'scale(0.95)'}
+            onTouchEnd={(e) => e.currentTarget.style.transform = 'scale(1)'}>
+            <X size={18} strokeWidth={2.5} />
           </button>
         </div>
       </div>
-      
-      {/* Content - Scrollable */}
-      <div style={{
-        flex: 1,
-        overflow: 'auto',
-        padding: isMobile ? '1rem' : '1.5rem 1rem',
-        WebkitOverflowScrolling: 'touch'
-      }}>
-        <div style={{
-          maxWidth: '1200px',
-          margin: '0 auto'
-        }}>
-          <ExerciseList
-            exercises={workout.exercises || []}
-            todaysLogs={todaysLogs}
-            onLogsUpdate={onLogsUpdate}
-            client={client}
-            schema={schema}
-            db={db}
-            workoutDayKey={workout.dayKey}
-          />
+
+      {/* ── CONTENT ── */}
+      <div style={{ flex: 1, overflow: 'auto', WebkitOverflowScrolling: 'touch' }}>
+
+        {/* Feeling sectie */}
+        <div style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+          <div onClick={() => setShowDayNote(p => !p)} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: isMobile ? '0.625rem 1rem' : '0.75rem 1.5rem', cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+              <MessageSquare size={isMobile ? 13 : 14} color="rgba(255,215,0,0.5)" strokeWidth={2} />
+              <span style={{ fontSize: isMobile ? '0.7rem' : '0.75rem', fontWeight: '700', color: 'rgba(255,215,0,0.6)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Hoe voel je je vandaag?</span>
+              {dayFeeling && (() => { const f = feelings.find(f => f.key === dayFeeling); if (!f) return null; const Icon = f.icon; return <Icon size={13} color={f.color} /> })()}
+              {dayNoteSaved && !showDayNote && <span style={{ fontSize: '0.55rem', color: 'rgba(16,185,129,0.5)', fontWeight: '700' }}>✓</span>}
+            </div>
+            <ChevronDown size={14} color="rgba(255,255,255,0.2)" style={{ transition: 'transform 0.2s ease', transform: showDayNote ? 'rotate(180deg)' : 'rotate(0deg)' }} />
+          </div>
+
+          <div style={{ maxHeight: showDayNote ? '260px' : '0px', overflow: 'hidden', transition: 'max-height 0.35s cubic-bezier(0.4,0,0.2,1)' }}>
+            <div style={{ padding: isMobile ? '0 1rem 0.875rem' : '0 1.5rem 1rem' }}>
+              <div style={{ display: 'flex', gap: '0.375rem', marginBottom: '0.625rem' }}>
+                {feelings.map(f => {
+                  const Icon = f.icon
+                  const active = dayFeeling === f.key
+                  return (
+                    <button key={f.key} onClick={() => handleFeelingSelect(f.key)} style={{ flex: 1, padding: isMobile ? '0.5rem 0.2rem' : '0.55rem 0.25rem', background: active ? `${f.color}12` : 'transparent', border: `1px solid ${active ? `${f.color}35` : 'rgba(255,255,255,0.07)'}`, borderRadius: '6px', cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.2rem', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', transition: 'all 0.15s ease' }}>
+                      <Icon size={isMobile ? 15 : 16} color={active ? f.color : 'rgba(255,255,255,0.2)'} strokeWidth={active ? 2.5 : 2} />
+                      <span style={{ fontSize: isMobile ? '0.5rem' : '0.55rem', fontWeight: '700', color: active ? f.color : 'rgba(255,255,255,0.25)', textTransform: 'uppercase', letterSpacing: '0.03em' }}>{f.label}</span>
+                    </button>
+                  )
+                })}
+              </div>
+              <textarea value={dayNote} onChange={(e) => setDayNote(e.target.value)} onBlur={handleNoteBlur} placeholder="Extra info... (bv. slecht geslapen, weinig gegeten)" style={{ width: '100%', minHeight: '44px', padding: '0.5rem 0.625rem', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: '6px', color: '#fff', fontSize: isMobile ? '0.75rem' : '0.8rem', fontWeight: '500', resize: 'none', outline: 'none', fontFamily: 'inherit', lineHeight: 1.4, boxSizing: 'border-box' }} />
+              {dayNoteSaved && <div style={{ fontSize: '0.57rem', color: 'rgba(16,185,129,0.45)', fontWeight: '600', marginTop: '0.2rem', textAlign: 'right' }}>Opgeslagen ✓</div>}
+            </div>
+          </div>
         </div>
+
+        {/* ✅ Oefeningen — gebruikt liveExercises ipv workout.exercises */}
+        <ExerciseList
+          exercises={liveExercises}
+          todaysLogs={todaysLogs}
+          onLogsUpdate={onLogsUpdate}
+          client={client}
+          schema={schema}
+          db={db}
+          workoutDayKey={workout.dayKey}
+        />
       </div>
-      
-      {/* ⭐ FOOTER - FINISH WORKOUT KNOP */}
+
+      {/* ── FOOTER ── */}
       {!isWorkoutCompleted && (
-        <div style={{
-          background: 'linear-gradient(135deg, rgba(17, 17, 17, 0.98) 0%, rgba(10, 10, 10, 0.98) 100%)',
-          backdropFilter: 'blur(20px)',
-          borderTop: '1px solid rgba(249, 115, 22, 0.25)',
-          padding: isMobile ? '1rem' : '1.25rem 1.5rem',
-          position: 'relative',
-          overflow: 'hidden'
-        }}>
-          {/* Top glow */}
-          <div style={{
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            right: 0,
-            height: '2px',
-            background: 'linear-gradient(90deg, transparent 0%, #10b981 50%, transparent 100%)',
-            opacity: 0.4
-          }} />
-          
-          <div style={{
-            maxWidth: '1200px',
-            margin: '0 auto'
-          }}>
-            {/* Grote groene FINISH knop */}
-            <button
-              onClick={handleFinishWorkout}
-              disabled={isFinishing}
-              style={{
-                width: '100%',
-                background: isFinishing
-                  ? 'rgba(16, 185, 129, 0.5)'
-                  : 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-                border: 'none',
-                borderRadius: '12px',
-                padding: isMobile ? '1rem' : '1.25rem',
-                color: '#000',
-                fontSize: isMobile ? '0.95rem' : '1.05rem',
-                fontWeight: '800',
-                textTransform: 'uppercase',
-                letterSpacing: '0.05em',
-                cursor: isFinishing ? 'not-allowed' : 'pointer',
-                boxShadow: isFinishing
-                  ? 'none'
-                  : '0 8px 32px rgba(16, 185, 129, 0.4)',
-                transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '0.625rem',
-                minHeight: '56px',
-                touchAction: 'manipulation',
-                WebkitTapHighlightColor: 'transparent',
-                opacity: isFinishing ? 0.7 : 1
-              }}
-              onMouseEnter={(e) => {
-                if (!isMobile && !isFinishing) {
-                  e.currentTarget.style.transform = 'translateY(-2px)'
-                  e.currentTarget.style.boxShadow = '0 12px 40px rgba(16, 185, 129, 0.5)'
-                }
-              }}
-              onMouseLeave={(e) => {
-                if (!isMobile && !isFinishing) {
-                  e.currentTarget.style.transform = 'translateY(0)'
-                  e.currentTarget.style.boxShadow = '0 8px 32px rgba(16, 185, 129, 0.4)'
-                }
-              }}
-              onTouchStart={(e) => {
-                if (isMobile && !isFinishing) {
-                  e.currentTarget.style.transform = 'scale(0.98)'
-                }
-              }}
-              onTouchEnd={(e) => {
-                if (isMobile && !isFinishing) {
-                  e.currentTarget.style.transform = 'scale(1)'
-                }
-              }}
-            >
-              {isFinishing ? (
-                <>
-                  <div style={{
-                    width: isMobile ? '18px' : '20px',
-                    height: isMobile ? '18px' : '20px',
-                    border: '3px solid rgba(0, 0, 0, 0.3)',
-                    borderTopColor: '#000',
-                    borderRadius: '50%',
-                    animation: 'spin 1s linear infinite'
-                  }} />
-                  Voltooien...
-                </>
-              ) : (
-                <>
-                  <Check size={isMobile ? 22 : 24} strokeWidth={3} />
-                  Workout Voltooien
-                </>
-              )}
+        <div style={{ background: '#0a0a0a', borderTop: '1px solid rgba(255,255,255,0.06)', padding: isMobile ? '0.75rem 1rem' : '0.875rem 1.5rem', flexShrink: 0 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.6fr', gap: isMobile ? '0.5rem' : '0.625rem', marginBottom: isMobile ? '0.4rem' : '0.5rem' }}>
+            <button onClick={() => setShowWorkoutFlow(true)} style={{ padding: isMobile ? '0.75rem 0.5rem' : '0.875rem 1rem', background: 'rgba(255,215,0,0.08)', border: '1px solid rgba(255,215,0,0.2)', borderRadius: '8px', color: '#FFD700', fontSize: isMobile ? '0.78rem' : '0.85rem', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '0.04em', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.375rem', minHeight: isMobile ? '46px' : '50px', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', transition: 'all 0.15s ease' }}
+              onTouchStart={(e) => e.currentTarget.style.transform = 'scale(0.98)'}
+              onTouchEnd={(e) => e.currentTarget.style.transform = 'scale(1)'}>
+              <Play size={isMobile ? 14 : 16} strokeWidth={2.5} />Flow
             </button>
-            
-            {/* Kleine tekst onder knop */}
-            <p style={{
-              textAlign: 'center',
-              fontSize: isMobile ? '0.65rem' : '0.7rem',
-              color: 'rgba(255, 255, 255, 0.4)',
-              margin: '0.75rem 0 0 0',
-              fontWeight: '600'
-            }}>
-              Klik hier om je workout als voltooid te markeren
-            </p>
+
+            <button onClick={handleFinishWorkout} disabled={isFinishing} style={{ padding: isMobile ? '0.75rem 0.5rem' : '0.875rem 1rem', background: 'rgba(16,185,129,0.15)', border: `1px solid ${isFinishing ? 'rgba(16,185,129,0.15)' : 'rgba(16,185,129,0.35)'}`, borderRadius: '8px', color: isFinishing ? 'rgba(16,185,129,0.4)' : '#10b981', fontSize: isMobile ? '0.78rem' : '0.85rem', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '0.04em', cursor: isFinishing ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.375rem', minHeight: isMobile ? '46px' : '50px', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', transition: 'all 0.15s ease' }}
+              onTouchStart={(e) => { if (!isFinishing) e.currentTarget.style.transform = 'scale(0.98)' }}
+              onTouchEnd={(e) => e.currentTarget.style.transform = 'scale(1)'}>
+              {isFinishing
+                ? <><div style={{ width: '14px', height: '14px', border: '2px solid rgba(16,185,129,0.2)', borderTopColor: '#10b981', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />Even...</>
+                : <><Check size={isMobile ? 15 : 17} strokeWidth={2.5} />Voltooien</>}
+            </button>
+          </div>
+          <div style={{ textAlign: 'center', fontSize: isMobile ? '0.57rem' : '0.62rem', color: 'rgba(255,255,255,0.2)', fontWeight: '600' }}>
+            <span style={{ color: 'rgba(255,215,0,0.4)' }}>Flow</span> begeleide workout met timers &nbsp;·&nbsp; <span style={{ color: 'rgba(16,185,129,0.4)' }}>Voltooien</span> direct afronden
           </div>
         </div>
       )}
-      
-      {/* Success message als workout completed */}
+
       {isWorkoutCompleted && (
-        <div style={{
-          background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.15) 0%, rgba(5, 150, 105, 0.08) 100%)',
-          backdropFilter: 'blur(10px)',
-          borderTop: '1px solid rgba(16, 185, 129, 0.3)',
-          padding: isMobile ? '0.875rem 1rem' : '1.25rem 1.5rem',
-          textAlign: 'center',
-          animation: 'slideUp 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
-          position: 'relative',
-          overflow: 'hidden'
-        }}>
-          {/* Top glow */}
-          <div style={{
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            right: 0,
-            height: '2px',
-            background: 'linear-gradient(90deg, transparent 0%, #10b981 50%, transparent 100%)',
-            opacity: 0.6
-          }} />
-          
-          <div style={{
-            maxWidth: '600px',
-            margin: '0 auto'
-          }}>
-            <div style={{
-              fontSize: isMobile ? '1.1rem' : '1.3rem',
-              fontWeight: '800',
-              color: '#10b981',
-              marginBottom: '0.35rem',
-              letterSpacing: '-0.02em',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '0.5rem'
-            }}>
-              <CheckCircle 
-                size={isMobile ? 20 : 24} 
-                style={{ filter: 'drop-shadow(0 0 10px rgba(16, 185, 129, 0.6))' }}
-              />
-              WORKOUT VOLTOOID!
-            </div>
-            <div style={{
-              fontSize: isMobile ? '0.75rem' : '0.8rem',
-              color: 'rgba(255, 255, 255, 0.7)',
-              fontWeight: '600'
-            }}>
-              {totalExercises > 0 && completedCount === totalExercises
-                ? `Geweldig werk! Alle ${totalExercises} oefeningen gelogd.`
-                : 'Geweldig werk vandaag! Workout voltooid.'}
-            </div>
+        <div style={{ background: 'rgba(16,185,129,0.06)', borderTop: '1px solid rgba(16,185,129,0.2)', padding: isMobile ? '1rem' : '1.25rem 1.5rem', textAlign: 'center', flexShrink: 0, position: 'relative' }}>
+          <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '2px', background: 'linear-gradient(90deg, transparent 0%, #10b981 50%, transparent 100%)', opacity: 0.5 }} />
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', marginBottom: '0.25rem' }}>
+            <CheckCircle size={isMobile ? 18 : 20} color="#10b981" strokeWidth={2.5} />
+            <span style={{ fontSize: isMobile ? '0.95rem' : '1.05rem', fontWeight: '800', color: '#10b981', letterSpacing: '-0.01em' }}>Workout Voltooid</span>
+          </div>
+          <div style={{ fontSize: isMobile ? '0.72rem' : '0.78rem', color: 'rgba(255,255,255,0.4)', fontWeight: '500' }}>
+            {completedCount === totalExercises && totalExercises > 0 ? `Alle ${totalExercises} oefeningen gelogd.` : 'Goed werk vandaag.'}
           </div>
         </div>
       )}
-      
-      {/* CSS Animations */}
-      <style>{`
-        @keyframes slideUp {
-          from {
-            opacity: 0;
-            transform: translateY(20px);
-          }
-          to {
-            opacity: 1;
-            transform: translateY(0);
-          }
-        }
-        
-        @keyframes spin {
-          to { transform: rotate(360deg); }
-        }
-        
-        /* Custom scrollbar */
-        *::-webkit-scrollbar {
-          width: 8px;
-        }
-        
-        *::-webkit-scrollbar-track {
-          background: rgba(0, 0, 0, 0.3);
-        }
-        
-        *::-webkit-scrollbar-thumb {
-          background: rgba(249, 115, 22, 0.3);
-          borderRadius: 4px;
-        }
-        
-        *::-webkit-scrollbar-thumb:hover {
-          background: rgba(249, 115, 22, 0.5);
-        }
-      `}</style>
+
+      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
     </div>
   )
 }

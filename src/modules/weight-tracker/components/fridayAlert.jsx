@@ -1,66 +1,58 @@
+// src/modules/weight-tracker/components/FridayAlert.jsx
+// v3.0 AINextMeal DNA — flush alert bar, no border-radius, compact
+// Props IDENTIEK: { isFriday, todayEntry, isMobile }
+
 import React from 'react'
-import { Star } from 'lucide-react'
+import { Scale } from 'lucide-react'
 
-const THEME = {
-  friday: '#8b5cf6'
-}
-
-export default function FridayAlert({ 
-  isFriday = false,
-  todayEntry = null,
-  isMobile = false 
-}) {
-  
-  // Only show if it's Friday and no entry yet
+export default function FridayAlert({ isFriday = false, todayEntry = null, isMobile = false }) {
   if (!isFriday || todayEntry) return null
   
   return (
     <div style={{
-      background: `linear-gradient(135deg, ${THEME.friday}33 0%, ${THEME.friday}11 100%)`,
-      border: `1px solid ${THEME.friday}`,
-      borderRadius: '12px',
-      padding: isMobile ? '0.75rem' : '1rem',
-      marginBottom: '1.5rem',
+      position: 'relative',
+      background: 'linear-gradient(135deg, rgba(139, 92, 246, 0.12) 0%, rgba(139, 92, 246, 0.04) 100%)',
+      borderBottom: '1px solid rgba(139, 92, 246, 0.15)',
       display: 'flex',
       alignItems: 'center',
-      gap: '0.75rem',
-      animation: 'pulse 2s infinite'
+      gap: isMobile ? '0.5rem' : '0.625rem',
+      padding: isMobile ? '0.5rem 1rem' : '0.625rem 1.5rem',
+      overflow: 'hidden'
     }}>
-      <Star 
-        size={isMobile ? 18 : 20} 
-        color={THEME.friday}
-        style={{ flexShrink: 0 }}
+      {/* Top accent line */}
+      <div style={{
+        position: 'absolute',
+        top: 0, left: 0, right: 0,
+        height: '1px',
+        background: 'linear-gradient(90deg, transparent 0%, #8b5cf6 50%, transparent 100%)',
+        opacity: 0.4
+      }} />
+
+      <Scale 
+        size={isMobile ? 14 : 16} 
+        color="#8b5cf6"
+        style={{ flexShrink: 0, opacity: 0.7 }}
       />
-      <div style={{ flex: 1 }}>
-        <div style={{
-          fontSize: isMobile ? '0.875rem' : '1rem',
-          fontWeight: '600',
-          color: THEME.friday,
-          marginBottom: '0.125rem'
-        }}>
-          Friday Weigh-in Required!
-        </div>
+      <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{
           fontSize: isMobile ? '0.7rem' : '0.75rem',
-          color: THEME.friday,
-          opacity: 0.8
+          fontWeight: '800',
+          color: '#8b5cf6',
+          textTransform: 'uppercase',
+          letterSpacing: '0.03em',
+          lineHeight: 1.2
         }}>
-          Complete your weekly weigh-in for the 8-week challenge
+          Vrijdag Weegmoment Vereist
+        </div>
+        <div style={{
+          fontSize: isMobile ? '0.55rem' : '0.6rem',
+          color: 'rgba(139, 92, 246, 0.6)',
+          fontWeight: '500',
+          marginTop: '0.1rem'
+        }}>
+          Wekelijkse weging voor de 8-weken challenge
         </div>
       </div>
-      
-      <style>{`
-        @keyframes pulse {
-          0%, 100% { 
-            opacity: 1;
-            transform: scale(1);
-          }
-          50% { 
-            opacity: 0.9;
-            transform: scale(0.98);
-          }
-        }
-      `}</style>
     </div>
   )
 }

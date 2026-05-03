@@ -1,74 +1,193 @@
 // src/modules/workout/components/todays-workout/components/SwapModal.jsx
-import { X, RefreshCw, Search, Plus } from 'lucide-react'
+import { X, Search, Plus, Home, Dumbbell as DumbbellIcon, ChevronRight, ChevronDown, SlidersHorizontal, Pin } from 'lucide-react'
 import { useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import CustomExerciseModal from './CustomExerciseModal'
+import ExerciseService from '../../../../../services/ExerciseService'
+import WorkoutServiceNew from '../../../services/WorkoutServiceNew'
 
-export default function SwapModal({ 
-  exercise, 
-  exerciseIndex, 
-  workoutDayKey, 
-  schema, 
-  onClose, 
-  onSwapComplete, 
-  db 
-}) {
+const getFallbackImage = (exercise) => {
+  const muscles = (exercise.primair_spieren || '').toLowerCase()
+  if (muscles.includes('chest')) return 'https://images.unsplash.com/photo-1598971457999-ca4ef48a9a71?w=400&h=400&fit=crop&q=80&crop=center'
+  if (muscles.includes('back')) return 'https://images.unsplash.com/photo-1603287681836-b174ce5074c2?w=400&h=400&fit=crop&q=80&crop=center'
+  if (muscles.includes('leg')) return 'https://images.unsplash.com/photo-1567598508481-65985588e295?w=400&h=400&fit=crop&q=80&crop=center'
+  if (muscles.includes('shoulder')) return 'https://images.unsplash.com/photo-1541534741688-6078c6bfb5c5?w=400&h=400&fit=crop&q=80&crop=center'
+  if (muscles.includes('bicep') || muscles.includes('tricep')) return 'https://images.unsplash.com/photo-1583454110551-21f2fa2afe61?w=400&h=400&fit=crop&q=80&crop=center'
+  if (muscles.includes('core')) return 'https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?w=400&h=400&fit=crop&q=80&crop=center'
+  return 'https://images.unsplash.com/photo-1517836357463-d25dfeac3438?w=400&h=400&fit=crop&q=80&crop=center'
+}
+
+const fuzzyMatch = (text, query) => {
+  if (!text || !query) return false
+  text = text.toLowerCase().trim()
+  query = query.toLowerCase().trim()
+  if (text.includes(query)) return true
+  return query.split(/\s+/).every(word => text.includes(word))
+}
+
+const DUTCH_SYNONYMS = {
+  'schouder': ['shoulder', 'delts', 'delt'],
+  'borst': ['chest', 'pec'],
+  'rug': ['back', 'lat'],
+  'been': ['leg', 'quad', 'hamstring'],
+  'bicep': ['biceps', 'arm'],
+  'tricep': ['triceps', 'arm'],
+  'buik': ['core', 'abs'],
+  'zijkant': ['lateral', 'side'],
+  'voorkant': ['front'],
+  'achterkant': ['rear', 'back'],
+  'kabel': ['cable'],
+  'dumbbell': ['dumbbells', 'db'],
+  'barbell': ['bar', 'bb'],
+  'opheffen': ['raise', 'raises'],
+  'curl': ['curls'],
+  'drukken': ['press'],
+  'trekken': ['row', 'pull']
+}
+
+const expandQuery = (query) => {
+  let expanded = [query]
+  Object.keys(DUTCH_SYNONYMS).forEach(dutch => {
+    if (query.toLowerCase().includes(dutch)) {
+      DUTCH_SYNONYMS[dutch].forEach(english => {
+        expanded.push(query.toLowerCase().replace(dutch, english))
+      })
+    }
+  })
+  return expanded
+}
+
+const MUSCLE_LABELS = {
+  'chest': 'Borst', 'back': 'Rug', 'shoulders': 'Schouders',
+  'biceps': 'Biceps', 'triceps': 'Triceps', 'legs': 'Benen', 'core': 'Core'
+}
+
+const EQUIPMENT_LABELS = {
+  'barbell': 'Barbell', 'dumbbells': 'Dumbbells', 'cables': 'Kabels',
+  'machine': 'Machine', 'bodyweight': 'Bodyweight'
+}
+
+export default function SwapModal({ exercise, exerciseIndex, workoutDayKey, schema, onClose, onSwapComplete, db, client }) {
   const isMobile = window.innerWidth <= 768
   const [visible, setVisible] = useState(false)
-  const [alternatives, setAlternatives] = useState([])
   const [allExercises, setAllExercises] = useState([])
   const [filteredAlternatives, setFilteredAlternatives] = useState([])
   const [searchQuery, setSearchQuery] = useState('')
   const [loading, setLoading] = useState(true)
   const [swapping, setSwapping] = useState(false)
   const [showCustomModal, setShowCustomModal] = useState(false)
-  const [searchMode, setSearchMode] = useState('alternatives')
-  
+  const [selectedMuscle, setSelectedMuscle] = useState(exercise.primairSpieren || null)
+  const [selectedEquipment, setSelectedEquipment] = useState(null)
+  const [showMuscleDropdown, setShowMuscleDropdown] = useState(false)
+  const [showEquipmentDropdown, setShowEquipmentDropdown] = useState(false)
+  const [showExtraFilters, setShowExtraFilters] = useState(false)
+  const [homeOnlyFilter, setHomeOnlyFilter] = useState(false)
+  const [selectedType, setSelectedType] = useState(null)
+  const [exerciseImages, setExerciseImages] = useState({})
+
   useEffect(() => {
     setTimeout(() => setVisible(true), 50)
-    loadAlternatives()
+    loadAllExercises()
+    document.body.style.overflow = 'hidden'
+    return () => { document.body.style.overflow = 'auto' }
   }, [])
-  
-  const loadAlternatives = async () => {
+
+  const loadAllExercises = async () => {
     setLoading(true)
     try {
-      const muscleGroup = exercise.primairSpieren || 'chest'
-      const alts = await db.getAlternativeExercises(muscleGroup, exercise.name)
-      setAlternatives(alts)
-      
-      const all = await db.getAllExercisesForSwap()
+      const [dbExercises, customResult] = await Promise.all([
+        ExerciseService.getAllExercises({ limit: 200 }),
+        client?.id
+          ? db.supabase.from('custom_exercises').select('*').eq('client_id', client.id).order('created_at', { ascending: false })
+          : Promise.resolve({ data: [] })
+      ])
+      const customExercises = (customResult?.data || []).map(c => ({
+        id: c.id, name: c.name,
+        primair_spieren: c.primair_spieren || c.muscle_group || null,
+        equipment: c.equipment || null, type: 'custom',
+        image_url: c.image_url || null, home_friendly: false, gym_friendly: true, _isCustom: true
+      }))
+      const seen = new Set(customExercises.map(c => c.name.toLowerCase()))
+      const deduped = (dbExercises || []).filter(ex => !seen.has(ex.name.toLowerCase()))
+      const all = [...customExercises, ...deduped]
       setAllExercises(all)
-      
-      setFilteredAlternatives(alts)
+      setFilteredAlternatives(all.filter(ex => ex.primair_spieren === (exercise.primairSpieren || null)))
+      loadExerciseImages(all)
     } catch (error) {
-      console.error('❌ Error loading alternatives:', error)
-      setAlternatives([])
+      console.error('❌ Error loading exercises:', error)
       setAllExercises([])
-    } finally {
-      setLoading(false)
-    }
+    } finally { setLoading(false) }
   }
-  
-  useEffect(() => {
-    const sourceList = searchMode === 'all' ? allExercises : alternatives
-    
-    if (!searchQuery.trim()) {
-      setFilteredAlternatives(sourceList)
-      return
+
+  const loadExerciseImages = async (exercises) => {
+    const images = {}
+    for (const ex of exercises) {
+      if (ex._isCustom && ex.image_url) { images[ex.name] = ex.image_url; continue }
+      const img = await ExerciseService.getExerciseImage(ex.name)
+      if (img) images[ex.name] = img
     }
-    
-    const query = searchQuery.toLowerCase()
-    const filtered = sourceList.filter(alt =>
-      alt.name.toLowerCase().includes(query)
-    )
+    setExerciseImages(images)
+  }
+
+  useEffect(() => {
+    let filtered = [...allExercises]
+    if (selectedMuscle) filtered = filtered.filter(ex => ex.primair_spieren === selectedMuscle)
+    if (selectedEquipment) filtered = filtered.filter(ex => ex.equipment === selectedEquipment)
+    if (homeOnlyFilter) filtered = filtered.filter(ex => ex.home_friendly === true)
+    if (selectedType) filtered = filtered.filter(ex => ex.type === selectedType)
+    if (searchQuery.trim()) {
+      const queries = expandQuery(searchQuery)
+      filtered = filtered.filter(alt => {
+        if (queries.some(q => fuzzyMatch(alt.name, q))) return true
+        if (alt.tags?.some(tag => queries.some(q => fuzzyMatch(tag, q)))) return true
+        if (alt.search_terms?.some(term => queries.some(q => fuzzyMatch(term, q)))) return true
+        if (queries.some(q => fuzzyMatch(alt.equipment, q))) return true
+        if (queries.some(q => fuzzyMatch(alt.primair_spieren, q))) return true
+        return false
+      })
+    }
+    filtered = filtered.filter(ex => ex.name !== exercise.name)
     setFilteredAlternatives(filtered)
-  }, [searchQuery, alternatives, allExercises, searchMode])
-  
+  }, [searchQuery, allExercises, selectedMuscle, selectedEquipment, homeOnlyFilter, selectedType])
+
+  const muscleGroups = [...new Set(allExercises.map(ex => ex.primair_spieren).filter(Boolean))].sort()
+  const equipmentTypes = [...new Set(allExercises.filter(ex => !ex._isCustom).map(ex => ex.equipment).filter(Boolean))].sort()
+  const activeExtraFiltersCount = [homeOnlyFilter, selectedType].filter(Boolean).length
+
   const handleSwap = async (newExercise) => {
     if (!schema?.id || !workoutDayKey || swapping) return
-    
     setSwapping(true)
-    
+    try {
+      const updatedExercise = {
+        ...exercise,
+        name: newExercise.name,
+        equipment: newExercise.equipment || exercise.equipment,
+        primairSpieren: exercise.primairSpieren,
+        _isWeeklyOverride: true,
+        _originalName: exercise.name
+      }
+
+      // Sla op als weekly override — NIET in het schema
+      await WorkoutServiceNew.saveWeeklyOverride(
+        client.id, schema.id, workoutDayKey, exerciseIndex, updatedExercise, db
+      )
+
+      if (navigator.vibrate) navigator.vibrate(50)
+      setVisible(false)
+      setTimeout(() => {
+        onSwapComplete({ reloadSchema: true, newExercise: updatedExercise })
+        onClose()
+      }, 300)
+    } catch (error) {
+      console.error('❌ Swap failed:', error)
+      alert('Kon oefening niet wisselen. Probeer opnieuw.')
+      setSwapping(false)
+    }
+  }
+
+  const handleMakePermanent = async (newExercise) => {
+    if (!schema?.id || !workoutDayKey || swapping) return
+    setSwapping(true)
     try {
       const updatedExercise = {
         ...exercise,
@@ -76,446 +195,273 @@ export default function SwapModal({
         equipment: newExercise.equipment || exercise.equipment,
         primairSpieren: exercise.primairSpieren
       }
-      
-      await db.updateExerciseInSchema(
-        schema.id,
-        workoutDayKey,
-        exerciseIndex,
-        updatedExercise
-      )
-      
+      // Schrijf permanent naar schema
+      await db.updateExerciseInSchema(schema.id, workoutDayKey, exerciseIndex, updatedExercise)
+      // Verwijder de weekly override als die bestaat
+      await WorkoutServiceNew.removeWeeklyOverride(client.id, schema.id, workoutDayKey, exerciseIndex, db)
       if (navigator.vibrate) navigator.vibrate(50)
-      
       setVisible(false)
-      
       setTimeout(() => {
-        onSwapComplete({ reloadSchema: true })
+        onSwapComplete({ reloadSchema: true, newExercise: updatedExercise })
         onClose()
       }, 300)
-      
     } catch (error) {
-      console.error('❌ Swap failed:', error)
-      alert('Kon oefening niet wisselen. Probeer opnieuw.')
+      console.error('❌ Permanent swap failed:', error)
+      alert('Kon oefening niet permanent wisselen. Probeer opnieuw.')
       setSwapping(false)
     }
   }
-  
+
   const handleCustomCreated = (customExercise) => {
     setShowCustomModal(false)
-    handleSwap(customExercise)
-  }
-  
-  const handleClose = () => {
-    setVisible(false)
-    setTimeout(() => onClose(), 300)
-  }
-  
-  useEffect(() => {
-    document.body.style.overflow = 'hidden'
-    return () => {
-      document.body.style.overflow = 'auto'
+    if (customExercise._addedToDay) {
+      onSwapComplete({ reloadSchema: true })
+      onClose()
+    } else {
+      handleSwap(customExercise)
     }
-  }, [])
-  
+  }
+
+  const handleClose = () => { setVisible(false); setTimeout(() => onClose(), 300) }
+  const imageSize = isMobile ? '56px' : '64px'
+
+  const dropdownStyle = {
+    position: 'absolute', top: 'calc(100% + 0.375rem)', left: 0, right: 0,
+    background: '#0a0a0a', borderRadius: '10px', overflow: 'hidden',
+    zIndex: 100, boxShadow: '0 8px 24px rgba(0,0,0,0.5)'
+  }
+
+  const dropdownBtnStyle = (active) => ({
+    width: '100%', padding: '0.625rem 0.875rem',
+    background: active ? 'rgba(255,215,0,0.08)' : 'transparent',
+    border: 'none', borderBottom: '1px solid rgba(255,255,255,0.04)',
+    color: active ? '#FFD700' : 'rgba(255,255,255,0.6)',
+    fontSize: '0.85rem', fontWeight: '600', textAlign: 'left',
+    cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.5rem'
+  })
+
   return (
     <>
       {createPortal(
         <div
-          style={{
-            position: 'fixed',
-            inset: 0,
-            background: 'rgba(0, 0, 0, 0.95)',
-            backdropFilter: 'blur(10px)',
-            zIndex: 9999,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            padding: isMobile ? '1rem' : '2rem',
-            opacity: visible ? 1 : 0,
-            transition: 'opacity 0.3s ease-out'
-          }}
-          onClick={(e) => {
-            if (e.target === e.currentTarget) handleClose()
-          }}
+          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.97)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: isMobile ? '0' : '2rem', opacity: visible ? 1 : 0, transition: 'opacity 0.3s ease-out' }}
+          onClick={(e) => { if (e.target === e.currentTarget) handleClose() }}
         >
-        <div
-          style={{
-            maxWidth: isMobile ? '100%' : '700px',
-            width: '100%',
-            maxHeight: isMobile ? '90vh' : '80vh',
-            background: '#000',
-            border: '2px solid rgba(249, 115, 22, 0.3)',
-            borderRadius: '0',
-            display: 'flex',
-            flexDirection: 'column',
-            boxShadow: '0 20px 60px rgba(0, 0, 0, 0.8)',
-            opacity: visible ? 1 : 0,
-            transform: visible ? 'translateY(0)' : 'translateY(30px)',
-            transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)'
-          }}
-        >
-          <div style={{
-            padding: isMobile ? '1rem' : '1.5rem',
-            borderBottom: '1px solid rgba(249, 115, 22, 0.2)'
-          }}>
-            <div style={{
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              marginBottom: '1rem'
-            }}>
-              <h2 style={{
-                fontSize: isMobile ? '1.1rem' : '1.3rem',
-                fontWeight: '900',
-                color: '#fff',
-                margin: 0,
-                letterSpacing: '-0.02em',
-                textShadow: '0 0 20px rgba(249, 115, 22, 0.3)',
-                flex: 1
-              }}>
-                Wissel Oefening
-              </h2>
-              
-              <button
-                onClick={handleClose}
-                style={{
-                  width: '44px',
-                  height: '44px',
-                  background: 'transparent',
-                  border: '1px solid rgba(249, 115, 22, 0.3)',
-                  borderRadius: '0',
-                  color: '#f97316',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  cursor: 'pointer',
-                  transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                  marginLeft: '1rem',
-                  touchAction: 'manipulation',
-                  WebkitTapHighlightColor: 'transparent'
-                }}
-              >
-                <X size={isMobile ? 20 : 24} strokeWidth={2.5} />
-              </button>
-            </div>
-            
-            <div style={{
-              fontSize: isMobile ? '0.8rem' : '0.85rem',
-              color: 'rgba(255, 255, 255, 0.5)',
-              marginBottom: '0.5rem',
-              fontWeight: '600'
-            }}>
-              Huidig: <span style={{ color: '#f97316' }}>{exercise.name}</span>
-            </div>
-            
-            <div style={{
-              display: 'flex',
-              gap: '0.5rem',
-              marginBottom: '0.75rem'
-            }}>
-              <button
-                onClick={() => setSearchMode('alternatives')}
-                style={{
-                  flex: 1,
-                  padding: isMobile ? '0.5rem' : '0.625rem',
-                  background: searchMode === 'alternatives' 
-                    ? 'rgba(249, 115, 22, 0.15)' 
-                    : 'rgba(249, 115, 22, 0.05)',
-                  border: searchMode === 'alternatives'
-                    ? '1px solid rgba(249, 115, 22, 0.4)'
-                    : '1px solid rgba(249, 115, 22, 0.2)',
-                  borderRadius: '0',
-                  color: searchMode === 'alternatives' ? '#f97316' : 'rgba(255, 255, 255, 0.6)',
-                  fontSize: isMobile ? '0.75rem' : '0.8rem',
-                  fontWeight: '700',
-                  cursor: 'pointer',
-                  transition: 'all 0.3s ease',
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.05em'
-                }}
-              >
-                Alternatieven ({alternatives.length})
-              </button>
-              
-              <button
-                onClick={() => setSearchMode('all')}
-                style={{
-                  flex: 1,
-                  padding: isMobile ? '0.5rem' : '0.625rem',
-                  background: searchMode === 'all' 
-                    ? 'rgba(249, 115, 22, 0.15)' 
-                    : 'rgba(249, 115, 22, 0.05)',
-                  border: searchMode === 'all'
-                    ? '1px solid rgba(249, 115, 22, 0.4)'
-                    : '1px solid rgba(249, 115, 22, 0.2)',
-                  borderRadius: '0',
-                  color: searchMode === 'all' ? '#f97316' : 'rgba(255, 255, 255, 0.6)',
-                  fontSize: isMobile ? '0.75rem' : '0.8rem',
-                  fontWeight: '700',
-                  cursor: 'pointer',
-                  transition: 'all 0.3s ease',
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.05em'
-                }}
-              >
-                Alle Oefeningen ({allExercises.length})
-              </button>
-            </div>
-            
-            <div style={{
-              position: 'relative'
-            }}>
-              <Search 
-                size={18} 
-                color="rgba(249, 115, 22, 0.5)"
-                style={{
-                  position: 'absolute',
-                  left: '1rem',
-                  top: '50%',
-                  transform: 'translateY(-50%)',
-                  pointerEvents: 'none'
-                }}
-              />
-              <input
-                type="text"
-                placeholder={searchMode === 'all' ? "Zoek alle oefeningen..." : "Zoek alternatieve oefening..."}
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                style={{
-                  width: '100%',
-                  padding: isMobile ? '0.75rem 1rem 0.75rem 3rem' : '0.875rem 1.25rem 0.875rem 3.5rem',
-                  background: 'rgba(249, 115, 22, 0.05)',
-                  border: '1px solid rgba(249, 115, 22, 0.2)',
-                  borderRadius: '0',
-                  color: '#fff',
-                  fontSize: isMobile ? '0.85rem' : '0.95rem',
-                  fontWeight: '500',
-                  outline: 'none',
-                  transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
-                }}
-              />
-            </div>
-            
-            {searchQuery && (
-              <div style={{
-                marginTop: '0.5rem',
-                fontSize: isMobile ? '0.7rem' : '0.75rem',
-                color: 'rgba(255, 255, 255, 0.5)',
-                fontWeight: '600'
-              }}>
-                {filteredAlternatives.length} resultaten gevonden
+          <div style={{ maxWidth: isMobile ? '100%' : '600px', width: '100%', height: isMobile ? '100%' : 'auto', maxHeight: isMobile ? '100%' : '90vh', background: '#0a0a0a', border: isMobile ? 'none' : '1px solid rgba(255,215,0,0.15)', borderRadius: isMobile ? '0' : '20px', display: 'flex', flexDirection: 'column', boxShadow: '0 25px 80px rgba(0,0,0,0.8)', opacity: visible ? 1 : 0, transform: visible ? 'translateY(0) scale(1)' : 'translateY(20px) scale(0.98)', transition: 'all 0.4s cubic-bezier(0.4,0,0.2,1)', overflow: 'hidden' }}>
+
+            {/* HEADER */}
+            <div style={{ padding: isMobile ? '1rem' : '1.25rem', borderBottom: '1px solid rgba(255,255,255,0.06)', background: '#0a0a0a', position: 'sticky', top: 0, zIndex: 10 }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.875rem' }}>
+                <div>
+                  <h2 style={{ fontSize: isMobile ? '1rem' : '1.15rem', fontWeight: '800', color: '#fff', margin: 0, letterSpacing: '-0.02em', lineHeight: 1.2 }}>Wissel Oefening</h2>
+                  <div style={{ fontSize: isMobile ? '0.68rem' : '0.72rem', color: 'rgba(255,215,0,0.5)', fontWeight: '600', marginTop: '0.15rem' }}>{exercise.name}</div>
+                  {exercise._isWeeklyOverride && (
+                    <div style={{ fontSize: '0.58rem', color: 'rgba(255,255,255,0.3)', fontWeight: '600', marginTop: '0.1rem' }}>
+                      Origineel: {exercise._originalName}
+                    </div>
+                  )}
+                </div>
+                <button onClick={handleClose} style={{ width: '40px', height: '40px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '10px', color: 'rgba(255,255,255,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0, touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}>
+                  <X size={20} strokeWidth={2.5} />
+                </button>
               </div>
-            )}
-          </div>
-          
-          <div style={{
-            flex: 1,
-            overflow: 'auto',
-            padding: isMobile ? '1rem' : '1.5rem',
-            WebkitOverflowScrolling: 'touch'
-          }}>
-            {loading ? (
-              <div style={{ textAlign: 'center', padding: '3rem' }}>
-                <div style={{
-                  width: '40px',
-                  height: '40px',
-                  border: '3px solid rgba(249, 115, 22, 0.2)',
-                  borderTopColor: '#f97316',
-                  borderRadius: '50%',
-                  margin: '0 auto 1rem',
-                  animation: 'spin 1s linear infinite'
-                }} />
-                <p style={{
-                  color: 'rgba(255, 255, 255, 0.6)',
-                  fontSize: isMobile ? '0.85rem' : '0.95rem',
-                  fontWeight: '600'
-                }}>
-                  Alternatieven laden...
-                </p>
+
+              <div style={{ position: 'relative', marginBottom: '0.75rem' }}>
+                <Search size={16} color="rgba(255,215,0,0.4)" style={{ position: 'absolute', left: '0.875rem', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }} />
+                <input type="text" placeholder="Zoek oefening..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)}
+                  style={{ width: '100%', padding: isMobile ? '0.625rem 0.875rem 0.625rem 2.5rem' : '0.75rem 1rem 0.75rem 3rem', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '10px', color: '#fff', fontSize: isMobile ? '0.85rem' : '0.9rem', fontWeight: '500', outline: 'none' }} />
               </div>
-            ) : filteredAlternatives.length === 0 ? (
-              <div style={{ textAlign: 'center', padding: '3rem' }}>
-                <p style={{
-                  color: 'rgba(255, 255, 255, 0.6)',
-                  fontSize: isMobile ? '0.85rem' : '0.95rem',
-                  fontWeight: '600',
-                  marginBottom: '1rem'
-                }}>
-                  {searchQuery ? 'Geen resultaten voor je zoekopdracht' : 'Geen alternatieven gevonden'}
-                </p>
-                {searchQuery && (
-                  <button
-                    onClick={() => setSearchQuery('')}
-                    style={{
-                      padding: '0.5rem 1rem',
-                      background: 'rgba(249, 115, 22, 0.1)',
-                      border: '1px solid rgba(249, 115, 22, 0.3)',
-                      borderRadius: '0',
-                      color: '#f97316',
-                      fontSize: '0.85rem',
-                      fontWeight: '600',
-                      cursor: 'pointer'
-                    }}
-                  >
-                    Wis zoekopdracht
+
+              <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.625rem' }}>
+                <div style={{ flex: 1, position: 'relative' }}>
+                  <button onClick={() => { setShowMuscleDropdown(!showMuscleDropdown); setShowEquipmentDropdown(false) }}
+                    style={{ width: '100%', padding: isMobile ? '0.625rem 0.75rem' : '0.75rem 0.875rem', background: 'rgba(255,215,0,0.08)', border: '1px solid rgba(255,215,0,0.2)', borderRadius: '10px', color: '#FFD700', fontSize: isMobile ? '0.8rem' : '0.85rem', fontWeight: '700', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}>
+                    <span>{selectedMuscle ? MUSCLE_LABELS[selectedMuscle] : 'Alle Spieren'}</span>
+                    <ChevronDown size={16} style={{ transform: showMuscleDropdown ? 'rotate(180deg)' : 'rotate(0)', transition: 'transform 0.2s ease' }} />
                   </button>
-                )}
+                  {showMuscleDropdown && (
+                    <div style={{ ...dropdownStyle, border: '1px solid rgba(255,215,0,0.2)' }}>
+                      <button onClick={() => { setSelectedMuscle(null); setShowMuscleDropdown(false) }} style={dropdownBtnStyle(!selectedMuscle)}>
+                        {!selectedMuscle && <span style={{ color: '#FFD700' }}>✓</span>}<span>Alle Spieren</span>
+                      </button>
+                      {muscleGroups.map(muscle => (
+                        <button key={muscle} onClick={() => { setSelectedMuscle(muscle); setShowMuscleDropdown(false) }} style={dropdownBtnStyle(selectedMuscle === muscle)}>
+                          {selectedMuscle === muscle && <span style={{ color: '#FFD700' }}>✓</span>}<span>{MUSCLE_LABELS[muscle] || muscle}</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                <div style={{ flex: 1, position: 'relative' }}>
+                  <button onClick={() => { setShowEquipmentDropdown(!showEquipmentDropdown); setShowMuscleDropdown(false) }}
+                    style={{ width: '100%', padding: isMobile ? '0.625rem 0.75rem' : '0.75rem 0.875rem', background: selectedEquipment ? 'rgba(255,215,0,0.08)' : 'rgba(255,255,255,0.03)', border: selectedEquipment ? '1px solid rgba(255,215,0,0.2)' : '1px solid rgba(255,255,255,0.08)', borderRadius: '10px', color: selectedEquipment ? '#FFD700' : 'rgba(255,255,255,0.6)', fontSize: isMobile ? '0.8rem' : '0.85rem', fontWeight: '700', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}>
+                    <span style={{ display: 'flex', alignItems: 'center', gap: '0.375rem' }}>
+                      <DumbbellIcon size={14} strokeWidth={2.5} />
+                      {selectedEquipment ? EQUIPMENT_LABELS[selectedEquipment] : 'Equipment'}
+                    </span>
+                    <ChevronDown size={16} style={{ transform: showEquipmentDropdown ? 'rotate(180deg)' : 'rotate(0)', transition: 'transform 0.2s ease' }} />
+                  </button>
+                  {showEquipmentDropdown && (
+                    <div style={{ ...dropdownStyle, border: '1px solid rgba(255,255,255,0.15)' }}>
+                      <button onClick={() => { setSelectedEquipment(null); setShowEquipmentDropdown(false) }} style={dropdownBtnStyle(!selectedEquipment)}>
+                        {!selectedEquipment && <span style={{ color: '#FFD700' }}>✓</span>}<span>Alle Equipment</span>
+                      </button>
+                      {equipmentTypes.map(eq => (
+                        <button key={eq} onClick={() => { setSelectedEquipment(eq); setShowEquipmentDropdown(false) }} style={dropdownBtnStyle(selectedEquipment === eq)}>
+                          {selectedEquipment === eq && <span style={{ color: '#FFD700' }}>✓</span>}<span>{EQUIPMENT_LABELS[eq] || eq}</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                <button onClick={() => setShowExtraFilters(!showExtraFilters)}
+                  style={{ width: '44px', height: '44px', background: activeExtraFiltersCount > 0 ? 'rgba(255,215,0,0.12)' : 'rgba(255,255,255,0.05)', border: activeExtraFiltersCount > 0 ? '1px solid rgba(255,215,0,0.25)' : '1px solid rgba(255,255,255,0.08)', borderRadius: '10px', color: activeExtraFiltersCount > 0 ? '#FFD700' : 'rgba(255,255,255,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', position: 'relative', flexShrink: 0, touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}>
+                  <SlidersHorizontal size={18} strokeWidth={2.5} />
+                  {activeExtraFiltersCount > 0 && (
+                    <div style={{ position: 'absolute', top: '-4px', right: '-4px', width: '18px', height: '18px', borderRadius: '50%', background: '#FFD700', color: '#000', fontSize: '0.65rem', fontWeight: '800', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      {activeExtraFiltersCount}
+                    </div>
+                  )}
+                </button>
               </div>
-            ) : (
-              <div style={{
-                display: 'grid',
-                gridTemplateColumns: isMobile ? '1fr' : 'repeat(2, 1fr)',
-                gap: isMobile ? '0.75rem' : '1rem'
-              }}>
-                {filteredAlternatives.map((alt, index) => (
-                  <AlternativeCard
-                    key={index}
+
+              {showExtraFilters && (
+                <div style={{ padding: '0.75rem', background: 'rgba(255,255,255,0.02)', borderRadius: '10px', border: '1px solid rgba(255,255,255,0.06)', marginBottom: '0.625rem' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                    <div>
+                      <div style={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.4)', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.375rem' }}>Locatie</div>
+                      <button onClick={() => setHomeOnlyFilter(!homeOnlyFilter)} style={{ padding: '0.5rem 0.75rem', background: homeOnlyFilter ? 'rgba(255,215,0,0.12)' : 'rgba(255,255,255,0.05)', border: 'none', borderRadius: '8px', color: homeOnlyFilter ? '#FFD700' : 'rgba(255,255,255,0.6)', fontSize: '0.8rem', fontWeight: '700', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.5rem', textTransform: 'uppercase', letterSpacing: '0.03em' }}>
+                        <Home size={14} strokeWidth={2.5} />Thuis
+                      </button>
+                    </div>
+                    <div>
+                      <div style={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.4)', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.375rem' }}>Type</div>
+                      <div style={{ display: 'flex', gap: '0.5rem' }}>
+                        {['compound', 'isolation'].map(t => (
+                          <button key={t} onClick={() => setSelectedType(selectedType === t ? null : t)} style={{ flex: 1, padding: '0.5rem', background: selectedType === t ? 'rgba(255,215,0,0.12)' : 'rgba(255,255,255,0.05)', border: 'none', borderRadius: '8px', color: selectedType === t ? '#FFD700' : 'rgba(255,255,255,0.6)', fontSize: '0.8rem', fontWeight: '700', cursor: 'pointer', textTransform: 'capitalize' }}>
+                            {t.charAt(0).toUpperCase() + t.slice(1)}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    {activeExtraFiltersCount > 0 && (
+                      <button onClick={() => { setHomeOnlyFilter(false); setSelectedType(null) }} style={{ padding: '0.5rem', background: 'transparent', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '8px', color: 'rgba(255,255,255,0.5)', fontSize: '0.75rem', fontWeight: '600', cursor: 'pointer', textTransform: 'uppercase' }}>
+                        Reset Extra Filters
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              <div style={{ fontSize: '0.7rem', color: 'rgba(255,215,0,0.5)', fontWeight: '600', textAlign: 'center' }}>
+                {filteredAlternatives.length} resultaten
+              </div>
+            </div>
+
+            {/* LIST */}
+            <div style={{ flex: 1, overflow: 'auto', WebkitOverflowScrolling: 'touch' }}>
+              {loading ? (
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '3rem 1rem' }}>
+                  <div style={{ width: '32px', height: '32px', border: '3px solid rgba(255,215,0,0.15)', borderTopColor: '#FFD700', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
+                </div>
+              ) : filteredAlternatives.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '3rem 1rem', color: 'rgba(255,255,255,0.5)' }}>
+                  <p style={{ marginBottom: '1rem' }}>Geen resultaten gevonden</p>
+                  <button onClick={() => { setSearchQuery(''); setSelectedMuscle(exercise.primairSpieren || null); setSelectedEquipment(null); setHomeOnlyFilter(false); setSelectedType(null) }}
+                    style={{ padding: '0.5rem 1rem', background: 'rgba(255,215,0,0.1)', border: '1px solid rgba(255,215,0,0.25)', borderRadius: '8px', color: '#FFD700', fontSize: '0.8rem', fontWeight: '700', cursor: 'pointer', textTransform: 'uppercase' }}>
+                    Reset Alles
+                  </button>
+                </div>
+              ) : (
+                filteredAlternatives.map((alt, index) => (
+                  <ExerciseRow
+                    key={`${alt._isCustom ? 'custom' : 'db'}-${alt.id || index}`}
                     exercise={alt}
+                    imageUrl={exerciseImages[alt.name] || getFallbackImage(alt)}
                     onSelect={() => handleSwap(alt)}
+                    onSelectPermanent={() => handleMakePermanent(alt)}
                     swapping={swapping}
+                    imageSize={imageSize}
+                    isMobile={isMobile}
                   />
-                ))}
+                ))
+              )}
+
+              <div style={{ padding: isMobile ? '1rem' : '1.25rem', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+                <button onClick={() => setShowCustomModal(true)}
+                  style={{ width: '100%', padding: isMobile ? '0.875rem' : '1rem', background: 'transparent', border: '1px dashed rgba(255,215,0,0.3)', borderRadius: '12px', color: '#FFD700', fontSize: isMobile ? '0.8rem' : '0.85rem', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.05em', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}>
+                  <Plus size={18} strokeWidth={2.5} />Eigen Oefening
+                </button>
               </div>
-            )}
-            
-            <button
-              onClick={() => {
-                console.log('🔵 + Eigen Oefening CLICKED')
-                console.log('🔵 Current showCustomModal:', showCustomModal)
-                setShowCustomModal(true)
-                console.log('🔵 setShowCustomModal(true) called')
-              }}
-              style={{
-                width: '100%',
-                marginTop: isMobile ? '1rem' : '1.5rem',
-                padding: isMobile ? '0.875rem' : '1rem',
-                background: 'rgba(249, 115, 22, 0.1)',
-                border: '2px dashed rgba(249, 115, 22, 0.3)',
-                borderRadius: '0',
-                color: '#f97316',
-                fontSize: isMobile ? '0.85rem' : '0.9rem',
-                fontWeight: '700',
-                textTransform: 'uppercase',
-                letterSpacing: '0.05em',
-                cursor: 'pointer',
-                transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '0.75rem',
-                minHeight: '44px',
-                touchAction: 'manipulation',
-                WebkitTapHighlightColor: 'transparent'
-              }}
-            >
-              <Plus size={isMobile ? 18 : 20} />
-              Eigen Oefening Toevoegen
-            </button>
+            </div>
           </div>
-        </div>
-        
-        <style>{`
-          @keyframes spin {
-            to { transform: rotate(360deg); }
-          }
-        `}</style>
-      </div>,
-      document.body
+
+          <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+        </div>,
+        document.body
       )}
-      
-      {/* Custom Exercise Modal - PORTAL FIX WITH WRAPPER */}
-      {showCustomModal && (
-        <>
-          {console.log('🟢 RENDERING CustomExerciseModal, showCustomModal:', showCustomModal)}
-          {createPortal(
-            <div style={{ position: 'relative', zIndex: 10001 }}>
-              <CustomExerciseModal
-                onClose={() => {
-                  console.log('🔴 CustomExerciseModal onClose called')
-                  setShowCustomModal(false)
-                }}
-                onSave={(customExercise) => {
-                  console.log('🟢 CustomExerciseModal onSave called:', customExercise)
-                  handleCustomCreated(customExercise)
-                }}
-                client={null}
-                db={db}
-              />
-            </div>,
-            document.body
-          )}
-        </>
+
+      {showCustomModal && createPortal(
+        <CustomExerciseModal onClose={() => setShowCustomModal(false)} onSave={handleCustomCreated} client={client} db={db} schema={schema} />,
+        document.body
       )}
     </>
   )
 }
 
-function AlternativeCard({ exercise, onSelect, swapping }) {
-  const isMobile = window.innerWidth <= 768
-  
-  const handleClick = (e) => {
-    e.preventDefault()
-    e.stopPropagation()
-    if (!swapping) {
-      onSelect()
-    }
-  }
-  
+function ExerciseRow({ exercise, imageUrl, onSelect, onSelectPermanent, swapping, imageSize, isMobile }) {
+  const [showActions, setShowActions] = useState(false)
+
   return (
-    <button
-      onClick={handleClick}
-      disabled={swapping}
-      style={{
-        padding: isMobile ? '1rem' : '1.25rem',
-        background: 'rgba(10, 10, 10, 0.8)',
-        border: '1px solid rgba(249, 115, 22, 0.2)',
-        borderRadius: '0',
-        cursor: swapping ? 'not-allowed' : 'pointer',
-        transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-        textAlign: 'left',
-        opacity: swapping ? 0.5 : 1,
-        touchAction: 'manipulation',
-        WebkitTapHighlightColor: 'transparent'
-      }}
-    >
-      <div style={{
-        display: 'flex',
-        alignItems: 'center',
-        gap: '0.75rem',
-        marginBottom: '0.75rem'
-      }}>
-        <RefreshCw 
-          size={isMobile ? 16 : 18} 
-          color="#f97316"
-          style={{
-            filter: 'drop-shadow(0 0 8px rgba(249, 115, 22, 0.3))'
-          }}
-        />
-        <h3 style={{
-          fontSize: isMobile ? '0.95rem' : '1rem',
-          fontWeight: '800',
-          color: '#fff',
-          margin: 0,
-          flex: 1
-        }}>
-          {exercise.name}
-        </h3>
+    <div style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+      <div
+        onClick={() => !swapping && setShowActions(!showActions)}
+        style={{ display: 'flex', alignItems: 'stretch', cursor: swapping ? 'not-allowed' : 'pointer', opacity: swapping ? 0.5 : 1, transition: 'background 0.15s ease', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', background: showActions ? 'rgba(255,215,0,0.03)' : 'transparent' }}
+      >
+        <div style={{ width: imageSize, minHeight: imageSize, flexShrink: 0, position: 'relative', overflow: 'hidden' }}>
+          <div style={{ position: 'absolute', inset: 0, backgroundImage: `url(${imageUrl})`, backgroundSize: 'cover', backgroundPosition: 'center', opacity: 0.75 }} />
+          <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(135deg, rgba(0,0,0,0.3) 0%, rgba(0,0,0,0.1) 100%)' }} />
+        </div>
+
+        <div style={{ flex: 1, minWidth: 0, padding: isMobile ? '0.625rem 0.875rem' : '0.75rem 1rem', display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: '0.25rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <h3 style={{ fontSize: isMobile ? '0.88rem' : '0.95rem', fontWeight: '800', color: '#fff', margin: 0, letterSpacing: '-0.01em', lineHeight: 1.2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
+              {exercise.name}
+            </h3>
+            {exercise._isCustom && (
+              <span style={{ fontSize: '0.55rem', background: 'rgba(255,215,0,0.15)', color: '#FFD700', padding: '0.1rem 0.35rem', borderRadius: '3px', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '0.03em', lineHeight: 1, flexShrink: 0 }}>Eigen</span>
+            )}
+            {exercise.home_friendly && !exercise._isCustom && (
+              <div style={{ padding: '0.15rem 0.35rem', background: 'rgba(16,185,129,0.15)', border: '1px solid rgba(16,185,129,0.3)', borderRadius: '4px', fontSize: '0.55rem', fontWeight: '800', color: '#10b981', textTransform: 'uppercase', letterSpacing: '0.03em', lineHeight: 1, flexShrink: 0 }}>Thuis</div>
+            )}
+          </div>
+          <div style={{ fontSize: isMobile ? '0.68rem' : '0.72rem', color: 'rgba(255,255,255,0.4)', fontWeight: '600', display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+            {exercise.equipment && <span style={{ textTransform: 'capitalize' }}>{exercise.equipment}</span>}
+            {exercise.type && <span>• {exercise.type}</span>}
+          </div>
+        </div>
+
+        <div style={{ width: '44px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+          <ChevronRight size={isMobile ? 18 : 20} color={showActions ? '#FFD700' : 'rgba(255,215,0,0.3)'} strokeWidth={2.5}
+            style={{ transform: showActions ? 'rotate(90deg)' : 'none', transition: 'transform 0.2s ease' }} />
+        </div>
       </div>
-      
-      <div style={{
-        display: 'flex',
-        gap: '0.75rem',
-        fontSize: isMobile ? '0.7rem' : '0.75rem',
-        color: 'rgba(255, 255, 255, 0.6)',
-        fontWeight: '600'
-      }}>
-        {exercise.equipment && (
-          <span>{exercise.equipment}</span>
-        )}
-        {exercise.sets && exercise.reps && (
-          <span>• {exercise.sets} × {exercise.reps}</span>
-        )}
-      </div>
-    </button>
+
+      {/* Actie knoppen */}
+      {showActions && (
+        <div style={{ display: 'flex', gap: '0.5rem', padding: '0.5rem 1rem 0.625rem', background: 'rgba(255,215,0,0.02)' }}>
+          <button onClick={() => { onSelect(); setShowActions(false) }}
+            style={{ flex: 1, padding: '0.5rem 0.75rem', background: 'rgba(255,215,0,0.08)', border: '1px solid rgba(255,215,0,0.2)', borderRadius: '7px', color: '#FFD700', fontSize: '0.7rem', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.04em', cursor: 'pointer', touchAction: 'manipulation', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.3rem', minHeight: '36px' }}>
+            📅 Deze week
+          </button>
+          <button onClick={() => { onSelectPermanent(); setShowActions(false) }}
+            style={{ flex: 1, padding: '0.5rem 0.75rem', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '7px', color: 'rgba(255,255,255,0.5)', fontSize: '0.7rem', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.04em', cursor: 'pointer', touchAction: 'manipulation', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.3rem', minHeight: '36px' }}>
+            📌 Permanent
+          </button>
+        </div>
+      )}
+    </div>
   )
 }

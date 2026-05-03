@@ -1,135 +1,112 @@
-// src/modules/shopping/tabs/components/ShoppingItem.jsx
-import React from 'react'
-import { CheckCircle2, Circle } from 'lucide-react'
+// src/modules/shopping/tabs/components/ShoppingItem.jsx - V4 EXPAND LONG NAMES
+import React, { useState } from 'react'
+import { Check } from 'lucide-react'
+
+const TRUNCATE_LENGTH = 28
 
 export default function ShoppingItem({ 
   item, 
   checked, 
   onCheck, 
-  color, 
-  gradient, 
+  color,
   isMobile,
-  delay 
+  delay = 0
 }) {
+  const [expanded, setExpanded] = useState(false)
   if (!item) return null
+
+  const name = item.name || ''
+  const isTooLong = name.length > TRUNCATE_LENGTH
+  const displayName = isTooLong && !expanded
+    ? name.slice(0, TRUNCATE_LENGTH).trimEnd() + '…'
+    : name
+
+  const handleNameClick = (e) => {
+    if (isTooLong) {
+      e.stopPropagation()
+      setExpanded(prev => !prev)
+    }
+  }
 
   return (
     <div
       onClick={onCheck}
       style={{
         display: 'flex',
-        alignItems: 'center',
-        gap: isMobile ? '0.75rem' : '1rem',
-        padding: isMobile ? '0.75rem' : '0.875rem',
-        background: checked 
-          ? 'rgba(255, 255, 255, 0.02)' 
-          : 'transparent',
-        borderRadius: isMobile ? '10px' : '12px',
-        border: '1px solid rgba(255, 255, 255, 0.05)',
+        alignItems: 'flex-start',
+        gap: isMobile ? '0.5rem' : '0.625rem',
+        padding: isMobile ? '0.4rem 0' : '0.5rem 0',
         cursor: 'pointer',
         touchAction: 'manipulation',
         WebkitTapHighlightColor: 'transparent',
-        minHeight: '44px',
-        transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
-        opacity: checked ? 0.6 : 1,
-        marginBottom: isMobile ? '0.375rem' : '0.5rem',
-        transform: 'translateZ(0)'
-      }}
-      onMouseEnter={(e) => {
-        if (!isMobile) {
-          e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)'
-          e.currentTarget.style.transform = 'translateX(4px)'
-        }
-      }}
-      onMouseLeave={(e) => {
-        if (!isMobile) {
-          e.currentTarget.style.background = checked ? 'rgba(255, 255, 255, 0.02)' : 'transparent'
-          e.currentTarget.style.transform = 'translateX(0)'
-        }
-      }}
-      onTouchStart={(e) => {
-        if (isMobile) {
-          e.currentTarget.style.transform = 'scale(0.98)'
-        }
-      }}
-      onTouchEnd={(e) => {
-        if (isMobile) {
-          e.currentTarget.style.transform = 'scale(1)'
-        }
+        minHeight: '36px',
+        opacity: checked ? 0.45 : 1,
+        transition: 'opacity 0.2s ease'
       }}
     >
-      {/* Checkbox icon */}
-      <div
+      {/* Checkbox */}
+      <div style={{
+        width: '22px',
+        height: '22px',
+        borderRadius: '5px',
+        background: checked ? color : 'transparent',
+        border: checked 
+          ? `1px solid ${color}` 
+          : '1px solid rgba(255, 255, 255, 0.12)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        flexShrink: 0,
+        marginTop: '1px',
+        transition: 'all 0.2s ease'
+      }}>
+        {checked && <Check size={12} color="#fff" strokeWidth={3} />}
+      </div>
+
+      {/* Name — expandable */}
+      <span
+        onClick={handleNameClick}
         style={{
-          width: isMobile ? '28px' : '32px',
-          height: isMobile ? '28px' : '32px',
-          borderRadius: '7px',
-          background: checked 
-            ? gradient 
-            : 'rgba(255, 255, 255, 0.05)',
-          border: `1px solid ${checked ? color : 'rgba(255, 255, 255, 0.1)'}`,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          flexShrink: 0,
-          transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
-          boxShadow: checked ? `0 0 12px ${color}66` : 'none'
+          flex: 1,
+          color: checked ? 'rgba(255, 255, 255, 0.3)' : '#fff',
+          fontSize: isMobile ? '0.75rem' : '0.85rem',
+          fontWeight: '600',
+          textDecoration: checked ? 'line-through' : 'none',
+          minWidth: 0,
+          wordBreak: 'break-word',
+          lineHeight: '1.35',
+          borderBottom: isTooLong ? `1px dashed rgba(255,255,255,0.15)` : 'none',
+          cursor: isTooLong ? 'pointer' : 'inherit'
         }}
       >
-        {checked ? (
-          <CheckCircle2 size={isMobile ? 14 : 16} color="white" strokeWidth={2.5} />
-        ) : (
-          <Circle size={isMobile ? 14 : 16} color="rgba(255, 255, 255, 0.3)" strokeWidth={2} />
-        )}
-      </div>
+        {displayName}
+      </span>
 
-      {/* Item details */}
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{
-          color: 'white',
-          fontSize: isMobile ? '0.875rem' : '0.95rem',
-          fontWeight: '700',
-          letterSpacing: '-0.01em',
-          marginBottom: '0.125rem',
-          textDecoration: checked ? 'line-through' : 'none',
-          textShadow: '0 1px 4px rgba(0, 0, 0, 0.6)',
-          overflow: 'hidden',
-          textOverflow: 'ellipsis',
-          whiteSpace: 'nowrap'
-        }}>
-          {item.name}
-        </div>
-        <div style={{
-          color: 'rgba(255, 255, 255, 0.4)',
-          fontSize: isMobile ? '0.75rem' : '0.8125rem',
-          fontWeight: '600',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '0.5rem'
-        }}>
-          <span>
-            {item.displayAmount || item.totalAmount} {item.unit}
-          </span>
-          {item.estimatedCost > 0 && (
-            <>
-              <span style={{ color: 'rgba(255, 255, 255, 0.2)' }}>•</span>
-              <span style={{ color: color }}>
-                €{item.estimatedCost.toFixed(2)}
-              </span>
-            </>
-          )}
-        </div>
-      </div>
+      {/* Amount */}
+      <span style={{
+        color: checked ? 'rgba(255, 255, 255, 0.2)' : 'rgba(255, 255, 255, 0.5)',
+        fontSize: isMobile ? '0.65rem' : '0.7rem',
+        fontWeight: '700',
+        whiteSpace: 'nowrap',
+        flexShrink: 0,
+        marginTop: '2px'
+      }}>
+        {Math.round(item.displayAmount || item.totalAmount)}{item.unit}
+      </span>
 
-      {/* Subtle indicator line on right */}
-      <div style={{
-        width: '2px',
-        height: isMobile ? '20px' : '24px',
-        background: checked ? gradient : 'rgba(255, 255, 255, 0.1)',
-        borderRadius: '1px',
-        transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
-        flexShrink: 0
-      }} />
+      {/* Cost */}
+      <span style={{
+        color: checked ? 'rgba(255, 255, 255, 0.2)' : color,
+        fontSize: isMobile ? '0.65rem' : '0.7rem',
+        fontWeight: '800',
+        whiteSpace: 'nowrap',
+        flexShrink: 0,
+        minWidth: '36px',
+        textAlign: 'right',
+        marginTop: '2px'
+      }}>
+        €{(item.estimatedCost || 0).toFixed(2)}
+      </span>
     </div>
   )
 }

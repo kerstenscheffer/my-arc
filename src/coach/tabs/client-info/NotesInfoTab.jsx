@@ -1,15 +1,29 @@
 // src/coach/tabs/client-info/NotesInfoTab.jsx
-import { useState, useEffect, useRef } from 'react'
+// UPGRADED - Interactive checkboxes, copy message, input fields support
+
+import { useState, useEffect } from 'react'
 import { 
-  Plus, X, Search, Filter, Calendar, Tag, 
+  Plus, X, Search, Calendar, Tag, 
   FileText, CheckSquare, Target, AlertCircle, 
   MessageSquare, TrendingUp, Clock, Lightbulb,
-  Phone, ChevronLeft, ChevronRight, Edit2, Trash2,
-  Save, Archive, ChevronDown, ChevronUp
+  Phone, ChevronLeft, ChevronRight, Trash2,
+  Save, ChevronDown, ChevronUp, Layers,
+  GripVertical, Copy, Check
 } from 'lucide-react'
 import NotesService from '../../../modules/notes/NotesService'
+import TemplateSelector from './components/TemplateSelector'
 
-// Category configuration
+// GOLD THEME
+const GOLD = {
+  primary: '#FFD700',
+  secondary: '#D4AF37',
+  border: 'rgba(255, 215, 0, 0.3)',
+  borderActive: 'rgba(255, 215, 0, 0.5)',
+  glow: 'rgba(255, 215, 0, 0.2)',
+  background: 'rgba(255, 215, 0, 0.08)'
+}
+
+// Category configuration with gold accents
 const CATEGORIES = [
   { id: 'session', label: 'Session', icon: FileText, color: '#10b981' },
   { id: 'todo', label: 'To-Do', icon: CheckSquare, color: '#3b82f6' },
@@ -19,7 +33,7 @@ const CATEGORIES = [
   { id: 'tracking', label: 'Tracking', icon: TrendingUp, color: '#06b6d4' },
   { id: 'reminder', label: 'Reminder', icon: Clock, color: '#ec4899' },
   { id: 'idea', label: 'Idea', icon: Lightbulb, color: '#fbbf24' },
-  { id: 'call', label: 'Call', icon: Phone, color: '#10b981' }
+  { id: 'call', label: 'Call', icon: Phone, color: GOLD.primary }
 ]
 
 const PRIORITIES = [
@@ -37,12 +51,15 @@ export default function NotesInfoTab({ db, client, isMobile }) {
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedCategory, setSelectedCategory] = useState('')
-  const [templates, setTemplates] = useState([])
-  const [tags, setTags] = useState([])
   const [saving, setSaving] = useState(false)
   const [hasChanges, setHasChanges] = useState(false)
+  const [showTemplateSelector, setShowTemplateSelector] = useState(false)
+  const [copiedMessage, setCopiedMessage] = useState(null)
   
-  // Local edit state for the selected note
+  // Collapsible sections state
+  const [expandedSections, setExpandedSections] = useState([])
+  
+  // Local edit state
   const [editingNote, setEditingNote] = useState(null)
   
   const service = new NotesService(db)
@@ -58,24 +75,23 @@ export default function NotesInfoTab({ db, client, isMobile }) {
     content: { sections: [] }
   })
   
-  // Load data on mount and client change
   useEffect(() => {
     if (client?.id) {
       loadNotes()
-      loadTemplates()
-      loadTags()
     }
   }, [client?.id])
   
-  // Filter notes when search or category changes
   useEffect(() => {
     filterNotes()
   }, [notes, searchQuery, selectedCategory])
   
-  // Initialize editing note when selected note changes
   useEffect(() => {
     if (selectedNote) {
-      setEditingNote(JSON.parse(JSON.stringify(selectedNote))) // Deep clone
+      setEditingNote(JSON.parse(JSON.stringify(selectedNote)))
+      // Expand first section by default
+      if (selectedNote.content?.sections?.length > 0) {
+        setExpandedSections([selectedNote.content.sections[0].id])
+      }
       setHasChanges(false)
     }
   }, [selectedNote])
@@ -93,49 +109,54 @@ export default function NotesInfoTab({ db, client, isMobile }) {
     }
   }
   
-  const loadTemplates = async () => {
-    try {
-      const templatesData = await service.getTemplates()
-      setTemplates(templatesData)
-    } catch (error) {
-      console.error('Error loading templates:', error)
-    }
-  }
-  
-  const loadTags = async () => {
-    try {
-      const tagsData = await service.getTags()
-      setTags(tagsData)
-    } catch (error) {
-      console.error('Error loading tags:', error)
-    }
-  }
-  
   const filterNotes = () => {
     let filtered = [...notes]
-    
-    // Category filter
     if (selectedCategory) {
       filtered = filtered.filter(note => note.category === selectedCategory)
     }
-    
-    // Search filter
     if (searchQuery) {
       const query = searchQuery.toLowerCase()
       filtered = filtered.filter(note => 
         note.title?.toLowerCase().includes(query) ||
         note.subtitle?.toLowerCase().includes(query) ||
-        JSON.stringify(note.content).toLowerCase().includes(query) ||
-        note.tags?.some(tag => tag.toLowerCase().includes(query))
+        JSON.stringify(note.content).toLowerCase().includes(query)
       )
     }
-    
     setFilteredNotes(filtered)
+  }
+  
+  const toggleSection = (sectionId) => {
+    setExpandedSections(prev => 
+      prev.includes(sectionId) 
+        ? prev.filter(id => id !== sectionId) 
+        : [...prev, sectionId]
+    )
+  }
+  
+  const expandAllSections = () => {
+    if (editingNote?.content?.sections) {
+      setExpandedSections(editingNote.content.sections.map(s => s.id))
+    }
+  }
+  
+  const collapseAllSections = () => {
+    setExpandedSections([])
+  }
+  
+  const handleCopyMessage = async (message, sectionId) => {
+    try {
+      await navigator.clipboard.writeText(message)
+      setCopiedMessage(sectionId)
+      setTimeout(() => setCopiedMessage(null), 2000)
+    } catch (error) {
+      console.error('Failed to copy:', error)
+      alert('❌ Kopiëren mislukt')
+    }
   }
   
   const handleCreateNote = async () => {
     if (!newNote.title) {
-      alert('Please enter a title')
+      alert('⚠️ Vul een titel in')
       return
     }
     
@@ -143,11 +164,46 @@ export default function NotesInfoTab({ db, client, isMobile }) {
       const created = await service.createNote(client.id, newNote)
       setNotes([created, ...notes])
       setShowNewNote(false)
-      resetNewNote()
+      setNewNote({
+        title: '',
+        subtitle: '',
+        category: 'session',
+        priority: 'medium',
+        date: new Date().toISOString().split('T')[0],
+        tags: [],
+        content: { sections: [] }
+      })
       setSelectedNote(created)
     } catch (error) {
       console.error('Error creating note:', error)
-      alert('Error creating note: ' + error.message)
+      alert('❌ Fout: ' + error.message)
+    }
+  }
+  
+  const handleTemplateSelect = async (template) => {
+    const noteFromTemplate = {
+      title: template.name,
+      subtitle: `Created from ${template.name} template`,
+      category: template.category?.toLowerCase() || 'call',
+      priority: 'high',
+      date: new Date().toISOString().split('T')[0],
+      tags: [template.category?.toLowerCase() || 'onboarding'],
+      content: { 
+        sections: template.sections.map(section => ({
+          ...section,
+          id: `${section.id}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+        }))
+      }
+    }
+    
+    try {
+      const created = await service.createNote(client.id, noteFromTemplate)
+      setNotes([created, ...notes])
+      setShowTemplateSelector(false)
+      setSelectedNote(created)
+    } catch (error) {
+      console.error('Error creating note from template:', error)
+      alert('❌ Fout: ' + error.message)
     }
   }
   
@@ -160,17 +216,17 @@ export default function NotesInfoTab({ db, client, isMobile }) {
       setNotes(notes.map(n => n.id === editingNote.id ? updated : n))
       setSelectedNote(updated)
       setHasChanges(false)
-      alert('✅ Note saved successfully!')
+      alert('✅ Note opgeslagen!')
     } catch (error) {
       console.error('Error saving note:', error)
-      alert('❌ Error saving note: ' + error.message)
+      alert('❌ Fout: ' + error.message)
     } finally {
       setSaving(false)
     }
   }
   
   const handleDeleteNote = async (noteId) => {
-    if (!confirm('Are you sure you want to delete this note?')) return
+    if (!confirm('Weet je zeker dat je deze note wilt verwijderen?')) return
     
     try {
       await service.deleteNote(noteId)
@@ -181,7 +237,7 @@ export default function NotesInfoTab({ db, client, isMobile }) {
       }
     } catch (error) {
       console.error('Error deleting note:', error)
-      alert('Error deleting note: ' + error.message)
+      alert('❌ Fout: ' + error.message)
     }
   }
   
@@ -189,9 +245,9 @@ export default function NotesInfoTab({ db, client, isMobile }) {
     if (!editingNote) return
     
     const newSection = {
-      id: `section_${Date.now()}`,
+      id: `section_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
       type: 'text',
-      title: 'New Section',
+      title: 'Nieuwe Sectie',
       content: '',
       timestamp: new Date().toISOString()
     }
@@ -205,6 +261,7 @@ export default function NotesInfoTab({ db, client, isMobile }) {
     }
     
     setEditingNote(updatedNote)
+    setExpandedSections(prev => [...prev, newSection.id])
     setHasChanges(true)
   }
   
@@ -225,10 +282,20 @@ export default function NotesInfoTab({ db, client, isMobile }) {
     setHasChanges(true)
   }
   
-  const handleDeleteSection = (sectionId) => {
+  const handleToggleCheckItem = (sectionId, itemId) => {
     if (!editingNote) return
     
-    const updatedSections = editingNote.content.sections.filter(s => s.id !== sectionId)
+    const updatedSections = editingNote.content.sections.map(section => {
+      if (section.id === sectionId && section.checkItems) {
+        return {
+          ...section,
+          checkItems: section.checkItems.map(item =>
+            item.id === itemId ? { ...item, checked: !item.checked } : item
+          )
+        }
+      }
+      return section
+    })
     
     setEditingNote({
       ...editingNote,
@@ -240,16 +307,46 @@ export default function NotesInfoTab({ db, client, isMobile }) {
     setHasChanges(true)
   }
   
-  const resetNewNote = () => {
-    setNewNote({
-      title: '',
-      subtitle: '',
-      category: 'session',
-      priority: 'medium',
-      date: new Date().toISOString().split('T')[0],
-      tags: [],
-      content: { sections: [] }
+  const handleUpdateField = (sectionId, fieldId, value) => {
+    if (!editingNote) return
+    
+    const updatedSections = editingNote.content.sections.map(section => {
+      if (section.id === sectionId && section.fields) {
+        return {
+          ...section,
+          fields: section.fields.map(field =>
+            field.id === fieldId ? { ...field, value } : field
+          )
+        }
+      }
+      return section
     })
+    
+    setEditingNote({
+      ...editingNote,
+      content: {
+        ...editingNote.content,
+        sections: updatedSections
+      }
+    })
+    setHasChanges(true)
+  }
+  
+  const handleDeleteSection = (sectionId) => {
+    if (!editingNote) return
+    if (!confirm('Sectie verwijderen?')) return
+    
+    const updatedSections = editingNote.content.sections.filter(s => s.id !== sectionId)
+    
+    setEditingNote({
+      ...editingNote,
+      content: {
+        ...editingNote.content,
+        sections: updatedSections
+      }
+    })
+    setExpandedSections(prev => prev.filter(id => id !== sectionId))
+    setHasChanges(true)
   }
   
   const getCategoryInfo = (categoryId) => {
@@ -259,353 +356,372 @@ export default function NotesInfoTab({ db, client, isMobile }) {
   const getPriorityInfo = (priorityId) => {
     return PRIORITIES.find(p => p.id === priorityId) || PRIORITIES[2]
   }
-  
-  // Main list view when no note is selected
+
+  // ==========================================
+  // RENDER: NOTES LIST
+  // ==========================================
   const renderNotesList = () => (
     <div>
-      {/* Header with search and filters */}
+      {/* Header */}
       <div style={{
         display: 'flex',
-        flexDirection: 'column',
+        alignItems: 'center',
         gap: '1rem',
         marginBottom: '1.5rem'
       }}>
-        {/* Search bar */}
         <div style={{
-          position: 'relative'
-        }}>
-          <Search size={18} style={{
-            position: 'absolute',
-            left: '1rem',
-            top: '50%',
-            transform: 'translateY(-50%)',
-            color: 'rgba(255, 255, 255, 0.4)'
-          }} />
-          <input
-            type="text"
-            placeholder="Search notes..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            style={{
-              width: '100%',
-              padding: isMobile ? '0.75rem 1rem 0.75rem 3rem' : '0.875rem 1rem 0.875rem 3rem',
-              background: 'rgba(0, 0, 0, 0.5)',
-              border: '1px solid rgba(255, 255, 255, 0.1)',
-              borderRadius: '12px',
-              color: '#fff',
-              fontSize: isMobile ? '0.9rem' : '0.95rem',
-              outline: 'none',
-              minHeight: '44px',
-              touchAction: 'manipulation',
-              WebkitTapHighlightColor: 'transparent'
-            }}
-          />
-        </div>
-        
-        {/* Category filters */}
-        <div style={{
-          display: 'flex',
-          gap: '0.5rem',
-          overflowX: 'auto',
-          WebkitOverflowScrolling: 'touch',
-          paddingBottom: '0.25rem'
-        }}>
-          <button
-            onClick={() => setSelectedCategory('')}
-            style={{
-              padding: isMobile ? '0.5rem 0.75rem' : '0.6rem 1rem',
-              background: !selectedCategory 
-                ? 'linear-gradient(135deg, rgba(16, 185, 129, 0.2) 0%, rgba(16, 185, 129, 0.1) 100%)'
-                : 'rgba(255, 255, 255, 0.05)',
-              border: `1px solid ${!selectedCategory ? '#10b981' : 'rgba(255, 255, 255, 0.1)'}`,
-              borderRadius: '8px',
-              color: !selectedCategory ? '#10b981' : 'rgba(255, 255, 255, 0.7)',
-              fontSize: isMobile ? '0.8rem' : '0.85rem',
-              fontWeight: !selectedCategory ? '600' : '400',
-              cursor: 'pointer',
-              whiteSpace: 'nowrap',
-              minHeight: '44px',
-              touchAction: 'manipulation',
-              WebkitTapHighlightColor: 'transparent'
-            }}
-          >
-            All Notes
-          </button>
-          
-          {CATEGORIES.map(cat => {
-            const Icon = cat.icon
-            const count = notes.filter(n => n.category === cat.id).length
-            
-            return (
-              <button
-                key={cat.id}
-                onClick={() => setSelectedCategory(cat.id)}
-                style={{
-                  padding: isMobile ? '0.5rem 0.75rem' : '0.6rem 1rem',
-                  background: selectedCategory === cat.id 
-                    ? `linear-gradient(135deg, ${cat.color}20 0%, ${cat.color}10 100%)`
-                    : 'rgba(255, 255, 255, 0.05)',
-                  border: `1px solid ${selectedCategory === cat.id ? cat.color : 'rgba(255, 255, 255, 0.1)'}`,
-                  borderRadius: '8px',
-                  color: selectedCategory === cat.id ? cat.color : 'rgba(255, 255, 255, 0.7)',
-                  fontSize: isMobile ? '0.8rem' : '0.85rem',
-                  fontWeight: selectedCategory === cat.id ? '600' : '400',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.5rem',
-                  whiteSpace: 'nowrap',
-                  minHeight: '44px',
-                  touchAction: 'manipulation',
-                  WebkitTapHighlightColor: 'transparent'
-                }}
-              >
-                <Icon size={16} />
-                {cat.label}
-                {count > 0 && (
-                  <span style={{
-                    padding: '0.1rem 0.4rem',
-                    background: 'rgba(0, 0, 0, 0.3)',
-                    borderRadius: '10px',
-                    fontSize: isMobile ? '0.7rem' : '0.75rem'
-                  }}>
-                    {count}
-                  </span>
-                )}
-              </button>
-            )
-          })}
-        </div>
-      </div>
-      
-      {/* Add Note Button */}
-      <button
-        onClick={() => setShowNewNote(true)}
-        style={{
-          width: '100%',
-          padding: isMobile ? '0.875rem' : '1rem',
-          background: 'linear-gradient(135deg, #10b981, #059669)',
-          border: 'none',
-          borderRadius: '12px',
-          color: '#fff',
-          fontSize: isMobile ? '0.9rem' : '0.95rem',
-          fontWeight: '600',
-          cursor: 'pointer',
+          width: isMobile ? '56px' : '64px',
+          height: isMobile ? '56px' : '64px',
+          borderRadius: '16px',
+          background: `linear-gradient(135deg, ${GOLD.primary}20 0%, ${GOLD.secondary}10 100%)`,
+          border: `1px solid ${GOLD.borderActive}`,
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          gap: '0.5rem',
-          marginBottom: '1.5rem',
-          touchAction: 'manipulation',
-          WebkitTapHighlightColor: 'transparent',
-          minHeight: '44px',
-          transition: 'all 0.3s ease',
-          transform: 'translateZ(0)'
-        }}
-        onTouchStart={(e) => {
-          if (isMobile) {
-            e.currentTarget.style.transform = 'scale(0.98)'
-          }
-        }}
-        onTouchEnd={(e) => {
-          if (isMobile) {
-            e.currentTarget.style.transform = 'scale(1)'
-          }
-        }}
-      >
-        <Plus size={20} />
-        Add New Note
-      </button>
+          boxShadow: `0 0 20px ${GOLD.glow}`
+        }}>
+          <FileText size={isMobile ? 28 : 32} color={GOLD.primary} />
+        </div>
+        <div>
+          <h1 style={{
+            fontSize: isMobile ? '1.5rem' : '1.75rem',
+            fontWeight: '800',
+            background: `linear-gradient(135deg, ${GOLD.primary} 0%, ${GOLD.secondary} 100%)`,
+            WebkitBackgroundClip: 'text',
+            WebkitTextFillColor: 'transparent',
+            margin: 0
+          }}>
+            Notes
+          </h1>
+          <p style={{
+            color: 'rgba(255,255,255,0.5)',
+            fontSize: isMobile ? '0.85rem' : '0.9rem',
+            margin: 0
+          }}>
+            {notes.length} notities
+          </p>
+        </div>
+      </div>
+
+      {/* Search */}
+      <div style={{ position: 'relative', marginBottom: '1rem' }}>
+        <Search size={18} style={{
+          position: 'absolute',
+          left: '1rem',
+          top: '50%',
+          transform: 'translateY(-50%)',
+          color: 'rgba(255, 255, 255, 0.4)'
+        }} />
+        <input
+          type="text"
+          placeholder="Zoek in notities..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          style={{
+            width: '100%',
+            padding: isMobile ? '0.875rem 1rem 0.875rem 3rem' : '1rem 1rem 1rem 3rem',
+            background: 'rgba(0, 0, 0, 0.5)',
+            border: `1px solid ${GOLD.border}`,
+            borderRadius: '12px',
+            color: '#fff',
+            fontSize: isMobile ? '0.95rem' : '1rem',
+            outline: 'none',
+            minHeight: '48px'
+          }}
+        />
+      </div>
+      
+      {/* Category filters */}
+      <div style={{
+        display: 'flex',
+        gap: '0.5rem',
+        overflowX: 'auto',
+        WebkitOverflowScrolling: 'touch',
+        paddingBottom: '0.5rem',
+        marginBottom: '1.5rem'
+      }}>
+        <button
+          onClick={() => setSelectedCategory('')}
+          style={{
+            padding: isMobile ? '0.6rem 1rem' : '0.7rem 1.25rem',
+            background: !selectedCategory ? GOLD.background : 'rgba(0, 0, 0, 0.4)',
+            border: `1px solid ${!selectedCategory ? GOLD.border : 'rgba(255, 255, 255, 0.1)'}`,
+            borderRadius: '10px',
+            color: !selectedCategory ? GOLD.primary : 'rgba(255, 255, 255, 0.6)',
+            fontSize: isMobile ? '0.85rem' : '0.9rem',
+            fontWeight: !selectedCategory ? '600' : '500',
+            cursor: 'pointer',
+            whiteSpace: 'nowrap',
+            minHeight: '44px'
+          }}
+        >
+          Alle
+        </button>
+        
+        {CATEGORIES.map(cat => {
+          const Icon = cat.icon
+          const count = notes.filter(n => n.category === cat.id).length
+          if (count === 0) return null
+          
+          return (
+            <button
+              key={cat.id}
+              onClick={() => setSelectedCategory(cat.id)}
+              style={{
+                padding: isMobile ? '0.6rem 1rem' : '0.7rem 1.25rem',
+                background: selectedCategory === cat.id ? `${cat.color}15` : 'rgba(0, 0, 0, 0.4)',
+                border: `1px solid ${selectedCategory === cat.id ? cat.color : 'rgba(255, 255, 255, 0.1)'}`,
+                borderRadius: '10px',
+                color: selectedCategory === cat.id ? cat.color : 'rgba(255, 255, 255, 0.6)',
+                fontSize: isMobile ? '0.85rem' : '0.9rem',
+                fontWeight: selectedCategory === cat.id ? '600' : '500',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem',
+                whiteSpace: 'nowrap',
+                minHeight: '44px'
+              }}
+            >
+              <Icon size={16} />
+              {cat.label}
+              <span style={{
+                padding: '0.15rem 0.5rem',
+                background: 'rgba(0, 0, 0, 0.3)',
+                borderRadius: '8px',
+                fontSize: '0.75rem'
+              }}>
+                {count}
+              </span>
+            </button>
+          )
+        })}
+      </div>
+      
+      {/* Action buttons */}
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: '1fr 1fr',
+        gap: '0.75rem',
+        marginBottom: '1.5rem'
+      }}>
+        <button
+          onClick={() => setShowTemplateSelector(true)}
+          style={{
+            padding: isMobile ? '1rem' : '1.25rem',
+            background: `linear-gradient(135deg, ${GOLD.background} 0%, rgba(0,0,0,0.4) 100%)`,
+            border: `1px solid ${GOLD.border}`,
+            borderRadius: '14px',
+            color: GOLD.primary,
+            fontSize: isMobile ? '0.95rem' : '1rem',
+            fontWeight: '700',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '0.5rem',
+            minHeight: '56px',
+            transition: 'all 0.2s ease'
+          }}
+        >
+          <Layers size={20} />
+          Template
+        </button>
+        
+        <button
+          onClick={() => setShowNewNote(true)}
+          style={{
+            padding: isMobile ? '1rem' : '1.25rem',
+            background: `linear-gradient(135deg, ${GOLD.primary} 0%, ${GOLD.secondary} 100%)`,
+            border: 'none',
+            borderRadius: '14px',
+            color: '#000',
+            fontSize: isMobile ? '0.95rem' : '1rem',
+            fontWeight: '700',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '0.5rem',
+            minHeight: '56px',
+            boxShadow: `0 4px 20px ${GOLD.glow}`
+          }}
+        >
+          <Plus size={20} />
+          Nieuwe Note
+        </button>
+      </div>
       
       {/* Notes List */}
       {loading ? (
-        <div style={{
-          padding: '2rem',
-          textAlign: 'center'
-        }}>
+        <div style={{ padding: '3rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           <div style={{
-            width: '40px',
-            height: '40px',
-            border: '3px solid rgba(16, 185, 129, 0.2)',
-            borderTopColor: '#10b981',
+            width: '50px',
+            height: '50px',
+            border: `3px solid ${GOLD.border}`,
+            borderTopColor: GOLD.primary,
             borderRadius: '50%',
-            margin: '0 auto',
             animation: 'spin 1s linear infinite'
           }} />
           <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
         </div>
       ) : filteredNotes.length === 0 ? (
         <div style={{
-          padding: '3rem 1rem',
+          padding: '3rem 1.5rem',
           textAlign: 'center',
-          background: 'rgba(0, 0, 0, 0.3)',
-          borderRadius: '12px',
-          border: '1px solid rgba(255, 255, 255, 0.05)'
+          background: 'rgba(0, 0, 0, 0.4)',
+          borderRadius: '16px',
+          border: `1px solid ${GOLD.border}`
         }}>
-          <FileText size={48} color="#10b981" style={{ margin: '0 auto 1rem', opacity: 0.5 }} />
+          <FileText size={56} color={GOLD.primary} style={{ margin: '0 auto 1rem', opacity: 0.4 }} />
           <h4 style={{
-            fontSize: isMobile ? '1rem' : '1.1rem',
+            fontSize: isMobile ? '1.1rem' : '1.2rem',
             fontWeight: '600',
             color: 'rgba(255, 255, 255, 0.6)',
             marginBottom: '0.5rem'
           }}>
-            {searchQuery || selectedCategory ? 'No notes found' : 'No notes yet'}
+            {searchQuery || selectedCategory ? 'Geen notities gevonden' : 'Nog geen notities'}
           </h4>
           <p style={{
             color: 'rgba(255, 255, 255, 0.4)',
-            fontSize: isMobile ? '0.85rem' : '0.9rem'
+            fontSize: isMobile ? '0.9rem' : '0.95rem'
           }}>
-            {searchQuery || selectedCategory 
-              ? 'Try adjusting your filters' 
-              : 'Click "Add New Note" to get started'}
+            Gebruik een template of maak een lege note
           </p>
         </div>
       ) : (
-        <div style={{
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '0.75rem'
-        }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
           {filteredNotes.map(note => {
             const category = getCategoryInfo(note.category)
             const priority = getPriorityInfo(note.priority)
             const CategoryIcon = category.icon
+            const sectionCount = note.content?.sections?.length || 0
             
             return (
-              <div
+              <button
                 key={note.id}
                 onClick={() => setSelectedNote(note)}
                 style={{
-                  background: 'rgba(0, 0, 0, 0.3)',
-                  borderRadius: '12px',
+                  width: '100%',
+                  background: 'rgba(0, 0, 0, 0.4)',
+                  borderRadius: '14px',
                   padding: isMobile ? '1rem' : '1.25rem',
-                  border: '1px solid rgba(255, 255, 255, 0.05)',
+                  border: `1px solid rgba(255, 255, 255, 0.08)`,
                   cursor: 'pointer',
+                  textAlign: 'left',
                   transition: 'all 0.2s ease',
-                  transform: 'translateZ(0)'
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.background = 'rgba(0, 0, 0, 0.4)'
-                  e.currentTarget.style.borderColor = 'rgba(16, 185, 129, 0.2)'
-                  e.currentTarget.style.transform = 'translateY(-2px)'
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.background = 'rgba(0, 0, 0, 0.3)'
-                  e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.05)'
-                  e.currentTarget.style.transform = 'translateY(0)'
+                  position: 'relative',
+                  overflow: 'hidden'
                 }}
               >
+                {/* Top accent */}
                 <div style={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'flex-start',
-                  marginBottom: '0.5rem'
-                }}>
-                  <div style={{ flex: 1 }}>
-                    <div style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '0.5rem',
-                      marginBottom: '0.25rem'
-                    }}>
-                      <div style={{
-                        width: '32px',
-                        height: '32px',
-                        borderRadius: '8px',
-                        background: `${category.color}15`,
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center'
-                      }}>
-                        <CategoryIcon size={16} color={category.color} />
-                      </div>
-                      <h4 style={{
-                        fontSize: isMobile ? '0.95rem' : '1rem',
-                        fontWeight: '600',
-                        color: '#fff',
-                        margin: 0
-                      }}>
-                        {note.title}
-                      </h4>
-                    </div>
-                    
-                    {note.subtitle && (
-                      <p style={{
-                        fontSize: isMobile ? '0.8rem' : '0.85rem',
-                        color: 'rgba(255, 255, 255, 0.6)',
-                        margin: '0.25rem 0',
-                        paddingLeft: '2.5rem'
-                      }}>
-                        {note.subtitle}
-                      </p>
-                    )}
-                  </div>
-                  
-                  <div style={{
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'flex-end',
-                    gap: '0.25rem'
-                  }}>
-                    <span style={{
-                      padding: '0.2rem 0.5rem',
-                      background: `${priority.color}20`,
-                      borderRadius: '6px',
-                      fontSize: isMobile ? '0.65rem' : '0.7rem',
-                      color: priority.color,
-                      fontWeight: '600'
-                    }}>
-                      {priority.label}
-                    </span>
-                  </div>
-                </div>
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  height: '3px',
+                  background: `linear-gradient(90deg, ${category.color} 0%, transparent 100%)`,
+                  opacity: 0.6
+                }} />
                 
                 <div style={{
                   display: 'flex',
                   justifyContent: 'space-between',
-                  alignItems: 'center',
-                  paddingLeft: '2.5rem'
+                  alignItems: 'flex-start'
                 }}>
-                  <div style={{
-                    display: 'flex',
-                    gap: '0.5rem',
-                    flexWrap: 'wrap'
-                  }}>
-                    {note.tags?.slice(0, 3).map(tag => (
-                      <span
-                        key={tag}
-                        style={{
-                          padding: '0.15rem 0.5rem',
-                          background: 'rgba(16, 185, 129, 0.1)',
-                          borderRadius: '12px',
-                          fontSize: isMobile ? '0.65rem' : '0.7rem',
-                          color: '#10b981'
-                        }}
-                      >
-                        #{tag}
-                      </span>
-                    ))}
+                  <div style={{ display: 'flex', gap: '0.75rem', flex: 1 }}>
+                    <div style={{
+                      width: '44px',
+                      height: '44px',
+                      borderRadius: '12px',
+                      background: `${category.color}15`,
+                      border: `1px solid ${category.color}30`,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      flexShrink: 0
+                    }}>
+                      <CategoryIcon size={20} color={category.color} />
+                    </div>
+                    
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <h4 style={{
+                        fontSize: isMobile ? '1rem' : '1.05rem',
+                        fontWeight: '600',
+                        color: '#fff',
+                        margin: 0,
+                        marginBottom: '0.25rem',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap'
+                      }}>
+                        {note.title}
+                      </h4>
+                      
+                      {note.subtitle && (
+                        <p style={{
+                          fontSize: isMobile ? '0.8rem' : '0.85rem',
+                          color: 'rgba(255, 255, 255, 0.5)',
+                          margin: '0 0 0.5rem 0',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap'
+                        }}>
+                          {note.subtitle}
+                        </p>
+                      )}
+                      
+                      <div style={{
+                        display: 'flex',
+                        gap: '0.5rem',
+                        flexWrap: 'wrap',
+                        alignItems: 'center'
+                      }}>
+                        <span style={{
+                          padding: '0.2rem 0.6rem',
+                          background: `${priority.color}20`,
+                          borderRadius: '6px',
+                          fontSize: '0.7rem',
+                          color: priority.color,
+                          fontWeight: '600'
+                        }}>
+                          {priority.label}
+                        </span>
+                        
+                        <span style={{
+                          fontSize: '0.75rem',
+                          color: 'rgba(255, 255, 255, 0.4)'
+                        }}>
+                          {sectionCount} secties
+                        </span>
+                        
+                        <span style={{
+                          fontSize: '0.75rem',
+                          color: 'rgba(255, 255, 255, 0.4)'
+                        }}>
+                          {new Date(note.note_date).toLocaleDateString('nl-NL', {
+                            day: 'numeric',
+                            month: 'short'
+                          })}
+                        </span>
+                      </div>
+                    </div>
                   </div>
                   
-                  <span style={{
-                    fontSize: isMobile ? '0.7rem' : '0.75rem',
-                    color: 'rgba(255, 255, 255, 0.4)'
-                  }}>
-                    {new Date(note.note_date).toLocaleDateString('en-GB', {
-                      day: 'numeric',
-                      month: 'short'
-                    })}
-                  </span>
+                  <ChevronRight size={20} color="rgba(255, 255, 255, 0.3)" />
                 </div>
-              </div>
+              </button>
             )
           })}
         </div>
       )}
     </div>
   )
-  
-  // New note form
+
+  // ==========================================
+  // RENDER: NEW NOTE FORM
+  // ==========================================
   const renderNewNoteForm = () => (
     <div>
       <div style={{
@@ -614,31 +730,38 @@ export default function NotesInfoTab({ db, client, isMobile }) {
         justifyContent: 'space-between',
         marginBottom: '1.5rem'
       }}>
-        <h3 style={{
-          fontSize: isMobile ? '1.1rem' : '1.25rem',
-          fontWeight: '600',
-          color: '#fff',
-          margin: 0
-        }}>
-          New Note
-        </h3>
         <button
           onClick={() => setShowNewNote(false)}
           style={{
-            width: '36px',
-            height: '36px',
-            borderRadius: '8px',
-            background: 'rgba(255, 255, 255, 0.1)',
-            border: '1px solid rgba(255, 255, 255, 0.2)',
             display: 'flex',
             alignItems: 'center',
-            justifyContent: 'center',
+            gap: '0.5rem',
+            padding: '0.7rem 1rem',
+            background: 'rgba(0,0,0,0.4)',
+            border: `1px solid ${GOLD.border}`,
+            borderRadius: '10px',
+            color: GOLD.primary,
+            fontSize: isMobile ? '0.9rem' : '0.95rem',
+            fontWeight: '600',
             cursor: 'pointer',
-            color: '#fff'
+            minHeight: '44px'
           }}
         >
-          <X size={18} />
+          ← Terug
         </button>
+        
+        <h2 style={{
+          fontSize: isMobile ? '1.25rem' : '1.5rem',
+          fontWeight: '700',
+          background: `linear-gradient(135deg, ${GOLD.primary} 0%, ${GOLD.secondary} 100%)`,
+          WebkitBackgroundClip: 'text',
+          WebkitTextFillColor: 'transparent',
+          margin: 0
+        }}>
+          Nieuwe Note
+        </h2>
+        
+        <div style={{ width: '80px' }} />
       </div>
       
       <div style={{
@@ -646,16 +769,24 @@ export default function NotesInfoTab({ db, client, isMobile }) {
         flexDirection: 'column',
         gap: '1rem'
       }}>
-        {/* Date picker */}
-        <div>
+        {/* Date */}
+        <div style={{
+          padding: '1.25rem',
+          background: 'rgba(0, 0, 0, 0.4)',
+          borderRadius: '14px',
+          border: `1px solid ${GOLD.border}`
+        }}>
           <label style={{
-            display: 'block',
-            marginBottom: '0.5rem',
-            fontSize: isMobile ? '0.8rem' : '0.85rem',
-            color: 'rgba(255, 255, 255, 0.6)',
-            fontWeight: '500'
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.5rem',
+            fontSize: isMobile ? '0.9rem' : '0.95rem',
+            color: GOLD.primary,
+            fontWeight: '600',
+            marginBottom: '0.75rem'
           }}>
-            Date
+            <Calendar size={18} />
+            Datum
           </label>
           <input
             type="date"
@@ -663,71 +794,47 @@ export default function NotesInfoTab({ db, client, isMobile }) {
             onChange={(e) => setNewNote({...newNote, date: e.target.value})}
             style={{
               width: '100%',
-              padding: isMobile ? '0.75rem' : '0.875rem',
+              padding: '0.875rem 1rem',
               background: 'rgba(0, 0, 0, 0.5)',
-              border: '1px solid rgba(255, 255, 255, 0.1)',
-              borderRadius: '8px',
+              border: `1px solid ${GOLD.border}`,
+              borderRadius: '10px',
               color: '#fff',
-              fontSize: isMobile ? '0.9rem' : '0.95rem',
-              minHeight: '44px'
+              fontSize: '1rem',
+              minHeight: '48px'
             }}
           />
         </div>
         
         {/* Title */}
-        <div>
+        <div style={{
+          padding: '1.25rem',
+          background: 'rgba(0, 0, 0, 0.4)',
+          borderRadius: '14px',
+          border: `1px solid ${GOLD.border}`
+        }}>
           <label style={{
             display: 'block',
-            marginBottom: '0.5rem',
-            fontSize: isMobile ? '0.8rem' : '0.85rem',
-            color: 'rgba(255, 255, 255, 0.6)',
-            fontWeight: '500'
+            fontSize: isMobile ? '0.9rem' : '0.95rem',
+            color: GOLD.primary,
+            fontWeight: '600',
+            marginBottom: '0.75rem'
           }}>
-            Title <span style={{ color: '#ef4444' }}>*</span>
+            Titel <span style={{ color: '#ef4444' }}>*</span>
           </label>
           <input
             type="text"
-            placeholder="Enter note title..."
+            placeholder="Note titel..."
             value={newNote.title}
             onChange={(e) => setNewNote({...newNote, title: e.target.value})}
             style={{
               width: '100%',
-              padding: isMobile ? '0.75rem' : '0.875rem',
+              padding: '0.875rem 1rem',
               background: 'rgba(0, 0, 0, 0.5)',
-              border: '1px solid rgba(255, 255, 255, 0.1)',
-              borderRadius: '8px',
+              border: `1px solid ${newNote.title ? GOLD.borderActive : 'rgba(255,255,255,0.1)'}`,
+              borderRadius: '10px',
               color: '#fff',
-              fontSize: isMobile ? '0.9rem' : '0.95rem',
-              minHeight: '44px'
-            }}
-          />
-        </div>
-        
-        {/* Subtitle */}
-        <div>
-          <label style={{
-            display: 'block',
-            marginBottom: '0.5rem',
-            fontSize: isMobile ? '0.8rem' : '0.85rem',
-            color: 'rgba(255, 255, 255, 0.6)',
-            fontWeight: '500'
-          }}>
-            Subtitle
-          </label>
-          <input
-            type="text"
-            placeholder="Brief description..."
-            value={newNote.subtitle}
-            onChange={(e) => setNewNote({...newNote, subtitle: e.target.value})}
-            style={{
-              width: '100%',
-              padding: isMobile ? '0.75rem' : '0.875rem',
-              background: 'rgba(0, 0, 0, 0.5)',
-              border: '1px solid rgba(255, 255, 255, 0.1)',
-              borderRadius: '8px',
-              color: '#fff',
-              fontSize: isMobile ? '0.9rem' : '0.95rem',
-              minHeight: '44px'
+              fontSize: '1rem',
+              minHeight: '48px'
             }}
           />
         </div>
@@ -735,32 +842,37 @@ export default function NotesInfoTab({ db, client, isMobile }) {
         {/* Category & Priority */}
         <div style={{
           display: 'grid',
-          gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr',
+          gridTemplateColumns: '1fr 1fr',
           gap: '1rem'
         }}>
-          <div>
+          <div style={{
+            padding: '1.25rem',
+            background: 'rgba(0, 0, 0, 0.4)',
+            borderRadius: '14px',
+            border: '1px solid rgba(255,255,255,0.1)'
+          }}>
             <label style={{
               display: 'block',
-              marginBottom: '0.5rem',
-              fontSize: isMobile ? '0.8rem' : '0.85rem',
-              color: 'rgba(255, 255, 255, 0.6)',
-              fontWeight: '500'
+              fontSize: isMobile ? '0.85rem' : '0.9rem',
+              color: 'rgba(255,255,255,0.6)',
+              fontWeight: '600',
+              marginBottom: '0.75rem'
             }}>
-              Category
+              Categorie
             </label>
             <select
               value={newNote.category}
               onChange={(e) => setNewNote({...newNote, category: e.target.value})}
               style={{
                 width: '100%',
-                padding: isMobile ? '0.75rem' : '0.875rem',
+                padding: '0.875rem',
                 background: 'rgba(0, 0, 0, 0.5)',
-                border: '1px solid rgba(255, 255, 255, 0.1)',
-                borderRadius: '8px',
+                border: '1px solid rgba(255,255,255,0.1)',
+                borderRadius: '10px',
                 color: '#fff',
-                fontSize: isMobile ? '0.9rem' : '0.95rem',
-                minHeight: '44px',
-                cursor: 'pointer'
+                fontSize: '0.95rem',
+                cursor: 'pointer',
+                minHeight: '48px'
               }}
             >
               {CATEGORIES.map(cat => (
@@ -771,29 +883,34 @@ export default function NotesInfoTab({ db, client, isMobile }) {
             </select>
           </div>
           
-          <div>
+          <div style={{
+            padding: '1.25rem',
+            background: 'rgba(0, 0, 0, 0.4)',
+            borderRadius: '14px',
+            border: '1px solid rgba(255,255,255,0.1)'
+          }}>
             <label style={{
               display: 'block',
-              marginBottom: '0.5rem',
-              fontSize: isMobile ? '0.8rem' : '0.85rem',
-              color: 'rgba(255, 255, 255, 0.6)',
-              fontWeight: '500'
+              fontSize: isMobile ? '0.85rem' : '0.9rem',
+              color: 'rgba(255,255,255,0.6)',
+              fontWeight: '600',
+              marginBottom: '0.75rem'
             }}>
-              Priority
+              Prioriteit
             </label>
             <select
               value={newNote.priority}
               onChange={(e) => setNewNote({...newNote, priority: e.target.value})}
               style={{
                 width: '100%',
-                padding: isMobile ? '0.75rem' : '0.875rem',
+                padding: '0.875rem',
                 background: 'rgba(0, 0, 0, 0.5)',
-                border: '1px solid rgba(255, 255, 255, 0.1)',
-                borderRadius: '8px',
+                border: '1px solid rgba(255,255,255,0.1)',
+                borderRadius: '10px',
                 color: '#fff',
-                fontSize: isMobile ? '0.9rem' : '0.95rem',
-                minHeight: '44px',
-                cursor: 'pointer'
+                fontSize: '0.95rem',
+                cursor: 'pointer',
+                minHeight: '48px'
               }}
             >
               {PRIORITIES.map(pri => (
@@ -809,46 +926,270 @@ export default function NotesInfoTab({ db, client, isMobile }) {
         <button
           onClick={handleCreateNote}
           style={{
-            padding: isMobile ? '0.875rem' : '1rem',
-            background: 'linear-gradient(135deg, #10b981, #059669)',
+            padding: '1.25rem',
+            background: `linear-gradient(135deg, ${GOLD.primary} 0%, ${GOLD.secondary} 100%)`,
             border: 'none',
-            borderRadius: '10px',
-            color: '#fff',
-            fontSize: isMobile ? '0.9rem' : '0.95rem',
-            fontWeight: '600',
+            borderRadius: '14px',
+            color: '#000',
+            fontSize: '1rem',
+            fontWeight: '700',
             cursor: 'pointer',
-            marginTop: '1rem',
-            minHeight: '44px'
+            minHeight: '56px',
+            boxShadow: `0 4px 20px ${GOLD.glow}`
           }}
         >
-          Create Note
+          Note Aanmaken
         </button>
       </div>
     </div>
   )
-  
-  // Note detail view with manual save
+
+  // ==========================================
+  // RENDER: SECTION CONTENT (NEW - HANDLES ALL TYPES)
+  // ==========================================
+  const renderSectionContent = (section) => {
+    // TYPE: CHECKLIST (interactive checkboxes)
+    if (section.type === 'checklist' && section.checkItems) {
+      return (
+        <div>
+          {/* Checklist items */}
+          <div style={{ marginBottom: '1.5rem' }}>
+            {section.checkItems.map(item => (
+              <label
+                key={item.id}
+                style={{
+                  display: 'flex',
+                  alignItems: 'flex-start',
+                  gap: '0.75rem',
+                  padding: '0.75rem',
+                  background: item.checked ? 'rgba(16, 185, 129, 0.08)' : 'rgba(0, 0, 0, 0.3)',
+                  borderRadius: '10px',
+                  marginBottom: '0.5rem',
+                  cursor: 'pointer',
+                  border: `1px solid ${item.checked ? 'rgba(16, 185, 129, 0.3)' : 'rgba(255,255,255,0.05)'}`,
+                  transition: 'all 0.2s ease',
+                  minHeight: '48px'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = item.checked ? 'rgba(16, 185, 129, 0.12)' : 'rgba(255,255,255,0.05)'
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = item.checked ? 'rgba(16, 185, 129, 0.08)' : 'rgba(0, 0, 0, 0.3)'
+                }}
+              >
+                <input
+                  type="checkbox"
+                  checked={item.checked || false}
+                  onChange={() => handleToggleCheckItem(section.id, item.id)}
+                  style={{
+                    width: '20px',
+                    height: '20px',
+                    cursor: 'pointer',
+                    accentColor: '#10b981',
+                    flexShrink: 0,
+                    marginTop: '0.1rem'
+                  }}
+                />
+                <span style={{
+                  fontSize: isMobile ? '0.9rem' : '0.95rem',
+                  color: item.checked ? '#10b981' : 'rgba(255,255,255,0.8)',
+                  textDecoration: item.checked ? 'line-through' : 'none',
+                  opacity: item.checked ? 0.7 : 1,
+                  flex: 1
+                }}>
+                  {item.label}
+                </span>
+              </label>
+            ))}
+          </div>
+          
+          {/* Input fields (if present) */}
+          {section.fields && section.fields.length > 0 && (
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: isMobile ? '1fr' : 'repeat(2, 1fr)',
+              gap: '0.75rem',
+              marginBottom: '1rem'
+            }}>
+              {section.fields.map(field => (
+                <div key={field.id}>
+                  <label style={{
+                    display: 'block',
+                    fontSize: '0.8rem',
+                    color: 'rgba(255,255,255,0.5)',
+                    marginBottom: '0.5rem',
+                    fontWeight: '600'
+                  }}>
+                    {field.label}
+                  </label>
+                  <input
+                    type="text"
+                    value={field.value || ''}
+                    onChange={(e) => handleUpdateField(section.id, field.id, e.target.value)}
+                    placeholder={field.placeholder || ''}
+                    style={{
+                      width: '100%',
+                      padding: '0.75rem',
+                      background: 'rgba(0, 0, 0, 0.5)',
+                      border: `1px solid ${field.value ? GOLD.borderActive : 'rgba(255,255,255,0.1)'}`,
+                      borderRadius: '8px',
+                      color: '#fff',
+                      fontSize: '0.95rem',
+                      outline: 'none'
+                    }}
+                  />
+                </div>
+              ))}
+            </div>
+          )}
+          
+          {/* Notes field */}
+          <div>
+            <label style={{
+              display: 'block',
+              fontSize: '0.8rem',
+              color: 'rgba(255,255,255,0.5)',
+              marginBottom: '0.5rem',
+              fontWeight: '600'
+            }}>
+              Extra notities
+            </label>
+            <textarea
+              value={section.notes || ''}
+              onChange={(e) => handleUpdateSection(section.id, { notes: e.target.value })}
+              placeholder="Extra opmerkingen tijdens de call..."
+              style={{
+                width: '100%',
+                minHeight: '100px',
+                padding: '0.875rem',
+                background: 'rgba(0, 0, 0, 0.5)',
+                border: `1px solid ${section.notes ? GOLD.borderActive : 'rgba(255,255,255,0.1)'}`,
+                borderRadius: '10px',
+                color: '#fff',
+                fontSize: '0.95rem',
+                resize: 'vertical',
+                fontFamily: 'inherit',
+                outline: 'none',
+                lineHeight: '1.6'
+              }}
+            />
+          </div>
+          
+          {/* Copy message button */}
+          {section.clientMessage && (
+            <div style={{ marginTop: '1rem' }}>
+              <button
+                onClick={() => handleCopyMessage(section.clientMessage, section.id)}
+                style={{
+                  width: '100%',
+                  padding: '1rem',
+                  background: copiedMessage === section.id 
+                    ? 'rgba(16, 185, 129, 0.2)' 
+                    : `linear-gradient(135deg, ${GOLD.background} 0%, rgba(0,0,0,0.4) 100%)`,
+                  border: `1px solid ${copiedMessage === section.id ? '#10b981' : GOLD.border}`,
+                  borderRadius: '12px',
+                  color: copiedMessage === section.id ? '#10b981' : GOLD.primary,
+                  fontSize: isMobile ? '0.9rem' : '0.95rem',
+                  fontWeight: '700',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '0.5rem',
+                  minHeight: '52px',
+                  transition: 'all 0.2s ease'
+                }}
+              >
+                {copiedMessage === section.id ? (
+                  <>
+                    <Check size={20} />
+                    Gekopieerd!
+                  </>
+                ) : (
+                  <>
+                    <Copy size={20} />
+                    Kopieer Client Bericht
+                  </>
+                )}
+              </button>
+            </div>
+          )}
+        </div>
+      )
+    }
+    
+    // TYPE: TEXT (regular textarea - fallback)
+    return (
+      <div>
+        <label style={{
+          display: 'block',
+          fontSize: '0.8rem',
+          color: 'rgba(255,255,255,0.5)',
+          marginBottom: '0.5rem',
+          fontWeight: '600'
+        }}>
+          Inhoud
+        </label>
+        <textarea
+          value={section.content || ''}
+          onChange={(e) => handleUpdateSection(section.id, { content: e.target.value })}
+          placeholder="Schrijf hier je notities...
+
+• Punt 1
+• Punt 2
+• Etc."
+          style={{
+            width: '100%',
+            minHeight: '200px',
+            padding: '1rem',
+            background: 'rgba(0, 0, 0, 0.5)',
+            border: `1px solid ${section.content ? GOLD.borderActive : 'rgba(255,255,255,0.15)'}`,
+            borderRadius: '12px',
+            color: '#fff',
+            fontSize: isMobile ? '0.95rem' : '1rem',
+            lineHeight: '1.7',
+            resize: 'vertical',
+            fontFamily: 'inherit',
+            outline: 'none'
+          }}
+          onFocus={(e) => {
+            e.target.style.borderColor = GOLD.borderActive
+            e.target.style.background = 'rgba(0, 0, 0, 0.7)'
+          }}
+          onBlur={(e) => {
+            e.target.style.borderColor = section.content ? GOLD.borderActive : 'rgba(255,255,255,0.15)'
+            e.target.style.background = 'rgba(0, 0, 0, 0.5)'
+          }}
+        />
+      </div>
+    )
+  }
+
+  // ==========================================
+  // RENDER: NOTE DETAIL WITH UPGRADED SECTIONS
+  // ==========================================
   const renderNoteDetail = () => {
     if (!selectedNote || !editingNote) return null
     
     const category = getCategoryInfo(editingNote.category)
     const priority = getPriorityInfo(editingNote.priority)
     const CategoryIcon = category.icon
+    const sections = editingNote.content?.sections || []
     
     return (
       <div>
-        {/* Header with Back and Save buttons */}
+        {/* Header */}
         <div style={{
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          marginBottom: '1.5rem'
+          marginBottom: '1.5rem',
+          flexWrap: 'wrap',
+          gap: '0.75rem'
         }}>
           <button
             onClick={() => {
-              if (hasChanges && !confirm('You have unsaved changes. Discard them?')) {
-                return
-              }
+              if (hasChanges && !confirm('Je hebt onopgeslagen wijzigingen. Terug zonder opslaan?')) return
               setSelectedNote(null)
               setEditingNote(null)
               setHasChanges(false)
@@ -857,35 +1198,33 @@ export default function NotesInfoTab({ db, client, isMobile }) {
               display: 'flex',
               alignItems: 'center',
               gap: '0.5rem',
-              padding: isMobile ? '0.5rem 0.75rem' : '0.6rem 1rem',
-              background: 'rgba(255, 255, 255, 0.05)',
-              border: '1px solid rgba(255, 255, 255, 0.1)',
-              borderRadius: '8px',
-              color: 'rgba(255, 255, 255, 0.7)',
+              padding: '0.7rem 1rem',
+              background: 'rgba(0,0,0,0.4)',
+              border: `1px solid ${GOLD.border}`,
+              borderRadius: '10px',
+              color: GOLD.primary,
               fontSize: isMobile ? '0.85rem' : '0.9rem',
+              fontWeight: '600',
               cursor: 'pointer',
               minHeight: '44px'
             }}
           >
-            <ChevronLeft size={18} />
-            Back
+            ← Terug
           </button>
           
-          <div style={{
-            display: 'flex',
-            gap: '0.5rem'
-          }}>
+          <div style={{ display: 'flex', gap: '0.5rem' }}>
             {hasChanges && (
               <span style={{
                 padding: '0.5rem 0.75rem',
-                background: 'rgba(251, 191, 36, 0.1)',
+                background: 'rgba(251, 191, 36, 0.15)',
                 borderRadius: '8px',
                 color: '#fbbf24',
                 fontSize: isMobile ? '0.8rem' : '0.85rem',
+                fontWeight: '600',
                 display: 'flex',
                 alignItems: 'center'
               }}>
-                Unsaved changes
+                Niet opgeslagen
               </span>
             )}
             
@@ -893,35 +1232,34 @@ export default function NotesInfoTab({ db, client, isMobile }) {
               onClick={handleSaveNote}
               disabled={!hasChanges || saving}
               style={{
-                padding: isMobile ? '0.5rem 1rem' : '0.6rem 1.25rem',
+                padding: '0.7rem 1.25rem',
                 background: hasChanges 
-                  ? 'linear-gradient(135deg, #10b981, #059669)' 
-                  : 'rgba(255, 255, 255, 0.1)',
+                  ? `linear-gradient(135deg, ${GOLD.primary} 0%, ${GOLD.secondary} 100%)`
+                  : 'rgba(255,255,255,0.1)',
                 border: 'none',
-                borderRadius: '8px',
-                color: '#fff',
+                borderRadius: '10px',
+                color: hasChanges ? '#000' : 'rgba(255,255,255,0.3)',
                 fontSize: isMobile ? '0.85rem' : '0.9rem',
-                fontWeight: '600',
+                fontWeight: '700',
                 cursor: hasChanges ? 'pointer' : 'not-allowed',
                 display: 'flex',
                 alignItems: 'center',
                 gap: '0.5rem',
-                minHeight: '44px',
-                opacity: hasChanges ? 1 : 0.5
+                minHeight: '44px'
               }}
             >
               <Save size={16} />
-              {saving ? 'Saving...' : 'Save'}
+              {saving ? 'Opslaan...' : 'Opslaan'}
             </button>
             
             <button
               onClick={() => handleDeleteNote(selectedNote.id)}
               style={{
-                width: '40px',
-                height: '40px',
-                borderRadius: '8px',
-                background: 'rgba(239, 68, 68, 0.1)',
-                border: '1px solid rgba(239, 68, 68, 0.2)',
+                width: '44px',
+                height: '44px',
+                borderRadius: '10px',
+                background: 'rgba(239, 68, 68, 0.15)',
+                border: '1px solid rgba(239, 68, 68, 0.3)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
@@ -929,36 +1267,43 @@ export default function NotesInfoTab({ db, client, isMobile }) {
                 color: '#ef4444'
               }}
             >
-              <Trash2 size={16} />
+              <Trash2 size={18} />
             </button>
           </div>
         </div>
         
-        {/* Note content */}
+        {/* Note header card */}
         <div style={{
-          background: 'rgba(0, 0, 0, 0.3)',
-          borderRadius: '12px',
           padding: isMobile ? '1.25rem' : '1.5rem',
-          border: '1px solid rgba(255, 255, 255, 0.05)'
+          background: `linear-gradient(135deg, ${GOLD.background} 0%, rgba(0,0,0,0.4) 100%)`,
+          borderRadius: '16px',
+          border: `1px solid ${GOLD.border}`,
+          marginBottom: '1rem',
+          position: 'relative',
+          overflow: 'hidden'
         }}>
-          {/* Note header info */}
           <div style={{
-            display: 'flex',
-            alignItems: 'flex-start',
-            gap: '1rem',
-            marginBottom: '1.5rem'
-          }}>
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            height: '3px',
+            background: `linear-gradient(90deg, ${GOLD.primary} 0%, ${GOLD.secondary} 100%)`
+          }} />
+          
+          <div style={{ display: 'flex', alignItems: 'flex-start', gap: '1rem' }}>
             <div style={{
-              width: '48px',
-              height: '48px',
-              borderRadius: '12px',
+              width: '56px',
+              height: '56px',
+              borderRadius: '14px',
               background: `${category.color}15`,
+              border: `1px solid ${category.color}30`,
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               flexShrink: 0
             }}>
-              <CategoryIcon size={24} color={category.color} />
+              <CategoryIcon size={28} color={category.color} />
             </div>
             
             <div style={{ flex: 1 }}>
@@ -970,23 +1315,19 @@ export default function NotesInfoTab({ db, client, isMobile }) {
                   setHasChanges(true)
                 }}
                 style={{
-                  fontSize: isMobile ? '1.1rem' : '1.25rem',
-                  fontWeight: '600',
+                  fontSize: isMobile ? '1.25rem' : '1.4rem',
+                  fontWeight: '700',
                   color: '#fff',
                   background: 'transparent',
                   border: 'none',
                   borderBottom: '2px solid transparent',
                   outline: 'none',
                   width: '100%',
-                  marginBottom: '0.25rem',
+                  marginBottom: '0.5rem',
                   padding: '0.25rem 0'
                 }}
-                onFocus={(e) => {
-                  e.target.style.borderBottomColor = 'rgba(16, 185, 129, 0.3)'
-                }}
-                onBlur={(e) => {
-                  e.target.style.borderBottomColor = 'transparent'
-                }}
+                onFocus={(e) => e.target.style.borderBottomColor = GOLD.border}
+                onBlur={(e) => e.target.style.borderBottomColor = 'transparent'}
               />
               
               <input
@@ -996,36 +1337,24 @@ export default function NotesInfoTab({ db, client, isMobile }) {
                   setEditingNote({ ...editingNote, subtitle: e.target.value })
                   setHasChanges(true)
                 }}
-                placeholder="Add a subtitle..."
+                placeholder="Voeg een ondertitel toe..."
                 style={{
-                  fontSize: isMobile ? '0.85rem' : '0.9rem',
-                  color: 'rgba(255, 255, 255, 0.6)',
+                  fontSize: isMobile ? '0.9rem' : '0.95rem',
+                  color: 'rgba(255, 255, 255, 0.5)',
                   background: 'transparent',
                   border: 'none',
-                  borderBottom: '1px solid transparent',
                   outline: 'none',
                   width: '100%',
-                  marginBottom: '0.75rem',
-                  padding: '0.25rem 0'
-                }}
-                onFocus={(e) => {
-                  e.target.style.borderBottomColor = 'rgba(16, 185, 129, 0.2)'
-                }}
-                onBlur={(e) => {
-                  e.target.style.borderBottomColor = 'transparent'
+                  marginBottom: '0.75rem'
                 }}
               />
               
-              <div style={{
-                display: 'flex',
-                flexWrap: 'wrap',
-                gap: '0.5rem'
-              }}>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
                 <span style={{
-                  padding: '0.25rem 0.75rem',
+                  padding: '0.3rem 0.75rem',
                   background: `${priority.color}20`,
-                  borderRadius: '6px',
-                  fontSize: isMobile ? '0.75rem' : '0.8rem',
+                  borderRadius: '8px',
+                  fontSize: isMobile ? '0.8rem' : '0.85rem',
                   color: priority.color,
                   fontWeight: '600'
                 }}>
@@ -1033,161 +1362,338 @@ export default function NotesInfoTab({ db, client, isMobile }) {
                 </span>
                 
                 <span style={{
-                  padding: '0.25rem 0.75rem',
+                  padding: '0.3rem 0.75rem',
                   background: 'rgba(255, 255, 255, 0.05)',
-                  borderRadius: '6px',
-                  fontSize: isMobile ? '0.75rem' : '0.8rem',
-                  color: 'rgba(255, 255, 255, 0.6)'
+                  borderRadius: '8px',
+                  fontSize: isMobile ? '0.8rem' : '0.85rem',
+                  color: 'rgba(255, 255, 255, 0.5)'
                 }}>
-                  {new Date(editingNote.note_date).toLocaleDateString('en-GB', {
+                  {new Date(editingNote.note_date).toLocaleDateString('nl-NL', {
+                    weekday: 'long',
                     day: 'numeric',
-                    month: 'long',
-                    year: 'numeric'
+                    month: 'long'
                   })}
                 </span>
               </div>
             </div>
           </div>
-          
-          {/* Sections */}
+        </div>
+        
+        {/* Section controls */}
+        {sections.length > 0 && (
           <div style={{
             display: 'flex',
-            flexDirection: 'column',
-            gap: '1rem'
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            marginBottom: '1rem',
+            padding: '0 0.25rem'
           }}>
-            {editingNote.content?.sections?.map((section, index) => (
-              <div
-                key={section.id || index}
+            <span style={{
+              fontSize: isMobile ? '0.85rem' : '0.9rem',
+              color: 'rgba(255,255,255,0.5)'
+            }}>
+              {sections.length} secties · {expandedSections.length} open
+            </span>
+            
+            <div style={{ display: 'flex', gap: '0.5rem' }}>
+              <button
+                onClick={expandAllSections}
                 style={{
-                  padding: isMobile ? '1rem' : '1.25rem',
-                  background: 'rgba(255, 255, 255, 0.02)',
-                  borderRadius: '10px',
-                  border: '1px solid rgba(255, 255, 255, 0.05)',
-                  position: 'relative'
+                  padding: '0.5rem 0.75rem',
+                  background: 'rgba(255,255,255,0.05)',
+                  border: '1px solid rgba(255,255,255,0.1)',
+                  borderRadius: '8px',
+                  color: 'rgba(255,255,255,0.6)',
+                  fontSize: '0.8rem',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.25rem'
                 }}
               >
-                {/* Section header */}
-                <div style={{
+                <ChevronDown size={14} />
+                Alles open
+              </button>
+              
+              <button
+                onClick={collapseAllSections}
+                style={{
+                  padding: '0.5rem 0.75rem',
+                  background: 'rgba(255,255,255,0.05)',
+                  border: '1px solid rgba(255,255,255,0.1)',
+                  borderRadius: '8px',
+                  color: 'rgba(255,255,255,0.6)',
+                  fontSize: '0.8rem',
+                  cursor: 'pointer',
                   display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'flex-start',
-                  marginBottom: '0.75rem'
-                }}>
-                  <input
-                    type="text"
-                    value={section.title || ''}
-                    onChange={(e) => handleUpdateSection(section.id, { title: e.target.value })}
-                    placeholder="Section title..."
-                    style={{
-                      background: 'transparent',
-                      border: 'none',
-                      borderBottom: '1px solid transparent',
-                      fontSize: isMobile ? '0.95rem' : '1rem',
-                      fontWeight: '600',
-                      color: '#10b981',
-                      outline: 'none',
-                      padding: '0.25rem 0',
-                      marginRight: '1rem',
-                      flex: 1
-                    }}
-                    onFocus={(e) => {
-                      e.target.style.borderBottomColor = 'rgba(16, 185, 129, 0.3)'
-                    }}
-                    onBlur={(e) => {
-                      e.target.style.borderBottomColor = 'transparent'
-                    }}
-                  />
-                  
-                  <button
-                    onClick={() => {
-                      if (confirm('Delete this section?')) {
-                        handleDeleteSection(section.id)
-                      }
-                    }}
-                    style={{
-                      width: '32px',
-                      height: '32px',
-                      borderRadius: '6px',
-                      background: 'rgba(239, 68, 68, 0.1)',
-                      border: '1px solid rgba(239, 68, 68, 0.2)',
+                  alignItems: 'center',
+                  gap: '0.25rem'
+                }}
+              >
+                <ChevronUp size={14} />
+                Alles dicht
+              </button>
+            </div>
+          </div>
+        )}
+        
+        {/* COLLAPSIBLE SECTIONS - UPGRADED */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', marginBottom: '1rem' }}>
+          {sections.map((section, index) => {
+            const isExpanded = expandedSections.includes(section.id)
+            const hasContent = section.content || section.notes || 
+                              (section.checkItems && section.checkItems.some(i => i.checked)) ||
+                              (section.fields && section.fields.some(f => f.value))
+            
+            const checkedCount = section.checkItems?.filter(i => i.checked).length || 0
+            const totalCheckItems = section.checkItems?.length || 0
+            const completionPercent = totalCheckItems > 0 ? Math.round((checkedCount / totalCheckItems) * 100) : 0
+            
+            return (
+              <div
+                key={section.id}
+                style={{
+                  background: 'rgba(0, 0, 0, 0.4)',
+                  borderRadius: '14px',
+                  border: `1px solid ${isExpanded ? GOLD.borderActive : 'rgba(255,255,255,0.08)'}`,
+                  overflow: 'hidden',
+                  transition: 'all 0.3s ease',
+                  boxShadow: isExpanded ? `0 4px 20px ${GOLD.glow}` : 'none'
+                }}
+              >
+                {/* Section header - clickable */}
+                <button
+                  onClick={() => toggleSection(section.id)}
+                  style={{
+                    width: '100%',
+                    padding: isMobile ? '1rem' : '1.25rem',
+                    background: isExpanded 
+                      ? `linear-gradient(135deg, ${GOLD.background} 0%, transparent 100%)`
+                      : 'transparent',
+                    border: 'none',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    textAlign: 'left'
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flex: 1 }}>
+                    <div style={{
+                      width: '36px',
+                      height: '36px',
+                      borderRadius: '10px',
+                      background: isExpanded ? `${GOLD.primary}20` : 'rgba(255,255,255,0.05)',
+                      border: `1px solid ${isExpanded ? GOLD.border : 'rgba(255,255,255,0.1)'}`,
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      cursor: 'pointer',
-                      color: '#ef4444',
                       flexShrink: 0
-                    }}
-                  >
-                    <X size={14} />
-                  </button>
-                </div>
+                    }}>
+                      <span style={{
+                        fontSize: '0.9rem',
+                        fontWeight: '700',
+                        color: isExpanded ? GOLD.primary : 'rgba(255,255,255,0.5)'
+                      }}>
+                        {index + 1}
+                      </span>
+                    </div>
+                    
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <h3 style={{
+                        fontSize: isMobile ? '1rem' : '1.05rem',
+                        fontWeight: '700',
+                        color: isExpanded ? GOLD.primary : '#fff',
+                        margin: 0,
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap'
+                      }}>
+                        {section.title || 'Naamloze sectie'}
+                      </h3>
+                      
+                      {!isExpanded && (
+                        <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.25rem', alignItems: 'center' }}>
+                          {section.type === 'checklist' && totalCheckItems > 0 && (
+                            <span style={{
+                              fontSize: '0.75rem',
+                              color: completionPercent === 100 ? '#10b981' : 'rgba(255,255,255,0.5)',
+                              fontWeight: '600'
+                            }}>
+                              {checkedCount}/{totalCheckItems} ✓
+                            </span>
+                          )}
+                          
+                          {hasContent && (
+                            <span style={{
+                              padding: '0.15rem 0.4rem',
+                              background: 'rgba(16,185,129,0.15)',
+                              borderRadius: '4px',
+                              fontSize: '0.7rem',
+                              color: '#10b981',
+                              fontWeight: '600'
+                            }}>
+                              Ingevuld
+                            </span>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                    {section.type === 'checklist' && !isExpanded && totalCheckItems > 0 && (
+                      <div style={{
+                        width: '32px',
+                        height: '32px',
+                        borderRadius: '50%',
+                        background: `conic-gradient(#10b981 ${completionPercent}%, rgba(255,255,255,0.1) 0)`,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        position: 'relative'
+                      }}>
+                        <div style={{
+                          width: '24px',
+                          height: '24px',
+                          borderRadius: '50%',
+                          background: '#000',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center'
+                        }}>
+                          <span style={{
+                            fontSize: '0.65rem',
+                            fontWeight: '700',
+                            color: completionPercent === 100 ? '#10b981' : 'rgba(255,255,255,0.5)'
+                          }}>
+                            {completionPercent}%
+                          </span>
+                        </div>
+                      </div>
+                    )}
+                    
+                    {isExpanded ? (
+                      <ChevronUp size={20} color={GOLD.primary} />
+                    ) : (
+                      <ChevronDown size={20} color="rgba(255,255,255,0.4)" />
+                    )}
+                  </div>
+                </button>
                 
-                {/* Section content */}
-                {section.type === 'text' && (
-                  <textarea
-                    value={section.content || ''}
-                    onChange={(e) => handleUpdateSection(section.id, { content: e.target.value })}
-                    placeholder="Write your notes here..."
-                    style={{
-                      width: '100%',
-                      minHeight: '100px',
-                      padding: isMobile ? '0.75rem' : '0.875rem',
-                      background: 'rgba(0, 0, 0, 0.3)',
-                      border: '1px solid rgba(255, 255, 255, 0.1)',
-                      borderRadius: '8px',
-                      color: 'rgba(255, 255, 255, 0.9)',
-                      fontSize: isMobile ? '0.85rem' : '0.9rem',
-                      lineHeight: '1.6',
-                      resize: 'vertical',
-                      fontFamily: 'inherit',
-                      outline: 'none'
-                    }}
-                    onFocus={(e) => {
-                      e.target.style.borderColor = 'rgba(16, 185, 129, 0.3)'
-                      e.target.style.background = 'rgba(0, 0, 0, 0.5)'
-                    }}
-                    onBlur={(e) => {
-                      e.target.style.borderColor = 'rgba(255, 255, 255, 0.1)'
-                      e.target.style.background = 'rgba(0, 0, 0, 0.3)'
-                    }}
-                  />
+                {/* Section content - expandable */}
+                {isExpanded && (
+                  <div style={{
+                    padding: isMobile ? '0 1rem 1.25rem' : '0 1.25rem 1.5rem'
+                  }}>
+                    {/* Section title edit */}
+                    <div style={{ marginBottom: '1rem' }}>
+                      <label style={{
+                        display: 'block',
+                        fontSize: '0.8rem',
+                        color: 'rgba(255,255,255,0.5)',
+                        marginBottom: '0.5rem',
+                        fontWeight: '600'
+                      }}>
+                        Sectie titel
+                      </label>
+                      <input
+                        type="text"
+                        value={section.title || ''}
+                        onChange={(e) => handleUpdateSection(section.id, { title: e.target.value })}
+                        placeholder="Sectie naam..."
+                        style={{
+                          width: '100%',
+                          padding: '0.875rem 1rem',
+                          background: 'rgba(0, 0, 0, 0.5)',
+                          border: `1px solid ${GOLD.border}`,
+                          borderRadius: '10px',
+                          color: GOLD.primary,
+                          fontSize: '1rem',
+                          fontWeight: '600',
+                          outline: 'none'
+                        }}
+                      />
+                    </div>
+                    
+                    {/* Render section content based on type */}
+                    {renderSectionContent(section)}
+                    
+                    {/* Delete section button */}
+                    <button
+                      onClick={() => handleDeleteSection(section.id)}
+                      style={{
+                        padding: '0.6rem 1rem',
+                        background: 'rgba(239, 68, 68, 0.1)',
+                        border: '1px solid rgba(239, 68, 68, 0.3)',
+                        borderRadius: '8px',
+                        color: '#ef4444',
+                        fontSize: '0.85rem',
+                        fontWeight: '600',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.5rem',
+                        marginTop: '1rem'
+                      }}
+                    >
+                      <Trash2 size={14} />
+                      Sectie verwijderen
+                    </button>
+                  </div>
                 )}
               </div>
-            ))}
-            
-            {/* Add section button */}
-            <button
-              onClick={handleAddSection}
-              style={{
-                padding: isMobile ? '0.75rem' : '0.875rem',
-                background: 'rgba(16, 185, 129, 0.1)',
-                border: '1px solid rgba(16, 185, 129, 0.3)',
-                borderRadius: '10px',
-                color: '#10b981',
-                fontSize: isMobile ? '0.85rem' : '0.9rem',
-                fontWeight: '600',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '0.5rem',
-                minHeight: '44px'
-              }}
-            >
-              <Plus size={18} />
-              Add Section
-            </button>
-          </div>
+            )
+          })}
         </div>
+        
+        {/* Add section button */}
+        <button
+          onClick={handleAddSection}
+          style={{
+            width: '100%',
+            padding: isMobile ? '1rem' : '1.25rem',
+            background: `linear-gradient(135deg, ${GOLD.background} 0%, rgba(0,0,0,0.4) 100%)`,
+            border: `2px dashed ${GOLD.border}`,
+            borderRadius: '14px',
+            color: GOLD.primary,
+            fontSize: isMobile ? '0.95rem' : '1rem',
+            fontWeight: '700',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '0.5rem',
+            minHeight: '56px',
+            transition: 'all 0.2s ease'
+          }}
+        >
+          <Plus size={20} />
+          Nieuwe Sectie Toevoegen
+        </button>
       </div>
     )
   }
   
-  // Main render
+  // ==========================================
+  // MAIN RENDER
+  // ==========================================
   return (
-    <div>
+    <div style={{
+      background: '#000',
+      minHeight: '100%',
+      padding: isMobile ? '0' : '0'
+    }}>
       {showNewNote ? renderNewNoteForm() : (
         selectedNote ? renderNoteDetail() : renderNotesList()
+      )}
+      
+      {showTemplateSelector && (
+        <TemplateSelector
+          isMobile={isMobile}
+          onSelect={handleTemplateSelect}
+          onClose={() => setShowTemplateSelector(false)}
+        />
       )}
     </div>
   )

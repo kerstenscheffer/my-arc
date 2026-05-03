@@ -4,8 +4,9 @@ import ProgressChartsWidget from "../progress/ProgressChartsWidget"
 import { useState, useEffect, useRef } from 'react'
 import { useLanguage } from '../../contexts/LanguageContext'
 import { Calendar } from 'lucide-react'
+import WorkoutNavTiles from './components/WorkoutNavTiles'
+import ClientPlanEditor from './components/ClientPlanEditor'
 
-// Import sub-components
 import WeekSchedule from './components/WeekSchedule'
 import TodaysWorkoutMain from './components/todays-workout/TodaysWorkoutMain'
 import LogModal from './components/todays-workout/LogModal'
@@ -13,15 +14,12 @@ import WorkoutChallengeSidebar from '../../client/components/WorkoutChallengeSid
 import WorkoutPhotoSlider from './components/WorkoutPhotoSlider'
 import WorkoutProgressToast from './components/WorkoutProgressToast'
 import TodaysLogToast from './components/TodaysLogToast'
-import ProgressInsightsSection from '../progress/ProgressInsightsSection'
+import WorkoutHistory from '../progress/WorkoutHistory'
 import PlanningWizard from './components/planning/PlanningWizard'
 
-// Import hooks
 import useWorkoutSchedule from './hooks/useWorkoutSchedule'
 import useWorkoutProgress from './hooks/useWorkoutProgress'
 import PageVideoWidget from '../videos/PageVideoWidget'
-
-// 🔥 Import WorkoutService
 import WorkoutService from '../../services/WorkoutService'
 
 export default function WorkoutPlan({ client, schema, db }) {
@@ -29,352 +27,157 @@ export default function WorkoutPlan({ client, schema, db }) {
   const isMobile = useIsMobile()
   const chartsRef = useRef(null)
   const chartWidgetRef = useRef(null)
-  
-  // 🔥 Initialize WorkoutService
+
   const [workoutService] = useState(() => new WorkoutService(db.supabase))
-  
-  // ⭐ Challenge refresh key
+  const [localSchema, setLocalSchema] = useState(schema)
+
+  // ✅ scheduleReloadKey — stijgt elke keer dat het weekschedule verandert
+  // TodaysWorkoutMain luistert hierop en herlaadt zijn workout
+  const [scheduleReloadKey, setScheduleReloadKey] = useState(0)
+
   const [challengeRefreshKey, setChallengeRefreshKey] = useState(0)
-  
-  // 🔥 NEW: LogModal state for any day
   const [showLogModal, setShowLogModal] = useState(false)
   const [selectedWorkoutData, setSelectedWorkoutData] = useState(null)
   const [selectedDayLogs, setSelectedDayLogs] = useState([])
-  
-  // State management via custom hooks
+
   const {
-    weekSchedule,
-    setWeekSchedule,
-    swapMode,
-    setSwapMode,
-    selectedWorkout,
-    setSelectedWorkout,
-    handleDaySwap,
-    quickAssignWorkout
+    weekSchedule, setWeekSchedule,
+    swapMode, setSwapMode,
+    selectedWorkout, setSelectedWorkout,
+    handleDaySwap, quickAssignWorkout
   } = useWorkoutSchedule(schema, client?.id, db)
-  
-  const {
-    completedWorkouts,
-    markWorkoutComplete,
-    weeklyStats,
-    loadWeeklyProgress
-  } = useWorkoutProgress(client?.id, db)
-  
-  // Local state
+
+  const { completedWorkouts, markWorkoutComplete, weeklyStats, loadWeeklyProgress } = useWorkoutProgress(client?.id, db)
+
   const [showWizard, setShowWizard] = useState(false)
-  
-  // Get current date info
+  const [showPlanEditor, setShowPlanEditor] = useState(false)
+
   const currentDate = new Date()
   const weekDays = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
   const todayIndex = (currentDate.getDay() + 6) % 7
-  const todayWorkout = weekSchedule[weekDays[todayIndex]]
-  
-  // Load initial data
+
   useEffect(() => {
-    if (client?.id) {
-      loadWeeklyProgress()
-    }
+    if (client?.id) loadWeeklyProgress()
   }, [client?.id])
-  
-  // 🔥 NEW: Handle day click - Open LogModal with workout data
+
+  useEffect(() => {
+    if (schema) setLocalSchema(schema)
+  }, [schema?.id])
+
   const handleDayClick = async (day, workoutKey) => {
     if (!workoutKey) return
-    
-    console.log('🎯 Day clicked:', day, 'Workout key:', workoutKey)
-    
     try {
       let workoutData = null
-      
-      // Check if custom workout
       if (workoutKey.startsWith('custom_')) {
         const customId = workoutKey.replace('custom_', '')
-        console.log('🔍 Loading custom workout:', customId)
-        
         const customWorkout = await workoutService.getCustomWorkoutById(customId)
-        
         if (customWorkout) {
-          workoutData = {
-            name: customWorkout.name,
-            focus: getCustomWorkoutTypeLabel(customWorkout.type),
-            geschatteTijd: `${customWorkout.duration} min`,
-            exercises: [],
-            workoutKey: workoutKey,
-            dayKey: workoutKey,
-            dayName: day,
-            isCustom: true,
-            customData: customWorkout
-          }
+          workoutData = { name: customWorkout.name, focus: getCustomWorkoutTypeLabel(customWorkout.type), geschatteTijd: `${customWorkout.duration} min`, exercises: [], workoutKey, dayKey: workoutKey, dayName: day, isCustom: true, customData: customWorkout }
         }
+      } else if (['swimming', 'cardio', 'hiking', 'cycling', 'running'].includes(workoutKey)) {
+        const labels = { swimming: 'Zwemmen', cardio: 'Cardio', hiking: 'Wandelen', cycling: 'Fietsen', running: 'Hardlopen' }
+        workoutData = { name: labels[workoutKey], focus: 'Cardio', geschatteTijd: '60 min', exercises: [], workoutKey, dayKey: workoutKey, dayName: day, isActivity: true }
+      } else if (localSchema?.week_structure?.[workoutKey]) {
+        workoutData = { ...localSchema.week_structure[workoutKey], workoutKey, dayKey: workoutKey, dayName: day, isCustom: false }
       }
-      // Check if activity (cardio, swimming, etc)
-      else if (['swimming', 'cardio', 'hiking', 'cycling', 'running'].includes(workoutKey)) {
-        const activityLabels = {
-          swimming: 'Zwemmen',
-          cardio: 'Cardio',
-          hiking: 'Wandelen',
-          cycling: 'Fietsen',
-          running: 'Hardlopen'
-        }
-        
-        workoutData = {
-          name: activityLabels[workoutKey],
-          focus: 'Cardio',
-          geschatteTijd: '60 min',
-          exercises: [],
-          workoutKey: workoutKey,
-          dayKey: workoutKey,
-          dayName: day,
-          isActivity: true
-        }
-      }
-      // Schema workout
-      else if (schema?.week_structure?.[workoutKey]) {
-        const workout = schema.week_structure[workoutKey]
-        workoutData = {
-          ...workout,
-          workoutKey: workoutKey,
-          dayKey: workoutKey,
-          dayName: day,
-          isCustom: false
-        }
-      }
-      
       if (workoutData) {
-        console.log('✅ Workout data prepared:', workoutData)
         setSelectedWorkoutData(workoutData)
-        
-        // Load logs for this day
         await loadDayLogs(day)
-        
-        // Open modal
         setShowLogModal(true)
-      } else {
-        console.log('❌ No workout data found')
       }
-      
-    } catch (error) {
-      console.error('❌ Error loading workout for day:', error)
-    }
+    } catch (error) { console.error('❌ Error loading workout for day:', error) }
   }
-  
-  // Helper: Load logs for specific day
+
   const loadDayLogs = async (dayName) => {
     if (!client?.id || !db) return
-    
     try {
-      // Get the date for this day
       const dayIndex = weekDays.indexOf(dayName)
       const targetDate = new Date()
       const currentDayIndex = (targetDate.getDay() + 6) % 7
-      const daysDiff = dayIndex - currentDayIndex
-      targetDate.setDate(targetDate.getDate() + daysDiff)
-      
+      targetDate.setDate(targetDate.getDate() + (dayIndex - currentDayIndex))
       const dateString = targetDate.toISOString().split('T')[0]
-      
-      const { data, error } = await db.supabase
-        .from('workout_logs')
-        .select('*')
-        .eq('client_id', client.id)
-        .eq('date', dateString)
-        .order('created_at', { ascending: false })
-      
-      if (error) throw error
-      
-      console.log(`✅ Logs loaded for ${dayName}:`, data?.length || 0)
-      setSelectedDayLogs(data || [])
-      
-    } catch (error) {
-      console.error('❌ Error loading day logs:', error)
-      setSelectedDayLogs([])
-    }
+      const { data: sessions } = await db.supabase.from('workout_sessions').select('id').eq('client_id', client.id).eq('workout_date', dateString)
+      if (!sessions?.length) { setSelectedDayLogs([]); return }
+      const { data: progress } = await db.supabase.from('workout_progress').select('*').in('session_id', sessions.map(s => s.id)).order('created_at', { ascending: false })
+      setSelectedDayLogs(progress || [])
+    } catch { setSelectedDayLogs([]) }
   }
-  
-  // Helper: Get custom workout type label
-  const getCustomWorkoutTypeLabel = (type) => {
-    const labels = {
-      cardio: 'Cardio',
-      cycling: 'Fietsen',
-      running: 'Hardlopen',
-      swimming: 'Zwemmen',
-      hiking: 'Wandelen',
-      yoga: 'Yoga',
-      sports: 'Sport',
-      custom: 'Custom'
-    }
-    return labels[type] || type
-  }
-  
-  // Handle close log modal
-  const handleCloseLogModal = () => {
-    setShowLogModal(false)
-    setSelectedWorkoutData(null)
-    setSelectedDayLogs([])
-  }
-  
-  // Handle logs update from modal
+
+  const getCustomWorkoutTypeLabel = (type) => ({ cardio: 'Cardio', cycling: 'Fietsen', running: 'Hardlopen', swimming: 'Zwemmen', hiking: 'Wandelen', yoga: 'Yoga', sports: 'Sport', custom: 'Custom' }[type] || type)
+
+  const handleCloseLogModal = () => { setShowLogModal(false); setSelectedWorkoutData(null); setSelectedDayLogs([]) }
+
   const handleLogsUpdate = async (options) => {
-    console.log('🔄 Logs updated from modal')
-    
-    // Reload progress
     await loadWeeklyProgress()
-    
-    // Reload day logs if modal still open
-    if (selectedWorkoutData?.dayName) {
-      await loadDayLogs(selectedWorkoutData.dayName)
-    }
-    
-    // If workout completed, refresh challenge
-    if (options?.workoutCompleted) {
-      handleWorkoutCompleted()
-    }
+    if (selectedWorkoutData?.dayName) await loadDayLogs(selectedWorkoutData.dayName)
+    if (options?.workoutCompleted) handleWorkoutCompleted()
   }
-  
-  // Handle toast click - scroll to chart
-  const handleToastViewChart = (exercise) => {
+
+  const handleToastViewChart = () => {
     if (chartsRef.current) {
-      const elementPosition = chartsRef.current.getBoundingClientRect().top + window.pageYOffset
-      const offsetPosition = elementPosition - (isMobile ? 100 : 150)
-      
-      window.scrollTo({
-        top: offsetPosition,
-        behavior: 'smooth'
-      })
+      const pos = chartsRef.current.getBoundingClientRect().top + window.pageYOffset
+      window.scrollTo({ top: pos - (isMobile ? 100 : 150), behavior: 'smooth' })
     }
   }
-  
-  // Handle insight exercise selection - scroll to chartsRef
-  const handleInsightExerciseSelect = (exercise, metric = '1rm') => {
-    // Scroll to charts with offset for better visibility
-    if (chartsRef.current) {
-      const elementPosition = chartsRef.current.getBoundingClientRect().top + window.pageYOffset
-      const offsetPosition = elementPosition - (isMobile ? 100 : 150)
-      
-      window.scrollTo({
-        top: offsetPosition,
-        behavior: 'smooth'
-      })
-    }
-    
-    // Open specific exercise + metric in chart widget
-    if (chartWidgetRef.current && chartWidgetRef.current.openExercise) {
-      setTimeout(() => {
-        chartWidgetRef.current.openExercise(exercise, metric)
-      }, 400)
-    }
-  }
-  
-  // Handle wizard complete
-  const handleWizardComplete = (newSchedule) => {
-    setWeekSchedule(newSchedule)
-    setShowWizard(false)
-  }
-  
-  // Handle workout completed - refresh challenge banner
-  const handleWorkoutCompleted = () => {
-    console.log('🔔 Workout completed - refreshing challenge banner')
-    setChallengeRefreshKey(prev => prev + 1)
-  }
-  
-  // No plan view
+
+  const handleWizardComplete = (newSchedule) => { setWeekSchedule(newSchedule); setShowWizard(false) }
+  const handleWorkoutCompleted = () => { setChallengeRefreshKey(prev => prev + 1) }
+
   if (!schema) {
     return (
-      <div style={{
-        minHeight: '100vh',
-        background: 'linear-gradient(180deg, #0a0f0d 0%, #1a1a1a 100%)',
-        padding: '1rem',
-        animation: 'fadeIn 0.5s ease'
-      }}>
-        <div style={{
-          maxWidth: '600px',
-          margin: '4rem auto',
-          textAlign: 'center',
-          padding: '2rem',
-          background: 'linear-gradient(135deg, rgba(139, 92, 246, 0.1) 0%, rgba(59, 130, 246, 0.05) 100%)',
-          backdropFilter: 'blur(20px)',
-          borderRadius: '20px',
-          border: '1px solid rgba(139, 92, 246, 0.2)'
-        }}>
+      <div style={{ minHeight: '100vh', background: 'linear-gradient(180deg, #0a0f0d 0%, #1a1a1a 100%)', padding: '1rem' }}>
+        <div style={{ maxWidth: '600px', margin: '4rem auto', textAlign: 'center', padding: '2rem', background: 'linear-gradient(135deg, rgba(139,92,246,0.1) 0%, rgba(59,130,246,0.05) 100%)', backdropFilter: 'blur(20px)', borderRadius: '20px', border: '1px solid rgba(139,92,246,0.2)' }}>
           <Calendar size={48} color="#8b5cf6" style={{ marginBottom: '1.5rem' }} />
-          <h3 style={{
-            fontSize: '1.5rem',
-            background: 'linear-gradient(135deg, #8b5cf6 0%, #3b82f6 100%)',
-            WebkitBackgroundClip: 'text',
-            WebkitTextFillColor: 'transparent',
-            marginBottom: '1rem',
-            fontWeight: 'bold'
-          }}>
+          <h3 style={{ fontSize: '1.5rem', background: 'linear-gradient(135deg, #8b5cf6 0%, #3b82f6 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', marginBottom: '1rem', fontWeight: 'bold' }}>
             {t('workout.noplan') || 'No Workout Plan Yet'}
           </h3>
-          <p style={{
-            fontSize: '0.95rem',
-            color: 'rgba(255,255,255,0.6)',
-            lineHeight: 1.6
-          }}>
+          <p style={{ fontSize: '0.95rem', color: 'rgba(255,255,255,0.6)', lineHeight: 1.6 }}>
             {t('workout.waitingForTrainer') || 'Your trainer will assign a workout plan soon!'}
           </p>
         </div>
       </div>
     )
   }
-  
+
   return (
-    <div style={{
-      minHeight: '100vh',
-      background: 'linear-gradient(180deg, #0a0a0a 0%, #171717 100%)',
-      paddingBottom: isMobile ? '5rem' : '2rem',
-      animation: 'fadeIn 0.5s ease',
-      position: 'relative'
-    }}>
-      {/* 1. Today's Workout */}
+    <div style={{ minHeight: '100vh', background: 'linear-gradient(180deg, #0a0a0a 0%, #171717 100%)', paddingBottom: isMobile ? '5rem' : '2rem', position: 'relative' }}>
+
+      <WorkoutNavTiles isMobile={isMobile} />
+
+      {/* Plan Bewerken knop */}
+      <div style={{ padding: isMobile ? '0 1rem 0.5rem' : '0 1.5rem 0.625rem' }}>
+        <button
+          onClick={() => setShowPlanEditor(true)}
+          style={{ width: '100%', padding: isMobile ? '0.6rem' : '0.7rem', background: 'transparent', border: '1px solid rgba(255,255,255,0.07)', borderRadius: '8px', color: 'rgba(255,255,255,0.35)', fontSize: isMobile ? '0.72rem' : '0.78rem', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.04em', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.375rem', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', transition: 'all 0.15s ease' }}
+          onTouchStart={(e) => e.currentTarget.style.borderColor = 'rgba(255,255,255,0.15)'}
+          onTouchEnd={(e) => e.currentTarget.style.borderColor = 'rgba(255,255,255,0.07)'}
+        >
+          ✎ Plan Bewerken
+        </button>
+      </div>
+
       <TodaysWorkoutMain
         client={client}
-        schema={schema}
+        schema={localSchema}
         db={db}
         workoutService={workoutService}
         onWorkoutCompleted={handleWorkoutCompleted}
-      />
-      
-      {/* 2. Today's Log Toast */}
-      <TodaysLogToast
-        client={client}
-        db={db}
-      />
-      
-      {/* 3. Progress Toast Notification */}
-      <WorkoutProgressToast
-        client={client}
-        db={db}
-        onViewChart={handleToastViewChart}
-      />
-      
-      {/* 4. Challenge Sidebar */}
-      <WorkoutChallengeSidebar 
-        client={client} 
-        db={db}
-        key={challengeRefreshKey}
+        onSchemaUpdate={(updatedSchema) => setLocalSchema(updatedSchema)}
+        scheduleReloadKey={scheduleReloadKey}
       />
 
-      {/* 5. Video Widget */}
-      <div style={{ 
-        paddingTop: isMobile ? '1rem' : '1.5rem',
-        paddingLeft: isMobile ? '1rem' : '1.5rem',
-        paddingRight: isMobile ? '1rem' : '1.5rem',
-        paddingBottom: '0.5rem',
-        marginBottom: '0.5rem'
-      }}>
-        <PageVideoWidget
-          client={client}
-          db={db}
-          pageContext="workout"
-          title="Workout Technique Videos"
-          compact={true}
-        />
+      <TodaysLogToast client={client} db={db} />
+      <WorkoutProgressToast client={client} db={db} onViewChart={handleToastViewChart} />
+      <WorkoutChallengeSidebar client={client} db={db} key={challengeRefreshKey} />
+
+      <div style={{ paddingTop: isMobile ? '1rem' : '1.5rem', paddingLeft: isMobile ? '1rem' : '1.5rem', paddingRight: isMobile ? '1rem' : '1.5rem', paddingBottom: '0.5rem', marginBottom: '0.5rem' }}>
+        <PageVideoWidget client={client} db={db} pageContext="workout" title="Workout Technique Videos" compact={true} />
       </div>
-      
-      {/* 6. Week Schedule - WITH DAY CLICK TO LOGMODAL */}
-      <WeekSchedule
+
+      <div id="week-schedule">
+        <WeekSchedule
         weekSchedule={weekSchedule}
-        schema={schema}
+        schema={localSchema}
         swapMode={swapMode}
         selectedWorkout={selectedWorkout}
         completedWorkouts={completedWorkouts}
@@ -385,85 +188,53 @@ export default function WorkoutPlan({ client, schema, db }) {
         workoutService={workoutService}
         onScheduleUpdate={(newSchedule) => {
           setWeekSchedule(newSchedule)
+          // ✅ Trigger TodaysWorkoutMain reload na elke schedule wijziging
+          setScheduleReloadKey(prev => prev + 1)
         }}
         onOpenWizard={() => setShowWizard(true)}
       />
-      
-      {/* 7. Photo Slider */}
-      <WorkoutPhotoSlider />
-      
-      {/* 8. Progress Insights & Stats */}
-      <div style={{ marginTop: '2rem' }}>
-        {/* Progress Insights */}
-        <ProgressInsightsSection
-          db={db}
-          clientId={client?.id}
-          onSelectExercise={handleInsightExerciseSelect}
-        />
-        
-        {/* Charts Wrapper */}
-        <div ref={chartsRef}>
-          <ProgressChartsWidget 
-            ref={chartWidgetRef}
-            db={db}
-            clientId={client?.id}
-          />
-        </div>
       </div>
-      
-      {/* 🔥 WIZARD MODAL */}
+
+      <div id="workout-history" style={{ padding: isMobile ? '0 1rem' : '0 1.5rem', marginTop: '1.5rem' }}>
+        <WorkoutHistory db={db} clientId={client?.id} onBack={null} />
+      </div>
+
+      <WorkoutPhotoSlider />
+
+      <div ref={chartsRef} style={{ padding: isMobile ? '0 1rem' : '0 1.5rem', marginTop: '1rem' }}>
+        <ProgressChartsWidget ref={chartWidgetRef} db={db} clientId={client?.id} />
+      </div>
+
       {showWizard && (
-        <PlanningWizard
-          schema={schema}
-          clientId={client?.id}
-          db={db}
-          workoutService={workoutService}
-          onClose={() => setShowWizard(false)}
-          onComplete={handleWizardComplete}
-        />
+        <PlanningWizard schema={localSchema} clientId={client?.id} db={db} workoutService={workoutService} onClose={() => setShowWizard(false)} onComplete={handleWizardComplete} />
       )}
-      
-      {/* 🔥 LOG MODAL - FOR ANY DAY WORKOUT */}
-      {showLogModal && selectedWorkoutData && (
-        <LogModal
-          workout={selectedWorkoutData}
-          todaysLogs={selectedDayLogs}
-          onClose={handleCloseLogModal}
-          onLogsUpdate={handleLogsUpdate}
+
+      {showPlanEditor && (
+        <ClientPlanEditor
+          schema={localSchema}
           client={client}
-          schema={schema}
           db={db}
+          weekSchedule={weekSchedule}
+          onClose={() => setShowPlanEditor(false)}
+          onSchemaSaved={(schemaId, newStructure, newWeekSchedule) => {
+            setLocalSchema(prev => ({ ...prev, id: schemaId, week_structure: newStructure, is_client_edited: true }))
+            if (newWeekSchedule) setWeekSchedule(newWeekSchedule)
+            setScheduleReloadKey(prev => prev + 1)
+          }}
         />
       )}
-      
-      {/* CSS Animations */}
+
+      {showLogModal && selectedWorkoutData && (
+        <LogModal workout={selectedWorkoutData} todaysLogs={selectedDayLogs} onClose={handleCloseLogModal} onLogsUpdate={handleLogsUpdate} client={client} schema={localSchema} db={db} />
+      )}
+
       <style>{`
-        @keyframes fadeIn {
-          from { opacity: 0; }
-          to { opacity: 1; }
-        }
-        
-        * {
-          -webkit-tap-highlight-color: transparent;
-        }
-        
-        *::-webkit-scrollbar {
-          width: 6px;
-          height: 6px;
-        }
-        
-        *::-webkit-scrollbar-track {
-          background: rgba(255, 255, 255, 0.03);
-        }
-        
-        *::-webkit-scrollbar-thumb {
-          background: rgba(16, 185, 129, 0.3);
-          border-radius: 3px;
-        }
-        
-        html {
-          scroll-behavior: smooth;
-        }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        * { -webkit-tap-highlight-color: transparent; }
+        *::-webkit-scrollbar { width: 6px; height: 6px; }
+        *::-webkit-scrollbar-track { background: rgba(255,255,255,0.03); }
+        *::-webkit-scrollbar-thumb { background: rgba(16,185,129,0.3); border-radius: 3px; }
+        html { scroll-behavior: smooth; }
       `}</style>
     </div>
   )

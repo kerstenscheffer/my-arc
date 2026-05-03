@@ -1,28 +1,13 @@
 // src/modules/workout/components/WorkoutPhotoSlider.jsx
+// 🏆 FULL WIDTH - No containers, edge-to-edge photo slider
 import { useState, useEffect } from 'react'
-import { Zap } from 'lucide-react'
 
 const workoutImages = [
-  {
-    url: 'https://images.unsplash.com/photo-1532029837206-abbe2b7620e3?w=1600&h=500&fit=crop&q=85',
-    caption: 'Push Day'
-  },
-  {
-    url: 'https://images.unsplash.com/photo-1605296867424-35fc25c9212a?w=1600&h=500&fit=crop&q=85',
-    caption: 'Pull Day'
-  },
-  {
-    url: 'https://images.unsplash.com/photo-1434682772747-f16d3ea162c3?w=1600&h=500&fit=crop&q=85',
-    caption: 'Leg Day'
-  },
-  {
-    url: 'https://images.unsplash.com/photo-1517836357463-d25dfeac3438?w=1600&h=500&fit=crop&q=85',
-    caption: 'Je Progressie'
-  },
-  {
-    url: 'https://images.unsplash.com/photo-1549060279-7e168fcee0c2?w=1600&h=500&fit=crop&q=85',
-    caption: 'Discipline Wins'
-  }
+  { url: 'https://images.unsplash.com/photo-1532029837206-abbe2b7620e3?w=1600&h=500&fit=crop&q=85', caption: 'Push Day' },
+  { url: 'https://images.unsplash.com/photo-1605296867424-35fc25c9212a?w=1600&h=500&fit=crop&q=85', caption: 'Pull Day' },
+  { url: 'https://images.unsplash.com/photo-1567598508481-65985588e295?w=1600&h=500&fit=crop&q=85', caption: 'Leg Day' },
+  { url: 'https://images.unsplash.com/photo-1517836357463-d25dfeac3438?w=1600&h=500&fit=crop&q=85', caption: 'Je Progressie' },
+  { url: 'https://images.unsplash.com/photo-1549060279-7e168fcee0c2?w=1600&h=500&fit=crop&q=85', caption: 'Discipline Wins' }
 ]
 
 export default function WorkoutPhotoSlider() {
@@ -37,10 +22,7 @@ export default function WorkoutPhotoSlider() {
     return () => clearInterval(interval)
   }, [])
   
-  const handleTouchStart = (e) => {
-    setTouchStart(e.targetTouches[0].clientX)
-  }
-  
+  const handleTouchStart = (e) => setTouchStart(e.targetTouches[0].clientX)
   const handleTouchEnd = (e) => {
     if (!touchStart) return
     const diff = touchStart - e.changedTouches[0].clientX
@@ -55,190 +37,101 @@ export default function WorkoutPhotoSlider() {
   }
   
   return (
-    <div style={{
-      padding: isMobile ? '0.5rem' : '0.625rem',
-      marginBottom: isMobile ? '1rem' : '1.5rem'
-    }}>
-      {/* Main container with orange accent ring */}
-      <div
-        onTouchStart={handleTouchStart}
-        onTouchEnd={handleTouchEnd}
-        style={{
-          position: 'relative',
-          width: '100%',
-          height: isMobile ? '200px' : '260px',
-          borderRadius: isMobile ? '16px' : '20px',
-          overflow: 'hidden',
-          touchAction: 'pan-y',
-          userSelect: 'none',
-          WebkitUserSelect: 'none',
-          border: '2px solid rgba(249, 115, 22, 0.3)',
-          boxShadow: '0 8px 32px rgba(249, 115, 22, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.03)',
-          transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-          background: '#000'
-        }}
-      >
-        {/* Background image with transition */}
+    <div
+      onTouchStart={handleTouchStart}
+      onTouchEnd={handleTouchEnd}
+      style={{
+        position: 'relative',
+        width: '100%',
+        height: isMobile ? '160px' : '220px',
+        overflow: 'hidden',
+        touchAction: 'pan-y',
+        userSelect: 'none',
+        WebkitUserSelect: 'none',
+        borderTop: '1px solid rgba(255, 215, 0, 0.06)',
+        borderBottom: '1px solid rgba(255, 215, 0, 0.06)',
+        background: '#000'
+      }}
+    >
+      {/* Background image */}
+      <div style={{
+        position: 'absolute',
+        inset: 0,
+        backgroundImage: `url(${workoutImages[currentIndex].url})`,
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+        transition: 'opacity 0.5s ease',
+        zIndex: 1
+      }} />
+      
+      {/* Top vignette */}
+      <div style={{
+        position: 'absolute',
+        top: 0, left: 0, right: 0,
+        height: '40%',
+        background: 'linear-gradient(to bottom, rgba(0,0,0,0.4), transparent)',
+        pointerEvents: 'none',
+        zIndex: 2
+      }} />
+      
+      {/* Bottom gradient */}
+      <div style={{
+        position: 'absolute',
+        bottom: 0, left: 0, right: 0,
+        height: '60%',
+        background: 'linear-gradient(to top, rgba(0,0,0,0.8) 0%, rgba(0,0,0,0.3) 60%, transparent 100%)',
+        pointerEvents: 'none',
+        zIndex: 2
+      }} />
+      
+      {/* Content layer — bottom, only dots */}
+      <div style={{
+        position: 'absolute',
+        bottom: 0, left: 0, right: 0,
+        padding: isMobile ? '0.75rem 1rem' : '1rem 1.5rem',
+        display: 'flex',
+        justifyContent: 'center',
+        alignItems: 'flex-end',
+        zIndex: 3
+      }}>
+        {/* Dot indicators */}
         <div style={{
-          position: 'absolute',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          backgroundImage: `url(${workoutImages[currentIndex].url})`,
-          backgroundSize: 'cover',
-          backgroundPosition: 'center',
-          transition: 'opacity 0.5s ease',
-          zIndex: 1
-        }} />
-        
-        {/* Top vignette for depth */}
-        <div style={{
-          position: 'absolute',
-          top: 0,
-          left: 0,
-          right: 0,
-          height: '40%',
-          background: 'linear-gradient(to bottom, rgba(0,0,0,0.5), transparent)',
-          pointerEvents: 'none',
-          zIndex: 2
-        }} />
-        
-        {/* Bottom gradient for content */}
-        <div style={{
-          position: 'absolute',
-          bottom: 0,
-          left: 0,
-          right: 0,
-          height: '60%',
-          background: 'linear-gradient(to top, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0.4) 60%, transparent 100%)',
-          pointerEvents: 'none',
-          zIndex: 2
-        }} />
-        
-        {/* Content layer */}
-        <div style={{
-          position: 'absolute',
-          bottom: 0,
-          left: 0,
-          right: 0,
-          padding: isMobile ? '1rem' : '1.5rem',
           display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'flex-end',
-          zIndex: 3
+          gap: '0.35rem',
+          alignItems: 'center'
         }}>
-          {/* Caption container - glassmorphic */}
-          <div style={{
-            background: 'linear-gradient(135deg, rgba(249, 115, 22, 0.15) 0%, rgba(249, 115, 22, 0.08) 100%)',
-            backdropFilter: 'blur(12px)',
-            border: '1px solid rgba(249, 115, 22, 0.3)',
-            borderRadius: isMobile ? '12px' : '14px',
-            padding: isMobile ? '0.75rem 1rem' : '0.875rem 1.25rem',
-            display: 'flex',
-            alignItems: 'center',
-            gap: isMobile ? '0.5rem' : '0.625rem',
-            boxShadow: '0 4px 16px rgba(249, 115, 22, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.05)',
-            maxWidth: isMobile ? '65%' : '50%'
-          }}>
-            {/* Orange zap icon */}
-            <div style={{
-              width: isMobile ? '28px' : '32px',
-              height: isMobile ? '28px' : '32px',
-              borderRadius: '8px',
-              background: 'rgba(249, 115, 22, 0.2)',
-              border: '1px solid rgba(249, 115, 22, 0.4)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              flexShrink: 0,
-              boxShadow: '0 0 12px rgba(249, 115, 22, 0.3)'
-            }}>
-              <Zap 
-                size={isMobile ? 14 : 16} 
-                color="#f97316"
-                fill="#f97316"
-                style={{ filter: 'drop-shadow(0 0 4px rgba(249, 115, 22, 0.6))' }}
-              />
-            </div>
-            
-            {/* Caption text */}
-            <span style={{
-              color: 'white',
-              fontSize: isMobile ? '0.95rem' : '1.15rem',
-              fontWeight: '800',
-              letterSpacing: '-0.02em',
-              textTransform: 'uppercase',
-              textShadow: '0 2px 8px rgba(0, 0, 0, 0.6)',
-              lineHeight: 1.2
-            }}>
-              {workoutImages[currentIndex].caption}
-            </span>
-          </div>
-          
-          {/* STREEPJES BAR - GLASSMORPHIC */}
-          <div style={{
-            background: 'linear-gradient(135deg, rgba(23, 23, 23, 0.8) 0%, rgba(23, 23, 23, 0.6) 100%)',
-            backdropFilter: 'blur(12px)',
-            border: '1px solid rgba(255, 255, 255, 0.1)',
-            borderRadius: isMobile ? '10px' : '12px',
-            padding: isMobile ? '0.625rem 0.75rem' : '0.625rem 0.875rem',
-            display: 'flex',
-            gap: isMobile ? '0.5rem' : '0.625rem',
-            alignItems: 'center',
-            boxShadow: '0 4px 16px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.05)'
-          }}>
-            {workoutImages.map((_, index) => (
-              <div
-                key={index}
-                onClick={() => setCurrentIndex(index)}
-                style={{
-                  width: index === currentIndex ? '32px' : '16px',
-                  height: '2px',
-                  borderRadius: '1px',
-                  background: index === currentIndex 
-                    ? 'linear-gradient(135deg, #f97316 0%, #ea580c 100%)' 
-                    : 'rgba(255, 255, 255, 0.35)',
-                  cursor: 'pointer',
-                  transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                  touchAction: 'manipulation',
-                  WebkitTapHighlightColor: 'transparent',
-                  boxShadow: index === currentIndex 
-                    ? '0 0 8px rgba(249, 115, 22, 0.6)' 
-                    : 'none',
-                  transform: 'translateZ(0)',
-                  position: 'relative'
-                }}
-                onMouseEnter={(e) => {
-                  if (!isMobile && index !== currentIndex) {
-                    e.currentTarget.style.background = 'rgba(249, 115, 22, 0.7)'
-                    e.currentTarget.style.width = '20px'
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  if (!isMobile && index !== currentIndex) {
-                    e.currentTarget.style.background = 'rgba(255, 255, 255, 0.35)'
-                    e.currentTarget.style.width = '16px'
-                  }
-                }}
-              />
-            ))}
-          </div>
+          {workoutImages.map((_, index) => (
+            <div
+              key={index}
+              onClick={() => setCurrentIndex(index)}
+              style={{
+                width: index === currentIndex ? '18px' : '6px',
+                height: '3px',
+                borderRadius: '1.5px',
+                background: index === currentIndex 
+                  ? '#FFD700'
+                  : 'rgba(255, 255, 255, 0.35)',
+                cursor: 'pointer',
+                transition: 'all 0.3s ease',
+                touchAction: 'manipulation',
+                boxShadow: index === currentIndex 
+                  ? '0 0 6px rgba(255, 215, 0, 0.5)'
+                  : 'none'
+              }}
+            />
+          ))}
         </div>
-        
-        {/* Top orange accent glow */}
-        <div style={{
-          position: 'absolute',
-          top: 0,
-          left: 0,
-          right: 0,
-          height: '2px',
-          background: 'linear-gradient(90deg, transparent 0%, #f97316 50%, transparent 100%)',
-          opacity: 0.6,
-          pointerEvents: 'none',
-          zIndex: 4
-        }} />
       </div>
+      
+      {/* Gold accent line top */}
+      <div style={{
+        position: 'absolute',
+        top: 0, left: 0, right: 0,
+        height: '1px',
+        background: 'linear-gradient(90deg, transparent 0%, rgba(255, 215, 0, 0.3) 50%, transparent 100%)',
+        pointerEvents: 'none',
+        zIndex: 4
+      }} />
     </div>
   )
 }

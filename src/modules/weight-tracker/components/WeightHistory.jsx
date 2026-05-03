@@ -1,245 +1,122 @@
+// src/modules/weight-tracker/components/WeightHistory.jsx
+// v3.0 AINextMeal DNA — flush rows, borderBottom, compact filter bar
+// Props IDENTIEK: { history, isMobile, maxItems }
+
 import React, { useState, useEffect } from 'react'
-import { Clock, Star, Calendar, Filter } from 'lucide-react'
+import { Clock, Star } from 'lucide-react'
 
-const THEME = {
-  primary: '#3b82f6',
-  primaryDark: '#2563eb',
-  success: '#10b981',
-  danger: '#dc2626',
-  friday: '#8b5cf6',
-  border: 'rgba(59, 130, 246, 0.08)',
-  borderActive: 'rgba(59, 130, 246, 0.15)'
-}
-
-export default function WeightHistory({ 
-  history = [],
-  isMobile = false,
-  maxItems = 50 
-}) {
-  const [filterType, setFilterType] = useState('week') // Default week view
+export default function WeightHistory({ history = [], isMobile = false, maxItems = 50 }) {
+  const [filterType, setFilterType] = useState('week')
   const [filteredHistory, setFilteredHistory] = useState(history)
   
-  // Simple filter options - alleen de belangrijkste
-  const filterOptions = [
+  const filters = [
     { value: 'week', label: 'Week' },
     { value: 'month', label: 'Maand' },
     { value: 'all', label: 'Alles' }
   ]
   
-  // Apply filters
   useEffect(() => {
-    let filtered = [...history]
+    let f = [...history]
     const today = new Date()
-    
-    switch(filterType) {
-      case 'week':
-        const weekAgo = new Date()
-        weekAgo.setDate(today.getDate() - 7)
-        filtered = history.filter(entry => 
-          new Date(entry.date) >= weekAgo
-        )
-        break
-        
-      case 'month':
-        const monthAgo = new Date()
-        monthAgo.setDate(today.getDate() - 30)
-        filtered = history.filter(entry => 
-          new Date(entry.date) >= monthAgo
-        )
-        break
-        
-      default:
-        filtered = history.slice(0, maxItems)
+    if (filterType === 'week') {
+      const ago = new Date(); ago.setDate(today.getDate() - 7)
+      f = history.filter(e => new Date(e.date) >= ago)
+    } else if (filterType === 'month') {
+      const ago = new Date(); ago.setDate(today.getDate() - 30)
+      f = history.filter(e => new Date(e.date) >= ago)
+    } else {
+      f = history.slice(0, maxItems)
     }
-    
-    setFilteredHistory(filtered)
+    setFilteredHistory(f)
   }, [filterType, history, maxItems])
   
   return (
     <div style={{
-      background: 'linear-gradient(135deg, rgba(17, 17, 17, 0.6) 0%, rgba(10, 10, 10, 0.6) 100%)',
-      borderRadius: isMobile ? '12px' : '16px',
-      padding: isMobile ? '0.75rem' : '1rem',
-      backdropFilter: 'blur(10px)',
-      border: `1px solid ${THEME.border}`
+      borderTop: '1px solid rgba(255, 255, 255, 0.06)',
+      overflow: 'hidden'
     }}>
-      {/* Header met filter tabs */}
+      {/* ── Header bar — flush, with filter pills ── */}
       <div style={{
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        marginBottom: isMobile ? '0.5rem' : '0.75rem'
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        padding: isMobile ? '0.5rem 1rem' : '0.625rem 1.5rem',
+        borderBottom: '1px solid rgba(255, 255, 255, 0.04)'
       }}>
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '0.375rem'
-        }}>
-          <Clock size={isMobile ? 14 : 16} color={THEME.primary} style={{ opacity: 0.7 }} />
-          <span style={{
-            fontSize: isMobile ? '0.8rem' : '0.9rem',
-            fontWeight: '600',
-            color: '#fff'
-          }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+          <Clock size={isMobile ? 12 : 13} color="rgba(255,255,255,0.3)" />
+          <span style={{ fontSize: isMobile ? '0.65rem' : '0.7rem', fontWeight: '600', color: 'rgba(255,255,255,0.5)' }}>
             Historie
           </span>
-          <span style={{
-            fontSize: isMobile ? '0.65rem' : '0.7rem',
-            color: 'rgba(255,255,255,0.35)',
-            marginLeft: '0.25rem'
-          }}>
+          <span style={{ fontSize: isMobile ? '0.5rem' : '0.55rem', color: 'rgba(255,255,255,0.2)' }}>
             ({filteredHistory.length})
           </span>
         </div>
         
-        {/* Filter Tabs */}
-        <div style={{
-          display: 'flex',
-          gap: '0.25rem',
-          background: 'rgba(0, 0, 0, 0.3)',
-          padding: '0.125rem',
-          borderRadius: '8px'
-        }}>
-          {filterOptions.map(option => (
-            <button
-              key={option.value}
-              onClick={() => setFilterType(option.value)}
+        {/* Filter bar — flush pills like AINextMeal action bar */}
+        <div style={{ display: 'flex', background: 'rgba(0,0,0,0.3)', borderRadius: '4px', overflow: 'hidden' }}>
+          {filters.map((f, i) => (
+            <button key={f.value} onClick={() => setFilterType(f.value)}
               style={{
-                padding: isMobile ? '0.25rem 0.5rem' : '0.3rem 0.625rem',
-                background: filterType === option.value ? THEME.primary : 'transparent',
+                padding: isMobile ? '0.2rem 0.4rem' : '0.25rem 0.5rem',
+                background: filterType === f.value ? '#FFD700' : 'transparent',
                 border: 'none',
-                borderRadius: '6px',
-                color: filterType === option.value ? '#fff' : 'rgba(255,255,255,0.5)',
-                fontSize: isMobile ? '0.6rem' : '0.65rem',
-                fontWeight: filterType === option.value ? '600' : '500',
-                cursor: 'pointer',
-                transition: 'all 0.2s ease',
-                textTransform: 'uppercase',
-                letterSpacing: '0.05em'
-              }}
-            >
-              {option.label}
+                borderRight: i < filters.length - 1 ? '1px solid rgba(255,255,255,0.04)' : 'none',
+                color: filterType === f.value ? '#000' : 'rgba(255,255,255,0.35)',
+                fontSize: isMobile ? '0.5rem' : '0.55rem',
+                fontWeight: filterType === f.value ? '800' : '600',
+                cursor: 'pointer', textTransform: 'uppercase', letterSpacing: '0.04em',
+                touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent'
+              }}>
+              {f.label}
             </button>
           ))}
         </div>
       </div>
       
-      {/* History List - Compact */}
+      {/* ── Rows — flush, borderBottom each ── */}
       <div style={{
-        display: 'flex',
-        flexDirection: 'column',
-        gap: '0.25rem',
-        maxHeight: isMobile ? '200px' : '250px',
-        overflowY: 'auto',
-        paddingRight: '0.25rem'
+        maxHeight: isMobile ? '200px' : '250px', overflowY: 'auto'
       }}>
         {filteredHistory.map((entry, index) => {
-          const prevEntry = filteredHistory[index + 1]
-          const change = prevEntry ? entry.weight - prevEntry.weight : 0
-          const entryDate = new Date(entry.date)
-          const isEntryFriday = entry.is_friday_weighin
+          const prev = filteredHistory[index + 1]
+          const change = prev ? entry.weight - prev.weight : 0
+          const d = new Date(entry.date)
+          const isFri = entry.is_friday_weighin
           
           return (
-            <div
-              key={entry.id || index}
-              style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                padding: isMobile ? '0.5rem 0.625rem' : '0.625rem 0.75rem',
-                background: isEntryFriday ? 
-                  'linear-gradient(90deg, rgba(139, 92, 246, 0.08) 0%, rgba(139, 92, 246, 0.02) 100%)' : 
-                  'rgba(0, 0, 0, 0.2)',
-                borderRadius: '8px',
-                borderLeft: isEntryFriday ? `2px solid ${THEME.friday}` : `2px solid transparent`,
-                transition: 'all 0.2s ease'
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.background = isEntryFriday ? 
-                  'linear-gradient(90deg, rgba(139, 92, 246, 0.12) 0%, rgba(139, 92, 246, 0.04) 100%)' : 
-                  'rgba(59, 130, 246, 0.05)'
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.background = isEntryFriday ? 
-                  'linear-gradient(90deg, rgba(139, 92, 246, 0.08) 0%, rgba(139, 92, 246, 0.02) 100%)' : 
-                  'rgba(0, 0, 0, 0.2)'
-              }}
-            >
-              <div style={{ 
-                display: 'flex', 
-                alignItems: 'center', 
-                gap: isMobile ? '0.5rem' : '0.625rem' 
-              }}>
-                {/* Datum */}
-                <div style={{
-                  minWidth: isMobile ? '60px' : '70px'
-                }}>
-                  <div style={{ 
-                    fontSize: isMobile ? '0.65rem' : '0.7rem', 
-                    color: 'rgba(255,255,255,0.5)',
-                    lineHeight: 1
-                  }}>
-                    {entryDate.toLocaleDateString('nl-NL', {
-                      day: 'numeric',
-                      month: 'short'
-                    })}
+            <div key={entry.id || index} style={{
+              display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+              padding: isMobile ? '0.4rem 1rem' : '0.5rem 1.5rem',
+              borderBottom: '1px solid rgba(255, 255, 255, 0.03)',
+              background: isFri ? 'rgba(139, 92, 246, 0.04)' : 'transparent'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? '0.625rem' : '0.75rem' }}>
+                {/* Date */}
+                <div style={{ minWidth: isMobile ? '48px' : '56px' }}>
+                  <div style={{ fontSize: isMobile ? '0.6rem' : '0.65rem', color: 'rgba(255,255,255,0.45)', lineHeight: 1 }}>
+                    {d.toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })}
                   </div>
-                  <div style={{ 
-                    fontSize: isMobile ? '0.55rem' : '0.6rem', 
-                    color: 'rgba(255,255,255,0.35)',
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.05em',
-                    marginTop: '0.125rem'
-                  }}>
-                    {entryDate.toLocaleDateString('nl-NL', {
-                      weekday: 'short'
-                    })}
+                  <div style={{ fontSize: isMobile ? '0.45rem' : '0.5rem', color: 'rgba(255,255,255,0.2)', textTransform: 'uppercase', letterSpacing: '0.04em', marginTop: '0.08rem' }}>
+                    {d.toLocaleDateString('nl-NL', { weekday: 'short' })}
                   </div>
                 </div>
                 
-                {/* Gewicht */}
-                <div style={{ 
-                  fontSize: isMobile ? '0.95rem' : '1.05rem', 
-                  fontWeight: '700', 
-                  color: '#fff',
-                  display: 'flex',
-                  alignItems: 'baseline',
-                  gap: '0.125rem'
+                {/* Weight — key element, slightly brighter */}
+                <span style={{
+                  fontSize: isMobile ? '0.85rem' : '0.9rem', fontWeight: '700', color: '#fff'
                 }}>
                   {entry.weight.toFixed(1)}
-                  <span style={{
-                    fontSize: isMobile ? '0.65rem' : '0.7rem',
-                    fontWeight: '500',
-                    opacity: 0.5
-                  }}>
-                    kg
-                  </span>
-                </div>
+                  <span style={{ fontSize: isMobile ? '0.5rem' : '0.55rem', fontWeight: '500', opacity: 0.35, marginLeft: '0.1rem' }}>kg</span>
+                </span>
                 
-                {/* Friday badge */}
-                {isEntryFriday && (
-                  <Star 
-                    size={isMobile ? 12 : 14} 
-                    color={THEME.friday}
-                    style={{ 
-                      opacity: 0.7,
-                      marginLeft: '0.25rem'
-                    }}
-                  />
-                )}
+                {isFri && <Star size={isMobile ? 9 : 10} color="#8b5cf6" style={{ opacity: 0.4 }} />}
               </div>
               
-              {/* Change indicator */}
+              {/* Change */}
               {change !== 0 && (
                 <span style={{
-                  padding: isMobile ? '0.125rem 0.375rem' : '0.2rem 0.5rem',
-                  background: change > 0 ? 
-                    'rgba(220, 38, 38, 0.1)' : 
-                    'rgba(16, 185, 129, 0.1)',
-                  borderRadius: '4px',
-                  fontSize: isMobile ? '0.65rem' : '0.7rem',
-                  color: change > 0 ? THEME.danger : THEME.success,
-                  fontWeight: '600'
+                  padding: '0.1rem 0.25rem',
+                  fontSize: isMobile ? '0.55rem' : '0.6rem', fontWeight: '700',
+                  color: change > 0 ? '#dc2626' : '#10b981'
                 }}>
                   {change > 0 ? '+' : ''}{change.toFixed(1)}
                 </span>
@@ -250,48 +127,13 @@ export default function WeightHistory({
         
         {filteredHistory.length === 0 && (
           <div style={{
-            textAlign: 'center',
-            padding: '1.5rem 1rem',
-            color: 'rgba(255,255,255,0.35)',
-            fontSize: isMobile ? '0.75rem' : '0.8rem'
+            textAlign: 'center', padding: '1.5rem',
+            color: 'rgba(255,255,255,0.2)', fontSize: isMobile ? '0.65rem' : '0.7rem'
           }}>
             Geen wegingen gevonden
           </div>
         )}
       </div>
-      
-      {/* Scroll indicator als er meer entries zijn */}
-      {filteredHistory.length > 5 && (
-        <div style={{
-          textAlign: 'center',
-          marginTop: '0.5rem',
-          fontSize: isMobile ? '0.6rem' : '0.65rem',
-          color: 'rgba(255,255,255,0.25)',
-          textTransform: 'uppercase',
-          letterSpacing: '0.05em'
-        }}>
-          Scroll voor meer
-        </div>
-      )}
-      
-      <style>{`
-        ::-webkit-scrollbar {
-          width: 3px;
-        }
-        
-        ::-webkit-scrollbar-track {
-          background: transparent;
-        }
-        
-        ::-webkit-scrollbar-thumb {
-          background: ${THEME.primary}33;
-          border-radius: 2px;
-        }
-        
-        ::-webkit-scrollbar-thumb:hover {
-          background: ${THEME.primary}55;
-        }
-      `}</style>
     </div>
   )
 }

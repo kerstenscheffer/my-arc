@@ -1,4 +1,5 @@
 // src/modules/progress/components/TopExercisesStrip.jsx
+// 🏆 GOLD THEME - Top 3 exercises compact strip
 import { Dumbbell } from 'lucide-react'
 
 export default function TopExercisesStrip({ exercises, onExerciseClick, isMobile }) {
@@ -6,21 +7,21 @@ export default function TopExercisesStrip({ exercises, onExerciseClick, isMobile
     <div style={{
       background: 'linear-gradient(135deg, rgba(23, 23, 23, 0.95) 0%, rgba(10, 10, 10, 0.9) 100%)',
       backdropFilter: 'blur(12px)',
-      border: '1px solid rgba(249, 115, 22, 0.25)',
+      border: '1px solid rgba(255, 215, 0, 0.25)', // GOLD
       borderRadius: isMobile ? '10px' : '12px',
       padding: isMobile ? '0.75rem' : '0.875rem',
-      boxShadow: '0 2px 12px rgba(249, 115, 22, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.02)',
+      boxShadow: '0 2px 12px rgba(255, 215, 0, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.02)', // GOLD
       position: 'relative',
       overflow: 'hidden'
     }}>
-      {/* Top accent line */}
+      {/* Top GOLD accent line */}
       <div style={{
         position: 'absolute',
         top: 0,
         left: 0,
         right: 0,
         height: '2px',
-        background: 'linear-gradient(90deg, transparent 0%, #f97316 50%, transparent 100%)',
+        background: 'linear-gradient(90deg, transparent 0%, #FFD700 50%, transparent 100%)', // GOLD
         opacity: 0.4
       }} />
       
@@ -35,13 +36,13 @@ export default function TopExercisesStrip({ exercises, onExerciseClick, isMobile
           width: isMobile ? '28px' : '30px',
           height: isMobile ? '28px' : '30px',
           borderRadius: '6px',
-          background: 'rgba(249, 115, 22, 0.15)',
-          border: '1px solid rgba(249, 115, 22, 0.25)',
+          background: 'rgba(255, 215, 0, 0.15)', // GOLD
+          border: '1px solid rgba(255, 215, 0, 0.25)', // GOLD
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center'
         }}>
-          <Dumbbell size={isMobile ? 13 : 14} color="#f97316" style={{ opacity: 0.9 }} />
+          <Dumbbell size={isMobile ? 13 : 14} color="#FFD700" strokeWidth={2.5} style={{ opacity: 0.9 }} />
         </div>
         
         <span style={{
@@ -66,9 +67,9 @@ export default function TopExercisesStrip({ exercises, onExerciseClick, isMobile
             key={idx}
             onClick={() => onExerciseClick(exercise.name, '1rm')}
             style={{
-              background: 'linear-gradient(135deg, rgba(249, 115, 22, 0.1) 0%, rgba(249, 115, 22, 0.05) 100%)',
+              background: 'linear-gradient(135deg, rgba(255, 215, 0, 0.1) 0%, rgba(255, 215, 0, 0.05) 100%)', // GOLD
               backdropFilter: 'blur(8px)',
-              border: '1px solid rgba(249, 115, 22, 0.2)',
+              border: '1px solid rgba(255, 215, 0, 0.2)', // GOLD
               borderRadius: '8px',
               padding: isMobile ? '0.625rem 0.75rem' : '0.75rem 0.875rem',
               cursor: 'pointer',
@@ -83,16 +84,16 @@ export default function TopExercisesStrip({ exercises, onExerciseClick, isMobile
             }}
             onMouseEnter={(e) => {
               if (!isMobile) {
-                e.currentTarget.style.background = 'linear-gradient(135deg, rgba(249, 115, 22, 0.2) 0%, rgba(249, 115, 22, 0.1) 100%)'
+                e.currentTarget.style.background = 'linear-gradient(135deg, rgba(255, 215, 0, 0.2) 0%, rgba(255, 215, 0, 0.1) 100%)' // GOLD hover
                 e.currentTarget.style.transform = 'translateY(-1px)'
-                e.currentTarget.style.borderColor = 'rgba(249, 115, 22, 0.35)'
+                e.currentTarget.style.borderColor = 'rgba(255, 215, 0, 0.35)' // GOLD
               }
             }}
             onMouseLeave={(e) => {
               if (!isMobile) {
-                e.currentTarget.style.background = 'linear-gradient(135deg, rgba(249, 115, 22, 0.1) 0%, rgba(249, 115, 22, 0.05) 100%)'
+                e.currentTarget.style.background = 'linear-gradient(135deg, rgba(255, 215, 0, 0.1) 0%, rgba(255, 215, 0, 0.05) 100%)' // GOLD
                 e.currentTarget.style.transform = 'translateY(0)'
-                e.currentTarget.style.borderColor = 'rgba(249, 115, 22, 0.2)'
+                e.currentTarget.style.borderColor = 'rgba(255, 215, 0, 0.2)' // GOLD
               }
             }}
             onTouchStart={(e) => {
@@ -123,12 +124,13 @@ export default function TopExercisesStrip({ exercises, onExerciseClick, isMobile
               </div>
             </div>
             
+            {/* Ranking badge - GOLD */}
             <div style={{
               width: isMobile ? '24px' : '26px',
               height: isMobile ? '24px' : '26px',
               borderRadius: '6px',
-              background: 'rgba(249, 115, 22, 0.2)',
-              border: '1px solid rgba(249, 115, 22, 0.3)',
+              background: 'rgba(255, 215, 0, 0.2)', // GOLD
+              border: '1px solid rgba(255, 215, 0, 0.3)', // GOLD
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
@@ -137,7 +139,7 @@ export default function TopExercisesStrip({ exercises, onExerciseClick, isMobile
               <span style={{
                 fontSize: isMobile ? '0.75rem' : '0.8rem',
                 fontWeight: '800',
-                color: '#f97316'
+                color: '#FFD700' // GOLD
               }}>
                 {idx + 1}
               </span>

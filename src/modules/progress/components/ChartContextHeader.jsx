@@ -1,4 +1,5 @@
 // src/modules/progress/components/ChartContextHeader.jsx
+// 🏆 GOLD THEME
 import { TrendingUp, TrendingDown, Minus } from 'lucide-react'
 
 export default function ChartContextHeader({ 
@@ -29,9 +30,9 @@ export default function ChartContextHeader({
     return (
       <div style={{
         padding: isMobile ? '0.75rem' : '1rem',
-        background: 'linear-gradient(135deg, rgba(249, 115, 22, 0.1) 0%, rgba(234, 88, 12, 0.05) 100%)',
+        background: 'linear-gradient(135deg, rgba(255, 215, 0, 0.1) 0%, rgba(212, 175, 55, 0.05) 100%)', // GOLD
         borderRadius: isMobile ? '10px' : '12px',
-        border: '1px solid rgba(249, 115, 22, 0.2)',
+        border: '1px solid rgba(255, 215, 0, 0.2)', // GOLD
         marginBottom: isMobile ? '0.75rem' : '1rem',
         backdropFilter: 'blur(10px)',
         display: 'flex',
@@ -42,8 +43,8 @@ export default function ChartContextHeader({
         <div style={{
           width: isMobile ? '20px' : '24px',
           height: isMobile ? '20px' : '24px',
-          border: '2px solid rgba(249, 115, 22, 0.2)',
-          borderTopColor: '#f97316',
+          border: '2px solid rgba(255, 215, 0, 0.2)', // GOLD
+          borderTopColor: '#FFD700', // GOLD
           borderRadius: '50%',
           animation: 'spin 1s linear infinite'
         }} />
@@ -54,22 +55,22 @@ export default function ChartContextHeader({
   return (
     <div style={{
       padding: isMobile ? '0.75rem' : '1rem',
-      background: 'linear-gradient(135deg, rgba(249, 115, 22, 0.1) 0%, rgba(234, 88, 12, 0.05) 100%)',
+      background: 'linear-gradient(135deg, rgba(255, 215, 0, 0.1) 0%, rgba(212, 175, 55, 0.05) 100%)', // GOLD
       borderRadius: isMobile ? '10px' : '12px',
-      border: '1px solid rgba(249, 115, 22, 0.2)',
+      border: '1px solid rgba(255, 215, 0, 0.2)', // GOLD
       marginBottom: isMobile ? '0.75rem' : '1rem',
       backdropFilter: 'blur(10px)',
       position: 'relative',
       overflow: 'hidden'
     }}>
-      {/* Top accent line */}
+      {/* Top accent line - GOLD */}
       <div style={{
         position: 'absolute',
         top: 0,
         left: 0,
         right: 0,
         height: '2px',
-        background: 'linear-gradient(90deg, transparent 0%, #f97316 50%, transparent 100%)',
+        background: 'linear-gradient(90deg, transparent 0%, #FFD700 50%, transparent 100%)', // GOLD
         opacity: 0.6,
         zIndex: 10
       }} />
@@ -85,9 +86,9 @@ export default function ChartContextHeader({
         <div style={{
           fontSize: isMobile ? '0.8rem' : '0.9rem',
           fontWeight: '800',
-          color: '#f97316',
+          color: '#FFD700', // GOLD
           letterSpacing: '-0.015em',
-          textShadow: '0 0 16px rgba(249, 115, 22, 0.25)'
+          textShadow: '0 0 16px rgba(255, 215, 0, 0.25)' // GOLD
         }}>
           {metricName}
         </div>
@@ -107,12 +108,12 @@ export default function ChartContextHeader({
         gridTemplateColumns: isMobile ? '1fr' : 'repeat(3, 1fr)',
         gap: isMobile ? '0.5rem' : '0.625rem'
       }}>
-        {/* Current Value */}
+        {/* Current Value - GOLD */}
         <div style={{
           background: 'rgba(23, 23, 23, 0.7)',
           borderRadius: isMobile ? '8px' : '10px',
           padding: isMobile ? '0.5rem 0.625rem' : '0.625rem 0.75rem',
-          border: '1px solid rgba(249, 115, 22, 0.2)',
+          border: '1px solid rgba(255, 215, 0, 0.2)', // GOLD
           backdropFilter: 'blur(8px)'
         }}>
           <div style={{
@@ -128,9 +129,9 @@ export default function ChartContextHeader({
           <div style={{
             fontSize: isMobile ? '1rem' : '1.15rem',
             fontWeight: '800',
-            color: '#f97316',
+            color: '#FFD700', // GOLD
             letterSpacing: '-0.02em',
-            textShadow: '0 0 12px rgba(249, 115, 22, 0.3)',
+            textShadow: '0 0 12px rgba(255, 215, 0, 0.3)', // GOLD
             lineHeight: 1
           }}>
             {currentValue !== null && currentValue !== undefined 
@@ -171,7 +172,7 @@ export default function ChartContextHeader({
           </div>
         )}
 
-        {/* Change Badge */}
+        {/* Change Badge - Keeps green/red for trend */}
         {change !== 0 && previousValue !== null && previousValue !== undefined && (
           <div style={{
             background: `linear-gradient(135deg, ${trendColor}20 0%, ${trendColor}12 100%)`,
@@ -182,7 +183,7 @@ export default function ChartContextHeader({
             position: 'relative',
             overflow: 'hidden'
           }}>
-            {/* Accent line */}
+            {/* Accent line - trend color (green/red) */}
             <div style={{
               position: 'absolute',
               top: 0,
@@ -205,7 +206,7 @@ export default function ChartContextHeader({
               alignItems: 'center',
               gap: '0.25rem'
             }}>
-              <TrendIcon size={isMobile ? 10 : 11} color={trendColor} />
+              <TrendIcon size={isMobile ? 10 : 11} color={trendColor} strokeWidth={2.5} />
               Trend
             </div>
             <div style={{

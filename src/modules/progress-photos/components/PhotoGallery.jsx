@@ -1,319 +1,123 @@
 // src/modules/progress-photos/components/PhotoGallery.jsx
-import React, { useState } from 'react'
-import { Grid, Calendar, Trash2, ChevronDown, ChevronUp, Eye, X } from 'lucide-react'
+// v3.0 - ONLY PROGRESS TYPE - No filter chips, clean flush gallery
+// Props IDENTIEK: { photos, onDelete, isMobile }
 
-export default function PhotoGallery({ 
-  photos = {}, 
-  onDelete,
-  isMobile = false 
-}) {
+import React, { useState } from 'react'
+import { Grid, Calendar, Trash2, ChevronDown, ChevronUp, X } from 'lucide-react'
+
+export default function PhotoGallery({ photos = {}, onDelete, isMobile = false }) {
   const [expanded, setExpanded] = useState(false)
-  const [filterType, setFilterType] = useState('all')
   const [selectedPhoto, setSelectedPhoto] = useState(null)
   
-  // Get dates and limit if not expanded
   const dates = Object.keys(photos).sort((a, b) => new Date(b) - new Date(a))
   const displayDates = expanded ? dates : dates.slice(0, 3)
-  
-  // Count total photos
-  const totalPhotos = dates.reduce((sum, date) => {
-    const dayPhotos = photos[date] || []
-    return sum + dayPhotos.length
-  }, 0)
+  const totalPhotos = dates.reduce((s, d) => s + (photos[d]?.length || 0), 0)
 
-  const handleDelete = async (photoId, photoUrl) => {
-    if (confirm('Weet je zeker dat je deze foto wilt verwijderen?')) {
-      await onDelete(photoId, photoUrl)
-    }
-  }
-
-  const typeColors = {
-    progress: '#8b5cf6',
-    meal: '#10b981',
-    workout: '#f97316',
-    victory: '#fbbf24'
-  }
-
-  const typeLabels = {
-    all: 'Alles',
-    progress: 'Progressie',
-    meal: 'Maaltijd',
-    workout: 'Workout',
-    victory: 'Victory'
+  const handleDelete = async (id, url) => {
+    if (confirm('Foto verwijderen?')) await onDelete(id, url)
   }
 
   if (dates.length === 0) {
     return (
       <div style={{
-        background: 'linear-gradient(135deg, rgba(139, 92, 246, 0.05) 0%, rgba(139, 92, 246, 0.02) 100%)',
-        borderRadius: isMobile ? '12px' : '14px',
-        padding: isMobile ? '1.5rem' : '2rem',
-        textAlign: 'center',
-        border: '1px solid rgba(139, 92, 246, 0.08)',
-        marginTop: '0.5rem'
+        padding: isMobile ? '2rem 1rem' : '2.5rem', textAlign: 'center',
+        borderBottom: '1px solid rgba(255,255,255,0.04)'
       }}>
-        <Grid size={40} color="rgba(139, 92, 246, 0.2)" style={{ marginBottom: '0.75rem' }} />
-        <div style={{
-          fontSize: isMobile ? '0.95rem' : '1.05rem',
-          fontWeight: '600',
-          color: 'white',
-          marginBottom: '0.25rem'
-        }}>
+        <Grid size={32} color="rgba(255, 215, 0, 0.15)" style={{ marginBottom: '0.5rem' }} />
+        <div style={{ fontSize: isMobile ? '0.85rem' : '0.9rem', fontWeight: '600', color: 'rgba(255,255,255,0.5)', marginBottom: '0.2rem' }}>
           Nog geen foto's
         </div>
-        <div style={{
-          fontSize: isMobile ? '0.75rem' : '0.8rem',
-          color: 'rgba(139, 92, 246, 0.5)'
-        }}>
-          Upload je eerste foto om te beginnen
+        <div style={{ fontSize: isMobile ? '0.65rem' : '0.7rem', color: 'rgba(255,255,255,0.25)' }}>
+          Upload je eerste progressie foto
         </div>
       </div>
     )
   }
 
   return (
-    <div style={{
-      marginTop: '0.5rem'
-    }}>
-      {/* Header - Minimal */}
+    <div>
+      {/* ── HEADER BAR ── */}
       <div style={{
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        marginBottom: '0.75rem',
-        padding: '0 0.25rem'
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        padding: isMobile ? '0.5rem 1rem' : '0.625rem 1.5rem',
+        borderBottom: '1px solid rgba(255, 255, 255, 0.04)'
       }}>
-        <div style={{
-          fontSize: isMobile ? '0.75rem' : '0.85rem',
-          color: 'rgba(139, 92, 246, 0.7)',
-          textTransform: 'uppercase',
-          letterSpacing: '0.05em',
-          fontWeight: '600',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '0.5rem'
-        }}>
-          <Grid size={14} color="#8b5cf6" opacity={0.7} />
-          Galerij
-          <span style={{
-            color: 'rgba(139, 92, 246, 0.4)',
-            fontWeight: '400'
-          }}>
-            {totalPhotos} foto's
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+          <Grid size={12} color="rgba(255,255,255,0.3)" />
+          <span style={{ fontSize: isMobile ? '0.65rem' : '0.7rem', fontWeight: '600', color: 'rgba(255,255,255,0.5)' }}>
+            Galerij
+          </span>
+          <span style={{ fontSize: isMobile ? '0.5rem' : '0.55rem', color: 'rgba(255,255,255,0.2)' }}>
+            {totalPhotos}
           </span>
         </div>
 
-        <button
-          onClick={() => setExpanded(!expanded)}
+        <button onClick={() => setExpanded(!expanded)}
           style={{
-            padding: '0.375rem 0.625rem',
-            background: 'transparent',
-            border: '1px solid rgba(139, 92, 246, 0.15)',
-            borderRadius: '8px',
-            color: '#8b5cf6',
-            fontSize: isMobile ? '0.7rem' : '0.75rem',
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.25rem',
-            transition: 'all 0.2s ease',
-            touchAction: 'manipulation',
-            WebkitTapHighlightColor: 'transparent'
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.background = 'rgba(139, 92, 246, 0.05)'
-            e.currentTarget.style.borderColor = 'rgba(139, 92, 246, 0.25)'
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.background = 'transparent'
-            e.currentTarget.style.borderColor = 'rgba(139, 92, 246, 0.15)'
-          }}
-        >
-          {expanded ? (
-            <>
-              <ChevronUp size={14} />
-              Minder
-            </>
-          ) : (
-            <>
-              <ChevronDown size={14} />
-              Alle {totalPhotos}
-            </>
-          )}
+            background: 'none', border: 'none', color: 'rgba(255,215,0,0.4)',
+            cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.2rem',
+            padding: '0.2rem', fontSize: isMobile ? '0.55rem' : '0.6rem', fontWeight: '600',
+            touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent'
+          }}>
+          {expanded ? 'Minder' : `Alle ${totalPhotos}`}
+          {expanded ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
         </button>
       </div>
 
-      {/* Filter Chips - Compact */}
+      {/* ── PHOTO GRID ── */}
       <div style={{
-        display: 'flex',
-        gap: '0.375rem',
-        marginBottom: '0.75rem',
-        overflowX: 'auto',
-        WebkitOverflowScrolling: 'touch',
-        scrollbarWidth: 'none',
-        msOverflowStyle: 'none'
-      }}>
-        {['all', 'progress', 'meal', 'workout', 'victory'].map(type => (
-          <button
-            key={type}
-            onClick={() => setFilterType(type)}
-            style={{
-              padding: isMobile ? '0.375rem 0.625rem' : '0.375rem 0.75rem',
-              background: filterType === type 
-                ? `linear-gradient(135deg, ${typeColors[type] || '#8b5cf6'}20 0%, ${typeColors[type] || '#8b5cf6'}10 100%)`
-                : 'rgba(255, 255, 255, 0.03)',
-              border: filterType === type 
-                ? `1px solid ${typeColors[type] || '#8b5cf6'}30`
-                : '1px solid rgba(255, 255, 255, 0.08)',
-              borderRadius: '8px',
-              color: filterType === type 
-                ? (typeColors[type] || '#8b5cf6')
-                : 'rgba(255, 255, 255, 0.5)',
-              fontSize: isMobile ? '0.65rem' : '0.7rem',
-              fontWeight: filterType === type ? '600' : '400',
-              cursor: 'pointer',
-              transition: 'all 0.2s ease',
-              textTransform: 'uppercase',
-              letterSpacing: '0.03em',
-              whiteSpace: 'nowrap',
-              touchAction: 'manipulation',
-              WebkitTapHighlightColor: 'transparent'
-            }}
-          >
-            {typeLabels[type]}
-          </button>
-        ))}
-      </div>
-
-      {/* Photo Grid Container */}
-      <div style={{
-        background: 'linear-gradient(135deg, rgba(17, 17, 17, 0.3) 0%, rgba(10, 10, 10, 0.3) 100%)',
-        borderRadius: isMobile ? '12px' : '14px',
-        padding: isMobile ? '0.75rem' : '1rem',
-        border: '1px solid rgba(139, 92, 246, 0.08)',
-        maxHeight: expanded ? 'none' : isMobile ? '320px' : '400px',
+        maxHeight: expanded ? 'none' : isMobile ? '280px' : '350px',
         overflow: expanded ? 'visible' : 'hidden',
         position: 'relative'
       }}>
         {displayDates.map((date, dateIdx) => {
           const dayPhotos = photos[date] || []
-          const dateObj = new Date(date)
-          
-          // Filter photos if filter is active
-          const filteredPhotos = filterType === 'all' 
-            ? dayPhotos
-            : dayPhotos.filter(p => p.photo_type === filterType)
-          
-          if (filteredPhotos.length === 0) return null
+          if (dayPhotos.length === 0) return null
+          const d = new Date(date)
           
           return (
-            <div key={date} style={{
-              marginBottom: dateIdx < displayDates.length - 1 ? '1rem' : 0
-            }}>
-              {/* Date Header - Compact */}
+            <div key={date} style={{ borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
+              {/* Date header */}
               <div style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.5rem',
-                marginBottom: '0.5rem'
+                display: 'flex', alignItems: 'center', gap: '0.35rem',
+                padding: isMobile ? '0.35rem 1rem' : '0.4rem 1.5rem'
               }}>
-                <Calendar size={12} color="rgba(139, 92, 246, 0.4)" />
+                <Calendar size={10} color="rgba(255,215,0,0.3)" />
                 <span style={{
-                  fontSize: isMobile ? '0.7rem' : '0.75rem',
-                  color: 'rgba(139, 92, 246, 0.5)',
-                  fontWeight: '500'
+                  fontSize: isMobile ? '0.55rem' : '0.6rem', fontWeight: '500',
+                  color: 'rgba(255,215,0,0.4)'
                 }}>
-                  {dateObj.toLocaleDateString('nl-NL', {
-                    weekday: 'short',
-                    day: 'numeric',
-                    month: 'short'
-                  })}
+                  {d.toLocaleDateString('nl-NL', { weekday: 'short', day: 'numeric', month: 'short' })}
                 </span>
-                {dateObj.getDay() === 5 && (
-                  <span style={{
-                    background: 'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)',
-                    borderRadius: '4px',
-                    padding: '0.125rem 0.375rem',
-                    fontSize: isMobile ? '0.6rem' : '0.65rem',
-                    color: 'white',
-                    fontWeight: '600'
-                  }}>
-                    Vrijdag
-                  </span>
+                {d.getDay() === 5 && (
+                  <span style={{ fontSize: '0.45rem', fontWeight: '700', color: '#FFD700', textTransform: 'uppercase' }}>VR</span>
                 )}
               </div>
 
-              {/* Photos Grid - Compact */}
+              {/* Grid */}
               <div style={{
                 display: 'grid',
-                gridTemplateColumns: `repeat(${isMobile ? 6 : 10}, 1fr)`,
-                gap: '0.375rem'
+                gridTemplateColumns: `repeat(${isMobile ? 4 : 6}, 1fr)`,
+                gap: '2px',
+                padding: isMobile ? '0 0.5rem 0.5rem' : '0 0.75rem 0.625rem'
               }}>
-                {filteredPhotos.map(photo => (
-                  <div
-                    key={photo.id}
-                    onClick={() => setSelectedPhoto(photo)}
+                {dayPhotos.map(photo => (
+                  <div key={photo.id} onClick={() => setSelectedPhoto(photo)}
                     style={{
-                      position: 'relative',
-                      paddingBottom: '100%',
-                      borderRadius: '6px',
-                      overflow: 'hidden',
-                      border: `1px solid ${typeColors[photo.photo_type]}20`,
-                      cursor: 'pointer',
-                      transition: 'all 0.2s ease',
-                      background: `${typeColors[photo.photo_type]}05`
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.transform = 'scale(1.05)'
-                      e.currentTarget.style.borderColor = `${typeColors[photo.photo_type]}40`
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.transform = 'scale(1)'
-                      e.currentTarget.style.borderColor = `${typeColors[photo.photo_type]}20`
-                    }}
-                  >
-                    <img
-                      src={photo.photo_url}
-                      alt={photo.photo_type}
-                      style={{
-                        position: 'absolute',
-                        top: 0,
-                        left: 0,
-                        width: '100%',
-                        height: '100%',
-                        objectFit: 'cover'
-                      }}
-                      onError={(e) => {
-                        e.target.style.display = 'none'
-                      }}
-                    />
-                    
-                    {/* Type Indicator Dot */}
-                    <div style={{
-                      position: 'absolute',
-                      top: '3px',
-                      left: '3px',
-                      width: '5px',
-                      height: '5px',
-                      borderRadius: '50%',
-                      background: typeColors[photo.photo_type],
-                      boxShadow: '0 0 0 1.5px rgba(0,0,0,0.5)'
-                    }} />
-                    
-                    {/* Subtype for progress photos */}
-                    {photo.photo_type === 'progress' && photo.metadata?.subtype && (
+                      position: 'relative', paddingBottom: '100%',
+                      overflow: 'hidden', cursor: 'pointer',
+                      background: 'rgba(255, 215, 0, 0.02)'
+                    }}>
+                    <img src={photo.photo_url} alt="Progress"
+                      style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }}
+                      onError={(e) => { e.target.style.display = 'none' }} loading="lazy" />
+                    {/* Subtype label */}
+                    {photo.metadata?.subtype && (
                       <div style={{
-                        position: 'absolute',
-                        bottom: '2px',
-                        right: '2px',
-                        background: 'rgba(0,0,0,0.8)',
-                        borderRadius: '3px',
-                        padding: '0px 3px',
-                        fontSize: '0.5rem',
-                        color: 'white',
-                        fontWeight: '700',
-                        textTransform: 'uppercase',
-                        lineHeight: '1.2'
+                        position: 'absolute', bottom: '1px', right: '1px',
+                        background: 'rgba(0,0,0,0.8)', borderRadius: '2px',
+                        padding: '0 2px', fontSize: '0.4rem', color: '#FFD700',
+                        fontWeight: '700', textTransform: 'uppercase', lineHeight: 1.3
                       }}>
                         {photo.metadata.subtype[0]}
                       </div>
@@ -325,126 +129,56 @@ export default function PhotoGallery({
           )
         })}
 
-        {/* Fade overlay if not expanded */}
+        {/* Fade */}
         {!expanded && dates.length > 3 && (
           <div style={{
-            position: 'absolute',
-            bottom: 0,
-            left: 0,
-            right: 0,
-            height: '60px',
-            background: 'linear-gradient(to top, rgba(10, 10, 10, 0.9), transparent)',
+            position: 'absolute', bottom: 0, left: 0, right: 0, height: '50px',
+            background: 'linear-gradient(to top, rgba(0,0,0,0.9), transparent)',
             pointerEvents: 'none'
           }} />
         )}
       </div>
 
-      {/* Photo Modal */}
+      {/* ── PHOTO MODAL ── */}
       {selectedPhoto && (
-        <div
-          onClick={() => setSelectedPhoto(null)}
+        <div onClick={() => setSelectedPhoto(null)}
           style={{
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            background: 'rgba(0, 0, 0, 0.95)',
-            zIndex: 1000,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            padding: '1rem',
-            backdropFilter: 'blur(10px)'
-          }}
-        >
-          <div style={{
-            maxWidth: '90%',
-            maxHeight: '85vh',
-            position: 'relative'
+            position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.95)',
+            zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center',
+            padding: '1rem', backdropFilter: 'blur(10px)'
           }}>
-            <img
-              src={selectedPhoto.photo_url}
-              alt="Photo"
-              style={{
-                maxWidth: '100%',
-                maxHeight: '100%',
-                borderRadius: '12px',
-                objectFit: 'contain'
-              }}
-            />
+          <div style={{ maxWidth: '90%', maxHeight: '85vh', position: 'relative' }}>
+            <img src={selectedPhoto.photo_url} alt="Photo"
+              style={{ maxWidth: '100%', maxHeight: '80vh', objectFit: 'contain', borderRadius: '4px' }} />
             
-            {/* Modal Header Bar */}
             <div style={{
-              position: 'absolute',
-              top: 0,
-              left: 0,
-              right: 0,
+              position: 'absolute', top: 0, left: 0, right: 0,
               background: 'linear-gradient(to bottom, rgba(0,0,0,0.8), transparent)',
-              padding: '1rem',
-              borderRadius: '12px 12px 0 0',
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center'
+              padding: '0.75rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center'
             }}>
-              {/* Type Badge */}
-              <div style={{
-                background: `${typeColors[selectedPhoto.photo_type]}20`,
-                border: `1px solid ${typeColors[selectedPhoto.photo_type]}40`,
-                borderRadius: '6px',
-                padding: '0.25rem 0.5rem',
-                fontSize: '0.75rem',
-                color: typeColors[selectedPhoto.photo_type],
-                fontWeight: '600',
-                textTransform: 'uppercase'
+              <span style={{
+                fontSize: '0.65rem', fontWeight: '700', color: '#FFD700',
+                textTransform: 'uppercase', letterSpacing: '0.04em'
               }}>
-                {typeLabels[selectedPhoto.photo_type]}
-              </div>
-
-              {/* Action Buttons */}
-              <div style={{
-                display: 'flex',
-                gap: '0.5rem'
-              }}>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    handleDelete(selectedPhoto.id, selectedPhoto.photo_url)
-                    setSelectedPhoto(null)
-                  }}
+                Progressie {selectedPhoto.metadata?.subtype ? `— ${selectedPhoto.metadata.subtype}` : ''}
+              </span>
+              <div style={{ display: 'flex', gap: '0.375rem' }}>
+                <button onClick={(e) => { e.stopPropagation(); handleDelete(selectedPhoto.id, selectedPhoto.photo_url); setSelectedPhoto(null) }}
                   style={{
-                    padding: '0.5rem',
-                    background: 'rgba(239, 68, 68, 0.9)',
-                    borderRadius: '8px',
-                    border: 'none',
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '0.25rem',
-                    color: 'white',
-                    fontSize: '0.8rem',
-                    fontWeight: '500'
-                  }}
-                >
-                  <Trash2 size={14} />
-                  Verwijder
+                    padding: '0.35rem 0.5rem', background: 'rgba(239,68,68,0.8)',
+                    borderRadius: '6px', border: 'none', cursor: 'pointer',
+                    display: 'flex', alignItems: 'center', gap: '0.2rem',
+                    color: '#fff', fontSize: '0.65rem', fontWeight: '600'
+                  }}>
+                  <Trash2 size={12} /> Verwijder
                 </button>
-                
-                <button
-                  onClick={() => setSelectedPhoto(null)}
+                <button onClick={() => setSelectedPhoto(null)}
                   style={{
-                    padding: '0.5rem',
-                    background: 'rgba(255, 255, 255, 0.1)',
-                    borderRadius: '8px',
-                    border: '1px solid rgba(255, 255, 255, 0.2)',
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    color: 'white'
-                  }}
-                >
-                  <X size={16} />
+                    padding: '0.35rem', background: 'rgba(255,255,255,0.1)',
+                    borderRadius: '6px', border: '1px solid rgba(255,255,255,0.15)',
+                    cursor: 'pointer', color: '#fff', display: 'flex', alignItems: 'center'
+                  }}>
+                  <X size={14} />
                 </button>
               </div>
             </div>

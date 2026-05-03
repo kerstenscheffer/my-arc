@@ -1,570 +1,378 @@
-// src/components/login/LoginMain.jsx - UPDATED VERSION
-import { useState, useEffect } from 'react'
+// src/components/login/LoginMain.jsx
+import { useState, useEffect, useRef } from 'react'
 import DatabaseService from '../../services/DatabaseService'
-import PasswordResetService from '../../services/PasswordResetService' // NEW SERVICE
-import BackgroundSlideshow from './BackgroundSlideshow'
-import LoginButtons from './LoginButtons'
-import FeatureSlider from './FeatureSlider'
-import QuoteSlider from './QuoteSlider'
-import LoginWidget from './LoginWidget'
-import { ChevronLeft, Mail, ArrowRight, CheckCircle, AlertCircle, Info } from 'lucide-react'
+import PasswordResetService from '../../services/PasswordResetService'
 
 const db = DatabaseService
-const passwordReset = PasswordResetService // NEW SERVICE INSTANCE
+const passwordReset = PasswordResetService
 const COACH_ACCESS_PASSWORD = 'MYARC2025'
 
+const SLIDES = [
+  'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?w=800&q=80',
+  'https://images.unsplash.com/photo-1517836357463-d25dfeac3438?w=800&q=80',
+  'https://images.unsplash.com/photo-1574680096145-d05b474e2155?w=800&q=80',
+  'https://images.unsplash.com/photo-1549060279-7e168fcee0c2?w=800&q=80',
+]
+
 export default function LoginMain() {
-  const [loginMode, setLoginMode] = useState(null)
-  const [showFeatures, setShowFeatures] = useState(true)
-  const [coachPassword, setCoachPassword] = useState('')
-  const [coachAccessVerified, setCoachAccessVerified] = useState(false)
-  const [message, setMessage] = useState(null)
-  const [showResetModal, setShowResetModal] = useState(false)
+  const isMobile = window.innerWidth <= 768
+
+  // slideshow
+  const [slide, setSlide] = useState(0)
+  const timer = useRef(null)
+  useEffect(() => {
+    timer.current = setInterval(() => setSlide(s => (s + 1) % SLIDES.length), 5000)
+    return () => clearInterval(timer.current)
+  }, [])
+
+  // mode: 'client' (default) | 'coach-verify' | 'coach'
+  const [mode, setMode] = useState('client')
+
+  // form
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [rememberMe, setRememberMe] = useState(false)
+  const [showPw, setShowPw] = useState(false)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState(null)
+
+  // coach verify
+  const [coachPw, setCoachPw] = useState('')
+
+  // reset
+  const [showReset, setShowReset] = useState(false)
   const [resetEmail, setResetEmail] = useState('')
   const [resetLoading, setResetLoading] = useState(false)
-  const [resetMessage, setResetMessage] = useState(null)
-  
-  const isMobile = window.innerWidth <= 768
-  
+  const [resetMsg, setResetMsg] = useState(null)
+
   useEffect(() => {
-    checkExistingSession()
-    
-    // Log setup instructions in development
-    if (window.location.hostname === 'localhost') {
-      passwordReset.logSetupInstructions()
-    }
+    const stored = localStorage.getItem('rememberEmail')
+    if (stored) { setEmail(stored); setRememberMe(true) }
+    checkSession()
+    if (window.location.hostname === 'localhost') passwordReset.logSetupInstructions?.()
   }, [])
-  
-  const checkExistingSession = async () => {
+
+  const checkSession = async () => {
     const user = await db.getCurrentUser()
-    if (user) {
-      const isClientMode = localStorage.getItem('isClientMode') === 'true'
-      window.location.href = '/dashboard' // FIXED: Always go to dashboard, let App.jsx handle routing
-    }
+    if (user) window.location.href = '/'
   }
-  
-  const handleLogin = async (email, password, rememberMe) => {
+
+  // ── login ──────────────────────────────────────────────────────────────────
+  const handleLogin = async (e) => {
+    e?.preventDefault()
+    if (!email || !password) { setError('Vul je gegevens in'); return }
+    setLoading(true); setError(null)
     try {
-      if (loginMode === 'coach' && !coachAccessVerified) {
-        if (coachPassword !== COACH_ACCESS_PASSWORD) {
-          return { 
-            success: false, 
-            error: 'Onjuiste coach toegangscode' 
-          }
-        }
-        setCoachAccessVerified(true)
-        setCoachPassword('')
-        return { 
-          success: false, 
-          error: 'Voer nu je inloggegevens in' 
-        }
-      }
-      
       const result = await db.signIn(email, password)
-      
       if (result?.user) {
-        const isClientMode = loginMode === 'client'
-        localStorage.setItem('isClientMode', isClientMode.toString())
-        
-        if (rememberMe) {
-          localStorage.setItem('rememberEmail', email)
-        } else {
-          localStorage.removeItem('rememberEmail')
-        }
-        
-        setTimeout(() => {
-          window.location.href = '/dashboard' // FIXED: Redirect to dashboard instead of root
-        }, 1000)
-        
-        return { success: true }
+        localStorage.setItem('isClientMode', (mode === 'client').toString())
+        if (rememberMe) localStorage.setItem('rememberEmail', email)
+        else localStorage.removeItem('rememberEmail')
+        window.location.href = '/'
+      } else {
+        setError('Onjuist email of wachtwoord')
       }
-      
-      return { 
-        success: false, 
-        error: result?.error || 'Onjuist email of wachtwoord' 
-      }
-    } catch (error) {
-      console.error('Login error:', error)
-      return { 
-        success: false, 
-        error: error.message || 'Er ging iets mis bij het inloggen' 
-      }
+    } catch (err) {
+      setError(err.message || 'Er ging iets mis')
     }
+    setLoading(false)
   }
-  
-  const handlePasswordReset = () => {
-    setShowResetModal(true)
-    setResetMessage(null)
-    setResetEmail('')
-  }
-  
-  const sendResetEmail = async () => {
-    if (!resetEmail) {
-      setResetMessage({
-        type: 'error',
-        text: 'Vul je email adres in'
-      })
-      return
-    }
-    
-    setResetLoading(true)
-    setResetMessage(null)
-    
-    // Use new PasswordResetService
-    const result = await passwordReset.sendResetEmail(resetEmail)
-    
-    if (result.success) {
-      setResetMessage({
-        type: 'success',
-        text: result.message
-      })
-      
-      // Close modal after 3 seconds on success
-      setTimeout(() => {
-        setShowResetModal(false)
-        setResetEmail('')
-        setResetMessage(null)
-      }, 3000)
+
+  // ── coach verify ──────────────────────────────────────────────────────────
+  const handleCoachVerify = (e) => {
+    e?.preventDefault()
+    if (coachPw === COACH_ACCESS_PASSWORD) {
+      setCoachPw(''); setError(null); setMode('coach')
     } else {
-      setResetMessage({
-        type: 'error',
-        text: result.error
-      })
-      
-      // Show developer note if available
-      if (result.developerNote && window.location.hostname === 'localhost') {
-        console.log('📋 Developer Note:', result.developerNote)
-      }
+      setError('Onjuiste toegangscode')
     }
-    
+  }
+
+  // ── reset ─────────────────────────────────────────────────────────────────
+  const handleReset = async (e) => {
+    e?.preventDefault()
+    if (!resetEmail) { setResetMsg({ ok: false, text: 'Vul je email in' }); return }
+    setResetLoading(true); setResetMsg(null)
+    const result = await passwordReset.sendResetEmail(resetEmail)
+    setResetMsg({ ok: result.success, text: result.success ? result.message : result.error })
+    if (result.success) setTimeout(() => { setShowReset(false); setResetEmail(''); setResetMsg(null) }, 3000)
     setResetLoading(false)
   }
-  
-  const handleModeSelect = (mode) => {
-    setLoginMode(mode)
+
+  // ── shared input style ────────────────────────────────────────────────────
+  const inp = {
+    width: '100%',
+    padding: '0.875rem 1rem',
+    background: 'rgba(255,255,255,0.05)',
+    border: '1px solid rgba(255,255,255,0.08)',
+    borderRadius: '10px',
+    color: '#fff',
+    fontSize: '1rem',
+    outline: 'none',
+    boxSizing: 'border-box',
+    fontFamily: 'inherit',
+    WebkitAppearance: 'none',
+    transition: 'border-color 0.2s',
   }
-  
+
+  // ── COACH VERIFY SCREEN ───────────────────────────────────────────────────
+  if (mode === 'coach-verify') return (
+    <Wrapper slide={slide}>
+      <div style={{ width: '100%', maxWidth: '340px' }}>
+        <button onClick={() => { setMode('client'); setError(null); setCoachPw('') }}
+          style={backBtn}>← Terug</button>
+
+        <div style={labelStyle}>COACH TOEGANG</div>
+        <h1 style={headingStyle}>Verificatie</h1>
+
+        {error && <ErrorBox>{error}</ErrorBox>}
+
+        <form onSubmit={handleCoachVerify} style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+          <input type="password" placeholder="Toegangscode" value={coachPw}
+            onChange={e => setCoachPw(e.target.value)} style={inp} autoFocus
+            onFocus={e => e.target.style.borderColor = '#FFD700'}
+            onBlur={e => e.target.style.borderColor = 'rgba(255,255,255,0.08)'} />
+          <GoldButton type="submit">Verifieer</GoldButton>
+        </form>
+      </div>
+    </Wrapper>
+  )
+
+  // ── MAIN LOGIN (client + coach after verify) ──────────────────────────────
+  return (
+    <Wrapper slide={slide}>
+      <div style={{ width: '100%', maxWidth: '340px' }}>
+
+        {/* Logo */}
+        <div style={{ textAlign: 'center', marginBottom: '2.25rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.45rem', marginBottom: '0.3rem' }}>
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#FFD700" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
+            </svg>
+            <span style={{ fontSize: '1.75rem', fontWeight: '900', color: '#FFD700', letterSpacing: '-0.01em', lineHeight: 1 }}>
+              MY ARC
+            </span>
+          </div>
+          <div style={{ fontSize: '0.5rem', fontWeight: '700', color: 'rgba(255,215,0,0.35)', letterSpacing: '0.28em', textTransform: 'uppercase' }}>
+            JOUW TRAINING PLATFORM
+          </div>
+        </div>
+
+        {/* Mode label */}
+        <div style={labelStyle}>
+          {mode === 'coach' ? 'COACH PORTAL' : 'INLOGGEN'}
+        </div>
+        <h1 style={{ ...headingStyle, marginBottom: '1.75rem' }}>Welkom terug</h1>
+
+        {error && <ErrorBox>{error}</ErrorBox>}
+
+        {/* Form */}
+        <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+          <input type="email" placeholder="Email" value={email} onChange={e => setEmail(e.target.value)}
+            style={inp} autoComplete="email" autoCapitalize="none"
+            onFocus={e => e.target.style.borderColor = '#FFD700'}
+            onBlur={e => e.target.style.borderColor = 'rgba(255,255,255,0.08)'} />
+
+          <div style={{ position: 'relative' }}>
+            <input type={showPw ? 'text' : 'password'} placeholder="Wachtwoord" value={password}
+              onChange={e => setPassword(e.target.value)} style={{ ...inp, paddingRight: '3.5rem' }}
+              autoComplete="current-password"
+              onFocus={e => e.target.style.borderColor = '#FFD700'}
+              onBlur={e => e.target.style.borderColor = 'rgba(255,255,255,0.08)'} />
+            <button type="button" onClick={() => setShowPw(!showPw)} style={{
+              position: 'absolute', right: '1rem', top: '50%', transform: 'translateY(-50%)',
+              background: 'none', border: 'none', color: 'rgba(255,255,255,0.25)',
+              fontSize: '0.6rem', fontWeight: '700', letterSpacing: '0.06em',
+              cursor: 'pointer', padding: 0,
+              touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+            }}>
+              {showPw ? 'HIDE' : 'SHOW'}
+            </button>
+          </div>
+
+          {/* Remember + Forgot */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
+              <div onClick={() => setRememberMe(!rememberMe)} style={{
+                width: '17px', height: '17px', flexShrink: 0, borderRadius: '4px',
+                background: rememberMe ? '#FFD700' : 'transparent',
+                border: `1px solid ${rememberMe ? '#FFD700' : 'rgba(255,255,255,0.18)'}`,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                cursor: 'pointer', transition: 'all 0.2s',
+              }}>
+                {rememberMe && <span style={{ fontSize: '10px', color: '#000', fontWeight: '900', lineHeight: 1 }}>✓</span>}
+              </div>
+              <span style={{ fontSize: '0.72rem', color: 'rgba(255,255,255,0.3)', userSelect: 'none' }}>Onthoud mij</span>
+            </label>
+            <button type="button" onClick={() => { setShowReset(true); setResetEmail(email); setResetMsg(null) }}
+              style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.28)', fontSize: '0.72rem', cursor: 'pointer', padding: 0, touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}>
+              Wachtwoord vergeten?
+            </button>
+          </div>
+
+          <GoldButton type="submit" disabled={loading} style={{ marginTop: '0.25rem' }}>
+            {loading ? 'Inloggen...' : 'Inloggen'}
+          </GoldButton>
+        </form>
+
+        {/* Coach link — alleen zichtbaar op client mode, klein onderaan */}
+        {mode === 'client' && (
+          <div style={{ textAlign: 'center', marginTop: '2.5rem' }}>
+            <button onClick={() => { setMode('coach-verify'); setError(null) }} style={{
+              background: 'none', border: 'none',
+              color: 'rgba(255,255,255,0.18)',
+              fontSize: '0.68rem', fontWeight: '600',
+              letterSpacing: '0.08em', textTransform: 'uppercase',
+              cursor: 'pointer', padding: '0.5rem 1rem', minHeight: '44px',
+              touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+            }}>
+              Coach toegang
+            </button>
+          </div>
+        )}
+
+        {mode === 'coach' && (
+          <div style={{ textAlign: 'center', marginTop: '1.5rem' }}>
+            <button onClick={() => { setMode('client'); setError(null) }} style={{
+              background: 'none', border: 'none', color: 'rgba(255,255,255,0.2)',
+              fontSize: '0.72rem', cursor: 'pointer', padding: '0.5rem',
+              touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+            }}>
+              ← Terug naar client login
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* Password Reset Modal */}
+      {showReset && (
+        <div onClick={() => setShowReset(false)} style={{
+          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.88)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          zIndex: 200, padding: '1.5rem',
+        }}>
+          <div onClick={e => e.stopPropagation()} style={{
+            background: '#0f0f0f', border: '1px solid rgba(255,215,0,0.1)',
+            borderRadius: '12px', padding: '1.75rem',
+            width: '100%', maxWidth: '340px',
+          }}>
+            <h3 style={{ fontSize: '1rem', fontWeight: '800', color: '#fff', margin: '0 0 0.3rem' }}>Wachtwoord resetten</h3>
+            <p style={{ fontSize: '0.72rem', color: 'rgba(255,255,255,0.3)', margin: '0 0 1.25rem' }}>
+              Je ontvangt een email met een resetlink.
+            </p>
+            {resetMsg && (
+              <div style={{
+                padding: '0.75rem', borderRadius: '6px', fontSize: '0.78rem', fontWeight: '600', marginBottom: '1rem',
+                background: resetMsg.ok ? 'rgba(16,185,129,0.08)' : 'rgba(239,68,68,0.08)',
+                border: `1px solid ${resetMsg.ok ? 'rgba(16,185,129,0.2)' : 'rgba(239,68,68,0.2)'}`,
+                color: resetMsg.ok ? '#10b981' : '#ef4444',
+              }}>
+                {resetMsg.text}
+              </div>
+            )}
+            <form onSubmit={handleReset} style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+              <input type="email" placeholder="Email adres" value={resetEmail}
+                onChange={e => setResetEmail(e.target.value)} style={inp} autoFocus
+                onFocus={e => e.target.style.borderColor = '#FFD700'}
+                onBlur={e => e.target.style.borderColor = 'rgba(255,255,255,0.08)'} />
+              <GoldButton type="submit" disabled={resetLoading}>
+                {resetLoading ? 'Versturen...' : 'Reset sturen'}
+              </GoldButton>
+              <button type="button" onClick={() => setShowReset(false)} style={{
+                background: 'none', border: 'none', color: 'rgba(255,255,255,0.25)',
+                fontSize: '0.78rem', cursor: 'pointer', padding: '0.25rem',
+                touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+              }}>
+                Annuleren
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+    </Wrapper>
+  )
+}
+
+// ── Sub-components ────────────────────────────────────────────────────────────
+
+function Wrapper({ children, slide }) {
   return (
     <div style={{
-      position: 'fixed',
-      top: 0,
-      left: 0,
-      width: '100%',
-      height: '100%',
-      overflow: 'hidden'
+      position: 'fixed', inset: 0, background: '#000',
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      paddingTop: 'env(safe-area-inset-top)', paddingBottom: 'env(safe-area-inset-bottom)',
+      paddingLeft: 'env(safe-area-inset-left)', paddingRight: 'env(safe-area-inset-right)',
+      overflow: 'hidden',
     }}>
-      <BackgroundSlideshow />
-      
-      {!loginMode && (
-        <LoginButtons onModeSelect={handleModeSelect} />
-      )}
-      
-      {showFeatures && !loginMode && (
-        <FeatureSlider onClose={() => setShowFeatures(false)} />
-      )}
-      
-      <QuoteSlider />
-      
-      {!showFeatures && !loginMode && (
-        <button
-          onClick={() => setShowFeatures(true)}
-          style={{
-            position: 'fixed',
-            top: '50%',
-            left: '50%',
-            transform: 'translate(-50%, -50%)',
-            padding: '0.5rem 1.25rem',
-            background: 'rgba(255, 255, 255, 0.08)',
-            backdropFilter: 'blur(10px)',
-            border: '1px solid rgba(255, 255, 255, 0.15)',
-            borderRadius: '100px',
-            color: 'rgba(255,255,255,0.6)',
-            fontSize: '0.875rem',
-            cursor: 'pointer',
-            transition: 'all 0.3s',
-            zIndex: 25
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.background = 'rgba(255, 255, 255, 0.12)'
-            e.currentTarget.style.color = 'rgba(255,255,255,0.9)'
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)'
-            e.currentTarget.style.color = 'rgba(255,255,255,0.6)'
-          }}
-        >
-          Bekijk features
-        </button>
-      )}
-      
-      {/* Password Reset Modal - UPDATED */}
-      {showResetModal && (
-        <div style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          background: 'rgba(0, 0, 0, 0.8)',
-          backdropFilter: 'blur(10px)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 100,
-          padding: '1rem'
-        }}>
-          <div style={{
-            maxWidth: '400px',
-            width: '100%',
-            background: 'rgba(17, 17, 17, 0.98)',
-            backdropFilter: 'blur(20px)',
-            border: '1px solid rgba(255, 255, 255, 0.15)',
-            borderRadius: '18px',
-            padding: isMobile ? '1.5rem' : '2rem',
-            boxShadow: '0 20px 40px rgba(0, 0, 0, 0.9)'
-          }}>
-            <h3 style={{
-              fontSize: '1.25rem',
-              fontWeight: '700',
-              color: '#10b981',
-              marginBottom: '0.5rem',
-              textAlign: 'center'
-            }}>
-              Wachtwoord Reset
-            </h3>
-            
-            <p style={{
-              color: 'rgba(255,255,255,0.6)',
-              fontSize: '0.875rem',
-              textAlign: 'center',
-              marginBottom: '1.5rem'
-            }}>
-              Voer je email in voor een reset link
-            </p>
-            
-            {/* Development mode info */}
-            {window.location.hostname === 'localhost' && (
-              <div style={{
-                background: 'rgba(59, 130, 246, 0.1)',
-                border: '1px solid rgba(59, 130, 246, 0.3)',
-                borderRadius: '8px',
-                padding: '0.75rem',
-                marginBottom: '1rem',
-                fontSize: '0.75rem',
-                color: '#3b82f6'
-              }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                  <Info size={14} />
-                  <span>Development Mode - Check console voor setup</span>
-                </div>
-              </div>
-            )}
-            
-            {resetMessage && (
-              <div style={{
-                background: resetMessage.type === 'error'
-                  ? 'rgba(239, 68, 68, 0.1)'
-                  : 'rgba(16, 185, 129, 0.1)',
-                border: `1px solid ${resetMessage.type === 'error'
-                  ? 'rgba(239, 68, 68, 0.3)'
-                  : 'rgba(16, 185, 129, 0.3)'}`,
-                borderRadius: '8px',
-                padding: '0.75rem',
-                marginBottom: '1rem',
-                color: resetMessage.type === 'error' ? '#ef4444' : '#10b981',
-                fontSize: '0.875rem',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.5rem'
-              }}>
-                {resetMessage.type === 'error' ? <AlertCircle size={16} /> : <CheckCircle size={16} />}
-                {resetMessage.text}
-              </div>
-            )}
-            
-            <div style={{ position: 'relative', marginBottom: '1rem' }}>
-              <input
-                type="email"
-                value={resetEmail}
-                onChange={(e) => setResetEmail(e.target.value)}
-                placeholder="jouw@email.nl"
-                style={{
-                  width: '100%',
-                  padding: '0.75rem 0.75rem 0.75rem 2.5rem',
-                  background: 'rgba(255, 255, 255, 0.05)',
-                  border: '1px solid rgba(255, 255, 255, 0.1)',
-                  borderRadius: '8px',
-                  color: '#fff',
-                  fontSize: '0.95rem',
-                  outline: 'none',
-                  transition: 'all 0.3s'
-                }}
-                onFocus={(e) => {
-                  e.currentTarget.style.borderColor = 'rgba(16, 185, 129, 0.5)'
-                  e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)'
-                }}
-                onBlur={(e) => {
-                  e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.1)'
-                  e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)'
-                }}
-                onKeyPress={(e) => {
-                  if (e.key === 'Enter' && !resetLoading) {
-                    sendResetEmail()
-                  }
-                }}
-                disabled={resetLoading}
-                autoFocus
-              />
-              <Mail size={18} style={{
-                position: 'absolute',
-                left: '0.75rem',
-                top: '50%',
-                transform: 'translateY(-50%)',
-                color: 'rgba(255,255,255,0.3)'
-              }} />
-            </div>
-            
-            <div style={{ display: 'flex', gap: '0.75rem' }}>
-              <button
-                onClick={sendResetEmail}
-                disabled={resetLoading}
-                style={{
-                  flex: 1,
-                  padding: '0.75rem',
-                  background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-                  border: 'none',
-                  borderRadius: '8px',
-                  color: '#fff',
-                  fontSize: '0.95rem',
-                  fontWeight: '600',
-                  cursor: resetLoading ? 'not-allowed' : 'pointer',
-                  opacity: resetLoading ? 0.6 : 1,
-                  transition: 'all 0.3s',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '0.5rem'
-                }}
-              >
-                <ArrowRight size={16} />
-                {resetLoading ? 'Versturen...' : 'Stuur Reset Email'}
-              </button>
-              
-              <button
-                onClick={() => {
-                  setShowResetModal(false)
-                  setResetEmail('')
-                  setResetMessage(null)
-                }}
-                disabled={resetLoading}
-                style={{
-                  padding: '0.75rem 1.25rem',
-                  background: 'rgba(255, 255, 255, 0.05)',
-                  border: '1px solid rgba(255, 255, 255, 0.1)',
-                  borderRadius: '8px',
-                  color: 'rgba(255,255,255,0.7)',
-                  fontSize: '0.95rem',
-                  fontWeight: '500',
-                  cursor: 'pointer',
-                  transition: 'all 0.3s'
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)'
-                  e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.2)'
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)'
-                  e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.1)'
-                }}
-              >
-                Annuleer
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-      
-      {/* Coach Access Code Modal */}
-      {loginMode === 'coach' && !coachAccessVerified && (
-        <div style={{
-          position: 'fixed',
-          top: '50%',
-          left: '50%',
-          transform: 'translate(-50%, -50%)',
-          width: isMobile ? '85%' : '360px',
-          maxWidth: '360px',
-          zIndex: 40
-        }}>
-          <div style={{
-            background: 'rgba(17, 17, 17, 0.98)',
-            backdropFilter: 'blur(20px)',
-            border: '1px solid rgba(59, 130, 246, 0.3)',
-            borderRadius: '18px',
-            padding: isMobile ? '1.5rem' : '2rem',
-            boxShadow: '0 20px 40px rgba(0, 0, 0, 0.9)'
-          }}>
-            <h3 style={{
-              fontSize: '1.25rem',
-              fontWeight: '700',
-              color: '#3b82f6',
-              marginBottom: '1rem',
-              textAlign: 'center'
-            }}>
-              Coach Verificatie
-            </h3>
-            
-            {message && message.type === 'error' && (
-              <div style={{
-                background: 'rgba(239, 68, 68, 0.1)',
-                border: '1px solid rgba(239, 68, 68, 0.3)',
-                borderRadius: '8px',
-                padding: '0.75rem',
-                marginBottom: '1rem',
-                color: '#ef4444',
-                fontSize: '0.875rem',
-                textAlign: 'center'
-              }}>
-                {message.text}
-              </div>
-            )}
-            
-            <input
-              type="password"
-              value={coachPassword}
-              onChange={(e) => setCoachPassword(e.target.value)}
-              placeholder="Coach toegangscode"
-              style={{
-                width: '100%',
-                padding: '0.75rem',
-                background: 'rgba(255, 255, 255, 0.05)',
-                border: '1px solid rgba(59, 130, 246, 0.2)',
-                borderRadius: '8px',
-                color: '#fff',
-                fontSize: '0.95rem',
-                marginBottom: '1rem',
-                outline: 'none'
-              }}
-              onFocus={(e) => {
-                e.currentTarget.style.borderColor = 'rgba(59, 130, 246, 0.5)'
-              }}
-              onBlur={(e) => {
-                e.currentTarget.style.borderColor = 'rgba(59, 130, 246, 0.2)'
-              }}
-              onKeyPress={(e) => {
-                if (e.key === 'Enter') {
-                  if (coachPassword === COACH_ACCESS_PASSWORD) {
-                    setCoachAccessVerified(true)
-                    setCoachPassword('')
-                    setMessage(null)
-                  } else {
-                    setMessage({ type: 'error', text: 'Onjuiste toegangscode' })
-                  }
-                }
-              }}
-              autoFocus
-            />
-            
-            <button
-              onClick={() => {
-                if (coachPassword === COACH_ACCESS_PASSWORD) {
-                  setCoachAccessVerified(true)
-                  setCoachPassword('')
-                  setMessage(null)
-                } else {
-                  setMessage({ type: 'error', text: 'Onjuiste toegangscode' })
-                }
-              }}
-              style={{
-                width: '100%',
-                padding: '0.75rem',
-                background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
-                border: 'none',
-                borderRadius: '8px',
-                color: '#fff',
-                fontSize: '0.95rem',
-                fontWeight: '600',
-                cursor: 'pointer',
-                transition: 'all 0.3s'
-              }}
-            >
-              Verifieer Toegang
-            </button>
-            
-            <button
-              onClick={() => {
-                setLoginMode(null)
-                setCoachPassword('')
-                setMessage(null)
-              }}
-              style={{
-                width: '100%',
-                marginTop: '0.75rem',
-                padding: '0.5rem',
-                background: 'transparent',
-                border: 'none',
-                color: 'rgba(255,255,255,0.5)',
-                fontSize: '0.875rem',
-                cursor: 'pointer',
-                transition: 'color 0.2s'
-              }}
-              onMouseEnter={(e) => e.currentTarget.style.color = 'rgba(255,255,255,0.8)'}
-              onMouseLeave={(e) => e.currentTarget.style.color = 'rgba(255,255,255,0.5)'}
-            >
-              Terug
-            </button>
-          </div>
-        </div>
-      )}
-      
-      {loginMode && (loginMode === 'client' || coachAccessVerified) && (
-        <>
-          <button
-            onClick={() => {
-              setLoginMode(null)
-              setCoachAccessVerified(false)
-              setCoachPassword('')
-              setMessage(null)
-            }}
-            style={{
-              position: 'fixed',
-              top: isMobile ? '20px' : '40px',
-              left: isMobile ? '20px' : '40px',
-              zIndex: 45,
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.5rem',
-              padding: '0.5rem 1rem',
-              background: 'rgba(17, 17, 17, 0.95)',
-              backdropFilter: 'blur(20px)',
-              border: '1px solid rgba(255, 255, 255, 0.15)',
-              borderRadius: '100px',
-              color: 'rgba(255,255,255,0.8)',
-              fontSize: '0.875rem',
-              fontWeight: '500',
-              cursor: 'pointer',
-              transition: 'all 0.3s'
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)'
-              e.currentTarget.style.color = '#fff'
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.background = 'rgba(17, 17, 17, 0.95)'
-              e.currentTarget.style.color = 'rgba(255,255,255,0.8)'
-            }}
-          >
-            <ChevronLeft size={18} />
-            Terug
-          </button>
-          
-          <LoginWidget 
-            loginMode={loginMode}
-            onLogin={handleLogin}
-            onPasswordReset={handlePasswordReset}
-            isVisible={true}
-          />
-        </>
-      )}
+      {/* Slideshow */}
+      {[
+        'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?w=800&q=80',
+        'https://images.unsplash.com/photo-1517836357463-d25dfeac3438?w=800&q=80',
+        'https://images.unsplash.com/photo-1574680096145-d05b474e2155?w=800&q=80',
+        'https://images.unsplash.com/photo-1549060279-7e168fcee0c2?w=800&q=80',
+      ].map((src, i) => (
+        <div key={i} style={{
+          position: 'absolute', inset: 0,
+          backgroundImage: `url(${src})`, backgroundSize: 'cover', backgroundPosition: 'center',
+          opacity: i === slide ? 0.1 : 0, transition: 'opacity 1.8s ease', zIndex: 0,
+        }} />
+      ))}
+      {/* Dark gradient */}
+      <div style={{
+        position: 'absolute', inset: 0, zIndex: 1, pointerEvents: 'none',
+        background: 'linear-gradient(to bottom, rgba(0,0,0,0.6) 0%, rgba(0,0,0,0.75) 50%, rgba(0,0,0,0.97) 100%)',
+      }} />
+      {/* Content */}
+      <div style={{ position: 'relative', zIndex: 10, width: '100%', padding: '2rem 1.5rem', display: 'flex', justifyContent: 'center' }}>
+        {children}
+      </div>
     </div>
   )
+}
+
+function GoldButton({ children, disabled, style, ...props }) {
+  return (
+    <button disabled={disabled} style={{
+      width: '100%', padding: '0.9rem', minHeight: '48px',
+      background: disabled ? 'rgba(255,215,0,0.45)' : '#FFD700',
+      border: 'none', borderRadius: '10px',
+      color: '#000', fontSize: '0.95rem', fontWeight: '800',
+      cursor: disabled ? 'not-allowed' : 'pointer',
+      letterSpacing: '0.02em',
+      touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+      transition: 'opacity 0.15s',
+      ...style,
+    }} {...props}>
+      {children}
+    </button>
+  )
+}
+
+function ErrorBox({ children }) {
+  return (
+    <div style={{
+      padding: '0.75rem 1rem', marginBottom: '1rem',
+      background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)',
+      borderRadius: '8px', color: '#ef4444', fontSize: '0.8rem', fontWeight: '600',
+    }}>
+      {children}
+    </div>
+  )
+}
+
+const labelStyle = {
+  fontSize: '0.5rem', fontWeight: '700', color: 'rgba(255,215,0,0.5)',
+  letterSpacing: '0.25em', textTransform: 'uppercase', marginBottom: '0.35rem',
+}
+
+const headingStyle = {
+  fontSize: '1.75rem', fontWeight: '900', color: '#fff',
+  margin: 0, letterSpacing: '-0.02em', lineHeight: 1.1,
+}
+
+const backBtn = {
+  background: 'none', border: 'none', color: 'rgba(255,255,255,0.3)',
+  fontSize: '0.78rem', cursor: 'pointer', padding: '0 0 1.75rem',
+  touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+  display: 'flex', alignItems: 'center', gap: '0.3rem',
 }

@@ -1,265 +1,225 @@
 // src/modules/workout/components/todays-workout/components/ExerciseList.jsx
-import { useState, useEffect } from 'react'
-import { Plus } from 'lucide-react'
+import { useState, useEffect, useRef } from 'react'
+import { Plus, Trash2 } from 'lucide-react'
 import ExerciseCard from './ExerciseCard'
-import CustomExerciseModal from './CustomExerciseModal'
+import AddExerciseModal from './AddExerciseModal'
 
-export default function ExerciseList({ 
-  exercises, 
-  todaysLogs, 
-  onLogsUpdate, 
-  client, 
-  schema,
-  db,
-  workoutDayKey 
+export default function ExerciseList({
+  exercises, todaysLogs, onLogsUpdate,
+  client, schema, db, workoutDayKey
 }) {
   const isMobile = window.innerWidth <= 768
   const [visibleExercises, setVisibleExercises] = useState([])
   const [showAddModal, setShowAddModal] = useState(false)
   const [localExercises, setLocalExercises] = useState(exercises || [])
-  
-  // Progressive reveal - stagger each exercise
+  const [deletingIndex, setDeletingIndex] = useState(null)
+  const [swipedIndex, setSwipedIndex] = useState(null)
+
   useEffect(() => {
     localExercises.forEach((_, index) => {
-      setTimeout(() => {
-        setVisibleExercises(prev => [...prev, index])
-      }, index * 150) // 150ms stagger per exercise (was 200ms)
+      setTimeout(() => setVisibleExercises(prev => [...prev, index]), index * 120)
     })
   }, [localExercises])
-  
-  // Sync with parent exercises
-  useEffect(() => {
-    setLocalExercises(exercises || [])
-  }, [exercises])
-  
-  // Create lookup for logged exercises
+
+  useEffect(() => { setLocalExercises(exercises || []) }, [exercises])
+
   const loggedExercises = new Set(todaysLogs.map(log => log.exercise_name))
-  
-  // Handle add custom exercise
+
+  const saveExercises = async (updatedExercises) => {
+    if (!client?.id || !db || !workoutDayKey || !schema?.id) return
+    const updatedStructure = {
+      ...schema.week_structure,
+      [workoutDayKey]: { ...schema.week_structure[workoutDayKey], exercises: updatedExercises }
+    }
+    const { error } = await db.supabase
+      .from('workout_schemas')
+      .update({ week_structure: updatedStructure, updated_at: new Date().toISOString() })
+      .eq('id', schema.id)
+    if (error) throw error
+  }
+
   const handleAddExercise = async (newExercise) => {
     try {
-      // Add to local state immediately (optimistic update)
       const updatedExercises = [...localExercises, newExercise]
       setLocalExercises(updatedExercises)
-      
-      // Save to database if workoutDayKey exists
-      if (client?.id && db && workoutDayKey && schema) {
-        // Update schema in database
-        const updatedSchema = {
-          ...schema,
-          week_structure: {
-            ...schema.week_structure,
-            [workoutDayKey]: {
-              ...schema.week_structure[workoutDayKey],
-              exercises: updatedExercises
-            }
-          }
-        }
-        
-        // Save to database
-        await db.updateWorkoutSchema(schema.id, updatedSchema)
-        console.log('✅ Exercise added to workout schema')
+      if (!newExercise._addedToDay) {
+        await saveExercises(updatedExercises)
       }
-      
-      // Success feedback
       if (navigator.vibrate) navigator.vibrate([50, 100, 50])
-      
-      // Close modal
       setShowAddModal(false)
-      
+      if (onLogsUpdate) onLogsUpdate({ reloadSchema: true })
     } catch (error) {
       console.error('❌ Add exercise failed:', error)
-      alert('Kon oefening niet toevoegen. Probeer opnieuw.')
-      // Revert optimistic update
+      alert('Kon oefening niet toevoegen.')
       setLocalExercises(exercises || [])
     }
   }
-  
-  if (!localExercises || localExercises.length === 0) {
-    return (
-      <div style={{
-        padding: isMobile ? '2rem 1rem' : '3rem 1rem',
-        textAlign: 'center'
-      }}>
-        {/* Empty state message */}
-        <div style={{
-          background: 'rgba(23, 23, 23, 0.6)',
-          backdropFilter: 'blur(10px)',
-          border: '1px solid rgba(249, 115, 22, 0.1)',
-          borderRadius: '12px',
-          padding: isMobile ? '1.5rem' : '2rem',
-          marginBottom: isMobile ? '1.25rem' : '1.5rem'
-        }}>
-          <p style={{
-            color: 'rgba(255, 255, 255, 0.7)',
-            fontSize: isMobile ? '0.85rem' : '0.9rem',
-            fontWeight: '600',
-            margin: 0
-          }}>
-            Nog geen oefeningen in deze workout
-          </p>
-        </div>
-        
-        {/* Add Exercise Button */}
-        <button
-          onClick={() => setShowAddModal(true)}
-          style={{
-            padding: isMobile ? '0.75rem 1.5rem' : '0.875rem 2rem',
-            background: 'linear-gradient(135deg, #f97316 0%, #ea580c 100%)',
-            border: 'none',
-            borderRadius: '10px',
-            color: '#000',
-            fontSize: isMobile ? '0.8rem' : '0.85rem',
-            fontWeight: '700',
-            textTransform: 'uppercase',
-            letterSpacing: '0.05em',
-            cursor: 'pointer',
-            boxShadow: '0 4px 20px rgba(249, 115, 22, 0.35)',
-            transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: '0.5rem',
-            minHeight: '44px',
-            touchAction: 'manipulation',
-            WebkitTapHighlightColor: 'transparent'
-          }}
-          onMouseEnter={(e) => {
-            if (!isMobile) {
-              e.currentTarget.style.transform = 'translateY(-2px)'
-              e.currentTarget.style.boxShadow = '0 8px 30px rgba(249, 115, 22, 0.5)'
-            }
-          }}
-          onMouseLeave={(e) => {
-            if (!isMobile) {
-              e.currentTarget.style.transform = 'translateY(0)'
-              e.currentTarget.style.boxShadow = '0 4px 20px rgba(249, 115, 22, 0.35)'
-            }
-          }}
-          onTouchStart={(e) => {
-            if (isMobile) {
-              e.currentTarget.style.transform = 'scale(0.98)'
-            }
-          }}
-          onTouchEnd={(e) => {
-            if (isMobile) {
-              e.currentTarget.style.transform = 'scale(1)'
-            }
-          }}
-        >
-          <Plus size={isMobile ? 16 : 18} strokeWidth={2.5} />
-          Voeg Eerste Oefening Toe
-        </button>
-        
-        {/* Custom Exercise Modal */}
-        {showAddModal && (
-          <CustomExerciseModal
-            onClose={() => setShowAddModal(false)}
-            onSave={handleAddExercise}
-            client={client}
-            db={db}
-          />
-        )}
-      </div>
-    )
+
+  const handleDelete = async (index) => {
+    try {
+      setDeletingIndex(index)
+      const updatedExercises = localExercises.filter((_, i) => i !== index)
+      setLocalExercises(updatedExercises)
+      setSwipedIndex(null)
+      await saveExercises(updatedExercises)
+      if (navigator.vibrate) navigator.vibrate([30, 60, 30])
+      if (onLogsUpdate) onLogsUpdate({ reloadSchema: true })
+    } catch (error) {
+      console.error('❌ Delete failed:', error)
+      setLocalExercises(exercises || [])
+    } finally {
+      setDeletingIndex(null)
+    }
   }
-  
+
+  const handleMakePermanent = async (index) => {
+    try {
+      const updatedExercises = localExercises.map((ex, i) =>
+        i === index ? { ...ex, _pendingPermanent: false } : ex
+      )
+      await saveExercises(updatedExercises)
+      setLocalExercises(updatedExercises)
+      if (onLogsUpdate) onLogsUpdate({ reloadSchema: true })
+    } catch (e) {
+      console.error('❌ Make permanent failed:', e)
+    }
+  }
+
+  const emptyState = !localExercises || localExercises.length === 0
+
   return (
     <>
-      <div style={{
-        display: 'flex',
-        flexDirection: 'column',
-        gap: isMobile ? '0.875rem' : '1rem'
-      }}>
-        {localExercises.map((exercise, index) => (
-          <ExerciseCard
-            key={index}
-            exercise={exercise}
-            index={index}
-            totalExercises={localExercises.length}
-            isLogged={loggedExercises.has(exercise.name)}
-            previousLog={null} // Will be loaded by ExerciseCard
-            onLogsUpdate={onLogsUpdate}
-            client={client}
-            schema={schema}
-            db={db}
-            workoutDayKey={workoutDayKey}
-            visible={visibleExercises.includes(index)}
-            delay={index * 150}
-          />
-        ))}
-        
-        {/* Add Exercise Button - ONDERAAN */}
-        <div style={{
-          marginTop: isMobile ? '0.5rem' : '0.75rem',
-          paddingTop: isMobile ? '0.875rem' : '1rem',
-          borderTop: '1px solid rgba(249, 115, 22, 0.1)'
-        }}>
-          <button
-            onClick={() => setShowAddModal(true)}
-            style={{
-              width: '100%',
-              padding: isMobile ? '0.75rem' : '0.875rem',
-              background: 'rgba(23, 23, 23, 0.6)',
-              backdropFilter: 'blur(10px)',
-              border: '1px dashed rgba(249, 115, 22, 0.25)',
-              borderRadius: '10px',
-              color: '#f97316',
-              fontSize: isMobile ? '0.8rem' : '0.85rem',
-              fontWeight: '700',
-              textTransform: 'uppercase',
-              letterSpacing: '0.05em',
-              cursor: 'pointer',
-              transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '0.5rem',
-              minHeight: '44px',
-              touchAction: 'manipulation',
-              WebkitTapHighlightColor: 'transparent'
-            }}
-            onMouseEnter={(e) => {
-              if (!isMobile) {
-                e.currentTarget.style.background = 'linear-gradient(135deg, rgba(249, 115, 22, 0.12) 0%, rgba(249, 115, 22, 0.04) 100%)'
-                e.currentTarget.style.transform = 'translateY(-2px)'
-                e.currentTarget.style.borderColor = 'rgba(249, 115, 22, 0.35)'
-                e.currentTarget.style.borderStyle = 'solid'
-              }
-            }}
-            onMouseLeave={(e) => {
-              if (!isMobile) {
-                e.currentTarget.style.background = 'rgba(23, 23, 23, 0.6)'
-                e.currentTarget.style.transform = 'translateY(0)'
-                e.currentTarget.style.borderColor = 'rgba(249, 115, 22, 0.25)'
-                e.currentTarget.style.borderStyle = 'dashed'
-              }
-            }}
-            onTouchStart={(e) => {
-              if (isMobile) {
-                e.currentTarget.style.transform = 'scale(0.98)'
-              }
-            }}
-            onTouchEnd={(e) => {
-              if (isMobile) {
-                e.currentTarget.style.transform = 'scale(1)'
-              }
-            }}
-          >
+      {emptyState ? (
+        <div style={{ padding: isMobile ? '2rem 1rem' : '3rem 1rem', textAlign: 'center' }}>
+          <div style={{ background: 'rgba(23,23,23,0.6)', border: '1px solid rgba(255,215,0,0.1)', borderRadius: '12px', padding: isMobile ? '1.5rem' : '2rem', marginBottom: isMobile ? '1.25rem' : '1.5rem' }}>
+            <p style={{ color: 'rgba(255,255,255,0.7)', fontSize: isMobile ? '0.85rem' : '0.9rem', fontWeight: '600', margin: 0 }}>
+              Nog geen oefeningen in deze workout
+            </p>
+          </div>
+          <button onClick={() => setShowAddModal(true)} style={{ padding: isMobile ? '0.75rem 1.5rem' : '0.875rem 2rem', background: 'linear-gradient(135deg, rgba(255,215,0,0.2) 0%, rgba(255,165,0,0.12) 100%)', border: '1px solid rgba(255,215,0,0.3)', borderRadius: '10px', color: '#FFD700', fontSize: isMobile ? '0.8rem' : '0.85rem', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.05em', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '0.5rem', minHeight: '44px', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}>
             <Plus size={isMobile ? 16 : 18} strokeWidth={2.5} />
-            Voeg Eigen Oefening Toe
+            Voeg Eerste Oefening Toe
           </button>
         </div>
-      </div>
-      
-      {/* Custom Exercise Modal */}
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+          {localExercises.map((exercise, index) => (
+            <SwipeableRow
+              key={`${exercise.name}-${index}`}
+              index={index}
+              swipedIndex={swipedIndex}
+              onSwipeOpen={() => setSwipedIndex(index)}
+              onSwipeClose={() => setSwipedIndex(null)}
+              onDelete={() => handleDelete(index)}
+              deleting={deletingIndex === index}
+              isMobile={isMobile}
+            >
+              <ExerciseCard
+                exercise={exercise}
+                index={index}
+                totalExercises={localExercises.length}
+                isLogged={loggedExercises.has(exercise.name)}
+                previousLog={null}
+                onLogsUpdate={onLogsUpdate}
+                client={client}
+                schema={schema}
+                db={db}
+                workoutDayKey={workoutDayKey}
+                visible={visibleExercises.includes(index)}
+                delay={index * 120}
+                onMakePermanent={() => handleMakePermanent(index)}
+              />
+            </SwipeableRow>
+          ))}
+
+          <div style={{ padding: isMobile ? '0.75rem 1rem' : '1rem 1.25rem' }}>
+            <button onClick={() => setShowAddModal(true)} style={{ width: '100%', padding: isMobile ? '0.65rem' : '0.75rem', background: 'transparent', border: '1px dashed rgba(255,215,0,0.2)', borderRadius: '10px', color: 'rgba(255,215,0,0.6)', fontSize: isMobile ? '0.75rem' : '0.8rem', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.05em', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem', minHeight: '44px', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}>
+              <Plus size={isMobile ? 14 : 16} strokeWidth={2.5} />
+              Voeg Oefening Toe
+            </button>
+          </div>
+        </div>
+      )}
+
       {showAddModal && (
-        <CustomExerciseModal
+        <AddExerciseModal
           onClose={() => setShowAddModal(false)}
           onSave={handleAddExercise}
           client={client}
           db={db}
+          schema={schema}
+          workoutDayKey={workoutDayKey}
         />
       )}
     </>
+  )
+}
+
+function SwipeableRow({ children, index, swipedIndex, onSwipeOpen, onSwipeClose, onDelete, deleting, isMobile }) {
+  const startX = useRef(null)
+  const currentX = useRef(0)
+  const rowRef = useRef(null)
+  const DELETE_THRESHOLD = 80
+  const isOpen = swipedIndex === index
+
+  const handleTouchStart = (e) => {
+    startX.current = e.touches[0].clientX
+    currentX.current = 0
+  }
+
+  const handleTouchMove = (e) => {
+    if (startX.current === null) return
+    const diff = startX.current - e.touches[0].clientX
+    if (diff < 0) return
+    currentX.current = Math.min(diff, DELETE_THRESHOLD + 20)
+    if (rowRef.current) {
+      rowRef.current.style.transform = `translateX(-${currentX.current}px)`
+      rowRef.current.style.transition = 'none'
+    }
+  }
+
+  const handleTouchEnd = () => {
+    if (startX.current === null) return
+    if (rowRef.current) rowRef.current.style.transition = 'transform 0.25s ease'
+    if (currentX.current >= DELETE_THRESHOLD) {
+      onSwipeOpen()
+      if (rowRef.current) rowRef.current.style.transform = `translateX(-${DELETE_THRESHOLD}px)`
+    } else {
+      onSwipeClose()
+      if (rowRef.current) rowRef.current.style.transform = 'translateX(0)'
+    }
+    startX.current = null
+  }
+
+  useEffect(() => {
+    if (!isOpen && rowRef.current) {
+      rowRef.current.style.transition = 'transform 0.25s ease'
+      rowRef.current.style.transform = 'translateX(0)'
+    }
+  }, [isOpen])
+
+  return (
+    <div style={{ position: 'relative', overflow: 'hidden' }}>
+      {/* Delete zone */}
+      <div style={{ position: 'absolute', right: 0, top: 0, bottom: 0, width: `${DELETE_THRESHOLD}px`, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(239,68,68,0.12)', borderLeft: '1px solid rgba(239,68,68,0.2)' }}>
+        <button onClick={onDelete} disabled={deleting} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.2rem', background: 'transparent', border: 'none', cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', padding: '0.5rem' }}>
+          {deleting ? (
+            <div style={{ width: '18px', height: '18px', border: '2px solid rgba(239,68,68,0.3)', borderTopColor: '#ef4444', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
+          ) : (
+            <Trash2 size={18} color="#ef4444" strokeWidth={2} />
+          )}
+          <span style={{ fontSize: '0.55rem', color: '#ef4444', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.03em' }}>Verwijder</span>
+        </button>
+      </div>
+
+      {/* Content */}
+      <div ref={rowRef} style={{ position: 'relative', zIndex: 1, background: '#0a0a0a', transform: 'translateX(0)', transition: 'transform 0.25s ease', userSelect: 'none' }}
+        onTouchStart={isMobile ? handleTouchStart : undefined}
+        onTouchMove={isMobile ? handleTouchMove : undefined}
+        onTouchEnd={isMobile ? handleTouchEnd : undefined}
+        onClick={() => { if (isOpen) onSwipeClose() }}>
+        {children}
+      </div>
+    </div>
   )
 }

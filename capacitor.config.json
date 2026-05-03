@@ -1,0 +1,15 @@
+{
+  "appId": "com.myarcfitness.app",
+  "appName": "MY ARC",
+  "webDir": "dist",
+  "ios": {
+    "backgroundColor": "#000000"
+  },
+  "plugins": {
+    "StatusBar": {
+      "style": "DARK",
+      "backgroundColor": "#000000",
+      "overlaysWebView": false
+    }
+  }
+}

@@ -1,8 +1,10 @@
 // src/modules/meal-plan/MealPlanMain.jsx
 // MINIMAL VERSION - Routes to AI Dashboard when AI plan detected
+// v2 — PageVideoWidget toegevoegd aan fallback scherm (pageContext="meal")
 import React, { useState, useEffect } from 'react'
 import MealPlanService from './MealPlanService'
 import AIMealDashboard from './AIMealDashboard'
+import PageVideoWidget from '../videos/PageVideoWidget'
 
 export default function MealPlanMain({ client, onNavigate, db }) {
   const [service] = useState(() => new MealPlanService(db))
@@ -58,7 +60,7 @@ export default function MealPlanMain({ client, onNavigate, db }) {
     )
   }
   
-  // Route to AI Dashboard if AI plan exists
+  // Route to AI Dashboard if AI plan exists (has its own PageVideoWidget)
   if (hasAIPlan) {
     return <AIMealDashboard client={client} onNavigate={onNavigate} db={db} />
   }
@@ -106,6 +108,9 @@ export default function MealPlanMain({ client, onNavigate, db }) {
           Terug naar Home
         </button>
       </div>
+
+      {/* Coach video's voor meal pagina — ook zichtbaar zonder actief plan */}
+      <PageVideoWidget client={client} db={db} pageContext="meal" />
     </div>
   )
 }

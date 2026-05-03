@@ -1,0 +1,551 @@
+// ============================================
+// 📁 FILE: src/modules/coach-command-center/components/ClientInsightModal.jsx
+// ClientInsightModal.jsx - v4.0 Fullscreen insight panel
+// 3 kolommen: Gewicht+Metingen+Foto's | Workouts (drill-down) | Meals
+// Props: { isOpen, onClose, client, isMobile, onNavigatePlan }
+// ============================================
+import React, { useState } from 'react'
+import {
+  X, Scale, Dumbbell, Camera, TrendingDown, TrendingUp,
+  ChevronLeft, ChevronRight, BarChart3, Target, Ruler, ArrowLeft,
+  UtensilsCrossed, ExternalLink, Flame, Zap
+} from 'lucide-react'
+import WeightStatsGrid from '../../weight-tracker/components/WeightStatsGrid'
+
+export default function ClientInsightModal({ isOpen, onClose, client, isMobile, onNavigatePlan }) {
+  const [selectedPhotoIndex, setSelectedPhotoIndex] = useState(0)
+  const [photoZoom, setPhotoZoom] = useState(false)
+  const [mobileTab, setMobileTab] = useState('weight')
+  const [workoutView, setWorkoutView] = useState('sessions')
+  const [selectedSession, setSelectedSession] = useState(null)
+  const [selectedExercise, setSelectedExercise] = useState(null)
+  const [mealView, setMealView] = useState('days') // 'days' | 'detail'
+  const [selectedMealDay, setSelectedMealDay] = useState(null)
+
+  if (!isOpen || !client) return null
+
+  const weightData = client.weightData
+  const photoData = client.photoData
+  const workoutData = client.workoutData
+  const exerciseProgress = client.exerciseProgress || {}
+  const circumData = client.circumferenceData || { entries: [], latest: null, previous: null }
+  const mealData = client.mealData || { plan: null, targets: null, todayMeals: [], todayTotals: { calories: 0, protein: 0, carbs: 0, fat: 0 }, dailyLog: {}, loggingDays: 0, avgCalories: 0 }
+  const history = weightData?.history || []
+  const photos = photoData?.photos?.filter(p => (p.metadata?.category || 'progress') === 'progress') || []
+  const workouts = workoutData?.workouts || []
+
+  const formatDate = (d) => { if (!d) return '-'; const dt = new Date(d); return dt.toLocaleDateString('nl-NL', { day: 'numeric', month: 'short', year: dt.getFullYear() !== new Date().getFullYear() ? 'numeric' : undefined }) }
+  const formatDaysAgo = (d) => { if (d === null || d === undefined) return 'Nooit'; if (d === 0) return 'Vandaag'; if (d === 1) return 'Gisteren'; return `${d}d geleden` }
+
+  const mobileTabs = [
+    { id: 'weight', label: 'Gewicht', icon: Scale, color: '#FFD700' },
+    { id: 'workout', label: 'Training', icon: Dumbbell, color: '#f97316' },
+    { id: 'meals', label: 'Voeding', icon: UtensilsCrossed, color: '#10b981' }
+  ]
+
+  // ═══════════════════════════════════
+  // COLUMN 1: GEWICHT + METINGEN + FOTO'S
+  // ═══════════════════════════════════
+  const WeightColumn = () => {
+    const circumFields = [
+      { key: 'waist_cm', label: 'Buik' }, { key: 'bicep_cm', label: 'Arm' },
+      { key: 'chest_cm', label: 'Borst' }, { key: 'thigh_cm', label: 'Bovenbeen' }
+    ]
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
+        <div style={{ padding: isMobile ? '0.625rem 0.75rem' : '0.75rem 1rem', borderBottom: '1px solid rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+          <Scale size={14} color="#FFD700" />
+          <span style={{ fontSize: '0.7rem', fontWeight: '700', color: '#FFD700', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Gewicht & Body</span>
+        </div>
+
+        {/* Current + Goal */}
+        <div style={{ padding: isMobile ? '0.75rem' : '1rem', borderBottom: '1px solid rgba(255,255,255,0.04)', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
+          <div>
+            <div style={{ fontSize: '0.4rem', fontWeight: '700', color: 'rgba(255,255,255,0.2)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '0.15rem' }}>HUIDIG</div>
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.15rem' }}>
+              <span style={{ fontSize: '1.75rem', fontWeight: '800', color: '#FFD700', letterSpacing: '-0.03em', lineHeight: 1 }}>{weightData?.latest?.weight ? weightData.latest.weight.toFixed(1) : '—'}</span>
+              <span style={{ fontSize: '0.5rem', fontWeight: '600', color: 'rgba(255,215,0,0.4)' }}>kg</span>
+            </div>
+          </div>
+          {client.target_weight && (
+            <div style={{ textAlign: 'right' }}>
+              <div style={{ fontSize: '0.4rem', fontWeight: '700', color: 'rgba(255,255,255,0.2)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '0.15rem' }}>DOEL</div>
+              <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.15rem', justifyContent: 'flex-end' }}>
+                <Target size={11} color="rgba(255,255,255,0.3)" />
+                <span style={{ fontSize: '1.1rem', fontWeight: '700', color: 'rgba(255,255,255,0.5)', lineHeight: 1 }}>{parseFloat(client.target_weight).toFixed(1)}</span>
+                <span style={{ fontSize: '0.45rem', fontWeight: '600', color: 'rgba(255,255,255,0.2)' }}>kg</span>
+              </div>
+              {client.goal_deadline && <div style={{ fontSize: '0.5rem', color: 'rgba(255,255,255,0.15)', marginTop: '0.1rem' }}>{formatDate(client.goal_deadline)}</div>}
+            </div>
+          )}
+        </div>
+
+        <div style={{ flex: 1, overflowY: 'auto', WebkitOverflowScrolling: 'touch' }}>
+          {history.length > 0 && <WeightStatsGrid stats={weightData?.stats || {}} client={client} fridayData={{ friday_count: weightData?.fridayCount || 0, total_fridays: 8 }} history={history} isMobile={isMobile} />}
+
+          {/* Weight History */}
+          {history.length > 0 && (
+            <div style={{ padding: isMobile ? '0.5rem 0.75rem' : '0.625rem 1rem', borderTop: '1px solid rgba(255,255,255,0.04)' }}>
+              <div style={{ fontSize: '0.45rem', fontWeight: '700', color: 'rgba(255,215,0,0.35)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.375rem' }}>Gewicht</div>
+              {history.slice(0, 8).map((e, idx) => (
+                <div key={e.date} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.275rem 0', borderBottom: idx < 7 ? '1px solid rgba(255,255,255,0.03)' : 'none' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                    <span style={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.4)' }}>{formatDate(e.date)}</span>
+                    {e.is_friday_weighin && <span style={{ fontSize: '0.45rem', padding: '0.05rem 0.2rem', background: 'rgba(255,215,0,0.1)', borderRadius: '3px', color: '#FFD700', fontWeight: '700' }}>VR</span>}
+                  </div>
+                  <span style={{ fontSize: '0.7rem', fontWeight: '700', color: idx === 0 ? '#FFD700' : '#fff' }}>{e.weight.toFixed(1)} kg</span>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Circumference */}
+          {circumData.latest && (
+            <div style={{ padding: isMobile ? '0.5rem 0.75rem' : '0.625rem 1rem', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.375rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                  <Ruler size={12} color="rgba(255,215,0,0.5)" />
+                  <span style={{ fontSize: '0.45rem', fontWeight: '700', color: 'rgba(255,215,0,0.35)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Omtrek</span>
+                </div>
+                <span style={{ fontSize: '0.5rem', color: 'rgba(255,255,255,0.2)' }}>{formatDate(circumData.latest.measurement_date)}</span>
+              </div>
+              {circumFields.map(f => {
+                const val = circumData.latest[f.key]; const prev = circumData.previous?.[f.key]
+                if (!val) return null
+                const diff = prev ? parseFloat((val - prev).toFixed(1)) : null
+                return (
+                  <div key={f.key} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.275rem 0', borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
+                    <span style={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.4)' }}>{f.label}</span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                      <span style={{ fontSize: '0.7rem', fontWeight: '800', color: '#FFD700' }}>{parseFloat(val).toFixed(1)}<span style={{ fontSize: '0.4rem', fontWeight: '500', opacity: 0.4 }}>cm</span></span>
+                      {diff !== null && diff !== 0 && <span style={{ fontSize: '0.5rem', fontWeight: '700', color: diff < 0 ? '#10b981' : '#ef4444' }}>{diff > 0 ? '+' : ''}{diff}</span>}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+
+          {/* Photos */}
+          {photos.length > 0 && (
+            <div style={{ padding: isMobile ? '0.5rem 0.75rem' : '0.625rem 1rem', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.375rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                  <Camera size={12} color="rgba(168,85,247,0.5)" />
+                  <span style={{ fontSize: '0.45rem', fontWeight: '700', color: 'rgba(168,85,247,0.4)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Foto's</span>
+                </div>
+                <span style={{ fontSize: '0.5rem', color: 'rgba(255,255,255,0.2)' }}>{photos.length}</span>
+              </div>
+              <div style={{ display: 'flex', gap: '0.25rem', overflowX: 'auto', WebkitOverflowScrolling: 'touch', paddingBottom: '0.25rem' }}>
+                {photos.slice(0, 6).map((p, idx) => (
+                  <div key={p.id} onClick={() => { setSelectedPhotoIndex(idx); setPhotoZoom(true) }} style={{ width: '48px', height: '48px', borderRadius: '6px', overflow: 'hidden', border: '1px solid rgba(255,255,255,0.06)', cursor: 'pointer', flexShrink: 0 }}>
+                    <img src={p.photo_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  </div>
+                ))}
+                {photos.length > 6 && <div style={{ width: '48px', height: '48px', borderRadius: '6px', background: 'rgba(255,255,255,0.04)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.6rem', color: 'rgba(255,255,255,0.3)', flexShrink: 0 }}>+{photos.length - 6}</div>}
+              </div>
+            </div>
+          )}
+
+          {!history.length && !circumData.latest && photos.length === 0 && (
+            <div style={{ padding: '2rem 1rem', textAlign: 'center', color: 'rgba(255,255,255,0.2)', fontSize: '0.75rem' }}>Geen data</div>
+          )}
+        </div>
+      </div>
+    )
+  }
+
+  // ═══════════════════════════════════
+  // COLUMN 2: WORKOUTS (navigable drill-down)
+  // ═══════════════════════════════════
+  const WorkoutColumn = () => {
+    const getSessionExercises = () => {
+      if (!selectedSession) return []
+      const exercises = []
+      Object.entries(exerciseProgress).forEach(([name, entries]) => {
+        const match = entries.find(e => e.sessionId === selectedSession.id)
+        if (match) exercises.push({ name, ...match })
+      })
+      if (exercises.length === 0 && selectedSession.exercises_completed) {
+        return selectedSession.exercises_completed.map(e => ({ name: e.name, sets: [], bestWeight: 0, bestReps: 0, totalSets: e.sets || 0 }))
+      }
+      return exercises
+    }
+    const getExerciseHistory = () => {
+      if (!selectedExercise) return []
+      return (exerciseProgress[selectedExercise] || []).sort((a, b) => new Date(b.date) - new Date(a.date))
+    }
+
+    // Sessions list
+    if (workoutView === 'sessions') {
+      return (
+        <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
+          <div style={{ padding: isMobile ? '0.625rem 0.75rem' : '0.75rem 1rem', borderBottom: '1px solid rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}><Dumbbell size={14} color="#f97316" /><span style={{ fontSize: '0.7rem', fontWeight: '700', color: '#f97316', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Sessies</span></div>
+            {workoutData?.totalWorkouts > 0 && <span style={{ fontSize: '0.65rem', fontWeight: '700', color: 'rgba(249,115,22,0.6)' }}>{workoutData.completedWorkouts}/{workoutData.totalWorkouts}</span>}
+          </div>
+          {workoutData?.totalWorkouts > 0 && (
+            <div style={{ display: 'flex', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+              {[{ label: 'VOLTOOID', val: workoutData.completedWorkouts, color: '#10b981' }, { label: 'TOTAAL', val: workoutData.totalWorkouts, color: '#fff' }, { label: 'LAATSTE', val: formatDaysAgo(workoutData.daysSinceWorkout), color: workoutData.daysSinceWorkout <= 3 ? '#10b981' : workoutData.daysSinceWorkout <= 7 ? '#f59e0b' : '#ef4444' }].map((s, i) => (
+                <div key={i} style={{ flex: 1, textAlign: 'center', padding: isMobile ? '0.4rem 0.125rem' : '0.5rem 0.25rem', borderRight: i < 2 ? '1px solid rgba(255,255,255,0.04)' : 'none' }}>
+                  <div style={{ fontSize: '0.4rem', fontWeight: '700', color: 'rgba(255,255,255,0.2)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '0.1rem' }}>{s.label}</div>
+                  <div style={{ fontSize: isMobile ? '0.8rem' : '0.9rem', fontWeight: '800', color: s.color, lineHeight: 1 }}>{s.val}</div>
+                </div>
+              ))}
+            </div>
+          )}
+          <div style={{ flex: 1, overflowY: 'auto', WebkitOverflowScrolling: 'touch' }}>
+            {workouts.length > 0 ? workouts.slice(0, 20).map((w, idx) => (
+              <button key={`${w.workout_date}-${idx}`} onClick={() => { setSelectedSession(w); setWorkoutView('exercises') }} style={{ width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: isMobile ? '0.5rem 0.75rem' : '0.625rem 1rem', borderBottom: '1px solid rgba(255,255,255,0.03)', background: 'transparent', border: 'none', cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', textAlign: 'left' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                  <span style={{ fontSize: '0.5rem', padding: '0.1rem 0.25rem', borderRadius: '3px', fontWeight: '700', background: w.is_completed ? 'rgba(16,185,129,0.12)' : 'rgba(249,115,22,0.12)', color: w.is_completed ? '#10b981' : '#f97316' }}>{w.is_completed ? '✓' : '—'}</span>
+                  <span style={{ fontSize: isMobile ? '0.7rem' : '0.75rem', fontWeight: '600', color: '#fff' }}>{w.day_name}</span>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                  <span style={{ fontSize: '0.55rem', color: 'rgba(255,255,255,0.25)' }}>{formatDate(w.workout_date)}</span>
+                  <ChevronRight size={12} color="rgba(255,255,255,0.15)" />
+                </div>
+              </button>
+            )) : <div style={{ padding: '2rem 1rem', textAlign: 'center', color: 'rgba(255,255,255,0.2)', fontSize: '0.75rem' }}>Geen workouts</div>}
+          </div>
+        </div>
+      )
+    }
+
+    // Exercises for session
+    if (workoutView === 'exercises' && selectedSession) {
+      const exs = getSessionExercises()
+      return (
+        <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
+          <div style={{ padding: isMobile ? '0.625rem 0.75rem' : '0.75rem 1rem', borderBottom: '1px solid rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+            <button onClick={() => { setWorkoutView('sessions'); setSelectedSession(null) }} style={{ display: 'flex', alignItems: 'center', background: 'transparent', border: 'none', color: '#f97316', cursor: 'pointer', padding: 0, touchAction: 'manipulation' }}><ArrowLeft size={14} /></button>
+            <span style={{ fontSize: '0.7rem', fontWeight: '700', color: '#f97316' }}>{selectedSession.day_name}</span>
+            <span style={{ fontSize: '0.5rem', color: 'rgba(255,255,255,0.25)' }}>{formatDate(selectedSession.workout_date)}</span>
+          </div>
+          <div style={{ flex: 1, overflowY: 'auto', WebkitOverflowScrolling: 'touch' }}>
+            {exs.length > 0 ? exs.map((ex, idx) => (
+              <button key={idx} onClick={() => { setSelectedExercise(ex.name); setWorkoutView('progress') }} style={{ width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: isMobile ? '0.5rem 0.75rem' : '0.625rem 1rem', borderBottom: '1px solid rgba(255,255,255,0.03)', background: 'transparent', border: 'none', cursor: 'pointer', touchAction: 'manipulation', textAlign: 'left' }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: isMobile ? '0.7rem' : '0.75rem', fontWeight: '600', color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{ex.name}</div>
+                  {ex.sets?.length > 0 && <div style={{ display: 'flex', gap: '0.25rem', marginTop: '0.15rem', flexWrap: 'wrap' }}>
+                    {ex.sets.map((s, si) => <span key={si} style={{ fontSize: '0.5rem', padding: '0.1rem 0.25rem', background: 'rgba(249,115,22,0.08)', borderRadius: '3px', color: 'rgba(249,115,22,0.6)' }}>{s.weight || 0}kg×{s.reps || 0}{s.partials ? <span style={{ color: 'rgba(168,85,247,0.6)' }}>+{s.partials}p</span> : null}{s.dropsets?.length > 0 ? s.dropsets.map((ds, di) => <span key={di} style={{ color: 'rgba(255,215,0,0.6)' }}> D{ds.weight}×{ds.reps}</span>) : null}</span>)}
+                  </div>}
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.2rem', flexShrink: 0 }}>
+                  {ex.bestWeight > 0 && <span style={{ fontSize: '0.7rem', fontWeight: '800', color: '#f97316' }}>{ex.bestWeight}kg</span>}
+                  <ChevronRight size={12} color="rgba(255,255,255,0.15)" />
+                </div>
+              </button>
+            )) : <div style={{ padding: '2rem 1rem', textAlign: 'center', color: 'rgba(255,255,255,0.2)', fontSize: '0.75rem' }}>Geen data</div>}
+          </div>
+        </div>
+      )
+    }
+
+    // Exercise progress over time
+    if (workoutView === 'progress' && selectedExercise) {
+      const entries = getExerciseHistory()
+      const first = entries.length > 0 ? entries[entries.length - 1] : null
+      const latest = entries[0] || null
+      const wDiff = (first && latest && entries.length >= 2) ? latest.bestWeight - first.bestWeight : null
+      return (
+        <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
+          <div style={{ padding: isMobile ? '0.625rem 0.75rem' : '0.75rem 1rem', borderBottom: '1px solid rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+            <button onClick={() => setWorkoutView('exercises')} style={{ display: 'flex', alignItems: 'center', background: 'transparent', border: 'none', color: '#f97316', cursor: 'pointer', padding: 0, touchAction: 'manipulation' }}><ArrowLeft size={14} /></button>
+            <span style={{ fontSize: '0.7rem', fontWeight: '700', color: '#f97316', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{selectedExercise}</span>
+          </div>
+          {latest && (
+            <div style={{ display: 'flex', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+              {[{ label: 'BESTE', val: `${latest.bestWeight}kg`, color: '#f97316' }, { label: 'REPS', val: `×${latest.bestReps}`, color: '#fff' }, { label: 'SESSIES', val: entries.length, color: '#fff' }, ...(wDiff !== null && wDiff !== 0 ? [{ label: 'TREND', val: `${wDiff > 0 ? '+' : ''}${wDiff}kg`, color: wDiff > 0 ? '#10b981' : '#ef4444' }] : [])].map((s, i) => (
+                <div key={i} style={{ flex: 1, textAlign: 'center', padding: isMobile ? '0.4rem 0.125rem' : '0.5rem 0.25rem', borderRight: i < 3 ? '1px solid rgba(255,255,255,0.04)' : 'none' }}>
+                  <div style={{ fontSize: '0.4rem', fontWeight: '700', color: 'rgba(255,255,255,0.2)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '0.1rem' }}>{s.label}</div>
+                  <div style={{ fontSize: isMobile ? '0.75rem' : '0.85rem', fontWeight: '800', color: s.color, lineHeight: 1 }}>{s.val}</div>
+                </div>
+              ))}
+            </div>
+          )}
+          {entries.length > 1 && (
+            <div style={{ padding: isMobile ? '0.5rem 0.75rem' : '0.625rem 1rem', borderBottom: '1px solid rgba(255,255,255,0.04)', display: 'flex', gap: '0.2rem', alignItems: 'flex-end', justifyContent: 'center' }}>
+              {[...entries].reverse().slice(-12).map((e, ei, arr) => {
+                const mx = Math.max(...arr.map(x => x.bestWeight)), mn = Math.min(...arr.map(x => x.bestWeight)), rng = mx - mn || 1
+                return <div key={ei} title={`${formatDate(e.date)}: ${e.bestWeight}kg`} style={{ width: '10px', height: `${8 + ((e.bestWeight - mn) / rng) * 24}px`, borderRadius: '2px', background: ei === arr.length - 1 ? '#f97316' : 'rgba(249,115,22,0.25)', flexShrink: 0 }} />
+              })}
+            </div>
+          )}
+          <div style={{ flex: 1, overflowY: 'auto', WebkitOverflowScrolling: 'touch' }}>
+            {entries.map((e, idx) => (
+              <div key={idx} style={{ padding: isMobile ? '0.5rem 0.75rem' : '0.625rem 1rem', borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.2rem' }}>
+                  <span style={{ fontSize: '0.6rem', color: idx === 0 ? '#f97316' : 'rgba(255,255,255,0.35)' }}>{formatDate(e.date)}</span>
+                  <span style={{ fontSize: '0.7rem', fontWeight: '800', color: idx === 0 ? '#f97316' : '#fff' }}>{e.bestWeight}kg <span style={{ fontWeight: '500', fontSize: '0.5rem', opacity: 0.5 }}>×{e.bestReps}</span></span>
+                </div>
+                {e.sets?.length > 0 && <div style={{ display: 'flex', gap: '0.2rem', flexWrap: 'wrap' }}>
+                  {e.sets.map((s, si) => <span key={si} style={{ fontSize: '0.5rem', padding: '0.1rem 0.3rem', background: 'rgba(249,115,22,0.06)', borderRadius: '3px', color: 'rgba(255,255,255,0.35)' }}>{s.weight || 0}×{s.reps || 0}{s.partials ? <span style={{ color: 'rgba(168,85,247,0.5)' }}>+{s.partials}p</span> : null}{s.dropsets?.length > 0 ? s.dropsets.map((ds, di) => <span key={di} style={{ color: 'rgba(255,215,0,0.5)' }}> D{ds.weight}×{ds.reps}</span>) : null}</span>)}
+                </div>}
+              </div>
+            ))}
+            {entries.length === 0 && <div style={{ padding: '2rem 1rem', textAlign: 'center', color: 'rgba(255,255,255,0.2)', fontSize: '0.75rem' }}>Geen progressie</div>}
+          </div>
+        </div>
+      )
+    }
+    return null
+  }
+
+  // ═══════════════════════════════════
+  // COLUMN 3: MEALS (navigable: days → detail)
+  // ═══════════════════════════════════
+  const MealsColumn = () => {
+    const targets = mealData.targets
+    const today = mealData.todayTotals
+    const dailyLog = mealData.dailyLog
+    const days = Object.keys(dailyLog).sort((a, b) => new Date(b) - new Date(a))
+
+    const pct = (val, target) => target > 0 ? Math.min(100, Math.round((val / target) * 100)) : 0
+    const pctColor = (p) => p >= 90 ? '#10b981' : p >= 70 ? '#f59e0b' : '#ef4444'
+
+    const mealTypeLabel = { breakfast: 'Ontbijt', lunch: 'Lunch', dinner: 'Diner', snack: 'Snack', quick_add: 'Quick Add', custom_meal: 'Custom', custom: 'Overig' }
+    const mealTypeColor = { breakfast: '#f59e0b', lunch: '#10b981', dinner: '#3b82f6', snack: '#a855f7', quick_add: '#6b7280' }
+
+    // ── DAY DETAIL VIEW ──
+    if (mealView === 'detail' && selectedMealDay) {
+      const dayData = dailyLog[selectedMealDay]
+      if (!dayData) { setMealView('days'); return null }
+
+      const dayMeals = dayData.meals || []
+      const grouped = {}
+      dayMeals.forEach(m => {
+        const type = m.type || 'other'
+        if (!grouped[type]) grouped[type] = []
+        grouped[type].push(m)
+      })
+      const mealOrder = ['breakfast', 'lunch', 'dinner', 'snack', 'quick_add', 'custom_meal', 'custom', 'other']
+      const sortedTypes = Object.keys(grouped).sort((a, b) => mealOrder.indexOf(a) - mealOrder.indexOf(b))
+
+      return (
+        <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
+          <div style={{ padding: isMobile ? '0.625rem 0.75rem' : '0.75rem 1rem', borderBottom: '1px solid rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+            <button onClick={() => { setMealView('days'); setSelectedMealDay(null) }} style={{ display: 'flex', alignItems: 'center', background: 'transparent', border: 'none', color: '#10b981', cursor: 'pointer', padding: 0, touchAction: 'manipulation' }}><ArrowLeft size={14} /></button>
+            <span style={{ fontSize: '0.7rem', fontWeight: '700', color: '#10b981' }}>{formatDate(selectedMealDay)}</span>
+            <span style={{ fontSize: '0.5rem', color: 'rgba(255,255,255,0.25)' }}>{dayData.count} items</span>
+          </div>
+
+          {/* Day totals stat bar */}
+          {targets && (
+            <div style={{ display: 'flex', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+              {[
+                { label: 'KCAL', val: Math.round(dayData.calories), target: targets.calories, color: '#10b981' },
+                { label: 'EIWIT', val: Math.round(dayData.protein), target: targets.protein, color: '#3b82f6' },
+                { label: 'CARBS', val: Math.round(dayData.carbs), target: targets.carbs, color: '#f59e0b' },
+                { label: 'VET', val: Math.round(dayData.fat), target: targets.fat, color: '#ef4444' }
+              ].map((m, i) => {
+                const p = pct(m.val, m.target)
+                return (
+                  <div key={i} style={{ flex: 1, textAlign: 'center', padding: isMobile ? '0.4rem 0.125rem' : '0.5rem 0.25rem', borderRight: i < 3 ? '1px solid rgba(255,255,255,0.04)' : 'none' }}>
+                    <div style={{ fontSize: '0.4rem', fontWeight: '700', color: 'rgba(255,255,255,0.2)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '0.1rem' }}>{m.label}</div>
+                    <div style={{ fontSize: isMobile ? '0.75rem' : '0.85rem', fontWeight: '800', color: pctColor(p), lineHeight: 1 }}>{m.val}</div>
+                    <div style={{ fontSize: '0.4rem', color: 'rgba(255,255,255,0.2)', marginTop: '0.05rem' }}>/{m.target}</div>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+
+          {/* Meals grouped by type */}
+          <div style={{ flex: 1, overflowY: 'auto', WebkitOverflowScrolling: 'touch' }}>
+            {sortedTypes.map(type => (
+              <div key={type}>
+                <div style={{ padding: isMobile ? '0.4rem 0.75rem' : '0.5rem 1rem', borderBottom: '1px solid rgba(255,255,255,0.04)', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                  <div style={{ width: '4px', height: '4px', borderRadius: '50%', background: mealTypeColor[type] || 'rgba(255,255,255,0.3)' }} />
+                  <span style={{ fontSize: '0.5rem', fontWeight: '700', color: mealTypeColor[type] || 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                    {mealTypeLabel[type] || type}
+                  </span>
+                </div>
+                {grouped[type].map((meal, mIdx) => (
+                  <div key={mIdx} style={{ padding: isMobile ? '0.4rem 0.75rem 0.4rem 1.25rem' : '0.5rem 1rem 0.5rem 1.5rem', borderBottom: '1px solid rgba(255,255,255,0.03)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: isMobile ? '0.65rem' : '0.7rem', fontWeight: '600', color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{meal.name}</div>
+                    </div>
+                    <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center', flexShrink: 0 }}>
+                      <span style={{ fontSize: '0.6rem', fontWeight: '800', color: '#10b981' }}>{meal.calories}</span>
+                      <span style={{ fontSize: '0.45rem', color: 'rgba(255,255,255,0.2)' }}>E:{Math.round(meal.protein)}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ))}
+          </div>
+        </div>
+      )
+    }
+
+    // ── DAYS LIST VIEW ──
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
+        <div style={{ padding: isMobile ? '0.625rem 0.75rem' : '0.75rem 1rem', borderBottom: '1px solid rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+            <UtensilsCrossed size={14} color="#10b981" />
+            <span style={{ fontSize: '0.7rem', fontWeight: '700', color: '#10b981', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Voeding</span>
+          </div>
+          <span style={{ fontSize: '0.55rem', color: 'rgba(255,255,255,0.25)' }}>{mealData.loggingDays}/7 dagen</span>
+        </div>
+
+        {/* Today vs Targets */}
+        {targets && (
+          <div style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+            <div style={{ display: 'flex' }}>
+              {[
+                { label: 'KCAL', val: Math.round(today.calories), target: targets.calories, color: '#10b981' },
+                { label: 'EIWIT', val: Math.round(today.protein), target: targets.protein, color: '#3b82f6' },
+                { label: 'CARBS', val: Math.round(today.carbs), target: targets.carbs, color: '#f59e0b' },
+                { label: 'VET', val: Math.round(today.fat), target: targets.fat, color: '#ef4444' }
+              ].map((m, i) => {
+                const p = pct(m.val, m.target)
+                return (
+                  <div key={i} style={{ flex: 1, textAlign: 'center', padding: isMobile ? '0.4rem 0.125rem' : '0.5rem 0.25rem', borderRight: i < 3 ? '1px solid rgba(255,255,255,0.04)' : 'none' }}>
+                    <div style={{ fontSize: '0.4rem', fontWeight: '700', color: 'rgba(255,255,255,0.2)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '0.1rem' }}>{m.label}</div>
+                    <div style={{ fontSize: isMobile ? '0.75rem' : '0.85rem', fontWeight: '800', color: pctColor(p), lineHeight: 1 }}>{m.val}</div>
+                    <div style={{ fontSize: '0.4rem', color: 'rgba(255,255,255,0.2)', marginTop: '0.1rem' }}>/{m.target}</div>
+                    <div style={{ height: '2px', background: 'rgba(255,255,255,0.04)', borderRadius: '1px', marginTop: '0.2rem', overflow: 'hidden' }}>
+                      <div style={{ height: '100%', width: `${p}%`, background: pctColor(p), borderRadius: '1px' }} />
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* Plan + navigate — always visible */}
+        {onNavigatePlan && (
+          <div style={{ padding: isMobile ? '0.5rem 0.75rem' : '0.625rem 1rem', borderBottom: '1px solid rgba(255,255,255,0.04)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div>
+              {mealData.plan ? (
+                <>
+                  <div style={{ fontSize: '0.6rem', fontWeight: '600', color: mealData.plan.isActive ? '#10b981' : 'rgba(255,255,255,0.4)' }}>{mealData.plan.name || 'Mealplan'}</div>
+                  <div style={{ fontSize: '0.45rem', color: 'rgba(255,255,255,0.2)' }}>{mealData.plan.isActive ? 'Actief' : 'Concept'}</div>
+                </>
+              ) : (
+                <div style={{ fontSize: '0.6rem', fontWeight: '600', color: 'rgba(255,255,255,0.3)' }}>Geen plan</div>
+              )}
+            </div>
+            <button onClick={() => { onNavigatePlan(client.id, mealData.plan?.id || null); onClose() }} style={{ padding: isMobile ? '0.3rem 0.5rem' : '0.35rem 0.625rem', background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.2)', borderRadius: '6px', color: '#10b981', fontSize: '0.6rem', fontWeight: '700', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.2rem', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', minHeight: '28px' }}>
+              <ExternalLink size={10} /> {mealData.plan ? 'Bekijk Plan' : 'Nieuw Plan'}
+            </button>
+          </div>
+        )}
+
+        {/* Avg stats */}
+        {mealData.loggingDays > 0 && (
+          <div style={{ display: 'flex', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+            <div style={{ flex: 1, textAlign: 'center', padding: isMobile ? '0.4rem' : '0.5rem', borderRight: '1px solid rgba(255,255,255,0.04)' }}>
+              <div style={{ fontSize: '0.4rem', fontWeight: '700', color: 'rgba(255,255,255,0.2)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '0.1rem' }}>GEM KCAL</div>
+              <div style={{ fontSize: isMobile ? '0.75rem' : '0.85rem', fontWeight: '800', color: '#10b981', lineHeight: 1 }}>{mealData.avgCalories}</div>
+            </div>
+            <div style={{ flex: 1, textAlign: 'center', padding: isMobile ? '0.4rem' : '0.5rem' }}>
+              <div style={{ fontSize: '0.4rem', fontWeight: '700', color: 'rgba(255,255,255,0.2)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '0.1rem' }}>LOG DAGEN</div>
+              <div style={{ fontSize: isMobile ? '0.75rem' : '0.85rem', fontWeight: '800', color: '#fff', lineHeight: 1 }}>{mealData.loggingDays}<span style={{ fontSize: '0.4rem', opacity: 0.4 }}>/7</span></div>
+            </div>
+          </div>
+        )}
+
+        {/* Daily log — clickable */}
+        <div style={{ flex: 1, overflowY: 'auto', WebkitOverflowScrolling: 'touch' }}>
+          {days.length > 0 ? (
+            <div style={{ padding: isMobile ? '0.375rem 0.5rem' : '0.5rem 0.75rem' }}>
+              <div style={{ fontSize: '0.45rem', fontWeight: '700', color: 'rgba(16,185,129,0.3)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.25rem' }}>Dagelijks</div>
+              {days.map((day, idx) => {
+                const d = dailyLog[day]
+                const calPct = targets ? pct(d.calories, targets.calories) : null
+                return (
+                  <button key={day} onClick={() => { setSelectedMealDay(day); setMealView('detail') }} style={{
+                    width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                    padding: '0.35rem 0.25rem', borderBottom: idx < days.length - 1 ? '1px solid rgba(255,255,255,0.03)' : 'none',
+                    background: 'transparent', border: 'none', cursor: 'pointer',
+                    touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', textAlign: 'left'
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                      <span style={{ fontSize: '0.6rem', color: idx === 0 ? '#10b981' : 'rgba(255,255,255,0.35)' }}>{formatDate(day)}</span>
+                      <span style={{ fontSize: '0.45rem', color: 'rgba(255,255,255,0.15)' }}>{d.count}x</span>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                      <span style={{ fontSize: '0.65rem', fontWeight: '800', color: calPct !== null ? pctColor(calPct) : '#fff' }}>{d.calories}</span>
+                      <span style={{ fontSize: '0.45rem', color: 'rgba(255,255,255,0.2)' }}>E:{Math.round(d.protein)}</span>
+                      <ChevronRight size={12} color="rgba(255,255,255,0.15)" />
+                    </div>
+                  </button>
+                )
+              })}
+            </div>
+          ) : (
+            <div style={{ padding: '2rem 1rem', textAlign: 'center', color: 'rgba(255,255,255,0.2)', fontSize: '0.75rem' }}>Geen voedingsdata</div>
+          )}
+        </div>
+      </div>
+    )
+  }
+
+  // ═══════════════════════════════════
+  // MAIN RENDER
+  // ═══════════════════════════════════
+  return (
+    <>
+      <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.92)', backdropFilter: 'blur(8px)', zIndex: 10000, display: 'flex', flexDirection: 'column', animation: 'insightFadeIn 0.2s ease' }}>
+        <div onClick={e => e.stopPropagation()} style={{ flex: 1, display: 'flex', flexDirection: 'column', maxWidth: isMobile ? '100%' : '1200px', width: '100%', margin: '0 auto', background: '#0a0a0a', overflow: 'hidden' }}>
+          {/* Top bar */}
+          <div style={{ padding: isMobile ? '0.625rem 0.75rem' : '0.75rem 1.25rem', borderBottom: '1px solid rgba(255,255,255,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <BarChart3 size={16} color="#FFD700" />
+              <h2 style={{ fontSize: isMobile ? '1rem' : '1.15rem', fontWeight: '800', color: '#FFD700', margin: 0, letterSpacing: '-0.02em' }}>{client.first_name} {client.last_name}</h2>
+            </div>
+            <button onClick={onClose} style={{ width: '32px', height: '32px', borderRadius: '8px', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}><X size={16} /></button>
+          </div>
+
+          {/* Mobile tabs */}
+          {isMobile && (
+            <div style={{ display: 'flex', borderBottom: '1px solid rgba(255,255,255,0.06)', flexShrink: 0 }}>
+              {mobileTabs.map(tab => {
+                const TabIcon = tab.icon; const isActive = mobileTab === tab.id
+                return <button key={tab.id} onClick={() => { setMobileTab(tab.id); if (tab.id === 'workout') { setWorkoutView('sessions'); setSelectedSession(null); setSelectedExercise(null) }; if (tab.id === 'meals') { setMealView('days'); setSelectedMealDay(null) } }} style={{ flex: 1, padding: '0.5rem 0', background: 'transparent', border: 'none', borderBottom: isActive ? `2px solid ${tab.color}` : '2px solid transparent', color: isActive ? tab.color : 'rgba(255,255,255,0.3)', fontSize: '0.6rem', fontWeight: isActive ? '700' : '500', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.2rem', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}>
+                  <TabIcon size={12} />{tab.label}
+                </button>
+              })}
+            </div>
+          )}
+
+          {/* Content */}
+          <div style={{ flex: 1, display: 'flex', overflow: 'hidden', flexDirection: isMobile ? 'column' : 'row' }}>
+            {!isMobile && (<>
+              <div style={{ flex: 1, borderRight: '1px solid rgba(255,255,255,0.06)', overflow: 'hidden' }}><WeightColumn /></div>
+              <div style={{ flex: 1, borderRight: '1px solid rgba(255,255,255,0.06)', overflow: 'hidden' }}><WorkoutColumn /></div>
+              <div style={{ flex: 1, overflow: 'hidden' }}><MealsColumn /></div>
+            </>)}
+            {isMobile && <div style={{ flex: 1, overflow: 'hidden' }}>
+              {mobileTab === 'weight' && <WeightColumn />}
+              {mobileTab === 'workout' && <WorkoutColumn />}
+              {mobileTab === 'meals' && <MealsColumn />}
+            </div>}
+          </div>
+        </div>
+      </div>
+
+      {/* Photo zoom */}
+      {photoZoom && photos.length > 0 && (
+        <div onClick={() => setPhotoZoom(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.97)', zIndex: 10500, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: isMobile ? '1rem' : '2rem' }}>
+          <button onClick={() => setPhotoZoom(false)} style={{ position: 'absolute', top: isMobile ? '0.75rem' : '1.5rem', right: isMobile ? '0.75rem' : '1.5rem', width: '36px', height: '36px', borderRadius: '50%', background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.2)', color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10501, touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}><X size={18} /></button>
+          <img onClick={e => e.stopPropagation()} src={photos[selectedPhotoIndex]?.photo_url} alt="" style={{ maxWidth: '90vw', maxHeight: '75vh', borderRadius: '8px', objectFit: 'contain' }} />
+          {photos.length > 1 && (<>
+            <button onClick={e => { e.stopPropagation(); setSelectedPhotoIndex(p => (p - 1 + photos.length) % photos.length) }} style={{ position: 'absolute', left: isMobile ? '0.5rem' : '2rem', top: '50%', transform: 'translateY(-50%)', width: '40px', height: '40px', borderRadius: '50%', background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.15)', color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}><ChevronLeft size={22} /></button>
+            <button onClick={e => { e.stopPropagation(); setSelectedPhotoIndex(p => (p + 1) % photos.length) }} style={{ position: 'absolute', right: isMobile ? '0.5rem' : '2rem', top: '50%', transform: 'translateY(-50%)', width: '40px', height: '40px', borderRadius: '50%', background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.15)', color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}><ChevronRight size={22} /></button>
+          </>)}
+          <div style={{ marginTop: '0.75rem', textAlign: 'center' }}>
+            <div style={{ fontSize: '0.8rem', fontWeight: '600', color: 'rgba(255,255,255,0.7)' }}>{formatDate(photos[selectedPhotoIndex]?.photo_date)}</div>
+            <div style={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.3)', marginTop: '0.15rem' }}>{selectedPhotoIndex + 1} / {photos.length}</div>
+          </div>
+        </div>
+      )}
+
+      <style>{`@keyframes insightFadeIn { from { opacity: 0 } to { opacity: 1 } }`}</style>
+    </>
+  )
+}

@@ -1,423 +1,683 @@
-import { useState, useEffect } from 'react'
-import { Plus, Settings, ChevronDown, ChevronUp } from 'lucide-react'
+// src/modules/lead-management/components/kanban/KanbanBoard.jsx
+// VERSION 7.0 - STYLING GUIDE COMPLIANT
+// ALL LOGIC PRESERVED 1:1 FROM v6.4
+// STYLING: Compact headers, flush rows, no gradients, no glow, no boxShadow animations
+
+import { useState, useEffect, useCallback, useRef } from 'react'
+import { createPortal } from 'react-dom'
+import { Plus, Settings, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, GripVertical, Save, RotateCcw, Users, Instagram, Search, X, ArrowUp, Clock, Maximize2, Minimize2, CheckCircle } from 'lucide-react'
 import KanbanCard from './KanbanCard'
 import AddLeadModal from './AddLeadModal'
 import SectionModal from './SectionModal'
+import DailyStatsBar from '../DailyStatsBar'
+import WarmUpBoard from './WarmUpBoard'
+import { exportDailyReport } from '../../utils/exportDailyReport'
+import SalesCallModal from './SalesCallModal'
 
-export default function KanbanBoard({ leadService, coachId, isMobile }) {
+const SNOOZE_SECTION_PATTERNS = ['later follow', 'later opvolg', 'follow up', 'followup', 'snooze', 'parkeer']
+
+// Gold theme tokens (consistent with CoachHub)
+const G = {
+  primary: '#FFD700',
+  border: 'rgba(255, 215, 0, 0.15)',
+  bg: 'rgba(255, 215, 0, 0.08)',
+  text: 'rgba(255, 215, 0, 0.6)'
+}
+
+export default function KanbanBoard({ 
+  leadService, db, coachId, isMobile, onUnsavedChanges, coachName = 'Coach',
+  campaigns = [], activeCampaign = null
+}) { 
+  const [viewMode, setViewMode] = useState('leads')
   const [sections, setSections] = useState([])
+  const [originalSections, setOriginalSections] = useState([])
   const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
   const [showAddLead, setShowAddLead] = useState(false)
   const [showSectionModal, setShowSectionModal] = useState(false)
   const [selectedSection, setSelectedSection] = useState(null)
   const [selectedSectionForLead, setSelectedSectionForLead] = useState(null)
+  const [expandedSections, setExpandedSections] = useState({})
+  const [activityData, setActivityData] = useState({})
+  const [funnelData, setFunnelData] = useState({})
   const [draggedLead, setDraggedLead] = useState(null)
-  const [draggedOverSection, setDraggedOverSection] = useState(null)
-  const [expandedSections, setExpandedSections] = useState({}) // Track which sections are expanded
+  const [dragOverSectionId, setDragOverSectionId] = useState(null)
+  const [draggedSection, setDraggedSection] = useState(null)
+  const [dragOverForSection, setDragOverForSection] = useState(null)
+  const [isDraggingSection, setIsDraggingSection] = useState(false)
+  const [searchQuery, setSearchQuery] = useState('')
+  const [searchResults, setSearchResults] = useState([])
+  const [showSearchResults, setShowSearchResults] = useState(false)
+  const [highlightedLeadId, setHighlightedLeadId] = useState(null)
+  const searchInputRef = useRef(null)
+  const leadRefs = useRef({})
+  const [showScrollTop, setShowScrollTop] = useState(false)
+  const [staleCheckDone, setStaleCheckDone] = useState(false)
+  const [staleCheckResult, setStaleCheckResult] = useState(null)
+  const [snoozeSection, setSnoozeSection] = useState(null)
+  const [isFullscreen, setIsFullscreen] = useState(false)
+  const [salesCallLead, setSalesCallLead] = useState(null)
+  const fullscreenContentRef = useRef(null)
+  
+  const MAX_VISIBLE_LEADS = 5
 
-  const MAX_VISIBLE_LEADS = 5 // Maximum leads to show before collapsing
-
+  // ========================================
+  // REAL-TIME SUBSCRIPTION — PRESERVED 1:1
+  // ========================================
   useEffect(() => {
-    if (leadService && coachId) {
-      loadBoard()
-    }
-  }, [leadService, coachId])
+    if (!db?.supabase || !coachId) return
 
-  const loadBoard = async () => {
-    try {
-      setLoading(true)
-      const board = await leadService.getKanbanBoard(coachId)
-      setSections(board)
-    } catch (error) {
-      console.error('❌ Load kanban failed:', error)
-    } finally {
-      setLoading(false)
+    const timestamp = Date.now()
+    const channelName1 = `kanban_leads_${coachId}_${timestamp}`
+    const channelName2 = `kanban_items_${coachId}_${timestamp}`
+
+    const subscription1 = db.supabase
+      .channel(channelName1)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'call_leads' }, (payload) => {
+        handleRealtimeEvent(payload, 'call_leads')
+      })
+      .subscribe()
+
+    const subscription2 = db.supabase
+      .channel(channelName2)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'lead_section_items' }, (payload) => {
+        handleRealtimeEvent(payload, 'lead_section_items')
+      })
+      .subscribe()
+
+    return () => {
+      subscription1.unsubscribe()
+      subscription2.unsubscribe()
+    }
+  }, [db, coachId])
+
+  // ========================================
+  // REALTIME EVENT HANDLER — PRESERVED 1:1
+  // ========================================
+  const handleRealtimeEvent = async (payload, tableName) => {
+    const updatedItem = payload.new
+    const oldItem = payload.old
+    
+    if (tableName === 'lead_section_items') {
+      const leadId = updatedItem?.lead_id || oldItem?.lead_id
+      if (!leadId) return
+      
+      const { data: fullLead, error: leadError } = await db.supabase
+        .from('call_leads').select('*').eq('id', leadId).single()
+      
+      if (leadError || !fullLead) { loadBoard(false); return }
+      
+      const enrichedLead = {
+        ...fullLead,
+        section_id: updatedItem?.section_id,
+        position: updatedItem?.position || 0,
+        previous_section_id: updatedItem?.previous_section_id,
+        previous_section_title: updatedItem?.previous_section_title,
+        previous_section_color: updatedItem?.previous_section_color
+      }
+      
+      if (payload.eventType === 'UPDATE') handleLeadUpdate(enrichedLead, { ...fullLead, section_id: oldItem?.section_id })
+      else if (payload.eventType === 'INSERT') handleLeadInsert(enrichedLead)
+      else if (payload.eventType === 'DELETE') handleRealtimeLeadDelete(oldItem)
+      return
+    }
+    
+    const updatedLead = payload.new
+    const oldLead = payload.old
+    const isRelevant = updatedLead?.coach_id === coachId || updatedLead?.coach_id === null || oldLead?.coach_id === coachId || oldLead?.coach_id === null
+    if (!isRelevant) return
+    
+    if (payload.eventType === 'UPDATE') handleLeadUpdate(updatedLead, oldLead)
+    else if (payload.eventType === 'INSERT') handleLeadInsert(updatedLead)
+    else if (payload.eventType === 'DELETE') handleRealtimeLeadDelete(oldLead)
+  }
+
+  // ========================================
+  // LEAD UPDATE/INSERT/DELETE — PRESERVED 1:1
+  // ========================================
+  const handleLeadUpdate = (updatedLead, oldLead) => {
+    const targetSectionId = updatedLead.section_id || null
+    let currentSectionId = null
+    for (const section of sections) {
+      if ((section.leads || []).some(l => l.id === updatedLead.id)) { currentSectionId = section.id; break }
+    }
+    const isMove = targetSectionId && currentSectionId !== targetSectionId
+    
+    if (!isMove) {
+      setSections(prev => prev.map(section => ({
+        ...section,
+        leads: (section.leads || []).map(l => l.id === updatedLead.id ? { ...l, ...updatedLead } : l)
+      })))
+    } else {
+      setSections(prev => prev.map(section => {
+        if (section.id === currentSectionId) return { ...section, leads: (section.leads || []).filter(l => l.id !== updatedLead.id) }
+        if (targetSectionId && section.id === targetSectionId) {
+          const exists = (section.leads || []).some(l => l.id === updatedLead.id)
+          if (exists) return { ...section, leads: (section.leads || []).map(l => l.id === updatedLead.id ? updatedLead : l) }
+          return { ...section, leads: [updatedLead, ...(section.leads || [])] }
+        }
+        return section
+      }))
+      if (targetSectionId) setExpandedSections(prev => ({ ...prev, [targetSectionId]: true }))
+      setHighlightedLeadId(updatedLead.id)
+      setTimeout(() => setHighlightedLeadId(null), 3000)
+      loadActivityData()
     }
   }
 
+  const handleLeadInsert = (newLead) => {
+    const targetSectionId = newLead.section_id || 'unassigned'
+    setSections(prev => prev.map(section => {
+      if (section.id === targetSectionId) {
+        const exists = (section.leads || []).some(l => l.id === newLead.id)
+        if (!exists) return { ...section, leads: [newLead, ...(section.leads || [])] }
+      }
+      return section
+    }))
+    setHighlightedLeadId(newLead.id)
+    setTimeout(() => setHighlightedLeadId(null), 3000)
+    loadActivityData()
+  }
+
+  const handleRealtimeLeadDelete = (deletedLead) => {
+    setSections(prev => prev.map(section => ({ ...section, leads: (section.leads || []).filter(l => l.id !== deletedLead.id) })))
+    loadActivityData()
+  }
+
+  // ========================================
+  // EFFECTS — PRESERVED 1:1
+  // ========================================
+  useEffect(() => {
+    const handleKeyDown = (e) => { if (e.key === 'Escape' && isFullscreen) setIsFullscreen(false) }
+    if (isFullscreen) { document.addEventListener('keydown', handleKeyDown); document.body.style.overflow = 'hidden' }
+    else { document.body.style.overflow = '' }
+    return () => { document.removeEventListener('keydown', handleKeyDown); document.body.style.overflow = '' }
+  }, [isFullscreen])
+
+  useEffect(() => {
+    if (sections.length > 0) {
+      const found = sections.find(s => SNOOZE_SECTION_PATTERNS.some(p => (s.title || '').toLowerCase().includes(p)))
+      setSnoozeSection(found || null)
+    }
+  }, [sections])
+
+  useEffect(() => {
+    const handleScroll = () => setShowScrollTop(window.scrollY > 300)
+    window.addEventListener('scroll', handleScroll, { passive: true })
+    return () => window.removeEventListener('scroll', handleScroll)
+  }, [])
+
+  const scrollToTop = () => window.scrollTo({ top: 0, behavior: 'smooth' })
+
+  // CONTACTED TODAY SORTING — PRESERVED
+  const getSortedLeads = (section) => {
+    const leads = section.leads || []
+    const today = new Date().toISOString().split('T')[0]
+    return [...leads].sort((a, b) => {
+      const aToday = a.contacted_today_date?.split('T')[0] === today
+      const bToday = b.contacted_today_date?.split('T')[0] === today
+      if (aToday && !bToday) return 1
+      if (!aToday && bToday) return -1
+      return (a.position || 0) - (b.position || 0)
+    })
+  }
+
+  const getContactedTodayCount = (section) => {
+    const today = new Date().toISOString().split('T')[0]
+    return (section.leads || []).filter(l => l.contacted_today_date?.split('T')[0] === today).length
+  }
+
+  // SEARCH — PRESERVED 1:1
+  const handleSearch = (query) => {
+    setSearchQuery(query)
+    if (!query.trim()) { setSearchResults([]); setShowSearchResults(false); return }
+    const q = query.toLowerCase().trim()
+    const results = []
+    sections.forEach(section => {
+      (section.leads || []).forEach(lead => {
+        const fn = (lead.first_name || '').toLowerCase()
+        const ln = (lead.last_name || '').toLowerCase()
+        const full = `${fn} ${ln}`.trim()
+        const ig = (lead.instagram_handle || '').toLowerCase()
+        const em = (lead.email || '').toLowerCase()
+        const notes = (lead.notes || '').toLowerCase()
+        if (fn.includes(q) || ln.includes(q) || full.includes(q) || ig.includes(q) || em.includes(q) || notes.includes(q)) {
+          results.push({ ...lead, sectionId: section.id, sectionTitle: section.title, sectionColor: section.color })
+        }
+      })
+    })
+    setSearchResults(results.slice(0, 10))
+    setShowSearchResults(true)
+  }
+
+  const scrollToLead = (leadId, sectionId) => {
+    setExpandedSections(prev => ({ ...prev, [sectionId]: true }))
+    setHighlightedLeadId(leadId)
+    setShowSearchResults(false)
+    setSearchQuery('')
+    setTimeout(() => {
+      const el = leadRefs.current[leadId]
+      if (el) {
+        if (isFullscreen && fullscreenContentRef.current) {
+          const container = fullscreenContentRef.current
+          const eRect = el.getBoundingClientRect()
+          const cRect = container.getBoundingClientRect()
+          container.scrollTo({ top: container.scrollTop + (eRect.top - cRect.top) - (cRect.height / 2) + (eRect.height / 2), behavior: 'smooth' })
+        } else {
+          el.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' })
+        }
+      }
+    }, 200)
+    setTimeout(() => setHighlightedLeadId(null), 3000)
+  }
+
+  // DATA LOADING — PRESERVED 1:1
+  const loadActivityData = async () => {
+    try {
+      const [activity, funnel] = await Promise.all([leadService.getTodayActivity(coachId), leadService.getTodayFunnelStats(coachId)])
+      setActivityData(activity)
+      setFunnelData(funnel)
+    } catch (error) { console.error('❌ Load activity data failed:', error) }
+  }
+
+  const handleExportPDF = async () => {
+    await loadActivityData()
+    exportDailyReport(sections, { coachName, dailyGoal: 100 }, activityData, funnelData)
+  }
+
+  const hasUnsavedChanges = useCallback(() => {
+    if (sections.length === 0 || originalSections.length === 0) return false
+    const cur = sections.filter(s => s.id !== 'unassigned').map(s => s.id)
+    const orig = originalSections.filter(s => s.id !== 'unassigned').map(s => s.id)
+    if (cur.length !== orig.length) return true
+    return cur.some((id, i) => id !== orig[i])
+  }, [sections, originalSections])
+
+  useEffect(() => { if (onUnsavedChanges) onUnsavedChanges(hasUnsavedChanges()) }, [sections, originalSections, hasUnsavedChanges, onUnsavedChanges])
+
+  useEffect(() => {
+    const handler = (e) => { if (hasUnsavedChanges()) { e.preventDefault(); e.returnValue = 'Je hebt onopgeslagen wijzigingen.'; return e.returnValue } }
+    window.addEventListener('beforeunload', handler)
+    return () => window.removeEventListener('beforeunload', handler)
+  }, [hasUnsavedChanges])
+
+  useEffect(() => {
+    if (leadService && coachId) { loadBoard(true); loadActivityData() }
+  }, [leadService, coachId])
+
+  const loadBoard = async (isInitialLoad = false) => {
+    try {
+      setLoading(true)
+      const board = await leadService.getKanbanBoard(coachId)
+      if (isInitialLoad) { setSections(board); setOriginalSections(board) }
+      else {
+        const currentOrder = sections.filter(s => s.id !== 'unassigned').map(s => s.id)
+        const unassigned = board.find(s => s.id === 'unassigned')
+        const reordered = currentOrder.map(id => board.find(s => s.id === id)).filter(Boolean)
+        board.forEach(s => { if (s.id !== 'unassigned' && !currentOrder.includes(s.id)) reordered.push(s) })
+        if (unassigned) reordered.push(unassigned)
+        setSections(reordered)
+      }
+    } catch (error) { console.error('❌ Load kanban failed:', error) }
+    finally { setLoading(false) }
+  }
+
+  // STALE CHECK — PRESERVED 1:1
+  useEffect(() => {
+    const run = async () => {
+      if (!leadService || !coachId || staleCheckDone || loading) return
+      if (typeof leadService.checkAndMoveStaleLeads !== 'function') { setStaleCheckDone(true); return }
+      try {
+        const result = await leadService.checkAndMoveStaleLeads(coachId)
+        setStaleCheckResult(result)
+        setStaleCheckDone(true)
+        if (result && result.moved > 0) { await loadBoard(true); await loadActivityData() }
+      } catch (error) { console.error('❌ Stale check failed:', error); setStaleCheckDone(true) }
+    }
+    if (!loading && !staleCheckDone) run()
+  }, [leadService, coachId, loading, staleCheckDone])
+
+  // ========================================
+  // HANDLERS — ALL PRESERVED 1:1
+  // ========================================
+  const handleSnoozeLead = async (leadId) => {
+    if (!snoozeSection) { alert('⚠️ Geen "Later Follow Up" sectie gevonden!'); return }
+    let currentSectionId = null, leadData = null
+    for (const section of sections) {
+      const found = (section.leads || []).find(l => l.id === leadId)
+      if (found) { currentSectionId = section.id; leadData = found; break }
+    }
+    if (currentSectionId === snoozeSection.id) return
+    try {
+      await leadService.moveLeadToSection(leadId, snoozeSection.id, 0, coachId)
+      setSections(prev => prev.map(section => {
+        if (section.id === currentSectionId) return { ...section, leads: (section.leads || []).filter(l => l.id !== leadId) }
+        if (section.id === snoozeSection.id) return { ...section, leads: [leadData, ...(section.leads || []).filter(l => l.id !== leadId)] }
+        return section
+      }))
+      setExpandedSections(prev => ({ ...prev, [snoozeSection.id]: true }))
+      setHighlightedLeadId(leadId)
+      setTimeout(() => setHighlightedLeadId(null), 2000)
+      loadActivityData()
+    } catch (error) { console.error('❌ Snooze lead failed:', error); loadBoard(false) }
+  }
+
+  const isSnoozeSectionById = (sectionId) => snoozeSection && snoozeSection.id === sectionId
+
+  const handleSave = async () => {
+    if (!hasUnsavedChanges()) return
+    try {
+      setSaving(true)
+      await leadService.reorderSections(coachId, sections.filter(s => s.id !== 'unassigned').map(s => s.id))
+      setOriginalSections([...sections])
+    } catch (error) { console.error('❌ Save failed:', error); alert('Opslaan mislukt') }
+    finally { setSaving(false) }
+  }
+
+  const handleReset = () => { if (hasUnsavedChanges() && window.confirm('Wijzigingen ongedaan maken?')) setSections([...originalSections]) }
+
+  const getReorderableSections = () => sections.filter(s => s.id !== 'unassigned')
+
+  const moveSection = (sectionId, direction) => {
+    const reorderable = getReorderableSections()
+    const idx = reorderable.findIndex(s => s.id === sectionId)
+    if (idx === -1) return
+    const newIdx = direction === 'left' ? idx - 1 : idx + 1
+    if (newIdx < 0 || newIdx >= reorderable.length) return
+    const newOrder = [...reorderable]
+    ;[newOrder[idx], newOrder[newIdx]] = [newOrder[newIdx], newOrder[idx]]
+    setSections([...newOrder, sections.find(s => s.id === 'unassigned')])
+  }
+
+  // SECTION DRAG — PRESERVED 1:1
+  const onGripDragStart = (e, section) => { e.stopPropagation(); if (section.id === 'unassigned') { e.preventDefault(); return }; setIsDraggingSection(true); setDraggedSection(section); e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('dragType', 'section') }
+  const onGripDragEnd = () => { setDraggedSection(null); setDragOverForSection(null); setIsDraggingSection(false) }
+  const onColumnDragOver = (e, section) => { e.preventDefault(); if (isDraggingSection && draggedSection) { if (section.id !== 'unassigned' && section.id !== draggedSection.id) setDragOverForSection(section.id) } else if (draggedLead) { setDragOverSectionId(section.id) } }
+  const onColumnDragLeave = () => { setDragOverForSection(null); setDragOverSectionId(null) }
+
+  const onColumnDrop = async (e, targetSection) => {
+    e.preventDefault()
+    if (isDraggingSection && draggedSection) {
+      setDragOverForSection(null)
+      if (targetSection.id === 'unassigned' || targetSection.id === draggedSection.id) { setDraggedSection(null); setIsDraggingSection(false); return }
+      const reorderable = getReorderableSections()
+      const di = reorderable.findIndex(s => s.id === draggedSection.id)
+      const ti = reorderable.findIndex(s => s.id === targetSection.id)
+      if (di !== -1 && ti !== -1) { const n = [...reorderable]; n.splice(di, 1); n.splice(ti, 0, draggedSection); setSections([...n, sections.find(s => s.id === 'unassigned')]) }
+      setDraggedSection(null); setIsDraggingSection(false)
+    } else if (draggedLead) {
+      setDragOverSectionId(null)
+      if (draggedLead.currentSectionId === targetSection.id) { setDraggedLead(null); return }
+      try {
+        await leadService.moveLeadToSection(draggedLead.id, targetSection.id, 0, coachId)
+        setSections(prev => prev.map(section => {
+          if (section.id === draggedLead.currentSectionId) return { ...section, leads: (section.leads || []).filter(l => l.id !== draggedLead.id) }
+          if (section.id === targetSection.id) return { ...section, leads: [draggedLead, ...(section.leads || []).filter(l => l.id !== draggedLead.id)] }
+          return section
+        }))
+        setExpandedSections(prev => ({ ...prev, [targetSection.id]: true }))
+        setHighlightedLeadId(draggedLead.id)
+        setTimeout(() => setHighlightedLeadId(null), 2000)
+        loadActivityData()
+      } catch (error) { console.error('❌ Move lead failed:', error); await loadBoard(true) }
+      setDraggedLead(null)
+    }
+  }
+
+  const onLeadDragStart = (e, lead, sectionId) => { e.stopPropagation(); setDraggedLead({ ...lead, currentSectionId: sectionId }); e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('dragType', 'lead') }
+
+  // CRUD — PRESERVED 1:1
   const handleCreateSection = async (sectionData) => {
     try {
-      await leadService.createSection(coachId, {
-        ...sectionData,
-        position: sections.filter(s => s.id !== 'unassigned').length
-      })
-      await loadBoard()
-      setShowSectionModal(false)
-    } catch (error) {
-      console.error('❌ Create section failed:', error)
-      alert('Sectie maken mislukt')
-    }
+      const ns = await leadService.createSection(coachId, { ...sectionData, position: sections.filter(s => s.id !== 'unassigned').length })
+      const update = (prev) => { const u = prev.find(s => s.id === 'unassigned'); const o = prev.filter(s => s.id !== 'unassigned'); return [...o, { ...ns, leads: [] }, u] }
+      setSections(update); setOriginalSections(update); setShowSectionModal(false)
+    } catch (error) { console.error('❌ Create section failed:', error); alert('Sectie maken mislukt') }
   }
 
   const handleUpdateSection = async (sectionId, updates) => {
     try {
       await leadService.updateSection(sectionId, updates)
-      await loadBoard()
-      setShowSectionModal(false)
-    } catch (error) {
-      console.error('❌ Update section failed:', error)
-      alert('Sectie bijwerken mislukt')
-    }
+      const update = (prev) => prev.map(s => s.id === sectionId ? { ...s, ...updates } : s)
+      setSections(update); setOriginalSections(update); setShowSectionModal(false)
+    } catch (error) { console.error('❌ Update section failed:', error); alert('Sectie bijwerken mislukt') }
   }
 
   const handleDeleteSection = async (sectionId) => {
-    if (!window.confirm('Sectie verwijderen? Leads blijven behouden.')) return
+    if (!window.confirm('Sectie verwijderen?')) return
     try {
       await leadService.deleteSection(sectionId)
-      await loadBoard()
-      setShowSectionModal(false)
-    } catch (error) {
-      console.error('❌ Delete section failed:', error)
-    }
+      const update = (prev) => { const d = prev.find(s => s.id === sectionId); const leads = d?.leads || []; return prev.filter(s => s.id !== sectionId).map(s => s.id === 'unassigned' ? { ...s, leads: [...leads, ...(s.leads || [])] } : s) }
+      setSections(update); setOriginalSections(update); setShowSectionModal(false)
+    } catch (error) { console.error('❌ Delete section failed:', error) }
   }
 
   const handleAddLead = async (leadData) => {
     try {
-      await leadService.createLeadWithSection(leadData, selectedSectionForLead, coachId)
-      await loadBoard()
-      setShowAddLead(false)
-      setSelectedSectionForLead(null)
-    } catch (error) {
-      console.error('❌ Add lead failed:', error)
-      alert('Lead toevoegen mislukt')
+      const newLead = await leadService.createLeadWithSection(leadData, selectedSectionForLead, coachId)
+      setSections(prev => prev.map(section => {
+        if (section.id === selectedSectionForLead) return { ...section, leads: [newLead, ...(section.leads || []).filter(l => l.id !== newLead.id)] }
+        return section
+      }))
+      setExpandedSections(prev => ({ ...prev, [selectedSectionForLead]: true }))
+      setHighlightedLeadId(newLead.id)
+      setTimeout(() => setHighlightedLeadId(null), 3000)
+      loadActivityData(); setShowAddLead(false); setSelectedSectionForLead(null)
+    } catch (error) { console.error('❌ Add lead failed:', error); alert('Lead toevoegen mislukt') }
+  }
+
+  const handleLeadEdit = async (lead, section, updates) => {
+    if (updates.previous_section_id !== undefined) {
+      try {
+        const { error } = await leadService.db.supabase.from('lead_section_items').update({ previous_section_id: updates.previous_section_id, previous_section_title: updates.previous_section_title, previous_section_color: updates.previous_section_color }).eq('lead_id', lead.id)
+        if (error) throw error
+        setSections(prev => prev.map(s => ({ ...s, leads: (s.leads || []).map(l => l.id === lead.id ? { ...l, ...updates } : l) })))
+        return
+      } catch (error) { console.error('❌ Update return section failed:', error); return }
     }
-  }
-
-  const handleDragStart = (e, lead, sectionId) => {
-    setDraggedLead({ ...lead, currentSectionId: sectionId })
-    e.dataTransfer.effectAllowed = 'move'
-  }
-
-  const handleDragOver = (e, sectionId) => {
-    e.preventDefault()
-    e.dataTransfer.dropEffect = 'move'
-    setDraggedOverSection(sectionId)
-  }
-
-  const handleDrop = async (e, targetSectionId) => {
-    e.preventDefault()
-    setDraggedOverSection(null)
-
-    if (!draggedLead || draggedLead.currentSectionId === targetSectionId) {
-      setDraggedLead(null)
+    
+    if (updates.contacted_today_date !== undefined || updates.reply_count !== undefined) {
+      let currentSectionId = null
+      for (const sec of sections) { if ((sec.leads || []).some(l => l.id === lead.id)) { currentSectionId = sec.id; break } }
+      if (!currentSectionId) { await leadService.updateLead(lead.id, updates, coachId); await loadBoard(false); return }
+      try {
+        const result = await leadService.updateLead(lead.id, updates, coachId)
+        if (result.restored && result.restoredTo) {
+          setSections(prev => prev.map(s => {
+            if (s.id === currentSectionId) return { ...s, leads: (s.leads || []).filter(l => l.id !== lead.id) }
+            if (s.id === result.restoredTo.id) return { ...s, leads: [{ ...lead, ...updates }, ...(s.leads || []).filter(l => l.id !== lead.id)] }
+            return s
+          }))
+          setExpandedSections(prev => ({ ...prev, [result.restoredTo.id]: true }))
+          setHighlightedLeadId(lead.id)
+          setTimeout(() => setHighlightedLeadId(null), 2000)
+        } else {
+          setSections(prev => prev.map(s => ({ ...s, leads: (s.leads || []).map(l => l.id === lead.id ? { ...l, ...updates } : l) })))
+        }
+        loadActivityData()
+      } catch (error) { console.error('❌ Update lead failed:', error); await loadBoard(false) }
       return
     }
+    
+    await leadService.updateLead(lead.id, updates, coachId)
+    loadActivityData()
+  }
 
+  const handleLeadDelete = async (lead) => {
+    if (!window.confirm('Lead verwijderen?')) return
     try {
-      await leadService.moveLeadToSection(draggedLead.id, targetSectionId, 0)
-      await loadBoard()
-    } catch (error) {
-      console.error('❌ Move lead failed:', error)
-    } finally {
-      setDraggedLead(null)
-    }
+      await leadService.deleteLead(lead.id)
+      setSections(prev => prev.map(section => ({ ...section, leads: (section.leads || []).filter(l => l.id !== lead.id) })))
+      loadActivityData()
+    } catch (error) { console.error('❌ Delete failed:', error); await loadBoard(false) }
   }
 
-  const toggleSectionExpansion = (sectionId) => {
-    setExpandedSections(prev => ({
-      ...prev,
-      [sectionId]: !prev[sectionId]
-    }))
-  }
+  const toggleSectionExpansion = (sectionId) => setExpandedSections(prev => ({ ...prev, [sectionId]: !prev[sectionId] }))
 
   const getVisibleLeads = (section) => {
-    const leads = section.leads || []
+    const sorted = getSortedLeads(section)
     const isExpanded = expandedSections[section.id]
-    
-    if (isExpanded || leads.length <= MAX_VISIBLE_LEADS) {
-      return leads
-    }
-    
-    return leads.slice(0, MAX_VISIBLE_LEADS)
+    return (isExpanded || sorted.length <= MAX_VISIBLE_LEADS) ? sorted : sorted.slice(0, MAX_VISIBLE_LEADS)
   }
 
-  if (loading) {
+  // Search bar is now inline in the toolbar — renderSearchBar removed
+
+  // ========================================
+  // RENDER: LEAD CARD WRAPPER — PRESERVED
+  // ========================================
+  const renderLeadCard = (lead, section) => {
+    const isThisSnooze = isSnoozeSectionById(section.id)
+    const qualScore = [lead.qual_goal_checked, lead.qual_pain_checked, lead.qual_urgency_checked, lead.qual_open_checked].filter(Boolean).length
+    const isCallReady = qualScore >= 3
+    let cardShadow = 'none'
+    if (highlightedLeadId === lead.id) cardShadow = `0 0 0 2px ${section.color}, 0 0 15px ${section.color}40`
+    else if (isCallReady) cardShadow = '0 0 0 1px #D4AF37'
+    
     return (
-      <div style={{ minHeight: '400px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <div style={{
-          width: '48px',
-          height: '48px',
-          border: '3px solid rgba(16, 185, 129, 0.2)',
-          borderTopColor: '#10b981',
-          borderRadius: '50%',
-          animation: 'spin 1s linear infinite'
-        }} />
+      <div key={lead.id} ref={(el) => { leadRefs.current[lead.id] = el }} style={{ transition: 'all 0.2s ease', borderRadius: isMobile ? '10px' : '12px', boxShadow: cardShadow }}>
+        <KanbanCard 
+          lead={lead} sectionColor={section.color} isMobile={isMobile}
+          onDragStart={(e) => onLeadDragStart(e, lead, section.id)}
+          onEdit={(updates) => handleLeadEdit(lead, section, updates)}
+          onDelete={() => handleLeadDelete(lead)}
+          onSnooze={snoozeSection && !isThisSnooze ? handleSnoozeLead : null}
+          sections={sections} currentSectionId={section.id}
+          sectionTitle={section.title}
+          onSalesCallClick={(lead) => setSalesCallLead(lead)}
+          coachId={coachId} db={db} onRefresh={loadBoard}
+        />
       </div>
     )
   }
 
-  return (
-    <div style={{ padding: isMobile ? '1rem' : '1.5rem', background: '#0a0a0a', borderRadius: '16px', minHeight: '600px' }}>
-      {/* Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
-        <h2 style={{ fontSize: isMobile ? '1.25rem' : '1.5rem', fontWeight: '600', color: '#fff', margin: 0 }}>
-          Lead Board
-        </h2>
-        <button
-          onClick={() => { setSelectedSection(null); setShowSectionModal(true) }}
-          style={{
-            padding: isMobile ? '0.6rem 1rem' : '0.75rem 1.25rem',
-            background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-            border: 'none',
-            borderRadius: '10px',
-            color: '#fff',
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.5rem',
-            fontSize: isMobile ? '0.85rem' : '0.9rem',
-            fontWeight: '600',
-            minHeight: '44px',
-            transition: 'all 0.2s ease',
-            touchAction: 'manipulation',
-            WebkitTapHighlightColor: 'transparent'
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.transform = 'translateY(-2px)'
-            e.currentTarget.style.boxShadow = '0 8px 20px rgba(16, 185, 129, 0.4)'
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.transform = 'translateY(0)'
-            e.currentTarget.style.boxShadow = 'none'
-          }}
-        >
-          <Plus size={isMobile ? 16 : 18} />
-          Nieuwe Sectie
-        </button>
-      </div>
-
-      {/* Kanban Columns - Fixed horizontal scrolling with padding */}
-      <div style={{ 
-        display: 'flex', 
-        gap: '1rem', 
-        overflowX: 'auto', 
-        paddingBottom: '1rem',
-        paddingLeft: '0.5rem',
-        paddingRight: '0.5rem',
-        marginLeft: '-0.5rem',
-        marginRight: '-0.5rem'
-      }}>
-        {sections.map(section => {
+  // ========================================
+  // RENDER: KANBAN COLUMNS — STYLING UPGRADED
+  // ========================================
+  const renderKanbanColumns = (isFullscreenView = false) => {
+    const colW = isFullscreenView ? (isMobile ? '300px' : '350px') : (isMobile ? '280px' : '320px')
+    return (
+      <div style={{ display: 'flex', gap: '0.75rem', overflowX: 'auto', paddingBottom: '0.75rem', WebkitOverflowScrolling: 'touch' }}>
+        {sections.map((section) => {
           const totalLeads = section.leads?.length || 0
           const visibleLeads = getVisibleLeads(section)
-          const hasMoreLeads = totalLeads > MAX_VISIBLE_LEADS
+          const hasMore = totalLeads > MAX_VISIBLE_LEADS
           const isExpanded = expandedSections[section.id]
+          const isUnassigned = section.id === 'unassigned'
+          const reIdx = getReorderableSections().findIndex(s => s.id === section.id)
+          const canLeft = !isUnassigned && reIdx > 0
+          const canRight = !isUnassigned && reIdx < getReorderableSections().length - 1
+          const isBeingDragged = draggedSection?.id === section.id
+          const isSectionDrop = dragOverForSection === section.id
+          const isLeadDrop = dragOverSectionId === section.id
+          const isThisSnooze = isSnoozeSectionById(section.id)
+          const contactedCount = getContactedTodayCount(section)
 
           return (
-            <div
-              key={section.id}
-              onDragOver={(e) => handleDragOver(e, section.id)}
-              onDragLeave={() => setDraggedOverSection(null)}
-              onDrop={(e) => handleDrop(e, section.id)}
+            <div key={section.id}
+              onDragOver={(e) => onColumnDragOver(e, section)}
+              onDragLeave={onColumnDragLeave}
+              onDrop={(e) => onColumnDrop(e, section)}
               style={{
-                minWidth: isMobile ? '280px' : '320px',
-                maxWidth: isMobile ? '280px' : '320px',
-                background: draggedOverSection === section.id 
-                  ? `linear-gradient(135deg, ${section.color}20 0%, ${section.color}10 100%)`
-                  : 'rgba(17, 17, 17, 0.8)',
-                border: draggedOverSection === section.id 
-                  ? `2px solid ${section.color}` 
-                  : `1px solid ${section.color}30`,
-                borderRadius: '12px',
-                display: 'flex',
-                flexDirection: 'column',
-                flexShrink: 0,
+                minWidth: colW, maxWidth: colW,
+                background: '#0a0a0a',
+                border: isSectionDrop ? `2px dashed ${section.color}` : isLeadDrop ? `2px solid ${section.color}` : `1px solid rgba(255,255,255,0.06)`,
+                borderRadius: isMobile ? '10px' : '12px',
+                display: 'flex', flexDirection: 'column', flexShrink: 0,
                 transition: 'all 0.2s ease',
-                backdropFilter: 'blur(10px)'
+                opacity: isBeingDragged ? 0.5 : 1,
+                transform: 'translateZ(0)',
+                overflow: 'hidden'
               }}
             >
-              {/* Section Header */}
+              {/* Section Header — compact, flush */}
               <div style={{
-                padding: '1rem',
-                background: `linear-gradient(135deg, ${section.color}15 0%, ${section.color}08 100%)`,
+                padding: isMobile ? '0.5rem 0.625rem' : '0.5rem 0.75rem',
                 borderBottom: `2px solid ${section.color}`,
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                gap: '0.5rem',
-                borderTopLeftRadius: '12px',
-                borderTopRightRadius: '12px'
+                display: 'flex', alignItems: 'center', gap: '0.375rem'
               }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flex: 1 }}>
-                  <div style={{
-                    width: '12px',
-                    height: '12px',
-                    borderRadius: '50%',
-                    background: section.color,
-                    boxShadow: `0 0 12px ${section.color}, 0 0 24px ${section.color}60`,
-                    border: `2px solid ${section.color}40`
-                  }} />
-                  <h3 style={{
-                    fontSize: isMobile ? '0.9rem' : '1rem',
-                    fontWeight: '600',
-                    color: section.color,
-                    margin: 0,
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                    whiteSpace: 'nowrap',
-                    textShadow: `0 0 20px ${section.color}40`
-                  }}>
-                    {section.title}
-                  </h3>
-                  <span style={{
-                    padding: '0.25rem 0.65rem',
-                    background: `${section.color}25`,
-                    border: `1px solid ${section.color}50`,
-                    borderRadius: '8px',
-                    fontSize: '0.75rem',
-                    fontWeight: '700',
-                    color: section.color,
-                    boxShadow: `0 2px 8px ${section.color}20`
-                  }}>
-                    {totalLeads}
-                  </span>
-                </div>
+                {!isUnassigned && (
+                  <div draggable onDragStart={(e) => onGripDragStart(e, section)} onDragEnd={onGripDragEnd}
+                    style={{ color: 'rgba(255,255,255,0.2)', cursor: 'grab', display: 'flex', alignItems: 'center', flexShrink: 0 }}>
+                    <GripVertical size={13} />
+                  </div>
+                )}
+                <div style={{ width: '7px', height: '7px', borderRadius: '50%', background: section.color, flexShrink: 0 }} />
+                <h3 style={{
+                  fontSize: isMobile ? '0.75rem' : '0.8rem', fontWeight: '700',
+                  color: section.color, margin: 0,
+                  overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                  flex: 1, display: 'flex', alignItems: 'center', gap: '0.3rem'
+                }}>
+                  {section.title}
+                  {isThisSnooze && <Clock size={11} style={{ opacity: 0.5 }} />}
+                </h3>
 
-                <div style={{ display: 'flex', gap: '0.25rem' }}>
-                  {section.id !== 'unassigned' && (
-                    <button
-                      onClick={() => { setSelectedSection(section); setShowSectionModal(true) }}
-                      style={{
-                        padding: '0.5rem',
-                        background: `${section.color}15`,
-                        border: `1px solid ${section.color}30`,
-                        borderRadius: '6px',
-                        color: section.color,
-                        cursor: 'pointer',
-                        transition: 'all 0.2s ease',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        touchAction: 'manipulation',
-                        WebkitTapHighlightColor: 'transparent'
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.background = `${section.color}30`
-                        e.currentTarget.style.boxShadow = `0 0 12px ${section.color}40`
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.background = `${section.color}15`
-                        e.currentTarget.style.boxShadow = 'none'
-                      }}
-                    >
-                      <Settings size={16} />
-                    </button>
-                  )}
-                  
-                  <button
-                    onClick={() => { setSelectedSectionForLead(section.id); setShowAddLead(true) }}
-                    style={{
-                      padding: '0.5rem',
-                      background: `${section.color}20`,
-                      border: `1px solid ${section.color}40`,
-                      borderRadius: '6px',
-                      color: section.color,
-                      cursor: 'pointer',
-                      transition: 'all 0.2s ease',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      touchAction: 'manipulation',
-                      WebkitTapHighlightColor: 'transparent'
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.background = `${section.color}35`
-                      e.currentTarget.style.boxShadow = `0 0 12px ${section.color}50`
-                      e.currentTarget.style.transform = 'scale(1.05)'
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.background = `${section.color}20`
-                      e.currentTarget.style.boxShadow = 'none'
-                      e.currentTarget.style.transform = 'scale(1)'
-                    }}
-                  >
-                    <Plus size={16} />
+                {/* Count */}
+                <span style={{
+                  fontSize: '0.6rem', fontWeight: '800', color: section.color, opacity: 0.8,
+                  minWidth: '16px', textAlign: 'center'
+                }}>
+                  {totalLeads}
+                </span>
+
+                {/* Contacted today count */}
+                {contactedCount > 0 && (
+                  <span style={{
+                    display: 'flex', alignItems: 'center', gap: '2px',
+                    fontSize: '0.5rem', fontWeight: '700', color: '#9ca3af',
+                    opacity: 0.6
+                  }}>
+                    <CheckCircle size={8} />{contactedCount}
+                  </span>
+                )}
+
+                {/* Actions */}
+                {!isUnassigned && (
+                  <button onClick={() => { setSelectedSection(section); setShowSectionModal(true) }}
+                    style={{ width: '24px', height: '24px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'transparent', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '5px', color: 'rgba(255,255,255,0.25)', cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}>
+                    <Settings size={11} />
                   </button>
-                </div>
+                )}
+                <button onClick={() => { setSelectedSectionForLead(section.id); setShowAddLead(true) }}
+                  style={{ width: '24px', height: '24px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: `${section.color}10`, border: `1px solid ${section.color}25`, borderRadius: '5px', color: section.color, cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}>
+                  <Plus size={11} />
+                </button>
               </div>
 
-              {/* Leads Container */}
+              {/* Reorder buttons — compact, only non-fullscreen */}
+              {!isUnassigned && !isFullscreenView && (
+                <div style={{
+                  display: 'flex', gap: '0.25rem', justifyContent: 'center',
+                  padding: '0.3rem 0.625rem',
+                  borderBottom: '1px solid rgba(255,255,255,0.03)'
+                }}>
+                  <button onClick={() => moveSection(section.id, 'left')} disabled={!canLeft}
+                    style={{ padding: '0.2rem 0.4rem', background: 'transparent', border: `1px solid ${canLeft ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.03)'}`, borderRadius: '4px', color: canLeft ? 'rgba(255,255,255,0.4)' : 'rgba(255,255,255,0.12)', cursor: canLeft ? 'pointer' : 'not-allowed', fontSize: '0.55rem', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '2px', minHeight: '24px', touchAction: 'manipulation' }}>
+                    <ChevronLeft size={10} /> Links
+                  </button>
+                  <button onClick={() => moveSection(section.id, 'right')} disabled={!canRight}
+                    style={{ padding: '0.2rem 0.4rem', background: 'transparent', border: `1px solid ${canRight ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.03)'}`, borderRadius: '4px', color: canRight ? 'rgba(255,255,255,0.4)' : 'rgba(255,255,255,0.12)', cursor: canRight ? 'pointer' : 'not-allowed', fontSize: '0.55rem', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '2px', minHeight: '24px', touchAction: 'manipulation' }}>
+                    Rechts <ChevronRight size={10} />
+                  </button>
+                </div>
+              )}
+
+              {/* Leads */}
               <div style={{
-                padding: '0.75rem',
-                flex: 1,
-                overflowY: 'auto',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '0.75rem',
-                minHeight: '200px',
-                maxHeight: isExpanded ? 'none' : '600px'
+                padding: '0.5rem', flex: 1, overflowY: 'auto',
+                display: 'flex', flexDirection: 'column', gap: '0.5rem',
+                minHeight: isFullscreenView ? '300px' : '200px',
+                maxHeight: isExpanded ? 'none' : (isFullscreenView ? '500px' : '600px')
               }}>
                 {totalLeads === 0 ? (
-                  <div style={{
-                    padding: '2rem 1rem',
-                    textAlign: 'center',
-                    color: 'rgba(255, 255, 255, 0.3)',
-                    fontSize: '0.875rem'
-                  }}>
-                    Geen leads
-                  </div>
+                  <div style={{ padding: '1.5rem 0.75rem', textAlign: 'center', color: 'rgba(255,255,255,0.15)', fontSize: '0.7rem' }}>Geen leads</div>
                 ) : (
                   <>
-                    {visibleLeads.map(lead => (
-                      <KanbanCard
-                        key={lead.id}
-                        lead={lead}
-                        sectionColor={section.color}
-                        isMobile={isMobile}
-                        onDragStart={(e) => handleDragStart(e, lead, section.id)}
-                        onEdit={async (updates) => { 
-                          await leadService.updateLead(lead.id, updates)
-                          await loadBoard()
-                        }}
-                        onDelete={async () => { 
-                          if (window.confirm('Lead verwijderen?')) {
-                            await leadService.deleteLead(lead.id)
-                            await loadBoard()
-                          }
-                        }}
-                      />
-                    ))}
-                    
-                    {/* Show More/Less Button */}
-                    {hasMoreLeads && (
-                      <button
-                        onClick={() => toggleSectionExpansion(section.id)}
-                        style={{
-                          padding: '0.75rem',
-                          background: `${section.color}10`,
-                          border: `1px solid ${section.color}30`,
-                          borderRadius: '8px',
-                          color: section.color,
-                          cursor: 'pointer',
-                          fontSize: '0.85rem',
-                          fontWeight: '600',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          gap: '0.5rem',
-                          transition: 'all 0.2s ease',
-                          marginTop: '0.25rem'
-                        }}
-                        onMouseEnter={(e) => {
-                          e.currentTarget.style.background = `${section.color}20`
-                          e.currentTarget.style.borderColor = `${section.color}50`
-                        }}
-                        onMouseLeave={(e) => {
-                          e.currentTarget.style.background = `${section.color}10`
-                          e.currentTarget.style.borderColor = `${section.color}30`
-                        }}
-                      >
-                        {isExpanded ? (
-                          <>
-                            <ChevronUp size={16} />
-                            Toon minder
-                          </>
-                        ) : (
-                          <>
-                            <ChevronDown size={16} />
-                            Toon meer ({totalLeads - MAX_VISIBLE_LEADS} verborgen)
-                          </>
-                        )}
+                    {visibleLeads.map(lead => renderLeadCard(lead, section))}
+                    {hasMore && (
+                      <button onClick={() => toggleSectionExpansion(section.id)}
+                        style={{ padding: '0.4rem', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '6px', color: section.color, cursor: 'pointer', fontSize: '0.7rem', fontWeight: '600', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.3rem', minHeight: '32px', touchAction: 'manipulation' }}>
+                        {isExpanded ? <><ChevronUp size={13} /> Minder</> : <><ChevronDown size={13} /> +{totalLeads - MAX_VISIBLE_LEADS} meer</>}
                       </button>
                     )}
                   </>
@@ -427,52 +687,270 @@ export default function KanbanBoard({ leadService, coachId, isMobile }) {
           )
         })}
       </div>
+    )
+  }
 
-      {/* Modals */}
-      {showAddLead && (
-        <AddLeadModal
-          isMobile={isMobile}
-          onClose={() => { setShowAddLead(false); setSelectedSectionForLead(null) }}
-          onSubmit={handleAddLead}
-        />
+  // ========================================
+  // LOADING
+  // ========================================
+  if (loading) {
+    return (
+      <div style={{ minHeight: '400px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <div style={{ width: '40px', height: '40px', border: '2px solid rgba(255,255,255,0.06)', borderTopColor: '#10b981', borderRadius: '50%', animation: 'kbSpin 0.8s linear infinite' }} />
+      </div>
+    )
+  }
+
+  const showSaveBar = hasUnsavedChanges()
+
+  // ========================================
+  // MAIN RENDER
+  // ========================================
+  return (
+    <div style={{ transform: 'translateZ(0)' }}>
+
+      {viewMode === 'warmup' ? (
+        <>
+          {/* Minimal back-to-leads */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem', marginBottom: '0.5rem' }}>
+            <button onClick={() => { setViewMode('leads'); setStaleCheckDone(false) }}
+              style={{ padding: '0.3rem 0.5rem', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '6px', color: 'rgba(255,255,255,0.4)', cursor: 'pointer', fontSize: '0.6rem', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '0.25rem', minHeight: '28px', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}>
+              <Users size={10} /> Leads
+            </button>
+            <span style={{ fontSize: '0.7rem', fontWeight: '700', color: '#E1306C' }}>Warm-Up</span>
+          </div>
+          <WarmUpBoard leadService={leadService} coachId={coachId} isMobile={isMobile} sections={sections} />
+        </>
+      ) : (
+        <div>
+          <DailyStatsBar leadService={leadService} coachId={coachId} sections={sections} isMobile={isMobile} onExportPDF={handleExportPDF} />
+
+          {/* ═══ ONE TOOLBAR ROW: Search + Warm-Up + Fullscreen + Sectie ═══ */}
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: '0.375rem',
+            marginBottom: '0.5rem',
+            position: 'relative', zIndex: 100
+          }}>
+            {/* Search */}
+            <div style={{
+              flex: 1, display: 'flex', alignItems: 'center', gap: '0.35rem',
+              padding: isMobile ? '0.3rem 0.5rem' : '0.35rem 0.625rem',
+              background: 'rgba(255,255,255,0.03)',
+              border: showSearchResults && searchResults.length > 0 ? '1px solid rgba(16,185,129,0.3)' : '1px solid rgba(255,255,255,0.06)',
+              borderRadius: '6px', transition: 'all 0.2s ease', minHeight: '28px'
+            }}>
+              <Search size={12} color={searchQuery ? '#10b981' : 'rgba(255,255,255,0.2)'} style={{ flexShrink: 0 }} />
+              <input ref={searchInputRef} type="text" value={searchQuery}
+                onChange={(e) => handleSearch(e.target.value)}
+                onFocus={() => searchQuery && setShowSearchResults(true)}
+                placeholder={isMobile ? 'Zoek lead...' : 'Zoek op naam, Instagram, email...'}
+                style={{ flex: 1, background: 'transparent', border: 'none', outline: 'none', color: '#fff', fontSize: isMobile ? '0.7rem' : '0.75rem', minWidth: 0 }} />
+              {searchQuery && (
+                <button onClick={() => { setSearchQuery(''); setSearchResults([]); setShowSearchResults(false) }} style={{ padding: '2px', background: 'rgba(255,255,255,0.06)', border: 'none', borderRadius: '3px', color: 'rgba(255,255,255,0.4)', cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
+                  <X size={10} />
+                </button>
+              )}
+            </div>
+
+            {/* Warm-Up icon */}
+            <button onClick={() => setViewMode('warmup')}
+              style={{ width: '28px', height: '28px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'transparent', border: '1px solid rgba(225,48,108,0.15)', borderRadius: '6px', color: 'rgba(225,48,108,0.5)', cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', flexShrink: 0 }}
+              title="Warm-Up Board">
+              <Instagram size={12} />
+            </button>
+
+            {/* Fullscreen */}
+            <button onClick={() => setIsFullscreen(true)}
+              style={{ width: '28px', height: '28px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'transparent', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '6px', color: 'rgba(255,255,255,0.25)', cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', flexShrink: 0 }}>
+              <Maximize2 size={12} />
+            </button>
+
+            {/* + Sectie */}
+            <button onClick={() => { setSelectedSection(null); setShowSectionModal(true) }}
+              style={{ padding: '0 0.5rem', height: '28px', background: '#10b981', border: 'none', borderRadius: '6px', color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.2rem', fontSize: '0.6rem', fontWeight: '700', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', flexShrink: 0, whiteSpace: 'nowrap' }}>
+              <Plus size={10} /> Sectie
+            </button>
+          </div>
+
+          {/* Search results dropdown */}
+          {showSearchResults && (
+            <>
+              <div onClick={() => setShowSearchResults(false)} style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 40 }} />
+              {searchResults.length > 0 ? (
+                <div style={{ position: 'relative', zIndex: 1000, marginTop: '-0.375rem', marginBottom: '0.5rem' }}>
+                  <div style={{ background: '#111', border: '1px solid rgba(16,185,129,0.2)', borderRadius: '8px', overflow: 'hidden', boxShadow: '0 8px 24px rgba(0,0,0,0.5)', maxHeight: '250px', overflowY: 'auto' }}>
+                    <div style={{ padding: '0.35rem 0.625rem', borderBottom: '1px solid rgba(255,255,255,0.06)', fontSize: '0.45rem', fontWeight: '700', color: '#10b981', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                      {searchResults.length} RESULTATEN
+                    </div>
+                    {searchResults.map(lead => (
+                      <button key={lead.id} onClick={() => scrollToLead(lead.id, lead.sectionId)} style={{ width: '100%', padding: '0.4rem 0.625rem', background: 'transparent', border: 'none', borderBottom: '1px solid rgba(255,255,255,0.03)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem', textAlign: 'left' }} onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(16,185,129,0.06)'} onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ color: '#fff', fontWeight: '700', fontSize: '0.75rem' }}>{lead.first_name} {lead.last_name}</div>
+                          {lead.instagram_handle && <span style={{ fontSize: '0.55rem', color: '#E1306C' }}>@{lead.instagram_handle}</span>}
+                        </div>
+                        <span style={{ padding: '2px 5px', background: `${lead.sectionColor}12`, border: `1px solid ${lead.sectionColor}25`, borderRadius: '3px', fontSize: '0.5rem', fontWeight: '600', color: lead.sectionColor, whiteSpace: 'nowrap' }}>{lead.sectionTitle?.substring(0, 12)}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ) : searchQuery && (
+                <div style={{ position: 'relative', zIndex: 1000, marginTop: '-0.375rem', marginBottom: '0.5rem', padding: '0.6rem', background: '#111', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '6px', textAlign: 'center', color: 'rgba(255,255,255,0.3)', fontSize: '0.65rem' }}>
+                  Geen leads gevonden
+                </div>
+              )}
+            </>
+          )}
+
+          {/* Inline notifications — ultra compact, borderLeft only */}
+          {staleCheckResult && staleCheckResult.moved > 0 && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', padding: '0.3rem 0.625rem', marginBottom: '0.375rem', borderLeft: '3px solid #fbbf24' }}>
+              <Clock size={10} color="#fbbf24" style={{ flexShrink: 0 }} />
+              <span style={{ color: '#fbbf24', fontWeight: '700', fontSize: '0.55rem' }}>{staleCheckResult.moved} verplaatst</span>
+              <span style={{ color: 'rgba(255,255,255,0.15)', fontSize: '0.45rem' }}>geen activiteit</span>
+              <div style={{ flex: 1 }} />
+              <button onClick={() => setStaleCheckResult(null)} style={{ padding: '1px', background: 'transparent', border: 'none', color: 'rgba(255,255,255,0.15)', cursor: 'pointer', touchAction: 'manipulation' }}><X size={9} /></button>
+            </div>
+          )}
+
+          {!snoozeSection && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', padding: '0.25rem 0.625rem', marginBottom: '0.375rem', borderLeft: '3px solid #3b82f6' }}>
+              <Clock size={9} color="#3b82f6" style={{ flexShrink: 0 }} />
+              <span style={{ color: 'rgba(255,255,255,0.25)', fontSize: '0.5rem' }}>Maak "Later Follow Up" sectie voor ⏰</span>
+            </div>
+          )}
+
+          {/* Save bar — minimal inline */}
+          {showSaveBar && (
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.3rem 0.625rem', marginBottom: '0.375rem', borderLeft: '3px solid #fbbf24' }}>
+              <span style={{ color: '#fbbf24', fontSize: '0.55rem', fontWeight: '600' }}>Wijzigingen</span>
+              <div style={{ display: 'flex', gap: '0.25rem' }}>
+                <button onClick={handleReset} disabled={saving} style={{ padding: '0.2rem 0.35rem', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '4px', color: 'rgba(255,255,255,0.4)', cursor: 'pointer', fontSize: '0.5rem', minHeight: '22px', touchAction: 'manipulation' }}>Reset</button>
+                <button onClick={handleSave} disabled={saving} style={{ padding: '0.2rem 0.4rem', background: saving ? 'rgba(16,185,129,0.3)' : '#10b981', border: 'none', borderRadius: '4px', color: '#fff', cursor: saving ? 'not-allowed' : 'pointer', fontSize: '0.5rem', fontWeight: '700', minHeight: '22px', touchAction: 'manipulation' }}>{saving ? '...' : 'Opslaan'}</button>
+              </div>
+            </div>
+          )}
+
+          {renderKanbanColumns(false)}
+
+          {showAddLead && <AddLeadModal isMobile={isMobile} onClose={() => { setShowAddLead(false); setSelectedSectionForLead(null) }} onSubmit={handleAddLead} />}
+          {showSectionModal && <SectionModal isMobile={isMobile} section={selectedSection} onClose={() => { setShowSectionModal(false); setSelectedSection(null) }} onSubmit={selectedSection ? (u) => handleUpdateSection(selectedSection.id, u) : handleCreateSection} onDelete={selectedSection ? () => handleDeleteSection(selectedSection.id) : null} />}
+        </div>
       )}
 
-      {showSectionModal && (
-        <SectionModal
+      {/* ═══ SCROLL TO TOP — compact ═══ */}
+      {showScrollTop && createPortal(
+        <button onClick={scrollToTop}
+          style={{
+            position: 'fixed', bottom: isMobile ? '90px' : '32px',
+            left: '50%', transform: 'translateX(-50%)',
+            padding: isMobile ? '0.5rem 1rem' : '0.5rem 1.25rem',
+            background: '#10b981', border: 'none', borderRadius: '20px',
+            color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.35rem',
+            fontSize: '0.7rem', fontWeight: '700',
+            zIndex: 99999, minHeight: '36px',
+            touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+            animation: 'kbFadeUp 0.2s ease'
+          }}>
+          <ArrowUp size={14} /> Naar boven
+        </button>,
+        document.body
+      )}
+
+      {/* ═══ FULLSCREEN — clean, no gradients ═══ */}
+      {isFullscreen && createPortal(
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 99999, background: '#000', display: 'flex', flexDirection: 'column', animation: 'kbFadeIn 0.2s ease' }}>
+          {/* Fullscreen header — compact */}
+          <div style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+            padding: isMobile ? '0.5rem 0.75rem' : '0.625rem 1rem',
+            borderBottom: '1px solid rgba(255,255,255,0.06)',
+            flexShrink: 0
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <div style={{ width: '7px', height: '7px', borderRadius: '50%', background: '#10b981' }} />
+              <h1 style={{ fontSize: isMobile ? '0.9rem' : '1rem', fontWeight: '800', color: '#fff', margin: 0 }}>Lead Board</h1>
+              <span style={{ fontSize: '0.4rem', fontWeight: '700', color: 'rgba(255,255,255,0.15)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>FULLSCREEN</span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem' }}>
+              {!isMobile && (
+                <span style={{ fontSize: '0.6rem', color: 'rgba(255,255,255,0.25)', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                  <kbd style={{ padding: '1px 4px', background: 'rgba(255,255,255,0.06)', borderRadius: '3px', fontSize: '0.55rem', fontFamily: 'monospace' }}>ESC</kbd>
+                </span>
+              )}
+              <button onClick={() => setIsFullscreen(false)}
+                style={{ width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'transparent', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '6px', color: 'rgba(255,255,255,0.5)', cursor: 'pointer', touchAction: 'manipulation' }}>
+                <Minimize2 size={14} />
+              </button>
+              <button onClick={() => setIsFullscreen(false)}
+                style={{ width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.15)', borderRadius: '6px', color: '#ef4444', cursor: 'pointer', touchAction: 'manipulation' }}>
+                <X size={14} />
+              </button>
+            </div>
+          </div>
+
+          {/* Fullscreen content */}
+          <div ref={fullscreenContentRef} style={{ flex: 1, overflow: 'auto', padding: isMobile ? '0.5rem' : '0.75rem' }}>
+            {/* View toggle */}
+            <div style={{ display: 'flex', gap: '0.25rem', padding: '0.375rem', background: 'rgba(255,255,255,0.02)', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.04)', marginBottom: '0.75rem' }}>
+              <button onClick={() => { setViewMode('leads'); setStaleCheckDone(false) }}
+                style={{ flex: 1, padding: '0.4rem', background: viewMode === 'leads' ? '#10b981' : 'transparent', border: 'none', borderRadius: '6px', color: viewMode === 'leads' ? '#fff' : 'rgba(255,255,255,0.4)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.35rem', fontSize: '0.7rem', fontWeight: '700', minHeight: '32px', touchAction: 'manipulation' }}>
+                <Users size={13} /> Leads
+              </button>
+              <button onClick={() => setViewMode('warmup')}
+                style={{ flex: 1, padding: '0.4rem', background: viewMode === 'warmup' ? '#E1306C' : 'transparent', border: 'none', borderRadius: '6px', color: viewMode === 'warmup' ? '#fff' : 'rgba(255,255,255,0.4)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.35rem', fontSize: '0.7rem', fontWeight: '700', minHeight: '32px', touchAction: 'manipulation' }}>
+                <Instagram size={13} /> Warm-Up
+              </button>
+            </div>
+
+            {viewMode === 'warmup' ? (
+              <WarmUpBoard leadService={leadService} coachId={coachId} isMobile={isMobile} sections={sections} />
+            ) : (
+              <>
+                <DailyStatsBar leadService={leadService} coachId={coachId} sections={sections} isMobile={isMobile} onExportPDF={handleExportPDF} />
+                {/* Fullscreen toolbar */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem', marginBottom: '0.5rem' }}>
+                  <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: '0.35rem', padding: '0.3rem 0.5rem', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '6px', minHeight: '28px' }}>
+                    <Search size={12} color={searchQuery ? '#10b981' : 'rgba(255,255,255,0.2)'} />
+                    <input ref={searchInputRef} type="text" value={searchQuery} onChange={(e) => handleSearch(e.target.value)} onFocus={() => searchQuery && setShowSearchResults(true)} placeholder="Zoek lead..." style={{ flex: 1, background: 'transparent', border: 'none', outline: 'none', color: '#fff', fontSize: '0.7rem', minWidth: 0 }} />
+                    {searchQuery && <button onClick={() => { setSearchQuery(''); setSearchResults([]); setShowSearchResults(false) }} style={{ padding: '2px', background: 'rgba(255,255,255,0.06)', border: 'none', borderRadius: '3px', color: 'rgba(255,255,255,0.4)', cursor: 'pointer', display: 'flex', alignItems: 'center' }}><X size={10} /></button>}
+                  </div>
+                  <button onClick={() => { setSelectedSection(null); setShowSectionModal(true) }}
+                    style={{ padding: '0 0.5rem', height: '28px', background: '#10b981', border: 'none', borderRadius: '6px', color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.2rem', fontSize: '0.6rem', fontWeight: '700', touchAction: 'manipulation', flexShrink: 0 }}>
+                    <Plus size={10} /> Sectie
+                  </button>
+                </div>
+                {renderKanbanColumns(true)}
+              </>
+            )}
+          </div>
+
+          {showAddLead && <AddLeadModal isMobile={isMobile} onClose={() => { setShowAddLead(false); setSelectedSectionForLead(null) }} onSubmit={handleAddLead} />}
+          {showSectionModal && <SectionModal isMobile={isMobile} section={selectedSection} onClose={() => { setShowSectionModal(false); setSelectedSection(null) }} onSubmit={selectedSection ? (u) => handleUpdateSection(selectedSection.id, u) : handleCreateSection} onDelete={selectedSection ? () => handleDeleteSection(selectedSection.id) : null} />}
+        </div>,
+        document.body
+      )}
+
+      {salesCallLead && (
+        <SalesCallModal
+          lead={salesCallLead}
+          db={db}
+          coachId={coachId}
           isMobile={isMobile}
-          section={selectedSection}
-          onClose={() => { setShowSectionModal(false); setSelectedSection(null) }}
-          onSubmit={selectedSection 
-            ? (updates) => handleUpdateSection(selectedSection.id, updates)
-            : handleCreateSection
-          }
-          onDelete={selectedSection ? () => handleDeleteSection(selectedSection.id) : null}
+          onClose={() => setSalesCallLead(null)}
+          onLeadUpdate={async () => {
+            setSalesCallLead(null)
+            await loadBoard(false)
+          }}
         />
       )}
 
       <style>{`
-        @keyframes spin { 
-          to { transform: rotate(360deg); }
-        }
-        
-        div::-webkit-scrollbar { 
-          width: 6px; 
-          height: 6px; 
-        }
-        
-        div::-webkit-scrollbar-track { 
-          background: rgba(255, 255, 255, 0.05);
-          borderRadius: 3px;
-        }
-        
-        div::-webkit-scrollbar-thumb { 
-          background: rgba(16, 185, 129, 0.3);
-          borderRadius: 3px;
-        }
-        
-        div::-webkit-scrollbar-thumb:hover {
-          background: rgba(16, 185, 129, 0.5);
-        }
+        @keyframes kbSpin { to { transform: rotate(360deg); } }
+        @keyframes kbFadeUp { from { opacity: 0; transform: translateX(-50%) translateY(10px); } to { opacity: 1; transform: translateX(-50%) translateY(0); } }
+        @keyframes kbFadeIn { from { opacity: 0; } to { opacity: 1; } }
+        div::-webkit-scrollbar { width: 4px; height: 4px; }
+        div::-webkit-scrollbar-track { background: transparent; }
+        div::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.06); border-radius: 2px; }
       `}</style>
     </div>
   )

@@ -1,685 +1,356 @@
+// src/modules/call-planning/ClientCalls.jsx
+// v6.0 - Blue theme, full visual treatment, single booking action
+// No call flow/journey — just a clean styled page to book a call with Kersten
+
 import useIsMobile from '../../hooks/useIsMobile'
-import React, { useState, useEffect } from 'react';
-import { 
-  Bell, RefreshCw, Plus, HelpCircle
-} from 'lucide-react';
-import PageVideoWidget from '../videos/PageVideoWidget';
-import CallPlanningService from './CallPlanningService';
-import { callTypeConfig } from './constants/callTypes';
-import ProgressBar from './components/ProgressBar';
-import CallCard from './components/CallCard';
-import NextCallHighlight from './components/NextCallHighlight';
-import BookingModal from './components/BookingModal';
-import RequestModal from './components/RequestModal';
-import './styles/animations.css';
+import React, { useState, useEffect } from 'react'
+import { createPortal } from 'react-dom'
+import { Calendar, X, ExternalLink, Phone, Clock, Video, ArrowRight } from 'lucide-react'
+import PageVideoWidget from '../videos/PageVideoWidget'
+
+const BLUE = {
+  primary: '#3b82f6',
+  dark: '#2563eb',
+  light: '#60a5fa',
+  border: 'rgba(59, 130, 246, 0.15)',
+  borderActive: 'rgba(59, 130, 246, 0.3)',
+  bg: 'rgba(59, 130, 246, 0.06)',
+  glow: 'rgba(59, 130, 246, 0.2)'
+}
+
+const CALENDLY_LINK = 'https://calendly.com/kerstenscheffer/kennismaking-doelstelling-call'
 
 export default function ClientCalls({ db, clientInfo }) {
-  const [plans, setPlans] = useState([]);
-  const [calls, setCalls] = useState([]);
-  const [requests, setRequests] = useState([]);
-  const [notifications, setNotifications] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [selectedCall, setSelectedCall] = useState(null);
-  const [showBookingModal, setShowBookingModal] = useState(false);
-  const [showRequestModal, setShowRequestModal] = useState(false);
-  const [calendlyLoaded, setCalendlyLoaded] = useState(false);
-  const [modalKey, setModalKey] = useState(0);
-  const [userStats, setUserStats] = useState({
-    totalCalls: 0,
-    completedCalls: 0,
-    scheduledCalls: 0
-  });
+  const [showBooking, setShowBooking] = useState(false)
+  const [bookingUrl, setBookingUrl] = useState('')
+  const isMobile = useIsMobile()
 
-  const isMobile = useIsMobile();
-
-  // Body scroll management voor modals
+  // ─── Body scroll lock ───
   useEffect(() => {
-    if (showBookingModal || showRequestModal) {
-      const scrollY = window.scrollY;
-      
-      document.body.style.position = 'fixed';
-      document.body.style.top = `-${scrollY}px`;
-      document.body.style.width = '100%';
-      document.body.style.overflow = 'hidden';
-      
+    if (!showBooking) return
+    const scrollY = window.scrollY
+    document.body.style.position = 'fixed'
+    document.body.style.top = `-${scrollY}px`
+    document.body.style.width = '100%'
+    document.body.style.overflow = 'hidden'
+    if (isMobile) {
+      document.documentElement.style.overflow = 'hidden'
+      document.documentElement.style.height = '100%'
+    }
+    return () => {
+      const saved = document.body.style.top
+      document.body.style.position = ''
+      document.body.style.top = ''
+      document.body.style.width = ''
+      document.body.style.overflow = ''
       if (isMobile) {
-        document.documentElement.style.overflow = 'hidden';
-        document.documentElement.style.height = '100%';
+        document.documentElement.style.overflow = ''
+        document.documentElement.style.height = ''
       }
-      
-      return () => {
-        const scrollY = document.body.style.top;
-        document.body.style.position = '';
-        document.body.style.top = '';
-        document.body.style.width = '';
-        document.body.style.overflow = '';
-        
-        if (isMobile) {
-          document.documentElement.style.overflow = '';
-          document.documentElement.style.height = '';
-        }
-        
-        window.scrollTo(0, parseInt(scrollY || '0') * -1);
-      };
+      window.scrollTo(0, parseInt(saved || '0') * -1)
     }
-  }, [showBookingModal, showRequestModal, isMobile]);
+  }, [showBooking, isMobile])
 
-  // Calculate user stats
-  const calculateUserStats = (callsData) => {
-    const completed = callsData.filter(c => c.status === 'completed').length;
-    const scheduled = callsData.filter(c => c.status === 'scheduled').length;
-    
-    setUserStats({
-      totalCalls: callsData.length,
-      completedCalls: completed,
-      scheduledCalls: scheduled
-    });
-  };
-
-  // Load call data
-  const loadCallData = async () => {
-    try {
-      setLoading(true);
-      
-      const plansData = await CallPlanningService.getClientPlans(clientInfo.id);
-      setPlans(plansData || []);
-      
-      if (plansData && plansData.length > 0) {
-        const activePlan = plansData.find(p => p.status === 'active') || plansData[0];
-        
-        if (activePlan.client_calls) {
-          let callsData = activePlan.client_calls;
-          
-          // Auto unlock first call and subsequent calls if previous is completed
-          callsData = callsData.map((call, index) => {
-            if (call.call_number === 1 && call.status === 'locked') {
-              return { ...call, status: 'available' };
-            }
-            
-            if (call.call_number > 1 && call.status === 'locked') {
-              const previousCall = callsData.find(c => c.call_number === call.call_number - 1);
-              if (previousCall && previousCall.status === 'completed') {
-                return { ...call, status: 'available' };
-              }
-            }
-            
-            return call;
-          });
-          
-          setCalls(callsData);
-          calculateUserStats(callsData);
-        }
-      }
-      
-      // Load requests and notifications
-      try {
-        if (CallPlanningService.getClientRequests) {
-          const requestsData = await CallPlanningService.getClientRequests(clientInfo.id);
-          setRequests(requestsData || []);
-        }
-      } catch (e) {
-        console.log('Requests not available');
-      }
-      
-      try {
-        if (CallPlanningService.getCallNotifications) {
-          const notificationsData = await CallPlanningService.getCallNotifications(clientInfo.id);
-          setNotifications(notificationsData?.filter(n => !n.read) || []);
-        }
-      } catch (e) {
-        console.log('Notifications not available');
-      }
-      
-    } catch (error) {
-      console.error('Error loading call data:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    if (clientInfo?.id) {
-      loadCallData();
-    }
-  }, [clientInfo]);
-
-  const handleBookCall = (call) => {
-    console.log('Opening booking for call:', call);
-    
-    let callWithLink = { ...call };
-    
-    // Add fallback Calendly links if needed
-    if (!callWithLink.calendly_link) {
-      const fallbackLinks = {
-        1: 'https://calendly.com/kerstenscheffer/kennismaking-doelstelling-call',
-        2: 'https://calendly.com/kerstenscheffer/persoonlijk-plan-pitch',
-        3: 'https://calendly.com/kerstenscheffer/reflectie-bijsturen',
-        4: 'https://calendly.com/kerstenscheffer/halfway-progressie-call',
-        5: 'https://calendly.com/kerstenscheffer/final-sprint-call',
-        6: 'https://calendly.com/kerstenscheffer/final-call',
-        99: 'https://calendly.com/kerstenscheffer/bonus-call'
-      };
-      
-      if (fallbackLinks[callWithLink.call_number]) {
-        callWithLink.calendly_link = fallbackLinks[callWithLink.call_number];
-      }
-    }
-    
-    if (callWithLink.call_number === 99) {
-      callWithLink.call_title = callWithLink.call_title || 'Bonus Call';
-      if (callWithLink.client_subject) {
-        callWithLink.display_subject = callWithLink.client_subject;
-      }
-    }
-    
-    if (!callWithLink.calendly_link || !callWithLink.calendly_link.includes('calendly.com')) {
-      alert('Er is geen geldige Calendly link voor deze call. Neem contact op met je coach.');
-      return;
-    }
-
-    const separator = callWithLink.calendly_link.includes('?') ? '&' : '?';
-    const clientEmail = clientInfo?.email || '';
-    const fullCalendlyUrl = `${callWithLink.calendly_link}${separator}utm_content=call_${call.id}&email=${encodeURIComponent(clientEmail)}`;
-    
-    callWithLink.calendly_link = fullCalendlyUrl;
-    
-    setCalendlyLoaded(false);
-    setSelectedCall(callWithLink);
-    setShowBookingModal(true);
-    setModalKey(prev => prev + 1);
-  };
-
-  const calculateProgress = () => {
-    const completed = calls.filter(c => c.status === 'completed').length;
-    return calls.length > 0 ? (completed / calls.length) * 100 : 0;
-  };
-
-  if (loading) {
-    return (
-      <div style={{
-        display: 'flex',
-        justifyContent: 'center',
-        alignItems: 'center',
-        height: '400px',
-        background: 'linear-gradient(135deg, rgba(37, 99, 235, 0.12) 0%, rgba(23, 23, 23, 0.8) 100%)',
-        border: '1px solid rgba(37, 99, 235, 0.25)',
-        borderRadius: isMobile ? '16px' : '20px',
-        backdropFilter: 'blur(12px)'
-      }}>
-        <div style={{ textAlign: 'center' }}>
-          <div style={{
-            width: '40px',
-            height: '40px',
-            border: '3px solid rgba(37, 99, 235, 0.2)',
-            borderTopColor: '#2563eb',
-            borderRadius: '50%',
-            animation: 'spin 1s linear infinite',
-            margin: '0 auto'
-          }} />
-          <div style={{ 
-            color: 'rgba(255, 255, 255, 0.6)', 
-            marginTop: '1rem',
-            fontSize: isMobile ? '0.9rem' : '1rem'
-          }}>
-            Calls laden...
-          </div>
-        </div>
-      </div>
-    );
+  // ─── Build Calendly URL ───
+  const openBooking = () => {
+    const email = encodeURIComponent(clientInfo?.email || '')
+    const name = encodeURIComponent(`${clientInfo?.first_name || ''} ${clientInfo?.last_name || ''}`.trim())
+    const sep = CALENDLY_LINK.includes('?') ? '&' : '?'
+    const url = `${CALENDLY_LINK}${sep}hide_landing_page_details=1&hide_gdpr_banner=1&background_color=1a1a1a&text_color=ffffff&primary_color=3b82f6&email=${email}&name=${name}`
+    setBookingUrl(url)
+    setShowBooking(true)
   }
 
-  const activePlan = plans.find(p => p.status === 'active');
-  const nextCall = calls.find(c => c.status === 'available' || c.status === 'scheduled');
-  const progress = calculateProgress();
-
   return (
-    <div style={{ 
-      padding: isMobile ? '0.75rem' : '1rem', 
-      maxWidth: '1400px',
-      margin: '0 auto'
-    }}>
-      {/* Hero Section - Dark Blue Upgraded */}
+    <div style={{ maxWidth: '900px', margin: '0 auto' }}>
+
+      {/* ═══ HEADER ═══ */}
       <div style={{
-        position: 'relative',
-        background: 'linear-gradient(135deg, rgba(37, 99, 235, 0.2) 0%, rgba(30, 58, 138, 0.1) 100%)',
-        backdropFilter: 'blur(12px)',
-        borderRadius: isMobile ? '16px' : '20px',
-        padding: isMobile ? '1.5rem 1rem' : '2rem 1.5rem',
-        marginBottom: isMobile ? '1.5rem' : '2rem',
-        border: '2px solid rgba(37, 99, 235, 0.3)',
-        boxShadow: '0 8px 32px rgba(37, 99, 235, 0.2)',
+        padding: isMobile ? '0.75rem 0' : '1rem 0',
+        borderBottom: '1px solid rgba(255, 255, 255, 0.06)'
+      }}>
+        <h1 style={{
+          fontSize: isMobile ? '1.25rem' : '1.5rem',
+          fontWeight: '800',
+          color: '#fff',
+          margin: 0,
+          letterSpacing: '-0.02em'
+        }}>
+          Coaching Calls
+        </h1>
+        <p style={{
+          fontSize: isMobile ? '0.65rem' : '0.7rem',
+          color: 'rgba(255, 255, 255, 0.25)',
+          margin: '0.15rem 0 0 0',
+          fontWeight: '600'
+        }}>
+          Plan een call in met je coach
+        </p>
+      </div>
+
+      {/* ═══ VIDEO WIDGET ═══ */}
+      {clientInfo && db && (
+        <div style={{ padding: isMobile ? '0.75rem 0' : '1rem 0' }}>
+          <PageVideoWidget client={clientInfo} db={db} pageContext="calls" title="Coaching Call Tips" compact={true} />
+        </div>
+      )}
+
+      {/* ═══ CALL BOOKING CARD ═══ */}
+      <div style={{
+        marginTop: isMobile ? '0.25rem' : '0.5rem',
+        background: '#0a0a0a',
+        border: '1px solid rgba(255, 255, 255, 0.06)',
+        borderRadius: isMobile ? '10px' : '12px',
         overflow: 'hidden',
         transform: 'translateZ(0)'
       }}>
-        {/* Top Accent Glow Line */}
+        {/* Top accent line */}
         <div style={{
-          position: 'absolute',
-          top: 0,
-          left: 0,
-          right: 0,
           height: '2px',
-          background: 'linear-gradient(90deg, transparent 0%, #2563eb 50%, transparent 100%)',
-          opacity: 0.6,
-          zIndex: 10
+          background: `linear-gradient(90deg, transparent 0%, ${BLUE.primary} 50%, transparent 100%)`,
+          opacity: 0.4
         }} />
 
-        <div style={{ position: 'relative', zIndex: 1 }}>
-          {/* Header Content */}
+        {/* Card header */}
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          padding: isMobile ? '0.625rem 0.75rem' : '0.75rem 1rem',
+          borderBottom: '1px solid rgba(255, 255, 255, 0.04)'
+        }}>
           <div style={{
-            display: 'flex',
-            flexDirection: isMobile ? 'column' : 'row',
-            justifyContent: 'space-between',
-            alignItems: isMobile ? 'flex-start' : 'center',
-            gap: isMobile ? '1rem' : '1.5rem',
-            marginBottom: isMobile ? '1.25rem' : '1.5rem'
+            width: isMobile ? '30px' : '34px',
+            height: isMobile ? '30px' : '34px',
+            borderRadius: '8px',
+            background: BLUE.bg,
+            border: `1px solid ${BLUE.border}`,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            marginRight: isMobile ? '0.6rem' : '0.75rem',
+            flexShrink: 0
           }}>
-            <div>
-              <h1 style={{ 
-                fontSize: isMobile ? '1.5rem' : '2rem', 
-                fontWeight: '700',
-                color: '#fff',
-                marginBottom: '0.5rem',
-                textShadow: '0 2px 8px rgba(0, 0, 0, 0.3)',
-                letterSpacing: '-0.01em'
-              }}>
-                🎯 Jouw Coaching Calls
-              </h1>
-              <p style={{
-                color: 'rgba(255, 255, 255, 0.75)',
-                fontSize: isMobile ? '0.875rem' : '0.95rem',
-                margin: 0
-              }}>
-                Plan je calls en blijf op schema voor maximaal resultaat
-              </p>
-            </div>
-
-            {/* Stats Cards - Dark Blue */}
+            <Phone size={isMobile ? 14 : 16} color={BLUE.primary} strokeWidth={2.5} />
+          </div>
+          <div style={{ flex: 1 }}>
             <div style={{
-              display: 'flex',
-              gap: isMobile ? '0.6rem' : '0.75rem',
-              width: isMobile ? '100%' : 'auto'
+              fontSize: isMobile ? '0.9rem' : '1rem',
+              fontWeight: '700',
+              color: '#fff'
             }}>
-              <div style={{
-                flex: 1,
-                background: 'linear-gradient(135deg, rgba(37, 99, 235, 0.15) 0%, rgba(37, 99, 235, 0.08) 100%)',
-                backdropFilter: 'blur(10px)',
-                borderRadius: isMobile ? '10px' : '12px',
-                padding: isMobile ? '0.65rem 0.75rem' : '0.75rem 0.9rem',
-                border: '1px solid rgba(37, 99, 235, 0.3)',
-                boxShadow: '0 4px 16px rgba(37, 99, 235, 0.15)'
-              }}>
-                <div style={{ 
-                  fontSize: isMobile ? '1.3rem' : '1.5rem', 
-                  fontWeight: '800', 
-                  color: '#3b82f6',
-                  textShadow: '0 0 12px rgba(37, 99, 235, 0.4)'
-                }}>
-                  {userStats.completedCalls}
-                </div>
-                <div style={{ 
-                  fontSize: isMobile ? '0.65rem' : '0.7rem', 
-                  color: 'rgba(255, 255, 255, 0.7)',
-                  fontWeight: '600',
-                  letterSpacing: '0.05em',
-                  textTransform: 'uppercase'
-                }}>
-                  Voltooid
-                </div>
-              </div>
-
-              <div style={{
-                flex: 1,
-                background: 'linear-gradient(135deg, rgba(37, 99, 235, 0.15) 0%, rgba(37, 99, 235, 0.08) 100%)',
-                backdropFilter: 'blur(10px)',
-                borderRadius: isMobile ? '10px' : '12px',
-                padding: isMobile ? '0.65rem 0.75rem' : '0.75rem 0.9rem',
-                border: '1px solid rgba(37, 99, 235, 0.3)',
-                boxShadow: '0 4px 16px rgba(37, 99, 235, 0.15)'
-              }}>
-                <div style={{ 
-                  fontSize: isMobile ? '1.3rem' : '1.5rem', 
-                  fontWeight: '800', 
-                  color: '#60a5fa',
-                  textShadow: '0 0 12px rgba(96, 165, 250, 0.4)'
-                }}>
-                  {userStats.scheduledCalls}
-                </div>
-                <div style={{ 
-                  fontSize: isMobile ? '0.65rem' : '0.7rem', 
-                  color: 'rgba(255, 255, 255, 0.7)',
-                  fontWeight: '600',
-                  letterSpacing: '0.05em',
-                  textTransform: 'uppercase'
-                }}>
-                  Gepland
-                </div>
-              </div>
-
-              <div style={{
-                flex: 1,
-                background: 'linear-gradient(135deg, rgba(37, 99, 235, 0.15) 0%, rgba(37, 99, 235, 0.08) 100%)',
-                backdropFilter: 'blur(10px)',
-                borderRadius: isMobile ? '10px' : '12px',
-                padding: isMobile ? '0.65rem 0.75rem' : '0.75rem 0.9rem',
-                border: '1px solid rgba(37, 99, 235, 0.3)',
-                boxShadow: '0 4px 16px rgba(37, 99, 235, 0.15)'
-              }}>
-                <div style={{ 
-                  fontSize: isMobile ? '1.3rem' : '1.5rem', 
-                  fontWeight: '800', 
-                  color: '#2563eb',
-                  textShadow: '0 0 12px rgba(37, 99, 235, 0.4)'
-                }}>
-                  {userStats.totalCalls}
-                </div>
-                <div style={{ 
-                  fontSize: isMobile ? '0.65rem' : '0.7rem', 
-                  color: 'rgba(255, 255, 255, 0.7)',
-                  fontWeight: '600',
-                  letterSpacing: '0.05em',
-                  textTransform: 'uppercase'
-                }}>
-                  Totaal
-                </div>
-              </div>
+              Plan een coaching call met Kersten
             </div>
           </div>
+        </div>
 
-          {/* Action Buttons - Dark Blue */}
-          <div style={{
-            display: 'flex',
-            flexWrap: 'wrap',
-            gap: isMobile ? '0.6rem' : '0.75rem',
-            marginBottom: isMobile ? '0.75rem' : '0.9rem'
+        {/* Info rows — flush stat bar style */}
+        <div style={{
+          display: 'flex',
+          borderBottom: '1px solid rgba(255, 255, 255, 0.04)'
+        }}>
+          <InfoCol
+            icon={<Clock size={12} color={BLUE.light} />}
+            label="DUUR"
+            value="30 min"
+            isMobile={isMobile}
+            borderRight
+          />
+          <InfoCol
+            icon={<Video size={12} color={BLUE.light} />}
+            label="LOCATIE"
+            value="Zoom"
+            isMobile={isMobile}
+            borderRight
+          />
+          <InfoCol
+            icon={<Calendar size={12} color={BLUE.light} />}
+            label="WANNEER"
+            value="Jij kiest"
+            isMobile={isMobile}
+          />
+        </div>
+
+        {/* Description */}
+        <div style={{
+          padding: isMobile ? '0.625rem 0.75rem' : '0.75rem 1rem',
+          borderBottom: '1px solid rgba(255, 255, 255, 0.04)'
+        }}>
+          <p style={{
+            fontSize: isMobile ? '0.72rem' : '0.78rem',
+            color: 'rgba(255, 255, 255, 0.35)',
+            margin: 0,
+            lineHeight: 1.5,
+            fontWeight: '500'
           }}>
+            Kies een moment dat jou uitkomt. Na het inplannen ontvang je automatisch een Zoom link via e-mail.
+          </p>
+        </div>
+
+        {/* CTA button row */}
+        <div style={{
+          padding: isMobile ? '0.625rem 0.75rem' : '0.75rem 1rem'
+        }}>
+          <button
+            onClick={openBooking}
+            style={{
+              width: '100%',
+              padding: isMobile ? '0.75rem' : '0.875rem',
+              background: BLUE.primary,
+              border: 'none',
+              borderRadius: '8px',
+              color: '#fff',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '0.5rem',
+              cursor: 'pointer',
+              fontSize: isMobile ? '0.85rem' : '0.9rem',
+              fontWeight: '800',
+              touchAction: 'manipulation',
+              WebkitTapHighlightColor: 'transparent',
+              minHeight: '48px',
+              transition: 'all 0.2s ease',
+              transform: 'translateZ(0)'
+            }}
+            onTouchStart={(e) => { if (isMobile) e.currentTarget.style.transform = 'scale(0.98)' }}
+            onTouchEnd={(e) => { if (isMobile) e.currentTarget.style.transform = 'scale(1)' }}
+          >
+            <Calendar size={16} strokeWidth={2.5} />
+            Call Inplannen
+            <ArrowRight size={16} strokeWidth={2.5} />
+          </button>
+        </div>
+      </div>
+
+      {/* ═══ BOOKING MODAL — Calendly embed via createPortal ═══ */}
+      {showBooking && createPortal(
+        <div
+          onClick={() => setShowBooking(false)}
+          style={{
+            position: 'fixed', inset: 0,
+            background: 'rgba(0, 0, 0, 0.92)',
+            zIndex: 9999,
+            display: 'flex', flexDirection: 'column',
+            animation: 'fadeIn 0.2s ease'
+          }}
+        >
+          {/* Header */}
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+              padding: isMobile ? '0.75rem 1rem' : '1rem 1.5rem',
+              borderBottom: `1px solid ${BLUE.border}`,
+              flexShrink: 0
+            }}
+          >
+            <div>
+              <div style={{
+                fontSize: isMobile ? '0.5rem' : '0.55rem',
+                fontWeight: '700', color: BLUE.primary,
+                textTransform: 'uppercase', letterSpacing: '0.08em',
+                marginBottom: '0.1rem'
+              }}>Call inplannen</div>
+              <div style={{ fontSize: isMobile ? '1rem' : '1.15rem', fontWeight: '800', color: '#fff' }}>
+                Coaching Call met Kersten
+              </div>
+            </div>
             <button
-              onClick={loadCallData}
+              onClick={() => setShowBooking(false)}
               style={{
-                flex: isMobile ? 1 : 'none',
-                padding: isMobile ? '0.75rem 1.125rem' : '0.875rem 1.375rem',
-                background: 'linear-gradient(135deg, rgba(37, 99, 235, 0.2) 0%, rgba(37, 99, 235, 0.12) 100%)',
-                border: '1px solid rgba(37, 99, 235, 0.35)',
-                borderRadius: isMobile ? '10px' : '12px',
-                color: '#3b82f6',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '0.5rem',
+                width: '36px', height: '36px',
+                background: 'rgba(255, 255, 255, 0.05)',
+                border: '1px solid rgba(255, 255, 255, 0.08)',
+                borderRadius: '8px',
+                color: 'rgba(255, 255, 255, 0.4)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
                 cursor: 'pointer',
-                transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                fontWeight: '700',
-                fontSize: isMobile ? '0.85rem' : '0.9rem',
-                touchAction: 'manipulation',
-                WebkitTapHighlightColor: 'transparent',
-                minHeight: '44px',
-                backdropFilter: 'blur(10px)',
-                boxShadow: '0 4px 16px rgba(37, 99, 235, 0.15)',
-                letterSpacing: '0.02em'
-              }}
-              onTouchStart={(e) => {
-                if (isMobile) {
-                  e.currentTarget.style.transform = 'scale(0.98)';
-                  e.currentTarget.style.background = 'rgba(37, 99, 235, 0.25)';
-                }
-              }}
-              onTouchEnd={(e) => {
-                if (isMobile) {
-                  e.currentTarget.style.transform = 'scale(1)';
-                  e.currentTarget.style.background = 'linear-gradient(135deg, rgba(37, 99, 235, 0.2) 0%, rgba(37, 99, 235, 0.12) 100%)';
-                }
+                touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+                minHeight: '44px', minWidth: '44px'
               }}
             >
-              <RefreshCw size={isMobile ? 16 : 18} />
-              <span>Refresh</span>
+              <X size={18} />
             </button>
-            
-            {activePlan && (
-              <button
-                onClick={() => setShowRequestModal(true)}
-                style={{
-                  flex: isMobile ? 1 : 'none',
-                  padding: isMobile ? '0.75rem 1.125rem' : '0.875rem 1.375rem',
-                  background: 'linear-gradient(135deg, rgba(168, 85, 247, 0.2) 0%, rgba(168, 85, 247, 0.12) 100%)',
-                  border: '1px solid rgba(168, 85, 247, 0.35)',
-                  borderRadius: isMobile ? '10px' : '12px',
-                  color: '#a855f7',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '0.5rem',
-                  cursor: 'pointer',
-                  fontWeight: '700',
-                  transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                  boxShadow: '0 4px 16px rgba(168, 85, 247, 0.15)',
-                  fontSize: isMobile ? '0.85rem' : '0.9rem',
-                  touchAction: 'manipulation',
-                  WebkitTapHighlightColor: 'transparent',
-                  minHeight: '44px',
-                  backdropFilter: 'blur(10px)',
-                  letterSpacing: '0.02em'
-                }}
-                onTouchStart={(e) => {
-                  if (isMobile) {
-                    e.currentTarget.style.transform = 'scale(0.98)';
-                    e.currentTarget.style.background = 'rgba(168, 85, 247, 0.25)';
-                  }
-                }}
-                onTouchEnd={(e) => {
-                  if (isMobile) {
-                    e.currentTarget.style.transform = 'scale(1)';
-                    e.currentTarget.style.background = 'linear-gradient(135deg, rgba(168, 85, 247, 0.2) 0%, rgba(168, 85, 247, 0.12) 100%)';
-                  }
-                }}
-              >
-                <Plus size={isMobile ? 16 : 18} />
-                <span>Bonus Call</span>
-              </button>
-            )}
           </div>
 
-          {/* Info Section - Dark Blue */}
-          <div style={{
-            position: 'relative',
-            background: 'linear-gradient(135deg, rgba(37, 99, 235, 0.08) 0%, rgba(23, 23, 23, 0.6) 100%)',
-            backdropFilter: 'blur(10px)',
-            borderRadius: isMobile ? '10px' : '12px',
-            padding: isMobile ? '0.65rem 0.75rem' : '0.75rem 0.9rem',
-            marginBottom: isMobile ? '0.75rem' : '0.9rem',
-            border: '1px solid rgba(37, 99, 235, 0.2)',
-            overflow: 'hidden'
-          }}>
-            {/* Subtle top glow */}
-            <div style={{
-              position: 'absolute',
-              top: 0,
-              left: 0,
-              right: 0,
-              height: '1px',
-              background: 'linear-gradient(90deg, transparent 0%, rgba(37, 99, 235, 0.4) 50%, transparent 100%)',
-              opacity: 0.5
-            }} />
-            
-            <p style={{
-              color: 'rgba(255, 255, 255, 0.9)',
-              fontSize: isMobile ? '0.75rem' : '0.8rem',
-              lineHeight: '1.4',
-              margin: 0,
-              display: 'flex',
-              alignItems: 'flex-start',
-              gap: '0.5rem'
-            }}>
-              <HelpCircle size={14} style={{ flexShrink: 0, marginTop: '1px', color: '#60a5fa' }} />
-              <span>
-                <strong style={{ color: '#3b82f6' }}>Tip:</strong> Plan calls wanneer het jou uitkomt en krijg direct een Zoom link.
-              </span>
-            </p>
-          </div>
-
-          {/* Progress Bar */}
-          <ProgressBar 
-            calls={calls}
-            userStats={userStats}
-            progress={progress}
-            handleBookCall={handleBookCall}
-          />
-        </div>
-      </div>
-
-      {/* Video Widget - Under Header */}
-      {clientInfo && db && (
-        <div style={{
-          marginBottom: isMobile ? '1.25rem' : '1.5rem'
-        }}>
-          <PageVideoWidget   
-            client={clientInfo}
-            db={db}
-            pageContext="calls"
-            title="Coaching Call Tips"
-            compact={true}
-          />
-        </div>
-      )}
-
-      {/* Notifications - Keep Yellow (Warning State) */}
-      {notifications.length > 0 && (
-        <div style={{
-          position: 'relative',
-          background: 'linear-gradient(135deg, rgba(249, 115, 22, 0.12) 0%, rgba(249, 115, 22, 0.05) 100%)',
-          backdropFilter: 'blur(10px)',
-          borderLeft: '3px solid #f97316',
-          borderRadius: isMobile ? '12px' : '14px',
-          padding: isMobile ? '1rem' : '1.25rem',
-          marginBottom: isMobile ? '1.5rem' : '2rem',
-          border: '1px solid rgba(249, 115, 22, 0.25)',
-          overflow: 'hidden'
-        }}>
-          {/* Top accent glow */}
-          <div style={{
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            right: 0,
-            height: '2px',
-            background: 'linear-gradient(90deg, transparent 0%, #f97316 50%, transparent 100%)',
-            opacity: 0.5,
-            zIndex: 10
-          }} />
-          
-          <div style={{ display: 'flex', gap: isMobile ? '0.6rem' : '0.75rem' }}>
-            <Bell size={isMobile ? 16 : 18} style={{ 
-              color: '#f97316', 
-              marginTop: '2px', 
-              flexShrink: 0 
-            }} />
-            <div style={{ flex: 1 }}>
-              <h3 style={{ 
-                fontWeight: '700', 
-                color: '#fff', 
-                marginBottom: '0.5rem',
-                fontSize: isMobile ? '0.95rem' : '1.05rem'
-              }}>
-                Nieuwe Updates
-              </h3>
-              <div style={{ 
-                display: 'flex', 
-                flexDirection: 'column', 
-                gap: isMobile ? '0.4rem' : '0.5rem' 
-              }}>
-                {notifications.map(notif => (
-                  <div 
-                    key={notif.id} 
-                    style={{ 
-                      fontSize: isMobile ? '0.8rem' : '0.85rem', 
-                      color: 'rgba(255, 255, 255, 0.85)',
-                      padding: isMobile ? '0.5rem' : '0.6rem',
-                      background: 'rgba(0, 0, 0, 0.2)',
-                      borderRadius: '8px',
-                      borderLeft: '2px solid #f97316',
-                      lineHeight: '1.4'
-                    }}
-                  >
-                    {notif.message}
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Next Call Highlight */}
-      {nextCall && (
-        <NextCallHighlight 
-          nextCall={nextCall}
-          handleBookCall={handleBookCall}
-        />
-      )}
-
-      {/* Call Cards Grid */}
-      <div style={{ marginTop: isMobile ? '1.5rem' : '2rem' }}>
-        <h2 style={{ 
-          fontSize: isMobile ? '1.25rem' : '1.5rem', 
-          fontWeight: '700', 
-          color: '#fff', 
-          marginBottom: isMobile ? '1rem' : '1.25rem',
-          letterSpacing: '-0.01em'
-        }}>
-          Jouw 6-Call Journey
-        </h2>
-        
-        <div style={{
-          display: 'grid',
-          gap: isMobile ? '0.9rem' : '1.25rem',
-          gridTemplateColumns: window.innerWidth > 1024 ? 'repeat(3, 1fr)' 
-            : window.innerWidth > 640 ? 'repeat(2, 1fr)' 
-            : '1fr'
-        }}>
-          {calls.sort((a, b) => a.call_number - b.call_number).map((call, index) => (
-            <CallCard 
-              key={call.id}
-              call={call}
-              index={index}
-              handleBookCall={handleBookCall}
+          {/* Calendly iframe — dark bg, email prefilled */}
+          <div onClick={(e) => e.stopPropagation()} style={{ flex: 1, overflow: 'hidden' }}>
+            <iframe
+              src={bookingUrl}
+              style={{ width: '100%', height: '100%', border: 'none', background: '#1a1a1a' }}
+              title="Calendly Scheduling"
+              loading="lazy"
             />
-          ))}
-        </div>
-      </div>
+          </div>
 
-      {/* Booking Modal */}
-      {showBookingModal && selectedCall && (
-        <BookingModal
-          selectedCall={selectedCall}
-          setShowBookingModal={setShowBookingModal}
-          setSelectedCall={setSelectedCall}
-          calendlyLoaded={calendlyLoaded}
-          setCalendlyLoaded={setCalendlyLoaded}
-          modalKey={modalKey}
-          calls={calls}
-          setCalls={setCalls}
-          loadCallData={loadCallData}
-        />
+          {/* Fallback link */}
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              padding: isMobile ? '0.6rem 1rem' : '0.75rem 1.5rem',
+              borderTop: '1px solid rgba(255, 255, 255, 0.06)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              flexShrink: 0
+            }}
+          >
+            <a
+              href={bookingUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{
+                display: 'flex', alignItems: 'center', gap: '0.3rem',
+                color: 'rgba(255, 255, 255, 0.25)',
+                fontSize: isMobile ? '0.65rem' : '0.7rem',
+                fontWeight: '600', textDecoration: 'none'
+              }}
+            >
+              <ExternalLink size={12} />
+              Openen in nieuw venster
+            </a>
+          </div>
+        </div>,
+        document.body
       )}
 
-      {/* Bonus Call Request Modal */}
-      {showRequestModal && (
-        <RequestModal
-          setShowRequestModal={setShowRequestModal}
-          clientInfo={clientInfo}
-          plans={plans}
-          loadCallData={loadCallData}
-        />
-      )}
-
-      {/* Animation Styles */}
       <style>{`
-        @keyframes spin {
-          to { transform: rotate(360deg); }
-        }
-        @keyframes float-animation {
-          0%, 100% { transform: translateY(0); }
-          50% { transform: translateY(-10px); }
-        }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
       `}</style>
     </div>
-  );
+  )
+}
+
+
+// ─── INFO COLUMN (flush stat bar) ───
+function InfoCol({ icon, label, value, isMobile, borderRight }) {
+  return (
+    <div style={{
+      flex: 1,
+      padding: isMobile ? '0.5rem 0.6rem' : '0.6rem 0.75rem',
+      borderRight: borderRight ? '1px solid rgba(255, 255, 255, 0.04)' : 'none',
+      display: 'flex',
+      flexDirection: 'column',
+      gap: '0.2rem'
+    }}>
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: '0.25rem'
+      }}>
+        {icon}
+        <span style={{
+          fontSize: isMobile ? '0.4rem' : '0.45rem',
+          fontWeight: '700',
+          color: 'rgba(255, 255, 255, 0.15)',
+          textTransform: 'uppercase',
+          letterSpacing: '0.06em'
+        }}>
+          {label}
+        </span>
+      </div>
+      <div style={{
+        fontSize: isMobile ? '0.8rem' : '0.88rem',
+        fontWeight: '800',
+        color: '#fff',
+        letterSpacing: '-0.01em'
+      }}>
+        {value}
+      </div>
+    </div>
+  )
 }

@@ -1,0 +1,1067 @@
+// MY ARC MEAL PLAN HTML GENERATOR - MEN'S HEALTH GOLD EDITION V2
+// 2-column layout: 1 day = 1 page | Photos integrated
+
+/**
+ * Generate Men's Health styled meal plan HTML with photos
+ * @param {Object} enrichedPlan - Enriched plan data
+ * @param {string} clientName - Client naam
+ * @param {string} weekRange - Week range
+ * @returns {string} Compact HTML voor print/PDF
+ */
+export const generateMealPlanHTML = (enrichedPlan, clientName = 'Client', weekRange = 'Week Plan') => {
+  // Stats
+  const stats = enrichedPlan.weeklyStats || {
+    avgCalories: 0,
+    avgProtein: 0,
+    avgCarbs: 0,
+    avgFat: 0,
+    uniqueIngredients: 0
+  }
+  
+  // Day names
+  const dayNames = {
+    monday: 'Maandag',
+    tuesday: 'Dinsdag', 
+    wednesday: 'Woensdag',
+    thursday: 'Donderdag',
+    friday: 'Vrijdag',
+    saturday: 'Zaterdag',
+    sunday: 'Zondag'
+  }
+  
+  // Meal types
+  const mealTypes = {
+    breakfast: 'ONTBIJT',
+    lunch: 'LUNCH',
+    dinner: 'DINER',
+    snacks: 'SNACK'
+  }
+  
+  // Meal photos rotation
+  const mealPhotos = [
+    'https://i.ibb.co/YBXKM0Zz/1.png',
+    'https://i.ibb.co/FLrFV8Vq/2.png',
+    'https://i.ibb.co/PvDhbSjV/3.png',
+    'https://i.ibb.co/4gYjtpbY/12.png',
+    'https://i.ibb.co/KzNkDpvk/11.png',
+    'https://i.ibb.co/zHsdJS5y/10.png',
+    'https://i.ibb.co/jvmybhpK/9.png',
+    'https://i.ibb.co/Lh0Ph1vV/8.png'
+  ]
+  
+  let photoIndex = 0
+  const getNextPhoto = () => {
+    const photo = mealPhotos[photoIndex % mealPhotos.length]
+    photoIndex++
+    return photo
+  }
+  
+  // Calculate week cost
+  let totalWeekCost = 0
+  Object.entries(enrichedPlan.week_structure_enriched || {}).forEach(([day, dayData]) => {
+    if (!dayData) return
+    const meals = [dayData.breakfast, dayData.lunch, dayData.dinner, ...(dayData.snacks || [])]
+    meals.forEach(meal => {
+      if (meal?.total_cost) {
+        totalWeekCost += meal.total_cost * (meal.scale_factor || 1)
+      }
+    })
+  })
+  
+  // Format ingredients COMPACT
+  const formatIngredientsCompact = (ingredients) => {
+    if (!ingredients || ingredients.length === 0) return ''
+    
+    const limitedIngredients = ingredients.slice(0, 5)
+    const hasMore = ingredients.length > 5
+    
+    return `
+      <div class="ingredients-list">
+        ${limitedIngredients.map(ing => {
+          const amount = Math.round(ing.amount_scaled || ing.amount || 0)
+          return `
+            <div class="ingredient-row">
+              <span class="ing-name">${ing.name}</span>
+              <span class="ing-amount">${amount}${ing.unit || 'g'}</span>
+            </div>
+          `
+        }).join('')}
+        ${hasMore ? `<div class="ingredient-more">+${ingredients.length - 5} meer</div>` : ''}
+      </div>
+    `
+  }
+  
+  // Build HTML
+  const html = `
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>${clientName} - MY ARC Meal Plan</title>
+    <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Anton&family=Source+Sans+3:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --black: #1a1a1a;
+            --dark: #0a0a0a;
+            --white: #ffffff;
+            --gold: #FFD700;
+            --gold-dark: #D4AF37;
+            --gray-light: #f5f5f5;
+            --gray: #666666;
+            --gray-dark: #333333;
+        }
+
+        body {
+            background: var(--white);
+            color: var(--black);
+            font-family: 'Source Sans 3', sans-serif;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+        }
+
+        @page { 
+            size: A4; 
+            margin: 0; 
+        }
+
+        .page {
+            width: 210mm;
+            height: 297mm;
+            background: var(--white);
+            page-break-after: always;
+            page-break-inside: avoid;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .page:last-child { 
+            page-break-after: avoid; 
+        }
+
+        /* ================================
+           PAGE 1: COVER
+           ================================ */
+        .cover-page {
+            height: 100%;
+            background: var(--dark);
+            color: var(--white);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .cover-image {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-image: url('https://i.ibb.co/YBXKM0Zz/1.png');
+            background-size: cover;
+            background-position: center;
+            opacity: 0.5;
+        }
+
+        .cover-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(to bottom, rgba(10,10,10,0.7) 0%, rgba(10,10,10,0.95) 100%);
+        }
+
+        .cover-header {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            padding: 25px 40px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            z-index: 10;
+            border-bottom: 2px solid var(--gold);
+        }
+
+        .cover-logo {
+            font-family: 'Anton', sans-serif;
+            font-size: 24px;
+            letter-spacing: 2px;
+            color: var(--gold);
+        }
+
+        .cover-date {
+            font-size: 11px;
+            font-weight: 600;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            color: rgba(255,255,255,0.7);
+        }
+
+        .cover-content {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            padding: 50px 40px;
+            z-index: 10;
+        }
+
+        .cover-tag {
+            display: inline-block;
+            padding: 8px 16px;
+            background: var(--gold);
+            color: var(--black);
+            font-size: 11px;
+            font-weight: 700;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            margin-bottom: 20px;
+        }
+
+        .cover-title {
+            font-family: 'Anton', sans-serif;
+            font-size: 70px;
+            line-height: 0.95;
+            letter-spacing: -1px;
+            text-transform: uppercase;
+            margin-bottom: 15px;
+        }
+
+        .cover-subtitle {
+            font-size: 16px;
+            font-weight: 400;
+            color: rgba(255,255,255,0.8);
+            max-width: 450px;
+            line-height: 1.6;
+            margin-bottom: 30px;
+        }
+
+        .cover-stats {
+            display: flex;
+            gap: 35px;
+        }
+
+        .cover-stat {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .cover-stat-value {
+            font-family: 'Anton', sans-serif;
+            font-size: 42px;
+            color: var(--gold);
+            line-height: 1;
+        }
+
+        .cover-stat-label {
+            font-size: 11px;
+            font-weight: 600;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            color: rgba(255,255,255,0.6);
+            margin-top: 5px;
+        }
+
+        /* ================================
+           PAGE 2: INTRO
+           ================================ */
+        .intro-page {
+            height: 100%;
+            background: var(--dark);
+            color: var(--white);
+            padding: 40px;
+        }
+
+        .page-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 30px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid var(--gold);
+        }
+
+        .page-title {
+            font-family: 'Anton', sans-serif;
+            font-size: 14px;
+            letter-spacing: 3px;
+            text-transform: uppercase;
+            color: var(--gold);
+        }
+
+        .page-num {
+            font-size: 12px;
+            font-weight: 600;
+            color: rgba(255,255,255,0.5);
+        }
+
+        .section-title {
+            font-family: 'Anton', sans-serif;
+            font-size: 42px;
+            line-height: 1;
+            letter-spacing: -0.5px;
+            text-transform: uppercase;
+            margin-bottom: 20px;
+        }
+
+        /* Coach Bubble */
+        .coach-bubble {
+            display: flex;
+            align-items: flex-start;
+            gap: 18px;
+            padding: 20px;
+            background: rgba(255, 215, 0, 0.15);
+            border: 2px solid var(--gold);
+            border-radius: 12px;
+            margin-bottom: 25px;
+        }
+
+        .coach-photo {
+            width: 65px;
+            height: 65px;
+            border-radius: 50%;
+            border: 3px solid var(--gold);
+            overflow: hidden;
+            flex-shrink: 0;
+        }
+
+        .coach-photo img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .coach-message {
+            flex: 1;
+        }
+
+        .coach-name {
+            font-size: 15px;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: var(--gold);
+            margin-bottom: 8px;
+        }
+
+        .coach-text {
+            font-size: 14px;
+            color: rgba(255,255,255,0.9);
+            line-height: 1.6;
+        }
+
+        .coach-text strong {
+            color: var(--gold);
+        }
+
+        /* Stats Grid */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 12px;
+            margin-bottom: 25px;
+        }
+
+        .stat-box {
+            background: rgba(255, 215, 0, 0.1);
+            border: 2px solid var(--gold);
+            padding: 18px;
+            text-align: center;
+        }
+
+        .stat-value {
+            font-family: 'Anton', sans-serif;
+            font-size: 28px;
+            color: var(--gold);
+            display: block;
+            line-height: 1;
+        }
+
+        .stat-label {
+            font-size: 9px;
+            letter-spacing: 1.5px;
+            text-transform: uppercase;
+            color: rgba(255,255,255,0.6);
+            margin-top: 6px;
+        }
+
+        /* Content Box */
+        .content-box {
+            background: rgba(255, 255, 255, 0.05);
+            border-left: 4px solid var(--gold);
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+
+        .content-title {
+            font-family: 'Anton', sans-serif;
+            font-size: 18px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 12px;
+            color: var(--gold);
+        }
+
+        .content-list {
+            list-style: none;
+        }
+
+        .content-list li {
+            font-size: 13px;
+            color: rgba(255,255,255,0.9);
+            margin-bottom: 10px;
+            padding-left: 20px;
+            position: relative;
+            line-height: 1.5;
+        }
+
+        .content-list li::before {
+            content: '✓';
+            position: absolute;
+            left: 0;
+            color: var(--gold);
+            font-weight: 800;
+            font-size: 14px;
+        }
+
+        /* ================================
+           DAY PAGES - 2 COLUMN LAYOUT
+           ================================ */
+        .day-page {
+            height: 100%;
+            padding: 35px;
+            background: var(--dark);
+            color: var(--white);
+        }
+
+        .day-header-large {
+            font-family: 'Anton', sans-serif;
+            font-size: 48px;
+            line-height: 0.9;
+            letter-spacing: -1px;
+            text-transform: uppercase;
+            margin-bottom: 15px;
+            color: var(--black);
+        }
+
+        .day-header-large .gold {
+            color: var(--gold);
+        }
+
+        /* Day Totals */
+        .day-totals {
+            display: flex;
+            justify-content: space-between;
+            padding: 15px 20px;
+            background: #1a1a1a;
+            border-left: 4px solid var(--gold);
+            margin-bottom: 20px;
+        }
+
+        .day-total {
+            text-align: center;
+        }
+
+        .day-total-value {
+            font-family: 'Anton', sans-serif;
+            font-size: 24px;
+            color: var(--gold);
+            line-height: 1;
+        }
+
+        .day-total-label {
+            font-size: 9px;
+            letter-spacing: 1.5px;
+            text-transform: uppercase;
+            color: rgba(255, 255, 255, 0.6);
+            margin-top: 4px;
+        }
+
+        /* 2 Column Meals Layout */
+        .meals-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+        }
+
+        /* Meal Card COMPACT with Photo */
+        .meal-card {
+            background: #1a1a1a;
+            border: 2px solid #2a2a2a;
+            border-left: 4px solid var(--gold);
+            overflow: hidden;
+            page-break-inside: avoid;
+        }
+
+        .meal-photo {
+            width: 100%;
+            height: 100px;
+            background-size: cover;
+            background-position: center;
+            position: relative;
+        }
+
+        .meal-photo-overlay {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            padding: 8px 12px;
+            background: linear-gradient(to top, rgba(0,0,0,0.8), transparent);
+        }
+
+        .meal-type {
+            font-size: 10px;
+            font-weight: 700;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            color: var(--gold);
+        }
+
+        .meal-content {
+            padding: 15px;
+        }
+
+        .meal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 12px;
+        }
+
+        .meal-name {
+            font-family: 'Anton', sans-serif;
+            font-size: 16px;
+            text-transform: uppercase;
+            letter-spacing: -0.5px;
+            color: var(--white);
+            flex: 1;
+            line-height: 1.1;
+        }
+
+        .meal-calories {
+            font-family: 'Anton', sans-serif;
+            font-size: 24px;
+            color: var(--gold);
+            line-height: 1;
+            margin-left: 10px;
+        }
+
+        /* Ingredients */
+        .ingredients-list {
+            background: rgba(0, 0, 0, 0.3);
+            padding: 10px;
+            margin-bottom: 10px;
+        }
+
+        .ingredient-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 4px 0;
+            border-bottom: 1px solid rgba(0,0,0,0.05);
+            font-size: 11px;
+        }
+
+        .ingredient-row:last-child {
+            border-bottom: none;
+        }
+
+        .ing-name {
+            color: rgba(255, 255, 255, 0.8);
+        }
+
+        .ing-amount {
+            color: var(--gold);
+            font-weight: 700;
+        }
+
+        .ingredient-more {
+            font-size: 10px;
+            color: rgba(255, 255, 255, 0.5);
+            font-style: italic;
+            padding-top: 6px;
+        }
+
+        /* Meal Macros */
+        .meal-macros {
+            display: flex;
+            gap: 6px;
+            flex-wrap: wrap;
+        }
+
+        .macro-badge {
+            padding: 4px 10px;
+            background: rgba(0, 0, 0, 0.3);
+            border: 1px solid var(--gold);
+            font-size: 10px;
+            font-weight: 700;
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+            color: rgba(255, 255, 255, 0.8);
+        }
+
+        /* ================================
+           FINAL PAGE
+           ================================ */
+        .final-page {
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .final-top {
+            flex: 1;
+            padding: 50px 40px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            background: var(--white);
+        }
+
+        .final-bottom {
+            background: var(--dark);
+            color: var(--white);
+            padding: 40px;
+        }
+
+        .final-quote {
+            font-family: 'Anton', sans-serif;
+            font-size: 52px;
+            line-height: 1;
+            text-transform: uppercase;
+            margin-bottom: 20px;
+            color: var(--black);
+        }
+
+        .final-quote .gold {
+            color: var(--gold);
+        }
+
+        .final-text {
+            font-size: 15px;
+            color: var(--gray);
+            max-width: 450px;
+            line-height: 1.6;
+        }
+
+        /* CTA Grid */
+        .cta-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 25px;
+        }
+
+        .cta-item {
+            text-align: center;
+        }
+
+        .cta-icon {
+            width: 50px;
+            height: 50px;
+            background: var(--gold);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 15px;
+        }
+
+        .cta-title {
+            font-size: 14px;
+            font-weight: 700;
+            text-transform: uppercase;
+            margin-bottom: 8px;
+            color: var(--white);
+        }
+
+        .cta-desc {
+            font-size: 12px;
+            color: rgba(255,255,255,0.6);
+            line-height: 1.5;
+        }
+
+        /* Footer */
+        .page-footer {
+            position: absolute;
+            bottom: 20px;
+            left: 35px;
+            right: 35px;
+            display: flex;
+            justify-content: space-between;
+            font-size: 10px;
+            font-weight: 600;
+            color: var(--gray);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        /* Print Button */
+        .print-btn {
+            position: fixed;
+            top: 25px;
+            right: 25px;
+            background: var(--gold);
+            color: var(--black);
+            border: none;
+            padding: 12px 24px;
+            font-family: 'Source Sans 3', sans-serif;
+            font-size: 13px;
+            font-weight: 700;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            cursor: pointer;
+            z-index: 9999;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        @media print {
+            .print-btn { display: none; }
+            body { background: var(--white) !important; }
+            * {
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+            }
+        }
+    </style>
+</head>
+<body>
+    <button class="print-btn" onclick="window.print()">
+        <i data-lucide="download" style="width: 14px; height: 14px;"></i>
+        Print PDF
+    </button>
+
+    <!-- PAGE 1: COVER -->
+    <div class="page">
+        <div class="cover-page">
+            <div class="cover-image"></div>
+            <div class="cover-overlay"></div>
+            
+            <div class="cover-header">
+                <div class="cover-logo">MY ARC NUTRITION</div>
+                <div class="cover-date">${weekRange}</div>
+            </div>
+            
+            <div class="cover-content">
+                <div class="cover-tag">WEEK PLAN</div>
+                
+                <h1 class="cover-title">
+                    MY ARC NUTRITION - ${clientName.toUpperCase()}
+                </h1>
+                
+                <p class="cover-subtitle">
+                    Succes met je voeding draait niet om perfectie. Het draait om het hebben van een 
+                    duidelijk plan dat bij jouw leven past.
+                </p>
+                
+                <div class="cover-stats">
+                    <div class="cover-stat">
+                        <span class="cover-stat-value">${stats.avgCalories}</span>
+                        <span class="cover-stat-label">KCAL/DAG</span>
+                    </div>
+                    <div class="cover-stat">
+                        <span class="cover-stat-value">${stats.avgProtein}g</span>
+                        <span class="cover-stat-label">EIWIT/DAG</span>
+                    </div>
+                    <div class="cover-stat">
+                        <span class="cover-stat-value">€${Math.round(totalWeekCost)}</span>
+                        <span class="cover-stat-label">WEEK BUDGET</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- PAGE 2: INTRO -->
+    <div class="page">
+        <div class="intro-page">
+            <div class="page-header">
+                <span class="page-title">Introductie</span>
+                <span class="page-num">Pagina 1</span>
+            </div>
+            
+            <h2 class="section-title">JOUW COMPLETE WEEK</h2>
+            
+            <!-- Coach Bubble -->
+            <div class="coach-bubble">
+                <div class="coach-photo">
+                    <img src="https://i.ibb.co/601NSR8W/IMG-4752.jpg" alt="Kersten">
+                </div>
+                <div class="coach-message">
+                    <div class="coach-name">Kersten — Jouw Coach</div>
+                    <p class="coach-text">
+                        <strong>Succes met je voeding</strong> draait niet om perfectie. Het draait om het hebben van een 
+                        <strong>duidelijk plan</strong> dat bij jouw leven past.
+                    </p>
+                    <p class="coach-text" style="margin-top: 6px;">
+                        Dit weekplan neemt het denken weg. <strong>Alles is berekend</strong> - calorieën, eiwitten, 
+                        zelfs je boodschappenlijst. Volg het plan en de resultaten komen vanzelf.
+                    </p>
+                </div>
+            </div>
+            
+            <!-- Stats Grid -->
+            <div class="stats-grid">
+                <div class="stat-box">
+                    <span class="stat-value">${stats.avgCalories}</span>
+                    <span class="stat-label">KCAL/DAG</span>
+                </div>
+                <div class="stat-box">
+                    <span class="stat-value">${stats.avgProtein}g</span>
+                    <span class="stat-label">EIWIT/DAG</span>
+                </div>
+                <div class="stat-box">
+                    <span class="stat-value">${stats.avgCarbs}g</span>
+                    <span class="stat-label">KOOLH/DAG</span>
+                </div>
+                <div class="stat-box">
+                    <span class="stat-value">${stats.avgFat}g</span>
+                    <span class="stat-label">VET/DAG</span>
+                </div>
+            </div>
+            
+            <!-- Content Box -->
+            <div class="content-box">
+                <h3 class="content-title">Jouw Complete Week</h3>
+                <ul class="content-list">
+                    <li><strong>7 dagen</strong> aan maaltijden - ontbijt, lunch, diner & snacks</li>
+                    <li><strong>${stats.uniqueIngredients} ingrediënten</strong> - alles wat je nodig hebt</li>
+                    <li><strong>Perfect afgestemd</strong> op jouw doelen en voorkeuren</li>
+                    <li><strong>Inclusief bereidingstips</strong> voor elke maaltijd</li>
+                </ul>
+            </div>
+            
+            <!-- Tips Box -->
+            <div class="content-box">
+                <h3 class="content-title">Jouw Succesformule</h3>
+                <ul class="content-list">
+                    <li><strong>Meal prep op zondag:</strong> Bereid voor 3-4 dagen = geen stress doordeweeks</li>
+                    <li><strong>Weeg je porties:</strong> De eerste week precies, daarna ken je de hoeveelheden</li>
+                    <li><strong>80/20 regel:</strong> 80% volgens plan, 20% flexibiliteit voor het leven</li>
+                    <li><strong>Water eerst:</strong> Begin elke maaltijd met een glas water</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <!-- DAY PAGES - 2 COLUMN: 1 DAY = 1 PAGE -->
+    ${Object.entries(enrichedPlan.week_structure_enriched || {}).map(([day, dayData], dayIndex) => {
+      if (!dayData) return ''
+      
+      // Collect all meals (max 4: breakfast, lunch, dinner, 1 snack)
+      const meals = []
+      
+      if (dayData.breakfast) {
+        meals.push({ type: 'breakfast', data: dayData.breakfast, photo: getNextPhoto() })
+      }
+      if (dayData.lunch) {
+        meals.push({ type: 'lunch', data: dayData.lunch, photo: getNextPhoto() })
+      }
+      if (dayData.dinner) {
+        meals.push({ type: 'dinner', data: dayData.dinner, photo: getNextPhoto() })
+      }
+      if (dayData.snacks && dayData.snacks[0]) {
+        meals.push({ type: 'snacks', data: dayData.snacks[0], photo: getNextPhoto() })
+      }
+      
+      return `
+    <!-- ${dayNames[day].toUpperCase()} -->
+    <div class="page">
+        <div class="day-page">
+            <div class="page-header">
+                <span class="page-title">Dag ${dayIndex + 1}</span>
+                <span class="page-num">Pagina ${dayIndex + 3}</span>
+            </div>
+            
+            <h2 class="day-header-large">
+                <span class="gold">${dayNames[day].toUpperCase()}</span>
+            </h2>
+            
+            <div class="day-totals">
+                <div class="day-total">
+                    <div class="day-total-value">${dayData.totals?.kcal || 0}</div>
+                    <div class="day-total-label">Kcal</div>
+                </div>
+                <div class="day-total">
+                    <div class="day-total-value">${dayData.totals?.protein || 0}g</div>
+                    <div class="day-total-label">Eiwit</div>
+                </div>
+                <div class="day-total">
+                    <div class="day-total-value">${dayData.totals?.carbs || 0}g</div>
+                    <div class="day-total-label">Koolh</div>
+                </div>
+                <div class="day-total">
+                    <div class="day-total-value">${dayData.totals?.fat || 0}g</div>
+                    <div class="day-total-label">Vet</div>
+                </div>
+            </div>
+            
+            <div class="meals-grid">
+                ${meals.map(({ type, data, photo }) => `
+                <div class="meal-card">
+                    <div class="meal-photo" style="background-image: url('${photo}');">
+                        <div class="meal-photo-overlay">
+                            <div class="meal-type">${mealTypes[type]}</div>
+                        </div>
+                    </div>
+                    
+                    <div class="meal-content">
+                        <div class="meal-header">
+                            <div class="meal-name">${data.meal_name || 'Geen naam'}</div>
+                            <div class="meal-calories">${data.calories || 0}</div>
+                        </div>
+                        
+                        ${data.ingredients && data.ingredients.length > 0 ? formatIngredientsCompact(data.ingredients) : ''}
+                        
+                        <div class="meal-macros">
+                            <span class="macro-badge">${data.protein || 0}g E</span>
+                            <span class="macro-badge">${data.carbs || 0}g K</span>
+                            <span class="macro-badge">${data.fat || 0}g V</span>
+                        </div>
+                    </div>
+                </div>
+                `).join('')}
+            </div>
+            
+            <div class="page-footer">
+                <span>${dayNames[day]}</span>
+                <span>MY ARC | Transform Your Life</span>
+            </div>
+        </div>
+    </div>
+      `
+    }).join('')}
+
+    <!-- FINAL PAGE -->
+    <div class="page">
+        <div class="final-page">
+            <div class="final-top">
+                <h2 class="final-quote">
+                    WEEK<br>
+                    <span class="gold">COMPLEET!</span>
+                </h2>
+                <p class="final-text">
+                    Goed gedaan - je bent klaar voor een geweldige week. 
+                    Dit plan is een hulpmiddel, geen wet. Luister naar je lichaam, 
+                    pas aan waar nodig, en vooral: geniet van je eten!
+                </p>
+            </div>
+            
+            <div class="final-bottom">
+                <div class="cta-grid">
+                    <div class="cta-item">
+                        <div class="cta-icon">
+                            <i data-lucide="shopping-cart" style="width: 22px; height: 22px; color: #0a0a0a;"></i>
+                        </div>
+                        <h4 class="cta-title">Boodschappen</h4>
+                        <p class="cta-desc">Alles wat je deze week nodig hebt</p>
+                    </div>
+                    
+                    <div class="cta-item">
+                        <div class="cta-icon">
+                            <i data-lucide="chef-hat" style="width: 22px; height: 22px; color: #0a0a0a;"></i>
+                        </div>
+                        <h4 class="cta-title">Meal Prep</h4>
+                        <p class="cta-desc">Zondag voorbereiden = doordeweeks relaxen</p>
+                    </div>
+                    
+                    <div class="cta-item">
+                        <div class="cta-icon">
+                            <i data-lucide="trophy" style="width: 22px; height: 22px; color: #0a0a0a;"></i>
+                        </div>
+                        <h4 class="cta-title">Resultaat</h4>
+                        <p class="cta-desc">Op naar een geweldige week!</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        lucide.createIcons();
+    </script>
+</body>
+</html>
+  `
+  
+  return html
+}
+
+/**
+ * Open meal plan voor print/PDF
+ */
+export const openMealPlanForPrint = async (mealPlan, clientName, weekRange) => {
+  const MealPlanPDFService = (await import('./MealPlanPDFService')).default
+  const pdfService = new MealPlanPDFService()
+  
+  try {
+    const loadingDiv = document.createElement('div')
+    loadingDiv.style.cssText = `
+      position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+      background: #1a1a1a; color: #FFD700; 
+      padding: 20px 40px; border-radius: 8px; border: 2px solid #FFD700;
+      font-weight: 800; z-index: 9999; font-size: 14px;
+      text-transform: uppercase; letter-spacing: 1px;
+      font-family: 'Source Sans 3', sans-serif;
+    `
+    loadingDiv.textContent = 'PDF MAKEN...'
+    document.body.appendChild(loadingDiv)
+    
+    const enrichedPlan = await pdfService.enrichMealPlanData(mealPlan)
+    enrichedPlan.shoppingSummary = pdfService.generateShoppingSummary(enrichedPlan)
+    enrichedPlan.weeklyStats = pdfService.calculateWeeklyStats(enrichedPlan)
+    
+    const html = generateMealPlanHTML(enrichedPlan, clientName, weekRange)
+    
+    document.body.removeChild(loadingDiv)
+    
+    const printWindow = window.open('', '_blank', 'width=900,height=700')
+    
+    if (printWindow) {
+      printWindow.document.write(html)
+      printWindow.document.close()
+      
+      printWindow.onload = () => {
+        setTimeout(() => {
+          printWindow.print()
+        }, 500)
+      }
+    } else {
+      const printFrame = document.createElement('iframe')
+      printFrame.style.cssText = 'position: fixed; width: 0; height: 0; border: 0;'
+      document.body.appendChild(printFrame)
+      
+      const frameDoc = printFrame.contentDocument || printFrame.contentWindow.document
+      frameDoc.open()
+      frameDoc.write(html)
+      frameDoc.close()
+      
+      setTimeout(() => {
+        printFrame.contentWindow.focus()
+        printFrame.contentWindow.print()
+        
+        setTimeout(() => {
+          document.body.removeChild(printFrame)
+        }, 1000)
+      }, 500)
+    }
+  } catch (error) {
+    console.error('Error generating PDF:', error)
+    alert('Fout bij PDF maken. Probeer opnieuw.')
+  }
+}
+
+export default { generateMealPlanHTML, openMealPlanForPrint }

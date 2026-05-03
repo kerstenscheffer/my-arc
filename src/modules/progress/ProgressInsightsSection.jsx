@@ -1,363 +1,392 @@
 // src/modules/progress/ProgressInsightsSection.jsx
+// V2: Clean stats per oefening - Gem 8 Rep, 1RM, Max Volume
 import { useState, useEffect } from 'react'
-import { TrendingUp, Flame, Target, Zap, Trophy } from 'lucide-react'
-import HeroInsightCard from './components/HeroInsightCard'
-import RegularInsightCard from './components/RegularInsightCard'
-import TopExercisesStrip from './components/TopExercisesStrip'
+import { TrendingUp, Search, ChevronDown, Dumbbell } from 'lucide-react'
 
 export default function ProgressInsightsSection({ db, clientId, onSelectExercise }) {
   const isMobile = window.innerWidth <= 768
   const [loading, setLoading] = useState(true)
-  const [insights, setInsights] = useState([])
-  const [topExercises, setTopExercises] = useState([])
-  const [heroInsight, setHeroInsight] = useState(null)
+  const [exercises, setExercises] = useState([])
+  const [selectedExercise, setSelectedExercise] = useState('')
+  const [showDropdown, setShowDropdown] = useState(false)
+  const [searchQuery, setSearchQuery] = useState('')
+  const [stats, setStats] = useState({
+    avg8Rep: null,
+    oneRepMax: null,
+    maxVolume: null
+  })
 
   useEffect(() => {
     if (clientId && db) {
-      analyzeProgress()
+      loadExercises()
     }
   }, [clientId, db])
 
-  const handleExerciseClick = (exerciseName, metric = '1rm') => {
-    // Let parent handle scroll + chart opening
-    if (onSelectExercise) {
-      onSelectExercise(exerciseName, metric)
+  useEffect(() => {
+    if (selectedExercise && clientId && db) {
+      calculateStats()
     }
-  }
+  }, [selectedExercise, clientId, db])
 
-  const analyzeProgress = async () => {
+  const loadExercises = async () => {
     try {
-      setLoading(true)
-
-      const endDate = new Date()
-      const startDate = new Date()
-      startDate.setDate(startDate.getDate() - 30)
-
-      const { data: sessions, error: sessionsError } = await db.supabase
+      const { data: sessions } = await db.supabase
         .from('workout_sessions')
-        .select('id, completed_at')
+        .select('id')
         .eq('client_id', clientId)
-        .gte('completed_at', startDate.toISOString())
-        .lte('completed_at', endDate.toISOString())
-        .order('completed_at', { ascending: false })
+        .order('workout_date', { ascending: false })
+        .limit(100)
 
-      if (sessionsError || !sessions || sessions.length === 0) {
-        setLoading(false)
-        return
-      }
+      if (sessions?.length > 0) {
+        const sessionIds = sessions.map(s => s.id)
+        const { data: progress } = await db.supabase
+          .from('workout_progress')
+          .select('exercise_name')
+          .in('session_id', sessionIds)
 
-      const sessionIds = sessions.map(s => s.id)
-
-      const { data: progressData, error: progressError } = await db.supabase
-        .from('workout_progress')
-        .select('*')
-        .in('session_id', sessionIds)
-
-      if (progressError || !progressData || progressData.length === 0) {
-        setLoading(false)
-        return
-      }
-
-      const exerciseStats = {}
-      const exerciseFrequency = {}
-
-      progressData.forEach(record => {
-        const exercise = record.exercise_name
-        const sessionDate = sessions.find(s => s.id === record.session_id)?.completed_at
-        const sets = Array.isArray(record.sets) ? record.sets : []
-        const maxWeight = Math.max(...sets.map(s => parseFloat(s.weight) || 0), 0)
-
-        if (!exerciseStats[exercise]) {
-          exerciseStats[exercise] = []
-          exerciseFrequency[exercise] = 0
-        }
-
-        exerciseStats[exercise].push({
-          date: sessionDate,
-          maxWeight
-        })
-        exerciseFrequency[exercise]++
-      })
-
-      const generatedInsights = []
-      let hero = null
-
-      // 1. PR - HERO CARD
-      let biggestPR = null
-      Object.entries(exerciseStats).forEach(([exercise, records]) => {
-        if (records.length < 2) return
-
-        records.sort((a, b) => new Date(a.date) - new Date(b.date))
-        const firstWeight = records[0].maxWeight
-        const lastWeight = records[records.length - 1].maxWeight
-        const increase = lastWeight - firstWeight
-
-        if (increase > 0) {
-          if (!biggestPR || increase > biggestPR.increase) {
-            biggestPR = { exercise, increase, from: firstWeight, to: lastWeight }
-          }
-        }
-      })
-
-      if (biggestPR && biggestPR.increase >= 2.5) {
-        hero = {
-          type: 'pr',
-          icon: Trophy,
-          title: `+${biggestPR.increase}kg Personal Record!`,
-          subtitle: `${biggestPR.exercise} - Van ${biggestPR.from}kg naar ${biggestPR.to}kg`,
-          message: 'Je wordt elke week sterker! Blijf dit tempo vasthouden en zie wat er gebeurt. 💪',
-          exercise: biggestPR.exercise,
-          metric: '1rm',
-          badge: 'BEAST MODE',
-          color: '#10b981',
-          image: 'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?w=800&q=80'
+        const uniqueExercises = [...new Set(progress?.map(p => p.exercise_name) || [])]
+        setExercises(uniqueExercises.sort())
+        
+        // Auto-select first exercise
+        if (uniqueExercises.length > 0 && !selectedExercise) {
+          setSelectedExercise(uniqueExercises[0])
         }
       }
-
-      // 2. Consistency Achievement
-      if (sessions.length >= 12) {
-        generatedInsights.push({
-          type: 'consistency',
-          icon: Flame,
-          title: `${sessions.length} workouts deze maand!`,
-          subtitle: 'Consistentie is de sleutel',
-          message: 'Dit is hoe je resultaten behaalt. Respect! 🔥',
-          color: '#f97316',
-          badge: 'ON FIRE'
-        })
-      }
-
-      // 3. Stagnation - BLUE TIP
-      Object.entries(exerciseStats).forEach(([exercise, records]) => {
-        if (records.length < 3) return
-
-        const recent = records.slice(-3)
-        const weights = recent.map(r => r.maxWeight)
-        const allSame = weights.every(w => w === weights[0])
-
-        if (allSame && weights[0] > 0 && generatedInsights.length < 2) {
-          generatedInsights.push({
-            type: 'tip',
-            icon: Target,
-            title: `${exercise} progressie tip`,
-            subtitle: `Al 3 sessies ${weights[0]}kg`,
-            message: 'Tijd voor een nieuwe uitdaging! Probeer +2.5kg of +2 reps.',
-            exercise,
-            metric: 'maxWeight',
-            color: '#3b82f6',
-            badge: 'TIP'
-          })
-        }
-      })
-
-      // 4. Volume Achievement
-      if (generatedInsights.length < 2) {
-        const totalVolume = progressData.reduce((sum, record) => {
-          const sets = Array.isArray(record.sets) ? record.sets : []
-          const volume = sets.reduce((s, set) => 
-            s + ((parseFloat(set.weight) || 0) * (parseInt(set.reps) || 0)), 0
-          )
-          return sum + volume
-        }, 0)
-
-        if (totalVolume > 10000) {
-          const exerciseVolumes = {}
-          progressData.forEach(record => {
-            const exercise = record.exercise_name
-            const sets = Array.isArray(record.sets) ? record.sets : []
-            const volume = sets.reduce((s, set) => 
-              s + ((parseFloat(set.weight) || 0) * (parseInt(set.reps) || 0)), 0
-            )
-            exerciseVolumes[exercise] = (exerciseVolumes[exercise] || 0) + volume
-          })
-
-          const topVolumeExercise = Object.entries(exerciseVolumes)
-            .sort(([, a], [, b]) => b - a)[0]
-
-          if (topVolumeExercise) {
-            generatedInsights.push({
-              type: 'volume',
-              icon: Zap,
-              title: `${Math.round(totalVolume / 1000)}k volume op ${topVolumeExercise[0]}`,
-              subtitle: 'Massieve workload',
-              message: 'Deze volume maakt je sterker. Keep pushing! ⚡',
-              exercise: topVolumeExercise[0],
-              metric: 'volume',
-              color: '#10b981',
-              badge: 'STRONG'
-            })
-          }
-        }
-      }
-
-      setHeroInsight(hero)
-      setInsights(generatedInsights)
-
-      const sortedExercises = Object.entries(exerciseFrequency)
-        .sort(([, a], [, b]) => b - a)
-        .slice(0, 3)
-        .map(([name, count]) => ({ name, count }))
-
-      setTopExercises(sortedExercises)
-
+      setLoading(false)
     } catch (error) {
-      console.error('Failed to analyze progress:', error)
-    } finally {
+      console.error('Failed to load exercises:', error)
       setLoading(false)
     }
   }
 
+  const calculateStats = async () => {
+    try {
+      // Get all progress for this exercise
+      const { data: sessions } = await db.supabase
+        .from('workout_sessions')
+        .select('id')
+        .eq('client_id', clientId)
+
+      if (!sessions?.length) return
+
+      const sessionIds = sessions.map(s => s.id)
+
+      const { data: progressData } = await db.supabase
+        .from('workout_progress')
+        .select('sets')
+        .in('session_id', sessionIds)
+        .eq('exercise_name', selectedExercise)
+
+      if (!progressData?.length) {
+        setStats({ avg8Rep: null, oneRepMax: null, maxVolume: null })
+        return
+      }
+
+      // Collect all sets
+      const allSets = []
+      progressData.forEach(record => {
+        if (Array.isArray(record.sets)) {
+          record.sets.forEach(set => {
+            const weight = parseFloat(set.weight) || 0
+            const reps = parseInt(set.reps) || 0
+            if (weight > 0 && reps > 0) {
+              allSets.push({ weight, reps })
+            }
+          })
+        }
+      })
+
+      if (allSets.length === 0) {
+        setStats({ avg8Rep: null, oneRepMax: null, maxVolume: null })
+        return
+      }
+
+      // Calculate 1RM for each set using Epley formula: weight × (1 + reps/30)
+      const oneRepMaxes = allSets.map(set => set.weight * (1 + set.reps / 30))
+      const maxOneRepMax = Math.max(...oneRepMaxes)
+
+      // Calculate estimated 8 rep weight from 1RM: 1RM / (1 + 8/30) = 1RM / 1.267
+      // Then average all estimated 8 rep weights
+      const estimated8Reps = oneRepMaxes.map(orm => orm / (1 + 8 / 30))
+      const avg8Rep = estimated8Reps.reduce((a, b) => a + b, 0) / estimated8Reps.length
+
+      // Max volume per set
+      const volumes = allSets.map(set => set.weight * set.reps)
+      const maxVolume = Math.max(...volumes)
+
+      setStats({
+        avg8Rep: Math.round(avg8Rep * 10) / 10,
+        oneRepMax: Math.round(maxOneRepMax * 10) / 10,
+        maxVolume: Math.round(maxVolume)
+      })
+
+    } catch (error) {
+      console.error('Failed to calculate stats:', error)
+    }
+  }
+
+  const filteredExercises = exercises.filter(ex =>
+    ex.toLowerCase().includes(searchQuery.toLowerCase())
+  )
+
   if (loading) {
     return (
       <div style={{
-        position: 'relative',
-        background: 'linear-gradient(135deg, rgba(23, 23, 23, 0.95) 0%, rgba(10, 10, 10, 0.9) 100%)',
-        borderRadius: isMobile ? '14px' : '16px',
-        border: '1px solid rgba(249, 115, 22, 0.25)',
-        padding: isMobile ? '1.25rem' : '1.5rem',
-        marginBottom: isMobile ? '0.75rem' : '1rem',
-        backdropFilter: 'blur(12px)',
+        padding: isMobile ? '2rem 1rem' : '2.5rem',
         display: 'flex',
-        flexDirection: 'column',
         alignItems: 'center',
-        justifyContent: 'center',
-        minHeight: isMobile ? '100px' : '120px',
-        overflow: 'hidden',
-        boxShadow: '0 4px 16px rgba(249, 115, 22, 0.15)',
-        touchAction: 'manipulation',
-        WebkitTapHighlightColor: 'transparent'
+        justifyContent: 'center'
       }}>
-        {/* Top accent glow line */}
         <div style={{
-          position: 'absolute',
-          top: 0,
-          left: 0,
-          right: 0,
-          height: '2px',
-          background: 'linear-gradient(90deg, transparent 0%, #f97316 50%, transparent 100%)',
-          opacity: 0.6
+          width: '32px',
+          height: '32px',
+          border: '3px solid rgba(255, 215, 0, 0.2)',
+          borderTopColor: '#FFD700',
+          borderRadius: '50%',
+          animation: 'spin 1s linear infinite'
         }} />
-        
-        {/* Compact spinner */}
-        <div style={{ 
-          position: 'relative', 
-          width: isMobile ? '44px' : '52px', 
-          height: isMobile ? '44px' : '52px' 
-        }}>
-          <div style={{
-            position: 'absolute',
-            inset: 0,
-            border: '3px solid rgba(249, 115, 22, 0.1)',
-            borderTopColor: '#f97316',
-            borderRadius: '50%',
-            animation: 'spin 1.2s cubic-bezier(0.4, 0, 0.2, 1) infinite',
-            transform: 'translateZ(0)'
-          }} />
-          <div style={{
-            position: 'absolute',
-            inset: '8px',
-            border: '3px solid rgba(249, 115, 22, 0.15)',
-            borderBottomColor: '#f97316',
-            borderRadius: '50%',
-            animation: 'spin-reverse 1s cubic-bezier(0.4, 0, 0.2, 1) infinite',
-            transform: 'translateZ(0)'
-          }} />
-          <div style={{
-            position: 'absolute',
-            top: '50%',
-            left: '50%',
-            transform: 'translate(-50%, -50%)',
-            width: isMobile ? '6px' : '8px',
-            height: isMobile ? '6px' : '8px',
-            background: '#f97316',
-            borderRadius: '50%',
-            animation: 'pulse 1.5s ease-in-out infinite',
-            boxShadow: '0 0 12px rgba(249, 115, 22, 0.6)'
-          }} />
-        </div>
-        
-        <p style={{
-          marginTop: '1rem',
-          fontSize: isMobile ? '0.75rem' : '0.8rem',
-          color: 'rgba(249, 115, 22, 0.8)',
-          fontWeight: '600',
-          letterSpacing: '0.03em'
-        }}>
-          Analyseren van progressie...
-        </p>
       </div>
     )
   }
 
-  if (!heroInsight && insights.length === 0 && topExercises.length === 0) {
+  if (exercises.length === 0) {
     return null
   }
 
   return (
-    <div style={{
-      marginBottom: isMobile ? '0.75rem' : '1rem'
-    }}>
-      {/* HERO CARD */}
-      {heroInsight && (
-        <HeroInsightCard 
-          insight={heroInsight}
-          onClick={() => handleExerciseClick(heroInsight?.exercise, heroInsight?.metric)}
-          isMobile={isMobile}
-        />
-      )}
-
-      {/* REGULAR INSIGHTS */}
-      {insights.length > 0 && (
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: isMobile 
-            ? '1fr' 
-            : insights.length === 1 ? '1fr' : 'repeat(2, 1fr)',
-          gap: isMobile ? '0.625rem' : '0.75rem',
-          marginBottom: isMobile ? '0.625rem' : '0.75rem'
-        }}>
-          {insights.map((insight, idx) => (
-            <RegularInsightCard
-              key={idx}
-              insight={insight}
-              onClick={() => {
-                if (insight.exercise && insight.metric) {
-                  handleExerciseClick(insight.exercise, insight.metric)
-                }
-              }}
-              isMobile={isMobile}
-            />
-          ))}
+    <div style={{ marginBottom: isMobile ? '1rem' : '1.25rem' }}>
+      {/* HEADER */}
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        padding: isMobile ? '0 0 0.75rem 0' : '0 0 1rem 0',
+        borderBottom: '1px solid rgba(255, 255, 255, 0.06)'
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          <TrendingUp size={isMobile ? 16 : 18} color="#FFD700" />
+          <h3 style={{
+            fontSize: isMobile ? '0.95rem' : '1.1rem',
+            fontWeight: '800',
+            color: '#fff',
+            margin: 0,
+            letterSpacing: '-0.02em'
+          }}>
+            Oefening Stats
+          </h3>
         </div>
-      )}
 
-      {/* TOP EXERCISES STRIP */}
-      {topExercises.length > 0 && (
-        <TopExercisesStrip 
-          exercises={topExercises}
-          onExerciseClick={handleExerciseClick}
+        {/* Exercise Selector */}
+        <div style={{ position: 'relative' }}>
+          <button
+            onClick={() => setShowDropdown(!showDropdown)}
+            style={{
+              background: 'transparent',
+              border: '1px solid rgba(255, 255, 255, 0.08)',
+              borderRadius: '8px',
+              padding: isMobile ? '0.45rem 0.7rem' : '0.5rem 0.875rem',
+              color: selectedExercise ? '#fff' : 'rgba(255, 255, 255, 0.5)',
+              fontSize: isMobile ? '0.65rem' : '0.7rem',
+              fontWeight: '700',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.35rem',
+              maxWidth: isMobile ? '140px' : '200px',
+              touchAction: 'manipulation',
+              WebkitTapHighlightColor: 'transparent'
+            }}
+          >
+            <Dumbbell size={isMobile ? 12 : 13} color="#FFD700" />
+            <span style={{
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap'
+            }}>
+              {selectedExercise || 'Kies oefening'}
+            </span>
+            <ChevronDown
+              size={12}
+              style={{
+                transform: showDropdown ? 'rotate(180deg)' : 'rotate(0deg)',
+                transition: 'transform 0.2s ease',
+                flexShrink: 0
+              }}
+            />
+          </button>
+
+          {showDropdown && (
+            <div style={{
+              position: 'absolute',
+              top: '100%',
+              right: 0,
+              marginTop: '0.35rem',
+              background: 'rgba(15, 15, 15, 0.98)',
+              border: '1px solid rgba(255, 255, 255, 0.1)',
+              borderRadius: '10px',
+              zIndex: 30,
+              minWidth: isMobile ? '200px' : '250px',
+              maxHeight: '280px',
+              overflow: 'hidden',
+              boxShadow: '0 8px 24px rgba(0, 0, 0, 0.6)'
+            }}>
+              {/* Search */}
+              <div style={{ padding: '0.5rem', borderBottom: '1px solid rgba(255, 255, 255, 0.06)' }}>
+                <div style={{ position: 'relative' }}>
+                  <Search size={12} style={{
+                    position: 'absolute',
+                    left: '0.625rem',
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    color: 'rgba(255, 255, 255, 0.3)'
+                  }} />
+                  <input
+                    type="text"
+                    placeholder="Zoek oefening..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    onClick={(e) => e.stopPropagation()}
+                    style={{
+                      width: '100%',
+                      padding: '0.4rem 0.5rem 0.4rem 1.75rem',
+                      background: 'rgba(255, 255, 255, 0.03)',
+                      border: '1px solid rgba(255, 255, 255, 0.08)',
+                      borderRadius: '6px',
+                      color: '#fff',
+                      fontSize: isMobile ? '16px' : '0.75rem',
+                      outline: 'none'
+                    }}
+                  />
+                </div>
+              </div>
+
+              <div style={{
+                maxHeight: '200px',
+                overflowY: 'auto',
+                WebkitOverflowScrolling: 'touch'
+              }}>
+                {filteredExercises.map(ex => (
+                  <button
+                    key={ex}
+                    onClick={() => {
+                      setSelectedExercise(ex)
+                      setShowDropdown(false)
+                      setSearchQuery('')
+                    }}
+                    style={{
+                      width: '100%',
+                      padding: isMobile ? '0.625rem 0.75rem' : '0.5rem 0.75rem',
+                      background: selectedExercise === ex ? 'rgba(255, 215, 0, 0.08)' : 'transparent',
+                      border: 'none',
+                      color: selectedExercise === ex ? '#FFD700' : 'rgba(255, 255, 255, 0.6)',
+                      fontSize: isMobile ? '0.75rem' : '0.8rem',
+                      fontWeight: '600',
+                      cursor: 'pointer',
+                      textAlign: 'left',
+                      touchAction: 'manipulation',
+                      WebkitTapHighlightColor: 'transparent'
+                    }}
+                  >
+                    {ex}
+                  </button>
+                ))}
+                {filteredExercises.length === 0 && (
+                  <div style={{
+                    padding: '1rem',
+                    textAlign: 'center',
+                    color: 'rgba(255, 255, 255, 0.4)',
+                    fontSize: '0.75rem'
+                  }}>
+                    Geen oefeningen gevonden
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* STATS - 3 columns, all GOLD */}
+      <div style={{
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        padding: isMobile ? '0.75rem 0' : '1rem 0',
+        borderBottom: '1px solid rgba(255, 255, 255, 0.06)'
+      }}>
+        <StatItem
+          label="Gem. 8 Rep"
+          value={stats.avg8Rep !== null ? `${stats.avg8Rep}kg` : '-'}
+          sublabel="geschat"
           isMobile={isMobile}
         />
-      )}
+        <StatDivider />
+        <StatItem
+          label="1RM"
+          value={stats.oneRepMax !== null ? `${stats.oneRepMax}kg` : '-'}
+          sublabel="max"
+          isMobile={isMobile}
+        />
+        <StatDivider />
+        <StatItem
+          label="Max Volume"
+          value={stats.maxVolume !== null ? `${stats.maxVolume}kg` : '-'}
+          sublabel="per set"
+          isMobile={isMobile}
+        />
+      </div>
 
       <style>{`
         @keyframes spin {
           to { transform: rotate(360deg); }
         }
-        @keyframes spin-reverse {
-          to { transform: rotate(-360deg); }
-        }
-        @keyframes pulse {
-          0%, 100% { 
-            opacity: 1; 
-            transform: translate(-50%, -50%) scale(1); 
-          }
-          50% { 
-            opacity: 0.8; 
-            transform: translate(-50%, -50%) scale(1.15); 
-          }
-        }
       `}</style>
     </div>
+  )
+}
+
+function StatItem({ label, value, sublabel, isMobile }) {
+  return (
+    <div style={{ textAlign: 'center', flex: 1 }}>
+      <div style={{
+        fontSize: isMobile ? '1.1rem' : '1.25rem',
+        fontWeight: '800',
+        color: '#FFD700',
+        letterSpacing: '-0.02em',
+        lineHeight: 1.2
+      }}>
+        {value}
+      </div>
+      <div style={{
+        fontSize: isMobile ? '0.5rem' : '0.55rem',
+        color: 'rgba(255, 255, 255, 0.35)',
+        fontWeight: '600',
+        textTransform: 'uppercase',
+        letterSpacing: '0.05em',
+        marginTop: '0.1rem'
+      }}>
+        {label}
+      </div>
+      {sublabel && (
+        <div style={{
+          fontSize: isMobile ? '0.45rem' : '0.5rem',
+          color: 'rgba(255, 255, 255, 0.2)',
+          marginTop: '0.05rem'
+        }}>
+          {sublabel}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function StatDivider() {
+  return (
+    <div style={{
+      width: '1px',
+      height: '28px',
+      background: 'rgba(255, 255, 255, 0.06)',
+      flexShrink: 0
+    }} />
   )
 }

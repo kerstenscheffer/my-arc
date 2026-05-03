@@ -1,6 +1,7 @@
 // src/modules/workout/components/ExerciseVideoModal.jsx
 import { useState, useEffect } from 'react'
 import { X, Play, AlertCircle, ExternalLink } from 'lucide-react'
+import ExerciseService from '../../services/ExerciseService'
 
 export default function ExerciseVideoModal({ exercise, onClose, isMobile }) {
   const [videoUrl, setVideoUrl] = useState(null)
@@ -8,29 +9,47 @@ export default function ExerciseVideoModal({ exercise, onClose, isMobile }) {
   const [error, setError] = useState(null)
   
   useEffect(() => {
-    // Simulate loading video URL
-    // In production, fetch from database
-    const timer = setTimeout(() => {
-      // Mock video URLs based on exercise name
-      const mockVideos = {
-        'Bench Press': 'https://www.youtube.com/embed/rT7DgCr-3pg',
-        'Squat': 'https://www.youtube.com/embed/ultWZbUMPL8',
-        'Deadlift': 'https://www.youtube.com/embed/op9kVnSso6Q',
-        'Pull-ups': 'https://www.youtube.com/embed/eGo4IYlbE5g',
-        'Overhead Press': 'https://www.youtube.com/embed/2yjwXTZQDDI'
-      }
+    loadVideo()
+  }, [exercise])
+  
+  const loadVideo = async () => {
+    setLoading(true)
+    setError(null)
+    
+    try {
+      // 🆕 Load from ExerciseService instead of mock data
+      const url = await ExerciseService.getExerciseVideo(exercise.name)
       
-      const video = mockVideos[exercise.name]
-      if (video) {
-        setVideoUrl(video)
+      if (url) {
+        // Convert YouTube URL to embed format if needed
+        const embedUrl = getYouTubeEmbedUrl(url)
+        setVideoUrl(embedUrl || url)
       } else {
         setError('Video nog niet beschikbaar')
       }
+    } catch (err) {
+      console.error('❌ Failed to load video:', err)
+      setError('Video nog niet beschikbaar')
+    } finally {
       setLoading(false)
-    }, 500)
+    }
+  }
+  
+  // Helper to convert YouTube URLs to embed format
+  const getYouTubeEmbedUrl = (url) => {
+    if (!url) return null
     
-    return () => clearTimeout(timer)
-  }, [exercise])
+    // Already embed URL
+    if (url.includes('youtube.com/embed/')) return url
+    
+    // Regular YouTube URL
+    const match = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([^&\s]+)/)
+    if (match) {
+      return `https://www.youtube.com/embed/${match[1]}`
+    }
+    
+    return null
+  }
   
   return (
     <div style={{

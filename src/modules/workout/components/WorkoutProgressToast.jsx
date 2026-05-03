@@ -1,4 +1,5 @@
 // src/modules/workout/components/WorkoutProgressToast.jsx
+// 🏆 GOLD THEME - Compact progress insights toast
 import { useState, useEffect } from 'react'
 import { TrendingUp, X, Flame, Target, Zap, ChevronRight } from 'lucide-react'
 
@@ -102,7 +103,7 @@ export default function WorkoutProgressToast({ client, db, onViewChart }) {
           icon: Flame,
           title: `${biggestImprovement.exercise} +${biggestImprovement.increase}kg!`,
           message: 'Sterke progressie deze maand',
-          color: '#f97316',
+          color: '#FFD700', // GOLD
           exercise: biggestImprovement.exercise
         })
       }
@@ -121,7 +122,7 @@ export default function WorkoutProgressToast({ client, db, onViewChart }) {
             icon: Target,
             title: `${exercise} op ${weights[0]}kg`,
             message: 'Tijd voor progressie overload!',
-            color: '#3b82f6',
+            color: '#FFD700', // GOLD
             exercise
           })
         }
@@ -140,7 +141,7 @@ export default function WorkoutProgressToast({ client, db, onViewChart }) {
           icon: Zap,
           title: `${thisWeekSessions} workouts deze week!`,
           message: 'Je bent op 🔥',
-          color: '#10b981',
+          color: '#FFD700', // GOLD
           exercise: null
         })
       }
@@ -194,31 +195,32 @@ export default function WorkoutProgressToast({ client, db, onViewChart }) {
         left: '50%',
         transform: 'translateX(-50%)',
         width: isMobile ? 'calc(100% - 2rem)' : 'auto',
-        minWidth: isMobile ? 'auto' : '380px',
-        maxWidth: isMobile ? '100%' : '420px',
-        background: `linear-gradient(135deg, ${insight.color}25 0%, ${insight.color}15 100%)`,
-        backdropFilter: 'blur(20px)',
-        border: `1px solid ${insight.color}40`,
-        borderRadius: '14px',
-        padding: isMobile ? '0.875rem 1rem' : '1rem 1.25rem',
-        boxShadow: `0 8px 30px ${insight.color}30, 0 0 0 1px ${insight.color}20`,
+        minWidth: isMobile ? 'auto' : '360px',
+        maxWidth: isMobile ? '100%' : '400px',
+        background: 'linear-gradient(135deg, rgba(23, 23, 23, 0.95) 0%, rgba(10, 10, 10, 0.9) 100%)', // Dark glassmorphic
+        backdropFilter: 'blur(16px)',
+        border: '1px solid rgba(255, 215, 0, 0.3)', // GOLD border
+        borderRadius: isMobile ? '12px' : '14px',
+        padding: isMobile ? '0.75rem 0.875rem' : '0.875rem 1rem',
+        boxShadow: '0 8px 32px rgba(255, 215, 0, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.03)', // GOLD glow
         cursor: 'pointer',
         zIndex: 95,
         transition: 'all 0.5s cubic-bezier(0.4, 0, 0.2, 1)',
         touchAction: 'manipulation',
         WebkitTapHighlightColor: 'transparent',
-        animation: visible ? 'slideDown 0.5s ease-out' : 'none'
+        animation: visible ? 'slideDown 0.5s ease-out' : 'none',
+        overflow: 'hidden'
       }}
       onMouseEnter={(e) => {
         if (!isMobile) {
           e.currentTarget.style.transform = 'translateX(-50%) translateY(-2px) scale(1.02)'
-          e.currentTarget.style.boxShadow = `0 12px 40px ${insight.color}40, 0 0 0 1px ${insight.color}30`
+          e.currentTarget.style.boxShadow = '0 12px 40px rgba(255, 215, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.05)'
         }
       }}
       onMouseLeave={(e) => {
         if (!isMobile) {
           e.currentTarget.style.transform = 'translateX(-50%) translateY(0) scale(1)'
-          e.currentTarget.style.boxShadow = `0 8px 30px ${insight.color}30, 0 0 0 1px ${insight.color}20`
+          e.currentTarget.style.boxShadow = '0 8px 32px rgba(255, 215, 0, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.03)'
         }
       }}
       onTouchStart={(e) => {
@@ -232,88 +234,103 @@ export default function WorkoutProgressToast({ client, db, onViewChart }) {
         }
       }}
     >
-      {/* Glow effect */}
+      {/* Top GOLD accent line */}
       <div style={{
         position: 'absolute',
         top: 0,
         left: 0,
         right: 0,
-        height: '3px',
-        background: `linear-gradient(90deg, transparent 0%, ${insight.color} 50%, transparent 100%)`,
-        borderRadius: '14px 14px 0 0',
-        filter: `blur(1px)`,
+        height: '2px',
+        background: 'linear-gradient(90deg, transparent 0%, #FFD700 50%, transparent 100%)',
         opacity: 0.6
+      }} />
+
+      {/* Shine overlay */}
+      <div style={{
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        height: '40%',
+        background: 'linear-gradient(180deg, rgba(255, 255, 255, 0.04) 0%, transparent 100%)',
+        pointerEvents: 'none'
       }} />
 
       <div style={{
         display: 'flex',
         alignItems: 'center',
-        gap: isMobile ? '0.75rem' : '1rem'
+        gap: isMobile ? '0.625rem' : '0.75rem',
+        position: 'relative',
+        zIndex: 2
       }}>
-        {/* Icon */}
+        {/* Icon - GOLD container */}
         <div style={{
-          width: isMobile ? '42px' : '48px',
-          height: isMobile ? '42px' : '48px',
-          borderRadius: '12px',
-          background: `${insight.color}20`,
-          border: `1px solid ${insight.color}30`,
+          width: isMobile ? '36px' : '40px',
+          height: isMobile ? '36px' : '40px',
+          borderRadius: '10px',
+          background: 'rgba(255, 215, 0, 0.15)', // GOLD
+          border: '1px solid rgba(255, 215, 0, 0.3)', // GOLD
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
           flexShrink: 0,
-          boxShadow: `0 0 20px ${insight.color}30`
+          boxShadow: '0 0 16px rgba(255, 215, 0, 0.25)' // GOLD glow
         }}>
           <Icon 
-            size={isMobile ? 22 : 26} 
-            color={insight.color}
+            size={isMobile ? 18 : 20} 
+            color="#FFD700" // GOLD
+            strokeWidth={2.5}
             style={{
-              filter: `drop-shadow(0 0 8px ${insight.color}60)`
+              filter: 'drop-shadow(0 0 6px rgba(255, 215, 0, 0.5))' // GOLD glow
             }}
           />
         </div>
 
-        {/* Content */}
+        {/* Content - COMPACT */}
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{
-            fontSize: isMobile ? '0.95rem' : '1.05rem',
+            fontSize: isMobile ? '0.85rem' : '0.95rem',
             fontWeight: '800',
-            color: insight.color,
-            marginBottom: '0.15rem',
-            letterSpacing: '-0.02em',
-            textShadow: `0 0 20px ${insight.color}40`
+            color: '#FFD700', // GOLD
+            marginBottom: '0.125rem',
+            letterSpacing: '-0.01em',
+            textShadow: '0 0 12px rgba(255, 215, 0, 0.3)',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap'
           }}>
             {insight.title}
           </div>
           <div style={{
-            fontSize: isMobile ? '0.75rem' : '0.8rem',
-            color: 'rgba(255, 255, 255, 0.7)',
-            fontWeight: '500'
+            fontSize: isMobile ? '0.7rem' : '0.75rem',
+            color: 'rgba(255, 255, 255, 0.6)',
+            fontWeight: '600'
           }}>
             {insight.message}
           </div>
         </div>
 
-        {/* Action buttons */}
+        {/* Action buttons - COMPACT */}
         <div style={{
           display: 'flex',
           alignItems: 'center',
-          gap: '0.5rem',
+          gap: '0.375rem',
           flexShrink: 0
         }}>
           {/* View Chart Arrow */}
           {insight.exercise && (
             <div style={{
-              width: isMobile ? '32px' : '36px',
-              height: isMobile ? '32px' : '36px',
-              borderRadius: '10px',
-              background: `${insight.color}15`,
-              border: `1px solid ${insight.color}30`,
+              width: isMobile ? '28px' : '32px',
+              height: isMobile ? '28px' : '32px',
+              borderRadius: '8px',
+              background: 'rgba(255, 215, 0, 0.12)', // GOLD
+              border: '1px solid rgba(255, 215, 0, 0.25)', // GOLD
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
             }}>
-              <ChevronRight size={isMobile ? 16 : 18} color={insight.color} />
+              <ChevronRight size={isMobile ? 14 : 16} color="#FFD700" strokeWidth={2.5} />
             </div>
           )}
 
@@ -324,9 +341,9 @@ export default function WorkoutProgressToast({ client, db, onViewChart }) {
               handleDismiss()
             }}
             style={{
-              width: isMobile ? '32px' : '36px',
-              height: isMobile ? '32px' : '36px',
-              borderRadius: '10px',
+              width: isMobile ? '28px' : '32px',
+              height: isMobile ? '28px' : '32px',
+              borderRadius: '8px',
               background: 'rgba(255, 255, 255, 0.05)',
               border: '1px solid rgba(255, 255, 255, 0.1)',
               display: 'flex',
@@ -351,7 +368,7 @@ export default function WorkoutProgressToast({ client, db, onViewChart }) {
               }
             }}
           >
-            <X size={isMobile ? 16 : 18} color="rgba(255, 255, 255, 0.7)" />
+            <X size={isMobile ? 14 : 16} color="rgba(255, 255, 255, 0.6)" strokeWidth={2.5} />
           </button>
         </div>
       </div>

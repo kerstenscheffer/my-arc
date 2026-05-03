@@ -1,4 +1,4 @@
-// src/components/login/FeatureSlider.jsx
+// src/components/login/FeatureSlider.jsx - ELEGANT GOLDEN VERSION
 import { useState, useEffect } from 'react'
 import { 
   ChevronLeft, ChevronRight, Activity, Utensils, 
@@ -15,8 +15,8 @@ const FEATURES = [
       "Dagelijkse check-ins",
       "Motivatie widgets"
     ],
-    gradient: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-    color: '#764ba2'
+    gradient: 'linear-gradient(135deg, #FFD700 0%, #FFA500 100%)',
+    color: '#FFD700'
   },
   {
     icon: Utensils,
@@ -27,8 +27,8 @@ const FEATURES = [
       "Boodschappenlijst",
       "Macro tracking"
     ],
-    gradient: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',
-    color: '#f5576c'
+    gradient: 'linear-gradient(135deg, #FFA500 0%, #FF8C00 100%)',
+    color: '#FFA500'
   },
   {
     icon: Dumbbell,
@@ -39,8 +39,8 @@ const FEATURES = [
       "Video uitleg",
       "Progress tracking"
     ],
-    gradient: 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)',
-    color: '#00f2fe'
+    gradient: 'linear-gradient(135deg, #D4AF37 0%, #C4A12A 100%)',
+    color: '#D4AF37'
   },
   {
     icon: TrendingUp,
@@ -51,8 +51,8 @@ const FEATURES = [
       "Body measurements",
       "Strength gains"
     ],
-    gradient: 'linear-gradient(135deg, #43e97b 0%, #38f9d7 100%)',
-    color: '#38f9d7'
+    gradient: 'linear-gradient(135deg, #FFD700 0%, #D4AF37 100%)',
+    color: '#FFD700'
   },
   {
     icon: Trophy,
@@ -63,8 +63,8 @@ const FEATURES = [
       "30-day challenges",
       "Community support"
     ],
-    gradient: 'linear-gradient(135deg, #fa709a 0%, #fee140 100%)',
-    color: '#fee140'
+    gradient: 'linear-gradient(135deg, #FFA500 0%, #FFD700 100%)',
+    color: '#FFA500'
   }
 ]
 
@@ -101,98 +101,139 @@ export default function FeatureSlider({ onClose }) {
   return (
     <div style={{
       position: 'fixed',
-      top: isMobile ? '70%' : '65%', // VERDER OMLAAG: Meer ruimte boven
+      top: isMobile ? '70%' : '65%',
       left: '50%',
       transform: 'translate(-50%, -50%)',
       width: isMobile ? '90%' : '420px',
       maxWidth: '90vw',
-      maxHeight: '26vh', // NOG COMPACTER: Minder verticale ruimte
+      maxHeight: '26vh',
       zIndex: 25
     }}>
       <div style={{
-        background: 'rgba(17, 17, 17, 0.95)',
+        background: 'linear-gradient(135deg, rgba(23, 23, 23, 0.92) 0%, rgba(17, 17, 17, 0.95) 100%)',
         backdropFilter: 'blur(20px)',
-        border: '1px solid rgba(255, 255, 255, 0.15)',
+        border: '1px solid rgba(255, 215, 0, 0.2)',
         borderRadius: '16px',
-        padding: isMobile ? '0.875rem' : '1.125rem', // AANGEPAST: Iets minder padding
+        padding: isMobile ? '0.875rem' : '1.125rem',
         position: 'relative',
-        overflow: 'hidden'
+        overflow: 'hidden',
+        boxShadow: '0 8px 32px rgba(255, 215, 0, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.03)'
       }}>
+        {/* Top accent line */}
+        <div style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          height: '2px',
+          background: currentFeature.gradient,
+          opacity: 0.5,
+          zIndex: 2
+        }} />
+        
+        {/* Shine overlay */}
+        <div style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          height: '40%',
+          background: 'linear-gradient(180deg, rgba(255, 215, 0, 0.04) 0%, transparent 100%)',
+          pointerEvents: 'none',
+          zIndex: 1
+        }} />
+        
         {/* Close button */}
         {onClose && (
           <button
             onClick={onClose}
             style={{
               position: 'absolute',
-              top: '0.625rem', // AANGEPAST: Kleinere top spacing
+              top: '0.625rem',
               right: '0.625rem',
-              width: '26px', // AANGEPAST: Iets kleiner
+              width: '26px',
               height: '26px',
               borderRadius: '50%',
-              background: 'rgba(255, 255, 255, 0.08)',
-              border: '1px solid rgba(255, 255, 255, 0.15)',
+              background: 'rgba(255, 215, 0, 0.08)',
+              border: '1px solid rgba(255, 215, 0, 0.2)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               cursor: 'pointer',
-              color: 'rgba(255, 255, 255, 0.5)',
+              color: 'rgba(255, 215, 0, 0.5)',
               transition: 'all 0.3s',
               zIndex: 10,
               touchAction: 'manipulation',
               WebkitTapHighlightColor: 'transparent'
             }}
             onMouseEnter={(e) => {
-              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.15)'
-              e.currentTarget.style.color = '#fff'
+              e.currentTarget.style.background = 'rgba(255, 215, 0, 0.15)'
+              e.currentTarget.style.color = '#FFD700'
             }}
             onMouseLeave={(e) => {
-              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)'
-              e.currentTarget.style.color = 'rgba(255, 255, 255, 0.5)'
+              e.currentTarget.style.background = 'rgba(255, 215, 0, 0.08)'
+              e.currentTarget.style.color = 'rgba(255, 215, 0, 0.5)'
             }}
           >
             <X size={13} />
           </button>
         )}
         
-        {/* Background gradient effect */}
+        {/* Background golden glow - subtiel */}
         <div style={{
           position: 'absolute',
           top: '-30%',
           right: '-20%',
-          width: '100px', // AANGEPAST: Kleiner
+          width: '100px',
           height: '100px',
           background: currentFeature.gradient,
           borderRadius: '50%',
           filter: 'blur(60px)',
-          opacity: 0.15
+          opacity: 0.12,
+          zIndex: 0
         }} />
         
-        {/* Header - Extra compact */}
+        {/* Header - Compact */}
         <div style={{
           display: 'flex',
           alignItems: 'center',
-          gap: isMobile ? '0.625rem' : '0.875rem', // AANGEPAST: Kleinere gap
-          marginBottom: isMobile ? '0.625rem' : '0.875rem'
+          gap: isMobile ? '0.625rem' : '0.875rem',
+          marginBottom: isMobile ? '0.625rem' : '0.875rem',
+          position: 'relative',
+          zIndex: 2
         }}>
-          {/* Icon */}
+          {/* Icon container */}
           <div style={{
-            width: isMobile ? '40px' : '44px', // AANGEPAST: Kleiner
+            width: isMobile ? '40px' : '44px',
             height: isMobile ? '40px' : '44px',
             borderRadius: '11px',
             background: currentFeature.gradient,
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            boxShadow: `0 6px 16px ${currentFeature.color}25`,
-            flexShrink: 0
+            boxShadow: `0 4px 12px ${currentFeature.color}20, inset 0 1px 0 rgba(255, 255, 255, 0.15)`,
+            flexShrink: 0,
+            position: 'relative',
+            overflow: 'hidden'
           }}>
-            <Icon size={isMobile ? 18 : 20} color="#fff" />
+            {/* Icon gloss */}
+            <div style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              height: '40%',
+              background: 'linear-gradient(180deg, rgba(255,255,255,0.2) 0%, transparent 100%)',
+              borderRadius: '11px 11px 0 0',
+              pointerEvents: 'none'
+            }} />
+            <Icon size={isMobile ? 18 : 20} color="#000" strokeWidth={2.5} />
           </div>
           
           {/* Title with gradient text */}
           <div style={{ flex: 1 }}>
             <h3 style={{
-              fontSize: isMobile ? '1.05rem' : '1.2rem', // AANGEPAST: Kleiner
+              fontSize: isMobile ? '1.05rem' : '1.2rem',
               fontWeight: '800',
               backgroundImage: currentFeature.gradient,
               backgroundSize: '200% 100%',
@@ -204,13 +245,14 @@ export default function FeatureSlider({ onClose }) {
               display: 'inline-block',
               animation: 'gradientShift 8s ease-in-out infinite',
               letterSpacing: '-0.02em',
-              lineHeight: 1.1
+              lineHeight: 1.1,
+              textShadow: `0 0 20px ${currentFeature.color}20`
             }}>
               {currentFeature.title}
             </h3>
             <p style={{
-              fontSize: isMobile ? '0.7rem' : '0.75rem', // AANGEPAST: Kleiner
-              color: 'rgba(255, 255, 255, 0.5)',
+              fontSize: isMobile ? '0.7rem' : '0.75rem',
+              color: 'rgba(255, 255, 255, 0.45)',
               margin: 0,
               marginTop: '0.125rem',
               lineHeight: 1.2
@@ -220,12 +262,14 @@ export default function FeatureSlider({ onClose }) {
           </div>
         </div>
         
-        {/* Highlights - Extra compact */}
+        {/* Highlights - Compact */}
         <div style={{
           display: 'flex',
           flexDirection: 'column',
-          gap: isMobile ? '0.3rem' : '0.35rem', // AANGEPAST: Kleinere gap
-          marginBottom: isMobile ? '0.75rem' : '0.875rem'
+          gap: isMobile ? '0.3rem' : '0.35rem',
+          marginBottom: isMobile ? '0.75rem' : '0.875rem',
+          position: 'relative',
+          zIndex: 2
         }}>
           {currentFeature.highlights.map((highlight, index) => (
             <div 
@@ -233,20 +277,24 @@ export default function FeatureSlider({ onClose }) {
               style={{
                 display: 'flex',
                 alignItems: 'center',
-                gap: '0.35rem', // AANGEPAST: Kleinere gap
+                gap: '0.35rem',
                 opacity: 0,
                 animation: `fadeInLeft 0.5s ease ${index * 0.1}s forwards`
               }}
             >
               <CheckCircle 
-                size={isMobile ? 11 : 12} // AANGEPAST: Kleiner
-                color="#10b981" 
-                style={{ flexShrink: 0 }}
+                size={isMobile ? 11 : 12}
+                color={currentFeature.color}
+                style={{ 
+                  flexShrink: 0,
+                  filter: `drop-shadow(0 0 3px ${currentFeature.color}40)`
+                }}
               />
               <span style={{
-                color: 'rgba(255,255,255,0.7)',
-                fontSize: isMobile ? '0.7rem' : '0.75rem', // AANGEPAST: Kleiner
-                lineHeight: 1.2
+                color: 'rgba(255,255,255,0.65)',
+                fontSize: isMobile ? '0.7rem' : '0.75rem',
+                lineHeight: 1.2,
+                fontWeight: '500'
               }}>
                 {highlight}
               </span>
@@ -254,16 +302,18 @@ export default function FeatureSlider({ onClose }) {
           ))}
         </div>
         
-        {/* Navigation - Extra compact */}
+        {/* Navigation - Compact */}
         <div style={{
           display: 'flex',
           alignItems: 'center',
-          justifyContent: 'space-between'
+          justifyContent: 'space-between',
+          position: 'relative',
+          zIndex: 2
         }}>
-          {/* Dots */}
+          {/* Dots - Golden */}
           <div style={{
             display: 'flex',
-            gap: '0.3rem' // AANGEPAST: Kleinere gap
+            gap: '0.3rem'
           }}>
             {FEATURES.map((_, index) => (
               <button
@@ -273,59 +323,56 @@ export default function FeatureSlider({ onClose }) {
                   setIsAutoPlaying(false)
                 }}
                 style={{
-                  width: index === currentIndex ? '16px' : '4px', // AANGEPAST: Kleiner
+                  width: index === currentIndex ? '16px' : '4px',
                   height: '4px',
                   borderRadius: '2px',
                   background: index === currentIndex 
                     ? currentFeature.color 
-                    : 'rgba(255,255,255,0.15)',
+                    : 'rgba(255, 215, 0, 0.15)',
                   border: 'none',
                   cursor: 'pointer',
                   transition: 'all 0.3s ease',
                   padding: 0,
                   touchAction: 'manipulation',
-                  WebkitTapHighlightColor: 'transparent'
+                  WebkitTapHighlightColor: 'transparent',
+                  boxShadow: index === currentIndex ? `0 0 6px ${currentFeature.color}40` : 'none'
                 }}
               />
             ))}
           </div>
           
-          {/* Arrows */}
+          {/* Arrows - Golden */}
           <div style={{ display: 'flex', gap: '0.35rem' }}>
             <button
               onClick={handlePrev}
               style={{
-                width: '26px', // AANGEPAST: Kleiner
+                width: '26px',
                 height: '26px',
                 borderRadius: '50%',
-                background: 'rgba(255,255,255,0.08)',
-                border: '1px solid rgba(255,255,255,0.15)',
+                background: 'rgba(255, 215, 0, 0.08)',
+                border: '1px solid rgba(255, 215, 0, 0.2)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
                 cursor: 'pointer',
-                color: 'rgba(255,255,255,0.6)',
+                color: 'rgba(255, 215, 0, 0.5)',
                 transition: 'all 0.3s',
                 touchAction: 'manipulation',
                 WebkitTapHighlightColor: 'transparent'
               }}
               onMouseEnter={(e) => {
-                e.currentTarget.style.background = 'rgba(255,255,255,0.15)'
-                e.currentTarget.style.color = '#fff'
+                e.currentTarget.style.background = 'rgba(255, 215, 0, 0.15)'
+                e.currentTarget.style.color = '#FFD700'
               }}
               onMouseLeave={(e) => {
-                e.currentTarget.style.background = 'rgba(255,255,255,0.08)'
-                e.currentTarget.style.color = 'rgba(255,255,255,0.6)'
+                e.currentTarget.style.background = 'rgba(255, 215, 0, 0.08)'
+                e.currentTarget.style.color = 'rgba(255, 215, 0, 0.5)'
               }}
               onTouchStart={(e) => {
-                if (isMobile) {
-                  e.currentTarget.style.transform = 'scale(0.95)'
-                }
+                if (isMobile) e.currentTarget.style.transform = 'scale(0.95)'
               }}
               onTouchEnd={(e) => {
-                if (isMobile) {
-                  e.currentTarget.style.transform = 'scale(1)'
-                }
+                if (isMobile) e.currentTarget.style.transform = 'scale(1)'
               }}
             >
               <ChevronLeft size={13} />
@@ -337,34 +384,30 @@ export default function FeatureSlider({ onClose }) {
                 width: '26px',
                 height: '26px',
                 borderRadius: '50%',
-                background: 'rgba(255,255,255,0.08)',
-                border: '1px solid rgba(255,255,255,0.15)',
+                background: 'rgba(255, 215, 0, 0.08)',
+                border: '1px solid rgba(255, 215, 0, 0.2)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
                 cursor: 'pointer',
-                color: 'rgba(255,255,255,0.6)',
+                color: 'rgba(255, 215, 0, 0.5)',
                 transition: 'all 0.3s',
                 touchAction: 'manipulation',
                 WebkitTapHighlightColor: 'transparent'
               }}
               onMouseEnter={(e) => {
-                e.currentTarget.style.background = 'rgba(255,255,255,0.15)'
-                e.currentTarget.style.color = '#fff'
+                e.currentTarget.style.background = 'rgba(255, 215, 0, 0.15)'
+                e.currentTarget.style.color = '#FFD700'
               }}
               onMouseLeave={(e) => {
-                e.currentTarget.style.background = 'rgba(255,255,255,0.08)'
-                e.currentTarget.style.color = 'rgba(255,255,255,0.6)'
+                e.currentTarget.style.background = 'rgba(255, 215, 0, 0.08)'
+                e.currentTarget.style.color = 'rgba(255, 215, 0, 0.5)'
               }}
               onTouchStart={(e) => {
-                if (isMobile) {
-                  e.currentTarget.style.transform = 'scale(0.95)'
-                }
+                if (isMobile) e.currentTarget.style.transform = 'scale(0.95)'
               }}
               onTouchEnd={(e) => {
-                if (isMobile) {
-                  e.currentTarget.style.transform = 'scale(1)'
-                }
+                if (isMobile) e.currentTarget.style.transform = 'scale(1)'
               }}
             >
               <ChevronRight size={13} />
@@ -372,14 +415,15 @@ export default function FeatureSlider({ onClose }) {
           </div>
         </div>
         
-        {/* Progress bar */}
+        {/* Progress bar - Golden */}
         <div style={{
           position: 'absolute',
           bottom: 0,
           left: 0,
           width: '100%',
           height: '2px',
-          background: 'rgba(255,255,255,0.05)'
+          background: 'rgba(255, 215, 0, 0.08)',
+          zIndex: 1
         }}>
           <div 
             key={currentIndex}
@@ -387,7 +431,8 @@ export default function FeatureSlider({ onClose }) {
               height: '100%',
               background: currentFeature.gradient,
               width: isAutoPlaying ? '100%' : '0%',
-              transition: isAutoPlaying ? 'width 5s linear' : 'none'
+              transition: isAutoPlaying ? 'width 5s linear' : 'none',
+              boxShadow: `0 0 8px ${currentFeature.color}40`
             }} 
           />
         </div>

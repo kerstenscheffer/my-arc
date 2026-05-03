@@ -1,414 +1,404 @@
-import React from 'react'
-import { Check, Loader2, Scale } from 'lucide-react'
+// src/modules/weight-tracker/components/WeightProgressRing.jsx
+// v15.2 - Flush button styling, matching de rest van de pagina (geen dikke gevulde cards meer)
 
-const THEME = {
-  primary: '#3b82f6',
-  primaryDark: '#2563eb',
-  primaryLight: '#60a5fa',
-  primaryLightest: '#93c5fd',
-  gradient: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
-  gradientLight: 'linear-gradient(135deg, #60a5fa 0%, #3b82f6 100%)',
-  gradientSubtle: 'linear-gradient(135deg, rgba(59, 130, 246, 0.15) 0%, rgba(37, 99, 235, 0.08) 100%)',
-  success: '#10b981',
-  friday: '#8b5cf6'
-}
+import React, { useState, useRef, useEffect, useCallback } from 'react'
+import { Check, Loader2, Pencil, X } from 'lucide-react'
 
-export default function WeightProgressRing({ 
-  weight = 70,
-  onWeightChange,
-  onSave,
-  saving = false,
-  todayEntry = null,
-  progressPercent = 0,
-  isFriday = false,
-  isMobile = false
-}) {
-  
-  // Ring calculation
-  const radius = isMobile ? 70 : 85
-  const strokeWidth = 12
-  const normalizedRadius = radius - strokeWidth * 2
-  const circumference = normalizedRadius * 2 * Math.PI
-  const strokeDashoffset = circumference - (progressPercent / 100) * circumference
-  
+const MIN = 30
+const MAX = 200
+const ITEM_W = 72
+const valToIdx = (v) => Math.round((parseFloat(v) - MIN) * 10)
+const idxToVal = (i) => Math.round((MIN * 10 + i)) / 10
+const TOTAL = valToIdx(MAX) + 1
+
+function HorizontalPicker({ value, onChange, disabled }) {
+  const isMobile = window.innerWidth <= 768
+  const ref = useRef(null)
+  const wrapRef = useRef(null)
+  const [idx, setIdx] = useState(() => valToIdx(value))
+  const [scrollerW, setScrollerW] = useState(0)
+  const programmatic = useRef(false)
+  const scrollEndTimer = useRef(null)
+  const idxRef = useRef(idx)
+  idxRef.current = idx
+
+  const spacerW = Math.max(0, scrollerW / 2 - ITEM_W / 2)
+
+  const goTo = useCallback((i, smooth = false) => {
+    if (!ref.current || scrollerW === 0) return
+    programmatic.current = true
+    ref.current.scrollTo({ left: i * ITEM_W, behavior: smooth ? 'smooth' : 'auto' })
+    setTimeout(() => { programmatic.current = false }, smooth ? 400 : 50)
+  }, [scrollerW])
+
+  useEffect(() => {
+    if (!wrapRef.current) return
+    const measure = () => {
+      const w = wrapRef.current?.offsetWidth || 0
+      setScrollerW(w)
+    }
+    measure()
+    const ro = new ResizeObserver(measure)
+    ro.observe(wrapRef.current)
+    window.addEventListener('resize', measure)
+    return () => {
+      ro.disconnect()
+      window.removeEventListener('resize', measure)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (scrollerW === 0) return
+    goTo(idxRef.current, false)
+  }, [scrollerW, goTo])
+
+  useEffect(() => {
+    const newIdx = valToIdx(value)
+    if (newIdx !== idxRef.current) {
+      setIdx(newIdx)
+      goTo(newIdx, false)
+    }
+  }, [value, goTo])
+
+  const onScroll = useCallback(() => {
+    if (!ref.current || scrollerW === 0 || disabled) return
+    if (programmatic.current) return
+
+    const i = Math.max(0, Math.min(TOTAL - 1, Math.round(ref.current.scrollLeft / ITEM_W)))
+    if (i !== idxRef.current) {
+      setIdx(i)
+      onChange(idxToVal(i))
+      if (navigator.vibrate) navigator.vibrate(5)
+    }
+
+    if (scrollEndTimer.current) clearTimeout(scrollEndTimer.current)
+    scrollEndTimer.current = setTimeout(() => {
+      if (!ref.current) return
+      const finalIdx = Math.max(0, Math.min(TOTAL - 1, Math.round(ref.current.scrollLeft / ITEM_W)))
+      goTo(finalIdx, true)
+    }, 150)
+  }, [scrollerW, onChange, goTo, disabled])
+
+  const tapItem = (i) => {
+    if (disabled) return
+    setIdx(i)
+    onChange(idxToVal(i))
+    if (navigator.vibrate) navigator.vibrate(8)
+    goTo(i, true)
+  }
+
+  const current = idxToVal(idx)
+  const scrollerH = isMobile ? 56 : 64
+
   return (
     <div style={{
-      background: THEME.gradientSubtle,
-      borderRadius: '24px',
-      padding: isMobile ? '1.5rem' : '2rem',
-      backdropFilter: 'blur(20px)',
-      border: `1px solid rgba(59, 130, 246, 0.2)`,
-      display: 'flex',
-      flexDirection: 'column',
-      alignItems: 'center',
-      position: 'relative',
-      overflow: 'hidden',
-      boxShadow: '0 20px 40px rgba(59, 130, 246, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.05)'
+      width: '100%',
+      maxWidth: '100%',
+      boxSizing: 'border-box',
+      minWidth: 0,
+      contain: 'layout',
+      opacity: disabled ? 0.5 : 1,
+      transition: 'opacity 0.2s ease',
+      pointerEvents: disabled ? 'none' : 'auto',
     }}>
-      {/* Background Scale Icon */}
+
+      {/* Huidig getal */}
       <div style={{
-        position: 'absolute',
-        top: '50%',
-        left: '50%',
-        transform: 'translate(-50%, -50%)',
-        opacity: 0.03,
-        pointerEvents: 'none'
+        textAlign: 'center',
+        fontSize: isMobile ? '2.2rem' : '2.8rem',
+        fontWeight: '900',
+        color: '#FFD700',
+        letterSpacing: '-0.03em',
+        lineHeight: 1,
+        marginBottom: '0.75rem',
       }}>
-        <Scale size={isMobile ? 250 : 350} color={THEME.primary} />
+        {current.toFixed(1)}
+        <span style={{ fontSize: '0.38em', color: 'rgba(255,215,0,0.4)', marginLeft: '0.2rem' }}>kg</span>
       </div>
-      
-      {/* Floating Bubbles */}
-      <div style={{
-        position: 'absolute',
-        top: '10%',
-        left: '10%',
-        width: '80px',
-        height: '80px',
-        borderRadius: '50%',
-        background: `radial-gradient(circle at 30% 30%, ${THEME.primaryLight}20, transparent)`,
-        animation: 'float 8s ease-in-out infinite',
-        pointerEvents: 'none'
-      }} />
-      
-      <div style={{
-        position: 'absolute',
-        bottom: '15%',
-        right: '5%',
-        width: '60px',
-        height: '60px',
-        borderRadius: '50%',
-        background: `radial-gradient(circle at 30% 30%, ${THEME.primary}15, transparent)`,
-        animation: 'float 10s ease-in-out infinite reverse',
-        pointerEvents: 'none'
-      }} />
-      
-      <div style={{
-        position: 'absolute',
-        top: '60%',
-        left: '80%',
-        width: '40px',
-        height: '40px',
-        borderRadius: '50%',
-        background: `radial-gradient(circle at 30% 30%, ${THEME.primaryLightest}25, transparent)`,
-        animation: 'float 6s ease-in-out infinite',
-        animationDelay: '2s',
-        pointerEvents: 'none'
-      }} />
-      
-      {/* Progress Ring */}
-      <div style={{
-        position: 'relative',
-        width: radius * 2,
-        height: radius * 2,
-        marginBottom: '1.5rem',
-        filter: 'drop-shadow(0 8px 24px rgba(59, 130, 246, 0.25))'
-      }}>
-        <svg
-          height={radius * 2}
-          width={radius * 2}
-          style={{ transform: 'rotate(-90deg)' }}
-        >
-          {/* Background circle */}
-          <circle
-            stroke="rgba(59, 130, 246, 0.1)"
-            fill="transparent"
-            strokeWidth={strokeWidth}
-            r={normalizedRadius}
-            cx={radius}
-            cy={radius}
-          />
-          {/* Progress circle */}
-          <circle
-            stroke={progressPercent >= 90 ? THEME.success : THEME.primary}
-            fill="transparent"
-            strokeWidth={strokeWidth}
-            strokeDasharray={circumference + ' ' + circumference}
-            style={{
-              strokeDashoffset,
-              transition: 'stroke-dashoffset 0.5s ease',
-              strokeLinecap: 'round',
-              filter: `drop-shadow(0 0 ${progressPercent >= 90 ? '12px' : '8px'} ${progressPercent >= 90 ? THEME.success : THEME.primary}66)`
-            }}
-            r={normalizedRadius}
-            cx={radius}
-            cy={radius}
-          />
-        </svg>
-        
-        {/* Center content */}
-        <div style={{
-          position: 'absolute',
-          top: '50%',
-          left: '50%',
-          transform: 'translate(-50%, -50%)',
-          textAlign: 'center',
-          background: 'rgba(0, 0, 0, 0.2)',
-          borderRadius: '50%',
-          width: '80%',
-          height: '80%',
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          justifyContent: 'center',
-          backdropFilter: 'blur(10px)',
-          border: '1px solid rgba(59, 130, 246, 0.15)'
-        }}>
-          <div style={{
-            fontSize: isMobile ? '2rem' : '2.5rem',
-            fontWeight: 'bold',
-            background: THEME.gradient,
-            WebkitBackgroundClip: 'text',
-            WebkitTextFillColor: 'transparent',
-            backgroundClip: 'text',
-            lineHeight: 1.1
-          }}>
-            {weight.toFixed(1)}
-          </div>
-          <div style={{
-            fontSize: isMobile ? '0.75rem' : '0.875rem',
-            color: THEME.primaryLight,
-            marginTop: '0.25rem',
-            opacity: 0.8
-          }}>
-            kilogram
-          </div>
-        </div>
-      </div>
-      
-      {/* Weight Input Controls */}
-      <div style={{
-        width: '100%',
-        marginBottom: '1.5rem',
-        position: 'relative',
-        zIndex: 1
-      }}>
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '1rem'
-        }}>
-          <button
-            onClick={() => onWeightChange(Math.max(40, weight - 0.1))}
-            disabled={todayEntry}
-            style={{
-              width: '36px',
-              height: '36px',
-              borderRadius: '10px',
-              background: todayEntry ? 'rgba(255,255,255,0.05)' : 'rgba(59, 130, 246, 0.15)',
-              border: `1px solid ${todayEntry ? 'rgba(255,255,255,0.1)' : THEME.primary}`,
-              color: todayEntry ? 'rgba(255,255,255,0.3)' : THEME.primary,
-              fontSize: '1.5rem',
-              cursor: todayEntry ? 'not-allowed' : 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              transition: 'all 0.2s ease',
-              fontWeight: '600'
-            }}
-            onMouseEnter={(e) => {
-              if (!todayEntry) {
-                e.currentTarget.style.background = 'rgba(59, 130, 246, 0.25)'
-                e.currentTarget.style.transform = 'scale(1.1)'
-              }
-            }}
-            onMouseLeave={(e) => {
-              if (!todayEntry) {
-                e.currentTarget.style.background = 'rgba(59, 130, 246, 0.15)'
-                e.currentTarget.style.transform = 'scale(1)'
-              }
-            }}
-          >
-            -
-          </button>
-          
-          <div style={{
-            flex: 1,
-            position: 'relative',
-            height: '36px',
-            display: 'flex',
-            alignItems: 'center'
-          }}>
-            <input
-              type="range"
-              min="40"
-              max="150"
-              step="0.1"
-              value={weight}
-              onChange={(e) => onWeightChange(parseFloat(e.target.value))}
-              disabled={todayEntry}
-              style={{
-                width: '100%',
-                height: '8px',
-                appearance: 'none',
-                background: 'rgba(59, 130, 246, 0.15)',
-                borderRadius: '4px',
-                outline: 'none',
-                opacity: todayEntry ? 0.5 : 1,
-                cursor: todayEntry ? 'not-allowed' : 'pointer'
-              }}
-            />
-            {/* Slider Glow */}
-            <div style={{
-              position: 'absolute',
-              left: `${((weight - 40) / (150 - 40)) * 100}%`,
-              top: '50%',
-              transform: 'translate(-50%, -50%)',
-              width: '24px',
-              height: '24px',
-              borderRadius: '50%',
-              background: THEME.primary,
-              boxShadow: `0 0 20px ${THEME.primary}66`,
-              pointerEvents: 'none',
-              opacity: todayEntry ? 0.3 : 0.6
-            }} />
-          </div>
-          
-          <button
-            onClick={() => onWeightChange(Math.min(150, weight + 0.1))}
-            disabled={todayEntry}
-            style={{
-              width: '36px',
-              height: '36px',
-              borderRadius: '10px',
-              background: todayEntry ? 'rgba(255,255,255,0.05)' : 'rgba(59, 130, 246, 0.15)',
-              border: `1px solid ${todayEntry ? 'rgba(255,255,255,0.1)' : THEME.primary}`,
-              color: todayEntry ? 'rgba(255,255,255,0.3)' : THEME.primary,
-              fontSize: '1.5rem',
-              cursor: todayEntry ? 'not-allowed' : 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              transition: 'all 0.2s ease',
-              fontWeight: '600'
-            }}
-            onMouseEnter={(e) => {
-              if (!todayEntry) {
-                e.currentTarget.style.background = 'rgba(59, 130, 246, 0.25)'
-                e.currentTarget.style.transform = 'scale(1.1)'
-              }
-            }}
-            onMouseLeave={(e) => {
-              if (!todayEntry) {
-                e.currentTarget.style.background = 'rgba(59, 130, 246, 0.15)'
-                e.currentTarget.style.transform = 'scale(1)'
-              }
-            }}
-          >
-            +
-          </button>
-        </div>
-        
-        {/* Save button */}
-        <button
-          onClick={onSave}
-          disabled={todayEntry || saving}
+
+      {/* Scroller */}
+      <div
+        ref={wrapRef}
+        style={{
+          position: 'relative',
+          width: '100%',
+          maxWidth: '100%',
+          minWidth: 0,
+          height: `${scrollerH}px`,
+          overflow: 'hidden',
+        }}
+      >
+        <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: '60px', background: 'linear-gradient(to right, #0a0a0a, transparent)', zIndex: 2, pointerEvents: 'none' }} />
+        <div style={{ position: 'absolute', right: 0, top: 0, bottom: 0, width: '60px', background: 'linear-gradient(to left, #0a0a0a, transparent)', zIndex: 2, pointerEvents: 'none' }} />
+        <div style={{ position: 'absolute', top: 0, bottom: 0, left: `calc(50% - ${ITEM_W / 2}px)`, width: '1px', background: 'rgba(255,215,0,0.3)', zIndex: 3, pointerEvents: 'none' }} />
+        <div style={{ position: 'absolute', top: 0, bottom: 0, left: `calc(50% + ${ITEM_W / 2}px)`, width: '1px', background: 'rgba(255,215,0,0.3)', zIndex: 3, pointerEvents: 'none' }} />
+
+        <div
+          ref={ref}
+          onScroll={onScroll}
           style={{
-            width: '100%',
-            marginTop: '1rem',
-            padding: isMobile ? '0.875rem' : '1rem',
-            background: todayEntry ? 'rgba(255,255,255,0.05)' : THEME.gradient,
-            border: todayEntry ? '1px solid rgba(255,255,255,0.1)' : '1px solid rgba(59, 130, 246, 0.3)',
-            borderRadius: '12px',
-            color: '#fff',
-            fontSize: isMobile ? '0.95rem' : '1rem',
-            fontWeight: '600',
-            cursor: todayEntry || saving ? 'not-allowed' : 'pointer',
+            position: 'absolute',
+            left: 0,
+            right: 0,
+            top: 0,
+            bottom: 0,
             display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: '0.5rem',
-            transition: 'all 0.3s ease',
-            opacity: todayEntry ? 0.5 : 1,
-            boxShadow: todayEntry ? 'none' : '0 8px 24px rgba(59, 130, 246, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.1)'
-          }}
-          onMouseEnter={(e) => {
-            if (!todayEntry && !saving) {
-              e.currentTarget.style.transform = 'translateY(-2px)'
-              e.currentTarget.style.boxShadow = '0 12px 32px rgba(59, 130, 246, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.15)'
-            }
-          }}
-          onMouseLeave={(e) => {
-            if (!todayEntry && !saving) {
-              e.currentTarget.style.transform = 'translateY(0)'
-              e.currentTarget.style.boxShadow = '0 8px 24px rgba(59, 130, 246, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.1)'
-            }
+            overflowX: 'auto',
+            overflowY: 'hidden',
+            WebkitOverflowScrolling: 'touch',
+            scrollbarWidth: 'none',
+            msOverflowStyle: 'none',
+            borderTop: '1px solid rgba(255,255,255,0.06)',
+            borderBottom: '1px solid rgba(255,255,255,0.06)',
           }}
         >
-          {saving ? (
-            <>
-              <Loader2 size={18} style={{ animation: 'spin 1s linear infinite' }} />
-              Opslaan...
-            </>
-          ) : todayEntry ? (
-            <>
-              <Check size={18} />
-              Al Ingelogd
-            </>
-          ) : (
-            'Gewicht Opslaan'
-          )}
-        </button>
+          <div style={{ flexShrink: 0, width: `${spacerW}px` }} />
+          {Array.from({ length: TOTAL }, (_, i) => {
+            const sel = i === idx
+            return (
+              <div
+                key={i}
+                onClick={() => tapItem(i)}
+                style={{
+                  flexShrink: 0, width: `${ITEM_W}px`, height: '100%',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  cursor: disabled ? 'default' : 'pointer',
+                  touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+                  fontSize: sel ? (isMobile ? '1.2rem' : '1.4rem') : (isMobile ? '0.75rem' : '0.85rem'),
+                  fontWeight: sel ? '800' : '400',
+                  color: sel ? '#FFD700' : 'rgba(255,255,255,0.2)',
+                  userSelect: 'none',
+                  transition: 'font-size 0.15s ease, color 0.15s ease',
+                }}
+              >
+                {idxToVal(i).toFixed(1)}
+              </div>
+            )
+          })}
+          <div style={{ flexShrink: 0, width: `${spacerW}px` }} />
+        </div>
       </div>
-      
-      {/* Friday Badge */}
-      {isFriday && !todayEntry && (
+
+      <style>{`div::-webkit-scrollbar{display:none}`}</style>
+    </div>
+  )
+}
+
+export default function WeightProgressRing({
+  weight = 70, onWeightChange, onSave, saving = false,
+  todayEntry = null, isFriday = false, isMobile = false,
+  // legacy props (niet meer gebruikt)
+  progressPercent, targetWeight,
+}) {
+  const alreadyLogged = !!todayEntry
+  const [editing, setEditing] = useState(!alreadyLogged)
+  const originalWeight = useRef(weight)
+
+  useEffect(() => {
+    if (alreadyLogged) setEditing(false)
+    else setEditing(true)
+  }, [alreadyLogged])
+
+  const adjust = (delta) => {
+    const newVal = Math.max(MIN, Math.min(MAX, weight + delta))
+    const rounded = Math.round(newVal * 10) / 10
+    onWeightChange(rounded)
+    if (navigator.vibrate) navigator.vibrate(8)
+  }
+
+  const startEdit = () => {
+    originalWeight.current = weight
+    setEditing(true)
+    if (navigator.vibrate) navigator.vibrate(8)
+  }
+
+  const cancelEdit = () => {
+    onWeightChange(originalWeight.current)
+    setEditing(false)
+    if (navigator.vibrate) navigator.vibrate(8)
+  }
+
+  const handleSave = () => {
+    onSave()
+  }
+
+  const showSavedState = alreadyLogged && !editing
+  const showEditMode = alreadyLogged && editing
+  const showInitialSave = !alreadyLogged
+
+  // Shared button label styling (alle action rows)
+  const labelStyle = {
+    fontSize: isMobile ? '0.65rem' : '0.7rem',
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: '0.05em',
+  }
+
+  return (
+    <div style={{
+      borderTop: '1px solid rgba(255,255,255,0.06)',
+      borderBottom: '1px solid rgba(255,255,255,0.06)',
+      width: '100%',
+      maxWidth: '100%',
+      boxSizing: 'border-box',
+      overflow: 'hidden',
+      contain: 'layout',
+      padding: isMobile ? '0.875rem 1rem 0' : '1rem 1.5rem 0',
+    }}>
+      <HorizontalPicker
+        value={weight}
+        onChange={onWeightChange}
+        disabled={showSavedState}
+      />
+
+      {/* Fine-tune ±0.1 — alleen wanneer aanpassen mogelijk */}
+      {!showSavedState && (
         <div style={{
-          padding: '0.5rem 1rem',
-          background: `linear-gradient(135deg, ${THEME.friday}33, ${THEME.friday}11)`,
-          border: `1px solid ${THEME.friday}55`,
-          borderRadius: '10px',
-          fontSize: isMobile ? '0.75rem' : '0.8rem',
-          color: THEME.friday,
-          fontWeight: '600',
-          boxShadow: `0 4px 12px ${THEME.friday}22`
+          display: 'flex',
+          gap: '0.4rem',
+          marginTop: '0.625rem',
+          justifyContent: 'center',
+          maxWidth: '100%',
         }}>
-          🌟 Vrijdag Weging
+          {[-0.1, +0.1].map((d) => (
+            <button key={d} onClick={() => adjust(d)} style={{
+              width: isMobile ? '64px' : '72px',
+              height: '32px',
+              flexShrink: 0,
+              padding: 0,
+              background: 'rgba(255,215,0,0.04)',
+              border: '1px solid rgba(255,215,0,0.1)',
+              borderRadius: '6px',
+              color: 'rgba(255,215,0,0.55)',
+              fontSize: isMobile ? '0.65rem' : '0.7rem',
+              fontWeight: '700',
+              cursor: 'pointer',
+              touchAction: 'manipulation',
+              WebkitTapHighlightColor: 'transparent',
+            }}>{d > 0 ? `+${d}` : d}</button>
+          ))}
         </div>
       )}
-      
+
+      {/* Action row — flush, edge-to-edge, geen rounded card */}
+      <div style={{
+        marginTop: showSavedState ? '0.875rem' : '0.75rem',
+        marginLeft: isMobile ? '-1rem' : '-1.5rem',
+        marginRight: isMobile ? '-1rem' : '-1.5rem',
+        borderTop: '1px solid rgba(255,255,255,0.06)',
+      }}>
+
+        {/* INITIAL SAVE — single flush button */}
+        {showInitialSave && (
+          <button onClick={handleSave} disabled={saving} style={{
+            display: 'block',
+            width: '100%',
+            padding: isMobile ? '0.875rem' : '1rem',
+            background: 'transparent',
+            border: 'none',
+            color: '#FFD700',
+            cursor: saving ? 'default' : 'pointer',
+            minHeight: '48px',
+            touchAction: 'manipulation',
+            WebkitTapHighlightColor: 'transparent',
+            opacity: saving ? 0.5 : 1,
+            ...labelStyle,
+          }}>
+            {saving ? 'Opslaan...' : 'Gewicht Opslaan'}
+          </button>
+        )}
+
+        {/* SAVED STATE — flush 2-column rij, vertical divider */}
+        {showSavedState && (
+          <div style={{ display: 'flex', minHeight: '48px' }}>
+            <div style={{
+              flex: 1,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '0.4rem',
+              padding: isMobile ? '0.875rem 0.5rem' : '1rem 0.75rem',
+              color: '#10b981',
+              ...labelStyle,
+            }}>
+              <Check size={isMobile ? 12 : 13} strokeWidth={2.5} />
+              <span>Opgeslagen</span>
+            </div>
+            <div style={{ width: '1px', background: 'rgba(255,255,255,0.06)' }} />
+            <button onClick={startEdit} style={{
+              flex: 1,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '0.4rem',
+              padding: isMobile ? '0.875rem 0.5rem' : '1rem 0.75rem',
+              background: 'transparent',
+              border: 'none',
+              color: '#FFD700',
+              cursor: 'pointer',
+              touchAction: 'manipulation',
+              WebkitTapHighlightColor: 'transparent',
+              ...labelStyle,
+            }}>
+              <Pencil size={isMobile ? 11 : 12} strokeWidth={2.5} />
+              <span>Aanpassen</span>
+            </button>
+          </div>
+        )}
+
+        {/* EDIT MODE — flush 2-column rij */}
+        {showEditMode && (
+          <div style={{ display: 'flex', minHeight: '48px' }}>
+            <button onClick={cancelEdit} disabled={saving} style={{
+              flex: 1,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '0.4rem',
+              padding: isMobile ? '0.875rem 0.5rem' : '1rem 0.75rem',
+              background: 'transparent',
+              border: 'none',
+              color: 'rgba(255,255,255,0.45)',
+              cursor: saving ? 'default' : 'pointer',
+              touchAction: 'manipulation',
+              WebkitTapHighlightColor: 'transparent',
+              opacity: saving ? 0.5 : 1,
+              ...labelStyle,
+            }}>
+              <X size={isMobile ? 11 : 12} strokeWidth={2.5} />
+              <span>Annuleren</span>
+            </button>
+            <div style={{ width: '1px', background: 'rgba(255,255,255,0.06)' }} />
+            <button onClick={handleSave} disabled={saving} style={{
+              flex: 1,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              padding: isMobile ? '0.875rem 0.5rem' : '1rem 0.75rem',
+              background: 'transparent',
+              border: 'none',
+              color: '#FFD700',
+              cursor: saving ? 'default' : 'pointer',
+              touchAction: 'manipulation',
+              WebkitTapHighlightColor: 'transparent',
+              opacity: saving ? 0.5 : 1,
+              ...labelStyle,
+            }}>
+              {saving ? 'Opslaan...' : 'Update Gewicht'}
+            </button>
+          </div>
+        )}
+      </div>
+
+      {saving && (
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.375rem', padding: '0.5rem 0' }}>
+          <Loader2 size={11} color="rgba(255,215,0,0.5)" style={{ animation: 'spin 1s linear infinite' }} />
+          <span style={{ fontSize: '0.6rem', fontWeight: '700', color: 'rgba(255,215,0,0.4)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Bezig...</span>
+        </div>
+      )}
+
       <style>{`
-        input[type="range"]::-webkit-slider-thumb {
-          appearance: none;
-          width: 24px;
-          height: 24px;
-          background: ${THEME.gradient};
-          border-radius: 50%;
-          cursor: pointer;
-          border: 3px solid #fff;
-          box-shadow: 0 4px 12px rgba(59, 130, 246, 0.5);
-          transition: all 0.2s ease;
-        }
-        
-        input[type="range"]::-webkit-slider-thumb:hover {
-          transform: scale(1.15);
-          box-shadow: 0 6px 20px rgba(59, 130, 246, 0.6);
-        }
-        
-        input[type="range"]::-moz-range-thumb {
-          width: 24px;
-          height: 24px;
-          background: ${THEME.gradient};
-          border-radius: 50%;
-          cursor: pointer;
-          border: 3px solid #fff;
-          box-shadow: 0 4px 12px rgba(59, 130, 246, 0.5);
-          transition: all 0.2s ease;
-        }
-        
-        input[type="range"]:disabled::-webkit-slider-thumb,
-        input[type="range"]:disabled::-moz-range-thumb {
-          cursor: not-allowed;
-          opacity: 0.5;
-        }
-        
-        @keyframes spin {
-          to { transform: rotate(360deg); }
-        }
-        
-        @keyframes float {
-          0%, 100% { transform: translateY(0px); }
-          50% { transform: translateY(-20px); }
-        }
+        @keyframes spin { to { transform: rotate(360deg); } }
       `}</style>
     </div>
   )
