@@ -4,7 +4,8 @@
 // Props: { workoutData, exerciseProgress, isMobile, onNavigateWorkout, client, onClose }
 // ============================================
 import React, { useState } from 'react'
-import { Dumbbell, TrendingDown, TrendingUp, ChevronRight, ArrowLeft, ExternalLink } from 'lucide-react'
+import { Dumbbell, TrendingDown, TrendingUp, ChevronRight, ArrowLeft, ExternalLink, BarChart3 } from 'lucide-react'
+import WorkoutOverviewChart from './WorkoutOverviewChart'
 
 const formatDate = (d) => { if (!d) return '-'; const dt = new Date(d); return dt.toLocaleDateString('nl-NL', { day: 'numeric', month: 'short', year: dt.getFullYear() !== new Date().getFullYear() ? 'numeric' : undefined }) }
 const formatDaysAgo = (d) => { if (d === null || d === undefined) return 'Nooit'; if (d === 0) return 'Vandaag'; if (d === 1) return 'Gisteren'; return `${d}d geleden` }
@@ -17,7 +18,7 @@ const SetDisplay = ({ s }) => (
   </span>
 )
 
-export default function WorkoutColumn({ workoutData, exerciseProgress = {}, isMobile, onNavigateWorkout, client, onClose }) {
+export default function WorkoutColumn({ db, workoutData, exerciseProgress = {}, isMobile, onNavigateWorkout, client, onClose }) {
   const [view, setView] = useState('sessions')
   const [selectedSession, setSelectedSession] = useState(null)
   const [selectedExercise, setSelectedExercise] = useState(null)
@@ -41,13 +42,44 @@ export default function WorkoutColumn({ workoutData, exerciseProgress = {}, isMo
     return (exerciseProgress[selectedExercise] || []).sort((a, b) => new Date(b.date) - new Date(a.date))
   }
 
+  // ── OVERVIEW (multi-exercise chart) ──
+  if (view === 'overview') {
+    return (
+      <WorkoutOverviewChart
+        db={db}
+        client={client}
+        exerciseProgress={exerciseProgress}
+        isMobile={isMobile}
+        onBack={() => setView('sessions')}
+      />
+    )
+  }
+
   // ── SESSIONS ──
   if (view === 'sessions') {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
         <div style={{ padding: isMobile ? '0.625rem 0.75rem' : '0.75rem 1rem', borderBottom: '1px solid rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}><Dumbbell size={14} color="#f97316" /><span style={{ fontSize: '0.7rem', fontWeight: '700', color: '#f97316', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Sessies</span></div>
-          {workoutData?.totalWorkouts > 0 && <span style={{ fontSize: '0.65rem', fontWeight: '700', color: 'rgba(249,115,22,0.6)' }}>{workoutData.completedWorkouts}/{workoutData.totalWorkouts}</span>}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            {workoutData?.totalWorkouts > 0 && <span style={{ fontSize: '0.65rem', fontWeight: '700', color: 'rgba(249,115,22,0.6)' }}>{workoutData.completedWorkouts}/{workoutData.totalWorkouts}</span>}
+            <button
+              onClick={() => setView('overview')}
+              title="Krachtoverzicht"
+              style={{
+                display: 'flex', alignItems: 'center', gap: '0.2rem',
+                padding: '0.25rem 0.4rem',
+                background: 'rgba(249,115,22,0.08)',
+                border: '1px solid rgba(249,115,22,0.2)',
+                borderRadius: '5px', color: '#f97316',
+                fontSize: '0.55rem', fontWeight: '700',
+                cursor: 'pointer', touchAction: 'manipulation',
+                WebkitTapHighlightColor: 'transparent', minHeight: '24px'
+              }}
+            >
+              <BarChart3 size={11} /> OVERZICHT
+            </button>
+          </div>
         </div>
         {workoutData?.totalWorkouts > 0 && (
           <div style={{ display: 'flex', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>

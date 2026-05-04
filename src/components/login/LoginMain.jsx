@@ -1,7 +1,9 @@
 // src/components/login/LoginMain.jsx
 import { useState, useEffect, useRef } from 'react'
+import { Capacitor } from '@capacitor/core'
 import DatabaseService from '../../services/DatabaseService'
 import PasswordResetService from '../../services/PasswordResetService'
+import AppleSignInButton from './AppleSignInButton'
 
 const db = DatabaseService
 const passwordReset = PasswordResetService
@@ -214,6 +216,30 @@ export default function LoginMain() {
             {loading ? 'Inloggen...' : 'Inloggen'}
           </GoldButton>
         </form>
+
+        {/* Apple Sign-In (only renders on iOS native) */}
+        {Capacitor.isNativePlatform() && (
+          <div style={{ marginTop: '1.25rem' }}>
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: '0.625rem',
+              marginBottom: '0.875rem',
+            }}>
+              <div style={{ flex: 1, height: '1px', background: 'rgba(255,255,255,0.06)' }} />
+              <span style={{
+                fontSize: '0.6rem', fontWeight: '700',
+                color: 'rgba(255,255,255,0.25)',
+                letterSpacing: '0.12em', textTransform: 'uppercase',
+              }}>
+                of
+              </span>
+              <div style={{ flex: 1, height: '1px', background: 'rgba(255,255,255,0.06)' }} />
+            </div>
+            <AppleSignInButton
+              isClientMode={mode === 'client'}
+              onError={(msg) => setError(msg)}
+            />
+          </div>
+        )}
 
         {/* Coach link — alleen zichtbaar op client mode, klein onderaan */}
         {mode === 'client' && (

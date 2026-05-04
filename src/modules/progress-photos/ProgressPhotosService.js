@@ -189,8 +189,13 @@ class ProgressPhotosService {
       let category = photoType // meal, workout, victory, progress
       
       if (photoType === 'progress') {
-        // For progress photos, use the subtype (front/side/back)
-        dbPhotoType = metadata.subtype || 'front'
+        // For progress photos, use the subtype (front/side/back).
+        // Custom subtypes (e.g. 'links', 'rechts', 'detail') are preserved in
+        // metadata.subtype but photo_type stays a standard value to satisfy
+        // the DB column constraint.
+        const STANDARD_ANGLES = ['front', 'side', 'back']
+        const sub = metadata.subtype
+        dbPhotoType = STANDARD_ANGLES.includes(sub) ? sub : 'front'
         category = 'progress'
       } else {
         // For non-progress photos, we need to use a valid photo_type

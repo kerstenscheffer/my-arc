@@ -30,7 +30,12 @@ export default function ProgressMain({ db, client }) {
   const [photoCount, setPhotoCount] = useState(0)
   const [recentPhotos, setRecentPhotos] = useState([])
   const [todayData, setTodayData] = useState({})
-  
+  // Angle picker modal — opens when a 'progress' photo is being uploaded.
+  // Replaces the old browser prompt() flow.
+  const [anglePicker, setAnglePicker] = useState(null)   // { file, photoType } when open
+  const [angleChoice, setAngleChoice] = useState('front')
+  const [customAngle, setCustomAngle] = useState('')
+
   const isMobile = window.innerWidth <= 768
   const today = new Date()
   const isFriday = today.getDay() === 5
@@ -73,19 +78,44 @@ export default function ProgressMain({ db, client }) {
   }
 
   const handlePhotoUpload = async (file, photoType) => {
+    // Progress photos need an angle. Open the picker modal; non-progress uploads run directly.
+    if (photoType === 'progress') {
+      setAnglePicker({ file, photoType })
+      setAngleChoice('front')
+      setCustomAngle('')
+      return
+    }
+    await doUpload(file, photoType, null)
+  }
+
+  const doUpload = async (file, photoType, subtype) => {
     try {
       const PSS = (await import('../progress-photos/ProgressPhotosService')).default
       const svc = new PSS(db)
       const metadata = {}
-      if (photoType === 'progress') {
-        const sub = prompt('Is dit een FRONT of SIDE foto?', 'front')?.toLowerCase()
-        if (!['front','side'].includes(sub)) { showMessage('Kies front of side', 'error'); return }
-        metadata.subtype = sub
-      }
+      if (subtype) metadata.subtype = subtype
       await svc.uploadPhoto(client.id, file, photoType, metadata)
       showMessage({ progress:'Progressie foto geupload!', meal:'Maaltijd foto vastgelegd!', workout:'Workout vastgelegd!', victory:'Overwinning opgeslagen!' }[photoType] || 'Foto geupload!')
       await loadAllData()
     } catch { showMessage('Upload mislukt', 'error') }
+  }
+
+  const handleAngleConfirm = async () => {
+    if (!anglePicker) return
+    let subtype = angleChoice
+    if (angleChoice === 'other') {
+      subtype = customAngle.trim().toLowerCase()
+      if (!subtype) { showMessage('Vul een hoek in', 'error'); return }
+    }
+    const { file, photoType } = anglePicker
+    setAnglePicker(null)
+    await doUpload(file, photoType, subtype)
+  }
+
+  const cancelAnglePicker = () => {
+    setAnglePicker(null)
+    setCustomAngle('')
+    setAngleChoice('front')
   }
 
   const handleSaveWeight = async () => {
@@ -214,6 +244,117 @@ export default function ProgressMain({ db, client }) {
       )}
 
       <PageVideoWidget client={client} db={db} pageContext="tracking" />
+
+      {/* ═══ ANGLE PICKER MODAL — for progress photos ═══ */}
+      {anglePicker && (
+        <div
+          onClick={cancelAnglePicker}
+          style={{
+            position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.88)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            zIndex: 2100, padding: '1.5rem',
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              background: '#0f0f0f', border: '1px solid rgba(255,215,0,0.1)',
+              borderRadius: '12px', padding: '1.75rem',
+              width: '100%', maxWidth: '340px',
+            }}
+          >
+            <h3 style={{ fontSize: '1rem', fontWeight: '800', color: '#fff', margin: '0 0 0.3rem' }}>
+              Welke hoek?
+            </h3>
+            <p style={{ fontSize: '0.72rem', color: 'rgba(255,255,255,0.3)', margin: '0 0 1.25rem' }}>
+              Kies de hoek voor je progressie foto
+            </p>
+
+            <select
+              value={angleChoice}
+              onChange={(e) => setAngleChoice(e.target.value)}
+              style={{
+                width: '100%',
+                padding: '0.875rem 1rem',
+                background: 'rgba(255,255,255,0.05)',
+                border: '1px solid rgba(255,255,255,0.08)',
+                borderRadius: '10px',
+                color: '#fff',
+                fontSize: '1rem',
+                outline: 'none',
+                boxSizing: 'border-box',
+                fontFamily: 'inherit',
+                appearance: 'none',
+                WebkitAppearance: 'none',
+                MozAppearance: 'none',
+                backgroundImage: 'url("data:image/svg+xml;utf8,<svg xmlns=\'http://www.w3.org/2000/svg\' width=\'12\' height=\'12\' viewBox=\'0 0 24 24\' fill=\'none\' stroke=\'%23FFD700\' stroke-width=\'3\' stroke-linecap=\'round\' stroke-linejoin=\'round\'><polyline points=\'6 9 12 15 18 9\'/></svg>")',
+                backgroundRepeat: 'no-repeat',
+                backgroundPosition: 'right 1rem center',
+                paddingRight: '2.5rem',
+              }}
+            >
+              <option value="front">Voorkant (front)</option>
+              <option value="side">Zijkant (side)</option>
+              <option value="back">Achterkant (back)</option>
+              <option value="other">Anders…</option>
+            </select>
+
+            {angleChoice === 'other' && (
+              <input
+                type="text"
+                placeholder="Bijv. links, rechts, detail…"
+                value={customAngle}
+                onChange={(e) => setCustomAngle(e.target.value)}
+                autoFocus
+                style={{
+                  width: '100%',
+                  marginTop: '0.625rem',
+                  padding: '0.875rem 1rem',
+                  background: 'rgba(255,255,255,0.05)',
+                  border: '1px solid rgba(255,255,255,0.08)',
+                  borderRadius: '10px',
+                  color: '#fff',
+                  fontSize: '1rem',
+                  outline: 'none',
+                  boxSizing: 'border-box',
+                  fontFamily: 'inherit',
+                  WebkitAppearance: 'none',
+                }}
+                onFocus={(e) => e.target.style.borderColor = '#FFD700'}
+                onBlur={(e) => e.target.style.borderColor = 'rgba(255,255,255,0.08)'}
+              />
+            )}
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginTop: '1.25rem' }}>
+              <button
+                type="button"
+                onClick={handleAngleConfirm}
+                style={{
+                  width: '100%', padding: '0.9rem', minHeight: '48px',
+                  background: '#FFD700', border: 'none', borderRadius: '10px',
+                  color: '#000', fontSize: '0.95rem', fontWeight: '800',
+                  cursor: 'pointer', letterSpacing: '0.02em',
+                  touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+                }}
+              >
+                Bevestig & upload
+              </button>
+              <button
+                type="button"
+                onClick={cancelAnglePicker}
+                style={{
+                  background: 'none', border: 'none',
+                  color: 'rgba(255,255,255,0.25)',
+                  fontSize: '0.78rem', cursor: 'pointer', padding: '0.25rem',
+                  touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+                }}
+              >
+                Annuleren
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <style>{`
         @keyframes spin { to { transform:rotate(360deg); } }

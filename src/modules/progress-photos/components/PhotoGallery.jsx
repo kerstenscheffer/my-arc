@@ -5,6 +5,14 @@
 import React, { useState } from 'react'
 import { Grid, Calendar, Trash2, ChevronDown, ChevronUp, X } from 'lucide-react'
 
+// Color per angle. Custom subtypes fall back to grey.
+const ANGLE_COLOR = {
+  front: '#FFD700',
+  side:  '#f97316',
+  back:  '#3b82f6',
+}
+const angleColor = (subtype) => ANGLE_COLOR[(subtype || '').toLowerCase()] || '#9ca3af'
+
 export default function PhotoGallery({ photos = {}, onDelete, isMobile = false }) {
   const [expanded, setExpanded] = useState(false)
   const [selectedPhoto, setSelectedPhoto] = useState(null)
@@ -111,12 +119,13 @@ export default function PhotoGallery({ photos = {}, onDelete, isMobile = false }
                     <img src={photo.photo_url} alt="Progress"
                       style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }}
                       onError={(e) => { e.target.style.display = 'none' }} loading="lazy" />
-                    {/* Subtype label */}
+                    {/* Subtype label — color per angle */}
                     {photo.metadata?.subtype && (
                       <div style={{
                         position: 'absolute', bottom: '1px', right: '1px',
                         background: 'rgba(0,0,0,0.8)', borderRadius: '2px',
-                        padding: '0 2px', fontSize: '0.4rem', color: '#FFD700',
+                        padding: '0 2px', fontSize: '0.4rem',
+                        color: angleColor(photo.metadata.subtype),
                         fontWeight: '700', textTransform: 'uppercase', lineHeight: 1.3
                       }}>
                         {photo.metadata.subtype[0]}

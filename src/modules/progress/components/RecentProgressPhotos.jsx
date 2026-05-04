@@ -6,6 +6,14 @@ import React from 'react'
 import { Camera } from 'lucide-react'
 import UploadSection from '../../progress-photos/components/UploadSection'
 
+// Color per angle. Custom subtypes (e.g. 'links', 'detail') fall back to grey.
+const ANGLE_COLOR = {
+  front: '#FFD700',
+  side:  '#f97316',
+  back:  '#3b82f6',
+}
+const angleColor = (subtype) => ANGLE_COLOR[(subtype || '').toLowerCase()] || '#9ca3af'
+
 export default function RecentProgressPhotos({ photos = [], onUpload, todayData = {}, isFriday = false, isMobile = false }) {
   const progressPhotos = photos
     .filter(p => (p.metadata?.category || 'progress') === 'progress')
@@ -74,12 +82,13 @@ export default function RecentProgressPhotos({ photos = [], onUpload, todayData 
                 <img src={photo.photo_url} alt={`Progress ${index + 1}`}
                   style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                   loading="lazy" />
-                {/* Subtype badge */}
+                {/* Subtype badge — color per angle (F gold, S orange, B blue, custom grey) */}
                 {photo.metadata?.subtype && (
                   <div style={{
                     position: 'absolute', bottom: '2px', right: '2px',
                     background: 'rgba(0,0,0,0.75)', borderRadius: '2px',
-                    padding: '0 3px', fontSize: '0.45rem', color: '#FFD700',
+                    padding: '0 3px', fontSize: '0.45rem',
+                    color: angleColor(photo.metadata.subtype),
                     fontWeight: '700', textTransform: 'uppercase', lineHeight: 1.4
                   }}>
                     {photo.metadata.subtype[0]}

@@ -291,7 +291,7 @@ export default function ClientInsightModal({ isOpen, onClose, client, isMobile, 
                 </ColWrapper>
                 <ColWrapper id="workout">
                   <WorkoutColumn
-                    workoutData={workoutData} exerciseProgress={exerciseProgress}
+                    db={db} workoutData={workoutData} exerciseProgress={exerciseProgress}
                     isMobile={false} onNavigateWorkout={onNavigateWorkout}
                     client={effectiveClient} onClose={onClose}
                   />
@@ -364,7 +364,7 @@ export default function ClientInsightModal({ isOpen, onClose, client, isMobile, 
               )}
               {mobileTab === 'workout' && (
                 <WorkoutColumn
-                  workoutData={workoutData} exerciseProgress={exerciseProgress}
+                  db={db} workoutData={workoutData} exerciseProgress={exerciseProgress}
                   isMobile={true} onNavigateWorkout={onNavigateWorkout}
                   client={effectiveClient} onClose={onClose}
                 />
