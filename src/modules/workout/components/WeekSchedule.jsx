@@ -1,11 +1,8 @@
 // src/modules/workout/components/WeekSchedule.jsx
 import useIsMobile from '../../../hooks/useIsMobile'
-import { AlertCircle, MoveHorizontal } from 'lucide-react'
+import { AlertCircle, Calendar } from 'lucide-react'
 import { useState, useEffect } from 'react'
-import PlanningModal from './planning/PlanningModal'
-import PlanningButtons from './week-schedule/PlanningButtons'
 import WeekGrid from './week-schedule/WeekGrid'
-import WeekList from './week-schedule/WeekList'
 import ActionButtons from './week-schedule/ActionButtons'
 
 export default function WeekSchedule({
@@ -20,7 +17,6 @@ export default function WeekSchedule({
   const [hasChanges, setHasChanges] = useState(false)
   const [saving, setSaving] = useState(false)
   const [loading, setLoading] = useState(false)
-  const [showPlanningModal, setShowPlanningModal] = useState(false)
   const [customWorkouts, setCustomWorkouts] = useState({})
 
   const weekDays = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
@@ -98,12 +94,6 @@ export default function WeekSchedule({
     setLocalSwapMode(false); setSelectedForSwap(null)
   }
 
-  const handlePlanningModalSave = async (newSchedule) => {
-    setTempSchedule(newSchedule)
-    await loadCustomWorkoutsForSchedule(newSchedule)
-    await handleAutoSave(newSchedule)
-  }
-
   const getWorkoutData = (workoutKey) => {
     if (!workoutKey) return null
     if (workoutKey.startsWith('custom_')) return customWorkouts[workoutKey.replace('custom_', '')] || null
@@ -131,28 +121,18 @@ export default function WeekSchedule({
   return (
     <div style={{ padding: 0, marginBottom: '1rem' }}>
 
-      {/* HEADER */}
-      <div style={{ padding: isMobile ? '0 1rem 0.5rem' : '0 1.25rem 0.625rem', borderBottom: '1px solid rgba(255,255,255,0.05)', marginBottom: isMobile ? '0.625rem' : '0.75rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <h3 style={{ fontSize: isMobile ? '0.95rem' : '1.05rem', fontWeight: '800', color: '#fff', margin: 0, letterSpacing: '-0.01em' }}>
-          Planning
-        </h3>
-        {saving && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', fontSize: '0.65rem', color: 'rgba(255,255,255,0.3)', fontWeight: '600' }}>
-            <div style={{ width: '5px', height: '5px', borderRadius: '50%', background: 'rgba(255,255,255,0.3)', animation: 'pulse 1.5s ease-in-out infinite' }} />
-            Opslaan
-          </div>
-        )}
-      </div>
-
-      {/* ✅ INSTRUCTIE STRIP — duidelijk, groep 3 taal */}
-      <div style={{ padding: isMobile ? '0 0.75rem 0.5rem' : '0 1rem 0.625rem' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: isMobile ? '0.5rem 0.75rem' : '0.5rem 0.875rem', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '6px' }}>
-          <MoveHorizontal size={isMobile ? 13 : 14} color="rgba(255,255,255,0.3)" strokeWidth={2} />
-          <span style={{ fontSize: isMobile ? '0.7rem' : '0.75rem', color: 'rgba(255,255,255,0.35)', fontWeight: '600' }}>
-            {isMobile ? 'Houd een dag vast en sleep hem naar een andere dag om te wisselen.' : 'Sleep een dag naar een andere dag om je planning te wijzigen.'}
-          </span>
+      {/* "Planning" header + instruction strip removed — week-tiles speak for
+          themselves; opslaan-indicator floats top-right when saving. */}
+      {saving && (
+        <div style={{
+          padding: isMobile ? '0 1rem 0.375rem' : '0 1.25rem 0.5rem',
+          display: 'flex', alignItems: 'center', justifyContent: 'flex-end',
+          gap: '0.3rem', fontSize: '0.65rem', color: 'rgba(255,255,255,0.3)', fontWeight: '600'
+        }}>
+          <div style={{ width: '5px', height: '5px', borderRadius: '50%', background: 'rgba(255,255,255,0.3)', animation: 'pulse 1.5s ease-in-out infinite' }} />
+          Opslaan
         </div>
-      </div>
+      )}
 
       {/* Swap mode banner */}
       {localSwapMode && (
@@ -162,6 +142,19 @@ export default function WeekSchedule({
             : 'Selecteer een workout om te verplaatsen'}
         </div>
       )}
+
+      {/* Hint above the grid — readable size, clear instruction so users
+          discover the hidden drag-gesture before they see the cards. */}
+      <div style={{
+        textAlign: 'center',
+        padding: isMobile ? '0.25rem 1rem 0.625rem' : '0.375rem 1rem 0.75rem',
+        fontSize: isMobile ? '0.78rem' : '0.85rem',
+        color: 'rgba(255,255,255,0.55)',
+        fontWeight: '600',
+        letterSpacing: '-0.005em',
+      }}>
+        Houd vast en sleep om te wisselen
+      </div>
 
       {/* WeekGrid */}
       <div style={{ padding: isMobile ? '0 0.75rem' : '0 1rem' }}>
@@ -174,9 +167,30 @@ export default function WeekSchedule({
         />
       </div>
 
-      {/* Planning knoppen */}
+      {/* Single planning button — wizard only. Custom-week flow lives in
+          the header "Plan" pencil (ClientPlanEditor) to avoid 3 paths. */}
       <div style={{ marginTop: '0.625rem', padding: isMobile ? '0 0.75rem' : '0 1rem' }}>
-        <PlanningButtons onOpenWizard={onOpenWizard} onOpenCustom={() => setShowPlanningModal(true)} isMobile={isMobile} />
+        <button
+          onClick={onOpenWizard}
+          style={{
+            width: '100%', padding: isMobile ? '0.6rem 0.75rem' : '0.7rem 1rem',
+            background: 'transparent',
+            border: '1px solid rgba(255,255,255,0.08)',
+            borderRadius: isMobile ? '6px' : '8px',
+            color: 'rgba(255,255,255,0.55)',
+            fontSize: isMobile ? '0.75rem' : '0.8rem',
+            fontWeight: '600',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center', justifyContent: 'center',
+            gap: isMobile ? '0.4rem' : '0.45rem',
+            minHeight: '40px',
+            touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+          }}
+        >
+          <Calendar size={14} strokeWidth={2} />
+          Plan Je Week
+        </button>
       </div>
 
       {localSwapMode && (
@@ -185,23 +199,8 @@ export default function WeekSchedule({
         </div>
       )}
 
-      {!swapMode && (
-        <WeekList
-          tempSchedule={tempSchedule} weekDays={weekDays} todayIndex={todayIndex}
-          completedWorkouts={completedWorkouts} selectedWorkout={selectedWorkout}
-          selectedForSwap={selectedForSwap} localSwapMode={localSwapMode}
-          getWorkoutData={getWorkoutData} onDayClick={onDayClick} onSwapClick={handleSwapClick}
-          onScheduleUpdate={handleAutoSave} isMobile={isMobile}
-        />
-      )}
-
-      {showPlanningModal && (
-        <PlanningModal
-          schema={schema} currentSchedule={tempSchedule} clientId={clientId}
-          db={db} workoutService={workoutService}
-          onClose={() => setShowPlanningModal(false)} onSave={handlePlanningModalSave}
-        />
-      )}
+      {/* WeekList ("Schema" expanded card list) removed — duplicates the
+          WeekGrid above; tile tap already opens the workout details. */}
 
       <style>{`
         @keyframes pulse { 0%, 100% { opacity: 0.3; } 50% { opacity: 0.8; } }

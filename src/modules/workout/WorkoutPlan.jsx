@@ -3,19 +3,17 @@ import useIsMobile from '../../hooks/useIsMobile'
 import ProgressChartsWidget from "../progress/ProgressChartsWidget"
 import { useState, useEffect, useRef } from 'react'
 import { useLanguage } from '../../contexts/LanguageContext'
-import { Calendar } from 'lucide-react'
-import WorkoutNavTiles from './components/WorkoutNavTiles'
+import { Calendar, Pencil, Clock } from 'lucide-react'
 import ClientPlanEditor from './components/ClientPlanEditor'
 
 import WeekSchedule from './components/WeekSchedule'
 import TodaysWorkoutMain from './components/todays-workout/TodaysWorkoutMain'
 import LogModal from './components/todays-workout/LogModal'
 import WorkoutChallengeSidebar from '../../client/components/WorkoutChallengeSidebar'
-import WorkoutPhotoSlider from './components/WorkoutPhotoSlider'
 import WorkoutProgressToast from './components/WorkoutProgressToast'
-import TodaysLogToast from './components/TodaysLogToast'
 import WorkoutHistory from '../progress/WorkoutHistory'
 import PlanningWizard from './components/planning/PlanningWizard'
+import { X } from 'lucide-react'
 
 import useWorkoutSchedule from './hooks/useWorkoutSchedule'
 import useWorkoutProgress from './hooks/useWorkoutProgress'
@@ -51,6 +49,7 @@ export default function WorkoutPlan({ client, schema, db }) {
 
   const [showWizard, setShowWizard] = useState(false)
   const [showPlanEditor, setShowPlanEditor] = useState(false)
+  const [showHistoryModal, setShowHistoryModal] = useState(false)
 
   const currentDate = new Date()
   const weekDays = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
@@ -142,18 +141,65 @@ export default function WorkoutPlan({ client, schema, db }) {
   return (
     <div style={{ minHeight: '100vh', background: 'linear-gradient(180deg, #0a0a0a 0%, #171717 100%)', paddingBottom: isMobile ? '5rem' : '2rem', position: 'relative' }}>
 
-      <WorkoutNavTiles isMobile={isMobile} />
-
-      {/* Plan Bewerken knop */}
-      <div style={{ padding: isMobile ? '0 1rem 0.5rem' : '0 1.5rem 0.625rem' }}>
+      {/* ── Page header strip: title left, Plan + Geschiedenis right ── */}
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        gap: '0.5rem',
+        padding: isMobile ? '0.625rem 1rem 0.75rem' : '0.75rem 1.5rem 0.875rem',
+        borderBottom: '1px solid rgba(255,255,255,0.05)',
+      }}>
+        <div style={{
+          fontSize: isMobile ? '0.95rem' : '1.05rem',
+          fontWeight: '800',
+          color: '#fff',
+          letterSpacing: '-0.01em',
+        }}>
+          Mijn workout
+        </div>
+        <div style={{ display: 'flex', gap: '0.5rem' }}>
         <button
           onClick={() => setShowPlanEditor(true)}
-          style={{ width: '100%', padding: isMobile ? '0.6rem' : '0.7rem', background: 'transparent', border: '1px solid rgba(255,255,255,0.07)', borderRadius: '8px', color: 'rgba(255,255,255,0.35)', fontSize: isMobile ? '0.72rem' : '0.78rem', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.04em', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.375rem', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', transition: 'all 0.15s ease' }}
-          onTouchStart={(e) => e.currentTarget.style.borderColor = 'rgba(255,255,255,0.15)'}
-          onTouchEnd={(e) => e.currentTarget.style.borderColor = 'rgba(255,255,255,0.07)'}
+          aria-label="Plan bewerken"
+          style={{
+            display: 'flex', alignItems: 'center', gap: '0.375rem',
+            padding: '0.45rem 0.75rem',
+            background: 'rgba(255,255,255,0.04)',
+            border: '1px solid rgba(255,255,255,0.08)',
+            borderRadius: '8px',
+            color: 'rgba(255,255,255,0.55)',
+            fontSize: isMobile ? '0.7rem' : '0.75rem',
+            fontWeight: '600',
+            cursor: 'pointer',
+            touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+            minHeight: '34px',
+          }}
         >
-          ✎ Plan Bewerken
+          <Pencil size={13} strokeWidth={2.2} />
+          Plan
         </button>
+        <button
+          onClick={() => setShowHistoryModal(true)}
+          aria-label="Geschiedenis"
+          style={{
+            display: 'flex', alignItems: 'center', gap: '0.375rem',
+            padding: '0.45rem 0.75rem',
+            background: 'rgba(255,255,255,0.04)',
+            border: '1px solid rgba(255,255,255,0.08)',
+            borderRadius: '8px',
+            color: 'rgba(255,255,255,0.55)',
+            fontSize: isMobile ? '0.7rem' : '0.75rem',
+            fontWeight: '600',
+            cursor: 'pointer',
+            touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+            minHeight: '34px',
+          }}
+        >
+          <Clock size={13} strokeWidth={2.2} />
+          Geschiedenis
+        </button>
+        </div>
       </div>
 
       <TodaysWorkoutMain
@@ -166,7 +212,9 @@ export default function WorkoutPlan({ client, schema, db }) {
         scheduleReloadKey={scheduleReloadKey}
       />
 
-      <TodaysLogToast client={client} db={db} />
+      {/* TodaysLogToast removed — same heaviest-lift info already lives in
+          TodaysWorkoutCard. WorkoutProgressToast stays for the 30-day
+          PR/stagnation insights that aren't visible elsewhere. */}
       <WorkoutProgressToast client={client} db={db} onViewChart={handleToastViewChart} />
       <WorkoutChallengeSidebar client={client} db={db} key={challengeRefreshKey} />
 
@@ -195,11 +243,9 @@ export default function WorkoutPlan({ client, schema, db }) {
       />
       </div>
 
-      <div id="workout-history" style={{ padding: isMobile ? '0 1rem' : '0 1.5rem', marginTop: '1.5rem' }}>
-        <WorkoutHistory db={db} clientId={client?.id} onBack={null} />
-      </div>
-
-      <WorkoutPhotoSlider />
+      {/* WorkoutHistory inline section + WorkoutPhotoSlider removed —
+          history now lives behind the Geschiedenis-icon (modal below).
+          Photo slider was generic Unsplash decoration with no data. */}
 
       <div ref={chartsRef} style={{ padding: isMobile ? '0 1rem' : '0 1.5rem', marginTop: '1rem' }}>
         <ProgressChartsWidget ref={chartWidgetRef} db={db} clientId={client?.id} />
@@ -226,6 +272,64 @@ export default function WorkoutPlan({ client, schema, db }) {
 
       {showLogModal && selectedWorkoutData && (
         <LogModal workout={selectedWorkoutData} todaysLogs={selectedDayLogs} onClose={handleCloseLogModal} onLogsUpdate={handleLogsUpdate} client={client} schema={localSchema} db={db} />
+      )}
+
+      {showHistoryModal && (
+        <div
+          onClick={(e) => { if (e.target === e.currentTarget) setShowHistoryModal(false) }}
+          style={{
+            position: 'fixed', inset: 0, zIndex: 9999,
+            background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(8px)',
+            display: 'flex', alignItems: 'flex-start', justifyContent: 'center',
+            padding: isMobile ? '0' : '2rem',
+          }}
+        >
+          <div style={{
+            width: '100%', maxWidth: '900px',
+            height: isMobile ? '100%' : 'calc(100vh - 4rem)',
+            background: '#0a0a0a',
+            border: isMobile ? 'none' : '1px solid rgba(255,255,255,0.08)',
+            borderRadius: isMobile ? '0' : '16px',
+            display: 'flex', flexDirection: 'column',
+            overflow: 'hidden',
+          }}>
+            <div style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+              padding: isMobile ? '0.875rem 1rem' : '1rem 1.5rem',
+              paddingTop: `calc(env(safe-area-inset-top, 0) + ${isMobile ? '0.875rem' : '1rem'})`,
+              borderBottom: '1px solid rgba(255,255,255,0.06)',
+              flexShrink: 0,
+            }}>
+              <div style={{
+                fontSize: isMobile ? '1rem' : '1.1rem',
+                fontWeight: '800', color: '#fff', letterSpacing: '-0.01em',
+              }}>
+                Workout geschiedenis
+              </div>
+              <button
+                onClick={() => setShowHistoryModal(false)}
+                aria-label="Sluiten"
+                style={{
+                  width: '36px', height: '36px',
+                  background: 'rgba(255,255,255,0.04)',
+                  border: '1px solid rgba(255,255,255,0.08)',
+                  borderRadius: '8px',
+                  color: 'rgba(255,255,255,0.6)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  cursor: 'pointer', touchAction: 'manipulation',
+                }}
+              >
+                <X size={16} />
+              </button>
+            </div>
+            <div style={{
+              flex: 1, overflowY: 'auto', WebkitOverflowScrolling: 'touch',
+              padding: isMobile ? '0.875rem 1rem 1.5rem' : '1rem 1.5rem 2rem',
+            }}>
+              <WorkoutHistory db={db} clientId={client?.id} onBack={null} />
+            </div>
+          </div>
+        </div>
       )}
 
       <style>{`

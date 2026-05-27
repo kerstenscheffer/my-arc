@@ -29,7 +29,6 @@ export default function KanbanHeader({
   onCloseSearchResults,
   staleCheckResult,
   onDismissStaleResult,
-  snoozeSection,
   onNewSection,
   onFullscreen
 }) {
@@ -147,24 +146,6 @@ export default function KanbanHeader({
           >
             <X size={16} />
           </button>
-        </div>
-      )}
-
-      {/* NO SNOOZE SECTION TIP */}
-      {!snoozeSection && (
-        <div style={{ 
-          display: 'flex', 
-          alignItems: 'center', 
-          gap: '0.75rem', 
-          padding: '0.6rem 1rem', 
-          background: 'rgba(59, 130, 246, 0.1)', 
-          border: '1px solid rgba(59, 130, 246, 0.3)', 
-          borderRadius: '10px' 
-        }}>
-          <Clock size={16} color="#3b82f6" />
-          <span style={{ color: 'rgba(255, 255, 255, 0.7)', fontSize: '0.8rem' }}>
-            💡 Tip: Maak een sectie "Later Follow Up" aan om de ⏰ Later knop te activeren
-          </span>
         </div>
       )}
 

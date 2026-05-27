@@ -173,10 +173,37 @@ export default function LeadManagement({ db, isMobile, coachId, user }) {
     const { eventType, new: newRecord, old: oldRecord } = payload
     setLeads(currentLeads => {
       switch (eventType) {
-        case 'INSERT': return [newRecord, ...currentLeads]
-        case 'UPDATE': return currentLeads.map(lead => lead.id === newRecord.id ? newRecord : lead)
-        case 'DELETE': return currentLeads.filter(lead => lead.id !== oldRecord.id)
-        default: return currentLeads
+        case 'INSERT':
+          // INSERT lacks the embed; reload to get the full shape. Cheaper
+          // than fetching just one row with joins.
+          loadLeads(false)
+          return currentLeads
+        case 'UPDATE':
+          // Realtime payloads only carry plain columns — NO embedded joins
+          // (outreach_campaign, source_lead_magnet, lead_notes). Without
+          // this merge those nested objects get nuked on every touch
+          // (last_touched, contacted_today, reply_count, …) and the gold
+          // campaign pill / purple magnet pill disappear from the card.
+          // Spread-merging preserves them while still applying the new
+          // column values.
+          return currentLeads.map(lead => {
+            if (lead.id !== newRecord.id) return lead
+            const merged = { ...lead, ...newRecord }
+            // If the FK changed, the cached embed is now stale — drop it
+            // so a fresh loadLeads can repopulate. The card simply shows
+            // no pill until then (better than showing the wrong one).
+            if (newRecord.outreach_campaign_id !== lead.outreach_campaign_id) {
+              merged.outreach_campaign = null
+            }
+            if (newRecord.source_lead_magnet_id !== lead.source_lead_magnet_id) {
+              merged.source_lead_magnet = null
+            }
+            return merged
+          })
+        case 'DELETE':
+          return currentLeads.filter(lead => lead.id !== oldRecord.id)
+        default:
+          return currentLeads
       }
     })
     loadStats()
@@ -554,7 +581,7 @@ export default function LeadManagement({ db, isMobile, coachId, user }) {
         )}
       </div>
 
-      <DMBibleModal isMobile={isMobile} />
+      <DMBibleModal isMobile={isMobile} db={db} coachId={coachId} />
 
       <style>{`
         @keyframes lmSpin {

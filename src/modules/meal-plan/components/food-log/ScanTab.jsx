@@ -244,7 +244,7 @@ export default function ScanTab({ db, onSelect, onBack, onClose, isMobile }) {
     return (
       <div style={{ padding: isMobile ? '1.25rem 1rem' : '1.5rem', overflowY: 'auto', maxHeight: '80vh' }}>
         <div style={{
-          fontSize: '0.5rem', fontWeight: '700', color: 'rgba(16, 185, 129, 0.5)',
+          fontSize: '0.5rem', fontWeight: '700', color: 'rgba(255, 215, 0, 0.5)',
           textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '0.5rem'
         }}>
           Product niet gevonden
@@ -330,7 +330,7 @@ export default function ScanTab({ db, onSelect, onBack, onClose, isMobile }) {
         <div style={{ display: 'flex', gap: '0.5rem' }}>
           <button onClick={handleSaveManualProduct} disabled={!canSave || lookupLoading}
             style={{
-              flex: 1, padding: '0.75rem', background: canSave ? '#10b981' : 'rgba(16,185,129,0.1)',
+              flex: 1, padding: '0.75rem', background: canSave ? '#FFD700' : 'rgba(16,185,129,0.1)',
               border: 'none', borderRadius: '6px',
               color: canSave ? '#000' : 'rgba(255,255,255,0.3)',
               fontSize: '0.8rem', fontWeight: '800', cursor: canSave ? 'pointer' : 'default',
@@ -378,7 +378,7 @@ export default function ScanTab({ db, onSelect, onBack, onClose, isMobile }) {
         </div>
         <div style={{ display: 'flex', gap: '0.5rem' }}>
           <button onClick={handleConfirmName} disabled={!editedName.trim() || lookupLoading}
-            style={{ flex: 1, padding: '0.75rem', background: 'rgba(16, 185, 129, 0.12)', border: '1px solid rgba(16, 185, 129, 0.3)', borderRadius: '6px', color: '#10b981', fontSize: '0.85rem', fontWeight: '700', cursor: 'pointer', minHeight: '44px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.375rem', touchAction: 'manipulation', opacity: (!editedName.trim() || lookupLoading) ? 0.4 : 1 }}>
+            style={{ flex: 1, padding: '0.75rem', background: 'rgba(255, 215, 0, 0.12)', border: '1px solid rgba(255, 215, 0, 0.3)', borderRadius: '6px', color: '#FFD700', fontSize: '0.85rem', fontWeight: '700', cursor: 'pointer', minHeight: '44px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.375rem', touchAction: 'manipulation', opacity: (!editedName.trim() || lookupLoading) ? 0.4 : 1 }}>
             <Check size={16} strokeWidth={2.5} />
             {lookupLoading ? 'Opslaan...' : 'Bevestig'}
           </button>
@@ -399,6 +399,7 @@ export default function ScanTab({ db, onSelect, onBack, onClose, isMobile }) {
           <BarcodeScanner
             onScan={(code) => handleBarcode(code)}
             onClose={onClose || onBack}
+            onSwitchToSearch={onBack}
             onError={(err) => { setError(err); setScanning(false) }}
           />
         </div>
@@ -427,7 +428,7 @@ export default function ScanTab({ db, onSelect, onBack, onClose, isMobile }) {
 
       {lookupLoading ? (
         <div style={{ textAlign: 'center', padding: '2rem 0' }}>
-          <div style={{ width: '24px', height: '24px', margin: '0 auto 0.75rem', border: '2px solid rgba(16, 185, 129, 0.15)', borderTopColor: '#10b981', borderRadius: '50%', animation: 'stSpin 1s linear infinite' }} />
+          <div style={{ width: '24px', height: '24px', margin: '0 auto 0.75rem', border: '2px solid rgba(255, 215, 0, 0.15)', borderTopColor: '#FFD700', borderRadius: '50%', animation: 'stSpin 1s linear infinite' }} />
           <div style={{ fontSize: '0.8rem', color: 'rgba(255,255,255,0.3)' }}>Product ophalen...</div>
         </div>
       ) : (
@@ -448,7 +449,7 @@ export default function ScanTab({ db, onSelect, onBack, onClose, isMobile }) {
               placeholder="Bijv. 3017624010701"
               style={{ flex: 1, padding: '0.75rem', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '6px', color: '#fff', fontSize: '0.9rem', fontWeight: '600', outline: 'none', minHeight: '44px' }} />
             <button onClick={() => handleBarcode(manualBarcode)} disabled={manualBarcode.length < 8}
-              style={{ padding: '0.75rem 1rem', background: manualBarcode.length >= 8 ? '#10b981' : 'transparent', border: manualBarcode.length >= 8 ? 'none' : '1px solid rgba(255,255,255,0.08)', borderRadius: '6px', color: manualBarcode.length >= 8 ? '#000' : 'rgba(255,255,255,0.3)', fontSize: '0.8rem', fontWeight: '700', cursor: manualBarcode.length >= 8 ? 'pointer' : 'default', minHeight: '44px', touchAction: 'manipulation' }}>
+              style={{ padding: '0.75rem 1rem', background: manualBarcode.length >= 8 ? '#FFD700' : 'transparent', border: manualBarcode.length >= 8 ? 'none' : '1px solid rgba(255,255,255,0.08)', borderRadius: '6px', color: manualBarcode.length >= 8 ? '#000' : 'rgba(255,255,255,0.3)', fontSize: '0.8rem', fontWeight: '700', cursor: manualBarcode.length >= 8 ? 'pointer' : 'default', minHeight: '44px', touchAction: 'manipulation' }}>
               Zoek
             </button>
           </div>

@@ -5,7 +5,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { createPortal } from 'react-dom'
-import { Plus, Settings, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, GripVertical, Save, RotateCcw, Users, Instagram, Search, X, ArrowUp, Clock, Maximize2, Minimize2, CheckCircle } from 'lucide-react'
+import { Plus, Settings, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, GripVertical, Save, RotateCcw, Users, Instagram, Search, X, ArrowUp, Clock, Maximize2, Minimize2, CheckCircle, Send } from 'lucide-react'
 import KanbanCard from './KanbanCard'
 import AddLeadModal from './AddLeadModal'
 import SectionModal from './SectionModal'
@@ -13,6 +13,9 @@ import DailyStatsBar from '../DailyStatsBar'
 import WarmUpBoard from './WarmUpBoard'
 import { exportDailyReport } from '../../utils/exportDailyReport'
 import SalesCallModal from './SalesCallModal'
+import LeadDetailModalV2 from './LeadDetailModalV2'
+import OutreachLoggerModal from '../OutreachLoggerModal'
+import LeadSourceModal from './LeadSourceModal'
 
 const SNOOZE_SECTION_PATTERNS = ['later follow', 'later opvolg', 'follow up', 'followup', 'snooze', 'parkeer']
 
@@ -48,13 +51,71 @@ export default function KanbanBoard({
   const [searchQuery, setSearchQuery] = useState('')
   const [searchResults, setSearchResults] = useState([])
   const [showSearchResults, setShowSearchResults] = useState(false)
+  // Server-side duplicate check — runs when local board has no match. Surfaces
+  // existing leads (e.g. in "Niet toegewezen") that the local sections array
+  // didn't include, so we don't accidentally create dupes.
+  const [dbCheckResults, setDbCheckResults] = useState([])
+  const [dbCheckLoading, setDbCheckLoading] = useState(false)
+  // Drop-triggered modal: when a lead is dropped into the Lead-magnets
+  // section, this holds { lead, sectionColor } and forces the modal to
+  // open on the Magnets tab so the coach can immediately pick which one.
+  const [magnetPickerLead, setMagnetPickerLead] = useState(null)
+  // Outreach logger modal — daily DMs sent per campaign.
+  const [showOutreachLogger, setShowOutreachLogger] = useState(false)
+  // Most recent active campaign id — pre-filled when a new lead is added so
+  // attribution is automatic. Null when the coach has no active campaign.
+  const [activeCampaignId, setActiveCampaignId] = useState(null)
+  const [activeCampaignName, setActiveCampaignName] = useState('')
+
+  useEffect(() => {
+    if (!coachId) return
+    let cancelled = false
+    leadService.db.supabase
+      .from('outreach_campaigns')
+      .select('id, name, variant_tag')
+      .eq('coach_id', coachId)
+      .eq('status', 'active')
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (cancelled) return
+        // Clear state when no active campaign exists — otherwise a deleted /
+        // archived campaign id would stick around and cause an FK violation
+        // on the next lead-add (call_leads_outreach_campaign_id_fkey).
+        if (!data) {
+          setActiveCampaignId(null)
+          setActiveCampaignName('')
+          return
+        }
+        setActiveCampaignId(data.id)
+        setActiveCampaignName(data.variant_tag ? `${data.name} · ${data.variant_tag}` : data.name)
+      })
+    return () => { cancelled = true }
+    // Re-fetch when the logger modal closes (user may have created a new campaign).
+  }, [coachId, leadService, showOutreachLogger])
   const [highlightedLeadId, setHighlightedLeadId] = useState(null)
+  // Holds the just-created lead so we can prompt for its source. Cleared
+  // when the source modal closes (whether attributed or skipped).
+  const [leadForSource, setLeadForSource] = useState(null)
+  const handleSourceAttributed = (leadId, updates) => {
+    // Mirror the new attribution into local state so any open detail modal
+    // or card label reflects it without a full board reload.
+    setSections(prev => prev.map(s => ({
+      ...s,
+      leads: (s.leads || []).map(l => l.id === leadId ? { ...l, ...updates } : l),
+    })))
+  }
   const searchInputRef = useRef(null)
   const leadRefs = useRef({})
   const [showScrollTop, setShowScrollTop] = useState(false)
   const [staleCheckDone, setStaleCheckDone] = useState(false)
   const [staleCheckResult, setStaleCheckResult] = useState(null)
   const [snoozeSection, setSnoozeSection] = useState(null)
+  // Tracks whether we've already attempted to auto-create the default snooze
+  // section this session, so the effect below stays idempotent if it re-fires
+  // (e.g. after sections state updates).
+  const snoozeAutoCreatedRef = useRef(false)
   const [isFullscreen, setIsFullscreen] = useState(false)
   const [salesCallLead, setSalesCallLead] = useState(null)
   const fullscreenContentRef = useRef(null)
@@ -149,12 +210,21 @@ export default function KanbanBoard({
         leads: (section.leads || []).map(l => l.id === updatedLead.id ? { ...l, ...updatedLead } : l)
       })))
     } else {
+      // Find the existing card so we can carry its embed (outreach_campaign,
+      // source_lead_magnet) forward — realtime payloads don't include joins,
+      // so a raw replace would nuke the gold campaign pill on the card.
+      let prevCard = null
+      for (const s of sections) {
+        const found = (s.leads || []).find(l => l.id === updatedLead.id)
+        if (found) { prevCard = found; break }
+      }
+      const mergedLead = prevCard ? { ...prevCard, ...updatedLead } : updatedLead
       setSections(prev => prev.map(section => {
         if (section.id === currentSectionId) return { ...section, leads: (section.leads || []).filter(l => l.id !== updatedLead.id) }
         if (targetSectionId && section.id === targetSectionId) {
           const exists = (section.leads || []).some(l => l.id === updatedLead.id)
-          if (exists) return { ...section, leads: (section.leads || []).map(l => l.id === updatedLead.id ? updatedLead : l) }
-          return { ...section, leads: [updatedLead, ...(section.leads || [])] }
+          if (exists) return { ...section, leads: (section.leads || []).map(l => l.id === updatedLead.id ? mergedLead : l) }
+          return { ...section, leads: [mergedLead, ...(section.leads || [])] }
         }
         return section
       }))
@@ -195,11 +265,39 @@ export default function KanbanBoard({
   }, [isFullscreen])
 
   useEffect(() => {
-    if (sections.length > 0) {
-      const found = sections.find(s => SNOOZE_SECTION_PATTERNS.some(p => (s.title || '').toLowerCase().includes(p)))
-      setSnoozeSection(found || null)
+    if (sections.length === 0) return
+    const found = sections.find(s => SNOOZE_SECTION_PATTERNS.some(p => (s.title || '').toLowerCase().includes(p)))
+    if (found) {
+      setSnoozeSection(found)
+      return
     }
-  }, [sections])
+    setSnoozeSection(null)
+    // No snooze section yet — auto-create a default one once. The ref guard
+    // prevents re-creation when this effect runs again after sections update.
+    if (!coachId || !leadService || snoozeAutoCreatedRef.current || loading) return
+    snoozeAutoCreatedRef.current = true
+    ;(async () => {
+      try {
+        const ns = await leadService.createSection(coachId, {
+          title: '💤 Snooze',
+          color: '#64748b',
+          position: sections.filter(s => s.id !== 'unassigned').length,
+        })
+        const sectionWithLeads = { ...ns, leads: [] }
+        const update = (prev) => {
+          const u = prev.find(s => s.id === 'unassigned')
+          const others = prev.filter(s => s.id !== 'unassigned')
+          return [...others, sectionWithLeads, ...(u ? [u] : [])]
+        }
+        setSections(update)
+        setOriginalSections(update)
+      } catch (e) {
+        console.error('Auto-create snooze section failed:', e)
+        // Allow retry on next mount if it failed.
+        snoozeAutoCreatedRef.current = false
+      }
+    })()
+  }, [sections, coachId, leadService, loading])
 
   useEffect(() => {
     const handleScroll = () => setShowScrollTop(window.scrollY > 300)
@@ -230,7 +328,11 @@ export default function KanbanBoard({
   // SEARCH — PRESERVED 1:1
   const handleSearch = (query) => {
     setSearchQuery(query)
-    if (!query.trim()) { setSearchResults([]); setShowSearchResults(false); return }
+    if (!query.trim()) {
+      setSearchResults([]); setShowSearchResults(false)
+      setDbCheckResults([]); setDbCheckLoading(false)
+      return
+    }
     const q = query.toLowerCase().trim()
     const results = []
     sections.forEach(section => {
@@ -248,6 +350,128 @@ export default function KanbanBoard({
     })
     setSearchResults(results.slice(0, 10))
     setShowSearchResults(true)
+  }
+
+  // When local results come back empty for a non-trivial query, do an
+  // async server-side lookup. PostgREST ilike with * wildcards (not %)
+  // because % gets URL-mangled in OR-filters.
+  useEffect(() => {
+    const q = (searchQuery || '').trim()
+    // Need at least 2 chars + coach context + zero local hits.
+    if (!coachId || q.length < 2 || searchResults.length > 0) {
+      setDbCheckResults([])
+      setDbCheckLoading(false)
+      return
+    }
+    let cancelled = false
+    setDbCheckLoading(true)
+    const localLeadIds = new Set(sections.flatMap(s => (s.leads || []).map(l => l.id)))
+    const handleClean = q.replace(/^@+/, '')
+    const timer = setTimeout(async () => {
+      try {
+        const { data, error } = await leadService.db.supabase
+          .from('call_leads')
+          .select('id, first_name, last_name, email, phone, lead_source, notes, coach_id')
+          .eq('coach_id', coachId)
+          .is('deleted_at', null)
+          .or(`first_name.ilike.*${handleClean}*,last_name.ilike.*${handleClean}*,email.ilike.*${handleClean}*,notes.ilike.*${handleClean}*`)
+          .limit(8)
+        if (cancelled) return
+        if (error) { console.warn('Server-side lead search failed:', error); setDbCheckResults([]); setDbCheckLoading(false); return }
+        // Drop hits that are already in the local board (no need to dupe-warn).
+        const novel = (data || []).filter(l => !localLeadIds.has(l.id))
+        // Annotate with current section info via lead_section_items lookup.
+        if (novel.length === 0) { setDbCheckResults([]); setDbCheckLoading(false); return }
+        const novelIds = novel.map(l => l.id)
+        const { data: items } = await leadService.db.supabase
+          .from('lead_section_items')
+          .select('lead_id, section_id')
+          .in('lead_id', novelIds)
+        if (cancelled) return
+        const sectionMap = {}
+        sections.forEach(s => { sectionMap[s.id] = s })
+        const annotated = novel.map(l => {
+          const item = (items || []).find(i => i.lead_id === l.id)
+          const sec = item ? sectionMap[item.section_id] : null
+          return { ...l, sectionId: sec?.id || null, sectionTitle: sec?.title || 'Niet toegewezen', sectionColor: sec?.color || '#6b7280' }
+        })
+        setDbCheckResults(annotated)
+      } catch (err) {
+        console.error('DB dupe-check error:', err)
+        if (!cancelled) setDbCheckResults([])
+      } finally {
+        if (!cancelled) setDbCheckLoading(false)
+      }
+    }, 300) // debounce so we don't query on every keystroke
+    return () => { cancelled = true; clearTimeout(timer) }
+  }, [searchQuery, searchResults.length, coachId, leadService, sections])
+
+  // Called when a magnet is *added* to a lead via the modal. Auto-moves the
+  // lead into the "Lead magnets" section if it isn't already there. No-op
+  // if the section doesn't exist or the lead is already in it.
+  const handleMagnetAttachedForLead = async (leadObj /* , magnetName */) => {
+    const target = findLeadMagnetsSection()
+    if (!target || !leadObj?.id) return
+    let currentSectionId = null
+    for (const s of sections) {
+      if ((s.leads || []).some(l => l.id === leadObj.id)) { currentSectionId = s.id; break }
+    }
+    if (currentSectionId === target.id) return // already there, nothing to do
+    // Optimistic move — strip currentSectionId annotation if present.
+    const { currentSectionId: _x, ...cleanLead } = leadObj
+    void _x
+    setSections(prev => prev.map(s => {
+      if (s.id === currentSectionId) return { ...s, leads: (s.leads || []).filter(l => l.id !== cleanLead.id) }
+      if (s.id === target.id) return { ...s, leads: [cleanLead, ...(s.leads || []).filter(l => l.id !== cleanLead.id)] }
+      return s
+    }))
+    setExpandedSections(prev => ({ ...prev, [target.id]: true }))
+    setHighlightedLeadId(cleanLead.id)
+    setTimeout(() => setHighlightedLeadId(null), 2000)
+    try {
+      await leadService.moveLeadToSection(cleanLead.id, target.id, 0, coachId)
+    } catch (err) {
+      console.error('Auto-move to lead-magnets failed:', err)
+      await loadBoard(false)
+    }
+  }
+
+  // Move an existing (server-side-found) lead into the Gesprek-Insta section.
+  // Optimistic — drop it into the target section immediately so the user
+  // doesn't see it bounce through "Niet toegewezen" while the realtime
+  // DELETE/INSERT events on lead_section_items arrive out-of-order. We
+  // intentionally skip loadBoard() here; the realtime subscription keeps
+  // things eventually consistent.
+  const handlePlaceExistingLead = async (existingLead) => {
+    const section = findInstagramConversationSection()
+    if (!section) return
+    // Strip transient annotations added by the dbCheck (sectionId/etc) so the
+    // lead object is purely call_leads-shaped for KanbanCard.
+    const { sectionId: _s1, sectionTitle: _s2, sectionColor: _s3, ...cleanLead } = existingLead
+    void _s1; void _s2; void _s3
+    // 1) Optimistic UI: clear search + place card directly in target section.
+    setSearchQuery(''); setSearchResults([]); setShowSearchResults(false)
+    setDbCheckResults([])
+    setSections(prev => prev.map(s => {
+      // Drop the lead from any other local section it might already be in.
+      const leadsWithout = (s.leads || []).filter(l => l.id !== cleanLead.id)
+      if (s.id === section.id) return { ...s, leads: [cleanLead, ...leadsWithout] }
+      return { ...s, leads: leadsWithout }
+    }))
+    setExpandedSections(prev => ({ ...prev, [section.id]: true }))
+    setHighlightedLeadId(cleanLead.id)
+    setTimeout(() => setHighlightedLeadId(null), 3000)
+    // 2) Persist. On failure, revert the optimistic insert.
+    try {
+      await leadService.moveLeadToSection(cleanLead.id, section.id, 0, coachId)
+    } catch (err) {
+      console.error('Place existing lead failed:', err)
+      alert('Verplaatsen mislukt')
+      setSections(prev => prev.map(s => s.id === section.id
+        ? { ...s, leads: (s.leads || []).filter(l => l.id !== cleanLead.id) }
+        : s
+      ))
+    }
   }
 
   const scrollToLead = (leadId, sectionId) => {
@@ -408,6 +632,8 @@ export default function KanbanBoard({
     } else if (draggedLead) {
       setDragOverSectionId(null)
       if (draggedLead.currentSectionId === targetSection.id) { setDraggedLead(null); return }
+      const magnetsSection = findLeadMagnetsSection()
+      const isMagnetsDrop = magnetsSection && targetSection.id === magnetsSection.id
       try {
         await leadService.moveLeadToSection(draggedLead.id, targetSection.id, 0, coachId)
         setSections(prev => prev.map(section => {
@@ -419,6 +645,14 @@ export default function KanbanBoard({
         setHighlightedLeadId(draggedLead.id)
         setTimeout(() => setHighlightedLeadId(null), 2000)
         loadActivityData()
+        // Auto-open the magnet picker when this drop landed in the
+        // Lead-magnets section. Strip the dragged-lead's transient
+        // currentSectionId before handing it to the modal.
+        if (isMagnetsDrop) {
+          const { currentSectionId: _csId, ...cleanLead } = draggedLead
+          void _csId
+          setMagnetPickerLead({ lead: cleanLead, sectionColor: targetSection.color })
+        }
       } catch (error) { console.error('❌ Move lead failed:', error); await loadBoard(true) }
       setDraggedLead(null)
     }
@@ -463,7 +697,78 @@ export default function KanbanBoard({
       setHighlightedLeadId(newLead.id)
       setTimeout(() => setHighlightedLeadId(null), 3000)
       loadActivityData(); setShowAddLead(false); setSelectedSectionForLead(null)
-    } catch (error) { console.error('❌ Add lead failed:', error); alert('Lead toevoegen mislukt') }
+      // Prompt the coach to attribute the source while it's fresh.
+      setLeadForSource(newLead)
+    } catch (error) {
+      console.error('❌ Add lead failed:', error)
+      const msg = error?.message || error?.details || JSON.stringify(error)
+      alert(`Lead toevoegen mislukt — ${msg}\n\ncoachId: ${coachId || '(leeg!)'}`)
+    }
+  }
+
+  // ── Quick-add directly from the search bar when no match was found.
+  //
+  // - If the query starts with "@" we treat it as an Instagram handle (no
+  //   first name yet) and stash it in the notes field for now.
+  // - Otherwise the query becomes first_name.
+  // - lead_source is hard-coded to "Instagram" and the lead is dropped into
+  //   the first section whose title matches /gesprek.*insta/i (the
+  //   "Gesprek insta" workflow). Falls back to the first available section
+  //   if the user renames it.
+  const findInstagramConversationSection = () => {
+    const re = /gesprek.*insta|insta.*gesprek/i
+    return sections.find(s => s.id !== 'unassigned' && re.test(s.title || ''))
+        || sections.find(s => s.id !== 'unassigned')
+  }
+  // Lead-magnets workflow: matches "Lead magnets", "Lead magnet", "Magnets",
+  // etc. — case-insensitive whole-name lookup so coach can rename loosely.
+  const findLeadMagnetsSection = () => {
+    const re = /lead\s*magnets?|^\s*magnets?\s*$/i
+    return sections.find(s => s.id !== 'unassigned' && re.test(s.title || ''))
+  }
+  const handleQuickAddFromSearch = async () => {
+    const q = (searchQuery || '').trim()
+    if (!q) return
+    const section = findInstagramConversationSection()
+    if (!section) {
+      alert('Geen sectie gevonden om de lead in te plaatsen.')
+      return
+    }
+    const isHandle = q.startsWith('@')
+    const handleClean = isHandle ? q.replace(/^@+/, '') : ''
+    const leadData = {
+      firstName: isHandle ? handleClean : q,
+      source: 'Instagram',
+      notes: isHandle ? `Instagram: @${handleClean}` : null,
+      // Auto-attribute to the latest active outreach campaign so funnel
+      // metrics tie back to a specific message variant. (campaign_id is the
+      // old scrape_campaigns ref; outreach_campaign_id is the new column.)
+      outreachCampaignId: activeCampaignId || null,
+    }
+    try {
+      const newLead = await leadService.createLeadWithSection(leadData, section.id, coachId)
+      setSections(prev => prev.map(s => {
+        if (s.id === section.id) return { ...s, leads: [newLead, ...(s.leads || []).filter(l => l.id !== newLead.id)] }
+        return s
+      }))
+      setExpandedSections(prev => ({ ...prev, [section.id]: true }))
+      setHighlightedLeadId(newLead.id)
+      setTimeout(() => setHighlightedLeadId(null), 3000)
+      // Clear search + jump to the new card so the user sees it land.
+      setSearchQuery('')
+      setSearchResults([])
+      setShowSearchResults(false)
+      setTimeout(() => {
+        const el = leadRefs.current?.[newLead.id]
+        if (el?.scrollIntoView) el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      }, 250)
+      loadActivityData()
+      setLeadForSource(newLead)
+    } catch (error) {
+      console.error('❌ Quick add from search failed:', error)
+      const msg = error?.message || error?.details || JSON.stringify(error)
+      alert(`Lead toevoegen mislukt — ${msg}\n\ncoachId: ${coachId || '(leeg!)'}`)
+    }
   }
 
   const handleLeadEdit = async (lead, section, updates) => {
@@ -535,7 +840,7 @@ export default function KanbanBoard({
     
     return (
       <div key={lead.id} ref={(el) => { leadRefs.current[lead.id] = el }} style={{ transition: 'all 0.2s ease', borderRadius: isMobile ? '10px' : '12px', boxShadow: cardShadow }}>
-        <KanbanCard 
+        <KanbanCard
           lead={lead} sectionColor={section.color} isMobile={isMobile}
           onDragStart={(e) => onLeadDragStart(e, lead, section.id)}
           onEdit={(updates) => handleLeadEdit(lead, section, updates)}
@@ -545,6 +850,7 @@ export default function KanbanBoard({
           sectionTitle={section.title}
           onSalesCallClick={(lead) => setSalesCallLead(lead)}
           coachId={coachId} db={db} onRefresh={loadBoard}
+          onMagnetAttached={handleMagnetAttachedForLead}
         />
       </div>
     )
@@ -752,6 +1058,26 @@ export default function KanbanBoard({
               )}
             </div>
 
+            {/* Mijn berichten — outreach loggen + metrics in één scherm */}
+            <button onClick={() => setShowOutreachLogger(true)}
+              style={{
+                padding: '0 0.6rem', height: '28px',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                gap: '0.3rem',
+                background: 'rgba(225,48,108,0.12)',
+                border: '1px solid rgba(225,48,108,0.35)',
+                borderRadius: '6px',
+                color: '#E1306C',
+                fontSize: '0.62rem', fontWeight: '800',
+                cursor: 'pointer',
+                touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+                flexShrink: 0, whiteSpace: 'nowrap',
+              }}
+              title="Bekijk je berichten en log hoeveel je vandaag verstuurde">
+              <Send size={11} />
+              {isMobile ? 'DMs' : 'Mijn berichten'}
+            </button>
+
             {/* Warm-Up icon */}
             <button onClick={() => setViewMode('warmup')}
               style={{ width: '28px', height: '28px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'transparent', border: '1px solid rgba(225,48,108,0.15)', borderRadius: '6px', color: 'rgba(225,48,108,0.5)', cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', flexShrink: 0 }}
@@ -793,11 +1119,104 @@ export default function KanbanBoard({
                     ))}
                   </div>
                 </div>
-              ) : searchQuery && (
-                <div style={{ position: 'relative', zIndex: 1000, marginTop: '-0.375rem', marginBottom: '0.5rem', padding: '0.6rem', background: '#111', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '6px', textAlign: 'center', color: 'rgba(255,255,255,0.3)', fontSize: '0.65rem' }}>
-                  Geen leads gevonden
-                </div>
-              )}
+              ) : searchQuery && (() => {
+                const quickSection = findInstagramConversationSection()
+                const q = searchQuery.trim()
+                const display = q.startsWith('@') ? q : `"${q}"`
+                return (
+                  <div style={{ position: 'relative', zIndex: 1000, marginTop: '-0.375rem', marginBottom: '0.5rem' }}>
+                    <div style={{ background: '#111', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '6px', overflow: 'hidden' }}>
+                      <div style={{ padding: '0.45rem 0.625rem', borderBottom: '1px solid rgba(255,255,255,0.04)', fontSize: '0.6rem', color: 'rgba(255,255,255,0.35)', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                        <Search size={10} />
+                        {dbCheckLoading
+                          ? <>Zoeken in database…</>
+                          : <>Geen lead gevonden voor {display}</>
+                        }
+                      </div>
+
+                      {/* Server-side hits — existing leads that weren't in the local board. */}
+                      {dbCheckResults.length > 0 && (
+                        <div style={{ borderBottom: '1px solid rgba(255,255,255,0.04)', background: 'rgba(245,158,11,0.04)' }}>
+                          <div style={{ padding: '0.4rem 0.625rem 0.2rem', fontSize: '0.5rem', fontWeight: '800', color: '#f59e0b', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                            Bestaat al — open in plaats van toevoegen
+                          </div>
+                          {dbCheckResults.map(existing => (
+                            <button
+                              key={existing.id}
+                              onClick={() => handlePlaceExistingLead(existing)}
+                              style={{
+                                width: '100%',
+                                display: 'flex', alignItems: 'center', gap: '0.5rem',
+                                padding: '0.45rem 0.625rem',
+                                background: 'transparent',
+                                border: 'none',
+                                borderTop: '1px solid rgba(255,255,255,0.03)',
+                                color: '#fff', cursor: 'pointer', textAlign: 'left',
+                                touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+                                minHeight: '38px',
+                              }}
+                              onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(245,158,11,0.08)'}
+                              onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+                            >
+                              <div style={{ flex: 1, minWidth: 0 }}>
+                                <div style={{ fontSize: '0.72rem', fontWeight: '700', color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                  {[existing.first_name, existing.last_name].filter(Boolean).join(' ') || 'Naamloze lead'}
+                                </div>
+                                <div style={{ fontSize: '0.5rem', color: 'rgba(255,255,255,0.4)', marginTop: '0.1rem', fontWeight: '600' }}>
+                                  {existing.lead_source ? `${existing.lead_source} · ` : ''}{existing.sectionTitle}
+                                </div>
+                              </div>
+                              <span style={{ padding: '2px 6px', background: 'rgba(245,158,11,0.14)', border: '1px solid rgba(245,158,11,0.3)', borderRadius: '3px', fontSize: '0.5rem', fontWeight: '700', color: '#f59e0b', whiteSpace: 'nowrap' }}>
+                                → {quickSection?.title || 'plaats'}
+                              </span>
+                            </button>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* Always-available create-new button */}
+                      <button
+                        onClick={handleQuickAddFromSearch}
+                        style={{
+                          width: '100%',
+                          display: 'flex', alignItems: 'center', gap: '0.5rem',
+                          padding: '0.55rem 0.625rem',
+                          background: 'rgba(225,48,108,0.08)',
+                          border: 'none',
+                          borderLeft: '3px solid #E1306C',
+                          color: '#fff', cursor: 'pointer', textAlign: 'left',
+                          touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+                          minHeight: '40px',
+                        }}
+                        onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(225,48,108,0.14)'}
+                        onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(225,48,108,0.08)'}
+                      >
+                        <div style={{
+                          width: '22px', height: '22px', borderRadius: '5px',
+                          background: '#E1306C',
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          flexShrink: 0,
+                        }}>
+                          <Plus size={13} color="#fff" strokeWidth={2.8} />
+                        </div>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontSize: '0.7rem', fontWeight: '800', color: '#fff', letterSpacing: '-0.01em' }}>
+                            {dbCheckResults.length > 0 ? `Toch nieuwe lead aanmaken (${display})` : `Voeg ${display} toe als nieuwe lead`}
+                          </div>
+                          <div style={{ fontSize: '0.55rem', color: 'rgba(255,255,255,0.4)', marginTop: '0.15rem', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '0.3rem', flexWrap: 'wrap' }}>
+                            <span>Instagram · {quickSection?.title || 'eerste sectie'}</span>
+                            {activeCampaignName && (
+                              <span style={{ padding: '1px 5px', background: 'rgba(225,48,108,0.18)', color: '#E1306C', borderRadius: '3px', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '0.04em', fontSize: '0.48rem' }}>
+                                ⮕ {activeCampaignName}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </button>
+                    </div>
+                  </div>
+                )
+              })()}
             </>
           )}
 
@@ -941,6 +1360,43 @@ export default function KanbanBoard({
             setSalesCallLead(null)
             await loadBoard(false)
           }}
+        />
+      )}
+
+      {/* Outreach logger — daily DM counts per campaign */}
+      {showOutreachLogger && (
+        <OutreachLoggerModal
+          coachId={coachId}
+          isMobile={isMobile}
+          onClose={() => setShowOutreachLogger(false)}
+        />
+      )}
+
+      {/* Auto-prompt: after a new lead is created, ask which source it
+          came from (campaign vs lead magnet) so weekly metrics are accurate. */}
+      <LeadSourceModal
+        isOpen={!!leadForSource}
+        onClose={() => setLeadForSource(null)}
+        lead={leadForSource}
+        db={leadService.db}
+        coachId={coachId}
+        onAttributed={handleSourceAttributed}
+      />
+
+      {/* Drop-triggered magnet picker — opens after dragging a lead into the
+          Lead-magnets section so the coach can immediately tag a magnet. */}
+      {magnetPickerLead && (
+        <LeadDetailModalV2
+          lead={magnetPickerLead.lead}
+          sectionColor={magnetPickerLead.sectionColor || '#6366f1'}
+          isMobile={isMobile}
+          initialTab="magnets"
+          onClose={() => setMagnetPickerLead(null)}
+          onEdit={(updates) => handleLeadEdit(magnetPickerLead.lead, { id: 'unknown' }, updates)}
+          onDelete={async () => { await handleLeadDelete(magnetPickerLead.lead); setMagnetPickerLead(null) }}
+          // Already in lead-magnets section (we just dropped them) so no
+          // auto-move needed.
+          onMagnetAttached={null}
         />
       )}
 

@@ -3,12 +3,35 @@
 // Training drill-down: Sessions → Exercises → Progress
 // Props: { workoutData, exerciseProgress, isMobile, onNavigateWorkout, client, onClose }
 // ============================================
-import React, { useState } from 'react'
-import { Dumbbell, TrendingDown, TrendingUp, ChevronRight, ArrowLeft, ExternalLink, BarChart3 } from 'lucide-react'
+import React, { useState, useMemo } from 'react'
+import { Dumbbell, TrendingDown, TrendingUp, ChevronRight, ArrowLeft, ExternalLink, BarChart3, MessageSquare, Zap, ThumbsUp, Moon, Thermometer } from 'lucide-react'
 import WorkoutOverviewChart from './WorkoutOverviewChart'
 
 const formatDate = (d) => { if (!d) return '-'; const dt = new Date(d); return dt.toLocaleDateString('nl-NL', { day: 'numeric', month: 'short', year: dt.getFullYear() !== new Date().getFullYear() ? 'numeric' : undefined }) }
 const formatDaysAgo = (d) => { if (d === null || d === undefined) return 'Nooit'; if (d === 0) return 'Vandaag'; if (d === 1) return 'Gisteren'; return `${d}d geleden` }
+
+// Mirror of the feelings list in LogModal — client picks one of these +
+// optional free-text note. They get stored together in workout_sessions.notes
+// as "feeling|note" (separator-delimited).
+const FEELINGS_MAP = {
+  sterk:   { icon: Zap,           label: 'Sterk',   color: '#10b981' },
+  normaal: { icon: ThumbsUp,      label: 'Normaal', color: '#FFD700' },
+  moe:     { icon: Moon,          label: 'Moe',     color: '#f59e0b' },
+  zwak:    { icon: TrendingDown,  label: 'Zwak',    color: '#f97316' },
+  ziek:    { icon: Thermometer,   label: 'Ziek',    color: '#ef4444' },
+}
+
+const parseSessionNote = (raw) => {
+  if (!raw || typeof raw !== 'string') return { feeling: null, note: null }
+  const idx = raw.indexOf('|')
+  if (idx === -1) return { feeling: null, note: raw.trim() || null }
+  const feeling = raw.slice(0, idx).trim()
+  const note    = raw.slice(idx + 1).trim()
+  return {
+    feeling: FEELINGS_MAP[feeling] ? feeling : null,
+    note: note || null,
+  }
+}
 
 const SetDisplay = ({ s }) => (
   <span style={{ fontSize: '0.5rem', padding: '0.1rem 0.25rem', background: 'rgba(249,115,22,0.08)', borderRadius: '3px', color: 'rgba(249,115,22,0.6)' }}>
@@ -23,6 +46,20 @@ export default function WorkoutColumn({ db, workoutData, exerciseProgress = {}, 
   const [selectedSession, setSelectedSession] = useState(null)
   const [selectedExercise, setSelectedExercise] = useState(null)
   const workouts = workoutData?.workouts || []
+
+  // Per-session count of exercise-level notes (from workout_progress.notes).
+  // Lets us show a "💬 3" indicator on session rows without drilling in.
+  const exerciseNotesBySession = useMemo(() => {
+    const counts = {}
+    Object.values(exerciseProgress).forEach(entries => {
+      entries.forEach(e => {
+        if (e.notes && e.sessionId) {
+          counts[e.sessionId] = (counts[e.sessionId] || 0) + 1
+        }
+      })
+    })
+    return counts
+  }, [exerciseProgress])
 
   const getSessionExercises = () => {
     if (!selectedSession) return []
@@ -120,18 +157,83 @@ export default function WorkoutColumn({ db, workoutData, exerciseProgress = {}, 
         )}
 
         <div style={{ flex: 1, overflowY: 'auto', WebkitOverflowScrolling: 'touch' }}>
-          {workouts.length > 0 ? workouts.slice(0, 20).map((w, idx) => (
-            <button key={`${w.workout_date}-${idx}`} onClick={() => { setSelectedSession(w); setView('exercises') }} style={{ width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: isMobile ? '0.5rem 0.75rem' : '0.625rem 1rem', borderBottom: '1px solid rgba(255,255,255,0.03)', background: 'transparent', border: 'none', cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', textAlign: 'left' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
-                <span style={{ fontSize: '0.5rem', padding: '0.1rem 0.25rem', borderRadius: '3px', fontWeight: '700', background: w.is_completed ? 'rgba(16,185,129,0.12)' : 'rgba(249,115,22,0.12)', color: w.is_completed ? '#10b981' : '#f97316' }}>{w.is_completed ? '✓' : '—'}</span>
-                <span style={{ fontSize: isMobile ? '0.7rem' : '0.75rem', fontWeight: '600', color: '#fff' }}>{w.day_name}</span>
+          {workouts.length > 0 ? workouts.slice(0, 20).map((w, idx) => {
+            const parsed = parseSessionNote(w.notes)
+            const feelingCfg = parsed.feeling ? FEELINGS_MAP[parsed.feeling] : null
+            const FeelingIcon = feelingCfg?.icon
+            const exerciseNotesCount = exerciseNotesBySession[w.id] || 0
+            const hasContent = !!(parsed.note || feelingCfg || exerciseNotesCount > 0)
+            return (
+            <button key={`${w.workout_date}-${idx}`} onClick={() => { setSelectedSession(w); setView('exercises') }} style={{ width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '0.5rem', padding: isMobile ? '0.55rem 0.75rem' : '0.65rem 1rem', borderBottom: '1px solid rgba(255,255,255,0.03)', background: 'transparent', border: 'none', cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', textAlign: 'left' }}>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                {/* Regel 1 — status, dag, feeling-pill */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', minWidth: 0 }}>
+                  <span style={{ fontSize: '0.5rem', padding: '0.1rem 0.25rem', borderRadius: '3px', fontWeight: '700', background: w.is_completed ? 'rgba(16,185,129,0.12)' : 'rgba(249,115,22,0.12)', color: w.is_completed ? '#10b981' : '#f97316' }}>{w.is_completed ? '✓' : '—'}</span>
+                  <span style={{ fontSize: isMobile ? '0.7rem' : '0.75rem', fontWeight: '600', color: '#fff' }}>{w.day_name}</span>
+                  {feelingCfg && (
+                    <span title={feelingCfg.label} style={{
+                      display: 'inline-flex', alignItems: 'center', gap: '0.15rem',
+                      padding: '0.1rem 0.3rem',
+                      background: `${feelingCfg.color}1a`,
+                      border: `1px solid ${feelingCfg.color}55`,
+                      borderRadius: '3px',
+                      color: feelingCfg.color,
+                      fontSize: '0.5rem', fontWeight: '700',
+                      letterSpacing: '0.03em',
+                      flexShrink: 0,
+                    }}>
+                      <FeelingIcon size={9} strokeWidth={2.5} />
+                      {feelingCfg.label}
+                    </span>
+                  )}
+                  {exerciseNotesCount > 0 && (
+                    <span title={`${exerciseNotesCount} oefening-notitie${exerciseNotesCount === 1 ? '' : 's'}`} style={{
+                      display: 'inline-flex', alignItems: 'center', gap: '0.15rem',
+                      padding: '0.1rem 0.3rem',
+                      background: 'rgba(249,115,22,0.12)',
+                      border: '1px solid rgba(249,115,22,0.35)',
+                      borderRadius: '3px',
+                      color: '#f97316',
+                      fontSize: '0.5rem', fontWeight: '800',
+                      flexShrink: 0,
+                    }}>
+                      <MessageSquare size={9} strokeWidth={2.5} />
+                      {exerciseNotesCount}
+                    </span>
+                  )}
+                </div>
+                {/* Regel 2 — notitie-tekst (truncated, 2 regels) */}
+                {parsed.note && (
+                  <div style={{
+                    display: 'flex', alignItems: 'flex-start', gap: '0.3rem',
+                    marginTop: '0.25rem',
+                    paddingLeft: '0.05rem',
+                  }}>
+                    <MessageSquare size={9} color="rgba(255,255,255,0.3)" strokeWidth={2.2}
+                      style={{ flexShrink: 0, marginTop: '2px' }} />
+                    <span style={{
+                      fontSize: isMobile ? '0.62rem' : '0.66rem',
+                      color: 'rgba(255,255,255,0.5)',
+                      fontWeight: '500',
+                      lineHeight: 1.35,
+                      display: '-webkit-box',
+                      WebkitLineClamp: 2,
+                      WebkitBoxOrient: 'vertical',
+                      overflow: 'hidden',
+                      wordBreak: 'break-word',
+                    }}>
+                      {parsed.note}
+                    </span>
+                  </div>
+                )}
               </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', flexShrink: 0, paddingTop: hasContent ? '0.1rem' : 0 }}>
                 <span style={{ fontSize: '0.55rem', color: 'rgba(255,255,255,0.25)' }}>{formatDate(w.workout_date)}</span>
                 <ChevronRight size={12} color="rgba(255,255,255,0.15)" />
               </div>
             </button>
-          )) : <div style={{ padding: '2rem 1rem', textAlign: 'center', color: 'rgba(255,255,255,0.2)', fontSize: '0.75rem' }}>Geen workouts</div>}
+            )
+          }) : <div style={{ padding: '2rem 1rem', textAlign: 'center', color: 'rgba(255,255,255,0.2)', fontSize: '0.75rem' }}>Geen workouts</div>}
         </div>
       </div>
     )
@@ -140,6 +242,9 @@ export default function WorkoutColumn({ db, workoutData, exerciseProgress = {}, 
   // ── EXERCISES ──
   if (view === 'exercises' && selectedSession) {
     const exs = getSessionExercises()
+    const parsed = parseSessionNote(selectedSession.notes)
+    const feelingCfg = parsed.feeling ? FEELINGS_MAP[parsed.feeling] : null
+    const FeelingIcon = feelingCfg?.icon
     return (
       <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
         <div style={{ padding: isMobile ? '0.625rem 0.75rem' : '0.75rem 1rem', borderBottom: '1px solid rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
@@ -147,14 +252,104 @@ export default function WorkoutColumn({ db, workoutData, exerciseProgress = {}, 
           <span style={{ fontSize: '0.7rem', fontWeight: '700', color: '#f97316' }}>{selectedSession.day_name}</span>
           <span style={{ fontSize: '0.5rem', color: 'rgba(255,255,255,0.25)' }}>{formatDate(selectedSession.workout_date)}</span>
         </div>
+
+        {/* Client-notitie blok — toon feeling-pill + note tekst zoals de client
+            ze invulde in LogModal. Geeft de coach context bij deze sessie. */}
+        {(parsed.note || feelingCfg) && (
+          <div style={{
+            padding: isMobile ? '0.5rem 0.75rem' : '0.625rem 1rem',
+            borderBottom: '1px solid rgba(255,255,255,0.04)',
+            background: feelingCfg ? `${feelingCfg.color}08` : 'rgba(255,255,255,0.02)',
+          }}>
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: '0.4rem',
+              marginBottom: parsed.note ? '0.35rem' : 0,
+            }}>
+              <MessageSquare size={11} color="rgba(255,255,255,0.35)" strokeWidth={2.2} />
+              <span style={{
+                fontSize: '0.5rem', fontWeight: '700',
+                color: 'rgba(255,255,255,0.3)',
+                textTransform: 'uppercase', letterSpacing: '0.06em',
+              }}>
+                Notitie van client
+              </span>
+              {feelingCfg && (
+                <span style={{
+                  marginLeft: 'auto',
+                  display: 'inline-flex', alignItems: 'center', gap: '0.25rem',
+                  padding: '0.15rem 0.4rem',
+                  background: `${feelingCfg.color}1a`,
+                  border: `1px solid ${feelingCfg.color}55`,
+                  borderRadius: '4px',
+                  color: feelingCfg.color,
+                  fontSize: '0.55rem', fontWeight: '800',
+                  textTransform: 'uppercase', letterSpacing: '0.05em',
+                }}>
+                  <FeelingIcon size={10} strokeWidth={2.5} />
+                  {feelingCfg.label}
+                </span>
+              )}
+            </div>
+            {parsed.note && (
+              <div style={{
+                fontSize: isMobile ? '0.72rem' : '0.78rem',
+                color: 'rgba(255,255,255,0.75)',
+                fontWeight: '500',
+                lineHeight: 1.45,
+                whiteSpace: 'pre-wrap',
+                wordBreak: 'break-word',
+              }}>
+                {parsed.note}
+              </div>
+            )}
+          </div>
+        )}
+
         <div style={{ flex: 1, overflowY: 'auto', WebkitOverflowScrolling: 'touch' }}>
           {exs.length > 0 ? exs.map((ex, idx) => (
-            <button key={idx} onClick={() => { setSelectedExercise(ex.name); setView('progress') }} style={{ width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: isMobile ? '0.5rem 0.75rem' : '0.625rem 1rem', borderBottom: '1px solid rgba(255,255,255,0.03)', background: 'transparent', border: 'none', cursor: 'pointer', touchAction: 'manipulation', textAlign: 'left' }}>
+            <button key={idx} onClick={() => { setSelectedExercise(ex.name); setView('progress') }} style={{ width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '0.5rem', padding: isMobile ? '0.5rem 0.75rem' : '0.625rem 1rem', borderBottom: '1px solid rgba(255,255,255,0.03)', background: 'transparent', border: 'none', cursor: 'pointer', touchAction: 'manipulation', textAlign: 'left' }}>
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: isMobile ? '0.7rem' : '0.75rem', fontWeight: '600', color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{ex.name}</div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                  <span style={{ fontSize: isMobile ? '0.7rem' : '0.75rem', fontWeight: '600', color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', flex: '0 1 auto', minWidth: 0 }}>{ex.name}</span>
+                  {ex.attachment_used && (
+                    <span style={{
+                      fontSize: '0.45rem', fontWeight: '700',
+                      color: 'rgba(255,255,255,0.4)',
+                      background: 'rgba(255,255,255,0.05)',
+                      padding: '0.1rem 0.3rem', borderRadius: '3px',
+                      textTransform: 'lowercase', letterSpacing: '0.02em',
+                      flexShrink: 0,
+                    }}>
+                      {ex.attachment_used.replace(/_/g, ' ')}
+                    </span>
+                  )}
+                </div>
                 {ex.sets?.length > 0 && <div style={{ display: 'flex', gap: '0.25rem', marginTop: '0.15rem', flexWrap: 'wrap' }}>{ex.sets.map((s, si) => <SetDisplay key={si} s={s} />)}</div>}
+                {ex.notes && (
+                  <div style={{
+                    display: 'flex', alignItems: 'flex-start', gap: '0.3rem',
+                    marginTop: '0.3rem',
+                    padding: '0.35rem 0.5rem',
+                    background: 'rgba(249,115,22,0.04)',
+                    borderLeft: '2px solid rgba(249,115,22,0.4)',
+                    borderRadius: '0 4px 4px 0',
+                  }}>
+                    <MessageSquare size={9} color="rgba(249,115,22,0.6)" strokeWidth={2.2}
+                      style={{ flexShrink: 0, marginTop: '2px' }} />
+                    <span style={{
+                      fontSize: isMobile ? '0.62rem' : '0.66rem',
+                      color: 'rgba(255,255,255,0.7)',
+                      fontWeight: '500',
+                      lineHeight: 1.45,
+                      whiteSpace: 'pre-wrap',
+                      wordBreak: 'break-word',
+                    }}>
+                      {ex.notes}
+                    </span>
+                  </div>
+                )}
               </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.2rem', flexShrink: 0 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.2rem', flexShrink: 0, paddingTop: '0.15rem' }}>
                 {ex.bestWeight > 0 && <span style={{ fontSize: '0.7rem', fontWeight: '800', color: '#f97316' }}>{ex.bestWeight}kg</span>}
                 <ChevronRight size={12} color="rgba(255,255,255,0.15)" />
               </div>

@@ -1,11 +1,19 @@
 // src/modules/client-meal-builder/components/BarcodeScanner.jsx
-// 🎯 v3.0 - Clean UX: subtle instructions, active feedback, timeout handling
+// Food-app inspired: gold theme, soft frame, in-viewfinder helper text,
+// silent feedback (no scan-line), late hints, bottom Zoeken|Barcode pill.
+
 import React, { useState, useEffect, useRef } from 'react'
 import { BarcodeFormat, DecodeHintType } from '@zxing/library'
 import { BrowserMultiFormatReader } from '@zxing/library'
-import { X, Keyboard, Camera, CheckCircle, Zap, ZapOff, AlertCircle } from 'lucide-react'
+import { X, Keyboard, Camera, CheckCircle, Zap, ZapOff, Search, ScanLine } from 'lucide-react'
 
-export default function BarcodeScanner({ onScan, onClose }) {
+const G = {
+  primary: '#FFD700',
+  primarySoft: 'rgba(255, 215, 0, 0.15)',
+  primaryBorder: 'rgba(255, 215, 0, 0.35)',
+}
+
+export default function BarcodeScanner({ onScan, onClose, onSwitchToSearch }) {
   const isMobile = window.innerWidth <= 768
   const videoRef = useRef(null)
   const readerRef = useRef(null)
@@ -28,7 +36,7 @@ export default function BarcodeScanner({ onScan, onClose }) {
     return () => { stopScanning(); if (timeoutRef.current) clearInterval(timeoutRef.current) }
   }, [manualMode])
 
-  // Timer for active scanning feedback
+  // Silent timer — used only for late hint + 25s timeout fallback
   useEffect(() => {
     if (status === 'scanning') {
       setScanTime(0)
@@ -54,7 +62,8 @@ export default function BarcodeScanner({ onScan, onClose }) {
       const hints = new Map()
       hints.set(DecodeHintType.POSSIBLE_FORMATS, [
         BarcodeFormat.EAN_13, BarcodeFormat.EAN_8,
-        BarcodeFormat.UPC_A, BarcodeFormat.UPC_E
+        BarcodeFormat.UPC_A, BarcodeFormat.UPC_E,
+        BarcodeFormat.QR_CODE
       ])
       hints.set(DecodeHintType.TRY_HARDER, true)
 
@@ -87,9 +96,8 @@ export default function BarcodeScanner({ onScan, onClose }) {
           }
         },
         videoElement,
-        (result, error) => {
+        (result) => {
           if (result) {
-            console.log('🎯 Barcode detected:', result.text)
             handleScanSuccess(result.text)
           }
         }
@@ -105,7 +113,7 @@ export default function BarcodeScanner({ onScan, onClose }) {
 
   const stopScanning = () => {
     if (readerRef.current) {
-      try { readerRef.current.reset() } catch {}
+      try { readerRef.current.reset() } catch { /* reader already torn down */ }
       readerRef.current = null
     }
     setScanning(false)
@@ -115,7 +123,7 @@ export default function BarcodeScanner({ onScan, onClose }) {
     if (window.navigator.vibrate) window.navigator.vibrate([100, 50, 100])
     setStatus('success')
     stopScanning()
-    setTimeout(() => onScan(barcode), 600)
+    setTimeout(() => onScan(barcode), 500)
   }
 
   const handleManualSubmit = () => {
@@ -141,15 +149,23 @@ export default function BarcodeScanner({ onScan, onClose }) {
         await track.applyConstraints({ advanced: [{ torch: !torchEnabled }] })
         setTorchEnabled(!torchEnabled)
       }
-    } catch {}
+    } catch { /* torch unsupported on this device */ }
   }
 
-  // Scanning hint text based on time
-  const getScanHint = () => {
-    if (scanTime < 5) return 'Richt op de barcode'
-    if (scanTime < 12) return 'Houd stil, iets dichterbij'
-    if (scanTime < 20) return 'Zorg voor goed licht'
-    return 'Probeer handmatig invoeren'
+  // Helper text under the frame. Stays calm — only changes after 8s.
+  const helperText = () => {
+    if (status === 'success') return 'Gevonden!'
+    if (status === 'timeout') return 'Niet herkend — probeer opnieuw of voer handmatig in'
+    if (status === 'error')   return 'Camera niet beschikbaar'
+    if (status === 'scanning' && scanTime >= 18) return 'Zorg voor goed licht of voer handmatig in'
+    if (status === 'scanning' && scanTime >= 8)  return 'Houd stil — iets dichter op de barcode'
+    return 'Houd de barcode rechtop binnen het kader'
+  }
+
+  const helperColor = () => {
+    if (status === 'success') return G.primary
+    if (status === 'timeout' || status === 'error') return 'rgba(239, 68, 68, 0.85)'
+    return 'rgba(255, 255, 255, 0.85)'
   }
 
   return (
@@ -163,36 +179,44 @@ export default function BarcodeScanner({ onScan, onClose }) {
       <div style={{
         position: 'absolute', top: 0, left: 0, right: 0,
         padding: isMobile ? '0.875rem 1rem' : '1.25rem 1.5rem',
+        paddingTop: `calc(env(safe-area-inset-top, 0) + ${isMobile ? '0.875rem' : '1.25rem'})`,
         background: 'linear-gradient(180deg, rgba(0,0,0,0.85) 0%, transparent 100%)',
         zIndex: 10, display: 'flex', justifyContent: 'space-between', alignItems: 'center'
       }}>
-        <div>
-          <div style={{ fontSize: isMobile ? '1rem' : '1.15rem', fontWeight: '800', color: '#fff' }}>
-            Scan barcode
-          </div>
-          <div style={{
-            fontSize: '0.6rem', fontWeight: '600', marginTop: '0.15rem',
-            color: status === 'success' ? '#10b981'
-              : status === 'timeout' ? 'rgba(239,68,68,0.7)'
-              : 'rgba(255,255,255,0.4)'
-          }}>
-            {status === 'scanning' ? getScanHint()
-              : status === 'success' ? 'Gevonden!'
-              : status === 'timeout' ? 'Barcode niet herkend'
-              : status === 'error' ? 'Camera niet beschikbaar'
-              : 'Starten...'}
-          </div>
-        </div>
-
-        <button onClick={onClose} style={{
-          width: '40px', height: '40px', borderRadius: '6px',
-          background: 'rgba(255,255,255,0.08)',
-          border: '1px solid rgba(255,255,255,0.15)',
+        <button onClick={onClose} aria-label="Sluiten" style={{
+          width: '38px', height: '38px', borderRadius: '8px',
+          background: 'rgba(255,255,255,0.06)',
+          border: '1px solid rgba(255,255,255,0.1)',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           cursor: 'pointer', touchAction: 'manipulation'
         }}>
           <X size={18} color="#fff" />
         </button>
+
+        <div style={{
+          fontSize: isMobile ? '0.95rem' : '1.05rem',
+          fontWeight: '700',
+          color: '#fff',
+          letterSpacing: '-0.01em',
+        }}>
+          Voeding loggen
+        </div>
+
+        {!manualMode ? (
+          <button onClick={toggleTorch} aria-label="Flits" style={{
+            width: '38px', height: '38px', borderRadius: '8px',
+            background: torchEnabled ? G.primarySoft : 'rgba(255,255,255,0.06)',
+            border: torchEnabled ? `1px solid ${G.primaryBorder}` : '1px solid rgba(255,255,255,0.1)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            cursor: 'pointer', touchAction: 'manipulation'
+          }}>
+            {torchEnabled
+              ? <Zap size={17} color={G.primary} fill={G.primary} />
+              : <ZapOff size={17} color="rgba(255,255,255,0.5)" />}
+          </button>
+        ) : (
+          <div style={{ width: '38px', height: '38px' }} />
+        )}
       </div>
 
       {/* ═══ CAMERA VIEW ═══ */}
@@ -200,112 +224,104 @@ export default function BarcodeScanner({ onScan, onClose }) {
         <div style={{ flex: 1, position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
           <video ref={videoRef} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
 
-          {/* Scan area frame */}
+          {/* Portrait scan-area frame — matches how staande (vertical)
+              barcodes are presented to the camera. Inside: an animated
+              horizontal laser-line that travels up-and-down so users
+              instantly understand the scan direction. */}
           <div style={{
             position: 'absolute', top: '50%', left: '50%',
-            transform: 'translate(-50%, -50%)',
-            width: isMobile ? '280px' : '360px', height: isMobile ? '130px' : '160px',
-            border: `3px solid ${status === 'success' ? '#10b981' : status === 'timeout' ? 'rgba(239,68,68,0.5)' : 'rgba(16, 185, 129, 0.6)'}`,
-            borderRadius: '8px', pointerEvents: 'none',
-            transition: 'border-color 0.3s ease'
+            transform: 'translate(-50%, calc(-50% - 28px))',
+            width: isMobile ? 'min(62vw, 240px)' : '260px',
+            height: isMobile ? '320px' : '360px',
+            border: `1.5px solid ${
+              status === 'success' ? G.primary
+              : status === 'timeout' ? 'rgba(239,68,68,0.55)'
+              : 'rgba(255,255,255,0.45)'
+            }`,
+            borderRadius: '20px', pointerEvents: 'none',
+            transition: 'border-color 0.3s ease',
+            boxShadow: status === 'success'
+              ? `0 0 0 2px ${G.primarySoft}, 0 0 32px rgba(255, 215, 0, 0.25)`
+              : 'none',
+            overflow: 'hidden',
           }}>
-            {/* Corner markers */}
-            {['tl', 'tr', 'bl', 'br'].map(c => (
-              <div key={c} style={{
-                position: 'absolute', width: '24px', height: '24px',
-                ...(c === 'tl' && { top: '-3px', left: '-3px', borderTop: '4px solid #10b981', borderLeft: '4px solid #10b981' }),
-                ...(c === 'tr' && { top: '-3px', right: '-3px', borderTop: '4px solid #10b981', borderRight: '4px solid #10b981' }),
-                ...(c === 'bl' && { bottom: '-3px', left: '-3px', borderBottom: '4px solid #10b981', borderLeft: '4px solid #10b981' }),
-                ...(c === 'br' && { bottom: '-3px', right: '-3px', borderBottom: '4px solid #10b981', borderRight: '4px solid #10b981' }),
-                borderRadius: '4px'
+            {/* Animated scan line — horizontal stripe sweeping vertically */}
+            {status === 'scanning' && (
+              <div style={{
+                position: 'absolute',
+                left: '6%', right: '6%',
+                height: 2,
+                background: 'linear-gradient(90deg, transparent 0%, rgba(255,215,0,0.95) 50%, transparent 100%)',
+                boxShadow: '0 0 10px rgba(255,215,0,0.65)',
+                animation: 'bsScanLine 1.6s cubic-bezier(0.45, 0, 0.55, 1) infinite alternate',
+                willChange: 'transform',
               }} />
-            ))}
+            )}
 
-            {/* Success checkmark */}
+            {/* Success flash */}
             {status === 'success' && (
               <div style={{
                 position: 'absolute', inset: 0,
-                background: 'rgba(16, 185, 129, 0.2)',
+                background: G.primarySoft,
+                borderRadius: '18px',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                 animation: 'bsFadeIn 0.2s ease'
               }}>
                 <div style={{
                   width: '56px', height: '56px', borderRadius: '50%',
-                  background: '#10b981',
+                  background: G.primary,
                   display: 'flex', alignItems: 'center', justifyContent: 'center'
                 }}>
-                  <CheckCircle size={32} color="#fff" />
+                  <CheckCircle size={32} color="#000" strokeWidth={2.5} />
                 </div>
               </div>
             )}
           </div>
 
-          {/* Scan line animation */}
-          {status === 'scanning' && (
-            <div style={{
-              position: 'absolute', top: '50%', left: '50%',
-              transform: 'translate(-50%, -50%)',
-              width: isMobile ? '280px' : '360px', height: '2px',
-              background: 'linear-gradient(90deg, transparent, #10b981, transparent)',
-              animation: 'bsScanLine 1.8s linear infinite',
-              opacity: 0.8
-            }} />
-          )}
+          {/* Helper text directly UNDER the scan frame */}
+          <div style={{
+            position: 'absolute', top: '50%', left: '50%',
+            transform: `translate(-50%, calc(-50% + ${isMobile ? '180px' : '200px'}))`,
+            maxWidth: isMobile ? '88vw' : '420px',
+            textAlign: 'center',
+            fontSize: isMobile ? '0.82rem' : '0.88rem',
+            fontWeight: '600',
+            color: helperColor(),
+            lineHeight: 1.4,
+            padding: '0 1rem',
+            transition: 'color 0.2s ease',
+            pointerEvents: 'none',
+          }}>
+            {helperText()}
+          </div>
 
-          {/* Timeout overlay */}
+          {/* Timeout retry buttons — anchored above the bottom pill */}
           {status === 'timeout' && (
             <div style={{
-              position: 'absolute', bottom: isMobile ? '110px' : '130px',
+              position: 'absolute',
+              bottom: isMobile ? '120px' : '140px',
               left: '50%', transform: 'translateX(-50%)',
-              background: 'rgba(0,0,0,0.9)', padding: '1rem 1.25rem',
-              borderRadius: '8px', border: '1px solid rgba(239,68,68,0.2)',
-              maxWidth: '85%', textAlign: 'center'
+              display: 'flex', gap: '0.5rem',
+              padding: '0 1rem',
             }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.375rem', marginBottom: '0.5rem' }}>
-                <AlertCircle size={14} color="rgba(239,68,68,0.7)" />
-                <div style={{ fontSize: '0.8rem', fontWeight: '700', color: 'rgba(239,68,68,0.7)' }}>
-                  Barcode niet herkend
-                </div>
-              </div>
-              <div style={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.4)', marginBottom: '0.75rem', lineHeight: 1.4 }}>
-                Zorg dat de barcode goed zichtbaar is in het kader, of voer de code handmatig in.
-              </div>
-              <div style={{ display: 'flex', gap: '0.5rem' }}>
-                <button onClick={retryScanning} style={{
-                  flex: 1, padding: '0.5rem', background: 'rgba(16,185,129,0.1)',
-                  border: '1px solid rgba(16,185,129,0.25)', borderRadius: '6px',
-                  color: '#10b981', fontSize: '0.7rem', fontWeight: '700',
-                  cursor: 'pointer', touchAction: 'manipulation', minHeight: '36px'
-                }}>
-                  Opnieuw
-                </button>
-                <button onClick={() => { stopScanning(); setManualMode(true) }} style={{
-                  flex: 1, padding: '0.5rem', background: 'rgba(255,255,255,0.05)',
-                  border: '1px solid rgba(255,255,255,0.1)', borderRadius: '6px',
-                  color: 'rgba(255,255,255,0.5)', fontSize: '0.7rem', fontWeight: '700',
-                  cursor: 'pointer', touchAction: 'manipulation', minHeight: '36px'
-                }}>
-                  Handmatig
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* Scanning time indicator (subtle dots) */}
-          {status === 'scanning' && scanTime > 2 && (
-            <div style={{
-              position: 'absolute', bottom: isMobile ? '110px' : '130px',
-              left: '50%', transform: 'translateX(-50%)',
-              display: 'flex', gap: '4px', alignItems: 'center'
-            }}>
-              {[0, 1, 2].map(i => (
-                <div key={i} style={{
-                  width: '5px', height: '5px', borderRadius: '50%',
-                  background: '#10b981',
-                  opacity: (scanTime % 3 === i) ? 1 : 0.2,
-                  transition: 'opacity 0.3s ease'
-                }} />
-              ))}
+              <button onClick={retryScanning} style={{
+                padding: '0.6rem 1rem', background: G.primarySoft,
+                border: `1px solid ${G.primaryBorder}`, borderRadius: '8px',
+                color: G.primary, fontSize: '0.78rem', fontWeight: '700',
+                cursor: 'pointer', touchAction: 'manipulation', minHeight: '40px',
+                display: 'flex', alignItems: 'center', gap: '0.4rem'
+              }}>
+                <ScanLine size={14} /> Opnieuw
+              </button>
+              <button onClick={() => { stopScanning(); setManualMode(true) }} style={{
+                padding: '0.6rem 1rem', background: 'rgba(255,255,255,0.06)',
+                border: '1px solid rgba(255,255,255,0.12)', borderRadius: '8px',
+                color: 'rgba(255,255,255,0.75)', fontSize: '0.78rem', fontWeight: '700',
+                cursor: 'pointer', touchAction: 'manipulation', minHeight: '40px',
+                display: 'flex', alignItems: 'center', gap: '0.4rem'
+              }}>
+                <Keyboard size={14} /> Handmatig
+              </button>
             </div>
           )}
         </div>
@@ -323,7 +339,7 @@ export default function BarcodeScanner({ onScan, onClose }) {
             Barcode invoeren
           </div>
           <div style={{
-            fontSize: '0.7rem', color: 'rgba(255,255,255,0.4)', marginBottom: '1.5rem', textAlign: 'center'
+            fontSize: '0.75rem', color: 'rgba(255,255,255,0.5)', marginBottom: '1.5rem', textAlign: 'center'
           }}>
             Typ de cijfers onder de streepjescode
           </div>
@@ -332,14 +348,14 @@ export default function BarcodeScanner({ onScan, onClose }) {
             type="text" inputMode="numeric"
             value={manualBarcode}
             onChange={(e) => setManualBarcode(e.target.value.replace(/[^0-9]/g, ''))}
-            onKeyPress={(e) => e.key === 'Enter' && handleManualSubmit()}
+            onKeyDown={(e) => e.key === 'Enter' && handleManualSubmit()}
             placeholder="8710400000000"
             autoFocus
             style={{
-              width: '100%', maxWidth: '280px', height: '52px',
+              width: '100%', maxWidth: '300px', height: '52px',
               background: 'rgba(255,255,255,0.06)',
-              border: '2px solid rgba(16, 185, 129, 0.25)',
-              borderRadius: '6px', color: '#fff',
+              border: `1.5px solid ${G.primaryBorder}`,
+              borderRadius: '10px', color: '#fff',
               fontSize: '1.2rem', fontWeight: '700',
               textAlign: 'center', letterSpacing: '0.08em',
               outline: 'none', marginBottom: '0.75rem'
@@ -349,9 +365,9 @@ export default function BarcodeScanner({ onScan, onClose }) {
           <button onClick={handleManualSubmit}
             disabled={!manualBarcode.trim() || manualBarcode.length < 8}
             style={{
-              width: '100%', maxWidth: '280px', height: '48px',
-              background: manualBarcode.length >= 8 ? '#10b981' : 'rgba(16,185,129,0.15)',
-              border: 'none', borderRadius: '6px',
+              width: '100%', maxWidth: '300px', height: '48px',
+              background: manualBarcode.length >= 8 ? G.primary : 'rgba(255, 215, 0, 0.15)',
+              border: 'none', borderRadius: '10px',
               color: manualBarcode.length >= 8 ? '#000' : 'rgba(255,255,255,0.3)',
               fontSize: '0.9rem', fontWeight: '800',
               cursor: manualBarcode.length >= 8 ? 'pointer' : 'default',
@@ -363,48 +379,116 @@ export default function BarcodeScanner({ onScan, onClose }) {
         </div>
       )}
 
-      {/* ═══ BOTTOM BAR ═══ */}
+      {/* ═══ BOTTOM SEGMENTED CONTROL — Zoeken | Barcode ═══ */}
       <div style={{
         position: 'absolute', bottom: 0, left: 0, right: 0,
-        padding: isMobile ? '1rem 1rem 1.5rem' : '1.5rem',
-        background: 'linear-gradient(0deg, rgba(0,0,0,0.85) 0%, transparent 100%)',
-        display: 'flex', justifyContent: 'center', gap: '0.75rem', zIndex: 10
+        padding: isMobile ? '0.875rem 1rem 1.25rem' : '1.25rem 1.5rem 1.5rem',
+        paddingBottom: `calc(env(safe-area-inset-bottom, 0) + ${isMobile ? '0.875rem' : '1.25rem'})`,
+        background: 'linear-gradient(0deg, rgba(0,0,0,0.92) 0%, transparent 100%)',
+        display: 'flex', justifyContent: 'center', zIndex: 10
       }}>
+        <div style={{
+          display: 'inline-flex',
+          background: 'rgba(255, 255, 255, 0.08)',
+          border: '1px solid rgba(255, 255, 255, 0.1)',
+          borderRadius: '999px',
+          padding: '4px',
+          backdropFilter: 'blur(20px)',
+        }}>
+          <button
+            onClick={() => {
+              if (onSwitchToSearch) onSwitchToSearch()
+              else if (onClose) onClose()
+            }}
+            style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              gap: '0.4rem',
+              padding: '0.6rem 1.25rem',
+              background: 'transparent',
+              border: 'none',
+              borderRadius: '999px',
+              color: 'rgba(255, 255, 255, 0.55)',
+              fontSize: '0.82rem', fontWeight: '600',
+              cursor: 'pointer', touchAction: 'manipulation',
+              minHeight: '38px',
+            }}
+          >
+            <Search size={15} strokeWidth={2.4} /> Zoeken
+          </button>
+          <button
+            onClick={() => {
+              // Already on barcode — if in manual mode, toggle back to camera
+              if (manualMode) {
+                setManualMode(false)
+                setStatus('idle')
+                setScanTime(0)
+              }
+            }}
+            style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              gap: '0.4rem',
+              padding: '0.6rem 1.25rem',
+              background: '#000',
+              border: 'none',
+              borderRadius: '999px',
+              color: G.primary,
+              fontSize: '0.82rem', fontWeight: '700',
+              cursor: 'pointer', touchAction: 'manipulation',
+              minHeight: '38px',
+              boxShadow: `0 2px 12px rgba(255, 215, 0, 0.15)`,
+            }}
+          >
+            <ScanLine size={15} strokeWidth={2.4} /> Barcode
+          </button>
+        </div>
+
+        {/* Subtle "handmatig" link below the segmented control */}
         {!manualMode && (
-          <button onClick={toggleTorch} style={{
-            width: '48px', height: '48px',
-            background: torchEnabled ? 'rgba(251,191,36,0.15)' : 'rgba(255,255,255,0.08)',
-            border: torchEnabled ? '1px solid rgba(251,191,36,0.4)' : '1px solid rgba(255,255,255,0.15)',
-            borderRadius: '6px',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            cursor: 'pointer', touchAction: 'manipulation'
-          }}>
-            {torchEnabled ? <Zap size={20} color="#fbbf24" /> : <ZapOff size={20} color="rgba(255,255,255,0.4)" />}
+          <button onClick={() => { stopScanning(); setManualMode(true); setStatus('idle'); setScanTime(0) }}
+            style={{
+              position: 'absolute',
+              right: isMobile ? '1rem' : '1.5rem',
+              bottom: `calc(env(safe-area-inset-bottom, 0) + ${isMobile ? '1.55rem' : '2rem'})`,
+              padding: '0.4rem 0.6rem',
+              background: 'transparent',
+              border: 'none',
+              color: 'rgba(255, 255, 255, 0.45)',
+              fontSize: '0.7rem', fontWeight: '600',
+              cursor: 'pointer', touchAction: 'manipulation',
+              display: 'flex', alignItems: 'center', gap: '0.3rem',
+            }}
+          >
+            <Keyboard size={13} /> Typ
           </button>
         )}
-
-        <button onClick={() => { if (!manualMode) stopScanning(); setManualMode(!manualMode); setStatus('idle'); setScanTime(0) }}
-          style={{
-            flex: 1, maxWidth: '240px', height: '48px',
-            background: 'rgba(16,185,129,0.1)',
-            border: '1px solid rgba(16,185,129,0.3)',
-            borderRadius: '6px', color: '#10b981',
-            fontSize: '0.85rem', fontWeight: '700',
-            cursor: 'pointer', touchAction: 'manipulation',
-            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.375rem'
-          }}
-        >
-          {manualMode ? <><Camera size={16} /> Camera</> : <><Keyboard size={16} /> Handmatig</>}
-        </button>
+        {manualMode && (
+          <button onClick={() => { setManualMode(false); setStatus('idle'); setScanTime(0) }}
+            style={{
+              position: 'absolute',
+              right: isMobile ? '1rem' : '1.5rem',
+              bottom: `calc(env(safe-area-inset-bottom, 0) + ${isMobile ? '1.55rem' : '2rem'})`,
+              padding: '0.4rem 0.6rem',
+              background: 'transparent',
+              border: 'none',
+              color: G.primary,
+              fontSize: '0.7rem', fontWeight: '600',
+              cursor: 'pointer', touchAction: 'manipulation',
+              display: 'flex', alignItems: 'center', gap: '0.3rem',
+            }}
+          >
+            <Camera size={13} /> Camera
+          </button>
+        )}
       </div>
 
       <style>{`
-        @keyframes bsScanLine {
-          0% { margin-top: -65px; }
-          100% { margin-top: 65px; }
-        }
         @keyframes bsFadeIn {
-          from { opacity: 0; } to { opacity: 1; }
+          from { opacity: 0; transform: scale(0.94); }
+          to   { opacity: 1; transform: scale(1); }
+        }
+        @keyframes bsScanLine {
+          0%   { top: 4%;  }
+          100% { top: calc(100% - 4% - 2px); }
         }
       `}</style>
     </div>

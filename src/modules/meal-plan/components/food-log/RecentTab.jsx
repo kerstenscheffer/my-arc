@@ -1,14 +1,100 @@
 // src/modules/meal-plan/components/food-log/RecentTab.jsx
-// 🎯 v2.1 - Images toegevoegd (zelfde patroon als SearchTab ResultIcon)
+// 🎯 v2.2 - Product-image fallback: meals without image_url get enriched
+//          from ai_ingredients lookup so old/legacy logs show thumbnails too.
 import React, { useState, useEffect } from 'react'
 import { Plus, Copy, ChevronRight, UtensilsCrossed } from 'lucide-react'
+
+// Bulk-resolve missing meal photos by querying multiple image sources.
+// Order of preference: ai_meals (curated) → ai_ingredients (popular) →
+// consumed_meals (shared from other clients).
+const sanitizeForOr = (s) => (s || '').replace(/[%,()*."'\\]/g, ' ').trim()
+
+const enrichWithProductImages = async (meals, db) => {
+  if (!db?.supabase || !Array.isArray(meals) || meals.length === 0) return meals
+
+  // Collect unique meal names without image, max 20 to keep query small.
+  const seen = new Set()
+  const unmatched = []
+  for (const m of meals) {
+    if (m.image_url) continue
+    const key = sanitizeForOr((m.meal_name || '').toLowerCase())
+    if (!key || seen.has(key) || key.length < 2) continue
+    seen.add(key)
+    unmatched.push(key)
+    if (unmatched.length >= 20) break
+  }
+  if (unmatched.length === 0) return meals
+
+  // PostgREST OR-filter wildcards must use `*`, not `%` (the % gets URL-mangled).
+  const orFilterName     = unmatched.map(n => `name.ilike.*${n}*`).join(',')
+  const orFilterMealName = unmatched.map(n => `meal_name.ilike.*${n}*`).join(',')
+
+  try {
+    const [mealsRes, ingredientsRes, sharedRes] = await Promise.all([
+      // ai_meals — curated recipes, ~51% have images
+      db.supabase
+        .from('ai_meals')
+        .select('name, image_url')
+        .or(orFilterName)
+        .not('image_url', 'is', null)
+        .limit(100),
+      // ai_ingredients — generic foods, sparse but log_count-ranked
+      db.supabase
+        .from('ai_ingredients')
+        .select('name, image_url, log_count')
+        .or(orFilterName)
+        .not('image_url', 'is', null)
+        .order('log_count', { ascending: false })
+        .limit(100),
+      // consumed_meals — shared logs from any client
+      db.supabase
+        .from('consumed_meals')
+        .select('meal_name, image_url, log_count')
+        .or(orFilterMealName)
+        .not('image_url', 'is', null)
+        .eq('is_shared', true)
+        .order('log_count', { ascending: false })
+        .limit(100),
+    ])
+
+    // Build name → image_url map. First hit wins; prefer ai_meals → ai_ingredients → consumed.
+    const imgMap = {}
+    const tryMatch = (rows, nameField) => {
+      if (!rows?.data) return
+      for (const queryName of unmatched) {
+        if (imgMap[queryName]) continue
+        for (const row of rows.data) {
+          const rowName = (row[nameField] || '').toLowerCase()
+          if (rowName.includes(queryName)) {
+            imgMap[queryName] = row.image_url
+            break
+          }
+        }
+      }
+    }
+    tryMatch(mealsRes,       'name')
+    tryMatch(ingredientsRes, 'name')
+    tryMatch(sharedRes,      'meal_name')
+
+    if (Object.keys(imgMap).length === 0) return meals
+
+    return meals.map(m => {
+      if (m.image_url) return m
+      const key = sanitizeForOr((m.meal_name || '').toLowerCase())
+      return imgMap[key] ? { ...m, image_url: imgMap[key], _imageFromProduct: true } : m
+    })
+  } catch (err) {
+    console.warn('Failed to enrich recents with product images:', err)
+    return meals
+  }
+}
 
 export default function RecentTab({ client, db, onSelect, onQuickLog, onCopyYesterday, isMobile, defaultMealMoment }) {
   const [recentMeals, setRecentMeals] = useState([])
   const [loading, setLoading] = useState(true)
   const [yesterdayCount, setYesterdayCount] = useState(0)
 
-  const accent = '#10b981'
+  const accent = '#FFD700'
 
   useEffect(() => {
     if (client?.id) {
@@ -50,7 +136,14 @@ export default function RecentTab({ client, db, onSelect, onQuickLog, onCopyYest
           return new Date(b.consumed_at) - new Date(a.consumed_at)
         })
 
+      // Show the list immediately, then enrich missing images in the background.
       setRecentMeals(sorted)
+      setLoading(false)
+
+      const enriched = await enrichWithProductImages(sorted, db)
+      // Avoid extra render if nothing changed.
+      if (enriched !== sorted) setRecentMeals(enriched)
+      return
     } catch (err) {
       console.error('Failed to load recents:', err)
       setRecentMeals([])
@@ -90,11 +183,21 @@ export default function RecentTab({ client, db, onSelect, onQuickLog, onCopyYest
       ingredients: meal.ingredients || [],
       source: 'recent_relog',
       image_url: meal.image_url,
+      // Preserve the original portion so the new log retains it
+      amount: (meal.amount !== null && meal.amount !== undefined) ? parseFloat(meal.amount) : null,
+      per_unit: meal.per_unit || null,
       meal_type: defaultMealMoment || meal.meal_type || 'snack'
     })
   }
 
   const handleSelect = (meal) => {
+    // Macros stored in consumed_meals are TOTALS for the persisted amount.
+    // Pass _savedAmount + _savedPerUnit so AmountPicker uses linear scaling
+    // around that anchor instead of treating the totals as per-100g.
+    const hasAmount = meal.amount !== null && meal.amount !== undefined
+    const savedAmount = hasAmount ? parseFloat(meal.amount) : null
+    const savedPerUnit = meal.per_unit || null
+
     onSelect({
       id: meal.meal_id || meal.id,
       name: meal.meal_name,
@@ -106,7 +209,13 @@ export default function RecentTab({ client, db, onSelect, onQuickLog, onCopyYest
       ingredients: meal.ingredients || [],
       type: 'recent',
       source: 'recent',
-      per100g: true
+      // Re-open hints
+      _savedAmount: savedAmount,
+      _savedPerUnit: savedPerUnit,
+      // Pre-select the right serving picker. Legacy entries (no per_unit)
+      // are treated as portion-based so a stored "200g eggs / 250 kcal"
+      // never gets misread as "per-100g 250 kcal" anymore.
+      per100g: savedPerUnit === 'gram',
     })
   }
 
@@ -139,7 +248,7 @@ export default function RecentTab({ client, db, onSelect, onQuickLog, onCopyYest
             display: 'flex', alignItems: 'center',
             gap: '0.5rem', width: '100%',
             padding: isMobile ? '0.75rem 1rem' : '0.875rem 1.25rem',
-            background: 'rgba(16, 185, 129, 0.04)',
+            background: 'rgba(255, 215, 0, 0.04)',
             border: 'none',
             borderBottom: '1px solid rgba(255, 255, 255, 0.06)',
             cursor: 'pointer', textAlign: 'left',
@@ -147,13 +256,13 @@ export default function RecentTab({ client, db, onSelect, onQuickLog, onCopyYest
             WebkitTapHighlightColor: 'transparent',
             minHeight: '48px'
           }}
-          onTouchStart={(e) => { if (isMobile) e.currentTarget.style.background = 'rgba(16, 185, 129, 0.08)' }}
-          onTouchEnd={(e) => { if (isMobile) e.currentTarget.style.background = 'rgba(16, 185, 129, 0.04)' }}
+          onTouchStart={(e) => { if (isMobile) e.currentTarget.style.background = 'rgba(255, 215, 0, 0.08)' }}
+          onTouchEnd={(e) => { if (isMobile) e.currentTarget.style.background = 'rgba(255, 215, 0, 0.04)' }}
         >
           <div style={{
             width: '28px', height: '28px', borderRadius: '8px',
-            background: 'rgba(16, 185, 129, 0.1)',
-            border: '1px solid rgba(16, 185, 129, 0.2)',
+            background: 'rgba(255, 215, 0, 0.1)',
+            border: '1px solid rgba(255, 215, 0, 0.2)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             flexShrink: 0
           }}>
@@ -163,11 +272,11 @@ export default function RecentTab({ client, db, onSelect, onQuickLog, onCopyYest
             <div style={{ fontSize: isMobile ? '0.82rem' : '0.9rem', fontWeight: '700', color: accent }}>
               Kopieer gisteren
             </div>
-            <div style={{ fontSize: '0.55rem', color: 'rgba(16, 185, 129, 0.5)' }}>
+            <div style={{ fontSize: '0.55rem', color: 'rgba(255, 215, 0, 0.5)' }}>
               {yesterdayCount} maaltijd{yesterdayCount !== 1 ? 'en' : ''} van gisteren opnieuw loggen
             </div>
           </div>
-          <ChevronRight size={14} color="rgba(16, 185, 129, 0.3)" />
+          <ChevronRight size={14} color="rgba(255, 215, 0, 0.3)" />
         </button>
       )}
 
@@ -221,8 +330,8 @@ export default function RecentTab({ client, db, onSelect, onQuickLog, onCopyYest
             ) : meal.count > 1 ? (
               <div style={{
                 width: '40px', height: '40px', borderRadius: '8px', flexShrink: 0,
-                background: 'rgba(16, 185, 129, 0.06)',
-                border: '1px solid rgba(16, 185, 129, 0.15)',
+                background: 'rgba(255, 215, 0, 0.06)',
+                border: '1px solid rgba(255, 215, 0, 0.15)',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                 fontSize: '0.55rem', fontWeight: '800', color: accent
               }}>
@@ -256,8 +365,8 @@ export default function RecentTab({ client, db, onSelect, onQuickLog, onCopyYest
                 {meal.image_url && meal.count > 1 && (
                   <span style={{
                     fontSize: '0.45rem', fontWeight: '800', color: accent,
-                    background: 'rgba(16, 185, 129, 0.1)',
-                    border: '1px solid rgba(16, 185, 129, 0.2)',
+                    background: 'rgba(255, 215, 0, 0.1)',
+                    border: '1px solid rgba(255, 215, 0, 0.2)',
                     borderRadius: '4px', padding: '0.1rem 0.25rem',
                     flexShrink: 0
                   }}>
@@ -298,7 +407,7 @@ export default function RecentTab({ client, db, onSelect, onQuickLog, onCopyYest
               touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
               transition: 'background 0.15s ease'
             }}
-            onTouchStart={(e) => { if (isMobile) e.currentTarget.style.background = 'rgba(16, 185, 129, 0.08)' }}
+            onTouchStart={(e) => { if (isMobile) e.currentTarget.style.background = 'rgba(255, 215, 0, 0.08)' }}
             onTouchEnd={(e) => { if (isMobile) e.currentTarget.style.background = 'transparent' }}
           >
             <Plus size={16} strokeWidth={2.5} />

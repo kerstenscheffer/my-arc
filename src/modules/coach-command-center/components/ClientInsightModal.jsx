@@ -2,19 +2,22 @@
 // ClientInsightModal.jsx - v8.3
 // + onOpenMealPanel prop toegevoegd voor Meal Plan SOP widget
 import React, { useState, useRef, useCallback } from 'react'
-import { X, Scale, Dumbbell, UtensilsCrossed, ChevronLeft, ChevronRight, TrendingUp, User, BookOpen } from 'lucide-react'
+import { X, Scale, Dumbbell, UtensilsCrossed, ChevronLeft, ChevronRight, TrendingUp, User, BookOpen, ClipboardCheck } from 'lucide-react'
 import WeightColumn from './insight/WeightColumn'
 import WorkoutColumn from './insight/WorkoutColumn'
 import MealsColumn from './insight/MealsColumn'
 import ClientDataColumn from './insight/ClientDataColumn'
+import CheckinsColumn from './insight/CheckinsColumn'
 import ClientJourneyTimeline from '../../client-journey/ClientJourneyTimeline'
 import CoachingLogModal from './CoachingLogModal'
+import CoachingPeriodPanel from './CoachingPeriodPanel'
 
 const COLS = [
-  { id: 'weight',  label: 'Gewicht',  color: '#FFD700' },
-  { id: 'workout', label: 'Training', color: '#f97316' },
-  { id: 'meals',   label: 'Voeding',  color: '#10b981' },
-  { id: 'data',    label: 'Gegevens', color: '#FFD700' },
+  { id: 'weight',  label: 'Gewicht',   color: '#FFD700' },
+  { id: 'workout', label: 'Training',  color: '#f97316' },
+  { id: 'meals',   label: 'Voeding',   color: '#10b981' },
+  { id: 'data',    label: 'Gegevens',  color: '#FFD700' },
+  { id: 'checkin', label: 'Check-ins', color: '#FFD700' },
 ]
 
 export default function ClientInsightModal({ isOpen, onClose, client, isMobile, onNavigatePlan, onNavigateWorkout, db, coachId, onOpenMealPanel, onOpenWorkoutPanel }) {
@@ -24,7 +27,9 @@ export default function ClientInsightModal({ isOpen, onClose, client, isMobile, 
   const [showHeader, setShowHeader] = useState(false)
   const [splitRatio, setSplitRatio] = useState(60)
   const [isDragging, setIsDragging] = useState(false)
-  const [collapsed, setCollapsed] = useState(new Set())
+  // Default-collapse 'data' so the new 5-column layout stays comfortable.
+  // Coach can re-expand it via the "Secties"-toggles in the hover header.
+  const [collapsed, setCollapsed] = useState(() => new Set(['data']))
   const [showLog, setShowLog] = useState(false)
 
   const [localClient, setLocalClient] = useState(null)
@@ -127,11 +132,12 @@ export default function ClientInsightModal({ isOpen, onClose, client, isMobile, 
   }
 
   const mobileTabs = [
-    { id: 'weight',  label: 'Gewicht',  icon: Scale,           color: '#FFD700' },
-    { id: 'workout', label: 'Training', icon: Dumbbell,         color: '#f97316' },
-    { id: 'meals',   label: 'Voeding',  icon: UtensilsCrossed, color: '#10b981' },
-    { id: 'data',    label: 'Gegevens', icon: User,             color: '#FFD700' },
-    { id: 'journey', label: 'Journey',  icon: TrendingUp,       color: '#d4a853' },
+    { id: 'weight',  label: 'Gewicht',   icon: Scale,            color: '#FFD700' },
+    { id: 'workout', label: 'Training',  icon: Dumbbell,         color: '#f97316' },
+    { id: 'meals',   label: 'Voeding',   icon: UtensilsCrossed,  color: '#10b981' },
+    { id: 'checkin', label: 'Check-in',  icon: ClipboardCheck,   color: '#FFD700' },
+    { id: 'data',    label: 'Gegevens',  icon: User,             color: '#FFD700' },
+    { id: 'journey', label: 'Journey',   icon: TrendingUp,       color: '#d4a853' },
   ]
 
   return (
@@ -278,6 +284,14 @@ export default function ClientInsightModal({ isOpen, onClose, client, isMobile, 
             </>
           )}
 
+          {/* ═══ COACHING-PERIODE STRIP — boven alle data zichtbaar ═══ */}
+          <CoachingPeriodPanel
+            client={effectiveClient}
+            coachId={coachId}
+            isMobile={isMobile}
+            onClientUpdate={handleClientUpdate}
+          />
+
           {/* ═══ DESKTOP CONTENT ═══ */}
           {!isMobile && (
             <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
@@ -304,10 +318,15 @@ export default function ClientInsightModal({ isOpen, onClose, client, isMobile, 
                     onGeneratePlan={(planId) => { onNavigatePlan && onNavigatePlan(effectiveClient.id, planId); onClose() }}
                   />
                 </ColWrapper>
-                <ColWrapper id="data" isLast>
+                <ColWrapper id="data">
                   <ClientDataColumn
                     client={effectiveClient} db={db} isMobile={false}
                     onClientUpdate={handleClientUpdate}
+                  />
+                </ColWrapper>
+                <ColWrapper id="checkin" isLast>
+                  <CheckinsColumn
+                    client={effectiveClient} db={db} isMobile={false}
                   />
                 </ColWrapper>
               </div>
@@ -381,6 +400,11 @@ export default function ClientInsightModal({ isOpen, onClose, client, isMobile, 
                 <ClientDataColumn
                   client={effectiveClient} db={db} isMobile={true}
                   onClientUpdate={handleClientUpdate}
+                />
+              )}
+              {mobileTab === 'checkin' && (
+                <CheckinsColumn
+                  client={effectiveClient} db={db} isMobile={true}
                 />
               )}
               {mobileTab === 'journey' && db && (

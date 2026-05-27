@@ -1,8 +1,10 @@
 // src/modules/workout/components/todays-workout/LogModal.jsx
-import { X, CheckCircle, Dumbbell, Check, Play, MessageSquare, ChevronDown, Zap, ThumbsUp, Moon, TrendingDown, Thermometer } from 'lucide-react'
+import { X, CheckCircle, Dumbbell, Check, Play, MessageSquare, ChevronDown, Zap, ThumbsUp, Moon, TrendingDown, Thermometer, Plus, Camera } from 'lucide-react'
 import { useState, useEffect } from 'react'
 import ExerciseList from './components/ExerciseList'
 import WorkoutFlowWizard from './WorkoutFlowWizard'
+import CustomExerciseModal from './components/CustomExerciseModal'
+import PumpShareModal from './PumpShareModal'
 
 export default function LogModal({ workout, todaysLogs, onClose, onLogsUpdate, client, schema, db }) {
   const isMobile = window.innerWidth <= 768
@@ -11,9 +13,28 @@ export default function LogModal({ workout, todaysLogs, onClose, onLogsUpdate, c
   const [isFinishing, setIsFinishing] = useState(false)
   const [isWorkoutCompleted, setIsWorkoutCompleted] = useState(false)
   const [showWorkoutFlow, setShowWorkoutFlow] = useState(false)
+  const [showCustomModal, setShowCustomModal] = useState(false)
+  const [showPumpModal, setShowPumpModal] = useState(false)
+  // Stamp the moment the modal opened so we can show a duration on the
+  // pump-card. Persists across remounts within the same session via state.
+  const [sessionStartAt] = useState(() => Date.now())
 
   // ✅ Live exercises state — synct met workout prop na swap + reload
   const [liveExercises, setLiveExercises] = useState(workout.exercises || [])
+
+  const handleCustomExerciseSave = (newExercise) => {
+    setLiveExercises(prev => [...prev, {
+      name: newExercise.name,
+      sets: newExercise.sets,
+      reps: newExercise.reps,
+      rust: newExercise.rust,
+      primairSpieren: newExercise.primairSpieren,
+      equipment: newExercise.equipment,
+      image_url: newExercise.image_url,
+      type: 'custom'
+    }])
+    setShowCustomModal(false)
+  }
 
   const [dayFeeling, setDayFeeling] = useState(null)
   const [dayNote, setDayNote] = useState('')
@@ -91,7 +112,7 @@ export default function LogModal({ workout, todaysLogs, onClose, onLogsUpdate, c
 
   const handleClose = () => { setVisible(false); setTimeout(() => onClose(), 300) }
 
-  const handleFinishWorkout = async () => {
+  const handleFinishWorkout = async ({ autoClose = true } = {}) => {
     if (!client?.id || !db) return
     setIsFinishing(true)
     try {
@@ -100,7 +121,11 @@ export default function LogModal({ workout, todaysLogs, onClose, onLogsUpdate, c
       if (error) throw error
       if (navigator.vibrate) navigator.vibrate([50, 100, 50, 100, 50])
       setIsWorkoutCompleted(true)
-      setTimeout(() => handleClose(), 1200)
+      // Skip the auto-close when the caller wants to keep the modal open
+      // (e.g. the pump-share flow needs LogModal to stay mounted so the
+      // PumpShareModal it renders doesn't disappear).
+      if (autoClose) setTimeout(() => handleClose(), 1200)
+      else setIsFinishing(false)
     } catch (e) {
       console.error('❌ Finish workout failed:', e)
       alert('Er ging iets mis. Probeer opnieuw.')
@@ -109,6 +134,46 @@ export default function LogModal({ workout, todaysLogs, onClose, onLogsUpdate, c
   }
 
   const handleWorkoutFlowComplete = () => { setShowWorkoutFlow(false); if (onLogsUpdate) onLogsUpdate(); handleFinishWorkout() }
+
+  // "Voltooien + Pump" — first marks the workout completed (same as the
+  // green Voltooien button), then opens the pump-share modal. We pass
+  // autoClose=false so LogModal stays mounted while the pump modal is open.
+  // LogModal closes when the pump modal itself closes.
+  const handleFinishAndPump = async () => {
+    await handleFinishWorkout({ autoClose: false })
+    setShowPumpModal(true)
+  }
+
+  const handlePumpClose = () => {
+    setShowPumpModal(false)
+    // Now collapse LogModal too — the workout was already marked completed.
+    handleClose()
+  }
+
+  const buildPumpStats = () => {
+    const logs = Array.isArray(todaysLogs) ? todaysLogs : []
+    let setsCount = 0
+    let volume = 0
+    logs.forEach(log => {
+      // workout_progress.sets is jsonb — array of { reps, weight, completed }
+      const sets = Array.isArray(log?.sets) ? log.sets : []
+      sets.forEach(s => {
+        if (s?.completed === false) return
+        setsCount += 1
+        const reps = Number(s?.reps) || 0
+        const weight = Number(s?.weight) || 0
+        volume += reps * weight
+      })
+    })
+    const durationMin = Math.max(1, Math.round((Date.now() - sessionStartAt) / 60000))
+    return {
+      workoutName: workout?.name || workout?.day_display_name || 'Workout',
+      exercisesCount: completedCount || (Array.isArray(liveExercises) ? liveExercises.length : 0),
+      setsCount: setsCount > 0 ? setsCount : null,
+      volume: volume > 0 ? volume : null,
+      duration: durationMin,
+    }
+  }
 
   if (showWorkoutFlow) {
     return (
@@ -217,28 +282,60 @@ export default function LogModal({ workout, todaysLogs, onClose, onLogsUpdate, c
           db={db}
           workoutDayKey={workout.dayKey}
         />
+
+        {/* Subtle "+ Eigen oefening" link — replaces the prominent button
+            previously shown above today's workout card. */}
+        {!isWorkoutCompleted && (
+          <div style={{ display: 'flex', justifyContent: 'center', padding: isMobile ? '0.5rem 1rem 1rem' : '0.625rem 1.5rem 1.25rem' }}>
+            <button
+              onClick={() => setShowCustomModal(true)}
+              style={{
+                display: 'inline-flex', alignItems: 'center', gap: '0.4rem',
+                padding: '0.5rem 0.875rem',
+                background: 'transparent',
+                border: '1px dashed rgba(255,215,0,0.2)',
+                borderRadius: '8px',
+                color: 'rgba(255,215,0,0.55)',
+                fontSize: isMobile ? '0.72rem' : '0.78rem',
+                fontWeight: '600',
+                cursor: 'pointer',
+                touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+                minHeight: '36px'
+              }}
+            >
+              <Plus size={13} strokeWidth={2.2} />
+              Eigen oefening toevoegen
+            </button>
+          </div>
+        )}
       </div>
 
       {/* ── FOOTER ── */}
       {!isWorkoutCompleted && (
         <div style={{ background: '#0a0a0a', borderTop: '1px solid rgba(255,255,255,0.06)', padding: isMobile ? '0.75rem 1rem' : '0.875rem 1.5rem', flexShrink: 0 }}>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.6fr', gap: isMobile ? '0.5rem' : '0.625rem', marginBottom: isMobile ? '0.4rem' : '0.5rem' }}>
-            <button onClick={() => setShowWorkoutFlow(true)} style={{ padding: isMobile ? '0.75rem 0.5rem' : '0.875rem 1rem', background: 'rgba(255,215,0,0.08)', border: '1px solid rgba(255,215,0,0.2)', borderRadius: '8px', color: '#FFD700', fontSize: isMobile ? '0.78rem' : '0.85rem', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '0.04em', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.375rem', minHeight: isMobile ? '46px' : '50px', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', transition: 'all 0.15s ease' }}
+          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr 1fr 1fr' : '1fr 1.3fr 1.3fr', gap: isMobile ? '0.45rem' : '0.625rem', marginBottom: isMobile ? '0.4rem' : '0.5rem' }}>
+            <button onClick={() => setShowWorkoutFlow(true)} style={{ padding: isMobile ? '0.75rem 0.35rem' : '0.875rem 1rem', background: 'rgba(255,215,0,0.08)', border: '1px solid rgba(255,215,0,0.2)', borderRadius: '8px', color: '#FFD700', fontSize: isMobile ? '0.72rem' : '0.85rem', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '0.04em', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.35rem', minHeight: isMobile ? '46px' : '50px', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', transition: 'all 0.15s ease' }}
               onTouchStart={(e) => e.currentTarget.style.transform = 'scale(0.98)'}
               onTouchEnd={(e) => e.currentTarget.style.transform = 'scale(1)'}>
-              <Play size={isMobile ? 14 : 16} strokeWidth={2.5} />Flow
+              <Play size={isMobile ? 13 : 16} strokeWidth={2.5} />Flow
             </button>
 
-            <button onClick={handleFinishWorkout} disabled={isFinishing} style={{ padding: isMobile ? '0.75rem 0.5rem' : '0.875rem 1rem', background: 'rgba(16,185,129,0.15)', border: `1px solid ${isFinishing ? 'rgba(16,185,129,0.15)' : 'rgba(16,185,129,0.35)'}`, borderRadius: '8px', color: isFinishing ? 'rgba(16,185,129,0.4)' : '#10b981', fontSize: isMobile ? '0.78rem' : '0.85rem', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '0.04em', cursor: isFinishing ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.375rem', minHeight: isMobile ? '46px' : '50px', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', transition: 'all 0.15s ease' }}
+            <button onClick={handleFinishWorkout} disabled={isFinishing} style={{ padding: isMobile ? '0.75rem 0.35rem' : '0.875rem 1rem', background: 'rgba(16,185,129,0.15)', border: `1px solid ${isFinishing ? 'rgba(16,185,129,0.15)' : 'rgba(16,185,129,0.35)'}`, borderRadius: '8px', color: isFinishing ? 'rgba(16,185,129,0.4)' : '#10b981', fontSize: isMobile ? '0.72rem' : '0.85rem', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '0.04em', cursor: isFinishing ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.35rem', minHeight: isMobile ? '46px' : '50px', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', transition: 'all 0.15s ease' }}
               onTouchStart={(e) => { if (!isFinishing) e.currentTarget.style.transform = 'scale(0.98)' }}
               onTouchEnd={(e) => e.currentTarget.style.transform = 'scale(1)'}>
               {isFinishing
                 ? <><div style={{ width: '14px', height: '14px', border: '2px solid rgba(16,185,129,0.2)', borderTopColor: '#10b981', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />Even...</>
-                : <><Check size={isMobile ? 15 : 17} strokeWidth={2.5} />Voltooien</>}
+                : <><Check size={isMobile ? 14 : 17} strokeWidth={2.5} />Voltooi</>}
+            </button>
+
+            <button onClick={handleFinishAndPump} disabled={isFinishing} style={{ padding: isMobile ? '0.75rem 0.35rem' : '0.875rem 1rem', background: 'linear-gradient(135deg, rgba(255,215,0,0.18) 0%, rgba(255,215,0,0.08) 100%)', border: `1px solid rgba(255,215,0,0.45)`, borderRadius: '8px', color: '#FFD700', fontSize: isMobile ? '0.72rem' : '0.85rem', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '0.04em', cursor: isFinishing ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.35rem', minHeight: isMobile ? '46px' : '50px', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', transition: 'all 0.15s ease', opacity: isFinishing ? 0.5 : 1 }}
+              onTouchStart={(e) => { if (!isFinishing) e.currentTarget.style.transform = 'scale(0.98)' }}
+              onTouchEnd={(e) => e.currentTarget.style.transform = 'scale(1)'}>
+              <Camera size={isMobile ? 14 : 17} strokeWidth={2.5} />Pump
             </button>
           </div>
-          <div style={{ textAlign: 'center', fontSize: isMobile ? '0.57rem' : '0.62rem', color: 'rgba(255,255,255,0.2)', fontWeight: '600' }}>
-            <span style={{ color: 'rgba(255,215,0,0.4)' }}>Flow</span> begeleide workout met timers &nbsp;·&nbsp; <span style={{ color: 'rgba(16,185,129,0.4)' }}>Voltooien</span> direct afronden
+          <div style={{ textAlign: 'center', fontSize: isMobile ? '0.55rem' : '0.62rem', color: 'rgba(255,255,255,0.2)', fontWeight: '600' }}>
+            <span style={{ color: 'rgba(255,215,0,0.4)' }}>Flow</span> &nbsp;·&nbsp; <span style={{ color: 'rgba(16,185,129,0.4)' }}>Voltooi</span> direct afronden &nbsp;·&nbsp; <span style={{ color: 'rgba(255,215,0,0.5)' }}>Pump</span> voltooi + foto delen
           </div>
         </div>
       )}
@@ -255,6 +352,24 @@ export default function LogModal({ workout, todaysLogs, onClose, onLogsUpdate, c
           </div>
         </div>
       )}
+
+      {showCustomModal && (
+        <CustomExerciseModal
+          onClose={() => setShowCustomModal(false)}
+          onSave={handleCustomExerciseSave}
+          client={client}
+          db={db}
+          schema={schema}
+        />
+      )}
+
+      <PumpShareModal
+        isOpen={showPumpModal}
+        onClose={handlePumpClose}
+        client={client}
+        db={db}
+        stats={buildPumpStats()}
+      />
 
       <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
     </div>

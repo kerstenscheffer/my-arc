@@ -4,6 +4,7 @@
 
 import React, { useState, useRef, useEffect } from 'react'
 import { Check } from 'lucide-react'
+import { findPortionConfig } from './portionPresets'
 
 // ═══════════════════════════════════════════
 // SCROLL PICKER MODAL (MFP style)
@@ -79,7 +80,7 @@ function ScrollPickerModal({ value, onConfirm, onClose, isMobile }) {
             {displayValue}
           </div>
           <button onClick={() => onConfirm(combined)} style={{
-            background: 'none', border: 'none', color: '#10b981',
+            background: 'none', border: 'none', color: '#FFD700',
             fontSize: isMobile ? '0.8rem' : '0.85rem', fontWeight: '700',
             cursor: 'pointer', touchAction: 'manipulation'
           }}>
@@ -112,7 +113,7 @@ function ScrollPickerModal({ value, onConfirm, onClose, isMobile }) {
                 fontSize: n === whole ? (isMobile ? '1.25rem' : '1.4rem') : (isMobile ? '0.85rem' : '0.95rem'),
                 fontWeight: n === whole ? '800' : '500',
                 color: n === whole ? '#fff' : 'rgba(255, 255, 255, 0.2)',
-                background: n === whole ? 'rgba(16, 185, 129, 0.06)' : 'transparent',
+                background: n === whole ? 'rgba(255, 215, 0, 0.06)' : 'transparent',
                 cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent'
               }}>{n}</div>
             ))}
@@ -127,7 +128,7 @@ function ScrollPickerModal({ value, onConfirm, onClose, isMobile }) {
                 fontSize: idx === fracIndex ? (isMobile ? '1.25rem' : '1.4rem') : (isMobile ? '0.85rem' : '0.95rem'),
                 fontWeight: idx === fracIndex ? '800' : '500',
                 color: idx === fracIndex ? '#fff' : 'rgba(255, 255, 255, 0.2)',
-                background: idx === fracIndex ? 'rgba(16, 185, 129, 0.06)' : 'transparent',
+                background: idx === fracIndex ? 'rgba(255, 215, 0, 0.06)' : 'transparent',
                 cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent'
               }}>{f.label}</div>
             ))}
@@ -323,10 +324,10 @@ export default function AmountPicker({ item, remaining, onLog, onCancel, isMobil
   const DropdownBtn = ({ label, onClick, active }) => (
     <button onClick={onClick} style={{
       padding: isMobile ? '0.5rem 0.75rem' : '0.5rem 0.875rem',
-      background: active ? 'rgba(16, 185, 129, 0.06)' : 'transparent',
-      border: `1px solid ${active ? 'rgba(16, 185, 129, 0.2)' : 'rgba(255, 255, 255, 0.1)'}`,
+      background: active ? 'rgba(255, 215, 0, 0.06)' : 'transparent',
+      border: `1px solid ${active ? 'rgba(255, 215, 0, 0.2)' : 'rgba(255, 255, 255, 0.1)'}`,
       borderRadius: '8px',
-      color: active ? '#10b981' : '#fff',
+      color: active ? '#FFD700' : '#fff',
       fontSize: isMobile ? '0.8rem' : '0.85rem', fontWeight: '600',
       cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
       minHeight: '36px'
@@ -347,10 +348,10 @@ export default function AmountPicker({ item, remaining, onLog, onCancel, isMobil
           <button key={opt.id} onClick={() => onSelect(opt)} style={{
             display: 'block', width: '100%',
             padding: isMobile ? '0.75rem' : '0.625rem 0.75rem',
-            background: selected === opt.id ? 'rgba(16, 185, 129, 0.08)' : 'transparent',
+            background: selected === opt.id ? 'rgba(255, 215, 0, 0.08)' : 'transparent',
             border: 'none',
             borderBottom: i < options.length - 1 ? '1px solid rgba(255,255,255,0.04)' : 'none',
-            color: selected === opt.id ? '#10b981' : 'rgba(255, 255, 255, 0.7)',
+            color: selected === opt.id ? '#FFD700' : 'rgba(255, 255, 255, 0.7)',
             fontSize: isMobile ? '0.8rem' : '0.85rem',
             fontWeight: selected === opt.id ? '700' : '500',
             cursor: 'pointer', textAlign: 'left',
@@ -415,21 +416,108 @@ export default function AmountPicker({ item, remaining, onLog, onCancel, isMobil
         )}
       </Row>
 
-      {/* Aantal */}
-      <Row label={item._savedPerUnit === 'gram' ? 'Aantal gram' : 'Aantal porties'}>
-        <button onClick={() => setShowQuantityPicker(true)} style={{
-          padding: isMobile ? '0.5rem 0.75rem' : '0.5rem 0.875rem',
-          background: 'transparent',
-          border: '1px solid rgba(16, 185, 129, 0.3)',
-          borderRadius: '8px', color: '#10b981',
-          fontSize: isMobile ? '1.1rem' : '1.2rem', fontWeight: '800',
-          cursor: 'pointer',
-          touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-          minHeight: '36px', minWidth: '60px', textAlign: 'center'
-        }}>
-          {displayQuantity(quantity)}
-        </button>
-      </Row>
+      {/* Aantal — label respects category unit (ml for drinks, gram default) */}
+      {(() => {
+        const cfg = isPer100g ? findPortionConfig(item.name) : null
+        const unit = cfg?.displayUnit || 'g'
+        const aantalLabel = item._savedPerUnit === 'gram'
+          ? (unit === 'ml' ? 'Aantal ml' : 'Aantal gram')
+          : 'Aantal porties'
+        return (
+          <Row label={aantalLabel}>
+            <button onClick={() => setShowQuantityPicker(true)} style={{
+              padding: isMobile ? '0.5rem 0.75rem' : '0.5rem 0.875rem',
+              background: 'transparent',
+              border: '1px solid rgba(255, 215, 0, 0.3)',
+              borderRadius: '8px', color: '#FFD700',
+              fontSize: isMobile ? '1.1rem' : '1.2rem', fontWeight: '800',
+              cursor: 'pointer',
+              touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+              minHeight: '36px', minWidth: '60px', textAlign: 'center'
+            }}>
+              {displayQuantity(quantity)}
+            </button>
+          </Row>
+        )
+      })()}
+
+      {/* ✅ Snel kiezen — category-aware presets ("1 glas 250 ml", "1 appel 180 g", etc.) */}
+      {(() => {
+        if (!isPer100g) return null
+        const cfg = findPortionConfig(item.name)
+        if (!cfg || cfg.presets.length === 0) return null
+        const unit = cfg.displayUnit  // 'g' | 'ml' | 'stuks'
+        return (
+          <div style={{
+            padding: isMobile ? '0.625rem 1rem 0.875rem' : '0.75rem 1.5rem 1rem',
+            borderBottom: '1px solid rgba(255, 255, 255, 0.06)',
+          }}>
+            <div style={{
+              fontSize: isMobile ? '0.5rem' : '0.55rem',
+              fontWeight: '800', color: 'rgba(255, 215, 0, 0.55)',
+              textTransform: 'uppercase', letterSpacing: '0.06em',
+              marginBottom: '0.5rem',
+            }}>
+              Snel kiezen
+            </div>
+            <div style={{
+              display: 'flex',
+              flexWrap: 'wrap',
+              gap: '0.4rem',
+            }}>
+              {cfg.presets.map((p, i) => {
+                const isGramServing = selectedServing.id === 'gram' || selectedServing.grams === 1
+                const active = isGramServing && Math.abs(quantity - p.grams) < 0.01
+                // Show ml or g in the chip suffix; for stuks-categories (where the
+                // label already says "1 appel"/"2 stuks") we still expose the gram
+                // value as a small fact so user knows the underlying weight.
+                const suffix =
+                  unit === 'ml'    ? `${p.grams} ml` :
+                  unit === 'stuks' ? `${p.grams} g`  :
+                                     `${p.grams} g`
+                return (
+                  <button
+                    key={i}
+                    onClick={() => {
+                      const gramServing = servingOptions.find(s => s.id === 'gram') || servingOptions[0]
+                      setSelectedServing(gramServing)
+                      setQuantity(p.grams)
+                    }}
+                    style={{
+                      padding: isMobile ? '0.45rem 0.7rem' : '0.5rem 0.8rem',
+                      background: active
+                        ? 'rgba(255, 215, 0, 0.18)'
+                        : 'rgba(255, 215, 0, 0.05)',
+                      border: `1px solid ${active ? 'rgba(255, 215, 0, 0.5)' : 'rgba(255, 215, 0, 0.18)'}`,
+                      borderRadius: '8px',
+                      color: active ? '#FFD700' : 'rgba(255, 255, 255, 0.85)',
+                      fontSize: isMobile ? '0.7rem' : '0.75rem',
+                      fontWeight: active ? '800' : '700',
+                      cursor: 'pointer',
+                      minHeight: '36px',
+                      touchAction: 'manipulation',
+                      WebkitTapHighlightColor: 'transparent',
+                      transition: 'all 0.15s ease',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '0.35rem',
+                    }}
+                  >
+                    {p.label}
+                    <span style={{
+                      fontSize: isMobile ? '0.55rem' : '0.6rem',
+                      fontWeight: '600',
+                      color: active ? 'rgba(255, 215, 0, 0.7)' : 'rgba(255, 255, 255, 0.4)',
+                    }}>
+                      {suffix}
+                    </span>
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+        )
+      })()}
 
       {/* Maaltijd */}
       <Row label="Maaltijd">
@@ -458,7 +546,7 @@ export default function AmountPicker({ item, remaining, onLog, onCancel, isMobil
         <div style={{ position: 'relative', width: '80px', height: '80px', flexShrink: 0 }}>
           <svg viewBox="0 0 36 36" style={{ width: '100%', height: '100%', transform: 'rotate(-90deg)' }}>
             <circle cx="18" cy="18" r="14" fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="3.5" />
-            <circle cx="18" cy="18" r="14" fill="none" stroke="#10b981" strokeWidth="3.5"
+            <circle cx="18" cy="18" r="14" fill="none" stroke="#FFD700" strokeWidth="3.5"
               strokeDasharray={`${protPct * 0.88} 88`} strokeDashoffset="0" strokeLinecap="round" />
             <circle cx="18" cy="18" r="14" fill="none" stroke="#f59e0b" strokeWidth="3.5"
               strokeDasharray={`${carbPct * 0.88} 88`} strokeDashoffset={`${-protPct * 0.88}`} strokeLinecap="round" />
@@ -479,7 +567,7 @@ export default function AmountPicker({ item, remaining, onLog, onCancel, isMobil
           {[
             { label: 'Koolhydr', value: macros.carbs, pct: carbPct, color: '#f59e0b' },
             { label: 'Vetten', value: macros.fat, pct: fatPct, color: '#8b5cf6' },
-            { label: 'Eiwitten', value: macros.protein, pct: protPct, color: '#10b981' }
+            { label: 'Eiwitten', value: macros.protein, pct: protPct, color: '#FFD700' }
           ].map(m => (
             <div key={m.label} style={{ textAlign: 'center' }}>
               <div style={{ fontSize: '0.6rem', fontWeight: '700', color: m.color, marginBottom: '0.15rem' }}>{m.pct} %</div>
@@ -500,10 +588,10 @@ export default function AmountPicker({ item, remaining, onLog, onCancel, isMobil
       }}>
         <button onClick={handleLog} disabled={saving || macros.calories === 0} style={{
           width: '100%', padding: isMobile ? '0.875rem' : '1rem',
-          background: saving ? 'rgba(16, 185, 129, 0.05)' : 'rgba(16, 185, 129, 0.12)',
-          border: '1px solid rgba(16, 185, 129, 0.3)',
+          background: saving ? 'rgba(255, 215, 0, 0.05)' : 'rgba(255, 215, 0, 0.12)',
+          border: '1px solid rgba(255, 215, 0, 0.3)',
           borderRadius: isMobile ? '10px' : '12px',
-          color: '#10b981', fontSize: isMobile ? '0.85rem' : '0.95rem',
+          color: '#FFD700', fontSize: isMobile ? '0.85rem' : '0.95rem',
           fontWeight: '800', cursor: saving ? 'wait' : 'pointer',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           gap: '0.5rem', minHeight: '48px',

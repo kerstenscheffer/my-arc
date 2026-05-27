@@ -2,7 +2,7 @@
 // 🎯 v3.1 — Edit flow race fix: useEffect deps gefixt + diagnostic log
 import React, { useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
-import { X, ArrowLeft, Check, Scan } from 'lucide-react'
+import { X, ArrowLeft, Check, Scan, AlertCircle } from 'lucide-react'
 import FoodLogHeader from './FoodLogHeader'
 import SearchTab from './SearchTab'
 import QuickAddTab from './QuickAddTab'
@@ -10,6 +10,7 @@ import MyMealsTab from './MyMealsTab'
 import ScanTab from './ScanTab'
 import AmountPicker from './AmountPicker'
 import SmartLoggingService from './SmartLoggingService'
+import IngredientFeedbackModal from './IngredientFeedbackModal'
 
 export default function FoodLogModal({
   isOpen, onClose, client, db,
@@ -25,6 +26,7 @@ export default function FoodLogModal({
   const [addIngredientCallback, setAddIngredientCallback] = useState(null)
   const [buildingMeal, setBuildingMeal] = useState(null)
   const [showCopyConfirm, setShowCopyConfirm] = useState(false)
+  const [showFeedback, setShowFeedback] = useState(false)
 
   useEffect(() => {
     if (db?.supabase && !loggingService) {
@@ -59,7 +61,10 @@ export default function FoodLogModal({
 
     if (isOpen && editMeal && editMeal.id) {
       const hasAmount = editMeal.amount !== null && editMeal.amount !== undefined
-      const isPer100g = editMeal.per_unit === 'gram' || (!editMeal.per_unit)
+      // Strict per_unit detection — legacy null falls back to portion-mode
+      // so the stored totals are treated as "1 portion" instead of "per-100g".
+      // This matches RecentTab.handleSelect for consistency.
+      const isPer100g = editMeal.per_unit === 'gram'
 
       const newSelectedItem = {
         id: editMeal.meal_id || editMeal.id,
@@ -305,9 +310,9 @@ export default function FoodLogModal({
                 onClick={handleCopyYesterdayConfirm}
                 style={{
                   flex: 1, padding: '0.625rem', borderRadius: '8px',
-                  background: 'rgba(16, 185, 129, 0.15)',
-                  border: '1px solid rgba(16, 185, 129, 0.3)',
-                  color: '#10b981',
+                  background: 'rgba(255, 215, 0, 0.15)',
+                  border: '1px solid rgba(255, 215, 0, 0.3)',
+                  color: '#FFD700',
                   fontSize: isMobile ? '0.75rem' : '0.8rem', fontWeight: '700',
                   cursor: 'pointer', minHeight: '44px',
                   touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent'
@@ -329,13 +334,13 @@ export default function FoodLogModal({
         }}>
           <div style={{
             width: '64px', height: '64px', borderRadius: '50%',
-            background: 'rgba(16, 185, 129, 0.15)',
-            border: '2px solid rgba(16, 185, 129, 0.4)',
+            background: 'rgba(255, 215, 0, 0.15)',
+            border: '2px solid rgba(255, 215, 0, 0.4)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             marginBottom: '1rem',
             animation: 'flmPop 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)'
           }}>
-            <Check size={28} color="#10b981" strokeWidth={3} />
+            <Check size={28} color="#FFD700" strokeWidth={3} />
           </div>
           <div style={{ fontSize: isMobile ? '1rem' : '1.15rem', fontWeight: '800', color: '#fff', marginBottom: '0.25rem' }}>
             {successData.isEdit ? 'Bijgewerkt!' : 'Gelogd!'}
@@ -343,7 +348,7 @@ export default function FoodLogModal({
           <div style={{ fontSize: isMobile ? '0.75rem' : '0.8rem', color: 'rgba(255, 255, 255, 0.5)', textAlign: 'center', maxWidth: '250px' }}>
             {successData.name}
           </div>
-          <div style={{ fontSize: isMobile ? '0.65rem' : '0.7rem', color: '#10b981', fontWeight: '700', marginTop: '0.375rem' }}>
+          <div style={{ fontSize: isMobile ? '0.65rem' : '0.7rem', color: '#FFD700', fontWeight: '700', marginTop: '0.375rem' }}>
             +{successData.calories} kcal → {MOMENT_LABELS[successData.meal_type] || 'Gelogd'}
           </div>
         </div>
@@ -366,6 +371,24 @@ export default function FoodLogModal({
             }}
           >
             <ArrowLeft size={16} />
+          </button>
+          <button
+            onClick={() => setShowFeedback(true)}
+            title="Klopt iets niet?"
+            style={{
+              position: 'absolute', top: isMobile ? '0.75rem' : '1rem',
+              right: isMobile ? '0.75rem' : '1rem',
+              display: 'flex', alignItems: 'center', gap: '0.3rem',
+              padding: '0 0.7rem', height: '36px', borderRadius: '10px',
+              background: 'rgba(255, 215, 0, 0.1)',
+              border: '1px solid rgba(255, 215, 0, 0.3)',
+              color: '#FFD700',
+              fontSize: '0.72rem', fontWeight: 700,
+              cursor: 'pointer', zIndex: 10001,
+              touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+            }}
+          >
+            <AlertCircle size={13} /> Klopt niet?
           </button>
           <AmountPicker
             item={selectedItem}
@@ -397,9 +420,6 @@ export default function FoodLogModal({
 
           {activeTab !== 'scan' && (
             <FoodLogHeader
-              remaining={remaining}
-              targets={targets}
-              consumedToday={consumedToday}
               activeTab={activeTab}
               onTabChange={setActiveTab}
               isMobile={isMobile}
@@ -419,7 +439,7 @@ export default function FoodLogModal({
               />
             )}
             {activeTab === 'quick' && (
-              <QuickAddTab onLog={handleLog} isMobile={isMobile} />
+              <QuickAddTab onLog={handleLog} isMobile={isMobile} db={db} />
             )}
             {activeTab === 'meals' && (
               <MyMealsTab
@@ -454,13 +474,13 @@ export default function FoodLogModal({
                 left: '50%', transform: 'translateX(-50%)',
                 zIndex: 10001,
                 padding: isMobile ? '0.75rem 1.25rem' : '0.875rem 1.5rem',
-                background: '#10b981', border: 'none', borderRadius: '6px',
+                background: '#FFD700', border: 'none', borderRadius: '6px',
                 color: '#000', fontSize: isMobile ? '0.75rem' : '0.8rem',
                 fontWeight: '800', cursor: 'pointer',
                 display: 'flex', alignItems: 'center',
                 gap: '0.375rem', minHeight: '44px',
                 touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-                boxShadow: '0 4px 16px rgba(16, 185, 129, 0.3)',
+                boxShadow: '0 4px 16px rgba(255, 215, 0, 0.3)',
                 letterSpacing: '0.02em'
               }}
             >
@@ -475,6 +495,14 @@ export default function FoodLogModal({
         @keyframes flmFadeIn { from { opacity: 0; } to { opacity: 1; } }
         @keyframes flmPop { from { transform: scale(0.5); opacity: 0; } to { transform: scale(1); opacity: 1; } }
       `}</style>
+
+      <IngredientFeedbackModal
+        isOpen={showFeedback}
+        onClose={() => setShowFeedback(false)}
+        item={selectedItem}
+        client={client}
+        db={db}
+      />
     </div>
   )
 

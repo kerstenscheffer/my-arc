@@ -84,7 +84,7 @@ export default class CommandCenterService {
       const [workoutsResult, clientsResult] = await Promise.all([
         this.supabase
           .from('workout_sessions')
-          .select('id, client_id, workout_date, day_name, is_completed, exercises_completed, completed_at')
+          .select('id, client_id, workout_date, day_name, is_completed, exercises_completed, completed_at, notes')
           .in('client_id', clientIds)
           .gte('workout_date', ninetyDaysAgo.toISOString().split('T')[0])
           .order('workout_date', { ascending: false }),
@@ -154,7 +154,7 @@ export default class CommandCenterService {
       const batchSize = 200
       for (let i = 0; i < sessions.length; i += batchSize) {
         const batch = sessions.slice(i, i + batchSize).map(s => s.id)
-        const { data: progress } = await this.supabase.from('workout_progress').select('session_id, exercise_name, sets').in('session_id', batch)
+        const { data: progress } = await this.supabase.from('workout_progress').select('session_id, exercise_name, sets, notes, attachment_used').in('session_id', batch)
         if (progress) allProgress = allProgress.concat(progress)
       }
       const progressByClient = {}
@@ -172,7 +172,9 @@ export default class CommandCenterService {
           sets: completedSets.map(s => ({ reps: s.reps, weight: s.weight, partials: s.partials || 0, dropsets: s.dropsets || [] })),
           bestWeight: bestSet?.weight || 0, bestReps: bestSet?.reps || 0,
           totalSets: completedSets.length,
-          totalVolume: completedSets.reduce((v, s) => v + ((s.weight || 0) * (s.reps || 0)), 0)
+          totalVolume: completedSets.reduce((v, s) => v + ((s.weight || 0) * (s.reps || 0)), 0),
+          notes: entry.notes || null,
+          attachment_used: entry.attachment_used || null,
         })
       })
       return progressByClient

@@ -62,12 +62,12 @@ export default function PillarenSection({ isMobile }) {
   return (
     <section style={{
       scrollSnapAlign: 'start',
-      minHeight: '100vh',
+      minHeight: '100dvh',
       background: '#0a0a0a',
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
-      padding: '3rem 2rem',
+      padding: isMobile ? '2rem 1rem' : '3rem 2rem',
       position: 'relative',
       overflow: 'hidden'
     }}>
@@ -93,27 +93,30 @@ export default function PillarenSection({ isMobile }) {
         position: 'relative', zIndex: 2
       }}>
         {/* Header */}
-        <div style={{ textAlign: 'center', marginBottom: '2.5rem' }}>
+        <div style={{ textAlign: 'center', marginBottom: isMobile ? '1.5rem' : '2.5rem' }}>
           <span style={{
-            fontSize: '0.58rem', fontWeight: '800', letterSpacing: '0.15em',
+            fontSize: isMobile ? '0.55rem' : '0.58rem', fontWeight: '800', letterSpacing: '0.15em',
             color: GOLD, display: 'inline-block', marginBottom: '0.65rem'
           }}>HOE WE DAT DOEN</span>
           <h2 style={{
-            fontSize: '2.2rem',
-            fontWeight: '900', color: '#fff', margin: 0, lineHeight: 1.15
+            fontSize: isMobile ? 'clamp(1.3rem, 6vw, 1.7rem)' : '2.2rem',
+            fontWeight: '900', color: '#fff', margin: 0, lineHeight: 1.2,
+            padding: isMobile ? '0 0.25rem' : 0,
           }}>
-            Je Goed Voelen & Vet Verliezen<br/>
-            <span className="shimmer-gold" style={{ fontStyle: 'italic' }}>
-              Zonder De Moeite Van Alles Zelf Uit Zoeken
+            Naast je werk en sociale leven<br/>
+            je doelen bereiken met{' '}
+            <span style={{ fontStyle: 'italic', color: GOLD }}>
+              de 5 pilars
             </span>
           </h2>
         </div>
 
-        {/* Pillars grid — 5 cards */}
+        {/* Pillars grid — 5 cards on desktop, 2 cols on mobile (5th wraps
+            into the bottom row centered via auto-flow). */}
         <div style={{
           display: 'grid',
-          gridTemplateColumns: 'repeat(5, 1fr)',
-          gap: '0.8rem'
+          gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(5, 1fr)',
+          gap: isMobile ? '0.5rem' : '0.8rem'
         }}>
           {PILLARS.map((p, i) => {
             const Icon = p.icon
@@ -128,7 +131,7 @@ export default function PillarenSection({ isMobile }) {
                 {/* Image */}
                 <div style={{
                   width: '100%',
-                  height: '100px',
+                  height: isMobile ? '80px' : '100px',
                   position: 'relative',
                   overflow: 'hidden'
                 }}>

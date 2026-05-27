@@ -128,6 +128,28 @@ class BatchService {
     }
   }
 
+  // Batches + their items in one query — used by the Batch view so we don't
+  // have to N+1 a getBatchById per row. Items are sorted by item_number.
+  async getBatchesWithItems(coachId) {
+    try {
+      const { data, error } = await this.supabase
+        .from('content_batches')
+        .select('*, batch_items(*)')
+        .eq('coach_id', coachId)
+        .order('created_at', { ascending: false })
+      if (error) throw error
+      return (data || []).map(b => ({
+        ...b,
+        batch_items: (b.batch_items || []).slice().sort(
+          (a, z) => (a.item_number || 0) - (z.item_number || 0)
+        ),
+      }))
+    } catch (error) {
+      console.error('❌ Get batches with items failed:', error)
+      return []
+    }
+  }
+
   /**
    * Get single batch with all items (including blueprint data)
    * @param {string} batchId - Batch UUID

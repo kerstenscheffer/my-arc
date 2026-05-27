@@ -33,7 +33,6 @@ const isYouTubeShort = (url) => {
 
 export default function PageVideoWidget({ client, db, pageContext = 'home' }) {
   const [videos, setVideos] = useState([])
-  const [categories, setCategories] = useState([])
   const [loading, setLoading] = useState(true)
   const [isOpen, setIsOpen] = useState(false)
   const [playingItem, setPlayingItem] = useState(null)
@@ -50,42 +49,35 @@ export default function PageVideoWidget({ client, db, pageContext = 'home' }) {
   const loadData = async () => {
     setLoading(true)
     try {
-      const [pageVideos, coachCategories] = await Promise.all([
-        videoService.getVideosForPage(client.id, pageContext, {}, db),
-        client.trainer_id
-          ? videoService.getCategories(client.trainer_id)
-          : Promise.resolve([])
-      ])
-
+      const pageVideos = await videoService.getVideosForPage(client.id, pageContext, {}, db)
       setVideos(pageVideos || [])
-      setCategories(coachCategories || [])
     } catch (e) {
       console.error('Error loading page videos:', e)
       setVideos([])
-      setCategories([])
     } finally {
       setLoading(false)
     }
   }
 
-  // Group videos by category_id
+  // Group videos by category. We rely on the embedded video_category from
+  // the JOIN in getVideosForPage — no separate categories call needed (that
+  // used to break when client.trainer_id was missing or didn't match).
   const grouped = {}
+  const categoryMap = {} // id -> { id, name, color, order_index }
   const uncategorized = []
 
   videos.forEach(item => {
-    const catId = item?.video?.category_id
-    const found = catId ? categories.find(c => c.id === catId) : null
-
-    if (catId && found) {
-      if (!grouped[catId]) grouped[catId] = []
-      grouped[catId].push(item)
+    const cat = item?.video?.video_category
+    if (cat?.id) {
+      if (!categoryMap[cat.id]) categoryMap[cat.id] = cat
+      if (!grouped[cat.id]) grouped[cat.id] = []
+      grouped[cat.id].push(item)
     } else {
       uncategorized.push(item)
     }
   })
 
-  const orderedCategories = categories
-    .filter(cat => grouped[cat.id] && grouped[cat.id].length > 0)
+  const orderedCategories = Object.values(categoryMap)
     .sort((a, b) => (a.order_index ?? 0) - (b.order_index ?? 0))
 
   const hasContent = videos.length > 0

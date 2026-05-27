@@ -4,6 +4,17 @@
 // v7.1: Expanded stale exclusions — sale, ghost, snooze sections all excluded
 import DatabaseService from '../../services/DatabaseService'
 
+// "Dead" outcome sections — when a lead lands here, it does NOT count as a
+// funnel progression in any of the stats endpoints. Without this list, a
+// section titled "Sale verloren" would match the 'sale' keyword and bump
+// the sales count.
+const NEGATIVE_FUNNEL_WORDS = [
+  'verloren', 'lost', 'afgewezen',
+  'ghost', 'geghost',
+  'no show', 'no-show', 'noshow',
+  'unqualified',
+]
+
 class LeadManagementService {
   constructor() {
     this.db = DatabaseService
@@ -15,15 +26,26 @@ class LeadManagementService {
 
 async createLead(leadData) {
   try {
+    // Defensive: filter out string "null"/"undefined" that have been seen
+    // coming from upstream when the auth session is stale. A bare ||-fallback
+    // doesn't catch them because non-empty strings are truthy.
+    const cleanUuid = (v) => {
+      if (typeof v !== 'string') return v || null
+      if (v === 'null' || v === 'undefined' || v.trim() === '') return null
+      return v
+    }
     const insertData = {
       first_name: leadData.firstName || leadData.name?.split(' ')[0] || '',
       last_name: leadData.lastName || leadData.name?.split(' ').slice(1).join(' ') || '',
       email: leadData.email || null,
       phone: leadData.phone || null,
       lead_source: leadData.source || 'manual',
-      coach_id: leadData.coachId || null,
+      coach_id: cleanUuid(leadData.coachId),
       notes: leadData.notes || null,
-      campaign_id: leadData.campaignId || null,
+      // scrape_campaigns reference (legacy)
+      campaign_id: cleanUuid(leadData.campaignId),
+      // outreach_campaigns reference (new attribution model)
+      outreach_campaign_id: cleanUuid(leadData.outreachCampaignId),
       utm_source: leadData.utmSource || null,
       utm_medium: leadData.utmMedium || null,
       utm_campaign: leadData.utmCampaign || null,
@@ -31,11 +53,36 @@ async createLead(leadData) {
       last_touched: new Date().toISOString()
     }
 
-    const { data, error } = await this.db.supabase
+    let { data, error } = await this.db.supabase
       .from('call_leads')
       .insert(insertData)
       .select()
       .single()
+
+    // FK retries — if the caller passed a campaign id that's been deleted or
+    // archived (e.g. stale in-memory state after a delete in the logger modal),
+    // drop the offending ref and retry rather than failing the whole create.
+    if (error?.code === '23503') {
+      const msg = error.message || ''
+      let retried = false
+      if (msg.includes('outreach_campaign_id') && insertData.outreach_campaign_id) {
+        console.warn('⚠️  outreach_campaign_id FK invalid, retrying without it:', insertData.outreach_campaign_id)
+        insertData.outreach_campaign_id = null
+        retried = true
+      }
+      if (msg.includes('campaign_id_fkey') && !msg.includes('outreach_') && insertData.campaign_id) {
+        console.warn('⚠️  campaign_id FK invalid, retrying without it:', insertData.campaign_id)
+        insertData.campaign_id = null
+        retried = true
+      }
+      if (retried) {
+        ;({ data, error } = await this.db.supabase
+          .from('call_leads')
+          .insert(insertData)
+          .select()
+          .single())
+      }
+    }
 
     if (error) throw error
     console.log('✅ Lead created:', data.id, insertData.campaign_id ? `(campaign: ${insertData.campaign_id})` : '')
@@ -50,7 +97,12 @@ async createLead(leadData) {
     try {
       let query = this.db.supabase
         .from('call_leads')
-        .select(`*, lead_notes:lead_notes(count)`)
+        .select(`
+          *,
+          lead_notes:lead_notes(count),
+          source_lead_magnet:lead_magnets!call_leads_source_lead_magnet_id_fkey(id, name),
+          outreach_campaign:outreach_campaigns!call_leads_outreach_campaign_id_fkey(id, name, variant_tag)
+        `)
         .or(`coach_id.eq.${coachId},coach_id.is.null`)
         .is('deleted_at', null)
         .order('created_at', { ascending: false })
@@ -430,7 +482,11 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
       
       const { data: allLeads } = await this.db.supabase
         .from('call_leads')
-        .select('*')
+        .select(`
+          *,
+          source_lead_magnet:lead_magnets!call_leads_source_lead_magnet_id_fkey(id, name),
+          outreach_campaign:outreach_campaigns!call_leads_outreach_campaign_id_fkey(id, name, variant_tag)
+        `)
         .or(`coach_id.eq.${coachId},coach_id.is.null`)
         .is('deleted_at', null)
         .order('created_at', { ascending: false })
@@ -1045,6 +1101,7 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
 
       ;(movements || []).forEach(mov => {
         const toSection = (mov.to_section_title || '').toLowerCase()
+        if (NEGATIVE_FUNNEL_WORDS.some(w => toSection.includes(w))) return
         for (const [stage, keywords] of Object.entries(funnelKeywords)) {
           if (keywords.some(kw => toSection.includes(kw))) {
             funnel[stage].count++
@@ -1062,6 +1119,346 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
     } catch (error) {
       console.error('❌ Get funnel stats failed:', error)
       return { replied: { count: 0, leads: [] }, conversation: { count: 0, leads: [] }, callScheduled: { count: 0, leads: [] } }
+    }
+  }
+
+  // Reaction stats for a date range. Uses the two card-counters as the
+  // source of truth (NOT funnel-section keywords) because the user
+  // explicitly toggles these per lead — they're the authoritative signal:
+  //   reply_count    > 0  → lead reacted to outreach
+  //   followup_count > 0  → coach had to chase (= no reply yet)
+  // Window applies to lead.created_at — counts the cohort created in this
+  // window, regardless of when the reply/follow-up happened later.
+  async getRangeReactionStats(coachId, startISO, endISO) {
+    try {
+      const { data: leads, error } = await this.db.supabase
+        .from('call_leads')
+        .select('id, created_at, reply_count, followup_count, last_followup_sent_at')
+        .eq('coach_id', coachId)
+        .gte('created_at', startISO)
+        .lt('created_at', endISO)
+        .is('deleted_at', null)
+      if (error) throw error
+      const all = leads || []
+      const newLeads = all.length
+      const reactedLeads   = all.filter(l => (l.reply_count    || 0) > 0).length
+      const followedLeads  = all.filter(l => (l.followup_count || 0) > 0).length
+      const notReactedYet  = newLeads - reactedLeads
+      // Follow-ups SENT in the window (regardless of lead creation date) —
+      // uses last_followup_sent_at on every lead the coach owns.
+      const { count: followupsInWindow } = await this.db.supabase
+        .from('call_leads')
+        .select('id', { count: 'exact', head: true })
+        .eq('coach_id', coachId)
+        .gte('last_followup_sent_at', startISO)
+        .lt('last_followup_sent_at', endISO)
+      return {
+        newLeads,
+        reactedLeads, notReactedYet, followedLeads,
+        followupsInWindow: followupsInWindow || 0,
+      }
+    } catch (e) {
+      console.error('❌ Get range reaction stats failed:', e)
+      return { newLeads: 0, reactedLeads: 0, notReactedYet: 0, followedLeads: 0, followupsInWindow: 0 }
+    }
+  }
+
+  // Count of leads where the most recent follow-up was sent today (date,
+  // local time). Uses the denormalized `last_followup_sent_at` stamp the
+  // KanbanCard writes on every + click. One lead = one entry per day (option 1
+  // tradeoff — 2 follow-ups to same lead in 1 day still counts as 1).
+  async getTodayFollowupCount(coachId) {
+    try {
+      const today = new Date()
+      today.setHours(0, 0, 0, 0)
+      const { count, error } = await this.db.supabase
+        .from('call_leads')
+        .select('id', { count: 'exact', head: true })
+        .eq('coach_id', coachId)
+        .gte('last_followup_sent_at', today.toISOString())
+      if (error) throw error
+      return count || 0
+    } catch (error) {
+      console.error('❌ Get today followup count failed:', error)
+      return 0
+    }
+  }
+
+  // Range version of getTodayActivity — same payload shape but for any
+  // [start, end) window. `startISO` is the inclusive lower bound, `endISO`
+  // the exclusive upper bound (both ISO strings, e.g. midnight boundaries).
+  async getRangeActivity(coachId, startISO, endISO) {
+    try {
+      const { data: movements, error: movError } = await this.db.supabase
+        .from('lead_movements')
+        .select('*')
+        .gte('moved_at', startISO)
+        .lt('moved_at', endISO)
+        .order('moved_at', { ascending: false })
+      if (movError) throw movError
+
+      const movementsBySection = {}
+      const movementsList = []
+      ;(movements || []).forEach(mov => {
+        const toSection = mov.to_section_title || 'Unknown'
+        const fromSection = mov.from_section_title || 'Niet toegewezen'
+        if (!movementsBySection[toSection]) movementsBySection[toSection] = { count: 0, leads: [] }
+        movementsBySection[toSection].count++
+        movementsBySection[toSection].leads.push(mov.lead_id)
+        movementsList.push({
+          leadName: mov.lead_name || 'Unknown',
+          leadId: mov.lead_id,
+          from: fromSection, to: toSection,
+          time: new Date(mov.moved_at).toLocaleString('nl-NL', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }),
+        })
+      })
+
+      // Touches: any lead whose last_touched falls in this window. New
+      // outreach = those whose created_at also falls inside; otherwise it's
+      // a follow-up of an older lead.
+      const { data: touchedLeads, error: touchError } = await this.db.supabase
+        .from('call_leads')
+        .select('id, first_name, last_name, created_at, last_touched, lead_source')
+        .gte('last_touched', startISO)
+        .lt('last_touched', endISO)
+        .is('deleted_at', null)
+      if (touchError) throw touchError
+
+      const startT = new Date(startISO).getTime()
+      const endT = new Date(endISO).getTime()
+      const newOutreach = (touchedLeads || []).filter(l => {
+        const t = new Date(l.created_at).getTime()
+        return t >= startT && t < endT
+      })
+      const followUps = (touchedLeads || []).filter(l => {
+        const t = new Date(l.created_at).getTime()
+        return t < startT
+      })
+
+      return {
+        movements: movements || [],
+        movementsBySection,
+        totalMovements: movements?.length || 0,
+        newOutreach: newOutreach.length,
+        followUps: followUps.length,
+        totalTouches: newOutreach.length + followUps.length,
+        touchedLeadIds: (touchedLeads || []).map(l => l.id),
+        movementsList,
+      }
+    } catch (error) {
+      console.error('❌ Get range activity failed:', error)
+      return {
+        movements: [], movementsBySection: {}, totalMovements: 0,
+        newOutreach: 0, followUps: 0, totalTouches: 0,
+        touchedLeadIds: [], movementsList: [],
+      }
+    }
+  }
+
+  // Range version of getTodayFunnelStats.
+  async getRangeFunnelStats(coachId, startISO, endISO) {
+    try {
+      const { data: movements } = await this.db.supabase
+        .from('lead_movements')
+        .select('*')
+        .gte('moved_at', startISO)
+        .lt('moved_at', endISO)
+      // ORDER MATTERS — first match wins. We check `callProposed` ahead of
+      // `callScheduled` so a section titled "Call voorgesteld" lands in the
+      // proposed-bucket and "Sales Call" / "Ingepland" lands in the
+      // scheduled-bucket. Generic 'call' is intentionally NOT in the
+      // scheduled keywords because that would catch "Call voorgesteld" too.
+      const funnelKeywords = {
+        replied:       ['replied', 'gereageerd', 'reactie', 'response', 'antwoord'],
+        conversation:  ['gesprek', 'conversation', 'kwalificatie', 'qualified', 'interesse'],
+        callProposed:  ['voorgesteld', 'voorstel'],
+        callScheduled: ['sales call', 'ingepland', 'scheduled', 'booking', 'afspraak', 'meeting'],
+        sale:          ['sale', 'verkocht', 'klant', 'client', 'gewonnen', 'won', 'deal'],
+      }
+      const funnel = {
+        replied:       { count: 0, leads: [] },
+        conversation:  { count: 0, leads: [] },
+        callProposed:  { count: 0, leads: [] },
+        callScheduled: { count: 0, leads: [] },
+        sale:          { count: 0, leads: [] },
+      }
+      ;(movements || []).forEach(mov => {
+        const toSection = (mov.to_section_title || '').toLowerCase()
+        if (NEGATIVE_FUNNEL_WORDS.some(w => toSection.includes(w))) return
+        for (const [stage, keywords] of Object.entries(funnelKeywords)) {
+          if (keywords.some(kw => toSection.includes(kw))) {
+            funnel[stage].count++
+            funnel[stage].leads.push({
+              name: mov.lead_name || 'Unknown',
+              from: mov.from_section_title || 'Unknown',
+              time: new Date(mov.moved_at).toLocaleString('nl-NL', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }),
+            })
+            break
+          }
+        }
+      })
+      return funnel
+    } catch (error) {
+      console.error('❌ Get range funnel stats failed:', error)
+      return {
+        replied: { count: 0, leads: [] }, conversation: { count: 0, leads: [] },
+        callProposed: { count: 0, leads: [] }, callScheduled: { count: 0, leads: [] },
+        sale: { count: 0, leads: [] },
+      }
+    }
+  }
+
+  // Breakdown of new leads grouped by source within [start, end). Returns
+  // two arrays — by outreach campaign and by lead magnet — each with
+  // counts of total new leads in the window and how many of those reached
+  // a call sectie (call_proposed or call_scheduled).
+  async getRangeLeadSources(coachId, startISO, endISO) {
+    try {
+      // Pull leads created in the window
+      const { data: leads } = await this.db.supabase
+        .from('call_leads')
+        .select('id, created_at, outreach_campaign_id, source_lead_magnet_id, followup_count, reply_count')
+        .eq('coach_id', coachId)
+        .gte('created_at', startISO)
+        .lt('created_at', endISO)
+        .is('deleted_at', null)
+
+      const leadIds = (leads || []).map(l => l.id)
+
+      // Per-lead stage flags so we can break down each source by funnel
+      // stage. Order matters: callProposed is checked BEFORE callScheduled
+      // (same convention as getRangeFunnelStats) so "Call voorgesteld"
+      // doesn't accidentally count as scheduled.
+      const stageKeywords = [
+        { key: 'replied',       words: ['replied', 'gereageerd', 'reactie', 'response', 'antwoord'] },
+        { key: 'callProposed',  words: ['voorgesteld', 'voorstel'] },
+        { key: 'callScheduled', words: ['sales call', 'ingepland', 'scheduled', 'booking', 'afspraak', 'meeting'] },
+        { key: 'sale',          words: ['sale', 'verkocht', 'klant', 'client', 'gewonnen', 'won', 'deal'] },
+      ]
+      // perLeadStages[leadId] = { replied, callProposed, callScheduled, sale }
+      const perLeadStages = new Map()
+      const reachedCall = new Set()
+      if (leadIds.length > 0) {
+        const { data: moves } = await this.db.supabase
+          .from('lead_movements')
+          .select('lead_id, to_section_title, moved_at')
+          .in('lead_id', leadIds)
+          .gte('moved_at', startISO)
+          .lt('moved_at', endISO)
+        ;(moves || []).forEach(m => {
+          const t = (m.to_section_title || '').toLowerCase()
+          if (NEGATIVE_FUNNEL_WORDS.some(w => t.includes(w))) return
+          for (const stage of stageKeywords) {
+            if (stage.words.some(k => t.includes(k))) {
+              const entry = perLeadStages.get(m.lead_id) || { replied: 0, callProposed: 0, callScheduled: 0, sale: 0 }
+              entry[stage.key] = 1
+              perLeadStages.set(m.lead_id, entry)
+              if (stage.key === 'callProposed' || stage.key === 'callScheduled') {
+                reachedCall.add(m.lead_id)
+              }
+              break
+            }
+          }
+        })
+      }
+
+      // Lookup names for campaigns + magnets we actually touched
+      const campIds = [...new Set((leads || []).map(l => l.outreach_campaign_id).filter(Boolean))]
+      const magnetIds = [...new Set((leads || []).map(l => l.source_lead_magnet_id).filter(Boolean))]
+      const [{ data: camps }, { data: mags }] = await Promise.all([
+        campIds.length ? this.db.supabase.from('outreach_campaigns').select('id, name, variant_tag, message_text, platform, purpose').in('id', campIds) : { data: [] },
+        magnetIds.length ? this.db.supabase.from('lead_magnets').select('id, name, description').in('id', magnetIds) : { data: [] },
+      ])
+      const campMap = new Map((camps || []).map(c => [c.id, c]))
+      const magMap = new Map((mags || []).map(m => [m.id, m]))
+
+      const campStats = new Map() // id → { name, total, reached }
+      const magStats = new Map()
+      let noSourceTotal = 0
+      let noSourceReached = 0
+
+      const emptyStages = () => ({ replied: 0, callProposed: 0, callScheduled: 0, sale: 0 })
+      const noSourceStages = emptyStages()
+      let noSourceFollowups = 0
+      let noSourceReplied = 0
+      let noSourceFollowed = 0
+      ;(leads || []).forEach(l => {
+        const stages = perLeadStages.get(l.id) || emptyStages()
+        const reached = reachedCall.has(l.id) ? 1 : 0
+        const fc = l.followup_count || 0
+        const repliedOne = (l.reply_count || 0) > 0 ? 1 : 0
+        const followedOne = fc > 0 ? 1 : 0
+        if (l.outreach_campaign_id) {
+          const c = campMap.get(l.outreach_campaign_id)
+          const entry = campStats.get(l.outreach_campaign_id) || {
+            id: l.outreach_campaign_id,
+            name: c ? `${c.name}${c.variant_tag ? ` · ${c.variant_tag}` : ''}` : 'Onbekende campagne',
+            messageText: c?.message_text || null,
+            platform: c?.platform || null,
+            purpose: c?.purpose || null,
+            total: 0, reached: 0, followupCount: 0,
+            repliedLeads: 0, followedLeads: 0,
+            stages: emptyStages(),
+          }
+          entry.total += 1
+          entry.reached += reached
+          entry.followupCount += fc
+          entry.repliedLeads  += repliedOne
+          entry.followedLeads += followedOne
+          entry.stages.replied       += stages.replied
+          entry.stages.callProposed  += stages.callProposed
+          entry.stages.callScheduled += stages.callScheduled
+          entry.stages.sale          += stages.sale
+          campStats.set(l.outreach_campaign_id, entry)
+        } else if (l.source_lead_magnet_id) {
+          const m = magMap.get(l.source_lead_magnet_id)
+          const entry = magStats.get(l.source_lead_magnet_id) || {
+            id: l.source_lead_magnet_id,
+            name: m?.name || 'Onbekende lead magnet',
+            description: m?.description || null,
+            total: 0, reached: 0, followupCount: 0,
+            repliedLeads: 0, followedLeads: 0,
+            stages: emptyStages(),
+          }
+          entry.total += 1
+          entry.reached += reached
+          entry.followupCount += fc
+          entry.repliedLeads  += repliedOne
+          entry.followedLeads += followedOne
+          entry.stages.replied       += stages.replied
+          entry.stages.callProposed  += stages.callProposed
+          entry.stages.callScheduled += stages.callScheduled
+          entry.stages.sale          += stages.sale
+          magStats.set(l.source_lead_magnet_id, entry)
+        } else {
+          noSourceTotal += 1
+          noSourceReached += reached
+          noSourceFollowups += fc
+          noSourceReplied  += repliedOne
+          noSourceFollowed += followedOne
+          noSourceStages.replied       += stages.replied
+          noSourceStages.callProposed  += stages.callProposed
+          noSourceStages.callScheduled += stages.callScheduled
+          noSourceStages.sale          += stages.sale
+        }
+      })
+
+      const sortByTotal = (a, b) => b.total - a.total
+      return {
+        campaigns: [...campStats.values()].sort(sortByTotal),
+        magnets:   [...magStats.values()].sort(sortByTotal),
+        noSource:  {
+          total: noSourceTotal, reached: noSourceReached,
+          followupCount: noSourceFollowups,
+          repliedLeads: noSourceReplied, followedLeads: noSourceFollowed,
+          stages: noSourceStages,
+        },
+        totalLeads: (leads || []).length,
+        totalFollowups: (leads || []).reduce((sum, l) => sum + (l.followup_count || 0), 0),
+      }
+    } catch (error) {
+      console.error('❌ Get range lead sources failed:', error)
+      return { campaigns: [], magnets: [], noSource: { total: 0, reached: 0 }, totalLeads: 0 }
     }
   }
 

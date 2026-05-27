@@ -202,7 +202,8 @@ export default function WarmUpBoard({
     } catch (error) {
       console.error('Add lead failed:', error)
       removeLeadFromBoard(optimisticLead.id)
-      alert('Lead toevoegen mislukt')
+      const msg = error?.message || error?.details || JSON.stringify(error)
+      alert(`Lead toevoegen mislukt — ${msg}`)
     }
   }
 

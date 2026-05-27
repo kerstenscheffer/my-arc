@@ -127,6 +127,14 @@ export default function CoachCommandCenter({ db, onSelectClient, setActiveTab, o
     }
     return true
   })
+  // Push paused / ended coaching clients to the bottom so the coach sees
+  // active clients first. Order within each bucket is preserved (stable sort).
+  .slice()
+  .sort((a, b) => {
+    const aw = a.coaching_status === 'ended' ? 2 : a.coaching_status === 'paused' ? 1 : 0
+    const bw = b.coaching_status === 'ended' ? 2 : b.coaching_status === 'paused' ? 1 : 0
+    return aw - bw
+  })
 
   if (loading) {
     return (

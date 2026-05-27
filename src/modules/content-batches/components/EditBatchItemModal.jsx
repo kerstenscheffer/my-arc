@@ -24,6 +24,7 @@ import {
   ChevronUp
 } from 'lucide-react'
 import { POST_FORMATS, STORY_GOALS, STORY_TOPICS, BLUEPRINT_STEP_TYPES, BROLL_TYPES } from '../constants'
+import TeleprompterModal from '../../output-planning/components/TeleprompterModal'
 
 const GOLD = {
   primary: '#FFD700',
@@ -65,6 +66,7 @@ export default function EditBatchItemModal({
   
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState(null)
+  const [showTeleprompter, setShowTeleprompter] = useState(false)
   
   // Load data when batchItem changes
   useEffect(() => {
@@ -393,7 +395,27 @@ export default function EditBatchItemModal({
           
           {/* Script */}
           <div style={{ marginBottom: '1rem' }}>
-            <label style={fieldLabel()}>Script / Voice-over</label>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem', marginBottom: '0.35rem' }}>
+              <label style={{ ...fieldLabel(), marginBottom: 0 }}>Script / Voice-over</label>
+              <button
+                type="button"
+                onClick={() => setShowTeleprompter(true)}
+                disabled={!script.trim()}
+                style={{
+                  display: 'inline-flex', alignItems: 'center', gap: '0.35rem',
+                  padding: '0.4rem 0.65rem', minHeight: 36,
+                  background: script.trim() ? GOLD.primary : 'rgba(255,255,255,0.05)',
+                  color: script.trim() ? '#000' : 'rgba(255,255,255,0.3)',
+                  border: 'none', borderRadius: 6,
+                  fontSize: '0.72rem', fontWeight: 700,
+                  cursor: script.trim() ? 'pointer' : 'not-allowed',
+                  touchAction: 'manipulation',
+                }}
+                title="Teleprompter openen"
+              >
+                <Video size={13} /> Teleprompter
+              </button>
+            </div>
             <textarea
               value={script}
               onChange={(e) => setScript(e.target.value)}
@@ -1077,6 +1099,13 @@ export default function EditBatchItemModal({
           to { transform: rotate(360deg); }
         }
       `}</style>
+
+      <TeleprompterModal
+        isOpen={showTeleprompter}
+        onClose={() => setShowTeleprompter(false)}
+        script={script}
+        title={title}
+      />
     </div>
   )
 }

@@ -5,7 +5,7 @@ import { createPortal } from 'react-dom'
 import {
   TrendingDown, TrendingUp,
   MessageCircle, Power, Camera, Dumbbell, MoreHorizontal,
-  BarChart3, UtensilsCrossed, BookOpen
+  BarChart3, UtensilsCrossed, BookOpen, Pause
 } from 'lucide-react'
 import ClientInsightModal from './ClientInsightModal'
 import CoachingLogModal from './CoachingLogModal'
@@ -133,16 +133,75 @@ export default function ClientWeightCard({ client, isMobile, onToggleStatus, sho
   const goalRoute  = intakeDoel?.route || client.primary_goal || null
   const goalLabel  = GOAL_LABELS[goalRoute] || goalRoute || null
 
+  const isPaused = client.coaching_status === 'paused'
+  const isEnded  = client.coaching_status === 'ended'
+  // Only tint as "active coaching" when a coaching period is actually set
+  // up. Clients without coaching_start_date still get the neutral look so
+  // it's visible they need attention to onboard.
+  const isCoachingActive = client.coaching_status === 'active' && !!client.coaching_start_date
+
+  // Per-status look. borderLeft keeps the urgency-colour signal for active
+  // clients (red/orange/gold based on weigh-in status) — only the background
+  // and outer border carry the coaching-status tint.
+  let cardBg = '#0a0a0a'
+  let cardBorder = '1px solid rgba(255,255,255,0.06)'
+  let cardBorderLeft = `3px solid ${urgencyColor}`
+  let cardShadow
+  if (isPaused) {
+    cardBg = 'linear-gradient(135deg, rgba(245,158,11,0.18) 0%, rgba(245,158,11,0.06) 60%, rgba(10,10,10,0.95) 100%)'
+    cardBorder = '1px solid rgba(245,158,11,0.45)'
+    cardBorderLeft = '4px solid #f59e0b'
+    cardShadow = '0 0 0 1px rgba(245,158,11,0.15), 0 4px 16px rgba(245,158,11,0.12)'
+  } else if (isEnded) {
+    cardBg = 'linear-gradient(135deg, rgba(107,114,128,0.14) 0%, rgba(10,10,10,0.95) 100%)'
+    cardBorder = '1px solid rgba(107,114,128,0.3)'
+  } else if (isCoachingActive) {
+    cardBg = 'linear-gradient(135deg, rgba(16,185,129,0.12) 0%, rgba(16,185,129,0.04) 60%, rgba(10,10,10,0.95) 100%)'
+    cardBorder = '1px solid rgba(16,185,129,0.3)'
+    cardShadow = '0 0 0 1px rgba(16,185,129,0.08)'
+  }
+
   return (
     <div style={{
-      background: '#0a0a0a',
-      border: '1px solid rgba(255,255,255,0.06)',
-      borderLeft: `3px solid ${urgencyColor}`,
+      background: cardBg,
+      border: cardBorder,
+      borderLeft: cardBorderLeft,
       borderRadius: isMobile ? '10px' : '12px',
       overflow: 'hidden', position: 'relative',
       transition: 'all 0.2s ease', transform: 'translateZ(0)',
-      opacity: isInactive ? 0.6 : 1
+      opacity: isInactive ? 0.6 : 1,
+      boxShadow: cardShadow,
     }}>
+
+      {/* ── PAUSE BANNER — full-width, prominent ── */}
+      {isPaused && (
+        <div style={{
+          padding: '0.35rem 0.75rem',
+          background: 'rgba(245,158,11,0.22)',
+          borderBottom: '1px solid rgba(245,158,11,0.32)',
+          display: 'flex', alignItems: 'center', gap: '0.4rem',
+          color: '#f59e0b',
+        }}>
+          <Pause size={12} strokeWidth={2.8} fill="#f59e0b" />
+          <span style={{
+            fontSize: '0.62rem', fontWeight: '900',
+            textTransform: 'uppercase', letterSpacing: '0.08em',
+          }}>
+            Coaching gepauzeerd
+          </span>
+          {client.coaching_pause_reason && (
+            <>
+              <span style={{ color: 'rgba(245,158,11,0.5)' }}>·</span>
+              <span style={{
+                fontSize: '0.65rem', fontWeight: '700',
+                color: 'rgba(255,255,255,0.75)',
+              }}>
+                {client.coaching_pause_reason}
+              </span>
+            </>
+          )}
+        </div>
+      )}
 
       {/* ── ROW 1 ── */}
       <div style={{

@@ -118,24 +118,47 @@ class ProductivityService {
 
   async createTask(coachId, taskData) {
     try {
+      // Forward agenda/scheduling fields so a task born from a tap on the
+      // agenda actually lands on the tapped slot. Without these spreads the
+      // INSERT silently dropped scheduled_day/start/end and the new card
+      // ended up in "Niet gepland".
+      const estMin = taskData.estimated_minutes
+      const payload = {
+        coach_id: coachId,
+        section_id: taskData.sectionId || null,
+        title: taskData.title,
+        description: taskData.description || null,
+        priority: taskData.priority || 'medium',
+        category: taskData.category || null,
+        deadline: taskData.deadline || null,
+        position: taskData.position || 0,
+        needs_reflection: (taskData.needs_reflection ?? taskData.needsReflection) !== false,
+        ...(taskData.scheduled_day        !== undefined ? { scheduled_day: taskData.scheduled_day } : {}),
+        ...(taskData.scheduled_date       !== undefined ? { scheduled_date: taskData.scheduled_date } : {}),
+        ...(taskData.scheduled_start_time !== undefined ? { scheduled_start_time: taskData.scheduled_start_time } : {}),
+        ...(taskData.scheduled_end_time   !== undefined ? { scheduled_end_time: taskData.scheduled_end_time } : {}),
+        ...(estMin !== undefined && estMin !== '' && estMin !== null
+          ? { estimated_minutes: Number(estMin) } : {}),
+        // Recurring fields — repeat the task on the given weekdays every week
+        ...(taskData.recurrence_active !== undefined ? { recurrence_active: !!taskData.recurrence_active } : {}),
+        ...(taskData.recurrence_days   !== undefined ? { recurrence_days: taskData.recurrence_days } : {}),
+      }
+      console.log('[RECUR-DEBUG service createTask payload]', {
+        recurrence_active: payload.recurrence_active,
+        recurrence_days: payload.recurrence_days,
+        recur_keys_in_payload: Object.keys(payload).filter(k => k.startsWith('recurrence')),
+      })
       const { data, error } = await this.db.supabase
-        .from('productivity_tasks')
-        .insert({
-          coach_id: coachId,
-          section_id: taskData.sectionId || null,
-          title: taskData.title,
-          description: taskData.description || null,
-          priority: taskData.priority || 'medium',
-          category: taskData.category || null,
-          deadline: taskData.deadline || null,
-          position: taskData.position || 0,
-          needs_reflection: taskData.needsReflection !== false
-        })
-        .select()
-        .single()
-
-      if (error) throw error
-      console.log('✅ Task created:', data.id)
+        .from('productivity_tasks').insert(payload).select().single()
+      if (error) {
+        console.error('[RECUR-DEBUG service createTask error]', error)
+        throw error
+      }
+      console.log('[RECUR-DEBUG service createTask result]', {
+        id: data.id,
+        recurrence_active: data.recurrence_active,
+        recurrence_days: data.recurrence_days,
+      })
       return data
     } catch (error) {
       console.error('❌ Create task failed:', error)
@@ -173,6 +196,12 @@ class ProductivityService {
       if (sanitized.category === '') sanitized.category = null
       if (sanitized.description === '') sanitized.description = null
 
+      if ('recurrence_active' in sanitized || 'recurrence_days' in sanitized) {
+        console.log('[RECUR-DEBUG service updateTask sanitized]', taskId, {
+          recurrence_active: sanitized.recurrence_active,
+          recurrence_days: sanitized.recurrence_days,
+        })
+      }
       const { data, error } = await this.db.supabase
         .from('productivity_tasks')
         .update({
@@ -183,8 +212,19 @@ class ProductivityService {
         .select()
         .single()
 
-      if (error) throw error
-      console.log('✅ Task updated:', taskId)
+      if (error) {
+        if ('recurrence_active' in sanitized || 'recurrence_days' in sanitized) {
+          console.error('[RECUR-DEBUG service updateTask error]', error)
+        }
+        throw error
+      }
+      if ('recurrence_active' in sanitized || 'recurrence_days' in sanitized) {
+        console.log('[RECUR-DEBUG service updateTask result]', {
+          id: data.id,
+          recurrence_active: data.recurrence_active,
+          recurrence_days: data.recurrence_days,
+        })
+      }
       return data
     } catch (error) {
       console.error('❌ Update task failed:', error)

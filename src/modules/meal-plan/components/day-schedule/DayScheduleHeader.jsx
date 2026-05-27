@@ -18,12 +18,12 @@ export default function DayScheduleHeader({ dayTemplates, onOpenTemplate, isMobi
         alignItems: 'center',
         gap: '0.5rem'
       }}>
-        <Calendar size={isMobile ? 14 : 16} color="#10b981" strokeWidth={2} />
+        <Calendar size={isMobile ? 14 : 16} color="#FFD700" strokeWidth={2} />
         <div style={{ minWidth: 0, overflow: 'hidden' }}>
           <div style={{
             fontSize: isMobile ? '0.5rem' : '0.55rem',
             fontWeight: '700',
-            color: 'rgba(16, 185, 129, 0.5)',
+            color: 'rgba(255, 215, 0, 0.5)',
             textTransform: 'uppercase',
             letterSpacing: '0.05em',
             lineHeight: 1,

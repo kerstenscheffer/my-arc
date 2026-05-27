@@ -188,14 +188,18 @@ const videoService = {
       const { data: assignments, error: assignmentError } = await supabase.from('video_assignments').select('*').eq('client_id', clientId).eq('page_context', pageContext).order('scheduled_for', { ascending: false })
       if (assignmentError) { console.error('Error fetching assignments:', assignmentError); return [] }
 
-      const { data: defaultVideos, error: defaultError } = await supabase.from('coach_videos').select('*').contains('default_pages', [pageContext]).eq('is_active', true)
+      // Embed category (id/name/color/icon/order_index) directly. Saves a
+      // second roundtrip in the UI and avoids coach_id-mismatch fallbacks.
+      const VIDEO_SELECT = '*, video_category:video_categories(id, name, color, icon, order_index)'
+
+      const { data: defaultVideos, error: defaultError } = await supabase.from('coach_videos').select(VIDEO_SELECT).contains('default_pages', [pageContext]).eq('is_active', true)
       if (defaultError) console.error('Error fetching default videos:', defaultError)
 
       let assignedVideoData = []
       if (assignments && assignments.length > 0) {
         const videoIds = [...new Set(assignments.map(a => a.video_id).filter(Boolean))]
         if (videoIds.length > 0) {
-          const { data: videos, error: videoError } = await supabase.from('coach_videos').select('*').in('id', videoIds).eq('is_active', true)
+          const { data: videos, error: videoError } = await supabase.from('coach_videos').select(VIDEO_SELECT).in('id', videoIds).eq('is_active', true)
           if (!videoError && videos) {
             const videoMap = new Map(videos.map(v => [v.id, v]))
             assignedVideoData = assignments.map(assignment => ({

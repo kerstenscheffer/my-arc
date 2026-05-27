@@ -27,11 +27,11 @@ export default function DaySelector({ days, currentDay, onDayClick, isToday, isM
                 flex: 1,
                 height: isMobile ? '38px' : '42px',
                 borderRadius: '8px',
-                background: isSelected ? '#10b981' : 'transparent',
+                background: isSelected ? '#FFD700' : 'transparent',
                 border: isSelected
-                  ? '1px solid rgba(16, 185, 129, 0.5)'
+                  ? '1px solid rgba(255, 215, 0, 0.5)'
                   : '1px solid rgba(255, 255, 255, 0.06)',
-                color: isSelected ? '#fff' : isDayToday ? '#10b981' : 'rgba(255, 255, 255, 0.4)',
+                color: isSelected ? '#fff' : isDayToday ? '#FFD700' : 'rgba(255, 255, 255, 0.4)',
                 fontSize: isMobile ? '0.7rem' : '0.75rem',
                 fontWeight: isSelected || isDayToday ? '800' : '600',
                 cursor: 'pointer',
@@ -55,7 +55,7 @@ export default function DaySelector({ days, currentDay, onDayClick, isToday, isM
                   width: '4px',
                   height: '4px',
                   borderRadius: '50%',
-                  background: '#10b981'
+                  background: '#FFD700'
                 }} />
               )}
             </button>

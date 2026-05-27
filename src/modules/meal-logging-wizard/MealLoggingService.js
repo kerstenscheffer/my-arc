@@ -25,28 +25,41 @@ export default class MealLoggingService {
         consumedAt
       })
 
+      // Persist portion info so re-opens show the right grams/macros split.
+      // Recent re-logs and edits depend on these to scale macros correctly.
+      const hasAmount = mealData.amount !== undefined && mealData.amount !== null && mealData.amount !== ''
+      const amountVal = hasAmount ? parseFloat(mealData.amount) : null
+      const perUnitVal = mealData.per_unit
+        || (typeof mealData.per100g === 'boolean'
+              ? (mealData.per100g ? 'gram' : 'portion')
+              : null)
+
       const mealLog = {
         client_id: clientId,
         coach_id: mealData.coach_id || null,
         meal_name: mealData.meal_name || mealData.name,
         meal_id: mealData.meal_id || mealData.id || null,
         meal_type: mealData.meal_type || 'custom',
-        
+
         // Ingredients (JSONB)
         ingredients: mealData.ingredients || mealData.ingredients_list || [],
-        
-        // Macros
+
+        // Macros (totals for the persisted amount)
         calories: parseFloat(mealData.calories) || 0,
         protein: parseFloat(mealData.protein) || 0,
         carbs: parseFloat(mealData.carbs) || 0,
         fat: parseFloat(mealData.fat) || 0,
-        
+
+        // Portion (for correct re-open + edit)
+        amount: Number.isFinite(amountVal) ? amountVal : null,
+        per_unit: perUnitVal,
+
         // Metadata
         consumed_at: consumedAt.toISOString(),
         source: mealData.source || 'manual_log',
         notes: mealData.notes || null,
         image_url: mealData.image_url || null,
-        
+
         // Timestamp
         created_at: new Date().toISOString()
       }

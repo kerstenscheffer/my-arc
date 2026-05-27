@@ -15,6 +15,8 @@ import ShoppingHub from '../modules/shopping/ShoppingHub'
 import NotificationWidget from '../modules/notifications/NotificationWidget'
 import PWAUpdateBanner from '../components/PWAUpdateBanner'
 import ClientFAQModal from '../modules/faq/ClientFAQModal'
+import CheckinReminderPopup from './components/CheckinReminderPopup'
+import CheckinModal from './components/CheckinModal'
 
 // Lucide Icons
 import { 
@@ -51,6 +53,7 @@ export default function ClientDashboard() {
   const [schema, setSchema] = useState(null)
   const [loading, setLoading] = useState(true)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const [showCheckinModal, setShowCheckinModal] = useState(false)
   const [error, setError] = useState(null)
   const [isMobile, setIsMobile] = useState(window.innerWidth <= 768)
   
@@ -223,6 +226,14 @@ export default function ClientDashboard() {
       position: 'relative'
     }}>
       <PWAUpdateBanner />
+
+      {/* Weekly check-in nag — center popup on Friday + missed-Friday window */}
+      <CheckinReminderPopup
+        client={client}
+        db={db}
+        isMobile={isMobile}
+        onOpen={() => setShowCheckinModal(true)}
+      />
 
       {/* ── Header ── */}
       <header style={{
@@ -514,6 +525,14 @@ export default function ClientDashboard() {
         db={db}
         onNavigate={(view) => setCurrentView(view)}
         coachWhatsApp="31631388756"
+      />
+
+      <CheckinModal
+        isOpen={showCheckinModal}
+        onClose={() => setShowCheckinModal(false)}
+        client={client}
+        db={db}
+        isMobile={isMobile}
       />
 
       <style>{`

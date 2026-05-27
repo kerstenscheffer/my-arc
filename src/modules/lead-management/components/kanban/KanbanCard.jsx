@@ -5,14 +5,13 @@
 // STYLING: Flush rows, borderBottom dividers, no gradient backgrounds, compact data-driven
 
 import { useState, useEffect, useRef } from 'react'
-import { createPortal } from 'react-dom'
-import { 
-  Edit2, Trash2, FileText, MessageCircle, Plus, Minus, 
-  ArrowLeftCircle, Clock, CheckCircle, Circle, Flame, 
-  ChevronDown, ChevronUp, Info, Target, AlertTriangle,
-  Gift, X, Save
+import {
+  MessageCircle, Plus, Minus,
+  ArrowLeftCircle, Clock, CheckCircle, Circle, Flame,
+  Info, FileText, Send, Gift,
 } from 'lucide-react'
 import DMConversationModal from "../../../dm-conversation/components/DMConversationModal"
+import LeadDetailModalV2 from "./LeadDetailModalV2"
 
 // ============================================
 // CRM CONFIG
@@ -34,12 +33,12 @@ const TEMP_CONFIG = {
   hot:  { label: 'HOT',  color: '#ef4444', bg: 'rgba(239,68,68,0.12)',  border: 'rgba(239,68,68,0.25)' }
 }
 
-export default function KanbanCard({ 
-  lead, 
-  sectionColor, 
-  isMobile, 
-  onDragStart, 
-  onEdit, 
+export default function KanbanCard({
+  lead,
+  sectionColor,
+  isMobile,
+  onDragStart,
+  onEdit,
   onDelete,
   onSnooze,
   onClick,
@@ -49,59 +48,32 @@ export default function KanbanCard({
   db,
   onRefresh,
   sectionTitle = '',
-  onSalesCallClick
+  onSalesCallClick,
+  onMagnetAttached,
 }) {
-  const [isEditing, setIsEditing] = useState(false)
-  const [showInfo, setShowInfo] = useState(false)
   const [showReturnDropdown, setShowReturnDropdown] = useState(false)
   const [showDMModal, setShowDMModal] = useState(false)
-  const [showMagnetPicker, setShowMagnetPicker] = useState(false)
+  // Central tabbed lead-detail modal — primary path for "open this lead and
+  // see/edit everything". Triggered by card click + by the explicit button.
+  const [showDetail, setShowDetail] = useState(false)
   const dropdownRef = useRef(null)
-  const magnetRef = useRef(null)
-
-  const [editData, setEditData] = useState({
-    first_name: lead.first_name || '',
-    last_name: lead.last_name || '',
-    email: lead.email || '',
-    phone: lead.phone || '',
-    lead_source: lead.lead_source || '',
-    notes: lead.notes || '',
-    lead_struggle: lead.lead_struggle || '',
-    lead_goal: lead.lead_goal || '',
-    lead_temperature: lead.lead_temperature || ''
-  })
 
   const [replyCount, setReplyCount] = useState(lead.reply_count || 0)
   const [updatingReply, setUpdatingReply] = useState(false)
+  const [followupCount, setFollowupCount] = useState(lead.followup_count || 0)
+  const [updatingFollowup, setUpdatingFollowup] = useState(false)
+  // Brief "Gekopieerd!" feedback after click-to-copy on the name.
+  const [nameCopied, setNameCopied] = useState(false)
   const [snoozingLead, setSnoozingLead] = useState(false)
   const [contactedToday, setContactedToday] = useState(false)
   const [updatingContacted, setUpdatingContacted] = useState(false)
-  const [magnetsShared, setMagnetsShared] = useState(lead.lead_magnets_shared || [])
-
-  // ============================================
-  // ✅ SYNC WITH PROPS (real-time updates) — PRESERVED FROM v6.2
-  // ============================================
-  useEffect(() => {
-    setEditData({
-      first_name: lead.first_name || '',
-      last_name: lead.last_name || '',
-      email: lead.email || '',
-      phone: lead.phone || '',
-      lead_source: lead.lead_source || '',
-      notes: lead.notes || '',
-      lead_struggle: lead.lead_struggle || '',
-      lead_goal: lead.lead_goal || '',
-      lead_temperature: lead.lead_temperature || ''
-    })
-  }, [lead.first_name, lead.last_name, lead.email, lead.phone, lead.lead_source, lead.notes, lead.lead_struggle, lead.lead_goal, lead.lead_temperature])
 
   useEffect(() => {
     setReplyCount(lead.reply_count || 0)
   }, [lead.reply_count])
-
   useEffect(() => {
-    setMagnetsShared(lead.lead_magnets_shared || [])
-  }, [lead.lead_magnets_shared])
+    setFollowupCount(lead.followup_count || 0)
+  }, [lead.followup_count])
 
   // Close dropdowns on outside click
   // NOTE: magnet picker uses createPortal with its own backdrop, so NOT handled here
@@ -151,9 +123,6 @@ export default function KanbanCard({
   }
   const daysSinceStale = getDaysSinceStale()
 
-  // Has any CRM data?
-  const hasCrmData = lead.lead_struggle || lead.lead_goal || (magnetsShared && magnetsShared.length > 0)
-
   // ============================================
   // ✅ HANDLERS — ALL PRESERVED FROM v6.2
   // ============================================
@@ -191,6 +160,28 @@ export default function KanbanCard({
     }
   }
 
+  // Follow-up counter — same pattern as replies, but also stamps
+  // last_followup_sent_at so the daily stats card can count "today" using
+  // the stored timestamp instead of a separate events table.
+  const handleFollowupChange = async (delta, e) => {
+    e.stopPropagation()
+    if (updatingFollowup) return
+    if (delta < 0 && followupCount <= 0) return
+    setUpdatingFollowup(true)
+    const newCount = Math.max(0, followupCount + delta)
+    setFollowupCount(newCount)
+    try {
+      const patch = { followup_count: newCount }
+      if (delta > 0) patch.last_followup_sent_at = new Date().toISOString()
+      await onEdit(patch)
+    } catch (error) {
+      setFollowupCount(followupCount)
+      console.error('Update followup count failed:', error)
+    } finally {
+      setUpdatingFollowup(false)
+    }
+  }
+
   const handleSnooze = async (e) => {
     e.stopPropagation()
     if (snoozingLead || !onSnooze) return
@@ -210,15 +201,16 @@ export default function KanbanCard({
     if (e.target.closest('textarea')) return
     if (e.target.closest('[data-no-click]')) return
 
-    // Als lead in sales call sectie zit → open SalesCallModal
+    // Sales-section keeps its dedicated modal (different flow).
     const isSalesSection = sectionTitle?.toLowerCase().includes('sales')
     if (isSalesSection && onSalesCallClick) {
       onSalesCallClick(lead)
       return
     }
 
-    // Anders → toggle inline info panel
-    setShowInfo(!showInfo)
+    // Default: open the tabbed detail modal — replaces the old inline
+    // info-toggle. onClick prop still fired so external listeners survive.
+    setShowDetail(true)
     if (onClick) onClick(lead)
   }
 
@@ -229,26 +221,8 @@ export default function KanbanCard({
     if (onRefresh) await onRefresh()
   }
 
-  // ============================================
-  // NEW: Lead magnet toggle
-  // ============================================
-  const handleToggleMagnet = async (magnetName, e) => {
-    if (e) e.stopPropagation()
-    const current = magnetsShared || []
-    let updated
-    if (current.includes(magnetName)) {
-      updated = current.filter(m => m !== magnetName)
-    } else {
-      updated = [...current, magnetName]
-    }
-    setMagnetsShared(updated)
-    try {
-      await onEdit({ lead_magnets_shared: updated })
-    } catch (error) {
-      setMagnetsShared(current)
-      console.error('Update magnets failed:', error)
-    }
-  }
+  // Lead magnet toggle handler removed — magnets are now managed inside
+  // LeadDetailModalV2 (Magnets tab).
 
   // ============================================
   // NEW: Quick temperature toggle
@@ -265,113 +239,8 @@ export default function KanbanCard({
     }
   }
 
-  // ============================================
-  // EDIT MODE
-  // ============================================
-  if (isEditing) {
-    return (
-      <div style={{
-        background: '#0a0a0a',
-        border: `1px solid ${sectionColor}40`,
-        borderRadius: isMobile ? '10px' : '12px',
-        overflow: 'hidden'
-      }}>
-        {/* Edit header */}
-        <div style={{
-          padding: '0.5rem 0.75rem',
-          borderBottom: `1px solid ${sectionColor}30`,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between'
-        }}>
-          <span style={{ fontSize: '0.7rem', fontWeight: '700', color: sectionColor }}>BEWERKEN</span>
-          <div style={{ display: 'flex', gap: '0.375rem' }}>
-            <button onClick={async () => { await onEdit(editData); setIsEditing(false) }} style={{ padding: '0.3rem 0.5rem', background: `${sectionColor}20`, border: `1px solid ${sectionColor}40`, borderRadius: '6px', color: sectionColor, fontSize: '0.65rem', fontWeight: '700', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.25rem', minHeight: '28px', touchAction: 'manipulation' }}>
-              <Save size={10} /> Opslaan
-            </button>
-            <button onClick={() => setIsEditing(false)} style={{ padding: '0.3rem 0.5rem', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '6px', color: 'rgba(255,255,255,0.5)', fontSize: '0.65rem', fontWeight: '600', cursor: 'pointer', minHeight: '28px', touchAction: 'manipulation' }}>
-              Annuleer
-            </button>
-          </div>
-        </div>
-
-        {/* Edit fields */}
-        <div style={{ padding: '0.625rem' }}>
-          {[
-            { key: 'first_name', placeholder: 'Voornaam' },
-            { key: 'last_name', placeholder: 'Achternaam' },
-            { key: 'lead_source', placeholder: 'Bron (instagram, tiktok...)' },
-            { key: 'email', placeholder: 'Email', type: 'email' },
-            { key: 'phone', placeholder: 'Telefoon', type: 'tel' },
-            { key: 'lead_goal', placeholder: '🎯 Doel (bijv: 5kg afvallen)' },
-            { key: 'lead_struggle', placeholder: '⚡ Struggle (bijv: geen structuur)' }
-          ].map(field => (
-            <input
-              key={field.key}
-              type={field.type || 'text'}
-              placeholder={field.placeholder}
-              value={editData[field.key]}
-              onChange={(e) => setEditData({ ...editData, [field.key]: e.target.value })}
-              style={{
-                width: '100%',
-                padding: '0.4rem 0.5rem',
-                marginBottom: '0.375rem',
-                background: 'rgba(255,255,255,0.04)',
-                border: '1px solid rgba(255,255,255,0.08)',
-                borderRadius: '6px',
-                color: '#fff',
-                fontSize: '0.8rem',
-                outline: 'none',
-                minHeight: '32px'
-              }}
-            />
-          ))}
-          <textarea
-            placeholder="Notities"
-            value={editData.notes}
-            onChange={(e) => setEditData({ ...editData, notes: e.target.value })}
-            rows={2}
-            style={{
-              width: '100%',
-              padding: '0.4rem 0.5rem',
-              background: 'rgba(255,255,255,0.04)',
-              border: '1px solid rgba(255,255,255,0.08)',
-              borderRadius: '6px',
-              color: '#fff',
-              fontSize: '0.8rem',
-              resize: 'none',
-              outline: 'none'
-            }}
-          />
-
-          {/* Temperature selector */}
-          <div style={{ display: 'flex', gap: '0.25rem', marginTop: '0.375rem' }}>
-            {Object.entries(TEMP_CONFIG).map(([key, cfg]) => (
-              <button
-                key={key}
-                onClick={() => setEditData({ ...editData, lead_temperature: editData.lead_temperature === key ? '' : key })}
-                style={{
-                  flex: 1,
-                  padding: '0.3rem',
-                  background: editData.lead_temperature === key ? cfg.bg : 'rgba(255,255,255,0.03)',
-                  border: `1px solid ${editData.lead_temperature === key ? cfg.border : 'rgba(255,255,255,0.06)'}`,
-                  borderRadius: '6px',
-                  color: editData.lead_temperature === key ? cfg.color : 'rgba(255,255,255,0.3)',
-                  fontSize: '0.6rem',
-                  fontWeight: '700',
-                  cursor: 'pointer',
-                  minHeight: '28px',
-                  touchAction: 'manipulation'
-                }}
-              >
-                {cfg.label}
-              </button>
-            ))}
-          </div>
-        </div>
-      </div>
-    )
-  }
+  // Inline edit-mode + showInfo panel removed — all editing now flows
+  // through LeadDetailModalV2 (opened by the "Open"-button or card click).
 
   // ============================================
   // MAIN CARD RENDER
@@ -431,18 +300,60 @@ export default function KanbanCard({
             }
           </button>
 
-          {/* Name */}
-          <span style={{ 
-            flex: 1,
-            fontSize: isMobile ? '0.8rem' : '0.85rem',
-            fontWeight: '700', 
-            color: contactedToday ? '#9ca3af' : (isCallReady ? '#FFD700' : '#fff'),
-            whiteSpace: 'nowrap',
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
-            lineHeight: 1
-          }}>
+          {/* Name — click to copy to clipboard. Stops propagation so the
+              card-click (open detail modal) doesn't fire. */}
+          <span
+            onClick={async (e) => {
+              e.stopPropagation()
+              const fullName = `${lead.first_name || ''} ${lead.last_name || ''}`.trim()
+              if (!fullName) return
+              try {
+                await navigator.clipboard.writeText(fullName)
+              } catch {
+                // Older Safari / insecure context fallback
+                const ta = document.createElement('textarea')
+                ta.value = fullName
+                ta.style.position = 'fixed'; ta.style.opacity = '0'
+                document.body.appendChild(ta)
+                ta.select()
+                try { document.execCommand('copy') } catch {}
+                document.body.removeChild(ta)
+              }
+              setNameCopied(true)
+              setTimeout(() => setNameCopied(false), 1100)
+            }}
+            title="Klik om naam te kopiëren"
+            style={{
+              flex: 1, position: 'relative',
+              fontSize: isMobile ? '0.8rem' : '0.85rem',
+              fontWeight: '700',
+              color: nameCopied
+                ? '#10b981'
+                : (contactedToday ? '#9ca3af' : (isCallReady ? '#FFD700' : '#fff')),
+              whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+              lineHeight: 1,
+              cursor: 'pointer',
+              borderBottom: '1px dotted rgba(255,255,255,0.18)',
+              transition: 'color 0.15s ease',
+              touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+            }}
+          >
             {lead.first_name} {lead.last_name}
+            {nameCopied && (
+              <span style={{
+                position: 'absolute',
+                left: '50%', top: '100%', transform: 'translate(-50%, 4px)',
+                background: '#10b981', color: '#fff',
+                fontSize: '0.55rem', fontWeight: 800,
+                padding: '2px 6px', borderRadius: 3,
+                letterSpacing: '0.04em', textTransform: 'uppercase',
+                whiteSpace: 'nowrap',
+                pointerEvents: 'none',
+                zIndex: 10,
+              }}>
+                Gekopieerd
+              </span>
+            )}
           </span>
 
           {/* Temperature badge (clickable cycle) */}
@@ -564,20 +475,84 @@ export default function KanbanCard({
             </div>
           )}
 
-          {/* Source */}
-          {lead.lead_source && (
-            <span style={{ 
-              padding: '2px 6px', 
-              background: contactedToday ? 'rgba(107,114,128,0.08)' : `${sectionColor}10`, 
-              border: `1px solid ${contactedToday ? 'rgba(107,114,128,0.15)' : sectionColor + '20'}`, 
-              borderRadius: '3px', 
-              color: contactedToday ? '#9ca3af' : sectionColor, 
-              fontSize: '0.55rem',
-              fontWeight: '600'
-            }}>
-              {lead.lead_source}
+          {/* Campaign banner — gold pill with campaign name (truncated). */}
+          {lead.outreach_campaign?.name && (
+            <span
+              title={`Campagne: ${lead.outreach_campaign.name}${lead.outreach_campaign.variant_tag ? ` (${lead.outreach_campaign.variant_tag})` : ''}`}
+              style={{
+                display: 'inline-flex', alignItems: 'center', gap: 4,
+                padding: '2px 6px',
+                background: 'rgba(255,215,0,0.14)',
+                border: '1px solid rgba(255,215,0,0.4)',
+                borderRadius: 3,
+                color: '#FFD700',
+                fontSize: '0.55rem', fontWeight: 700,
+                maxWidth: 160,
+                whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+              }}
+            >
+              <Send size={9} style={{ flexShrink: 0 }} />
+              {lead.outreach_campaign.name}
+              {lead.outreach_campaign.variant_tag ? ` · ${lead.outreach_campaign.variant_tag}` : ''}
             </span>
           )}
+
+          {/* Source magnet banner — shows which lead magnet brought this lead
+              in. Distinct purple so it pops above the regular source pill.
+              Prefers the FK-linked source_lead_magnet (modern flow), but
+              falls back to the first entry of lead_magnets_shared so older
+              leads — created before source_lead_magnet_id existed — still
+              show their magnet on the card. */}
+          {(() => {
+            const magnetName =
+              lead.source_lead_magnet?.name ||
+              (Array.isArray(lead.lead_magnets_shared) && lead.lead_magnets_shared.length > 0
+                ? lead.lead_magnets_shared[0]
+                : null)
+            if (!magnetName) return null
+            return (
+              <span
+                title={`Binnengekomen via lead magnet: ${magnetName}`}
+                style={{
+                  display: 'inline-flex', alignItems: 'center', gap: 4,
+                  padding: '2px 6px',
+                  background: 'rgba(168,85,247,0.14)',
+                  border: '1px solid rgba(168,85,247,0.4)',
+                  borderRadius: 3,
+                  color: '#c4a4f7',
+                  fontSize: '0.55rem', fontWeight: 700,
+                  maxWidth: 160,
+                  whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+                }}
+              >
+                <Gift size={9} style={{ flexShrink: 0 }} />
+                {magnetName}
+              </span>
+            )
+          })()}
+
+          {/* Follow-up counter — lives on the source/label row so it doesn't
+              steal width from the action bar (where it pushed the reply
+              counter off-screen). */}
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: '1px',
+            background: followupCount > 0 ? 'rgba(255,215,0,0.08)' : 'rgba(255,255,255,0.02)',
+            border: `1px solid ${followupCount > 0 ? 'rgba(255,215,0,0.25)' : 'rgba(255,255,255,0.06)'}`,
+            borderRadius: '3px', padding: '1px',
+          }} title="Opvolg-berichten verstuurd">
+            <button onClick={(e) => handleFollowupChange(-1, e)} disabled={followupCount <= 0 || updatingFollowup} style={{ width: 16, height: 16, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'transparent', border: 'none', color: followupCount > 0 ? 'rgba(255,255,255,0.4)' : 'rgba(255,255,255,0.1)', cursor: followupCount > 0 ? 'pointer' : 'not-allowed', padding: 0, touchAction: 'manipulation' }}>
+              <Minus size={8} />
+            </button>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 2, padding: '0 2px', minWidth: 18, justifyContent: 'center' }}>
+              <Send size={8} color={followupCount > 0 ? '#FFD700' : 'rgba(255,255,255,0.2)'} />
+              <span style={{ fontSize: '0.55rem', fontWeight: 800, color: followupCount > 0 ? '#FFD700' : 'rgba(255,255,255,0.2)' }}>
+                {followupCount}
+              </span>
+            </div>
+            <button onClick={(e) => handleFollowupChange(1, e)} disabled={updatingFollowup} style={{ width: 16, height: 16, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'transparent', border: 'none', color: '#FFD700', cursor: 'pointer', padding: 0, touchAction: 'manipulation' }}>
+              <Plus size={8} />
+            </button>
+          </div>
 
           {/* Contacted today label */}
           {contactedToday && (
@@ -593,20 +568,6 @@ export default function KanbanCard({
             </span>
           )}
 
-          {/* Lead magnet count indicator */}
-          {magnetsShared.length > 0 && (
-            <span style={{
-              padding: '2px 5px',
-              background: 'rgba(168,85,247,0.1)',
-              border: '1px solid rgba(168,85,247,0.2)',
-              borderRadius: '3px',
-              fontSize: '0.5rem', fontWeight: '700', color: '#a855f7',
-              display: 'flex', alignItems: 'center', gap: '2px'
-            }}>
-              <Gift size={8} />
-              {magnetsShared.length}
-            </span>
-          )}
         </div>
 
         {/* ═══ ROW 3: NOTES (1 line truncated) ═══ */}
@@ -660,6 +621,30 @@ export default function KanbanCard({
               </span>
             </div>
 
+            {/* Open detail modal — primary action, gold accent */}
+            <button
+              onClick={(e) => { e.stopPropagation(); setShowDetail(true) }}
+              style={{
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                gap: '0.25rem',
+                padding: '0 0.5rem',
+                height: '24px',
+                background: 'rgba(212,175,55,0.12)',
+                border: '1px solid rgba(212,175,55,0.35)',
+                borderRadius: '5px',
+                color: '#D4AF37',
+                fontSize: '0.55rem', fontWeight: '800',
+                textTransform: 'uppercase', letterSpacing: '0.04em',
+                cursor: 'pointer',
+                touchAction: 'manipulation',
+                WebkitTapHighlightColor: 'transparent'
+              }}
+              title="Open lead"
+            >
+              <Info size={10} strokeWidth={2.5} />
+              Open
+            </button>
+
             {/* DM Conversation button */}
             <button
               onClick={(e) => { e.stopPropagation(); setShowDMModal(true) }}
@@ -679,34 +664,8 @@ export default function KanbanCard({
               <MessageCircle size={11} />
             </button>
 
-            {/* Info toggle button */}
-            <button
-              onClick={(e) => { e.stopPropagation(); setShowInfo(!showInfo) }}
-              style={{
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                width: '24px', height: '24px',
-                background: showInfo ? `${sectionColor}15` : (hasCrmData ? 'rgba(16,185,129,0.08)' : 'rgba(255,255,255,0.03)'),
-                border: `1px solid ${showInfo ? sectionColor + '30' : (hasCrmData ? 'rgba(16,185,129,0.2)' : 'rgba(255,255,255,0.06)')}`,
-                borderRadius: '5px',
-                color: showInfo ? sectionColor : (hasCrmData ? '#10b981' : 'rgba(255,255,255,0.25)'),
-                cursor: 'pointer',
-                touchAction: 'manipulation',
-                WebkitTapHighlightColor: 'transparent'
-              }}
-              title="Lead Info"
-            >
-              <Info size={11} />
-            </button>
-
-            {/* Edit */}
-            <button onClick={(e) => { e.stopPropagation(); setIsEditing(true) }} style={{ padding: '3px', background: 'transparent', border: 'none', color: 'rgba(255,255,255,0.25)', cursor: 'pointer', touchAction: 'manipulation' }}>
-              <Edit2 size={10} />
-            </button>
-
-            {/* Delete */}
-            <button onClick={(e) => { e.stopPropagation(); onDelete() }} style={{ padding: '3px', background: 'transparent', border: 'none', color: 'rgba(255,255,255,0.15)', cursor: 'pointer', touchAction: 'manipulation' }}>
-              <Trash2 size={10} />
-            </button>
+            {/* Info-toggle, Edit, Delete removed — these all open in the
+                LeadDetailModalV2 now (via card click or the "Open" button). */}
           </div>
 
           {/* Center: Later button */}
@@ -737,13 +696,13 @@ export default function KanbanCard({
           {/* Right: Reply counter */}
           <div style={{
             display: 'flex', alignItems: 'center', gap: '1px',
-            background: replyCount > 0 
-              ? (contactedToday ? 'rgba(107,114,128,0.08)' : 'rgba(16,185,129,0.08)') 
+            background: replyCount > 0
+              ? (contactedToday ? 'rgba(107,114,128,0.08)' : 'rgba(16,185,129,0.08)')
               : 'rgba(255,255,255,0.02)',
             border: `1px solid ${replyCount > 0 ? (contactedToday ? 'rgba(107,114,128,0.15)' : 'rgba(16,185,129,0.2)') : 'rgba(255,255,255,0.06)'}`,
             borderRadius: '4px',
             padding: '1px'
-          }}>
+          }} title="Reacties van lead">
             <button onClick={(e) => handleReplyChange(-1, e)} disabled={replyCount <= 0 || updatingReply} style={{ width: '20px', height: '20px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'transparent', border: 'none', color: replyCount > 0 ? 'rgba(255,255,255,0.4)' : 'rgba(255,255,255,0.1)', cursor: replyCount > 0 ? 'pointer' : 'not-allowed', padding: 0, touchAction: 'manipulation' }}>
               <Minus size={9} />
             </button>
@@ -759,193 +718,7 @@ export default function KanbanCard({
           </div>
         </div>
 
-        {/* ═══ ROW 5: INFO PANEL (expandable) ═══ */}
-        {showInfo && (
-          <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }} data-no-click>
-            {/* Goal */}
-            <div style={{
-              display: 'flex', alignItems: 'flex-start', gap: '6px',
-              padding: isMobile ? '0.4rem 0.625rem' : '0.4rem 0.75rem',
-              borderBottom: '1px solid rgba(255,255,255,0.03)'
-            }}>
-              <Target size={10} color="#10b981" style={{ marginTop: '1px', flexShrink: 0 }} />
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: '0.4rem', fontWeight: '700', color: 'rgba(255,255,255,0.2)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '1px' }}>DOEL</div>
-                {lead.lead_goal ? (
-                  <div style={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.6)', lineHeight: 1.3 }}>{lead.lead_goal}</div>
-                ) : (
-                  <button onClick={(e) => { e.stopPropagation(); setIsEditing(true) }} style={{ fontSize: '0.6rem', color: 'rgba(255,255,255,0.2)', background: 'none', border: 'none', padding: 0, cursor: 'pointer', fontStyle: 'italic' }}>+ Toevoegen</button>
-                )}
-              </div>
-            </div>
-
-            {/* Struggle */}
-            <div style={{
-              display: 'flex', alignItems: 'flex-start', gap: '6px',
-              padding: isMobile ? '0.4rem 0.625rem' : '0.4rem 0.75rem',
-              borderBottom: '1px solid rgba(255,255,255,0.03)'
-            }}>
-              <AlertTriangle size={10} color="#f59e0b" style={{ marginTop: '1px', flexShrink: 0 }} />
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: '0.4rem', fontWeight: '700', color: 'rgba(255,255,255,0.2)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '1px' }}>STRUGGLE</div>
-                {lead.lead_struggle ? (
-                  <div style={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.6)', lineHeight: 1.3 }}>{lead.lead_struggle}</div>
-                ) : (
-                  <button onClick={(e) => { e.stopPropagation(); setIsEditing(true) }} style={{ fontSize: '0.6rem', color: 'rgba(255,255,255,0.2)', background: 'none', border: 'none', padding: 0, cursor: 'pointer', fontStyle: 'italic' }}>+ Toevoegen</button>
-                )}
-              </div>
-            </div>
-
-            {/* Lead Magnets Shared */}
-            <div style={{
-              padding: isMobile ? '0.4rem 0.625rem' : '0.4rem 0.75rem',
-              borderBottom: '1px solid rgba(255,255,255,0.03)'
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-                  <Gift size={10} color="#a855f7" />
-                  <span style={{ fontSize: '0.4rem', fontWeight: '700', color: 'rgba(255,255,255,0.2)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>LEAD MAGNETS</span>
-                </div>
-                <div style={{ position: 'relative' }} ref={magnetRef}>
-                  <button
-                    onClick={(e) => { e.stopPropagation(); setShowMagnetPicker(!showMagnetPicker) }}
-                    style={{
-                      display: 'flex', alignItems: 'center', gap: '2px',
-                      padding: '2px 5px',
-                      background: 'rgba(168,85,247,0.08)',
-                      border: '1px solid rgba(168,85,247,0.2)',
-                      borderRadius: '4px',
-                      color: '#a855f7',
-                      fontSize: '0.5rem', fontWeight: '600',
-                      cursor: 'pointer',
-                      touchAction: 'manipulation'
-                    }}
-                  >
-                    <Plus size={8} /> Toevoegen
-                  </button>
-
-                  {/* Magnet picker dropdown — via createPortal to escape overflow:hidden */}
-                  {showMagnetPicker && createPortal(
-                    <>
-                      {/* Backdrop — closes picker */}
-                      <div onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); setShowMagnetPicker(false) }} style={{ position: 'fixed', inset: 0, zIndex: 10000 }} />
-                      {/* Menu */}
-                      <div data-magnet-picker onMouseDown={(e) => e.stopPropagation()} style={{
-                        position: 'fixed',
-                        top: (() => { const r = magnetRef.current?.getBoundingClientRect(); return r ? Math.min(r.bottom + 3, window.innerHeight - 220) : 0 })(),
-                        left: (() => { const r = magnetRef.current?.getBoundingClientRect(); return r ? Math.max(8, r.right - 180) : 0 })(),
-                        width: '180px',
-                        maxHeight: '210px', overflowY: 'auto',
-                        background: '#111', border: '1px solid rgba(168,85,247,0.25)',
-                        borderRadius: '8px', boxShadow: '0 12px 32px rgba(0,0,0,0.7)',
-                        zIndex: 10001,
-                        WebkitOverflowScrolling: 'touch'
-                      }} onClick={(e) => e.stopPropagation()}>
-                        {LEAD_MAGNET_OPTIONS.map(magnet => {
-                          const isSelected = magnetsShared.includes(magnet)
-                          return (
-                            <div
-                              key={magnet}
-                              onClick={(e) => handleToggleMagnet(magnet, e)}
-                              style={{
-                                display: 'flex', alignItems: 'center', gap: '6px',
-                                padding: '8px 10px',
-                                cursor: 'pointer',
-                                borderBottom: '1px solid rgba(255,255,255,0.04)',
-                                background: isSelected ? 'rgba(168,85,247,0.1)' : 'transparent',
-                                touchAction: 'manipulation'
-                              }}
-                              onMouseEnter={(e) => { if (!isSelected) e.currentTarget.style.background = 'rgba(168,85,247,0.06)' }}
-                              onMouseLeave={(e) => { if (!isSelected) e.currentTarget.style.background = isSelected ? 'rgba(168,85,247,0.1)' : 'transparent' }}
-                            >
-                              <div style={{
-                                width: '16px', height: '16px', borderRadius: '3px',
-                                border: isSelected ? '1.5px solid #a855f7' : '1.5px solid rgba(255,255,255,0.15)',
-                                background: isSelected ? 'rgba(168,85,247,0.2)' : 'transparent',
-                                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                flexShrink: 0
-                              }}>
-                                {isSelected && <CheckCircle size={10} color="#a855f7" />}
-                              </div>
-                              <span style={{ fontSize: '0.75rem', color: isSelected ? '#a855f7' : 'rgba(255,255,255,0.6)', fontWeight: isSelected ? '600' : '400' }}>
-                                {magnet}
-                              </span>
-                            </div>
-                          )
-                        })}
-                      </div>
-                    </>,
-                    document.body
-                  )}
-                </div>
-              </div>
-
-              {/* Shared magnets tags */}
-              {magnetsShared.length > 0 ? (
-                <div style={{ display: 'flex', gap: '3px', flexWrap: 'wrap' }}>
-                  {magnetsShared.map(magnet => (
-                    <span key={magnet} style={{
-                      padding: '2px 6px',
-                      background: 'rgba(168,85,247,0.08)',
-                      border: '1px solid rgba(168,85,247,0.15)',
-                      borderRadius: '3px',
-                      fontSize: '0.5rem', fontWeight: '600', color: '#a855f7',
-                      display: 'flex', alignItems: 'center', gap: '3px'
-                    }}>
-                      {magnet}
-                      <X size={7} style={{ cursor: 'pointer', opacity: 0.6 }} onClick={(e) => handleToggleMagnet(magnet, e)} />
-                    </span>
-                  ))}
-                </div>
-              ) : (
-                <div style={{ fontSize: '0.55rem', color: 'rgba(255,255,255,0.15)', fontStyle: 'italic' }}>Nog geen lead magnets gedeeld</div>
-              )}
-            </div>
-
-            {/* Quick actions in info */}
-            <div style={{
-              display: 'flex', gap: '0.25rem',
-              padding: isMobile ? '0.35rem 0.625rem' : '0.35rem 0.75rem'
-            }}>
-              {!tempConfig && (
-                <button
-                  onClick={handleTempCycle}
-                  style={{
-                    padding: '3px 6px',
-                    background: 'rgba(255,255,255,0.03)',
-                    border: '1px solid rgba(255,255,255,0.06)',
-                    borderRadius: '4px',
-                    color: 'rgba(255,255,255,0.3)',
-                    fontSize: '0.5rem', fontWeight: '600',
-                    cursor: 'pointer',
-                    touchAction: 'manipulation',
-                    display: 'flex', alignItems: 'center', gap: '3px',
-                    minHeight: '24px'
-                  }}
-                >
-                  🌡️ Temperatuur
-                </button>
-              )}
-              <button
-                onClick={(e) => { e.stopPropagation(); setIsEditing(true) }}
-                style={{
-                  padding: '3px 6px',
-                  background: 'rgba(255,255,255,0.03)',
-                  border: '1px solid rgba(255,255,255,0.06)',
-                  borderRadius: '4px',
-                  color: 'rgba(255,255,255,0.3)',
-                  fontSize: '0.5rem', fontWeight: '600',
-                  cursor: 'pointer',
-                  touchAction: 'manipulation',
-                  display: 'flex', alignItems: 'center', gap: '3px',
-                  minHeight: '24px'
-                }}
-              >
-                <Edit2 size={8} /> Bewerken
-              </button>
-            </div>
-          </div>
-        )}
+        {/* Inline info panel removed — opens in LeadDetailModalV2. */}
       </div>
 
       {/* ═══ DM FLOW MODAL — PRESERVED FROM v6.2 ═══ */}
@@ -959,6 +732,19 @@ export default function KanbanCard({
           onClose={handleDMModalClose}
           onLeadUpdate={handleLeadUpdate}
           onLeadMoved={handleLeadUpdate}
+        />
+      )}
+
+      {/* ═══ CENTRAL LEAD DETAIL MODAL — tabbed; primary path for editing ═══ */}
+      {showDetail && (
+        <LeadDetailModalV2
+          lead={lead}
+          sectionColor={sectionColor}
+          isMobile={isMobile}
+          onClose={() => { setShowDetail(false); if (onRefresh) onRefresh() }}
+          onEdit={onEdit}
+          onDelete={async () => { setShowDetail(false); if (onDelete) await onDelete() }}
+          onMagnetAttached={onMagnetAttached ? (name) => onMagnetAttached(lead, name) : null}
         />
       )}
     </>

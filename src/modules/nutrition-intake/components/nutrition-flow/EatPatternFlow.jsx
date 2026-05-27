@@ -1,7 +1,71 @@
 // src/modules/nutrition-intake/components/nutrition-flow/EatPatternFlow.jsx
 // Stap 1-4: Eetpatroon drill-down — 2 kolommen via flex, lijst klapt uit onder card
 import React, { useState } from 'react'
+import { createPortal } from 'react-dom'
 import { Q, Hint, NextBtn, BackBtn, BigOption } from '../../../public-intake/components/phase1/FlowStep'
+
+// Minimum aantal "dingen" dat per maaltijd ingevuld moet zijn vóór doorgaan.
+// "Ding" = sub-item (specifiek gerecht), custom toegevoegd item, of een
+// niet-lege tekst bij "Iets anders". Wie de maaltijd overslaat (skip_*) mag
+// door zonder minimum.
+const MIN_ITEMS_PER_MEAL = 3
+
+const countMealItems = (key, data) => {
+  const subs = data[`${key}_subs`] || []
+  const text = data[`${key}_text`] || {}
+  const textCount = Object.values(text).filter(t => (t || '').trim()).length
+  return subs.length + textCount
+}
+
+const isMealSkipped = (key, data) =>
+  (data[`${key}_categories`] || []).some(c => c.startsWith('skip_'))
+
+const canContinueMeal = (key, data) =>
+  isMealSkipped(key, data) || countMealItems(key, data) >= MIN_ITEMS_PER_MEAL
+
+// Floating counter pill — portaled out of the page so it sticks above all
+// scrollable content. Always visible while the user scrolls through the
+// meal cards so they immediately see whether they still need to pick more.
+function MealItemCounter({ count, skipped, label }) {
+  const done = skipped || count >= MIN_ITEMS_PER_MEAL
+  const remaining = Math.max(0, MIN_ITEMS_PER_MEAL - count)
+
+  const bg = skipped
+    ? 'rgba(75,85,99,0.95)'
+    : done ? 'rgba(16,185,129,0.95)' : 'rgba(255,215,0,0.97)'
+  const fg = skipped ? '#fff' : done ? '#fff' : '#000'
+  const text = skipped
+    ? `${label || 'Maaltijd'} overgeslagen ✓`
+    : done
+      ? `✓ ${count} dingen ingevuld`
+      : `${count} van ${MIN_ITEMS_PER_MEAL} — kies er nog ${remaining}`
+
+  const pill = (
+    <div style={{
+      position: 'fixed',
+      top: 'calc(env(safe-area-inset-top) + 0.75rem)',
+      left: '50%',
+      transform: 'translateX(-50%)',
+      zIndex: 2147483000,
+      padding: '0.55rem 1rem', minHeight: 38,
+      display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+      borderRadius: 999,
+      background: bg, color: fg,
+      fontSize: '0.82rem', fontWeight: 800,
+      letterSpacing: '0.005em',
+      boxShadow: '0 6px 22px rgba(0,0,0,0.55), 0 0 0 1px rgba(255,255,255,0.06) inset',
+      pointerEvents: 'none',
+      maxWidth: 'calc(100vw - 2rem)',
+      whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+      transition: 'background 0.2s ease, color 0.2s ease',
+    }}>
+      {text}
+    </div>
+  )
+
+  if (typeof document === 'undefined') return null
+  return createPortal(pill, document.body)
+}
 
 // ── Data ──────────────────────────────────────────────────────────────────────
 const MAALTIJD_CONFIG = {
@@ -335,30 +399,33 @@ export default function EatPatternFlow({ data, onChange, onNext, onBack, isMobil
   if (step === 1) return (
     <div style={{ padding: pad }}>
       <BackBtn onBack={onBack} />
-      <Q isMobile={isMobile}>Wat eet je normaal als ontbijt?</Q>
-      <Hint isMobile={isMobile}>Tik een optie aan — er verschijnen dan meer keuzes</Hint>
+      <Q isMobile={isMobile}>Wat eet je of vind je lekker als ontbijt?</Q>
+      <Hint isMobile={isMobile}>Tik aan wat je eet of graag eet — kies er minimaal {MIN_ITEMS_PER_MEAL}</Hint>
       <MaaltijdDrillDown maaltijdKey="ontbijt" data={data} onChange={onChange} isMobile={isMobile} />
-      <NextBtn onClick={() => setStep(2)} disabled={!(data.ontbijt_categories?.length > 0)} isMobile={isMobile} />
+      <MealItemCounter count={countMealItems('ontbijt', data)} skipped={isMealSkipped('ontbijt', data)} label="Ontbijt" />
+      <NextBtn onClick={() => setStep(2)} disabled={!canContinueMeal('ontbijt', data)} isMobile={isMobile} />
     </div>
   )
 
   if (step === 2) return (
     <div style={{ padding: pad }}>
       <BackBtn onBack={goBack} />
-      <Q isMobile={isMobile}>Wat eet je normaal als lunch?</Q>
-      <Hint isMobile={isMobile}>Tik een optie aan — er verschijnen dan meer keuzes</Hint>
+      <Q isMobile={isMobile}>Wat eet je of vind je lekker als lunch?</Q>
+      <Hint isMobile={isMobile}>Tik aan wat je eet of graag eet — kies er minimaal {MIN_ITEMS_PER_MEAL}</Hint>
       <MaaltijdDrillDown maaltijdKey="lunch" data={data} onChange={onChange} isMobile={isMobile} />
-      <NextBtn onClick={() => setStep(3)} disabled={!(data.lunch_categories?.length > 0)} isMobile={isMobile} />
+      <MealItemCounter count={countMealItems('lunch', data)} skipped={isMealSkipped('lunch', data)} label="Lunch" />
+      <NextBtn onClick={() => setStep(3)} disabled={!canContinueMeal('lunch', data)} isMobile={isMobile} />
     </div>
   )
 
   if (step === 3) return (
     <div style={{ padding: pad }}>
       <BackBtn onBack={goBack} />
-      <Q isMobile={isMobile}>Wat eet je normaal als avondeten?</Q>
-      <Hint isMobile={isMobile}>Tik een optie aan — er verschijnen dan meer keuzes</Hint>
+      <Q isMobile={isMobile}>Wat eet je of vind je lekker als avondeten?</Q>
+      <Hint isMobile={isMobile}>Tik aan wat je eet of graag eet — kies er minimaal {MIN_ITEMS_PER_MEAL}</Hint>
       <MaaltijdDrillDown maaltijdKey="diner" data={data} onChange={onChange} isMobile={isMobile} />
-      <NextBtn onClick={() => setStep(4)} disabled={!(data.diner_categories?.length > 0)} isMobile={isMobile} />
+      <MealItemCounter count={countMealItems('diner', data)} skipped={isMealSkipped('diner', data)} label="Avondeten" />
+      <NextBtn onClick={() => setStep(4)} disabled={!canContinueMeal('diner', data)} isMobile={isMobile} />
     </div>
   )
 

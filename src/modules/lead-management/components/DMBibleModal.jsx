@@ -2,8 +2,9 @@
 // VERSION 4.0 - KERSTEN'S NATURAL VOICE
 // Jo man taal, emoji's, logische vragen
 
-import { useState } from 'react'
-import { Flame, X, Copy, Check } from 'lucide-react'
+import { useState, useRef, useEffect, useCallback } from 'react'
+import { createPortal } from 'react-dom'
+import { Flame, X, Copy, Check, GripHorizontal, Trash2, Plus, Eraser, Pencil, EyeOff, Eye, FolderPlus } from 'lucide-react'
 
 // GOLD THEME
 const GOLD = {
@@ -313,11 +314,279 @@ const CATEGORIES = [
   }
 ]
 
-export default function DMBibleModal({ isMobile = false }) {
+// Synthetic category id for the user's own draft messages. Treated specially
+// in the render — instead of the templates list, we show a free-form editor +
+// a history list backed by the dm_user_messages table.
+const MY_NOTES_ID = '__my_notes__'
+
+// Small icon-button style used in the sidebar for rename/delete/hide actions.
+const iconBtn = (color) => ({
+  width: 24, padding: 0,
+  display: 'flex', alignItems: 'center', justifyContent: 'center',
+  background: 'transparent', border: 'none', borderLeft: '1px solid rgba(255,255,255,0.06)',
+  color, cursor: 'pointer', touchAction: 'manipulation',
+})
+
+export default function DMBibleModal({ isMobile = false, db = null, coachId = null }) {
   const [isOpen, setIsOpen] = useState(false)
   const [activeCategory, setActiveCategory] = useState('eerste-dikker')
   const [copiedIndex, setCopiedIndex] = useState(null)
   const [searchTerm, setSearchTerm] = useState('')
+
+  // ── User-categories + my-notes + hidden built-ins ─────────────────────────
+  // A "custom category" is just a user-named tab that holds notes in the
+  // same dm_user_messages table — same writer/history UX as Mijn berichten,
+  // but filtered by category_id. The default Mijn berichten is category_id
+  // = null so legacy notes stay visible.
+  const [myDraft, setMyDraft] = useState('')
+  const [myNotes, setMyNotes] = useState([])         // ALL notes (every cat)
+  const [customCategories, setCustomCategories] = useState([])
+  const [hiddenBuiltins, setHiddenBuiltins] = useState(new Set())
+  const [showHidden, setShowHidden] = useState(false)
+  const [savingNote, setSavingNote] = useState(false)
+  const [notesLoading, setNotesLoading] = useState(false)
+  // Inline UI state
+  const [creatingCat, setCreatingCat] = useState(false)
+  const [newCatName, setNewCatName] = useState('')
+  const [renamingCatId, setRenamingCatId] = useState(null)
+  const [renamingCatName, setRenamingCatName] = useState('')
+
+  // Active category id resolution:
+  //   MY_NOTES_ID  → category_id IS NULL AND builtin_category IS NULL
+  //   uuid-string  → category_id = that uuid (custom tab)
+  //   built-in id  → builtin_category = that id (DB-backed since seeding)
+  const activeCustomCatId = customCategories.find(c => c.id === activeCategory)?.id || null
+  const activeBuiltinId = CATEGORIES.find(c => c.id === activeCategory)?.id || null
+  // All tabs are now DB-backed and editable, so every tab gets the writer UI.
+  const isUserNotesTab = true
+
+  // Notes filtered to the currently active tab.
+  const notesForActiveTab = activeBuiltinId
+    ? myNotes.filter(n => n.builtin_category === activeBuiltinId)
+    : activeCustomCatId
+      ? myNotes.filter(n => n.category_id === activeCustomCatId)
+      : myNotes.filter(n => !n.category_id && !n.builtin_category)
+
+  // Inline edit-in-place state.
+  const [editingNoteId, setEditingNoteId] = useState(null)
+  const [editingNoteText, setEditingNoteText] = useState('')
+
+  const handleSaveEdit = async () => {
+    if (!editingNoteId || !db?.supabase) return
+    const text = editingNoteText.trim()
+    if (!text) return
+    const prev = myNotes
+    setMyNotes(p => p.map(n => n.id === editingNoteId ? { ...n, text } : n))
+    setEditingNoteId(null); setEditingNoteText('')
+    try {
+      const { error } = await db.supabase
+        .from('dm_user_messages')
+        .update({ text, updated_at: new Date().toISOString() })
+        .eq('id', editingNoteId)
+      if (error) throw error
+    } catch (e) {
+      console.error('edit dm note failed:', e)
+      setMyNotes(prev)
+    }
+  }
+
+  // One-time seed: if the coach has zero built-in messages, copy the
+  // hardcoded CATEGORIES into the DB. After this, the user owns and can
+  // edit/delete/add to every built-in tab.
+  const seedBuiltinsIfNeeded = useCallback(async () => {
+    if (!db?.supabase || !coachId) return false
+    const { count } = await db.supabase
+      .from('dm_user_messages')
+      .select('id', { count: 'exact', head: true })
+      .eq('coach_id', coachId)
+      .not('builtin_category', 'is', null)
+    if ((count || 0) > 0) return false
+    const rows = []
+    CATEGORIES.forEach(cat => {
+      cat.messages.forEach(m => {
+        rows.push({
+          coach_id: coachId,
+          builtin_category: cat.id,
+          tag: m.tag || null,
+          text: m.text,
+        })
+      })
+    })
+    if (rows.length === 0) return false
+    const { error } = await db.supabase.from('dm_user_messages').insert(rows)
+    if (error) { console.error('seed builtins failed:', error); return false }
+    console.log(`[DM-BIBLE] Seeded ${rows.length} built-in messages for coach.`)
+    return true
+  }, [db, coachId])
+
+  const loadAllUserData = useCallback(async () => {
+    if (!db?.supabase || !coachId) return
+    setNotesLoading(true)
+    try {
+      await seedBuiltinsIfNeeded()
+      const [{ data: notes }, { data: cats }, { data: hidden }] = await Promise.all([
+        db.supabase.from('dm_user_messages')
+          .select('*').eq('coach_id', coachId).is('deleted_at', null)
+          .order('created_at', { ascending: true }).limit(1000),
+        db.supabase.from('dm_categories')
+          .select('*').eq('coach_id', coachId).is('deleted_at', null)
+          .order('position', { ascending: true }).order('created_at', { ascending: true }),
+        db.supabase.from('dm_hidden_builtins')
+          .select('builtin_id').eq('coach_id', coachId),
+      ])
+      setMyNotes(notes || [])
+      setCustomCategories(cats || [])
+      setHiddenBuiltins(new Set((hidden || []).map(h => h.builtin_id)))
+    } catch (e) {
+      console.error('load dm user data failed:', e)
+    } finally {
+      setNotesLoading(false)
+    }
+  }, [db, coachId, seedBuiltinsIfNeeded])
+
+  // Load everything when the modal opens (one round-trip). Refresh when the
+  // active user-tab changes so a freshly created tab is selectable.
+  useEffect(() => {
+    if (isOpen) loadAllUserData()
+  }, [isOpen, loadAllUserData])
+
+  const handleSaveNote = async () => {
+    const text = myDraft.trim()
+    if (!text || !db?.supabase || !coachId) return
+    setSavingNote(true)
+    try {
+      const payload = {
+        coach_id: coachId,
+        text,
+        category_id: activeCustomCatId,           // for user-made custom tabs
+        builtin_category: activeBuiltinId,        // for the seeded built-in tabs
+      }
+      const { data, error } = await db.supabase
+        .from('dm_user_messages').insert(payload).select().single()
+      if (error) throw error
+      // Append so new messages show at the bottom of the existing list
+      // (chronological — matches the seeded order).
+      setMyNotes(prev => [...prev, data])
+      setMyDraft('')
+    } catch (e) {
+      console.error('save dm note failed:', e)
+      alert('Opslaan mislukt — ' + (e?.message || e))
+    } finally {
+      setSavingNote(false)
+    }
+  }
+
+  const handleClearDraft = () => {
+    if (!myDraft.trim()) return
+    if (window.confirm('Veld leegmaken? De huidige tekst gaat verloren.')) {
+      setMyDraft('')
+    }
+  }
+
+  const handleDeleteNote = async (id) => {
+    if (!db?.supabase) return
+    if (!window.confirm('Bericht verwijderen?')) return
+    const prev = myNotes
+    setMyNotes(p => p.filter(n => n.id !== id))
+    try {
+      const { error } = await db.supabase
+        .from('dm_user_messages')
+        .update({ deleted_at: new Date().toISOString() })
+        .eq('id', id)
+      if (error) throw error
+    } catch (e) {
+      console.error('delete dm note failed:', e)
+      setMyNotes(prev)
+    }
+  }
+
+  // ── Custom category CRUD ──────────────────────────────────────────────────
+  const createCustomCategory = async () => {
+    const name = newCatName.trim()
+    if (!name || !db?.supabase || !coachId) return
+    try {
+      const { data, error } = await db.supabase
+        .from('dm_categories')
+        .insert({ coach_id: coachId, name, position: customCategories.length })
+        .select().single()
+      if (error) throw error
+      setCustomCategories(prev => [...prev, data])
+      setActiveCategory(data.id) // auto-switch to the new tab
+      setSearchTerm('')
+      setNewCatName('')
+      setCreatingCat(false)
+    } catch (e) {
+      alert('Tab aanmaken mislukt — ' + (e?.message || e))
+    }
+  }
+
+  const renameCustomCategory = async (id) => {
+    const name = renamingCatName.trim()
+    if (!name || !db?.supabase) return
+    try {
+      const { error } = await db.supabase
+        .from('dm_categories').update({ name }).eq('id', id)
+      if (error) throw error
+      setCustomCategories(prev => prev.map(c => c.id === id ? { ...c, name } : c))
+      setRenamingCatId(null)
+      setRenamingCatName('')
+    } catch (e) {
+      alert('Hernoemen mislukt — ' + (e?.message || e))
+    }
+  }
+
+  const deleteCustomCategory = async (id) => {
+    if (!window.confirm('Tab verwijderen? Berichten erin blijven bestaan onder "Mijn berichten".')) return
+    try {
+      const { error } = await db.supabase
+        .from('dm_categories')
+        .update({ deleted_at: new Date().toISOString() })
+        .eq('id', id)
+      if (error) throw error
+      // Move the notes in that category back to default by clearing category_id.
+      await db.supabase.from('dm_user_messages')
+        .update({ category_id: null }).eq('category_id', id)
+      setCustomCategories(prev => prev.filter(c => c.id !== id))
+      setMyNotes(prev => prev.map(n => n.category_id === id ? { ...n, category_id: null } : n))
+      if (activeCategory === id) setActiveCategory(MY_NOTES_ID)
+    } catch (e) {
+      alert('Verwijderen mislukt — ' + (e?.message || e))
+    }
+  }
+
+  // ── Hide / unhide built-in categories ─────────────────────────────────────
+  const hideBuiltin = async (builtinId) => {
+    if (!db?.supabase || !coachId) return
+    try {
+      const { error } = await db.supabase
+        .from('dm_hidden_builtins')
+        .upsert({ coach_id: coachId, builtin_id: builtinId })
+      if (error) throw error
+      setHiddenBuiltins(prev => new Set([...prev, builtinId]))
+      // If the user was looking at it, switch to Mijn berichten.
+      if (activeCategory === builtinId) setActiveCategory(MY_NOTES_ID)
+    } catch (e) {
+      alert('Verbergen mislukt — ' + (e?.message || e))
+    }
+  }
+
+  const unhideBuiltin = async (builtinId) => {
+    if (!db?.supabase || !coachId) return
+    try {
+      const { error } = await db.supabase
+        .from('dm_hidden_builtins')
+        .delete()
+        .eq('coach_id', coachId).eq('builtin_id', builtinId)
+      if (error) throw error
+      setHiddenBuiltins(prev => {
+        const next = new Set(prev)
+        next.delete(builtinId)
+        return next
+      })
+    } catch (e) {
+      alert('Tonen mislukt — ' + (e?.message || e))
+    }
+  }
 
   const copyToClipboard = (text, index) => {
     navigator.clipboard.writeText(text)
@@ -326,130 +595,200 @@ export default function DMBibleModal({ isMobile = false }) {
   }
 
   const currentCategory = CATEGORIES.find(c => c.id === activeCategory)
-  
-  const filteredMessages = searchTerm 
-    ? CATEGORIES.flatMap(cat => 
-        cat.messages
-          .filter(m => 
-            m.text.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            m.tag.toLowerCase().includes(searchTerm.toLowerCase())
-          )
-          .map(m => ({ ...m, category: cat.label, color: cat.color }))
-      )
-    : currentCategory?.messages || []
 
-  // ===== FLOATING BUTTON =====
-  if (!isOpen) {
-    return (
-      <button
-        onClick={() => setIsOpen(true)}
-        style={{
-          position: 'fixed',
-          bottom: isMobile ? '100px' : '32px',
-          right: isMobile ? '16px' : '32px',
-          width: isMobile ? '52px' : '60px',
-          height: isMobile ? '52px' : '60px',
-          borderRadius: '50%',
-          background: `linear-gradient(135deg, ${GOLD.light} 0%, ${GOLD.primary} 50%, ${GOLD.dark} 100%)`,
-          border: `2px solid ${GOLD.light}`,
-          cursor: 'pointer',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          boxShadow: `0 4px 20px ${GOLD.glow}, 0 0 30px ${GOLD.glow}`,
-          zIndex: 9999,
-          transition: 'all 0.3s ease',
-          animation: 'pulse-gold 2s infinite'
-        }}
-      >
-        <Flame size={isMobile ? 26 : 30} color="#000" />
-        
-        <style>{`
-          @keyframes pulse-gold {
-            0%, 100% { box-shadow: 0 4px 20px ${GOLD.glow}, 0 0 30px ${GOLD.glow}; }
-            50% { box-shadow: 0 4px 30px ${GOLD.glow}, 0 0 50px ${GOLD.glow}; }
+  // Search now runs against the DB-backed notes so user edits + additions
+  // are searchable. Maps back to {text, tag, category, color} shape that
+  // the search-result render expects.
+  const filteredMessages = searchTerm
+    ? myNotes
+        .filter(n => {
+          const q = searchTerm.toLowerCase()
+          return (n.text || '').toLowerCase().includes(q) ||
+                 (n.tag  || '').toLowerCase().includes(q)
+        })
+        .map(n => {
+          const builtin = n.builtin_category ? CATEGORIES.find(c => c.id === n.builtin_category) : null
+          const custom = n.category_id ? customCategories.find(c => c.id === n.category_id) : null
+          return {
+            id: n.id,
+            text: n.text,
+            tag: n.tag || '',
+            category: builtin?.label || custom?.name || 'Mijn berichten',
+            color: builtin?.color || custom?.color || GOLD.light,
           }
-        `}</style>
-      </button>
-    )
-  }
+        })
+    : []
 
-  // ===== MODAL =====
-  return (
-    <div 
+  // ── Drag state — modal floats anywhere on screen. ──────────────────────────
+  const PANEL_W = isMobile ? Math.min(window.innerWidth, 480) : 820
+  const PANEL_H = isMobile ? Math.min(window.innerHeight - 16, 700) : 640
+  const [pos, setPos] = useState(null) // { x, y } — set on first open, retained
+  const [isDragging, setIsDragging] = useState(false)
+  const dragOffset = useRef({ x: 0, y: 0 })
+
+  useEffect(() => {
+    if (!isOpen || pos) return
+    // Default: center on first open. On mobile we stick to top-left full-screen.
+    if (isMobile) {
+      setPos({ x: 0, y: 0 })
+    } else {
+      setPos({
+        x: Math.max(8, Math.round((window.innerWidth  - PANEL_W) / 2)),
+        y: Math.max(8, Math.round((window.innerHeight - PANEL_H) / 2)),
+      })
+    }
+  }, [isOpen, pos, isMobile, PANEL_W, PANEL_H])
+
+  const onDragStart = useCallback((e) => {
+    if (isMobile) return
+    // Ignore drag-start that originates from interactive elements inside the
+    // header (the close-button), otherwise X won't fire.
+    if (e.target?.closest?.('[data-no-drag]')) return
+    e.preventDefault()
+    const cx = e.clientX ?? e.touches?.[0]?.clientX ?? 0
+    const cy = e.clientY ?? e.touches?.[0]?.clientY ?? 0
+    dragOffset.current = { x: cx - (pos?.x ?? 0), y: cy - (pos?.y ?? 0) }
+    setIsDragging(true)
+  }, [pos, isMobile])
+
+  const onDragMove = useCallback((e) => {
+    const cx = e.clientX ?? e.touches?.[0]?.clientX ?? 0
+    const cy = e.clientY ?? e.touches?.[0]?.clientY ?? 0
+    setPos({
+      x: Math.max(0, Math.min(window.innerWidth  - PANEL_W, cx - dragOffset.current.x)),
+      y: Math.max(0, Math.min(window.innerHeight - 60,      cy - dragOffset.current.y)),
+    })
+  }, [PANEL_W])
+
+  const onDragEnd = useCallback(() => setIsDragging(false), [])
+
+  useEffect(() => {
+    if (!isDragging) return
+    window.addEventListener('mousemove', onDragMove)
+    window.addEventListener('mouseup',   onDragEnd)
+    window.addEventListener('touchmove', onDragMove, { passive: false })
+    window.addEventListener('touchend',  onDragEnd)
+    return () => {
+      window.removeEventListener('mousemove', onDragMove)
+      window.removeEventListener('mouseup',   onDragEnd)
+      window.removeEventListener('touchmove', onDragMove)
+      window.removeEventListener('touchend',  onDragEnd)
+    }
+  }, [isDragging, onDragMove, onDragEnd])
+
+  // ===== FLOATING BUTTON — portal'd to body so a parent's `transform:
+  // translateZ(0)` (used elsewhere for compositing) doesn't turn this from
+  // viewport-fixed into container-fixed and scroll the FAB off screen.
+  const fab = !isOpen ? createPortal(
+    <button
+      onClick={() => setIsOpen(true)}
       style={{
         position: 'fixed',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        background: 'rgba(0, 0, 0, 0.9)',
-        backdropFilter: 'blur(8px)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        zIndex: 10000,
-        padding: isMobile ? '0.5rem' : '1rem'
+        bottom: isMobile ? '100px' : '32px',
+        right: isMobile ? '16px' : '32px',
+        width: isMobile ? '52px' : '60px',
+        height: isMobile ? '52px' : '60px',
+        borderRadius: '50%',
+        background: `linear-gradient(135deg, ${GOLD.light} 0%, ${GOLD.primary} 50%, ${GOLD.dark} 100%)`,
+        border: `2px solid ${GOLD.light}`,
+        cursor: 'pointer',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        boxShadow: `0 4px 20px ${GOLD.glow}, 0 0 30px ${GOLD.glow}`,
+        zIndex: 2147483600,
+        transition: 'all 0.3s ease',
+        animation: 'pulse-gold-dmb 2s infinite',
       }}
-      onClick={() => setIsOpen(false)}
+      title="DM Copy Center"
     >
-      <div 
-        style={{
-          width: isMobile ? '100%' : '900px',
-          maxWidth: '100%',
-          height: isMobile ? '95vh' : '85vh',
-          background: 'linear-gradient(135deg, #0a0a0a 0%, #111 100%)',
-          border: `2px solid ${GOLD.border}`,
-          borderRadius: isMobile ? '12px' : '16px',
-          overflow: 'hidden',
-          display: 'flex',
-          flexDirection: 'column',
-          boxShadow: `0 0 50px ${GOLD.glow}`
-        }}
-        onClick={(e) => e.stopPropagation()}
-      >
-        {/* HEADER */}
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          padding: isMobile ? '0.75rem' : '1rem 1.25rem',
-          borderBottom: `1px solid ${GOLD.border}`,
-          background: GOLD.bg,
-          flexShrink: 0
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-            <Flame size={24} color={GOLD.light} />
+      <Flame size={isMobile ? 26 : 30} color="#000" />
+      <style>{`
+        @keyframes pulse-gold-dmb {
+          0%, 100% { box-shadow: 0 4px 20px ${GOLD.glow}, 0 0 30px ${GOLD.glow}; }
+          50%      { box-shadow: 0 4px 30px ${GOLD.glow}, 0 0 50px ${GOLD.glow}; }
+        }
+      `}</style>
+    </button>,
+    document.body,
+  ) : null
+
+  if (!isOpen) return fab
+
+  if (!pos) return fab // wait for initial position calc
+
+  // ===== MODAL — also portal'd. Draggable by its header (same pattern as
+  // FloatingPanel / CoachingLogModal). No dark backdrop — feels floating
+  // instead of blocking, so you can still see the lead card behind it.
+  return createPortal(
+    <div
+      onClick={(e) => e.stopPropagation()}
+      style={{
+        position: 'fixed',
+        left: pos.x,
+        top:  pos.y,
+        width:  isMobile ? '100vw' : PANEL_W,
+        height: isMobile ? '100dvh' : PANEL_H,
+        background: 'linear-gradient(135deg, #0a0a0a 0%, #111 100%)',
+        border: isMobile ? 'none' : `2px solid ${GOLD.border}`,
+        borderRadius: isMobile ? 0 : 14,
+        boxShadow: `0 12px 50px rgba(0,0,0,0.7), 0 0 40px ${GOLD.glow}`,
+        zIndex: 2147483601,
+        isolation: 'isolate',
+        display: 'flex', flexDirection: 'column',
+        overflow: 'hidden',
+        cursor: isDragging ? 'grabbing' : 'default',
+        userSelect: isDragging ? 'none' : 'auto',
+      }}
+    >
+        {/* HEADER — drag handle */}
+        <div
+          onMouseDown={onDragStart}
+          onTouchStart={onDragStart}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            padding: isMobile ? '0.75rem' : '0.85rem 1rem',
+            borderBottom: `1px solid ${GOLD.border}`,
+            background: GOLD.bg,
+            flexShrink: 0,
+            cursor: isMobile ? 'default' : (isDragging ? 'grabbing' : 'grab'),
+            touchAction: 'none',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+            {!isMobile && <GripHorizontal size={13} color="rgba(255,255,255,0.35)" />}
+            <Flame size={22} color={GOLD.light} />
             <div>
-              <h2 style={{ 
-                fontSize: isMobile ? '1rem' : '1.25rem', 
-                fontWeight: '800', 
-                color: GOLD.light, 
-                margin: 0 
+              <h2 style={{
+                fontSize: isMobile ? '0.95rem' : '1.1rem',
+                fontWeight: '800',
+                color: GOLD.light,
+                margin: 0,
               }}>
                 DM COPY CENTER
               </h2>
-              <p style={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.4)', margin: 0 }}>
+              <p style={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.4)', margin: 0 }}>
                 Klik om te kopiëren → Plak in DM
               </p>
             </div>
           </div>
-          <button 
-            onClick={() => setIsOpen(false)} 
+          <button
+            data-no-drag
+            onClick={(e) => { e.stopPropagation(); setIsOpen(false) }}
+            onMouseDown={(e) => e.stopPropagation()}
+            onTouchStart={(e) => e.stopPropagation()}
             style={{
-              width: '36px',
-              height: '36px',
-              borderRadius: '8px',
+              width: 32, height: 32,
+              borderRadius: 6,
               background: 'rgba(255,255,255,0.05)',
               border: '1px solid rgba(255,255,255,0.1)',
               color: 'rgba(255,255,255,0.5)',
               cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center'
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              touchAction: 'manipulation',
             }}
           >
-            <X size={20} />
+            <X size={16} />
           </button>
         </div>
 
@@ -497,45 +836,234 @@ export default function DMBibleModal({ isMobile = false }) {
             padding: '0.5rem',
             background: 'rgba(0,0,0,0.3)'
           }}>
-            {CATEGORIES.map(cat => (
+            {/* My Notes — first, so it's always at the top of the sidebar. */}
+            {db && coachId && (() => {
+              const isActive = activeCategory === MY_NOTES_ID && !searchTerm
+              const noteColor = GOLD.light
+              const defaultCount = myNotes.filter(n => !n.category_id).length
+              return (
+                <button
+                  onClick={() => { setActiveCategory(MY_NOTES_ID); setSearchTerm('') }}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: '0.5rem',
+                    padding: isMobile ? '0.5rem 0.75rem' : '0.6rem 0.75rem',
+                    background: isActive ? `${noteColor}1a` : 'transparent',
+                    border: isActive ? `1px solid ${noteColor}55` : '1px solid transparent',
+                    borderRadius: '6px',
+                    color: isActive ? noteColor : 'rgba(255,255,255,0.7)',
+                    fontSize: isMobile ? '0.7rem' : '0.8rem',
+                    fontWeight: 700,
+                    cursor: 'pointer', whiteSpace: 'nowrap',
+                    transition: 'all 0.2s ease',
+                    textAlign: 'left',
+                    flex: isMobile ? '0 0 auto' : 'none',
+                  }}
+                >
+                  <span>📝 Mijn berichten</span>
+                  <span style={{ fontSize: '0.65rem', opacity: 0.5, marginLeft: 'auto' }}>
+                    {defaultCount}
+                  </span>
+                </button>
+              )
+            })()}
+
+            {/* User-created custom tabs. Inline rename + delete. */}
+            {customCategories.map(cat => {
+              const isActive = activeCategory === cat.id && !searchTerm
+              const isRenaming = renamingCatId === cat.id
+              const count = myNotes.filter(n => n.category_id === cat.id).length
+              const color = cat.color || GOLD.light
+              if (isRenaming) {
+                return (
+                  <div key={cat.id} style={{
+                    display: 'flex', alignItems: 'center', gap: 4,
+                    padding: '0.35rem 0.5rem',
+                    background: `${color}1a`, border: `1px solid ${color}55`, borderRadius: 6,
+                  }}>
+                    <input
+                      autoFocus
+                      value={renamingCatName}
+                      onChange={(e) => setRenamingCatName(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') renameCustomCategory(cat.id)
+                        if (e.key === 'Escape') { setRenamingCatId(null); setRenamingCatName('') }
+                      }}
+                      style={{
+                        flex: 1, minWidth: 0,
+                        background: 'rgba(0,0,0,0.4)', border: '1px solid rgba(255,255,255,0.1)',
+                        borderRadius: 4, padding: '4px 6px',
+                        color: '#fff', fontSize: '0.75rem', outline: 'none',
+                      }}
+                    />
+                    <button onClick={() => renameCustomCategory(cat.id)} style={iconBtn(color)}>
+                      <Check size={11} />
+                    </button>
+                    <button onClick={() => { setRenamingCatId(null); setRenamingCatName('') }} style={iconBtn('rgba(255,255,255,0.4)')}>
+                      <X size={11} />
+                    </button>
+                  </div>
+                )
+              }
+              return (
+                <div key={cat.id} style={{
+                  display: 'flex', alignItems: 'stretch',
+                  background: isActive ? `${color}1a` : 'transparent',
+                  border: isActive ? `1px solid ${color}55` : '1px solid transparent',
+                  borderRadius: 6,
+                }}>
+                  <button
+                    onClick={() => { setActiveCategory(cat.id); setSearchTerm('') }}
+                    style={{
+                      flex: 1, display: 'flex', alignItems: 'center', gap: 6,
+                      padding: isMobile ? '0.5rem 0.5rem 0.5rem 0.65rem' : '0.55rem 0.5rem 0.55rem 0.7rem',
+                      background: 'transparent', border: 'none',
+                      color: isActive ? color : 'rgba(255,255,255,0.7)',
+                      fontSize: isMobile ? '0.7rem' : '0.8rem', fontWeight: 700,
+                      cursor: 'pointer', textAlign: 'left',
+                      whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+                    }}
+                  >
+                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>📁 {cat.name}</span>
+                    <span style={{ fontSize: '0.6rem', opacity: 0.5, marginLeft: 'auto' }}>{count}</span>
+                  </button>
+                  {isActive && (
+                    <>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); setRenamingCatId(cat.id); setRenamingCatName(cat.name) }}
+                        title="Hernoemen" style={iconBtn(color)}
+                      >
+                        <Pencil size={10} />
+                      </button>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); deleteCustomCategory(cat.id) }}
+                        title="Verwijderen" style={iconBtn('#fca5a5')}
+                      >
+                        <Trash2 size={10} />
+                      </button>
+                    </>
+                  )}
+                </div>
+              )
+            })}
+
+            {/* + Nieuwe tab */}
+            {db && coachId && (
+              creatingCat ? (
+                <div style={{
+                  display: 'flex', gap: 4, padding: '0.35rem 0.5rem',
+                  background: `${GOLD.light}1a`, border: `1px solid ${GOLD.light}55`, borderRadius: 6,
+                }}>
+                  <input
+                    autoFocus
+                    value={newCatName}
+                    onChange={(e) => setNewCatName(e.target.value)}
+                    placeholder="Naam tab…"
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') createCustomCategory()
+                      if (e.key === 'Escape') { setCreatingCat(false); setNewCatName('') }
+                    }}
+                    style={{
+                      flex: 1, minWidth: 0,
+                      background: 'rgba(0,0,0,0.4)', border: '1px solid rgba(255,255,255,0.1)',
+                      borderRadius: 4, padding: '4px 6px',
+                      color: '#fff', fontSize: '0.75rem', outline: 'none',
+                    }}
+                  />
+                  <button onClick={createCustomCategory} style={iconBtn(GOLD.light)}>
+                    <Check size={11} />
+                  </button>
+                  <button onClick={() => { setCreatingCat(false); setNewCatName('') }} style={iconBtn('rgba(255,255,255,0.4)')}>
+                    <X size={11} />
+                  </button>
+                </div>
+              ) : (
+                <button
+                  onClick={() => setCreatingCat(true)}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 5,
+                    padding: isMobile ? '0.5rem 0.75rem' : '0.55rem 0.75rem',
+                    background: 'transparent',
+                    border: '1px dashed rgba(255,255,255,0.15)',
+                    borderRadius: 6,
+                    color: 'rgba(255,255,255,0.55)',
+                    fontSize: '0.7rem', fontWeight: 700,
+                    cursor: 'pointer', textAlign: 'left',
+                  }}
+                >
+                  <FolderPlus size={11} /> Nieuwe tab
+                </button>
+              )
+            )}
+
+            {/* Divider tussen user-tabs en built-ins */}
+            <div style={{
+              height: 1, background: 'rgba(255,255,255,0.06)',
+              margin: '0.4rem 0.25rem',
+            }} />
+
+            {CATEGORIES.filter(cat => showHidden || !hiddenBuiltins.has(cat.id)).map(cat => {
+              const isActive = activeCategory === cat.id && !searchTerm
+              const isHidden = hiddenBuiltins.has(cat.id)
+              return (
+                <div key={cat.id} style={{
+                  display: 'flex', alignItems: 'stretch',
+                  background: isActive ? `${cat.color}22` : 'transparent',
+                  border: isActive ? `1px solid ${cat.color}55` : '1px solid transparent',
+                  borderRadius: 6,
+                  opacity: isHidden ? 0.45 : 1,
+                }}>
+                  <button
+                    onClick={() => { setActiveCategory(cat.id); setSearchTerm('') }}
+                    style={{
+                      flex: 1, display: 'flex', alignItems: 'center', gap: 6,
+                      padding: isMobile ? '0.5rem 0.5rem 0.5rem 0.65rem' : '0.55rem 0.5rem 0.55rem 0.7rem',
+                      background: 'transparent', border: 'none',
+                      color: isActive ? cat.color : 'rgba(255,255,255,0.6)',
+                      fontSize: isMobile ? '0.7rem' : '0.8rem', fontWeight: 600,
+                      cursor: 'pointer', textAlign: 'left',
+                      whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+                    }}
+                  >
+                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{cat.label}</span>
+                    <span style={{ fontSize: '0.6rem', opacity: 0.5, marginLeft: 'auto' }}>
+                      {cat.messages.length}
+                    </span>
+                  </button>
+                  {db && coachId && isActive && (
+                    isHidden ? (
+                      <button onClick={(e) => { e.stopPropagation(); unhideBuiltin(cat.id) }} title="Tonen" style={iconBtn(cat.color)}>
+                        <Eye size={10} />
+                      </button>
+                    ) : (
+                      <button onClick={(e) => { e.stopPropagation(); hideBuiltin(cat.id) }} title="Verbergen" style={iconBtn('rgba(255,255,255,0.4)')}>
+                        <EyeOff size={10} />
+                      </button>
+                    )
+                  )}
+                </div>
+              )
+            })}
+
+            {/* Toon-verborgen toggle als er iets verborgen is */}
+            {db && coachId && hiddenBuiltins.size > 0 && (
               <button
-                key={cat.id}
-                onClick={() => {
-                  setActiveCategory(cat.id)
-                  setSearchTerm('')
-                }}
+                onClick={() => setShowHidden(v => !v)}
                 style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.5rem',
-                  padding: isMobile ? '0.5rem 0.75rem' : '0.6rem 0.75rem',
-                  background: activeCategory === cat.id && !searchTerm
-                    ? `${cat.color}22`
-                    : 'transparent',
-                  border: activeCategory === cat.id && !searchTerm
-                    ? `1px solid ${cat.color}55`
-                    : '1px solid transparent',
-                  borderRadius: '6px',
-                  color: activeCategory === cat.id && !searchTerm ? cat.color : 'rgba(255,255,255,0.6)',
-                  fontSize: isMobile ? '0.7rem' : '0.8rem',
-                  fontWeight: '600',
+                  display: 'flex', alignItems: 'center', gap: 5,
+                  padding: '0.4rem 0.5rem',
+                  marginTop: 4,
+                  background: 'transparent',
+                  border: '1px solid rgba(255,255,255,0.08)',
+                  borderRadius: 5,
+                  color: 'rgba(255,255,255,0.5)',
+                  fontSize: '0.6rem', fontWeight: 700,
                   cursor: 'pointer',
-                  whiteSpace: 'nowrap',
-                  transition: 'all 0.2s ease',
-                  textAlign: 'left',
-                  flex: isMobile ? '0 0 auto' : 'none'
                 }}
               >
-                <span>{cat.label}</span>
-                <span style={{ 
-                  fontSize: '0.65rem', 
-                  opacity: 0.5,
-                  marginLeft: 'auto'
-                }}>
-                  {cat.messages.length}
-                </span>
+                {showHidden ? <Eye size={9} /> : <EyeOff size={9} />}
+                {showHidden ? 'Verberg gehidden' : `Toon ${hiddenBuiltins.size} verborgen`}
               </button>
-            ))}
+            )}
           </div>
 
           {/* MESSAGES LIST */}
@@ -544,8 +1072,251 @@ export default function DMBibleModal({ isMobile = false }) {
             overflow: 'auto',
             padding: isMobile ? '0.5rem' : '0.75rem'
           }}>
+            {/* Notes view — unified for default, custom, AND built-in tabs.
+                Everything is DB-backed now (built-ins seeded once per coach)
+                so every tab supports add/edit/delete with the same UI. */}
+            {!searchTerm && isUserNotesTab && (() => {
+              const activeCustom = customCategories.find(c => c.id === activeCategory)
+              const activeBuiltin = CATEGORIES.find(c => c.id === activeCategory)
+              const tabLabel = activeBuiltin?.label || activeCustom?.name || 'Mijn berichten'
+              const tabColor = activeBuiltin?.color || activeCustom?.color || GOLD.light
+              return (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
+                <div style={{
+                  display: 'flex', alignItems: 'center', gap: '0.5rem',
+                  paddingBottom: '0.4rem', borderBottom: `1px solid ${tabColor}33`,
+                }}>
+                  <Pencil size={14} color={tabColor} />
+                  <span style={{ fontSize: '1rem', fontWeight: 800, color: tabColor }}>
+                    {tabLabel}
+                  </span>
+                  <span style={{
+                    marginLeft: 'auto', fontSize: '0.65rem',
+                    color: 'rgba(255,255,255,0.4)',
+                  }}>
+                    {notesForActiveTab.length} opgeslagen
+                  </span>
+                </div>
+
+                <textarea
+                  value={myDraft}
+                  onChange={(e) => setMyDraft(e.target.value)}
+                  placeholder="Schrijf hier je doordachte bericht. Sla 'm op om 'm later opnieuw te gebruiken (klik in de lijst hieronder om te kopiëren)."
+                  rows={isMobile ? 5 : 7}
+                  style={{
+                    width: '100%', boxSizing: 'border-box',
+                    padding: '0.7rem 0.85rem',
+                    background: 'rgba(0,0,0,0.4)',
+                    border: `1px solid ${GOLD.border}`,
+                    borderRadius: 8,
+                    color: '#fff',
+                    fontSize: '0.85rem', lineHeight: 1.5,
+                    fontFamily: 'inherit', resize: 'vertical', outline: 'none',
+                  }}
+                />
+
+                <div style={{ display: 'flex', gap: '0.4rem' }}>
+                  <button
+                    onClick={handleSaveNote}
+                    disabled={!myDraft.trim() || savingNote}
+                    style={{
+                      flex: 2, padding: '0.55rem',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5,
+                      background: myDraft.trim() ? GOLD.primary : 'rgba(255,255,255,0.04)',
+                      border: `1px solid ${myDraft.trim() ? GOLD.primary : 'rgba(255,255,255,0.08)'}`,
+                      borderRadius: 6,
+                      color: myDraft.trim() ? '#000' : 'rgba(255,255,255,0.3)',
+                      fontSize: '0.8rem', fontWeight: 800,
+                      cursor: myDraft.trim() && !savingNote ? 'pointer' : 'not-allowed',
+                      touchAction: 'manipulation',
+                    }}
+                  >
+                    <Plus size={13} /> {savingNote ? 'Opslaan…' : 'Opslaan'}
+                  </button>
+                  <button
+                    onClick={handleClearDraft}
+                    disabled={!myDraft.trim()}
+                    style={{
+                      flex: 1, padding: '0.55rem',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5,
+                      background: 'rgba(239,68,68,0.08)',
+                      border: '1px solid rgba(239,68,68,0.25)',
+                      borderRadius: 6,
+                      color: myDraft.trim() ? '#fca5a5' : 'rgba(255,255,255,0.25)',
+                      fontSize: '0.75rem', fontWeight: 700,
+                      cursor: myDraft.trim() ? 'pointer' : 'not-allowed',
+                      touchAction: 'manipulation',
+                    }}
+                  >
+                    <Eraser size={12} /> Clear
+                  </button>
+                </div>
+
+                {/* History */}
+                <div style={{
+                  marginTop: '0.4rem', paddingTop: '0.5rem',
+                  borderTop: '1px solid rgba(255,255,255,0.05)',
+                }}>
+                  <div style={{
+                    fontSize: '0.55rem', fontWeight: 800,
+                    color: 'rgba(255,255,255,0.45)',
+                    letterSpacing: '0.06em', textTransform: 'uppercase',
+                    marginBottom: '0.45rem',
+                  }}>
+                    Opgeslagen berichten
+                  </div>
+                  {notesLoading && (
+                    <div style={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.4)', textAlign: 'center', padding: '0.5rem' }}>
+                      Laden…
+                    </div>
+                  )}
+                  {!notesLoading && notesForActiveTab.length === 0 && (
+                    <div style={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.3)', textAlign: 'center', padding: '0.85rem', fontStyle: 'italic' }}>
+                      Nog geen berichten in deze tab — schrijf 'r één en sla 'm op.
+                    </div>
+                  )}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                    {notesForActiveTab.map((n, i) => {
+                      const idx = `my-${n.id}`
+                      const isCopied = copiedIndex === idx
+                      const isEditing = editingNoteId === n.id
+                      const stripeColor = tabColor || GOLD.light
+                      return (
+                        <div
+                          key={n.id}
+                          onClick={() => { if (!isEditing) copyToClipboard(n.text, idx) }}
+                          style={{
+                            display: 'flex', alignItems: 'stretch',
+                            background: isCopied ? `${GOLD.primary}22` : 'rgba(255,255,255,0.03)',
+                            border: isCopied ? `1px solid ${GOLD.primary}` : '1px solid rgba(255,255,255,0.08)',
+                            borderRadius: 8, overflow: 'hidden',
+                            cursor: isEditing ? 'default' : 'pointer',
+                            transition: 'all 0.15s ease',
+                          }}
+                        >
+                          <div style={{ width: 4, background: stripeColor, flexShrink: 0 }} />
+                          <div style={{ flex: 1, padding: '0.6rem 0.7rem', display: 'flex', flexDirection: 'column', gap: 4 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                              {n.tag && (
+                                <span style={{
+                                  fontSize: '0.6rem', fontWeight: 700,
+                                  color: stripeColor,
+                                  background: `${stripeColor}18`,
+                                  padding: '1px 6px', borderRadius: 4,
+                                }}>{n.tag}</span>
+                              )}
+                              <span style={{
+                                fontSize: '0.55rem', fontWeight: 700,
+                                color: 'rgba(255,255,255,0.35)',
+                                letterSpacing: '0.04em', textTransform: 'uppercase',
+                              }}>
+                                {new Date(n.created_at).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })}
+                              </span>
+                            </div>
+                            {isEditing ? (
+                              <textarea
+                                autoFocus
+                                value={editingNoteText}
+                                onChange={(e) => setEditingNoteText(e.target.value)}
+                                onClick={(e) => e.stopPropagation()}
+                                rows={Math.max(2, Math.min(8, (editingNoteText.match(/\n/g)?.length || 0) + 2))}
+                                style={{
+                                  width: '100%', boxSizing: 'border-box',
+                                  padding: '0.45rem 0.55rem',
+                                  background: 'rgba(0,0,0,0.4)',
+                                  border: `1px solid ${stripeColor}55`,
+                                  borderRadius: 5,
+                                  color: '#fff', fontSize: '0.85rem', lineHeight: 1.4,
+                                  fontFamily: 'inherit', resize: 'vertical', outline: 'none',
+                                }}
+                              />
+                            ) : (
+                              <div style={{
+                                fontSize: isMobile ? '0.8rem' : '0.85rem',
+                                color: 'rgba(255,255,255,0.9)', lineHeight: 1.4,
+                                whiteSpace: 'pre-wrap',
+                              }}>
+                                {n.text}
+                              </div>
+                            )}
+                            {isEditing && (
+                              <div style={{ display: 'flex', gap: 4, marginTop: 4 }}>
+                                <button
+                                  onClick={(e) => { e.stopPropagation(); handleSaveEdit() }}
+                                  style={{
+                                    padding: '4px 10px',
+                                    background: '#10b981', border: 'none', borderRadius: 4,
+                                    color: '#fff', fontSize: '0.7rem', fontWeight: 800,
+                                    cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4,
+                                  }}
+                                >
+                                  <Check size={11} /> Opslaan
+                                </button>
+                                <button
+                                  onClick={(e) => { e.stopPropagation(); setEditingNoteId(null); setEditingNoteText('') }}
+                                  style={{
+                                    padding: '4px 10px',
+                                    background: 'rgba(255,255,255,0.05)',
+                                    border: '1px solid rgba(255,255,255,0.1)', borderRadius: 4,
+                                    color: 'rgba(255,255,255,0.6)', fontSize: '0.7rem', fontWeight: 700,
+                                    cursor: 'pointer',
+                                  }}
+                                >
+                                  Annuleer
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                          {!isEditing && (
+                            <div style={{
+                              width: 44, display: 'flex', flexDirection: 'column',
+                              borderLeft: '1px solid rgba(255,255,255,0.05)',
+                            }}>
+                              <div style={{
+                                flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                background: isCopied ? GOLD.primary : 'transparent',
+                              }}>
+                                {isCopied ? <Check size={16} color="#000" /> : <Copy size={14} color="rgba(255,255,255,0.3)" />}
+                              </div>
+                              <button
+                                onClick={(e) => { e.stopPropagation(); setEditingNoteId(n.id); setEditingNoteText(n.text) }}
+                                title="Bewerken"
+                                style={{
+                                  height: 26,
+                                  background: 'transparent',
+                                  border: 'none', borderTop: '1px solid rgba(255,255,255,0.05)',
+                                  color: 'rgba(255,255,255,0.4)',
+                                  cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                }}
+                              >
+                                <Pencil size={11} />
+                              </button>
+                              <button
+                                onClick={(e) => { e.stopPropagation(); handleDeleteNote(n.id) }}
+                                title="Verwijder"
+                                style={{
+                                  height: 26,
+                                  background: 'transparent',
+                                  border: 'none', borderTop: '1px solid rgba(255,255,255,0.05)',
+                                  color: 'rgba(239,68,68,0.5)',
+                                  cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                }}
+                              >
+                                <Trash2 size={12} />
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+              </div>
+              )
+            })()}
+
             {/* Category header */}
-            {!searchTerm && currentCategory && (
+            {!searchTerm && !isUserNotesTab && currentCategory && (
               <div style={{
                 display: 'flex',
                 alignItems: 'center',
@@ -586,7 +1357,9 @@ export default function DMBibleModal({ isMobile = false }) {
               </div>
             )}
 
-            {/* Messages */}
+            {/* Messages — hidden when the My Notes tab is active (that tab
+                renders its own writer + history above). */}
+            {!isUserNotesTab && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
               {filteredMessages.map((msg, i) => {
                 const index = searchTerm ? `search-${i}` : `${activeCategory}-${i}`
@@ -679,9 +1452,10 @@ export default function DMBibleModal({ isMobile = false }) {
                 )
               })}
             </div>
+            )}
 
-            {/* Empty state */}
-            {filteredMessages.length === 0 && (
+            {/* Empty state — only for the template categories. */}
+            {!isUserNotesTab && filteredMessages.length === 0 && (
               <div style={{
                 textAlign: 'center',
                 padding: '2rem',
@@ -712,7 +1486,7 @@ export default function DMBibleModal({ isMobile = false }) {
             💡 Klik = Kopiëren
           </span>
         </div>
-      </div>
-    </div>
+    </div>,
+    document.body,
   )
 }

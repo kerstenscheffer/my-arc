@@ -1,7 +1,7 @@
 // src/modules/meal-plan/components/food-log/MyMealsTab.jsx
 // 🎯 v3.0 - Uses parent buildingMeal state to survive tab switches
 import React, { useState, useEffect } from 'react'
-import { Plus, Trash2, Check, ArrowLeft, ChevronRight } from 'lucide-react'
+import { Plus, Trash2, Check, ArrowLeft, ChevronRight, Camera, Image as ImageIcon, X } from 'lucide-react'
 
 const MEAL_MOMENTS = [
   { id: 'breakfast', label: 'Ontbijt' },
@@ -39,7 +39,8 @@ export default function MyMealsTab({ client, db, onLog, onRequestAddIngredient, 
       calories: meal.calories || 0, protein: parseFloat(meal.protein) || 0,
       carbs: parseFloat(meal.carbs) || 0, fat: parseFloat(meal.fat) || 0,
       ingredients: meal.ingredients_list || [], source: 'my_meals',
-      meal_type: 'snack', per100g: false
+      meal_type: 'snack', per100g: false,
+      image_url: meal.image_url || null
     })
   }
 
@@ -83,9 +84,9 @@ export default function MyMealsTab({ client, db, onLog, onRequestAddIngredient, 
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           gap: '0.375rem', width: '100%',
           padding: isMobile ? '0.875rem 1rem' : '1rem 1.5rem',
-          background: 'rgba(16, 185, 129, 0.04)', border: 'none',
+          background: 'rgba(255, 215, 0, 0.04)', border: 'none',
           borderBottom: '1px solid rgba(255,255,255,0.06)',
-          color: '#10b981', fontSize: isMobile ? '0.8rem' : '0.85rem',
+          color: '#FFD700', fontSize: isMobile ? '0.8rem' : '0.85rem',
           fontWeight: '700', cursor: 'pointer',
           touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', minHeight: '48px'
         }}
@@ -115,9 +116,27 @@ export default function MyMealsTab({ client, db, onLog, onRequestAddIngredient, 
                 flex: 1, minWidth: 0, display: 'flex', alignItems: 'center',
                 padding: isMobile ? '0.75rem 1rem' : '0.875rem 1.25rem',
                 background: 'transparent', border: 'none', cursor: 'pointer',
-                textAlign: 'left', touchAction: 'manipulation', minHeight: '56px', gap: '0.5rem'
+                textAlign: 'left', touchAction: 'manipulation', minHeight: '64px', gap: '0.75rem'
               }}
             >
+              {/* Thumbnail (image or apple placeholder) */}
+              {meal.image_url ? (
+                <div style={{
+                  width: '48px', height: '48px', borderRadius: '10px', flexShrink: 0,
+                  background: `url(${meal.image_url}) center/cover, #fff`,
+                  border: '1px solid rgba(255,255,255,0.08)'
+                }} />
+              ) : (
+                <div style={{
+                  width: '48px', height: '48px', borderRadius: '10px', flexShrink: 0,
+                  background: 'rgba(255, 215, 0, 0.06)',
+                  border: '1px solid rgba(255, 215, 0, 0.15)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  color: 'rgba(255, 215, 0, 0.5)'
+                }}>
+                  <ImageIcon size={20} strokeWidth={1.8} />
+                </div>
+              )}
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{
                   fontSize: isMobile ? '0.85rem' : '0.9rem', fontWeight: '700', color: '#fff',
@@ -144,7 +163,7 @@ export default function MyMealsTab({ client, db, onLog, onRequestAddIngredient, 
                 width: '48px', minHeight: '56px', flexShrink: 0,
                 background: 'transparent', border: 'none',
                 borderLeft: '1px solid rgba(255,255,255,0.04)',
-                color: '#10b981', cursor: 'pointer',
+                color: '#FFD700', cursor: 'pointer',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                 touchAction: 'manipulation'
               }}
@@ -166,6 +185,37 @@ function MealDetailView({ meal, setMeal, client, db, isMobile, onBack, onRequest
   const [saving, setSaving] = useState(false)
   const [showMealDropdown, setShowMealDropdown] = useState(false)
   const [mealMoment, setMealMoment] = useState('breakfast')
+  // Photo state — `photoFile` is a File from the picker (upload pending),
+  // `photoPreview` is what's shown in the UI (object URL or saved image_url).
+  const [photoFile, setPhotoFile] = useState(null)
+  const [photoPreview, setPhotoPreview] = useState(meal.image_url || null)
+  const [photoUploading, setPhotoUploading] = useState(false)
+
+  const handlePhotoSelect = (e) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setPhotoFile(file)
+    setPhotoPreview(URL.createObjectURL(file))
+  }
+
+  const handlePhotoRemove = () => {
+    setPhotoFile(null)
+    setPhotoPreview(null)
+    // Mark image_url as cleared so save() knows to null it in DB
+    setMeal({ ...meal, image_url: null })
+  }
+
+  const uploadMealPhoto = async (file) => {
+    if (!file) return null
+    const ext = (file.name.split('.').pop() || 'jpg').toLowerCase()
+    const fileName = `${client.id}/${Date.now()}_${Math.random().toString(36).slice(2, 8)}.${ext}`
+    const { error } = await db.supabase.storage
+      .from('meal-photos')
+      .upload(fileName, file, { contentType: file.type || 'image/jpeg', upsert: false })
+    if (error) throw error
+    const { data: { publicUrl } } = db.supabase.storage.from('meal-photos').getPublicUrl(fileName)
+    return publicUrl
+  }
 
   const totals = (meal.ingredients_list || []).reduce((t, ing) => ({
     calories: t.calories + (ing.calories || 0),
@@ -185,15 +235,29 @@ function MealDetailView({ meal, setMeal, client, db, isMobile, onBack, onRequest
     setMeal({ ...meal, ingredients_list: updated })
   }
 
+  // Upload pending photo (if any) and return the URL to persist.
+  // Falls back to existing meal.image_url when nothing changed; returns null
+  // when the user explicitly removed the photo.
+  const resolveImageUrl = async () => {
+    if (photoFile) {
+      setPhotoUploading(true)
+      try { return await uploadMealPhoto(photoFile) }
+      finally { setPhotoUploading(false) }
+    }
+    return photoPreview ? (meal.image_url || photoPreview) : null
+  }
+
   const handleSave = async () => {
     if (!meal.name?.trim() || !meal.ingredients_list?.length) return
     setSaving(true)
     try {
+      const imageUrl = await resolveImageUrl()
       const mealData = {
         client_id: client.id, name: meal.name.trim(),
         calories: Math.round(totals.calories), protein: Math.round(totals.protein),
         carbs: Math.round(totals.carbs), fat: Math.round(totals.fat),
         ingredients_list: meal.ingredients_list, is_active: true,
+        image_url: imageUrl,
         updated_at: new Date().toISOString()
       }
       if (meal.id) {
@@ -212,12 +276,15 @@ function MealDetailView({ meal, setMeal, client, db, isMobile, onBack, onRequest
   const handleLogMeal = async () => {
     // First save to ai_custom_meals, then log to consumed_meals
     setSaving(true)
+    let imageUrl = null
     try {
+      imageUrl = await resolveImageUrl()
       const mealData = {
         client_id: client.id, name: meal.name.trim() || 'Mijn maaltijd',
         calories: Math.round(totals.calories), protein: Math.round(totals.protein),
         carbs: Math.round(totals.carbs), fat: Math.round(totals.fat),
         ingredients_list: meal.ingredients_list, is_active: true,
+        image_url: imageUrl,
         updated_at: new Date().toISOString()
       }
       if (meal.id) {
@@ -236,7 +303,8 @@ function MealDetailView({ meal, setMeal, client, db, isMobile, onBack, onRequest
       calories: Math.round(totals.calories), protein: Math.round(totals.protein),
       carbs: Math.round(totals.carbs), fat: Math.round(totals.fat),
       ingredients: meal.ingredients_list || [], source: 'my_meals',
-      meal_type: mealMoment, per100g: false
+      meal_type: mealMoment, per100g: false,
+      image_url: imageUrl
     })
     setSaving(false)
   }
@@ -267,7 +335,7 @@ function MealDetailView({ meal, setMeal, client, db, isMobile, onBack, onRequest
           style={{
             background: 'none', border: 'none',
             color: (saving || !meal.name?.trim() || !meal.ingredients_list?.length)
-              ? 'rgba(16,185,129,0.3)' : '#10b981',
+              ? 'rgba(16,185,129,0.3)' : '#FFD700',
             cursor: 'pointer', padding: '0.25rem', touchAction: 'manipulation',
             fontSize: '0.8rem', fontWeight: '700'
           }}
@@ -277,6 +345,72 @@ function MealDetailView({ meal, setMeal, client, db, isMobile, onBack, onRequest
       </div>
 
       <div style={{ flex: 1, overflowY: 'auto', WebkitOverflowScrolling: 'touch' }}>
+        {/* ── Foto (optioneel) ── */}
+        <div style={{
+          padding: isMobile ? '0.875rem 1rem' : '1rem 1.5rem',
+          borderBottom: '1px solid rgba(255,255,255,0.06)'
+        }}>
+          {photoPreview ? (
+            <div style={{
+              position: 'relative', width: '100%', height: isMobile ? '160px' : '200px',
+              borderRadius: '12px', overflow: 'hidden',
+              background: 'rgba(255,255,255,0.04)',
+            }}>
+              <img
+                src={photoPreview}
+                alt="Maaltijd foto"
+                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+              />
+              {photoUploading && (
+                <div style={{
+                  position: 'absolute', inset: 0,
+                  background: 'rgba(0,0,0,0.55)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  color: '#FFD700', fontSize: '0.75rem', fontWeight: '700',
+                  letterSpacing: '0.05em', textTransform: 'uppercase',
+                }}>
+                  Uploaden…
+                </div>
+              )}
+              <button
+                onClick={handlePhotoRemove}
+                aria-label="Foto verwijderen"
+                disabled={photoUploading}
+                style={{
+                  position: 'absolute', top: '8px', right: '8px',
+                  width: '32px', height: '32px',
+                  background: 'rgba(0,0,0,0.7)',
+                  border: '1px solid rgba(255,255,255,0.2)',
+                  borderRadius: '8px', color: '#fff',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  cursor: 'pointer', touchAction: 'manipulation',
+                  WebkitTapHighlightColor: 'transparent'
+                }}
+              >
+                <X size={15} />
+              </button>
+            </div>
+          ) : (
+            <div style={{ display: 'flex', gap: '0.5rem' }}>
+              <PhotoPickerLabel
+                isMobile={isMobile}
+                label="Camera"
+                capture="environment"
+                onChange={handlePhotoSelect}
+              >
+                <Camera size={20} color="rgba(255,215,0,0.6)" strokeWidth={2} />
+              </PhotoPickerLabel>
+              <PhotoPickerLabel
+                isMobile={isMobile}
+                label="Galerij"
+                onChange={handlePhotoSelect}
+              >
+                <ImageIcon size={20} color="rgba(255,215,0,0.6)" strokeWidth={2} />
+              </PhotoPickerLabel>
+            </div>
+          )}
+        </div>
+
         {/* Naam */}
         <div style={{
           padding: isMobile ? '0.875rem 1rem' : '1rem 1.5rem',
@@ -324,7 +458,7 @@ function MealDetailView({ meal, setMeal, client, db, isMobile, onBack, onRequest
                       display: 'block', width: '100%', padding: '0.75rem',
                       background: mealMoment === m.id ? 'rgba(16,185,129,0.08)' : 'transparent',
                       border: 'none', borderBottom: i < MEAL_MOMENTS.length - 1 ? '1px solid rgba(255,255,255,0.04)' : 'none',
-                      color: mealMoment === m.id ? '#10b981' : 'rgba(255,255,255,0.7)',
+                      color: mealMoment === m.id ? '#FFD700' : 'rgba(255,255,255,0.7)',
                       fontSize: '0.8rem', fontWeight: mealMoment === m.id ? '700' : '500',
                       cursor: 'pointer', textAlign: 'left', touchAction: 'manipulation', minHeight: '44px'
                     }}
@@ -347,7 +481,7 @@ function MealDetailView({ meal, setMeal, client, db, isMobile, onBack, onRequest
             <div style={{ position: 'relative', width: '72px', height: '72px', flexShrink: 0 }}>
               <svg viewBox="0 0 36 36" style={{ width: '100%', height: '100%', transform: 'rotate(-90deg)' }}>
                 <circle cx="18" cy="18" r="14" fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="3.5" />
-                <circle cx="18" cy="18" r="14" fill="none" stroke="#10b981" strokeWidth="3.5"
+                <circle cx="18" cy="18" r="14" fill="none" stroke="#FFD700" strokeWidth="3.5"
                   strokeDasharray={`${protPct * 0.88} 88`} strokeDashoffset="0" strokeLinecap="round" />
                 <circle cx="18" cy="18" r="14" fill="none" stroke="#f59e0b" strokeWidth="3.5"
                   strokeDasharray={`${carbPct * 0.88} 88`} strokeDashoffset={`${-protPct * 0.88}`} strokeLinecap="round" />
@@ -366,7 +500,7 @@ function MealDetailView({ meal, setMeal, client, db, isMobile, onBack, onRequest
               {[
                 { label: 'Koolhydr', value: Math.round(totals.carbs), pct: carbPct, color: '#f59e0b' },
                 { label: 'Vetten', value: Math.round(totals.fat), pct: fatPct, color: '#8b5cf6' },
-                { label: 'Eiwitten', value: Math.round(totals.protein), pct: protPct, color: '#10b981' }
+                { label: 'Eiwitten', value: Math.round(totals.protein), pct: protPct, color: '#FFD700' }
               ].map(m => (
                 <div key={m.label} style={{ textAlign: 'center' }}>
                   <div style={{ fontSize: '0.55rem', fontWeight: '700', color: m.color }}>{m.pct} %</div>
@@ -427,7 +561,7 @@ function MealDetailView({ meal, setMeal, client, db, isMobile, onBack, onRequest
           padding: isMobile ? '0.875rem 1rem' : '1rem 1.5rem',
           background: 'transparent', border: 'none',
           borderBottom: '1px solid rgba(255,255,255,0.06)',
-          color: '#10b981', fontSize: isMobile ? '0.8rem' : '0.85rem',
+          color: '#FFD700', fontSize: isMobile ? '0.8rem' : '0.85rem',
           fontWeight: '700', cursor: 'pointer',
           touchAction: 'manipulation', minHeight: '48px'
         }}>
@@ -451,7 +585,7 @@ function MealDetailView({ meal, setMeal, client, db, isMobile, onBack, onRequest
                 width: '100%', padding: isMobile ? '0.875rem' : '1rem',
                 background: (saving || !meal.name?.trim()) ? 'rgba(16,185,129,0.05)' : 'rgba(16,185,129,0.12)',
                 border: '1px solid rgba(16,185,129,0.3)', borderRadius: '10px',
-                color: '#10b981', fontSize: isMobile ? '0.85rem' : '0.9rem',
+                color: '#FFD700', fontSize: isMobile ? '0.85rem' : '0.9rem',
                 fontWeight: '800', cursor: (saving || !meal.name?.trim()) ? 'default' : 'pointer',
                 minHeight: '48px', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
                 display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.375rem',
@@ -480,5 +614,40 @@ function MealDetailView({ meal, setMeal, client, db, isMobile, onBack, onRequest
         </div>
       </div>
     </div>
+  )
+}
+
+// Photo picker tile — shared between Camera + Galerij buttons. Receives the
+// lucide icon as a child so we don't trigger no-unused-vars on PascalCase
+// destructuring (a quirk of this repo's eslint setup).
+function PhotoPickerLabel({ isMobile, label, capture, onChange, children }) {
+  return (
+    <label style={{
+      flex: 1, height: isMobile ? '72px' : '80px',
+      background: 'rgba(255,215,0,0.04)',
+      border: '1px dashed rgba(255,215,0,0.25)',
+      borderRadius: '12px',
+      display: 'flex', flexDirection: 'column',
+      alignItems: 'center', justifyContent: 'center',
+      gap: '0.35rem', cursor: 'pointer', touchAction: 'manipulation',
+      WebkitTapHighlightColor: 'transparent'
+    }}>
+      {children}
+      <span style={{
+        fontSize: '0.7rem',
+        color: 'rgba(255,255,255,0.55)',
+        fontWeight: '600',
+        letterSpacing: '-0.005em'
+      }}>
+        {label}
+      </span>
+      <input
+        type="file"
+        accept="image/*"
+        {...(capture ? { capture } : {})}
+        onChange={onChange}
+        style={{ display: 'none' }}
+      />
+    </label>
   )
 }

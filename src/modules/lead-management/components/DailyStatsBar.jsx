@@ -4,8 +4,9 @@
 
 import { useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
-import { Activity, Target, Clock, TrendingUp, MessageCircle, Users, Calendar, FileText, Zap, ChevronDown, ChevronUp, Flame, BookOpen, X, CheckCircle } from 'lucide-react'
+import { Activity, Target, Clock, TrendingUp, MessageCircle, Users, Calendar, FileText, Zap, ChevronDown, ChevronUp, Flame, BookOpen, X, CheckCircle, BarChart3, Send } from 'lucide-react'
 import { exportDailyReport } from '../utils/exportDailyReport'
+import WeekStatsModal from './WeekStatsModal'
 
 // GOLD THEME (consistent)
 const G = {
@@ -69,9 +70,11 @@ export default function DailyStatsBar({
 }) {
   const [isExpanded, setIsExpanded] = useState(false)
   const [showSOP, setShowSOP] = useState(false)
+  const [showWeek, setShowWeek] = useState(false)
   const [stats, setStats] = useState({
     newOutreach: 0, followUps: 0, totalTouches: 0,
-    movementsBySection: {}, totalMovements: 0
+    movementsBySection: {}, totalMovements: 0,
+    followupToday: 0,
   })
   const [funnel, setFunnel] = useState({
     replied: { count: 0, leads: [] },
@@ -90,16 +93,18 @@ export default function DailyStatsBar({
   const loadStats = async () => {
     if (!leadService || !coachId) return
     try {
-      const [activity, funnelStats] = await Promise.all([
+      const [activity, funnelStats, followupToday] = await Promise.all([
         leadService.getTodayActivity(coachId),
-        leadService.getTodayFunnelStats(coachId)
+        leadService.getTodayFunnelStats(coachId),
+        leadService.getTodayFollowupCount(coachId),
       ])
       setStats({
         newOutreach: activity.newOutreach || 0,
         followUps: activity.followUps || 0,
         totalTouches: activity.totalTouches || 0,
         movementsBySection: activity.movementsBySection || {},
-        totalMovements: activity.totalMovements || 0
+        totalMovements: activity.totalMovements || 0,
+        followupToday: followupToday || 0,
       })
       setFunnel(funnelStats)
       setActivityData(activity)
@@ -220,8 +225,27 @@ export default function DailyStatsBar({
             </div>
           </div>
 
-          {/* Right: SOP + PDF + Expand */}
+          {/* Right: Week + SOP + PDF + Expand */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', flexShrink: 0 }}>
+            {/* Week stats — opens a modal with current + previous weeks */}
+            <button onClick={() => setShowWeek(true)}
+              style={{
+                display: 'flex', alignItems: 'center', gap: '3px',
+                padding: '4px 8px',
+                background: G.bg,
+                border: `1px solid ${G.border}`,
+                borderRadius: '5px',
+                color: G.primary,
+                fontSize: '0.55rem', fontWeight: '700',
+                cursor: 'pointer',
+                touchAction: 'manipulation',
+                WebkitTapHighlightColor: 'transparent',
+                minHeight: '26px',
+              }}>
+              <BarChart3 size={10} />
+              WEEK
+            </button>
+
             {/* SOP Button */}
             <button onClick={() => setShowSOP(true)}
               style={{
@@ -280,6 +304,13 @@ export default function DailyStatsBar({
 
         {/* SOP MODAL */}
         {showSOP && <SOPModal isMobile={isMobile} onClose={() => setShowSOP(false)} />}
+        <WeekStatsModal
+          isOpen={showWeek}
+          onClose={() => setShowWeek(false)}
+          leadService={leadService}
+          coachId={coachId}
+          isMobile={isMobile}
+        />
       </>
     )
   }
@@ -309,6 +340,10 @@ export default function DailyStatsBar({
           </div>
           
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+            <button onClick={() => setShowWeek(true)}
+              style={{ display: 'flex', alignItems: 'center', gap: '3px', padding: '4px 8px', background: G.bg, border: `1px solid ${G.border}`, borderRadius: '5px', color: G.primary, fontSize: '0.55rem', fontWeight: '700', cursor: 'pointer', touchAction: 'manipulation', minHeight: '26px' }}>
+              <BarChart3 size={10} /> WEEK
+            </button>
             <button onClick={() => setShowSOP(true)}
               style={{ display: 'flex', alignItems: 'center', gap: '3px', padding: '4px 8px', background: 'rgba(139,92,246,0.08)', border: '1px solid rgba(139,92,246,0.2)', borderRadius: '5px', color: '#a855f7', fontSize: '0.55rem', fontWeight: '700', cursor: 'pointer', touchAction: 'manipulation', minHeight: '26px' }}>
               <BookOpen size={10} /> SOP
@@ -333,6 +368,7 @@ export default function DailyStatsBar({
         }}>
           <StatCard icon={<Zap size={9} />} label="Nieuw" value={stats.newOutreach} highlight={progress >= 90} progress={progress} subtext={`${progress}% van ${dailyGoal}`} />
           <StatCard icon={<TrendingUp size={9} />} label="Follow-up" value={stats.followUps} subtext="Bestaande leads" />
+          <StatCard icon={<Send size={9} />} label="Opvolg-DM" value={stats.followupToday} highlight={stats.followupToday > 0} subtext="Leads vandaag" />
           <StatCard icon={<Target size={9} />} label="Totaal" value={stats.totalTouches} subtext="Alle touches" />
           <StatCard icon={<MessageCircle size={9} />} label="Reacties" value={funnel.replied.count} highlight={funnel.replied.count > 0} subtext="Antwoorden" />
           <StatCard icon={<Users size={9} />} label="Gesprek" value={funnel.conversation.count} highlight={funnel.conversation.count > 0} subtext="Kwalificatie" />
@@ -361,6 +397,13 @@ export default function DailyStatsBar({
       </div>
 
       {showSOP && <SOPModal isMobile={isMobile} onClose={() => setShowSOP(false)} />}
+      <WeekStatsModal
+        isOpen={showWeek}
+        onClose={() => setShowWeek(false)}
+        leadService={leadService}
+        coachId={coachId}
+        isMobile={isMobile}
+      />
     </>
   )
 }

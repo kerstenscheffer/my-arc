@@ -28,6 +28,7 @@ import SupplementsTab from '../modules/supplements/SupplementsTab'
 import CoachNotificationBell from '../modules/notifications/CoachNotificationBell'
 import '../services/SpotsService'
 import FloatingTaskTimer from '../modules/productivity/components/kanban/FloatingTaskTimer'
+import WeekGoalsBar from './components/WeekGoalsBar'
 import StartTaskModal from '../modules/productivity/components/kanban/StartTaskModal'
 import ProductivityService from '../modules/productivity/ProductivityService'
 import CoachFAQManager from '../modules/faq/CoachFAQManager'
@@ -768,6 +769,9 @@ export default function CoachHub() {
           onStop={handleTimerStop}
         />
       )}
+
+      {/* Always-on goals overlay — fixed-top strip + tap to expand */}
+      <WeekGoalsBar db={db} coachId={user?.id} isMobile={isMobile} />
 
       {mealPanelClientId && (
         <ClientContextPanel

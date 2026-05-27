@@ -122,7 +122,7 @@ export default function AIAlternativesModal({
 
   const getDiff = (newVal, oldVal) => {
     const diff = Math.round((newVal || 0) - (oldVal || 0))
-    if (diff > 0) return { text: `+${diff}`, color: '#10b981', Icon: ArrowUp }
+    if (diff > 0) return { text: `+${diff}`, color: '#FFD700', Icon: ArrowUp }
     if (diff < 0) return { text: `${diff}`, color: '#ef4444', Icon: ArrowDown }
     return { text: '0', color: 'rgba(255,255,255,0.3)', Icon: Minus }
   }
@@ -295,9 +295,9 @@ export default function AIAlternativesModal({
                 onClick={() => setActiveFilter(f.id)}
                 style={{
                   padding: '0.35rem 0.625rem',
-                  background: activeFilter === f.id ? '#10b981' : 'transparent',
+                  background: activeFilter === f.id ? '#FFD700' : 'transparent',
                   border: activeFilter === f.id
-                    ? '1px solid rgba(16, 185, 129, 0.5)'
+                    ? '1px solid rgba(255, 215, 0, 0.5)'
                     : '1px solid rgba(255, 255, 255, 0.06)',
                   borderRadius: '20px',
                   color: activeFilter === f.id ? '#fff' : 'rgba(255, 255, 255, 0.4)',
@@ -441,11 +441,11 @@ export default function AIAlternativesModal({
                 onClick={() => onSelectMeal(selectedMeal.id)}
                 style={{
                   flex: 2,
-                  background: 'rgba(16, 185, 129, 0.12)',
+                  background: 'rgba(255, 215, 0, 0.12)',
                   border: 'none',
                   borderRadius: 0,
                   padding: isMobile ? '0.75rem' : '0.875rem',
-                  color: '#10b981',
+                  color: '#FFD700',
                   fontSize: isMobile ? '0.75rem' : '0.8rem',
                   fontWeight: '800',
                   cursor: 'pointer',
@@ -504,7 +504,7 @@ function SwapMealRow({ meal, currentMeal, isSelected, onSelect, isMobile, getDif
         display: 'flex',
         alignItems: 'center',
         borderBottom: '1px solid rgba(255, 255, 255, 0.04)',
-        background: isSelected ? 'rgba(16, 185, 129, 0.06)' : 'transparent',
+        background: isSelected ? 'rgba(255, 215, 0, 0.06)' : 'transparent',
         cursor: 'pointer',
         transition: 'background 0.15s ease',
         touchAction: 'manipulation',
@@ -523,7 +523,7 @@ function SwapMealRow({ meal, currentMeal, isSelected, onSelect, isMobile, getDif
           <div style={{
             position: 'absolute',
             inset: 0,
-            background: 'rgba(16, 185, 129, 0.8)',
+            background: 'rgba(255, 215, 0, 0.8)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center'

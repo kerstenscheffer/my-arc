@@ -1,25 +1,163 @@
 // src/modules/productivity/components/kanban/AddTaskModal.jsx
-// VERSION 2.0 - Styling guide compliant + stappen toevoegen bij aanmaken
+// VERSION 3.0 — Autosave to DB + confirm on close
+//
+// Behaviour changes vs v2.0:
+//   1. As soon as the user types anything meaningful (title or a step), the
+//      modal creates a draft task in the DB via `onAutoCreate`. Every
+//      subsequent edit is debounced-saved via `onAutoUpdate` so nothing is
+//      ever lost when the modal closes accidentally.
+//   2. The X / backdrop / Annuleer buttons now ask the user what to do with
+//      the in-progress draft (Bewaren / Verwijderen / Terug) so a fat-finger
+//      doesn't nuke the work.
 
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { X, Calendar, Flag, Tag, FileText, Clock, Plus, Circle, Trash2, Timer } from 'lucide-react'
+import { X, Calendar, Flag, Tag, Clock, Plus, Circle, Trash2, Timer, Layers, Repeat, CheckCircle2 } from 'lucide-react'
+import TaskLogSection from './TaskLogSection'
+
+const WEEK_DAYS = [
+  { id: 'monday',    short: 'Ma' },
+  { id: 'tuesday',   short: 'Di' },
+  { id: 'wednesday', short: 'Wo' },
+  { id: 'thursday',  short: 'Do' },
+  { id: 'friday',    short: 'Vr' },
+  { id: 'saturday',  short: 'Za' },
+  { id: 'sunday',    short: 'Zo' },
+]
 
 const genId = () => Math.random().toString(36).slice(2, 9)
+const AUTOSAVE_DELAY_MS = 700
 
-export default function AddTaskModal({ isMobile, onClose, onSubmit }) {
-  const [formData, setFormData] = useState({
-    title: '',
-    description: '',
-    priority: 'medium',
-    category: '',
-    deadline: '',
-    needs_reflection: true,
-    estimated_minutes: ''
+export default function AddTaskModal({
+  isMobile,
+  onClose,
+  onSubmit,
+  // New optional handlers for the DB-backed draft flow. When provided the
+  // modal auto-saves; when omitted it falls back to the original single-shot
+  // submit so legacy call-sites keep working.
+  onAutoCreate,   // async (taskData) => task
+  onAutoUpdate,   // async (taskId, updates) => void
+  onAutoDelete,   // async (taskId) => void
+  // Sections list + default-pick so the user can move a task between
+  // columns at creation time instead of always defaulting to "Niet
+  // toegewezen" (or whatever section the caller pre-picked).
+  sections = [],
+  defaultSectionId = null,
+  // Pre-fill from the agenda when the modal was opened by tapping an
+  // empty cell. Shape: { day, startTime, endTime }
+  agendaPreset = null,
+  // Edit mode — when provided, all autosaves go via onAutoUpdate against
+  // this task's id instead of creating a new draft. Lets one modal serve
+  // both "new" and "edit" flows.
+  initialTask = null,
+  // Needed for the optional Logboek section (only renders for recurring
+  // tasks in edit-mode).
+  db = null,
+  coachId = null,
+  // Mark this task as done. Same handler the kanban card uses, so the
+  // reflection-modal still fires for needs_reflection tasks.
+  onCompleteTask = null,
+}) {
+  // Default estimated_minutes from the preset (when opened on a 30-min
+  // empty slot we want the picker to already say 30).
+  const presetDur = (() => {
+    if (!agendaPreset?.startTime || !agendaPreset?.endTime) return ''
+    const [sh, sm] = agendaPreset.startTime.split(':').map(Number)
+    const [eh, em] = agendaPreset.endTime.split(':').map(Number)
+    const min = (eh * 60 + em) - (sh * 60 + sm)
+    return min > 0 ? min : ''
+  })()
+  const isEditMode = !!initialTask?.id
+  const [formData, setFormData] = useState(() => ({
+    title:             initialTask?.title || '',
+    description:       initialTask?.description || '',
+    priority:          initialTask?.priority || 'medium',
+    category:          initialTask?.category || '',
+    deadline:          initialTask?.deadline || '',
+    needs_reflection:  initialTask?.needs_reflection !== false,
+    estimated_minutes: initialTask?.estimated_minutes ?? presetDur,
+  }))
+  const [sectionId, setSectionId] = useState(() => {
+    if (initialTask?.section_id) return initialTask.section_id
+    return defaultSectionId && defaultSectionId !== 'unassigned' ? defaultSectionId : ''
   })
-  const [steps, setSteps] = useState([])
+  // Recurring state — when active, the task repeats every week on the
+  // selected weekdays. Pre-fill from the existing task (edit mode) or from
+  // the agenda preset day.
+  const [recurrenceActive, setRecurrenceActive] = useState(!!initialTask?.recurrence_active)
+  const [recurrenceDays, setRecurrenceDays] = useState(
+    (Array.isArray(initialTask?.recurrence_days) && initialTask.recurrence_days.length > 0)
+      ? initialTask.recurrence_days
+      : (agendaPreset?.day ? [agendaPreset.day] : [])
+  )
+  const toggleRecurrenceDay = (d) => {
+    setRecurrenceDays(prev => prev.includes(d) ? prev.filter(x => x !== d) : [...prev, d])
+  }
+  const [steps, setSteps] = useState(() =>
+    Array.isArray(initialTask?.steps) ? initialTask.steps : []
+  )
   const [newStepText, setNewStepText] = useState('')
   const [titleError, setTitleError] = useState(false)
+
+  // Draft autosave bookkeeping
+  // In edit mode the existing task IS the draft — every autosave is an
+  // update against this id, no create needed.
+  const [draftId, setDraftId] = useState(initialTask?.id || null)
+  const [savingState, setSavingState] = useState('idle') // 'idle' | 'saving' | 'saved'
+  const debounceRef = useRef(null)
+  const inFlightRef = useRef(false)
+  const submittedRef = useRef(false)
+
+  const autosaveEnabled = !!(onAutoCreate && onAutoUpdate && onAutoDelete)
+
+  // True when the form has meaningful content the user shouldn't lose.
+  const hasContent =
+    formData.title.trim().length > 0 ||
+    formData.description.trim().length > 0 ||
+    formData.category !== '' ||
+    formData.deadline !== '' ||
+    formData.estimated_minutes !== '' ||
+    steps.length > 0
+
+  // ── Autosave loop ────────────────────────────────────────────────────────
+  // We watch the entire form payload + step list; on every change we either
+  // create the draft (first time we have a title) or push an update.
+  useEffect(() => {
+    if (!autosaveEnabled) return
+    if (!hasContent) return
+    // Need at least a title before the DB row can exist (NOT NULL column).
+    if (!formData.title.trim() && !draftId) return
+
+    if (debounceRef.current) clearTimeout(debounceRef.current)
+    debounceRef.current = setTimeout(async () => {
+      if (inFlightRef.current) return
+      inFlightRef.current = true
+      setSavingState('saving')
+      try {
+        const payload = {
+          ...formData, steps,
+          sectionId: sectionId || null,
+          recurrence_active: recurrenceActive,
+          recurrence_days: recurrenceActive && recurrenceDays.length > 0 ? recurrenceDays : null,
+        }
+        if (!draftId) {
+          const created = await onAutoCreate(payload)
+          if (created?.id) setDraftId(created.id)
+        } else {
+          await onAutoUpdate(draftId, payload)
+        }
+        setSavingState('saved')
+      } catch (e) {
+        console.error('Autosave failed:', e)
+        setSavingState('idle')
+      } finally {
+        inFlightRef.current = false
+      }
+    }, AUTOSAVE_DELAY_MS)
+
+    return () => { if (debounceRef.current) clearTimeout(debounceRef.current) }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [formData, steps, autosaveEnabled, draftId])
 
   const handleAddStep = () => {
     const text = newStepText.trim()
@@ -30,15 +168,51 @@ export default function AddTaskModal({ isMobile, onClose, onSubmit }) {
 
   const handleDeleteStep = (id) => setSteps(prev => prev.filter(s => s.id !== id))
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!formData.title.trim()) { setTitleError(true); return }
-    onSubmit({ ...formData, steps })
+    submittedRef.current = true
+    // Flush any pending debounce so the final state is on disk.
+    if (debounceRef.current) clearTimeout(debounceRef.current)
+    const payload = {
+      ...formData, steps,
+      sectionId: sectionId || null,
+      recurrence_active: recurrenceActive,
+      recurrence_days: recurrenceActive && recurrenceDays.length > 0 ? recurrenceDays : null,
+    }
+    if (autosaveEnabled && draftId) {
+      try { await onAutoUpdate(draftId, payload) } catch (e) { console.error(e) }
+      onClose()
+    } else {
+      onSubmit(payload)
+    }
   }
 
+  // Attempted close (X, backdrop, or Annuleer button).
+  const handleAttemptClose = async () => {
+    submittedRef.current = false
+    // In edit mode there's nothing to "lose" — all edits are already saved
+    // via the autosave debounce. Just close.
+    if (isEditMode) { onClose(); return }
+    if (!hasContent) {
+      if (autosaveEnabled && draftId) {
+        try { await onAutoDelete(draftId) } catch (e) { console.error(e) }
+      }
+      onClose()
+      return
+    }
+    const userChoice = window.confirm(
+      'Je hebt al iets ingevuld.\n\n' +
+      'OK = Taak bewaren als concept\n' +
+      'Annuleren = Terug naar het formulier'
+    )
+    if (userChoice) onClose()
+  }
+
+  console.log('[AddTaskModal] mounting, portal target body present:', !!document?.body)
   return createPortal(
     <div
-      onClick={(e) => { if (e.target === e.currentTarget) onClose() }}
-      style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)', display: 'flex', alignItems: isMobile ? 'flex-end' : 'center', justifyContent: 'center', zIndex: 10000, padding: isMobile ? '0' : '1.5rem' }}
+      onClick={(e) => { if (e.target === e.currentTarget) handleAttemptClose() }}
+      style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)', display: 'flex', alignItems: isMobile ? 'flex-end' : 'center', justifyContent: 'center', zIndex: 2147483600, padding: isMobile ? '0' : '1.5rem' }}
     >
       <div style={{
         background: '#0a0a0a',
@@ -55,9 +229,19 @@ export default function AddTaskModal({ isMobile, onClose, onSubmit }) {
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: isMobile ? '0.75rem 1rem' : '0.75rem 1rem', borderBottom: '1px solid rgba(255,255,255,0.06)', flexShrink: 0 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
             <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#10b981' }} />
-            <span style={{ fontSize: '0.85rem', fontWeight: '800', color: '#fff' }}>Nieuwe Task</span>
+            <span style={{ fontSize: '0.85rem', fontWeight: '800', color: '#fff' }}>{isEditMode ? 'Task bewerken' : 'Nieuwe Task'}</span>
+            {autosaveEnabled && hasContent && (
+              <span style={{
+                marginLeft: '0.5rem',
+                fontSize: '0.55rem', fontWeight: 700,
+                color: savingState === 'saving' ? 'rgba(255,215,0,0.7)' : 'rgba(16,185,129,0.7)',
+                letterSpacing: '0.04em', textTransform: 'uppercase',
+              }}>
+                {savingState === 'saving' ? 'Opslaan…' : savingState === 'saved' ? 'Bewaard' : ''}
+              </span>
+            )}
           </div>
-          <button onClick={onClose} style={{ width: '28px', height: '28px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'transparent', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '6px', color: 'rgba(255,255,255,0.4)', cursor: 'pointer', touchAction: 'manipulation' }}>
+          <button onClick={handleAttemptClose} style={{ width: '28px', height: '28px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'transparent', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '6px', color: 'rgba(255,255,255,0.4)', cursor: 'pointer', touchAction: 'manipulation' }}>
             <X size={13} />
           </button>
         </div>
@@ -78,6 +262,41 @@ export default function AddTaskModal({ isMobile, onClose, onSubmit }) {
             />
             {titleError && <p style={{ margin: '0.3rem 0 0 0', color: '#ef4444', fontSize: '0.6rem' }}>Titel is verplicht</p>}
           </div>
+
+          {/* Sectie (kolom) — verschijnt zodra de kanban secties heeft */}
+          {sections.length > 0 && (
+            <div style={{ padding: '0.625rem 1rem', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+              <div style={{ fontSize: '0.45rem', fontWeight: '700', color: 'rgba(255,255,255,0.2)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '0.4rem', display: 'flex', alignItems: 'center', gap: '3px' }}>
+                <Layers size={8} /> SECTIE
+              </div>
+              <select
+                value={sectionId}
+                onChange={(e) => setSectionId(e.target.value)}
+                style={{ width: '100%', background: 'transparent', border: 'none', outline: 'none', color: '#fff', fontSize: '0.8rem', fontWeight: '600', cursor: 'pointer' }}
+              >
+                <option value="">Niet toegewezen</option>
+                {sections
+                  .filter(s => s.id !== 'unassigned')
+                  .map(s => (
+                    <option key={s.id} value={s.id}>{s.title}</option>
+                  ))}
+              </select>
+            </div>
+          )}
+
+          {/* Agenda preset — geeft kort weer wanneer de task gepland is */}
+          {agendaPreset && (
+            <div style={{
+              padding: '0.55rem 1rem', borderBottom: '1px solid rgba(255,255,255,0.04)',
+              display: 'flex', alignItems: 'center', gap: '0.4rem',
+              background: 'rgba(16,185,129,0.06)',
+              color: '#86efac', fontSize: '0.7rem', fontWeight: 700,
+              letterSpacing: '0.02em',
+            }}>
+              <Calendar size={11} />
+              Gepland op {agendaPreset.day} {agendaPreset.startTime}–{agendaPreset.endTime}
+            </div>
+          )}
 
           {/* Beschrijving */}
           <div style={{ padding: '0.75rem 1rem', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
@@ -182,6 +401,63 @@ export default function AddTaskModal({ isMobile, onClose, onSubmit }) {
             </div>
           </div>
 
+          {/* Recurring toggle + dag-picker */}
+          <div style={{ padding: '0.625rem 1rem', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+            <label style={{
+              display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer',
+              padding: '0.4rem 0.5rem',
+              background: recurrenceActive ? 'rgba(255,215,0,0.08)' : 'transparent',
+              border: `1px solid ${recurrenceActive ? 'rgba(255,215,0,0.25)' : 'rgba(255,255,255,0.06)'}`,
+              borderRadius: '6px',
+            }}>
+              <input
+                type="checkbox"
+                checked={recurrenceActive}
+                onChange={(e) => setRecurrenceActive(e.target.checked)}
+                style={{ accentColor: '#FFD700' }}
+              />
+              <Repeat size={10} color={recurrenceActive ? '#FFD700' : 'rgba(255,255,255,0.3)'} />
+              <span style={{ color: recurrenceActive ? '#FFD700' : 'rgba(255,255,255,0.4)', fontSize: '0.7rem', fontWeight: '700' }}>
+                Herhalen elke week
+              </span>
+            </label>
+            {recurrenceActive && (
+              <div style={{
+                marginTop: '0.5rem',
+                display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '0.25rem',
+              }}>
+                {WEEK_DAYS.map(d => {
+                  const active = recurrenceDays.includes(d.id)
+                  return (
+                    <button
+                      key={d.id}
+                      type="button"
+                      onClick={() => toggleRecurrenceDay(d.id)}
+                      style={{
+                        padding: '0.4rem 0', minHeight: 32,
+                        background: active ? '#FFD700' : 'rgba(255,255,255,0.04)',
+                        border: active ? '1px solid #FFD700' : '1px solid rgba(255,255,255,0.08)',
+                        borderRadius: 5,
+                        color: active ? '#000' : 'rgba(255,255,255,0.55)',
+                        fontSize: '0.65rem', fontWeight: 800,
+                        cursor: 'pointer', touchAction: 'manipulation',
+                      }}
+                    >
+                      {d.short}
+                    </button>
+                  )
+                })}
+              </div>
+            )}
+            {recurrenceActive && recurrenceDays.length === 0 && (
+              <div style={{
+                marginTop: '0.4rem', fontSize: '0.6rem', color: 'rgba(245,158,11,0.85)', fontWeight: 700,
+              }}>
+                Kies minimaal één dag — anders herhaalt 't doel niet.
+              </div>
+            )}
+          </div>
+
           {/* Reflectie toggle */}
           <div style={{ padding: '0.625rem 1rem', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
             <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', padding: '0.4rem 0.5rem', background: formData.needs_reflection ? 'rgba(139,92,246,0.08)' : 'transparent', border: `1px solid ${formData.needs_reflection ? 'rgba(139,92,246,0.2)' : 'rgba(255,255,255,0.06)'}`, borderRadius: '6px' }}>
@@ -192,18 +468,77 @@ export default function AddTaskModal({ isMobile, onClose, onSubmit }) {
               </span>
             </label>
           </div>
+
+          {/* Logboek — alleen voor recurring tasks in edit-mode, en alleen
+              wanneer we de db + coachId hebben (passed-through prop). */}
+          {isEditMode && recurrenceActive && db && coachId && draftId && (
+            <TaskLogSection
+              taskId={draftId}
+              coachId={coachId}
+              db={db}
+              isMobile={isMobile}
+            />
+          )}
         </div>
 
         {/* ═══ FOOTER ACTIONS ═══ */}
         <div style={{ display: 'flex', gap: '0.5rem', padding: '0.75rem 1rem', borderTop: '1px solid rgba(255,255,255,0.06)', flexShrink: 0 }}>
-          <button onClick={onClose}
+          {isEditMode && onAutoDelete && (
+            <button
+              onClick={async () => {
+                if (!window.confirm('Task verwijderen?')) return
+                try { await onAutoDelete(draftId) } catch (e) { console.error(e) }
+                onClose()
+              }}
+              title="Task verwijderen"
+              style={{
+                width: 40, padding: 0, minHeight: 40,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                background: 'rgba(239,68,68,0.1)',
+                border: '1px solid rgba(239,68,68,0.3)',
+                borderRadius: '6px', color: '#fca5a5',
+                cursor: 'pointer', touchAction: 'manipulation',
+              }}
+            >
+              <Trash2 size={14} />
+            </button>
+          )}
+          <button onClick={handleAttemptClose}
             style={{ flex: 1, padding: '0.6rem', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '6px', color: 'rgba(255,255,255,0.4)', fontSize: '0.75rem', fontWeight: '600', cursor: 'pointer', minHeight: '40px', touchAction: 'manipulation' }}>
-            Annuleer
+            {isEditMode ? 'Sluiten' : 'Annuleer'}
           </button>
+          {isEditMode && onCompleteTask && (
+            <button
+              onClick={async () => {
+                // Flush pending autosave first so any unsaved edits land
+                // before completion fires.
+                if (debounceRef.current) clearTimeout(debounceRef.current)
+                submittedRef.current = true
+                try {
+                  await onCompleteTask(draftId)
+                } catch (e) { console.error('Complete failed:', e) }
+                onClose()
+              }}
+              title={recurrenceActive ? 'Voltooi vandaag' : 'Voltooi taak'}
+              style={{
+                flex: 1, padding: '0.6rem',
+                background: '#10b981',
+                border: '1px solid #10b981',
+                borderRadius: '6px',
+                color: '#fff', fontSize: '0.75rem', fontWeight: 800,
+                cursor: 'pointer', minHeight: 40,
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4,
+                touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+              }}
+            >
+              <CheckCircle2 size={13} />
+              Voltooi
+            </button>
+          )}
           <button onClick={handleSubmit}
-            style={{ flex: 2, padding: '0.6rem', background: '#10b981', border: 'none', borderRadius: '6px', color: '#fff', fontSize: '0.8rem', fontWeight: '700', cursor: 'pointer', minHeight: '40px', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.3rem' }}>
+            style={{ flex: 2, padding: '0.6rem', background: isEditMode ? 'rgba(255,255,255,0.06)' : '#10b981', border: isEditMode ? '1px solid rgba(255,255,255,0.12)' : 'none', borderRadius: '6px', color: '#fff', fontSize: '0.8rem', fontWeight: '700', cursor: 'pointer', minHeight: '40px', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.3rem' }}>
             <Plus size={13} />
-            Task Toevoegen{steps.length > 0 ? ` + ${steps.length} stap${steps.length > 1 ? 'pen' : ''}` : ''}
+            {isEditMode ? 'Opslaan' : `Task Toevoegen${steps.length > 0 ? ` + ${steps.length} stap${steps.length > 1 ? 'pen' : ''}` : ''}`}
           </button>
         </div>
       </div>

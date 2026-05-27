@@ -50,7 +50,7 @@ export default function MealTimelineDesktop({
         position: 'relative',
         background: 'rgba(0, 0, 0, 0.2)',
         borderRadius: '12px',
-        border: '1px solid rgba(16, 185, 129, 0.1)'
+        border: '1px solid rgba(255, 215, 0, 0.1)'
       }}
     >
       <div style={{ position: 'relative' }}>
@@ -66,7 +66,7 @@ export default function MealTimelineDesktop({
                 color: 'rgba(255, 255, 255, 0.5)',
                 fontWeight: '700',
                 background: 'rgba(0, 0, 0, 0.3)',
-                borderBottom: '2px solid rgba(16, 185, 129, 0.2)',
+                borderBottom: '2px solid rgba(255, 215, 0, 0.2)',
                 position: 'sticky',
                 top: 0,
                 zIndex: 2

@@ -157,7 +157,7 @@ export default function WeeklyNutritionOverview({ isOpen, onClose, client, db, t
                 <div style={{ fontSize: '0.35rem', fontWeight: '700', color: 'rgba(255, 255, 255, 0.2)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '0.1rem' }}>
                   {m.label}
                 </div>
-                <div style={{ fontSize: isMobile ? '0.8rem' : '0.9rem', fontWeight: '800', color: isOver ? '#f59e0b' : '#10b981' }}>
+                <div style={{ fontSize: isMobile ? '0.8rem' : '0.9rem', fontWeight: '800', color: isOver ? '#f59e0b' : '#FFD700' }}>
                   {m.value}
                 </div>
                 <div style={{ fontSize: '0.4rem', fontWeight: '600', color: 'rgba(255, 255, 255, 0.15)' }}>
@@ -189,7 +189,7 @@ export default function WeeklyNutritionOverview({ isOpen, onClose, client, db, t
                   style={{
                     display: 'flex', alignItems: 'center', width: '100%',
                     padding: isMobile ? '0.625rem 1rem' : '0.75rem 1.25rem',
-                    background: day.isToday ? 'rgba(16, 185, 129, 0.03)' : 'transparent',
+                    background: day.isToday ? 'rgba(255, 215, 0, 0.03)' : 'transparent',
                     border: 'none',
                     borderBottom: '1px solid rgba(255, 255, 255, 0.04)',
                     cursor: 'pointer', textAlign: 'left',
@@ -200,16 +200,16 @@ export default function WeeklyNutritionOverview({ isOpen, onClose, client, db, t
                   {/* Day badge */}
                   <div style={{
                     width: '36px', height: '36px', borderRadius: '6px',
-                    background: day.isToday ? 'rgba(16, 185, 129, 0.12)' : 'rgba(255, 255, 255, 0.03)',
-                    border: day.isToday ? '1px solid rgba(16, 185, 129, 0.25)' : '1px solid rgba(255, 255, 255, 0.04)',
+                    background: day.isToday ? 'rgba(255, 215, 0, 0.12)' : 'rgba(255, 255, 255, 0.03)',
+                    border: day.isToday ? '1px solid rgba(255, 215, 0, 0.25)' : '1px solid rgba(255, 255, 255, 0.04)',
                     display: 'flex', flexDirection: 'column',
                     alignItems: 'center', justifyContent: 'center',
                     flexShrink: 0
                   }}>
-                    <div style={{ fontSize: '0.4rem', fontWeight: '700', color: day.isToday ? '#10b981' : 'rgba(255, 255, 255, 0.3)', textTransform: 'uppercase' }}>
+                    <div style={{ fontSize: '0.4rem', fontWeight: '700', color: day.isToday ? '#FFD700' : 'rgba(255, 255, 255, 0.3)', textTransform: 'uppercase' }}>
                       {day.dayShort}
                     </div>
-                    <div style={{ fontSize: '0.7rem', fontWeight: '800', color: day.isToday ? '#10b981' : 'rgba(255, 255, 255, 0.5)', lineHeight: 1 }}>
+                    <div style={{ fontSize: '0.7rem', fontWeight: '800', color: day.isToday ? '#FFD700' : 'rgba(255, 255, 255, 0.5)', lineHeight: 1 }}>
                       {day.dayNum}
                     </div>
                   </div>
@@ -221,7 +221,7 @@ export default function WeeklyNutritionOverview({ isOpen, onClose, client, db, t
                         {day.dayName}
                       </div>
                       {day.isToday && (
-                        <div style={{ fontSize: '0.4rem', fontWeight: '700', color: '#10b981', textTransform: 'uppercase', letterSpacing: '0.04em' }}>VANDAAG</div>
+                        <div style={{ fontSize: '0.4rem', fontWeight: '700', color: '#FFD700', textTransform: 'uppercase', letterSpacing: '0.04em' }}>VANDAAG</div>
                       )}
                     </div>
                     {isEmpty ? (
@@ -230,7 +230,7 @@ export default function WeeklyNutritionOverview({ isOpen, onClose, client, db, t
                       </div>
                     ) : (
                       <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.15rem' }}>
-                        <span style={{ fontSize: '0.6rem', color: isOver ? 'rgba(245, 158, 11, 0.6)' : isClose ? 'rgba(16, 185, 129, 0.6)' : 'rgba(255, 255, 255, 0.3)' }}>
+                        <span style={{ fontSize: '0.6rem', color: isOver ? 'rgba(245, 158, 11, 0.6)' : isClose ? 'rgba(255, 215, 0, 0.6)' : 'rgba(255, 255, 255, 0.3)' }}>
                           <span style={{ fontWeight: '800' }}>{Math.round(day.totals.calories)}</span> kcal
                         </span>
                         <span style={{ fontSize: '0.55rem', color: 'rgba(255, 255, 255, 0.2)' }}>
@@ -248,7 +248,7 @@ export default function WeeklyNutritionOverview({ isOpen, onClose, client, db, t
                       }}>
                         <div style={{
                           height: '100%', width: `${calPct}%`,
-                          background: isOver ? '#f59e0b' : isClose ? '#10b981' : 'rgba(16, 185, 129, 0.4)',
+                          background: isOver ? '#f59e0b' : isClose ? '#FFD700' : 'rgba(255, 215, 0, 0.4)',
                           borderRadius: '1px'
                         }} />
                       </div>
@@ -288,7 +288,7 @@ export default function WeeklyNutritionOverview({ isOpen, onClose, client, db, t
                             borderRight: i < 3 ? '1px solid rgba(255, 255, 255, 0.04)' : 'none'
                           }}>
                             <div style={{ fontSize: '0.35rem', fontWeight: '700', color: 'rgba(255, 255, 255, 0.15)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{m.label}</div>
-                            <div style={{ fontSize: '0.75rem', fontWeight: '800', color: over ? '#f59e0b' : '#10b981' }}>{m.value}</div>
+                            <div style={{ fontSize: '0.75rem', fontWeight: '800', color: over ? '#f59e0b' : '#FFD700' }}>{m.value}</div>
                             <div style={{ fontSize: '0.35rem', fontWeight: '600', color: 'rgba(255, 255, 255, 0.12)' }}>van {m.goal}{m.unit || ''}</div>
                           </div>
                         )

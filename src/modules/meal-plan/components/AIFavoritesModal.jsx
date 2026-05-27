@@ -40,7 +40,7 @@ export default function AIFavoritesModal({
   
   // Tab configuration
   const tabs = [
-    { id: 'smart', label: 'Smart', icon: Sparkles, color: '#10b981' },
+    { id: 'smart', label: 'Smart', icon: Sparkles, color: '#FFD700' },
     { id: 'all', label: 'Alle', icon: Heart, color: '#ef4444' },
     { id: 'stats', label: 'Stats', icon: BarChart3, color: '#8b5cf6' }
   ]
@@ -338,16 +338,16 @@ export default function AIFavoritesModal({
         maxHeight: '90vh',
         display: 'flex',
         flexDirection: 'column',
-        border: '1px solid rgba(16, 185, 129, 0.1)',
-        boxShadow: '0 25px 80px rgba(0, 0, 0, 0.5), 0 0 60px rgba(16, 185, 129, 0.05)',
+        border: '1px solid rgba(255, 215, 0, 0.1)',
+        boxShadow: '0 25px 80px rgba(0, 0, 0, 0.5), 0 0 60px rgba(255, 215, 0, 0.05)',
         overflow: 'hidden'
       }}>
         
         {/* Premium Header */}
         <div style={{
           padding: isMobile ? '1rem' : '1.5rem',
-          borderBottom: '1px solid rgba(16, 185, 129, 0.08)',
-          background: 'linear-gradient(180deg, rgba(16, 185, 129, 0.03) 0%, transparent 100%)'
+          borderBottom: '1px solid rgba(255, 215, 0, 0.08)',
+          background: 'linear-gradient(180deg, rgba(255, 215, 0, 0.03) 0%, transparent 100%)'
         }}>
           {/* Title Row */}
           <div style={{
@@ -559,8 +559,8 @@ export default function AIFavoritesModal({
         {selectedMeal && onSelectMeal && !loading && favorites.length > 0 && (
           <div style={{
             padding: isMobile ? '1rem' : '1.25rem',
-            borderTop: '1px solid rgba(16, 185, 129, 0.08)',
-            background: 'linear-gradient(180deg, rgba(16, 185, 129, 0.03) 0%, transparent 100%)',
+            borderTop: '1px solid rgba(255, 215, 0, 0.08)',
+            background: 'linear-gradient(180deg, rgba(255, 215, 0, 0.03) 0%, transparent 100%)',
             display: 'flex',
             gap: '1rem'
           }}>
@@ -589,26 +589,26 @@ export default function AIFavoritesModal({
               style={{
                 flex: 2,
                 padding: isMobile ? '0.875rem' : '1rem',
-                background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-                border: '1px solid rgba(16, 185, 129, 0.25)',
+                background: 'linear-gradient(135deg, #FFD700 0%, #059669 100%)',
+                border: '1px solid rgba(255, 215, 0, 0.25)',
                 borderRadius: '12px',
                 color: 'white',
                 fontSize: isMobile ? '0.9rem' : '0.95rem',
                 fontWeight: '700',
                 cursor: 'pointer',
                 transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                boxShadow: '0 8px 32px rgba(16, 185, 129, 0.3)',
+                boxShadow: '0 8px 32px rgba(255, 215, 0, 0.3)',
                 minHeight: '44px',
                 touchAction: 'manipulation',
                 WebkitTapHighlightColor: 'transparent'
               }}
               onMouseEnter={(e) => {
                 e.currentTarget.style.transform = 'translateY(-2px)'
-                e.currentTarget.style.boxShadow = '0 12px 40px rgba(16, 185, 129, 0.4)'
+                e.currentTarget.style.boxShadow = '0 12px 40px rgba(255, 215, 0, 0.4)'
               }}
               onMouseLeave={(e) => {
                 e.currentTarget.style.transform = 'translateY(0)'
-                e.currentTarget.style.boxShadow = '0 8px 32px rgba(16, 185, 129, 0.3)'
+                e.currentTarget.style.boxShadow = '0 8px 32px rgba(255, 215, 0, 0.3)'
               }}
             >
               Selecteer {selectedMeal.name}
@@ -739,15 +739,15 @@ function EmptyState({ onClose }) {
         onClick={onClose}
         style={{
           padding: isMobile ? '0.875rem 2rem' : '1rem 2.5rem',
-          background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-          border: '1px solid rgba(16, 185, 129, 0.25)',
+          background: 'linear-gradient(135deg, #FFD700 0%, #059669 100%)',
+          border: '1px solid rgba(255, 215, 0, 0.25)',
           borderRadius: '12px',
           color: 'white',
           fontSize: isMobile ? '0.95rem' : '1rem',
           fontWeight: '700',
           cursor: 'pointer',
           transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-          boxShadow: '0 8px 32px rgba(16, 185, 129, 0.3)',
+          boxShadow: '0 8px 32px rgba(255, 215, 0, 0.3)',
           touchAction: 'manipulation',
           WebkitTapHighlightColor: 'transparent'
         }}
@@ -766,7 +766,7 @@ function SmartTab({ categories, meals, favorites, selectedMeal, onSelectMeal, on
         <CategorySection
           title="Jouw Top 3"
           icon={TrendingUp}
-          color="#10b981"
+          color="#FFD700"
           description="Meest gekozen favorieten"
           items={categories.topUsed}
           meals={meals}
@@ -853,10 +853,10 @@ function AllTab({ meals, favorites, selectedMeal, onSelectMeal, onRemoveFavorite
             onClick={() => setViewMode('grid')}
             style={{
               padding: '0.5rem 0.875rem',
-              background: viewMode === 'grid' ? 'rgba(16, 185, 129, 0.15)' : 'transparent',
+              background: viewMode === 'grid' ? 'rgba(255, 215, 0, 0.15)' : 'transparent',
               border: 'none',
               borderRadius: '8px',
-              color: viewMode === 'grid' ? '#10b981' : 'rgba(255, 255, 255, 0.5)',
+              color: viewMode === 'grid' ? '#FFD700' : 'rgba(255, 255, 255, 0.5)',
               fontSize: '0.825rem',
               fontWeight: '600',
               cursor: 'pointer',
@@ -869,10 +869,10 @@ function AllTab({ meals, favorites, selectedMeal, onSelectMeal, onRemoveFavorite
             onClick={() => setViewMode('list')}
             style={{
               padding: '0.5rem 0.875rem',
-              background: viewMode === 'list' ? 'rgba(16, 185, 129, 0.15)' : 'transparent',
+              background: viewMode === 'list' ? 'rgba(255, 215, 0, 0.15)' : 'transparent',
               border: 'none',
               borderRadius: '8px',
-              color: viewMode === 'list' ? '#10b981' : 'rgba(255, 255, 255, 0.5)',
+              color: viewMode === 'list' ? '#FFD700' : 'rgba(255, 255, 255, 0.5)',
               fontSize: '0.825rem',
               fontWeight: '600',
               cursor: 'pointer',
@@ -1007,13 +1007,13 @@ function CompactMealCard({ meal, favoriteData, isSelected, onSelect, onRemove, s
       onClick={onSelect}
       style={{
         background: isSelected
-          ? 'linear-gradient(135deg, rgba(16, 185, 129, 0.12) 0%, rgba(16, 185, 129, 0.04) 100%)'
+          ? 'linear-gradient(135deg, rgba(255, 215, 0, 0.12) 0%, rgba(255, 215, 0, 0.04) 100%)'
           : 'rgba(17, 17, 17, 0.5)',
         backdropFilter: 'blur(10px)',
         borderRadius: '14px',
         padding: isMobile ? '0.875rem' : '1rem',
         border: isSelected
-          ? '2px solid rgba(16, 185, 129, 0.25)'
+          ? '2px solid rgba(255, 215, 0, 0.25)'
           : '1px solid rgba(255, 255, 255, 0.08)',
         cursor: 'pointer',
         transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
@@ -1045,7 +1045,7 @@ function CompactMealCard({ meal, favoriteData, isSelected, onSelect, onRemove, s
           right: '0.5rem',
           width: '24px',
           height: '24px',
-          background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+          background: 'linear-gradient(135deg, #FFD700 0%, #059669 100%)',
           borderRadius: '50%',
           display: 'flex',
           alignItems: 'center',
@@ -1058,7 +1058,7 @@ function CompactMealCard({ meal, favoriteData, isSelected, onSelect, onRemove, s
       <h4 style={{
         fontSize: isMobile ? '0.875rem' : '0.95rem',
         fontWeight: '600',
-        color: isSelected ? '#10b981' : 'white',
+        color: isSelected ? '#FFD700' : 'white',
         marginBottom: '0.5rem',
         paddingRight: isSelected ? '2rem' : 0
       }}>
@@ -1103,7 +1103,7 @@ function CompactMealCard({ meal, favoriteData, isSelected, onSelect, onRemove, s
       {showUsageCount && favoriteData?.times_selected > 0 && (
         <div style={{
           fontSize: '0.7rem',
-          color: 'rgba(16, 185, 129, 0.7)',
+          color: 'rgba(255, 215, 0, 0.7)',
           fontWeight: '600'
         }}>
           {favoriteData.times_selected}x gebruikt
@@ -1132,13 +1132,13 @@ function MealCard({ meal, favoriteData, isSelected, onSelect, onRemove, isMobile
       onClick={onSelect}
       style={{
         background: isSelected
-          ? 'linear-gradient(135deg, rgba(16, 185, 129, 0.12) 0%, rgba(16, 185, 129, 0.04) 100%)'
+          ? 'linear-gradient(135deg, rgba(255, 215, 0, 0.12) 0%, rgba(255, 215, 0, 0.04) 100%)'
           : 'rgba(17, 17, 17, 0.5)',
         backdropFilter: 'blur(10px)',
         borderRadius: '16px',
         overflow: 'hidden',
         border: isSelected
-          ? '2px solid rgba(16, 185, 129, 0.25)'
+          ? '2px solid rgba(255, 215, 0, 0.25)'
           : '1px solid rgba(255, 255, 255, 0.08)',
         cursor: 'pointer',
         transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
@@ -1179,7 +1179,7 @@ function MealCard({ meal, favoriteData, isSelected, onSelect, onRemove, isMobile
             position: 'absolute',
             bottom: '0.5rem',
             left: '0.5rem',
-            background: 'rgba(16, 185, 129, 0.9)',
+            background: 'rgba(255, 215, 0, 0.9)',
             padding: '0.25rem 0.5rem',
             borderRadius: '6px',
             fontSize: '0.7rem',
@@ -1197,7 +1197,7 @@ function MealCard({ meal, favoriteData, isSelected, onSelect, onRemove, isMobile
         <h4 style={{
           fontSize: isMobile ? '0.875rem' : '0.95rem',
           fontWeight: '700',
-          color: isSelected ? '#10b981' : 'white',
+          color: isSelected ? '#FFD700' : 'white',
           marginBottom: '0.375rem'
         }}>
           {meal.name}
@@ -1251,11 +1251,11 @@ function MealListItem({ meal, favoriteData, isSelected, onSelect, onRemove, isMo
         gap: '1rem',
         padding: isMobile ? '0.875rem' : '1rem',
         background: isSelected
-          ? 'linear-gradient(135deg, rgba(16, 185, 129, 0.12) 0%, rgba(16, 185, 129, 0.04) 100%)'
+          ? 'linear-gradient(135deg, rgba(255, 215, 0, 0.12) 0%, rgba(255, 215, 0, 0.04) 100%)'
           : 'rgba(17, 17, 17, 0.5)',
         borderRadius: '12px',
         border: isSelected
-          ? '2px solid rgba(16, 185, 129, 0.25)'
+          ? '2px solid rgba(255, 215, 0, 0.25)'
           : '1px solid rgba(255, 255, 255, 0.08)',
         cursor: 'pointer',
         transition: 'all 0.2s ease'
@@ -1265,7 +1265,7 @@ function MealListItem({ meal, favoriteData, isSelected, onSelect, onRemove, isMo
         <h4 style={{
           fontSize: isMobile ? '0.9rem' : '0.95rem',
           fontWeight: '600',
-          color: isSelected ? '#10b981' : 'white',
+          color: isSelected ? '#FFD700' : 'white',
           marginBottom: '0.25rem'
         }}>
           {meal.name}
@@ -1293,11 +1293,11 @@ function MealListItem({ meal, favoriteData, isSelected, onSelect, onRemove, isMo
       {favoriteData?.times_selected > 0 && (
         <div style={{
           padding: '0.375rem 0.625rem',
-          background: 'rgba(16, 185, 129, 0.15)',
+          background: 'rgba(255, 215, 0, 0.15)',
           borderRadius: '8px',
           fontSize: '0.75rem',
           fontWeight: '600',
-          color: '#10b981'
+          color: '#FFD700'
         }}>
           {favoriteData.times_selected}x
         </div>
@@ -1348,7 +1348,7 @@ function StatsTab({ stats, favorites, meals, isMobile }) {
           label="Keer Gebruikt"
           value={stats.totalSelections}
           icon={TrendingUp}
-          color="#10b981"
+          color="#FFD700"
         />
         <StatCard
           label="Gem. Calorieën"
@@ -1369,7 +1369,7 @@ function StatsTab({ stats, favorites, meals, isMobile }) {
           background: 'rgba(17, 17, 17, 0.5)',
           borderRadius: '14px',
           padding: isMobile ? '1rem' : '1.25rem',
-          border: '1px solid rgba(16, 185, 129, 0.08)'
+          border: '1px solid rgba(255, 215, 0, 0.08)'
         }}>
           <h4 style={{
             fontSize: isMobile ? '0.9rem' : '1rem',
@@ -1382,7 +1382,7 @@ function StatsTab({ stats, favorites, meals, isMobile }) {
           <div style={{
             fontSize: isMobile ? '1.25rem' : '1.5rem',
             fontWeight: '700',
-            color: '#10b981',
+            color: '#FFD700',
             textTransform: 'capitalize'
           }}>
             {stats.topCategory[0]} ({stats.topCategory[1]} meals)
@@ -1440,8 +1440,8 @@ function LoadingState() {
       <div style={{
         width: '48px',
         height: '48px',
-        border: '3px solid rgba(16, 185, 129, 0.15)',
-        borderTopColor: '#10b981',
+        border: '3px solid rgba(255, 215, 0, 0.15)',
+        borderTopColor: '#FFD700',
         borderRadius: '50%',
         animation: 'spin 1s cubic-bezier(0.4, 0, 0.2, 1) infinite'
       }} />

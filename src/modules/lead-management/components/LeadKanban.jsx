@@ -84,7 +84,8 @@ export default function LeadKanban({ leadService, coachId, isMobile }) {
       setSelectedSectionForLead(null)
     } catch (error) {
       console.error('❌ Add lead failed:', error)
-      alert('Lead toevoegen mislukt')
+      const msg = error?.message || error?.details || JSON.stringify(error)
+      alert(`Lead toevoegen mislukt — ${msg}\n\ncoachId: ${coachId || '(leeg!)'}`)
     }
   }
 

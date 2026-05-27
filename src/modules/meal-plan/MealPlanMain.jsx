@@ -50,8 +50,8 @@ export default function MealPlanMain({ client, onNavigate, db }) {
         <div style={{
           width: '60px',
           height: '60px',
-          border: '3px solid rgba(16, 185, 129, 0.2)',
-          borderTopColor: '#10b981',
+          border: '3px solid rgba(255, 215, 0, 0.2)',
+          borderTopColor: '#FFD700',
           borderRadius: '50%',
           animation: 'spin 1s linear infinite'
         }} />
@@ -97,8 +97,8 @@ export default function MealPlanMain({ client, onNavigate, db }) {
           onClick={() => onNavigate('home')}
           style={{
             padding: '0.875rem 2rem',
-            background: 'linear-gradient(135deg, #064e3b 0%, #10b981 100%)',
-            border: '1px solid rgba(16, 185, 129, 0.3)',
+            background: 'linear-gradient(135deg, #D4AF37 0%, #FFD700 100%)',
+            border: '1px solid rgba(255, 215, 0, 0.3)',
             borderRadius: '12px',
             color: 'white',
             fontWeight: '600',

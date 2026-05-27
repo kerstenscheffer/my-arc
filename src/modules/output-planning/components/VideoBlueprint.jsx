@@ -6,6 +6,7 @@ import {
   Save, ChevronDown, ChevronUp, Sparkles, AlertCircle,
   Video, FileText
 } from 'lucide-react'
+import TeleprompterModal from './TeleprompterModal'
 
 const COLORS = {
   gold: '#FFD700',
@@ -120,6 +121,7 @@ export default function VideoBlueprint({ item, onClose, onSave, db, isMobile: pr
   const isMobile = propIsMobile ?? window.innerWidth <= 768
 
   const [scriptOpen, setScriptOpen]       = useState(false)
+  const [teleprompterOpen, setTeleprompterOpen] = useState(false)
   const [editNotes, setEditNotes]         = useState(item?.edit_notes || '')
   const [steps, setSteps]                 = useState(item?.blueprint_steps || [])
   const [bRollList, setBRollList]         = useState(item?.b_roll_list || [])
@@ -192,6 +194,14 @@ export default function VideoBlueprint({ item, onClose, onSave, db, isMobile: pr
     <>
       {scriptOpen && <ScriptFullscreen steps={steps} onClose={() => setScriptOpen(false)} />}
 
+      <TeleprompterModal
+        isOpen={teleprompterOpen}
+        onClose={() => setTeleprompterOpen(false)}
+        script={item?.script}
+        title={item?.title}
+      />
+
+
       <div style={{ position: 'fixed', inset: 0, background: '#000', zIndex: 1000, overflow: 'auto', WebkitOverflowScrolling: 'touch' }}>
         <div style={{ minHeight: '100%', maxWidth: '600px', margin: '0 auto', background: '#0a0a0a' }}>
 
@@ -209,6 +219,22 @@ export default function VideoBlueprint({ item, onClose, onSave, db, isMobile: pr
             <div style={{ display: 'flex', gap: '0.5rem' }}>
               <button onClick={() => setScriptOpen(true)} style={{ display: 'flex', alignItems: 'center', gap: '0.375rem', padding: '0 0.875rem', height: '40px', background: '#fff', border: 'none', borderRadius: '8px', color: '#000', fontSize: '0.75rem', fontWeight: '700', cursor: 'pointer' }}>
                 <FileText size={14} />{!isMobile && 'Script'}
+              </button>
+              <button
+                onClick={() => setTeleprompterOpen(true)}
+                disabled={!item?.script?.trim()}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: '0.375rem',
+                  padding: '0 0.875rem', height: '40px',
+                  background: item?.script?.trim() ? COLORS.gold : 'rgba(255,255,255,0.05)',
+                  border: 'none', borderRadius: '8px',
+                  color: item?.script?.trim() ? '#000' : 'rgba(255,255,255,0.3)',
+                  fontSize: '0.75rem', fontWeight: '700',
+                  cursor: item?.script?.trim() ? 'pointer' : 'not-allowed',
+                }}
+                title={item?.script?.trim() ? 'Teleprompter openen' : 'Vul eerst een script in'}
+              >
+                <Video size={14} />{!isMobile && 'Teleprompter'}
               </button>
               <button onClick={() => setShowImport(true)} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 0.75rem', height: '40px', background: 'rgba(255,215,0,0.1)', border: `1px solid rgba(255,215,0,0.3)`, borderRadius: '8px', color: COLORS.gold, fontSize: '0.75rem', fontWeight: '600', cursor: 'pointer', gap: '0.375rem' }}>
                 <Sparkles size={14} />{!isMobile && 'AI'}

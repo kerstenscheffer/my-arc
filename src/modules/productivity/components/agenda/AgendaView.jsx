@@ -1,0 +1,987 @@
+// src/modules/productivity/components/agenda/AgendaView.jsx
+// Week agenda — Ma–Vr columns × hour rows. Tasks live at scheduled_day +
+// scheduled_start_time and are draggable to other day/time. Unscheduled
+// tasks sit in the right sidebar.
+
+import { useState, useMemo, useEffect, useRef } from 'react'
+import { ChevronLeft, ChevronRight, Calendar, Coffee, Users, Inbox, Plus, Repeat } from 'lucide-react'
+import AgendaBlockModal from './AgendaBlockModal'
+import FloatingPanel from '../FloatingPanel'
+import {
+  DAYS, START_HOUR, END_HOUR, HOUR_PX, GRID_HEIGHT,
+  timeToMinutes, minutesToTime, snapTo15, SNAP_MINUTES,
+  COACHING_COLOR,
+  findNextFreeSlot,
+  getISOWeek, getMondayOfWeek, getTodayDayId,
+  dateForDayInWeek, toISODate,
+} from './agendaConstants'
+
+const DEFAULT_DURATION = 60 // mins, used when a task has no estimated_minutes
+
+export default function AgendaView({
+  sections, scheduledTasks, allTasks,
+  onTaskUpdate, onTaskClick,
+  // New: emit a request to open the AddTaskModal with these defaults.
+  // ProductivityKanban hooks this up so the existing modal is reused.
+  onRequestNewTask,
+  // New: db + coachId so we can read/write agenda_blocks.
+  db, coachId,
+  isMobile,
+}) {
+  // Week navigation — anchored to Monday of selected week.
+  const [weekAnchor, setWeekAnchor] = useState(() => getMondayOfWeek(new Date()))
+  const weekNumber = getISOWeek(weekAnchor)
+  const isCurrentWeek = +weekAnchor === +getMondayOfWeek(new Date())
+  const todayDayId = getTodayDayId()
+
+  const [draggedTask, setDraggedTask] = useState(null)
+  const [dragOverDay, setDragOverDay] = useState(null)
+  const [conflictHint, setConflictHint] = useState(null) // string for tiny inline warning
+  // Live drop preview during a drag — { dayId, startMin, endMin }. Shown as
+  // a ghost block so the coach sees exactly where the task will land.
+  const [dropPreview, setDropPreview] = useState(null)
+  // Pixel offset of the cursor inside the dragged block at the moment of
+  // dragstart. We subtract this from the drop Y so the BLOCK TOP lands
+  // where the cursor is, not the cursor itself — otherwise a 60-min task
+  // dragged from its middle can never start at 09:00.
+  const dragOffsetYRef = useRef(0)
+  // Suppress the click event that fires right after a resize-pointerup so
+  // the detail modal doesn't pop open as soon as the user releases.
+  const justResizedRef = useRef(false)
+  // Resize state — while the user drags the bottom-handle of a task block,
+  // we render the block at `currentEnd` (live preview) and commit on pointer-up.
+  const [resize, setResize] = useState(null) // { taskId, startY, startEndMin, currentEnd, topMin, task }
+
+  // Reserved blocks (lunch + coaching) live in DB now — `agenda_blocks`.
+  const [blocks, setBlocks] = useState([])
+  const [editingBlock, setEditingBlock] = useState(null) // null | { id?, day?, start_time?, ... }
+  const blockClickedRef = useRef(false)
+
+  useEffect(() => {
+    if (!coachId || !db?.supabase) return
+    let cancelled = false
+    const load = async () => {
+      const { data, error } = await db.supabase
+        .from('agenda_blocks').select('*').eq('coach_id', coachId)
+        .order('start_time', { ascending: true })
+      if (cancelled) return
+      if (error) { console.error('load agenda_blocks failed:', error); return }
+      setBlocks(data || [])
+    }
+    load()
+    return () => { cancelled = true }
+  }, [coachId, db])
+
+  const reloadBlocks = async () => {
+    if (!coachId || !db?.supabase) return
+    const { data } = await db.supabase
+      .from('agenda_blocks').select('*').eq('coach_id', coachId)
+      .order('start_time', { ascending: true })
+    setBlocks(data || [])
+  }
+
+  // Local replacement for the old agendaConstants.overlapsReserved — uses
+  // the DB-driven block list and only blocks PAUZE-type entries (coaching
+  // is now informational only; tasks may overlap it).
+  const overlapsReservedDB = (dayId, startMin, endMin) => {
+    return blocks
+      .filter(b => b.day === dayId && b.type === 'pauze')
+      .some(b => {
+        const bs = timeToMinutes(b.start_time?.slice(0,5))
+        const be = timeToMinutes(b.end_time?.slice(0,5))
+        if (bs == null || be == null) return false
+        return startMin < be && endMin > bs
+      })
+  }
+
+  // Save block via service (handles both create + update).
+  const handleSaveBlock = async (payload) => {
+    if (!coachId || !db?.supabase) return
+    if (payload.id) {
+      const { id, ...rest } = payload
+      const { error } = await db.supabase
+        .from('agenda_blocks')
+        .update({ ...rest, updated_at: new Date().toISOString() })
+        .eq('id', id)
+      if (error) throw error
+    } else {
+      const { error } = await db.supabase
+        .from('agenda_blocks')
+        .insert({ coach_id: coachId, position: blocks.length, ...payload })
+      if (error) throw error
+    }
+    await reloadBlocks()
+  }
+  const handleDeleteBlock = async (id) => {
+    if (!db?.supabase) return
+    const { error } = await db.supabase.from('agenda_blocks').delete().eq('id', id)
+    if (error) throw error
+    await reloadBlocks()
+  }
+
+  // Global pointermove/pointerup listeners while resizing.
+  useEffect(() => {
+    if (!resize) return
+    const onMove = (e) => {
+      const dy = (e.clientY ?? 0) - resize.startY
+      // 1 px = 1 minute (HOUR_PX = 60). Snap to SNAP_MINUTES.
+      const raw = resize.startEndMin + dy
+      const minEnd = resize.topMin + SNAP_MINUTES
+      const maxEnd = (END_HOUR - START_HOUR) * 60
+      const snapped = Math.max(minEnd, Math.min(maxEnd, snapTo15(raw)))
+      setResize(prev => prev ? { ...prev, currentEnd: snapped } : prev)
+    }
+    const onUp = async () => {
+      const r = resize
+      setResize(null)
+      // Swallow the click that the browser fires right after pointerup so
+      // releasing the resize-handle doesn't open the task detail modal.
+      justResizedRef.current = true
+      setTimeout(() => { justResizedRef.current = false }, 300)
+      if (!r || r.currentEnd === r.startEndMin) return
+      try {
+        // Persist BOTH the new end-time and a matching estimated_minutes
+        // so the detail modal pre-fills with the resized duration. Without
+        // this the modal would still show the old "Geschatte tijd" and
+        // saving from there would silently undo the resize.
+        const newDurMin = Math.max(SNAP_MINUTES, r.currentEnd - r.topMin)
+        await onTaskUpdate(r.task.id, {
+          scheduled_end_time: minutesToTime(r.currentEnd),
+          estimated_minutes: newDurMin,
+        })
+      } catch (err) { console.error('Resize persist failed:', err) }
+    }
+    window.addEventListener('pointermove', onMove)
+    window.addEventListener('pointerup', onUp)
+    return () => {
+      window.removeEventListener('pointermove', onMove)
+      window.removeEventListener('pointerup', onUp)
+    }
+  }, [resize, onTaskUpdate])
+
+  // Mobile day-picker — pick one day at a time. Defaults to today (or Monday
+  // if today is Sat/Sun).
+  const [mobileDay, setMobileDay] = useState(() => {
+    const tid = getTodayDayId()
+    return DAYS.find(d => d.id === tid)?.id || 'monday'
+  })
+
+  // Section color lookup — only used when section.color is missing on a task.
+  const sectionColorById = useMemo(() => {
+    const map = {}
+    ;(sections || []).forEach(s => { map[s.id] = s.color })
+    return map
+  }, [sections])
+
+  // Group scheduled tasks per day, filtering to ones with a start_time set.
+  // Map day-id -> Date for the currently shown week. Recomputed when the
+  // user navigates between weeks. Used both to render date pills in the
+  // header and to filter scheduled_date-bound tasks to this week only.
+  const weekDates = useMemo(() => {
+    const m = {}
+    DAYS.forEach(d => { m[d.id] = dateForDayInWeek(weekAnchor, d.id) })
+    return m
+  }, [weekAnchor])
+
+  const weekDateStrings = useMemo(() => {
+    const m = {}
+    Object.entries(weekDates).forEach(([day, dt]) => { m[day] = toISODate(dt) })
+    return m
+  }, [weekDates])
+
+  const tasksByDay = useMemo(() => {
+    const out = {}
+    DAYS.forEach(d => { out[d.id] = [] })
+    const seen = new Set()
+    const pushOnce = (day, task) => {
+      const key = `${task.id}__${day}`
+      if (seen.has(key)) return
+      seen.add(key)
+      out[day].push(task)
+    }
+    // Today's real date — legacy tasks that don't have scheduled_date set
+    // are pinned to the actual current week so they don't repeat every week
+    // visually until the user touches them again.
+    const thisWeekMonday = +getMondayOfWeek(new Date())
+    const shownWeekMonday = +weekAnchor
+    const isShownWeekTheRealWeek = thisWeekMonday === shownWeekMonday
+
+    Object.entries(scheduledTasks || {}).forEach(([day, tasks]) => {
+      if (!out[day]) return
+      tasks.forEach(t => {
+        if (!t.scheduled_start_time) return
+        // Recurring → expand to every weekday in the list, every week. The
+        // recurring case is week-agnostic on purpose so the coach can plan
+        // ahead and the daily logbook still works per actual date.
+        if (t.recurrence_active && Array.isArray(t.recurrence_days) && t.recurrence_days.length > 0) {
+          t.recurrence_days.forEach(rday => {
+            if (out[rday]) pushOnce(rday, { ...t, _isRecurring: true })
+          })
+          return
+        }
+        // Non-recurring path. Two cases:
+        //   (a) Task has scheduled_date -> show only when that date falls
+        //       inside the displayed week (matched per day-id).
+        //   (b) Task has no scheduled_date (legacy / pre-feature) -> show
+        //       only in the user's real current week, otherwise the same
+        //       card would haunt every week.
+        if (t.scheduled_date) {
+          if (t.scheduled_date === weekDateStrings[day]) {
+            pushOnce(day, t)
+          }
+        } else if (isShownWeekTheRealWeek) {
+          pushOnce(day, t)
+        }
+      })
+    })
+    Object.values(out).forEach(arr => {
+      arr.sort((a, b) => (a.scheduled_start_time || '').localeCompare(b.scheduled_start_time || ''))
+    })
+    return out
+  }, [scheduledTasks, weekAnchor, weekDateStrings])
+
+  // Niet-gepland: tasks without scheduled_day. Pulled from allTasks since
+  // ProductivityKanban filters unscheduled into sections.
+  const unscheduledTasks = useMemo(() => {
+    return (allTasks || []).filter(t => !t.scheduled_day)
+  }, [allTasks])
+
+  // ── Drag handlers ─────────────────────────────────────────────────────────
+  const onTaskDragStart = (e, task, source) => {
+    e.dataTransfer.effectAllowed = 'move'
+    e.dataTransfer.setData('text/plain', JSON.stringify({ taskId: task.id, source }))
+    // Capture where in the block the cursor grabbed so the drop math can
+    // align the block's TOP with the visual cursor position, not the
+    // cursor itself. Without this, dragging a 60-min block from the
+    // middle could never land at 09:00 — the top would always end up
+    // half-an-hour earlier than the grid allows and get clamped to 09:30.
+    const rect = e.currentTarget?.getBoundingClientRect?.()
+    dragOffsetYRef.current = rect ? (e.clientY - rect.top) : 0
+    setDraggedTask({ ...task, _source: source })
+  }
+  const onTaskDragEnd = () => {
+    setDraggedTask(null)
+    setDragOverDay(null)
+    setConflictHint(null)
+    setDropPreview(null)
+    dragOffsetYRef.current = 0
+  }
+
+  const computeDropMinutes = (e, dayEl) => {
+    const rect = dayEl.getBoundingClientRect()
+    // Subtract drag-offset so the block TOP lands where the cursor visually
+    // sits, then snap to the SNAP_MINUTES grid.
+    const y = e.clientY - rect.top - (dragOffsetYRef.current || 0)
+    const raw = (y / HOUR_PX) * 60
+    return Math.max(0, snapTo15(Math.round(raw)))
+  }
+
+  const duration = (task) => {
+    if (task.scheduled_start_time && task.scheduled_end_time) {
+      return timeToMinutes(task.scheduled_end_time) - timeToMinutes(task.scheduled_start_time)
+    }
+    return parseInt(task.estimated_minutes, 10) || DEFAULT_DURATION
+  }
+
+  const onDayDragOver = (e, dayId, dayEl) => {
+    e.preventDefault()
+    e.dataTransfer.dropEffect = 'move'
+    setDragOverDay(dayId)
+    // Update the live drop-preview so the coach sees the target slot.
+    if (dayEl && draggedTask) {
+      const dur = duration(draggedTask)
+      let startMin = computeDropMinutes(e, dayEl)
+      const maxStart = (END_HOUR - START_HOUR) * 60 - dur
+      if (startMin > maxStart) startMin = Math.max(0, maxStart)
+      setDropPreview({ dayId, startMin, endMin: startMin + dur })
+    }
+  }
+
+  const onDayDrop = async (e, dayId, dayEl) => {
+    e.preventDefault()
+    let payload
+    try { payload = JSON.parse(e.dataTransfer.getData('text/plain')) } catch { return }
+    if (!payload?.taskId) return
+
+    // Resolve task object (from scheduled or unscheduled lists).
+    const task = (allTasks || []).find(t => t.id === payload.taskId)
+    if (!task) return
+
+    const dur = duration(task)
+    let startMin = computeDropMinutes(e, dayEl)
+    let endMin = startMin + dur
+
+    // Clamp inside grid bounds.
+    const maxStart = (END_HOUR - START_HOUR) * 60 - dur
+    if (startMin > maxStart) startMin = Math.max(0, maxStart)
+    endMin = startMin + dur
+
+    // Pauzes blijven onaanraakbaar — alleen daarop checken we hard. Taken
+    // mogen elkaar overlappen en aansluiten (back-to-back) zoals de coach
+    // dat vroeg.
+    if (overlapsReservedDB(dayId, startMin, endMin)) {
+      setConflictHint('Pauze-slot — kies een ander uur')
+      setTimeout(() => setConflictHint(null), 2000)
+      setDragOverDay(null)
+      return
+    }
+
+    const start = minutesToTime(startMin)
+    const end   = minutesToTime(endMin)
+
+    setDragOverDay(null)
+    // For non-recurring tasks: pin scheduled_date to the date represented by
+    // the column where the task is dropped, so week-navigation keeps showing
+    // it on the right week.
+    await onTaskUpdate(task.id, {
+      scheduled_day: dayId,
+      scheduled_start_time: start,
+      scheduled_end_time:   end,
+      ...(task.recurrence_active ? {} : { scheduled_date: weekDateStrings[dayId] }),
+    })
+  }
+
+  // Drop on a day's HEADER (no specific hour) → append at end of day.
+  const onDayHeaderDrop = async (e, dayId) => {
+    e.preventDefault()
+    let payload
+    try { payload = JSON.parse(e.dataTransfer.getData('text/plain')) } catch { return }
+    if (!payload?.taskId) return
+    const task = (allTasks || []).find(t => t.id === payload.taskId)
+    if (!task) return
+
+    const dur = duration(task)
+    const startMin = findNextFreeSlot(dayId, tasksByDay[dayId] || [], dur)
+    if (startMin == null) {
+      setConflictHint('Geen vrij slot op deze dag')
+      setTimeout(() => setConflictHint(null), 2000)
+      return
+    }
+    await onTaskUpdate(task.id, {
+      scheduled_day: dayId,
+      scheduled_start_time: minutesToTime(startMin),
+      scheduled_end_time:   minutesToTime(startMin + dur),
+      ...(task.recurrence_active ? {} : { scheduled_date: weekDateStrings[dayId] }),
+    })
+  }
+
+  // Drop into sidebar = unschedule (clear day + times + date).
+  const onSidebarDrop = async (e) => {
+    e.preventDefault()
+    let payload
+    try { payload = JSON.parse(e.dataTransfer.getData('text/plain')) } catch { return }
+    if (!payload?.taskId) return
+    await onTaskUpdate(payload.taskId, {
+      scheduled_day: null,
+      scheduled_date: null,
+      scheduled_start_time: null,
+      scheduled_end_time:   null,
+    })
+  }
+
+  // ── Render helpers ────────────────────────────────────────────────────────
+  const renderHourGutter = () => {
+    const hours = []
+    for (let h = START_HOUR; h <= END_HOUR; h++) {
+      hours.push(
+        <div key={h} style={{
+          position: 'absolute',
+          top: `${(h - START_HOUR) * HOUR_PX}px`,
+          left: 0, right: 0,
+          height: '0px',
+          borderTop: '1px dashed rgba(255,255,255,0.05)',
+        }}>
+          <span style={{
+            position: 'absolute',
+            top: '-7px', left: '-44px',
+            fontSize: '0.6rem',
+            color: 'rgba(255,255,255,0.3)',
+            fontWeight: '600',
+            width: '38px',
+            textAlign: 'right',
+          }}>
+            {String(h).padStart(2, '0')}:00
+          </span>
+        </div>
+      )
+    }
+    return hours
+  }
+
+  // Click handler on a reserved block — opens AgendaBlockModal for edit.
+  // We mark `blockClickedRef` so the surrounding day-cell's onClick (which
+  // would open a NEW task modal) skips this tap.
+  const openBlockEditor = (e, block) => {
+    e.stopPropagation()
+    blockClickedRef.current = true
+    setTimeout(() => { blockClickedRef.current = false }, 250)
+    setEditingBlock(block)
+  }
+
+  const renderReservedBlocks = (dayId) => {
+    const out = []
+    blocks.filter(b => b.day === dayId).forEach((b) => {
+      const top = timeToMinutes(b.start_time?.slice(0, 5))
+      const end = timeToMinutes(b.end_time?.slice(0, 5))
+      if (top == null || end == null) return
+      const height = end - top
+      const color = b.color || (b.type === 'coaching' ? COACHING_COLOR : '#64748b')
+      const isCoaching = b.type === 'coaching'
+      out.push(
+        <button
+          key={b.id}
+          type="button"
+          onClick={(e) => openBlockEditor(e, b)}
+          style={{
+            position: 'absolute', top: `${top}px`, left: '2px', right: '2px',
+            height: `${height}px`,
+            background: isCoaching
+              ? `${color}26`
+              : 'repeating-linear-gradient(45deg, rgba(255,255,255,0.025) 0 6px, rgba(255,255,255,0.05) 6px 12px)',
+            border: isCoaching ? `1px solid ${color}55` : '1px solid rgba(255,255,255,0.06)',
+            borderLeft: isCoaching ? `3px solid ${color}` : '1px solid rgba(255,255,255,0.06)',
+            borderRadius: '4px',
+            padding: height >= 26 ? '0.2rem 0.4rem' : '0.1rem',
+            color: isCoaching ? '#cbd5e1' : 'rgba(255,255,255,0.45)',
+            fontSize: '0.65rem', fontWeight: '700',
+            display: 'flex', alignItems: 'flex-start', gap: '0.25rem',
+            cursor: 'pointer', touchAction: 'manipulation',
+            textAlign: 'left',
+            zIndex: 1,
+          }}
+          title={`${b.label} · ${b.start_time?.slice(0,5)}–${b.end_time?.slice(0,5)} — klik om te bewerken`}
+        >
+          {isCoaching ? <Users size={11} style={{ flexShrink: 0, marginTop: '1px', color }} /> : <Coffee size={11} style={{ flexShrink: 0, marginTop: '1px' }} />}
+          {height >= 26 && <span>{b.label}</span>}
+        </button>
+      )
+    })
+    return out
+  }
+
+  // Ghost preview of where the task will land. Renders the snapped start
+  // and end time so the coach can see "09:00 → 10:00" in real-time.
+  const renderDropPreview = ({ startMin, endMin }) => {
+    const h = Math.max(20, endMin - startMin)
+    return (
+      <div
+        key="__drop-preview"
+        style={{
+          position: 'absolute',
+          top: `${startMin}px`, left: '3px', right: '3px',
+          height: `${h}px`,
+          background: 'rgba(16,185,129,0.18)',
+          border: '1.5px dashed rgba(16,185,129,0.7)',
+          borderRadius: 6,
+          pointerEvents: 'none',
+          zIndex: 4,
+          display: 'flex', alignItems: 'flex-start', justifyContent: 'center',
+          paddingTop: '0.2rem',
+        }}
+      >
+        <span style={{
+          background: 'rgba(16,185,129,0.95)',
+          color: '#fff',
+          fontSize: '0.65rem', fontWeight: 800,
+          padding: '2px 6px', borderRadius: 4,
+          fontFamily: 'monospace',
+          letterSpacing: '0.02em',
+          boxShadow: '0 1px 4px rgba(0,0,0,0.4)',
+        }}>
+          {minutesToTime(startMin).slice(0, 5)} → {minutesToTime(endMin).slice(0, 5)}
+        </span>
+      </div>
+    )
+  }
+
+  const renderTaskBlock = (task) => {
+    const top = timeToMinutes(task.scheduled_start_time)
+    if (top == null) return null
+    const persistedDur = duration(task)
+    const color = task._sectionColor || sectionColorById[task.section_id] || '#10b981'
+    const isDragging = draggedTask?.id === task.id
+    const isResizingThis = resize?.taskId === task.id
+
+    // Live duration during resize, otherwise persisted duration.
+    const effectiveDur = isResizingThis ? (resize.currentEnd - top) : persistedDur
+
+    const startResize = (e) => {
+      e.stopPropagation()
+      e.preventDefault()
+      const endMin = timeToMinutes(task.scheduled_end_time) ?? (top + persistedDur)
+      setResize({
+        taskId: task.id,
+        startY: e.clientY,
+        startEndMin: endMin,
+        currentEnd: endMin,
+        topMin: top,
+        task,
+      })
+    }
+
+    return (
+      <div
+        key={task.id}
+        // Disable native drag while resizing so the bottom-handle pointer
+        // doesn't kick off an HTML5 drag operation.
+        draggable={!isResizingThis}
+        onDragStart={(e) => {
+          if (e.target?.dataset?.resizeHandle === 'true' || isResizingThis) {
+            e.preventDefault(); return
+          }
+          onTaskDragStart(e, task, 'grid')
+        }}
+        onDragEnd={onTaskDragEnd}
+        onClick={(e) => {
+          // Stop bubbling so the day-cell click (which opens the new-task
+          // modal for empty slots) doesn't also fire on top of this tap.
+          e.stopPropagation()
+          if (isDragging || isResizingThis) { e.preventDefault(); return }
+          if (justResizedRef.current) { e.preventDefault(); return }
+          if (onTaskClick) onTaskClick(task)
+        }}
+        style={{
+          position: 'absolute',
+          top: `${top}px`, left: '3px', right: '3px',
+          height: `${Math.max(effectiveDur, 22)}px`,
+          background: `linear-gradient(135deg, ${color}33 0%, ${color}1a 100%)`,
+          border: `1px solid ${color}66`,
+          borderLeft: `3px solid ${color}`,
+          borderRadius: '6px',
+          padding: effectiveDur < 30 ? '0.15rem 0.4rem' : '0.3rem 0.5rem',
+          color: '#fff',
+          fontSize: effectiveDur < 30 ? '0.6rem' : '0.7rem',
+          fontWeight: '600',
+          lineHeight: 1.2,
+          cursor: isDragging ? 'grabbing' : (isResizingThis ? 'ns-resize' : 'grab'),
+          opacity: isDragging ? 0.4 : 1,
+          overflow: 'hidden',
+          touchAction: 'manipulation',
+          WebkitTapHighlightColor: 'transparent',
+          zIndex: isResizingThis ? 3 : 2,
+          boxShadow: isResizingThis
+            ? `0 0 0 1px ${color}, 0 4px 12px ${color}55`
+            : '0 1px 2px rgba(0,0,0,0.3)',
+          transition: isResizingThis ? 'none' : 'opacity 0.15s ease',
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.3rem' }}>
+          <span style={{ fontSize: '0.55rem', color: `${color}cc`, fontWeight: '700', flexShrink: 0 }}>
+            {task.scheduled_start_time?.slice(0, 5)}
+            {isResizingThis && (
+              <> – {minutesToTime(resize.currentEnd).slice(0, 5)}</>
+            )}
+          </span>
+          <span style={{
+            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+            color: '#fff', fontWeight: '700',
+          }}>
+            {task.title}
+          </span>
+          {(task._isRecurring || task.recurrence_active) && (
+            <Repeat size={9} color={`${color}cc`} style={{ flexShrink: 0, marginLeft: 'auto' }} title="Herhaalt elke week" />
+          )}
+        </div>
+        {effectiveDur >= 40 && (
+          <div style={{ fontSize: '0.55rem', color: 'rgba(255,255,255,0.45)', marginTop: '0.15rem' }}>
+            {effectiveDur} min
+          </div>
+        )}
+
+        {/* Bottom resize-handle — drag down/up to change duration */}
+        <div
+          data-resize-handle="true"
+          draggable={false}
+          onPointerDown={startResize}
+          onDragStart={(e) => e.preventDefault()}
+          style={{
+            position: 'absolute',
+            left: 0, right: 0, bottom: 0,
+            height: '10px',
+            cursor: 'ns-resize',
+            background: 'transparent',
+            // Visual hint on hover (active or hover)
+            display: 'flex', alignItems: 'flex-end', justifyContent: 'center',
+            paddingBottom: '2px',
+            touchAction: 'none',
+          }}
+          onMouseEnter={(e) => { e.currentTarget.style.background = `linear-gradient(to bottom, transparent, ${color}40)` }}
+          onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent' }}
+        >
+          <div style={{
+            width: '20px', height: '2px',
+            background: isResizingThis ? color : `${color}80`,
+            borderRadius: '2px',
+            opacity: isResizingThis ? 1 : 0.5,
+          }} />
+        </div>
+      </div>
+    )
+  }
+
+  // Today-marker line — only renders on current-week and only on today's column.
+  const renderTodayLine = (dayId) => {
+    if (!isCurrentWeek || dayId !== todayDayId) return null
+    const now = new Date()
+    const minsFromStart = (now.getHours() - START_HOUR) * 60 + now.getMinutes()
+    if (minsFromStart < 0 || minsFromStart > (END_HOUR - START_HOUR) * 60) return null
+    return (
+      <div style={{
+        position: 'absolute',
+        top: `${minsFromStart}px`,
+        left: 0, right: 0,
+        height: '0px',
+        borderTop: '1.5px solid #ef4444',
+        zIndex: 3,
+        pointerEvents: 'none',
+      }}>
+        <div style={{
+          position: 'absolute',
+          left: '-4px', top: '-4px',
+          width: '8px', height: '8px', borderRadius: '50%',
+          background: '#ef4444',
+        }} />
+      </div>
+    )
+  }
+
+  // ── Render ────────────────────────────────────────────────────────────────
+  const visibleDays = isMobile ? DAYS.filter(d => d.id === mobileDay) : DAYS
+
+  return (
+    <div style={{
+      display: 'flex', flexDirection: 'column',
+      background: '#0a0a0a',
+      minHeight: '600px',
+    }}>
+      {/* ── Header: week-nav + week-number ─────────────────────────────────── */}
+      <div style={{
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        padding: isMobile ? '0.5rem 0.75rem' : '0.625rem 1rem',
+        borderBottom: '1px solid rgba(255,255,255,0.06)',
+        gap: '0.5rem',
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+          <button
+            onClick={() => setWeekAnchor(getMondayOfWeek(new Date()))}
+            disabled={isCurrentWeek}
+            style={{
+              ...navBtnStyle,
+              padding: '0.3rem 0.6rem',
+              opacity: isCurrentWeek ? 0.4 : 1,
+              fontSize: '0.65rem',
+              fontWeight: '700',
+              color: isCurrentWeek ? 'rgba(255,255,255,0.3)' : '#10b981',
+              borderColor: isCurrentWeek ? 'rgba(255,255,255,0.06)' : 'rgba(16,185,129,0.3)',
+            }}
+          >
+            Vandaag
+          </button>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', color: 'rgba(255,255,255,0.55)' }}>
+          <button
+            onClick={() => setWeekAnchor(prev => { const d = new Date(prev); d.setDate(d.getDate() - 7); return d })}
+            aria-label="Vorige week"
+            style={navBtnStyle}
+          >
+            <ChevronLeft size={14} />
+          </button>
+          <Calendar size={13} />
+          <span style={{ fontSize: '0.7rem', fontWeight: '700' }}>Week {weekNumber}</span>
+          <button
+            onClick={() => setWeekAnchor(prev => { const d = new Date(prev); d.setDate(d.getDate() + 7); return d })}
+            aria-label="Volgende week"
+            style={navBtnStyle}
+          >
+            <ChevronRight size={14} />
+          </button>
+
+          {/* Floating "Niet gepland" chip — same drop-target as the old
+              sidebar but takes near-zero space when collapsed. */}
+          <div
+            onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move' }}
+            onDrop={onSidebarDrop}
+            style={{ marginLeft: 4 }}
+          >
+            <FloatingPanel
+              icon={Inbox}
+              label="Niet gepland"
+              badge={unscheduledTasks.length}
+              accent="#10b981"
+              iconColor="rgba(255,255,255,0.6)"
+              isMobile={isMobile}
+              align="right"
+              panelWidth={260}
+            >
+              <div
+                onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move' }}
+                onDrop={onSidebarDrop}
+                style={{
+                  padding: '0.5rem',
+                  display: 'flex', flexDirection: 'column', gap: '0.4rem',
+                }}
+              >
+                {unscheduledTasks.length === 0 && (
+                  <div style={{
+                    padding: '1.2rem 0.5rem', textAlign: 'center',
+                    color: 'rgba(255,255,255,0.25)',
+                    fontSize: '0.7rem', fontWeight: 500, lineHeight: 1.4,
+                  }}>
+                    Geen losse taken. Sleep een blok hierheen om uit te plannen.
+                  </div>
+                )}
+                {unscheduledTasks.map(task => {
+                  const color = sectionColorById[task.section_id] || '#10b981'
+                  return (
+                    <div
+                      key={task.id}
+                      draggable
+                      onDragStart={(e) => onTaskDragStart(e, task, 'sidebar')}
+                      onDragEnd={onTaskDragEnd}
+                      onClick={() => onTaskClick && onTaskClick(task)}
+                      style={{
+                        padding: '0.5rem 0.6rem',
+                        background: 'rgba(255,255,255,0.04)',
+                        border: '1px solid rgba(255,255,255,0.07)',
+                        borderLeft: `3px solid ${color}`,
+                        borderRadius: 6,
+                        cursor: 'grab',
+                        touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+                      }}
+                    >
+                      <div style={{
+                        fontSize: '0.75rem', fontWeight: 700, color: '#fff',
+                        letterSpacing: '-0.01em', lineHeight: 1.25,
+                        whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+                      }}>
+                        {task.title}
+                      </div>
+                      {task.estimated_minutes && (
+                        <div style={{
+                          fontSize: '0.55rem', color: 'rgba(255,255,255,0.35)',
+                          fontWeight: 600, marginTop: 2,
+                        }}>
+                          {task.estimated_minutes} min
+                        </div>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+            </FloatingPanel>
+          </div>
+          <button
+            onClick={() => setEditingBlock({})} // empty = new
+            style={{
+              marginLeft: '0.5rem',
+              display: 'inline-flex', alignItems: 'center', gap: '0.25rem',
+              padding: '0.3rem 0.55rem',
+              background: 'rgba(255,215,0,0.12)',
+              border: '1px solid rgba(255,215,0,0.3)',
+              borderRadius: 6,
+              color: '#FFD700',
+              fontSize: '0.65rem', fontWeight: 800,
+              cursor: 'pointer', touchAction: 'manipulation',
+            }}
+            title="Nieuw vast blok (lunch / coaching / focus)"
+          >
+            <Plus size={11} strokeWidth={3} /> Blok
+          </button>
+        </div>
+      </div>
+
+      {/* Conflict toast */}
+      {conflictHint && (
+        <div style={{
+          position: 'sticky', top: 0, zIndex: 10,
+          padding: '0.4rem 0.75rem',
+          background: 'rgba(239,68,68,0.12)',
+          borderBottom: '1px solid rgba(239,68,68,0.3)',
+          color: '#fca5a5', fontSize: '0.7rem', fontWeight: '700',
+          textAlign: 'center',
+        }}>
+          {conflictHint}
+        </div>
+      )}
+
+      {/* Mobile day-picker tabs */}
+      {isMobile && (
+        <div style={{
+          display: 'flex', borderBottom: '1px solid rgba(255,255,255,0.06)',
+          overflowX: 'auto',
+        }}>
+          {DAYS.map(d => {
+            const active = d.id === mobileDay
+            const isToday = d.id === todayDayId && isCurrentWeek
+            const dateNum = weekDates[d.id] ? weekDates[d.id].getDate() : ''
+            return (
+              <button
+                key={d.id}
+                onClick={() => setMobileDay(d.id)}
+                style={{
+                  flex: 1, minWidth: '52px',
+                  padding: '0.5rem 0.25rem',
+                  background: active ? 'rgba(16,185,129,0.08)' : 'transparent',
+                  border: 'none',
+                  borderBottom: active ? '2px solid #10b981' : '2px solid transparent',
+                  color: active ? '#10b981' : isToday ? '#fff' : 'rgba(255,255,255,0.4)',
+                  fontSize: '0.7rem',
+                  fontWeight: active || isToday ? '800' : '600',
+                  cursor: 'pointer',
+                  touchAction: 'manipulation',
+                  WebkitTapHighlightColor: 'transparent',
+                  display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1,
+                }}
+              >
+                <span>{d.short}</span>
+                <span style={{ fontSize: '0.55rem', fontWeight: 600, opacity: 0.65 }}>{dateNum}</span>
+              </button>
+            )
+          })}
+        </div>
+      )}
+
+      {/* ── Body: grid + sidebar ───────────────────────────────────────────── */}
+      <div style={{ display: 'flex', flex: 1, minHeight: 0 }}>
+        {/* GRID */}
+        <div style={{
+          flex: 1, overflowX: 'auto', overflowY: 'auto',
+          padding: isMobile ? '0.5rem 0.5rem 0.5rem 3rem' : '0.75rem 0.5rem 0.75rem 3.5rem',
+          position: 'relative',
+        }}>
+          {/* Day headers (drop = append to end) */}
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: `repeat(${visibleDays.length}, 1fr)`,
+            gap: '4px',
+            marginBottom: '0.5rem',
+            minWidth: isMobile ? 'auto' : `${visibleDays.length * 90}px`,
+          }}>
+            {visibleDays.map(day => {
+              const isToday = day.id === todayDayId && isCurrentWeek
+              const dayDate = weekDates[day.id]
+              const dateNum = dayDate ? dayDate.getDate() : ''
+              return (
+                <div
+                  key={day.id}
+                  onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move' }}
+                  onDrop={(e) => onDayHeaderDrop(e, day.id)}
+                  style={{
+                    textAlign: 'center',
+                    padding: '0.4rem 0.25rem',
+                    borderRadius: '6px',
+                    background: isToday ? 'rgba(16,185,129,0.08)' : 'rgba(255,255,255,0.03)',
+                    border: `1px solid ${isToday ? 'rgba(16,185,129,0.3)' : 'rgba(255,255,255,0.06)'}`,
+                    color: isToday ? '#10b981' : '#fff',
+                    fontSize: '0.7rem',
+                    fontWeight: '800',
+                    letterSpacing: '0.02em',
+                    display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1,
+                  }}
+                >
+                  <span>{isMobile ? day.label : day.short}</span>
+                  <span style={{
+                    fontSize: '0.6rem', fontWeight: 600,
+                    color: isToday ? '#10b981' : 'rgba(255,255,255,0.45)',
+                  }}>
+                    {dateNum}
+                  </span>
+                </div>
+              )
+            })}
+          </div>
+
+          {/* Time-grid cells */}
+          <div style={{
+            position: 'relative',
+            display: 'grid',
+            gridTemplateColumns: `repeat(${visibleDays.length}, 1fr)`,
+            gap: '4px',
+            minWidth: isMobile ? 'auto' : `${visibleDays.length * 90}px`,
+            height: `${GRID_HEIGHT}px`,
+          }}>
+            {/* Hour gutter (drawn once, spans full width via the first cell) */}
+            <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}>
+              {renderHourGutter()}
+            </div>
+
+            {visibleDays.map(day => {
+              const isOverDay = dragOverDay === day.id
+              const dayTasks = tasksByDay[day.id] || []
+              return (
+                <div
+                  key={day.id}
+                  ref={(el) => { if (el) el._dayId = day.id }}
+                  onDragOver={(e) => onDayDragOver(e, day.id, e.currentTarget)}
+                  onDragLeave={() => {
+                    setDragOverDay(prev => prev === day.id ? null : prev)
+                    setDropPreview(prev => prev?.dayId === day.id ? null : prev)
+                  }}
+                  onDrop={(e) => onDayDrop(e, day.id, e.currentTarget)}
+                  onClick={(e) => {
+                    console.log('[AgendaView] cell click', { day: day.id, hasHandler: !!onRequestNewTask, blockClicked: blockClickedRef.current, targetTag: e.target?.tagName })
+                    if (blockClickedRef.current) return
+                    if (!onRequestNewTask) { console.warn('[AgendaView] onRequestNewTask not provided'); return }
+                    const rect = e.currentTarget.getBoundingClientRect()
+                    const y = e.clientY - rect.top
+                    if (y < 0 || y > rect.height) return
+                    const startMin = Math.max(0, snapTo15(Math.round((y / HOUR_PX) * 60)))
+                    const preset = {
+                      day: day.id,
+                      date: weekDateStrings[day.id], // YYYY-MM-DD of the cell's actual date
+                      startTime: minutesToTime(startMin),
+                      endTime: minutesToTime(startMin + 30),
+                    }
+                    onRequestNewTask(preset)
+                  }}
+                  style={{
+                    position: 'relative',
+                    background: isOverDay
+                      ? 'rgba(16,185,129,0.04)'
+                      : 'rgba(255,255,255,0.015)',
+                    border: `1px solid ${isOverDay ? 'rgba(16,185,129,0.35)' : 'rgba(255,255,255,0.04)'}`,
+                    borderRadius: '6px',
+                    overflow: 'hidden',
+                    cursor: 'crosshair',
+                    backgroundImage: `repeating-linear-gradient(to bottom, rgba(255,255,255,0.03) 0, rgba(255,255,255,0.03) 1px, transparent 1px, transparent ${HOUR_PX / 6}px)`,
+                  }}
+                >
+                  {renderReservedBlocks(day.id)}
+                  {dayTasks.map(t => renderTaskBlock(t))}
+                  {dropPreview?.dayId === day.id && renderDropPreview(dropPreview)}
+                  {renderTodayLine(day.id)}
+                </div>
+              )
+            })}
+          </div>
+        </div>
+
+      </div>
+
+      {editingBlock && (
+        <AgendaBlockModal
+          block={editingBlock?.id ? editingBlock : null}
+          isMobile={isMobile}
+          defaultDay={editingBlock?.day}
+          defaultStartTime={editingBlock?.start_time?.slice(0,5)}
+          defaultEndTime={editingBlock?.end_time?.slice(0,5)}
+          onClose={() => setEditingBlock(null)}
+          onSave={handleSaveBlock}
+          onDelete={handleDeleteBlock}
+        />
+      )}
+    </div>
+  )
+}
+
+const navBtnStyle = {
+  display: 'flex', alignItems: 'center', justifyContent: 'center',
+  width: '28px', height: '28px',
+  background: 'rgba(255,255,255,0.04)',
+  border: '1px solid rgba(255,255,255,0.08)',
+  borderRadius: '6px',
+  color: 'rgba(255,255,255,0.6)',
+  cursor: 'pointer',
+  touchAction: 'manipulation',
+  WebkitTapHighlightColor: 'transparent',
+}

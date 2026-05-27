@@ -7,13 +7,15 @@ import AINextMeal from './AINextMeal'
 import AIDaySchedule from './AIDaySchedule'
 import MacroOverview from './MacroOverview'
 
-export default function AIDailyGoals({ 
+export default function AIDailyGoals({
   dailyTotals, waterIntake, todayMood,
   onUpdateWater, onLogMood, onMealLogged, onQuickIntake,
   client, db, activePlan, todayMeals, todayProgress,
   onCheckMeal, onUncheckMeal, onOpenInfo, onOpenAlternatives,
   dayTemplates, onPlanUpdate, onNavigateToDay, selectedDay,
-  nextMeal, onFinishMeal
+  nextMeal, onFinishMeal,
+  // ✅ OVERHAUL: pass through mode to inner schedule
+  mode = 'plan',
 }) {
   const isMobile = window.innerWidth <= 768
   const [showIntakeModal, setShowIntakeModal] = useState(false)
@@ -66,6 +68,8 @@ export default function AIDailyGoals({
         client={client}
         onMealLogged={onMealLogged}
         targets={dailyTotals?.targets}
+        // ✅ OVERHAUL: forward mode
+        mode={mode}
       />
 
       {/* ═══ ZONE 3: Actions ═══ */}

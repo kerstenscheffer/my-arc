@@ -51,6 +51,32 @@ export default class CheckinService {
     }
   }
 
+  // Returns true if the client has submitted/reviewed a check-in since the
+  // most recent Friday (inclusive). On Friday itself "lastFriday" === today,
+  // so this returns true only after they fill in today's check-in.
+  async hasCheckinSinceLastFriday(clientId) {
+    try {
+      const now = new Date()
+      const day = now.getDay() // 0=Sun..6=Sat
+      const daysSinceFriday = (day - 5 + 7) % 7
+      const lastFriday = new Date(now)
+      lastFriday.setDate(now.getDate() - daysSinceFriday)
+      lastFriday.setHours(0, 0, 0, 0)
+      const { data, error } = await this.supabase
+        .from('client_checkins')
+        .select('id')
+        .eq('client_id', clientId)
+        .gte('checkin_date', lastFriday.toISOString().split('T')[0])
+        .in('status', ['submitted', 'reviewed'])
+        .limit(1)
+      if (error) throw error
+      return Array.isArray(data) && data.length > 0
+    } catch (error) {
+      console.error('❌ hasCheckinSinceLastFriday failed:', error)
+      return false
+    }
+  }
+
   async hasCheckinThisWeek(clientId) {
     try {
       const now = new Date()

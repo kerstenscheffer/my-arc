@@ -2,13 +2,15 @@
 // VERSION 4.0 - Timer state omhoog naar CoachHub via onStartTask prop
 
 import { useState, useEffect } from 'react'
-import { LayoutGrid, Lightbulb, Trophy, Bell, Zap, Timer } from 'lucide-react'
+import { LayoutGrid, Lightbulb, Trophy, Bell, Zap, Timer, Target } from 'lucide-react'
 import ProductivityService from './ProductivityService'
 import ProductivityKanban from './components/kanban/ProductivityKanban'
 import ReflectionsHub from './components/reflections/ReflectionsHub'
 import WeeklyWinsHub from './components/weekly-wins/WeeklyWinsHub'
 import ReflectionModal from './components/reflections/ReflectionModal'
 import TimeInsightsHub from './components/time/TimeInsightsHub'
+import WeekGoalsManager from './components/WeekGoalsManager'
+import FloatingPanel from './components/FloatingPanel'
 
 const TABS = [
   { id: 'kanban',      label: 'Tasks',      icon: LayoutGrid, color: '#10b981' },
@@ -98,7 +100,7 @@ export default function ProductivityHub({ db, isMobile, onStartTask, activeTaskI
   const activeTabConfig = TABS.find(t => t.id === activeTab)
 
   return (
-    <div style={{ background: '#0a0a0a', borderRadius: isMobile ? '10px' : '12px', overflow: 'hidden', transform: 'translateZ(0)' }}>
+    <div style={{ background: '#0a0a0a', borderRadius: isMobile ? '10px' : '12px', overflow: 'hidden' }}>
 
       {/* ═══ HEADER ═══ */}
       <div style={{ padding: isMobile ? '0.625rem 0.75rem' : '0.625rem 1rem', borderBottom: '1px solid rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
@@ -136,15 +138,37 @@ export default function ProductivityHub({ db, isMobile, onStartTask, activeTaskI
       {/* ═══ TAB CONTENT ═══ */}
       <div>
         {activeTab === 'kanban' && (
-          <ProductivityKanban
-            productivityService={productivityService}
-            coachId={coachId}
-            isMobile={isMobile}
-            onTaskCompleted={handleTaskCompleted}
-            onSectionsChange={setSections}
-            onStartTask={onStartTask}
-            activeTaskId={activeTaskId}
-          />
+          <>
+            <div style={{
+              display: 'flex', justifyContent: 'flex-end',
+              padding: isMobile ? '0.5rem 0.75rem 0' : '0.625rem 1rem 0',
+            }}>
+              <FloatingPanel
+                icon={Target}
+                label="Doelen deze week"
+                accent="#FFD700"
+                iconColor="#FFD700"
+                isMobile={isMobile}
+                align="right"
+                panelWidth={isMobile ? 320 : 420}
+                panelMaxHeight="75vh"
+              >
+                <div style={{ padding: '0.5rem 0.65rem' }}>
+                  <WeekGoalsManager db={db} coachId={coachId} isMobile={isMobile} />
+                </div>
+              </FloatingPanel>
+            </div>
+            <ProductivityKanban
+              productivityService={productivityService}
+              coachId={coachId}
+              db={db}
+              isMobile={isMobile}
+              onTaskCompleted={handleTaskCompleted}
+              onSectionsChange={setSections}
+              onStartTask={onStartTask}
+              activeTaskId={activeTaskId}
+            />
+          </>
         )}
         {activeTab === 'reflections' && (
           <ReflectionsHub

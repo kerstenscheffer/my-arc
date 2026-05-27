@@ -6,7 +6,7 @@
 // "Voedingsmiddel toevoegen" per section
 import React, { useState } from 'react'
 import MealCard from './MealCard'
-import { Plus, Eye, EyeOff, Trash2, Edit3, MoreHorizontal, X } from 'lucide-react'
+import { Plus, Eye, EyeOff, Trash2, Edit3, MoreHorizontal, X, Apple } from 'lucide-react'
 
 const MOMENTS = [
   { id: 'breakfast', label: 'Ontbijt' },
@@ -47,51 +47,91 @@ function LoggedMealRow({ meal, onDelete, onEdit, isMobile }) {
 
   return (
     <div style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.04)' }}>
-      {/* Main row */}
+      {/* Main row — SearchTab-inspired clean layout */}
       <div style={{
         display: 'flex', alignItems: 'center',
-        padding: isMobile ? '0.5rem 1rem' : '0.625rem 1.25rem',
-        minHeight: '44px'
+        padding: isMobile ? '0.55rem 1rem' : '0.625rem 1.25rem',
+        minHeight: '52px',
+        gap: '0.75rem'
       }}>
-        {/* Name + macros */}
+        {/* Thumbnail — 44x44 with gold apple placeholder */}
+        {meal.image_url ? (
+          <div style={{
+            width: '44px', height: '44px',
+            borderRadius: '12px',
+            background: `url(${meal.image_url}) center/cover, #fff`,
+            border: '1px solid rgba(255, 255, 255, 0.08)',
+            flexShrink: 0,
+          }} />
+        ) : (
+          <div style={{
+            width: '44px', height: '44px',
+            borderRadius: '12px',
+            background: 'rgba(255, 215, 0, 0.06)',
+            border: '1px solid rgba(255, 215, 0, 0.15)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            color: 'rgba(255, 215, 0, 0.55)',
+            flexShrink: 0,
+          }}>
+            <Apple size={20} strokeWidth={1.8} />
+          </div>
+        )}
+
+        {/* Name + subtitle */}
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{
             display: 'flex', alignItems: 'center', gap: '0.375rem'
           }}>
             <div style={{
-              fontSize: isMobile ? '0.8rem' : '0.85rem',
-              fontWeight: '600', color: '#fff',
+              fontSize: isMobile ? '0.88rem' : '0.92rem',
+              fontWeight: '700', color: '#fff',
               whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
-              maxWidth: '100%'
+              letterSpacing: '-0.01em',
+              minWidth: 0,
             }}>
               {meal.meal_name || 'Onbekend'}
             </div>
             {meal.source === 'plan_check' && (
               <div style={{
-                fontSize: '0.4rem', fontWeight: '700',
-                color: 'rgba(16, 185, 129, 0.5)',
-                textTransform: 'uppercase', letterSpacing: '0.04em',
+                fontSize: '0.5rem', fontWeight: '700',
+                color: '#FFD700',
+                background: 'rgba(255, 215, 0, 0.1)',
+                padding: '0.1rem 0.35rem', borderRadius: '4px',
+                textTransform: 'uppercase', letterSpacing: '0.06em',
                 flexShrink: 0
               }}>
-                PLAN
+                Plan
               </div>
             )}
           </div>
           <div style={{
-            fontSize: isMobile ? '0.6rem' : '0.65rem',
-            color: 'rgba(255, 255, 255, 0.3)', marginTop: '0.1rem'
+            fontSize: isMobile ? '0.7rem' : '0.75rem',
+            color: 'rgba(255, 255, 255, 0.4)',
+            marginTop: '0.15rem',
+            fontWeight: '500',
           }}>
-            {meal.brand ? `${meal.brand}, ` : ''}{formatTime(meal.consumed_at)}
+            {meal.brand ? `${meal.brand} · ` : ''}{formatTime(meal.consumed_at)}
           </div>
         </div>
 
-        {/* Calories */}
+        {/* Calories — gold accent */}
         <div style={{
-          fontSize: isMobile ? '0.8rem' : '0.85rem',
-          fontWeight: '800', color: 'rgba(255, 255, 255, 0.5)',
-          flexShrink: 0, marginRight: '0.5rem'
+          display: 'flex', alignItems: 'baseline', gap: '0.15rem',
+          flexShrink: 0, marginRight: '0.375rem',
         }}>
-          {Math.round(meal.calories || 0)}
+          <span style={{
+            fontSize: isMobile ? '0.92rem' : '0.95rem',
+            fontWeight: '800', color: '#FFD700',
+            letterSpacing: '-0.01em',
+          }}>
+            {Math.round(meal.calories || 0)}
+          </span>
+          <span style={{
+            fontSize: '0.6rem', fontWeight: '600',
+            color: 'rgba(255, 215, 0, 0.5)',
+          }}>
+            kcal
+          </span>
         </div>
 
         {/* More button */}
@@ -193,11 +233,15 @@ export default function MealTimelineMobile({
     return grouped[momentId].loggedMeals.reduce((sum, m) => sum + (m.calories || 0), 0)
   }
 
-  // Handle plan meal check → auto-log to consumed_meals
+  // Handle plan meal check → auto-log to consumed_meals.
+  // CRITICAL: when NEW-logging, only fire `onPlanMealLog` (it handles both
+  // the consumed_meals insert + macro update + visual check). Firing
+  // `onMealCheck` in addition causes a duplicate macro increment on the
+  // DailyTotalsBar. `onMealCheck` only runs on the UNCHECK path.
   const handlePlanCheck = (meal) => {
-    if (onPlanMealLog && !checkedMeals[meal.slot]) {
-      // Not checked yet → check it AND log it
+    if (!checkedMeals[meal.slot] && onPlanMealLog) {
       onPlanMealLog(meal)
+      return
     }
     if (onMealCheck) onMealCheck(meal)
   }
@@ -214,10 +258,10 @@ export default function MealTimelineMobile({
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             gap: '0.375rem', width: '100%',
             padding: isMobile ? '0.5rem 1rem' : '0.625rem 1.25rem',
-            background: showPlan ? 'rgba(16, 185, 129, 0.03)' : 'transparent',
+            background: showPlan ? 'rgba(255, 215, 0, 0.03)' : 'transparent',
             border: 'none',
             borderBottom: '1px solid rgba(255, 255, 255, 0.06)',
-            color: showPlan ? 'rgba(16, 185, 129, 0.5)' : 'rgba(255, 255, 255, 0.2)',
+            color: showPlan ? 'rgba(255, 215, 0, 0.5)' : 'rgba(255, 255, 255, 0.2)',
             fontSize: isMobile ? '0.6rem' : '0.65rem',
             fontWeight: '600', cursor: 'pointer',
             touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
@@ -230,100 +274,107 @@ export default function MealTimelineMobile({
       )}
 
       {/* ── Per-moment sections ── */}
-      {MOMENTS.map((moment, mIdx) => {
-        const group = grouped[moment.id]
-        // Filter out plan_check entries when plan is visible (they show as MealCard instead)
-        const visibleLoggedMeals = showPlan
-          ? group.loggedMeals.filter(m => m.source !== 'plan_check')
-          : group.loggedMeals
-        const hasLogged = visibleLoggedMeals.length > 0
-        const hasPlanMeals = group.planMeals.length > 0 && showPlan
-        const cal = momentCalories(moment.id)
+      {(() => {
+        // Track which moment-section is the first that actually renders, so we
+        // can skip the top border on it (otherwise we'd get a stray line under
+        // the plan-toggle when the early moments are empty).
+        let renderedCount = 0
+        return MOMENTS.map(moment => {
+          const group = grouped[moment.id]
+          // Filter out plan_check entries when plan is visible (they show as MealCard instead)
+          const visibleLoggedMeals = showPlan
+            ? group.loggedMeals.filter(m => m.source !== 'plan_check')
+            : group.loggedMeals
+          const hasPlanMeals = group.planMeals.length > 0 && showPlan
+          // Skip moments that have nothing to show — no per-moment "+ add"
+          // button anymore, so an empty header is just noise.
+          if (!hasPlanMeals && visibleLoggedMeals.length === 0) return null
+          const cal = momentCalories(moment.id)
+          const isFirst = renderedCount === 0
+          renderedCount += 1
 
-        return (
-          <div key={moment.id}>
-            {/* Moment header */}
-            <div style={{
-              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-              padding: isMobile ? '0.5rem 1rem' : '0.625rem 1.25rem',
-              background: 'rgba(255, 255, 255, 0.015)',
-              borderTop: mIdx > 0 ? '1px solid rgba(255, 255, 255, 0.06)' : 'none',
-              borderBottom: '1px solid rgba(255, 255, 255, 0.04)'
-            }}>
+          return (
+            <div key={moment.id}>
+              {/* Moment header */}
               <div style={{
-                fontSize: isMobile ? '0.85rem' : '0.9rem',
-                fontWeight: '800', color: '#fff'
+                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                padding: isMobile ? '0.5rem 1rem' : '0.625rem 1.25rem',
+                background: 'rgba(255, 255, 255, 0.015)',
+                borderTop: isFirst ? 'none' : '1px solid rgba(255, 255, 255, 0.06)',
+                borderBottom: '1px solid rgba(255, 255, 255, 0.04)'
               }}>
-                {moment.label}
-              </div>
-              {cal > 0 && (
                 <div style={{
-                  fontSize: isMobile ? '0.7rem' : '0.75rem',
-                  fontWeight: '800', color: 'rgba(255, 255, 255, 0.35)'
+                  fontSize: isMobile ? '0.85rem' : '0.9rem',
+                  fontWeight: '800', color: '#fff'
                 }}>
-                  {cal}
+                  {moment.label}
                 </div>
-              )}
+                {cal > 0 && (
+                  <div style={{
+                    fontSize: isMobile ? '0.7rem' : '0.75rem',
+                    fontWeight: '800', color: 'rgba(255, 255, 255, 0.35)'
+                  }}>
+                    {cal}
+                  </div>
+                )}
+              </div>
+
+              {/* Plan meals (when toggle is on) */}
+              {hasPlanMeals && group.planMeals.map((meal, idx) => (
+                <MealCard
+                  key={`plan-${meal.slot}-${idx}`}
+                  meal={meal}
+                  isChecked={checkedMeals[meal.slot]}
+                  onCheck={() => handlePlanCheck(meal)}
+                  onInfo={() => onOpenInfo(meal)}
+                  onAlternatives={() => onOpenAlternatives(meal)}
+                  isMobile={true}
+                  isLast={false}
+                />
+              ))}
+
+              {/* Logged meals (excluding plan_check when plan visible) */}
+              {visibleLoggedMeals.map(meal => (
+                <LoggedMealRow
+                  key={`logged-${meal.id}`}
+                  meal={meal}
+                  onDelete={onDeleteConsumedMeal}
+                  onEdit={onEditConsumedMeal}
+                  isMobile={isMobile}
+                />
+              ))}
             </div>
+          )
+        })
+      })()}
 
-            {/* Plan meals (when toggle is on) */}
-            {hasPlanMeals && group.planMeals.map((meal, idx) => (
-              <MealCard
-                key={`plan-${meal.slot}-${idx}`}
-                meal={meal}
-                isChecked={checkedMeals[meal.slot]}
-                onCheck={() => handlePlanCheck(meal)}
-                onInfo={() => onOpenInfo(meal)}
-                onAlternatives={() => onOpenAlternatives(meal)}
-                isMobile={true}
-                isLast={false}
-              />
-            ))}
-
-            {/* Logged meals (excluding plan_check when plan visible) */}
-            {visibleLoggedMeals.map(meal => (
-              <LoggedMealRow
-                key={`logged-${meal.id}`}
-                meal={meal}
-                onDelete={onDeleteConsumedMeal}
-                onEdit={onEditConsumedMeal}
-                isMobile={isMobile}
-              />
-            ))}
-
-            {/* "Voedingsmiddel toevoegen" per section */}
-            {onOpenFoodLog && (
-              <button
-                onClick={() => onOpenFoodLog(moment.id)}
-                style={{
-                  display: 'flex', alignItems: 'center',
-                  gap: '0.25rem', width: '100%',
-                  padding: isMobile ? '0.4rem 1rem' : '0.5rem 1.25rem',
-                  background: 'transparent', border: 'none',
-                  color: '#10b981',
-                  fontSize: isMobile ? '0.6rem' : '0.65rem',
-                  fontWeight: '700',
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.03em',
-                  cursor: 'pointer',
-                  touchAction: 'manipulation',
-                  WebkitTapHighlightColor: 'transparent',
-                  minHeight: '32px'
-                }}
-                onTouchStart={(e) => {
-                  if (isMobile) e.currentTarget.style.background = 'rgba(16, 185, 129, 0.04)'
-                }}
-                onTouchEnd={(e) => {
-                  if (isMobile) e.currentTarget.style.background = 'transparent'
-                }}
-              >
-                <Plus size={11} strokeWidth={2.5} />
-                Voedingsmiddel toevoegen
-              </button>
-            )}
-          </div>
-        )
-      })}
+      {/* ── Single central "Voedingsmiddel toevoegen" — no moment pre-set,
+            modal infers from time / lets user pick. ── */}
+      {onOpenFoodLog && (
+        <button
+          onClick={() => onOpenFoodLog(null)}
+          style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            gap: '0.4rem', width: '100%',
+            padding: isMobile ? '0.875rem 1rem' : '1rem 1.25rem',
+            background: 'rgba(255, 215, 0, 0.05)',
+            border: 'none',
+            borderTop: '1px solid rgba(255, 215, 0, 0.12)',
+            borderBottom: '1px solid rgba(255, 215, 0, 0.12)',
+            color: '#FFD700',
+            fontSize: isMobile ? '0.85rem' : '0.9rem',
+            fontWeight: '700',
+            letterSpacing: '-0.005em',
+            cursor: 'pointer',
+            touchAction: 'manipulation',
+            WebkitTapHighlightColor: 'transparent',
+            minHeight: '48px'
+          }}
+        >
+          <Plus size={16} strokeWidth={2.5} />
+          Voedingsmiddel toevoegen
+        </button>
+      )}
     </div>
   )
 }

@@ -375,7 +375,7 @@ export default function AIWeekPlanner({
               <div style={{
                 fontSize: isMobile ? '1.25rem' : '1.5rem',
                 fontWeight: '700',
-                color: '#10b981'
+                color: '#FFD700'
               }}>
                 {Math.round(weekTotals.calories / 1000)}k
               </div>

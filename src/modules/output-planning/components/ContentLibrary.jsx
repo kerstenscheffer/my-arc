@@ -6,7 +6,7 @@ import { useState, useEffect } from 'react'
 import VideoBlueprint from './VideoBlueprint'
 
 // Sub-components
-import BatchModeView from './content-library/BatchModeView'
+import BatchesListView from './content-library/BatchesListView'
 import CalendarView from './content-library/CalendarView'
 import IdeasView from './content-library/IdeasView'
 import LibraryView from './content-library/LibraryView'
@@ -84,6 +84,9 @@ export default function ContentLibrary({ content, service, db, onRefresh }) {
   const [showEditBatchItemModal, setShowEditBatchItemModal] = useState(false)
   const [itemToBeScheduled, setItemToBeScheduled] = useState(null)
   const [itemToBeEdited, setItemToBeEdited] = useState(null)
+  // Real batches (content_batches + batch_items) for the Batch tab.
+  const [batches, setBatches] = useState([])
+  const [loadingBatches, setLoadingBatches] = useState(false)
   
   // Load planning data
   useEffect(() => {
@@ -96,7 +99,44 @@ export default function ContentLibrary({ content, service, db, onRefresh }) {
     if (activeView === 'ready') {
       loadReadyItems()
     }
+    if (activeView === 'batch') {
+      loadBatches()
+    }
   }, [activeView])
+
+  // Refresh batches whenever the create-batch modal closes (in case user
+  // just saved a new one). Cheap query; no need to be clever.
+  useEffect(() => {
+    if (!showBatchModal && activeView === 'batch') {
+      loadBatches()
+    }
+  }, [showBatchModal])
+
+  const loadBatches = async () => {
+    setLoadingBatches(true)
+    try {
+      const user = await db.getCurrentUser()
+      if (!user) return
+      const data = await batchService.getBatchesWithItems(user.id)
+      setBatches(data || [])
+    } catch (e) {
+      console.error('loadBatches failed:', e)
+    } finally {
+      setLoadingBatches(false)
+    }
+  }
+
+  const handleDeleteBatch = async (batch) => {
+    if (!window.confirm(`Batch "${batch.batch_name || 'Naamloos'}" + alle items verwijderen?`)) return
+    try {
+      await batchService.deleteBatch(batch.id)
+      setBatches(prev => prev.filter(b => b.id !== batch.id))
+    } catch (e) {
+      console.error('deleteBatch failed:', e)
+      alert(`Batch verwijderen mislukt — ${e?.message || JSON.stringify(e)}`)
+    }
+  }
+
   
   const loadPlanningData = async () => {
     setLoading(true)
@@ -344,13 +384,6 @@ export default function ContentLibrary({ content, service, db, onRefresh }) {
     )
   }
   
-  // Get batch items
-  const getBatchItems = () => {
-    return getWeekItems().filter(item => 
-      (item.status === 'planned' || item.status === 'idea')
-    )
-  }
-  
   // Get ideas
   const getIdeas = () => {
     return planningItems.filter(item => 
@@ -473,45 +506,6 @@ export default function ContentLibrary({ content, service, db, onRefresh }) {
     } catch (error) {
       console.error('Delete failed:', error)
     }
-  }
-  
-  const handleSeedWeek = async () => {
-    try {
-      const user = await db.getCurrentUser()
-      if (!user) return
-      
-      const defaultSchedule = [
-        { dayOffset: 0, type: 'reel', category: 'lifestyle', title: 'Reel: Day in my life' },
-        { dayOffset: 2, type: 'carousel', category: 'educational', title: 'Carousel: Educatief' },
-        { dayOffset: 3, type: 'reel', category: 'relatable', title: 'Reel: Relatable moment' },
-        { dayOffset: 4, type: 'post', category: 'social_proof', title: 'Post: Social Proof' }
-      ]
-      
-      for (const schedule of defaultSchedule) {
-        const date = new Date(currentWeekMonday)
-        date.setDate(date.getDate() + schedule.dayOffset)
-        
-        await db.supabase.from('content_items').insert({
-          coach_id: user.id,
-          title: schedule.title,
-          type: schedule.type,
-          category: schedule.category,
-          planned_date: formatDateString(date),
-          status: 'planned',
-          created_at: new Date().toISOString()
-        })
-      }
-      
-      loadPlanningData()
-    } catch (error) {
-      console.error('Seed failed:', error)
-    }
-  }
-  
-  // Handle Plan in Week from Batch Mode
-  const handlePlanInWeek = (item) => {
-    setSelectedBatchItem(item)
-    setShowPlanFromBatchModal(true)
   }
   
   // ============================================
@@ -878,18 +872,14 @@ export default function ContentLibrary({ content, service, db, onRefresh }) {
       ) : (
         <>
           {activeView === 'batch' && (
-            <BatchModeView
-              items={getBatchItems()}
-              currentWeekMonday={currentWeekMonday}
-              onStatusChange={handleStatusChange}
-              onShowScript={setShowScriptModal}
-              onDelete={handleDeletePlanningItem}
-              onSeedWeek={handleSeedWeek}
-              onEdit={openPlanningModal}
-              onPlanInWeek={handlePlanInWeek}
+            <BatchesListView
+              batches={batches}
+              loading={loadingBatches}
+              onCreateBatch={() => setShowBatchModal(true)}
+              onEditItem={handleEditBatchItem}
+              onPlanItem={handlePlanReadyItem}
+              onDeleteBatch={handleDeleteBatch}
               isMobile={isMobile}
-              goToPreviousWeek={goToPreviousWeek}
-              goToNextWeek={goToNextWeek}
             />
           )}
           

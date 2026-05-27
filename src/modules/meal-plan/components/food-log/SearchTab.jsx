@@ -4,13 +4,37 @@
 // + knop blijft kopiëren wat er staat (zelfde als laatste log)
 
 import React, { useState, useRef, useEffect } from 'react'
-import { Search, Loader, Flame, X, ChevronRight, ShoppingBag, UtensilsCrossed, Plus, Copy } from 'lucide-react'
+import { Search, Loader, Apple, X, ChevronRight, UtensilsCrossed, Plus, Copy, BadgeCheck } from 'lucide-react'
 import FatSecretService from './FatSecretService'
 
 const MODES = [
-  { id: 'products', label: 'Producten', icon: ShoppingBag },
-  { id: 'meals', label: 'Maaltijden', icon: UtensilsCrossed }
+  { id: 'products', label: 'Alle producten' },
+  { id: 'meals',    label: 'Maaltijden' }
 ]
+
+// Relevance score: lower = better.
+// 0  exact match
+// 1  starts with query as a whole word ("Meloen geel" for "meloen")
+// 2  starts with query as substring  ("Meloensap" for "meloen")
+// 3  contains query as a whole word  ("rode meloen" for "meloen")
+// 4  contains query anywhere         ("Watermeloen" for "meloen")
+// Combined with log_count as a tiebreaker so the base ingredient outranks
+// derivatives like *sap / *ijsje / *yoghurt.
+const escapeReg = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+const computeRelevance = (name, query) => {
+  if (!name || !query) return 9
+  const n = String(name).toLowerCase().trim()
+  const q = String(query).toLowerCase().trim()
+  if (!n || !q) return 9
+  if (n === q) return 0
+  const wb = new RegExp('\\b' + escapeReg(q) + '\\b', 'i')
+  const startsAsWord = n === q || wb.test(n.slice(0, q.length + 1)) || n.startsWith(q + ' ') || n.startsWith(q + ',') || n.startsWith(q + '-')
+  if (startsAsWord) return 1
+  if (n.startsWith(q)) return 2
+  if (wb.test(n)) return 3
+  if (n.includes(q)) return 4
+  return 5
+}
 
 export default function SearchTab({ db, onSelect, isMobile, client, onQuickLog, onCopyYesterday, defaultMealMoment }) {
   const [mode, setMode] = useState('products')
@@ -138,7 +162,14 @@ export default function SearchTab({ db, onSelect, isMobile, client, onQuickLog, 
 
       const allResults = []
       if (ingredients) {
+        // Sort priority:
+        //   1. Relevance (exact > starts-as-word > starts > word-boundary > contains)
+        //   2. Generic items (no barcode / manual source) over branded variants
+        //   3. log_count desc (popular items first within same relevance bucket)
         const sorted = ingredients.sort((a, b) => {
+          const rA = computeRelevance(a.name, query)
+          const rB = computeRelevance(b.name, query)
+          if (rA !== rB) return rA - rB
           const aGen = !a.barcode || a.source === 'manual' ? 1 : 0
           const bGen = !b.barcode || b.source === 'manual' ? 1 : 0
           if (aGen !== bGen) return bGen - aGen
@@ -177,7 +208,24 @@ export default function SearchTab({ db, onSelect, isMobile, client, onQuickLog, 
               externalId: f.externalId || f.id
             })
           })
-          if (ext.length > 0) setResults(prev => [...prev, ...ext])
+          if (ext.length > 0) {
+            // Merge + re-sort by relevance so an exact-match FatSecret item
+            // can outrank myarc derivatives. myarc keeps a tie-break edge
+            // through log_count when relevance is equal.
+            setResults(prev => {
+              const combined = [...prev, ...ext]
+              combined.sort((a, b) => {
+                const rA = computeRelevance(a.name, query)
+                const rB = computeRelevance(b.name, query)
+                if (rA !== rB) return rA - rB
+                const aMyarc = a.source === 'myarc' ? 0 : 1
+                const bMyarc = b.source === 'myarc' ? 0 : 1
+                if (aMyarc !== bMyarc) return aMyarc - bMyarc
+                return 0
+              })
+              return combined
+            })
+          }
         }
       } catch {} finally { setOffLoading(false) }
     } catch (err) {
@@ -198,7 +246,13 @@ export default function SearchTab({ db, onSelect, isMobile, client, onQuickLog, 
 
       const allResults = []
       if (meals) {
-        meals.forEach(m => {
+        // Sort by relevance so exact "rijst" outranks "rijst-yoghurt-bowl" etc.
+        const sortedMeals = meals.slice().sort((a, b) => {
+          const rA = computeRelevance(a.name, query)
+          const rB = computeRelevance(b.name, query)
+          return rA - rB
+        })
+        sortedMeals.forEach(m => {
           let timingLabel = ''
           try {
             const t = Array.isArray(m.timing) ? m.timing : JSON.parse(m.timing || '[]')
@@ -284,82 +338,87 @@ export default function SearchTab({ db, onSelect, isMobile, client, onQuickLog, 
     return `${Math.floor(days / 7)}w`
   }
 
-  const accent = '#10b981'
+  const accent = '#FFD700'
   const isSearching = searched && searchTerm.length >= 2
 
   return (
     <div>
-      <div style={{
-        padding: isMobile ? '0.625rem 0.75rem' : '0.75rem 1rem',
-        borderBottom: '1px solid rgba(255, 255, 255, 0.06)'
-      }}>
+      {/* ── Big inviting search bar ── */}
+      <div style={{ padding: isMobile ? '0.875rem 1rem 0.5rem' : '1rem 1.25rem 0.625rem' }}>
         <div style={{
           display: 'flex', alignItems: 'center',
-          background: 'rgba(255, 255, 255, 0.04)',
+          background: 'rgba(255, 255, 255, 0.06)',
           border: '1px solid rgba(255, 255, 255, 0.08)',
-          borderRadius: '8px',
-          padding: isMobile ? '0 0.625rem' : '0 0.75rem',
-          gap: '0.5rem'
+          borderRadius: '12px',
+          padding: isMobile ? '0 0.875rem' : '0 1rem',
+          gap: '0.625rem',
+          minHeight: isMobile ? '46px' : '50px',
         }}>
-          <Search size={14} color="rgba(255, 255, 255, 0.25)" style={{ flexShrink: 0 }} />
+          <Search size={18} color="rgba(255, 255, 255, 0.4)" strokeWidth={2.2} style={{ flexShrink: 0 }} />
           <input
             ref={inputRef}
             type="text"
             value={searchTerm}
             onChange={(e) => handleSearch(e.target.value)}
-            placeholder={mode === 'products'
-              ? 'Zoek product, bijv. "ei", "kipfilet"...'
-              : 'Zoek maaltijd, bijv. "kip rijst"...'
-            }
+            placeholder={mode === 'products' ? 'Zoek producten' : 'Zoek maaltijden'}
             style={{
               flex: 1, background: 'transparent', border: 'none', outline: 'none',
-              color: '#fff', fontSize: isMobile ? '0.85rem' : '0.9rem',
-              fontWeight: '500', padding: isMobile ? '0.625rem 0' : '0.75rem 0',
-              minHeight: '40px'
+              color: '#fff', fontSize: isMobile ? '0.95rem' : '1rem',
+              fontWeight: '500', padding: 0,
+              minHeight: isMobile ? '46px' : '50px'
             }}
           />
           {searchTerm && (
             <button
               onClick={() => { setSearchTerm(''); setResults([]); setSearched(false) }}
               style={{
-                background: 'transparent', border: 'none',
-                color: 'rgba(255, 255, 255, 0.3)', cursor: 'pointer',
-                padding: '0.25rem', touchAction: 'manipulation',
+                background: 'rgba(255,255,255,0.08)', border: 'none',
+                color: 'rgba(255, 255, 255, 0.6)', cursor: 'pointer',
+                width: '22px', height: '22px', borderRadius: '50%',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                flexShrink: 0, touchAction: 'manipulation',
                 WebkitTapHighlightColor: 'transparent'
               }}
+              aria-label="Wissen"
             >
-              <X size={14} />
+              <X size={13} />
             </button>
           )}
         </div>
       </div>
 
+      {/* ── Filter chip pills ── */}
       <div style={{
         display: 'flex',
-        borderBottom: '1px solid rgba(255, 255, 255, 0.06)'
+        gap: '0.5rem',
+        padding: isMobile ? '0.25rem 1rem 0.875rem' : '0.375rem 1.25rem 1rem',
+        overflowX: 'auto',
+        WebkitOverflowScrolling: 'touch',
+        scrollbarWidth: 'none',
       }}>
         {MODES.map(m => {
           const isActive = mode === m.id
-          const Icon = m.icon
           return (
             <button
               key={m.id}
               onClick={() => setMode(m.id)}
               style={{
-                flex: 1, padding: isMobile ? '0.4rem 0' : '0.5rem 0',
-                background: 'transparent', border: 'none',
-                borderBottom: isActive ? `2px solid ${accent}` : '2px solid transparent',
-                color: isActive ? accent : 'rgba(255, 255, 255, 0.3)',
-                fontSize: isMobile ? '0.6rem' : '0.65rem',
-                fontWeight: isActive ? '700' : '600',
-                cursor: 'pointer', display: 'flex',
-                alignItems: 'center', justifyContent: 'center',
-                gap: '0.25rem', touchAction: 'manipulation',
+                padding: isMobile ? '0.5rem 1rem' : '0.55rem 1.125rem',
+                background: isActive ? accent : 'rgba(255, 255, 255, 0.06)',
+                border: isActive ? 'none' : '1px solid rgba(255, 255, 255, 0.08)',
+                borderRadius: '999px',
+                color: isActive ? '#000' : 'rgba(255, 255, 255, 0.65)',
+                fontSize: isMobile ? '0.8rem' : '0.85rem',
+                fontWeight: isActive ? '800' : '600',
+                cursor: 'pointer',
+                whiteSpace: 'nowrap',
+                touchAction: 'manipulation',
                 WebkitTapHighlightColor: 'transparent',
-                transition: 'all 0.15s ease'
+                transition: 'all 0.15s ease',
+                minHeight: '36px',
+                flexShrink: 0,
               }}
             >
-              <Icon size={11} />
               {m.label}
             </button>
           )
@@ -376,29 +435,36 @@ export default function SearchTab({ db, onSelect, isMobile, client, onQuickLog, 
         </div>
       )}
 
-      {/* SEARCH RESULTS */}
-      {!loading && isSearching && results.map((item, idx) => (
-        <button
-          key={`${item.source}-${item.id}-${idx}`}
-          onClick={() => onSelect(item)}
-          style={{
-            display: 'flex', alignItems: 'center', width: '100%',
-            padding: isMobile ? '0.625rem 0.75rem' : '0.75rem 1rem',
-            gap: isMobile ? '0.625rem' : '0.75rem',
-            background: 'transparent', border: 'none',
-            borderBottom: idx < results.length - 1 ? '1px solid rgba(255, 255, 255, 0.04)' : 'none',
-            cursor: 'pointer', textAlign: 'left',
-            touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-            minHeight: '52px', transition: 'background 0.15s ease'
-          }}
-          onTouchStart={(e) => { if (isMobile) e.currentTarget.style.background = 'rgba(255, 255, 255, 0.02)' }}
-          onTouchEnd={(e) => { if (isMobile) e.currentTarget.style.background = 'transparent' }}
-        >
-          <ResultIcon item={item} accent={accent} />
-          <ResultContent item={item} isMobile={isMobile} accent={accent} />
-          <ChevronRight size={14} color="rgba(255, 255, 255, 0.15)" style={{ flexShrink: 0 }} />
-        </button>
-      ))}
+      {/* SEARCH RESULTS — large card style */}
+      {!loading && isSearching && (
+        <div style={{
+          padding: isMobile ? '0 1rem 1rem' : '0 1.25rem 1.25rem',
+          display: 'flex', flexDirection: 'column', gap: '0.5rem'
+        }}>
+          {results.map((item, idx) => (
+            <button
+              key={`${item.source}-${item.id}-${idx}`}
+              onClick={() => onSelect(item)}
+              style={{
+                display: 'flex', alignItems: 'center', width: '100%',
+                padding: isMobile ? '0.75rem' : '0.875rem',
+                gap: '0.875rem',
+                background: 'rgba(255, 255, 255, 0.04)',
+                border: '1px solid rgba(255, 255, 255, 0.06)',
+                borderRadius: '14px',
+                cursor: 'pointer', textAlign: 'left',
+                touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+                minHeight: '76px', transition: 'background 0.15s ease'
+              }}
+              onTouchStart={(e) => { if (isMobile) e.currentTarget.style.background = 'rgba(255, 255, 255, 0.07)' }}
+              onTouchEnd={(e) => { if (isMobile) e.currentTarget.style.background = 'rgba(255, 255, 255, 0.04)' }}
+            >
+              <ResultIcon item={item} accent={accent} />
+              <ResultContent item={item} isMobile={isMobile} accent={accent} />
+            </button>
+          ))}
+        </div>
+      )}
 
       {offLoading && (
         <div style={{
@@ -431,7 +497,7 @@ export default function SearchTab({ db, onSelect, isMobile, client, onQuickLog, 
                 display: 'flex', alignItems: 'center',
                 gap: '0.5rem', width: '100%',
                 padding: isMobile ? '0.625rem 0.75rem' : '0.75rem 1rem',
-                background: 'rgba(16, 185, 129, 0.04)', border: 'none',
+                background: 'rgba(255, 215, 0, 0.04)', border: 'none',
                 borderBottom: '1px solid rgba(255, 255, 255, 0.06)',
                 cursor: 'pointer', textAlign: 'left',
                 touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
@@ -440,8 +506,8 @@ export default function SearchTab({ db, onSelect, isMobile, client, onQuickLog, 
             >
               <div style={{
                 width: '28px', height: '28px', borderRadius: '8px',
-                background: 'rgba(16, 185, 129, 0.1)',
-                border: '1px solid rgba(16, 185, 129, 0.2)',
+                background: 'rgba(255, 215, 0, 0.1)',
+                border: '1px solid rgba(255, 215, 0, 0.2)',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                 flexShrink: 0
               }}>
@@ -451,23 +517,22 @@ export default function SearchTab({ db, onSelect, isMobile, client, onQuickLog, 
                 <div style={{ fontSize: isMobile ? '0.82rem' : '0.9rem', fontWeight: '700', color: accent }}>
                   Kopieer gisteren
                 </div>
-                <div style={{ fontSize: '0.55rem', color: 'rgba(16, 185, 129, 0.5)' }}>
+                <div style={{ fontSize: '0.55rem', color: 'rgba(255, 215, 0, 0.5)' }}>
                   {yesterdayCount} maaltijd{yesterdayCount !== 1 ? 'en' : ''} opnieuw loggen
                 </div>
               </div>
-              <ChevronRight size={14} color="rgba(16, 185, 129, 0.3)" />
+              <ChevronRight size={14} color="rgba(255, 215, 0, 0.3)" />
             </button>
           )}
 
           {recentMeals.length > 0 && (
             <div style={{
-              padding: isMobile ? '0.5rem 0.75rem' : '0.625rem 1rem',
-              borderBottom: '1px solid rgba(255, 255, 255, 0.04)'
+              padding: isMobile ? '0.625rem 1rem 0.5rem' : '0.75rem 1.25rem 0.625rem',
             }}>
               <div style={{
-                fontSize: isMobile ? '0.4rem' : '0.45rem',
-                fontWeight: '700', color: 'rgba(255, 255, 255, 0.2)',
-                textTransform: 'uppercase', letterSpacing: '0.06em'
+                fontSize: isMobile ? '0.7rem' : '0.75rem',
+                fontWeight: '700', color: 'rgba(255, 255, 255, 0.45)',
+                textTransform: 'uppercase', letterSpacing: '0.08em'
               }}>
                 Recent gelogd
               </div>
@@ -480,94 +545,127 @@ export default function SearchTab({ db, onSelect, isMobile, client, onQuickLog, 
             </div>
           )}
 
-          {!recentsLoading && recentMeals.map((meal, idx) => (
-            <div
-              key={meal.id || idx}
-              style={{
-                display: 'flex', alignItems: 'center',
-                borderBottom: idx < recentMeals.length - 1
-                  ? '1px solid rgba(255, 255, 255, 0.04)' : 'none'
-              }}
-            >
-              <button
-                onClick={() => handleSelectRecent(meal)}
-                style={{
-                  flex: 1, minWidth: 0,
-                  display: 'flex', alignItems: 'center',
-                  gap: isMobile ? '0.625rem' : '0.75rem',
-                  padding: isMobile ? '0.625rem 0.75rem' : '0.75rem 1rem',
-                  background: 'transparent', border: 'none',
-                  cursor: 'pointer', textAlign: 'left',
-                  touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-                  minHeight: '52px'
-                }}
-              >
-                {meal.count > 1 && (
-                  <div style={{
-                    width: '22px', height: '22px', borderRadius: '6px',
-                    background: 'rgba(16, 185, 129, 0.1)',
-                    border: '1px solid rgba(16, 185, 129, 0.2)',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    flexShrink: 0, fontSize: '0.55rem', fontWeight: '800', color: accent
-                  }}>
-                    {meal.count}x
-                  </div>
-                )}
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{
-                    fontSize: isMobile ? '0.82rem' : '0.9rem',
-                    fontWeight: '700', color: '#fff',
-                    whiteSpace: 'nowrap', overflow: 'hidden',
-                    textOverflow: 'ellipsis', letterSpacing: '-0.01em', lineHeight: 1.2
-                  }}>
-                    {meal.meal_name}
-                  </div>
-                  <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.2rem', alignItems: 'baseline' }}>
-                    {[
-                      { v: meal.calories, l: 'kcal' },
-                      { v: meal.protein, l: 'E' },
-                      { v: meal.carbs, l: 'K' },
-                      { v: meal.fat, l: 'V' }
-                    ].filter(m => m.v > 0).map(m => (
-                      <span key={m.l} style={{ fontSize: isMobile ? '0.6rem' : '0.65rem', color: 'rgba(255, 255, 255, 0.35)' }}>
-                        <span style={{ fontWeight: '800', color: 'rgba(255, 255, 255, 0.5)' }}>{Math.round(parseFloat(m.v))}</span>
-                        <span style={{ fontWeight: '500', fontSize: '0.5rem', marginLeft: '0.05rem' }}>{m.l}</span>
-                      </span>
-                    ))}
-                    {/* Toon portie info */}
-                    {meal.amount && meal.per_unit && (
-                      <span style={{
-                        fontSize: '0.5rem', color: 'rgba(16, 185, 129, 0.4)',
-                        fontWeight: '700', marginLeft: '0.25rem'
-                      }}>
-                        ({meal.amount}{meal.per_unit === 'gram' ? 'g' : meal.amount === 1 ? ' portie' : ' porties'})
-                      </span>
+          {!recentsLoading && recentMeals.length > 0 && (
+            <div style={{
+              padding: isMobile ? '0 1rem 1rem' : '0 1.25rem 1.25rem',
+              display: 'flex', flexDirection: 'column', gap: '0.5rem'
+            }}>
+              {recentMeals.map((meal, idx) => {
+                const portionTxt = meal.amount && meal.per_unit
+                  ? `${meal.amount}${meal.per_unit === 'gram' ? 'g' : meal.amount === 1 ? ' portie' : ' porties'}`
+                  : ''
+                return (
+                  <div
+                    key={meal.id || idx}
+                    style={{
+                      display: 'flex', alignItems: 'stretch',
+                      background: 'rgba(255, 255, 255, 0.04)',
+                      border: '1px solid rgba(255, 255, 255, 0.06)',
+                      borderRadius: '14px',
+                      overflow: 'hidden',
+                    }}
+                  >
+                    <button
+                      onClick={() => handleSelectRecent(meal)}
+                      style={{
+                        flex: 1, minWidth: 0,
+                        display: 'flex', alignItems: 'center',
+                        gap: '0.875rem',
+                        padding: isMobile ? '0.75rem' : '0.875rem',
+                        background: 'transparent', border: 'none',
+                        cursor: 'pointer', textAlign: 'left',
+                        touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+                        minHeight: '76px'
+                      }}
+                    >
+                      {/* Image / placeholder + count badge overlay */}
+                      <div style={{ position: 'relative', flexShrink: 0 }}>
+                        {meal.image_url ? (
+                          <div style={{
+                            width: '56px', height: '56px', borderRadius: '12px',
+                            background: `url(${meal.image_url}) center/cover, #fff`,
+                            border: '1px solid rgba(255, 255, 255, 0.08)'
+                          }} />
+                        ) : (
+                          <div style={{
+                            width: '56px', height: '56px', borderRadius: '12px',
+                            background: 'rgba(255, 215, 0, 0.06)',
+                            border: '1px solid rgba(255, 215, 0, 0.15)',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            color: 'rgba(255, 215, 0, 0.55)'
+                          }}>
+                            <Apple size={24} strokeWidth={1.8} />
+                          </div>
+                        )}
+                        {meal.count > 1 && (
+                          <div style={{
+                            position: 'absolute', top: '-4px', right: '-4px',
+                            minWidth: '22px', height: '22px', padding: '0 4px',
+                            borderRadius: '11px',
+                            background: accent,
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            fontSize: '0.65rem', fontWeight: '800', color: '#000',
+                            border: '2px solid #0a0a0a',
+                          }}>
+                            {meal.count}×
+                          </div>
+                        )}
+                      </div>
+
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{
+                          fontSize: isMobile ? '0.95rem' : '1rem',
+                          fontWeight: '700', color: '#fff',
+                          whiteSpace: 'nowrap', overflow: 'hidden',
+                          textOverflow: 'ellipsis', letterSpacing: '-0.01em',
+                          lineHeight: 1.3, marginBottom: '0.25rem',
+                        }}>
+                          {meal.meal_name}
+                        </div>
+                        <div style={{
+                          display: 'flex', alignItems: 'center', gap: '0.4rem',
+                          fontSize: isMobile ? '0.78rem' : '0.85rem',
+                          color: 'rgba(255, 255, 255, 0.45)', fontWeight: '500',
+                          whiteSpace: 'nowrap', overflow: 'hidden',
+                        }}>
+                          <span style={{ color: accent, fontWeight: '700' }}>
+                            {Math.round(meal.calories || 0)} kcal
+                          </span>
+                          {portionTxt && (
+                            <>
+                              <span style={{ color: 'rgba(255,255,255,0.2)' }}>·</span>
+                              <span>{portionTxt}</span>
+                            </>
+                          )}
+                          <span style={{ color: 'rgba(255,255,255,0.2)' }}>·</span>
+                          <span>{formatTimeAgo(meal.consumed_at)}</span>
+                        </div>
+                      </div>
+                    </button>
+
+                    {onQuickLog && (
+                      <button
+                        onClick={(e) => { e.stopPropagation(); handleQuickLog(meal) }}
+                        aria-label="Snel loggen"
+                        style={{
+                          width: isMobile ? '52px' : '56px',
+                          flexShrink: 0,
+                          background: 'rgba(255, 215, 0, 0.08)',
+                          border: 'none',
+                          borderLeft: '1px solid rgba(255, 215, 0, 0.12)',
+                          color: accent, cursor: 'pointer',
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent'
+                        }}
+                      >
+                        <Plus size={20} strokeWidth={2.5} />
+                      </button>
                     )}
                   </div>
-                </div>
-                <div style={{ fontSize: '0.5rem', fontWeight: '600', color: 'rgba(255, 255, 255, 0.15)', flexShrink: 0 }}>
-                  {formatTimeAgo(meal.consumed_at)}
-                </div>
-              </button>
-
-              {onQuickLog && (
-                <button
-                  onClick={(e) => { e.stopPropagation(); handleQuickLog(meal) }}
-                  style={{
-                    width: isMobile ? '48px' : '52px',
-                    height: '100%', minHeight: '52px', flexShrink: 0,
-                    background: 'transparent', border: 'none',
-                    borderLeft: '1px solid rgba(255, 255, 255, 0.04)',
-                    color: accent, cursor: 'pointer',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent'
-                  }}
-                >
-                  <Plus size={16} strokeWidth={2.5} />
-                </button>
-              )}
+                )
+              })}
             </div>
-          ))}
+          )}
 
           {!recentsLoading && recentMeals.length === 0 && (
             <div style={{
@@ -584,71 +682,91 @@ export default function SearchTab({ db, onSelect, isMobile, client, onQuickLog, 
 }
 
 function ResultIcon({ item, accent }) {
-  if (item.image_url) {
-    return (
-      <div style={{
-        width: '40px', height: '40px', borderRadius: '8px', flexShrink: 0,
-        background: `url(${item.image_url}) center/cover`,
-        border: '1px solid rgba(255, 255, 255, 0.06)'
-      }} />
-    )
-  }
+  // 56x56 rounded square — bigger, more visual presence (Food-app style).
+  // Verified-badge overlay for items in our own DB (basis ingredients,
+  // myarc products) — distinguishes them from external (FatSecret) items.
+  const isVerified = item.source === 'myarc'
+  const verifyColor = item.isGeneric ? accent : '#3b82f6'
+
   return (
-    <div style={{
-      width: '40px', height: '40px', borderRadius: '8px', flexShrink: 0,
-      background: item.isGeneric ? 'rgba(16, 185, 129, 0.06)' : 'rgba(255, 255, 255, 0.04)',
-      border: item.isGeneric ? '1px solid rgba(16, 185, 129, 0.15)' : '1px solid rgba(255, 255, 255, 0.06)',
-      display: 'flex', alignItems: 'center', justifyContent: 'center',
-      color: item.isGeneric ? 'rgba(16, 185, 129, 0.4)' : 'rgba(255, 255, 255, 0.15)'
-    }}>
-      {item.type === 'meal' ? <UtensilsCrossed size={14} /> : <Flame size={14} />}
+    <div style={{ position: 'relative', flexShrink: 0 }}>
+      {item.image_url ? (
+        <div style={{
+          width: '56px', height: '56px', borderRadius: '12px',
+          background: `url(${item.image_url}) center/cover, #fff`,
+          border: '1px solid rgba(255, 255, 255, 0.08)'
+        }} />
+      ) : (
+        <div style={{
+          width: '56px', height: '56px', borderRadius: '12px',
+          background: 'rgba(255, 215, 0, 0.06)',
+          border: '1px solid rgba(255, 215, 0, 0.15)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          color: 'rgba(255, 215, 0, 0.55)'
+        }}>
+          {item.type === 'meal'
+            ? <UtensilsCrossed size={22} strokeWidth={1.8} />
+            : <Apple size={24} strokeWidth={1.8} />}
+        </div>
+      )}
+      {isVerified && (
+        <div style={{
+          position: 'absolute', bottom: '-2px', right: '-2px',
+          width: '18px', height: '18px', borderRadius: '50%',
+          background: '#000',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          border: '2px solid #0a0a0a',
+        }}>
+          <BadgeCheck size={16} color={verifyColor} fill={verifyColor === accent ? accent : '#3b82f6'} strokeWidth={0} />
+          <BadgeCheck size={16} color="#000" strokeWidth={2} style={{ position: 'absolute' }} />
+        </div>
+      )}
     </div>
   )
 }
 
 function ResultContent({ item, isMobile, accent }) {
+  // Simple 2-line hierarchy (Food-app style):
+  //   line 1: bold name
+  //   line 2: gold kcal · portion/source description
+  const portionLabel = item.per100g
+    ? '/100g'
+    : item.defaultPortion
+      ? `${item.defaultPortion}g`
+      : item.sourceLabel || ''
+
   return (
     <div style={{ flex: 1, minWidth: 0 }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem' }}>
-        <span style={{
-          fontSize: isMobile ? '0.82rem' : '0.9rem',
-          fontWeight: '700', color: '#fff',
-          whiteSpace: 'nowrap', overflow: 'hidden',
-          textOverflow: 'ellipsis', letterSpacing: '-0.01em',
-          flex: 1, minWidth: 0
-        }}>
-          {item.name}
-        </span>
-        <span style={{
-          fontSize: '0.4rem', fontWeight: '700',
-          textTransform: 'uppercase', letterSpacing: '0.05em',
-          color: item.isGeneric ? accent
-            : item.source === 'fatsecret' ? '#f59e0b'
-            : 'rgba(255,255,255,0.25)',
-          opacity: 0.7, flexShrink: 0
-        }}>
-          {item.sourceLabel}
-        </span>
+      <div style={{
+        fontSize: isMobile ? '0.95rem' : '1rem',
+        fontWeight: '700', color: '#fff',
+        whiteSpace: 'nowrap', overflow: 'hidden',
+        textOverflow: 'ellipsis', letterSpacing: '-0.01em',
+        lineHeight: 1.3,
+        marginBottom: '0.25rem',
+      }}>
+        {item.name}
       </div>
-      {item.brand && (
-        <div style={{ fontSize: '0.55rem', color: 'rgba(255, 255, 255, 0.2)', marginTop: '0.05rem' }}>
-          {item.brand}
-        </div>
-      )}
-      <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.2rem' }}>
-        {[
-          { v: item.calories, l: 'kcal' },
-          { v: item.protein, l: 'E' },
-          { v: item.carbs, l: 'K' },
-          { v: item.fat, l: 'V' }
-        ].filter(m => m.v > 0).map(m => (
-          <span key={m.l} style={{ fontSize: isMobile ? '0.6rem' : '0.65rem', color: 'rgba(255, 255, 255, 0.35)' }}>
-            <span style={{ fontWeight: '800', color: 'rgba(255, 255, 255, 0.5)' }}>{m.v}</span>
-            <span style={{ fontWeight: '500', fontSize: '0.45rem', marginLeft: '0.05rem' }}>{m.l}</span>
-          </span>
-        ))}
-        {item.per100g && (
-          <span style={{ fontSize: '0.45rem', color: 'rgba(255, 255, 255, 0.15)', fontWeight: '500' }}>/100g</span>
+      <div style={{
+        display: 'flex', alignItems: 'center',
+        gap: '0.4rem',
+        fontSize: isMobile ? '0.78rem' : '0.85rem',
+        color: 'rgba(255, 255, 255, 0.45)',
+        fontWeight: '500',
+      }}>
+        <span style={{ color: accent, fontWeight: '700' }}>
+          {item.calories} kcal
+        </span>
+        {portionLabel && (
+          <>
+            <span style={{ color: 'rgba(255,255,255,0.2)' }}>·</span>
+            <span style={{
+              whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+              minWidth: 0,
+            }}>
+              {portionLabel}{item.brand ? ` · ${item.brand}` : ''}
+            </span>
+          </>
         )}
       </div>
     </div>

@@ -5,17 +5,45 @@
 // ✅ v6.3 - Fixed: Supplement button styled to match dashboard design
 import React, { useState, useEffect } from 'react'
 import AIMealPlanService from './AIMealPlanService'
-import MealLoggingService from '../meal-logging-wizard/MealLoggingService'
 
 // Core Components
-import AIDailyGoals from './components/AIDailyGoals'
-import PlanWithCoachSection from './components/PlanWithCoachSection'
-import AIQuickActions from './components/AIQuickActions'
-import MealLibrarySection from './components/MealLibrarySection'
+import AIDaySchedule from './components/AIDaySchedule'
 import AIWeekPlanner from './components/AIWeekPlanner'
 import MealSetupWizard from './components/wizard/MealSetupWizard'
-import MealPhotoSlider from './components/MealPhotoSlider'
-import MealPhotoNav from './components/MealPhotoNav'
+
+// New (overhaul) — header + macro hero + more sheet
+import MealPageHeader from './components/MealPageHeader'
+import MacroHero from './components/MacroHero'
+import MoreActionsSheet from './components/MoreActionsSheet'
+import RemainingPill from './components/RemainingPill'
+import { resolveMealMode, updateMealMode } from './mealViewMode'
+
+// Day-of-week metadata used by both the lifted DaySelector and downstream timeline.
+const DAYS_OF_WEEK = [
+  { id: 0, name: 'Ma', key: 'monday' },
+  { id: 1, name: 'Di', key: 'tuesday' },
+  { id: 2, name: 'Wo', key: 'wednesday' },
+  { id: 3, name: 'Do', key: 'thursday' },
+  { id: 4, name: 'Vr', key: 'friday' },
+  { id: 5, name: 'Za', key: 'saturday' },
+  { id: 6, name: 'Zo', key: 'sunday' },
+]
+const getTodayIndex = () => {
+  const day = new Date().getDay()
+  return day === 0 ? 6 : day - 1
+}
+const dayKeyToIndex = (key) => {
+  if (key === 'today' || !key) return getTodayIndex()
+  const i = DAYS_OF_WEEK.findIndex(d => d.key === key)
+  return i >= 0 ? i : getTodayIndex()
+}
+const indexToDate = (idx) => {
+  const todayIdx = getTodayIndex()
+  const diff = idx - todayIdx
+  const date = new Date()
+  date.setDate(date.getDate() + diff)
+  return date
+}
 
 // Challenge Sidebar
 import MealChallengeSidebar from '../../client/components/MealChallengeSidebar'
@@ -40,7 +68,6 @@ import ClientDocumentsSection from '../coach-command-center/components/insight/C
 
 export default function AIMealDashboard({ client, onNavigate, db }) {
   const [service] = useState(() => new AIMealPlanService(db))
-  const [mealLoggingService, setMealLoggingService] = useState(null)
   const isMobile = window.innerWidth <= 768
   
   const [loading, setLoading] = useState(true)
@@ -53,25 +80,39 @@ export default function AIMealDashboard({ client, onNavigate, db }) {
   const [modals, setModals] = useState({
     alternatives: null,
     info: null,
-    quickIntake: false,
-    customMeal: false,
     history: false,
-    mealBase: false,
     favorites: false,
-    shopping: false,
-    recipes: false,
-    supplements: false, // ✅ NIEUW
-    weekOverview: false // ✅ NIEUW
+    supplements: false,
+    weekOverview: false,
+    more: false,
+    documents: false,
   })
-  
-  // Initialize MealLoggingService
+
+  // ── Meal view mode (Plan / Free) — phase 1 of overhaul ──
+  // null while resolving; once resolved holds 'plan' | 'free'.
+  const [mealMode, setMealMode] = useState(null)
+  const [modeUpdating, setModeUpdating] = useState(false)
+
   useEffect(() => {
-    if (db?.supabase) {
-      const loggingService = new MealLoggingService(db.supabase)
-      setMealLoggingService(loggingService)
-      console.log('✅ MealLoggingService initialized')
+    if (!client || mealMode !== null) return
+    const hasActivePlan = !!dashboardData?.activePlan
+    setMealMode(resolveMealMode(client, hasActivePlan))
+  }, [client, dashboardData?.activePlan, mealMode])
+
+  const handleModeChange = async (next) => {
+    if (next === mealMode || modeUpdating || !client?.id) return
+    const prev = mealMode
+    setMealMode(next)        // optimistic
+    setModeUpdating(true)
+    try {
+      await updateMealMode(db, client.id, next)
+    } catch (err) {
+      console.error('Failed to update meal_view_mode, reverting:', err)
+      setMealMode(prev)
+    } finally {
+      setModeUpdating(false)
     }
-  }, [db])
+  }
   
   useEffect(() => {
     if (client?.id) {
@@ -211,74 +252,6 @@ export default function AIMealDashboard({ client, onNavigate, db }) {
     }
   }
   
-  const handleUpdateWater = async (milliliters) => {
-    try {
-      await service.updateAIWaterIntake(client.id, milliliters)
-      setDashboardData(prev => ({
-        ...prev,
-        waterIntake: milliliters
-      }))
-    } catch (error) {
-      console.error('Failed to update water:', error)
-    }
-  }
-  
-  const handleMoodLog = async (moodData) => {
-    try {
-      const result = await service.logAIMood(client.id, moodData)
-      setDashboardData(prev => ({
-        ...prev,
-        mood: result
-      }))
-      return result
-    } catch (error) {
-      console.error('Failed to log mood:', error)
-      return null
-    }
-  }
-  
-  const handleQuickIntake = async (intakeData) => {
-    console.log('🍽️ [OPTIMISTIC] Quick Intake:', intakeData)
-    
-    setDashboardData(prev => {
-      const newConsumed = {
-        calories: prev.dailyTotals.consumed.calories + intakeData.calories,
-        protein: prev.dailyTotals.consumed.protein + intakeData.protein,
-        carbs: prev.dailyTotals.consumed.carbs + intakeData.carbs,
-        fat: prev.dailyTotals.consumed.fat + intakeData.fat
-      }
-      
-      const targets = prev.dailyTotals.targets
-      
-      return {
-        ...prev,
-        dailyTotals: {
-          ...prev.dailyTotals,
-          consumed: newConsumed,
-          percentages: {
-            calories: targets.calories > 0 ? Math.round((newConsumed.calories / targets.calories) * 100) : 0,
-            protein: targets.protein > 0 ? Math.round((newConsumed.protein / targets.protein) * 100) : 0,
-            carbs: targets.carbs > 0 ? Math.round((newConsumed.carbs / targets.carbs) * 100) : 0,
-            fat: targets.fat > 0 ? Math.round((newConsumed.fat / targets.fat) * 100) : 0
-          }
-        }
-      }
-    })
-    
-    try {
-      await service.logManualIntake(
-        client.id, 
-        dashboardData.activePlan?.id,
-        intakeData
-      )
-      console.log('✅ [OPTIMISTIC] Quick Intake saved to DB')
-    } catch (error) {
-      console.error('❌ [OPTIMISTIC] Quick Intake failed, reverting...', error)
-      await loadDashboardData()
-      throw error
-    }
-  }
-
   const handleMealLogged = async (loggedData) => {
     console.log('✅ [OPTIMISTIC] Meal logged:', loggedData)
     
@@ -420,10 +393,6 @@ export default function AIMealDashboard({ client, onNavigate, db }) {
     }
   }
   
-  const handleFinishMeal = async (meal) => {
-    await handleCheckMeal(meal.slot, meal)
-  }
-  
   const handleSwapMeal = async (originalMeal, newMealId) => {
     try {
       await service.swapAIMeal(
@@ -444,15 +413,11 @@ export default function AIMealDashboard({ client, onNavigate, db }) {
     setSelectedDay(newDay)
   }
 
-  const handleWizardComplete = async (planData) => {
+  const handleWizardComplete = async () => {
     setShowWizard(false)
     await loadDashboardData()
   }
 
-  const handleOpenFavorites = () => {
-    setModals(prev => ({ ...prev, favorites: true }))
-  }
-  
   if (loading) {
     return (
       <div style={{
@@ -465,8 +430,8 @@ export default function AIMealDashboard({ client, onNavigate, db }) {
         <div style={{
           width: '48px',
           height: '48px',
-          border: '4px solid rgba(16, 185, 129, 0.2)',
-          borderTop: '4px solid #10b981',
+          border: '4px solid rgba(255, 215, 0, 0.2)',
+          borderTop: '4px solid #FFD700',
           borderRadius: '50%',
           animation: 'spin 1s linear infinite'
         }} />
@@ -474,7 +439,9 @@ export default function AIMealDashboard({ client, onNavigate, db }) {
     )
   }
   
-  if (!dashboardData?.activePlan) {
+  // In plan-mode without an active plan: show empty state.
+  // In free-mode: keep rendering the dashboard so users can still log meals.
+  if (!dashboardData?.activePlan && (mealMode || 'plan') === 'plan') {
     return (
       <div style={{
         minHeight: '100vh',
@@ -489,7 +456,7 @@ export default function AIMealDashboard({ client, onNavigate, db }) {
           maxWidth: '500px',
           background: 'rgba(17, 17, 17, 0.6)',
           backdropFilter: 'blur(20px)',
-          border: '1px solid rgba(255, 255, 255, 0.1)',
+          border: '1px solid rgba(255, 215, 0, 0.18)',
           borderRadius: '24px',
           padding: isMobile ? '2rem 1.5rem' : '3rem 2.5rem',
           boxShadow: '0 20px 60px rgba(0, 0, 0, 0.5)'
@@ -497,308 +464,155 @@ export default function AIMealDashboard({ client, onNavigate, db }) {
           <h2 style={{
             fontSize: isMobile ? '1.5rem' : '2rem',
             fontWeight: '700',
-            color: '#10b981',
+            color: '#FFD700',
             marginBottom: '1rem'
           }}>
             Geen actief meal plan
           </h2>
-          
+
           <p style={{
             fontSize: isMobile ? '1rem' : '1.125rem',
             color: 'rgba(255, 255, 255, 0.6)',
-            marginBottom: '2rem',
+            marginBottom: '1.5rem',
             lineHeight: 1.6
           }}>
             Je coach heeft nog geen AI meal plan voor je aangemaakt.
+            Wissel naar <strong style={{ color: '#FFD700' }}>Free</strong> modus om alleen meals te loggen.
           </p>
-          
-          <button
-            onClick={() => onNavigate('home')}
-            style={{
-              marginTop: '2rem',
-              padding: isMobile ? '0.875rem 2rem' : '1rem 2.5rem',
-              background: 'linear-gradient(135deg, #064e3b 0%, #10b981 100%)',
-              border: '1px solid rgba(16, 185, 129, 0.3)',
-              borderRadius: '14px',
-              color: 'white',
-              fontSize: isMobile ? '1rem' : '1.125rem',
-              fontWeight: '600',
-              cursor: 'pointer',
-              transition: 'all 0.3s ease',
-              boxShadow: '0 10px 30px rgba(16, 185, 129, 0.3)'
-            }}
-          >
-            Terug naar Home
-          </button>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+            <button
+              onClick={() => handleModeChange('free')}
+              style={{
+                padding: isMobile ? '0.875rem 2rem' : '1rem 2.5rem',
+                background: 'linear-gradient(135deg, #FFD700 0%, #D4AF37 100%)',
+                border: 'none',
+                borderRadius: '14px',
+                color: '#0a0a0a',
+                fontSize: isMobile ? '1rem' : '1.05rem',
+                fontWeight: '800',
+                cursor: 'pointer',
+                boxShadow: '0 10px 30px rgba(255, 215, 0, 0.25)'
+              }}
+            >
+              Schakel naar Free modus
+            </button>
+            <button
+              onClick={() => onNavigate('home')}
+              style={{
+                padding: isMobile ? '0.75rem 2rem' : '0.875rem 2.5rem',
+                background: 'transparent',
+                border: '1px solid rgba(255, 255, 255, 0.1)',
+                borderRadius: '14px',
+                color: 'rgba(255, 255, 255, 0.6)',
+                fontSize: '0.95rem',
+                fontWeight: '600',
+                cursor: 'pointer'
+              }}
+            >
+              Terug naar Home
+            </button>
+          </div>
         </div>
       </div>
     )
   }
-  
+
+
   return (
     <div style={{
       minHeight: '100vh',
       background: 'linear-gradient(180deg, #0a0a0a 0%, #171717 100%)',
       paddingTop: 0,
       paddingBottom: isMobile ? '6rem' : '2rem',
+      overflowX: 'hidden',
+      maxWidth: '100vw',
       animation: 'fadeIn 0.5s ease'
     }}>
-      
+
+      {/* ════ NEW HEADER (overhaul phase 2) ════ */}
+      <MealPageHeader
+        mode={mealMode}
+        onModeChange={handleModeChange}
+        modeLoading={modeUpdating}
+        onOpenHistory={() => setModals(prev => ({ ...prev, history: true }))}
+        onOpenMore={() => setModals(prev => ({ ...prev, more: true }))}
+        isMobile={isMobile}
+      />
+
+      {/* ════ TODAY BUDGET — "Je mag nog eten: X kcal" + progress bar (Food-app style) ════ */}
+      {(() => {
+        const t = dashboardData?.dailyTotals?.targets
+        const c = dashboardData?.dailyTotals?.consumed
+        if (!t?.calories) return null
+        const remaining = {
+          kcal:    Math.round(t.calories - (c?.calories || 0)),
+          protein: t.protein ? Math.round(t.protein - (c?.protein || 0)) : null,
+        }
+        return (
+          <RemainingPill
+            remaining={remaining}
+            consumed={c}
+            target={t}
+            isMobile={isMobile}
+          />
+        )
+      })()}
+
+      {/* DaySelector removed — history modal (header icon) handles other days. */}
+
+      {/* ════ NEW MACRO HERO — selected-day aware ════ */}
+      {(() => {
+        const currentDayIdx = dayKeyToIndex(selectedDay)
+        const selectedDate = indexToDate(currentDayIdx)
+        const selectedIsToday = currentDayIdx === getTodayIndex()
+        return (
+          <MacroHero
+            consumed={dashboardData?.dailyTotals?.consumed}
+            targets={dashboardData?.dailyTotals?.targets}
+            db={db}
+            clientId={client?.id}
+            selectedDate={selectedDate}
+            selectedIsToday={selectedIsToday}
+            isMobile={isMobile}
+            onWeekDetail={() => setModals(prev => ({ ...prev, weekOverview: true }))}
+          />
+        )
+      })()}
+
       {/* Challenge Sidebar - Floating Widget */}
       <MealChallengeSidebar client={client} db={db} />
 
-      {/* ✅ 1. MACRO DOELEN + DAY SCHEDULE + NEXT MEAL (all inside AIDailyGoals) */}
-      <AIDailyGoals
-        client={client}
+      {/* ════ TIMELINE (overhaul phase 5: direct AIDaySchedule, mode-aware) ════ */}
+      <AIDaySchedule
+        mode={mealMode || 'plan'}
+        hideDayPicker
+        hideTotalsBar
+        activePlan={dashboardData.activePlan}
+        todayMeals={dashboardData.todayMeals || []}
+        todayProgress={dashboardData.todayProgress}
+        selectedDay={selectedDay}
+        onDayChange={handleDayChange}
+        onCheckMeal={handleCheckMeal}
+        onUncheckMeal={handleUncheckMeal}
+        onOpenInfo={(meal) => setModals(prev => ({ ...prev, info: meal }))}
+        onOpenAlternatives={(meal) => setModals(prev => ({ ...prev, alternatives: meal }))}
+        dayTemplates={dayTemplates || []}
         db={db}
+        onPlanUpdate={loadDashboardData}
         dailyTotals={dashboardData.dailyTotals || {
           targets: {
             calories: client.target_calories || 0,
             protein: client.target_protein || 0,
             carbs: client.target_carbs || 0,
-            fat: client.target_fat || 0   
+            fat: client.target_fat || 0,
           },
           consumed: { calories: 0, protein: 0, carbs: 0, fat: 0 },
-          percentages: { calories: 0, protein: 0, carbs: 0, fat: 0 },
-          mealsConsumed: 0,
-          mealsPlanned: dashboardData.todayMeals?.length || 0
         }}
-        waterIntake={dashboardData.waterIntake || 0}
-        todayMood={dashboardData.mood}
-        onUpdateWater={handleUpdateWater}
-        onLogMood={handleMoodLog}
+        client={client}
         onMealLogged={handleMealLogged}
-        onQuickIntake={handleQuickIntake}
-        activePlan={dashboardData.activePlan}
-        todayMeals={dashboardData.todayMeals || []}
-        todayProgress={dashboardData.todayProgress}
-        onCheckMeal={handleCheckMeal}
-        onUncheckMeal={handleUncheckMeal}
-        onOpenInfo={(meal) => setModals(prev => ({ ...prev, info: meal }))}
-        onOpenAlternatives={(meal) => setModals(prev => ({ ...prev, alternatives: meal }))}
-        dayTemplates={dayTemplates}
-        clients={[client]}
-        onPlanUpdate={loadDashboardData}
-        onNavigateToDay={handleDayChange}
-        selectedDay={selectedDay}
-        nextMeal={dashboardData.nextMeal}
-        onFinishMeal={handleFinishMeal}
+        targets={dashboardData.dailyTotals?.targets}
       />
-
-      {/* ✅ 2. MEAL PHOTO NAVIGATION */}
-      <div id="meal-photo-nav">
-        <MealPhotoNav
-          onActionClick={(actionId) => {
-            switch(actionId) {
-              case 'schedule':
-                setShowWeekPlanner(!showWeekPlanner)
-                break
-              case 'shopping':
-                onNavigate('boodschappen')
-                break
-              case 'custom':
-                setShowWizard(true)
-                break
-              case 'history':
-                setModals(prev => ({ ...prev, history: true }))
-                break
-              case 'swap':
-                handleOpenFavorites()
-                break
-              case 'stats':
-                alert('Week statistieken komen binnenkort!')
-                break
-            }
-          }}
-        />
-      </div>
-
-      {/* ✅ SUPPLEMENT ADVIES - Subtle row matching dashboard style */}
-      <div style={{
-        padding: isMobile ? '0 1rem' : '0 2rem',
-        maxWidth: '1400px',
-        margin: '0.75rem auto 0'
-      }}>
-        <button
-          onClick={() => setModals(prev => ({ ...prev, supplements: true }))}
-          style={{
-            width: '100%',
-            padding: isMobile ? '0.875rem 1rem' : '1rem 1.25rem',
-            background: 'rgba(23, 23, 23, 0.8)',
-            backdropFilter: 'blur(20px)',
-            border: '1px solid rgba(255, 255, 255, 0.08)',
-            borderRadius: isMobile ? '12px' : '16px',
-            color: '#fff',
-            fontSize: isMobile ? '0.9rem' : '1rem',
-            fontWeight: 500,
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.75rem',
-            transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-            touchAction: 'manipulation',
-            WebkitTapHighlightColor: 'transparent',
-            minHeight: '48px'
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.background = 'rgba(16, 185, 129, 0.08)'
-            e.currentTarget.style.borderColor = 'rgba(16, 185, 129, 0.2)'
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.background = 'rgba(23, 23, 23, 0.8)'
-            e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.08)'
-          }}
-          onTouchStart={(e) => {
-            if (isMobile) {
-              e.currentTarget.style.transform = 'scale(0.98)'
-              e.currentTarget.style.background = 'rgba(16, 185, 129, 0.08)'
-            }
-          }}
-          onTouchEnd={(e) => {
-            if (isMobile) {
-              e.currentTarget.style.transform = 'scale(1)'
-              e.currentTarget.style.background = 'rgba(23, 23, 23, 0.8)'
-            }
-          }}
-        >
-          {/* Icon container */}
-          <div style={{
-            width: '32px',
-            height: '32px',
-            borderRadius: '8px',
-            background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.15) 0%, rgba(16, 185, 129, 0.05) 100%)',
-            border: '1px solid rgba(16, 185, 129, 0.2)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            flexShrink: 0,
-            fontSize: '1rem'
-          }}>
-            💊
-          </div>
-          
-          {/* Label */}
-          <div style={{ flex: 1, textAlign: 'left' }}>
-            <span style={{ 
-              color: 'rgba(255, 255, 255, 0.5)',
-              fontSize: isMobile ? '0.65rem' : '0.7rem',
-              textTransform: 'uppercase',
-              letterSpacing: '0.05em',
-              display: 'block',
-              marginBottom: '1px'
-            }}>
-              Supplement Plan
-            </span>
-            <span style={{ 
-              color: 'rgba(255, 255, 255, 0.9)',
-              fontSize: isMobile ? '0.875rem' : '0.95rem',
-              fontWeight: 600
-            }}>
-              Bekijk supplement advies
-            </span>
-          </div>
-          
-          {/* Chevron */}
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.3)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
-            <polyline points="9 18 15 12 9 6"></polyline>
-          </svg>
-        </button>
-      </div>
-
-      {/* ✅ WEEKOVERZICHT - Subtle row matching dashboard style */}
-      <div style={{
-        padding: isMobile ? '0 1rem' : '0 2rem',
-        maxWidth: '1400px',
-        margin: '0.5rem auto 0'
-      }}>
-        <button
-          onClick={() => setModals(prev => ({ ...prev, weekOverview: true }))}
-          style={{
-            width: '100%',
-            padding: isMobile ? '0.875rem 1rem' : '1rem 1.25rem',
-            background: 'rgba(23, 23, 23, 0.8)',
-            backdropFilter: 'blur(20px)',
-            border: '1px solid rgba(255, 255, 255, 0.08)',
-            borderRadius: isMobile ? '12px' : '16px',
-            color: '#fff',
-            fontSize: isMobile ? '0.9rem' : '1rem',
-            fontWeight: 500,
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.75rem',
-            transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-            touchAction: 'manipulation',
-            WebkitTapHighlightColor: 'transparent',
-            minHeight: '48px'
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.background = 'rgba(16, 185, 129, 0.08)'
-            e.currentTarget.style.borderColor = 'rgba(16, 185, 129, 0.2)'
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.background = 'rgba(23, 23, 23, 0.8)'
-            e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.08)'
-          }}
-          onTouchStart={(e) => {
-            if (isMobile) {
-              e.currentTarget.style.transform = 'scale(0.98)'
-              e.currentTarget.style.background = 'rgba(16, 185, 129, 0.08)'
-            }
-          }}
-          onTouchEnd={(e) => {
-            if (isMobile) {
-              e.currentTarget.style.transform = 'scale(1)'
-              e.currentTarget.style.background = 'rgba(23, 23, 23, 0.8)'
-            }
-          }}
-        >
-          <div style={{
-            width: '32px',
-            height: '32px',
-            borderRadius: '8px',
-            background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.15) 0%, rgba(16, 185, 129, 0.05) 100%)',
-            border: '1px solid rgba(16, 185, 129, 0.2)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            flexShrink: 0,
-            fontSize: '1rem'
-          }}>
-            📊
-          </div>
-          <div style={{ flex: 1, textAlign: 'left' }}>
-            <span style={{ 
-              color: 'rgba(255, 255, 255, 0.5)',
-              fontSize: isMobile ? '0.65rem' : '0.7rem',
-              textTransform: 'uppercase',
-              letterSpacing: '0.05em',
-              display: 'block',
-              marginBottom: '1px'
-            }}>
-              Voeding Overzicht
-            </span>
-            <span style={{ 
-              color: 'rgba(255, 255, 255, 0.9)',
-              fontSize: isMobile ? '0.875rem' : '0.95rem',
-              fontWeight: 600
-            }}>
-              Weekoverzicht bekijken
-            </span>
-          </div>
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.3)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
-            <polyline points="9 18 15 12 9 6"></polyline>
-          </svg>
-        </button>
-      </div>
-
-      {/* ✅ NIEUW: Client Documents (PDF viewer, read-only) */}
-      <div style={{ padding: isMobile ? '0 1rem' : '0 2rem', maxWidth: '1400px', margin: '0.5rem auto 0' }}>
-        <ClientDocumentsSection
-          db={db} clientId={client.id} coachId={null}
-          isMobile={isMobile} isClientView={true}
-        />
-      </div>
 
       {/* Week Planner */}
       {showWeekPlanner && (
@@ -893,6 +707,92 @@ export default function AIMealDashboard({ client, onNavigate, db }) {
         />
       )}
       
+      {/* ✅ OVERHAUL: Meer-sheet (bottom sheet) */}
+      <MoreActionsSheet
+        isOpen={modals.more}
+        onClose={() => setModals(prev => ({ ...prev, more: false }))}
+        isPlanMode={(mealMode || 'plan') === 'plan'}
+        onOpenSupplements={() => setModals(prev => ({ ...prev, more: false, supplements: true }))}
+        onOpenDocuments={() => setModals(prev => ({ ...prev, more: false, documents: true }))}
+        onOpenPlanEdit={() => {
+          setModals(prev => ({ ...prev, more: false }))
+          setShowWeekPlanner(true)
+        }}
+        onOpenCoachWizard={() => {
+          setModals(prev => ({ ...prev, more: false }))
+          setShowWizard(true)
+        }}
+        isMobile={isMobile}
+      />
+
+      {/* ✅ OVERHAUL: Documents fullscreen modal */}
+      {modals.documents && (
+        <div
+          onClick={() => setModals(prev => ({ ...prev, documents: false }))}
+          style={{
+            position: 'fixed', inset: 0,
+            background: 'rgba(0,0,0,0.92)',
+            backdropFilter: 'blur(8px)',
+            zIndex: 2050,
+            display: 'flex',
+            flexDirection: 'column',
+            paddingTop: 'env(safe-area-inset-top, 0)',
+            paddingBottom: 'env(safe-area-inset-bottom, 0)',
+            animation: 'fadeIn 0.2s ease',
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              flex: 1,
+              maxWidth: '900px',
+              width: '100%',
+              margin: '0 auto',
+              background: '#0a0a0a',
+              display: 'flex',
+              flexDirection: 'column',
+              overflow: 'hidden',
+            }}
+          >
+            <div style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+              padding: '0.75rem 1rem',
+              borderBottom: '1px solid rgba(255, 215, 0, 0.18)',
+            }}>
+              <span style={{
+                fontSize: '0.75rem', fontWeight: 800, color: '#FFD700',
+                letterSpacing: '0.06em', textTransform: 'uppercase',
+              }}>
+                Documenten
+              </span>
+              <button
+                onClick={() => setModals(prev => ({ ...prev, documents: false }))}
+                aria-label="Sluiten"
+                style={{
+                  width: '30px', height: '30px',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  background: 'rgba(255, 215, 0, 0.06)',
+                  border: '1px solid rgba(255, 215, 0, 0.18)',
+                  borderRadius: '8px',
+                  color: '#FFD700',
+                  cursor: 'pointer',
+                  fontSize: '1.1rem',
+                  fontWeight: 700,
+                }}
+              >
+                ✕
+              </button>
+            </div>
+            <div style={{ flex: 1, overflowY: 'auto', padding: isMobile ? '0.75rem' : '1.5rem' }}>
+              <ClientDocumentsSection
+                db={db} clientId={client.id} coachId={null}
+                isMobile={isMobile} isClientView={true}
+              />
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Coach Strategy Wizard */}
       {showWizard && (
         <MealSetupWizard

@@ -88,16 +88,28 @@ export default function GarantiePrijsSection({ isMobile }) {
             display: 'block',
             fontSize: isMobile ? 'clamp(1.4rem, 7vw, 1.9rem)' : 'clamp(1.8rem, 3vw, 2.4rem)',
             color: '#fff'
-          }}>Voel Je Goed, Verlies Vet</span>
+          }}>Je Droom Fysiek Bereiken</span>
           <span style={{
             display: 'block',
-            fontSize: isMobile ? 'clamp(1.2rem, 6vw, 1.6rem)' : 'clamp(1.5rem, 2.5vw, 2rem)',
-            marginTop: '0.1em'
+            fontSize: isMobile ? 'clamp(1rem, 5vw, 1.3rem)' : 'clamp(1.2rem, 2vw, 1.6rem)',
+            marginTop: '0.2em',
+            color: '#fff',
+            fontWeight: '700',
           }}>
-            <span style={{ color: '#fff' }}>& Leer Hoe Het </span>
-            <span className="shimmer-gold" style={{ fontStyle: 'italic' }}>Wegblijft</span>
+            naast je <span style={{ fontStyle: 'italic', color: GOLD }}>werk en sociale leven</span>
           </span>
         </h2>
+        <p style={{
+          margin: isMobile ? '0.7rem auto 0' : '0.85rem auto 0',
+          maxWidth: '460px',
+          fontSize: isMobile ? '0.78rem' : '0.9rem',
+          fontWeight: '500',
+          color: 'rgba(255,255,255,0.75)',
+          lineHeight: 1.45,
+          textAlign: 'center',
+        }}>
+          Leer hoe je je fysieke doelen behaalt naast je werk en sociale leven.
+        </p>
 
         {/* ═══ Pillars — photo + bullet ═══ */}
         <div style={{

@@ -464,34 +464,31 @@ export default function PublicIntakePage() {
             </div>
           </div>
 
-          {/* Video block */}
+          {/* Video block — YouTube embed */}
           <div style={{
             aspectRatio: '16/9',
-            background: '#0a0a0a',
+            background: '#000',
             border: '1px solid rgba(255,255,255,0.06)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
             marginBottom: isMobile ? '1.25rem' : '1.5rem',
-            position: 'relative', overflow: 'hidden'
+            position: 'relative', overflow: 'hidden',
           }}>
-            {/* Subtiele gouden top-accent */}
-            <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '2px', background: 'linear-gradient(90deg, #FFD700, rgba(255,165,0,0.3), transparent)' }} />
-
-            <div style={{ textAlign: 'center' }}>
-              <div style={{
-                width: '48px', height: '48px', borderRadius: '50%',
-                background: 'rgba(255,215,0,0.08)',
-                border: '1px solid rgba(255,215,0,0.2)',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                margin: '0 auto 0.75rem'
-              }}>
-                <svg width="16" height="16" viewBox="0 0 10 10" fill="#FFD700">
-                  <polygon points="3,1 9,5 3,9" />
-                </svg>
-              </div>
-              <div style={{ fontSize: '0.48rem', fontWeight: 700, color: 'rgba(255,255,255,0.2)', letterSpacing: '0.08em', textTransform: 'uppercase' }}>
-                Video wordt hier geladen
-              </div>
-            </div>
+            {/* Gouden top-accent over de iframe */}
+            <div style={{
+              position: 'absolute', top: 0, left: 0, right: 0, height: '2px', zIndex: 2,
+              background: 'linear-gradient(90deg, #FFD700, rgba(255,165,0,0.3), transparent)',
+              pointerEvents: 'none',
+            }} />
+            <iframe
+              src="https://www.youtube.com/embed/zVLeOFluGMM?rel=0&modestbranding=1&playsinline=1"
+              title="MY ARC intake intro"
+              loading="lazy"
+              allow="accelerometer; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+              allowFullScreen
+              style={{
+                position: 'absolute', inset: 0,
+                width: '100%', height: '100%', border: 0,
+              }}
+            />
           </div>
 
           {/* Beginnen knop */}

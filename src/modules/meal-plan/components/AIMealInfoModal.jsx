@@ -138,7 +138,7 @@ export default function AIMealInfoModal({ isOpen, onClose, meal, db }) {
           {tabs.map(tab => {
             const TabIcon = tab.icon
             return (
-              <button key={tab.id} onClick={() => setActiveTab(tab.id)} style={{ flex: 1, padding: '0.65rem 0', background: 'transparent', border: 'none', borderBottom: activeTab === tab.id ? '2px solid #10b981' : '2px solid transparent', color: activeTab === tab.id ? '#fff' : 'rgba(255,255,255,0.35)', fontSize: '0.68rem', fontWeight: activeTab === tab.id ? '800' : '600', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.25rem', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}>
+              <button key={tab.id} onClick={() => setActiveTab(tab.id)} style={{ flex: 1, padding: '0.65rem 0', background: 'transparent', border: 'none', borderBottom: activeTab === tab.id ? '2px solid #FFD700' : '2px solid transparent', color: activeTab === tab.id ? '#fff' : 'rgba(255,255,255,0.35)', fontSize: '0.68rem', fontWeight: activeTab === tab.id ? '800' : '600', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.25rem', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}>
                 <TabIcon size={13} />{tab.label}
               </button>
             )
@@ -210,7 +210,7 @@ function RecipeTab({ meal, loading, isMobile }) {
   if (loading) {
     return (
       <div style={{ textAlign: 'center', padding: '2rem' }}>
-        <div style={{ width: '24px', height: '24px', border: '2px solid rgba(255,255,255,0.06)', borderTopColor: '#10b981', borderRadius: '50%', margin: '0 auto', animation: 'infoSpin 0.8s linear infinite' }} />
+        <div style={{ width: '24px', height: '24px', border: '2px solid rgba(255,255,255,0.06)', borderTopColor: '#FFD700', borderRadius: '50%', margin: '0 auto', animation: 'infoSpin 0.8s linear infinite' }} />
         <div style={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.2)', marginTop: '0.5rem' }}>Recept laden...</div>
       </div>
     )
@@ -222,7 +222,7 @@ function RecipeTab({ meal, loading, isMobile }) {
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
           {steps.map((step, idx) => (
             <div key={idx} style={{ display: 'flex', gap: '0.625rem', padding: '0.5rem 0', borderBottom: idx < steps.length - 1 ? '1px solid rgba(255,255,255,0.03)' : 'none' }}>
-              <div style={{ width: '22px', height: '22px', borderRadius: '50%', background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontSize: '0.65rem', fontWeight: '800', color: '#10b981' }}>
+              <div style={{ width: '22px', height: '22px', borderRadius: '50%', background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontSize: '0.65rem', fontWeight: '800', color: '#FFD700' }}>
                 {idx + 1}
               </div>
               <p style={{ fontSize: isMobile ? '0.8rem' : '0.85rem', color: 'rgba(255,255,255,0.7)', lineHeight: 1.5, margin: 0, paddingTop: '0.1rem' }}>{step}</p>

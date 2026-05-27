@@ -1,16 +1,18 @@
 // src/modules/productivity/components/kanban/ProductivityKanban.jsx
 // VERSION 3.0 - DaySchedule links + ultra compact cards + this-week marking
 
-import { useState, useEffect, useCallback } from 'react'
-import { Plus, Settings, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, GripVertical, X } from 'lucide-react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
+import { Plus, Settings, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, GripVertical, X, LayoutGrid, CalendarDays } from 'lucide-react'
 import TaskCard from './TaskCard'
 import DaySchedule from './DaySchedule'
 import DayDetailView from './DayDetailView'
 import AddTaskModal from './AddTaskModal'
 import SectionModal from './SectionModal'
+import AgendaView from '../agenda/AgendaView'
+import AgendaTaskModal from '../agenda/AgendaTaskModal'
 
 export default function ProductivityKanban({
-  productivityService, coachId, isMobile,
+  productivityService, coachId, db, isMobile,
   onTaskCompleted, onSectionsChange,
   onStartTask, activeTaskId
 }) {
@@ -20,6 +22,18 @@ export default function ProductivityKanban({
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [showAddTask, setShowAddTask] = useState(false)
+  // When the user clicks an empty cell in the agenda we open AddTaskModal
+  // pre-filled with the tapped day/time. Cleared on modal close.
+  const [agendaPreset, setAgendaPreset] = useState(null)
+  // When set, AddTaskModal opens in edit-mode for this task.
+  const [editingTask, setEditingTask] = useState(null)
+
+  // Observe state changes so we can see whether setShowAddTask actually
+  // commits. If this never logs `true` after the cell-click, the setter
+  // is being batched away or the component is unmounting.
+  useEffect(() => {
+    console.log('[ProductivityKanban] showAddTask state =', showAddTask, ' viewMode =', viewMode)
+  }, [showAddTask])
   const [showSectionModal, setShowSectionModal] = useState(false)
   const [selectedSection, setSelectedSection] = useState(null)
   const [selectedSectionForTask, setSelectedSectionForTask] = useState(null)
@@ -39,13 +53,57 @@ export default function ProductivityKanban({
   const MAX_VISIBLE = 8
   const [selectedDay, setSelectedDay] = useState(null) // dayId of null
 
-  const setSections = (updater) => {
-    setSectionsRaw(prev => {
-      const next = typeof updater === 'function' ? updater(prev) : updater
-      if (onSectionsChange) onSectionsChange(next)
-      return next
-    })
+  // Agenda-view toggle. Persisted in localStorage so users stay in the view
+  // they last picked.
+  const [viewMode, setViewMode] = useState(() => {
+    try { return localStorage.getItem('productivity_view_mode') || 'kanban' }
+    catch { return 'kanban' }
+  })
+  const [agendaModalTask, setAgendaModalTask] = useState(null)
+
+  const switchView = (mode) => {
+    setViewMode(mode)
+    try { localStorage.setItem('productivity_view_mode', mode) } catch { /* private mode */ }
   }
+
+  // Flat task list spanning kanban-sections + day-scheduled buckets. Used by
+  // AgendaView to render the "Niet gepland" sidebar and to resolve a task by
+  // id during drag-drop.
+  const allTasks = useMemo(() => {
+    const fromSections = sections.flatMap(s => (s.tasks || []).map(t => ({ ...t, section_id: t.section_id || s.id })))
+    const fromScheduled = Object.values(scheduledTasks || {}).flat()
+    return [...fromSections, ...fromScheduled]
+  }, [sections, scheduledTasks])
+
+  // Generic update path used by the agenda view: persist + full reload to
+  // keep both buckets (sections vs scheduledTasks) in sync regardless of
+  // whether the change was schedule/unschedule/move.
+  const handleAgendaTaskUpdate = async (taskId, updates) => {
+    try {
+      await productivityService.updateTask(taskId, updates)
+      await loadBoard(false)
+    } catch (err) {
+      console.error('Agenda task update failed:', err)
+    }
+  }
+  const handleAgendaTaskDelete = async (taskId) => {
+    try {
+      await productivityService.deleteTask(taskId)
+      await loadBoard(false)
+    } catch (err) {
+      console.error('Agenda task delete failed:', err)
+    }
+  }
+
+  // Forward sections to parent in an effect, NOT inside the state updater.
+  // Calling a parent setter from inside `setSectionsRaw(prev => …)` triggers
+  // React's "Cannot update a component while rendering a different component"
+  // warning because the updater fires during the kanban's render phase.
+  const setSections = setSectionsRaw
+
+  useEffect(() => {
+    if (onSectionsChange) onSectionsChange(sections)
+  }, [sections, onSectionsChange])
 
   // ── LOAD ──────────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -177,6 +235,118 @@ export default function ProductivityKanban({
       })
       setShowAddTask(false); setSelectedSectionForTask(null)
     } catch (err) { console.error('❌ Add task failed:', err) }
+  }
+
+  // ── Autosave handlers used by AddTaskModal ──────────────────────────────
+  // The modal creates a real row as soon as the user types, then debounces
+  // updates. We mirror those into local state so the kanban board reflects
+  // the in-progress card immediately and the work is preserved if the modal
+  // is closed accidentally.
+  const handleAutoCreateTask = async (taskData) => {
+    console.log('[RECUR-DEBUG kanban handleAutoCreateTask] received:', {
+      recurrence_active: taskData.recurrence_active,
+      recurrence_days: taskData.recurrence_days,
+      scheduled_day: taskData.scheduled_day,
+      scheduled_start_time: taskData.scheduled_start_time,
+    })
+    // The modal may pass an explicit sectionId (user picked from the new
+    // dropdown). Fall back to whatever the kanban had pre-selected.
+    const chosenSection = taskData.sectionId !== undefined
+      ? (taskData.sectionId || null)
+      : (selectedSectionForTask === 'unassigned' ? null : selectedSectionForTask)
+    const targetSectionKey = chosenSection || 'unassigned'
+    const targetSection = sections.find(s => s.id === targetSectionKey)
+    const position = (targetSection?.tasks || []).length
+    const created = await productivityService.createTask(coachId, {
+      ...taskData,
+      sectionId: chosenSection,
+      position,
+    })
+    console.log('[RECUR-DEBUG kanban createTask returned]', {
+      id: created?.id,
+      recurrence_active: created?.recurrence_active,
+      recurrence_days: created?.recurrence_days,
+      scheduled_day: created?.scheduled_day,
+    })
+    const sectionColor = targetSection?.color || '#6b7280'
+    // Mirror to the right bucket — `sections` and `scheduledTasks` are
+    // mutually exclusive (loadBoard filters scheduled tasks out of sections).
+    // If we'd push into both, the same card shows up in the kanban AND in
+    // the "Niet gepland" sidebar simultaneously.
+    if (created?.scheduled_day) {
+      setScheduledTasks(prev => {
+        const day = created.scheduled_day
+        const list = prev[day] || []
+        return { ...prev, [day]: [...list, { ...created, _sectionColor: sectionColor }] }
+      })
+    } else {
+      setSections(prev => prev.map(s =>
+        s.id === targetSectionKey ? { ...s, tasks: [...(s.tasks || []), created] } : s
+      ))
+    }
+    return created
+  }
+
+  const handleAutoUpdateTask = async (taskId, updates) => {
+    console.log('[RECUR-DEBUG kanban handleAutoUpdateTask]', taskId, {
+      recurrence_active: updates.recurrence_active,
+      recurrence_days: updates.recurrence_days,
+    })
+    // Translate sectionId → section_id (DB column) before persisting so the
+    // service's spread doesn't drop a bogus camelCase column. Also strip
+    // `steps` which lives in a different table / shape.
+    const { sectionId, steps, ...rest } = updates
+    const dbUpdates = {
+      ...rest,
+      ...(sectionId !== undefined ? { section_id: sectionId || null } : {}),
+    }
+    setSections(prev => {
+      // Mirror in local state: if section changes, move the task to the new column.
+      if (sectionId !== undefined) {
+        let moved = null
+        const without = prev.map(s => {
+          const remaining = (s.tasks || []).filter(t => {
+            if (t.id === taskId) { moved = t; return false }
+            return true
+          })
+          return { ...s, tasks: remaining }
+        })
+        if (moved) {
+          const targetKey = sectionId || 'unassigned'
+          return without.map(s =>
+            s.id === targetKey ? { ...s, tasks: [...(s.tasks || []), { ...moved, ...rest, section_id: sectionId || null }] } : s
+          )
+        }
+      }
+      return prev.map(s => ({
+        ...s,
+        tasks: (s.tasks || []).map(t => t.id === taskId ? { ...t, ...rest } : t),
+      }))
+    })
+    // Mirror in scheduledTasks too — without this, the AgendaView keeps the
+    // pre-edit values (e.g. recurrence_active: false) and the recurring
+    // expansion never fires until a hard refresh.
+    setScheduledTasks(prev => {
+      const out = {}
+      Object.entries(prev).forEach(([day, tasks]) => {
+        out[day] = (tasks || []).map(t => t.id === taskId ? { ...t, ...rest } : t)
+      })
+      return out
+    })
+    try {
+      await productivityService.updateTask(taskId, dbUpdates)
+    } catch (err) {
+      console.error('❌ Autosave update failed:', err)
+    }
+  }
+
+  const handleAutoDeleteTask = async (taskId) => {
+    setSections(prev => prev.map(s => ({
+      ...s,
+      tasks: (s.tasks || []).filter(t => t.id !== taskId),
+    })))
+    try { await productivityService.deleteTask(taskId) }
+    catch (err) { console.error('❌ Autosave delete failed:', err) }
   }
 
   const handleTaskEdit = async (taskId, updates) => {
@@ -403,6 +573,82 @@ export default function ProductivityKanban({
   return (
     <div style={{ padding: isMobile ? '0.625rem' : '0.75rem', transform: 'translateZ(0)' }}>
 
+      {/* View toggle: Kanban ↔ Agenda */}
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: '0.4rem',
+        marginBottom: '0.625rem',
+      }}>
+        <div style={{
+          display: 'inline-flex',
+          background: 'rgba(255,255,255,0.04)',
+          border: '1px solid rgba(255,255,255,0.08)',
+          borderRadius: '8px',
+          padding: '3px',
+        }}>
+          {[
+            { id: 'kanban', label: 'Kanban', Icon: LayoutGrid },
+            { id: 'agenda', label: 'Agenda', Icon: CalendarDays },
+          ].map(({ id, label, Icon }) => {
+            const active = viewMode === id
+            return (
+              <button
+                key={id}
+                onClick={() => switchView(id)}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: '0.35rem',
+                  padding: '0.35rem 0.75rem',
+                  background: active ? 'rgba(16,185,129,0.15)' : 'transparent',
+                  border: 'none',
+                  borderRadius: '6px',
+                  color: active ? '#10b981' : 'rgba(255,255,255,0.5)',
+                  fontSize: '0.7rem',
+                  fontWeight: active ? '800' : '600',
+                  cursor: 'pointer',
+                  touchAction: 'manipulation',
+                  WebkitTapHighlightColor: 'transparent',
+                  minHeight: '30px',
+                }}
+              >
+                <Icon size={12} />
+                {label}
+              </button>
+            )
+          })}
+        </div>
+      </div>
+
+      {/* Agenda view replaces the entire kanban body */}
+      {viewMode === 'agenda' && (
+        <>
+          <AgendaView
+            productivityService={productivityService}
+            coachId={coachId}
+            db={db}
+            sections={sections}
+            scheduledTasks={scheduledTasks}
+            allTasks={allTasks}
+            onTaskUpdate={handleAgendaTaskUpdate}
+            onTaskClick={(task) => {
+              // Re-use the new AddTaskModal for editing — same UI, more
+              // functionality (steps, recurring, section dropdown) than the
+              // old AgendaTaskModal.
+              setEditingTask(task)
+              setShowAddTask(true)
+            }}
+            onRequestNewTask={(preset) => {
+              console.log('[ProductivityKanban] onRequestNewTask hit, will setShowAddTask(true)', { preset, sectionsCount: sections.length })
+              setSelectedSectionForTask(sections[0]?.id || 'unassigned')
+              setAgendaPreset(preset)
+              setEditingTask(null)
+              setShowAddTask(true)
+            }}
+            isMobile={isMobile}
+          />
+        </>
+      )}
+
+      {viewMode === 'kanban' && (
+        <>
       {/* Toolbar */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem', marginBottom: '0.5rem' }}>
         <div style={{ flex: 1 }} />
@@ -608,9 +854,36 @@ export default function ProductivityKanban({
           )}
         </div>
       )}
+        </>
+      )}
 
+      {/* Modals MUST live OUTSIDE the viewMode==='kanban' branch — otherwise
+          opening the new-task modal from the agenda-view never renders the
+          UI even though showAddTask flips to true. */}
       {showAddTask && (
-        <AddTaskModal isMobile={isMobile} onClose={() => { setShowAddTask(false); setSelectedSectionForTask(null) }} onSubmit={handleAddTask} />
+        <AddTaskModal
+          isMobile={isMobile}
+          sections={sections}
+          defaultSectionId={selectedSectionForTask}
+          agendaPreset={agendaPreset}
+          initialTask={editingTask}
+          db={db}
+          coachId={coachId}
+          onCompleteTask={handleCompleteTask}
+          onClose={() => { setShowAddTask(false); setSelectedSectionForTask(null); setAgendaPreset(null); setEditingTask(null) }}
+          onSubmit={handleAddTask}
+          onAutoCreate={(taskData) => handleAutoCreateTask({
+            ...taskData,
+            ...(agendaPreset ? {
+              scheduled_day: agendaPreset.day,
+              scheduled_start_time: agendaPreset.startTime,
+              scheduled_end_time: agendaPreset.endTime,
+              ...(agendaPreset.date ? { scheduled_date: agendaPreset.date } : {}),
+            } : {}),
+          })}
+          onAutoUpdate={handleAutoUpdateTask}
+          onAutoDelete={handleAutoDeleteTask}
+        />
       )}
       {showSectionModal && (
         <SectionModal isMobile={isMobile} section={selectedSection}

@@ -1,13 +1,16 @@
 // src/modules/workout/components/week-schedule/DayCard.jsx
-import { Check, Moon, Plus } from 'lucide-react'
+// Calendar-strip layout: static day-header on top, separate workout card
+// below. The card looks visibly "pickup-able" (gap, rounded corners,
+// drag-grip dots) so users intuit drag-to-swap without instructions.
+import { Check, GripVertical } from 'lucide-react'
 import WorkoutIndicator from './WorkoutIndicator'
 import CustomWorkoutIndicator from './CustomWorkoutIndicator'
 
 export default function DayCard({
-  day, dayIndex, workoutKey, workoutData,
+  dayIndex, workoutKey, workoutData,
   isToday, isCompleted, isSelected, swapMode,
-  isMobile, weekDaysShort, weekDaysDutch,
-  isDragging, isAnyDragging, onClick, onSwapClick, localSwapMode
+  isMobile, weekDaysDutch,
+  isDragging, isAnyDragging, onClick
 }) {
   const isCustom = workoutKey?.startsWith('custom_')
   const isActivity = ['cardio', 'swimming', 'hiking', 'cycling', 'running'].includes(workoutKey)
@@ -20,69 +23,134 @@ export default function DayCard({
 
   return (
     <div
-      onClick={handleClick}
       style={{
-        padding: isMobile ? '0.375rem 0.15rem 0.4rem' : '0.5rem 0.2rem 0.5rem',
-        minHeight: isMobile ? '86px' : '100px',
-        background: isCompleted ? 'rgba(16,185,129,0.03)' : isToday ? 'rgba(255,255,255,0.03)' : 'transparent',
-        border: `1px solid ${isToday ? 'rgba(255,255,255,0.12)' : isCompleted ? 'rgba(16,185,129,0.15)' : 'rgba(255,255,255,0.05)'}`,
-        borderRadius: isMobile ? '4px' : '6px',
-        cursor: hasContent ? (isDragging ? 'grabbing' : 'grab') : (swapMode ? 'pointer' : 'default'),
-        transition: 'all 0.15s ease',
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        justifyContent: 'flex-start',
-        textAlign: 'center',
+        display: 'flex', flexDirection: 'column',
+        alignItems: 'stretch',
+        gap: isMobile ? '4px' : '5px',
         position: 'relative',
-        transform: isDragging ? 'scale(0.97)' : 'scale(1)',
-        opacity: isDragging ? 0.5 : 1,
-        touchAction: 'manipulation',
-        WebkitTapHighlightColor: 'transparent',
         pointerEvents: isAnyDragging && !isDragging ? 'none' : 'auto',
-        overflow: 'hidden'
       }}
     >
-      {/* Vandaag — witte top streep */}
-      {isToday && (
-        <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '2px', background: 'rgba(255,255,255,0.5)' }} />
-      )}
-
-      {/* Dag label */}
+      {/* ── Static day-header (not draggable) ── */}
       <div style={{
-        fontSize: isMobile ? '0.52rem' : '0.57rem',
-        fontWeight: isToday ? '800' : '600',
-        color: isToday ? '#fff' : isCompleted ? 'rgba(16,185,129,0.7)' : 'rgba(255,255,255,0.3)',
-        textTransform: 'uppercase',
-        letterSpacing: '0.02em',
-        lineHeight: 1,
-        marginBottom: isMobile ? '0.3rem' : '0.375rem',
-        marginTop: isMobile ? '0.1rem' : '0.15rem'
+        textAlign: 'center',
+        paddingTop: isMobile ? '0.1rem' : '0.15rem',
+        paddingBottom: isMobile ? '0.2rem' : '0.25rem',
+        borderBottom: isToday
+          ? '2px solid rgba(255,255,255,0.5)'
+          : '1px solid rgba(255,255,255,0.06)',
       }}>
-        {isMobile ? weekDaysDutch[dayIndex] : weekDaysDutch[dayIndex]}
+        <div style={{
+          fontSize: isMobile ? '0.55rem' : '0.6rem',
+          fontWeight: isToday ? '800' : '700',
+          color: isToday ? '#fff' : isCompleted ? 'rgba(16,185,129,0.7)' : 'rgba(255,255,255,0.4)',
+          textTransform: 'uppercase',
+          letterSpacing: '0.04em',
+          lineHeight: 1,
+        }}>
+          {weekDaysDutch[dayIndex]}
+        </div>
       </div>
 
-      {/* Content */}
-      {workoutData ? (
-        isCustom ? (
-          <CustomWorkoutIndicator workout={workoutData} isMobile={isMobile} />
-        ) : (
-          <WorkoutIndicator workoutData={workoutData} isMobile={isMobile} />
-        )
-      ) : isActivity ? (
-        <div style={{ width: isMobile ? '28px' : '32px', height: isMobile ? '28px' : '32px', borderRadius: '50%', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <div style={{ width: isMobile ? '7px' : '8px', height: isMobile ? '7px' : '8px', borderRadius: '50%', background: 'rgba(255,255,255,0.3)' }} />
-        </div>
-      ) : swapMode ? (
-        <Plus size={isMobile ? 13 : 15} color="rgba(255,255,255,0.15)" strokeWidth={1.5} />
-      ) : (
-        <Moon size={isMobile ? 12 : 13} color="rgba(255,255,255,0.1)" strokeWidth={1.5} />
-      )}
+      {/* ── Workout card (or empty slot) ── */}
+      {hasContent ? (
+        <div
+          onClick={handleClick}
+          style={{
+            position: 'relative',
+            padding: isMobile ? '0.4rem 0.15rem 0.45rem' : '0.5rem 0.2rem 0.55rem',
+            minHeight: isMobile ? '76px' : '88px',
+            background: isCompleted
+              ? 'rgba(16,185,129,0.06)'
+              : isSelected
+                ? 'rgba(255,215,0,0.08)'
+                : 'rgba(255,255,255,0.045)',
+            border: `1px solid ${
+              isCompleted
+                ? 'rgba(16,185,129,0.22)'
+                : isSelected
+                  ? 'rgba(255,215,0,0.35)'
+                  : 'rgba(255,255,255,0.09)'
+            }`,
+            borderRadius: isMobile ? '8px' : '10px',
+            boxShadow: isDragging
+              ? '0 6px 18px rgba(0,0,0,0.45)'
+              : '0 1px 0 rgba(255,255,255,0.02), 0 2px 4px rgba(0,0,0,0.18)',
+            cursor: isDragging ? 'grabbing' : 'grab',
+            transition: 'transform 0.15s ease, box-shadow 0.15s ease, opacity 0.15s ease',
+            transform: isDragging ? 'scale(1.04)' : 'scale(1)',
+            opacity: isDragging ? 0.9 : 1,
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'flex-start',
+            textAlign: 'center',
+            touchAction: 'manipulation',
+            WebkitTapHighlightColor: 'transparent',
+            overflow: 'hidden',
+          }}
+        >
+          {/* Drag-grip dots — top-right corner. Universal "pick me up" cue. */}
+          <div style={{
+            position: 'absolute',
+            top: isMobile ? '2px' : '3px',
+            right: isMobile ? '1px' : '2px',
+            color: 'rgba(255,255,255,0.28)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            pointerEvents: 'none',
+          }}>
+            <GripVertical size={isMobile ? 9 : 10} strokeWidth={2.2} />
+          </div>
 
-      {/* Voltooid check — rechtsonder */}
-      {isCompleted && (
-        <div style={{ position: 'absolute', bottom: isMobile ? '3px' : '4px', right: isMobile ? '3px' : '4px' }}>
-          <Check size={isMobile ? 8 : 9} color="#10b981" strokeWidth={2.5} />
+          {isCustom ? (
+            <CustomWorkoutIndicator workout={workoutData} isMobile={isMobile} />
+          ) : workoutData ? (
+            <WorkoutIndicator workoutData={workoutData} isMobile={isMobile} />
+          ) : (
+            // Activity placeholder (cardio / swim / etc)
+            <div style={{
+              width: isMobile ? '28px' : '32px',
+              height: isMobile ? '28px' : '32px',
+              borderRadius: '50%',
+              background: 'rgba(255,255,255,0.05)',
+              border: '1px solid rgba(255,255,255,0.08)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              marginTop: '0.25rem',
+            }}>
+              <div style={{
+                width: isMobile ? '7px' : '8px', height: isMobile ? '7px' : '8px',
+                borderRadius: '50%', background: 'rgba(255,255,255,0.3)'
+              }} />
+            </div>
+          )}
+
+          {/* Voltooid check — bottom-right */}
+          {isCompleted && (
+            <div style={{ position: 'absolute', bottom: isMobile ? '3px' : '4px', right: isMobile ? '3px' : '4px' }}>
+              <Check size={isMobile ? 9 : 10} color="#10b981" strokeWidth={2.5} />
+            </div>
+          )}
+        </div>
+      ) : (
+        // Empty rest-day slot — dashed placeholder, drop-target ready
+        <div
+          onClick={swapMode ? handleClick : undefined}
+          style={{
+            minHeight: isMobile ? '76px' : '88px',
+            border: '1px dashed rgba(255,255,255,0.1)',
+            borderRadius: isMobile ? '8px' : '10px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            cursor: swapMode ? 'pointer' : 'default',
+            color: 'rgba(255,255,255,0.18)',
+            fontSize: isMobile ? '0.85rem' : '0.95rem',
+            fontWeight: '300',
+            touchAction: 'manipulation',
+            WebkitTapHighlightColor: 'transparent',
+          }}
+        >
+          —
         </div>
       )}
     </div>

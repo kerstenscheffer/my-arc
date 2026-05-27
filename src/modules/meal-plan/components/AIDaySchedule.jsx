@@ -3,6 +3,7 @@
 // ✅ FOOD LOG: Loads consumed_meals, combined totals, log button
 // ✅ EDIT: editingMeal state + FoodLogModal editMeal prop
 import React, { useState, useEffect } from 'react'
+import { Apple } from 'lucide-react'
 import DayScheduleHeader from './day-schedule/DayScheduleHeader'
 import DaySelector from './day-schedule/DaySelector'
 import DailyTotalsBar from './day-schedule/DailyTotalsBar'
@@ -32,8 +33,15 @@ export default function AIDaySchedule({
   onCheckMeal, onUncheckMeal, onOpenInfo, onOpenAlternatives,
   dayTemplates = [], db, onPlanUpdate, dailyTotals,
   // ✅ FOOD LOG: New props from AIMealDashboard
-  client, onMealLogged, targets
+  client, onMealLogged, targets,
+  // ✅ OVERHAUL: View mode — 'plan' (default, show plan slots) | 'free' (logging only)
+  mode = 'plan',
+  // ✅ OVERHAUL: hide internal day picker + totals bar when dashboard renders
+  // its own at page-level (so they don't appear twice).
+  hideDayPicker = false,
+  hideTotalsBar = false,
 }) {
+  const isFreeMode = mode === 'free'
   const isMobile = window.innerWidth <= 768
   const [currentDay, setCurrentDay] = useState(getTodayIndex())
   const [displayMeals, setDisplayMeals] = useState([])
@@ -75,12 +83,18 @@ export default function AIDaySchedule({
   }, [todayProgress])
 
   useEffect(() => {
-    if (currentDay === getTodayIndex() && todayMeals) setDisplayMeals(todayMeals)
-    else loadDayMeals(currentDay)
+    // OVERHAUL: free-mode skips plan loading entirely
+    if (isFreeMode) {
+      setDisplayMeals([])
+    } else if (currentDay === getTodayIndex() && todayMeals) {
+      setDisplayMeals(todayMeals)
+    } else {
+      loadDayMeals(currentDay)
+    }
 
-    // ✅ FOOD LOG: Load consumed meals for this day
+    // ✅ FOOD LOG: Load consumed meals for this day (works in both modes)
     if (client?.id) loadConsumedMeals(currentDay)
-  }, [currentDay, todayMeals, activePlan, client?.id])
+  }, [currentDay, todayMeals, activePlan, client?.id, isFreeMode])
 
   // ✅ FOOD LOG: Load consumed_meals from DB for selected day
   const loadConsumedMeals = async (dayIndex) => {
@@ -227,27 +241,64 @@ export default function AIDaySchedule({
   return (
     <div style={{
       width: '100%',
+      maxWidth: '100%',
+      overflowX: 'hidden',
       borderTop: '1px solid rgba(255, 255, 255, 0.06)',
       borderBottom: '1px solid rgba(255, 255, 255, 0.06)'
     }}>
-      <DayScheduleHeader
-        dayTemplates={dayTemplates}
-        onOpenTemplate={() => setShowApplyTemplate(true)}
-        isMobile={isMobile}
-      />
-      
-      <DaySelector
-        days={daysOfWeek}
-        currentDay={currentDay}
-        onDayClick={handleDayClick}
-        isToday={currentDay === getTodayIndex()}
-        isMobile={isMobile}
-      />
-      
-      {hasContent && (
+      {!isFreeMode && (
+        <DayScheduleHeader
+          dayTemplates={dayTemplates}
+          onOpenTemplate={() => setShowApplyTemplate(true)}
+          isMobile={isMobile}
+        />
+      )}
+
+      {!hideDayPicker && (
+        <DaySelector
+          days={daysOfWeek}
+          currentDay={currentDay}
+          onDayClick={handleDayClick}
+          isToday={currentDay === getTodayIndex()}
+          isMobile={isMobile}
+        />
+      )}
+
+      {!hideTotalsBar && hasContent && (
         <DailyTotalsBar dailyTotals={combinedTotals} targets={clientTargets} isMobile={isMobile} />
       )}
-      
+
+      {/* ✅ OVERHAUL: persistent primary log button (both modes) */}
+      {client && !loading && (
+        <div style={{
+          padding: isMobile ? '0.625rem 1rem' : '0.75rem 1.25rem',
+          borderBottom: '1px solid rgba(255, 255, 255, 0.04)',
+        }}>
+          <button
+            onClick={() => setShowFoodLog(true)}
+            style={{
+              width: '100%',
+              minHeight: '44px',
+              padding: '0.7rem 1rem',
+              background: 'linear-gradient(135deg, #FFD700 0%, #D4AF37 100%)',
+              color: '#0a0a0a',
+              border: 'none',
+              borderRadius: '10px',
+              fontSize: isMobile ? '0.85rem' : '0.9rem',
+              fontWeight: 800,
+              letterSpacing: '0.02em',
+              cursor: 'pointer',
+              touchAction: 'manipulation',
+              WebkitTapHighlightColor: 'transparent',
+              boxShadow: '0 4px 14px rgba(255, 215, 0, 0.25)',
+              transition: 'transform 0.15s ease, box-shadow 0.15s ease',
+            }}
+          >
+            + Maaltijd loggen
+          </button>
+        </div>
+      )}
+
       {loading ? (
         <div style={{ textAlign: 'center', padding: '2rem', color: 'rgba(255,255,255,0.2)', fontSize: '0.8rem' }}>Laden...</div>
       ) : !hasContent && !client ? (
@@ -310,6 +361,10 @@ export default function AIDaySchedule({
                   protein: Math.round(meal.protein || 0),
                   carbs: Math.round(meal.carbs || 0),
                   fat: Math.round(meal.fat || 0),
+                  // Plan meals = pre-formed portions; explicit "1 portion" so
+                  // re-opening from Recent/Edit anchors macros to that.
+                  amount: 1,
+                  per_unit: 'portion',
                   consumed_at: new Date().toISOString(),
                   source: 'plan_check',
                   is_shared: true,
@@ -323,6 +378,10 @@ export default function AIDaySchedule({
 
               if (result) {
                 setConsumedMeals(prev => [...prev, result])
+                // Visual check — replaces the role onMealCheck used to play
+                // here. Done locally so we don't trigger the parent's
+                // handleCheckMeal which would add macros a second time.
+                setCheckedMeals(prev => ({ ...prev, [meal.slot]: true }))
                 if (onMealLogged) onMealLogged({
                   calories: meal.calories || 0,
                   protein: meal.protein || 0,
@@ -351,13 +410,70 @@ export default function AIDaySchedule({
           {consumedMeals.map((meal) => (
             <div key={`logged-desktop-${meal.id}`} style={{
               borderBottom: '1px solid rgba(255, 255, 255, 0.04)',
-              borderLeft: '3px solid #f59e0b',
-              padding: '0.625rem 1rem',
-              display: 'flex', alignItems: 'center', gap: '0.75rem'
+              padding: '0.75rem 1rem',
+              display: 'flex', alignItems: 'center', gap: '0.875rem',
+              minHeight: '60px',
             }}>
-              <span style={{ fontSize: '0.4rem', fontWeight: '700', color: '#f59e0b', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Gelogd</span>
-              <span style={{ fontSize: '0.85rem', fontWeight: '700', color: '#fff', flex: 1 }}>{meal.meal_name}</span>
-              <span style={{ fontSize: '0.7rem', fontWeight: '800', color: 'rgba(245, 158, 11, 0.7)' }}>{Math.round(meal.calories || 0)} kcal</span>
+              {/* Thumbnail — 48x48 with gold apple placeholder */}
+              {meal.image_url ? (
+                <div style={{
+                  width: '48px', height: '48px',
+                  borderRadius: '12px',
+                  background: `url(${meal.image_url}) center/cover, #fff`,
+                  border: '1px solid rgba(255, 255, 255, 0.08)',
+                  flexShrink: 0,
+                }} />
+              ) : (
+                <div style={{
+                  width: '48px', height: '48px',
+                  borderRadius: '12px',
+                  background: 'rgba(255, 215, 0, 0.06)',
+                  border: '1px solid rgba(255, 215, 0, 0.15)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  color: 'rgba(255, 215, 0, 0.55)',
+                  flexShrink: 0,
+                }}>
+                  <Apple size={22} strokeWidth={1.8} />
+                </div>
+              )}
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{
+                  display: 'flex', alignItems: 'center', gap: '0.4rem',
+                  marginBottom: '0.15rem',
+                }}>
+                  <span style={{
+                    fontSize: '0.92rem', fontWeight: '700', color: '#fff',
+                    whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+                    letterSpacing: '-0.01em', minWidth: 0,
+                  }}>
+                    {meal.meal_name}
+                  </span>
+                  <span style={{
+                    fontSize: '0.5rem', fontWeight: '700',
+                    color: '#FFD700',
+                    background: 'rgba(255, 215, 0, 0.1)',
+                    padding: '0.1rem 0.4rem', borderRadius: '4px',
+                    textTransform: 'uppercase', letterSpacing: '0.06em',
+                    flexShrink: 0,
+                  }}>
+                    Gelogd
+                  </span>
+                </div>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.2rem', flexShrink: 0 }}>
+                <span style={{
+                  fontSize: '0.95rem', fontWeight: '800', color: '#FFD700',
+                  letterSpacing: '-0.01em',
+                }}>
+                  {Math.round(meal.calories || 0)}
+                </span>
+                <span style={{
+                  fontSize: '0.65rem', fontWeight: '600',
+                  color: 'rgba(255, 215, 0, 0.5)',
+                }}>
+                  kcal
+                </span>
+              </div>
             </div>
           ))}
         </>
@@ -373,10 +489,10 @@ export default function AIDaySchedule({
             onClick={() => setShowFoodLog(true)}
             style={{
               padding: '0.625rem 1.25rem',
-              background: 'rgba(16, 185, 129, 0.08)',
-              border: '1px solid rgba(16, 185, 129, 0.25)',
+              background: 'rgba(255, 215, 0, 0.08)',
+              border: '1px solid rgba(255, 215, 0, 0.25)',
               borderRadius: '8px',
-              color: '#10b981',
+              color: '#FFD700',
               fontSize: '0.75rem', fontWeight: '700',
               cursor: 'pointer',
               touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',

@@ -154,7 +154,11 @@ export default function CoachingLogModal({ client, db, coachId, onClose, isMobil
       top:  isMobile ? 0 : pos.y,
       width:  isMobile ? '100vw' : size.w,
       height: isMobile ? '100dvh' : (minimized ? 'auto' : size.h),
-      zIndex: 10600,
+      // Bumped above any other modal in the app. Some recent screens added
+      // overlays with their own stacking contexts that ended up over this
+      // floating panel — push it above all of them.
+      zIndex: 2147483000,
+      isolation: 'isolate',
       display: 'flex', flexDirection: 'column',
       background: '#0a0a0a',
       border: isMobile ? 'none' : '1px solid rgba(255,255,255,0.08)',

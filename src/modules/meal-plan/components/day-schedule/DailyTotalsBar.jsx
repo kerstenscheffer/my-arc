@@ -24,11 +24,23 @@ export default function DailyTotalsBar({ dailyTotals, targets, isMobile }) {
         const remaining = Math.max(0, macro.goal - macro.eaten)
         const isOver = macro.eaten > macro.goal && macro.goal > 0
 
+        // Auto-scale eaten font when values get long so 4 columns stay equal width.
+        const eatenStr = String(macro.eaten)
+        const eatenLen = eatenStr.length
+        const baseEaten = isMobile ? 0.95 : 1.05
+        const eatenSize =
+          eatenLen >= 7 ? baseEaten * 0.55 :
+          eatenLen >= 6 ? baseEaten * 0.65 :
+          eatenLen >= 5 ? baseEaten * 0.78 :
+          baseEaten
+
         return (
           <div
             key={macro.label}
             style={{
-              flex: 1,
+              flex: '1 1 0',
+              minWidth: 0,
+              overflow: 'hidden',
               padding: isMobile ? '0.5rem 0.25rem' : '0.625rem 0.375rem',
               textAlign: 'center',
               position: 'relative',
@@ -42,20 +54,26 @@ export default function DailyTotalsBar({ dailyTotals, targets, isMobile }) {
               color: 'rgba(255, 255, 255, 0.2)',
               textTransform: 'uppercase',
               letterSpacing: '0.06em',
-              marginBottom: '0.2rem'
+              marginBottom: '0.2rem',
+              whiteSpace: 'nowrap',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
             }}>
               {macro.label}
             </div>
 
-            {/* Eaten value — big */}
+            {/* Eaten value — big, auto-scaled */}
             <div style={{
-              fontSize: isMobile ? '0.95rem' : '1.05rem',
+              fontSize: `${eatenSize}rem`,
               fontWeight: '900',
-              color: isOver ? '#f59e0b' : '#10b981',
+              color: isOver ? '#f59e0b' : '#FFD700',
               lineHeight: 1,
-              letterSpacing: '-0.02em'
+              letterSpacing: '-0.02em',
+              whiteSpace: 'nowrap',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
             }}>
-              {macro.eaten}
+              {eatenStr}
             </div>
 
             {/* "van [goal]" */}
@@ -63,7 +81,10 @@ export default function DailyTotalsBar({ dailyTotals, targets, isMobile }) {
               fontSize: isMobile ? '0.45rem' : '0.5rem',
               fontWeight: '600',
               color: 'rgba(255, 255, 255, 0.2)',
-              marginTop: '0.1rem'
+              marginTop: '0.1rem',
+              whiteSpace: 'nowrap',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
             }}>
               van {macro.goal}{macro.unit || ''}
             </div>
@@ -72,8 +93,11 @@ export default function DailyTotalsBar({ dailyTotals, targets, isMobile }) {
             <div style={{
               fontSize: isMobile ? '0.4rem' : '0.45rem',
               fontWeight: '700',
-              color: isOver ? 'rgba(245, 158, 11, 0.5)' : 'rgba(16, 185, 129, 0.4)',
-              marginTop: '0.05rem'
+              color: isOver ? 'rgba(245, 158, 11, 0.5)' : 'rgba(255, 215, 0, 0.4)',
+              marginTop: '0.05rem',
+              whiteSpace: 'nowrap',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
             }}>
               {isOver
                 ? `${macro.eaten - macro.goal} over`
@@ -96,7 +120,7 @@ export default function DailyTotalsBar({ dailyTotals, targets, isMobile }) {
                 width: `${percent}%`,
                 background: isOver
                   ? 'linear-gradient(90deg, #f59e0b, #ef4444)'
-                  : '#10b981',
+                  : '#FFD700',
                 borderRadius: '1.5px',
                 transition: 'width 0.4s ease'
               }} />
