@@ -150,7 +150,7 @@ export default function NextCallHighlight({ nextCall, handleBookCall }) {
                       day: 'numeric',
                       month: 'long'
                     })}
-                    {!isMobile && ` om ${new Date(nextCall.scheduled_date).toLocaleTimeString('nl-NL', {
+                    {` om ${new Date(nextCall.scheduled_date).toLocaleTimeString('nl-NL', {
                       hour: '2-digit',
                       minute: '2-digit'
                     })}`}
