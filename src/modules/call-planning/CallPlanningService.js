@@ -287,6 +287,8 @@ class CallPlanningService {
           template_item_id: item.id,
           call_number: item.call_number,
           call_title: item.call_title,
+          duration_minutes: item.duration_minutes || 30,
+          calendly_link: item.calendly_link || '',
           status: index === 0 ? 'available' : 'locked' // First call is available
         }))
 
@@ -442,6 +444,7 @@ class CallPlanningService {
             *,
             call_template_items:template_item_id (
               calendly_link,
+              duration_minutes,
               preparation_notes
             )
           )
@@ -453,17 +456,17 @@ class CallPlanningService {
         console.error('Error loading client plans:', error)
         return []
       }
-      
+
       // Fallback: als geen plans, probeer met user_id
       if ((!plans || plans.length === 0) && this.currentUser) {
         console.log('No plans found with client_id, trying with user_id...')
-        
+
         const { data: client } = await this.supabase
           .from('clients')
           .select('id')
           .eq('id', this.currentUser.id)
           .single()
-      
+
         if (client) {
           console.log('Found client by user_id:', client.id)
           const { data: userPlans } = await this.supabase
@@ -478,6 +481,7 @@ class CallPlanningService {
                 *,
                 call_template_items:template_item_id (
                   calendly_link,
+                  duration_minutes,
                   preparation_notes
                 )
               )
@@ -489,7 +493,7 @@ class CallPlanningService {
         }
       }
       
-      // Process plans - voeg calendly links toe van template OF template_items
+      // Process plans - voeg calendly links en duration_minutes toe van template OF template_items
       if (plans && plans.length > 0) {
         plans.forEach(plan => {
           if (plan.client_calls) {
@@ -498,13 +502,19 @@ class CallPlanningService {
               if (call.call_template_items?.calendly_link) {
                 call.calendly_link = call.call_template_items.calendly_link
               }
+              if (call.call_template_items?.duration_minutes) {
+                call.duration_minutes = call.call_template_items.duration_minutes
+              }
               // Anders zoek in de template items op call_number
-              else if (plan.call_templates?.call_template_items) {
+              if (plan.call_templates?.call_template_items) {
                 const templateItem = plan.call_templates.call_template_items.find(
                   item => item.call_number === call.call_number
                 )
-                if (templateItem?.calendly_link) {
+                if (templateItem?.calendly_link && !call.calendly_link) {
                   call.calendly_link = templateItem.calendly_link
+                }
+                if (templateItem?.duration_minutes && !call.duration_minutes) {
+                  call.duration_minutes = templateItem.duration_minutes
                 }
               }
             })
@@ -796,7 +806,6 @@ class CallPlanningService {
           status: 'available',
           // VASTE Calendly link voor bonus calls
           calendly_link: 'https://calendly.com/kerstenscheffer/bonus-call',
-          duration_minutes: 30,
           preparation_notes: `Deze bonus call is aangevraagd door de client met als reden: "${request.reason || 'Geen specifieke reden opgegeven'}". Focus op het bespreken van dit onderwerp.`
         })
         .select()

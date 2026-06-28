@@ -304,12 +304,12 @@ export default function BookingModal({
                   flexShrink: 0
                 }} />
                 <div>
-                  <p style={{ 
-                    color: 'rgba(255, 255, 255, 0.9)', 
+                  <p style={{
+                    color: 'rgba(255, 255, 255, 0.9)',
                     fontSize: isMobile ? '0.85rem' : '0.9rem',
                     lineHeight: '1.4'
                   }}>
-                    Kies een moment • Direct Zoom link in je mail
+                    {selectedCall.duration_minutes ? `${selectedCall.duration_minutes} min sessie` : 'Coaching sessie'} • Direct Zoom link in je mail
                   </p>
                 </div>
               </div>

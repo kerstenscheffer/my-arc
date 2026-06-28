@@ -255,15 +255,30 @@ export default function CallCard({ call, index, handleBookCall }) {
           </span>
         </div>
         
-        {call.scheduled_date && (
-          <span style={{
-            fontSize: isMobile ? '0.85rem' : '0.9rem',
-            color: 'rgba(255, 255, 255, 0.6)',
-            fontWeight: '500'
-          }}>
-            {new Date(call.scheduled_date).toLocaleDateString('nl-NL')}
-          </span>
-        )}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          {call.duration_minutes && (
+            <span style={{
+              fontSize: isMobile ? '0.75rem' : '0.8rem',
+              color: 'rgba(255, 255, 255, 0.5)',
+              fontWeight: '500',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.2rem'
+            }}>
+              <Clock size={12} />
+              {call.duration_minutes} min
+            </span>
+          )}
+          {call.scheduled_date && (
+            <span style={{
+              fontSize: isMobile ? '0.85rem' : '0.9rem',
+              color: 'rgba(255, 255, 255, 0.6)',
+              fontWeight: '500'
+            }}>
+              {new Date(call.scheduled_date).toLocaleDateString('nl-NL')}
+            </span>
+          )}
+        </div>
       </div>
       
       {/* Action Button */}
