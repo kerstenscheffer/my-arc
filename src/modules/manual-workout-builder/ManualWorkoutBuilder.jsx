@@ -303,10 +303,10 @@ export default function ManualWorkoutBuilder({ db, clients }) {
     }}>
       {/* Header Section */}
       <div style={{
-        background: 'rgba(17, 17, 17, 0.8)',
-        backdropFilter: 'blur(20px)',
-        borderRadius: '16px',
-        border: '1px solid rgba(255, 255, 255, 0.1)',
+        background: 'linear-gradient(135deg, rgba(23, 23, 23, 0.95) 0%, rgba(10, 10, 10, 0.95) 100%)',
+        backdropFilter: 'blur(10px)',
+        borderRadius: '14px',
+        border: '1px solid rgba(255, 255, 255, 0.08)',
         padding: isMobile ? '1rem' : '1.5rem',
         marginBottom: '1.5rem'
       }}>
@@ -584,9 +584,9 @@ export default function ManualWorkoutBuilder({ db, clients }) {
         <button
           onClick={addDay}
           style={{
-            background: 'rgba(16, 185, 129, 0.1)',
-            border: '2px dashed rgba(16, 185, 129, 0.3)',
-            borderRadius: '16px',
+            background: 'rgba(16, 185, 129, 0.05)',
+            border: '2px dashed rgba(16, 185, 129, 0.25)',
+            borderRadius: '14px',
             padding: isMobile ? '2rem' : '3rem',
             display: 'flex',
             flexDirection: 'column',
@@ -594,18 +594,20 @@ export default function ManualWorkoutBuilder({ db, clients }) {
             justifyContent: 'center',
             gap: '0.5rem',
             cursor: 'pointer',
-            transition: 'all 0.3s ease',
+            transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
             minHeight: isMobile ? '150px' : '200px',
             touchAction: 'manipulation',
             WebkitTapHighlightColor: 'transparent'
           }}
           onMouseEnter={(e) => {
-            e.currentTarget.style.background = 'rgba(16, 185, 129, 0.2)'
-            e.currentTarget.style.borderColor = 'rgba(16, 185, 129, 0.5)'
+            e.currentTarget.style.background = 'rgba(16, 185, 129, 0.12)'
+            e.currentTarget.style.borderColor = 'rgba(16, 185, 129, 0.4)'
+            e.currentTarget.style.transform = 'translateX(4px)'
           }}
           onMouseLeave={(e) => {
-            e.currentTarget.style.background = 'rgba(16, 185, 129, 0.1)'
-            e.currentTarget.style.borderColor = 'rgba(16, 185, 129, 0.3)'
+            e.currentTarget.style.background = 'rgba(16, 185, 129, 0.05)'
+            e.currentTarget.style.borderColor = 'rgba(16, 185, 129, 0.25)'
+            e.currentTarget.style.transform = 'translateX(0)'
           }}
         >
           <Plus size={32} color="#10b981" />
