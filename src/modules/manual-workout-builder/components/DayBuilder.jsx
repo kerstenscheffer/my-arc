@@ -60,11 +60,11 @@ export default function DayBuilder({
       onClick={onActivate}
       style={{
         background: isActive
-          ? 'linear-gradient(135deg, rgba(16, 185, 129, 0.08) 0%, rgba(5, 150, 105, 0.04) 100%)'
+          ? 'linear-gradient(135deg, rgba(249, 115, 22, 0.08) 0%, rgba(234, 88, 12, 0.04) 100%)'
           : 'linear-gradient(135deg, rgba(23, 23, 23, 0.9) 0%, rgba(10, 10, 10, 0.9) 100%)',
         backdropFilter: 'blur(10px)',
         borderRadius: '14px',
-        border: `1px solid ${isActive ? 'rgba(16, 185, 129, 0.3)' : 'rgba(255, 255, 255, 0.08)'}`,
+        border: `1px solid ${isActive ? 'rgba(249, 115, 22, 0.3)' : 'rgba(255, 255, 255, 0.08)'}`,
         padding: isMobile ? '1rem' : '1.25rem',
         cursor: 'pointer',
         transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
@@ -77,7 +77,7 @@ export default function DayBuilder({
         if (!isMobile) {
           e.currentTarget.style.transform = 'translateX(4px)'
           e.currentTarget.style.borderColor = isActive
-            ? 'rgba(16, 185, 129, 0.5)'
+            ? 'rgba(249, 115, 22, 0.5)'
             : 'rgba(255, 255, 255, 0.15)'
         }
       }}
@@ -85,7 +85,7 @@ export default function DayBuilder({
         if (!isMobile) {
           e.currentTarget.style.transform = 'translateX(0)'
           e.currentTarget.style.borderColor = isActive
-            ? 'rgba(16, 185, 129, 0.3)'
+            ? 'rgba(249, 115, 22, 0.3)'
             : 'rgba(255, 255, 255, 0.08)'
         }
       }}
@@ -98,8 +98,8 @@ export default function DayBuilder({
           top: 0,
           bottom: 0,
           width: '3px',
-          background: 'linear-gradient(180deg, #10b981 0%, #059669 100%)',
-          boxShadow: '2px 0 8px rgba(16, 185, 129, 0.3)'
+          background: 'linear-gradient(180deg, #f97316 0%, #ea580c 100%)',
+          boxShadow: '2px 0 8px rgba(249, 115, 22, 0.3)'
         }} />
       )}
 
@@ -117,7 +117,7 @@ export default function DayBuilder({
           height: isMobile ? '42px' : '48px',
           borderRadius: '12px',
           background: isActive
-            ? 'linear-gradient(135deg, rgba(16, 185, 129, 0.2) 0%, rgba(5, 150, 105, 0.1) 100%)'
+            ? 'linear-gradient(135deg, rgba(249, 115, 22, 0.2) 0%, rgba(234, 88, 12, 0.1) 100%)'
             : 'linear-gradient(135deg, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0.03) 100%)',
           display: 'flex',
           alignItems: 'center',
@@ -125,7 +125,7 @@ export default function DayBuilder({
           flexShrink: 0
         }}>
           <span style={{
-            color: isActive ? '#10b981' : 'rgba(255, 255, 255, 0.5)',
+            color: isActive ? '#f97316' : 'rgba(255, 255, 255, 0.5)',
             fontSize: isMobile ? '1rem' : '1.1rem',
             fontWeight: '800'
           }}>
@@ -138,7 +138,7 @@ export default function DayBuilder({
           {/* DAG label */}
           <div style={{
             fontSize: isMobile ? '0.7rem' : '0.75rem',
-            color: isActive ? '#10b981' : 'rgba(255, 255, 255, 0.4)',
+            color: isActive ? '#f97316' : 'rgba(255, 255, 255, 0.4)',
             marginBottom: '0.2rem',
             fontWeight: '700',
             textTransform: 'uppercase',
@@ -151,7 +151,7 @@ export default function DayBuilder({
             {isActive && (
               <span style={{
                 fontSize: '0.6rem',
-                background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                background: 'linear-gradient(135deg, #f97316 0%, #ea580c 100%)',
                 padding: '0.1rem 0.35rem',
                 borderRadius: '6px',
                 fontWeight: '800',
@@ -179,7 +179,7 @@ export default function DayBuilder({
                 style={{
                   flex: 1,
                   background: 'rgba(255, 255, 255, 0.05)',
-                  border: '1px solid rgba(16, 185, 129, 0.3)',
+                  border: '1px solid rgba(249, 115, 22, 0.3)',
                   borderRadius: '8px',
                   padding: '0.5rem',
                   color: '#fff',
@@ -191,7 +191,7 @@ export default function DayBuilder({
                   if (e.key === 'Escape') handleCancelName()
                 }}
               />
-              <button onClick={handleSaveName} style={{ padding: '0.5rem', background: 'rgba(16, 185, 129, 0.2)', border: '1px solid rgba(16, 185, 129, 0.3)', borderRadius: '8px', color: '#10b981', cursor: 'pointer', minWidth: '32px', minHeight: '32px' }}>✓</button>
+              <button onClick={handleSaveName} style={{ padding: '0.5rem', background: 'rgba(249, 115, 22, 0.2)', border: '1px solid rgba(249, 115, 22, 0.3)', borderRadius: '8px', color: '#f97316', cursor: 'pointer', minWidth: '32px', minHeight: '32px' }}>✓</button>
               <button onClick={handleCancelName} style={{ padding: '0.5rem', background: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.2)', borderRadius: '8px', color: '#ef4444', cursor: 'pointer', minWidth: '32px', minHeight: '32px' }}>✕</button>
             </div>
           ) : (
@@ -224,10 +224,10 @@ export default function DayBuilder({
                 onChange={(e) => setTempFocus(e.target.value)}
                 placeholder="Bijv: chest, shoulders, triceps"
                 autoFocus
-                style={{ flex: 1, background: 'rgba(255, 255, 255, 0.05)', border: '1px solid rgba(16, 185, 129, 0.3)', borderRadius: '6px', padding: '0.4rem', color: 'rgba(255, 255, 255, 0.8)', fontSize: isMobile ? '0.8rem' : '0.85rem' }}
+                style={{ flex: 1, background: 'rgba(255, 255, 255, 0.05)', border: '1px solid rgba(249, 115, 22, 0.3)', borderRadius: '6px', padding: '0.4rem', color: 'rgba(255, 255, 255, 0.8)', fontSize: isMobile ? '0.8rem' : '0.85rem' }}
                 onKeyDown={(e) => { if (e.key === 'Enter') handleSaveFocus(); if (e.key === 'Escape') handleCancelFocus() }}
               />
-              <button onClick={handleSaveFocus} style={{ padding: '0.4rem', background: 'rgba(16, 185, 129, 0.2)', border: '1px solid rgba(16, 185, 129, 0.3)', borderRadius: '6px', color: '#10b981', cursor: 'pointer', minWidth: '28px', minHeight: '28px' }}>✓</button>
+              <button onClick={handleSaveFocus} style={{ padding: '0.4rem', background: 'rgba(249, 115, 22, 0.2)', border: '1px solid rgba(249, 115, 22, 0.3)', borderRadius: '6px', color: '#f97316', cursor: 'pointer', minWidth: '28px', minHeight: '28px' }}>✓</button>
               <button onClick={handleCancelFocus} style={{ padding: '0.4rem', background: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.2)', borderRadius: '6px', color: '#ef4444', cursor: 'pointer', minWidth: '28px', minHeight: '28px' }}>✕</button>
             </div>
           ) : (
@@ -339,8 +339,8 @@ export default function DayBuilder({
                     {exercise.name}
                   </div>
                   <div style={{ fontSize: isMobile ? '0.7rem' : '0.75rem', color: 'rgba(255,255,255,0.4)', display: 'flex', gap: '0.5rem' }}>
-                    <span><strong style={{ color: '#10b981' }}>{exercise.sets}</strong> sets</span>
-                    <span><strong style={{ color: '#10b981' }}>{exercise.reps}</strong> reps</span>
+                    <span><strong style={{ color: '#f97316' }}>{exercise.sets}</strong> sets</span>
+                    <span><strong style={{ color: '#f97316' }}>{exercise.reps}</strong> reps</span>
                     <span>{exercise.rust || '90s'} rust</span>
                   </div>
                 </div>
@@ -373,25 +373,38 @@ export default function DayBuilder({
             onClick={(e) => { e.stopPropagation(); onAddExercise() }}
             style={{
               width: '100%',
-              padding: '0.7rem',
-              background: 'rgba(16, 185, 129, 0.08)',
-              border: '1px solid rgba(16, 185, 129, 0.25)',
+              padding: isMobile ? '0.75rem' : '0.875rem',
+              background: 'linear-gradient(135deg, #f97316 0%, #ea580c 100%)',
+              border: 'none',
               borderRadius: '10px',
-              color: '#10b981',
+              color: '#000',
               fontSize: isMobile ? '0.85rem' : '0.9rem',
-              fontWeight: '600',
+              fontWeight: '700',
+              textTransform: 'uppercase',
+              letterSpacing: '0.05em',
               cursor: 'pointer',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               gap: '0.5rem',
-              transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+              boxShadow: '0 4px 20px rgba(249, 115, 22, 0.35)',
+              transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
               touchAction: 'manipulation',
               WebkitTapHighlightColor: 'transparent',
               minHeight: '44px'
             }}
-            onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(16, 185, 129, 0.15)'; e.currentTarget.style.borderColor = 'rgba(16, 185, 129, 0.4)' }}
-            onMouseLeave={(e) => { e.currentTarget.style.background = 'rgba(16, 185, 129, 0.08)'; e.currentTarget.style.borderColor = 'rgba(16, 185, 129, 0.25)' }}
+            onMouseEnter={(e) => {
+              if (!isMobile) {
+                e.currentTarget.style.transform = 'translateY(-2px)'
+                e.currentTarget.style.boxShadow = '0 8px 30px rgba(249, 115, 22, 0.5)'
+              }
+            }}
+            onMouseLeave={(e) => {
+              if (!isMobile) {
+                e.currentTarget.style.transform = 'translateY(0)'
+                e.currentTarget.style.boxShadow = '0 4px 20px rgba(249, 115, 22, 0.35)'
+              }
+            }}
             onTouchStart={(e) => { if (isMobile) e.currentTarget.style.transform = 'scale(0.98)' }}
             onTouchEnd={(e) => { if (isMobile) e.currentTarget.style.transform = 'scale(1)' }}
           >

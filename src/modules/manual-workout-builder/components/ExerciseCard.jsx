@@ -267,16 +267,16 @@ export default function ExerciseCard({
             color: 'rgba(255, 255, 255, 0.6)'
           }}>
             <span>
-              <strong style={{ color: '#10b981' }}>{exercise.sets}</strong> sets
+              <strong style={{ color: '#f97316' }}>{exercise.sets}</strong> sets
             </span>
             <span>
-              <strong style={{ color: '#10b981' }}>{exercise.reps}</strong> reps
+              <strong style={{ color: '#f97316' }}>{exercise.reps}</strong> reps
             </span>
             <span>
-              <strong style={{ color: '#10b981' }}>{exercise.rust}</strong> rust
+              <strong style={{ color: '#f97316' }}>{exercise.rust}</strong> rust
             </span>
             <span>
-              RPE <strong style={{ color: '#10b981' }}>{exercise.rpe}</strong>
+              RPE <strong style={{ color: '#f97316' }}>{exercise.rpe}</strong>
             </span>
           </div>
         )}
@@ -327,8 +327,8 @@ export default function ExerciseCard({
                 saveEdits()
               }}
               style={{
-                background: 'rgba(16, 185, 129, 0.2)',
-                border: '1px solid rgba(16, 185, 129, 0.3)',
+                background: 'rgba(249, 115, 22, 0.2)',
+                border: '1px solid rgba(249, 115, 22, 0.3)',
                 borderRadius: '6px',
                 padding: '0.5rem',
                 cursor: 'pointer',
@@ -341,7 +341,7 @@ export default function ExerciseCard({
                 minWidth: '36px'
               }}
             >
-              <Check size={16} color="#10b981" />
+              <Check size={16} color="#f97316" />
             </button>
             
             <button

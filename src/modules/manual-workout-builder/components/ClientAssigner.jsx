@@ -220,10 +220,10 @@ export default function ClientAssigner({ clients, workoutPlan, db, onClose, isMo
                       gap: '0.75rem',
                       padding: isMobile ? '0.75rem' : '1rem',
                       background: selectedClients.includes(client.id)
-                        ? 'rgba(16, 185, 129, 0.1)'
+                        ? 'rgba(249, 115, 22, 0.1)'
                         : 'rgba(255, 255, 255, 0.03)',
                       border: selectedClients.includes(client.id)
-                        ? '1px solid rgba(16, 185, 129, 0.3)'
+                        ? '1px solid rgba(249, 115, 22, 0.3)'
                         : '1px solid rgba(255, 255, 255, 0.1)',
                       borderRadius: '10px',
                       cursor: 'pointer',
@@ -238,10 +238,10 @@ export default function ClientAssigner({ clients, workoutPlan, db, onClose, isMo
                       height: '20px',
                       borderRadius: '6px',
                       border: selectedClients.includes(client.id)
-                        ? '2px solid #10b981'
+                        ? '2px solid #f97316'
                         : '2px solid rgba(255, 255, 255, 0.3)',
                       background: selectedClients.includes(client.id)
-                        ? '#10b981'
+                        ? '#f97316'
                         : 'transparent',
                       display: 'flex',
                       alignItems: 'center',
@@ -413,7 +413,7 @@ export default function ClientAssigner({ clients, workoutPlan, db, onClose, isMo
                 ? 'rgba(255, 255, 255, 0.1)'
                 : selectedClients.length === 0
                 ? 'rgba(255, 255, 255, 0.05)'
-                : 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                : 'linear-gradient(135deg, #f97316 0%, #ea580c 100%)',
               border: 'none',
               borderRadius: '10px',
               color: '#fff',

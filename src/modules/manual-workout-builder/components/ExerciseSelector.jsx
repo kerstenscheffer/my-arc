@@ -78,7 +78,7 @@ export default function ExerciseSelector({ onSelect, onClose, isMobile }) {
   // Difficulty colors
   const getDifficultyColor = (difficulty) => {
     switch(difficulty) {
-      case 'beginner': return '#10b981'
+      case 'beginner': return '#f97316'
       case 'intermediate': return '#f97316'
       case 'advanced': return '#dc2626'
       default: return 'rgba(255, 255, 255, 0.5)'
@@ -124,7 +124,7 @@ export default function ExerciseSelector({ onSelect, onClose, isMobile }) {
             alignItems: 'center',
             gap: '0.75rem'
           }}>
-            <Dumbbell size={24} color="#10b981" />
+            <Dumbbell size={24} color="#f97316" />
             <h2 style={{
               fontSize: isMobile ? '1.25rem' : '1.5rem',
               fontWeight: '700',
@@ -298,8 +298,8 @@ export default function ExerciseSelector({ onSelect, onClose, isMobile }) {
                   WebkitTapHighlightColor: 'transparent'
                 }}
                 onMouseEnter={(e) => {
-                  e.currentTarget.style.background = 'rgba(16, 185, 129, 0.1)'
-                  e.currentTarget.style.borderColor = 'rgba(16, 185, 129, 0.3)'
+                  e.currentTarget.style.background = 'rgba(249, 115, 22, 0.1)'
+                  e.currentTarget.style.borderColor = 'rgba(249, 115, 22, 0.3)'
                   e.currentTarget.style.transform = 'translateY(-2px)'
                 }}
                 onMouseLeave={(e) => {
@@ -335,14 +335,14 @@ export default function ExerciseSelector({ onSelect, onClose, isMobile }) {
                   
                   <span style={{
                     background: exercise.type === 'compound' 
-                      ? 'rgba(16, 185, 129, 0.2)' 
+                      ? 'rgba(249, 115, 22, 0.2)' 
                       : 'rgba(139, 92, 246, 0.2)',
                     border: `1px solid ${exercise.type === 'compound' 
-                      ? 'rgba(16, 185, 129, 0.3)' 
+                      ? 'rgba(249, 115, 22, 0.3)' 
                       : 'rgba(139, 92, 246, 0.3)'}`,
                     borderRadius: '6px',
                     padding: '0.2rem 0.5rem',
-                    color: exercise.type === 'compound' ? '#10b981' : '#8b5cf6',
+                    color: exercise.type === 'compound' ? '#f97316' : '#8b5cf6',
                     fontSize: isMobile ? '0.7rem' : '0.75rem',
                     fontWeight: '500'
                   }}>
@@ -363,7 +363,7 @@ export default function ExerciseSelector({ onSelect, onClose, isMobile }) {
                     gap: '0.25rem'
                   }}>
                     <span style={{ color: 'rgba(255, 255, 255, 0.4)' }}>Spier:</span>
-                    <strong style={{ color: '#10b981' }}>
+                    <strong style={{ color: '#f97316' }}>
                       {exercise.muscle.charAt(0).toUpperCase() + exercise.muscle.slice(1)}
                     </strong>
                   </span>

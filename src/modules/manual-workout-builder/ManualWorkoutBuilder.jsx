@@ -316,11 +316,11 @@ export default function ManualWorkoutBuilder({ db, clients }) {
           gap: '1rem',
           marginBottom: '1rem'
         }}>
-          <Activity size={24} color="#10b981" />
+          <Activity size={24} color="#f97316" />
           <h1 style={{
             fontSize: isMobile ? '1.5rem' : '2rem',
             fontWeight: '800',
-            background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+            background: 'linear-gradient(135deg, #f97316 0%, #ea580c 100%)',
             WebkitBackgroundClip: 'text',
             WebkitTextFillColor: 'transparent',
             margin: 0
@@ -457,7 +457,7 @@ export default function ManualWorkoutBuilder({ db, clients }) {
               border: '1px solid rgba(255, 255, 255, 0.1)',
               borderRadius: '8px',
               padding: '0.75rem',
-              color: '#10b981',
+              color: '#f97316',
               fontSize: isMobile ? '0.9rem' : '1rem',
               minHeight: '44px',
               display: 'flex',
@@ -504,10 +504,10 @@ export default function ManualWorkoutBuilder({ db, clients }) {
             disabled={saving || workoutPlan.days.length === 0 || !workoutPlan.name}
             style={{
               padding: '0.5rem 1rem',
-              background: saving ? 'rgba(255, 255, 255, 0.1)' : 'rgba(16, 185, 129, 0.2)',
-              border: '1px solid rgba(16, 185, 129, 0.3)',
+              background: saving ? 'rgba(255, 255, 255, 0.1)' : 'rgba(249, 115, 22, 0.2)',
+              border: '1px solid rgba(249, 115, 22, 0.3)',
               borderRadius: '8px',
-              color: saving ? 'rgba(255, 255, 255, 0.5)' : '#10b981',
+              color: saving ? 'rgba(255, 255, 255, 0.5)' : '#f97316',
               fontSize: isMobile ? '0.85rem' : '0.9rem',
               fontWeight: '600',
               cursor: saving || !workoutPlan.name ? 'not-allowed' : 'pointer',
@@ -584,8 +584,8 @@ export default function ManualWorkoutBuilder({ db, clients }) {
         <button
           onClick={addDay}
           style={{
-            background: 'rgba(16, 185, 129, 0.05)',
-            border: '2px dashed rgba(16, 185, 129, 0.25)',
+            background: 'rgba(249, 115, 22, 0.05)',
+            border: '2px dashed rgba(249, 115, 22, 0.25)',
             borderRadius: '14px',
             padding: isMobile ? '2rem' : '3rem',
             display: 'flex',
@@ -600,19 +600,19 @@ export default function ManualWorkoutBuilder({ db, clients }) {
             WebkitTapHighlightColor: 'transparent'
           }}
           onMouseEnter={(e) => {
-            e.currentTarget.style.background = 'rgba(16, 185, 129, 0.12)'
-            e.currentTarget.style.borderColor = 'rgba(16, 185, 129, 0.4)'
+            e.currentTarget.style.background = 'rgba(249, 115, 22, 0.12)'
+            e.currentTarget.style.borderColor = 'rgba(249, 115, 22, 0.4)'
             e.currentTarget.style.transform = 'translateX(4px)'
           }}
           onMouseLeave={(e) => {
-            e.currentTarget.style.background = 'rgba(16, 185, 129, 0.05)'
-            e.currentTarget.style.borderColor = 'rgba(16, 185, 129, 0.25)'
+            e.currentTarget.style.background = 'rgba(249, 115, 22, 0.05)'
+            e.currentTarget.style.borderColor = 'rgba(249, 115, 22, 0.25)'
             e.currentTarget.style.transform = 'translateX(0)'
           }}
         >
-          <Plus size={32} color="#10b981" />
+          <Plus size={32} color="#f97316" />
           <span style={{
-            color: '#10b981',
+            color: '#f97316',
             fontSize: isMobile ? '0.9rem' : '1rem',
             fontWeight: '600'
           }}>
