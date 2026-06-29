@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react'
 import { X, ArrowLeft, ArrowRight, Check, Zap } from 'lucide-react'
 import StandardFoodsSection from '../../client-meal-base/components/StandardFoodsSection'
-import AICustomMealBuilder from './AICustomMealBuilder'
+import AICustomMealBuilder from './CustomMealBuilder'
 import AIFavoritesModal from './AIFavoritesModal'
 import WeekPlannerService from '../services/WeekPlannerService'
 

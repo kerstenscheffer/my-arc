@@ -1,6 +1,24 @@
 // src/modules/client-meal-builder/components/IngredientList.jsx
 import { X } from 'lucide-react'
 
+const CATEGORY_IMAGES = {
+  carbs: 'https://images.unsplash.com/photo-1549931319-a545dcf3bc73?w=80&h=80&fit=crop',
+  protein: 'https://images.unsplash.com/photo-1611532736597-de2d4265fba3?w=80&h=80&fit=crop',
+  dairy: 'https://images.unsplash.com/photo-1550583724-b2692b85b150?w=80&h=80&fit=crop',
+  fruits: 'https://images.unsplash.com/photo-1490474504059-bf2db5ab2348?w=80&h=80&fit=crop',
+  fruit: 'https://images.unsplash.com/photo-1490474504059-bf2db5ab2348?w=80&h=80&fit=crop',
+  vegetables: 'https://images.unsplash.com/photo-1512621776951-a57141f2eefd?w=80&h=80&fit=crop',
+  vegetable: 'https://images.unsplash.com/photo-1512621776951-a57141f2eefd?w=80&h=80&fit=crop',
+  fats: 'https://images.unsplash.com/photo-1474979266404-7eaacbcd87c5?w=80&h=80&fit=crop',
+  condiments: 'https://images.unsplash.com/photo-1455619452474-d2be8b1e70cd?w=80&h=80&fit=crop',
+  other: 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=80&h=80&fit=crop',
+}
+
+function getIngredientImage(ingredient) {
+  if (ingredient?.image_url) return ingredient.image_url
+  return CATEGORY_IMAGES[ingredient?.category] || CATEGORY_IMAGES.other
+}
+
 export default function IngredientList({
   ingredients,
   macros,
@@ -34,19 +52,27 @@ export default function IngredientList({
               background: 'rgba(0, 0, 0, 0.6)',
               border: '1px solid rgba(16, 185, 129, 0.2)',
               borderRadius: '0',
-              padding: isMobile ? '1rem' : '1.25rem',
+              padding: isMobile ? '0.75rem' : '1rem',
               display: 'flex',
               justifyContent: 'space-between',
               alignItems: 'center',
               gap: '1rem'
             }}
           >
+            <div style={{
+              width: '48px',
+              height: '48px',
+              borderRadius: '8px',
+              background: `url(${getIngredientImage(item.ingredient)}) center/cover`,
+              flexShrink: 0,
+              border: '1px solid rgba(16, 185, 129, 0.3)'
+            }} />
             <div style={{ flex: 1 }}>
               <div style={{
                 color: '#fff',
                 fontSize: '1rem',
                 fontWeight: '700',
-                marginBottom: '0.5rem'
+                marginBottom: '0.25rem'
               }}>
                 {item.ingredient.name}
               </div>

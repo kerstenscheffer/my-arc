@@ -4,7 +4,7 @@ import DayBuilder from './components/DayBuilder'
 import ExerciseSelector from './components/ExerciseSelector'
 import TemplateManager from './components/TemplateManager'
 import ClientAssigner from './components/ClientAssigner'
-import { Activity, Plus, Save, Users, FileText } from 'lucide-react'
+import { Activity, Plus, Save, Users, FileText, Dumbbell } from 'lucide-react'
 
 export default function ManualWorkoutBuilder({ db, clients }) {
   const isMobile = window.innerWidth <= 768
@@ -303,29 +303,51 @@ export default function ManualWorkoutBuilder({ db, clients }) {
     }}>
       {/* Header Section */}
       <div style={{
-        background: 'rgba(17, 17, 17, 0.8)',
+        background: 'linear-gradient(135deg, rgba(23, 23, 23, 0.95) 0%, rgba(10, 10, 10, 0.95) 100%)',
         backdropFilter: 'blur(20px)',
         borderRadius: '16px',
-        border: '1px solid rgba(255, 255, 255, 0.1)',
+        border: '1px solid rgba(249, 115, 22, 0.15)',
         padding: isMobile ? '1rem' : '1.5rem',
-        marginBottom: '1.5rem'
+        marginBottom: '1.5rem',
+        position: 'relative',
+        overflow: 'hidden'
       }}>
+        {/* Orange top accent */}
+        <div style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          height: '3px',
+          background: 'linear-gradient(90deg, #f97316 0%, #ea580c 100%)'
+        }} />
         <div style={{
           display: 'flex',
           alignItems: 'center',
           gap: '1rem',
           marginBottom: '1rem'
         }}>
-          <Activity size={24} color="#10b981" />
+          <div style={{
+            width: isMobile ? '42px' : '48px',
+            height: isMobile ? '42px' : '48px',
+            borderRadius: '12px',
+            background: 'linear-gradient(135deg, rgba(249, 115, 22, 0.2) 0%, rgba(234, 88, 12, 0.1) 100%)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            border: '1px solid rgba(249, 115, 22, 0.2)'
+          }}>
+            <Dumbbell size={isMobile ? 20 : 24} color="#f97316" />
+          </div>
           <h1 style={{
             fontSize: isMobile ? '1.5rem' : '2rem',
             fontWeight: '800',
-            background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+            background: 'linear-gradient(135deg, #f97316 0%, #ea580c 100%)',
             WebkitBackgroundClip: 'text',
             WebkitTextFillColor: 'transparent',
             margin: 0
           }}>
-            Manual Workout Builder
+            Workout Builder
           </h1>
         </div>
         
@@ -478,77 +500,115 @@ export default function ManualWorkoutBuilder({ db, clients }) {
           <button
             onClick={() => setShowTemplateManager(true)}
             style={{
-              padding: '0.5rem 1rem',
-              background: 'rgba(139, 92, 246, 0.2)',
-              border: '1px solid rgba(139, 92, 246, 0.3)',
-              borderRadius: '8px',
-              color: '#8b5cf6',
+              padding: '0.625rem 1.125rem',
+              background: 'linear-gradient(135deg, rgba(249, 115, 22, 0.15) 0%, rgba(234, 88, 12, 0.08) 100%)',
+              border: '1px solid rgba(249, 115, 22, 0.25)',
+              borderRadius: '10px',
+              color: '#f97316',
               fontSize: isMobile ? '0.85rem' : '0.9rem',
               fontWeight: '600',
               cursor: 'pointer',
               display: 'flex',
               alignItems: 'center',
               gap: '0.5rem',
-              transition: 'all 0.3s ease',
+              transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
               touchAction: 'manipulation',
               WebkitTapHighlightColor: 'transparent',
               minHeight: '44px'
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = 'linear-gradient(135deg, rgba(249, 115, 22, 0.25) 0%, rgba(234, 88, 12, 0.15) 100%)'
+              e.currentTarget.style.transform = 'translateY(-1px)'
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = 'linear-gradient(135deg, rgba(249, 115, 22, 0.15) 0%, rgba(234, 88, 12, 0.08) 100%)'
+              e.currentTarget.style.transform = 'translateY(0)'
             }}
           >
             <FileText size={16} />
             Templates
           </button>
-          
+
           <button
             onClick={saveAsTemplate}
             disabled={saving || workoutPlan.days.length === 0 || !workoutPlan.name}
             style={{
-              padding: '0.5rem 1rem',
-              background: saving ? 'rgba(255, 255, 255, 0.1)' : 'rgba(16, 185, 129, 0.2)',
-              border: '1px solid rgba(16, 185, 129, 0.3)',
-              borderRadius: '8px',
-              color: saving ? 'rgba(255, 255, 255, 0.5)' : '#10b981',
+              padding: '0.625rem 1.125rem',
+              background: saving || workoutPlan.days.length === 0 || !workoutPlan.name
+                ? 'rgba(255, 255, 255, 0.05)'
+                : 'linear-gradient(135deg, rgba(249, 115, 22, 0.2) 0%, rgba(234, 88, 12, 0.1) 100%)',
+              border: `1px solid ${saving || workoutPlan.days.length === 0 || !workoutPlan.name ? 'rgba(255,255,255,0.1)' : 'rgba(249, 115, 22, 0.3)'}`,
+              borderRadius: '10px',
+              color: saving || workoutPlan.days.length === 0 || !workoutPlan.name
+                ? 'rgba(255, 255, 255, 0.3)'
+                : '#f97316',
               fontSize: isMobile ? '0.85rem' : '0.9rem',
-              fontWeight: '600',
-              cursor: saving || !workoutPlan.name ? 'not-allowed' : 'pointer',
+              fontWeight: '700',
+              cursor: saving || !workoutPlan.name || workoutPlan.days.length === 0 ? 'not-allowed' : 'pointer',
               display: 'flex',
               alignItems: 'center',
               gap: '0.5rem',
-              opacity: workoutPlan.days.length === 0 || !workoutPlan.name ? 0.5 : 1,
-              transition: 'all 0.3s ease',
+              transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
               touchAction: 'manipulation',
               WebkitTapHighlightColor: 'transparent',
               minHeight: '44px'
             }}
+            onMouseEnter={(e) => {
+              if (!saving && workoutPlan.name && workoutPlan.days.length > 0) {
+                e.currentTarget.style.background = 'linear-gradient(135deg, rgba(249, 115, 22, 0.3) 0%, rgba(234, 88, 12, 0.2) 100%)'
+                e.currentTarget.style.transform = 'translateY(-1px)'
+                e.currentTarget.style.boxShadow = '0 4px 12px rgba(249, 115, 22, 0.2)'
+              }
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = saving || workoutPlan.days.length === 0 || !workoutPlan.name
+                ? 'rgba(255, 255, 255, 0.05)'
+                : 'linear-gradient(135deg, rgba(249, 115, 22, 0.2) 0%, rgba(234, 88, 12, 0.1) 100%)'
+              e.currentTarget.style.transform = 'translateY(0)'
+              e.currentTarget.style.boxShadow = 'none'
+            }}
           >
             <Save size={16} />
-            {saving ? 'Opslaan...' : 'Save Template'}
+            {saving ? 'Opslaan...' : 'Opslaan'}
           </button>
-          
+
           <button
             onClick={() => setShowClientAssigner(true)}
             disabled={workoutPlan.days.length === 0}
             style={{
-              padding: '0.5rem 1rem',
-              background: 'rgba(59, 130, 246, 0.2)',
-              border: '1px solid rgba(59, 130, 246, 0.3)',
-              borderRadius: '8px',
-              color: '#3b82f6',
+              padding: '0.625rem 1.125rem',
+              background: workoutPlan.days.length === 0
+                ? 'rgba(255, 255, 255, 0.05)'
+                : 'linear-gradient(135deg, rgba(249, 115, 22, 0.12) 0%, rgba(234, 88, 12, 0.06) 100%)',
+              border: `1px solid ${workoutPlan.days.length === 0 ? 'rgba(255,255,255,0.1)' : 'rgba(249, 115, 22, 0.2)'}`,
+              borderRadius: '10px',
+              color: workoutPlan.days.length === 0 ? 'rgba(255,255,255,0.3)' : 'rgba(249, 115, 22, 0.8)',
               fontSize: isMobile ? '0.85rem' : '0.9rem',
               fontWeight: '600',
               cursor: workoutPlan.days.length === 0 ? 'not-allowed' : 'pointer',
               display: 'flex',
               alignItems: 'center',
               gap: '0.5rem',
-              opacity: workoutPlan.days.length === 0 ? 0.5 : 1,
-              transition: 'all 0.3s ease',
+              transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
               touchAction: 'manipulation',
               WebkitTapHighlightColor: 'transparent',
               minHeight: '44px'
             }}
+            onMouseEnter={(e) => {
+              if (workoutPlan.days.length > 0) {
+                e.currentTarget.style.background = 'linear-gradient(135deg, rgba(249, 115, 22, 0.2) 0%, rgba(234, 88, 12, 0.12) 100%)'
+                e.currentTarget.style.transform = 'translateY(-1px)'
+              }
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = workoutPlan.days.length === 0
+                ? 'rgba(255, 255, 255, 0.05)'
+                : 'linear-gradient(135deg, rgba(249, 115, 22, 0.12) 0%, rgba(234, 88, 12, 0.06) 100%)'
+              e.currentTarget.style.transform = 'translateY(0)'
+            }}
           >
             <Users size={16} />
-            Assign to Clients
+            Toewijzen
           </button>
         </div>
       </div>
@@ -584,9 +644,9 @@ export default function ManualWorkoutBuilder({ db, clients }) {
         <button
           onClick={addDay}
           style={{
-            background: 'rgba(16, 185, 129, 0.1)',
-            border: '2px dashed rgba(16, 185, 129, 0.3)',
-            borderRadius: '16px',
+            background: 'linear-gradient(135deg, rgba(249, 115, 22, 0.08) 0%, rgba(234, 88, 12, 0.04) 100%)',
+            border: '2px dashed rgba(249, 115, 22, 0.3)',
+            borderRadius: '14px',
             padding: isMobile ? '2rem' : '3rem',
             display: 'flex',
             flexDirection: 'column',
@@ -594,27 +654,29 @@ export default function ManualWorkoutBuilder({ db, clients }) {
             justifyContent: 'center',
             gap: '0.5rem',
             cursor: 'pointer',
-            transition: 'all 0.3s ease',
+            transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
             minHeight: isMobile ? '150px' : '200px',
             touchAction: 'manipulation',
             WebkitTapHighlightColor: 'transparent'
           }}
           onMouseEnter={(e) => {
-            e.currentTarget.style.background = 'rgba(16, 185, 129, 0.2)'
-            e.currentTarget.style.borderColor = 'rgba(16, 185, 129, 0.5)'
+            e.currentTarget.style.background = 'linear-gradient(135deg, rgba(249, 115, 22, 0.15) 0%, rgba(234, 88, 12, 0.08) 100%)'
+            e.currentTarget.style.borderColor = 'rgba(249, 115, 22, 0.5)'
+            e.currentTarget.style.transform = 'translateY(-2px)'
           }}
           onMouseLeave={(e) => {
-            e.currentTarget.style.background = 'rgba(16, 185, 129, 0.1)'
-            e.currentTarget.style.borderColor = 'rgba(16, 185, 129, 0.3)'
+            e.currentTarget.style.background = 'linear-gradient(135deg, rgba(249, 115, 22, 0.08) 0%, rgba(234, 88, 12, 0.04) 100%)'
+            e.currentTarget.style.borderColor = 'rgba(249, 115, 22, 0.3)'
+            e.currentTarget.style.transform = 'translateY(0)'
           }}
         >
-          <Plus size={32} color="#10b981" />
+          <Plus size={32} color="#f97316" />
           <span style={{
-            color: '#10b981',
+            color: '#f97316',
             fontSize: isMobile ? '0.9rem' : '1rem',
             fontWeight: '600'
           }}>
-            Nieuwe Dag Toevoegen
+            Dag Toevoegen
           </span>
         </button>
       </div>

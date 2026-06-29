@@ -59,68 +59,112 @@ export default function DayBuilder({
   const totalVolume = day.exercises.reduce((sum, ex) => sum + (ex.sets || 0), 0)
   
   return (
-    <div 
+    <div
       onClick={onActivate}
       style={{
-        background: isActive 
-          ? 'linear-gradient(135deg, rgba(16, 185, 129, 0.12) 0%, rgba(16, 185, 129, 0.04) 100%)'
-          : 'rgba(17, 17, 17, 0.8)',
-        backdropFilter: 'blur(20px)',
-        borderRadius: '16px',
-        border: isActive 
-          ? '2px solid rgba(16, 185, 129, 0.4)'
-          : '1px solid rgba(255, 255, 255, 0.1)',
+        background: isActive
+          ? 'linear-gradient(135deg, rgba(249, 115, 22, 0.1) 0%, rgba(234, 88, 12, 0.05) 100%)'
+          : 'linear-gradient(135deg, rgba(23, 23, 23, 0.9) 0%, rgba(10, 10, 10, 0.9) 100%)',
+        backdropFilter: 'blur(10px)',
+        borderRadius: '14px',
+        border: isActive
+          ? '1px solid rgba(249, 115, 22, 0.25)'
+          : '1px solid rgba(249, 115, 22, 0.1)',
         padding: isMobile ? '1rem' : '1.25rem',
         cursor: 'pointer',
-        transition: 'all 0.3s ease',
+        transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
         position: 'relative',
+        overflow: 'hidden',
         touchAction: 'manipulation',
         WebkitTapHighlightColor: 'transparent'
       }}
       onMouseEnter={(e) => {
-        if (!isActive && !isMobile) {
-          e.currentTarget.style.border = '1px solid rgba(255, 255, 255, 0.2)'
+        if (!isMobile) {
+          e.currentTarget.style.transform = 'translateX(4px)'
+          e.currentTarget.style.borderColor = isActive
+            ? 'rgba(249, 115, 22, 0.4)'
+            : 'rgba(249, 115, 22, 0.25)'
         }
       }}
       onMouseLeave={(e) => {
-        if (!isActive && !isMobile) {
-          e.currentTarget.style.border = '1px solid rgba(255, 255, 255, 0.1)'
+        if (!isMobile) {
+          e.currentTarget.style.transform = 'translateX(0)'
+          e.currentTarget.style.borderColor = isActive
+            ? 'rgba(249, 115, 22, 0.25)'
+            : 'rgba(249, 115, 22, 0.1)'
         }
       }}
     >
-      {/* Day number badge */}
+      {/* Left accent bar */}
       <div style={{
         position: 'absolute',
-        top: '-10px',
-        left: '16px',
-        background: isActive 
-          ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)'
-          : 'linear-gradient(135deg, #1f2937 0%, #111827 100%)',
-        padding: '0.25rem 0.75rem',
-        borderRadius: '20px',
-        fontSize: '0.75rem',
-        fontWeight: '700',
-        color: '#fff',
-        boxShadow: '0 2px 8px rgba(0, 0, 0, 0.3)'
-      }}>
-        DAG {dayNumber}
-      </div>
+        left: 0,
+        top: 0,
+        bottom: 0,
+        width: '3px',
+        background: isActive
+          ? 'linear-gradient(180deg, #f97316 0%, #ea580c 100%)'
+          : 'rgba(249, 115, 22, 0.3)',
+        boxShadow: isActive ? '2px 0 8px rgba(249, 115, 22, 0.3)' : 'none'
+      }} />
       
       {/* Header */}
       <div style={{
         display: 'flex',
-        justifyContent: 'space-between',
         alignItems: 'flex-start',
-        marginBottom: collapsed ? 0 : '1rem'
+        gap: '0.75rem',
+        marginBottom: collapsed ? 0 : '1rem',
+        paddingLeft: '0.5rem'
       }}>
+        {/* Icon container - matches WorkoutCard style */}
+        <div style={{
+          width: isMobile ? '42px' : '48px',
+          height: isMobile ? '42px' : '48px',
+          borderRadius: '12px',
+          background: isActive
+            ? 'linear-gradient(135deg, rgba(249, 115, 22, 0.25) 0%, rgba(234, 88, 12, 0.12) 100%)'
+            : 'linear-gradient(135deg, rgba(249, 115, 22, 0.15) 0%, rgba(234, 88, 12, 0.08) 100%)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          flexShrink: 0,
+          position: 'relative'
+        }}>
+          <Dumbbell size={isMobile ? 20 : 22} color={isActive ? '#f97316' : 'rgba(249, 115, 22, 0.7)'} strokeWidth={2} />
+          {isActive && (
+            <div style={{
+              position: 'absolute',
+              top: '-2px',
+              right: '-2px',
+              width: '8px',
+              height: '8px',
+              borderRadius: '50%',
+              background: '#f97316',
+              boxShadow: '0 0 8px rgba(249, 115, 22, 0.6)'
+            }} />
+          )}
+        </div>
+
         <div style={{ flex: 1 }}>
+          {/* Day label */}
+          <div style={{
+            fontSize: '0.7rem',
+            color: isActive ? '#f97316' : 'rgba(255,255,255,0.5)',
+            fontWeight: '700',
+            textTransform: 'uppercase',
+            letterSpacing: '0.05em',
+            marginBottom: '0.2rem'
+          }}>
+            DAG {dayNumber}{isActive && <span style={{ marginLeft: '0.4rem', fontSize: '0.65rem', background: 'linear-gradient(135deg, #f97316 0%, #ea580c 100%)', padding: '0.1rem 0.4rem', borderRadius: '6px' }}>ACTIEF</span>}
+          </div>
+
           {/* Name editing */}
           {editingName ? (
             <div style={{
               display: 'flex',
               gap: '0.5rem',
               alignItems: 'center',
-              marginBottom: '0.5rem'
+              marginBottom: '0.25rem'
             }} onClick={(e) => e.stopPropagation()}>
               <input
                 type="text"
@@ -131,7 +175,7 @@ export default function DayBuilder({
                 style={{
                   flex: 1,
                   background: 'rgba(255, 255, 255, 0.05)',
-                  border: '1px solid rgba(16, 185, 129, 0.3)',
+                  border: '1px solid rgba(249, 115, 22, 0.3)',
                   borderRadius: '8px',
                   padding: '0.5rem',
                   color: '#fff',
@@ -147,10 +191,10 @@ export default function DayBuilder({
                 onClick={handleSaveName}
                 style={{
                   padding: '0.5rem',
-                  background: 'rgba(16, 185, 129, 0.2)',
-                  border: '1px solid rgba(16, 185, 129, 0.3)',
+                  background: 'rgba(249, 115, 22, 0.2)',
+                  border: '1px solid rgba(249, 115, 22, 0.3)',
                   borderRadius: '8px',
-                  color: '#10b981',
+                  color: '#f97316',
                   cursor: 'pointer',
                   minWidth: '32px',
                   minHeight: '32px'
@@ -179,16 +223,16 @@ export default function DayBuilder({
               display: 'flex',
               alignItems: 'center',
               gap: '0.5rem',
-              marginBottom: '0.5rem'
+              marginBottom: '0.2rem'
             }}>
               <h3 style={{
-                fontSize: isMobile ? '1.1rem' : '1.25rem',
+                fontSize: isMobile ? '0.95rem' : '1rem',
                 fontWeight: '700',
                 color: day.name ? '#fff' : 'rgba(255, 255, 255, 0.3)',
                 margin: 0,
                 flex: 1
               }}>
-                {day.name || 'Klik om naam in te voeren...'}
+                {day.name || 'Klik om naam toe te voegen...'}
               </h3>
               <button
                 onClick={(e) => {
@@ -200,14 +244,14 @@ export default function DayBuilder({
                   padding: '0.25rem',
                   background: 'transparent',
                   border: 'none',
-                  color: 'rgba(255, 255, 255, 0.5)',
+                  color: 'rgba(249, 115, 22, 0.5)',
                   cursor: 'pointer',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center'
                 }}
               >
-                <Edit2 size={16} />
+                <Edit2 size={14} />
               </button>
             </div>
           )}
@@ -218,9 +262,9 @@ export default function DayBuilder({
               display: 'flex',
               gap: '0.5rem',
               alignItems: 'center',
-              marginBottom: '0.5rem'
+              marginBottom: '0.3rem'
             }} onClick={(e) => e.stopPropagation()}>
-              <Target size={14} color="rgba(255, 255, 255, 0.5)" />
+              <Target size={14} color="rgba(249, 115, 22, 0.5)" />
               <input
                 type="text"
                 value={tempFocus}
@@ -230,7 +274,7 @@ export default function DayBuilder({
                 style={{
                   flex: 1,
                   background: 'rgba(255, 255, 255, 0.05)',
-                  border: '1px solid rgba(16, 185, 129, 0.3)',
+                  border: '1px solid rgba(249, 115, 22, 0.3)',
                   borderRadius: '6px',
                   padding: '0.4rem',
                   color: 'rgba(255, 255, 255, 0.8)',
@@ -245,10 +289,10 @@ export default function DayBuilder({
                 onClick={handleSaveFocus}
                 style={{
                   padding: '0.4rem',
-                  background: 'rgba(16, 185, 129, 0.2)',
-                  border: '1px solid rgba(16, 185, 129, 0.3)',
+                  background: 'rgba(249, 115, 22, 0.2)',
+                  border: '1px solid rgba(249, 115, 22, 0.3)',
                   borderRadius: '6px',
-                  color: '#10b981',
+                  color: '#f97316',
                   cursor: 'pointer',
                   fontSize: '0.8rem',
                   minWidth: '28px',
@@ -279,15 +323,18 @@ export default function DayBuilder({
               display: 'flex',
               alignItems: 'center',
               gap: '0.5rem',
-              marginBottom: '0.75rem'
+              marginBottom: '0.3rem'
             }}>
-              <Target size={14} color="rgba(255, 255, 255, 0.5)" />
+              <Target size={12} color="rgba(249, 115, 22, 0.5)" />
               <span style={{
-                fontSize: isMobile ? '0.8rem' : '0.85rem',
-                color: day.focus ? 'rgba(255, 255, 255, 0.6)' : 'rgba(255, 255, 255, 0.3)',
-                flex: 1
+                fontSize: isMobile ? '0.7rem' : '0.75rem',
+                color: day.focus ? 'rgba(255,255,255,0.5)' : 'rgba(255, 255, 255, 0.3)',
+                flex: 1,
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.75rem'
               }}>
-                {day.focus || 'Klik om spiergroepen toe te voegen...'}
+                {day.focus || 'Spiergroepen...'}
               </span>
               <button
                 onClick={(e) => {
@@ -299,28 +346,29 @@ export default function DayBuilder({
                   padding: '0.25rem',
                   background: 'transparent',
                   border: 'none',
-                  color: 'rgba(255, 255, 255, 0.5)',
+                  color: 'rgba(249, 115, 22, 0.4)',
                   cursor: 'pointer',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center'
                 }}
               >
-                <Edit2 size={14} />
+                <Edit2 size={12} />
               </button>
             </div>
           )}
-          
+
           {/* Stats */}
           <div style={{
             display: 'flex',
-            gap: '1rem',
-            fontSize: isMobile ? '0.75rem' : '0.8rem',
-            color: 'rgba(255, 255, 255, 0.5)'
+            gap: '0.75rem',
+            fontSize: isMobile ? '0.7rem' : '0.75rem',
+            color: 'rgba(255,255,255,0.4)',
+            alignItems: 'center'
           }}>
             <span style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
               <Dumbbell size={12} />
-              {day.exercises.length} oefeningen
+              {day.exercises.length} oef.
             </span>
             <span>{totalVolume} sets</span>
             <span style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
@@ -381,7 +429,7 @@ export default function DayBuilder({
               minWidth: '44px'
             }}
           >
-            <Copy size={18} color="rgba(139, 92, 246, 0.7)" />
+            <Copy size={18} color="rgba(249, 115, 22, 0.7)" />
           </button>
           
           <button
@@ -550,10 +598,10 @@ export default function DayBuilder({
             style={{
               width: '100%',
               padding: '0.75rem',
-              background: 'rgba(16, 185, 129, 0.1)',
-              border: '1px solid rgba(16, 185, 129, 0.3)',
+              background: 'rgba(249, 115, 22, 0.1)',
+              border: '1px solid rgba(249, 115, 22, 0.3)',
               borderRadius: '8px',
-              color: '#10b981',
+              color: '#f97316',
               fontSize: isMobile ? '0.85rem' : '0.9rem',
               fontWeight: '600',
               cursor: 'pointer',
@@ -567,10 +615,10 @@ export default function DayBuilder({
               minHeight: '44px'
             }}
             onMouseEnter={(e) => {
-              e.currentTarget.style.background = 'rgba(16, 185, 129, 0.2)'
+              e.currentTarget.style.background = 'rgba(249, 115, 22, 0.2)'
             }}
             onMouseLeave={(e) => {
-              e.currentTarget.style.background = 'rgba(16, 185, 129, 0.1)'
+              e.currentTarget.style.background = 'rgba(249, 115, 22, 0.1)'
             }}
             onTouchStart={(e) => {
               if (isMobile) {
