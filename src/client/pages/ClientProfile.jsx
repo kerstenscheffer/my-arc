@@ -40,7 +40,8 @@ export default function ClientProfile({ client, user }) {
     // Settings
     notification_email: true,
     notification_push: false,
-    language: 'nl'
+    language: 'nl',
+    meal_view_mode: 'plan'
   })
 
   // Load client data when component mounts or client changes
@@ -56,7 +57,8 @@ export default function ClientProfile({ client, user }) {
         location: client.location || 'Amsterdam, Nederland',  // Direct van kolom
         notification_email: true,
         notification_push: false,
-        language: 'nl'
+        language: 'nl',
+        meal_view_mode: client.meal_view_mode || 'plan'
       })
       
       // Zet profiel foto als die bestaat
@@ -90,8 +92,9 @@ export default function ClientProfile({ client, user }) {
         phone: formData.phone,
         age: formData.age ? parseInt(formData.age) : null,
         height: formData.height ? parseInt(formData.height) : null,
-        location: formData.location,  // Direct als kolom
-        profile_image: profileImage,   // Direct als kolom
+        location: formData.location,
+        profile_image: profileImage,
+        meal_view_mode: formData.meal_view_mode,
         updated_at: new Date().toISOString()
       }
 
@@ -750,6 +753,50 @@ export default function ClientProfile({ client, user }) {
         {/* Instellingen Section */}
         {activeSection === 'instellingen' && (
           <div>
+            {/* Maaltijdplan weergave */}
+            <div style={{ marginBottom: '2rem' }}>
+              <h4 style={{
+                color: 'rgba(255,255,255,0.8)',
+                fontSize: '1rem',
+                marginBottom: '0.5rem',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem'
+              }}>
+                🥗 Maaltijdplan weergave
+              </h4>
+              <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: '0.85rem', marginBottom: '1rem' }}>
+                Kies of je een vast maaltijdplan van je coach wilt volgen, of vrij wilt eten op basis van je macro-doelen.
+              </p>
+              <div style={{ display: 'flex', gap: '0.75rem' }}>
+                {[
+                  { value: 'plan', label: 'Vast plan', desc: 'Coach stelt maaltijden in' },
+                  { value: 'free', label: 'Vrij', desc: 'Zelf kiezen op basis van macro\'s' }
+                ].map(opt => (
+                  <button
+                    key={opt.value}
+                    onClick={() => setFormData({ ...formData, meal_view_mode: opt.value })}
+                    style={{
+                      flex: 1,
+                      padding: '0.85rem',
+                      background: formData.meal_view_mode === opt.value
+                        ? profileColors.backgroundGradient
+                        : 'rgba(255,255,255,0.03)',
+                      border: `2px solid ${formData.meal_view_mode === opt.value ? profileColors.primary : profileColors.borderColor}`,
+                      borderRadius: '10px',
+                      color: formData.meal_view_mode === opt.value ? profileColors.primaryLight : 'rgba(255,255,255,0.6)',
+                      cursor: 'pointer',
+                      textAlign: 'center',
+                      transition: 'all 0.2s'
+                    }}
+                  >
+                    <div style={{ fontWeight: '600', marginBottom: '0.25rem' }}>{opt.label}</div>
+                    <div style={{ fontSize: '0.78rem', opacity: 0.75 }}>{opt.desc}</div>
+                  </button>
+                ))}
+              </div>
+            </div>
+
             {/* Notifications */}
             <div style={{ marginBottom: '2rem' }}>
               <h4 style={{ 
