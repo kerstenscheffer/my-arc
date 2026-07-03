@@ -146,11 +146,13 @@ export default function ClientDashboard() {
   const { t, language, toggleLanguage } = useLanguage()
   const currentTheme = pageThemes[currentView] || pageThemes.home
   
+  const mealPlanVisible = client?.meal_plan_visible !== false
+
   // Navigation Items - OPGESCHOOND
   const bottomNavItems = [
     { id: 'home', label: 'Home', Icon: Home },
     { id: 'workout', label: 'Workout', Icon: Dumbbell },
-    { id: 'meal', label: 'Meal', Icon: Utensils },
+    ...(mealPlanVisible ? [{ id: 'meal', label: 'Meal', Icon: Utensils }] : []),
     { id: 'tracking', label: 'Tracking', Icon: Camera },
     { id: 'calls', label: 'Calls', Icon: Phone },
     { id: 'profile', label: 'Profile', Icon: User }
@@ -159,7 +161,7 @@ export default function ClientDashboard() {
   const sideMenuItems = [
     { id: 'home', label: 'Home', Icon: Home },
     { id: 'workout', label: 'Workout', Icon: Dumbbell },
-    { id: 'meal', label: 'Meal', Icon: Utensils },
+    ...(mealPlanVisible ? [{ id: 'meal', label: 'Meal', Icon: Utensils }] : []),
     { id: 'boodschappen', label: 'Boodschappen', Icon: ShoppingCart },
     { id: 'tracking', label: 'Tracking', Icon: Camera },
     { id: 'calls', label: 'Calls', Icon: Phone },
@@ -195,6 +197,13 @@ export default function ClientDashboard() {
     metaViewport.content = 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no'
   }, [])
   
+  // Redirect away from meal view if meal plan is hidden
+  useEffect(() => {
+    if (client && client.meal_plan_visible === false && currentView === 'meal') {
+      setCurrentView('home')
+    }
+  }, [client, currentView])
+
   // Load client data
   useEffect(() => {
     loadClientData()

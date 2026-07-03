@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { ChevronDown, User, Phone, Mail, Calendar, MapPin, Settings, Bell, Globe, Shield, LogOut, Edit, Save, X, Camera, Target, Activity } from 'lucide-react'
+import { ChevronDown, User, Phone, Mail, Calendar, MapPin, Settings, Bell, Globe, Shield, LogOut, Edit, Save, X, Camera, Target, Activity, Utensils } from 'lucide-react'
 import DatabaseService from '../../services/DatabaseService'
 const db = DatabaseService
 
@@ -40,7 +40,8 @@ export default function ClientProfile({ client, user }) {
     // Settings
     notification_email: true,
     notification_push: false,
-    language: 'nl'
+    language: 'nl',
+    meal_plan_visible: true
   })
 
   // Load client data when component mounts or client changes
@@ -56,7 +57,8 @@ export default function ClientProfile({ client, user }) {
         location: client.location || 'Amsterdam, Nederland',  // Direct van kolom
         notification_email: true,
         notification_push: false,
-        language: 'nl'
+        language: 'nl',
+        meal_plan_visible: client.meal_plan_visible !== false
       })
       
       // Zet profiel foto als die bestaat
@@ -90,8 +92,9 @@ export default function ClientProfile({ client, user }) {
         phone: formData.phone,
         age: formData.age ? parseInt(formData.age) : null,
         height: formData.height ? parseInt(formData.height) : null,
-        location: formData.location,  // Direct als kolom
-        profile_image: profileImage,   // Direct als kolom
+        location: formData.location,
+        profile_image: profileImage,
+        meal_plan_visible: formData.meal_plan_visible,
         updated_at: new Date().toISOString()
       }
 
@@ -750,6 +753,44 @@ export default function ClientProfile({ client, user }) {
         {/* Instellingen Section */}
         {activeSection === 'instellingen' && (
           <div>
+            {/* Weergave */}
+            <div style={{ marginBottom: '2rem' }}>
+              <h4 style={{
+                color: 'rgba(255,255,255,0.8)',
+                fontSize: '1rem',
+                marginBottom: '1rem',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem'
+              }}>
+                <Utensils size={16} />
+                Weergave
+              </h4>
+              <label style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                padding: '0.75rem',
+                background: 'rgba(255,255,255,0.03)',
+                borderRadius: '8px',
+                border: `1px solid ${profileColors.borderColor}`,
+                cursor: 'pointer'
+              }}>
+                <div>
+                  <span style={{ color: 'rgba(255,255,255,0.7)', display: 'block' }}>Meal plan zichtbaar</span>
+                  <span style={{ color: 'rgba(255,255,255,0.35)', fontSize: '0.78rem' }}>
+                    Toon of verberg het meal plan tabblad
+                  </span>
+                </div>
+                <input
+                  type="checkbox"
+                  checked={formData.meal_plan_visible}
+                  onChange={(e) => setFormData({...formData, meal_plan_visible: e.target.checked})}
+                  style={{ width: '20px', height: '20px', accentColor: profileColors.primary, flexShrink: 0 }}
+                />
+              </label>
+            </div>
+
             {/* Notifications */}
             <div style={{ marginBottom: '2rem' }}>
               <h4 style={{ 
