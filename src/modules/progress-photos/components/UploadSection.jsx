@@ -49,20 +49,7 @@ export default function UploadSection({ onUpload, todayData = {}, isFriday = fal
         background: 'rgba(10, 10, 10, 0.95)',
         borderBottom: '1px solid rgba(255, 255, 255, 0.06)'
       }}>
-        {/* Tip text left */}
-        <div style={{
-          padding: isMobile ? '0.55rem 0.75rem' : '0.65rem 1rem',
-          borderRight: '1px solid rgba(255, 255, 255, 0.06)',
-          display: 'flex', alignItems: 'center', gap: '0.25rem',
-          color: 'rgba(255, 255, 255, 0.3)',
-          fontSize: isMobile ? '0.55rem' : '0.6rem',
-          fontWeight: '600'
-        }}>
-          <Camera size={12} style={{ opacity: 0.5 }} />
-          Front & side
-        </div>
-
-        {/* Upload button right — gold accent */}
+        {/* Upload button — gold accent */}
         <button
           onClick={() => fileInputRef.current?.click()}
           disabled={uploading}

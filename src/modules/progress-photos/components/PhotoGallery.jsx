@@ -3,7 +3,7 @@
 // Props IDENTIEK: { photos, onDelete, isMobile }
 
 import React, { useState } from 'react'
-import { Grid, Calendar, Trash2, ChevronDown, ChevronUp, X } from 'lucide-react'
+import { Grid, Calendar, Trash2, ChevronDown, ChevronUp, X, ArrowLeftRight, Check } from 'lucide-react'
 
 // Color per angle. Custom subtypes fall back to grey.
 const ANGLE_COLOR = {
@@ -16,6 +16,27 @@ const angleColor = (subtype) => ANGLE_COLOR[(subtype || '').toLowerCase()] || '#
 export default function PhotoGallery({ photos = {}, onDelete, isMobile = false }) {
   const [expanded, setExpanded] = useState(false)
   const [selectedPhoto, setSelectedPhoto] = useState(null)
+  const [compareMode, setCompareMode] = useState(false)
+  const [comparePhotos, setComparePhotos] = useState([])
+
+  const isCompareSelected = (photo) => comparePhotos.some(p => p.id === photo.id)
+
+  const handlePhotoClick = (photo) => {
+    if (!compareMode) { setSelectedPhoto(photo); return }
+    if (isCompareSelected(photo)) {
+      setComparePhotos(prev => prev.filter(p => p.id !== photo.id))
+    } else if (comparePhotos.length < 2) {
+      setComparePhotos(prev => [...prev, photo])
+    } else {
+      setComparePhotos([comparePhotos[1], photo])
+    }
+  }
+
+  const toggleCompareMode = () => {
+    setCompareMode(v => !v)
+    setComparePhotos([])
+    setSelectedPhoto(null)
+  }
   
   const dates = Object.keys(photos).sort((a, b) => new Date(b) - new Date(a))
   const displayDates = expanded ? dates : dates.slice(0, 3)
@@ -60,17 +81,106 @@ export default function PhotoGallery({ photos = {}, onDelete, isMobile = false }
           </span>
         </div>
 
-        <button onClick={() => setExpanded(!expanded)}
-          style={{
-            background: 'none', border: 'none', color: 'rgba(255,215,0,0.4)',
-            cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.2rem',
-            padding: '0.2rem', fontSize: isMobile ? '0.55rem' : '0.6rem', fontWeight: '600',
-            touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent'
-          }}>
-          {expanded ? 'Minder' : `Alle ${totalPhotos}`}
-          {expanded ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          <button onClick={toggleCompareMode}
+            style={{
+              background: compareMode ? 'rgba(255,215,0,0.12)' : 'none',
+              border: compareMode ? '1px solid rgba(255,215,0,0.3)' : '1px solid transparent',
+              borderRadius: '6px',
+              color: compareMode ? '#FFD700' : 'rgba(255,255,255,0.35)',
+              cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.25rem',
+              padding: '0.25rem 0.5rem',
+              fontSize: isMobile ? '0.55rem' : '0.6rem', fontWeight: '700',
+              touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+              textTransform: 'uppercase', letterSpacing: '0.03em',
+            }}>
+            <ArrowLeftRight size={11} />
+            {compareMode ? 'Stop' : 'Vergelijk'}
+          </button>
+
+          <button onClick={() => setExpanded(!expanded)}
+            style={{
+              background: 'none', border: 'none', color: 'rgba(255,215,0,0.4)',
+              cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.2rem',
+              padding: '0.2rem', fontSize: isMobile ? '0.55rem' : '0.6rem', fontWeight: '600',
+              touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent'
+            }}>
+            {expanded ? 'Minder' : `Alle ${totalPhotos}`}
+            {expanded ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
+          </button>
+        </div>
       </div>
+
+      {/* ── COMPARE INSTRUCTIONS + RESULT ── */}
+      {compareMode && (
+        <div>
+          {comparePhotos.length < 2 ? (
+            <div style={{
+              padding: isMobile ? '0.4rem 1rem' : '0.5rem 1.5rem',
+              background: 'rgba(255,215,0,0.04)',
+              borderBottom: '1px solid rgba(255,215,0,0.08)',
+              fontSize: isMobile ? '0.6rem' : '0.65rem',
+              color: 'rgba(255,215,0,0.55)', fontWeight: '600',
+              display: 'flex', alignItems: 'center', gap: '0.4rem',
+            }}>
+              <ArrowLeftRight size={11} color="#FFD700" style={{ opacity: 0.6 }} />
+              {comparePhotos.length === 0 ? 'Tik op 2 foto\'s om te vergelijken' : 'Tik op een tweede foto'}
+              {comparePhotos.length === 1 && (
+                <button onClick={() => setComparePhotos([])}
+                  style={{ marginLeft: 'auto', background: 'none', border: 'none', color: 'rgba(255,255,255,0.35)', cursor: 'pointer', padding: 0 }}>
+                  <X size={13} />
+                </button>
+              )}
+            </div>
+          ) : (
+            <div style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+              {/* Side-by-side compare view */}
+              <div style={{
+                display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2px',
+                background: 'rgba(0,0,0,0.6)',
+              }}>
+                {comparePhotos.map((photo, i) => {
+                  const d = photo.taken_at || photo.created_at
+                  const dateLabel = d ? new Date(d).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short', year: '2-digit' }) : ''
+                  return (
+                    <div key={photo.id} style={{ position: 'relative', aspectRatio: '3/4' }}>
+                      <img src={photo.photo_url} alt={`Vergelijking ${i + 1}`}
+                        style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+                      <div style={{
+                        position: 'absolute', bottom: 0, left: 0, right: 0,
+                        padding: '0.5rem 0.5rem 0.35rem',
+                        background: 'linear-gradient(to top, rgba(0,0,0,0.75) 0%, transparent 100%)',
+                        display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between',
+                      }}>
+                        <span style={{ fontSize: '0.55rem', fontWeight: 700, color: '#FFD700' }}>
+                          {i === 0 ? 'VOOR' : 'NA'}
+                        </span>
+                        {dateLabel && (
+                          <span style={{ fontSize: '0.5rem', color: 'rgba(255,255,255,0.55)', fontWeight: 600 }}>
+                            {dateLabel}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+              <div style={{ padding: '0.35rem 0.75rem', display: 'flex', justifyContent: 'flex-end' }}>
+                <button onClick={() => setComparePhotos([])}
+                  style={{
+                    background: 'none', border: 'none', color: 'rgba(255,255,255,0.35)',
+                    fontSize: '0.55rem', fontWeight: 700, cursor: 'pointer',
+                    textTransform: 'uppercase', letterSpacing: '0.04em',
+                    display: 'flex', alignItems: 'center', gap: '0.2rem',
+                    touchAction: 'manipulation',
+                  }}>
+                  <X size={10} /> Reset selectie
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* ── PHOTO GRID ── */}
       <div style={{
@@ -109,30 +219,47 @@ export default function PhotoGallery({ photos = {}, onDelete, isMobile = false }
                 gap: '2px',
                 padding: isMobile ? '0 0.5rem 0.5rem' : '0 0.75rem 0.625rem'
               }}>
-                {dayPhotos.map(photo => (
-                  <div key={photo.id} onClick={() => setSelectedPhoto(photo)}
-                    style={{
-                      position: 'relative', paddingBottom: '100%',
-                      overflow: 'hidden', cursor: 'pointer',
-                      background: 'rgba(255, 215, 0, 0.02)'
-                    }}>
-                    <img src={photo.photo_url} alt="Progress"
-                      style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }}
-                      onError={(e) => { e.target.style.display = 'none' }} loading="lazy" />
-                    {/* Subtype label — color per angle */}
-                    {photo.metadata?.subtype && (
-                      <div style={{
-                        position: 'absolute', bottom: '1px', right: '1px',
-                        background: 'rgba(0,0,0,0.8)', borderRadius: '2px',
-                        padding: '0 2px', fontSize: '0.4rem',
-                        color: angleColor(photo.metadata.subtype),
-                        fontWeight: '700', textTransform: 'uppercase', lineHeight: 1.3
+                {dayPhotos.map(photo => {
+                  const selected = isCompareSelected(photo)
+                  return (
+                    <div key={photo.id} onClick={() => handlePhotoClick(photo)}
+                      style={{
+                        position: 'relative', paddingBottom: '100%',
+                        overflow: 'hidden', cursor: 'pointer',
+                        background: 'rgba(255, 215, 0, 0.02)',
+                        outline: selected ? '2px solid #FFD700' : 'none',
+                        outlineOffset: '-2px',
                       }}>
-                        {photo.metadata.subtype[0]}
-                      </div>
-                    )}
-                  </div>
-                ))}
+                      <img src={photo.photo_url} alt="Progress"
+                        style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }}
+                        onError={(e) => { e.target.style.display = 'none' }} loading="lazy" />
+                      {/* Subtype label — color per angle */}
+                      {photo.metadata?.subtype && (
+                        <div style={{
+                          position: 'absolute', bottom: '1px', right: '1px',
+                          background: 'rgba(0,0,0,0.8)', borderRadius: '2px',
+                          padding: '0 2px', fontSize: '0.4rem',
+                          color: angleColor(photo.metadata.subtype),
+                          fontWeight: '700', textTransform: 'uppercase', lineHeight: 1.3
+                        }}>
+                          {photo.metadata.subtype[0]}
+                        </div>
+                      )}
+                      {/* Compare checkmark */}
+                      {compareMode && (
+                        <div style={{
+                          position: 'absolute', top: '2px', left: '2px',
+                          width: 18, height: 18, borderRadius: 4,
+                          background: selected ? '#FFD700' : 'rgba(0,0,0,0.5)',
+                          border: selected ? '1px solid #FFD700' : '1px solid rgba(255,255,255,0.3)',
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        }}>
+                          {selected && <Check size={10} color="#000" strokeWidth={3} />}
+                        </div>
+                      )}
+                    </div>
+                  )
+                })}
               </div>
             </div>
           )

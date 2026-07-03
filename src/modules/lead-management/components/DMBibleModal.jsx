@@ -727,6 +727,8 @@ export default function DMBibleModal({ isMobile = false, db = null, coachId = nu
         top:  pos.y,
         width:  isMobile ? '100vw' : PANEL_W,
         height: isMobile ? '100dvh' : PANEL_H,
+        paddingTop: isMobile ? 'env(safe-area-inset-top, 0px)' : 0,
+        boxSizing: isMobile ? 'border-box' : 'content-box',
         background: 'linear-gradient(135deg, #0a0a0a 0%, #111 100%)',
         border: isMobile ? 'none' : `2px solid ${GOLD.border}`,
         borderRadius: isMobile ? 0 : 14,
@@ -778,7 +780,7 @@ export default function DMBibleModal({ isMobile = false, db = null, coachId = nu
             onMouseDown={(e) => e.stopPropagation()}
             onTouchStart={(e) => e.stopPropagation()}
             style={{
-              width: 32, height: 32,
+              width: isMobile ? 40 : 32, height: isMobile ? 40 : 32,
               borderRadius: 6,
               background: 'rgba(255,255,255,0.05)',
               border: '1px solid rgba(255,255,255,0.1)',
@@ -786,6 +788,7 @@ export default function DMBibleModal({ isMobile = false, db = null, coachId = nu
               cursor: 'pointer',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               touchAction: 'manipulation',
+              flexShrink: 0,
             }}
           >
             <X size={16} />

@@ -5,7 +5,6 @@
 import React, { useState, useEffect } from 'react'
 import { Loader2 } from 'lucide-react'
 import ProgressPhotosService from './ProgressPhotosService'
-import ExampleSlider from './components/ExampleSlider'
 import PhotoGallery from './components/PhotoGallery'
 import PhotoStats from './components/PhotoStats'
 
@@ -49,8 +48,6 @@ export default function ProgressPhotos({ db, client }) {
 
   return (
     <div>
-      {/* Components stack flush — each handles its own borders */}
-      <ExampleSlider isMobile={isMobile} />
       <PhotoGallery photos={recentPhotos} onDelete={handleDelete} isMobile={isMobile} />
       <PhotoStats weeklyStats={weeklyStats} todayData={todayData} isMobile={isMobile} />
     </div>
