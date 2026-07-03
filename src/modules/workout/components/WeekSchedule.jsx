@@ -65,15 +65,22 @@ export default function WeekSchedule({
   
   const loadSavedSchedule = async () => {
     if (!clientId || !db) return
-    
+
     setLoading(true)
     try {
       const savedSchedule = await db.getClientWorkoutSchedule(clientId)
       if (savedSchedule && Object.keys(savedSchedule).length > 0) {
-        setTempSchedule(savedSchedule)
-        
-        if (onScheduleUpdate) {
-          onScheduleUpdate(savedSchedule)
+        // Filter to only include days whose workout key exists in the current plan
+        const validKeys = new Set(Object.keys(schema?.week_structure || {}))
+        const filtered = validKeys.size > 0
+          ? Object.fromEntries(Object.entries(savedSchedule).filter(([, key]) => validKeys.has(key)))
+          : savedSchedule
+
+        if (Object.keys(filtered).length > 0) {
+          setTempSchedule(filtered)
+          if (onScheduleUpdate) {
+            onScheduleUpdate(filtered)
+          }
         }
       }
     } catch (error) {

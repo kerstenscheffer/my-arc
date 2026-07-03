@@ -5,8 +5,6 @@ import StandardFoodsSection from '../../client-meal-base/components/StandardFood
 import CustomMealsGrid from '../../client-meal-base/components/CustomMealsGrid'
 import SelectMealModal from '../../client-meal-base/components/SelectMealModal'
 import ClientMealBuilder from '../../client-meal-builder/ClientMealBuilder'
-import DayTemplatesSection from '../../client-meal-base/components/DayTemplatesSection'
-import DayTemplateBuilder from '../../client-meal-base/components/DayTemplateBuilder'
 
 export default function MealLibrarySection({ client, db, onMealCreated }) {
   const isMobile = window.innerWidth <= 768
@@ -18,14 +16,12 @@ export default function MealLibrarySection({ client, db, onMealCreated }) {
     carbs: [null, null, null],
     meal_prep: [null, null, null]
   })
-  const [dayTemplates, setDayTemplates] = useState([])
   const [loading, setLoading] = useState(true)
-  
+
   // Expand/collapse
   const [expandedSections, setExpandedSections] = useState({
     standard: false,
-    custom: false,
-    templates: false
+    custom: false
   })
   
   // Modals
@@ -33,8 +29,6 @@ export default function MealLibrarySection({ client, db, onMealCreated }) {
   const [showSelectModal, setShowSelectModal] = useState(false)
   const [selectModalConfig, setSelectModalConfig] = useState(null)
   const [editingMeal, setEditingMeal] = useState(null)
-  const [showTemplateBuilder, setShowTemplateBuilder] = useState(false)
-  const [editingTemplate, setEditingTemplate] = useState(null)
   
   // Load data
   useEffect(() => {
@@ -46,15 +40,13 @@ export default function MealLibrarySection({ client, db, onMealCreated }) {
   const loadData = async () => {
     setLoading(true)
     try {
-      const [meals, standards, templates] = await Promise.all([
+      const [meals, standards] = await Promise.all([
         db.getClientCustomMeals(client.id),
-        db.getClientStandardFoods(client.id),
-        db.getClientDayTemplates(client.id)
+        db.getClientStandardFoods(client.id)
       ])
-      
+
       setCustomMeals(meals)
       setStandardFoods(standards)
-      setDayTemplates(templates)
     } catch (error) {
       console.error('Failed to load meal library:', error)
     } finally {
@@ -118,47 +110,6 @@ export default function MealLibrarySection({ client, db, onMealCreated }) {
     setEditingMeal(null)
     await loadData()
     onMealCreated?.()
-  }
-  
-  const handleCreateTemplate = () => {
-    setEditingTemplate(null)
-    setShowTemplateBuilder(true)
-  }
-  
-  const handleEditTemplate = (template) => {
-    setEditingTemplate(template)
-    setShowTemplateBuilder(true)
-  }
-  
-  const handleSaveTemplate = async (templateData) => {
-    try {
-      if (editingTemplate) {
-        await db.updateDayTemplate(editingTemplate.id, {
-          name: templateData.name,
-          meals: templateData.meals
-        })
-      } else {
-        await db.createDayTemplate(client.id, templateData)
-      }
-      setShowTemplateBuilder(false)
-      setEditingTemplate(null)
-      await loadData()
-    } catch (error) {
-      console.error('Failed to save template:', error)
-      alert('Kon niet opslaan: ' + error.message)
-    }
-  }
-  
-  const handleDeleteTemplate = async (templateId) => {
-    if (!confirm('Verwijder deze template?')) return
-    
-    try {
-      await db.deleteDayTemplate(client.id, templateId)
-      await loadData()
-    } catch (error) {
-      console.error('Failed to delete template:', error)
-      alert('Kon niet verwijderen: ' + error.message)
-    }
   }
   
   const toggleSection = (section) => {
@@ -239,8 +190,6 @@ export default function MealLibrarySection({ client, db, onMealCreated }) {
           <span>{customMeals.length} Custom Meals</span>
           <span>•</span>
           <span>{standardCount}/9 Standaard Foods</span>
-          <span>•</span>
-          <span>{dayTemplates.length} Templates</span>
         </div>
       </div>
       
@@ -352,59 +301,6 @@ export default function MealLibrarySection({ client, db, onMealCreated }) {
         )}
       </div>
       
-      {/* Day Templates */}
-      <div style={{
-        background: 'rgba(17, 17, 17, 0.5)',
-        backdropFilter: 'blur(10px)',
-        border: '1px solid rgba(255, 255, 255, 0.1)',
-        borderRadius: '12px',
-        overflow: 'hidden'
-      }}>
-        <button
-          onClick={() => toggleSection('templates')}
-          style={{
-            width: '100%',
-            padding: isMobile ? '1rem' : '1.25rem',
-            background: 'transparent',
-            border: 'none',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            cursor: 'pointer',
-            touchAction: 'manipulation',
-            WebkitTapHighlightColor: 'transparent'
-          }}
-        >
-          <span style={{
-            fontSize: isMobile ? '1rem' : '1.125rem',
-            fontWeight: '600',
-            color: '#fff'
-          }}>
-            📅 Day Templates ({dayTemplates.length})
-          </span>
-          {expandedSections.templates ? (
-            <ChevronUp size={20} color="#fff" />
-          ) : (
-            <ChevronDown size={20} color="#fff" />
-          )}
-        </button>
-        
-        {expandedSections.templates && (
-          <div style={{
-            padding: isMobile ? '0 1rem 1rem' : '0 1.25rem 1.25rem',
-            borderTop: '1px solid rgba(255, 255, 255, 0.1)'
-          }}>
-            <DayTemplatesSection
-              templates={dayTemplates}
-              onCreateTemplate={handleCreateTemplate}
-              onEditTemplate={handleEditTemplate}
-              onDeleteTemplate={handleDeleteTemplate}
-              isMobile={isMobile}
-            />
-          </div>
-        )}
-      </div>
-      
       {/* Modals */}
       {showSelectModal && (
         <SelectMealModal
@@ -434,20 +330,6 @@ export default function MealLibrarySection({ client, db, onMealCreated }) {
         />
       )}
       
-      {/* Template Builder Modal */}
-      {showTemplateBuilder && (
-        <DayTemplateBuilder
-          isOpen={showTemplateBuilder}
-          onClose={() => {
-            setShowTemplateBuilder(false)
-            setEditingTemplate(null)
-          }}
-          onSave={handleSaveTemplate}
-          customMeals={customMeals}
-          editingTemplate={editingTemplate}
-          isMobile={isMobile}
-        />
-      )}
     </div>
   )
 }

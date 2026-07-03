@@ -19,14 +19,21 @@ export default function useWorkoutSchedule(schema, clientId, db) {
   
   const initializeSchedule = async () => {
     setIsLoading(true)
-    
+
     // Try to load saved schedule first
     if (clientId) {
       const savedSchedule = await workoutService.getWeekSchedule(clientId)
       if (savedSchedule) {
-        setWeekSchedule(savedSchedule)
-        setIsLoading(false)
-        return
+        // Filter to only include days whose workout key exists in the current plan
+        const validKeys = new Set(Object.keys(schema.week_structure))
+        const filtered = Object.fromEntries(
+          Object.entries(savedSchedule).filter(([, key]) => validKeys.has(key))
+        )
+        if (Object.keys(filtered).length > 0) {
+          setWeekSchedule(filtered)
+          setIsLoading(false)
+          return
+        }
       }
     }
     
