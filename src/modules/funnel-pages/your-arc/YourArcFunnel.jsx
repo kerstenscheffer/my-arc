@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import HeroTransformation from './components/HeroTransformation'
 import VideoSection from './components/VideoSection'
 import YourArcTransformation from './components/YourArcTransformation'
+import TrajectFasenSection from './components/TrajectFasenSection'
 import ValueStackComplete from './components/ValueStackComplete'
 import GuaranteesSection from './components/GuaranteesSection'
 import PriceAnchorSection from './components/PriceAnchorSection'
@@ -267,6 +268,7 @@ export default function YourArcFunnel() {
     HeroTransformation,
     VideoSection,
     YourArcTransformation,  // NEW - Added transformation section
+    TrajectFasenSection,    // 3 fases van het traject (concept — issue a46bed31)
     ValueStackComplete,
     GuaranteesSection,
     PriceAnchorSection,

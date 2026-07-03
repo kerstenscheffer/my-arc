@@ -8,11 +8,24 @@
 // - Contacted today counter
 
 import { useState } from 'react'
-import { 
-  Plus, Settings, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, 
-  GripVertical, Clock, CheckCircle 
+import {
+  Plus, Settings, ChevronDown, ChevronUp, ChevronLeft, ChevronRight,
+  GripVertical, Clock, CheckCircle, ArrowUpDown
 } from 'lucide-react'
 import KanbanCard from './KanbanCard'
+
+// Sort-opties per sectie. Default ('default') = positie + contacted-today
+// onderaan (oude gedrag). Andere opties tonen leads gebaseerd op stats:
+// weinig opvolgingen eerst → coach kan snel zien wie nog warming-up nodig
+// heeft. Geen reactie eerst → wie zit er stil. Etc.
+const SORT_OPTIONS = [
+  { id: 'default',    label: 'Standaard' },
+  { id: 'followup-asc',  label: 'Weinig opvolgingen ↑' },
+  { id: 'followup-desc', label: 'Veel opvolgingen ↓' },
+  { id: 'reply-asc',     label: 'Geen reactie eerst' },
+  { id: 'created-desc',  label: 'Nieuwste eerst' },
+  { id: 'created-asc',   label: 'Oudste eerst' },
+]
 
 // Golden Theme
 const GOLD = {
@@ -56,6 +69,8 @@ export default function KanbanColumn({
   snoozeSection = null
 }) {
   const [isExpanded, setIsExpanded] = useState(false)
+  const [sortMode, setSortMode] = useState('default')
+  const [showSortMenu, setShowSortMenu] = useState(false)
 
   const isUnassigned = section.id === 'unassigned'
   const totalLeads = section.leads?.length || 0
@@ -63,15 +78,35 @@ export default function KanbanColumn({
     ? (isMobile ? '300px' : '350px') 
     : (isMobile ? '280px' : '320px')
 
-  // Sort leads: contacted today at bottom
+  // Sort leads. Default-mode duwt vandaag-gecontacteerde leads naar onderen
+  // en sorteert anders op positie. De andere modes laten de coach snel een
+  // subset bovenaan krijgen (bv. leads die nog weinig opvolg-berichten
+  // hebben gehad, of die nog niet gereageerd hebben).
   const getSortedLeads = () => {
     const leads = section.leads || []
     const today = new Date().toISOString().split('T')[0]
-    
+    const num = (v) => Number(v) || 0
+    const t = (v) => v ? new Date(v).getTime() : 0
+
+    if (sortMode === 'followup-asc') {
+      return [...leads].sort((a, b) => num(a.followup_count) - num(b.followup_count))
+    }
+    if (sortMode === 'followup-desc') {
+      return [...leads].sort((a, b) => num(b.followup_count) - num(a.followup_count))
+    }
+    if (sortMode === 'reply-asc') {
+      return [...leads].sort((a, b) => num(a.reply_count) - num(b.reply_count))
+    }
+    if (sortMode === 'created-desc') {
+      return [...leads].sort((a, b) => t(b.created_at) - t(a.created_at))
+    }
+    if (sortMode === 'created-asc') {
+      return [...leads].sort((a, b) => t(a.created_at) - t(b.created_at))
+    }
+    // default
     return [...leads].sort((a, b) => {
       const aContactedToday = a.contacted_today_date?.split('T')[0] === today
       const bContactedToday = b.contacted_today_date?.split('T')[0] === today
-      
       if (aContactedToday && !bContactedToday) return 1
       if (!aContactedToday && bContactedToday) return -1
       return (a.position || 0) - (b.position || 0)
@@ -229,19 +264,75 @@ export default function KanbanColumn({
           </div>
 
           {/* Header Buttons */}
-          <div style={{ display: 'flex', gap: '0.25rem', flexShrink: 0 }}>
+          <div style={{ display: 'flex', gap: '0.25rem', flexShrink: 0, position: 'relative' }}>
+            <button
+              onClick={() => setShowSortMenu(v => !v)}
+              title="Sorteer leads in deze sectie"
+              style={{
+                padding: '0.4rem',
+                background: sortMode !== 'default' ? `${section.color}25` : `${section.color}15`,
+                border: `1px solid ${section.color}30`,
+                borderRadius: '6px',
+                color: section.color,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                transition: 'all 0.2s ease',
+              }}
+            >
+              <ArrowUpDown size={14} />
+            </button>
+            {showSortMenu && (
+              <>
+                <div onClick={() => setShowSortMenu(false)}
+                  style={{ position: 'fixed', inset: 0, zIndex: 99 }} />
+                <div style={{
+                  position: 'absolute', top: 'calc(100% + 0.3rem)', right: 0,
+                  zIndex: 100, minWidth: 180,
+                  background: '#111',
+                  border: `1px solid ${section.color}40`,
+                  borderRadius: 8, overflow: 'hidden',
+                  boxShadow: '0 8px 24px rgba(0,0,0,0.6)',
+                }}>
+                  {SORT_OPTIONS.map(opt => {
+                    const active = opt.id === sortMode
+                    return (
+                      <button
+                        key={opt.id}
+                        onClick={() => { setSortMode(opt.id); setShowSortMenu(false) }}
+                        style={{
+                          display: 'block', width: '100%',
+                          padding: '0.6rem 0.75rem',
+                          background: active ? `${section.color}15` : 'transparent',
+                          border: 'none',
+                          color: active ? section.color : 'rgba(255,255,255,0.7)',
+                          fontSize: '0.75rem',
+                          fontWeight: active ? 700 : 500,
+                          textAlign: 'left', cursor: 'pointer',
+                          minHeight: 36,
+                          borderBottom: '1px solid rgba(255,255,255,0.04)',
+                        }}
+                      >
+                        {opt.label}
+                      </button>
+                    )
+                  })}
+                </div>
+              </>
+            )}
             {!isUnassigned && (
-              <button 
-                onClick={() => onOpenSettings?.(section)} 
-                style={{ 
-                  padding: '0.4rem', 
-                  background: `${section.color}15`, 
-                  border: `1px solid ${section.color}30`, 
-                  borderRadius: '6px', 
-                  color: section.color, 
-                  cursor: 'pointer', 
-                  display: 'flex', 
-                  alignItems: 'center', 
+              <button
+                onClick={() => onOpenSettings?.(section)}
+                style={{
+                  padding: '0.4rem',
+                  background: `${section.color}15`,
+                  border: `1px solid ${section.color}30`,
+                  borderRadius: '6px',
+                  color: section.color,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
                   justifyContent: 'center',
                   transition: 'all 0.2s ease'
                 }}

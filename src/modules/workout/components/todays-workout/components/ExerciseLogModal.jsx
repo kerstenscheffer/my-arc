@@ -116,7 +116,7 @@ function SetInputWizard({ onComplete, onCancel, previousWeight = 20, previousRep
       <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '2px', background: 'linear-gradient(90deg, transparent, rgba(255,215,0,0.5), transparent)', zIndex: 1 }} />
 
       <div style={{ padding: isMobile ? '1rem' : '1.25rem', borderBottom: '1px solid rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <div style={{ fontSize: isMobile ? '0.55rem' : '0.6rem', color: 'rgba(255,255,255,0.25)', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+        <div style={{ fontSize: isMobile ? '0.62rem' : '0.68rem', color: 'rgba(255,255,255,0.5)', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
           {editMode ? 'SET AANPASSEN' : `STAP ${displayStep}/${totalSteps}`}
         </div>
         <button onClick={onCancel} style={{ background: 'none', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '6px', color: 'rgba(255,255,255,0.35)', fontSize: isMobile ? '0.7rem' : '0.75rem', fontWeight: '600', cursor: 'pointer', padding: '0.35rem 0.75rem', touchAction: 'manipulation' }}>
@@ -188,7 +188,7 @@ function LoggedSetRow({ set, index, onAddDropset, onEdit, onDelete, isMobile }) 
             {set.partials > 0 && <span style={{ color: 'rgba(255,215,0,0.4)', fontSize: '0.8em' }}> +{set.partials}p</span>}
           </div>
           {set.dropsets?.length > 0 && (
-            <div style={{ fontSize: isMobile ? '0.62rem' : '0.68rem', color: 'rgba(255,255,255,0.3)', fontWeight: '600', marginTop: '0.15rem', fontFamily: 'monospace' }}>
+            <div style={{ fontSize: isMobile ? '0.7rem' : '0.76rem', color: 'rgba(255,255,255,0.5)', fontWeight: 700, marginTop: '0.2rem', fontFamily: 'monospace' }}>
               {set.dropsets.map((ds, i) => (
                 <span key={i}><span style={{ color: 'rgba(255,215,0,0.3)' }}>↓</span> {ds.weight}kg × {ds.reps}{i < set.dropsets.length - 1 ? ', ' : ''}</span>
               ))}
@@ -214,7 +214,7 @@ function LoggedSetRow({ set, index, onAddDropset, onEdit, onDelete, isMobile }) 
 
 function MenuBtn({ label, onClick, isMobile, danger, gold }) {
   return (
-    <button onClick={onClick} style={{ padding: isMobile ? '0.4rem 0.6rem' : '0.45rem 0.75rem', background: gold ? 'rgba(255,215,0,0.06)' : 'transparent', border: `1px solid ${danger ? 'rgba(239,68,68,0.15)' : gold ? 'rgba(255,215,0,0.15)' : 'rgba(255,255,255,0.06)'}`, borderRadius: '6px', color: danger ? 'rgba(239,68,68,0.5)' : gold ? 'rgba(255,215,0,0.6)' : 'rgba(255,255,255,0.35)', fontSize: isMobile ? '0.6rem' : '0.65rem', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.04em', cursor: 'pointer', touchAction: 'manipulation' }}>
+    <button onClick={onClick} style={{ padding: isMobile ? '0.5rem 0.7rem' : '0.55rem 0.85rem', background: gold ? 'rgba(255,215,0,0.1)' : danger ? 'rgba(239,68,68,0.08)' : 'rgba(255,255,255,0.04)', border: `1px solid ${danger ? 'rgba(239,68,68,0.3)' : gold ? 'rgba(255,215,0,0.3)' : 'rgba(255,255,255,0.1)'}`, borderRadius: 8, color: danger ? '#ef4444' : gold ? '#FFD700' : 'rgba(255,255,255,0.7)', fontSize: isMobile ? '0.66rem' : '0.72rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.06em', cursor: 'pointer', minHeight: 36, touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}>
       {label}
     </button>
   )
@@ -445,23 +445,29 @@ export default function ExerciseLogModal({ db, client, exercise, onClose, isMobi
   const dropsetActive = dropsetIndex !== null && !showWizard
 
   return createPortal(
-    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.98)', zIndex: 10000, display: 'flex', flexDirection: 'column', animation: 'fadeIn 0.25s ease' }}>
+    <div style={{ position: 'fixed', inset: 0, height: '100dvh', background: '#0a0a0a', zIndex: 10000, display: 'flex', flexDirection: 'column', animation: 'fadeIn 0.25s ease' }}>
       {/* Gouden top streep */}
-      <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '2px', background: 'linear-gradient(90deg, transparent 0%, rgba(255,215,0,0.5) 50%, transparent 100%)', zIndex: 1 }} />
+      <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '2px', background: 'linear-gradient(90deg, transparent 0%, rgba(255,215,0,0.55) 50%, transparent 100%)', zIndex: 1 }} />
 
       {/* HEADER */}
-      <div style={{ padding: isMobile ? '0.875rem 1rem' : '1rem 1.5rem', borderBottom: '1px solid rgba(255,255,255,0.06)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
+      <div style={{
+        padding: isMobile ? '0.875rem 1rem' : '1rem 1.5rem',
+        paddingTop: `calc(env(safe-area-inset-top, 0px) + ${isMobile ? '0.875rem' : '1rem'})`,
+        borderBottom: '1px solid rgba(255,255,255,0.06)',
+        display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+        flexShrink: 0,
+      }}>
         <div style={{ flex: 1, minWidth: 0, paddingRight: '0.75rem' }}>
-          <h2 style={{ fontSize: isMobile ? '1.05rem' : '1.15rem', fontWeight: '800', color: '#fff', margin: 0, letterSpacing: '-0.02em', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{exercise.name}</h2>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.15rem', fontSize: isMobile ? '0.58rem' : '0.63rem', color: 'rgba(255,255,255,0.3)', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-            <span>{exercise.sets} SETS</span><span>·</span><span>{exercise.reps} REPS</span>
-            {saving && <><span>·</span><span style={{ color: 'rgba(255,215,0,0.5)' }}>Opslaan...</span></>}
-            {!saving && loggedSets.length > 0 && <><span>·</span><span style={{ color: 'rgba(16,185,129,0.5)' }}>Opgeslagen ✓</span></>}
-            {editingIndex !== null && <><span>·</span><span style={{ color: 'rgba(255,215,0,0.6)' }}>Set {editingIndex + 1} aanpassen</span></>}
+          <h2 style={{ fontSize: isMobile ? '1.1rem' : '1.25rem', fontWeight: 900, color: '#fff', margin: 0, letterSpacing: '-0.02em', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{exercise.name}</h2>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.25rem', fontSize: isMobile ? '0.66rem' : '0.72rem', color: 'rgba(255,255,255,0.55)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+            <span>{exercise.sets} SETS</span><span style={{ opacity: 0.4 }}>·</span><span>{exercise.reps} REPS</span>
+            {saving && <><span style={{ opacity: 0.4 }}>·</span><span style={{ color: '#FFD700' }}>Opslaan…</span></>}
+            {!saving && loggedSets.length > 0 && <><span style={{ opacity: 0.4 }}>·</span><span style={{ color: '#10b981' }}>Opgeslagen ✓</span></>}
+            {editingIndex !== null && <><span style={{ opacity: 0.4 }}>·</span><span style={{ color: '#FFD700' }}>Set {editingIndex + 1} aanpassen</span></>}
           </div>
         </div>
-        <button onClick={onClose} style={{ width: '40px', height: '40px', background: 'transparent', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '10px', color: 'rgba(255,255,255,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0, touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}>
-          <X size={isMobile ? 16 : 18} strokeWidth={2.5} />
+        <button onClick={onClose} aria-label="Sluit" style={{ width: 44, height: 44, background: 'rgba(10,10,10,0.85)', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)', border: '1px solid rgba(255,215,0,0.3)', borderRadius: 12, color: '#FFD700', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0, touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}>
+          <X size={isMobile ? 18 : 20} strokeWidth={2.4} />
         </button>
       </div>
 
@@ -476,7 +482,7 @@ export default function ExerciseLogModal({ db, client, exercise, onClose, isMobi
             {/* ── VORIGE PRESTATIES ── */}
             {previousPerformance?.sets?.length > 0 && (
               <div style={{ padding: isMobile ? '0.625rem 1rem' : '0.75rem 1.25rem', borderBottom: '1px solid rgba(255,255,255,0.05)', background: 'rgba(255,255,255,0.015)' }}>
-                <div style={{ fontSize: isMobile ? '0.55rem' : '0.6rem', fontWeight: '700', color: 'rgba(255,215,0,0.4)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '0.375rem' }}>
+                <div style={{ fontSize: isMobile ? '0.66rem' : '0.72rem', fontWeight: 800, color: '#FFD700', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '0.5rem', opacity: 0.85 }}>
                   Vorige sessie {previousPerformance.date ? `· ${new Date(previousPerformance.date).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })}` : ''}
                 </div>
                 <div style={{ display: 'flex', gap: '0.375rem', flexWrap: 'wrap' }}>
@@ -542,14 +548,14 @@ export default function ExerciseLogModal({ db, client, exercise, onClose, isMobi
 
             {showExerciseNote && (
               <div style={{ padding: isMobile ? '0.75rem 1rem' : '0.875rem 1.25rem', borderTop: '1px solid rgba(255,255,255,0.04)' }}>
-                <div style={{ fontSize: isMobile ? '0.58rem' : '0.63rem', color: 'rgba(255,215,0,0.4)', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.4rem' }}>Notitie bij oefening</div>
+                <div style={{ fontSize: isMobile ? '0.66rem' : '0.72rem', color: '#FFD700', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '0.5rem', opacity: 0.85 }}>Notitie bij oefening</div>
                 <textarea value={exerciseNote} onChange={(e) => setExerciseNote(e.target.value)} onBlur={() => saveToDatabase(loggedSets)} placeholder="Bv. Schouder voelde stijf..." style={{ width: '100%', minHeight: '60px', padding: '0.6rem', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: '8px', color: '#fff', fontSize: isMobile ? '0.78rem' : '0.85rem', fontWeight: '500', resize: 'vertical', outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box' }} />
               </div>
             )}
 
             {showWorkoutNote && (
               <div style={{ padding: isMobile ? '0.75rem 1rem' : '0.875rem 1.25rem', borderTop: '1px solid rgba(255,255,255,0.04)' }}>
-                <div style={{ fontSize: isMobile ? '0.58rem' : '0.63rem', color: 'rgba(255,215,0,0.4)', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.4rem' }}>Notitie bij workout dag</div>
+                <div style={{ fontSize: isMobile ? '0.66rem' : '0.72rem', color: '#FFD700', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '0.5rem', opacity: 0.85 }}>Notitie bij workout dag</div>
                 <textarea value={workoutNote} onChange={(e) => setWorkoutNote(e.target.value)} onBlur={saveWorkoutDayNote} placeholder="Bv. Slecht geslapen, weinig gegeten..." style={{ width: '100%', minHeight: '60px', padding: '0.6rem', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: '8px', color: '#fff', fontSize: isMobile ? '0.78rem' : '0.85rem', fontWeight: '500', resize: 'vertical', outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box' }} />
               </div>
             )}
@@ -573,22 +579,61 @@ export default function ExerciseLogModal({ db, client, exercise, onClose, isMobi
 
       {/* FOOTER */}
       {!wizardActive && !dropsetActive && (
-        <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)', padding: isMobile ? '0.75rem 1rem' : '0.875rem 1.5rem', flexShrink: 0 }}>
-          <button onClick={() => { setEditingIndex(null); setShowWizard(true) }} style={{ width: '100%', padding: isMobile ? '0.75rem' : '0.875rem', background: 'rgba(255,215,0,0.08)', border: '1px solid rgba(255,215,0,0.2)', borderRadius: '10px', color: '#FFD700', fontSize: isMobile ? '0.8rem' : '0.85rem', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '0.05em', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', minHeight: '48px', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}>
-            <Plus size={isMobile ? 16 : 18} strokeWidth={2.5} />
+        <div style={{
+          borderTop: '1px solid rgba(255,255,255,0.06)',
+          padding: isMobile ? '0.85rem 1rem' : '1rem 1.5rem',
+          paddingBottom: `calc(env(safe-area-inset-bottom, 0px) + ${isMobile ? '0.85rem' : '1rem'})`,
+          flexShrink: 0,
+        }}>
+          {/* Set Toevoegen — primaire CTA, gouden gradient pill conform CTA-token */}
+          <button
+            onClick={() => { setEditingIndex(null); setShowWizard(true) }}
+            style={{
+              width: '100%',
+              padding: isMobile ? '0.85rem' : '1rem',
+              background: 'linear-gradient(135deg, #FFD700 0%, #D4AF37 100%)',
+              border: 'none',
+              borderRadius: 14,
+              color: '#0a0a0a',
+              fontSize: isMobile ? '0.88rem' : '0.95rem',
+              fontWeight: 900,
+              textTransform: 'uppercase',
+              letterSpacing: '0.06em',
+              cursor: 'pointer',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              gap: 8,
+              minHeight: 54,
+              touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+              boxShadow: '0 10px 24px rgba(255,215,0,0.3), 0 2px 6px rgba(0,0,0,0.5)',
+            }}
+          >
+            <Plus size={isMobile ? 20 : 22} strokeWidth={2.6} />
             Set Toevoegen
           </button>
 
-          <div style={{ display: 'flex', gap: '0.35rem', marginTop: '0.5rem' }}>
-            <button onClick={() => setShowExerciseNote(!showExerciseNote)} style={{ flex: 1, padding: isMobile ? '0.4rem' : '0.5rem', background: showExerciseNote ? 'rgba(255,215,0,0.06)' : 'transparent', border: `1px solid ${showExerciseNote ? 'rgba(255,215,0,0.2)' : 'rgba(255,255,255,0.06)'}`, borderRadius: '8px', color: showExerciseNote ? 'rgba(255,215,0,0.6)' : 'rgba(255,255,255,0.25)', fontSize: isMobile ? '0.58rem' : '0.63rem', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.04em', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.3rem', minHeight: '34px', touchAction: 'manipulation' }}>
-              <MessageSquare size={isMobile ? 10 : 11} />Oefening notitie
-            </button>
-            <button onClick={() => setShowWorkoutNote(!showWorkoutNote)} style={{ flex: 1, padding: isMobile ? '0.4rem' : '0.5rem', background: showWorkoutNote ? 'rgba(255,215,0,0.06)' : 'transparent', border: `1px solid ${showWorkoutNote ? 'rgba(255,215,0,0.2)' : 'rgba(255,255,255,0.06)'}`, borderRadius: '8px', color: showWorkoutNote ? 'rgba(255,215,0,0.6)' : 'rgba(255,255,255,0.25)', fontSize: isMobile ? '0.58rem' : '0.63rem', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.04em', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.3rem', minHeight: '34px', touchAction: 'manipulation' }}>
-              <Edit3 size={isMobile ? 10 : 11} />Dag notitie
-            </button>
-            <button onClick={() => setShowHistory(!showHistory)} style={{ flex: 1, padding: isMobile ? '0.4rem' : '0.5rem', background: showHistory ? 'rgba(255,215,0,0.06)' : 'transparent', border: `1px solid ${showHistory ? 'rgba(255,215,0,0.2)' : 'rgba(255,255,255,0.06)'}`, borderRadius: '8px', color: showHistory ? 'rgba(255,215,0,0.6)' : 'rgba(255,255,255,0.25)', fontSize: isMobile ? '0.58rem' : '0.63rem', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.04em', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.3rem', minHeight: '34px', touchAction: 'manipulation' }}>
-              <History size={isMobile ? 10 : 11} />Geschiedenis
-            </button>
+          {/* Toggle-rij: 3 secundaire acties — groter font + grotere iconen */}
+          <div style={{ display: 'flex', gap: '0.4rem', marginTop: '0.6rem' }}>
+            <ToggleBtn
+              active={showExerciseNote}
+              onClick={() => setShowExerciseNote(!showExerciseNote)}
+              icon={<MessageSquare size={isMobile ? 13 : 14} strokeWidth={2.2} />}
+              label="Notitie"
+              isMobile={isMobile}
+            />
+            <ToggleBtn
+              active={showWorkoutNote}
+              onClick={() => setShowWorkoutNote(!showWorkoutNote)}
+              icon={<Edit3 size={isMobile ? 13 : 14} strokeWidth={2.2} />}
+              label="Dag-note"
+              isMobile={isMobile}
+            />
+            <ToggleBtn
+              active={showHistory}
+              onClick={() => setShowHistory(!showHistory)}
+              icon={<History size={isMobile ? 13 : 14} strokeWidth={2.2} />}
+              label="Historie"
+              isMobile={isMobile}
+            />
           </div>
         </div>
       )}
@@ -599,5 +644,37 @@ export default function ExerciseLogModal({ db, client, exercise, onClose, isMobi
       `}</style>
     </div>,
     document.body
+  )
+}
+
+// Secundaire toggle-knop in de footer-rij. Gouden tint wanneer actief,
+// donker glass wanneer rust. Min-height 44 voor tap-targets.
+function ToggleBtn({ active, onClick, icon, label, isMobile }) {
+  return (
+    <button
+      onClick={onClick}
+      aria-pressed={active}
+      style={{
+        flex: 1,
+        padding: isMobile ? '0.55rem 0.4rem' : '0.65rem 0.5rem',
+        background: active ? 'rgba(255,215,0,0.12)' : 'rgba(255,255,255,0.04)',
+        border: `1px solid ${active ? 'rgba(255,215,0,0.4)' : 'rgba(255,255,255,0.08)'}`,
+        borderRadius: 10,
+        color: active ? '#FFD700' : 'rgba(255,255,255,0.7)',
+        fontSize: isMobile ? '0.66rem' : '0.72rem',
+        fontWeight: 800,
+        textTransform: 'uppercase',
+        letterSpacing: '0.06em',
+        cursor: 'pointer',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        gap: 5,
+        minHeight: 44,
+        touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+        transition: 'background 0.15s ease, border-color 0.15s ease, color 0.15s ease',
+      }}
+    >
+      {icon}
+      {label}
+    </button>
   )
 }

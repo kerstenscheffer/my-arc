@@ -44,7 +44,8 @@ export default function CheckinReminderBanner({ client, db, onOpen, isMobile: pr
         // CheckinService expects the DatabaseService wrapper, not the raw
         // supabase client — it reads .supabase off it internally.
         const service = new CheckinService(db)
-        const filled = await service.hasCheckinThisWeek(client.id)
+        // Vrijdag-cyclus: reset elke vrijdag (zelfde logica als de form + popup).
+        const filled = await service.hasCheckinSinceLastFriday(client.id)
         if (!cancelled) setShow(!filled)
       } catch {
         // Silently hide on error — better than yelling at the client.

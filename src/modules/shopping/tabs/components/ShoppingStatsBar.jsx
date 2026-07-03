@@ -17,9 +17,9 @@ export default function ShoppingStatsBar({
     }}>
       {/* Items */}
       <div style={{
-        background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.1) 0%, rgba(16, 185, 129, 0.05) 100%)',
+        background: 'linear-gradient(135deg, rgba(255, 215, 0, 0.1) 0%, rgba(255, 215, 0, 0.05) 100%)',
         backdropFilter: 'blur(10px)',
-        border: '1px solid rgba(16, 185, 129, 0.2)',
+        border: '1px solid rgba(255, 215, 0, 0.2)',
         borderRadius: isMobile ? '10px' : '12px',
         padding: isMobile ? '0.75rem' : '0.875rem',
         position: 'relative',
@@ -43,7 +43,7 @@ export default function ShoppingStatsBar({
             gap: '0.375rem',
             marginBottom: '0.375rem'
           }}>
-            <ShoppingBag size={isMobile ? 12 : 14} color="#10b981" strokeWidth={2.5} />
+            <ShoppingBag size={isMobile ? 12 : 14} color="#FFD700" strokeWidth={2.5} />
             <div style={{
               fontSize: isMobile ? '0.65rem' : '0.7rem',
               color: 'rgba(255, 255, 255, 0.6)',
@@ -57,7 +57,7 @@ export default function ShoppingStatsBar({
           <div style={{
             fontSize: isMobile ? '1.375rem' : '1.5rem',
             fontWeight: '800',
-            color: '#10b981',
+            color: '#FFD700',
             letterSpacing: '-0.02em',
             lineHeight: 1
           }}>
@@ -119,9 +119,9 @@ export default function ShoppingStatsBar({
       
       {/* Progress */}
       <div style={{
-        background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.1) 0%, rgba(16, 185, 129, 0.05) 100%)',
+        background: 'linear-gradient(135deg, rgba(255, 215, 0, 0.1) 0%, rgba(255, 215, 0, 0.05) 100%)',
         backdropFilter: 'blur(10px)',
-        border: '1px solid rgba(16, 185, 129, 0.2)',
+        border: '1px solid rgba(255, 215, 0, 0.2)',
         borderRadius: isMobile ? '10px' : '12px',
         padding: isMobile ? '0.75rem' : '0.875rem',
         position: 'relative',
@@ -145,7 +145,7 @@ export default function ShoppingStatsBar({
             gap: '0.375rem',
             marginBottom: '0.375rem'
           }}>
-            <Target size={isMobile ? 12 : 14} color="#10b981" strokeWidth={2.5} />
+            <Target size={isMobile ? 12 : 14} color="#FFD700" strokeWidth={2.5} />
             <div style={{
               fontSize: isMobile ? '0.65rem' : '0.7rem',
               color: 'rgba(255, 255, 255, 0.6)',
@@ -159,7 +159,7 @@ export default function ShoppingStatsBar({
           <div style={{
             fontSize: isMobile ? '1.375rem' : '1.5rem',
             fontWeight: '800',
-            color: '#10b981',
+            color: '#FFD700',
             letterSpacing: '-0.02em',
             lineHeight: 1
           }}>

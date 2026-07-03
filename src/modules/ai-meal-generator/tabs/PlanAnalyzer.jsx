@@ -2,7 +2,9 @@
 // v4.0 — Sidebar layout: linker icon nav + compacte builder rechts
 
 import React, { useState, useEffect, useCallback, useRef } from 'react'
-import { BarChart3, FileText, ChevronRight, AlertTriangle, Zap, Grid3X3, Calendar, List, Download, MessageSquare, Play, Check, Loader, Clock, RotateCcw, RotateCw } from 'lucide-react'
+import { createPortal } from 'react-dom'
+import { BarChart3, FileText, ChevronLeft, ChevronRight, AlertTriangle, Zap, Grid3X3, Calendar, List, Download, MessageSquare, Play, Check, Loader, Clock, RotateCcw, RotateCw, Copy, X, Plus, Repeat, Bookmark } from 'lucide-react'
+import DayTemplatesSectionWrapper from '../../client-meal-base/components/DayTemplatesSectionWrapper'
 import DayNavigator, { DAYS } from './plan-analyzer/DayNavigator'
 import DayMacroBar from './plan-analyzer/DayMacroBar'
 import MealCard from './plan-analyzer/MealCard'
@@ -11,15 +13,24 @@ import ClientContextPanel from './plan-analyzer/ClientContextPanel'
 import AutoBalancer from './plan-analyzer/AutoBalancer'
 import WeekBalancer from './plan-analyzer/WeekBalancer'
 import WeekOverview from './plan-analyzer/WeekOverview'
+import ClientAgendaView from '../../client-agenda/ClientAgendaView'
+import MacroHero from '../../meal-plan/components/MacroHero'
 import PlanSwitcherModal from './plan-analyzer/PlanSwitcherModal'
 import TimingModal from './plan-analyzer/TimingModal'
+import BestSwapsModal from './plan-analyzer/BestSwapsModal'
+import PlanLibraryModal from './plan-analyzer/PlanLibraryModal'
+import ApplyDaysModal from './plan-analyzer/ApplyDaysModal'
 import { checkMealConflicts, buildConflictClientData } from './plan-analyzer/ConflictChecker'
 import { openMealPlanForPrint, openCoachingGuideForPrint } from '../mealplanhtmlgenerator'
 
-const SLOTS = ['breakfast', 'snack1', 'lunch', 'snack2', 'dinner', 'snack3']
+// Slots — de 6 vaste + extra snack-slots zodat er geen harde max van 6
+// maaltijden meer is. Alles wordt op tijd gesorteerd bij het tonen; lege
+// extra-slots verschijnen pas als je ze vult via "Maaltijd toevoegen".
+const SLOTS = ['breakfast', 'snack1', 'lunch', 'snack2', 'dinner', 'snack3', 'snack4', 'snack5', 'snack6', 'snack7', 'snack8']
 const SLOT_DEFAULT_TIMES = {
   breakfast: '07:30', snack1: '10:30', lunch: '13:00',
-  snack2: '15:30', dinner: '19:00', snack3: '21:30'
+  snack2: '15:30', dinner: '19:00', snack3: '21:30',
+  snack4: '22:00', snack5: '22:30', snack6: '23:00', snack7: '23:30', snack8: '23:59'
 }
 const MAX_HISTORY = 50
 
@@ -29,6 +40,12 @@ export default function PlanAnalyzer({
   onConceptLoaded, coachId
 }) {
   const [activeDay, setActiveDay] = useState(0)
+  // Agenda opent nu in het dock-vak (dockedSection === 'agenda').
+  // Bump counter dat de embedded ClientAgendaView dwingt opnieuw te
+  // laden — elke meal-swap / move / delete in plan-analyzer schrijft
+  // door naar de DB, dus de agenda moet refreshen om de nieuwe state
+  // te zien.
+  const [agendaRefreshKey, setAgendaRefreshKey] = useState(0)
   const [weekData, setWeekData] = useState(null)
   const [targets, setTargets] = useState(dailyTargets || null)
   const [planMeta, setPlanMeta] = useState(null)
@@ -36,14 +53,43 @@ export default function PlanAnalyzer({
   const [loadingConcepts, setLoadingConcepts] = useState(false)
   const [selectedConceptId, setSelectedConceptId] = useState(conceptPlanId || null)
   const [swapState, setSwapState] = useState(null)
+  const [applyDaysState, setApplyDaysState] = useState(null)
   const [clientIntake, setClientIntake] = useState(null)
   const [clientRecord, setClientRecord] = useState(null)
+  const [validSchemaDagKeys, setValidSchemaDagKeys] = useState(null)
   const [viewMode, setViewMode] = useState('day')
   const [showPlanSwitcher, setShowPlanSwitcher] = useState(false)
   const [showTimingModal, setShowTimingModal] = useState(false)
   const [showBalancer, setShowBalancer] = useState(false)
   const [showWeekBalancer, setShowWeekBalancer] = useState(false)
   const [showFloatingClient, setShowFloatingClient] = useState(false)
+  const [showDayTemplates, setShowDayTemplates] = useState(false)
+  const [showBestSwaps, setShowBestSwaps] = useState(false)
+  // Welke sectie staat gedokt in het middenpaneel (naast de knoppenbalk).
+  // null = dicht → dag+maaltijden krijgt de volle breedte.
+  const [dockedSection, setDockedSection] = useState(null)
+  // Breedte van het dock-paneel (px, desktop) — sleepbaar via het handvat.
+  const [dockWidth, setDockWidth] = useState(() => {
+    try { const s = Number(localStorage.getItem('planAnalyzerDockWidth')); return s >= 240 ? s : 420 } catch { return 420 }
+  })
+  const startDockResize = (e) => {
+    e.preventDefault()
+    const startX = e.clientX
+    const startW = dockWidth
+    let latest = startW
+    const onMove = (ev) => {
+      const max = Math.max(320, (typeof window !== 'undefined' ? window.innerWidth : 1200) - 92 - 360) // bouwer houdt min ~360px
+      latest = Math.min(Math.max(240, startW + (ev.clientX - startX)), max)
+      setDockWidth(latest)
+    }
+    const onUp = () => {
+      document.removeEventListener('pointermove', onMove)
+      document.removeEventListener('pointerup', onUp)
+      try { localStorage.setItem('planAnalyzerDockWidth', String(Math.round(latest))) } catch {}
+    }
+    document.addEventListener('pointermove', onMove)
+    document.addEventListener('pointerup', onUp)
+  }
   const [allClientPlans, setAllClientPlans] = useState([])
   const [resolvedClientId, setResolvedClientId] = useState(clientId || null)
 
@@ -143,6 +189,22 @@ export default function PlanAnalyzer({
     try { const { data } = await db.supabase.from('clients').select('*').eq('id', cId).single(); if (data) setClientRecord(data) } catch {}
   }
 
+  useEffect(() => {
+    const schemaId = clientRecord?.assigned_schema_id
+    if (!schemaId) { setValidSchemaDagKeys(null); return }
+    let cancelled = false
+    ;(async () => {
+      try {
+        const { data } = await db.supabase.from('workout_schemas').select('week_structure').eq('id', schemaId).single()
+        if (cancelled) return
+        const ws = data?.week_structure
+        if (ws && typeof ws === 'object') setValidSchemaDagKeys(new Set(Object.keys(ws)))
+        else setValidSchemaDagKeys(null)
+      } catch { if (!cancelled) setValidSchemaDagKeys(null) }
+    })()
+    return () => { cancelled = true }
+  }, [clientRecord?.assigned_schema_id])
+
   const loadFromGeneratedPlan = (plan) => {
     const days = plan.weekPlan.map((day, i) => {
       const meals = {}
@@ -157,49 +219,74 @@ export default function PlanAnalyzer({
     setHistory([JSON.parse(JSON.stringify(days))]); setHistoryIndex(0)
   }
 
+  // Reconstrueer een weekData-array (7 dagen, gehydrateerd met ai_meals-data)
+  // uit een opgeslagen week_structure. Ondersteunt zowel per-dag keys als de
+  // setA/setB-rotatie. Gedeeld door loadConceptPlan én het laden van een
+  // opgeslagen full_week-plan uit de bibliotheek, zodat beide identiek zijn.
+  const hydrateWeekStructure = async (rawWs) => {
+    if (!rawWs) return null
+    let ws = rawWs
+    if ((ws.setA || ws.setB) && Array.isArray(ws.training_days)) {
+      const trainingSet = new Set(ws.training_days.map(n => parseInt(n, 10)))
+      const expanded = {}
+      DAYS.forEach((d, idx) => {
+        const isTraining = trainingSet.has(idx)
+        const tpl = isTraining ? (ws.setA || ws.setB) : (ws.setB || ws.setA)
+        if (!tpl) return
+        expanded[d.id] = { ...tpl, is_training_day: isTraining }
+      })
+      ws = expanded
+    }
+    const mealIds = new Set()
+    Object.values(ws).forEach(dd => {
+      if (!dd) return
+      SLOTS.forEach(s => { if (dd[s]?.meal_id) mealIds.add(dd[s].meal_id); if (dd[s]?.id) mealIds.add(dd[s].id) })
+    })
+    const mealDataMap = {}
+    if (mealIds.size > 0) {
+      const { data: mealRows, error: mealError } = await db.supabase
+        .from('ai_meals')
+        .select('id, name, internal_name, calories, protein, carbs, fat, image_url, ingredients_list, preparation_steps, tips, allergens, scalable, difficulty, labels, timing')
+        .in('id', [...mealIds])
+      if (mealError) console.error('❌ ai_meals query error:', mealError)
+      mealRows?.forEach(m => { mealDataMap[m.id] = m })
+    }
+    return DAYS.map(day => {
+      const dd = ws[day.id]
+      if (!dd) return { dayId: day.id, meals: {}, totals: {}, is_training_day: false }
+      const meals = {}
+      SLOTS.forEach(s => {
+        if (!dd[s]) return
+        const slot = dd[s]
+        const fullMeal = mealDataMap[slot.meal_id] || mealDataMap[slot.id] || null
+        meals[s] = {
+          ...slot,
+          ...(fullMeal ? { name: fullMeal.name, internal_name: fullMeal.internal_name, image_url: fullMeal.image_url, ingredients_list: slot.ingredients_list || fullMeal.ingredients_list, preparation_steps: fullMeal.preparation_steps, tips: fullMeal.tips, allergens: fullMeal.allergens, scalable: fullMeal.scalable, difficulty: fullMeal.difficulty, labels: fullMeal.labels } : {}),
+          name: fullMeal?.name || slot.name || slot.meal_name || slot.title || undefined,
+          meal_id: slot.meal_id || slot.id || null,
+          original_calories: slot.original_calories || slot.calories,
+          original_protein: slot.original_protein || slot.protein,
+          original_carbs: slot.original_carbs || slot.carbs,
+          original_fat: slot.original_fat || slot.fat,
+        }
+      })
+      return { dayId: day.id, meals, totals: dd.totals || calculateTotals(meals), is_training_day: dd.is_training_day || false }
+    })
+  }
+
   const loadConceptPlan = async (planId) => {
     try {
       const { data, error } = await db.supabase.from('client_meal_plans').select('*').eq('id', planId).single()
       if (error || !data?.week_structure) return
       if (data.client_id) { setResolvedClientId(data.client_id); if (onConceptLoaded) onConceptLoaded(data.client_id) }
-      const ws = data.week_structure
-      const mealIds = new Set()
-      Object.values(ws).forEach(dd => {
-        if (!dd) return
-        SLOTS.forEach(s => { if (dd[s]?.meal_id) mealIds.add(dd[s].meal_id); if (dd[s]?.id) mealIds.add(dd[s].id) })
-      })
-      const mealDataMap = {}
-      if (mealIds.size > 0) {
-        const { data: mealRows, error: mealError } = await db.supabase
-          .from('ai_meals')
-          .select('id, name, internal_name, calories, protein, carbs, fat, image_url, ingredients_list, preparation_steps, tips, allergens, scalable, difficulty, labels, timing, icon')
-          .in('id', [...mealIds])
-        if (mealError) console.error('❌ ai_meals query error:', mealError)
-        mealRows?.forEach(m => { mealDataMap[m.id] = m })
-      }
-      const days = DAYS.map(day => {
-        const dd = ws[day.id]
-        if (!dd) return { dayId: day.id, meals: {}, totals: {}, is_training_day: false }
-        const meals = {}
-        SLOTS.forEach(s => {
-          if (!dd[s]) return
-          const slot = dd[s]
-          const fullMeal = mealDataMap[slot.meal_id] || mealDataMap[slot.id] || null
-          meals[s] = {
-            ...slot,
-            ...(fullMeal ? { name: fullMeal.name, internal_name: fullMeal.internal_name, image_url: fullMeal.image_url, ingredients_list: slot.ingredients_list || fullMeal.ingredients_list, preparation_steps: fullMeal.preparation_steps, tips: fullMeal.tips, allergens: fullMeal.allergens, scalable: fullMeal.scalable, difficulty: fullMeal.difficulty, labels: fullMeal.labels } : {}),
-            name: fullMeal?.name || slot.name || slot.meal_name || slot.title || undefined,
-            meal_id: slot.meal_id || slot.id || null,
-            original_calories: slot.original_calories || slot.calories,
-            original_protein: slot.original_protein || slot.protein,
-            original_carbs: slot.original_carbs || slot.carbs,
-            original_fat: slot.original_fat || slot.fat,
-          }
-        })
-        return { dayId: day.id, meals, totals: dd.totals || calculateTotals(meals), is_training_day: dd.is_training_day || false }
-      })
+      const days = await hydrateWeekStructure(data.week_structure)
+      if (!days) return
       setWeekData(days)
-      setTargets({ calories: data.daily_calories || 2500, protein: data.daily_protein || 150, carbs: data.daily_carbs || 300, fat: data.daily_fat || 80 })
+      // BEWUST GEEN setTargets hier: de macro-targets bovenaan moeten ALTIJD de
+      // door de coach berekende + toegewezen targets zijn (clientRecord.target_*),
+      // niet de macro's die in dit (opgeslagen) plan staan. De clientRecord-effect
+      // hierboven is de enige bron van targets — anders kreeg je soms de plan-macro's
+      // (race condition tussen plan-load en clientRecord-load).
       setPlanMeta({ id: data.id, name: data.template_name, isActive: data.is_active, clientId: data.client_id, createdAt: data.created_at, stats: data.stats, aiGenerated: data.ai_generated })
       setActivated(data.is_active || false)
       setHistory([JSON.parse(JSON.stringify(days))]); setHistoryIndex(0)
@@ -231,7 +318,12 @@ export default function PlanAnalyzer({
 
   const EN_TO_NL = { Monday: 'ma', Tuesday: 'di', Wednesday: 'wo', Thursday: 'do', Friday: 'vr', Saturday: 'za', Sunday: 'zo' }
   const workoutSchedule = clientRecord?.workout_schedule || null
-  const trainingDaysFromSchedule = workoutSchedule ? Object.keys(workoutSchedule).map(k => EN_TO_NL[k]).filter(Boolean) : null
+  const trainingDaysFromSchedule = workoutSchedule
+    ? Object.entries(workoutSchedule)
+        .filter(([, dagKey]) => !validSchemaDagKeys || validSchemaDagKeys.has(dagKey))
+        .map(([day]) => EN_TO_NL[day])
+        .filter(Boolean)
+    : null
   const trainingDays = trainingDaysFromSchedule?.length ? trainingDaysFromSchedule : (clientIntake?.training?.training_days?.length > 0 ? clientIntake.training.training_days : ['ma', 'di', 'wo', 'vr', 'za'])
   const mealSchedule = clientIntake?.meal_schedule || null
   const trainingTime = clientIntake?.training?.default_time || null
@@ -264,15 +356,31 @@ export default function PlanAnalyzer({
 
   const applyWeekUpdate = async (updated, actionDesc) => {
     setWeekData(updated); pushHistory(updated, actionDesc); await persistWeekData(updated)
+    // Trigger embedded agenda om de nieuwe meal-data op te halen.
+    setAgendaRefreshKey(k => k + 1)
   }
 
   // ════════════ MEAL EDITING ════════════
+
+  // Zorg dat een geplaatste meal een geldige KLOK-tijd op .timing heeft. Meals
+  // uit ai_meals dragen .timing als array van maaltijd-types (bv. ['lunch']) —
+  // geen klok-tijd — waardoor de agenda ze overslaat. Behoud een geldige vorige
+  // slot-tijd, anders de slot-default. (HH:MM string).
+  const isClockTime = (t) => typeof t === 'string' && /^\d{1,2}:\d{2}/.test(t)
+  const withSlotTiming = (meal, slot, prevMeal) => {
+    if (!meal) return meal
+    const timing = isClockTime(meal.timing) ? meal.timing
+      : isClockTime(prevMeal?.timing) ? prevMeal.timing
+      : (SLOT_DEFAULT_TIMES[slot] || '12:00')
+    return { ...meal, timing }
+  }
 
   const handleSwap = (dayIndex, slot, meal) => setSwapState({ dayIndex, slot, meal })
   const handleSwapSelect = async (newMeal) => {
     if (!swapState || !weekData) return
     const updated = [...weekData]
-    updated[swapState.dayIndex] = { ...updated[swapState.dayIndex], meals: { ...updated[swapState.dayIndex].meals, [swapState.slot]: newMeal } }
+    const placed = withSlotTiming(newMeal, swapState.slot, updated[swapState.dayIndex].meals[swapState.slot])
+    updated[swapState.dayIndex] = { ...updated[swapState.dayIndex], meals: { ...updated[swapState.dayIndex].meals, [swapState.slot]: placed } }
     updated[swapState.dayIndex].totals = calculateTotals(updated[swapState.dayIndex].meals)
     await applyWeekUpdate(updated, `Swap ${DAYS[swapState.dayIndex].full}: ${swapState.meal?.name || 'leeg'} → ${newMeal.name || '?'}`)
     setSwapState(null)
@@ -280,9 +388,22 @@ export default function PlanAnalyzer({
   const handleMultiDaySelect = async (newMeal, slot, dayIndices) => {
     if (!weekData) return
     const updated = [...weekData]
-    dayIndices.forEach(di => { updated[di] = { ...updated[di], meals: { ...updated[di].meals, [slot]: newMeal } }; updated[di].totals = calculateTotals(updated[di].meals) })
+    dayIndices.forEach(di => { updated[di] = { ...updated[di], meals: { ...updated[di].meals, [slot]: withSlotTiming(newMeal, slot, updated[di].meals[slot]) } }; updated[di].totals = calculateTotals(updated[di].meals) })
     await applyWeekUpdate(updated, `Swap ${slot} op ${dayIndices.length} dagen → ${newMeal.name}`)
     setSwapState(null)
+  }
+  // "Dagen"-knop op een meal-card: open de dag-picker in het dock-vak.
+  const handleApplyToDays = (dayIndex, slot, meal) => { if (meal) setApplyDaysState({ dayIndex, slot, meal }) }
+  // Pas de gekozen meal (met huidige aanpassingen) toe op de geselecteerde dagen.
+  const handleApplyDaysConfirm = async (dayIndices) => {
+    if (!applyDaysState || !weekData) return
+    const { meal, slot } = applyDaysState
+    const updated = [...weekData]
+    dayIndices.forEach(di => {
+      updated[di] = { ...updated[di], meals: { ...updated[di].meals, [slot]: withSlotTiming(meal, slot, updated[di].meals[slot]) } }
+      updated[di].totals = calculateTotals(updated[di].meals)
+    })
+    await applyWeekUpdate(updated, `${meal.name || 'Maaltijd'} toegepast op ${dayIndices.length} dag${dayIndices.length !== 1 ? 'en' : ''}`)
   }
   const handleDelete = async (dayIndex, slot) => {
     if (!weekData) return
@@ -292,6 +413,16 @@ export default function PlanAnalyzer({
     await applyWeekUpdate(updated, `Verwijderd: ${mealName} (${DAYS[dayIndex].full})`)
   }
   const handleAdd = (dayIndex, slot) => setSwapState({ dayIndex, slot, meal: null })
+  // Laad een opgeslagen full_week-plan uit de bibliotheek en pas het toe op het
+  // huidige (client-)plan. Reconstrueert via dezelfde hydrate-helper als een
+  // normale plan-load, en persisteert naar het actieve planMeta.id.
+  const handleLoadSavedPlan = async (ws, name) => {
+    if (!ws) return
+    const days = await hydrateWeekStructure(ws)
+    if (!days) return
+    await applyWeekUpdate(days, `Plan geladen: ${name || 'opgeslagen plan'}`)
+    setDockedSection(null)
+  }
   const handleUpdateMeal = async (dayIndex, slot, updatedMeal) => {
     if (!weekData) return
     const updated = [...weekData]
@@ -430,6 +561,13 @@ export default function PlanAnalyzer({
   // ════════════ RENDER: MAIN ════════════
 
   const currentDay = weekData?.[activeDay]
+  const DAY_CODE_BY_INDEX = { 0: 'ma', 1: 'di', 2: 'wo', 3: 'do', 4: 'vr', 5: 'za', 6: 'zo' }
+  // Trainingsdag-indices (0=ma..6=zo) voor de "Trainingsdagen"-pill in de dag-picker.
+  const CODE_TO_INDEX = { ma: 0, di: 1, wo: 2, do: 3, vr: 4, za: 5, zo: 6 }
+  const trainingDayIndices = (trainingDays || []).map(c => CODE_TO_INDEX[c]).filter(i => i != null).sort((a, b) => a - b)
+  const currentDayIsTraining = trainingDays?.length > 0
+    ? trainingDays.includes(DAY_CODE_BY_INDEX[activeDay])
+    : !!currentDay?.is_training_day
   const preWorkoutSlot = getPreWorkoutSlot(activeDay)
   const sortedSlots = currentDay ? getSortedSlots(currentDay.meals) : SLOTS
   const warningCount = weekData?.reduce((count, day) => {
@@ -459,173 +597,482 @@ export default function PlanAnalyzer({
     },
   ]
 
+  // Toggle een sectie in het dock-paneel (klik zelfde knop = sluiten).
+  const toggleDock = (id) => setDockedSection(d => d === id ? null : id)
   const sidebarNav = [
-    { id: 'plans',  icon: <List size={14} />,      label: 'Plannen', active: showPlanSwitcher,     onClick: () => setShowPlanSwitcher(true),        badge: allClientPlans.length > 0 ? allClientPlans.length : null },
-    { id: 'client', icon: '👤',                    label: 'Client',  active: showFloatingClient,   onClick: () => setShowFloatingClient(p => !p) },
-    { id: 'timing', icon: <Clock size={14} />,     label: 'Tijden',  active: showTimingModal,      onClick: () => setShowTimingModal(true) },
-    { id: 'dag',    icon: <Zap size={14} />,       label: 'Dag',     active: showBalancer,         onClick: () => setShowBalancer(true) },
-    { id: 'week',   icon: <Grid3X3 size={14} />,   label: 'Week',    active: viewMode === 'week',  onClick: () => setViewMode(v => v === 'week' ? 'day' : 'week') },
+    { id: 'plans',  icon: <List size={18} />,      label: 'Plannen', active: dockedSection === 'plans',  onClick: () => toggleDock('plans'),  badge: allClientPlans.length > 0 ? allClientPlans.length : null },
+    { id: 'client', icon: '👤',                    label: 'Client',  active: dockedSection === 'client', onClick: () => toggleDock('client') },
+    { id: 'timing', icon: <Clock size={18} />,     label: 'Tijden',  active: dockedSection === 'timing', onClick: () => toggleDock('timing') },
+    { id: 'dag',    icon: <Zap size={18} />,       label: 'Dag',     active: dockedSection === 'dag',    onClick: () => toggleDock('dag') },
+    { id: 'week',   icon: <Grid3X3 size={18} />,   label: 'Week',    active: viewMode === 'week',        onClick: () => setViewMode(v => v === 'week' ? 'day' : 'week') },
+    { id: 'agenda', icon: <Calendar size={18} />,  label: 'Agenda',  active: dockedSection === 'agenda', onClick: () => toggleDock('agenda') },
+    { id: 'swaps',  icon: <Repeat size={18} />,    label: 'Swaps',   active: dockedSection === 'swaps',  onClick: () => toggleDock('swaps') },
+    { id: 'library', icon: <Bookmark size={18} />, label: 'Opslaan', active: dockedSection === 'library', onClick: () => toggleDock('library') },
   ]
 
   const sidebarBottom = [
-    { id: 'pdf',     icon: loadingPdf ? <Loader size={13} style={{ animation: 'spin 1s linear infinite' }} /> : <Download size={13} />, label: 'PDF',    onClick: handlePDF,                                                     color: '#FFD700' },
-    { id: 'guide',   icon: <FileText size={13} />,    label: 'Guide',  onClick: () => openCoachingGuideForPrint(clientRecord?.first_name || 'Client'), color: '#6366f1' },
-    { id: 'wa',      icon: <MessageSquare size={13} />, label: 'WA',   onClick: handleWhatsApp,  color: '#10b981' },
-    { id: 'undo',    icon: <RotateCcw size={13} />,   label: 'Undo',   onClick: handleUndo,      color: canUndo ? 'rgba(255,255,255,0.4)' : 'rgba(255,255,255,0.1)', disabled: !canUndo },
-    { id: 'redo',    icon: <RotateCw size={13} />,    label: 'Redo',   onClick: handleRedo,      color: canRedo ? 'rgba(255,255,255,0.4)' : 'rgba(255,255,255,0.1)', disabled: !canRedo },
+    { id: 'pdf',     icon: loadingPdf ? <Loader size={16} style={{ animation: 'spin 1s linear infinite' }} /> : <Download size={16} />, label: 'PDF',    onClick: handlePDF,                                                     color: '#FFD700' },
+    { id: 'guide',   icon: <FileText size={16} />,    label: 'Guide',  onClick: () => openCoachingGuideForPrint(clientRecord?.first_name || 'Client'), color: '#6366f1' },
+    { id: 'wa',      icon: <MessageSquare size={16} />, label: 'WA',   onClick: handleWhatsApp,  color: '#10b981' },
+    { id: 'undo',    icon: <RotateCcw size={16} />,   label: 'Undo',   onClick: handleUndo,      color: canUndo ? '#fff' : 'rgba(255,255,255,0.2)', disabled: !canUndo },
+    { id: 'redo',    icon: <RotateCw size={16} />,    label: 'Redo',   onClick: handleRedo,      color: canRedo ? '#fff' : 'rgba(255,255,255,0.2)', disabled: !canRedo },
   ]
 
   return (
-    <div style={{ display: 'flex', height: '100%', minHeight: '400px', background: '#0a0a0a' }}>
+    <div style={{ display: 'flex', height: '100%', minHeight: '400px', background: '#0a0a0a', position: 'relative' }}>
 
-      {/* ════════════ SIDEBAR ════════════ */}
+      {/* ════════════ SIDEBAR ════════════
+          Bredere kolom (72/92 ipv 56/80), iconen 18px (was 14), labels
+          0.58rem (was 0.42 ≈ 5px). Inactieve knoppen krijgen een subtiele
+          achtergrond + border zodat ze duidelijk als tap-target ogen. */}
       <div style={{
-        width: m ? '56px' : '80px', flexShrink: 0,
+        width: m ? 72 : 92, flexShrink: 0,
         background: '#080808',
         borderRight: '1px solid rgba(255,255,255,0.05)',
         display: 'flex', flexDirection: 'column', alignItems: 'center',
-        padding: '8px 0', gap: '4px',
-        overflowY: 'auto', WebkitOverflowScrolling: 'touch'
+        padding: '10px 0', gap: 6,
+        overflowY: 'auto', WebkitOverflowScrolling: 'touch',
       }}>
         {/* Activeer knop */}
-        {planMeta && (
-          <button onClick={handleActivate} disabled={activating || activated || planMeta?.isActive} style={{
-            width: m ? '44px' : '68px', padding: '6px 0',
-          }}>
-            {activating ? <Loader size={14} color="#10b981" style={{ animation: 'spin 1s linear infinite' }} /> : <Check size={14} color="#10b981" />}
-            <span style={{ fontSize: '0.42rem', fontWeight: 700, color: '#10b981' }}>{(activated || planMeta?.isActive) ? 'Actief' : 'Activeer'}</span>
-          </button>
-        )}
+        {planMeta && (() => {
+          const isActiveAlready = activated || planMeta?.isActive
+          return (
+            <button
+              onClick={handleActivate}
+              disabled={activating || isActiveAlready}
+              style={{
+                width: m ? 58 : 78, padding: '8px 4px',
+                display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3,
+                background: 'rgba(16,185,129,0.08)',
+                border: '1px solid rgba(16,185,129,0.3)',
+                borderRadius: 8,
+                cursor: isActiveAlready ? 'default' : 'pointer',
+                touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+              }}
+            >
+              {activating
+                ? <Loader size={18} color="#10b981" style={{ animation: 'spin 1s linear infinite' }} />
+                : <Check size={18} color="#10b981" />}
+              <span style={{ fontSize: '0.58rem', fontWeight: 800, color: '#10b981' }}>
+                {isActiveAlready ? 'Actief' : 'Activeer'}
+              </span>
+            </button>
+          )
+        })()}
 
-        <div style={{ width: '32px', height: '1px', background: 'rgba(255,255,255,0.06)', margin: '2px 0' }} />
+        <div style={{ width: 36, height: 1, background: 'rgba(255,255,255,0.08)', margin: '4px 0' }} />
 
-        {/* Nav knoppen */}
+        {/* Nav knoppen — altijd zichtbare achtergrond + border zodat ze
+            als knoppen herkenbaar zijn. Active state krijgt gold accent. */}
         {sidebarNav.map(btn => (
           <button key={btn.id} onClick={btn.onClick} title={btn.label} style={{
-            width: m ? '44px' : '68px', padding: '6px 0',
-            display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px',
-            background: btn.active ? 'rgba(255,215,0,0.08)' : 'transparent',
-            border: `1px solid ${btn.active ? 'rgba(255,215,0,0.2)' : 'transparent'}`,
-            borderRadius: '7px', cursor: 'pointer',
+            width: m ? 58 : 78, padding: '8px 4px',
+            display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3,
+            background: btn.active ? 'rgba(255,215,0,0.14)' : 'rgba(255,255,255,0.025)',
+            border: `1px solid ${btn.active ? 'rgba(255,215,0,0.45)' : 'rgba(255,255,255,0.07)'}`,
+            borderRadius: 8, cursor: 'pointer',
             touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-            position: 'relative', transition: 'all 0.15s ease'
+            position: 'relative', transition: 'background 0.15s ease, border-color 0.15s ease',
           }}>
-            <span style={{ color: btn.active ? '#FFD700' : 'rgba(255,255,255,0.35)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: typeof btn.icon === 'string' ? '13px' : undefined }}>
+            <span style={{
+              color: btn.active ? '#FFD700' : 'rgba(255,255,255,0.65)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontSize: typeof btn.icon === 'string' ? '18px' : undefined,
+            }}>
               {btn.icon}
             </span>
-            <span style={{ fontSize: '0.42rem', fontWeight: 700, color: btn.active ? '#FFD700' : 'rgba(255,255,255,0.25)' }}>{btn.label}</span>
+            <span style={{
+              fontSize: '0.58rem', fontWeight: 800,
+              color: btn.active ? '#FFD700' : 'rgba(255,255,255,0.6)',
+              letterSpacing: '0.01em',
+            }}>{btn.label}</span>
             {btn.badge && (
-              <span style={{ position: 'absolute', top: '2px', right: '2px', fontSize: '0.32rem', fontWeight: 800, background: 'rgba(255,215,0,0.15)', color: '#FFD700', borderRadius: '3px', padding: '0 2px', lineHeight: '1.4' }}>{btn.badge}</span>
+              <span style={{
+                position: 'absolute', top: 3, right: 3,
+                fontSize: '0.45rem', fontWeight: 800,
+                background: '#FFD700', color: '#000',
+                borderRadius: 8, padding: '0 4px',
+                lineHeight: 1.5, minWidth: 14, textAlign: 'center',
+              }}>{btn.badge}</span>
             )}
           </button>
         ))}
 
         {/* Waarschuwing indicator */}
         {warningCount > 0 && (
-          <div style={{ width: m ? '36px' : '40px', padding: '3px 0', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px' }}>
-            <AlertTriangle size={12} color="#ef4444" />
-            <span style={{ fontSize: '0.35rem', fontWeight: 700, color: '#ef4444' }}>{warningCount}d</span>
+          <div style={{
+            width: m ? 58 : 78, padding: '6px 4px',
+            display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3,
+            background: 'rgba(239,68,68,0.08)',
+            border: '1px solid rgba(239,68,68,0.3)',
+            borderRadius: 8,
+          }}>
+            <AlertTriangle size={16} color="#ef4444" />
+            <span style={{ fontSize: '0.55rem', fontWeight: 800, color: '#ef4444' }}>{warningCount}d</span>
           </div>
         )}
 
         <div style={{ flex: 1 }} />
 
-        <div style={{ width: '32px', height: '1px', background: 'rgba(255,255,255,0.06)', margin: '2px 0' }} />
+        <div style={{ width: 36, height: 1, background: 'rgba(255,255,255,0.08)', margin: '4px 0' }} />
 
-        {/* Bottom acties */}
+        {/* Bottom acties — zelfde stijl als nav */}
         {sidebarBottom.map(btn => (
           <button key={btn.id} onClick={btn.onClick} disabled={btn.disabled} title={btn.label} style={{
-            width: m ? '44px' : '68px', padding: '6px 0',
-            display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px',
-            background: 'transparent', border: '1px solid transparent',
-            borderRadius: '7px', cursor: btn.disabled ? 'not-allowed' : 'pointer',
+            width: m ? 58 : 78, padding: '8px 4px',
+            display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3,
+            background: 'rgba(255,255,255,0.025)',
+            border: '1px solid rgba(255,255,255,0.07)',
+            borderRadius: 8,
+            cursor: btn.disabled ? 'not-allowed' : 'pointer',
             touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-            opacity: btn.disabled ? 0.35 : 1
+            opacity: btn.disabled ? 0.4 : 1,
           }}>
-            <span style={{ color: btn.color || 'rgba(255,255,255,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{btn.icon}</span>
-            <span style={{ fontSize: '0.42rem', fontWeight: 700, color: btn.disabled ? 'rgba(255,255,255,0.15)' : 'rgba(255,255,255,0.3)' }}>{btn.label}</span>
+            <span style={{
+              color: btn.color || 'rgba(255,255,255,0.7)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}>{btn.icon}</span>
+            <span style={{
+              fontSize: '0.58rem', fontWeight: 800,
+              color: btn.disabled ? 'rgba(255,255,255,0.25)' : (btn.color || 'rgba(255,255,255,0.6)'),
+            }}>{btn.label}</span>
           </button>
         ))}
       </div>
 
+      {/* ════════════ DOCK-PANEEL ════════════
+          De gekozen sectie opent hier, naast de knoppenbalk. Samen vullen ze
+          ~40% van de breedte; de bouwer (dag+maaltijden) neemt de rest. Op
+          mobiel ligt het paneel als overlay over de bouwer. De transform maakt
+          de fixed-modals binnen dit paneel relatief hieraan i.p.v. het scherm. */}
+      {(dockedSection || swapState || applyDaysState) && (
+        <div style={{
+          flexShrink: 0, minWidth: 0, background: '#0a0a0a',
+          borderRight: '1px solid rgba(255,255,255,0.06)',
+          transform: 'translateZ(0)', overflow: 'hidden',
+          display: 'flex', flexDirection: 'column',
+          ...(m
+            ? { position: 'absolute', left: 72, right: 0, top: 0, bottom: 0, zIndex: 40 }
+            : { position: 'relative', flexBasis: dockWidth, width: dockWidth }),
+        }}>
+          {/* Swap + "toepassen op dagen" openen met voorrang in het modal vak
+              (getriggerd door de knoppen op een meal card). */}
+          {swapState ? (
+            <SwapModal embedded db={db} slot={swapState.slot} currentMeal={swapState.meal}
+              dayIndex={swapState.dayIndex} dayTotals={currentDay?.totals} targets={targets}
+              trainingDays={trainingDayIndices}
+              onSelect={handleSwapSelect} onMultiDaySelect={handleMultiDaySelect}
+              onClose={() => setSwapState(null)} isMobile={m} />
+          ) : applyDaysState ? (
+            <ApplyDaysModal embedded meal={applyDaysState.meal} slot={applyDaysState.slot}
+              dayIndex={applyDaysState.dayIndex} trainingDays={trainingDayIndices}
+              onApply={handleApplyDaysConfirm}
+              onClose={() => setApplyDaysState(null)} isMobile={m} />
+          ) : (<>
+          {dockedSection === 'client' && resolvedClientId && (
+            <ClientContextPanel db={db} clientId={resolvedClientId} isMobile={m} isFloating={false} onClose={() => setDockedSection(null)} />
+          )}
+          {dockedSection === 'timing' && weekData && (
+            <TimingModal embedded weekData={weekData}
+              onApply={async (updated) => { await applyWeekUpdate(updated, 'Tijden bijgewerkt'); setDockedSection(null) }}
+              onClose={() => setDockedSection(null)} isMobile={m} />
+          )}
+          {dockedSection === 'dag' && currentDay && (
+            <AutoBalancer embedded dayData={currentDay} targets={targets} dayIndex={activeDay}
+              onApply={handleAutoBalance} onClose={() => setDockedSection(null)} isMobile={m} />
+          )}
+          {dockedSection === 'swaps' && resolvedClientId && (
+            <BestSwapsModal embedded db={db} clientId={resolvedClientId} isMobile={m} onClose={() => setDockedSection(null)} />
+          )}
+          {dockedSection === 'plans' && resolvedClientId && (
+            <PlanSwitcherModal embedded db={db} clientId={resolvedClientId} coachId={coachId} activePlanId={planMeta?.id}
+              onSelect={(planId) => { setSelectedConceptId(planId); setDockedSection(null); loadAllPlanCount(resolvedClientId) }}
+              onClose={() => setDockedSection(null)} isMobile={m} />
+          )}
+          {dockedSection === 'library' && (
+            <PlanLibraryModal embedded db={db} coachId={coachId} isMobile={m}
+              weekData={weekData} planMeta={planMeta}
+              clientName={clientRecord?.first_name || ''}
+              onLoad={handleLoadSavedPlan}
+              onClose={() => setDockedSection(null)} />
+          )}
+          {dockedSection === 'agenda' && (clientRecord || resolvedClientId) && (
+            <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: '#0a0a0a' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.6rem 0.8rem', borderBottom: '1px solid rgba(255,215,0,0.2)', flexShrink: 0 }}>
+                <span style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: '#FFD700', fontWeight: 800, fontSize: m ? '0.85rem' : '0.9rem' }}>
+                  <Calendar size={15} /> Agenda · {DAYS[activeDay]?.full || DAYS[activeDay]?.label || ''}
+                </span>
+                <button onClick={() => setDockedSection(null)} style={{ width: 30, height: 30, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 7, color: 'rgba(255,255,255,0.6)', cursor: 'pointer' }}><X size={15} /></button>
+              </div>
+              <div style={{ flex: 1, overflowY: 'auto', WebkitOverflowScrolling: 'touch', background: 'rgba(0,0,0,0.2)' }}>
+                <ClientAgendaView
+                  client={clientRecord || { id: resolvedClientId }}
+                  db={db}
+                  isMobile={m}
+                  viewerRole="coach"
+                  singleDay={DAYS[activeDay]?.id}
+                  refreshKey={agendaRefreshKey}
+                  mealPlanId={selectedConceptId || planMeta?.id || null}
+                  onMealTimingChange={({ day, slot, newTiming }) => {
+                    const idx = DAYS.findIndex(d => d.id === day)
+                    if (idx < 0 || !slot || !newTiming) return
+                    setWeekData(prev => {
+                      if (!prev) return prev
+                      const next = [...prev]
+                      if (!next[idx]?.meals?.[slot]) return prev
+                      next[idx] = { ...next[idx], meals: { ...next[idx].meals, [slot]: { ...next[idx].meals[slot], timing: newTiming } } }
+                      return next
+                    })
+                  }}
+                  onMealUpdate={() => {
+                    const reloadId = selectedConceptId || planMeta?.id
+                    if (reloadId) loadConceptPlan(reloadId)
+                  }}
+                />
+              </div>
+            </div>
+          )}
+          </>)}
+        </div>
+      )}
+
+      {/* Sleep-handvat om het dock-paneel breder/smaller te maken (desktop). */}
+      {(dockedSection || swapState || applyDaysState) && !m && (
+        <div
+          onPointerDown={startDockResize}
+          title="Sleep om het paneel groter/kleiner te maken"
+          style={{
+            flexShrink: 0, width: 7, cursor: 'col-resize', alignSelf: 'stretch',
+            background: 'rgba(255,255,255,0.05)',
+            borderRight: '1px solid rgba(255,255,255,0.08)',
+            zIndex: 45, touchAction: 'none',
+          }}
+          onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(255,215,0,0.3)' }}
+          onMouseLeave={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.05)' }}
+        />
+      )}
+
       {/* ════════════ MAIN BUILDER ════════════ */}
       <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
 
-        {/* Plan naam + dag header */}
+        {/* Header — compact: pijl + dagnaam + pijl, daaronder MacroHero
+            (zelfde stijl als client meal pagina). De oude plan-name banner,
+            DayMacroBar, DayNavigator-knoppen en training-badge zijn weg. */}
         <div style={{ flexShrink: 0, borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
-          {/* Plan naam */}
-          {planMeta && (
-            <div style={{ padding: '0.25rem 0.75rem', background: (activated || planMeta?.isActive) ? 'rgba(16,185,129,0.03)' : 'rgba(255,215,0,0.02)', borderBottom: '1px solid rgba(255,255,255,0.03)', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-              <span style={{ fontSize: '0.38rem', fontWeight: 700, color: (activated || planMeta?.isActive) ? '#10b981' : '#FFD700', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-                {(activated || planMeta?.isActive) ? '✓ ACTIEF' : '⏳ CONCEPT'}
-              </span>
-              <span style={{ fontSize: '0.7rem', fontWeight: 800, color: '#fff', flex: 1, minWidth: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{planMeta.name}</span>
-              {planMeta.stats?.smartScaling && (
-                <span style={{ fontSize: '0.38rem', color: 'rgba(255,255,255,0.2)', flexShrink: 0 }}>{planMeta.stats.smartScaling.replacements} vervangingen</span>
+          <div style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+            // Bredere zij-padding → pijlen liggen meer naar binnen, niet
+            // aan de rand van het paneel. Mobiel iets minder agressief
+            // dan desktop om tap-targets behouden te houden.
+            padding: m ? '0.6rem 2.5rem' : '0.75rem 5rem',
+            gap: 10,
+          }}>
+            <button
+              onClick={() => setActiveDay(d => Math.max(0, d - 1))}
+              disabled={activeDay === 0}
+              aria-label="Vorige dag"
+              style={{
+                width: m ? 32 : 36, height: m ? 32 : 36,
+                background: 'transparent', border: 'none',
+                color: activeDay === 0 ? 'rgba(255,255,255,0.18)' : '#FFD700',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                padding: 0, cursor: activeDay === 0 ? 'not-allowed' : 'pointer',
+                touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+                flexShrink: 0,
+              }}
+            >
+              <ChevronLeft size={m ? 22 : 24} strokeWidth={2.4} />
+            </button>
+
+            <div style={{
+              flex: 1, textAlign: 'center', minWidth: 0,
+              display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3,
+            }}>
+              <div style={{
+                fontSize: m ? '1.15rem' : '1.3rem',
+                fontWeight: 900,
+                color: '#FFD700',
+                letterSpacing: '-0.02em', lineHeight: 1.1,
+                whiteSpace: 'nowrap',
+              }}>
+                {DAYS[activeDay]?.full || '—'}
+              </div>
+              {currentDayIsTraining && (
+                <div style={{
+                  fontSize: '0.55rem', fontWeight: 800,
+                  color: 'rgba(0,0,0,0.85)',
+                  background: '#FFD700',
+                  padding: '2px 7px', borderRadius: 4,
+                  letterSpacing: '0.05em', textTransform: 'uppercase',
+                }}>
+                  Trainingsdag
+                </div>
               )}
             </div>
+
+            <button
+              onClick={() => setActiveDay(d => Math.min(6, d + 1))}
+              disabled={activeDay === 6}
+              aria-label="Volgende dag"
+              style={{
+                width: m ? 32 : 36, height: m ? 32 : 36,
+                background: 'transparent', border: 'none',
+                color: activeDay === 6 ? 'rgba(255,255,255,0.18)' : '#FFD700',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                padding: 0, cursor: activeDay === 6 ? 'not-allowed' : 'pointer',
+                touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+                flexShrink: 0,
+              }}
+            >
+              <ChevronRight size={m ? 22 : 24} strokeWidth={2.4} />
+            </button>
+          </div>
+
+          {/* MacroHero — in week-view direct hier (geen splitsing). In
+              day-view verhuist 'ie naar boven de meal-cards kolom. */}
+          {viewMode === 'week' && (
+            <MacroHero
+              consumed={{
+                calories: currentDay?.totals?.kcal || currentDay?.totals?.calories || 0,
+                protein:  currentDay?.totals?.protein || 0,
+                carbs:    currentDay?.totals?.carbs || 0,
+                fat:      currentDay?.totals?.fat || 0,
+              }}
+              targets={targets || {}}
+              db={db}
+              clientId={resolvedClientId}
+              isMobile={m}
+              selectedIsToday={true}
+            />
           )}
-
-          {/* Macro bar */}
-          <DayMacroBar dayTotals={currentDay?.totals} targets={targets} isMobile={m} />
-
-          {/* Dag navigator */}
-          <div style={{ padding: m ? '0.25rem 0.5rem' : '0.3rem 0.75rem' }}>
-            <DayNavigator activeDay={activeDay} setActiveDay={setActiveDay} weekData={weekData} targets={targets} trainingDays={trainingDays} isMobile={m} />
-          </div>
-
-          {/* Dag naam + training badge */}
-          <div style={{ padding: '0.2rem 0.75rem 0.25rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-            <span style={{ fontSize: m ? '0.85rem' : '0.95rem', fontWeight: 800, color: '#fff' }}>{DAYS[activeDay]?.full || ''}</span>
-            {currentDay?.is_training_day && (
-              <span style={{ fontSize: '0.38rem', fontWeight: 700, color: '#f97316', background: 'rgba(249,115,22,0.1)', padding: '0.08rem 0.3rem', borderRadius: '3px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>TRAININGSDAG</span>
-            )}
-            {lastAction && (
-              <span style={{ fontSize: '0.38rem', color: 'rgba(255,255,255,0.15)', marginLeft: 'auto' }}>{lastAction}</span>
-            )}
-          </div>
         </div>
 
-        {/* ── WEEK VIEW ── */}
+        {/* ── WEEK VIEW: rendered agenda ── */}
+        {/* De client-agenda heeft de hele week timeline al met meals,
+            workouts, sleep en werk-blokken. Coach kan vanuit hier drag/
+            click-edits doen die direct doorslaan naar week_structure +
+            client_agenda_blocks. Plan-analyzer's lokale state blijft
+            stale tot reload, maar de DB is bron-van-waarheid. */}
         {viewMode === 'week' && (
           <div style={{ flex: 1, overflow: 'auto' }}>
-            <WeekOverview weekData={weekData} targets={targets} trainingDays={trainingDays} activeDay={activeDay}
-              onSelectDay={(i) => { setActiveDay(i); setViewMode('day') }}
-              onMoveMeal={handleMoveMeal} onAddMeal={handleAdd} isMobile={m} />
+            {(clientRecord || resolvedClientId) ? (
+              <ClientAgendaView
+                client={clientRecord || { id: resolvedClientId }}
+                db={db}
+                isMobile={m}
+                viewerRole="coach"
+                refreshKey={agendaRefreshKey}
+                mealPlanId={selectedConceptId || planMeta?.id || null}
+                onMealTimingChange={({ day, slot, newTiming }) => {
+                  // Synchroon: update weekData lokaal zodat MealCard direct
+                  // de nieuwe tijd toont. Agenda's async DB-save runt apart.
+                  const idx = DAYS.findIndex(d => d.id === day)
+                  if (idx < 0 || !slot || !newTiming) return
+                  setWeekData(prev => {
+                    if (!prev) return prev
+                    const next = [...prev]
+                    if (!next[idx]?.meals?.[slot]) return prev
+                    next[idx] = {
+                      ...next[idx],
+                      meals: {
+                        ...next[idx].meals,
+                        [slot]: { ...next[idx].meals[slot], timing: newTiming },
+                      },
+                    }
+                    return next
+                  })
+                }}
+                onMealUpdate={() => {
+                  const reloadId = selectedConceptId || planMeta?.id
+                  if (reloadId) loadConceptPlan(reloadId)
+                }}
+              />
+            ) : (
+              <div style={{ padding: '2rem', color: 'rgba(255,255,255,0.5)', textAlign: 'center' }}>
+                Selecteer een client om de agenda te laden.
+              </div>
+            )}
           </div>
         )}
 
-        {/* ── DAG VIEW ── */}
+        {/* ── DAG VIEW ──
+            Twee onafhankelijk scrollende stroken:
+              LINKS  = agenda dag-strook (volle hoogte van content-area)
+              RECHTS = MacroHero + meal cards (boven elkaar, samen scrollend) */}
         {viewMode === 'day' && (
-          <div style={{ flex: 1, overflowY: 'auto', WebkitOverflowScrolling: 'touch' }}>
-            {currentDay && sortedSlots.map(slot => {
-              const meal = currentDay.meals[slot]
-              const isPreWorkout = slot === preWorkoutSlot
-              const expectedSlots = mealSchedule?.num_meals
-                ? SLOTS.slice(0, Math.min(mealSchedule.num_meals, SLOTS.length))
-                : SLOTS.slice(0, 4)
-              if (!meal && !expectedSlots.includes(slot)) return null
-              const conflicts = getMealConflicts(meal)
-              return (
-                <MealCard key={slot} db={db} meal={meal} slot={slot} dayIndex={activeDay}
-                  mealSchedule={mealSchedule} isPreWorkout={isPreWorkout}
-                  isEmpty={!meal} onSwap={handleSwap} onDelete={handleDelete}
-                  onAdd={handleAdd} onUpdateMeal={handleUpdateMeal}
-                  conflicts={conflicts} isMobile={m} />
-              )
-            })}
+          <div style={{
+            flex: 1, overflow: 'hidden',
+            display: 'flex',
+            flexDirection: m ? 'column' : 'row',
+            WebkitOverflowScrolling: 'touch',
+          }}>
+            {/* Meal-cards strook — MacroHero erboven, beide samen scrollend */}
+            <div style={{
+              flex: 1, overflowY: 'auto', WebkitOverflowScrolling: 'touch',
+              minWidth: 0,
+            }}>
+              <MacroHero
+                consumed={{
+                  calories: currentDay?.totals?.kcal || currentDay?.totals?.calories || 0,
+                  protein:  currentDay?.totals?.protein || 0,
+                  carbs:    currentDay?.totals?.carbs || 0,
+                  fat:      currentDay?.totals?.fat || 0,
+                }}
+                targets={targets || {}}
+                db={db}
+                clientId={resolvedClientId}
+                isMobile={m}
+                selectedIsToday={true}
+              />
+              {currentDay && sortedSlots.map(slot => {
+                const meal = currentDay.meals[slot]
+                const isPreWorkout = slot === preWorkoutSlot
+                const expectedSlots = mealSchedule?.num_meals
+                  ? SLOTS.slice(0, Math.min(mealSchedule.num_meals, SLOTS.length))
+                  : SLOTS.slice(0, 4)
+                if (!meal && !expectedSlots.includes(slot)) return null
+                const conflicts = getMealConflicts(meal)
+                return (
+                  <MealCard key={slot} db={db} meal={meal} slot={slot} dayIndex={activeDay}
+                    mealSchedule={mealSchedule} isPreWorkout={isPreWorkout}
+                    isEmpty={!meal} onSwap={handleSwap} onDelete={handleDelete}
+                    onAdd={handleAdd} onUpdateMeal={handleUpdateMeal} onApplyToDays={handleApplyToDays}
+                    conflicts={conflicts} isMobile={m} />
+                )
+              })}
+
+              {/* Nieuwe maaltijd toevoegen — pakt de eerstvolgende vrije slot
+                  en opent de kies-modal. */}
+              {currentDay && (() => {
+                const freeSlot = SLOTS.find(s => !currentDay.meals?.[s])
+                return (
+                  <button
+                    onClick={() => freeSlot && handleAdd(activeDay, freeSlot)}
+                    disabled={!freeSlot}
+                    style={{
+                      width: '100%', marginTop: '0.6rem',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem',
+                      padding: m ? '0.7rem' : '0.8rem',
+                      background: freeSlot ? 'rgba(255,215,0,0.08)' : 'rgba(255,255,255,0.03)',
+                      border: `1px dashed ${freeSlot ? 'rgba(255,215,0,0.4)' : 'rgba(255,255,255,0.1)'}`,
+                      borderRadius: 12,
+                      color: freeSlot ? '#FFD700' : 'rgba(255,255,255,0.25)',
+                      fontSize: m ? '0.78rem' : '0.85rem', fontWeight: 800,
+                      cursor: freeSlot ? 'pointer' : 'not-allowed',
+                      touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', fontFamily: 'inherit',
+                    }}
+                  >
+                    <Plus size={16} /> {freeSlot ? 'Maaltijd toevoegen' : 'Alle maaltijd-slots gevuld'}
+                  </button>
+                )
+              })()}
+            </div>
           </div>
         )}
       </div>
 
       {/* ════════════ MODALS ════════════ */}
-      {swapState && (
-        <SwapModal db={db} slot={swapState.slot} currentMeal={swapState.meal}
-          dayIndex={swapState.dayIndex} dayTotals={currentDay?.totals}
-          targets={targets} onSelect={handleSwapSelect}
-          onMultiDaySelect={handleMultiDaySelect}
-          onClose={() => setSwapState(null)} isMobile={m} />
-      )}
+      {/* SwapModal opent nu in het modal vak (zie boven), niet meer full-screen. */}
 
       {showBalancer && currentDay && (
         <AutoBalancer dayData={currentDay} targets={targets} dayIndex={activeDay}
@@ -647,10 +1094,67 @@ export default function PlanAnalyzer({
         <ClientContextPanel db={db} clientId={resolvedClientId} isMobile={m} isFloating={true} />
       )}
 
+      {showBestSwaps && resolvedClientId && (
+        <BestSwapsModal db={db} clientId={resolvedClientId} isMobile={m} onClose={() => setShowBestSwaps(false)} />
+      )}
+
       {showPlanSwitcher && resolvedClientId && (
         <PlanSwitcherModal db={db} clientId={resolvedClientId} coachId={coachId} activePlanId={planMeta?.id}
           onSelect={(planId) => { setSelectedConceptId(planId); setShowPlanSwitcher(false); loadAllPlanCount(resolvedClientId) }}
           onClose={() => setShowPlanSwitcher(false)} isMobile={m} />
+      )}
+
+      {/* Day-templates overlay verwijderd (2026-07-03) — op verzoek uitgezet. */}
+      {false && showDayTemplates && resolvedClientId && createPortal(
+        <div
+          onClick={(e) => { if (e.target === e.currentTarget) setShowDayTemplates(false) }}
+          style={{
+            position: 'fixed', inset: 0,
+            background: 'rgba(0,0,0,0.88)',
+            zIndex: 2147483600,
+            display: 'flex', flexDirection: 'column',
+          }}
+        >
+          <div style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+            padding: '0.7rem 1rem',
+            background: '#0a0a0a',
+            borderBottom: '1px solid rgba(255,215,0,0.2)',
+            flexShrink: 0,
+          }}>
+            <span style={{ color: '#FFD700', fontWeight: 800, fontSize: '0.9rem', letterSpacing: '-0.01em' }}>
+              Dag-templates {clientRecord?.first_name ? `· ${clientRecord.first_name}` : ''}
+            </span>
+            <button
+              onClick={() => setShowDayTemplates(false)}
+              style={{
+                width: 36, height: 36,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                background: 'rgba(255,255,255,0.06)',
+                border: '1px solid rgba(255,255,255,0.1)',
+                borderRadius: 8, color: 'rgba(255,255,255,0.6)',
+                cursor: 'pointer', touchAction: 'manipulation',
+              }}
+            >
+              <X size={16} />
+            </button>
+          </div>
+          <div style={{ flex: 1, overflowY: 'auto', WebkitOverflowScrolling: 'touch', background: '#0a0a0a' }}
+               onClick={(e) => e.stopPropagation()}>
+            <DayTemplatesSectionWrapper
+              db={db}
+              clientId={resolvedClientId}
+              activePlan={planMeta ? { id: planMeta.id } : null}
+              onPlanUpdate={() => { /* reload via parent if needed */ }}
+              onNavigateToDay={(dayKey) => {
+                const idx = DAYS.findIndex(d => d.key === dayKey)
+                if (idx >= 0) { setActiveDay(idx); setViewMode('day') }
+                setShowDayTemplates(false)
+              }}
+            />
+          </div>
+        </div>,
+        document.body
       )}
 
       <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>

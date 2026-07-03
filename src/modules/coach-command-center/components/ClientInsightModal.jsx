@@ -2,7 +2,7 @@
 // ClientInsightModal.jsx - v8.3
 // + onOpenMealPanel prop toegevoegd voor Meal Plan SOP widget
 import React, { useState, useRef, useCallback } from 'react'
-import { X, Scale, Dumbbell, UtensilsCrossed, ChevronLeft, ChevronRight, TrendingUp, User, BookOpen, ClipboardCheck } from 'lucide-react'
+import { X, Scale, Dumbbell, UtensilsCrossed, ChevronLeft, ChevronRight, ChevronDown, TrendingUp, User, BookOpen, ClipboardCheck, Bell } from 'lucide-react'
 import WeightColumn from './insight/WeightColumn'
 import WorkoutColumn from './insight/WorkoutColumn'
 import MealsColumn from './insight/MealsColumn'
@@ -11,14 +11,63 @@ import CheckinsColumn from './insight/CheckinsColumn'
 import ClientJourneyTimeline from '../../client-journey/ClientJourneyTimeline'
 import CoachingLogModal from './CoachingLogModal'
 import CoachingPeriodPanel from './CoachingPeriodPanel'
+import SendNotificationModal from '../../notifications/SendNotificationModal'
 
 const COLS = [
   { id: 'weight',  label: 'Gewicht',   color: '#FFD700' },
-  { id: 'workout', label: 'Training',  color: '#f97316' },
-  { id: 'meals',   label: 'Voeding',   color: '#10b981' },
+  { id: 'workout', label: 'Training',  color: '#FFD700' },
+  { id: 'meals',   label: 'Voeding',   color: '#FFD700' },
   { id: 'data',    label: 'Gegevens',  color: '#FFD700' },
   { id: 'checkin', label: 'Check-ins', color: '#FFD700' },
 ]
+
+// Top-level component zodat z'n referentie stabiel blijft tussen renders.
+// Voorheen werd ColWrapper binnen ClientInsightModal gedefinieerd; React
+// kreeg dan elke render een nieuw functie-type en mounted de hele subtree
+// (incl. ClientDataColumn-state als activeSection) opnieuw. Daardoor
+// "sprong" de Gegevens-kolom terug naar de Profiel-tab na elke save.
+function ColWrapper({ id, children, isLast, collapsed, onToggle }) {
+  const col = COLS.find(c => c.id === id)
+  const isCollapsed = collapsed.has(id)
+  return (
+    <div style={{
+      display: 'flex', flexDirection: 'row',
+      flex: isCollapsed ? '0 0 32px' : 1,
+      minWidth: 0,
+      borderRight: isLast ? 'none' : '1px solid rgba(255,255,255,0.06)',
+      overflow: 'hidden',
+      transition: 'flex 0.2s ease',
+    }}>
+      {!isCollapsed && (
+        <div style={{ flex: 1, overflow: 'hidden', minWidth: 0 }}>
+          {children}
+        </div>
+      )}
+      <button
+        onClick={() => onToggle(id)}
+        title={isCollapsed ? `${col?.label} uitklappen` : `${col?.label} inklappen`}
+        style={{
+          flexShrink: 0, width: '20px',
+          background: isCollapsed ? 'rgba(255,255,255,0.02)' : 'transparent',
+          border: 'none',
+          borderLeft: isCollapsed ? 'none' : '1px solid rgba(255,255,255,0.04)',
+          cursor: 'pointer', display: 'flex', flexDirection: 'column',
+          alignItems: 'center', justifyContent: 'center', gap: '0.4rem',
+          padding: '0.5rem 0', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+        }}
+      >
+        {isCollapsed ? (
+          <>
+            <span style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)', fontSize: '0.42rem', fontWeight: '700', color: col?.color || 'rgba(255,255,255,0.3)', textTransform: 'uppercase', letterSpacing: '0.1em', userSelect: 'none', whiteSpace: 'nowrap' }}>{col?.label}</span>
+            <ChevronRight size={9} color={col?.color || 'rgba(255,255,255,0.3)'} />
+          </>
+        ) : (
+          <ChevronLeft size={9} color="rgba(255,255,255,0.15)" />
+        )}
+      </button>
+    </div>
+  )
+}
 
 export default function ClientInsightModal({ isOpen, onClose, client, isMobile, onNavigatePlan, onNavigateWorkout, db, coachId, onOpenMealPanel, onOpenWorkoutPanel }) {
   const [selectedPhotoIndex, setSelectedPhotoIndex] = useState(0)
@@ -27,10 +76,13 @@ export default function ClientInsightModal({ isOpen, onClose, client, isMobile, 
   const [showHeader, setShowHeader] = useState(false)
   const [splitRatio, setSplitRatio] = useState(60)
   const [isDragging, setIsDragging] = useState(false)
+  // Journey-vak standaard ingeklapt; klik op de header klapt'm open.
+  const [journeyCollapsed, setJourneyCollapsed] = useState(true)
   // Default-collapse 'data' so the new 5-column layout stays comfortable.
   // Coach can re-expand it via the "Secties"-toggles in the hover header.
   const [collapsed, setCollapsed] = useState(() => new Set(['data']))
   const [showLog, setShowLog] = useState(false)
+  const [showNotify, setShowNotify] = useState(false)
 
   const [localClient, setLocalClient] = useState(null)
   const containerRef = useRef(null)
@@ -88,56 +140,13 @@ export default function ClientInsightModal({ isOpen, onClose, client, isMobile, 
     document.addEventListener('touchend', onEnd)
   }, [])
 
-  const ColWrapper = ({ id, children, isLast }) => {
-    const col = COLS.find(c => c.id === id)
-    const isCollapsed = collapsed.has(id)
-    return (
-      <div style={{
-        display: 'flex', flexDirection: 'row',
-        flex: isCollapsed ? '0 0 32px' : 1,
-        minWidth: 0,
-        borderRight: isLast ? 'none' : '1px solid rgba(255,255,255,0.06)',
-        overflow: 'hidden',
-        transition: 'flex 0.2s ease',
-      }}>
-        {!isCollapsed && (
-          <div style={{ flex: 1, overflow: 'hidden', minWidth: 0 }}>
-            {children}
-          </div>
-        )}
-        <button
-          onClick={() => toggleCollapse(id)}
-          title={isCollapsed ? `${col?.label} uitklappen` : `${col?.label} inklappen`}
-          style={{
-            flexShrink: 0, width: '20px',
-            background: isCollapsed ? 'rgba(255,255,255,0.02)' : 'transparent',
-            border: 'none',
-            borderLeft: isCollapsed ? 'none' : '1px solid rgba(255,255,255,0.04)',
-            cursor: 'pointer', display: 'flex', flexDirection: 'column',
-            alignItems: 'center', justifyContent: 'center', gap: '0.4rem',
-            padding: '0.5rem 0', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-          }}
-        >
-          {isCollapsed ? (
-            <>
-              <span style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)', fontSize: '0.42rem', fontWeight: '700', color: col?.color || 'rgba(255,255,255,0.3)', textTransform: 'uppercase', letterSpacing: '0.1em', userSelect: 'none', whiteSpace: 'nowrap' }}>{col?.label}</span>
-              <ChevronRight size={9} color={col?.color || 'rgba(255,255,255,0.3)'} />
-            </>
-          ) : (
-            <ChevronLeft size={9} color="rgba(255,255,255,0.15)" />
-          )}
-        </button>
-      </div>
-    )
-  }
-
   const mobileTabs = [
     { id: 'weight',  label: 'Gewicht',   icon: Scale,            color: '#FFD700' },
-    { id: 'workout', label: 'Training',  icon: Dumbbell,         color: '#f97316' },
-    { id: 'meals',   label: 'Voeding',   icon: UtensilsCrossed,  color: '#10b981' },
+    { id: 'workout', label: 'Training',  icon: Dumbbell,         color: '#FFD700' },
+    { id: 'meals',   label: 'Voeding',   icon: UtensilsCrossed,  color: '#FFD700' },
     { id: 'checkin', label: 'Check-in',  icon: ClipboardCheck,   color: '#FFD700' },
     { id: 'data',    label: 'Gegevens',  icon: User,             color: '#FFD700' },
-    { id: 'journey', label: 'Journey',   icon: TrendingUp,       color: '#d4a853' },
+    { id: 'journey', label: 'Journey',   icon: TrendingUp,       color: '#FFD700' },
   ]
 
   return (
@@ -151,7 +160,11 @@ export default function ClientInsightModal({ isOpen, onClose, client, isMobile, 
           flex: 1, display: 'flex', flexDirection: 'column',
           maxWidth: isMobile ? '100%' : '1600px',
           width: '100%', margin: '0 auto',
-          background: '#0a0a0a', overflow: 'hidden', position: 'relative'
+          background: '#0a0a0a', overflow: 'hidden', position: 'relative',
+          // iPhone Dynamic Island / notch beschermt anders de header met
+          // de X-knop → onbereikbaar voor jou. Safe-area-inset op de
+          // container voorkomt dit zonder UI te verschuiven op desktop.
+          paddingTop: 'env(safe-area-inset-top, 0px)',
         }}>
 
           {/* ═══ DESKTOP HOVER HEADER ═══ */}
@@ -209,6 +222,17 @@ export default function ClientInsightModal({ isOpen, onClose, client, isMobile, 
                   }}>
                     <BookOpen size={10} /> Log
                   </button>
+                  <button onClick={() => setShowNotify(true)} title="Stuur notificatie" style={{
+                    display: 'flex', alignItems: 'center', gap: '0.2rem',
+                    padding: '0.25rem 0.5rem',
+                    background: 'rgba(255,215,0,0.08)', border: '1px solid rgba(255,215,0,0.25)',
+                    borderRadius: '5px', color: '#FFD700',
+                    fontSize: '0.55rem', fontWeight: 800, cursor: 'pointer',
+                    touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', minHeight: '22px',
+                    textTransform: 'uppercase', letterSpacing: '0.04em',
+                  }}>
+                    <Bell size={10} strokeWidth={2.6} /> Notif
+                  </button>
                   <button onClick={onClose} style={{
                     width: '26px', height: '26px', borderRadius: '6px',
                     background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)',
@@ -249,13 +273,26 @@ export default function ClientInsightModal({ isOpen, onClose, client, isMobile, 
                 }}>
                   <BookOpen size={11} /> Log
                 </button>
-                <button onClick={onClose} style={{
-                  width: '28px', height: '28px', borderRadius: '6px', flexShrink: 0,
-                  background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)',
-                  color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent'
+                <button onClick={() => setShowNotify(true)} title="Stuur notificatie" style={{
+                  display: 'flex', alignItems: 'center', gap: '0.2rem',
+                  padding: '0.3rem 0.55rem',
+                  background: 'rgba(255,215,0,0.1)', border: '1px solid rgba(255,215,0,0.3)',
+                  borderRadius: '6px', color: '#FFD700',
+                  fontSize: '0.6rem', fontWeight: 800, cursor: 'pointer',
+                  touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', minHeight: '28px',
+                  flexShrink: 0,
+                  textTransform: 'uppercase', letterSpacing: '0.04em',
                 }}>
-                  <X size={14} />
+                  <Bell size={11} strokeWidth={2.6} /> Notif
+                </button>
+                <button onClick={onClose} style={{
+                  width: '40px', height: '40px', borderRadius: '8px', flexShrink: 0,
+                  background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.3)',
+                  color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+                  minHeight: '40px', minWidth: '40px',
+                }}>
+                  <X size={18} strokeWidth={2.5} />
                 </button>
               </div>
               <div style={{
@@ -295,22 +332,22 @@ export default function ClientInsightModal({ isOpen, onClose, client, isMobile, 
           {/* ═══ DESKTOP CONTENT ═══ */}
           {!isMobile && (
             <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-              <div style={{ height: `${splitRatio}%`, display: 'flex', minHeight: 0, overflow: 'hidden' }}>
-                <ColWrapper id="weight">
+              <div style={{ height: journeyCollapsed ? 'auto' : `${splitRatio}%`, flex: journeyCollapsed ? 1 : 'none', display: 'flex', minHeight: 0, overflow: 'hidden' }}>
+                <ColWrapper id="weight" collapsed={collapsed} onToggle={toggleCollapse}>
                   <WeightColumn
                     client={effectiveClient} weightData={weightData} circumData={circumData}
                     photos={photos} coachingPlan={effectiveClient.coachingPlan} isMobile={false}
                     onPhotoClick={(idx) => { setSelectedPhotoIndex(idx); setPhotoZoom(true) }}
                   />
                 </ColWrapper>
-                <ColWrapper id="workout">
+                <ColWrapper id="workout" collapsed={collapsed} onToggle={toggleCollapse}>
                   <WorkoutColumn
                     db={db} workoutData={workoutData} exerciseProgress={exerciseProgress}
                     isMobile={false} onNavigateWorkout={onNavigateWorkout}
                     client={effectiveClient} onClose={onClose}
                   />
                 </ColWrapper>
-                <ColWrapper id="meals">
+                <ColWrapper id="meals" collapsed={collapsed} onToggle={toggleCollapse}>
                   <MealsColumn
                     client={effectiveClient} mealData={mealData} isMobile={false}
                     onNavigatePlan={onNavigatePlan} onClose={onClose}
@@ -318,56 +355,78 @@ export default function ClientInsightModal({ isOpen, onClose, client, isMobile, 
                     onGeneratePlan={(planId) => { onNavigatePlan && onNavigatePlan(effectiveClient.id, planId); onClose() }}
                   />
                 </ColWrapper>
-                <ColWrapper id="data">
+                <ColWrapper id="data" collapsed={collapsed} onToggle={toggleCollapse}>
                   <ClientDataColumn
                     client={effectiveClient} db={db} isMobile={false}
                     onClientUpdate={handleClientUpdate}
                   />
                 </ColWrapper>
-                <ColWrapper id="checkin" isLast>
+                <ColWrapper id="checkin" isLast collapsed={collapsed} onToggle={toggleCollapse}>
                   <CheckinsColumn
                     client={effectiveClient} db={db} isMobile={false}
                   />
                 </ColWrapper>
               </div>
 
-              {/* DRAGGABLE DIVIDER */}
-              <div
-                onMouseDown={handleDragStart} onTouchStart={handleDragStart}
+              {/* DRAGGABLE DIVIDER — alleen zichtbaar wanneer journey open is */}
+              {!journeyCollapsed && (
+                <div
+                  onMouseDown={handleDragStart} onTouchStart={handleDragStart}
+                  style={{
+                    height: '6px', flexShrink: 0,
+                    background: isDragging ? 'rgba(255,215,0,0.15)' : 'rgba(255,255,255,0.03)',
+                    borderTop: '1px solid rgba(255,255,255,0.06)',
+                    borderBottom: '1px solid rgba(255,255,255,0.06)',
+                    cursor: 'row-resize', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    transition: isDragging ? 'none' : 'background 0.2s ease', touchAction: 'none'
+                  }}
+                >
+                  <div style={{
+                    width: '40px', height: '3px', borderRadius: '2px',
+                    background: isDragging ? 'rgba(255,215,0,0.4)' : 'rgba(255,255,255,0.1)',
+                    transition: isDragging ? 'none' : 'background 0.2s ease'
+                  }} />
+                </div>
+              )}
+
+              {/* JOURNEY — klikbare header, standaard ingeklapt */}
+              <button
+                onClick={() => setJourneyCollapsed(c => !c)}
                 style={{
-                  height: '6px', flexShrink: 0,
-                  background: isDragging ? 'rgba(255,215,0,0.15)' : 'rgba(255,255,255,0.03)',
-                  borderTop: '1px solid rgba(255,255,255,0.06)',
-                  borderBottom: '1px solid rgba(255,255,255,0.06)',
-                  cursor: 'row-resize', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  transition: isDragging ? 'none' : 'background 0.2s ease', touchAction: 'none'
+                  flexShrink: 0, height: '44px', width: '100%',
+                  display: 'flex', alignItems: 'center', gap: '0.5rem',
+                  padding: '0 1.25rem',
+                  background: journeyCollapsed ? 'rgba(255,215,0,0.04)' : 'rgba(255,215,0,0.08)',
+                  border: 'none', borderTop: '1px solid rgba(255,215,0,0.15)',
+                  cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
                 }}
               >
-                <div style={{
-                  width: '40px', height: '3px', borderRadius: '2px',
-                  background: isDragging ? 'rgba(255,215,0,0.4)' : 'rgba(255,255,255,0.1)',
-                  transition: isDragging ? 'none' : 'background 0.2s ease'
-                }} />
-              </div>
+                <TrendingUp size={15} color="#FFD700" strokeWidth={2.4} />
+                <span style={{ fontSize: '0.8rem', fontWeight: 800, color: '#fff', letterSpacing: '0.01em' }}>Journey</span>
+                <span style={{ flex: 1 }} />
+                <ChevronDown size={16} color="rgba(255,215,0,0.6)" style={{ transform: journeyCollapsed ? 'none' : 'rotate(180deg)', transition: 'transform 0.18s ease' }} />
+              </button>
 
-              <div style={{ height: `${100 - splitRatio}%`, overflow: 'auto', WebkitOverflowScrolling: 'touch', minHeight: 0 }}>
-                {db ? (
-                  <ClientJourneyTimeline
-                    db={db}
-                    clients={[effectiveClient]}
-                    selectedClient={effectiveClient}
-                    onSelectClient={() => {}}
-                    coachId={coachId}
-                    isMobile={false}
-                    onOpenMealPanel={onOpenMealPanel}
-                    onOpenWorkoutPanel={onOpenWorkoutPanel}
-                  />
-                ) : (
-                  <div style={{ padding: '2rem', textAlign: 'center', color: 'rgba(255,255,255,0.2)', fontSize: '0.75rem' }}>
-                    Journey niet beschikbaar
-                  </div>
-                )}
-              </div>
+              {!journeyCollapsed && (
+                <div style={{ flex: 1, overflow: 'auto', WebkitOverflowScrolling: 'touch', minHeight: 0 }}>
+                  {db ? (
+                    <ClientJourneyTimeline
+                      db={db}
+                      clients={[effectiveClient]}
+                      selectedClient={effectiveClient}
+                      onSelectClient={() => {}}
+                      coachId={coachId}
+                      isMobile={false}
+                      onOpenMealPanel={onOpenMealPanel}
+                      onOpenWorkoutPanel={onOpenWorkoutPanel}
+                    />
+                  ) : (
+                    <div style={{ padding: '2rem', textAlign: 'center', color: 'rgba(255,255,255,0.2)', fontSize: '0.75rem' }}>
+                      Journey niet beschikbaar
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           )}
 
@@ -471,6 +530,15 @@ export default function ClientInsightModal({ isOpen, onClose, client, isMobile, 
           onClose={() => setShowLog(false)}
         />
       )}
+
+      <SendNotificationModal
+        open={showNotify}
+        onClose={() => setShowNotify(false)}
+        client={effectiveClient}
+        db={db}
+        coachId={coachId}
+        isMobile={isMobile}
+      />
 
       <style>{`@keyframes insightFadeIn { from { opacity: 0 } to { opacity: 1 } }`}</style>
     </>

@@ -1,26 +1,24 @@
 // src/modules/workout/WorkoutPlan.jsx
 import useIsMobile from '../../hooks/useIsMobile'
-import ProgressChartsWidget from "../progress/ProgressChartsWidget"
+import ClientWorkoutChart from './components/ClientWorkoutChart'
 import { useState, useEffect, useRef } from 'react'
 import { useLanguage } from '../../contexts/LanguageContext'
-import { Calendar, Pencil, Clock } from 'lucide-react'
-import ClientPlanEditor from './components/ClientPlanEditor'
+import { Calendar, Clock, ChevronLeft, ChevronRight, ChevronDown } from 'lucide-react'
 
 import WeekSchedule from './components/WeekSchedule'
 import TodaysWorkoutMain from './components/todays-workout/TodaysWorkoutMain'
-import LogModal from './components/todays-workout/LogModal'
 import WorkoutChallengeSidebar from '../../client/components/WorkoutChallengeSidebar'
 import WorkoutProgressToast from './components/WorkoutProgressToast'
+import CardioLogSection from './components/CardioLogSection'
 import WorkoutHistory from '../progress/WorkoutHistory'
+import FadeOnScroll from '../../components/FadeOnScroll'
 import PlanningWizard from './components/planning/PlanningWizard'
-import { X } from 'lucide-react'
 
 import useWorkoutSchedule from './hooks/useWorkoutSchedule'
 import useWorkoutProgress from './hooks/useWorkoutProgress'
-import PageVideoWidget from '../videos/PageVideoWidget'
 import WorkoutService from '../../services/WorkoutService'
 
-export default function WorkoutPlan({ client, schema, db }) {
+export default function WorkoutPlan({ client, schema, db, onFocusChange }) {
   const { t } = useLanguage()
   const isMobile = useIsMobile()
   const chartsRef = useRef(null)
@@ -34,9 +32,9 @@ export default function WorkoutPlan({ client, schema, db }) {
   const [scheduleReloadKey, setScheduleReloadKey] = useState(0)
 
   const [challengeRefreshKey, setChallengeRefreshKey] = useState(0)
-  const [showLogModal, setShowLogModal] = useState(false)
-  const [selectedWorkoutData, setSelectedWorkoutData] = useState(null)
-  const [selectedDayLogs, setSelectedDayLogs] = useState([])
+  // showLogModal / selectedWorkoutData / selectedDayLogs verwijderd —
+  // de standalone LogModal die vroeger door week-day-click werd geopend is
+  // vervangen door de inline-dropdown van TodaysWorkoutMain.
 
   const {
     weekSchedule, setWeekSchedule,
@@ -48,12 +46,45 @@ export default function WorkoutPlan({ client, schema, db }) {
   const { completedWorkouts, markWorkoutComplete, weeklyStats, loadWeeklyProgress } = useWorkoutProgress(client?.id, db)
 
   const [showWizard, setShowWizard] = useState(false)
-  const [showPlanEditor, setShowPlanEditor] = useState(false)
-  const [showHistoryModal, setShowHistoryModal] = useState(false)
+  // showPlanEditor + showHistoryModal modals zijn verwijderd — Geschiedenis
+  // zit nu in de inline dropdown-bar boven WeekSchedule, en Plan had geen
+  // entrypoint meer na het schrappen van de bottom-strip.
+  // Inline-dropdown voor workout-geschiedenis tussen de TodaysWorkout-card
+  // en de week-planning sectie. Zelfde black-bar stijl als de koolh/vet-balk
+  // op de meal-pagina (SubtleCarbsFatBar).
+  const [historyOpen, setHistoryOpen] = useState(false)
+  // Focus-mode: TodaysWorkoutMain meldt via callback wanneer de dropdown
+  // open is. Dan verbergen we week-schedule, chart en bottom-strip — én via
+  // onFocusChange (door-bubbled naar ClientDashboard) ook de bottom-nav.
+  const [workoutOpen, setWorkoutOpen] = useState(false)
+  useEffect(() => { if (onFocusChange) onFocusChange(workoutOpen) }, [workoutOpen, onFocusChange])
 
   const currentDate = new Date()
   const weekDays = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
   const todayIndex = (currentDate.getDay() + 6) % 7
+
+  // Dag-navigatie bovenaan de pagina — selecteerde dag bepaalt welke workout
+  // TodaysWorkoutMain laadt.
+  const DAYS_NL = ['Maandag', 'Dinsdag', 'Woensdag', 'Donderdag', 'Vrijdag', 'Zaterdag', 'Zondag']
+  const DAY_KEYS = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday']
+  const [selectedDayIdx, setSelectedDayIdx] = useState(todayIndex)
+  const selectedDayKey = DAY_KEYS[selectedDayIdx]
+  const selectedDayName = DAYS_NL[selectedDayIdx]
+  const isToday = selectedDayIdx === todayIndex
+  const relativeLabel = selectedDayIdx === todayIndex
+    ? 'Vandaag'
+    : selectedDayIdx === todayIndex - 1 ? 'Gisteren'
+    : selectedDayIdx === todayIndex + 1 ? 'Morgen'
+    : null
+  // Trainingsdag-detectie: workoutKey in weekSchedule voor de geselecteerde dag.
+  const selectedWorkoutKey = weekSchedule?.[weekDays[selectedDayIdx]] || null
+  const isTrainingDay = !!selectedWorkoutKey
+  const selectedDate = (() => {
+    const d = new Date()
+    d.setDate(d.getDate() + (selectedDayIdx - todayIndex))
+    return d
+  })()
+  const dateLabel = selectedDate.toLocaleDateString('nl-NL', { day: 'numeric', month: 'long' })
 
   useEffect(() => {
     if (client?.id) loadWeeklyProgress()
@@ -63,53 +94,21 @@ export default function WorkoutPlan({ client, schema, db }) {
     if (schema) setLocalSchema(schema)
   }, [schema?.id])
 
-  const handleDayClick = async (day, workoutKey) => {
+  // Klik op een week-day-card: selecteer die dag, open de inline-dropdown
+  // van TodaysWorkoutMain en scroll erheen. Geen aparte modal meer — de
+  // data-flow gaat via TodaysWorkoutMain's `selectedDay` prop die zelf de
+  // juiste workout laadt (custom, activity of schema-dag).
+  const handleDayClick = (day, workoutKey) => {
     if (!workoutKey) return
-    try {
-      let workoutData = null
-      if (workoutKey.startsWith('custom_')) {
-        const customId = workoutKey.replace('custom_', '')
-        const customWorkout = await workoutService.getCustomWorkoutById(customId)
-        if (customWorkout) {
-          workoutData = { name: customWorkout.name, focus: getCustomWorkoutTypeLabel(customWorkout.type), geschatteTijd: `${customWorkout.duration} min`, exercises: [], workoutKey, dayKey: workoutKey, dayName: day, isCustom: true, customData: customWorkout }
-        }
-      } else if (['swimming', 'cardio', 'hiking', 'cycling', 'running'].includes(workoutKey)) {
-        const labels = { swimming: 'Zwemmen', cardio: 'Cardio', hiking: 'Wandelen', cycling: 'Fietsen', running: 'Hardlopen' }
-        workoutData = { name: labels[workoutKey], focus: 'Cardio', geschatteTijd: '60 min', exercises: [], workoutKey, dayKey: workoutKey, dayName: day, isActivity: true }
-      } else if (localSchema?.week_structure?.[workoutKey]) {
-        workoutData = { ...localSchema.week_structure[workoutKey], workoutKey, dayKey: workoutKey, dayName: day, isCustom: false }
-      }
-      if (workoutData) {
-        setSelectedWorkoutData(workoutData)
-        await loadDayLogs(day)
-        setShowLogModal(true)
-      }
-    } catch (error) { console.error('❌ Error loading workout for day:', error) }
-  }
-
-  const loadDayLogs = async (dayName) => {
-    if (!client?.id || !db) return
-    try {
-      const dayIndex = weekDays.indexOf(dayName)
-      const targetDate = new Date()
-      const currentDayIndex = (targetDate.getDay() + 6) % 7
-      targetDate.setDate(targetDate.getDate() + (dayIndex - currentDayIndex))
-      const dateString = targetDate.toISOString().split('T')[0]
-      const { data: sessions } = await db.supabase.from('workout_sessions').select('id').eq('client_id', client.id).eq('workout_date', dateString)
-      if (!sessions?.length) { setSelectedDayLogs([]); return }
-      const { data: progress } = await db.supabase.from('workout_progress').select('*').in('session_id', sessions.map(s => s.id)).order('created_at', { ascending: false })
-      setSelectedDayLogs(progress || [])
-    } catch { setSelectedDayLogs([]) }
-  }
-
-  const getCustomWorkoutTypeLabel = (type) => ({ cardio: 'Cardio', cycling: 'Fietsen', running: 'Hardlopen', swimming: 'Zwemmen', hiking: 'Wandelen', yoga: 'Yoga', sports: 'Sport', custom: 'Custom' }[type] || type)
-
-  const handleCloseLogModal = () => { setShowLogModal(false); setSelectedWorkoutData(null); setSelectedDayLogs([]) }
-
-  const handleLogsUpdate = async (options) => {
-    await loadWeeklyProgress()
-    if (selectedWorkoutData?.dayName) await loadDayLogs(selectedWorkoutData.dayName)
-    if (options?.workoutCompleted) handleWorkoutCompleted()
+    const dayIdx = weekDays.indexOf(day)
+    if (dayIdx >= 0) setSelectedDayIdx(dayIdx)
+    setWorkoutOpen(true)
+    // Scroll naar TodaysWorkoutMain zodat de net-geopende dropdown direct
+    // in beeld is. Kleine timeout zodat React eerst kan rerenderen.
+    setTimeout(() => {
+      const el = document.getElementById('todays-workout-anchor')
+      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    }, 80)
   }
 
   const handleToastViewChart = () => {
@@ -124,7 +123,7 @@ export default function WorkoutPlan({ client, schema, db }) {
 
   if (!schema) {
     return (
-      <div style={{ minHeight: '100vh', background: 'linear-gradient(180deg, #0a0f0d 0%, #1a1a1a 100%)', padding: '1rem' }}>
+      <div style={{ minHeight: '100vh', background: 'linear-gradient(180deg, #0a0a0a 0%, #1a1a1a 100%)', padding: '1rem' }}>
         <div style={{ maxWidth: '600px', margin: '4rem auto', textAlign: 'center', padding: '2rem', background: 'linear-gradient(135deg, rgba(139,92,246,0.1) 0%, rgba(59,130,246,0.05) 100%)', backdropFilter: 'blur(20px)', borderRadius: '20px', border: '1px solid rgba(139,92,246,0.2)' }}>
           <Calendar size={48} color="#8b5cf6" style={{ marginBottom: '1.5rem' }} />
           <h3 style={{ fontSize: '1.5rem', background: 'linear-gradient(135deg, #8b5cf6 0%, #3b82f6 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', marginBottom: '1rem', fontWeight: 'bold' }}>
@@ -139,90 +138,184 @@ export default function WorkoutPlan({ client, schema, db }) {
   }
 
   return (
-    <div style={{ minHeight: '100vh', background: 'linear-gradient(180deg, #0a0a0a 0%, #171717 100%)', paddingBottom: isMobile ? '5rem' : '2rem', position: 'relative' }}>
+    <div style={{ minHeight: '100vh', background: '#0a0a0a', paddingBottom: isMobile ? '5rem' : '2rem', position: 'relative' }}>
 
-      {/* ── Page header strip: title left, Plan + Geschiedenis right ── */}
-      <div style={{
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        gap: '0.5rem',
-        padding: isMobile ? '0.625rem 1rem 0.75rem' : '0.75rem 1.5rem 0.875rem',
-        borderBottom: '1px solid rgba(255,255,255,0.05)',
+      {/* ── Dag-nav header — verbergen tijdens focus-mode ── */}
+      {!workoutOpen && <div style={{
+        position: 'sticky', top: 0, zIndex: 50,
+        background: 'rgba(10,10,10,0.92)',
+        backdropFilter: 'blur(16px)',
+        WebkitBackdropFilter: 'blur(16px)',
+        paddingTop: 'env(safe-area-inset-top, 0)',
       }}>
         <div style={{
-          fontSize: isMobile ? '0.95rem' : '1.05rem',
-          fontWeight: '800',
-          color: '#fff',
-          letterSpacing: '-0.01em',
+          maxWidth: 1400, margin: '0 auto',
+          padding: isMobile ? '0.65rem 1.5rem' : '0.8rem 2.5rem',
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10,
         }}>
-          Mijn workout
-        </div>
-        <div style={{ display: 'flex', gap: '0.5rem' }}>
-        <button
-          onClick={() => setShowPlanEditor(true)}
-          aria-label="Plan bewerken"
-          style={{
-            display: 'flex', alignItems: 'center', gap: '0.375rem',
-            padding: '0.45rem 0.75rem',
-            background: 'rgba(255,255,255,0.04)',
-            border: '1px solid rgba(255,255,255,0.08)',
-            borderRadius: '8px',
-            color: 'rgba(255,255,255,0.55)',
-            fontSize: isMobile ? '0.7rem' : '0.75rem',
-            fontWeight: '600',
-            cursor: 'pointer',
-            touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-            minHeight: '34px',
-          }}
-        >
-          <Pencil size={13} strokeWidth={2.2} />
-          Plan
-        </button>
-        <button
-          onClick={() => setShowHistoryModal(true)}
-          aria-label="Geschiedenis"
-          style={{
-            display: 'flex', alignItems: 'center', gap: '0.375rem',
-            padding: '0.45rem 0.75rem',
-            background: 'rgba(255,255,255,0.04)',
-            border: '1px solid rgba(255,255,255,0.08)',
-            borderRadius: '8px',
-            color: 'rgba(255,255,255,0.55)',
-            fontSize: isMobile ? '0.7rem' : '0.75rem',
-            fontWeight: '600',
-            cursor: 'pointer',
-            touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-            minHeight: '34px',
-          }}
-        >
-          <Clock size={13} strokeWidth={2.2} />
-          Geschiedenis
-        </button>
-        </div>
-      </div>
+          <button
+            onClick={() => setSelectedDayIdx(i => Math.max(0, i - 1))}
+            disabled={selectedDayIdx === 0}
+            aria-label="Vorige dag"
+            style={{
+              width: isMobile ? 32 : 36, height: isMobile ? 32 : 36,
+              background: 'transparent', border: 'none',
+              color: selectedDayIdx === 0 ? 'rgba(255,255,255,0.18)' : '#fff',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              cursor: selectedDayIdx === 0 ? 'not-allowed' : 'pointer',
+              touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', flexShrink: 0,
+            }}
+          >
+            <ChevronLeft size={isMobile ? 22 : 24} strokeWidth={2.4} />
+          </button>
 
-      <TodaysWorkoutMain
-        client={client}
-        schema={localSchema}
-        db={db}
-        workoutService={workoutService}
-        onWorkoutCompleted={handleWorkoutCompleted}
-        onSchemaUpdate={(updatedSchema) => setLocalSchema(updatedSchema)}
-        scheduleReloadKey={scheduleReloadKey}
-      />
+          <div style={{ flex: 1, textAlign: 'center', minWidth: 0 }}>
+            <div style={{
+              fontSize: isMobile ? '1.15rem' : '1.3rem',
+              fontWeight: 900, color: '#FFD700', letterSpacing: '-0.02em',
+              lineHeight: 1.1,
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+              whiteSpace: 'nowrap',
+            }}>
+              {selectedDayName}
+              {relativeLabel && (
+                <span style={{
+                  fontSize: '0.65rem', fontWeight: 800,
+                  color: 'rgba(0,0,0,0.85)', background: '#FFD700',
+                  padding: '2px 7px', borderRadius: 4,
+                  letterSpacing: '0.04em', textTransform: 'uppercase',
+                }}>{relativeLabel}</span>
+              )}
+            </div>
+            <div style={{
+              fontSize: isMobile ? '0.75rem' : '0.82rem',
+              fontWeight: 700, marginTop: 3,
+              color: isTrainingDay ? '#FFD700' : 'rgba(255,255,255,0.5)',
+              letterSpacing: '0.04em', textTransform: 'uppercase',
+            }}>
+              {isTrainingDay ? 'Trainingsdag' : 'Rustdag'} · {dateLabel}
+            </div>
+          </div>
+
+          <button
+            onClick={() => setSelectedDayIdx(i => Math.min(6, i + 1))}
+            disabled={selectedDayIdx === 6}
+            aria-label="Volgende dag"
+            style={{
+              width: isMobile ? 32 : 36, height: isMobile ? 32 : 36,
+              background: 'transparent', border: 'none',
+              color: selectedDayIdx === 6 ? 'rgba(255,255,255,0.18)' : '#fff',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              cursor: selectedDayIdx === 6 ? 'not-allowed' : 'pointer',
+              touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', flexShrink: 0,
+            }}
+          >
+            <ChevronRight size={isMobile ? 22 : 24} strokeWidth={2.4} />
+          </button>
+        </div>
+      </div>}
+
+      <div id="todays-workout-anchor">
+        <TodaysWorkoutMain
+          client={client}
+          schema={localSchema}
+          db={db}
+          workoutService={workoutService}
+          onWorkoutCompleted={handleWorkoutCompleted}
+          onSchemaUpdate={(updatedSchema) => setLocalSchema(updatedSchema)}
+          scheduleReloadKey={scheduleReloadKey}
+          onOpenPlanner={() => setShowWizard(true)}
+          selectedDay={selectedDayKey}
+          expanded={workoutOpen}
+          onExpandedChange={setWorkoutOpen}
+        />
+      </div>
 
       {/* TodaysLogToast removed — same heaviest-lift info already lives in
           TodaysWorkoutCard. WorkoutProgressToast stays for the 30-day
           PR/stagnation insights that aren't visible elsewhere. */}
-      <WorkoutProgressToast client={client} db={db} onViewChart={handleToastViewChart} />
-      <WorkoutChallengeSidebar client={client} db={db} key={challengeRefreshKey} />
+      {!workoutOpen && (
+        <FadeOnScroll>
+          <div style={{ marginTop: isMobile ? '2.5rem' : '3rem' }}>
+            <WorkoutProgressToast client={client} db={db} onViewChart={handleToastViewChart} />
+          </div>
+        </FadeOnScroll>
+      )}
+      {!workoutOpen && (
+        <FadeOnScroll>
+          <div style={{ marginTop: isMobile ? '2rem' : '2.5rem' }}>
+            <WorkoutChallengeSidebar client={client} db={db} key={challengeRefreshKey} />
+          </div>
+        </FadeOnScroll>
+      )}
 
-      <div style={{ paddingTop: isMobile ? '1rem' : '1.5rem', paddingLeft: isMobile ? '1rem' : '1.5rem', paddingRight: isMobile ? '1rem' : '1.5rem', paddingBottom: '0.5rem', marginBottom: '0.5rem' }}>
-        <PageVideoWidget client={client} db={db} pageContext="workout" title="Workout Technique Videos" compact={true} />
-      </div>
+      {/* PageVideoWidget gemigreerd naar centrale WidgetSidebar in ClientDashboard. */}
 
-      <div id="week-schedule">
+      {/* ── Geschiedenis-balk — inline dropdown tussen workout-dropdown en
+            week-planning. Zelfde stijl als de koolh/vet-balk op de meal-pagina
+            (zwarte bg, subtiele border, rounded 10). Klik = inline expand. */}
+      {!workoutOpen && (
+        <FadeOnScroll>
+        <div style={{
+          padding: isMobile ? '2.5rem 1rem 0.25rem' : '3rem 1.25rem 0.375rem',
+        }}>
+          <div style={{
+            background: '#171717',
+            border: '1px solid rgba(255,255,255,0.08)',
+            borderRadius: 10,
+            overflow: 'hidden',
+            transition: 'border-color 0.2s ease',
+          }}>
+            <button
+              onClick={() => setHistoryOpen(p => !p)}
+              aria-expanded={historyOpen}
+              aria-label="Workout-geschiedenis"
+              style={{
+                width: '100%',
+                background: 'transparent',
+                border: 'none',
+                padding: isMobile ? '0.55rem 0.85rem' : '0.65rem 1.05rem',
+                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                cursor: 'pointer',
+                touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+              }}
+            >
+              <span style={{
+                display: 'flex', alignItems: 'center', gap: 8,
+                fontSize: isMobile ? '0.62rem' : '0.7rem',
+                fontWeight: 800, color: '#FFD700',
+                textTransform: 'uppercase', letterSpacing: '0.1em',
+              }}>
+                <Clock size={isMobile ? 12 : 14} strokeWidth={2.4} />
+                Geschiedenis
+              </span>
+              <ChevronDown
+                size={isMobile ? 16 : 18}
+                strokeWidth={2.4}
+                style={{
+                  color: 'rgba(255,255,255,0.55)',
+                  transform: historyOpen ? 'rotate(180deg)' : 'rotate(0deg)',
+                  transition: 'transform 0.2s ease',
+                }}
+              />
+            </button>
+
+            {historyOpen && (
+              <div style={{
+                borderTop: '1px solid rgba(255,255,255,0.06)',
+                maxHeight: isMobile ? '60vh' : '55vh',
+                overflowY: 'auto',
+                WebkitOverflowScrolling: 'touch',
+              }}>
+                <WorkoutHistory db={db} clientId={client?.id} onBack={null} />
+              </div>
+            )}
+          </div>
+        </div>
+        </FadeOnScroll>
+      )}
+
+      {!workoutOpen && <FadeOnScroll><div id="week-schedule" style={{ marginTop: isMobile ? '2.5rem' : '3rem' }}>
         <WeekSchedule
         weekSchedule={weekSchedule}
         schema={localSchema}
@@ -241,103 +334,41 @@ export default function WorkoutPlan({ client, schema, db }) {
         }}
         onOpenWizard={() => setShowWizard(true)}
       />
-      </div>
+      </div></FadeOnScroll>}
+
+      {!workoutOpen && <FadeOnScroll>
+        <CardioLogSection client={client} db={db} isMobile={isMobile} />
+      </FadeOnScroll>}
 
       {/* WorkoutHistory inline section + WorkoutPhotoSlider removed —
-          history now lives behind the Geschiedenis-icon (modal below).
+          history now lives behind de Geschiedenis-icon (modal below).
           Photo slider was generic Unsplash decoration with no data. */}
 
-      <div ref={chartsRef} style={{ padding: isMobile ? '0 1rem' : '0 1.5rem', marginTop: '1rem' }}>
-        <ProgressChartsWidget ref={chartWidgetRef} db={db} clientId={client?.id} />
-      </div>
+      {!workoutOpen && <FadeOnScroll><div ref={chartsRef} style={{
+        padding: isMobile ? '0 1rem' : '0 1.5rem',
+        marginTop: isMobile ? '3rem' : '3.5rem',
+      }}>
+        <ClientWorkoutChart db={db} client={client} />
+      </div></FadeOnScroll>}
+
+      {/* Bottom "Mijn workout / Plan / Geschiedenis"-strip verwijderd —
+          Geschiedenis zit nu in de inline dropdown-bar boven WeekSchedule,
+          Plan in de ClientPlanEditor die alleen nog via andere paden zou
+          openen (geen meer in deze view). */}
 
       {showWizard && (
         <PlanningWizard schema={localSchema} clientId={client?.id} db={db} workoutService={workoutService} onClose={() => setShowWizard(false)} onComplete={handleWizardComplete} />
       )}
 
-      {showPlanEditor && (
-        <ClientPlanEditor
-          schema={localSchema}
-          client={client}
-          db={db}
-          weekSchedule={weekSchedule}
-          onClose={() => setShowPlanEditor(false)}
-          onSchemaSaved={(schemaId, newStructure, newWeekSchedule) => {
-            setLocalSchema(prev => ({ ...prev, id: schemaId, week_structure: newStructure, is_client_edited: true }))
-            if (newWeekSchedule) setWeekSchedule(newWeekSchedule)
-            setScheduleReloadKey(prev => prev + 1)
-          }}
-        />
-      )}
-
-      {showLogModal && selectedWorkoutData && (
-        <LogModal workout={selectedWorkoutData} todaysLogs={selectedDayLogs} onClose={handleCloseLogModal} onLogsUpdate={handleLogsUpdate} client={client} schema={localSchema} db={db} />
-      )}
-
-      {showHistoryModal && (
-        <div
-          onClick={(e) => { if (e.target === e.currentTarget) setShowHistoryModal(false) }}
-          style={{
-            position: 'fixed', inset: 0, zIndex: 9999,
-            background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(8px)',
-            display: 'flex', alignItems: 'flex-start', justifyContent: 'center',
-            padding: isMobile ? '0' : '2rem',
-          }}
-        >
-          <div style={{
-            width: '100%', maxWidth: '900px',
-            height: isMobile ? '100%' : 'calc(100vh - 4rem)',
-            background: '#0a0a0a',
-            border: isMobile ? 'none' : '1px solid rgba(255,255,255,0.08)',
-            borderRadius: isMobile ? '0' : '16px',
-            display: 'flex', flexDirection: 'column',
-            overflow: 'hidden',
-          }}>
-            <div style={{
-              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-              padding: isMobile ? '0.875rem 1rem' : '1rem 1.5rem',
-              paddingTop: `calc(env(safe-area-inset-top, 0) + ${isMobile ? '0.875rem' : '1rem'})`,
-              borderBottom: '1px solid rgba(255,255,255,0.06)',
-              flexShrink: 0,
-            }}>
-              <div style={{
-                fontSize: isMobile ? '1rem' : '1.1rem',
-                fontWeight: '800', color: '#fff', letterSpacing: '-0.01em',
-              }}>
-                Workout geschiedenis
-              </div>
-              <button
-                onClick={() => setShowHistoryModal(false)}
-                aria-label="Sluiten"
-                style={{
-                  width: '36px', height: '36px',
-                  background: 'rgba(255,255,255,0.04)',
-                  border: '1px solid rgba(255,255,255,0.08)',
-                  borderRadius: '8px',
-                  color: 'rgba(255,255,255,0.6)',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  cursor: 'pointer', touchAction: 'manipulation',
-                }}
-              >
-                <X size={16} />
-              </button>
-            </div>
-            <div style={{
-              flex: 1, overflowY: 'auto', WebkitOverflowScrolling: 'touch',
-              padding: isMobile ? '0.875rem 1rem 1.5rem' : '1rem 1.5rem 2rem',
-            }}>
-              <WorkoutHistory db={db} clientId={client?.id} onBack={null} />
-            </div>
-          </div>
-        </div>
-      )}
+      {/* showPlanEditor + showHistoryModal modals weggehaald — geen entrypoints
+          meer, Geschiedenis zit inline boven WeekSchedule. */}
 
       <style>{`
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
         * { -webkit-tap-highlight-color: transparent; }
         *::-webkit-scrollbar { width: 6px; height: 6px; }
         *::-webkit-scrollbar-track { background: rgba(255,255,255,0.03); }
-        *::-webkit-scrollbar-thumb { background: rgba(16,185,129,0.3); border-radius: 3px; }
+        *::-webkit-scrollbar-thumb { background: rgba(255,215,0,0.3); border-radius: 3px; }
         html { scroll-behavior: smooth; }
       `}</style>
     </div>

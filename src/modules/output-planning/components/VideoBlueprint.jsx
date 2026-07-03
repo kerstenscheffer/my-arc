@@ -270,6 +270,18 @@ export default function VideoBlueprint({ item, onClose, onSave, db, isMobile: pr
             </div>
           )}
 
+          {/* Script — de tekst die je in het Script-vak hebt getypt, gewoon
+              zichtbaar (i.p.v. alleen achter de teleprompter). */}
+          {item?.script && (
+            <div style={{ margin: '1rem', padding: '1rem', background: '#0f0f0f', border: '1px solid rgba(255,215,0,0.25)', borderRadius: '8px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.6rem' }}>
+                <FileText size={12} color={COLORS.gold} />
+                <span style={{ fontSize: '0.65rem', fontWeight: '700', color: COLORS.gold, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Script</span>
+              </div>
+              <div style={{ fontSize: '0.9rem', color: '#fff', lineHeight: 1.6, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{item.script}</div>
+            </div>
+          )}
+
           {/* Productie Checklist */}
           {item?.productie_checklist && (
             <div style={{ margin: '1rem', background: '#0f0f0f', border: '1px solid rgba(59,130,246,0.3)', borderRadius: '8px', overflow: 'hidden' }}>

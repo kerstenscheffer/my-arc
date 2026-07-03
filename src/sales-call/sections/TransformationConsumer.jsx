@@ -1,5 +1,7 @@
 // src/sales-call/sections/TransformationConsumer.jsx
-// White section — Consumer transformation, same style as Sassus, foto rechts (mirrored)
+// White section — Hessel transformation, same style as Sassus, foto rechts (mirrored)
+// FOTO TODO: upload Hessel's before/after als /public/transformatie-hessel.png
+// en zijn avatar als /public/review-hessel.png — tot dan valt het terug op placeholder.
 
 const GOLD = '#ffba09'
 
@@ -37,8 +39,8 @@ export default function TransformationConsumer({ isMobile }) {
             boxShadow: '0 20px 60px rgba(0,0,0,0.08)'
           }}>
             <img
-              src="/transformatie-1.png"
-              alt="Consumer transformatie"
+              src="/transformatie-hessel.png"
+              alt="Hessel transformatie"
               style={{
                 width: '100%',
                 height: '100%',
@@ -68,7 +70,7 @@ export default function TransformationConsumer({ isMobile }) {
                 fontSize: isMobile ? '0.75rem' : '0.9rem',
                 fontWeight: '900',
                 color: GOLD
-              }}>Arm transformatie</span>
+              }}>-5,4 kg in 8 weken</span>
             </div>
           </div>
         </div>
@@ -94,13 +96,13 @@ export default function TransformationConsumer({ isMobile }) {
               flexShrink: 0
             }}>
               <img
-                src="/review-consumer.png"
-                alt="Consumer"
+                src="/review-hessel.png"
+                alt="Hessel"
                 style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                 onError={(e) => {
                   e.target.style.display = 'none'
                   e.target.parentElement.style.background = '#ddd'
-                  e.target.parentElement.innerHTML = '<span style="color:#888;font-size:0.6rem;font-weight:700;display:flex;align-items:center;justify-content:center;width:100%;height:100%">C</span>'
+                  e.target.parentElement.innerHTML = '<span style="color:#888;font-size:0.6rem;font-weight:700;display:flex;align-items:center;justify-content:center;width:100%;height:100%">H</span>'
                 }}
               />
             </div>
@@ -111,13 +113,13 @@ export default function TransformationConsumer({ isMobile }) {
                 color: '#1a1a1a',
                 display: 'block',
                 lineHeight: 1.2
-              }}>Consumer</span>
+              }}>Hessel</span>
               <span style={{
                 fontSize: '0.6rem',
                 fontWeight: '600',
                 color: 'rgba(0,0,0,0.3)',
                 display: 'block'
-              }}>nov 2025</span>
+              }}>feb 2026</span>
             </div>
             <div style={{ display: 'flex', gap: '2px', marginLeft: 'auto' }}>
               {[1,2,3,4,5].map(s => (
@@ -140,7 +142,7 @@ export default function TransformationConsumer({ isMobile }) {
             <span style={{
               borderBottom: `3px solid ${GOLD}`,
               paddingBottom: '0px'
-            }}>Echt resultaat door persoonlijke aanpak</span>
+            }}>Van 79,8 naar 74,4 kg in 8 weken</span>
           </p>
 
           {/* Quote */}
@@ -151,9 +153,8 @@ export default function TransformationConsumer({ isMobile }) {
             lineHeight: 1.45,
             margin: 0
           }}>
-            Zeer professionele aanpak. Dankzij zijn{' '}
-            <span style={{ color: '#e8a800' }}>persoonlijke begeleiding</span>{' '}
-            en deskundige aanpak zie je echt resultaat.
+            Na een 0-meting kreeg ik een uitgebreid plan: iedere week wegen en videobellen. Vooral de kennis en info spreekt me aan, waardoor ik nu{' '}
+            <span style={{ color: '#e8a800' }}>zonder teveel na te denken stabiel blijf in gewicht.</span>
           </p>
 
           {/* Trustpilot badge */}

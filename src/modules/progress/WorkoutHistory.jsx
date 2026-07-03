@@ -1,9 +1,9 @@
 // src/modules/progress/WorkoutHistory.jsx
 // V4: 30 dagen default, alles gold, zoek oefening, partials+dropsets+notes
 import { useState, useEffect, useRef } from 'react'
-import { 
-  Search, Filter, ChevronDown, ChevronUp, 
-  Dumbbell, Clock, History
+import {
+  Search, Filter, ChevronDown, ChevronUp,
+  Dumbbell, Clock,
 } from 'lucide-react'
 
 export default function WorkoutHistory({ db, clientId, onBack }) {
@@ -246,59 +246,47 @@ export default function WorkoutHistory({ db, clientId, onBack }) {
   }
   
   return (
-    <div>
-      {/* HEADER */}
+    <div style={{ padding: isMobile ? '0.5rem 0.85rem 0.85rem' : '0.65rem 1.05rem 1rem' }}>
+      {/* Filter-pill — interne header weggehaald, dropdown-bar erbuiten heeft
+          al de titel "GESCHIEDENIS". */}
       <div style={{
         display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        padding: isMobile ? '0 0 0.75rem 0' : '0 0 1rem 0',
-        borderBottom: '1px solid rgba(255, 255, 255, 0.06)'
+        justifyContent: 'flex-end',
+        paddingBottom: isMobile ? '0.6rem' : '0.7rem',
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-          <History size={isMobile ? 16 : 18} color="#FFD700" />
-          <h3 style={{
-            fontSize: isMobile ? '0.95rem' : '1.1rem',
-            fontWeight: '800',
-            color: '#fff',
-            margin: 0,
-            letterSpacing: '-0.02em'
-          }}>
-            Trainingsgeschiedenis
-          </h3>
-        </div>
-        
         <button
           onClick={() => setShowFilterDropdown(!showFilterDropdown)}
+          aria-expanded={showFilterDropdown}
           style={{
-            background: 'transparent',
-            border: '1px solid rgba(255, 255, 255, 0.08)',
-            borderRadius: '8px',
-            padding: isMobile ? '0.45rem 0.7rem' : '0.5rem 0.875rem',
-            color: 'rgba(255, 255, 255, 0.5)',
+            background: 'rgba(255,215,0,0.06)',
+            border: '1px solid rgba(255,215,0,0.25)',
+            borderRadius: 999,
+            padding: isMobile ? '0.4rem 0.75rem' : '0.45rem 0.875rem',
+            color: '#FFD700',
             fontSize: isMobile ? '0.65rem' : '0.7rem',
-            fontWeight: '700',
+            fontWeight: 800,
             textTransform: 'uppercase',
-            letterSpacing: '0.04em',
+            letterSpacing: '0.08em',
             cursor: 'pointer',
             display: 'flex',
             alignItems: 'center',
-            gap: '0.35rem',
+            gap: '0.4rem',
             touchAction: 'manipulation',
-            WebkitTapHighlightColor: 'transparent'
+            WebkitTapHighlightColor: 'transparent',
           }}
         >
-          <Filter size={isMobile ? 12 : 13} />
+          <Filter size={isMobile ? 12 : 13} strokeWidth={2.4} />
           {filter === 'last7' && '7 dagen'}
           {filter === 'last30' && '30 dagen'}
           {filter === 'date' && 'Datum'}
           {filter === 'exercise' && 'Oefening'}
-          <ChevronDown 
+          <ChevronDown
             size={12}
-            style={{ 
+            strokeWidth={2.4}
+            style={{
               transform: showFilterDropdown ? 'rotate(180deg)' : 'rotate(0deg)',
-              transition: 'transform 0.2s ease'
-            }} 
+              transition: 'transform 0.2s ease',
+            }}
           />
         </button>
       </div>
@@ -711,21 +699,22 @@ function StatItem({ label, value, isMobile }) {
   return (
     <div style={{ textAlign: 'center', flex: 1 }}>
       <div style={{
-        fontSize: isMobile ? '1.1rem' : '1.25rem',
-        fontWeight: '800',
+        fontSize: isMobile ? '1.15rem' : '1.3rem',
+        fontWeight: 900,
         color: '#FFD700',
         letterSpacing: '-0.02em',
-        lineHeight: 1.2
+        lineHeight: 1.2,
+        fontVariantNumeric: 'tabular-nums',
       }}>
         {value}
       </div>
       <div style={{
-        fontSize: isMobile ? '0.5rem' : '0.55rem',
-        color: 'rgba(255, 255, 255, 0.35)',
-        fontWeight: '600',
+        fontSize: isMobile ? '0.65rem' : '0.7rem',
+        color: 'rgba(255, 255, 255, 0.6)',
+        fontWeight: 700,
         textTransform: 'uppercase',
-        letterSpacing: '0.05em',
-        marginTop: '0.1rem'
+        letterSpacing: '0.08em',
+        marginTop: '0.2rem'
       }}>
         {label}
       </div>

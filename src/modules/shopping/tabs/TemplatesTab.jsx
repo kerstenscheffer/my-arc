@@ -12,7 +12,7 @@ export default function TemplatesTab() {
       description: 'Max calories voor min geld',
       price: '€25/week',
       icon: DollarSign,
-      color: '#10b981'
+      color: '#FFD700'
     },
     {
       id: 'lean-clean',
@@ -93,7 +93,7 @@ export default function TemplatesTab() {
                 backdropFilter: 'blur(10px)',
                 borderRadius: '14px',
                 padding: isMobile ? '1rem' : '1.25rem',
-                border: '1px solid rgba(16, 185, 129, 0.08)',
+                border: '1px solid rgba(255, 215, 0, 0.08)',
                 opacity: 0.7,
                 cursor: 'not-allowed'
               }}

@@ -56,8 +56,8 @@ export default function MealsColumn({ client, mealData, isMobile, onNavigatePlan
     return (
       <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
         <div style={{ padding: isMobile ? '0.625rem 0.75rem' : '0.75rem 1rem', borderBottom: '1px solid rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-          <button onClick={() => { setView('days'); setSelectedDay(null) }} style={{ display: 'flex', alignItems: 'center', background: 'transparent', border: 'none', color: '#10b981', cursor: 'pointer', padding: 0, touchAction: 'manipulation' }}><ArrowLeft size={14} /></button>
-          <span style={{ fontSize: '0.7rem', fontWeight: '700', color: '#10b981' }}>{formatDate(selectedDay)}</span>
+          <button onClick={() => { setView('days'); setSelectedDay(null) }} style={{ display: 'flex', alignItems: 'center', background: 'transparent', border: 'none', color: '#FFD700', cursor: 'pointer', padding: 0, touchAction: 'manipulation' }}><ArrowLeft size={14} /></button>
+          <span style={{ fontSize: '0.7rem', fontWeight: '700', color: '#FFD700' }}>{formatDate(selectedDay)}</span>
           <span style={{ fontSize: '0.5rem', color: 'rgba(255,255,255,0.25)' }}>{dayData.count} items</span>
         </div>
         {targets && <MacroBar items={[
@@ -79,7 +79,7 @@ export default function MealsColumn({ client, mealData, isMobile, onNavigatePlan
                     <div style={{ fontSize: isMobile ? '0.65rem' : '0.7rem', fontWeight: '600', color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{meal.name}</div>
                   </div>
                   <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center', flexShrink: 0 }}>
-                    <span style={{ fontSize: '0.6rem', fontWeight: '800', color: '#10b981' }}>{meal.calories}</span>
+                    <span style={{ fontSize: '0.6rem', fontWeight: '800', color: '#FFD700' }}>{meal.calories}</span>
                     <span style={{ fontSize: '0.45rem', color: 'rgba(255,255,255,0.2)' }}>E:{Math.round(meal.protein)}</span>
                   </div>
                 </div>
@@ -97,8 +97,8 @@ export default function MealsColumn({ client, mealData, isMobile, onNavigatePlan
       <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
         <div style={{ padding: isMobile ? '0.625rem 0.75rem' : '0.75rem 1rem', borderBottom: '1px solid rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-            <UtensilsCrossed size={14} color="#10b981" />
-            <span style={{ fontSize: '0.7rem', fontWeight: '700', color: '#10b981', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Voeding</span>
+            <UtensilsCrossed size={14} color="#FFD700" />
+            <span style={{ fontSize: '0.7rem', fontWeight: '700', color: '#FFD700', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Voeding</span>
           </div>
           <span style={{ fontSize: '0.55rem', color: 'rgba(255,255,255,0.25)' }}>{mealData.loggingDays}/7 dagen</span>
         </div>
@@ -116,7 +116,7 @@ export default function MealsColumn({ client, mealData, isMobile, onNavigatePlan
             <div style={{ flex: 1, minWidth: 0 }}>
               {mealData.plan ? (
                 <>
-                  <div style={{ fontSize: '0.6rem', fontWeight: '600', color: mealData.plan.isActive ? '#10b981' : 'rgba(255,255,255,0.4)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{mealData.plan.name || 'Mealplan'}</div>
+                  <div style={{ fontSize: '0.6rem', fontWeight: '600', color: mealData.plan.isActive ? '#FFD700' : 'rgba(255,255,255,0.4)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{mealData.plan.name || 'Mealplan'}</div>
                   <div style={{ fontSize: '0.45rem', color: 'rgba(255,255,255,0.2)' }}>{mealData.plan.isActive ? 'Actief' : 'Concept'}</div>
                 </>
               ) : (
@@ -145,9 +145,9 @@ export default function MealsColumn({ client, mealData, isMobile, onNavigatePlan
                 onClick={() => { onNavigatePlan(client.id, mealData.plan?.id || null); onClose() }}
                 style={{
                   padding: isMobile ? '0.3rem 0.5rem' : '0.35rem 0.625rem',
-                  background: 'rgba(16,185,129,0.08)',
-                  border: '1px solid rgba(16,185,129,0.2)',
-                  borderRadius: '6px', color: '#10b981',
+                  background: 'rgba(255,215,0,0.08)',
+                  border: '1px solid rgba(255,215,0,0.2)',
+                  borderRadius: '6px', color: '#FFD700',
                   fontSize: '0.6rem', fontWeight: '700',
                   cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.2rem',
                   touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', minHeight: '28px'
@@ -163,7 +163,7 @@ export default function MealsColumn({ client, mealData, isMobile, onNavigatePlan
           <div style={{ display: 'flex', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
             <div style={{ flex: 1, textAlign: 'center', padding: isMobile ? '0.4rem' : '0.5rem', borderRight: '1px solid rgba(255,255,255,0.04)' }}>
               <div style={{ fontSize: '0.4rem', fontWeight: '700', color: 'rgba(255,255,255,0.2)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '0.1rem' }}>GEM KCAL</div>
-              <div style={{ fontSize: isMobile ? '0.75rem' : '0.85rem', fontWeight: '800', color: '#10b981', lineHeight: 1 }}>{mealData.avgCalories}</div>
+              <div style={{ fontSize: isMobile ? '0.75rem' : '0.85rem', fontWeight: '800', color: '#FFD700', lineHeight: 1 }}>{mealData.avgCalories}</div>
             </div>
             <div style={{ flex: 1, textAlign: 'center', padding: isMobile ? '0.4rem' : '0.5rem' }}>
               <div style={{ fontSize: '0.4rem', fontWeight: '700', color: 'rgba(255,255,255,0.2)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '0.1rem' }}>LOG DAGEN</div>
@@ -175,14 +175,14 @@ export default function MealsColumn({ client, mealData, isMobile, onNavigatePlan
         <div style={{ flex: 1, overflowY: 'auto', WebkitOverflowScrolling: 'touch' }}>
           {days.length > 0 ? (
             <div style={{ padding: isMobile ? '0.375rem 0.5rem' : '0.5rem 0.75rem' }}>
-              <div style={{ fontSize: '0.45rem', fontWeight: '700', color: 'rgba(16,185,129,0.3)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.25rem' }}>Dagelijks</div>
+              <div style={{ fontSize: '0.45rem', fontWeight: '700', color: 'rgba(255,215,0,0.3)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.25rem' }}>Dagelijks</div>
               {days.map((day, idx) => {
                 const d = dailyLog[day]
                 const calPct = targets ? pct(d.calories, targets.calories) : null
                 return (
                   <button key={day} onClick={() => { setSelectedDay(day); setView('detail') }} style={{ width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.35rem 0.25rem', borderBottom: idx < days.length - 1 ? '1px solid rgba(255,255,255,0.03)' : 'none', background: 'transparent', border: 'none', cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', textAlign: 'left' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
-                      <span style={{ fontSize: '0.6rem', color: idx === 0 ? '#10b981' : 'rgba(255,255,255,0.35)' }}>{formatDate(day)}</span>
+                      <span style={{ fontSize: '0.6rem', color: idx === 0 ? '#FFD700' : 'rgba(255,255,255,0.35)' }}>{formatDate(day)}</span>
                       <span style={{ fontSize: '0.45rem', color: 'rgba(255,255,255,0.15)' }}>{d.count}x</span>
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>

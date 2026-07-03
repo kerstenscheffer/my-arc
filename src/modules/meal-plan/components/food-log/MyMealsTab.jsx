@@ -1,7 +1,8 @@
 // src/modules/meal-plan/components/food-log/MyMealsTab.jsx
 // 🎯 v3.0 - Uses parent buildingMeal state to survive tab switches
 import React, { useState, useEffect } from 'react'
-import { Plus, Trash2, Check, ArrowLeft, ChevronRight, Camera, Image as ImageIcon, X } from 'lucide-react'
+import { Plus, Trash2, Check, ArrowLeft, ChevronRight, Camera, Image as ImageIcon, X, Calculator } from 'lucide-react'
+import MealPrepCalculator from '../MealPrepCalculator'
 
 const MEAL_MOMENTS = [
   { id: 'breakfast', label: 'Ontbijt' },
@@ -13,6 +14,7 @@ const MEAL_MOMENTS = [
 export default function MyMealsTab({ client, db, onLog, onRequestAddIngredient, buildingMeal, setBuildingMeal, isMobile }) {
   const [myMeals, setMyMeals] = useState([])
   const [loading, setLoading] = useState(true)
+  const [showPrep, setShowPrep] = useState(false)
 
   useEffect(() => {
     if (client?.id) loadMyMeals()
@@ -94,6 +96,33 @@ export default function MyMealsTab({ client, db, onLog, onRequestAddIngredient, 
         <Plus size={16} strokeWidth={2.5} />
         Maaltijd aanmaken
       </button>
+
+      {/* Meal-prep calculator — reken je bakjes uit en sla ze hier op. */}
+      <button
+        onClick={() => setShowPrep(true)}
+        style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          gap: '0.375rem', width: '100%',
+          padding: isMobile ? '0.875rem 1rem' : '1rem 1.5rem',
+          background: 'rgba(255, 215, 0, 0.04)', border: 'none',
+          borderBottom: '1px solid rgba(255,255,255,0.06)',
+          color: '#FFD700', fontSize: isMobile ? '0.8rem' : '0.85rem',
+          fontWeight: '700', cursor: 'pointer',
+          touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', minHeight: '48px'
+        }}
+      >
+        <Calculator size={16} strokeWidth={2.5} />
+        Meal-prep calculator
+      </button>
+
+      {showPrep && (
+        <MealPrepCalculator
+          client={client}
+          db={db}
+          onClose={() => setShowPrep(false)}
+          onSaved={() => loadMyMeals()}
+        />
+      )}
 
       {myMeals.length === 0 ? (
         <div style={{ padding: '3rem 1rem', textAlign: 'center' }}>
@@ -392,14 +421,11 @@ function MealDetailView({ meal, setMeal, client, db, isMobile, onBack, onRequest
             </div>
           ) : (
             <div style={{ display: 'flex', gap: '0.5rem' }}>
-              <PhotoPickerLabel
-                isMobile={isMobile}
-                label="Camera"
-                capture="environment"
-                onChange={handlePhotoSelect}
-              >
-                <Camera size={20} color="rgba(255,215,0,0.6)" strokeWidth={2} />
-              </PhotoPickerLabel>
+              {/* iOS WKWebView crasht op `capture="environment"` zonder
+                  NSCameraUsageDescription en blijft ook na permissie-fix
+                  onbetrouwbaar. We bieden alleen nog Galerij — daar kan
+                  iemand binnen iOS alsnog een nieuwe foto maken via de
+                  systeem-picker. */}
               <PhotoPickerLabel
                 isMobile={isMobile}
                 label="Galerij"

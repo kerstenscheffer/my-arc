@@ -12,7 +12,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { X, Calendar, Flag, Tag, Clock, Plus, Circle, Trash2, Timer, Layers, Repeat, CheckCircle2 } from 'lucide-react'
+import { X, Calendar, Flag, Tag, Clock, Plus, Circle, Trash2, Timer, Layers, Repeat, CheckCircle2, CalendarMinus } from 'lucide-react'
 import TaskLogSection from './TaskLogSection'
 
 const WEEK_DAYS = [
@@ -57,6 +57,9 @@ export default function AddTaskModal({
   // Mark this task as done. Same handler the kanban card uses, so the
   // reflection-modal still fires for needs_reflection tasks.
   onCompleteTask = null,
+  // Strip scheduling fields and push the task back to "Niet gepland".
+  // Same write-shape the agenda-sidebar drop handler uses.
+  onUnscheduleTask = null,
 }) {
   // Default estimated_minutes from the preset (when opened on a 30-min
   // empty slot we want the picker to already say 30).
@@ -76,6 +79,7 @@ export default function AddTaskModal({
     deadline:          initialTask?.deadline || '',
     needs_reflection:  initialTask?.needs_reflection !== false,
     estimated_minutes: initialTask?.estimated_minutes ?? presetDur,
+    color:             initialTask?.color || '',
   }))
   const [sectionId, setSectionId] = useState(() => {
     if (initialTask?.section_id) return initialTask.section_id
@@ -98,6 +102,13 @@ export default function AddTaskModal({
   )
   const [newStepText, setNewStepText] = useState('')
   const [titleError, setTitleError] = useState(false)
+  // For recurring tasks in edit-mode the focus is the daily logbook —
+  // collapse all edit-fields by default so the coach lands straight on
+  // "log vandaag" instead of scrolling past description/prio/recurring
+  // pickers etc. Create-mode (or non-recurring edit) stays expanded.
+  const [detailsOpen, setDetailsOpen] = useState(
+    !(initialTask?.id && initialTask?.recurrence_active)
+  )
 
   // Draft autosave bookkeeping
   // In edit mode the existing task IS the draft — every autosave is an
@@ -107,6 +118,11 @@ export default function AddTaskModal({
   const debounceRef = useRef(null)
   const inFlightRef = useRef(false)
   const submittedRef = useRef(false)
+  // Onthoudt of er een wijziging is overgeslagen terwijl een save liep, +
+  // altijd-actuele waarden zodat de retry/flush nooit een stale payload pakt.
+  const pendingRef = useRef(false)
+  const draftIdRef = useRef(initialTask?.id || null)
+  const latestRef = useRef(null)
 
   const autosaveEnabled = !!(onAutoCreate && onAutoUpdate && onAutoDelete)
 
@@ -119,41 +135,54 @@ export default function AddTaskModal({
     formData.estimated_minutes !== '' ||
     steps.length > 0
 
+  // Altijd-actuele payload-bouwstenen, zodat doSave (na een debounce/await)
+  // nooit een verouderde formData pakt.
+  latestRef.current = { formData, steps, sectionId, recurrenceActive, recurrenceDays }
+  draftIdRef.current = draftId || draftIdRef.current
+
+  // Eén opslag-poging met de NIEUWSTE waarden. Komt er een wijziging binnen
+  // terwijl deze nog loopt (inFlightRef), dan markeren we 'pending' en draaien
+  // we 'm direct na afloop nog een keer — zo gaat geen enkele wijziging
+  // (bv. je net getypte notitie) verloren.
+  const doSave = async () => {
+    if (inFlightRef.current) { pendingRef.current = true; return }
+    inFlightRef.current = true
+    setSavingState('saving')
+    try {
+      const { formData: fd, steps: st, sectionId: sid, recurrenceActive: ra, recurrenceDays: rd } = latestRef.current
+      const payload = {
+        ...fd, steps: st,
+        sectionId: sid || null,
+        recurrence_active: ra,
+        recurrence_days: ra && rd.length > 0 ? rd : null,
+      }
+      console.log('[task-autosave] opslaan', { id: draftIdRef.current, isUpdate: !!draftIdRef.current, description: payload.description })
+      if (!draftIdRef.current) {
+        const created = await onAutoCreate(payload)
+        if (created?.id) { draftIdRef.current = created.id; setDraftId(created.id) }
+      } else {
+        await onAutoUpdate(draftIdRef.current, payload)
+      }
+      setSavingState('saved')
+    } catch (e) {
+      console.error('Autosave failed:', e)
+      setSavingState('idle')
+    } finally {
+      inFlightRef.current = false
+      // Tijdens deze save kwam er nog een wijziging binnen → nu alsnog opslaan.
+      if (pendingRef.current) { pendingRef.current = false; doSave() }
+    }
+  }
+
   // ── Autosave loop ────────────────────────────────────────────────────────
-  // We watch the entire form payload + step list; on every change we either
-  // create the draft (first time we have a title) or push an update.
+  // Bij elke wijziging debouncen we een doSave().
   useEffect(() => {
     if (!autosaveEnabled) return
     if (!hasContent) return
-    // Need at least a title before the DB row can exist (NOT NULL column).
     if (!formData.title.trim() && !draftId) return
 
     if (debounceRef.current) clearTimeout(debounceRef.current)
-    debounceRef.current = setTimeout(async () => {
-      if (inFlightRef.current) return
-      inFlightRef.current = true
-      setSavingState('saving')
-      try {
-        const payload = {
-          ...formData, steps,
-          sectionId: sectionId || null,
-          recurrence_active: recurrenceActive,
-          recurrence_days: recurrenceActive && recurrenceDays.length > 0 ? recurrenceDays : null,
-        }
-        if (!draftId) {
-          const created = await onAutoCreate(payload)
-          if (created?.id) setDraftId(created.id)
-        } else {
-          await onAutoUpdate(draftId, payload)
-        }
-        setSavingState('saved')
-      } catch (e) {
-        console.error('Autosave failed:', e)
-        setSavingState('idle')
-      } finally {
-        inFlightRef.current = false
-      }
-    }, AUTOSAVE_DELAY_MS)
+    debounceRef.current = setTimeout(() => { doSave() }, AUTOSAVE_DELAY_MS)
 
     return () => { if (debounceRef.current) clearTimeout(debounceRef.current) }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -187,12 +216,27 @@ export default function AddTaskModal({
     }
   }
 
+  // Flush de actuele formulier-staat naar de DB vóór sluiten. Nodig omdat de
+  // autosave-debounce of de in-flight-guard de laatste wijziging (bv. je net
+  // getypte notes/description) kan hebben overgeslagen — dan was die anders weg.
+  const flushPending = async () => {
+    if (debounceRef.current) clearTimeout(debounceRef.current)
+    if (!autosaveEnabled || !draftId) return
+    const payload = {
+      ...formData, steps,
+      sectionId: sectionId || null,
+      recurrence_active: recurrenceActive,
+      recurrence_days: recurrenceActive && recurrenceDays.length > 0 ? recurrenceDays : null,
+    }
+    try { await onAutoUpdate(draftId, payload) } catch (e) { console.error('Flush bij sluiten mislukt:', e) }
+  }
+
   // Attempted close (X, backdrop, or Annuleer button).
   const handleAttemptClose = async () => {
     submittedRef.current = false
-    // In edit mode there's nothing to "lose" — all edits are already saved
-    // via the autosave debounce. Just close.
-    if (isEditMode) { onClose(); return }
+    // In edit mode: eerst de laatste staat flushen (autosave kan ''m gemist
+    // hebben), dan sluiten.
+    if (isEditMode) { await flushPending(); onClose(); return }
     if (!hasContent) {
       if (autosaveEnabled && draftId) {
         try { await onAutoDelete(draftId) } catch (e) { console.error(e) }
@@ -205,7 +249,7 @@ export default function AddTaskModal({
       'OK = Taak bewaren als concept\n' +
       'Annuleren = Terug naar het formulier'
     )
-    if (userChoice) onClose()
+    if (userChoice) { await flushPending(); onClose() }
   }
 
   console.log('[AddTaskModal] mounting, portal target body present:', !!document?.body)
@@ -298,6 +342,44 @@ export default function AddTaskModal({
             </div>
           )}
 
+          {/* Logboek FIRST when this is a recurring task in edit-mode —
+              dat is de hele reden waarom de modal nu open staat. */}
+          {isEditMode && recurrenceActive && db && coachId && draftId && (
+            <TaskLogSection
+              taskId={draftId}
+              coachId={coachId}
+              db={db}
+              isMobile={isMobile}
+            />
+          )}
+
+          {/* Collapse-toggle voor alle edit-velden. Default-state hangt af
+              van of we in recurring-edit zitten (dichtgeklapt) of niet. */}
+          <button
+            type="button"
+            onClick={() => setDetailsOpen(v => !v)}
+            style={{
+              width: '100%', padding: '0.5rem 1rem',
+              display: 'flex', alignItems: 'center', gap: '0.5rem',
+              background: detailsOpen ? 'rgba(255,255,255,0.02)' : 'transparent',
+              border: 'none',
+              borderBottom: '1px solid rgba(255,255,255,0.04)',
+              color: 'rgba(255,255,255,0.55)',
+              fontSize: '0.65rem', fontWeight: 800,
+              letterSpacing: '0.05em', textTransform: 'uppercase',
+              cursor: 'pointer', touchAction: 'manipulation',
+            }}
+          >
+            <span style={{
+              fontSize: '0.7rem',
+              transform: detailsOpen ? 'rotate(90deg)' : 'rotate(0deg)',
+              transition: 'transform 0.15s', display: 'inline-block', width: 12,
+            }}>▸</span>
+            {detailsOpen ? 'Verberg task-instellingen' : 'Bewerk task-instellingen'}
+          </button>
+
+          {detailsOpen && (
+          <>
           {/* Beschrijving */}
           <div style={{ padding: '0.75rem 1rem', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
             <div style={{ fontSize: '0.45rem', fontWeight: '700', color: 'rgba(255,255,255,0.2)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '0.4rem' }}>BESCHRIJVING</div>
@@ -458,6 +540,60 @@ export default function AddTaskModal({
             )}
           </div>
 
+          {/* Kleur — overschrijft sectiekleur op de card. Klik nogmaals = leeg. */}
+          <div style={{ padding: '0.625rem 1rem', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+            <div style={{ fontSize: '0.45rem', fontWeight: 700, color: 'rgba(255,255,255,0.2)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '0.4rem' }}>
+              KLEUR
+            </div>
+            <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', alignItems: 'center' }}>
+              {[
+                '#10b981', // groen
+                '#3b82f6', // blauw
+                '#8b5cf6', // paars
+                '#FFD700', // goud
+                '#f59e0b', // amber
+                '#ef4444', // rood
+                '#ec4899', // roze
+                '#06b6d4', // cyan
+                '#6b7280', // grijs
+              ].map(c => {
+                const active = formData.color === c
+                return (
+                  <button
+                    key={c}
+                    type="button"
+                    onClick={() => setFormData({ ...formData, color: active ? '' : c })}
+                    title={c}
+                    style={{
+                      width: 24, height: 24, padding: 0,
+                      background: c, borderRadius: 6,
+                      border: active ? '2px solid #fff' : '1px solid rgba(255,255,255,0.1)',
+                      boxShadow: active ? `0 0 0 2px ${c}55` : 'none',
+                      cursor: 'pointer', touchAction: 'manipulation',
+                    }}
+                  />
+                )
+              })}
+              {formData.color && (
+                <button
+                  type="button"
+                  onClick={() => setFormData({ ...formData, color: '' })}
+                  style={{
+                    minHeight: 24, padding: '2px 7px', marginLeft: 4,
+                    background: 'transparent',
+                    border: '1px dashed rgba(255,255,255,0.15)',
+                    borderRadius: 5,
+                    color: 'rgba(255,255,255,0.4)',
+                    fontSize: '0.55rem', fontWeight: 700,
+                    cursor: 'pointer', touchAction: 'manipulation',
+                  }}
+                >
+                  Geen kleur
+                </button>
+              )}
+            </div>
+          </div>
+
           {/* Reflectie toggle */}
           <div style={{ padding: '0.625rem 1rem', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
             <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', padding: '0.4rem 0.5rem', background: formData.needs_reflection ? 'rgba(139,92,246,0.08)' : 'transparent', border: `1px solid ${formData.needs_reflection ? 'rgba(139,92,246,0.2)' : 'rgba(255,255,255,0.06)'}`, borderRadius: '6px' }}>
@@ -478,6 +614,8 @@ export default function AddTaskModal({
               db={db}
               isMobile={isMobile}
             />
+          )}
+          </>
           )}
         </div>
 
@@ -501,6 +639,31 @@ export default function AddTaskModal({
               }}
             >
               <Trash2 size={14} />
+            </button>
+          )}
+
+          {/* Uitplannen — alleen als de task daadwerkelijk gepland staat.
+              Strip scheduled_day/date/start/end zodat 'ie terug naar
+              Niet gepland gaat. Recurring blijft recurring (toggle apart). */}
+          {isEditMode && onUnscheduleTask && initialTask?.scheduled_day && (
+            <button
+              onClick={async () => {
+                if (debounceRef.current) clearTimeout(debounceRef.current)
+                submittedRef.current = true
+                try { await onUnscheduleTask(draftId) } catch (e) { console.error('Unschedule failed:', e) }
+                onClose()
+              }}
+              title="Uitplannen — terug naar Niet gepland"
+              style={{
+                width: 40, padding: 0, minHeight: 40,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                background: 'rgba(251,191,36,0.1)',
+                border: '1px solid rgba(251,191,36,0.3)',
+                borderRadius: '6px', color: '#fbbf24',
+                cursor: 'pointer', touchAction: 'manipulation',
+              }}
+            >
+              <CalendarMinus size={14} />
             </button>
           )}
           <button onClick={handleAttemptClose}

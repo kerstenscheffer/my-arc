@@ -3,8 +3,9 @@
 // Lives inside ProductivityHub. Uses WeekGoalsService for persistence.
 
 import { useEffect, useState } from 'react'
-import { Plus, Trash2, Target, Calendar, Pencil, Save, X, Copy } from 'lucide-react'
+import { Plus, Trash2, Target, Calendar, Pencil, Save, X, Copy, BarChart3 } from 'lucide-react'
 import WeekGoalsService from '../WeekGoalsService'
+import WeekGoalsStatsModal from './WeekGoalsStatsModal'
 
 // Tells the always-on WeekGoalsBar to reload itself — no hard refresh needed.
 const notifyGoalsChanged = () => {
@@ -20,6 +21,7 @@ const LEADKANBAN_SOURCES = [
   { key: 'callProposed',   label: 'Calls voorgesteld (sectie)' },
   { key: 'callScheduled',  label: 'Calls ingepland (sectie)' },
   { key: 'sale',           label: 'Sales / closes (sectie)' },
+  { key: 'noShow',         label: 'No shows (sectie)' },
 ]
 
 const blankDraft = () => ({
@@ -38,6 +40,7 @@ export default function WeekGoalsManager({ db, coachId, isMobile: propMobile }) 
   const [editingId, setEditingId] = useState(null)
   const [draft, setDraft] = useState(blankDraft())
   const [showNew, setShowNew] = useState(false)
+  const [showStats, setShowStats] = useState(false)
 
   const weekStart = WeekGoalsService.weekISO(new Date())
 
@@ -132,14 +135,17 @@ export default function WeekGoalsManager({ db, coachId, isMobile: propMobile }) 
         </div>
       </div>
 
-      {/* Add / dup row */}
+      {/* Add / dup / stats row */}
       {!showNew && !editingId && (
-        <div style={{ display: 'flex', gap: '0.4rem', marginBottom: '0.55rem' }}>
+        <div style={{ display: 'flex', gap: '0.4rem', marginBottom: '0.55rem', flexWrap: 'wrap' }}>
           <button onClick={startNew} style={primaryBtn}>
             <Plus size={13} /> Nieuw doel
           </button>
           <button onClick={handleDuplicatePrevWeek} style={secondaryBtn} title="Doelen uit vorige week kopiëren">
             <Copy size={13} /> Kopieer vorige week
+          </button>
+          <button onClick={() => setShowStats(true)} style={secondaryBtn} title="Bekijk hoe vorige weken zijn gegaan">
+            <BarChart3 size={13} /> Stats vorige weken
           </button>
         </div>
       )}
@@ -277,6 +283,15 @@ export default function WeekGoalsManager({ db, coachId, isMobile: propMobile }) 
             </div>
           ))}
         </div>
+      )}
+
+      {showStats && (
+        <WeekGoalsStatsModal
+          db={db}
+          coachId={coachId}
+          isMobile={isMobile}
+          onClose={() => setShowStats(false)}
+        />
       )}
     </div>
   )

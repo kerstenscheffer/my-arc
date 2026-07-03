@@ -3,8 +3,8 @@
 // (edit-mode). Today's answers autosave with a debounce so the coach can
 // just type and tab away.
 
-import { useEffect, useRef, useState } from 'react'
-import { BookOpen, Calendar, History, Loader2 } from 'lucide-react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { BookOpen, Calendar, History, Loader2, ChevronDown } from 'lucide-react'
 import TaskLogService from '../../TaskLogService'
 
 const AUTOSAVE_MS = 700
@@ -30,6 +30,9 @@ export default function TaskLogSection({ taskId, coachId, db, isMobile }) {
   })
   const [history, setHistory] = useState([])
   const [loading, setLoading] = useState(true)
+  // Which past log the prominent "Vorige keer"-card shows. Defaults to the
+  // most recent non-today entry; the dropdown lets the coach scroll back.
+  const [selectedPastDate, setSelectedPastDate] = useState(null)
   const [savingState, setSavingState] = useState('idle') // idle | saving | saved
   const debounceRef = useRef(null)
   const skipFirstSaveRef = useRef(true)
@@ -101,11 +104,21 @@ export default function TaskLogSection({ taskId, coachId, db, isMobile }) {
     fontFamily: 'inherit',
   }
 
-  // Most recent prior log (excluding today). This is the "where did I leave
-  // off?" preview shown at the very top — what Kersten asked for: open the
-  // task, instantly see what you wrote last time + what tomorrow-you (now
-  // present-you) said to do better.
-  const lastLog = history.find(h => h.log_date !== today)
+  // All prior logs (excluding today), newest first.
+  const priorLogs = useMemo(
+    () => history.filter(h => h.log_date !== today),
+    [history, today]
+  )
+  // The log shown in the prominent "Vorige keer" preview. Defaults to the
+  // newest prior log; dropdown lets the coach pick an earlier date.
+  const lastLog = useMemo(() => {
+    if (!priorLogs.length) return null
+    if (selectedPastDate) {
+      const m = priorLogs.find(h => h.log_date === selectedPastDate)
+      if (m) return m
+    }
+    return priorLogs[0]
+  }, [priorLogs, selectedPastDate])
 
   return (
     <div style={{ padding: '0.75rem 1rem', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
@@ -126,8 +139,44 @@ export default function TaskLogSection({ taskId, coachId, db, isMobile }) {
               fontSize: '0.52rem', fontWeight: 800, color: '#FFD700',
               letterSpacing: '0.06em', textTransform: 'uppercase',
             }}>
-              Vorige keer · {fmtDate(lastLog.log_date)}
+              Vorige keer
             </span>
+            {/* Date picker dropdown — scroll back through earlier log entries
+                without having to scan the full history list below. */}
+            {priorLogs.length > 1 ? (
+              <div style={{ position: 'relative', display: 'inline-flex', alignItems: 'center' }}>
+                <select
+                  value={lastLog.log_date}
+                  onChange={(e) => setSelectedPastDate(e.target.value)}
+                  style={{
+                    appearance: 'none', WebkitAppearance: 'none',
+                    padding: '2px 18px 2px 6px',
+                    background: 'rgba(255,215,0,0.12)',
+                    border: '1px solid rgba(255,215,0,0.35)',
+                    borderRadius: 4,
+                    color: '#FFD700',
+                    fontSize: '0.6rem', fontWeight: 800,
+                    letterSpacing: '0.02em', textTransform: 'capitalize',
+                    cursor: 'pointer', outline: 'none',
+                    fontFamily: 'inherit',
+                  }}
+                >
+                  {priorLogs.map(h => (
+                    <option key={h.id} value={h.log_date} style={{ background: '#0a0a0a', color: '#fff' }}>
+                      {fmtDate(h.log_date)}
+                    </option>
+                  ))}
+                </select>
+                <ChevronDown size={9} color="#FFD700" style={{ position: 'absolute', right: 4, pointerEvents: 'none' }} />
+              </div>
+            ) : (
+              <span style={{
+                fontSize: '0.6rem', fontWeight: 800, color: '#FFD700',
+                textTransform: 'capitalize',
+              }}>
+                · {fmtDate(lastLog.log_date)}
+              </span>
+            )}
             {lastLog.genoeg_score != null && (
               <span style={{
                 marginLeft: 'auto',

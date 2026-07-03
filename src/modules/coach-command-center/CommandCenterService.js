@@ -15,14 +15,17 @@ export default class CommandCenterService {
     if (!clients || clients.length === 0) return []
     try {
       const clientIds = clients.map(c => c.id)
-      const sixtyDaysAgo = new Date()
-      sixtyDaysAgo.setDate(sixtyDaysAgo.getDate() - 60)
-      
+      // Was 60 dagen — te kort om volledige gewicht-geschiedenis te tonen
+      // in het insight-paneel. We pakken nu 18 maanden zodat de coach
+      // alle metingen vanaf challenge-start kan zien.
+      const since = new Date()
+      since.setDate(since.getDate() - 545)
+
       const { data: weightLogs, error } = await this.supabase
         .from('weight_challenge_logs')
         .select('client_id, date, weight, is_friday_weighin')
         .in('client_id', clientIds)
-        .gte('date', sixtyDaysAgo.toISOString().split('T')[0])
+        .gte('date', since.toISOString().split('T')[0])
         .order('date', { ascending: false })
 
       if (error) { console.error('❌ Weight error:', error); return clients.map(c => ({ ...c, weightData: null })) }
@@ -48,7 +51,9 @@ export default class CommandCenterService {
         const fridayMissing = today.getDay() === 5 && !logs.some(l => l.date === todayStr)
         return {
           ...client,
-          weightData: { latest: latestLog, history: logs.slice(0, 56), daysSinceWeighin, fridayCount, weightStatus, fridayMissing, totalLogs: logs.length }
+          // Was begrensd op 56 entries — te weinig voor volledige
+          // historiek. Geen cap meer; we pakken alles binnen het venster.
+          weightData: { latest: latestLog, history: logs, daysSinceWeighin, fridayCount, weightStatus, fridayMissing, totalLogs: logs.length }
         }
       })
     } catch (error) { console.error('❌ Weight error:', error); return clients.map(c => ({ ...c, weightData: null })) }

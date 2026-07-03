@@ -2,6 +2,7 @@
 // 🎴 MEAL CARD v5.0 - Ultra Compact Premium Design
 import React from 'react'
 import { Clock, Trash2, Flame, Target, Zap, Droplets } from 'lucide-react'
+import { foodImageFallback } from '../foodImageFallback'
 
 const truncateMealName = (name, maxLength) => {
   if (!name) return ''
@@ -17,19 +18,8 @@ const formatTime = (timestamp) => {
 
 const getMealImage = (meal) => {
   if (meal?.image_url) return meal.image_url
-  
-  const mealType = meal?.meal_type || 'meal'
-  const fallbacks = {
-    breakfast: 'https://images.unsplash.com/photo-1525351484163-7529414344d8?w=100&h=100&fit=crop',
-    lunch: 'https://images.unsplash.com/photo-1547592166-23ac45744acd?w=100&h=100&fit=crop',
-    dinner: 'https://images.unsplash.com/photo-1555939594-58d7cb561ad1?w=100&h=100&fit=crop',
-    snack: 'https://images.unsplash.com/photo-1490474504059-bf2db5ab2348?w=100&h=100&fit=crop',
-    custom: 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=100&h=100&fit=crop',
-    custom_assembled: 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=100&h=100&fit=crop',
-    quick_add: 'https://images.unsplash.com/photo-1490474504059-bf2db5ab2348?w=100&h=100&fit=crop'
-  }
-  
-  return fallbacks[mealType] || fallbacks.custom
+  // Titel-gebaseerde fallback (kwark -> zuivel, kip -> kip, enz.).
+  return foodImageFallback(meal?.name || meal?.title || meal?.product_name, meal?.meal_type, 100)
 }
 
 const getMealTypeLabel = (type) => {

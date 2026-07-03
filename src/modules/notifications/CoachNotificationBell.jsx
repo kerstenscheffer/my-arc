@@ -1,12 +1,18 @@
 // src/modules/notifications/CoachNotificationBell.jsx
 // Simple notification bell for CoachHub - reads coach_notifications table
 import { useState, useEffect, useRef } from 'react'
-import { Bell, X, Check, ChevronRight, AlertCircle, FileText, Utensils } from 'lucide-react'
+import { Bell, X, Check, ChevronRight, AlertCircle, FileText, Utensils, LifeBuoy, ClipboardCheck } from 'lucide-react'
 
-export default function CoachNotificationBell({ db, isMobile, onNavigate }) {
+export default function CoachNotificationBell({ db, isMobile, onNavigate, open: openProp, onOpenChange, onCountChange }) {
+  const controlled = typeof openProp === 'boolean' && typeof onOpenChange === 'function'
   const [notifications, setNotifications] = useState([])
   const [unreadCount, setUnreadCount] = useState(0)
-  const [isOpen, setIsOpen] = useState(false)
+  const [openInternal, setOpenInternal] = useState(false)
+  const isOpen = controlled ? openProp : openInternal
+  const setIsOpen = (val) => {
+    const next = typeof val === 'function' ? val(isOpen) : val
+    if (controlled) onOpenChange(next); else setOpenInternal(next)
+  }
   const [loading, setLoading] = useState(false)
   const dropdownRef = useRef(null)
 
@@ -46,7 +52,9 @@ export default function CoachNotificationBell({ db, isMobile, onNavigate }) {
       }
 
       setNotifications(data || [])
-      setUnreadCount((data || []).filter(n => !n.read_status).length)
+      const unread = (data || []).filter(n => !n.read_status).length
+      setUnreadCount(unread)
+      if (typeof onCountChange === 'function') onCountChange(unread)
     } catch (err) {
       console.error('❌ Notification load error:', err)
     }
@@ -87,8 +95,10 @@ export default function CoachNotificationBell({ db, isMobile, onNavigate }) {
   const getIcon = (type) => {
     switch (type) {
       case 'intake_completed': return <FileText size={14} />
+      case 'checkin_completed': return <ClipboardCheck size={14} />
       case 'plan_ready': return <Utensils size={14} />
       case 'action_required': return <AlertCircle size={14} />
+      case 'support_message': return <LifeBuoy size={14} />
       default: return <Bell size={14} />
     }
   }
@@ -96,8 +106,10 @@ export default function CoachNotificationBell({ db, isMobile, onNavigate }) {
   const getIconColor = (type) => {
     switch (type) {
       case 'intake_completed': return '#C9A55A'
+      case 'checkin_completed': return '#FFD700'
       case 'plan_ready': return '#10b981'
       case 'action_required': return '#f59e0b'
+      case 'support_message': return '#FFD700'
       default: return 'rgba(255,255,255,0.5)'
     }
   }
@@ -114,68 +126,73 @@ export default function CoachNotificationBell({ db, isMobile, onNavigate }) {
   }
 
   return (
-    <div ref={dropdownRef} style={{ position: 'relative' }}>
-      {/* Bell button */}
-      <button
-        onClick={() => setIsOpen(!isOpen)}
-        style={{
-          position: 'relative',
-          width: '40px',
-          height: '40px',
-          borderRadius: '10px',
-          background: isOpen ? 'rgba(201, 165, 90, 0.1)' : 'rgba(255,255,255,0.03)',
-          border: `1px solid ${isOpen ? 'rgba(201, 165, 90, 0.3)' : 'rgba(255,255,255,0.06)'}`,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          cursor: 'pointer',
-          touchAction: 'manipulation',
-          WebkitTapHighlightColor: 'transparent',
-          transition: 'all 0.2s ease'
-        }}
-      >
-        <Bell size={18} color={unreadCount > 0 ? '#C9A55A' : 'rgba(255,255,255,0.4)'} />
+    <>
+      {/* Side-tab trigger — vertical pill op de rechterrand, zelfde
+          patroon als IssueNotesWidget. Verschijnt alleen als dichtgeklapt. */}
+      {!controlled && !isOpen && (
+        <button
+          onClick={() => setIsOpen(true)}
+          title="Meldingen"
+          style={{
+            position: 'fixed',
+            right: 0,
+            // Boven IssueNotesWidget (die op 40% staat). Bell op 25%.
+            top: '25%',
+            transform: 'translateY(-50%)',
+            zIndex: 2147483500,
+            width: 36, height: 56,
+            display: 'flex', flexDirection: 'column',
+            alignItems: 'center', justifyContent: 'center',
+            gap: 2,
+            background: unreadCount > 0 ? 'rgba(201,165,90,0.18)' : 'rgba(201,165,90,0.08)',
+            border: `1px solid ${unreadCount > 0 ? 'rgba(201,165,90,0.45)' : 'rgba(201,165,90,0.22)'}`,
+            borderRight: 'none',
+            borderRadius: '8px 0 0 8px',
+            color: unreadCount > 0 ? '#FFD700' : 'rgba(255,255,255,0.55)',
+            cursor: 'pointer',
+            touchAction: 'manipulation',
+            WebkitTapHighlightColor: 'transparent',
+          }}
+        >
+          <Bell size={15} />
+          {unreadCount > 0 && (
+            <span style={{ fontSize: '0.55rem', fontWeight: 800 }}>
+              {unreadCount > 9 ? '9+' : unreadCount}
+            </span>
+          )}
+        </button>
+      )}
 
-        {/* Unread badge */}
-        {unreadCount > 0 && (
-          <div style={{
-            position: 'absolute',
-            top: '-4px',
-            right: '-4px',
-            width: '18px',
-            height: '18px',
-            borderRadius: '50%',
-            background: '#ef4444',
-            color: '#fff',
-            fontSize: '0.55rem',
-            fontWeight: 800,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            border: '2px solid #000',
-            animation: 'bellPulse 2s ease-in-out infinite'
-          }}>
-            {unreadCount > 9 ? '9+' : unreadCount}
-          </div>
-        )}
-      </button>
-
-      {/* Dropdown */}
+      {/* Backdrop achter het paneel — klik buiten = sluit */}
       {isOpen && (
-        <div style={{
-          position: 'absolute',
-          top: '48px',
-          right: 0,
-          width: isMobile ? 'calc(100vw - 2rem)' : '360px',
-          maxHeight: '480px',
-          background: '#0a0a0a',
-          border: '1px solid rgba(201, 165, 90, 0.2)',
-          borderRadius: '14px',
-          boxShadow: '0 12px 40px rgba(0,0,0,0.8)',
-          overflow: 'hidden',
-          zIndex: 1000,
-          animation: 'dropdownSlide 0.2s ease'
-        }}>
+        <div
+          onClick={() => setIsOpen(false)}
+          style={{
+            position: 'fixed', inset: 0,
+            background: 'rgba(0,0,0,0.4)',
+            zIndex: 2147483545,
+          }}
+        />
+      )}
+
+      {/* Slide-out panel vanaf de rechterrand */}
+      {isOpen && (
+        <div
+          ref={dropdownRef}
+          onClick={(e) => e.stopPropagation()}
+          style={{
+            position: 'fixed',
+            top: 0, right: 0, bottom: 0,
+            width: 'min(380px, 100vw)',
+            background: '#0a0a0a',
+            borderLeft: '1px solid rgba(201,165,90,0.2)',
+            zIndex: 2147483550,
+            display: 'flex', flexDirection: 'column',
+            boxShadow: '-8px 0 24px rgba(0,0,0,0.6)',
+            paddingTop: 'env(safe-area-inset-top)',
+            paddingBottom: 'env(safe-area-inset-bottom)',
+            animation: 'dropdownSlide 0.2s ease',
+          }}>
           {/* Header */}
           <div style={{
             display: 'flex',
@@ -343,10 +360,10 @@ export default function CoachNotificationBell({ db, isMobile, onNavigate }) {
           50% { transform: scale(1.1) }
         }
         @keyframes dropdownSlide {
-          from { opacity: 0; transform: translateY(-8px) }
-          to { opacity: 1; transform: translateY(0) }
+          from { opacity: 0; transform: translateX(20px) }
+          to { opacity: 1; transform: translateX(0) }
         }
       `}</style>
-    </div>
+    </>
   )
 }

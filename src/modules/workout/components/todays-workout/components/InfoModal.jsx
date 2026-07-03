@@ -9,6 +9,14 @@ export default function InfoModal({ exercise, onClose, db, client, defaultTab })
   const [visible, setVisible] = useState(false)
   const [activeTab, setActiveTab] = useState(defaultTab || 'video')
   const [videoUrl, setVideoUrl] = useState(null)
+  // True wanneer de geladen URL een fallback van een externe creator is —
+  // tonen we als een label "Externe creator" zodat de gebruiker weet dat
+  // het niet door de coach zelf is opgenomen.
+  const [isFallback, setIsFallback] = useState(false)
+  // YouTube-search URLs (results?search_query=...) zijn NIET embeddable.
+  // In dat geval rendert de modal een knop naar YouTube i.p.v. iframe.
+  const [externalOnly, setExternalOnly] = useState(false)
+  const [externalUrl, setExternalUrl] = useState(null)
   const [loading, setLoading] = useState(true)
   const [videoPlaying, setVideoPlaying] = useState(false)
 
@@ -27,10 +35,22 @@ export default function InfoModal({ exercise, onClose, db, client, defaultTab })
   const loadVideo = async () => {
     setLoading(true)
     try {
-      const url = await ExerciseService.getExerciseVideo(exercise.name)
-      if (url) {
-        const embedUrl = getYouTubeEmbedUrl(url)
-        setVideoUrl(embedUrl || url)
+      // Fetch BOTH coach video and fallback so we can label them differently.
+      const details = await ExerciseService.getExerciseDetails(exercise.name)
+      const coachUrl = details?.video_url || null
+      const fbUrl = details?.fallback_video_url || null
+      const chosen = coachUrl || fbUrl
+      setIsFallback(!coachUrl && !!fbUrl)
+      if (!chosen) return
+      // Search-URLs zijn niet embeddable — render een externe knop i.p.v.
+      // iframe. Watch/embed-URLs gaan door de embed-conversie heen.
+      const isSearch = /youtube\.com\/results\?/.test(chosen)
+      if (isSearch) {
+        setExternalOnly(true)
+        setExternalUrl(chosen)
+      } else {
+        const embedUrl = getYouTubeEmbedUrl(chosen)
+        setVideoUrl(embedUrl || chosen)
       }
     } catch (error) {
       console.error('❌ Failed to load video:', error)
@@ -81,8 +101,24 @@ export default function InfoModal({ exercise, onClose, db, client, defaultTab })
                   <div style={{ width: '36px', height: '36px', border: '3px solid rgba(255,215,0,0.15)', borderTopColor: '#FFD700', borderRadius: '50%', margin: '0 auto 1rem', animation: 'spin 1s linear infinite' }} />
                   <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.85rem', margin: 0 }}>Video laden...</p>
                 </div>
+              ) : externalOnly ? (
+                <div style={{ textAlign: 'center', padding: '2rem', maxWidth: '380px' }}>
+                  <div style={{ width: isMobile ? '52px' : '60px', height: isMobile ? '52px' : '60px', borderRadius: '50%', background: 'rgba(255,215,0,0.08)', border: '1px solid rgba(255,215,0,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1rem' }}>
+                    <Play size={isMobile ? 22 : 26} color="#FFD700" />
+                  </div>
+                  <h4 style={{ fontSize: '0.95rem', color: 'rgba(255,255,255,0.85)', marginBottom: '0.375rem', fontWeight: '700' }}>Video van externe creator</h4>
+                  <p style={{ color: 'rgba(255,255,255,0.45)', fontSize: '0.8rem', margin: '0 0 1.25rem' }}>Coach heeft nog geen eigen opname — bekijk een uitleg van een andere creator op YouTube.</p>
+                  <a href={externalUrl} target="_blank" rel="noopener noreferrer" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', padding: '0.7rem 1.1rem', background: '#FFD700', border: 'none', borderRadius: '8px', color: '#000', fontSize: '0.82rem', fontWeight: '800', textDecoration: 'none', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                    <Play size={14} />Open op YouTube
+                  </a>
+                </div>
               ) : videoUrl ? (
                 <div style={{ width: '100%', height: '100%', background: '#000', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative' }}>
+                  {isFallback && (
+                    <div style={{ position: 'absolute', top: 12, left: 12, zIndex: 12, padding: '4px 8px', background: 'rgba(255,215,0,0.18)', border: '1px solid rgba(255,215,0,0.35)', borderRadius: 4, color: '#FFD700', fontSize: '0.55rem', fontWeight: 800, letterSpacing: '0.06em', textTransform: 'uppercase' }}>
+                      Externe creator
+                    </div>
+                  )}
                   <div style={{ width: isMobile ? '100%' : 'min(400px, 56.25vh)', height: '100%', position: 'relative', overflow: 'hidden', background: '#000' }}>
                     <iframe
                       src={`${videoUrl}?modestbranding=1&rel=0&showinfo=0&iv_load_policy=3&controls=1&playsinline=1&autoplay=${videoPlaying ? 1 : 0}&mute=0`}

@@ -4,6 +4,7 @@ import {
   Flame, Dumbbell, Zap, Droplets, Clock,
   TrendingUp, ChevronRight
 } from 'lucide-react'
+import { foodImageFallback } from '../foodImageFallback'
 
 export default function MealListToday({ 
   meals, 
@@ -142,25 +143,7 @@ function CompactMealCard({
   const [isHovered, setIsHovered] = useState(false)
   const isMobile = window.innerWidth <= 768
   
-  const getMealImage = (name) => {
-    if (!name) return 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=150&h=150&fit=crop'
-    
-    const images = {
-      'smoothie': 'https://images.unsplash.com/photo-1502767089025-6572583495f9?w=150&h=150&fit=crop',
-      'bowl': 'https://images.unsplash.com/photo-1590301157890-4810ed352733?w=150&h=150&fit=crop',
-      'chicken': 'https://images.unsplash.com/photo-1532550907401-a500c9a57435?w=150&h=150&fit=crop',
-      'kip': 'https://images.unsplash.com/photo-1532550907401-a500c9a57435?w=150&h=150&fit=crop',
-      'zalm': 'https://images.unsplash.com/photo-1467003909585-2f8a72700288?w=150&h=150&fit=crop',
-      'salmon': 'https://images.unsplash.com/photo-1467003909585-2f8a72700288?w=150&h=150&fit=crop',
-      'yoghurt': 'https://images.unsplash.com/photo-1488477304112-4944851de03d?w=150&h=150&fit=crop',
-      'oats': 'https://images.unsplash.com/photo-1517673400267-0251440c45dc?w=150&h=150&fit=crop',
-      'pasta': 'https://images.unsplash.com/photo-1621996346565-e3dbc646d9a9?w=150&h=150&fit=crop',
-      'salade': 'https://images.unsplash.com/photo-1512621776951-a57141f2eefd?w=150&h=150&fit=crop'
-    }
-    
-    const key = Object.keys(images).find(k => name.toLowerCase().includes(k))
-    return images[key] || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=150&h=150&fit=crop'
-  }
+  const getMealImage = (name) => foodImageFallback(name, null, 150)
   
   // Time status
   const getTimeStatus = () => {

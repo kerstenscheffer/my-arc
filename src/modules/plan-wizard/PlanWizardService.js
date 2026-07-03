@@ -32,7 +32,7 @@ class PlanWizardService {
     extremely_active: 1.9
   }
 
-  FAT_PER_KG = 1.1  // 1.1g vet per kg lichaamsgewicht
+  FAT_PER_KG = 1.0  // 1.0g vet per kg lichaamsgewicht (consistent met macroRules.js)
 
   // ============================================
   // DATA VALIDATION

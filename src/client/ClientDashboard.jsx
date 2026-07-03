@@ -15,11 +15,14 @@ import ShoppingHub from '../modules/shopping/ShoppingHub'
 import NotificationWidget from '../modules/notifications/NotificationWidget'
 import PWAUpdateBanner from '../components/PWAUpdateBanner'
 import ClientFAQModal from '../modules/faq/ClientFAQModal'
+import PageVideoWidget from '../modules/videos/PageVideoWidget'
+import WidgetSidebar from '../components/WidgetSidebar'
 import CheckinReminderPopup from './components/CheckinReminderPopup'
 import CheckinModal from './components/CheckinModal'
+import ClientAgendaView from '../modules/client-agenda/ClientAgendaView'
 
 // Lucide Icons
-import { 
+import {
   Home,
   Dumbbell,
   Utensils,
@@ -27,9 +30,10 @@ import {
   Phone,
   User,
   ShoppingCart,
-  Menu,
-  X,
-  LogOut
+  LogOut,
+  Bell,
+  HelpCircle,
+  PlayCircle
 } from 'lucide-react'
 
 // Initialize database
@@ -40,6 +44,7 @@ const pageThemes = {
   home:         { primary: '#FFD700' },
   workout:      { primary: '#FFD700' },
   meal:         { primary: '#FFD700' },
+  agenda:       { primary: '#FFD700' },
   boodschappen: { primary: '#FFD700' },
   tracking:     { primary: '#FFD700' },
   calls:        { primary: '#FFD700' },
@@ -52,31 +57,37 @@ export default function ClientDashboard() {
   const [client, setClient] = useState(null)
   const [schema, setSchema] = useState(null)
   const [loading, setLoading] = useState(true)
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [showCheckinModal, setShowCheckinModal] = useState(false)
+  // Versie-counter die we bumpen zodra een check-in binnenkomt. De
+  // CheckinReminderPopup luistert hierop om direct te re-evalueren en
+  // de pill weg te halen — geen pageload meer nodig.
+  const [checkinVersion, setCheckinVersion] = useState(0)
   const [error, setError] = useState(null)
   const [isMobile, setIsMobile] = useState(window.innerWidth <= 768)
+
+  // WidgetSidebar — één widget tegelijk geopend, plus live badge-counts.
+  const [widgetOpen, setWidgetOpen] = useState(null)
+  const [widgetCounts, setWidgetCounts] = useState({ notifications: 0, vragen: 0, video: 0 })
+  const setCount = (key) => (n) => setWidgetCounts(prev => prev[key] === n ? prev : { ...prev, [key]: n })
+
+  // Focus-mode: actieve pagina (zoals workout) kan via callback signalen
+  // dat de bottom-nav en widgetbar verborgen moet worden voor maximale focus.
+  const [focusMode, setFocusMode] = useState(false)
   
   const { t, language, toggleLanguage } = useLanguage()
   const currentTheme = pageThemes[currentView] || pageThemes.home
   
-  const bottomNavItems = [
-    { id: 'home', label: 'Home', Icon: Home },
-    { id: 'workout', label: 'Workout', Icon: Dumbbell },
-    { id: 'meal', label: 'Meal', Icon: Utensils },
-    { id: 'tracking', label: 'Tracking', Icon: Camera },
-    { id: 'calls', label: 'Calls', Icon: Phone },
-    { id: 'profile', label: 'Profile', Icon: User }
-  ]
-
-  const sideMenuItems = [
-    { id: 'home', label: 'Home', Icon: Home },
-    { id: 'workout', label: 'Workout', Icon: Dumbbell },
-    { id: 'meal', label: 'Meal', Icon: Utensils },
-    { id: 'boodschappen', label: 'Boodschappen', Icon: ShoppingCart },
-    { id: 'tracking', label: 'Tracking', Icon: Camera },
-    { id: 'calls', label: 'Calls', Icon: Phone },
-    { id: 'profile', label: 'Profile', Icon: User }
+  // Eén navigatie nu — header en side-nav zijn weggehaald, dus de
+  // floating bottom-bar is de enige route tussen views. Alle 7 views
+  // zitten erin.
+  const navItems = [
+    { id: 'home',         label: 'Home',     Icon: Home },
+    { id: 'workout',      label: 'Workout',  Icon: Dumbbell },
+    { id: 'meal',         label: 'Meal',     Icon: Utensils },
+    { id: 'boodschappen', label: 'Shop',     Icon: ShoppingCart },
+    { id: 'tracking',     label: 'Tracking', Icon: Camera },
+    { id: 'calls',        label: 'Calls',    Icon: Phone },
+    { id: 'profile',      label: 'Profile',  Icon: User }
   ]
   
   useEffect(() => {
@@ -233,215 +244,32 @@ export default function ClientDashboard() {
         db={db}
         isMobile={isMobile}
         onOpen={() => setShowCheckinModal(true)}
+        version={checkinVersion}
       />
 
-      {/* ── Header ── */}
-      <header style={{
-        background: 'rgba(10, 10, 10, 0.95)',
-        backdropFilter: 'blur(12px)',
-        borderBottom: '1px solid rgba(255, 255, 255, 0.06)',
-        position: 'sticky',
-        top: 0,
-        zIndex: 100
-      }}>
-        <div style={{
-          maxWidth: '1400px',
-          margin: '0 auto',
-          padding: isMobile ? '0.75rem 1rem' : '0.875rem 2rem',
-          display: 'flex',
-          justifyContent: isMobile ? 'center' : 'space-between',
-          alignItems: 'center',
-          position: 'relative'
-        }}>
-          {isMobile && (
-            <button
-              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              style={{
-                position: 'absolute',
-                left: '1rem',
-                width: '36px', height: '36px',
-                borderRadius: '8px',
-                background: 'rgba(255, 255, 255, 0.04)',
-                border: '1px solid rgba(255, 255, 255, 0.06)',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                cursor: 'pointer', color: 'rgba(255, 255, 255, 0.5)',
-                touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent'
-              }}
-            >
-              {mobileMenuOpen ? <X size={18} /> : <Menu size={18} />}
-            </button>
-          )}
-          
-          <div>
-            <h1 style={{
-              fontSize: isMobile ? '1.15rem' : '1.5rem',
-              fontWeight: '900',
-              color: currentTheme.primary,
-              margin: 0,
-              letterSpacing: '-0.03em',
-              textAlign: isMobile ? 'center' : 'left'
-            }}>
-              MY ARC
-            </h1>
-            <p style={{
-              fontSize: isMobile ? '0.65rem' : '0.75rem',
-              color: 'rgba(255, 255, 255, 0.3)',
-              margin: 0,
-              fontWeight: '500',
-              textAlign: isMobile ? 'center' : 'left'
-            }}>
-              Welkom, {client?.first_name}
-            </p>
-          </div>
-          
-          {!isMobile && (
-            <button
-              onClick={handleLogout}
-              style={{
-                padding: '0.5rem 1rem',
-                borderRadius: '8px',
-                background: 'transparent',
-                border: '1px solid rgba(255, 255, 255, 0.06)',
-                color: 'rgba(255, 255, 255, 0.4)',
-                fontWeight: '600',
-                fontSize: '0.8rem',
-                cursor: 'pointer',
-                display: 'flex', alignItems: 'center', gap: '0.4rem',
-                transition: 'all 0.2s ease'
-              }}
-            >
-              <LogOut size={15} />
-              Logout
-            </button>
-          )}
-        </div>
-      </header>
-
-      {/* ── Mobile Sliding Menu ── */}
-      {isMobile && (
-        <div style={{
-          position: 'fixed',
-          top: 0,
-          left: mobileMenuOpen ? 0 : '-100%',
-          width: '260px',
-          height: '100vh',
-          background: '#0a0a0a',
-          borderRight: '1px solid rgba(255, 255, 255, 0.06)',
-          transition: 'left 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-          zIndex: 99,
-          padding: '1.25rem',
-          paddingTop: '4.5rem'
-        }}>
-          <nav style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-            {sideMenuItems.map(item => {
-              const isActive = currentView === item.id
-              const theme = pageThemes[item.id]
-              return (
-                <button
-                  key={item.id}
-                  onClick={() => { setCurrentView(item.id); setMobileMenuOpen(false) }}
-                  style={{
-                    display: 'flex', alignItems: 'center', gap: '0.75rem',
-                    width: '100%', padding: '0.7rem 0.75rem',
-                    background: isActive ? `${theme.primary}10` : 'transparent',
-                    border: 'none',
-                    borderLeft: isActive ? `2px solid ${theme.primary}` : '2px solid transparent',
-                    color: isActive ? theme.primary : 'rgba(255, 255, 255, 0.5)',
-                    fontSize: '0.85rem',
-                    fontWeight: isActive ? '700' : '500',
-                    cursor: 'pointer',
-                    borderRadius: '0 8px 8px 0',
-                    transition: 'all 0.15s ease',
-                    textAlign: 'left'
-                  }}
-                >
-                  <item.Icon size={18} />
-                  {item.label}
-                </button>
-              )
-            })}
-            
-            <button onClick={handleLogout} style={{
-              width: '100%', padding: '0.7rem 0.75rem',
-              marginTop: '1.5rem',
-              background: 'rgba(239, 68, 68, 0.06)',
-              border: '1px solid rgba(239, 68, 68, 0.12)',
-              borderRadius: '8px',
-              color: '#ef4444', fontSize: '0.85rem', fontWeight: '600',
-              cursor: 'pointer',
-              display: 'flex', alignItems: 'center', gap: '0.5rem'
-            }}>
-              <LogOut size={16} />
-              Logout
-            </button>
-          </nav>
-        </div>
-      )}
-
-      {/* Overlay */}
-      {isMobile && mobileMenuOpen && (
-        <div
-          onClick={() => setMobileMenuOpen(false)}
-          style={{
-            position: 'fixed', inset: 0,
-            background: 'rgba(0, 0, 0, 0.7)',
-            zIndex: 98
-          }}
-        />
-      )}
-
       {/* ── Main Content ── */}
+      {/* Geen header en geen side-nav meer: enige navigatie is de floating
+          bottom-bar verderop. paddingBottom is groot genoeg om content
+          niet te verstoppen onder de zwevende balk (ca. 100-120px). */}
       <main style={{
         maxWidth: '1400px',
         margin: '0 auto',
-        marginTop: 0,
-        padding: isMobile ? '0' : '2rem',
-        paddingBottom: isMobile ? '80px' : '2rem'
+        padding: isMobile ? '0' : '1.25rem 1.5rem 0',
+        paddingBottom: '120px',
       }}>
-        <div style={{ display: 'flex', gap: '2rem' }}>
-          {!isMobile && (
-            <nav style={{ position: 'sticky', top: '80px', width: '200px', height: 'fit-content' }}>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.125rem' }}>
-                {sideMenuItems.map(item => {
-                  const isActive = currentView === item.id
-                  const theme = pageThemes[item.id]
-                  return (
-                    <button
-                      key={item.id}
-                      onClick={() => setCurrentView(item.id)}
-                      style={{
-                        display: 'flex', alignItems: 'center', gap: '0.625rem',
-                        width: '100%', padding: '0.625rem 0.75rem',
-                        background: isActive ? `${theme.primary}10` : 'transparent',
-                        border: 'none',
-                        borderLeft: isActive ? `2px solid ${theme.primary}` : '2px solid transparent',
-                        borderRadius: '0 8px 8px 0',
-                        cursor: 'pointer',
-                        transition: 'all 0.15s ease',
-                        color: isActive ? theme.primary : 'rgba(255, 255, 255, 0.5)',
-                        fontSize: '0.85rem',
-                        fontWeight: isActive ? '700' : '500',
-                        textAlign: 'left'
-                      }}
-                    >
-                      <item.Icon size={18} />
-                      <span>{item.label}</span>
-                    </button>
-                  )
-                })}
-              </div>
-            </nav>
-          )}
-
+        <div>
           <div style={{ flex: 1 }}>
             {currentView === 'home' && (
               <ClientHome client={client} db={db} setCurrentView={setCurrentView} />
             )}
             {currentView === 'workout' && (
-              <ClientWorkoutPlan client={client} schema={schema} db={db} />
+              <ClientWorkoutPlan client={client} schema={schema} db={db} onFocusChange={setFocusMode} />
             )}
             {currentView === 'meal' && (
               <MealPlanMain client={client} db={db} onNavigate={setCurrentView} />
+            )}
+            {currentView === 'agenda' && (
+              <ClientAgendaView client={client} db={db} viewerRole="client" />
             )}
             {currentView === 'boodschappen' && (
               <ShoppingHub client={client} db={db} onNavigate={setCurrentView} />
@@ -459,77 +287,126 @@ export default function ClientDashboard() {
         </div>
       </main>
 
-      {/* ── Bottom Nav ── */}
-      {isMobile && (
-        <nav style={{
-          position: 'fixed',
-          bottom: 0, left: 0, right: 0,
-          background: 'rgba(10, 10, 10, 0.95)',
-          backdropFilter: 'blur(12px)',
-          borderTop: '1px solid rgba(255, 255, 255, 0.06)',
-          padding: '0.5rem 0 0.625rem',
-          paddingBottom: 'calc(0.625rem + env(safe-area-inset-bottom))',
-          zIndex: 100
+      {/* ── Floating Bottom Nav — verbergen in focus-mode (bv. workout-dropdown open) ── */}
+      {!focusMode && <nav style={{
+        position: 'fixed',
+        bottom: 30,
+        left: isMobile ? 10 : '50%',
+        right: isMobile ? 10 : 'auto',
+        transform: isMobile ? 'none' : 'translateX(-50%)',
+        width: isMobile ? 'auto' : 'min(680px, calc(100vw - 32px))',
+        background: 'rgba(10, 10, 10, 0.88)',
+        backdropFilter: 'blur(20px)',
+        WebkitBackdropFilter: 'blur(20px)',
+        border: '1px solid rgba(255,255,255,0.08)',
+        borderRadius: 22,
+        boxShadow: '0 18px 48px rgba(0,0,0,0.55), 0 0 0 1px rgba(255,215,0,0.04)',
+        padding: isMobile ? '0.5rem 0.3rem' : '0.6rem 0.5rem',
+        zIndex: 100,
+      }}>
+        <div style={{
+          display: 'flex',
+          justifyContent: 'space-around',
+          alignItems: 'center',
+          gap: 2,
         }}>
-          <div style={{
-            display: 'flex',
-            justifyContent: 'space-around',
-            alignItems: 'center'
-          }}>
-            {bottomNavItems.map(item => {
-              const isActive = currentView === item.id
-              const theme = pageThemes[item.id]
-              return (
-                <button
-                  key={item.id}
-                  onClick={() => setCurrentView(item.id)}
-                  style={{
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'center',
-                    gap: '0.2rem',
-                    padding: '0.35rem 0.5rem',
-                    background: 'transparent',
-                    border: 'none',
-                    cursor: 'pointer',
-                    touchAction: 'manipulation',
-                    WebkitTapHighlightColor: 'transparent',
-                    minHeight: '44px',
-                    minWidth: '44px',
-                    transition: 'all 0.15s ease'
-                  }}
-                >
-                  <item.Icon
-                    size={22}
-                    color={isActive ? theme.primary : 'rgba(255, 255, 255, 0.35)'}
-                    strokeWidth={isActive ? 2.5 : 1.8}
-                  />
-                  <span style={{
-                    fontSize: '0.55rem',
-                    fontWeight: isActive ? '700' : '500',
-                    color: isActive ? theme.primary : 'rgba(255, 255, 255, 0.25)',
-                    letterSpacing: '-0.01em'
-                  }}>
-                    {item.label}
-                  </span>
-                </button>
-              )
-            })}
-          </div>
-        </nav>
-      )}
+          {navItems.map(item => {
+            const isActive = currentView === item.id
+            const theme = pageThemes[item.id]
+            return (
+              <button
+                key={item.id}
+                onClick={() => setCurrentView(item.id)}
+                style={{
+                  flex: 1,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  gap: 3,
+                  padding: isMobile ? '0.35rem 0.2rem' : '0.45rem 0.3rem',
+                  background: isActive ? `${theme.primary}14` : 'transparent',
+                  border: 'none',
+                  borderRadius: 14,
+                  cursor: 'pointer',
+                  touchAction: 'manipulation',
+                  WebkitTapHighlightColor: 'transparent',
+                  minHeight: 44,
+                  minWidth: 44,
+                  transition: 'background 0.15s ease',
+                }}
+              >
+                <item.Icon
+                  size={isMobile ? 20 : 22}
+                  color={isActive ? theme.primary : 'rgba(255, 255, 255, 0.42)'}
+                  strokeWidth={isActive ? 2.5 : 1.9}
+                />
+                <span style={{
+                  fontSize: isMobile ? '0.52rem' : '0.58rem',
+                  fontWeight: isActive ? 800 : 600,
+                  color: isActive ? theme.primary : 'rgba(255, 255, 255, 0.35)',
+                  letterSpacing: '-0.01em',
+                  lineHeight: 1,
+                }}>
+                  {item.label}
+                </span>
+              </button>
+            )
+          })}
+        </div>
+      </nav>}
 
-      <NotificationWidget db={db} clientId={user?.id} currentPage={currentView} />
+      <NotificationWidget
+        db={db} clientId={client?.id} currentPage={currentView}
+        open={widgetOpen === 'notifications'}
+        onOpenChange={(o) => setWidgetOpen(o ? 'notifications' : null)}
+        onCountChange={setCount('notifications')}
+      />
 
       <ClientFAQModal
         db={db}
         onNavigate={(view) => setCurrentView(view)}
         coachWhatsApp="31631388756"
+        open={widgetOpen === 'vragen'}
+        onOpenChange={(o) => setWidgetOpen(o ? 'vragen' : null)}
+      />
+
+      {/* Centrale video-widget — pageContext volgt huidige view, vervangt
+          de per-pagina varianten (die wel blijven bestaan voor backward
+          compat, maar in deze controlled mode tonen ze geen floating tab). */}
+      {client && (
+        <PageVideoWidget
+          client={client} db={db} pageContext={currentView}
+          open={widgetOpen === 'video'}
+          onOpenChange={(o) => setWidgetOpen(o ? 'video' : null)}
+          onCountChange={setCount('video')}
+        />
+      )}
+
+      <WidgetSidebar
+        isMobile={isMobile}
+        buttons={[
+          {
+            id: 'notifications', label: 'Meldingen', Icon: Bell, color: '#FFD700',
+            active: widgetOpen === 'notifications', badge: widgetCounts.notifications,
+            onClick: () => setWidgetOpen(o => o === 'notifications' ? null : 'notifications'),
+          },
+          {
+            id: 'vragen', label: 'Vragen', Icon: HelpCircle, color: '#FFD700',
+            active: widgetOpen === 'vragen',
+            onClick: () => setWidgetOpen(o => o === 'vragen' ? null : 'vragen'),
+          },
+          {
+            id: 'video', label: 'Video', Icon: PlayCircle, color: '#FFD700',
+            active: widgetOpen === 'video', badge: widgetCounts.video,
+            onClick: () => setWidgetOpen(o => o === 'video' ? null : 'video'),
+          },
+        ]}
       />
 
       <CheckinModal
         isOpen={showCheckinModal}
         onClose={() => setShowCheckinModal(false)}
+        onSubmitted={() => setCheckinVersion(v => v + 1)}
         client={client}
         db={db}
         isMobile={isMobile}

@@ -83,10 +83,10 @@ export default function TodayWorkout({ workout, onStart, client, db }) {
         marginBottom: isMobile ? '1rem' : '1.5rem'
       }}>
         <div style={{
-          background: 'rgba(23, 23, 23, 0.6)',
+          background: 'rgba(20, 20, 20, 0.6)',
           borderRadius: isMobile ? '14px' : '16px',
           padding: isMobile ? '1rem' : '1.25rem',
-          border: '1px solid rgba(249, 115, 22, 0.1)',
+          border: '1px solid rgba(255, 215, 0, 0.12)',
           textAlign: 'center',
           backdropFilter: 'blur(10px)'
         }}>

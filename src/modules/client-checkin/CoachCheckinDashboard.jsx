@@ -78,11 +78,11 @@ export default function CoachCheckinDashboard({ db, clients }) {
   // Handle mark as reviewed
   const handleMarkReviewed = async () => {
     if (!selectedCheckin) return
-    
+
     setSaving(true)
     try {
       await service.markAsReviewed(selectedCheckin.id)
-      
+
       // Update local state
       setCheckins(prev => prev.map(c =>
         c.id === selectedCheckin.id
@@ -94,11 +94,54 @@ export default function CoachCheckinDashboard({ db, clients }) {
         status: 'reviewed',
         reviewed_at: new Date().toISOString()
       }))
-      
-      alert('✅ Check-in gemarkeerd als bekeken')
     } catch (error) {
       console.error('❌ Mark reviewed error:', error)
       alert('❌ Fout: ' + error.message)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  // Coach stuurt bericht naar client n.a.v. een check-in. Slaat het bericht
+  // op de check-in op (komt onderaan PDF) én pusht via notifications-tabel
+  // zodat client het in de NotificationWidget ziet. Optioneel markeert het
+  // de check-in tegelijk als 'reviewed' (vanuit "verstuur & markeer").
+  const handleSendFeedback = async ({ message, markAsReviewed: alsoReview }) => {
+    if (!selectedCheckin || !message?.trim()) return false
+    setSaving(true)
+    try {
+      const user = await db.getCurrentUser()
+      const coachId = user?.id || selectedCheckin.coach_id
+
+      // 1) Save coach_message op de check-in (zichtbaar in PDF + detail view)
+      const updates = { coach_message: message.trim() }
+      if (alsoReview) {
+        updates.status = 'reviewed'
+        updates.reviewed_at = new Date().toISOString()
+      }
+      await service.updateCheckin(selectedCheckin.id, updates)
+
+      // 2) Push naar client via notifications-tabel (NotificationWidget)
+      const clientName = `${selectedCheckin.clients?.first_name || ''} ${selectedCheckin.clients?.last_name || ''}`.trim()
+      await db.notifications.sendManualNotification({
+        clientId: selectedCheckin.client_id,
+        coachId,
+        title: 'Bericht van je coach',
+        message: message.trim(),
+        pageContext: 'all',
+        priority: 'high',
+      })
+
+      // 3) Lokale state updaten
+      setCheckins(prev => prev.map(c =>
+        c.id === selectedCheckin.id ? { ...c, ...updates } : c
+      ))
+      setSelectedCheckin(prev => ({ ...prev, ...updates }))
+      return true
+    } catch (error) {
+      console.error('❌ Send feedback error:', error)
+      alert('❌ Versturen mislukt: ' + error.message)
+      return false
     } finally {
       setSaving(false)
     }
@@ -165,6 +208,7 @@ export default function CoachCheckinDashboard({ db, clients }) {
           checkin={selectedCheckin}
           onBack={handleBack}
           onMarkReviewed={handleMarkReviewed}
+          onSendFeedback={handleSendFeedback}
           onExportPDF={handleExportPDF}
           saving={saving}
         />

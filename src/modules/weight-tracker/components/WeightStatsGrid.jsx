@@ -9,53 +9,147 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 export default function WeightStatsGrid({ stats = {}, client = {}, fridayData = {}, history = [], isMobile = false, coachingPlan = null }) {
   const [showWeekly, setShowWeekly] = useState(false)
   const sortedHistory = [...history].sort((a, b) => new Date(a.date) - new Date(b.date))
-  
-  const getRolling = (offset = 0) => {
-    if (sortedHistory.length === 0) return null
-    const today = new Date(); today.setHours(0,0,0,0)
-    const end = new Date(today); end.setDate(today.getDate() - offset)
-    const start = new Date(end); start.setDate(end.getDate() - 7)
-    const entries = sortedHistory.filter(e => {
-      const d = new Date(e.date); d.setHours(0,0,0,0)
-      return d >= start && d <= end
-    })
-    if (entries.length === 0) return null
-    const sum = entries.reduce((t, e) => t + parseFloat(e.weight), 0)
-    return { avg: parseFloat((sum / entries.length).toFixed(1)), count: entries.length,
-      startDate: start.toISOString().split('T')[0], endDate: end.toISOString().split('T')[0] }
+
+  // Calendar-week averages (Ma-Zo) — apples-to-apples comparison between
+  // weeks. weekOffset 0 = current calendar week, -1 = last week. Returns
+  // { avg, count, monday, sunday } so the UI can show entry counts +
+  // date ranges as context.
+  const mondayOf = (date) => {
+    const d = new Date(date)
+    const day = d.getDay()
+    const diff = day === 0 ? -6 : 1 - day
+    d.setDate(d.getDate() + diff)
+    d.setHours(0, 0, 0, 0)
+    return d
   }
-  
+  const getCalendarWeekAvg = (weekOffset = 0) => {
+    const monday = mondayOf(new Date())
+    monday.setDate(monday.getDate() + weekOffset * 7)
+    const sunday = new Date(monday)
+    sunday.setDate(monday.getDate() + 6)
+    sunday.setHours(23, 59, 59, 999)
+    const entries = sortedHistory.filter(e => {
+      const d = new Date(e.date)
+      return d >= monday && d <= sunday
+    })
+    if (entries.length === 0) return { avg: null, count: 0, monday, sunday }
+    const avg = parseFloat(
+      (entries.reduce((t, e) => t + parseFloat(e.weight), 0) / entries.length).toFixed(1)
+    )
+    return { avg, count: entries.length, monday, sunday }
+  }
+  const fmtWeekRange = (mon, sun) => {
+    const fmt = d => d.toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })
+    return `${fmt(mon)} – ${fmt(sun)}`
+  }
+
+  // Build a list of up to 12 calendar weeks going back from this week,
+  // skipping weeks with zero measurements. Used for the expandable
+  // "Wekelijkse historie" list further down.
   const getAllWeeks = () => {
     const weeks = []
     for (let i = 0; i < 12; i++) {
-      const d = getRolling(i * 7)
-      if (d) weeks.push({
-        ...d,
-        weekStart: new Date(d.startDate).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' }),
-        weekEnd: new Date(d.endDate).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' }),
-        isCurrent: i === 0
-      })
+      const w = getCalendarWeekAvg(-i)
+      if (w.avg !== null) {
+        weeks.push({
+          ...w,
+          weekStart: w.monday.toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' }),
+          weekEnd: w.sunday.toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' }),
+          isCurrent: i === 0,
+          startDate: w.monday.toISOString().split('T')[0],
+          endDate: w.sunday.toISOString().split('T')[0],
+        })
+      }
     }
     return weeks.reverse()
   }
-  
+
   const allWeeks = getAllWeeks()
-  const cur = allWeeks[allWeeks.length - 1] || null
-  const prev = allWeeks.length > 1 ? allWeeks[allWeeks.length - 2] : null
-  const first = allWeeks[0] || null
+  const thisWeekData = getCalendarWeekAvg(0)
+  const lastWeekData = getCalendarWeekAvg(-1)
+  const cur  = thisWeekData.avg !== null ? thisWeekData : null
+  const prev = lastWeekData.avg !== null ? lastWeekData : null
+
+  // Real first-vs-latest entry change for "Sinds start" — no sampling.
+  const firstEntry  = sortedHistory[0]
+  const latestEntry = sortedHistory[sortedHistory.length - 1]
+  const totalChange = (firstEntry && latestEntry && sortedHistory.length >= 2)
+    ? parseFloat((parseFloat(latestEntry.weight) - parseFloat(firstEntry.weight)).toFixed(1))
+    : null
+  const startDateLabel = firstEntry
+    ? new Date(firstEntry.date).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })
+    : null
+
   const weekChange = (cur && prev) ? parseFloat((cur.avg - prev.avg).toFixed(1)) : null
-  const totalChange = (cur && first) ? parseFloat((cur.avg - first.avg).toFixed(1)) : null
   
   // ═══ Chart data with optional plan line ═══
+  // Twee modi voor de plan-lijn (rode lijn):
+  //   1. Coaching plan beschikbaar  → deficit-based: gebruikt tdee, target_cal
+  //      en adjustments over de tijd. Reageert dus op aanpassingen die de
+  //      coach mid-traject doet.
+  //   2. Geen plan maar wél start_weight + target_weight op de client     → lineaire fallback over een duur (goal_deadline als die er is,
+  //      anders 12 weken vanaf de eerste gemeten datum).
+  //
+  // De lijn loopt door naar de toekomst tot aan client.goal_deadline:
+  // we voegen lege chart-punten toe (weight=null) zodat alleen "expected"
+  // wordt getekend tot de einddatum.
   const chartData = useMemo(() => {
     const data = sortedHistory.slice(-30).map(e => ({
       date: new Date(e.date).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' }),
       rawDate: e.date,
       weight: parseFloat(e.weight),
-      isFriday: e.is_friday_weighin
+      isFriday: e.is_friday_weighin,
     }))
 
-    // Add expected weight from coaching plan if available
+    // Bron-prioriteit voor de einddatum waar de rode plan-lijn op uitkomt:
+    //   1. client.goal_deadline (Doelen-tab veld)
+    //   2. client.target_date (oudere data)
+    //   3. coaching_start_date + coaching_total_weeks (CoachingPeriodPanel)
+    // Stap 3 zorgt dat de lijn ook netjes loopt voor klanten waar de
+    // deadline nog niet expliciet is gezet, zolang het traject wel is
+    // ingesteld bovenin coach insight.
+    let goalDeadlineStr = client?.goal_deadline || client?.target_date
+    if (!goalDeadlineStr && client?.coaching_start_date && client?.coaching_total_weeks) {
+      const startMs = new Date(client.coaching_start_date + 'T00:00:00').getTime()
+      const weeks = parseInt(client.coaching_total_weeks, 10) || 0
+      const pausedDays = parseInt(client.coaching_paused_days_total, 10) || 0
+      const endMs = startMs + (weeks * 7 + pausedDays) * 86400000
+      goalDeadlineStr = new Date(endMs).toISOString().split('T')[0]
+    }
+    const goalDeadline = goalDeadlineStr ? new Date(goalDeadlineStr) : null
+
+    // Genereer lege toekomst-punten (weekly cadence) tot goal_deadline,
+    // zodat de plan-lijn doorloopt voorbij de laatste meting.
+    const today = new Date(); today.setHours(0, 0, 0, 0)
+    const futureBoundary = goalDeadline && goalDeadline > today ? goalDeadline : null
+    if (futureBoundary) {
+      const lastDate = data.length ? new Date(data[data.length - 1].rawDate) : today
+      const cursor = new Date(Math.max(lastDate.getTime(), today.getTime()))
+      cursor.setDate(cursor.getDate() + 7)
+      while (cursor <= futureBoundary) {
+        const iso = cursor.toISOString().split('T')[0]
+        data.push({
+          date: cursor.toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' }),
+          rawDate: iso,
+          weight: null,
+          isFriday: cursor.getDay() === 5,
+          isFuture: true,
+        })
+        cursor.setDate(cursor.getDate() + 7)
+      }
+      // Forceer een laatste punt exact op de deadline.
+      const lastIso = futureBoundary.toISOString().split('T')[0]
+      if (data.length === 0 || data[data.length - 1].rawDate !== lastIso) {
+        data.push({
+          date: futureBoundary.toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' }),
+          rawDate: lastIso,
+          weight: null,
+          isFuture: true,
+        })
+      }
+    }
+
+    // ── Modus 1: deficit-based via coaching plan ──
     if (coachingPlan?.plan && coachingPlan.startDate) {
       const plan = coachingPlan.plan
       const startWeight = parseFloat(plan.start_weight)
@@ -85,8 +179,6 @@ export default function WeightStatsGrid({ stats = {}, client = {}, fridayData = 
           const daysSince = Math.floor((d - planStart) / 86400000)
           if (daysSince < 0) return null
           const weekNum = daysSince / 7
-
-          // Calculate cumulative weight loss up to this fractional week
           let weight = startWeight
           const fullWeeks = Math.floor(weekNum)
           for (let i = 1; i <= fullWeeks; i++) {
@@ -94,7 +186,6 @@ export default function WeightStatsGrid({ stats = {}, client = {}, fridayData = 
             const weeklyLoss = ((tdee - targetCal) * 7) / 7700
             weight -= weeklyLoss
           }
-          // Fractional week
           const frac = weekNum - fullWeeks
           if (frac > 0) {
             const targetCal = getTargetCalAtWeek(fullWeeks + 1)
@@ -107,134 +198,170 @@ export default function WeightStatsGrid({ stats = {}, client = {}, fridayData = 
         data.forEach(point => {
           point.expected = getExpectedAtDate(point.rawDate)
         })
+        return data
       }
     }
 
+    // ── Modus 2: lineaire fallback ──
+    const startW  = parseFloat(client?.start_weight)
+    const targetW = parseFloat(client?.target_weight)
+    if (Number.isFinite(startW) && Number.isFinite(targetW) && startW !== targetW && data.length > 0) {
+      const planStart = new Date(data[0].rawDate)
+      const planEnd = futureBoundary || (() => {
+        const d = new Date(planStart); d.setDate(d.getDate() + 7 * 12); return d
+      })()
+      const totalDays = Math.max(1, Math.floor((planEnd - planStart) / 86400000))
+      data.forEach(point => {
+        const d = new Date(point.rawDate)
+        const daysSince = Math.floor((d - planStart) / 86400000)
+        const t = Math.max(0, Math.min(1, daysSince / totalDays))
+        const w = startW + (targetW - startW) * t
+        point.expected = Math.round(w * 10) / 10
+      })
+    }
+
     return data
-  }, [sortedHistory, coachingPlan])
+  }, [
+    sortedHistory, coachingPlan,
+    client?.start_weight, client?.target_weight,
+    client?.goal_deadline, client?.target_date,
+    client?.coaching_start_date, client?.coaching_total_weeks, client?.coaching_paused_days_total,
+  ])
 
   const hasPlanLine = chartData.some(d => d.expected != null)
+  const targetWeightNum = Number.isFinite(parseFloat(client?.target_weight))
+    ? parseFloat(client.target_weight) : null
   
   const CustomDot = (p) => p.payload.isFriday
     ? <circle cx={p.cx} cy={p.cy} r={3} fill="#8b5cf6" stroke="#000" strokeWidth={1} />
     : <circle cx={p.cx} cy={p.cy} r={1.5} fill="#FFD700" />
   
   const CustomTooltip = ({ active, payload }) => {
-    if (!active || !payload?.[0]) return null
-    const data = payload[0].payload
+    if (!active || !payload?.length) return null
+    // Pak EXPLICIET het werkelijke-gewicht-punt — recharts geeft payload[0]
+    // op basis van Line-volgorde, en dat was de plan-lijn (expected) waardoor
+    // de hover-waarde "het plan-gewicht" liet zien i.p.v. wat de klant
+    // gewogen heeft op die dag.
+    const weightEntry = payload.find(p => p.dataKey === 'weight') || payload[0]
+    const data = weightEntry.payload
+    const actualKg = typeof weightEntry.value === 'number' ? weightEntry.value : data.weight
     return (
       <div style={{
         background: 'rgba(0,0,0,0.9)', border: '1px solid rgba(255,255,255,0.08)',
         borderRadius: '4px', padding: '0.3rem 0.4rem'
       }}>
-        <div style={{ color: '#fff', fontWeight: '700', fontSize: '0.65rem' }}>{payload[0].value.toFixed(1)} kg</div>
+        <div style={{ color: '#FFD700', fontWeight: '700', fontSize: '0.65rem' }}>
+          {actualKg != null ? `${actualKg.toFixed(1)} kg` : '— geen meting'}
+        </div>
         {data.expected != null && (
-          <div style={{ color: 'rgba(255,255,255,0.35)', fontSize: '0.55rem' }}>Plan: {data.expected} kg</div>
+          <div style={{ color: '#fca5a5', fontSize: '0.55rem' }}>Plan: {data.expected} kg</div>
         )}
-        <div style={{ color: '#FFD700', fontSize: '0.55rem' }}>{data.date}</div>
+        <div style={{ color: 'rgba(255,255,255,0.5)', fontSize: '0.55rem' }}>{data.date}</div>
       </div>
     )
   }
   
   return (
     <div>
-      {/* ═══ 4-COLUMN STAT BAR ═══ */}
+      {/* ═══ 4-COLUMN STAT BAR — Deze week | Vorige week | Verschil | Sinds start
+            Zwevende card: los van de zijkanten, rounded, met margin. Tekst
+            bold wit en groter. ═══ */}
       <div style={{
-        display: 'flex',
-        borderTop: '1px solid rgba(255, 255, 255, 0.06)',
-        borderBottom: '1px solid rgba(255, 255, 255, 0.06)',
-        background: 'rgba(10, 10, 10, 0.5)'
+        margin: isMobile ? '0 1rem' : '0 1.5rem',
+        background: 'rgba(255,255,255,0.03)',
+        border: '1px solid rgba(255,255,255,0.08)',
+        borderRadius: 14,
+        boxShadow: '0 8px 24px rgba(0,0,0,0.35)',
+        display: 'grid',
+        gridTemplateColumns: 'repeat(4, 1fr)',
+        overflow: 'hidden',
       }}>
         {[
-          { label: 'DEZE WEEK', val: cur ? `${cur.avg}` : '--', sub: cur ? `${cur.count}x` : '-', gold: true },
-          { label: 'VORIGE', val: prev ? `${prev.avg}` : '--', sub: prev ? `${prev.count}x` : '-', gold: false },
-          { label: 'VERSCHIL', val: weekChange !== null ? `${weekChange > 0?'+':''}${weekChange}` : '--', sub: 'w/w', gold: false, icon: weekChange ? (weekChange < 0 ? TrendingDown : TrendingUp) : null },
-          { label: 'TOTAAL', val: totalChange !== null ? `${totalChange > 0?'+':''}${totalChange}` : '--', sub: 'start', gold: false, icon: totalChange ? (totalChange < 0 ? TrendingDown : TrendingUp) : null }
+          {
+            label: 'Deze week',
+            sub: cur
+              ? `${cur.count} meting${cur.count === 1 ? '' : 'en'}`
+              : 'geen meting',
+            val: cur ? `${cur.avg}` : '—',
+            color: '#FFD700',
+            isPrimary: true,
+          },
+          {
+            label: 'Vorige week',
+            sub: prev
+              ? `${prev.count} meting${prev.count === 1 ? '' : 'en'}`
+              : 'geen meting',
+            val: prev ? `${prev.avg}` : '—',
+            color: '#fff',
+          },
+          {
+            label: 'Verschil',
+            sub: weekChange !== null ? 'week tov week' : '—',
+            val: weekChange !== null ? `${weekChange > 0 ? '+' : ''}${weekChange}` : '—',
+            color: weekChange !== null
+              ? (weekChange < 0 ? '#10b981' : weekChange > 0 ? '#ef4444' : '#fff')
+              : 'rgba(255,255,255,0.4)',
+            icon: weekChange !== null && weekChange !== 0
+              ? (weekChange < 0 ? TrendingDown : TrendingUp) : null,
+          },
+          {
+            label: 'Sinds start',
+            sub: startDateLabel ? `vanaf ${startDateLabel}` : 'geen startmeting',
+            val: totalChange !== null ? `${totalChange > 0 ? '+' : ''}${totalChange}` : '—',
+            color: totalChange !== null
+              ? (totalChange < 0 ? '#10b981' : totalChange > 0 ? '#ef4444' : '#fff')
+              : 'rgba(255,255,255,0.4)',
+            icon: totalChange !== null && totalChange !== 0
+              ? (totalChange < 0 ? TrendingDown : TrendingUp) : null,
+          },
         ].map((s, i) => (
           <div key={i} style={{
-            flex: 1,
-            padding: isMobile ? '0.5rem 0.25rem' : '0.625rem 0.5rem',
-            borderRight: i < 3 ? '1px solid rgba(255, 255, 255, 0.04)' : 'none',
-            textAlign: 'center',
-            display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center'
+            padding: isMobile ? '0.8rem 0.55rem' : '1rem 0.85rem',
+            borderRight: i < 3 ? '1px solid rgba(255,255,255,0.06)' : 'none',
+            display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 4,
+            minWidth: 0,
           }}>
-            {s.icon && React.createElement(s.icon, { size: isMobile ? 10 : 12, color: s.gold ? '#FFD700' : 'rgba(255,255,255,0.3)', style: { marginBottom: '0.15rem' } })}
             <div style={{
-              fontSize: isMobile ? '0.45rem' : '0.5rem',
-              fontWeight: '700', color: s.gold ? 'rgba(255,215,0,0.5)' : 'rgba(255,255,255,0.25)',
-              textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.15rem'
-            }}>{s.label}</div>
-            <div style={{
-              fontSize: isMobile ? '0.9rem' : '1.05rem',
-              fontWeight: '800', color: s.gold ? '#FFD700' : '#fff', lineHeight: 1
+              display: 'flex', alignItems: 'center', gap: 4,
+              fontSize: isMobile ? '0.7rem' : '0.78rem',
+              fontWeight: 900,
+              color: s.isPrimary ? '#FFD700' : '#fff',
+              letterSpacing: '-0.01em',
+              whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+              maxWidth: '100%',
             }}>
-              {s.val}<span style={{ fontSize: isMobile ? '0.5rem' : '0.55rem', fontWeight: '500', opacity: 0.4, marginLeft: '0.1rem' }}>kg</span>
+              {s.icon && React.createElement(s.icon, { size: isMobile ? 12 : 13, strokeWidth: 2.6 })}
+              {s.label}
             </div>
             <div style={{
-              fontSize: isMobile ? '0.45rem' : '0.5rem',
-              color: 'rgba(255,255,255,0.2)', marginTop: '0.1rem'
-            }}>{s.sub}</div>
+              fontSize: isMobile ? '1.35rem' : '1.55rem',
+              fontWeight: 900, color: s.color, lineHeight: 1,
+              letterSpacing: '-0.025em',
+              fontVariantNumeric: 'tabular-nums',
+            }}>
+              {s.val}
+              <span style={{
+                fontSize: isMobile ? '0.62rem' : '0.68rem',
+                fontWeight: 700, opacity: 0.55, marginLeft: 4,
+              }}>
+                kg
+              </span>
+            </div>
+            <div style={{
+              fontSize: isMobile ? '0.66rem' : '0.72rem',
+              fontWeight: 700,
+              color: 'rgba(255,255,255,0.55)',
+              whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+              maxWidth: '100%',
+            }}>
+              {s.sub}
+            </div>
           </div>
         ))}
       </div>
 
-      {/* ═══ WEEKLY HISTORY — collapsible ═══ */}
-      {allWeeks.length > 0 && (
-        <div style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.04)' }}>
-          <button onClick={() => setShowWeekly(!showWeekly)}
-            style={{
-              width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-              padding: isMobile ? '0.5rem 1rem' : '0.625rem 1.5rem',
-              background: 'transparent', border: 'none', cursor: 'pointer',
-              touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent'
-            }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
-              <Calendar size={isMobile ? 12 : 13} color="rgba(255,255,255,0.3)" />
-              <span style={{ fontSize: isMobile ? '0.65rem' : '0.7rem', fontWeight: '600', color: 'rgba(255,255,255,0.5)' }}>
-                Wekelijkse Historie
-              </span>
-            </div>
-            {showWeekly ? <ChevronUp size={14} color="rgba(255,255,255,0.3)" /> : <ChevronDown size={14} color="rgba(255,255,255,0.3)" />}
-          </button>
-
-          {showWeekly && (
-            <div style={{
-              maxHeight: isMobile ? '200px' : '240px', overflowY: 'auto',
-              padding: isMobile ? '0 1rem 0.5rem' : '0 1.5rem 0.625rem'
-            }}>
-              {allWeeks.map((w, idx) => {
-                const p = idx > 0 ? allWeeks[idx-1] : null
-                const ch = p ? parseFloat((w.avg - p.avg).toFixed(1)) : null
-                return (
-                  <div key={idx} style={{
-                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                    padding: isMobile ? '0.35rem 0' : '0.4rem 0',
-                    borderBottom: idx < allWeeks.length - 1 ? '1px solid rgba(255,255,255,0.03)' : 'none'
-                  }}>
-                    <span style={{
-                      fontSize: isMobile ? '0.6rem' : '0.65rem',
-                      color: w.isCurrent ? '#FFD700' : 'rgba(255,255,255,0.5)',
-                      fontWeight: w.isCurrent ? '700' : '500', minWidth: isMobile ? '90px' : '110px'
-                    }}>{w.weekStart} — {w.weekEnd}</span>
-                    <span style={{
-                      fontSize: isMobile ? '0.7rem' : '0.75rem',
-                      color: w.isCurrent ? '#FFD700' : '#fff', fontWeight: '700'
-                    }}>{w.avg} kg</span>
-                    <span style={{ fontSize: isMobile ? '0.5rem' : '0.55rem', color: 'rgba(255,255,255,0.25)', minWidth: '20px', textAlign: 'right' }}>{w.count}x</span>
-                    {ch !== null ? (
-                      <span style={{
-                        fontSize: isMobile ? '0.55rem' : '0.6rem', fontWeight: '700',
-                        color: ch < 0 ? '#10b981' : ch > 0 ? '#dc2626' : 'rgba(255,255,255,0.2)',
-                        minWidth: '35px', textAlign: 'right'
-                      }}>{ch > 0 ? '+' : ''}{ch}</span>
-                    ) : <span style={{ minWidth: '35px' }} />}
-                  </div>
-                )
-              })}
-            </div>
-          )}
-        </div>
-      )}
+      {/* "Wekelijkse Historie" dropdown verwijderd — die functie zit nu in de
+          "Bekijk week progressie"-toggle van WeightHistory. */}
 
       {/* ═══ CHART — with optional plan line ═══ */}
       {chartData.length > 0 && (
@@ -265,10 +392,27 @@ export default function WeightStatsGrid({ stats = {}, client = {}, fridayData = 
               <YAxis stroke="rgba(255,255,255,0.1)" fontSize={isMobile ? 7 : 8}
                 domain={['dataMin - 0.5', 'dataMax + 0.5']} tick={{ fill: 'rgba(255,255,255,0.25)' }} width={25} />
               <Tooltip content={<CustomTooltip />} />
-              {/* Plan line — dashed, subtle */}
+              {/* Doel-referentielijn — horizontaal, groen, label rechts */}
+              {targetWeightNum != null && (
+                <ReferenceLine
+                  y={targetWeightNum}
+                  stroke="#10b981"
+                  strokeWidth={1}
+                  strokeDasharray="2 4"
+                  label={{
+                    value: `Doel ${targetWeightNum}`,
+                    position: 'insideTopRight',
+                    fill: 'rgba(16,185,129,0.85)',
+                    fontSize: isMobile ? 8 : 9,
+                    fontWeight: 700,
+                  }}
+                />
+              )}
+              {/* Plan-lijn — rood, doorgetrokken. Loopt door tot
+                  client.goal_deadline. */}
               {hasPlanLine && (
-                <Line type="monotone" dataKey="expected" stroke="rgba(255,255,255,0.2)" strokeWidth={1.5}
-                  strokeDasharray="4 3" dot={false} activeDot={false} connectNulls />
+                <Line type="monotone" dataKey="expected" stroke="#ef4444" strokeWidth={1.8}
+                  dot={false} activeDot={false} connectNulls />
               )}
               {/* Actual weight line — solid gold */}
               <Line type="monotone" dataKey="weight" stroke="#FFD700" strokeWidth={1.5}
@@ -277,7 +421,7 @@ export default function WeightStatsGrid({ stats = {}, client = {}, fridayData = 
           </ResponsiveContainer>
 
           <div style={{
-            display: 'flex', gap: '0.75rem', justifyContent: 'center',
+            display: 'flex', gap: '0.75rem', justifyContent: 'center', flexWrap: 'wrap',
             marginTop: '0.25rem', fontSize: isMobile ? '0.45rem' : '0.5rem'
           }}>
             {fridayData?.friday_count > 0 && (
@@ -286,11 +430,16 @@ export default function WeightStatsGrid({ stats = {}, client = {}, fridayData = 
               </span>
             )}
             <span style={{ display: 'flex', alignItems: 'center', gap: '0.15rem', color: 'rgba(255,255,255,0.25)' }}>
-              <div style={{ width: '8px', height: '1.5px', background: '#FFD700' }} /> Trend
+              <div style={{ width: '8px', height: '1.5px', background: '#FFD700' }} /> Werkelijk
             </span>
             {hasPlanLine && (
               <span style={{ display: 'flex', alignItems: 'center', gap: '0.15rem', color: 'rgba(255,255,255,0.25)' }}>
-                <div style={{ width: '8px', height: '1.5px', background: 'rgba(255,255,255,0.2)', borderRadius: '1px' }} /> Plan
+                <div style={{ width: '8px', height: '1.5px', background: '#ef4444', borderRadius: '1px' }} /> Plan
+              </span>
+            )}
+            {targetWeightNum != null && (
+              <span style={{ display: 'flex', alignItems: 'center', gap: '0.15rem', color: 'rgba(255,255,255,0.25)' }}>
+                <div style={{ width: '8px', height: '1.5px', background: '#10b981', borderRadius: '1px' }} /> Doel
               </span>
             )}
           </div>

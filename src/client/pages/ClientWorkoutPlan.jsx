@@ -9,8 +9,8 @@ import WorkoutPlan from '../../modules/workout/WorkoutPlan'
  * This component now simply imports and uses the modular WorkoutPlan
  * All logic has been moved to the /modules/workout folder
  */
-export default function ClientWorkoutPlan({ client, schema, db }) {
-  return <WorkoutPlan client={client} schema={schema} db={db} />
+export default function ClientWorkoutPlan({ client, schema, db, onFocusChange }) {
+  return <WorkoutPlan client={client} schema={schema} db={db} onFocusChange={onFocusChange} />
 }
 
 /**

@@ -3,6 +3,7 @@ import { useState, useEffect, useRef } from 'react'
 import { Plus, Trash2 } from 'lucide-react'
 import ExerciseCard from './ExerciseCard'
 import AddExerciseModal from './AddExerciseModal'
+import { isExerciseFullyLogged } from '../../../utils/exerciseCompletion'
 
 export default function ExerciseList({
   exercises, todaysLogs, onLogsUpdate,
@@ -21,9 +22,17 @@ export default function ExerciseList({
     })
   }, [localExercises])
 
-  useEffect(() => { setLocalExercises(exercises || []) }, [exercises])
+  // Sync on content (not just reference) — needed because after a permanent
+  // swap the parent reloads the schema but may pass an exercises array whose
+  // reference equality doesn't fire React's useEffect, leaving the list
+  // stale until a hard refresh.
+  const exercisesSignature = (exercises || [])
+    .map(e => `${e.name}|${e._pendingPermanent ? 1 : 0}|${e._isWeeklyOverride ? 1 : 0}|${e.image_url || ''}`)
+    .join(',')
+  useEffect(() => { setLocalExercises(exercises || []) }, [exercisesSignature])
 
-  const loggedExercises = new Set(todaysLogs.map(log => log.exercise_name))
+  // Een oefening geldt pas als "gelogd" (doorgestreept) als álle geplande sets
+  // gedaan zijn — niet al na de eerste set.
 
   const saveExercises = async (updatedExercises) => {
     if (!client?.id || !db || !workoutDayKey || !schema?.id) return
@@ -118,7 +127,7 @@ export default function ExerciseList({
                 exercise={exercise}
                 index={index}
                 totalExercises={localExercises.length}
-                isLogged={loggedExercises.has(exercise.name)}
+                isLogged={isExerciseFullyLogged(exercise, todaysLogs)}
                 previousLog={null}
                 onLogsUpdate={onLogsUpdate}
                 client={client}
@@ -132,14 +141,46 @@ export default function ExerciseList({
             </SwipeableRow>
           ))}
 
-          <div style={{ padding: isMobile ? '0.75rem 1rem' : '1rem 1.25rem' }}>
-            <button onClick={() => setShowAddModal(true)} style={{ width: '100%', padding: isMobile ? '0.65rem' : '0.75rem', background: 'transparent', border: '1px dashed rgba(255,215,0,0.2)', borderRadius: '10px', color: 'rgba(255,215,0,0.6)', fontSize: isMobile ? '0.75rem' : '0.8rem', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.05em', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem', minHeight: '44px', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}>
-              <Plus size={isMobile ? 14 : 16} strokeWidth={2.5} />
-              Voeg Oefening Toe
-            </button>
-          </div>
+          {/* Inline "Voeg Oefening Toe" knop weggehaald — vervangen door floating FAB hieronder */}
         </div>
       )}
+
+      {/* Floating FAB — zelfde stijl als MealLogFAB op de meal-pagina.
+          Alleen zichtbaar wanneer de exercise-list rendert (= dropdown open). */}
+      <button
+        onClick={() => setShowAddModal(true)}
+        aria-label="Oefening toevoegen"
+        style={{
+          position: 'fixed',
+          left: isMobile ? 18 : 28,
+          bottom: `calc(env(safe-area-inset-bottom, 0px) + ${isMobile ? 24 : 28}px)`,
+          zIndex: 90,
+          width: isMobile ? 76 : 84,
+          height: isMobile ? 76 : 84,
+          borderRadius: '50%',
+          background: 'linear-gradient(135deg, #FFD700 0%, #D4AF37 100%)',
+          border: 'none',
+          color: '#0a0a0a',
+          cursor: 'pointer',
+          touchAction: 'manipulation',
+          WebkitTapHighlightColor: 'transparent',
+          boxShadow: '0 14px 36px rgba(255,215,0,0.32), 0 4px 12px rgba(0,0,0,0.4)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          flexDirection: 'column', gap: 0,
+          transition: 'transform 0.18s ease',
+        }}
+        onMouseEnter={(e) => { e.currentTarget.style.transform = 'scale(1.05)' }}
+        onMouseLeave={(e) => { e.currentTarget.style.transform = 'scale(1)' }}
+      >
+        <Plus size={isMobile ? 30 : 34} strokeWidth={3} />
+        <span style={{
+          fontSize: '0.56rem', fontWeight: 900,
+          letterSpacing: '0.06em', textTransform: 'uppercase',
+          marginTop: -2, lineHeight: 1,
+        }}>
+          Oefening
+        </span>
+      </button>
 
       {showAddModal && (
         <AddExerciseModal
@@ -200,8 +241,9 @@ function SwipeableRow({ children, index, swipedIndex, onSwipeOpen, onSwipeClose,
 
   return (
     <div style={{ position: 'relative', overflow: 'hidden' }}>
-      {/* Delete zone */}
-      <div style={{ position: 'absolute', right: 0, top: 0, bottom: 0, width: `${DELETE_THRESHOLD}px`, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(239,68,68,0.12)', borderLeft: '1px solid rgba(239,68,68,0.2)' }}>
+      {/* Delete zone — alleen zichtbaar tijdens swipe (anders steekt de rode tint
+          uit langs de afgeronde card-randen). */}
+      <div style={{ position: 'absolute', right: 0, top: 0, bottom: 0, width: `${DELETE_THRESHOLD}px`, display: 'flex', alignItems: 'center', justifyContent: 'center', background: isOpen ? 'rgba(239,68,68,0.12)' : 'transparent', borderLeft: isOpen ? '1px solid rgba(239,68,68,0.2)' : 'none', transition: 'background 0.2s ease' }}>
         <button onClick={onDelete} disabled={deleting} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.2rem', background: 'transparent', border: 'none', cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', padding: '0.5rem' }}>
           {deleting ? (
             <div style={{ width: '18px', height: '18px', border: '2px solid rgba(239,68,68,0.3)', borderTopColor: '#ef4444', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />

@@ -163,32 +163,33 @@ export default function EvaluationModal({ isOpen, onClose, weekNumber, coachingP
 
   const plan = coachingPlan
   if (!isOpen || !plan) return null
-  const adjs = plan.adjustments || [], startW = plan.start_weight, goalW = plan.goal_weight
+  const adjs = plan.adjustments || []
   const defLvl = plan.deficit_level || 'moderate', isCut = plan.is_cut !== false
   const tdee = plan.tdee || 2500, curDef = DEFOPTS.find(d => d.id === defLvl) || DEFOPTS[1]
 
-  // Haal actuele macro targets op uit clients tabel — dit is de enige bron van waarheid
+  // Haal actuele targets op uit clients tabel — dit is nu de enige bron
+  // van waarheid voor gewicht-doel + start-gewicht. Het coaching_plan
+  // bewaart wat er bij de intake werd afgesproken; de clients-tabel is
+  // de "live" waarde die in de Doelen-tab van coach insight bewerkt kan
+  // worden, en die hoort overal te leiden.
   useEffect(() => {
     if (!db?.supabase || !journey?.client_id) return
     const fetchClientTargets = async () => {
-      console.log('🔍 [EvalModal] Fetching client targets for:', journey.client_id)
       const { data, error } = await db.supabase
         .from('clients')
-        .select('target_calories, target_protein, target_carbs, target_fat')
+        .select('target_calories, target_protein, target_carbs, target_fat, target_weight, start_weight')
         .eq('id', journey.client_id)
         .single()
       if (error) console.error('❌ [EvalModal] fetchClientTargets error:', error)
-      if (data) {
-        console.log('✅ [EvalModal] clientTargets loaded:', data)
-        setClientTargets(data)
-      } else {
-        console.warn('⚠️ [EvalModal] No client targets found')
-      }
+      if (data) setClientTargets(data)
     }
     fetchClientTargets()
   }, [journey?.client_id])
 
-  // Gebruik client targets als primaire bron, plan als fallback, berekening als laatste resort
+  // Bron-prioriteit: clients-tabel → coaching_plan → defaults.
+  const startW = parseFloat(clientTargets?.start_weight)  || plan.start_weight
+  const goalW  = parseFloat(clientTargets?.target_weight) || plan.goal_weight
+
   const curKcal = clientTargets?.target_calories || plan.target_calories || Math.round(tdee * (1 - curDef.pct))
   const initProtein = clientTargets?.target_protein || plan.target_protein || calcMacros(curKcal, startW).protein
   const initFat = clientTargets?.target_fat || plan.target_fat || calcMacros(curKcal, startW).fat

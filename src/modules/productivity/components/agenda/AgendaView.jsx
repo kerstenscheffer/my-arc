@@ -4,7 +4,7 @@
 // tasks sit in the right sidebar.
 
 import { useState, useMemo, useEffect, useRef } from 'react'
-import { ChevronLeft, ChevronRight, Calendar, Coffee, Users, Inbox, Plus, Repeat } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Calendar, Coffee, Users, Inbox, Plus, Repeat, Pencil, X } from 'lucide-react'
 import AgendaBlockModal from './AgendaBlockModal'
 import FloatingPanel from '../FloatingPanel'
 import {
@@ -27,6 +27,20 @@ export default function AgendaView({
   // New: db + coachId so we can read/write agenda_blocks.
   db, coachId,
   isMobile,
+  // Set of recurring-task ids the coach checked off today — used to dim
+  // their agenda blocks so it's obvious at a glance what's already done.
+  completedTodayIds = new Set(),
+  // Resize commit hook — parent decides between "alleen deze datum" and
+  // "hele reeks". Receives ({ taskId, updates, dateISO, task }) and returns
+  // a Promise<boolean>. If absent, falls back to the generic onTaskUpdate.
+  onRecurringResize = null,
+  // Delete-hook — parent toont de "alleen deze / hele reeks" popup voor
+  // recurring taken. Ontvangt (taskId, dateISO).
+  onTaskDelete = null,
+  productivityService = null,
+  // Parent bumps this when a recurring skip/override is written so we
+  // re-fetch the per-date overrides.
+  overridesVersion = 0,
 }) {
   // Week navigation — anchored to Monday of selected week.
   const [weekAnchor, setWeekAnchor] = useState(() => getMondayOfWeek(new Date()))
@@ -36,6 +50,10 @@ export default function AgendaView({
 
   const [draggedTask, setDraggedTask] = useState(null)
   const [dragOverDay, setDragOverDay] = useState(null)
+  // Tap-to-place: een ongeplande taak "armen" door erop te tikken, daarna op
+  // een dag/tijd-cel tikken om ''m in te plannen. Alternatief voor slepen, dat
+  // op mobiel niet werkt (de modal dekt het scherm).
+  const [armedTask, setArmedTask] = useState(null)
   const [conflictHint, setConflictHint] = useState(null) // string for tiny inline warning
   // Live drop preview during a drag — { dayId, startMin, endMin }. Shown as
   // a ghost block so the coach sees exactly where the task will land.
@@ -51,6 +69,11 @@ export default function AgendaView({
   // Resize state — while the user drags the bottom-handle of a task block,
   // we render the block at `currentEnd` (live preview) and commit on pointer-up.
   const [resize, setResize] = useState(null) // { taskId, startY, startEndMin, currentEnd, topMin, task }
+
+  // Per-(task_id, date) skip + duration override map for recurring tasks.
+  // Loaded for the visible week and re-fetched whenever the week changes or
+  // the parent bumps `overridesVersion` (after a skip/override write).
+  const [dateOverrides, setDateOverrides] = useState(() => new Map())
 
   // Reserved blocks (lunch + coaching) live in DB now — `agenda_blocks`.
   const [blocks, setBlocks] = useState([])
@@ -71,6 +94,27 @@ export default function AgendaView({
     load()
     return () => { cancelled = true }
   }, [coachId, db])
+
+  // Load per-date overrides for the currently visible week. Re-fires on
+  // week navigation and whenever the parent bumps overridesVersion.
+  useEffect(() => {
+    if (!productivityService || !coachId) return
+    let cancelled = false
+    const load = async () => {
+      const monday = getMondayOfWeek(weekAnchor)
+      const sunday = new Date(monday); sunday.setDate(sunday.getDate() + 6)
+      const fromISO = toISODate(monday)
+      const toISO = toISODate(sunday)
+      try {
+        const map = await productivityService.getRecurringDateOverrides(coachId, fromISO, toISO)
+        if (!cancelled) setDateOverrides(map)
+      } catch (e) {
+        console.error('load recurring date overrides failed:', e)
+      }
+    }
+    load()
+    return () => { cancelled = true }
+  }, [productivityService, coachId, weekAnchor, overridesVersion])
 
   const reloadBlocks = async () => {
     if (!coachId || !db?.supabase) return
@@ -145,10 +189,21 @@ export default function AgendaView({
         // this the modal would still show the old "Geschatte tijd" and
         // saving from there would silently undo the resize.
         const newDurMin = Math.max(SNAP_MINUTES, r.currentEnd - r.topMin)
-        await onTaskUpdate(r.task.id, {
+        const updates = {
           scheduled_end_time: minutesToTime(r.currentEnd),
           estimated_minutes: newDurMin,
-        })
+        }
+        // Recurring → let the parent prompt "alleen deze datum of hele reeks".
+        if (r.task?.recurrence_active && onRecurringResize) {
+          await onRecurringResize({
+            taskId: r.task.id,
+            updates,
+            dateISO: r.task._dateISO || null,
+            task: r.task,
+          })
+        } else {
+          await onTaskUpdate(r.task.id, updates)
+        }
       } catch (err) { console.error('Resize persist failed:', err) }
     }
     window.addEventListener('pointermove', onMove)
@@ -189,6 +244,10 @@ export default function AgendaView({
     return m
   }, [weekDates])
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  // Note: `dateOverrides` Map identity must change when content changes so
+  // this memo invalidates — the parent passes a fresh Map after a skip/
+  // override write, so this works in practice.
   const tasksByDay = useMemo(() => {
     const out = {}
     DAYS.forEach(d => { out[d.id] = [] })
@@ -215,7 +274,15 @@ export default function AgendaView({
         // ahead and the daily logbook still works per actual date.
         if (t.recurrence_active && Array.isArray(t.recurrence_days) && t.recurrence_days.length > 0) {
           t.recurrence_days.forEach(rday => {
-            if (out[rday]) pushOnce(rday, { ...t, _isRecurring: true })
+            if (!out[rday]) return
+            const dateISO = weekDateStrings[rday]
+            const ov = dateOverrides.get(`${t.id}__${dateISO}`)
+            if (ov?.skipped) return
+            const instance = { ...t, _isRecurring: true, _dateISO: dateISO }
+            if (ov?.override_start_time) instance.scheduled_start_time = ov.override_start_time
+            if (ov?.override_end_time) instance.scheduled_end_time = ov.override_end_time
+            if (ov?.override_minutes) instance.estimated_minutes = ov.override_minutes
+            pushOnce(rday, instance)
           })
           return
         }
@@ -238,12 +305,16 @@ export default function AgendaView({
       arr.sort((a, b) => (a.scheduled_start_time || '').localeCompare(b.scheduled_start_time || ''))
     })
     return out
-  }, [scheduledTasks, weekAnchor, weekDateStrings])
+  }, [scheduledTasks, weekAnchor, weekDateStrings, dateOverrides])
 
   // Niet-gepland: tasks without scheduled_day. Pulled from allTasks since
   // ProductivityKanban filters unscheduled into sections.
   const unscheduledTasks = useMemo(() => {
-    return (allTasks || []).filter(t => !t.scheduled_day)
+    // Alleen ongeplande én NIET-afgeronde tasks. Afgeronde tasks moeten uit de
+    // "niet ingepland"-lijst verdwijnen.
+    return (allTasks || []).filter(t =>
+      !t.scheduled_day && t.status !== 'completed' && !t.completed_at
+    )
   }, [allTasks])
 
   // ── Drag handlers ─────────────────────────────────────────────────────────
@@ -297,15 +368,42 @@ export default function AgendaView({
     }
   }
 
+  // Verplaats/plan een taak. Recurring taken lopen via onRecurringResize zodat
+  // de "alleen deze datum / hele reeks" popup verschijnt — "alleen deze" schrijft
+  // een tijd-override (start + eind), "hele reeks" verplaatst de reeks.
+  const commitMove = async (task, dayId, startMin, endMin) => {
+    // Duur clampen: minimaal 1 snap, maximaal de grid-hoogte. Voorkomt dat een
+    // foute/onbegrensde waarde het blok "de hele dag" laat vullen.
+    const gridMax = (END_HOUR - START_HOUR) * 60
+    let mins = endMin - startMin
+    if (!Number.isFinite(mins) || mins <= 0) mins = SNAP_MINUTES
+    mins = Math.min(Math.max(SNAP_MINUTES, mins), gridMax)
+    const updates = {
+      scheduled_day: dayId,
+      scheduled_start_time: minutesToTime(startMin),
+      scheduled_end_time: minutesToTime(startMin + mins),
+      estimated_minutes: mins,
+      ...(task.recurrence_active ? {} : { scheduled_date: weekDateStrings[dayId] }),
+    }
+    if (task.recurrence_active && onRecurringResize) {
+      await onRecurringResize({ taskId: task.id, updates, dateISO: task._dateISO || weekDateStrings[dayId], task })
+    } else {
+      await onTaskUpdate(task.id, updates)
+    }
+  }
+
   const onDayDrop = async (e, dayId, dayEl) => {
     e.preventDefault()
     let payload
     try { payload = JSON.parse(e.dataTransfer.getData('text/plain')) } catch { return }
     if (!payload?.taskId) return
 
-    // Resolve task object (from scheduled or unscheduled lists).
-    const task = (allTasks || []).find(t => t.id === payload.taskId)
-    if (!task) return
+    // Resolve task object. Gebruik de gesleepte INSTANCE (met de per-datum
+    // override, bv. een ingekorte duur) i.p.v. de basis-taak — anders gaat de
+    // ingekorte duur verloren bij het verplaatsen.
+    const base = (allTasks || []).find(t => t.id === payload.taskId)
+    if (!base) return
+    const task = (draggedTask && draggedTask.id === payload.taskId) ? draggedTask : base
 
     const dur = duration(task)
     let startMin = computeDropMinutes(e, dayEl)
@@ -330,15 +428,9 @@ export default function AgendaView({
     const end   = minutesToTime(endMin)
 
     setDragOverDay(null)
-    // For non-recurring tasks: pin scheduled_date to the date represented by
-    // the column where the task is dropped, so week-navigation keeps showing
-    // it on the right week.
-    await onTaskUpdate(task.id, {
-      scheduled_day: dayId,
-      scheduled_start_time: start,
-      scheduled_end_time:   end,
-      ...(task.recurrence_active ? {} : { scheduled_date: weekDateStrings[dayId] }),
-    })
+    // Recurring → popup (alleen deze datum / hele reeks); anders directe move
+    // met scheduled_date gepind op de kolom-datum.
+    await commitMove(task, dayId, startMin, endMin)
   }
 
   // Drop on a day's HEADER (no specific hour) → append at end of day.
@@ -347,8 +439,9 @@ export default function AgendaView({
     let payload
     try { payload = JSON.parse(e.dataTransfer.getData('text/plain')) } catch { return }
     if (!payload?.taskId) return
-    const task = (allTasks || []).find(t => t.id === payload.taskId)
-    if (!task) return
+    const base = (allTasks || []).find(t => t.id === payload.taskId)
+    if (!base) return
+    const task = (draggedTask && draggedTask.id === payload.taskId) ? draggedTask : base
 
     const dur = duration(task)
     const startMin = findNextFreeSlot(dayId, tasksByDay[dayId] || [], dur)
@@ -357,12 +450,7 @@ export default function AgendaView({
       setTimeout(() => setConflictHint(null), 2000)
       return
     }
-    await onTaskUpdate(task.id, {
-      scheduled_day: dayId,
-      scheduled_start_time: minutesToTime(startMin),
-      scheduled_end_time:   minutesToTime(startMin + dur),
-      ...(task.recurrence_active ? {} : { scheduled_date: weekDateStrings[dayId] }),
-    })
+    await commitMove(task, dayId, startMin, startMin + dur)
   }
 
   // Drop into sidebar = unschedule (clear day + times + date).
@@ -498,9 +586,25 @@ export default function AgendaView({
     const top = timeToMinutes(task.scheduled_start_time)
     if (top == null) return null
     const persistedDur = duration(task)
-    const color = task._sectionColor || sectionColorById[task.section_id] || '#10b981'
+    // Per-task color overrides the section color when set — lets the coach
+    // visually flag a specific block (e.g. red for hard-deadline) without
+    // changing the whole section's theme.
+    const color = task.color || task._sectionColor || sectionColorById[task.section_id] || '#10b981'
     const isDragging = draggedTask?.id === task.id
     const isResizingThis = resize?.taskId === task.id
+    // A block is "done" when:
+    //   - non-recurring task with status=completed / completed_at set, OR
+    //   - recurring task whose id is in completedTodayIds AND this block is
+    //     the TODAY-instance (we attach _dateISO when expanding a recurring
+    //     task per weekday — without the date-match, every day's render of
+    //     the same recurring task would turn green when "vandaag voltooid").
+    const todayISO_block = new Date().toISOString().slice(0, 10)
+    const isTodayInstance = task._isRecurring
+      ? task._dateISO === todayISO_block
+      : true
+    const isCompletedBlock = task.status === 'completed'
+      || !!task.completed_at
+      || (completedTodayIds.has(task.id) && isTodayInstance)
 
     // Live duration during resize, otherwise persisted duration.
     const effectiveDur = isResizingThis ? (resize.currentEnd - top) : persistedDur
@@ -544,9 +648,11 @@ export default function AgendaView({
           position: 'absolute',
           top: `${top}px`, left: '3px', right: '3px',
           height: `${Math.max(effectiveDur, 22)}px`,
-          background: `linear-gradient(135deg, ${color}33 0%, ${color}1a 100%)`,
-          border: `1px solid ${color}66`,
-          borderLeft: `3px solid ${color}`,
+          background: isCompletedBlock
+            ? 'linear-gradient(135deg, rgba(16,185,129,0.2) 0%, rgba(16,185,129,0.08) 100%)'
+            : `linear-gradient(135deg, ${color}33 0%, ${color}1a 100%)`,
+          border: isCompletedBlock ? '1px solid rgba(16,185,129,0.55)' : `1px solid ${color}66`,
+          borderLeft: `3px solid ${isCompletedBlock ? '#10b981' : color}`,
           borderRadius: '6px',
           padding: effectiveDur < 30 ? '0.15rem 0.4rem' : '0.3rem 0.5rem',
           color: '#fff',
@@ -554,7 +660,8 @@ export default function AgendaView({
           fontWeight: '600',
           lineHeight: 1.2,
           cursor: isDragging ? 'grabbing' : (isResizingThis ? 'ns-resize' : 'grab'),
-          opacity: isDragging ? 0.4 : 1,
+          opacity: isDragging ? 0.4 : (isCompletedBlock ? 0.55 : 1),
+          textDecoration: isCompletedBlock ? 'line-through' : 'none',
           overflow: 'hidden',
           touchAction: 'manipulation',
           WebkitTapHighlightColor: 'transparent',
@@ -565,7 +672,7 @@ export default function AgendaView({
           transition: isResizingThis ? 'none' : 'opacity 0.15s ease',
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.3rem' }}>
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.3rem', paddingRight: onTaskDelete ? '16px' : 0 }}>
           <span style={{ fontSize: '0.55rem', color: `${color}cc`, fontWeight: '700', flexShrink: 0 }}>
             {task.scheduled_start_time?.slice(0, 5)}
             {isResizingThis && (
@@ -586,6 +693,27 @@ export default function AgendaView({
           <div style={{ fontSize: '0.55rem', color: 'rgba(255,255,255,0.45)', marginTop: '0.15rem' }}>
             {effectiveDur} min
           </div>
+        )}
+
+        {/* Verwijder-knop — recurring taken tonen de "alleen deze / hele reeks"
+            popup via de parent (onTaskDelete). */}
+        {onTaskDelete && effectiveDur >= 26 && (
+          <button
+            onClick={(e) => { e.stopPropagation(); onTaskDelete(task.id, task._dateISO || task.scheduled_date || null) }}
+            onPointerDown={(e) => e.stopPropagation()}
+            draggable={false}
+            onDragStart={(e) => e.preventDefault()}
+            title="Verwijderen"
+            style={{
+              position: 'absolute', top: 2, right: 2, width: 18, height: 18,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              background: 'rgba(0,0,0,0.35)', border: 'none', borderRadius: 5,
+              color: 'rgba(255,255,255,0.6)', cursor: 'pointer', padding: 0, zIndex: 4,
+              touchAction: 'manipulation',
+            }}
+          >
+            <X size={11} />
+          </button>
         )}
 
         {/* Bottom resize-handle — drag down/up to change duration */}
@@ -731,39 +859,47 @@ export default function AgendaView({
                   </div>
                 )}
                 {unscheduledTasks.map(task => {
-                  const color = sectionColorById[task.section_id] || '#10b981'
+                  const color = task.color || sectionColorById[task.section_id] || '#10b981'
+                  const isArmed = armedTask?.id === task.id
                   return (
                     <div
                       key={task.id}
                       draggable
                       onDragStart={(e) => onTaskDragStart(e, task, 'sidebar')}
                       onDragEnd={onTaskDragEnd}
-                      onClick={() => onTaskClick && onTaskClick(task)}
+                      // Tik = armen voor plaatsing (tik nogmaals = annuleren).
+                      onClick={() => setArmedTask(prev => prev?.id === task.id ? null : task)}
                       style={{
+                        display: 'flex', alignItems: 'center', gap: '0.4rem',
                         padding: '0.5rem 0.6rem',
-                        background: 'rgba(255,255,255,0.04)',
-                        border: '1px solid rgba(255,255,255,0.07)',
+                        background: isArmed ? 'rgba(255,215,0,0.14)' : 'rgba(255,255,255,0.04)',
+                        border: isArmed ? '1px solid #FFD700' : '1px solid rgba(255,255,255,0.07)',
                         borderLeft: `3px solid ${color}`,
                         borderRadius: 6,
-                        cursor: 'grab',
+                        cursor: 'pointer',
                         touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
                       }}
                     >
-                      <div style={{
-                        fontSize: '0.75rem', fontWeight: 700, color: '#fff',
-                        letterSpacing: '-0.01em', lineHeight: 1.25,
-                        whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
-                      }}>
-                        {task.title}
-                      </div>
-                      {task.estimated_minutes && (
+                      <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{
-                          fontSize: '0.55rem', color: 'rgba(255,255,255,0.35)',
-                          fontWeight: 600, marginTop: 2,
+                          fontSize: '0.75rem', fontWeight: 700, color: '#fff',
+                          letterSpacing: '-0.01em', lineHeight: 1.25,
+                          whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
                         }}>
-                          {task.estimated_minutes} min
+                          {task.title}
                         </div>
-                      )}
+                        <div style={{ fontSize: '0.55rem', color: isArmed ? '#FFD700' : 'rgba(255,255,255,0.35)', fontWeight: 600, marginTop: 2 }}>
+                          {isArmed ? 'Tik op een dag/tijd →' : (task.estimated_minutes ? `${task.estimated_minutes} min` : 'Tik om in te plannen')}
+                        </div>
+                      </div>
+                      {/* Potlood — opent alsnog de bewerk-modal */}
+                      <button
+                        onClick={(e) => { e.stopPropagation(); onTaskClick && onTaskClick(task) }}
+                        title="Bewerk taak"
+                        style={{ flexShrink: 0, width: 24, height: 24, borderRadius: 6, background: 'rgba(255,255,255,0.06)', border: 'none', color: 'rgba(255,255,255,0.5)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', touchAction: 'manipulation' }}
+                      >
+                        <Pencil size={11} />
+                      </button>
                     </div>
                   )
                 })}
@@ -801,6 +937,25 @@ export default function AgendaView({
           textAlign: 'center',
         }}>
           {conflictHint}
+        </div>
+      )}
+
+      {/* Tap-to-place banner — zichtbaar zodra een taak geselecteerd is */}
+      {armedTask && (
+        <div style={{
+          position: 'sticky', top: 0, zIndex: 11,
+          display: 'flex', alignItems: 'center', gap: '0.5rem',
+          padding: '0.5rem 0.75rem',
+          background: 'rgba(255,215,0,0.14)',
+          borderBottom: '1px solid rgba(255,215,0,0.35)',
+        }}>
+          <Calendar size={14} color="#FFD700" />
+          <span style={{ flex: 1, minWidth: 0, fontSize: '0.72rem', fontWeight: 700, color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+            Tik op een dag/tijd om <span style={{ color: '#FFD700' }}>{armedTask.title}</span> in te plannen
+          </span>
+          <button onClick={() => setArmedTask(null)} style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: 3, padding: '0.25rem 0.5rem', background: 'rgba(255,255,255,0.08)', border: 'none', borderRadius: 6, color: 'rgba(255,255,255,0.8)', fontSize: '0.65rem', fontWeight: 700, cursor: 'pointer', touchAction: 'manipulation' }}>
+            <X size={11} /> Annuleer
+          </button>
         </div>
       )}
 
@@ -843,11 +998,21 @@ export default function AgendaView({
 
       {/* ── Body: grid + sidebar ───────────────────────────────────────────── */}
       <div style={{ display: 'flex', flex: 1, minHeight: 0 }}>
-        {/* GRID */}
+        {/* GRID — op mobiel een vaste viewport-hoogte + touch hints zodat
+            de scroll niet hangt door cell tap-handlers. Op desktop NIET
+            (anders trapt overscroll-contain de scroll en kun je niet meer
+            terug omhoog scrollen vanaf de bodem). */}
         <div style={{
           flex: 1, overflowX: 'auto', overflowY: 'auto',
           padding: isMobile ? '0.5rem 0.5rem 0.5rem 3rem' : '0.75rem 0.5rem 0.75rem 3.5rem',
           position: 'relative',
+          ...(isMobile && {
+            height: 'calc(100vh - 220px)',
+            maxHeight: 'calc(100vh - 220px)',
+            WebkitOverflowScrolling: 'touch',
+            overscrollBehavior: 'contain',
+            touchAction: 'pan-y pan-x',
+          }),
         }}>
           {/* Day headers (drop = append to end) */}
           <div style={{
@@ -919,13 +1084,32 @@ export default function AgendaView({
                   }}
                   onDrop={(e) => onDayDrop(e, day.id, e.currentTarget)}
                   onClick={(e) => {
-                    console.log('[AgendaView] cell click', { day: day.id, hasHandler: !!onRequestNewTask, blockClicked: blockClickedRef.current, targetTag: e.target?.tagName })
                     if (blockClickedRef.current) return
-                    if (!onRequestNewTask) { console.warn('[AgendaView] onRequestNewTask not provided'); return }
                     const rect = e.currentTarget.getBoundingClientRect()
                     const y = e.clientY - rect.top
                     if (y < 0 || y > rect.height) return
                     const startMin = Math.max(0, snapTo15(Math.round((y / HOUR_PX) * 60)))
+                    // Tap-to-place: is er een taak geselecteerd, plan die hier in.
+                    if (armedTask) {
+                      const dur = armedTask.estimated_minutes || DEFAULT_DURATION
+                      let s = startMin
+                      const maxStart = (END_HOUR - START_HOUR) * 60 - dur
+                      if (s > maxStart) s = Math.max(0, maxStart)
+                      if (overlapsReservedDB(day.id, s, s + dur)) {
+                        setConflictHint('Pauze-slot — kies een ander uur')
+                        setTimeout(() => setConflictHint(null), 2000)
+                        return
+                      }
+                      onTaskUpdate(armedTask.id, {
+                        scheduled_day: day.id,
+                        scheduled_start_time: minutesToTime(s),
+                        scheduled_end_time: minutesToTime(s + dur),
+                        ...(armedTask.recurrence_active ? {} : { scheduled_date: weekDateStrings[day.id] }),
+                      })
+                      setArmedTask(null)
+                      return
+                    }
+                    if (!onRequestNewTask) return
                     const preset = {
                       day: day.id,
                       date: weekDateStrings[day.id], // YYYY-MM-DD of the cell's actual date
@@ -944,6 +1128,10 @@ export default function AgendaView({
                     overflow: 'hidden',
                     cursor: 'crosshair',
                     backgroundImage: `repeating-linear-gradient(to bottom, rgba(255,255,255,0.03) 0, rgba(255,255,255,0.03) 1px, transparent 1px, transparent ${HOUR_PX / 6}px)`,
+                    // Sta verticaal pannen expliciet toe — zonder dit
+                    // claimt de tap-handler de gesture op iOS en blijft
+                    // de scroll plakken.
+                    touchAction: 'pan-y',
                   }}
                 >
                   {renderReservedBlocks(day.id)}

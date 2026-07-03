@@ -6,7 +6,6 @@ import useIsMobile from '../../hooks/useIsMobile'
 import React, { useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { Calendar, X, ExternalLink, Phone, Clock, Video, ArrowRight } from 'lucide-react'
-import PageVideoWidget from '../videos/PageVideoWidget'
 
 const BLUE = {
   primary: '#3b82f6',
@@ -88,12 +87,7 @@ export default function ClientCalls({ db, clientInfo }) {
         </p>
       </div>
 
-      {/* ═══ VIDEO WIDGET ═══ */}
-      {clientInfo && db && (
-        <div style={{ padding: isMobile ? '0.75rem 0' : '1rem 0' }}>
-          <PageVideoWidget client={clientInfo} db={db} pageContext="calls" title="Coaching Call Tips" compact={true} />
-        </div>
-      )}
+      {/* PageVideoWidget gemigreerd naar centrale WidgetSidebar in ClientDashboard. */}
 
       {/* ═══ CALL BOOKING CARD ═══ */}
       <div style={{

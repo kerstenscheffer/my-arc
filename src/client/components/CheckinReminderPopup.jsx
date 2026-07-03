@@ -1,87 +1,218 @@
 // src/client/components/CheckinReminderPopup.jsx
-// Center-screen nudge that pushes the client to the weekly check-in.
 //
-// Shows when:
-//   • Today is Friday and no check-in yet → "It's Friday"
-//   • Today is Sat/Sun/Mon/Tue and last Friday's check-in is missing →
-//     "You missed Friday — fill it in anyway"
-//   • All other days OR snoozed (24h) → nothing
+// Twee-fase nudge naar de wekelijkse check-in:
 //
-// The 24h snooze (localStorage) prevents the popup from re-firing on every
-// pageload; it reappears the next day until the check-in is filled.
+//   1. Full-screen modal — initieel, vraagt om aandacht.
+//   2. Persistente pill-widget — verschijnt zodra de klant de modal
+//      wegklikt. Blijft hangen rechtsonder totdat de check-in is
+//      ingevuld of de pagina opnieuw geladen wordt (dan opnieuw modal).
+//      Schudt elke ~25 seconden om aandacht te trekken.
+//
+// Geen localStorage-snooze meer: de gebruiker vroeg expliciet om iets
+// dat zichtbaar blijft na wegklikken. De pill-widget vervult die rol.
+//
+// Toon escaleert op basis van hoeveel dagen overdue:
+//   • Vrijdag vandaag        → goud (vriendelijk)
+//   • 1-2 dagen te laat       → amber (zacht waarschuwend)
+//   • 3+ dagen te laat       → rood (dwingend, sneller schudden)
 
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useState, useRef } from 'react'
 import { createPortal } from 'react-dom'
-import { ClipboardCheck, X, ArrowRight, Clock } from 'lucide-react'
+import { ClipboardCheck, X, ArrowRight, Clock, AlertCircle } from 'lucide-react'
 import CheckinService from '../../modules/client-checkin/CheckinService'
 
-const SNOOZE_KEY = 'myarc_checkin_popup_snooze_until'
-const SNOOZE_HOURS = 24
-
-const isSnoozed = () => {
-  try {
-    const v = localStorage.getItem(SNOOZE_KEY)
-    if (!v) return false
-    return new Date(v).getTime() > Date.now()
-  } catch { return false }
-}
-const setSnooze = () => {
-  try {
-    const until = new Date(Date.now() + SNOOZE_HOURS * 60 * 60 * 1000).toISOString()
-    localStorage.setItem(SNOOZE_KEY, until)
-  } catch { /* ignore */ }
+const daysSinceLastFriday = () => {
+  const day = new Date().getDay() // 0=Sun..6=Sat
+  if (day === 5) return 0
+  if (day === 6) return 1                  // Zaterdag
+  return day + 2                           // Zo=2, Ma=3, Di=4, Wo=5, Do=6
 }
 
-export default function CheckinReminderPopup({ client, db, onOpen, isMobile: propMobile }) {
+// Hoe vaak schudt de pill-widget (in ms). Sneller naarmate je later bent.
+const shakeIntervalFor = (daysLate) => {
+  if (daysLate >= 5) return 15000  // bijna een week → om de 15s
+  if (daysLate >= 3) return 20000  // 3-4 dagen      → om de 20s
+  return 28000                      // 0-2 dagen      → om de 28s
+}
+
+// Visueel palet — voor de modal blijft kleur-escalatie (goud → amber →
+// rood) omdat dat scherper aandacht trekt zodra je te laat bent. De pill
+// is altijd goud zodat 'ie past bij de rest van de app.
+const paletteFor = (mode) => {
+  if (mode === 'overdue') return { bg: 'rgba(239,68,68,0.18)', border: 'rgba(239,68,68,0.5)',  fg: '#ef4444', icon: AlertCircle }
+  if (mode === 'missed')  return { bg: 'rgba(245,158,11,0.18)', border: 'rgba(245,158,11,0.45)', fg: '#f59e0b', icon: ClipboardCheck }
+  return                          { bg: 'rgba(255,215,0,0.18)',  border: 'rgba(255,215,0,0.45)',  fg: '#FFD700', icon: ClipboardCheck }
+}
+
+const PILL_PALETTE = {
+  bg: 'rgba(255,215,0,0.14)',
+  border: '#FFD700',
+  fg: '#FFD700',
+}
+
+export default function CheckinReminderPopup({ client, db, onOpen, isMobile: propMobile, version = 0 }) {
   const isMobile = propMobile ?? (typeof window !== 'undefined' && window.innerWidth <= 768)
 
-  // 'friday'  → today IS Friday and not yet filled
-  // 'missed'  → it's after Friday in the same window and Friday is missing
-  // null      → no popup
+  // 'friday'   → vandaag IS vrijdag, nog niet ingevuld
+  // 'missed'   → 1-2 dagen na vrijdag, niets ingevuld
+  // 'overdue'  → 3+ dagen na vrijdag — dwingender
+  // null       → geen popup
   const [mode, setMode] = useState(null)
-  const [show, setShow] = useState(false)
+  const [phase, setPhase] = useState('init')   // 'init' | 'modal' | 'pill' | 'hidden'
+  const [daysLate, setDaysLate] = useState(0)
+  const [shaking, setShaking] = useState(false)
+  // Eenmaal verstuurd in deze sessie → nooit meer tonen. version bumpt alleen
+  // na een echte submit, dus dit is een harde garantie dat de melding niet
+  // terugkomt — ook niet als de DB-check een keer hapert.
+  const submittedRef = useRef(false)
 
   useEffect(() => {
     if (!client?.id || !db?.supabase) return
+    // Een nieuwe `version` van de parent = er is net een check-in opgeslagen.
+    // Markeer als verstuurd en verberg meteen; her-evalueren slaan we over.
+    if (version > 0) submittedRef.current = true
+    if (submittedRef.current) { setPhase('hidden'); return }
     let cancelled = false
 
     const evaluate = async () => {
-      if (isSnoozed()) return
-      const day = new Date().getDay() // 0=Sun..6=Sat
+      const day = new Date().getDay()
       const isFriday = day === 5
-      const isPostFridayWindow = [6, 0, 1, 2].includes(day) // Sat, Sun, Mon, Tue
-      if (!isFriday && !isPostFridayWindow) return
-
+      // Vanaf zaterdag t/m donderdag blijven we vragen zolang de afgelopen
+      // vrijdag niet is ingevuld. Op vrijdag zelf vragen we voor "vandaag".
+      const isPostFridayWindow = [6, 0, 1, 2, 3, 4].includes(day)
+      if (!isFriday && !isPostFridayWindow) {
+        setPhase('hidden')
+        return
+      }
       try {
         const service = new CheckinService(db)
         const filled = await service.hasCheckinSinceLastFriday(client.id)
         if (cancelled) return
-        if (filled) return
-        setMode(isFriday ? 'friday' : 'missed')
-        setShow(true)
+        if (filled) {
+          setPhase('hidden')
+          return
+        }
+        const late = daysSinceLastFriday()
+        setDaysLate(late)
+        if (isFriday)          setMode('friday')
+        else if (late >= 3)    setMode('overdue')
+        else                   setMode('missed')
+        setPhase('modal')
       } catch {
-        // Stay invisible on failure — coach can still chase via other means.
+        // Bij fout onzichtbaar — coach kan via andere kanalen achterna gaan.
+        setPhase('hidden')
       }
     }
     evaluate()
     return () => { cancelled = true }
-  }, [client?.id, db])
+  }, [client?.id, db, version])
 
-  if (!show || !mode) return null
+  // Periodieke schud-animatie van de pill om aandacht te trekken. Alleen
+  // actief in 'pill' fase, sneller naarmate je later bent.
+  useEffect(() => {
+    if (phase !== 'pill') return
+    const interval = shakeIntervalFor(daysLate)
+    const id = setInterval(() => {
+      setShaking(true)
+      setTimeout(() => setShaking(false), 900)
+    }, interval)
+    return () => clearInterval(id)
+  }, [phase, daysLate])
 
-  const handleSnooze = () => { setSnooze(); setShow(false) }
-  const handleOpen = () => { setShow(false); onOpen?.() }
+  if (phase === 'init' || phase === 'hidden') return null
 
-  const title = mode === 'friday'
-    ? 'Het is vrijdag — tijd voor je check-in'
-    : 'Vrijdag check-in gemist'
-  const body = mode === 'friday'
-    ? 'Vul nu je wekelijkse check-in in zodat je coach kan reageren op je week.'
-    : 'Je hebt afgelopen vrijdag de check-in niet ingevuld. Vul ‘m alsnog in — je coach wil graag weten hoe het gaat.'
+  const handleDismiss = () => setPhase('pill')
+  const handleOpenForm = () => {
+    setPhase('pill')  // na invullen + return zien we 'm als pill, en
+                      // bij volgende pageload zal evaluate hem opnieuw
+                      // verbergen als de check-in is opgeslagen.
+    onOpen?.()
+  }
+  const handlePillClick = () => setPhase('modal')
+
+  const palette = paletteFor(mode)
+  const Icon = palette.icon
+
+  // ── PILL WIDGET ──
+  // Gecentreerd boven de floating navbar, met de onderste helft achter
+  // de balk verstopt (z-index lager dan de bar, die op 100 zit). Zo lijkt
+  // het of de pill van achter de bar omhoog komt en bovenaan uitsteekt.
+  // Gouden palet zodat 'ie matched met de rest van de app.
+  if (phase === 'pill') {
+    return createPortal(
+      <>
+        <button
+          onClick={handlePillClick}
+          aria-label="Open check-in"
+          style={{
+            position: 'fixed',
+            // Navbar staat op bottom:30 en is ~60px hoog → top-rand op ~90.
+            // Pill op bottom:86 zit nét aan de bovenkant van de bar en
+            // steekt duidelijk erboven uit op telefoon.
+            bottom: 86,
+            left: '50%',
+            transform: 'translateX(-50%)',
+            // Lager dan de navbar (z-index 100) — geeft het "erachter
+            // weg komen"-effect zonder dat de hele pill verdwijnt.
+            zIndex: 90,
+            display: 'flex', alignItems: 'center', gap: 8,
+            padding: isMobile ? '0.6rem 1.1rem' : '0.7rem 1.4rem',
+            background: PILL_PALETTE.bg,
+            backdropFilter: 'blur(12px)',
+            WebkitBackdropFilter: 'blur(12px)',
+            border: `1px solid ${PILL_PALETTE.border}`,
+            borderRadius: 999,
+            color: PILL_PALETTE.fg,
+            fontWeight: 800,
+            fontSize: isMobile ? '0.8rem' : '0.88rem',
+            cursor: 'pointer',
+            touchAction: 'manipulation',
+            whiteSpace: 'nowrap',
+            boxShadow: '0 -8px 24px rgba(255,215,0,0.18), 0 -2px 8px rgba(0,0,0,0.4)',
+            animation: shaking ? 'checkinShake 0.85s cubic-bezier(.36,.07,.19,.97) both' : 'none',
+            transition: 'transform 0.18s ease',
+          }}
+          onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateX(-50%) translateY(-3px)' }}
+          onMouseLeave={(e) => { e.currentTarget.style.transform = 'translateX(-50%)' }}
+        >
+          <Icon size={isMobile ? 16 : 18} strokeWidth={2.4} />
+          {mode === 'overdue'
+            ? `Check-in ${daysLate}d te laat`
+            : mode === 'missed'
+            ? 'Check-in openstaand'
+            : 'Vul je check-in'}
+          <ArrowRight size={isMobile ? 14 : 16} strokeWidth={2.6} />
+        </button>
+        <style>{`
+          /* Pill is gecentreerd via translateX(-50%), dus de shake-keyframes
+             nemen die offset mee anders 'springt' de pill bij elke shake. */
+          @keyframes checkinShake {
+            0%, 100% { transform: translateX(-50%) rotate(0); }
+            10%, 30%, 50%, 70%, 90% { transform: translateX(calc(-50% - 4px)) rotate(-1.2deg); }
+            20%, 40%, 60%, 80%      { transform: translateX(calc(-50% + 4px)) rotate(1.2deg); }
+          }
+        `}</style>
+      </>,
+      document.body
+    )
+  }
+
+  // ── FULL MODAL ──
+  let title, body
+  if (mode === 'friday') {
+    title = 'Het is vrijdag — tijd voor je check-in'
+    body = 'Vul nu je wekelijkse check-in in zodat je coach kan reageren op je week.'
+  } else if (mode === 'overdue') {
+    title = `Je check-in is ${daysLate} dagen te laat`
+    body = 'Vul ‘m nu in. Hoe sneller je coach jouw week ziet, hoe sneller hij kan bijsturen waar nodig.'
+  } else {
+    title = 'Vrijdag check-in gemist'
+    body = 'Je hebt afgelopen vrijdag de check-in niet ingevuld. Vul ‘m alsnog in — je coach wil graag weten hoe het gaat.'
+  }
 
   const overlay = (
     <div
-      onClick={handleSnooze}
+      onClick={handleDismiss}
       style={{
         position: 'fixed', inset: 0, zIndex: 2147483400,
         background: 'rgba(0,0,0,0.78)', backdropFilter: 'blur(6px)',
@@ -105,7 +236,7 @@ export default function CheckinReminderPopup({ client, db, onOpen, isMobile: pro
         }}
       >
         <button
-          onClick={handleSnooze}
+          onClick={handleDismiss}
           aria-label="Later"
           style={{
             position: 'absolute', top: 10, right: 10,
@@ -121,12 +252,11 @@ export default function CheckinReminderPopup({ client, db, onOpen, isMobile: pro
 
         <div style={{
           width: 56, height: 56, borderRadius: 14,
-          background: mode === 'missed' ? 'rgba(245,158,11,0.18)' : 'rgba(255,215,0,0.18)',
-          border: `1px solid ${mode === 'missed' ? 'rgba(245,158,11,0.45)' : 'rgba(255,215,0,0.45)'}`,
+          background: palette.bg, border: `1px solid ${palette.border}`,
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           marginBottom: '0.85rem',
         }}>
-          <ClipboardCheck size={26} color={mode === 'missed' ? '#f59e0b' : '#FFD700'} />
+          <Icon size={26} color={palette.fg} />
         </div>
 
         <div style={{
@@ -145,7 +275,7 @@ export default function CheckinReminderPopup({ client, db, onOpen, isMobile: pro
         </div>
 
         <button
-          onClick={handleOpen}
+          onClick={handleOpenForm}
           style={{
             width: '100%', minHeight: 50,
             display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.45rem',
@@ -160,7 +290,7 @@ export default function CheckinReminderPopup({ client, db, onOpen, isMobile: pro
         </button>
 
         <button
-          onClick={handleSnooze}
+          onClick={handleDismiss}
           style={{
             width: '100%', minHeight: 40, marginTop: '0.55rem',
             display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem',
@@ -170,7 +300,7 @@ export default function CheckinReminderPopup({ client, db, onOpen, isMobile: pro
             touchAction: 'manipulation',
           }}
         >
-          <Clock size={13} /> Herinner me later
+          <Clock size={13} /> Later
         </button>
 
         <style>{`

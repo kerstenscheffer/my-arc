@@ -17,7 +17,7 @@ import { createPortal } from 'react-dom'
 import {
   X, Trash2, User, Target, Phone as PhoneCall, Magnet, FileText,
   Plus, AlertCircle, Zap, Heart, Flame, Check, Save,
-  ExternalLink, Tag, Trash, Copy, Pencil,
+  ExternalLink, Tag, Trash, Copy, Pencil, MessageSquare, Eraser,
 } from 'lucide-react'
 
 // Default template used when a magnet has no message_template stored. Same
@@ -48,6 +48,7 @@ const TABS = [
   { id: 'qual',     label: 'Kwalificatie', icon: Target },
   { id: 'sales',    label: 'Sales-call',   icon: PhoneCall },
   { id: 'magnets',  label: 'Lead magnets', icon: Magnet },
+  { id: 'messages', label: 'Berichten',    icon: MessageSquare },
   { id: 'notes',    label: 'Notities',     icon: FileText },
 ]
 
@@ -83,6 +84,9 @@ export default function LeadDetailModalV2({
   onDelete,
   initialTab = 'info',
   onMagnetAttached, // optional: called when a magnet is added (not removed)
+  // Required for the per-lead message library (Berichten tab).
+  db = null,
+  coachId = null,
 }) {
   const [activeTab, setActiveTab] = useState(initialTab)
 
@@ -166,6 +170,14 @@ export default function LeadDetailModalV2({
   useEffect(() => () => {
     Object.values(debounceRefs.current).forEach(t => t && clearTimeout(t))
   }, [])
+
+  // ESC = close. Backdrop click no longer closes (lost-notes bug); ESC
+  // keeps a second, intentional exit path next to the X button.
+  useEffect(() => {
+    const onKey = (e) => { if (e.key === 'Escape') onClose() }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [onClose])
 
   // ── Per-section persist helpers ────────────────────────────────────────
   const persistInfo = (patch) => {
@@ -361,7 +373,9 @@ export default function LeadDetailModalV2({
 
   return createPortal(
     <div
-      onClick={(e) => { if (e.target === e.currentTarget) onClose() }}
+      // Intentionally NO backdrop-click-to-close — coaches kept losing
+      // notes when they tapped outside the modal by accident. Closing
+      // requires the explicit X button or pressing Escape.
       style={{
         position: 'fixed', inset: 0, zIndex: 10000,
         background: 'rgba(0,0,0,0.78)', backdropFilter: 'blur(8px)',
@@ -499,6 +513,9 @@ export default function LeadDetailModalV2({
               cancelEditTemplate={cancelEditTemplate}
               saveTemplate={saveTemplate}
             />
+          )}
+          {activeTab === 'messages' && (
+            <LeadMessagesTab lead={lead} db={db} coachId={coachId} isMobile={isMobile} />
           )}
           {activeTab === 'notes' && (
             <NotesTab note={noteText} persistNote={persistNote} saving={savingField === 'notes'} />
@@ -1030,6 +1047,320 @@ function MagnetsTab({
             </>)}
           </div>
         )}
+      </div>
+    </div>
+  )
+}
+
+// ── Per-lead messages library — write/save/edit/delete/copy ──────────────
+// Stores entries in the existing `lead_notes` table with note_type='message'
+// so they don't collide with any other note-typed records.
+function LeadMessagesTab({ lead, db, coachId, isMobile }) {
+  const [messages, setMessages] = useState([])
+  const [loading, setLoading] = useState(false)
+  const [draft, setDraft] = useState('')
+  const [savingNew, setSavingNew] = useState(false)
+  const [editingId, setEditingId] = useState(null)
+  const [editingText, setEditingText] = useState('')
+  const [copiedId, setCopiedId] = useState(null)
+
+  const canUse = !!(db?.supabase && coachId && lead?.id)
+
+  const load = async () => {
+    if (!canUse) return
+    setLoading(true)
+    try {
+      const { data, error } = await db.supabase
+        .from('lead_notes')
+        .select('*')
+        .eq('lead_id', lead.id)
+        .eq('note_type', 'message')
+        .is('deleted_at', null)
+        .order('created_at', { ascending: false })
+        .limit(200)
+      if (error) throw error
+      setMessages(data || [])
+    } catch (e) {
+      console.error('load lead messages failed:', e)
+    } finally {
+      setLoading(false)
+    }
+  }
+  useEffect(() => { load() /* eslint-disable-next-line */ }, [lead?.id, coachId])
+
+  const handleSave = async () => {
+    const text = draft.trim()
+    if (!text || !canUse) return
+    setSavingNew(true)
+    try {
+      const { data, error } = await db.supabase
+        .from('lead_notes')
+        .insert({
+          lead_id: lead.id, coach_id: coachId,
+          note_type: 'message',
+          content: text, subject: null,
+        })
+        .select().single()
+      if (error) throw error
+      setMessages(prev => [data, ...prev])
+      setDraft('')
+    } catch (e) {
+      alert('Opslaan mislukt — ' + (e?.message || e))
+    } finally {
+      setSavingNew(false)
+    }
+  }
+
+  const handleClear = () => {
+    if (!draft.trim()) return
+    if (window.confirm('Veld leegmaken? Tekst gaat verloren.')) setDraft('')
+  }
+
+  const handleDelete = async (id) => {
+    if (!window.confirm('Bericht verwijderen?')) return
+    const prev = messages
+    setMessages(p => p.filter(m => m.id !== id))
+    try {
+      const { error } = await db.supabase
+        .from('lead_notes')
+        .update({ deleted_at: new Date().toISOString() })
+        .eq('id', id)
+      if (error) throw error
+    } catch (e) {
+      console.error('delete msg failed:', e); setMessages(prev)
+    }
+  }
+
+  const handleEditSave = async () => {
+    if (!editingId) return
+    const text = editingText.trim()
+    if (!text) return
+    const prev = messages
+    setMessages(p => p.map(m => m.id === editingId ? { ...m, content: text } : m))
+    setEditingId(null); setEditingText('')
+    try {
+      const { error } = await db.supabase
+        .from('lead_notes')
+        .update({ content: text, updated_at: new Date().toISOString() })
+        .eq('id', editingId)
+      if (error) throw error
+    } catch (e) {
+      console.error('edit msg failed:', e); setMessages(prev)
+    }
+  }
+
+  const copyToClipboard = async (text, id) => {
+    try { await navigator.clipboard.writeText(text) } catch {
+      const ta = document.createElement('textarea')
+      ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0'
+      document.body.appendChild(ta); ta.select()
+      try { document.execCommand('copy') } catch {}
+      document.body.removeChild(ta)
+    }
+    setCopiedId(id)
+    setTimeout(() => setCopiedId(null), 1200)
+  }
+
+  if (!canUse) {
+    return (
+      <div style={{ padding: '1rem', color: 'rgba(255,255,255,0.4)', fontSize: '0.8rem' }}>
+        Berichten-tab vereist een ingelogde coach. Sluit en open de lead opnieuw.
+      </div>
+    )
+  }
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.7rem' }}>
+      <FieldLabel>Berichten die ik naar deze lead stuur</FieldLabel>
+      <textarea
+        value={draft}
+        onChange={(e) => setDraft(e.target.value)}
+        placeholder="Schrijf hier een nieuw bericht voor deze lead — sla 'm op om 'm later te kopiëren."
+        rows={isMobile ? 5 : 7}
+        style={{
+          ...inputStyle, resize: 'vertical', minHeight: 120,
+          fontFamily: 'inherit',
+        }}
+      />
+      <div style={{ display: 'flex', gap: 6 }}>
+        <button
+          onClick={handleSave}
+          disabled={!draft.trim() || savingNew}
+          style={{
+            flex: 2, padding: '0.55rem',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+            background: draft.trim() ? '#FFD700' : 'rgba(255,255,255,0.04)',
+            border: `1px solid ${draft.trim() ? '#FFD700' : 'rgba(255,255,255,0.08)'}`,
+            borderRadius: 6,
+            color: draft.trim() ? '#000' : 'rgba(255,255,255,0.3)',
+            fontSize: '0.78rem', fontWeight: 800,
+            cursor: draft.trim() && !savingNew ? 'pointer' : 'not-allowed',
+            touchAction: 'manipulation',
+          }}
+        >
+          <Plus size={13} /> {savingNew ? 'Opslaan…' : 'Opslaan'}
+        </button>
+        <button
+          onClick={handleClear}
+          disabled={!draft.trim()}
+          style={{
+            flex: 1, padding: '0.55rem',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+            background: 'rgba(239,68,68,0.08)',
+            border: '1px solid rgba(239,68,68,0.25)',
+            borderRadius: 6,
+            color: draft.trim() ? '#fca5a5' : 'rgba(255,255,255,0.25)',
+            fontSize: '0.75rem', fontWeight: 700,
+            cursor: draft.trim() ? 'pointer' : 'not-allowed',
+          }}
+        >
+          <Eraser size={12} /> Clear
+        </button>
+      </div>
+
+      <div style={{
+        paddingTop: '0.55rem', marginTop: 2,
+        borderTop: '1px solid rgba(255,255,255,0.06)',
+      }}>
+        <div style={{
+          fontSize: '0.55rem', fontWeight: 800,
+          color: 'rgba(255,255,255,0.45)',
+          letterSpacing: '0.06em', textTransform: 'uppercase',
+          marginBottom: '0.45rem',
+        }}>
+          Opgeslagen ({messages.length})
+        </div>
+        {loading && (
+          <div style={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.4)', textAlign: 'center', padding: '0.5rem' }}>
+            Laden…
+          </div>
+        )}
+        {!loading && messages.length === 0 && (
+          <div style={{
+            fontSize: '0.7rem', color: 'rgba(255,255,255,0.3)',
+            textAlign: 'center', padding: '0.85rem', fontStyle: 'italic',
+          }}>
+            Nog geen berichten opgeslagen voor deze lead.
+          </div>
+        )}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+          {messages.map(m => {
+            const isCopied = copiedId === m.id
+            const isEditing = editingId === m.id
+            return (
+              <div
+                key={m.id}
+                onClick={() => { if (!isEditing) copyToClipboard(m.content, m.id) }}
+                style={{
+                  display: 'flex', alignItems: 'stretch',
+                  background: isCopied ? 'rgba(255,215,0,0.13)' : 'rgba(255,255,255,0.03)',
+                  border: isCopied ? '1px solid #FFD700' : '1px solid rgba(255,255,255,0.08)',
+                  borderRadius: 8, overflow: 'hidden',
+                  cursor: isEditing ? 'default' : 'pointer',
+                  transition: 'all 0.15s ease',
+                }}
+              >
+                <div style={{ width: 4, background: '#FFD700', flexShrink: 0 }} />
+                <div style={{ flex: 1, padding: '0.55rem 0.7rem', display: 'flex', flexDirection: 'column', gap: 4 }}>
+                  <div style={{
+                    fontSize: '0.55rem', fontWeight: 700,
+                    color: 'rgba(255,255,255,0.4)',
+                    letterSpacing: '0.04em', textTransform: 'uppercase',
+                  }}>
+                    {new Date(m.created_at).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                    {m.updated_at && m.updated_at !== m.created_at && (
+                      <span style={{ marginLeft: 6, color: 'rgba(255,215,0,0.55)' }}>· bewerkt</span>
+                    )}
+                  </div>
+                  {isEditing ? (
+                    <textarea
+                      autoFocus
+                      value={editingText}
+                      onChange={(e) => setEditingText(e.target.value)}
+                      onClick={(e) => e.stopPropagation()}
+                      rows={Math.max(3, Math.min(8, (editingText.match(/\n/g)?.length || 0) + 2))}
+                      style={{
+                        ...inputStyle, padding: '0.45rem 0.55rem',
+                        fontFamily: 'inherit', resize: 'vertical',
+                        background: 'rgba(0,0,0,0.4)',
+                        border: '1px solid rgba(255,215,0,0.4)',
+                      }}
+                    />
+                  ) : (
+                    <div style={{
+                      fontSize: '0.85rem', color: 'rgba(255,255,255,0.9)',
+                      lineHeight: 1.4, whiteSpace: 'pre-wrap',
+                    }}>
+                      {m.content}
+                    </div>
+                  )}
+                  {isEditing && (
+                    <div style={{ display: 'flex', gap: 4, marginTop: 4 }}>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); handleEditSave() }}
+                        style={{
+                          padding: '4px 10px',
+                          background: '#10b981', border: 'none', borderRadius: 4,
+                          color: '#fff', fontSize: '0.7rem', fontWeight: 800,
+                          cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4,
+                        }}
+                      >
+                        <Check size={11} /> Opslaan
+                      </button>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); setEditingId(null); setEditingText('') }}
+                        style={{
+                          padding: '4px 10px',
+                          background: 'rgba(255,255,255,0.05)',
+                          border: '1px solid rgba(255,255,255,0.1)', borderRadius: 4,
+                          color: 'rgba(255,255,255,0.6)', fontSize: '0.7rem', fontWeight: 700,
+                          cursor: 'pointer',
+                        }}
+                      >
+                        Annuleer
+                      </button>
+                    </div>
+                  )}
+                </div>
+                {!isEditing && (
+                  <div style={{
+                    width: 44, display: 'flex', flexDirection: 'column',
+                    borderLeft: '1px solid rgba(255,255,255,0.05)',
+                  }}>
+                    <div style={{
+                      flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      background: isCopied ? '#FFD700' : 'transparent',
+                    }}>
+                      {isCopied ? <Check size={16} color="#000" /> : <Copy size={14} color="rgba(255,255,255,0.3)" />}
+                    </div>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); setEditingId(m.id); setEditingText(m.content) }}
+                      title="Bewerk" style={{
+                        height: 26, background: 'transparent',
+                        border: 'none', borderTop: '1px solid rgba(255,255,255,0.05)',
+                        color: 'rgba(255,255,255,0.4)',
+                        cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      }}
+                    >
+                      <Pencil size={11} />
+                    </button>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); handleDelete(m.id) }}
+                      title="Verwijder" style={{
+                        height: 26, background: 'transparent',
+                        border: 'none', borderTop: '1px solid rgba(255,255,255,0.05)',
+                        color: 'rgba(239,68,68,0.5)',
+                        cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      }}
+                    >
+                      <Trash2 size={12} />
+                    </button>
+                  </div>
+                )}
+              </div>
+            )
+          })}
+        </div>
       </div>
     </div>
   )

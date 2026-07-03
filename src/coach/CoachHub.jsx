@@ -2,6 +2,7 @@
 // Gold Theme | Top Tabs | Hash Routing | Categorized Dropdown | Compact
 
 import { useState, useEffect, useRef } from 'react'
+import { createPortal } from 'react-dom'
 import DatabaseService from '../services/DatabaseService'
 import useIsMobile from '../hooks/useIsMobile'
 
@@ -22,10 +23,17 @@ import ProductivityHub from '../modules/productivity/ProductivityHub'
 import { FunnelDashboard } from '../modules/qualification-funnel'
 import SpotsManager from '../modules/spots/SpotsManager'
 import TemplateManager from '../modules/meal-templates/TemplateManager'
+import IngredientPhotoManager from '../modules/ingredient-photos/IngredientPhotoManager'
+import MealGuideManager from '../modules/meal-plan/MealGuideManager'
 import SalesSection from '../modules/sales/SalesSection'
 import '../modules/supplements/SupplementPlanService'
 import SupplementsTab from '../modules/supplements/SupplementsTab'
 import CoachNotificationBell from '../modules/notifications/CoachNotificationBell'
+import PortalSwitchButton from '../components/PortalSwitchButton'
+import IssueNotesWidget from '../components/IssueNotesWidget'
+import ContentIdeasWidget from '../components/ContentIdeasWidget'
+import ClientProblemsWidget from '../components/ClientProblemsWidget'
+import WidgetSidebar from '../components/WidgetSidebar'
 import '../services/SpotsService'
 import FloatingTaskTimer from '../modules/productivity/components/kanban/FloatingTaskTimer'
 import WeekGoalsBar from './components/WeekGoalsBar'
@@ -35,12 +43,16 @@ import CoachFAQManager from '../modules/faq/CoachFAQManager'
 import ResultsHub from '../modules/results/ResultsHub'
 import ClientContextPanel from '../modules/ai-meal-generator/tabs/plan-analyzer/ClientContextPanel'
 import WorkoutContextPanel from '../modules/coach-command-center/components/WorkoutContextPanel'
+import CoachAgendaTab from '../modules/client-agenda/CoachAgendaTab'
+import LabHub from '../modules/lab/LabHub'
 
-import { 
+import {
   Home, Wand2, Send, Users, ClipboardCheck, UserPlus, Shield,
   Sparkles, Trophy, Video, Phone, Activity, BarChart3, LogOut,
   Menu, X, ChevronDown, ChevronRight, Dumbbell, Target, Crown, FileText,
-  Flame, Globe, Save, Zap, DollarSign, Pill, MoreHorizontal, Settings
+  Flame, Globe, Save, Zap, DollarSign, Pill, MoreHorizontal, Settings, Calendar,
+  Bell, Bug, Lightbulb, AlertCircle, Image as ImageIcon, FlaskConical,
+  Eye, EyeOff
 } from 'lucide-react'
 
 // ============================================
@@ -70,6 +82,10 @@ const PRIMARY_TABS = [
 // ============================================
 // DROPDOWN CATEGORIES (inside "Meer")
 // ============================================
+// De oude inline Meer-dropdown is vervangen door de geportaalde bottom-sheet.
+// Vlag op false i.p.v. een kale `false &&` (dat laatste triggert een lint-error).
+const SHOW_LEGACY_INLINE_DROPDOWN = false
+
 const MORE_CATEGORIES = [
   {
     label: 'Gameplan',
@@ -97,9 +113,12 @@ const MORE_CATEGORIES = [
   {
     label: 'Plan Making',
     items: [
+      { id: 'client-agenda', label: 'Client Agenda', icon: Calendar },
       { id: 'plan-wizard', label: 'Plan Wizard', icon: Wand2 },
       { id: 'ai-meals', label: 'AI Meals', icon: Sparkles },
       { id: 'meal-templates', label: 'Meal Templates', icon: FileText },
+      { id: 'ingredient-photos', label: "Ingredient Foto's", icon: ImageIcon },
+      { id: 'meal-guide', label: 'Voedingsgids', icon: ImageIcon },
       { id: 'supplements', label: 'Supplementen', icon: Pill },
       { id: 'workout-builder', label: 'Workout Builder', icon: Dumbbell },
       { id: 'calls', label: 'Call Planning', icon: Phone },
@@ -110,7 +129,8 @@ const MORE_CATEGORIES = [
   {
     label: 'Systeem',
     items: [
-      { id: 'spots', label: 'Spots Manager', icon: Settings }
+      { id: 'spots', label: 'Spots Manager', icon: Settings },
+      { id: 'lab', label: 'Lab', icon: FlaskConical }
     ]
   }
 ]
@@ -170,6 +190,26 @@ export default function CoachHub() {
   // Client context panel (floating)
   const [mealPanelClientId, setMealPanelClientId] = useState(null)
   const [workoutPanelClientId, setWorkoutPanelClientId] = useState(null)
+
+  // Widget sidebar — één van { 'notifications' | 'issues' | 'ideas' | 'problems' | null }
+  // tegelijk geopend, plus live counts voor de badge per knop.
+  const [widgetOpen, setWidgetOpen] = useState(null)
+  // Klantmodus: verbergt de coach-only balken (quick-link sidebar + goals-balk)
+  // zodat een klant die meekijkt niet alles ziet. Onthouden in localStorage.
+  const [clientMode, setClientMode] = useState(() => {
+    try { return localStorage.getItem('coachClientMode') === '1' } catch { return false }
+  })
+  const toggleClientMode = () => setClientMode(v => {
+    const next = !v
+    try { localStorage.setItem('coachClientMode', next ? '1' : '0') } catch {}
+    if (next) setWidgetOpen(null) // sluit open panelen bij verbergen
+    return next
+  })
+  const [widgetCounts, setWidgetCounts] = useState({ notifications: 0, issues: 0, ideas: 0, problems: 0 })
+  // Aantal app_issues waar Claude een open vraag/reactie heeft staan — gouden
+  // badge op de Issues-knop in de WidgetSidebar.
+  const [issuesClaudePending, setIssuesClaudePending] = useState(0)
+  const setCount = (key) => (n) => setWidgetCounts(prev => prev[key] === n ? prev : { ...prev, [key]: n })
   
   const db = DatabaseService
   const isMobile = useIsMobile()
@@ -206,22 +246,14 @@ export default function CoachHub() {
   }, [])
 
   // ============================================
-  // CLOSE DROPDOWN ON OUTSIDE CLICK
+  // CLOSE DROPDOWN ON OUTSIDE CLICK — VERWIJDERD
   // ============================================
-  useEffect(() => {
-    if (!moreOpen) return
-    const handleClick = (e) => {
-      if (moreRef.current && !moreRef.current.contains(e.target)) {
-        setMoreOpen(false)
-      }
-    }
-    document.addEventListener('mousedown', handleClick)
-    document.addEventListener('touchstart', handleClick)
-    return () => {
-      document.removeEventListener('mousedown', handleClick)
-      document.removeEventListener('touchstart', handleClick)
-    }
-  }, [moreOpen])
+  // De Meer-dropdown is nu een geportaalde bottom-sheet (createPortal naar
+  // document.body) MET een eigen backdrop die op klik sluit. Een document-brede
+  // mousedown/touchstart-handler die checkte op `moreRef` werkte averechts: de
+  // portal valt buiten moreRef, dus elke tik op een menu-item gold als "buiten"
+  // en sloot het menu op touchstart — vóórdat de button-click kon navigeren.
+  // Daarom weg; de backdrop regelt het sluiten-bij-klik-buiten.
 
   // ============================================
   // LIFECYCLE
@@ -400,6 +432,16 @@ export default function CoachHub() {
         return <CoachCheckinDashboard db={db} clients={clients || []} />
       case 'challenge-hub':
         return <CoachChallengeHub db={db} clients={clients || []} />
+      case 'client-agenda':
+        return (
+          <CoachAgendaTab
+            db={db}
+            clients={clients || []}
+            selectedClient={selectedClient}
+            onClientSelect={setSelectedClient}
+            isMobile={isMobile}
+          />
+        )
       case 'plan-wizard':
         return <PlanWizard db={db} clients={clients || []} />
       case 'ai-meals':
@@ -414,6 +456,10 @@ export default function CoachHub() {
         )
       case 'meal-templates':
         return <TemplateManager db={db} isMobile={isMobile} />
+      case 'ingredient-photos':
+        return <IngredientPhotoManager db={db} isMobile={isMobile} />
+      case 'meal-guide':
+        return <MealGuideManager db={db} isMobile={isMobile} />
       case 'supplements':
         return (
           <SupplementsTab
@@ -442,6 +488,8 @@ export default function CoachHub() {
         return <CoachFAQManager db={db} />
       case 'spots':
         return <SpotsManager db={db} compact={false} />
+      case 'lab':
+        return <LabHub isMobile={isMobile} />
       default:
         return (
           <CoachCommandCenter 
@@ -471,20 +519,27 @@ export default function CoachHub() {
   // MAIN RENDER
   // ============================================
   return (
-    <div style={{ 
+    <div style={{
       minHeight: '100vh',
-      background: '#0a0a0a'
+      background: '#0a0a0a',
+      // Reserve space for the always-on WeekGoalsBar (fixed, top:0, ~32px
+      // + safe-area). Without this the bar floats over the header and
+      // covers the logout/switch/notification buttons.
+      paddingTop: 'calc(32px + env(safe-area-inset-top, 0px))'
     }}>
-      {/* ═══ HEADER ═══ */}
-      <header style={{
-        background: 'rgba(10, 10, 10, 0.97)',
-        backdropFilter: 'blur(20px)',
-        borderBottom: `1px solid ${G.border}`,
-        position: 'sticky',
-        top: 0,
-        zIndex: 100,
-        paddingTop: isMobile ? 'env(safe-area-inset-top, 0px)' : '0'
-      }}>
+      {/* ═══ NOTIFICATIE BEL — bestuurd door WidgetSidebar (geen eigen tab meer) ═══ */}
+      <CoachNotificationBell
+        db={db}
+        isMobile={isMobile}
+        onNavigate={(planId) => { setReviewPlanId(planId); navigateTo('ai-meals') }}
+        open={widgetOpen === 'notifications'}
+        onOpenChange={(o) => setWidgetOpen(o ? 'notifications' : null)}
+        onCountChange={setCount('notifications')}
+      />
+
+      {/* ═══ HEADER (verborgen — content verplaatst naar floating bel + bottom-nav) ═══ */}
+      <header style={{ display: 'none' }}>
+
         {/* Top bar: Logo + Notifications + Logout */}
         <div style={{
           display: 'flex',
@@ -512,79 +567,26 @@ export default function CoachHub() {
             </span>
           </div>
 
-          {/* Right: Notifications + Logout */}
+          {/* Right: alleen notifications — Wissel + Uitlog zitten in de
+              bottom-nav. */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <CoachNotificationBell db={db} isMobile={isMobile} onNavigate={(planId) => {
+            {!clientMode && <CoachNotificationBell db={db} isMobile={isMobile} onNavigate={(planId) => {
               setReviewPlanId(planId)
               navigateTo('ai-meals')
-            }} />
-            
-            <button
-              onClick={handleLogout}
-              style={{
-                width: '36px',
-                height: '36px',
-                borderRadius: '8px',
-                background: 'rgba(239, 68, 68, 0.08)',
-                border: '1px solid rgba(239, 68, 68, 0.15)',
-                color: 'rgba(239, 68, 68, 0.6)',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                touchAction: 'manipulation',
-                WebkitTapHighlightColor: 'transparent',
-                transition: 'all 0.2s ease'
-              }}
-            >
-              <LogOut size={16} />
-            </button>
+            }} />}
           </div>
         </div>
 
-        {/* ═══ TAB BAR ═══ */}
+        {/* ═══ MEER DROPDOWN ═══
+            Alleen de "Meer"-trigger blijft over in de top — primary tabs
+            zitten in de bottom-nav. De dropdown geeft toegang tot alle
+            secundaire tabs (sales, funnel, plan-wizard, ai-meals, etc.). */}
+        {!clientMode && (
         <div style={{
           display: 'flex',
           alignItems: 'stretch',
           position: 'relative'
         }}>
-          {/* Primary tabs */}
-          {PRIMARY_TABS.map(tab => {
-            const Icon = tab.icon
-            const isActive = activeTab === tab.id
-            return (
-              <button
-                key={tab.id}
-                onClick={() => navigateTo(tab.id)}
-                style={{
-                  flex: 1,
-                  padding: isMobile ? '0.625rem 0' : '0.75rem 0',
-                  background: 'transparent',
-                  border: 'none',
-                  borderBottom: isActive 
-                    ? `2px solid ${G.primary}` 
-                    : '2px solid transparent',
-                  color: isActive ? G.primary : 'rgba(255, 255, 255, 0.35)',
-                  fontSize: isMobile ? '0.7rem' : '0.8rem',
-                  fontWeight: isActive ? '700' : '500',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '0.35rem',
-                  touchAction: 'manipulation',
-                  WebkitTapHighlightColor: 'transparent',
-                  transition: 'all 0.15s ease',
-                  letterSpacing: '-0.01em'
-                }}
-              >
-                <Icon size={isMobile ? 14 : 16} />
-                {tab.label}
-              </button>
-            )
-          })}
-
-          {/* "Meer" button with dropdown */}
           <div ref={moreRef} style={{ flex: 1, position: 'relative' }}>
             <button
               onClick={() => setMoreOpen(!moreOpen)}
@@ -621,8 +623,13 @@ export default function CoachHub() {
               />
             </button>
 
-            {/* ═══ DROPDOWN MENU ═══ */}
-            {moreOpen && (
+            {/* ═══ OUDE INLINE DROPDOWN — UITGEZET ═══
+                De actieve Meer-dropdown is de geportaalde bottom-sheet verderop
+                (createPortal → document.body). Deze inline absolute-versie zat
+                gevangen in de stacking-context van de header; de portal-backdrop
+                (z 2147483646) ving daardoor de kliks op de zichtbare menu-items
+                op → "links niet aanklikbaar". Daarom niet renderen. */}
+            {SHOW_LEGACY_INLINE_DROPDOWN && (
               <>
                 {/* Backdrop */}
                 <div style={{
@@ -646,7 +653,9 @@ export default function CoachHub() {
                   borderTop: 'none',
                   borderRadius: '0 0 12px 12px',
                   boxShadow: '0 20px 60px rgba(0, 0, 0, 0.6)',
-                  zIndex: 200,
+                  // Boven de floating side-widgets (z ~2.1 mld) — anders vangen
+                  // die de klikken op dropdown-items rechts in beeld op.
+                  zIndex: 2147483647,
                   animation: 'chDropIn 0.15s ease'
                 }}>
                   {MORE_CATEGORIES.map((cat, catIdx) => (
@@ -741,14 +750,238 @@ export default function CoachHub() {
             )}
           </div>
         </div>
+        )}
       </header>
 
       {/* ═══ MAIN CONTENT ═══ */}
       <main style={{
-        minHeight: 'calc(100vh - 100px)'
+        minHeight: 'calc(100vh - 100px)',
+        // Ruimte onderaan voor de floating bottom-nav (zelfde pattern als
+        // ClientDashboard) — anders verdwijnt content onder de balk.
+        paddingBottom: '120px',
       }}>
         {renderTabContent()}
       </main>
+
+      {/* ═══ FLOATING BOTTOM NAV ═══ */}
+      {/* 7 quick-access knoppen: Command / Leads / Output / Productivity /
+          Agenda + acties Wissel / Uitlog. Verborgen in klantmodus (terug via
+          de oog-toggle linksonder). */}
+      {!clientMode && (<nav style={{
+        position: 'fixed',
+        bottom: 30,
+        left: isMobile ? 10 : '50%',
+        right: isMobile ? 10 : 'auto',
+        transform: isMobile ? 'none' : 'translateX(-50%)',
+        width: isMobile ? 'auto' : 'min(720px, calc(100vw - 32px))',
+        background: 'rgba(10, 10, 10, 0.88)',
+        backdropFilter: 'blur(20px)',
+        WebkitBackdropFilter: 'blur(20px)',
+        border: '1px solid rgba(255,255,255,0.08)',
+        borderRadius: 22,
+        boxShadow: '0 18px 48px rgba(0,0,0,0.55), 0 0 0 1px rgba(255,215,0,0.04)',
+        padding: isMobile ? '0.5rem 0.3rem' : '0.6rem 0.5rem',
+        zIndex: 100,
+      }}>
+        <div style={{ display: 'flex', justifyContent: 'space-around', alignItems: 'center', gap: 2 }}>
+          {[
+            { id: 'command',        label: 'Command',  Icon: Shield },
+            { id: 'leads',          label: 'Leads',    Icon: UserPlus },
+            { id: 'output',         label: 'Output',   Icon: Send },
+            { id: 'productivity',   label: 'Produc',   Icon: Target },
+            { id: 'client-agenda',  label: 'Agenda',   Icon: Calendar },
+          ].map(item => {
+            const isActive = activeTab === item.id
+            return (
+              <button
+                key={item.id}
+                onClick={() => navigateTo(item.id)}
+                style={{
+                  flex: 1,
+                  display: 'flex', flexDirection: 'column',
+                  alignItems: 'center', gap: 3,
+                  padding: isMobile ? '0.35rem 0.2rem' : '0.45rem 0.3rem',
+                  background: isActive ? 'rgba(255,215,0,0.1)' : 'transparent',
+                  border: 'none', borderRadius: 14,
+                  cursor: 'pointer',
+                  touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+                  minHeight: 44, minWidth: 44,
+                  transition: 'background 0.15s ease',
+                }}
+              >
+                <item.Icon
+                  size={isMobile ? 20 : 22}
+                  color={isActive ? G.primary : 'rgba(255,255,255,0.42)'}
+                  strokeWidth={isActive ? 2.5 : 1.9}
+                />
+                <span style={{
+                  fontSize: isMobile ? '0.52rem' : '0.58rem',
+                  fontWeight: isActive ? 800 : 600,
+                  color: isActive ? G.primary : 'rgba(255,255,255,0.35)',
+                  letterSpacing: '-0.01em', lineHeight: 1,
+                }}>
+                  {item.label}
+                </span>
+              </button>
+            )
+          })}
+
+          {/* Meer — opent een bottom-sheet met alle secundaire tabs */}
+          <button
+            onClick={() => setMoreOpen(o => !o)}
+            style={{
+              flex: 1,
+              display: 'flex', flexDirection: 'column',
+              alignItems: 'center', gap: 3,
+              padding: isMobile ? '0.35rem 0.2rem' : '0.45rem 0.3rem',
+              background: (moreOpen || isMoreTab) ? 'rgba(255,215,0,0.1)' : 'transparent',
+              border: 'none', borderRadius: 14,
+              cursor: 'pointer',
+              touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+              minHeight: 44, minWidth: 44,
+            }}
+          >
+            <MoreHorizontal
+              size={isMobile ? 20 : 22}
+              color={(moreOpen || isMoreTab) ? G.primary : 'rgba(255,255,255,0.42)'}
+              strokeWidth={(moreOpen || isMoreTab) ? 2.5 : 1.9}
+            />
+            <span style={{
+              fontSize: isMobile ? '0.52rem' : '0.58rem',
+              fontWeight: (moreOpen || isMoreTab) ? 800 : 600,
+              color: (moreOpen || isMoreTab) ? G.primary : 'rgba(255,255,255,0.35)',
+              letterSpacing: '-0.01em', lineHeight: 1,
+            }}>
+              Meer
+            </span>
+          </button>
+
+          {/* Wissel (naar client portal) — custom render PortalSwitchButton */}
+          <div style={{ flex: 1, display: 'flex', justifyContent: 'center' }}>
+            <PortalSwitchButton target="client" db={db} iconOnly />
+          </div>
+
+          {/* Uitlog */}
+          <button
+            onClick={handleLogout}
+            style={{
+              flex: 1,
+              display: 'flex', flexDirection: 'column',
+              alignItems: 'center', gap: 3,
+              padding: isMobile ? '0.35rem 0.2rem' : '0.45rem 0.3rem',
+              background: 'transparent',
+              border: 'none', borderRadius: 14,
+              cursor: 'pointer',
+              touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+              minHeight: 44, minWidth: 44,
+            }}
+          >
+            <LogOut
+              size={isMobile ? 20 : 22}
+              color="rgba(239,68,68,0.7)"
+              strokeWidth={2}
+            />
+            <span style={{
+              fontSize: isMobile ? '0.52rem' : '0.58rem',
+              fontWeight: 700,
+              color: 'rgba(239,68,68,0.7)',
+              letterSpacing: '-0.01em', lineHeight: 1,
+            }}>
+              Uitlog
+            </span>
+          </button>
+        </div>
+      </nav>)}
+
+      {/* ═══ MEER BOTTOM-SHEET ═══ */}
+      {/* Opent boven de bottom-nav als de coach op "Meer" tikt. Bevat
+          alle secundaire tabs (sales, funnel, plan-wizard, ai-meals,
+          meal-templates, supplements, workout-builder, calls, coachvids,
+          workout-analytics, spots, client-intel, checkins, etc.). */}
+      {moreOpen && createPortal((
+        <>
+          <div
+            onClick={() => setMoreOpen(false)}
+            style={{
+              position: 'fixed', inset: 0,
+              background: 'rgba(0,0,0,0.5)',
+              // Boven de floating side-widgets (z ~2.1 mld) zodat klikken in het
+              // Meer-menu niet 'doorvallen' naar die widgets/pagina eronder.
+              zIndex: 2147483646,
+            }}
+          />
+          <div style={{
+            position: 'fixed',
+            bottom: isMobile ? 102 : 110,
+            left: isMobile ? 10 : '50%',
+            right: isMobile ? 10 : 'auto',
+            transform: isMobile ? 'none' : 'translateX(-50%)',
+            width: isMobile ? 'auto' : 'min(720px, calc(100vw - 32px))',
+            maxHeight: 'calc(100vh - 200px)',
+            overflowY: 'auto',
+            background: 'rgba(10, 10, 10, 0.96)',
+            backdropFilter: 'blur(20px)',
+            WebkitBackdropFilter: 'blur(20px)',
+            border: '1px solid rgba(255,255,255,0.08)',
+            borderRadius: 22,
+            boxShadow: '0 -18px 48px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,215,0,0.04)',
+            zIndex: 2147483647,
+          }}>
+            {MORE_CATEGORIES.map((cat, catIdx) => (
+              <div key={cat.label}>
+                <div style={{
+                  padding: '0.55rem 1.1rem 0.35rem',
+                  fontSize: '0.55rem',
+                  fontWeight: 800,
+                  color: G.text,
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.08em',
+                  borderTop: catIdx > 0 ? '1px solid rgba(255,255,255,0.04)' : 'none',
+                }}>
+                  {cat.label}
+                </div>
+                {cat.items.map(item => {
+                  const Icon = item.icon
+                  const isActive = activeTab === item.id
+                  return (
+                    <button
+                      key={item.id}
+                      onClick={() => { navigateTo(item.id); setMoreOpen(false) }}
+                      style={{
+                        width: '100%',
+                        padding: '0.7rem 1.1rem',
+                        background: isActive ? G.bgStrong : 'transparent',
+                        border: 'none',
+                        color: isActive ? G.primary : 'rgba(255,255,255,0.7)',
+                        fontSize: '0.85rem',
+                        fontWeight: isActive ? 700 : 500,
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.7rem',
+                        textAlign: 'left',
+                        touchAction: 'manipulation',
+                        WebkitTapHighlightColor: 'transparent',
+                      }}
+                    >
+                      <Icon size={16} style={{ opacity: isActive ? 1 : 0.6, flexShrink: 0 }} />
+                      {item.label}
+                      {isActive && (
+                        <div style={{
+                          marginLeft: 'auto',
+                          width: 6, height: 6, borderRadius: '50%',
+                          background: G.primary,
+                          boxShadow: `0 0 8px ${G.primary}`,
+                        }} />
+                      )}
+                    </button>
+                  )
+                })}
+              </div>
+            ))}
+          </div>
+        </>
+      ), document.body)}
 
       {/* ═══ FLOATING TASK TIMER ═══ */}
       {timerStartModal && (
@@ -770,8 +1003,85 @@ export default function CoachHub() {
         />
       )}
 
-      {/* Always-on goals overlay — fixed-top strip + tap to expand */}
-      <WeekGoalsBar db={db} coachId={user?.id} isMobile={isMobile} />
+      {/* Always-on goals overlay — fixed-top strip + tap to expand.
+          Verborgen in klantmodus. */}
+      {!clientMode && <WeekGoalsBar db={db} coachId={user?.id} isMobile={isMobile} />}
+
+      {/* Issues / ideas / klant-pijnpunten — allen bestuurd via WidgetSidebar.
+          De widgets zelf renderen alleen nog hun slide-out panel; de quick-
+          access knop staat in de sidebar onderaan. */}
+      <IssueNotesWidget
+        db={db}
+        coachId={user?.id}
+        open={widgetOpen === 'issues'}
+        onOpenChange={(o) => setWidgetOpen(o ? 'issues' : null)}
+        onCountChange={setCount('issues')}
+        onClaudePendingChange={setIssuesClaudePending}
+      />
+      <ContentIdeasWidget
+        db={db}
+        coachId={user?.id}
+        open={widgetOpen === 'ideas'}
+        onOpenChange={(o) => setWidgetOpen(o ? 'ideas' : null)}
+        onCountChange={setCount('ideas')}
+      />
+      <ClientProblemsWidget
+        db={db}
+        coachId={user?.id}
+        open={widgetOpen === 'problems'}
+        onOpenChange={(o) => setWidgetOpen(o ? 'problems' : null)}
+        onCountChange={setCount('problems')}
+      />
+
+      {/* Klantmodus-toggle — altijd zichtbaar (klein, links onderin) zodat je
+          de coach-only balken kunt verbergen als een klant meekijkt. */}
+      <button
+        onClick={toggleClientMode}
+        title={clientMode ? 'Klantmodus uit — toon balken' : 'Klantmodus aan — verberg balken (issues, quick-links, goals)'}
+        style={{
+          position: 'fixed', left: isMobile ? 10 : 14, bottom: isMobile ? 74 : 18,
+          zIndex: 2147483200,
+          width: 40, height: 40, borderRadius: 10,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          background: clientMode ? 'rgba(16,185,129,0.18)' : 'rgba(0,0,0,0.55)',
+          border: `1px solid ${clientMode ? 'rgba(16,185,129,0.5)' : 'rgba(255,255,255,0.12)'}`,
+          color: clientMode ? '#34d399' : 'rgba(255,255,255,0.6)',
+          backdropFilter: 'blur(8px)', cursor: 'pointer',
+          boxShadow: '0 4px 14px rgba(0,0,0,0.4)',
+          touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+        }}
+      >
+        {clientMode ? <EyeOff size={18} /> : <Eye size={18} />}
+      </button>
+
+      {/* Eén verticale balk rechts met snel-knoppen voor alle widgets.
+          Verborgen in klantmodus. */}
+      {!clientMode && <WidgetSidebar
+        isMobile={isMobile}
+        buttons={[
+          {
+            id: 'notifications', label: 'Meldingen', Icon: Bell, color: G.primary,
+            active: widgetOpen === 'notifications', badge: widgetCounts.notifications,
+            onClick: () => setWidgetOpen(o => o === 'notifications' ? null : 'notifications'),
+          },
+          {
+            id: 'issues', label: 'Issues', Icon: Bug, color: '#fca5a5',
+            active: widgetOpen === 'issues', badge: widgetCounts.issues,
+            goldBadge: issuesClaudePending,
+            onClick: () => setWidgetOpen(o => o === 'issues' ? null : 'issues'),
+          },
+          {
+            id: 'ideas', label: 'Ideeën', Icon: Lightbulb, color: '#c4b5fd',
+            active: widgetOpen === 'ideas', badge: widgetCounts.ideas,
+            onClick: () => setWidgetOpen(o => o === 'ideas' ? null : 'ideas'),
+          },
+          {
+            id: 'problems', label: 'Problemen', Icon: AlertCircle, color: '#fca5a5',
+            active: widgetOpen === 'problems', badge: widgetCounts.problems,
+            onClick: () => setWidgetOpen(o => o === 'problems' ? null : 'problems'),
+          },
+        ]}
+      />}
 
       {mealPanelClientId && (
         <ClientContextPanel

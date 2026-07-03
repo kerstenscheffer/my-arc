@@ -7,6 +7,7 @@
 import React, { useState } from 'react'
 import MealCard from './MealCard'
 import { Plus, Eye, EyeOff, Trash2, Edit3, MoreHorizontal, X, Apple } from 'lucide-react'
+import { foodImageFallback } from '../../foodImageFallback'
 
 const MOMENTS = [
   { id: 'breakfast', label: 'Ontbijt' },
@@ -54,28 +55,15 @@ function LoggedMealRow({ meal, onDelete, onEdit, isMobile }) {
         minHeight: '52px',
         gap: '0.75rem'
       }}>
-        {/* Thumbnail — 44x44 with gold apple placeholder */}
-        {meal.image_url ? (
-          <div style={{
-            width: '44px', height: '44px',
-            borderRadius: '12px',
-            background: `url(${meal.image_url}) center/cover, #fff`,
-            border: '1px solid rgba(255, 255, 255, 0.08)',
-            flexShrink: 0,
-          }} />
-        ) : (
-          <div style={{
-            width: '44px', height: '44px',
-            borderRadius: '12px',
-            background: 'rgba(255, 215, 0, 0.06)',
-            border: '1px solid rgba(255, 215, 0, 0.15)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            color: 'rgba(255, 215, 0, 0.55)',
-            flexShrink: 0,
-          }}>
-            <Apple size={20} strokeWidth={1.8} />
-          </div>
-        )}
+        {/* Thumbnail — 44x44; eigen foto of titel-gebaseerde fallback
+            (kwark -> zuivel, kip -> kip, enz.) i.p.v. een appel-icoon. */}
+        <div style={{
+          width: '44px', height: '44px',
+          borderRadius: '12px',
+          background: `url(${meal.image_url || foodImageFallback(meal.name || meal.title || meal.product_name, meal.meal_type, 88)}) center/cover, #111`,
+          border: '1px solid rgba(255, 255, 255, 0.08)',
+          flexShrink: 0,
+        }} />
 
         {/* Name + subtitle */}
         <div style={{ flex: 1, minWidth: 0 }}>
@@ -250,28 +238,8 @@ export default function MealTimelineMobile({
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column' }}>
-      {/* ── Plan toggle ── */}
-      {hasPlan && (
-        <button
-          onClick={() => setShowPlan(!showPlan)}
-          style={{
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            gap: '0.375rem', width: '100%',
-            padding: isMobile ? '0.5rem 1rem' : '0.625rem 1.25rem',
-            background: showPlan ? 'rgba(255, 215, 0, 0.03)' : 'transparent',
-            border: 'none',
-            borderBottom: '1px solid rgba(255, 255, 255, 0.06)',
-            color: showPlan ? 'rgba(255, 215, 0, 0.5)' : 'rgba(255, 255, 255, 0.2)',
-            fontSize: isMobile ? '0.6rem' : '0.65rem',
-            fontWeight: '600', cursor: 'pointer',
-            touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-            minHeight: '32px'
-          }}
-        >
-          {showPlan ? <EyeOff size={12} /> : <Eye size={12} />}
-          {showPlan ? 'Plan verbergen' : 'Plan tonen'}
-        </button>
-      )}
+      {/* "Plan verbergen / Plan tonen" toggle weggehaald — was ruis
+          tussen dag-navigatie en eerste maaltijd. Plan staat altijd aan. */}
 
       {/* ── Per-moment sections ── */}
       {(() => {
@@ -295,26 +263,30 @@ export default function MealTimelineMobile({
 
           return (
             <div key={moment.id}>
-              {/* Moment header */}
+              {/* Moment header — geen achtergrond/borders meer, valt nu
+                  losjes boven de zwevende kaarten. Iets meer ruimte boven
+                  zodat groepen visueel uit elkaar liggen. */}
               <div style={{
-                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                padding: isMobile ? '0.5rem 1rem' : '0.625rem 1.25rem',
-                background: 'rgba(255, 255, 255, 0.015)',
-                borderTop: isFirst ? 'none' : '1px solid rgba(255, 255, 255, 0.06)',
-                borderBottom: '1px solid rgba(255, 255, 255, 0.04)'
+                display: 'flex', alignItems: 'baseline', justifyContent: 'space-between',
+                padding: isMobile
+                  ? `${isFirst ? '0.55rem' : '0.85rem'} 1.1rem 0.4rem`
+                  : `${isFirst ? '0.65rem' : '1rem'} 1.5rem 0.5rem`,
               }}>
                 <div style={{
-                  fontSize: isMobile ? '0.85rem' : '0.9rem',
-                  fontWeight: '800', color: '#fff'
+                  fontSize: isMobile ? '0.78rem' : '0.85rem',
+                  fontWeight: 800,
+                  color: 'rgba(255,255,255,0.85)',
+                  letterSpacing: '-0.01em',
                 }}>
                   {moment.label}
                 </div>
                 {cal > 0 && (
                   <div style={{
-                    fontSize: isMobile ? '0.7rem' : '0.75rem',
-                    fontWeight: '800', color: 'rgba(255, 255, 255, 0.35)'
+                    fontSize: isMobile ? '0.62rem' : '0.68rem',
+                    fontWeight: 700,
+                    color: 'rgba(255,255,255,0.3)',
                   }}>
-                    {cal}
+                    {cal} kcal
                   </div>
                 )}
               </div>
@@ -348,33 +320,8 @@ export default function MealTimelineMobile({
         })
       })()}
 
-      {/* ── Single central "Voedingsmiddel toevoegen" — no moment pre-set,
-            modal infers from time / lets user pick. ── */}
-      {onOpenFoodLog && (
-        <button
-          onClick={() => onOpenFoodLog(null)}
-          style={{
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            gap: '0.4rem', width: '100%',
-            padding: isMobile ? '0.875rem 1rem' : '1rem 1.25rem',
-            background: 'rgba(255, 215, 0, 0.05)',
-            border: 'none',
-            borderTop: '1px solid rgba(255, 215, 0, 0.12)',
-            borderBottom: '1px solid rgba(255, 215, 0, 0.12)',
-            color: '#FFD700',
-            fontSize: isMobile ? '0.85rem' : '0.9rem',
-            fontWeight: '700',
-            letterSpacing: '-0.005em',
-            cursor: 'pointer',
-            touchAction: 'manipulation',
-            WebkitTapHighlightColor: 'transparent',
-            minHeight: '48px'
-          }}
-        >
-          <Plus size={16} strokeWidth={2.5} />
-          Voedingsmiddel toevoegen
-        </button>
-      )}
+      {/* Wijde gele "Voedingsmiddel toevoegen" knop weggehaald —
+          de floating FAB rechtsonder is de enige log-actie op de pagina. */}
     </div>
   )
 }

@@ -79,6 +79,7 @@ export async function listMealPlanTemplates() {
   const { data, error } = await supabase
     .from('meal_plan_templates')
     .select('id, title, description, targets, created_at')
+    .or('plan_type.is.null,plan_type.neq.full_week')
     .order('created_at', { ascending: false })
   
   if (error) throw error

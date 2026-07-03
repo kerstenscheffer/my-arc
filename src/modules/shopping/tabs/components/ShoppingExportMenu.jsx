@@ -14,7 +14,7 @@ export default function ShoppingExportMenu({ onShare, onCopy, onClose, isMobile 
       icon: Copy,
       label: 'Kopiëren naar klembord',
       onClick: onCopy,
-      color: '#10b981'
+      color: '#FFD700'
     }
   ]
 
@@ -59,7 +59,7 @@ export default function ShoppingExportMenu({ onShare, onCopy, onClose, isMobile 
           {/* Top accent glow */}
           <div style={{
             height: '2px',
-            background: 'linear-gradient(90deg, transparent 0%, #10b981 50%, transparent 100%)',
+            background: 'linear-gradient(90deg, transparent 0%, #FFD700 50%, transparent 100%)',
             opacity: 0.6
           }} />
 

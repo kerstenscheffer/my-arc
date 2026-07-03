@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react'
 import IntakePhase1 from './components/IntakePhase1'
 import IntakePhase3 from './components/IntakePhase3'
 import DatabaseService from '../../services/DatabaseService'
+import { findClient, updateClient } from '../../lib/publicIntakeApi'
 
 const supabase = DatabaseService.supabase
 
@@ -201,10 +202,10 @@ export default function PublicIntakePage() {
     if (!personalData?.email || phase !== 1) return
     const t = setTimeout(async () => {
       try {
-        const { data: existing } = await supabase.from('clients').select('id').eq('email', personalData.email.toLowerCase().trim()).limit(1)
-        if (!existing?.length) return
+        const existing = await findClient(personalData.email)
+        if (!existing) return
         const age = personalData.date_of_birth ? Math.floor((Date.now() - new Date(personalData.date_of_birth)) / 31557600000) : personalData.age || null
-        await supabase.from('clients').update({
+        await updateClient(existing.id, {
           first_name: personalData.first_name || null, last_name: personalData.last_name || null,
           phone: personalData.phone || null, gender: personalData.gender || null,
           date_of_birth: personalData.date_of_birth || null, age,
@@ -221,7 +222,7 @@ export default function PublicIntakePage() {
           coaching_expectations: personalData.coaching_expectations || null,
           wat_werkte_eerder: personalData.wat_werkte_eerder || null,
           waarom_gestopt: personalData.waarom_gestopt || null,
-        }).eq('id', existing[0].id)
+        })
       } catch(e) { console.error('Auto-save failed:', e) }
     }, 800)
     return () => clearTimeout(t)
@@ -247,16 +248,17 @@ export default function PublicIntakePage() {
       target_calories: data.target_calories,
     })
     try {
-      const { data: existingClients, error: lookupError } = await supabase
-        .from('clients').select('id').eq('email', data.email.toLowerCase().trim()).limit(1)
+      let existingClient = null
+      try {
+        existingClient = await findClient(data.email)
+      } catch (lookupError) { console.error('❌ Lookup error:', lookupError); setErrorType('SAVE_FAILED'); setSaving(false); return }
+      if (!existingClient) { console.warn('⚠️ Email niet gevonden:', data.email); setErrorType('EMAIL_NOT_FOUND'); setSaving(false); return }
 
-      if (lookupError) { console.error('❌ Lookup error:', lookupError); setErrorType('SAVE_FAILED'); setSaving(false); return }
-      if (!existingClients || existingClients.length === 0) { console.warn('⚠️ Email niet gevonden:', data.email); setErrorType('EMAIL_NOT_FOUND'); setSaving(false); return }
-
-      const clientId = existingClients[0].id
+      const clientId = existingClient.id
       console.log('✅ Client gevonden, id:', clientId, '— nu opslaan...')
 
-      const { error: updateError } = await supabase.from('clients').update({
+      let updateError = null
+      try { await updateClient(clientId, {
         first_name: data.first_name, last_name: data.last_name,
         phone: data.phone, gender: data.gender,
         date_of_birth: data.date_of_birth || null, age: data.age || null,
@@ -298,7 +300,7 @@ export default function PublicIntakePage() {
         target_protein: data.target_protein || null,
         target_carbs: data.target_carbs || null, target_fat: data.target_fat || null,
         intake_completed: true, intake_completed_at: new Date().toISOString()
-      }).eq('id', clientId)
+      }) } catch (e) { updateError = e }
 
       if (updateError) {
         console.error('❌ Update mislukt:', updateError)
@@ -307,9 +309,7 @@ export default function PublicIntakePage() {
 
       // training_time direct opslaan in user_workout_preferences
       if (data.training_time) {
-        const { data: clientRow } = await supabase
-          .from('clients').select('auth_user_id').eq('id', clientId).single()
-        const userId = clientRow?.auth_user_id || clientId
+        const userId = existingClient.auth_user_id || clientId
         await supabase.from('user_workout_preferences').upsert({
           user_id: userId,
           training_time: data.training_time,
@@ -345,9 +345,9 @@ export default function PublicIntakePage() {
       const email = personalData.email || (() => { try { return localStorage.getItem('myarc_intake_email') } catch { return null } })()
       if (!email) { setErrorType('NO_EMAIL'); setSaving(false); return }
 
-      const { data: clients } = await supabase.from('clients').select('id, auth_user_id').eq('email', email.toLowerCase().trim()).limit(1)
-      if (!clients?.length) { setErrorType('CLIENT_NOT_FOUND'); setSaving(false); return }
-      const { id: clientId, auth_user_id: authUserId } = clients[0]
+      const client = await findClient(email)
+      if (!client) { setErrorType('CLIENT_NOT_FOUND'); setSaving(false); return }
+      const { id: clientId, auth_user_id: authUserId } = client
 
       await supabase.from('user_workout_preferences').upsert({
         user_id: authUserId || clientId,
@@ -378,12 +378,12 @@ export default function PublicIntakePage() {
         workout_completed: true, workout_completed_at: new Date().toISOString()
       }, { onConflict: 'user_id' })
 
-      await supabase.from('clients').update({
+      await updateClient(clientId, {
         training_experience: data.experience_level || null,
         workout_days_per_week: data.days_per_week || null,
         minutes_per_session: data.time_per_session || null,
         gym_name: data.gym_name || null, injuries: data.injuries || null
-      }).eq('id', clientId)
+      })
 
       setPhase(4)
       try { localStorage.removeItem('myarc_intake_email') } catch {}

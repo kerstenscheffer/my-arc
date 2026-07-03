@@ -376,6 +376,32 @@ export default function ExpandedCard({
           flexWrap: 'wrap'
         }}
       >
+        {/* Script Button — direct zichtbaar op de card (geen menu nodig). */}
+        {!isBatchItem && onViewScript && (hasScript(contentPiece) || item?.source_content_id || (item?.item_type === 'content' && (item?.description || item?.script))) && (
+          <button
+            onClick={(e) => { e.stopPropagation(); onViewScript(item, contentPiece) }}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '0.25rem',
+              padding: '0.3rem 0.5rem',
+              borderRadius: '4px',
+              background: 'rgba(255, 215, 0, 0.18)',
+              border: '1px solid rgba(255, 215, 0, 0.45)',
+              color: '#FFD700',
+              fontSize: '0.65rem',
+              fontWeight: '700',
+              cursor: 'pointer',
+              touchAction: 'manipulation',
+              WebkitTapHighlightColor: 'transparent'
+            }}
+          >
+            <ScrollText size={12} strokeWidth={2.5} />
+            Script
+          </button>
+        )}
+
         {/* Caption Button */}
         {canHaveCaption && (
           <button

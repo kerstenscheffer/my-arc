@@ -1,11 +1,13 @@
 // src/modules/videos/CoachVideoTab.jsx
 // v3.0 — Netflix categorie rijen + nieuwe filters (custom categorie + page filter)
 import React, { useState, useEffect } from 'react'
-import { Video, Plus, FolderPlus, ChevronRight } from 'lucide-react'
+import { Video, Plus, FolderPlus, ChevronRight, GraduationCap, Send, Pencil, Trash2 } from 'lucide-react'
 import useIsMobile from '../../hooks/useIsMobile'
 import videoService from './VideoService'
+import CoachFileManager from './CoachFileManager'
 import ManageAssignmentsModal from './ManageAssignmentsModal'
 import CategoryManagerModal from './CategoryManagerModal'
+import CourseManagerModal from './CourseManagerModal'
 
 import VideoStatsCards from './video-tab-components/VideoStatsCards'
 import VideoSearchFilters from './video-tab-components/VideoSearchFilters'
@@ -48,6 +50,13 @@ export default function CoachVideoTab({ clients = [], db }) {
   const [coachId, setCoachId] = useState(null)
   const [showCategoryModal, setShowCategoryModal] = useState(false)
 
+  // Cursussen (bundels van video's)
+  const [courses, setCourses] = useState([])
+  const [showCourseModal, setShowCourseModal] = useState(false)
+  const [editingCourse, setEditingCourse] = useState(null)
+  const [showCourseAssign, setShowCourseAssign] = useState(false)
+  const [assigningCourse, setAssigningCourse] = useState(null)
+
   const isMobile = useIsMobile()
 
   useEffect(() => {
@@ -61,7 +70,8 @@ export default function CoachVideoTab({ clients = [], db }) {
       await Promise.all([
         loadVideos(user.id),
         loadClients(),
-        loadCategories(user.id)
+        loadCategories(user.id),
+        loadCourses(user.id)
       ])
     } catch (e) {
       console.error('Init failed:', e)
@@ -106,6 +116,23 @@ export default function CoachVideoTab({ clients = [], db }) {
     } catch (error) {
       console.error('Error loading categories:', error)
     }
+  }
+
+  const loadCourses = async (userId) => {
+    try {
+      const uid = userId || coachId || (await db.getCurrentUser()).id
+      const data = await videoService.getCoachCourses(uid)
+      setCourses(data)
+    } catch (error) {
+      console.error('Error loading courses:', error)
+    }
+  }
+
+  const handleDeleteCourse = async (course) => {
+    if (!confirm(`Cursus "${course.title}" verwijderen? Bestaande toewijzingen van deze cursus worden ook verwijderd.`)) return
+    const res = await videoService.deleteCourse(course.id)
+    if (res.success) await loadCourses()
+    else alert('Verwijderen mislukt: ' + (res.error || 'onbekende fout'))
   }
 
   // ── FILTER LOGIC ──
@@ -186,6 +213,9 @@ export default function CoachVideoTab({ clients = [], db }) {
       background: '#0a0a0a',
       minHeight: '100vh'
     }}>
+      {/* ── PDF / Bestanden manager — bovenaan zodat'ie meteen zichtbaar is. */}
+      {coachId && <CoachFileManager coachId={coachId} />}
+
       {/* ── HEADER ── */}
       <div style={{
         marginBottom: '1rem',
@@ -272,6 +302,33 @@ export default function CoachVideoTab({ clients = [], db }) {
                 {customCategories.length}
               </span>
             )}
+          </button>
+
+          <button
+            onClick={() => { setEditingCourse(null); setShowCourseModal(true) }}
+            style={{
+              flex: isMobile ? 1 : '0 0 auto',
+              padding: '0.55rem 0.875rem',
+              background: '#0a0a0a',
+              border: `1px solid ${GOLD}`,
+              borderRadius: '8px',
+              color: GOLD,
+              fontSize: '0.7rem',
+              fontWeight: '800',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '0.4rem',
+              touchAction: 'manipulation',
+              WebkitTapHighlightColor: 'transparent',
+              minHeight: '40px',
+              textTransform: 'uppercase',
+              letterSpacing: '0.04em'
+            }}
+          >
+            <GraduationCap size={14} />
+            Cursus
           </button>
 
           <button
@@ -374,6 +431,18 @@ export default function CoachVideoTab({ clients = [], db }) {
             </button>
           )}
         </div>
+      )}
+
+      {/* ── CURSUSSEN ── */}
+      {courses.length > 0 && (
+        <CourseRow
+          courses={courses}
+          videos={videos}
+          onAssign={(c) => { setAssigningCourse(c); setShowCourseAssign(true) }}
+          onEdit={(c) => { setEditingCourse(c); setShowCourseModal(true) }}
+          onDelete={handleDeleteCourse}
+          isMobile={isMobile}
+        />
       )}
 
       {/* ── CONTENT ── */}
@@ -510,6 +579,80 @@ export default function CoachVideoTab({ clients = [], db }) {
         coachId={coachId}
         onChange={() => loadCategories()}
       />
+
+      {/* ── CURSUS aanmaken/bewerken ── */}
+      {showCourseModal && (
+        <CourseManagerModal
+          course={editingCourse}
+          videos={videos}
+          onClose={() => { setShowCourseModal(false); setEditingCourse(null) }}
+          onSaved={() => loadCourses()}
+        />
+      )}
+
+      {/* ── CURSUS toewijzen — hergebruikt VideoAssignModal ── */}
+      {showCourseAssign && assigningCourse && (
+        <VideoAssignModal
+          video={{ title: `Cursus: ${assigningCourse.title}` }}
+          clients={localClients}
+          clientsLoading={clientsLoading}
+          onClose={() => { setShowCourseAssign(false); setAssigningCourse(null) }}
+          onAssign={async (clientIds, assignmentData) => {
+            const result = await videoService.assignCourse(assigningCourse.id, clientIds, assignmentData)
+            if (result.success) {
+              alert(`Cursus toegewezen aan ${clientIds.length} client(s)!`)
+              setShowCourseAssign(false)
+              setAssigningCourse(null)
+            } else {
+              alert('Toewijzen mislukt: ' + (result.error || 'onbekende fout'))
+            }
+          }}
+        />
+      )}
+    </div>
+  )
+}
+
+// ============================================
+// COURSE ROW — cursus-kaarten met toewijzen/bewerken/verwijderen
+// ============================================
+function CourseRow({ courses, videos, onAssign, onEdit, onDelete, isMobile }) {
+  const thumbFor = (course) => {
+    if (course.thumbnail_url) return course.thumbnail_url
+    const first = videos.find(v => v.id === (course.videoIds || [])[0])
+    return first ? videoService.getThumbnailUrl(first) : null
+  }
+  return (
+    <div style={{ marginBottom: '1.5rem' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.625rem', padding: '0 0.25rem' }}>
+        <GraduationCap size={15} color={GOLD} />
+        <div style={{ fontSize: isMobile ? '0.7rem' : '0.78rem', fontWeight: '800', color: '#fff', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Cursussen</div>
+        <div style={{ fontSize: '0.6rem', color: 'rgba(255,255,255,0.3)', fontWeight: '700' }}>· {courses.length}</div>
+      </div>
+      <div className="cvt-row" style={{ display: 'flex', gap: '0.625rem', overflowX: 'auto', WebkitOverflowScrolling: 'touch', scrollbarWidth: 'none', paddingBottom: '0.25rem' }}>
+        {courses.map(course => {
+          const thumb = thumbFor(course)
+          return (
+            <div key={course.id} style={{ flexShrink: 0, width: isMobile ? '220px' : '260px', background: '#0a0a0a', border: `1px solid ${GOLD}33`, borderRadius: 10, overflow: 'hidden' }}>
+              <div style={{ position: 'relative', height: isMobile ? 110 : 130, background: '#000' }}>
+                {thumb && <img src={thumb} alt={course.title} style={{ width: '100%', height: '100%', objectFit: 'cover', opacity: 0.85 }} onError={e => { e.currentTarget.style.display = 'none' }} />}
+                <div style={{ position: 'absolute', top: 8, left: 8, display: 'flex', alignItems: 'center', gap: 4, padding: '0.2rem 0.45rem', background: GOLD, borderRadius: 6, color: '#000', fontSize: '0.55rem', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                  <GraduationCap size={11} /> Cursus · {course.videoCount}
+                </div>
+              </div>
+              <div style={{ padding: '0.6rem 0.7rem' }}>
+                <div style={{ fontSize: '0.85rem', fontWeight: 800, color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', marginBottom: '0.5rem' }}>{course.title}</div>
+                <div style={{ display: 'flex', gap: '0.35rem' }}>
+                  <button onClick={() => onAssign(course)} style={{ flex: 2, padding: '0.45rem', background: GOLD, border: 'none', borderRadius: 6, color: '#000', fontSize: '0.62rem', fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4, textTransform: 'uppercase' }}><Send size={11} /> Toewijzen</button>
+                  <button onClick={() => onEdit(course)} style={{ flex: 1, padding: '0.45rem', background: 'transparent', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 6, color: 'rgba(255,255,255,0.6)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Pencil size={12} /></button>
+                  <button onClick={() => onDelete(course)} style={{ flex: 1, padding: '0.45rem', background: 'transparent', border: '1px solid rgba(239,68,68,0.2)', borderRadius: 6, color: 'rgba(239,68,68,0.6)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Trash2 size={12} /></button>
+                </div>
+              </div>
+            </div>
+          )
+        })}
+      </div>
+      <style>{`.cvt-row::-webkit-scrollbar { display: none; }`}</style>
     </div>
   )
 }

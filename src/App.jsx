@@ -4,6 +4,7 @@ import SalesInfoPage from './pages/SalesInfoPage'
 import SalesSlider from './pages/SalesSlider'
 import SalesScrollPage from './pages/SalesScrollPageClean'
 import PrivacyPolicy from './pages/PrivacyPolicy'
+import SupportPage from './pages/SupportPage'
 import CoachingGuidePage from './pages/CoachingGuidePage'
 import MyArcInfo from './pages/myarcinfo/MyArcInfo'
 import IntakePage from './intake/IntakePage'
@@ -17,9 +18,12 @@ import TillTheGoalPage from './till-the-goal/TillTheGoalPage'
 import YourArcFunnel from './modules/funnel-pages/your-arc/YourArcFunnel'
 import MyArcFunnel from './modules/funnel-pages/my-arc/MyArcFunnelMain'
 import CheckoutPage from './pages/CheckoutPage'
+import BackInShapeCheckout from './pages/BackInShapeCheckout'
+import BackInShapeMonthlyCheckout from './pages/BackInShapeMonthlyCheckout'
 import EightWeekCheckout from './pages/EightWeekCheckout'
 import TwelveWeekCheckout from './pages/TwelveWeekCheckout'
 import MonthlySubscriptionCheckout from './pages/MonthlySubscriptionCheckout'
+import MaandCheckout from './pages/MaandCheckout'
 import SixMonthSubscriptionCheckout from './pages/SixMonthSubscriptionCheckout'
 import Homepage from './pages/Homepage'
 import LeadPicGenerator from './modules/lead-pic-generator/LeadPicGenerator'
@@ -29,10 +33,14 @@ import ResultPage from './lead-magnet/ResultPage'
 import SevenSecretsFunnel from './lead-magnet/7secretsfunnel/7SecretsFunnel'
 import GiveawayPage from './lead-magnet/7secretsfunnel/GiveawayPage'
 import SalesCallPage from './sales-call/SalesCallPage'
+import BackInShapePage from './sales-call/BackInShapePage'
+import VSLLandingPage from './sales-call-vsl/VSLLandingPage'
+import SalesCallVSLPage from './sales-call-vsl/SalesCallVSLPage'
 import NutritionIntakePage from './modules/nutrition-intake/NutritionIntakePage'
 import PublicIntakePage from './modules/public-intake/PublicIntakePage'
 import HubRouter from './modules/resource-hub/HubRouter'
 import QualificationFunnelPage from './modules/qualification-funnel'
+import LinkFunnelPage from './link-funnel/LinkFunnelPage'
 import { useState, useEffect } from 'react'
 import Login from './components/Login'
 import ResetPassword from './components/ResetPassword'
@@ -113,6 +121,25 @@ function App() {
     return <SalesCallPage />
   }
 
+  // Sales-pagina-kopie met gratis strategiegesprek-CTA i.p.v. prijzen
+  if (currentPath === '/backinshape') {
+    return <BackInShapePage />
+  }
+
+  // Publieke VSL-landing voor het "5 Uur Per Week Back In Shape" aanbod
+  // (Instagram link in bio). Cold traffic ziet hier de video + CTA naar
+  // Calendly.
+  if (currentPath === '/5-uur-per-week-back-in-shape') {
+    return <VSLLandingPage />
+  }
+
+  // Fullscreen sales-call presentatie voor hetzelfde aanbod. Bedoeld
+  // om tijdens een Zoom-call scherm te delen — geen CTA, alleen visuele
+  // ondersteuning bij wat Kersten vertelt.
+  if (currentPath === '/5uur-call') {
+    return <SalesCallVSLPage />
+  }
+
   // Call booking funnel (moved to /fitworden)
   if (currentPath === '/fitworden') {
     return <Homepage />
@@ -121,6 +148,14 @@ function App() {
   // Checkout pages (public)
   if (currentPath === '/checkout') {
     return <CheckoutPage />
+  }
+
+  if (currentPath === '/back-in-shape') {
+    return <BackInShapeCheckout />
+  }
+
+  if (currentPath === '/back-in-shape-maandelijks') {
+    return <BackInShapeMonthlyCheckout />
   }
 
   if (currentPath === '/8-week-checkout') {
@@ -133,6 +168,10 @@ function App() {
 
   if (currentPath === '/monthly-checkout') {
     return <MonthlySubscriptionCheckout />
+  }
+
+  if (currentPath === '/maand-checkout') {
+    return <MaandCheckout />
   }
 
   if (currentPath === '/6month-checkout') {
@@ -264,9 +303,11 @@ function App() {
     return <ThankYouPage />
   }
 
-  // Qualification funnel - NEW
+  // Klik-funnel voor link-verkeer (5 uur per week in shape programma).
+  // Was: QualificationFunnelPage — die blijft als component bestaan en is
+  // weer aan /start te koppelen door deze regel terug te zetten.
   if (currentPath === '/start') {
-    return <QualificationFunnelPage />
+    return <LinkFunnelPage />
   }
 
   // Client onboarding (public for new clients)
@@ -333,6 +374,11 @@ function App() {
   // Privacy Policy
   if (currentPath === '/privacy') {
     return <PrivacyPolicy />
+  }
+
+  // Support
+  if (currentPath === '/support') {
+    return <SupportPage />
   }
 
   // Coaching Guide

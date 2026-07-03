@@ -31,31 +31,31 @@ export default function ShoppingEmpty({
           margin: '0 auto',
           marginBottom: isMobile ? '1.5rem' : '2rem',
           borderRadius: isMobile ? '20px' : '24px',
-          background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.15) 0%, rgba(16, 185, 129, 0.08) 100%)',
+          background: 'linear-gradient(135deg, rgba(255, 215, 0, 0.15) 0%, rgba(255, 215, 0, 0.08) 100%)',
           backdropFilter: 'blur(12px)',
-          border: '1px solid rgba(16, 185, 129, 0.3)',
+          border: '1px solid rgba(255, 215, 0, 0.3)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          boxShadow: '0 8px 32px rgba(16, 185, 129, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.05)',
+          boxShadow: '0 8px 32px rgba(255, 215, 0, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.05)',
           animation: loading ? 'pulse 2s ease-in-out infinite' : 'none'
         }}>
           {loading ? (
             <Loader2 
               size={isMobile ? 32 : 40} 
-              color="#10b981"
+              color="#FFD700"
               style={{ 
                 animation: 'spin 1s linear infinite',
-                filter: 'drop-shadow(0 0 8px rgba(16, 185, 129, 0.6))'
+                filter: 'drop-shadow(0 0 8px rgba(255, 215, 0, 0.6))'
               }}
             />
           ) : Icon ? (
             <Icon 
               size={isMobile ? 32 : 40} 
-              color="#10b981"
+              color="#FFD700"
               strokeWidth={2}
               style={{ 
-                filter: 'drop-shadow(0 0 8px rgba(16, 185, 129, 0.6))'
+                filter: 'drop-shadow(0 0 8px rgba(255, 215, 0, 0.6))'
               }}
             />
           ) : null}
@@ -107,16 +107,16 @@ export default function ShoppingEmpty({
             onClick={action.onClick}
             style={{
               marginTop: isMobile ? '1.5rem' : '2rem',
-              background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.15) 0%, rgba(16, 185, 129, 0.08) 100%)',
+              background: 'linear-gradient(135deg, rgba(255, 215, 0, 0.15) 0%, rgba(255, 215, 0, 0.08) 100%)',
               backdropFilter: 'blur(12px)',
-              border: '1px solid rgba(16, 185, 129, 0.3)',
+              border: '1px solid rgba(255, 215, 0, 0.3)',
               borderRadius: isMobile ? '12px' : '14px',
               padding: isMobile ? '0.875rem 1.5rem' : '1rem 2rem',
               display: 'inline-flex',
               alignItems: 'center',
               gap: '0.625rem',
               cursor: 'pointer',
-              boxShadow: '0 4px 16px rgba(16, 185, 129, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.05)',
+              boxShadow: '0 4px 16px rgba(255, 215, 0, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.05)',
               transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
               touchAction: 'manipulation',
               WebkitTapHighlightColor: 'transparent',
@@ -127,13 +127,13 @@ export default function ShoppingEmpty({
             onMouseEnter={(e) => {
               if (!isMobile) {
                 e.currentTarget.style.transform = 'translateY(-2px) scale(1.02)'
-                e.currentTarget.style.boxShadow = '0 8px 24px rgba(16, 185, 129, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.1)'
+                e.currentTarget.style.boxShadow = '0 8px 24px rgba(255, 215, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.1)'
               }
             }}
             onMouseLeave={(e) => {
               if (!isMobile) {
                 e.currentTarget.style.transform = 'translateZ(0)'
-                e.currentTarget.style.boxShadow = '0 4px 16px rgba(16, 185, 129, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.05)'
+                e.currentTarget.style.boxShadow = '0 4px 16px rgba(255, 215, 0, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.05)'
               }
             }}
             onTouchStart={(e) => {
@@ -150,18 +150,18 @@ export default function ShoppingEmpty({
             {action.icon && (
               <action.icon 
                 size={isMobile ? 16 : 18} 
-                color="#10b981"
+                color="#FFD700"
                 strokeWidth={2.5}
-                style={{ filter: 'drop-shadow(0 0 4px rgba(16, 185, 129, 0.6))' }}
+                style={{ filter: 'drop-shadow(0 0 4px rgba(255, 215, 0, 0.6))' }}
               />
             )}
             <span style={{
-              color: '#10b981',
+              color: '#FFD700',
               fontSize: isMobile ? '0.875rem' : '0.95rem',
               fontWeight: '800',
               textTransform: 'uppercase',
               letterSpacing: '-0.01em',
-              textShadow: '0 2px 8px rgba(16, 185, 129, 0.3)'
+              textShadow: '0 2px 8px rgba(255, 215, 0, 0.3)'
             }}>
               {action.label}
             </span>

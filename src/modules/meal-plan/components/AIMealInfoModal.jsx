@@ -178,7 +178,15 @@ function InfoTab({ meal, ingredients, loading, calcMacros, isMobile }) {
             {ingredients.map((ing, idx) => {
               const macros = calcMacros(ing)
               return (
-                <div key={idx} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.5rem 0', borderBottom: idx < ingredients.length - 1 ? '1px solid rgba(255,255,255,0.03)' : 'none' }}>
+                <div key={idx} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.6rem', padding: '0.5rem 0', borderBottom: idx < ingredients.length - 1 ? '1px solid rgba(255,255,255,0.03)' : 'none' }}>
+                  {/* Ingrediënt-thumbnail + letter-fallback (zelfde patroon als Voedingsgids) */}
+                  <div style={{ width: 40, height: 40, borderRadius: 9, flexShrink: 0, overflow: 'hidden', background: 'rgba(255,255,255,0.05)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    {ing.image_url ? (
+                      <img src={ing.image_url} alt={ing.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={e => { e.currentTarget.style.display = 'none' }} />
+                    ) : (
+                      <span style={{ fontSize: '1.1rem', fontWeight: 800, color: 'rgba(255,215,0,0.6)' }}>{(ing.name || '?').charAt(0).toUpperCase()}</span>
+                    )}
+                  </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontSize: '0.82rem', fontWeight: '600', color: 'rgba(255,255,255,0.8)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{ing.name}</div>
                     <div style={{ fontSize: '0.6rem', color: 'rgba(255,255,255,0.25)', marginTop: '0.1rem' }}>{macros.calories} kcal · {macros.protein}g E</div>

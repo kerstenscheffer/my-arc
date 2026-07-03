@@ -3,9 +3,10 @@ import useIsMobile from '../../../hooks/useIsMobile'
 // VERVANG JE HELE BESTAND HIERMEE - ALLES IN 1 FILE
 import React, { useEffect } from 'react'
 import { 
-  Utensils, Star, RefreshCw, CheckCircle2, 
+  Utensils, Star, RefreshCw, CheckCircle2,
   Flame, Dumbbell, Zap, Droplets, PlusCircle
 } from 'lucide-react'
+import { foodImageFallback } from '../foodImageFallback'
 
 // Image service direct in dit bestand - geen aparte file nodig
 const getMealImage = (mealName) => {
@@ -99,8 +100,8 @@ const getMealImage = (mealName) => {
     }
   }
   
-  // Laatste fallback - generieke healthy food foto
-  return 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=200&h=200&fit=crop';
+  // Laatste fallback - titel-gebaseerde foto (kwark -> zuivel, enz.)
+  return foodImageFallback(mealName, null, 200);
 };
 
 export default function MealList({

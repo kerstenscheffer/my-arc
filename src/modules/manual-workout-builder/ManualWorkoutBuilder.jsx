@@ -4,8 +4,9 @@ import DayBuilder from './components/DayBuilder'
 import ExerciseSelector from './components/ExerciseSelector'
 import TemplateManager from './components/TemplateManager'
 import ClientAssigner from './components/ClientAssigner'
-import { Activity, Plus, Save, Users, FileText, ChevronDown } from 'lucide-react'
+import { Activity, Plus, Save, Users, FileText, ChevronDown, Video } from 'lucide-react'
 import PDFExportButton from './components/PDFExportButton'
+import ExerciseLibraryModal from './components/ExerciseLibraryModal'
 
 export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
   const isMobile = window.innerWidth <= 768
@@ -24,6 +25,7 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
   const [clientSchemas, setClientSchemas] = useState([])
   const [selectedSchemaId, setSelectedSchemaId] = useState(null)
   const [showSchemaPicker, setShowSchemaPicker] = useState(false)
+  const [showExerciseLibrary, setShowExerciseLibrary] = useState(false)
 
   useEffect(() => { loadTemplates() }, [])
 
@@ -202,10 +204,29 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
 
         {/* Header row */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1rem', flexWrap: 'wrap' }}>
-          <Activity size={24} color="#10b981" />
-          <h1 style={{ fontSize: isMobile ? '1.5rem' : '2rem', fontWeight: '800', background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', margin: 0 }}>
+          <Activity size={24} color="#f97316" />
+          <h1 style={{ fontSize: isMobile ? '1.5rem' : '2rem', fontWeight: '800', background: 'linear-gradient(135deg, #f97316 0%, #ea580c 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', margin: 0 }}>
             Manual Workout Builder
           </h1>
+
+          {/* Open the full exercise library — coach can attach videos to
+              any exercise without first dropping it into a workout day. */}
+          <button
+            onClick={() => setShowExerciseLibrary(true)}
+            title="Bibliotheek beheren · video's koppelen"
+            style={{
+              display: 'inline-flex', alignItems: 'center', gap: 5,
+              padding: '0.35rem 0.7rem',
+              background: 'rgba(255,215,0,0.12)',
+              border: '1px solid rgba(255,215,0,0.35)',
+              borderRadius: 6,
+              color: '#FFD700',
+              fontSize: '0.72rem', fontWeight: 800,
+              cursor: 'pointer', touchAction: 'manipulation',
+            }}
+          >
+            <Video size={12} /> Video's beheren
+          </button>
           {selectedClient && (
             <span style={{ fontSize: '0.75rem', fontWeight: '700', color: '#FFD700', background: 'rgba(255,215,0,0.1)', border: '1px solid rgba(255,215,0,0.2)', borderRadius: '6px', padding: '0.2rem 0.5rem' }}>
               {clientName}
@@ -216,7 +237,7 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
           {clientSchemas.length > 1 && (
             <div style={{ position: 'relative' }}>
               <button onClick={() => setShowSchemaPicker(!showSchemaPicker)}
-                style={{ display: 'flex', alignItems: 'center', gap: '0.375rem', padding: '0.35rem 0.75rem', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', color: 'rgba(255,255,255,0.7)', fontSize: '0.75rem', fontWeight: '600', cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}>
+                style={{ display: 'flex', alignItems: 'center', gap: '0.375rem', padding: '0.35rem 0.75rem', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '10px', color: 'rgba(255,255,255,0.7)', fontSize: '0.75rem', fontWeight: '600', cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}>
                 {activeSchema?._label || activeSchema?.name || 'Schema kiezen'}
                 <ChevronDown size={13} style={{ transition: 'transform 0.2s', transform: showSchemaPicker ? 'rotate(180deg)' : 'rotate(0)' }} />
               </button>
@@ -239,14 +260,14 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
 
         {/* Inputs */}
         <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '2fr 3fr', gap: '1rem', marginBottom: '1rem' }}>
-          <input type="text" placeholder="Workout naam... *" value={workoutPlan.name} onChange={(e) => setWorkoutPlan(prev => ({ ...prev, name: e.target.value }))} style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', padding: '0.75rem', color: '#fff', fontSize: isMobile ? '0.9rem' : '1rem', minHeight: '44px', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }} />
-          <input type="text" placeholder="Beschrijving..." value={workoutPlan.description} onChange={(e) => setWorkoutPlan(prev => ({ ...prev, description: e.target.value }))} style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', padding: '0.75rem', color: '#fff', fontSize: isMobile ? '0.9rem' : '1rem', minHeight: '44px', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }} />
+          <input type="text" placeholder="Workout naam... *" value={workoutPlan.name} onChange={(e) => setWorkoutPlan(prev => ({ ...prev, name: e.target.value }))} style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '10px', padding: '0.75rem', color: '#fff', fontSize: isMobile ? '0.9rem' : '1rem', minHeight: '44px', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }} />
+          <input type="text" placeholder="Beschrijving..." value={workoutPlan.description} onChange={(e) => setWorkoutPlan(prev => ({ ...prev, description: e.target.value }))} style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '10px', padding: '0.75rem', color: '#fff', fontSize: isMobile ? '0.9rem' : '1rem', minHeight: '44px', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }} />
         </div>
 
         <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(3, 1fr)', gap: '1rem', marginBottom: '1rem' }}>
           <div>
             <label style={{ display: 'block', color: 'rgba(255,255,255,0.7)', fontSize: '0.85rem', marginBottom: '0.25rem' }}>Primary Goal *</label>
-            <select value={workoutPlan.primary_goal} onChange={(e) => setWorkoutPlan(prev => ({ ...prev, primary_goal: e.target.value }))} style={{ width: '100%', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', padding: '0.75rem', color: '#fff', fontSize: isMobile ? '0.9rem' : '1rem', cursor: 'pointer', minHeight: '44px' }}>
+            <select value={workoutPlan.primary_goal} onChange={(e) => setWorkoutPlan(prev => ({ ...prev, primary_goal: e.target.value }))} style={{ width: '100%', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '10px', padding: '0.75rem', color: '#fff', fontSize: isMobile ? '0.9rem' : '1rem', cursor: 'pointer', minHeight: '44px' }}>
               <option value="muscle_gain">Muscle Gain</option>
               <option value="fat_loss">Fat Loss</option>
               <option value="strength">Strength</option>
@@ -257,7 +278,7 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
           </div>
           <div>
             <label style={{ display: 'block', color: 'rgba(255,255,255,0.7)', fontSize: '0.85rem', marginBottom: '0.25rem' }}>Experience Level *</label>
-            <select value={workoutPlan.experience_level} onChange={(e) => setWorkoutPlan(prev => ({ ...prev, experience_level: e.target.value }))} style={{ width: '100%', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', padding: '0.75rem', color: '#fff', fontSize: isMobile ? '0.9rem' : '1rem', cursor: 'pointer', minHeight: '44px' }}>
+            <select value={workoutPlan.experience_level} onChange={(e) => setWorkoutPlan(prev => ({ ...prev, experience_level: e.target.value }))} style={{ width: '100%', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '10px', padding: '0.75rem', color: '#fff', fontSize: isMobile ? '0.9rem' : '1rem', cursor: 'pointer', minHeight: '44px' }}>
               <option value="beginner">Beginner</option>
               <option value="intermediate">Intermediate</option>
               <option value="advanced">Advanced</option>
@@ -265,7 +286,7 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
           </div>
           <div>
             <label style={{ display: 'block', color: 'rgba(255,255,255,0.7)', fontSize: '0.85rem', marginBottom: '0.25rem' }}>Days Per Week</label>
-            <div style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', padding: '0.75rem', color: '#10b981', fontSize: isMobile ? '0.9rem' : '1rem', minHeight: '44px', display: 'flex', alignItems: 'center', fontWeight: '600' }}>
+            <div style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '10px', padding: '0.75rem', color: '#f97316', fontSize: isMobile ? '0.9rem' : '1rem', minHeight: '44px', display: 'flex', alignItems: 'center', fontWeight: '600' }}>
               {workoutPlan.days.length} dagen
             </div>
           </div>
@@ -273,20 +294,20 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
 
         {/* Action buttons */}
         <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-          <button onClick={() => setShowTemplateManager(true)} style={{ padding: '0.5rem 1rem', background: 'rgba(139,92,246,0.2)', border: '1px solid rgba(139,92,246,0.3)', borderRadius: '8px', color: '#8b5cf6', fontSize: isMobile ? '0.85rem' : '0.9rem', fontWeight: '600', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.5rem', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', minHeight: '44px' }}>
+          <button onClick={() => setShowTemplateManager(true)} style={{ padding: '0.5rem 1rem', background: 'rgba(139,92,246,0.2)', border: '1px solid rgba(139,92,246,0.3)', borderRadius: '10px', color: '#8b5cf6', fontSize: isMobile ? '0.85rem' : '0.9rem', fontWeight: '600', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.5rem', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', minHeight: '44px' }}>
             <FileText size={16} /> Templates
           </button>
-          <button onClick={saveAsTemplate} disabled={saving || workoutPlan.days.length === 0 || !workoutPlan.name} style={{ padding: '0.5rem 1rem', background: 'rgba(16,185,129,0.2)', border: '1px solid rgba(16,185,129,0.3)', borderRadius: '8px', color: '#10b981', fontSize: isMobile ? '0.85rem' : '0.9rem', fontWeight: '600', cursor: saving || !workoutPlan.name ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', gap: '0.5rem', opacity: workoutPlan.days.length === 0 || !workoutPlan.name ? 0.5 : 1, touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', minHeight: '44px' }}>
+          <button onClick={saveAsTemplate} disabled={saving || workoutPlan.days.length === 0 || !workoutPlan.name} style={{ padding: '0.5rem 1rem', background: 'rgba(249,115,22,0.2)', border: '1px solid rgba(249,115,22,0.3)', borderRadius: '10px', color: '#f97316', fontSize: isMobile ? '0.85rem' : '0.9rem', fontWeight: '600', cursor: saving || !workoutPlan.name ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', gap: '0.5rem', opacity: workoutPlan.days.length === 0 || !workoutPlan.name ? 0.5 : 1, touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', minHeight: '44px' }}>
             <Save size={16} /> {saving ? 'Opslaan...' : 'Save Template'}
           </button>
 
           {selectedSchemaId && (
-            <button onClick={saveToClientSchema} disabled={saving} style={{ padding: '0.5rem 1rem', background: 'rgba(255,215,0,0.12)', border: '1px solid rgba(255,215,0,0.3)', borderRadius: '8px', color: '#FFD700', fontSize: isMobile ? '0.85rem' : '0.9rem', fontWeight: '600', cursor: saving ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', gap: '0.5rem', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', minHeight: '44px' }}>
+            <button onClick={saveToClientSchema} disabled={saving} style={{ padding: '0.5rem 1rem', background: 'rgba(255,215,0,0.12)', border: '1px solid rgba(255,215,0,0.3)', borderRadius: '10px', color: '#FFD700', fontSize: isMobile ? '0.85rem' : '0.9rem', fontWeight: '600', cursor: saving ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', gap: '0.5rem', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', minHeight: '44px' }}>
               <Save size={16} /> {saving ? 'Opslaan...' : 'Opslaan in client plan'}
             </button>
           )}
 
-          <button onClick={() => setShowClientAssigner(true)} disabled={workoutPlan.days.length === 0} style={{ padding: '0.5rem 1rem', background: 'rgba(59,130,246,0.2)', border: '1px solid rgba(59,130,246,0.3)', borderRadius: '8px', color: '#3b82f6', fontSize: isMobile ? '0.85rem' : '0.9rem', fontWeight: '600', cursor: workoutPlan.days.length === 0 ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', gap: '0.5rem', opacity: workoutPlan.days.length === 0 ? 0.5 : 1, touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', minHeight: '44px' }}>
+          <button onClick={() => setShowClientAssigner(true)} disabled={workoutPlan.days.length === 0} style={{ padding: '0.5rem 1rem', background: 'rgba(59,130,246,0.2)', border: '1px solid rgba(59,130,246,0.3)', borderRadius: '10px', color: '#3b82f6', fontSize: isMobile ? '0.85rem' : '0.9rem', fontWeight: '600', cursor: workoutPlan.days.length === 0 ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', gap: '0.5rem', opacity: workoutPlan.days.length === 0 ? 0.5 : 1, touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', minHeight: '44px' }}>
             <Users size={16} /> Assign to Clients
           </button>
         </div>
@@ -302,17 +323,24 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
             onUpdateExercise={(exerciseId, updates) => updateExercise(day.id, exerciseId, updates)}
             onDeleteExercise={(exerciseId) => deleteExercise(day.id, exerciseId)} isMobile={isMobile} />
         ))}
-        <button onClick={addDay} style={{ background: 'rgba(16,185,129,0.1)', border: '2px dashed rgba(16,185,129,0.3)', borderRadius: '16px', padding: isMobile ? '2rem' : '3rem', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', cursor: 'pointer', minHeight: isMobile ? '150px' : '200px', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}
-          onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(16,185,129,0.2)'; e.currentTarget.style.borderColor = 'rgba(16,185,129,0.5)' }}
-          onMouseLeave={(e) => { e.currentTarget.style.background = 'rgba(16,185,129,0.1)'; e.currentTarget.style.borderColor = 'rgba(16,185,129,0.3)' }}>
-          <Plus size={32} color="#10b981" />
-          <span style={{ color: '#10b981', fontSize: isMobile ? '0.9rem' : '1rem', fontWeight: '600' }}>Nieuwe Dag Toevoegen</span>
+        <button onClick={addDay} style={{ background: 'rgba(249,115,22,0.1)', border: '2px dashed rgba(249,115,22,0.3)', borderRadius: '16px', padding: isMobile ? '2rem' : '3rem', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', cursor: 'pointer', minHeight: isMobile ? '150px' : '200px', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}
+          onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(249,115,22,0.2)'; e.currentTarget.style.borderColor = 'rgba(249,115,22,0.5)' }}
+          onMouseLeave={(e) => { e.currentTarget.style.background = 'rgba(249,115,22,0.1)'; e.currentTarget.style.borderColor = 'rgba(249,115,22,0.3)' }}>
+          <Plus size={32} color="#f97316" />
+          <span style={{ color: '#f97316', fontSize: isMobile ? '0.9rem' : '1rem', fontWeight: '600' }}>Nieuwe Dag Toevoegen</span>
         </button>
       </div>
 
       {showExerciseSelector && <ExerciseSelector onSelect={addExercise} onClose={() => setShowExerciseSelector(false)} isMobile={isMobile} db={db} selectedClient={selectedClient} />}
       {showTemplateManager && <TemplateManager templates={templates} onLoad={loadTemplate} onClose={() => setShowTemplateManager(false)} isMobile={isMobile} />}
       {showClientAssigner && <ClientAssigner clients={clients} workoutPlan={workoutPlan} db={db} initialClient={selectedClient || null} onClose={() => setShowClientAssigner(false)} isMobile={isMobile} />}
+
+      <ExerciseLibraryModal
+        isOpen={showExerciseLibrary}
+        onClose={() => setShowExerciseLibrary(false)}
+        db={db}
+        isMobile={isMobile}
+      />
 
       <PDFExportButton workoutPlan={workoutPlan} db={db} isMobile={isMobile} />
     </div>

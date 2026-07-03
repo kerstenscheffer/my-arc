@@ -22,6 +22,7 @@ import {
   Copy,
   Check,
   Eye,
+  Send,
   X
 } from 'lucide-react'
 
@@ -61,6 +62,7 @@ export default function CheckinDetailView({
   checkin,
   onBack,
   onMarkReviewed,
+  onSendFeedback,
   onExportPDF,
   onExportCoachNotes,
   saving = false
@@ -69,6 +71,12 @@ export default function CheckinDetailView({
   const [copiedNotes, setCopiedNotes] = useState(false)
   const [expandedSection, setExpandedSection] = useState(null)
   const [showNotesModal, setShowNotesModal] = useState(false)
+  // Feedback-modal: open vanuit "Markeer als Bekeken" OF vanuit een
+  // standalone follow-up-knop bij reeds beoordeelde check-ins.
+  const [showFeedbackModal, setShowFeedbackModal] = useState(false)
+  const [feedbackDraft, setFeedbackDraft] = useState(checkin?.coach_message || '')
+  const [feedbackSending, setFeedbackSending] = useState(false)
+  const [feedbackSent, setFeedbackSent] = useState(false)
   
   if (!checkin) return null
   
@@ -579,10 +587,12 @@ export default function CheckinDetailView({
         </div>
       )}
       
-      {/* Mark as Reviewed Button */}
+      {/* Mark as Reviewed Button — opent de feedback-modal zodat coach
+          tegelijk een bericht naar de client kan sturen. Skip-knop binnen
+          de modal markeert alleen. */}
       {checkin.status === 'submitted' && (
         <button
-          onClick={onMarkReviewed}
+          onClick={() => { setFeedbackDraft(checkin?.coach_message || ''); setShowFeedbackModal(true) }}
           disabled={saving}
           style={{
             width: '100%',
@@ -606,8 +616,220 @@ export default function CheckinDetailView({
           }}
         >
           <CheckCircle size={22} />
-          {saving ? 'Opslaan...' : 'Markeer als Bekeken'}
+          {saving ? 'Opslaan...' : 'Markeer als Bekeken & Stuur Bericht'}
         </button>
+      )}
+
+      {/* Follow-up bericht knop — bij reeds beoordeelde check-ins kan de
+          coach alsnog een (extra) bericht sturen. */}
+      {checkin.status !== 'submitted' && onSendFeedback && (
+        <button
+          onClick={() => { setFeedbackDraft(checkin?.coach_message || ''); setShowFeedbackModal(true) }}
+          style={{
+            width: '100%',
+            padding: isMobile ? '1rem' : '1.125rem',
+            background: 'rgba(255,255,255,0.04)',
+            border: `1px solid ${GOLD.border}`,
+            borderRadius: '12px',
+            color: GOLD.primary,
+            fontSize: isMobile ? '0.9rem' : '0.95rem',
+            fontWeight: '700',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '0.5rem',
+            minHeight: '52px',
+            touchAction: 'manipulation',
+            WebkitTapHighlightColor: 'transparent',
+            marginTop: '0.5rem'
+          }}
+        >
+          <Send size={18} />
+          {checkin?.coach_message ? 'Stuur opnieuw bericht naar client' : 'Stuur bericht naar client'}
+        </button>
+      )}
+
+      {/* Feedback Modal — bericht naar client. Bij submitted check-in
+          combineert verzenden + markeer-als-bekeken. */}
+      {showFeedbackModal && (
+        <div
+          onClick={() => !feedbackSending && setShowFeedbackModal(false)}
+          style={{
+            position: 'fixed', inset: 0,
+            background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(8px)',
+            zIndex: 1000, display: 'flex', alignItems: 'center',
+            justifyContent: 'center', padding: '1rem',
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              width: '100%', maxWidth: 560,
+              background: 'linear-gradient(135deg, #1a1a1a 0%, #0d0d0d 100%)',
+              borderRadius: 20, border: `1px solid ${GOLD.border}`,
+              overflow: 'hidden', display: 'flex', flexDirection: 'column',
+            }}
+          >
+            {/* Header */}
+            <div style={{
+              padding: isMobile ? '1.25rem' : '1.5rem',
+              borderBottom: `1px solid ${GOLD.border}`,
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+              background: `linear-gradient(135deg, ${GOLD.background} 0%, rgba(0,0,0,0.4) 100%)`,
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                <div style={{
+                  width: 40, height: 40,
+                  background: `linear-gradient(135deg, ${GOLD.background} 0%, rgba(0,0,0,0.3) 100%)`,
+                  border: `1px solid ${GOLD.border}`,
+                  borderRadius: 10,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                }}>
+                  <MessageCircle size={20} color={GOLD.primary} />
+                </div>
+                <div>
+                  <h3 style={{
+                    fontSize: isMobile ? '1.05rem' : '1.2rem',
+                    fontWeight: 700, color: GOLD.primary, margin: 0,
+                  }}>
+                    Bericht naar {clientName}
+                  </h3>
+                  <p style={{
+                    fontSize: '0.75rem', color: 'rgba(255,255,255,0.5)', margin: 0,
+                  }}>
+                    Verschijnt in haar app + onderaan de PDF
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => !feedbackSending && setShowFeedbackModal(false)}
+                disabled={feedbackSending}
+                style={{
+                  width: 36, height: 36,
+                  background: 'rgba(255,255,255,0.05)',
+                  border: '1px solid rgba(255,255,255,0.1)',
+                  borderRadius: 10, color: 'rgba(255,255,255,0.6)',
+                  cursor: feedbackSending ? 'not-allowed' : 'pointer',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                }}
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Body */}
+            <div style={{ padding: isMobile ? '1rem' : '1.5rem' }}>
+              <textarea
+                value={feedbackDraft}
+                onChange={(e) => setFeedbackDraft(e.target.value)}
+                placeholder="Bv. Top gedaan deze week — laten we de slaap-strategie volgende call concretiseren..."
+                disabled={feedbackSending}
+                rows={5}
+                style={{
+                  width: '100%', boxSizing: 'border-box',
+                  padding: '0.875rem 1rem',
+                  background: 'rgba(0,0,0,0.4)',
+                  border: `1px solid ${GOLD.border}`,
+                  borderRadius: 12,
+                  color: '#fff',
+                  fontSize: isMobile ? '0.95rem' : '1rem',
+                  fontFamily: 'inherit',
+                  lineHeight: 1.5,
+                  resize: 'vertical',
+                  outline: 'none',
+                }}
+              />
+              <div style={{
+                marginTop: 6, fontSize: '0.7rem',
+                color: 'rgba(255,255,255,0.4)',
+              }}>
+                {feedbackDraft.length} tekens · zichtbaar voor client in haar app
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div style={{
+              padding: isMobile ? '0.75rem 1rem 1rem' : '0.75rem 1.5rem 1.25rem',
+              borderTop: `1px solid ${GOLD.border}`,
+              background: 'rgba(0,0,0,0.3)',
+              display: 'flex', flexDirection: isMobile ? 'column' : 'row',
+              gap: '0.6rem',
+            }}>
+              {/* Skip — alleen relevant voor submitted (markeer-zonder-bericht) */}
+              {checkin.status === 'submitted' && (
+                <button
+                  onClick={async () => {
+                    setFeedbackSending(true)
+                    try {
+                      await onMarkReviewed()
+                      setShowFeedbackModal(false)
+                    } finally {
+                      setFeedbackSending(false)
+                    }
+                  }}
+                  disabled={feedbackSending}
+                  style={{
+                    flex: isMobile ? 'none' : 1,
+                    padding: '0.9rem',
+                    background: 'transparent',
+                    border: '1px solid rgba(255,255,255,0.15)',
+                    borderRadius: 12,
+                    color: 'rgba(255,255,255,0.7)',
+                    fontSize: '0.9rem', fontWeight: 600,
+                    cursor: feedbackSending ? 'not-allowed' : 'pointer',
+                  }}
+                >
+                  Alleen markeren, geen bericht
+                </button>
+              )}
+              <button
+                onClick={async () => {
+                  if (!feedbackDraft.trim() || feedbackSending) return
+                  setFeedbackSending(true)
+                  try {
+                    const result = await onSendFeedback?.({
+                      message: feedbackDraft.trim(),
+                      markAsReviewed: checkin.status === 'submitted',
+                    })
+                    if (result !== false) {
+                      setFeedbackSent(true)
+                      setTimeout(() => {
+                        setFeedbackSent(false)
+                        setShowFeedbackModal(false)
+                      }, 1200)
+                    }
+                  } finally {
+                    setFeedbackSending(false)
+                  }
+                }}
+                disabled={!feedbackDraft.trim() || feedbackSending || feedbackSent}
+                style={{
+                  flex: isMobile ? 'none' : 2,
+                  padding: '0.9rem',
+                  background: feedbackSent
+                    ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)'
+                    : `linear-gradient(135deg, ${GOLD.primary} 0%, ${GOLD.secondary} 100%)`,
+                  border: 'none',
+                  borderRadius: 12,
+                  color: feedbackSent ? '#fff' : '#000',
+                  fontSize: '0.95rem', fontWeight: 800,
+                  cursor: (!feedbackDraft.trim() || feedbackSending) ? 'not-allowed' : 'pointer',
+                  opacity: (!feedbackDraft.trim() || feedbackSending) ? 0.5 : 1,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  gap: '0.5rem',
+                }}
+              >
+                {feedbackSent
+                  ? (<><Check size={18} strokeWidth={3} /> Verstuurd</>)
+                  : feedbackSending
+                    ? 'Versturen…'
+                    : (<><Send size={18} /> {checkin.status === 'submitted' ? 'Verstuur & Markeer' : 'Verstuur'}</>)
+                }
+              </button>
+            </div>
+          </div>
+        </div>
       )}
       
       {/* Coach Notes Modal */}

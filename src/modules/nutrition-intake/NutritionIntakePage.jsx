@@ -5,6 +5,7 @@
 
 import React, { useState, useEffect } from 'react'
 import DatabaseService from '../../services/DatabaseService'
+import { findClient } from '../../lib/publicIntakeApi'
 import './services/NutritionIntakeService'
 import EatPatternFlow   from './components/nutrition-flow/EatPatternFlow'
 import KnowledgeFlow    from './components/nutrition-flow/KnowledgeFlow'
@@ -115,11 +116,9 @@ export default function NutritionIntakePage() {
   useEffect(() => {
     if (!storedEmail) return
     setEmailLoading(true)
-    DatabaseService.supabase.from('clients')
-      .select('id, first_name, email, tdee, surplus, target_calories, primary_goal, target_weight, motivation')
-      .eq('email', storedEmail.toLowerCase().trim()).single()
-      .then(({ data, error }) => {
-        if (!error && data) {
+    findClient(storedEmail)
+      .then((data) => {
+        if (data) {
           setClientId(data.id); setClientData(data)
           setFlowData(prev => ({ ...prev, target_calories: data.target_calories }))
           setShowEmailLookup(false)
@@ -135,10 +134,8 @@ export default function NutritionIntakePage() {
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { setEmailError('Vul een geldig email adres in'); return }
     setEmailLoading(true); setEmailError(null)
     try {
-      const { data, error } = await DatabaseService.supabase.from('clients')
-        .select('id, first_name, email, tdee, surplus, target_calories, primary_goal, target_weight, motivation')
-        .eq('email', email.toLowerCase().trim()).single()
-      if (error || !data) { setEmailError('Geen account gevonden.'); setEmailLoading(false); return }
+      const data = await findClient(email)
+      if (!data) { setEmailError('Geen account gevonden.'); setEmailLoading(false); return }
       setClientId(data.id); setClientData(data)
       setFlowData(prev => ({ ...prev, target_calories: data.target_calories }))
       setShowEmailLookup(false); setEmailLoading(false)

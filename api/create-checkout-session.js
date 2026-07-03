@@ -9,43 +9,46 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { plan, price, email, name, phone } = req.body;
-    
-    // Update deze URL naar je laatste deployment
-    const baseUrl = 'https://workapp-oyoj04i0x-myarc.vercel.app';
+    const { plan, price, email, name, phone, priceId, successPath, cancelPath, mode } = req.body;
 
-    // Create Stripe checkout session ZONDER custom_fields (die zorgen voor de error)
-    const session = await stripe.checkout.sessions.create({
-      payment_method_types: ['card', 'ideal'],
-      line_items: [{
-        price_data: {
-          currency: 'eur',
-          product_data: {
-            name: `MY ARC ${plan.charAt(0).toUpperCase() + plan.slice(1)} Plan`,
-            description: getPlanDescription(plan)
+    // 'payment' (eenmalig) of 'subscription' (maandelijks). Default eenmalig.
+    const checkoutMode = mode === 'subscription' ? 'subscription' : 'payment';
+
+    // Redirect-basis: gebruik de origin van het verzoek, val terug op de oude URL.
+    const baseUrl = req.headers.origin || 'https://workapp-oyoj04i0x-myarc.vercel.app';
+
+    // Line items: óf een bestaande Stripe Price (priceId), óf inline price_data.
+    const lineItems = priceId
+      ? [{ price: priceId, quantity: 1 }]
+      : [{
+          price_data: {
+            currency: 'eur',
+            product_data: {
+              name: `MY ARC ${plan.charAt(0).toUpperCase() + plan.slice(1)} Plan`,
+              description: getPlanDescription(plan)
+            },
+            unit_amount: price * 100,
           },
-          unit_amount: price * 100,
-        },
-        quantity: 1,
-      }],
-      mode: 'payment',
-      
-      // Enable promotional codes
+          quantity: 1,
+        }];
+
+    const session = await stripe.checkout.sessions.create({
+      // iDEAL ondersteunt geen recurring; subscriptions dus alleen kaart.
+      payment_method_types: checkoutMode === 'subscription' ? ['card'] : ['card', 'ideal'],
+      line_items: lineItems,
+      mode: checkoutMode,
       allow_promotion_codes: true,
-      
-      success_url: `${baseUrl}/success?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${baseUrl}/checkout`,
-      customer_email: email,
+      success_url: `${baseUrl}${successPath || '/success'}?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${baseUrl}${cancelPath || '/checkout'}`,
+      ...(email ? { customer_email: email } : {}),
       metadata: {
-        plan: plan,
-        customer_name: name,
+        plan: plan || 'back-in-shape',
+        customer_name: name || '',
         customer_phone: phone || '',
-        // Fitness goal in metadata instead of custom_fields
-        fitness_goal: plan === 'premium' ? 'muscle_gain' : 'fat_loss'
       }
     });
 
-    res.status(200).json({ sessionId: session.id });
+    res.status(200).json({ sessionId: session.id, url: session.url });
   } catch (error) {
     console.error('Stripe error:', error);
     res.status(500).json({ error: error.message });

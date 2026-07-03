@@ -10,6 +10,7 @@ import AddTaskModal from './AddTaskModal'
 import SectionModal from './SectionModal'
 import AgendaView from '../agenda/AgendaView'
 import AgendaTaskModal from '../agenda/AgendaTaskModal'
+import RecurringActionPrompt from './RecurringActionPrompt'
 
 export default function ProductivityKanban({
   productivityService, coachId, db, isMobile,
@@ -60,6 +61,14 @@ export default function ProductivityKanban({
     catch { return 'kanban' }
   })
   const [agendaModalTask, setAgendaModalTask] = useState(null)
+
+  // Recurring-task action prompt — surfaces when the user deletes/resizes a
+  // recurring task and we need to ask "alleen deze datum of hele reeks".
+  // Shape: { action, task, date, onResolve }
+  const [recurringPrompt, setRecurringPrompt] = useState(null)
+  // Bumped every time we write a skip/override so AgendaView re-fetches.
+  const [recurringOverridesVersion, setRecurringOverridesVersion] = useState(0)
+  const bumpOverridesVersion = () => setRecurringOverridesVersion(v => v + 1)
 
   const switchView = (mode) => {
     setViewMode(mode)
@@ -112,7 +121,10 @@ export default function ProductivityKanban({
 
   const loadBoard = async (isInitial = false) => {
     try {
-      setLoading(true)
+      // Only flip the loading spinner on the very first load. Re-loads after
+      // edits/deletes happen in the background — otherwise the spinner
+      // unmounts AgendaView and resets weekAnchor back to the current week.
+      if (isInitial) setLoading(true)
       const board = await productivityService.getKanbanBoard(coachId)
 
       // Haal geplande tasks op (scheduled_day gevuld)
@@ -146,7 +158,7 @@ export default function ProductivityKanban({
     } catch (err) {
       console.error('❌ Load kanban failed:', err)
     } finally {
-      setLoading(false)
+      if (isInitial) setLoading(false)
     }
   }
 
@@ -340,11 +352,94 @@ export default function ProductivityKanban({
     }
   }
 
-  const handleAutoDeleteTask = async (taskId) => {
+  const todayISO = () => new Date().toISOString().slice(0, 10)
+  const dateLabel = (iso) => {
+    if (!iso) return ''
+    try {
+      return new Date(iso).toLocaleDateString('nl-NL', { weekday: 'long', day: 'numeric', month: 'long' })
+    } catch { return iso }
+  }
+
+  // Remove the entire task from local state — used after a "hele reeks"
+  // delete OR a non-recurring delete.
+  const stripTaskFromState = (taskId) => {
     setSections(prev => prev.map(s => ({
       ...s,
       tasks: (s.tasks || []).filter(t => t.id !== taskId),
     })))
+    setScheduledTasks(prev => {
+      const out = {}
+      Object.entries(prev).forEach(([day, tasks]) => {
+        out[day] = (tasks || []).filter(t => t.id !== taskId)
+      })
+      return out
+    })
+  }
+
+  // Resize commit for recurring tasks — show the "alleen deze of hele reeks"
+  // prompt. "Alleen deze" writes an override to task_logs; "hele reeks" goes
+  // through the regular updateTask path.
+  const handleRecurringResize = async ({ taskId, updates, dateISO, task }) => {
+    const date = dateISO || todayISO()
+    return new Promise((resolve) => {
+      setRecurringPrompt({
+        action: 'shorten',
+        task,
+        date,
+        onResolve: async (scope) => {
+          setRecurringPrompt(null)
+          if (!scope) { resolve(false); return }
+          if (scope === 'only-this') {
+            try {
+              await productivityService.overrideRecurringOnDate(taskId, coachId, date, {
+                start_time: updates.scheduled_start_time,
+                end_time: updates.scheduled_end_time,
+                minutes: updates.estimated_minutes,
+              })
+              bumpOverridesVersion()
+            } catch (err) { console.error('❌ Override recurring date failed:', err) }
+            resolve(true)
+            return
+          }
+          try {
+            await handleAgendaTaskUpdate(taskId, updates)
+          } catch (err) { console.error('❌ Update recurring task failed:', err) }
+          resolve(true)
+        },
+      })
+    })
+  }
+
+  const handleAutoDeleteTask = async (taskId, opts = {}) => {
+    const task = findTaskAnywhere(taskId)
+    // Recurring task → prompt before doing anything (unless the caller
+    // already resolved the scope, e.g. from a re-entry).
+    if (task?.recurrence_active && !opts.scope) {
+      const date = opts.date || editingTask?._dateISO || agendaPreset?.date || todayISO()
+      return new Promise((resolve) => {
+        setRecurringPrompt({
+          action: 'delete',
+          task,
+          date,
+          onResolve: async (scope) => {
+            setRecurringPrompt(null)
+            if (!scope) { resolve(false); return }
+            if (scope === 'only-this') {
+              try {
+                await productivityService.skipRecurringOnDate(taskId, coachId, date)
+                bumpOverridesVersion()
+              } catch (err) { console.error('❌ Skip recurring date failed:', err) }
+              resolve(true)
+              return
+            }
+            // 'all' → fall through to the regular delete path.
+            await handleAutoDeleteTask(taskId, { scope: 'all' })
+            resolve(true)
+          },
+        })
+      })
+    }
+    stripTaskFromState(taskId)
     try { await productivityService.deleteTask(taskId) }
     catch (err) { console.error('❌ Autosave delete failed:', err) }
   }
@@ -361,27 +456,173 @@ export default function ProductivityKanban({
   }
 
   const handleTaskDelete = async (taskId) => {
+    const task = findTaskAnywhere(taskId)
+    if (task?.recurrence_active) {
+      const date = todayISO()
+      setRecurringPrompt({
+        action: 'delete',
+        task,
+        date,
+        onResolve: async (scope) => {
+          setRecurringPrompt(null)
+          if (!scope) return
+          if (scope === 'only-this') {
+            try {
+              await productivityService.skipRecurringOnDate(taskId, coachId, date)
+              bumpOverridesVersion()
+            } catch (err) { console.error('❌ Skip recurring date failed:', err) }
+            return
+          }
+          try {
+            await productivityService.deleteTask(taskId)
+            stripTaskFromState(taskId)
+          } catch (err) { console.error('❌ Delete task failed:', err) }
+        },
+      })
+      return
+    }
     if (!window.confirm('Task verwijderen?')) return
     try {
       await productivityService.deleteTask(taskId)
-      setSections(prev => prev.map(s => ({ ...s, tasks: (s.tasks || []).filter(t => t.id !== taskId) })))
+      stripTaskFromState(taskId)
     } catch (err) { console.error('❌ Delete task failed:', err) }
   }
 
-  const handleCompleteTask = async (taskId) => {
+  // Unschedule = strip every scheduling field and let the task return to
+  // the "Niet gepland" bucket. Mirrors local state on both sides so the UI
+  // updates without a refetch.
+  const handleUnscheduleTask = async (taskId) => {
     try {
-      const completedTask = await productivityService.completeTask(taskId)
-      setSections(prev => prev.map(s => ({ ...s, tasks: (s.tasks || []).filter(t => t.id !== taskId) })))
-      // Ook uit dagschema verwijderen
-      setScheduledTasks(prev => {
-        const updated = {}
-        Object.entries(prev).forEach(([day, tasks]) => {
-          updated[day] = tasks.filter(t => t.id !== taskId)
-        })
-        return updated
+      // Find the lead-in card so we know which bucket to move it from.
+      let mover = null
+      Object.values(scheduledTasks).forEach(list => {
+        const found = (list || []).find(t => t.id === taskId)
+        if (found) mover = found
       })
-      if (onTaskCompleted && completedTask?.needs_reflection) onTaskCompleted(completedTask)
+      const stripped = mover ? {
+        ...mover,
+        scheduled_day: null,
+        scheduled_date: null,
+        scheduled_start_time: null,
+        scheduled_end_time: null,
+      } : null
+
+      // Remove from scheduledTasks; if we had it, push it to sections so it
+      // shows up under "Niet gepland" / its kanban column immediately.
+      setScheduledTasks(prev => {
+        const out = {}
+        Object.entries(prev).forEach(([day, tasks]) => {
+          out[day] = (tasks || []).filter(t => t.id !== taskId)
+        })
+        return out
+      })
+      if (stripped) {
+        setSections(prev => prev.map(s =>
+          s.id === (stripped.section_id || 'unassigned')
+            ? { ...s, tasks: [...(s.tasks || []), stripped] }
+            : s
+        ))
+      }
+
+      await productivityService.updateTask(taskId, {
+        scheduled_day: null,
+        scheduled_date: null,
+        scheduled_start_time: null,
+        scheduled_end_time: null,
+      })
+    } catch (err) {
+      console.error('❌ Unschedule failed:', err)
+    }
+  }
+
+  // Set of task_ids that this coach completed *today* (recurring-only).
+  // Used to render today's recurring cards as done while leaving the task
+  // itself open for tomorrow's run.
+  const [completedTodayIds, setCompletedTodayIds] = useState(new Set())
+  useEffect(() => {
+    if (!productivityService || !coachId) return
+    productivityService.getRecurringCompletedTodayIds(coachId)
+      .then(setCompletedTodayIds)
+      .catch(() => {})
+  }, [productivityService, coachId])
+
+  // Find a task across both buckets (some tasks live only in sections, some
+  // only in scheduledTasks). Need this to know if it's recurring before
+  // we decide which complete-path to take.
+  const findTaskAnywhere = (taskId) => {
+    for (const s of sections) {
+      const t = (s.tasks || []).find(x => x.id === taskId)
+      if (t) return t
+    }
+    for (const list of Object.values(scheduledTasks)) {
+      const t = (list || []).find(x => x.id === taskId)
+      if (t) return t
+    }
+    return null
+  }
+
+  const handleCompleteTask = async (taskId) => {
+    const task = findTaskAnywhere(taskId)
+    const isRecurring = !!task?.recurrence_active
+    try {
+      if (isRecurring) {
+        // Recurring → log "done today" without flipping the task itself,
+        // so it shows back tomorrow.
+        await productivityService.markRecurringDoneToday(taskId, coachId)
+        setCompletedTodayIds(prev => new Set([...prev, taskId]))
+        // Trigger reflection modal if applicable.
+        if (onTaskCompleted && task?.needs_reflection) onTaskCompleted(task)
+      } else {
+        // Non-recurring → flip to completed, but keep the card visible on
+        // the board so the coach can see what's done today. Strikethrough +
+        // check are applied by TaskCard based on completed_at + status.
+        const completedTask = await productivityService.completeTask(taskId)
+        const patch = {
+          status: 'completed',
+          completed_at: completedTask?.completed_at || new Date().toISOString(),
+        }
+        setSections(prev => prev.map(s => ({
+          ...s,
+          tasks: (s.tasks || []).map(t => t.id === taskId ? { ...t, ...patch } : t),
+        })))
+        setScheduledTasks(prev => {
+          const out = {}
+          Object.entries(prev).forEach(([day, tasks]) => {
+            out[day] = (tasks || []).map(t => t.id === taskId ? { ...t, ...patch } : t)
+          })
+          return out
+        })
+        if (onTaskCompleted && completedTask?.needs_reflection) onTaskCompleted(completedTask)
+      }
     } catch (err) { console.error('❌ Complete task failed:', err) }
+  }
+
+  // Inverse — flip a completed (or done-today) card back to open.
+  const handleUncompleteTask = async (taskId) => {
+    const task = findTaskAnywhere(taskId)
+    const isRecurring = !!task?.recurrence_active
+    try {
+      if (isRecurring) {
+        await productivityService.unmarkRecurringDoneToday(taskId)
+        setCompletedTodayIds(prev => {
+          const n = new Set(prev); n.delete(taskId); return n
+        })
+      } else {
+        await productivityService.uncompleteTask(taskId)
+        const patch = { status: 'active', completed_at: null }
+        setSections(prev => prev.map(s => ({
+          ...s,
+          tasks: (s.tasks || []).map(t => t.id === taskId ? { ...t, ...patch } : t),
+        })))
+        setScheduledTasks(prev => {
+          const out = {}
+          Object.entries(prev).forEach(([day, tasks]) => {
+            out[day] = (tasks || []).map(t => t.id === taskId ? { ...t, ...patch } : t)
+          })
+          return out
+        })
+      }
+    } catch (err) { console.error('❌ Uncomplete task failed:', err) }
   }
 
   // ── DAG SCHEDULE ──────────────────────────────────────────────────────────
@@ -627,6 +868,7 @@ export default function ProductivityKanban({
             sections={sections}
             scheduledTasks={scheduledTasks}
             allTasks={allTasks}
+            completedTodayIds={completedTodayIds}
             onTaskUpdate={handleAgendaTaskUpdate}
             onTaskClick={(task) => {
               // Re-use the new AddTaskModal for editing — same UI, more
@@ -635,6 +877,9 @@ export default function ProductivityKanban({
               setEditingTask(task)
               setShowAddTask(true)
             }}
+            overridesVersion={recurringOverridesVersion}
+            onRecurringResize={handleRecurringResize}
+            onTaskDelete={(taskId, dateISO) => handleAutoDeleteTask(taskId, dateISO ? { date: dateISO } : {})}
             onRequestNewTask={(preset) => {
               console.log('[ProductivityKanban] onRequestNewTask hit, will setShowAddTask(true)', { preset, sectionsCount: sections.length })
               setSelectedSectionForTask(sections[0]?.id || 'unassigned')
@@ -802,6 +1047,8 @@ export default function ProductivityKanban({
                               onEdit={(updates) => handleTaskEdit(task.id, updates)}
                               onDelete={() => handleTaskDelete(task.id)}
                               onComplete={() => handleCompleteTask(task.id)}
+                              onUncomplete={() => handleUncompleteTask(task.id)}
+                              isDoneToday={completedTodayIds.has(task.id)}
                               onStart={onStartTask ? () => onStartTask(task) : undefined}
                               isActive={activeTaskId === task.id}
                             />
@@ -870,6 +1117,7 @@ export default function ProductivityKanban({
           db={db}
           coachId={coachId}
           onCompleteTask={handleCompleteTask}
+          onUnscheduleTask={handleUnscheduleTask}
           onClose={() => { setShowAddTask(false); setSelectedSectionForTask(null); setAgendaPreset(null); setEditingTask(null) }}
           onSubmit={handleAddTask}
           onAutoCreate={(taskData) => handleAutoCreateTask({
@@ -890,6 +1138,15 @@ export default function ProductivityKanban({
           onClose={() => { setShowSectionModal(false); setSelectedSection(null) }}
           onSubmit={selectedSection ? (u) => handleUpdateSection(selectedSection.id, u) : handleCreateSection}
           onDelete={selectedSection ? () => handleDeleteSection(selectedSection.id) : null}
+        />
+      )}
+
+      {recurringPrompt && (
+        <RecurringActionPrompt
+          action={recurringPrompt.action}
+          dateLabel={dateLabel(recurringPrompt.date)}
+          onChoose={(scope) => recurringPrompt.onResolve(scope)}
+          onCancel={() => recurringPrompt.onResolve(null)}
         />
       )}
 

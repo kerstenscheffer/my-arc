@@ -205,13 +205,15 @@ export default function MealPlanGenerator({ db, clients = [], conceptPlanId, sel
   return (
     <div style={{ minHeight: '100vh', background: '#0a0a0a' }}>
 
-      {/* ═══ TAB BAR — goud/zwart, sticky onder CoachHub header ═══ */}
+      {/* ═══ TAB BAR — sticky onder de WeekGoalsBar (32px) ═══
+          Vroeger zat hier `+ 88px / 101px` voor de oude CoachHub-header.
+          Header is nu weg → tab-bar plakt direct onder de WeekGoalsBar. */}
       <div style={{
         display: 'flex', alignItems: 'stretch',
         borderBottom: `1px solid ${G.border}`,
         background: 'rgba(10, 10, 10, 0.97)',
         position: 'sticky',
-        top: m ? 'calc(env(safe-area-inset-top, 0px) + 88px)' : '101px',
+        top: 'calc(env(safe-area-inset-top, 0px) + 32px)',
         zIndex: 50,
         overflowX: 'auto', WebkitOverflowScrolling: 'touch'
       }}>

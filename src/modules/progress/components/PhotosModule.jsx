@@ -257,7 +257,6 @@ export default function PhotosModule({ client, db, isMobile: propIsMobile }) {
             ref={fileInputRef}
             type="file"
             accept="image/*"
-            capture="environment"
             onChange={handleUpload}
             style={{ display: 'none' }}
           />

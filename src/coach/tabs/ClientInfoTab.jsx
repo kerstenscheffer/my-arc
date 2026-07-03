@@ -1,6 +1,7 @@
 // src/coach/tabs/ClientInfoTab.jsx - RLS FIX VERSION
 import { useState, useEffect } from 'react'
 import { User, Weight, Target, Activity, Heart, Brain, FileText, Ruler, Plus, X, Save, AlertCircle, Shield, Trash2 } from 'lucide-react'
+import { signUpNewClient } from '../../lib/supabase'
 
 // Import sub-tabs
 import BasicInfoTab from './client-info/BasicInfoTab'
@@ -193,18 +194,15 @@ export default function ClientInfoTab({ db, isMobile }) {
         return
       }
 
-      // Try to create auth user
-      const { data: authData, error: authError } = await db.supabase.auth.signUp({
-        email: newClientData.email,
-        password: newClientData.password,
-        options: {
-          emailRedirectTo: undefined,
-          data: {
-            full_name: `${newClientData.firstName} ${newClientData.lastName}`,
-            role: 'client' // Mark as client role
-          }
+      // Try to create auth user — geïsoleerde client, behoudt de coach-sessie
+      const { data: authData, error: authError } = await signUpNewClient(
+        newClientData.email,
+        newClientData.password,
+        {
+          full_name: `${newClientData.firstName} ${newClientData.lastName}`,
+          role: 'client' // Mark as client role
         }
-      })
+      )
       
       if (authError) {
         // Handle specific error cases

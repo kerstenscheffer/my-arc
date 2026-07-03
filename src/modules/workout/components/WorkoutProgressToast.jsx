@@ -1,11 +1,59 @@
 // src/modules/workout/components/WorkoutProgressToast.jsx
-// 🏆 GOLD THEME - Compact progress insights toast
+// Inline progress-insights card op de workout-pagina. Niet meer een
+// fixed-overlay; staat tussen TodaysWorkoutMain en WeekSchedule in normale
+// document-flow zodat'ie meescrollt en niet midden-in-beeld blijft hangen.
 import { useState, useEffect } from 'react'
-import { TrendingUp, X, Flame, Target, Zap, ChevronRight } from 'lucide-react'
+import { X, Flame, Target, Zap, ChevronRight } from 'lucide-react'
+
+// Coach-foto (zelfde als CoachNoteCard) — komt linksboven in de toast.
+const COACH_PHOTO_URL = 'https://i.ibb.co/mCQzTZrZ/ea169061-c9f1-4b4d-ab88-fc746cbde003.jpg'
+
+// Wisselende positieve aanmoedigingen — vervangen het statische
+// "Progressie/Streak/Plateau"-label. Per insight-type een eigen pool,
+// deterministisch gekozen op exercise+date zodat'ie binnen 1 dag stabiel is.
+const PRAISE_BY_TYPE = {
+  pr: [
+    'Lekker bezig',
+    'Alweer progressie geboekt',
+    'Sterke moves',
+    'Indrukwekkend',
+    'Knappe push',
+    'Doorgaan zo',
+    'Op de goede weg',
+    'Crushing it',
+    'Komt goed binnen',
+    'Goed gewerkt',
+  ],
+  streak: [
+    'Op fire deze week',
+    'Lekker bezig',
+    'Consistent als een tank',
+    'Mooie streak',
+    'Discipline op punt',
+    'Doorpakken werkt',
+    'Top ritme',
+  ],
+  stagnation: [
+    'Tijd voor een nieuwe push',
+    'Daag jezelf uit',
+    'Ronde 2 incoming',
+    'Volgende stap setupt',
+    'Plateau in zicht',
+  ],
+}
+
+const pickPraise = (type, seed = '') => {
+  const pool = PRAISE_BY_TYPE[type] || PRAISE_BY_TYPE.pr
+  const start = new Date(new Date().getFullYear(), 0, 0)
+  const dayOfYear = Math.floor((Date.now() - start.getTime()) / 86400000)
+  // Tel ASCII-bytes van seed bij voor extra spreiding tussen exercises.
+  let s = dayOfYear
+  for (let i = 0; i < seed.length; i++) s = (s * 31 + seed.charCodeAt(i)) >>> 0
+  return pool[s % pool.length]
+}
 
 export default function WorkoutProgressToast({ client, db, onViewChart }) {
   const isMobile = window.innerWidth <= 768
-  const [visible, setVisible] = useState(false)
   const [insight, setInsight] = useState(null)
   const [dismissed, setDismissed] = useState(false)
 
@@ -13,8 +61,9 @@ export default function WorkoutProgressToast({ client, db, onViewChart }) {
     // Check if dismissed today
     const dismissedDate = localStorage.getItem('workout_toast_dismissed')
     const today = new Date().toDateString()
-    
+
     if (dismissedDate === today) {
+      setDismissed(true)
       return
     }
 
@@ -101,6 +150,8 @@ export default function WorkoutProgressToast({ client, db, onViewChart }) {
         insights.push({
           type: 'pr',
           icon: Flame,
+          name: biggestImprovement.exercise,
+          metric: `+${biggestImprovement.increase}kg`,
           title: `${biggestImprovement.exercise} +${biggestImprovement.increase}kg!`,
           message: 'Sterke progressie deze maand',
           color: '#FFD700', // GOLD
@@ -120,6 +171,8 @@ export default function WorkoutProgressToast({ client, db, onViewChart }) {
           insights.push({
             type: 'stagnation',
             icon: Target,
+            name: exercise,
+            metric: `${weights[0]}kg`,
             title: `${exercise} op ${weights[0]}kg`,
             message: 'Tijd voor progressie overload!',
             color: '#FFD700', // GOLD
@@ -139,6 +192,8 @@ export default function WorkoutProgressToast({ client, db, onViewChart }) {
         insights.push({
           type: 'streak',
           icon: Zap,
+          name: null,
+          metric: `${thisWeekSessions} workouts`,
           title: `${thisWeekSessions} workouts deze week!`,
           message: 'Je bent op 🔥',
           color: '#FFD700', // GOLD
@@ -154,12 +209,6 @@ export default function WorkoutProgressToast({ client, db, onViewChart }) {
 
       if (bestInsight) {
         setInsight(bestInsight)
-        setTimeout(() => setVisible(true), 500)
-        
-        // Auto-dismiss after 8 seconds
-        setTimeout(() => {
-          handleDismiss()
-        }, 8000)
       }
 
     } catch (error) {
@@ -168,222 +217,184 @@ export default function WorkoutProgressToast({ client, db, onViewChart }) {
   }
 
   const handleDismiss = () => {
-    setVisible(false)
-    setTimeout(() => {
-      setDismissed(true)
-      localStorage.setItem('workout_toast_dismissed', new Date().toDateString())
-    }, 300)
+    setDismissed(true)
+    localStorage.setItem('workout_toast_dismissed', new Date().toDateString())
   }
 
   const handleClick = () => {
     if (onViewChart && insight?.exercise) {
       onViewChart(insight.exercise)
     }
-    handleDismiss()
   }
 
   if (dismissed || !insight) return null
 
-  const Icon = insight.icon
+  const isClickable = !!(onViewChart && insight.exercise)
 
   return (
-    <div
-      onClick={handleClick}
-      style={{
-        position: 'fixed',
-        top: visible ? (isMobile ? '85px' : '105px') : '-100px',
-        left: '50%',
-        transform: 'translateX(-50%)',
-        width: isMobile ? 'calc(100% - 2rem)' : 'auto',
-        minWidth: isMobile ? 'auto' : '360px',
-        maxWidth: isMobile ? '100%' : '400px',
-        background: 'linear-gradient(135deg, rgba(23, 23, 23, 0.95) 0%, rgba(10, 10, 10, 0.9) 100%)', // Dark glassmorphic
-        backdropFilter: 'blur(16px)',
-        border: '1px solid rgba(255, 215, 0, 0.3)', // GOLD border
-        borderRadius: isMobile ? '12px' : '14px',
-        padding: isMobile ? '0.75rem 0.875rem' : '0.875rem 1rem',
-        boxShadow: '0 8px 32px rgba(255, 215, 0, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.03)', // GOLD glow
-        cursor: 'pointer',
-        zIndex: 95,
-        transition: 'all 0.5s cubic-bezier(0.4, 0, 0.2, 1)',
-        touchAction: 'manipulation',
-        WebkitTapHighlightColor: 'transparent',
-        animation: visible ? 'slideDown 0.5s ease-out' : 'none',
-        overflow: 'hidden'
-      }}
-      onMouseEnter={(e) => {
-        if (!isMobile) {
-          e.currentTarget.style.transform = 'translateX(-50%) translateY(-2px) scale(1.02)'
-          e.currentTarget.style.boxShadow = '0 12px 40px rgba(255, 215, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.05)'
-        }
-      }}
-      onMouseLeave={(e) => {
-        if (!isMobile) {
-          e.currentTarget.style.transform = 'translateX(-50%) translateY(0) scale(1)'
-          e.currentTarget.style.boxShadow = '0 8px 32px rgba(255, 215, 0, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.03)'
-        }
-      }}
-      onTouchStart={(e) => {
-        if (isMobile) {
-          e.currentTarget.style.transform = 'translateX(-50%) scale(0.98)'
-        }
-      }}
-      onTouchEnd={(e) => {
-        if (isMobile) {
-          e.currentTarget.style.transform = 'translateX(-50%) scale(1)'
-        }
-      }}
-    >
-      {/* Top GOLD accent line */}
-      <div style={{
-        position: 'absolute',
-        top: 0,
-        left: 0,
-        right: 0,
-        height: '2px',
-        background: 'linear-gradient(90deg, transparent 0%, #FFD700 50%, transparent 100%)',
-        opacity: 0.6
-      }} />
-
-      {/* Shine overlay */}
-      <div style={{
-        position: 'absolute',
-        top: 0,
-        left: 0,
-        right: 0,
-        height: '40%',
-        background: 'linear-gradient(180deg, rgba(255, 255, 255, 0.04) 0%, transparent 100%)',
-        pointerEvents: 'none'
-      }} />
-
-      <div style={{
-        display: 'flex',
-        alignItems: 'center',
-        gap: isMobile ? '0.625rem' : '0.75rem',
-        position: 'relative',
-        zIndex: 2
-      }}>
-        {/* Icon - GOLD container */}
-        <div style={{
-          width: isMobile ? '36px' : '40px',
-          height: isMobile ? '36px' : '40px',
-          borderRadius: '10px',
-          background: 'rgba(255, 215, 0, 0.15)', // GOLD
-          border: '1px solid rgba(255, 215, 0, 0.3)', // GOLD
+    <div style={{
+      padding: isMobile ? '0 1rem' : '0 1.25rem',
+      animation: 'workoutInsightFadeIn 0.4s ease',
+    }}>
+      <div
+        onClick={isClickable ? handleClick : undefined}
+        style={{
+          position: 'relative',
+          background: 'linear-gradient(135deg, rgba(255,215,0,0.06) 0%, rgba(255,215,0,0.02) 100%)',
+          border: '1px solid rgba(255,215,0,0.28)',
+          borderLeft: '3px solid #FFD700',
+          borderRadius: 12,
+          padding: isMobile ? '0.85rem 1rem' : '1rem 1.15rem',
+          cursor: isClickable ? 'pointer' : 'default',
+          transition: 'transform 0.15s ease, border-color 0.15s ease',
+          touchAction: 'manipulation',
+          WebkitTapHighlightColor: 'transparent',
           display: 'flex',
           alignItems: 'center',
-          justifyContent: 'center',
-          flexShrink: 0,
-          boxShadow: '0 0 16px rgba(255, 215, 0, 0.25)' // GOLD glow
-        }}>
-          <Icon 
-            size={isMobile ? 18 : 20} 
-            color="#FFD700" // GOLD
-            strokeWidth={2.5}
-            style={{
-              filter: 'drop-shadow(0 0 6px rgba(255, 215, 0, 0.5))' // GOLD glow
-            }}
-          />
-        </div>
+          gap: isMobile ? 10 : 12,
+        }}
+        onMouseEnter={(e) => {
+          if (isClickable && !isMobile) {
+            e.currentTarget.style.transform = 'translateY(-1px)'
+            e.currentTarget.style.borderColor = 'rgba(255,215,0,0.5)'
+          }
+        }}
+        onMouseLeave={(e) => {
+          if (isClickable && !isMobile) {
+            e.currentTarget.style.transform = 'translateY(0)'
+            e.currentTarget.style.borderColor = 'rgba(255,215,0,0.28)'
+          }
+        }}
+      >
+        {/* Coach-foto — vervangt de oude gouden icoon-cirkel met Flame/Target/Zap. */}
+        <img
+          src={COACH_PHOTO_URL}
+          alt="Coach"
+          style={{
+            width: isMobile ? 40 : 44,
+            height: isMobile ? 40 : 44,
+            borderRadius: '50%',
+            objectFit: 'cover',
+            border: '2px solid rgba(255,215,0,0.55)',
+            flexShrink: 0,
+            boxShadow: '0 4px 12px rgba(255,215,0,0.22)',
+          }}
+        />
 
-        {/* Content - COMPACT */}
+        {/* Content */}
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{
-            fontSize: isMobile ? '0.85rem' : '0.95rem',
-            fontWeight: '800',
-            color: '#FFD700', // GOLD
-            marginBottom: '0.125rem',
-            letterSpacing: '-0.01em',
-            textShadow: '0 0 12px rgba(255, 215, 0, 0.3)',
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
-            whiteSpace: 'nowrap'
+            display: 'flex', alignItems: 'center', gap: 7,
+            marginBottom: 3,
           }}>
-            {insight.title}
+            <span style={{
+              fontSize: '0.58rem', fontWeight: 800,
+              color: '#FFD700', opacity: 0.85,
+              textTransform: 'uppercase', letterSpacing: '0.1em',
+            }}>
+              {pickPraise(insight.type, insight.exercise || '')}
+            </span>
+          </div>
+          {/* Oefeningnaam mag inkorten; de gewicht-progressie (metric) staat
+              in een flexShrink:0 gouden stuk en blijft dus ALTIJD leesbaar. */}
+          <div style={{
+            display: 'flex', alignItems: 'baseline', gap: 6,
+            fontSize: isMobile ? '0.95rem' : '1.05rem',
+            fontWeight: 900,
+            letterSpacing: '-0.015em',
+            lineHeight: 1.2,
+            marginBottom: 2,
+          }}>
+            {insight.name ? (
+              <>
+                <span style={{
+                  color: '#fff',
+                  overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                  minWidth: 0, flexShrink: 1,
+                }}>
+                  {insight.name}
+                </span>
+                {insight.metric && (
+                  <span style={{ color: '#FFD700', flexShrink: 0, whiteSpace: 'nowrap' }}>
+                    {insight.metric}
+                  </span>
+                )}
+              </>
+            ) : (
+              <span style={{
+                color: '#fff',
+                overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0,
+              }}>
+                {insight.title}
+              </span>
+            )}
           </div>
           <div style={{
-            fontSize: isMobile ? '0.7rem' : '0.75rem',
-            color: 'rgba(255, 255, 255, 0.6)',
-            fontWeight: '600'
+            fontSize: isMobile ? '0.76rem' : '0.82rem',
+            color: 'rgba(255,255,255,0.7)',
+            fontWeight: 600,
+            lineHeight: 1.4,
           }}>
             {insight.message}
           </div>
         </div>
 
-        {/* Action buttons - COMPACT */}
+        {/* Action buttons */}
         <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '0.375rem',
-          flexShrink: 0
+          display: 'flex', alignItems: 'center', gap: 6,
+          flexShrink: 0,
         }}>
-          {/* View Chart Arrow */}
-          {insight.exercise && (
+          {isClickable && (
             <div style={{
-              width: isMobile ? '28px' : '32px',
-              height: isMobile ? '28px' : '32px',
-              borderRadius: '8px',
-              background: 'rgba(255, 215, 0, 0.12)', // GOLD
-              border: '1px solid rgba(255, 215, 0, 0.25)', // GOLD
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
+              width: isMobile ? 30 : 32, height: isMobile ? 30 : 32,
+              borderRadius: 8,
+              background: 'rgba(255,215,0,0.12)',
+              border: '1px solid rgba(255,215,0,0.35)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              color: '#FFD700',
             }}>
-              <ChevronRight size={isMobile ? 14 : 16} color="#FFD700" strokeWidth={2.5} />
+              <ChevronRight size={isMobile ? 15 : 16} strokeWidth={2.6} />
             </div>
           )}
-
-          {/* Close button */}
           <button
-            onClick={(e) => {
-              e.stopPropagation()
-              handleDismiss()
-            }}
+            onClick={(e) => { e.stopPropagation(); handleDismiss() }}
+            aria-label="Sluit melding"
             style={{
-              width: isMobile ? '28px' : '32px',
-              height: isMobile ? '28px' : '32px',
-              borderRadius: '8px',
-              background: 'rgba(255, 255, 255, 0.05)',
-              border: '1px solid rgba(255, 255, 255, 0.1)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
+              width: isMobile ? 30 : 32, height: isMobile ? 30 : 32,
+              borderRadius: 8,
+              background: 'rgba(255,255,255,0.03)',
+              border: '1px solid rgba(255,255,255,0.08)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
               cursor: 'pointer',
-              transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-              touchAction: 'manipulation',
-              WebkitTapHighlightColor: 'transparent',
-              padding: 0
+              touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+              padding: 0,
+              color: 'rgba(255,255,255,0.55)',
+              transition: 'all 0.15s ease',
             }}
             onMouseEnter={(e) => {
               if (!isMobile) {
-                e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)'
-                e.currentTarget.style.transform = 'scale(1.1)'
+                e.currentTarget.style.background = 'rgba(239,68,68,0.12)'
+                e.currentTarget.style.borderColor = 'rgba(239,68,68,0.35)'
+                e.currentTarget.style.color = '#fff'
               }
             }}
             onMouseLeave={(e) => {
               if (!isMobile) {
-                e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)'
-                e.currentTarget.style.transform = 'scale(1)'
+                e.currentTarget.style.background = 'rgba(255,255,255,0.03)'
+                e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)'
+                e.currentTarget.style.color = 'rgba(255,255,255,0.55)'
               }
             }}
           >
-            <X size={isMobile ? 14 : 16} color="rgba(255, 255, 255, 0.6)" strokeWidth={2.5} />
+            <X size={isMobile ? 14 : 15} strokeWidth={2.4} />
           </button>
         </div>
       </div>
 
-      {/* CSS Animations */}
       <style>{`
-        @keyframes slideDown {
-          from {
-            opacity: 0;
-            transform: translateX(-50%) translateY(-20px);
-          }
-          to {
-            opacity: 1;
-            transform: translateX(-50%) translateY(0);
-          }
+        @keyframes workoutInsightFadeIn {
+          from { opacity: 0; transform: translateY(-6px); }
+          to   { opacity: 1; transform: translateY(0); }
         }
       `}</style>
     </div>

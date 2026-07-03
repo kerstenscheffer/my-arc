@@ -73,10 +73,103 @@ export default class MealLoggingService {
       if (error) throw error
 
       console.log('✅ [MealLoggingService] Meal logged successfully:', data.id)
+
+      // Fire-and-forget: track per-ingredient portions for the smart picker.
+      // Failures here must not break the meal log.
+      this._trackPortionsFromIngredients(clientId, mealLog.ingredients)
+        .catch(err => console.warn('⚠️ [MealLoggingService] portion tracking failed:', err))
+
       return data
     } catch (error) {
       console.error('❌ [MealLoggingService] Error logging meal:', error)
       throw error
+    }
+  }
+
+  async _trackPortionsFromIngredients(clientId, ingredients) {
+    if (!clientId || !Array.isArray(ingredients)) return
+    for (const ing of ingredients) {
+      if (!ing || !ing.name) continue
+      const unit = (ing.unit || 'g').toLowerCase()
+      if (unit !== 'g' && unit !== 'gram') continue
+      const grams = Math.round(parseFloat(ing.amount))
+      if (!Number.isFinite(grams) || grams <= 0) continue
+      await this._upsertPortion(clientId, ing.name, grams)
+    }
+  }
+
+  async _upsertPortion(clientId, ingredientName, portionGrams) {
+    const key = ingredientName.trim().toLowerCase()
+    if (!key) return
+    try {
+      const { data: existing } = await this.supabase
+        .from('client_ingredient_portions')
+        .select('id, use_count')
+        .eq('client_id', clientId)
+        .eq('ingredient_key', key)
+        .eq('portion_grams', portionGrams)
+        .maybeSingle()
+
+      if (existing) {
+        await this.supabase
+          .from('client_ingredient_portions')
+          .update({
+            use_count: existing.use_count + 1,
+            last_used_at: new Date().toISOString()
+          })
+          .eq('id', existing.id)
+      } else {
+        await this.supabase
+          .from('client_ingredient_portions')
+          .insert({
+            client_id: clientId,
+            ingredient_key: key,
+            ingredient_name: ingredientName.trim(),
+            portion_grams: portionGrams,
+            use_count: 1,
+            last_used_at: new Date().toISOString()
+          })
+      }
+    } catch (err) {
+      console.warn('⚠️ [MealLoggingService] _upsertPortion failed:', ingredientName, err)
+    }
+  }
+
+  async getPortionHistory(clientId, ingredientName, limit = 4) {
+    if (!clientId || !ingredientName) return []
+    try {
+      const key = ingredientName.trim().toLowerCase()
+      const { data, error } = await this.supabase
+        .from('client_ingredient_portions')
+        .select('portion_grams, use_count, last_used_at')
+        .eq('client_id', clientId)
+        .eq('ingredient_key', key)
+        .order('use_count', { ascending: false })
+        .order('last_used_at', { ascending: false })
+        .limit(limit)
+      if (error) throw error
+      return (data || []).map(r => Number(r.portion_grams))
+    } catch (err) {
+      console.warn('⚠️ [MealLoggingService] getPortionHistory failed:', err)
+      return []
+    }
+  }
+
+  async forgetPortion(clientId, ingredientName, portionGrams) {
+    if (!clientId || !ingredientName || !portionGrams) return false
+    try {
+      const key = ingredientName.trim().toLowerCase()
+      const { error } = await this.supabase
+        .from('client_ingredient_portions')
+        .delete()
+        .eq('client_id', clientId)
+        .eq('ingredient_key', key)
+        .eq('portion_grams', Math.round(portionGrams))
+      if (error) throw error
+      return true
+    } catch (err) {
+      console.warn('⚠️ [MealLoggingService] forgetPortion failed:', err)
+      return false
     }
   }
 

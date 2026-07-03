@@ -1,7 +1,7 @@
 // src/modules/workout/components/todays-workout/components/AttachmentSelector.jsx
 import { useState } from 'react'
 import { createPortal } from 'react-dom'
-import { ChevronDown, X, Check } from 'lucide-react'
+import { ChevronDown, X, Check, AlertTriangle } from 'lucide-react'
 import { ATTACHMENTS, getAttachment, getExerciseAttachmentDefaults } from '../../../constants/attachments'
 
 export default function AttachmentSelector({ suggested, value, onChange, isMobile, exerciseName }) {
@@ -18,10 +18,15 @@ export default function AttachmentSelector({ suggested, value, onChange, isMobil
   const isDefault = !value && !suggested && !!autoDefault
   const isSuggested = !value && !!suggested
 
-  // Filter beschikbare attachments
-  const visibleAttachments = availableIds
-    ? ATTACHMENTS.filter(a => availableIds.includes(a.id))
-    : ATTACHMENTS
+  // Toon nu ALLE attachments, niet alleen de voorgeschreven. Daarmee kan
+  // de klant kiezen voor iets dat niet in de defaults staat (bv. dumbbells
+  // voor overhead tricep extension) — wel met een waarschuwingslabel.
+  // Voorgeschreven attachments staan bovenaan, niet-voorgeschreven daaronder.
+  const isPrescribed = (id) => !availableIds || availableIds.includes(id)
+  const prescribed = ATTACHMENTS.filter(a => isPrescribed(a.id))
+  const others = ATTACHMENTS.filter(a => !isPrescribed(a.id))
+  const visibleAttachments = [...prescribed, ...others]
+  const activeIsPrescribed = isPrescribed(activeId)
 
   return (
     <>
@@ -47,6 +52,16 @@ export default function AttachmentSelector({ suggested, value, onChange, isMobil
               <div style={{ flex: 1, textAlign: 'left' }}>
                 <div style={{ fontSize: isMobile ? '0.85rem' : '0.9rem', fontWeight: '700', color: '#fff' }}>{current.nl}</div>
                 {isSuggested && <div style={{ fontSize: '0.58rem', color: 'rgba(255,215,0,0.4)', fontWeight: '600', marginTop: '0.1rem' }}>Aanbevolen</div>}
+                {!!value && !activeIsPrescribed && (
+                  <div style={{
+                    fontSize: '0.58rem', color: '#f59e0b',
+                    fontWeight: 700, marginTop: '0.15rem',
+                    display: 'flex', alignItems: 'center', gap: 4,
+                  }}>
+                    <AlertTriangle size={9} strokeWidth={2.6} />
+                    Niet voorgeschreven — overleg met coach
+                  </div>
+                )}
               </div>
             </>
           ) : (
@@ -73,36 +88,92 @@ export default function AttachmentSelector({ suggested, value, onChange, isMobil
               </button>
             </div>
 
-            {/* Grid */}
+            {/* Grid — voorgeschreven boven, overig onder met aparte koptekst */}
             <div style={{ flex: 1, overflowY: 'auto', WebkitOverflowScrolling: 'touch', padding: '0.875rem 1rem' }}>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.625rem' }}>
-                {visibleAttachments.map(attachment => {
-                  const isSelected = activeId === attachment.id
-                  const isSug = (suggested === attachment.id && !value) || (autoDefault === attachment.id && !value && !suggested)
-                  return (
-                    <button
-                      key={attachment.id}
-                      onClick={() => { onChange(attachment.id); setShowPicker(false) }}
-                      style={{ background: isSelected ? 'rgba(255,215,0,0.08)' : 'rgba(255,255,255,0.02)', border: `${isSelected ? '2' : '1'}px solid ${isSelected ? 'rgba(255,215,0,0.35)' : 'rgba(255,255,255,0.07)'}`, borderRadius: '8px', padding: '0.625rem 0.5rem', cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.375rem', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', position: 'relative', transition: 'all 0.15s ease' }}>
+              {/* Voorgeschreven sectie */}
+              {prescribed.length > 0 && (
+                <>
+                  {availableIds && (
+                    <div style={{
+                      fontSize: '0.5rem', fontWeight: 800,
+                      color: 'rgba(255,215,0,0.5)',
+                      textTransform: 'uppercase', letterSpacing: '0.08em',
+                      marginBottom: '0.5rem',
+                    }}>
+                      Voorgeschreven voor deze oefening
+                    </div>
+                  )}
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.625rem', marginBottom: others.length > 0 ? '1rem' : 0 }}>
+                    {prescribed.map(attachment => {
+                      const isSelected = activeId === attachment.id
+                      const isSug = (suggested === attachment.id && !value) || (autoDefault === attachment.id && !value && !suggested)
+                      return (
+                        <button
+                          key={attachment.id}
+                          onClick={() => { onChange(attachment.id); setShowPicker(false) }}
+                          style={{ background: isSelected ? 'rgba(255,215,0,0.08)' : 'rgba(255,255,255,0.02)', border: `${isSelected ? '2' : '1'}px solid ${isSelected ? 'rgba(255,215,0,0.35)' : 'rgba(255,255,255,0.07)'}`, borderRadius: '8px', padding: '0.625rem 0.5rem', cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.375rem', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', position: 'relative', transition: 'all 0.15s ease' }}>
+                          {isSug && (
+                            <div style={{ position: 'absolute', top: '4px', right: '4px', width: '14px', height: '14px', borderRadius: '50%', background: 'rgba(255,215,0,0.8)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                              <Check size={8} color="#000" strokeWidth={3} />
+                            </div>
+                          )}
+                          <div style={{ width: '52px', height: '52px', borderRadius: '6px', backgroundImage: `url(${attachment.img})`, backgroundSize: 'cover', backgroundPosition: 'center', opacity: isSelected ? 0.9 : 0.55 }} />
+                          <div style={{ fontSize: '0.62rem', fontWeight: '700', color: isSelected ? '#FFD700' : 'rgba(255,255,255,0.5)', textAlign: 'center', lineHeight: 1.3 }}>
+                            {attachment.nl}
+                          </div>
+                        </button>
+                      )
+                    })}
+                  </div>
+                </>
+              )}
 
-                      {/* Aanbevolen badge */}
-                      {isSug && (
-                        <div style={{ position: 'absolute', top: '4px', right: '4px', width: '14px', height: '14px', borderRadius: '50%', background: 'rgba(255,215,0,0.8)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                          <Check size={8} color="#000" strokeWidth={3} />
-                        </div>
-                      )}
-
-                      {/* Foto */}
-                      <div style={{ width: '52px', height: '52px', borderRadius: '6px', backgroundImage: `url(${attachment.img})`, backgroundSize: 'cover', backgroundPosition: 'center', opacity: isSelected ? 0.9 : 0.55 }} />
-
-                      {/* Naam */}
-                      <div style={{ fontSize: '0.62rem', fontWeight: '700', color: isSelected ? '#FFD700' : 'rgba(255,255,255,0.5)', textAlign: 'center', lineHeight: 1.3 }}>
-                        {attachment.nl}
-                      </div>
-                    </button>
-                  )
-                })}
-              </div>
+              {/* Niet-voorgeschreven sectie — met waarschuwingstekst */}
+              {others.length > 0 && availableIds && (
+                <>
+                  <div style={{
+                    fontSize: '0.5rem', fontWeight: 800,
+                    color: '#f59e0b',
+                    textTransform: 'uppercase', letterSpacing: '0.08em',
+                    marginBottom: 4,
+                    display: 'flex', alignItems: 'center', gap: 5,
+                  }}>
+                    <AlertTriangle size={10} strokeWidth={2.6} />
+                    Overig — niet voorgeschreven
+                  </div>
+                  <div style={{
+                    fontSize: '0.58rem', color: 'rgba(255,255,255,0.45)',
+                    fontWeight: 500, lineHeight: 1.4, marginBottom: '0.625rem',
+                  }}>
+                    Alleen kiezen als je dit met je coach hebt overlegd.
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.625rem' }}>
+                    {others.map(attachment => {
+                      const isSelected = activeId === attachment.id
+                      return (
+                        <button
+                          key={attachment.id}
+                          onClick={() => { onChange(attachment.id); setShowPicker(false) }}
+                          style={{
+                            background: isSelected ? 'rgba(245,158,11,0.08)' : 'rgba(255,255,255,0.015)',
+                            border: `${isSelected ? '2' : '1'}px solid ${isSelected ? 'rgba(245,158,11,0.4)' : 'rgba(255,255,255,0.05)'}`,
+                            borderRadius: '8px', padding: '0.625rem 0.5rem',
+                            cursor: 'pointer',
+                            display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.375rem',
+                            touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+                            position: 'relative', transition: 'all 0.15s ease',
+                            opacity: isSelected ? 1 : 0.55,
+                          }}>
+                          <div style={{ width: '52px', height: '52px', borderRadius: '6px', backgroundImage: `url(${attachment.img})`, backgroundSize: 'cover', backgroundPosition: 'center', opacity: isSelected ? 0.9 : 0.55 }} />
+                          <div style={{ fontSize: '0.62rem', fontWeight: '700', color: isSelected ? '#f59e0b' : 'rgba(255,255,255,0.5)', textAlign: 'center', lineHeight: 1.3 }}>
+                            {attachment.nl}
+                          </div>
+                        </button>
+                      )
+                    })}
+                  </div>
+                </>
+              )}
             </div>
           </div>
         </div>,

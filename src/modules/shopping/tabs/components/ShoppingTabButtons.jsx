@@ -28,9 +28,9 @@ export default function ShoppingTabButtons({ activeTab, onTabChange, isMobile })
             onClick={() => onTabChange(tab.id)}
             style={{
               padding: isMobile ? '0.3rem 0.5rem' : '0.35rem 0.625rem',
-              background: isActive ? 'rgba(16, 185, 129, 0.1)' : 'transparent',
+              background: isActive ? 'rgba(255, 215, 0, 0.1)' : 'transparent',
               border: isActive 
-                ? '1px solid rgba(16, 185, 129, 0.25)' 
+                ? '1px solid rgba(255, 215, 0, 0.25)' 
                 : '1px solid transparent',
               borderRadius: '6px',
               cursor: 'pointer',
@@ -47,13 +47,13 @@ export default function ShoppingTabButtons({ activeTab, onTabChange, isMobile })
           >
             <Icon 
               size={12} 
-              color={isActive ? '#10b981' : 'rgba(255, 255, 255, 0.35)'} 
+              color={isActive ? '#FFD700' : 'rgba(255, 255, 255, 0.35)'} 
               strokeWidth={2}
             />
             <span style={{
               fontSize: isMobile ? '0.65rem' : '0.7rem',
               fontWeight: isActive ? '700' : '600',
-              color: isActive ? '#10b981' : 'rgba(255, 255, 255, 0.35)'
+              color: isActive ? '#FFD700' : 'rgba(255, 255, 255, 0.35)'
             }}>
               {tab.label}
             </span>

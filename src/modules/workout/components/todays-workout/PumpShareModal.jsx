@@ -33,112 +33,122 @@ const formatDate = (d = new Date()) =>
 
 const formatVolume = (kg) => {
   if (!kg || Number.isNaN(kg)) return null
-  if (kg >= 1000) return `${(kg / 1000).toFixed(1).replace('.', ',')}k kg`
-  return `${Math.round(kg)} kg`
+  if (kg >= 1000) return `${(kg / 1000).toFixed(1).replace('.', ',')}k`
+  return String(Math.round(kg))
 }
 
-const formatDuration = (mins) => {
-  if (!mins || Number.isNaN(mins)) return null
-  if (mins < 60) return `${Math.round(mins)} min`
-  const h = Math.floor(mins / 60)
-  const m = Math.round(mins % 60)
-  return `${h}u ${m}m`
+const formatTimerCompact = (sec) => {
+  if (!sec || Number.isNaN(sec)) return null
+  const totalMin = Math.round(sec / 60)
+  if (totalMin < 60) return `${totalMin}m`
+  const h = Math.floor(totalMin / 60)
+  const m = totalMin % 60
+  return m > 0 ? `${h}u${m}` : `${h}u`
 }
 
-// Draws the stats card onto the bottom of the canvas, over the photo.
-// We size everything relative to the canvas height so it scales with
-// portrait/landscape variations from different cameras.
+// Draws clean text-only overlay on the photo. No background cards, no boxes —
+// pure typography met sterke drop-shadow zodat het over elke foto leesbaar is.
+//
+// Layout:
+//   linksboven:  [WORKOUT] / "voltooid" (goud) / datum (muted)
+//   rechtsboven: "MY ARC" mark
+//   onderaan:    stats-rij, grote gouden cijfers met kleine labels eronder
 const drawStatsOverlay = (ctx, canvas, stats) => {
   const W = canvas.width
   const H = canvas.height
-  const margin = Math.round(W * 0.04)
-  const cardH = Math.round(H * 0.22)
-  const cardY = H - cardH - margin
-  const cardX = margin
-  const cardW = W - margin * 2
-  const radius = Math.round(W * 0.03)
+  const margin = Math.round(W * 0.06)
 
-  // Card background (rounded rect).
-  ctx.fillStyle = STATS_THEME.bg
-  roundRect(ctx, cardX, cardY, cardW, cardH, radius)
-  ctx.fill()
-
-  // Gold accent stripe on top of the card.
-  ctx.fillStyle = STATS_THEME.accent
-  roundRect(ctx, cardX, cardY, cardW, Math.max(3, Math.round(W * 0.006)), radius)
-  ctx.fill()
-
-  // Title row: workout name + date
-  const titleFont = `800 ${Math.round(H * 0.032)}px -apple-system, BlinkMacSystemFont, sans-serif`
-  const subFont = `600 ${Math.round(H * 0.018)}px -apple-system, BlinkMacSystemFont, sans-serif`
-  const numberFont = `900 ${Math.round(H * 0.038)}px -apple-system, BlinkMacSystemFont, sans-serif`
-  const labelFont = `700 ${Math.round(H * 0.014)}px -apple-system, BlinkMacSystemFont, sans-serif`
+  const applyShadow = () => {
+    ctx.shadowColor = 'rgba(0,0,0,0.85)'
+    ctx.shadowBlur = Math.max(8, Math.round(H * 0.012))
+    ctx.shadowOffsetX = 0
+    ctx.shadowOffsetY = Math.round(H * 0.0035)
+  }
+  const clearShadow = () => {
+    ctx.shadowColor = 'transparent'
+    ctx.shadowBlur = 0
+    ctx.shadowOffsetX = 0
+    ctx.shadowOffsetY = 0
+  }
 
   ctx.textBaseline = 'top'
+  applyShadow()
+
+  // ── LINKSBOVEN: "[NAAM]" + "voltooid" + datum ──
+  const titleSize = Math.round(H * 0.072)
+  const subSize = Math.round(H * 0.032)
+  const dateSize = Math.round(H * 0.022)
+
   ctx.textAlign = 'left'
+  ctx.font = `900 ${titleSize}px -apple-system, BlinkMacSystemFont, sans-serif`
   ctx.fillStyle = STATS_THEME.text
-  ctx.font = titleFont
-  const padX = Math.round(W * 0.04)
-  const padY = Math.round(H * 0.018)
-  ctx.fillText(
-    (stats.workoutName || 'Workout').slice(0, 28),
-    cardX + padX,
-    cardY + padY + Math.round(H * 0.012)
-  )
-  ctx.fillStyle = STATS_THEME.sub
-  ctx.font = subFont
+  const rawName = (stats.workoutName || 'Workout').trim()
+  // Eerste woord — meestal "Push", "Pull", "Legs". Capitalized.
+  const firstWord = rawName.split(/\s+/)[0]
+  const cleanName = (firstWord.charAt(0).toUpperCase() + firstWord.slice(1).toLowerCase())
+  ctx.fillText(cleanName, margin, margin)
+
+  ctx.font = `800 italic ${subSize}px -apple-system, BlinkMacSystemFont, sans-serif`
+  ctx.fillStyle = STATS_THEME.accent
+  ctx.fillText('voltooid', margin, margin + titleSize + Math.round(H * 0.002))
+
+  ctx.font = `600 ${dateSize}px -apple-system, BlinkMacSystemFont, sans-serif`
+  ctx.fillStyle = 'rgba(255,255,255,0.9)'
   ctx.fillText(
     stats.dateLabel || formatDate(),
-    cardX + padX,
-    cardY + padY + Math.round(H * 0.05)
+    margin,
+    margin + titleSize + subSize + Math.round(H * 0.016)
   )
 
-  // Bottom row: stat boxes evenly spaced.
-  const items = [
-    stats.exercisesCount != null
-      ? { value: String(stats.exercisesCount), label: 'oef' }
-      : null,
-    stats.setsCount != null
-      ? { value: String(stats.setsCount), label: 'sets' }
-      : null,
-    stats.volume != null
-      ? { value: formatVolume(stats.volume), label: 'volume' }
-      : null,
-    stats.duration != null
-      ? { value: formatDuration(stats.duration), label: 'tijd' }
-      : null,
-  ].filter(Boolean)
+  // ── RECHTSBOVEN: MY ARC ──
+  ctx.textAlign = 'right'
+  ctx.font = `900 ${Math.round(H * 0.022)}px -apple-system, BlinkMacSystemFont, sans-serif`
+  ctx.fillStyle = STATS_THEME.accent
+  ctx.fillText('MY ARC', W - margin, margin + Math.round(H * 0.003))
+
+  // ── ONDERAAN: stats-rij, geen vakken — alleen tekst.
+  // KCAL komt altijd uit de ACSM MET-formule (formule 1). Met timer = echte
+  // tijd; zonder timer = geschatte tijd uit sets × 2.5 min.
+  //   - Met timer:    OEF · SETS · KCAL · TIJD
+  //   - Zonder timer: OEF · SETS · KCAL · KG
+  const hasTimer = stats.timerSec != null && stats.timerSec > 0
+  const items = []
+  if (stats.exercisesCount != null)
+    items.push({ value: String(stats.exercisesCount), label: 'OEF' })
+  if (stats.setsCount != null)
+    items.push({ value: String(stats.setsCount), label: 'SETS' })
+  if (stats.kcal != null)
+    items.push({ value: String(stats.kcal), label: 'KCAL' })
+  if (hasTimer) {
+    const t = formatTimerCompact(stats.timerSec)
+    if (t) items.push({ value: t, label: 'TIJD' })
+  } else if (stats.volume != null) {
+    items.push({ value: formatVolume(stats.volume), label: 'KG' })
+  }
 
   if (items.length > 0) {
-    const rowY = cardY + cardH - Math.round(H * 0.082)
-    const slotW = cardW / items.length
+    // Labels duidelijk leesbaar — flink vergroot t.o.v. eerdere versie zodat ze
+    // niet meer in het niets verdwijnen. ~55% van de cijfergrootte.
+    const numberSize = Math.round(H * 0.058)
+    const labelSize = Math.round(H * 0.028)
+    const numbersBaseY = H - margin - numberSize - labelSize - Math.round(H * 0.024)
+    const labelsBaseY = numbersBaseY + numberSize + Math.round(H * 0.01)
+    const innerW = W - margin * 2
+    const slotW = innerW / items.length
+
+    ctx.textAlign = 'center'
     items.forEach((it, i) => {
-      const cx = cardX + slotW * i + slotW / 2
-      ctx.textAlign = 'center'
+      const cx = margin + slotW * i + slotW / 2
       ctx.fillStyle = STATS_THEME.accent
-      ctx.font = numberFont
-      ctx.fillText(it.value, cx, rowY)
-      ctx.fillStyle = 'rgba(255,255,255,0.6)'
-      ctx.font = labelFont
-      ctx.fillText(it.label.toUpperCase(), cx, rowY + Math.round(H * 0.044))
+      ctx.font = `900 ${numberSize}px -apple-system, BlinkMacSystemFont, sans-serif`
+      ctx.fillText(it.value, cx, numbersBaseY)
+      ctx.fillStyle = '#fff'
+      ctx.font = `900 ${labelSize}px -apple-system, BlinkMacSystemFont, sans-serif`
+      ctx.fillText(it.label, cx, labelsBaseY)
     })
   }
 
-  // Subtle MY ARC mark in the corner.
-  ctx.textAlign = 'right'
-  ctx.font = `800 ${Math.round(H * 0.013)}px -apple-system, BlinkMacSystemFont, sans-serif`
-  ctx.fillStyle = 'rgba(255,255,255,0.5)'
-  ctx.fillText('MY ARC', cardX + cardW - padX, cardY + padY + Math.round(H * 0.008))
-}
-
-const roundRect = (ctx, x, y, w, h, r) => {
-  ctx.beginPath()
-  ctx.moveTo(x + r, y)
-  ctx.arcTo(x + w, y, x + w, y + h, r)
-  ctx.arcTo(x + w, y + h, x, y + h, r)
-  ctx.arcTo(x, y + h, x, y, r)
-  ctx.arcTo(x, y, x + w, y, r)
-  ctx.closePath()
+  clearShadow()
 }
 
 export default function PumpShareModal({
@@ -303,6 +313,9 @@ export default function PumpShareModal({
         new Date().toISOString().split('T')[0]
       )
       setSaved(true)
+      // Korte "Opgeslagen ✓" feedback, dan automatisch terug naar de gallery
+      // zodat de zojuist-geüploade foto direct zichtbaar is.
+      setTimeout(() => { if (onClose) onClose() }, 600)
     } catch (e) {
       console.error('Pump photo upload failed:', e)
       setCameraError(`Opslaan mislukt — ${e?.message || e}`)

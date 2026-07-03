@@ -66,6 +66,13 @@
         box-sizing: border-box;
       }
       
+      /* html óók zwart: iOS/WKWebView toont bij overscroll-bounce de
+         canvas-achtergrond — zonder dit kan er een andere tint doorschemeren
+         boven/onder de content. */
+      html {
+        background: #000;
+      }
+
       body {
         margin: 0;
         background: #000;

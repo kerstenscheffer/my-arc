@@ -4,6 +4,111 @@ export default class ShoppingService {
     this.db = db
     this.supabase = db.supabase
     
+    // ── PLACEHOLDER INGREDIENT MAP ──
+    // Veel ai_meals zijn ooit aangemaakt met placeholder-strings als
+    // ingredient_id (bv. "EGGS-UUID", "[BOTER-UUID-HIER]") in plaats van
+    // echte UUIDs. Die strings bestaan niet in ai_ingredients, dus de
+    // shopping-list fallback toonde voorheen "Unknown Ingredient" voor
+    // ~82 maaltijden. Deze map vertaalt elke bekende placeholder naar
+    // een nette Nederlandse naam + correcte category, zodat de klant
+    // wél een leesbare boodschappenlijst krijgt totdat de data zelf is
+    // opgeschoond.
+    this.PLACEHOLDER_MAP = {
+      // Proteins
+      'EGGS-UUID':            { name: 'Eieren',              category: 'protein',    unit_type: 'gram' },
+      'BOILED-EGG-UUID':      { name: 'Eieren',              category: 'protein',    unit_type: 'gram' },
+      'EGG-WHITES-UUID':      { name: 'Eiwitten',            category: 'protein',    unit_type: 'gram' },
+      'EGG-SALAD-UUID':       { name: 'Eiersalade',          category: 'protein',    unit_type: 'gram' },
+      'HAM-UUID':             { name: 'Ham',                 category: 'protein',    unit_type: 'gram' },
+      'HAM-CUBES-UUID':       { name: 'Hamblokjes',          category: 'protein',    unit_type: 'gram' },
+      'CHICKEN-SLICES-UUID':  { name: 'Kipfilet plakjes',    category: 'protein',    unit_type: 'gram' },
+      'GRILLED-CHICKEN-UUID': { name: 'Gegrilde kip',        category: 'protein',    unit_type: 'gram' },
+      'CANNED-TUNA-UUID':     { name: 'Tonijn (blik)',       category: 'protein',    unit_type: 'gram' },
+      'WHEY-VANILLA-UUID':    { name: 'Whey eiwit vanille',  category: 'protein',    unit_type: 'gram' },
+      'PROTEIN-BAR-UUID':     { name: 'Proteïnereep',        category: 'protein',    unit_type: 'gram' },
+
+      // Carbs
+      'BREAD-UUID':           { name: 'Brood',               category: 'carbs',      unit_type: 'gram' },
+      'OATS-UUID':            { name: 'Havermout',           category: 'carbs',      unit_type: 'gram' },
+      'MUESLI-UUID':          { name: 'Muesli',              category: 'carbs',      unit_type: 'gram' },
+      'GRANOLA-UUID':         { name: 'Granola',             category: 'carbs',      unit_type: 'gram' },
+      'CROISSANT-UUID':       { name: 'Croissant',           category: 'carbs',      unit_type: 'gram' },
+      'ENGLISH-MUFFIN-UUID':  { name: 'English Muffin',      category: 'carbs',      unit_type: 'gram' },
+      'ONTBIJTKOEK-UUID':     { name: 'Ontbijtkoek',         category: 'carbs',      unit_type: 'gram' },
+      'BRINTA-UUID':          { name: 'Brinta',              category: 'carbs',      unit_type: 'gram' },
+      'CRACKERS-UUID':        { name: 'Crackers',            category: 'carbs',      unit_type: 'gram' },
+      'LIGA-UUID':            { name: 'Liga koeken',         category: 'carbs',      unit_type: 'gram' },
+      'MUESLI-BAR-UUID':      { name: 'Muesli reep',         category: 'carbs',      unit_type: 'gram' },
+      'RICE-CAKE-PLAIN-UUID':   { name: 'Rijstwafels naturel',   category: 'carbs', unit_type: 'gram' },
+      'RICE-CAKE-BBQ-UUID':     { name: 'Rijstwafels barbecue',  category: 'carbs', unit_type: 'gram' },
+      'RICE-CAKE-CHEESE-UUID':  { name: 'Rijstwafels kaas',      category: 'carbs', unit_type: 'gram' },
+      'RICE-CAKE-PAPRIKA-UUID': { name: 'Rijstwafels paprika',   category: 'carbs', unit_type: 'gram' },
+      'RICE-CAKE-SALT-UUID':    { name: 'Rijstwafels zeezout',   category: 'carbs', unit_type: 'gram' },
+      'RICE-CAKE-CHOCO-UUID':   { name: 'Rijstwafels chocolade', category: 'carbs', unit_type: 'gram' },
+
+      // Dairy
+      'MILK-UUID':            { name: 'Melk',                category: 'dairy',      unit_type: 'ml'   },
+      'ALMOND-MILK-UUID':     { name: 'Amandelmelk',         category: 'dairy',      unit_type: 'ml'   },
+      'GREEK-YOGURT-UUID':    { name: 'Griekse yoghurt',     category: 'dairy',      unit_type: 'gram' },
+      'YOGURT-UUID':          { name: 'Yoghurt',             category: 'dairy',      unit_type: 'gram' },
+      'SKYR-UUID':            { name: 'Skyr',                category: 'dairy',      unit_type: 'gram' },
+      'QUARK-UUID':           { name: 'Kwark',               category: 'dairy',      unit_type: 'gram' },
+      'COTTAGE-CHEESE-UUID':  { name: 'Cottage cheese',      category: 'dairy',      unit_type: 'gram' },
+      'MOZZARELLA-UUID':      { name: 'Mozzarella',          category: 'dairy',      unit_type: 'gram' },
+      'CHEDDAR-UUID':         { name: 'Cheddar',             category: 'dairy',      unit_type: 'gram' },
+      'GORGONZOLA-UUID':      { name: 'Gorgonzola',          category: 'dairy',      unit_type: 'gram' },
+      'BRIE-UUID':            { name: 'Brie',                category: 'dairy',      unit_type: 'gram' },
+      'GRATED-CHEESE-UUID':   { name: 'Geraspte kaas',       category: 'dairy',      unit_type: 'gram' },
+
+      // Fats
+      '[BOTER-UUID-HIER]':    { name: 'Boter',               category: 'fats',       unit_type: 'gram' },
+      'OLIVE-OIL-UUID':       { name: 'Olijfolie',           category: 'fats',       unit_type: 'ml'   },
+      'PEANUT-BUTTER-UUID':   { name: 'Pindakaas',           category: 'fats',       unit_type: 'gram' },
+      'MIXED-NUTS-UUID':      { name: 'Notenmix',            category: 'fats',       unit_type: 'gram' },
+      'WALNUTS-UUID':         { name: 'Walnoten',            category: 'fats',       unit_type: 'gram' },
+      'AVOCADO-UUID':         { name: 'Avocado',             category: 'fats',       unit_type: 'gram' },
+      'COOKING-SPRAY-UUID':   { name: 'Bakspray',            category: 'fats',       unit_type: 'ml'   },
+      'HOLLANDAISE-UUID':     { name: 'Hollandaisesaus',     category: 'fats',       unit_type: 'ml'   },
+
+      // Fruit
+      'BANANA-UUID':          { name: 'Banaan',              category: 'fruit',      unit_type: 'gram' },
+      'APPLE-UUID':           { name: 'Appel',               category: 'fruit',      unit_type: 'gram' },
+      'ORANGE-UUID':          { name: 'Sinaasappel',         category: 'fruit',      unit_type: 'gram' },
+      'BLUEBERRIES-UUID':     { name: 'Blauwe bessen',       category: 'fruit',      unit_type: 'gram' },
+      'STRAWBERRIES-UUID':    { name: 'Aardbeien',           category: 'fruit',      unit_type: 'gram' },
+      'RASPBERRIES-UUID':     { name: 'Frambozen',           category: 'fruit',      unit_type: 'gram' },
+      'PINEAPPLE-UUID':       { name: 'Ananas',              category: 'fruit',      unit_type: 'gram' },
+      'MIXED-FRUIT-UUID':     { name: 'Gemengd fruit',       category: 'fruit',      unit_type: 'gram' },
+
+      // Vegetables
+      'TOMATO-UUID':          { name: 'Tomaat',              category: 'vegetables', unit_type: 'gram' },
+      'CHERRY-TOMATO-UUID':   { name: 'Cherrytomaatjes',     category: 'vegetables', unit_type: 'gram' },
+      'CANNED-TOMATOES-UUID': { name: 'Tomaten (blik)',      category: 'vegetables', unit_type: 'gram' },
+      'CUCUMBER-UUID':        { name: 'Komkommer',           category: 'vegetables', unit_type: 'gram' },
+      'LETTUCE-UUID':         { name: 'Sla',                 category: 'vegetables', unit_type: 'gram' },
+      'SPINACH-UUID':         { name: 'Spinazie',            category: 'vegetables', unit_type: 'gram' },
+      'ONION-UUID':           { name: 'Ui',                  category: 'vegetables', unit_type: 'gram' },
+      'GARLIC-UUID':          { name: 'Knoflook',            category: 'vegetables', unit_type: 'gram' },
+      'BELL-PEPPER-UUID':     { name: 'Paprika',             category: 'vegetables', unit_type: 'gram' },
+      'MUSHROOMS-UUID':       { name: 'Champignons',         category: 'vegetables', unit_type: 'gram' },
+      'BASIL-UUID':           { name: 'Basilicum',           category: 'vegetables', unit_type: 'gram' },
+
+      // Other / spices / extras
+      'HUMMUS-UUID':          { name: 'Hummus',              category: 'other',      unit_type: 'gram' },
+      'PESTO-UUID':           { name: 'Pesto',               category: 'other',      unit_type: 'gram' },
+      'HAGELSLAG-UUID':       { name: 'Hagelslag',           category: 'other',      unit_type: 'gram' },
+      'STRAWBERRY-JAM-UUID':  { name: 'Aardbeienjam',        category: 'other',      unit_type: 'gram' },
+      'HONEY-UUID':           { name: 'Honing',              category: 'other',      unit_type: 'gram' },
+      'COCOA-UUID':           { name: 'Cacao',               category: 'other',      unit_type: 'gram' },
+      'CINNAMON-UUID':        { name: 'Kaneel',              category: 'other',      unit_type: 'gram' },
+      'VANILLA-UUID':         { name: 'Vanille',             category: 'other',      unit_type: 'ml'   },
+      'CHIA-SEEDS-UUID':      { name: 'Chiazaad',            category: 'other',      unit_type: 'gram' },
+      'COCONUT-FLAKES-UUID':  { name: 'Kokosrasp',           category: 'other',      unit_type: 'gram' },
+      'PAPRIKA-POWDER-UUID':  { name: 'Paprikapoeder',       category: 'other',      unit_type: 'gram' },
+      'CUMIN-UUID':           { name: 'Komijn',              category: 'other',      unit_type: 'gram' },
+      'WATER-UUID':           { name: 'Water',               category: 'other',      unit_type: 'ml'   },
+    }
+
     // ── UNIT CONVERSION TABLE ──
     // Ingredients stored in grams but sold per piece
     // gram_per_piece = average weight of 1 unit
@@ -26,26 +131,32 @@ export default class ShoppingService {
   }
   
   // ── CHECK IF INGREDIENT NEEDS PIECE CONVERSION ──
+  // Match-strategie:
+  //   1. Exacte naam (lowercase) — primair pad
+  //   2. Heel-woord match (\b…\b regex) — voor namen met merknaam erbij,
+  //      bv. "Tortilla volkoren wrap (Albert Heijn)" → matcht "wrap" maar
+  //      NIET "ei" (de substring in "heijn") want word-boundary verplicht
+  //      een woordgrens. Voorheen werd "ei" wel gematcht en kreeg een
+  //      tortilla-wrap per ongeluk 60g/stuk als eieren-conversie.
   getConversionInfo(ingredientName, dbUnitType) {
     if (!ingredientName) return null
     const nameLower = ingredientName.toLowerCase().trim()
-    
-    // Check exact match first, then partial match
+
     if (this.PIECE_CONVERSIONS[nameLower]) {
       return this.PIECE_CONVERSIONS[nameLower]
     }
-    
-    // Partial match
+
     for (const [key, conv] of Object.entries(this.PIECE_CONVERSIONS)) {
-      if (nameLower.includes(key)) return conv
+      const escaped = key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+      const regex = new RegExp(`\\b${escaped}\\b`, 'i')
+      if (regex.test(nameLower)) return conv
     }
-    
-    // If DB says piece but we don't have a conversion, flag it
+
     if (dbUnitType === 'piece' || dbUnitType === 'stuks') {
       console.warn(`⚠️ Ingredient "${ingredientName}" is sold per piece but has no conversion entry`)
       return null
     }
-    
+
     return null
   }
   
@@ -225,11 +336,15 @@ export default class ShoppingService {
         }
       })
       
-      // Sort by category
+      // Sort by category — accepteer zowel "fruit" als "fruits" omdat de
+      // ai_ingredients tabel beide vormen kent.
+      const normalizeCat = (c) => (c === 'fruits' ? 'fruit' : c)
       shoppingList.sort((a, b) => {
         const categoryOrder = ['protein', 'carbs', 'vegetables', 'fats', 'dairy', 'fruit', 'other']
-        const aIdx = categoryOrder.indexOf(a.category) !== -1 ? categoryOrder.indexOf(a.category) : 999
-        const bIdx = categoryOrder.indexOf(b.category) !== -1 ? categoryOrder.indexOf(b.category) : 999
+        const aCat = normalizeCat(a.category)
+        const bCat = normalizeCat(b.category)
+        const aIdx = categoryOrder.indexOf(aCat) !== -1 ? categoryOrder.indexOf(aCat) : 999
+        const bIdx = categoryOrder.indexOf(bCat) !== -1 ? categoryOrder.indexOf(bCat) : 999
         if (aIdx !== bIdx) return aIdx - bIdx
         return a.name.localeCompare(b.name)
       })
@@ -315,8 +430,50 @@ export default class ShoppingService {
     }
   }
   
+  // Detecteer placeholder-strings die ooit als ingredient_id zijn
+  // opgeslagen ipv echte UUIDs. We willen geen DB-call doen op een
+  // string als "EGGS-UUID" — die zou alleen maar errors loggen.
+  isPlaceholderId(ingredientId) {
+    if (!ingredientId || typeof ingredientId !== 'string') return false
+    if (ingredientId in this.PLACEHOLDER_MAP) return true
+    // Vangnet: alles dat eindigt op -UUID of in vierkante haken staat
+    // is geen geldige UUID en kan een onbekende placeholder zijn.
+    if (/-UUID$/i.test(ingredientId)) return true
+    if (/^\[.*\]$/.test(ingredientId)) return true
+    // Echte UUIDs hebben 8-4-4-4-12 hex-formaat
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(ingredientId)) return true
+    return false
+  }
+
+  // Synthetiseer een ai_ingredients-achtig object uit een placeholder.
+  // Onbekende placeholders krijgen een afgeleide naam (bv. "CRACKERS-UUID"
+  // → "Crackers") zodat ze nog steeds leesbaar zijn in de boodschappenlijst.
+  resolvePlaceholder(ingredientId) {
+    const known = this.PLACEHOLDER_MAP[ingredientId]
+    if (known) {
+      return { id: ingredientId, ...known, price_per_unit: 0, _placeholder: true }
+    }
+    // Onbekende placeholder — derive name from prefix
+    let derived = String(ingredientId).replace(/-UUID$/i, '').replace(/^\[|\]$/g, '')
+    derived = derived.replace(/-/g, ' ').toLowerCase()
+    derived = derived.charAt(0).toUpperCase() + derived.slice(1)
+    return {
+      id: ingredientId,
+      name: derived || 'Onbekend',
+      category: 'other',
+      unit_type: 'gram',
+      price_per_unit: 0,
+      _placeholder: true,
+    }
+  }
+
   // Get ingredient details
   async getIngredientDetails(ingredientId) {
+    // Placeholder-strings nooit naar Supabase sturen — geeft een Postgres
+    // type-error en zorgde voorheen voor "Unknown Ingredient" in de lijst.
+    if (this.isPlaceholderId(ingredientId)) {
+      return this.resolvePlaceholder(ingredientId)
+    }
     try {
       const { data, error } = await this.supabase
         .from('ai_ingredients')

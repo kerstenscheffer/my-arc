@@ -11,12 +11,16 @@ import ScanTab from './ScanTab'
 import AmountPicker from './AmountPicker'
 import SmartLoggingService from './SmartLoggingService'
 import IngredientFeedbackModal from './IngredientFeedbackModal'
+import { enrichIngredientImage } from './enrichImageFromOFF'
 
 export default function FoodLogModal({
   isOpen, onClose, client, db,
   targets, consumedToday, onMealLogged,
   defaultMealMoment,
-  editMeal
+  editMeal,
+  // ISO timestamp to stamp on consumed_at. Pass when logging meals for a
+  // non-today date (e.g. backfilling yesterday). Null/omitted = use now.
+  consumedAt = null,
 }) {
   const isMobile = window.innerWidth <= 768
   const [activeTab, setActiveTab] = useState('search')
@@ -128,6 +132,14 @@ export default function FoodLogModal({
           .eq('id', selectedItem._editId)
       }
 
+      // Fire-and-forget: als dit een ingredient is zonder image maar mét
+      // barcode, ophalen via Open Food Facts en cachen. Volgende keer dat
+      // dit item in search/recent verschijnt staat de foto er al — sneller
+      // herkennen = sneller loggen.
+      if (logData.sourceId && logData.type !== 'meal' && !logData.image_url && logData.barcode) {
+        enrichIngredientImage(db, logData.sourceId).catch(() => {})
+      }
+
       const result = await loggingService.logMeal(client.id, {
         name: logData.name,
         sourceId: logData.sourceId || null,
@@ -147,7 +159,7 @@ export default function FoodLogModal({
         per_unit: logData.per_unit || null,
         defaultPortion: logData.defaultPortion || 100,
         meal_type: logData.meal_type || 'snack'
-      })
+      }, consumedAt)
 
       if (onMealLogged) {
         if (selectedItem?._editId) {
@@ -231,7 +243,7 @@ export default function FoodLogModal({
           source: 'copy_yesterday', image_url: meal.image_url,
           amount: meal.amount, per_unit: meal.per_unit,
           per100g: meal.per_unit === 'gram'
-        })
+        }, consumedAt)
         totalCal += meal.calories || 0
       }
 
@@ -397,6 +409,9 @@ export default function FoodLogModal({
             onCancel={() => setSelectedItem(null)}
             isMobile={isMobile}
             defaultMealMoment={defaultMealMoment}
+            db={db}
+            client={client}
+            loggingService={loggingService}
           />
         </>
       ) : !successData ? (

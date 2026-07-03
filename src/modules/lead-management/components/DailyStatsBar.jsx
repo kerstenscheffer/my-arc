@@ -436,7 +436,7 @@ function StatCard({ icon, label, value, highlight = false, progress = null, subt
 // ============================================
 // SOP MODAL
 // ============================================
-function SOPModal({ isMobile, onClose }) {
+export function SOPModal({ isMobile, onClose }) {
   const [checkedSteps, setCheckedSteps] = useState({})
   const [collapsedPhases, setCollapsedPhases] = useState(() => {
     const initial = {}

@@ -70,6 +70,7 @@ const fetchProgress = async ({ coachId, goals, leadService }) => {
         case 'callProposed':   value = f?.callProposed?.count ?? 0; break
         case 'callScheduled':  value = f?.callScheduled?.count ?? 0; break
         case 'sale':           value = f?.sale?.count ?? 0; break
+        case 'noShow':         value = f?.noShow?.count ?? 0; break
         default: value = 0
       }
     }

@@ -199,12 +199,12 @@ export default function BudgetOnboarding({ clientId, budgetService, onComplete, 
                         style={{
                           flex: 1,
                           padding: isMobile ? '0.3rem 0.25rem' : '0.35rem 0.375rem',
-                          background: selected ? 'rgba(16, 185, 129, 0.1)' : 'transparent',
+                          background: selected ? 'rgba(255, 215, 0, 0.1)' : 'transparent',
                           border: selected
-                            ? '1px solid rgba(16, 185, 129, 0.3)'
+                            ? '1px solid rgba(255, 215, 0, 0.3)'
                             : '1px solid rgba(255, 255, 255, 0.06)',
                           borderRadius: '6px',
-                          color: selected ? '#10b981' : 'rgba(255, 255, 255, 0.3)',
+                          color: selected ? '#FFD700' : 'rgba(255, 255, 255, 0.3)',
                           fontSize: isMobile ? '0.55rem' : '0.6rem',
                           fontWeight: selected ? 700 : 600,
                           cursor: 'pointer',
@@ -265,7 +265,7 @@ export default function BudgetOnboarding({ clientId, budgetService, onComplete, 
                           textAlign: 'center',
                           outline: 'none'
                         }}
-                        onFocus={(e) => { e.target.style.borderColor = '#10b981' }}
+                        onFocus={(e) => { e.target.style.borderColor = '#FFD700' }}
                         onBlur={(e) => { e.target.style.borderColor = 'rgba(255, 255, 255, 0.08)' }}
                       />
                     </div>
@@ -316,7 +316,7 @@ export default function BudgetOnboarding({ clientId, budgetService, onComplete, 
               style={{
                 width: '100%',
                 padding: '0.7rem',
-                background: weeklyTotal > 0 ? '#10b981' : 'rgba(255, 255, 255, 0.04)',
+                background: weeklyTotal > 0 ? '#FFD700' : 'rgba(255, 255, 255, 0.04)',
                 border: 'none',
                 borderRadius: '8px',
                 color: weeklyTotal > 0 ? '#000' : 'rgba(255, 255, 255, 0.15)',
@@ -412,7 +412,7 @@ export default function BudgetOnboarding({ clientId, budgetService, onComplete, 
         </div>
         <div style={{ flex: 1, textAlign: 'center', padding: isMobile ? '0.5rem' : '0.625rem', borderRight: '1px solid rgba(255, 255, 255, 0.04)' }}>
           <div style={{ fontSize: '0.4rem', fontWeight: 700, color: 'rgba(255, 255, 255, 0.15)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '0.1rem' }}>Met MY ARC</div>
-          <div style={{ fontSize: isMobile ? '0.85rem' : '0.95rem', fontWeight: 800, color: '#10b981', lineHeight: 1 }}>€{planCost}</div>
+          <div style={{ fontSize: isMobile ? '0.85rem' : '0.95rem', fontWeight: 800, color: '#FFD700', lineHeight: 1 }}>€{planCost}</div>
         </div>
         <div style={{ flex: 1, textAlign: 'center', padding: isMobile ? '0.5rem' : '0.625rem' }}>
           <div style={{ fontSize: '0.4rem', fontWeight: 700, color: 'rgba(255, 255, 255, 0.15)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '0.1rem' }}>Besparing</div>
@@ -421,7 +421,7 @@ export default function BudgetOnboarding({ clientId, budgetService, onComplete, 
       </div>
 
       {/* Lifetime */}
-      <div style={{ display: 'flex', background: 'rgba(16, 185, 129, 0.02)' }}>
+      <div style={{ display: 'flex', background: 'rgba(255, 215, 0, 0.02)' }}>
         {[
           { label: 'Per maand', value: `€${monthlySaving}` },
           { label: 'Per jaar', value: `€${yearlySaving}` },
@@ -433,7 +433,7 @@ export default function BudgetOnboarding({ clientId, budgetService, onComplete, 
             borderRight: i < 2 ? '1px solid rgba(255, 255, 255, 0.04)' : 'none'
           }}>
             <div style={{ fontSize: '0.4rem', fontWeight: 700, color: 'rgba(255, 255, 255, 0.15)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '0.1rem' }}>{s.label}</div>
-            <div style={{ fontSize: isMobile ? '0.75rem' : '0.85rem', fontWeight: 800, color: '#10b981', lineHeight: 1 }}>{s.value}</div>
+            <div style={{ fontSize: isMobile ? '0.75rem' : '0.85rem', fontWeight: 800, color: '#FFD700', lineHeight: 1 }}>{s.value}</div>
           </div>
         ))}
       </div>
@@ -445,7 +445,7 @@ export default function BudgetOnboarding({ clientId, budgetService, onComplete, 
           disabled={saving}
           style={{
             width: '100%', padding: '0.75rem',
-            background: '#10b981', border: 'none', borderRadius: '8px',
+            background: '#FFD700', border: 'none', borderRadius: '8px',
             color: '#000', fontSize: isMobile ? '0.8rem' : '0.85rem', fontWeight: 800,
             cursor: saving ? 'wait' : 'pointer',
             touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',

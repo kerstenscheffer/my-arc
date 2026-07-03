@@ -5,16 +5,8 @@ import ShoppingItem from './ShoppingItem'
 import EditableShoppingItem from './EditableShoppingItem'
 import { CATEGORY_CONFIG } from '../../constants/shoppingConstants'
 
-const CATEGORY_IMAGES = {
-  protein: 'https://images.unsplash.com/photo-1607623814075-e51df1bdc82f?w=600&h=200&fit=crop&crop=center',
-  carbs: 'https://images.unsplash.com/photo-1586201375761-83865001e31c?w=600&h=200&fit=crop&crop=center',
-  vegetables: 'https://images.unsplash.com/photo-1540420773420-3366772f4999?w=600&h=200&fit=crop&crop=center',
-  fruit: 'https://images.unsplash.com/photo-1619566636858-adf3ef46400b?w=600&h=200&fit=crop&crop=center',
-  dairy: 'https://images.unsplash.com/photo-1628088062854-d1870b4553da?w=600&h=200&fit=crop&crop=center',
-  fats: 'https://images.unsplash.com/photo-1523049673857-eb18f1d7b578?w=600&h=200&fit=crop&crop=center',
-  sauces: 'https://images.unsplash.com/photo-1472476443507-c7a5948772fc?w=600&h=200&fit=crop&crop=center',
-  other: null
-}
+// Foto-headers + emoji's verwijderd op verzoek — pagina moet minder ruis
+// hebben en een duidelijke lijst-uitstraling.
 
 export default function CompactShoppingCategory({ 
   category, 
@@ -51,157 +43,77 @@ export default function CompactShoppingCategory({
     return sum + (amount * costPerUnit)
   }, 0)
 
-  const heroImage = CATEGORY_IMAGES[category]
-
   return (
     <div style={{
-      marginTop: '0.5rem',
+      marginTop: isMobile ? '1.25rem' : '1.5rem',
       background: '#0a0a0a',
       border: 'none',
-      borderTop: '1px solid rgba(255, 255, 255, 0.06)',
-      borderBottom: '1px solid rgba(255, 255, 255, 0.06)',
-      borderRadius: '0',
       overflow: 'hidden',
-      transform: 'translateZ(0)'
+      transform: 'translateZ(0)',
     }}>
-      {/* HERO IMAGE + CATEGORY OVERLAY */}
-      {heroImage ? (
+      {/* Schoon list-header — geen foto, geen emoji */}
+      <div style={{
+        display: 'flex', alignItems: 'center',
+        gap: 10,
+        padding: isMobile ? '0.7rem 1rem 0.6rem' : '0.85rem 1.5rem 0.7rem',
+        borderBottom: '1px solid rgba(255,255,255,0.08)',
+      }}>
         <div style={{
-          position: 'relative',
-          height: isMobile ? '72px' : '88px',
-          overflow: 'hidden'
+          width: 4, height: 22, borderRadius: 2,
+          background: config.color, flexShrink: 0,
+        }} />
+        <span style={{
+          color: '#fff',
+          fontSize: isMobile ? '0.95rem' : '1.05rem',
+          fontWeight: 900,
+          flex: 1, minWidth: 0,
+          letterSpacing: '-0.015em',
         }}>
-          <img
-            src={heroImage}
-            alt={config.label}
-            loading="lazy"
-            style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
-          />
-
-          <div style={{
-            position: 'absolute',
-            bottom: 0, left: 0, right: 0,
-            height: '100%',
-            background: 'linear-gradient(180deg, rgba(10, 10, 10, 0.1) 0%, rgba(10, 10, 10, 0.4) 40%, rgba(10, 10, 10, 0.85) 75%, #0a0a0a 100%)',
-            pointerEvents: 'none'
-          }} />
-
-          <div style={{
-            position: 'absolute',
-            bottom: 0, left: 0, right: 0,
-            padding: isMobile ? '0 0.75rem 0.5rem' : '0 1rem 0.625rem',
-            display: 'flex',
-            alignItems: 'flex-end',
-            gap: isMobile ? '0.375rem' : '0.5rem'
-          }}>
-            <div style={{
-              width: '3px', height: '20px', borderRadius: '2px',
-              background: config.color, opacity: 0.8, flexShrink: 0, marginBottom: '2px'
-            }} />
-
-            <span style={{ fontSize: isMobile ? '0.8rem' : '0.9rem', flexShrink: 0 }}>
-              {config.emoji}
-            </span>
-            <span style={{
-              color: '#fff',
-              fontSize: isMobile ? '0.9rem' : '1rem',
-              fontWeight: '700',
-              flex: 1,
-              minWidth: 0,
-              textShadow: '0 1px 3px rgba(0,0,0,0.5)'
-            }}>
-              {config.label}
-            </span>
-
-            <span style={{
-              fontSize: isMobile ? '0.5rem' : '0.55rem',
-              color: 'rgba(255, 255, 255, 0.5)',
-              fontWeight: '600'
-            }}>
-              {checkedCount}/{visibleItems.length}
-            </span>
-
-            <span style={{
-              fontSize: isMobile ? '0.55rem' : '0.6rem',
-              color: config.color,
-              fontWeight: '800'
-            }}>
-              €{totalCost.toFixed(0)}
-            </span>
-
-            <button
-              onClick={() => onToggleEditMode(category)}
-              style={{
-                width: '26px', height: '26px', borderRadius: '4px',
-                background: editMode ? `${config.color}25` : 'rgba(0, 0, 0, 0.4)',
-                border: editMode ? `1px solid ${config.color}50` : '1px solid rgba(255, 255, 255, 0.12)',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-                transition: 'all 0.2s ease', flexShrink: 0, outline: 'none',
-                color: editMode ? config.color : 'rgba(255, 255, 255, 0.5)'
-              }}
-            >
-              {editMode ? <Check size={12} strokeWidth={2.5} /> : <Edit3 size={12} strokeWidth={2} />}
-            </button>
-
-            <div
-              onClick={onCheckAll}
-              style={{
-                width: '26px', height: '26px', borderRadius: '4px',
-                background: allChecked ? `${config.color}25` : 'rgba(0, 0, 0, 0.4)',
-                border: allChecked ? `1px solid ${config.color}50` : '1px solid rgba(255, 255, 255, 0.12)',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-                transition: 'all 0.2s ease', flexShrink: 0
-              }}
-            >
-              {allChecked ? (
-                <CheckCircle2 size={12} color={config.color} strokeWidth={2.5} />
-              ) : someChecked ? (
-                <Circle size={12} color={config.color} strokeWidth={2.5} fill={config.color} fillOpacity={0.3} />
-              ) : (
-                <Circle size={12} color="rgba(255, 255, 255, 0.4)" strokeWidth={2} />
-              )}
-            </div>
-          </div>
-        </div>
-      ) : (
-        <div style={{
-          display: 'flex', alignItems: 'center',
-          gap: isMobile ? '0.375rem' : '0.5rem',
-          padding: isMobile ? '0.625rem 0.75rem' : '0.75rem 1rem',
-          borderBottom: '1px solid rgba(255, 255, 255, 0.04)'
+          {config.label}
+        </span>
+        <span style={{
+          fontSize: isMobile ? '0.72rem' : '0.78rem',
+          color: 'rgba(255,255,255,0.65)',
+          fontWeight: 700,
+          fontVariantNumeric: 'tabular-nums',
         }}>
-          <div style={{ width: '3px', height: '24px', borderRadius: '2px', background: config.color, opacity: 0.6, flexShrink: 0 }} />
-          <span style={{ fontSize: isMobile ? '0.8rem' : '0.9rem', flexShrink: 0 }}>{config.emoji}</span>
-          <span style={{ color: '#fff', fontSize: isMobile ? '0.9rem' : '1rem', fontWeight: '700', flex: 1, minWidth: 0 }}>{config.label}</span>
-          <span style={{ fontSize: isMobile ? '0.6rem' : '0.65rem', color: 'rgba(255, 255, 255, 0.25)', fontWeight: '600' }}>{checkedCount}/{visibleItems.length}</span>
-          <span style={{ fontSize: isMobile ? '0.6rem' : '0.65rem', color: config.color, fontWeight: '800' }}>€{totalCost.toFixed(0)}</span>
-          <button onClick={() => onToggleEditMode(category)} style={{
-            width: '28px', height: '28px', borderRadius: '4px',
-            background: editMode ? `${config.color}18` : 'transparent',
-            border: editMode ? `1px solid ${config.color}40` : '1px solid rgba(255, 255, 255, 0.06)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-            transition: 'all 0.2s ease', flexShrink: 0, outline: 'none',
-            color: editMode ? config.color : 'rgba(255, 255, 255, 0.3)'
-          }}>
-            {editMode ? <Check size={13} strokeWidth={2.5} /> : <Edit3 size={13} strokeWidth={2} />}
-          </button>
-          <div onClick={onCheckAll} style={{
-            width: '28px', height: '28px', borderRadius: '4px',
-            background: allChecked ? `${config.color}18` : 'transparent',
-            border: allChecked ? `1px solid ${config.color}40` : '1px solid rgba(255, 255, 255, 0.06)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-            transition: 'all 0.2s ease', flexShrink: 0
-          }}>
-            {allChecked ? <CheckCircle2 size={13} color={config.color} strokeWidth={2.5} />
-              : someChecked ? <Circle size={13} color={config.color} strokeWidth={2.5} fill={config.color} fillOpacity={0.3} />
-              : <Circle size={13} color="rgba(255, 255, 255, 0.2)" strokeWidth={2} />}
-          </div>
-        </div>
-      )}
+          {checkedCount}/{visibleItems.length}
+        </span>
+        <span style={{
+          fontSize: isMobile ? '0.85rem' : '0.95rem',
+          color: config.color,
+          fontWeight: 900,
+          fontVariantNumeric: 'tabular-nums',
+          letterSpacing: '-0.015em',
+        }}>
+          €{totalCost.toFixed(0)}
+        </span>
+        <button onClick={() => onToggleEditMode(category)} style={{
+          width: 32, height: 32, borderRadius: 8, padding: 0,
+          background: editMode ? `${config.color}22` : 'transparent',
+          border: `1px solid ${editMode ? `${config.color}55` : 'rgba(255,255,255,0.1)'}`,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          cursor: 'pointer', touchAction: 'manipulation',
+          WebkitTapHighlightColor: 'transparent', flexShrink: 0,
+          color: editMode ? config.color : 'rgba(255,255,255,0.7)',
+        }}>
+          {editMode ? <Check size={14} strokeWidth={2.6} /> : <Edit3 size={14} strokeWidth={2.2} />}
+        </button>
+        <button onClick={onCheckAll} style={{
+          width: 32, height: 32, borderRadius: 8, padding: 0,
+          background: allChecked ? `${config.color}22` : 'transparent',
+          border: `1px solid ${allChecked ? `${config.color}55` : 'rgba(255,255,255,0.1)'}`,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          cursor: 'pointer', touchAction: 'manipulation',
+          WebkitTapHighlightColor: 'transparent', flexShrink: 0,
+        }}>
+          {allChecked
+            ? <CheckCircle2 size={14} color={config.color} strokeWidth={2.6} />
+            : someChecked
+              ? <Circle size={14} color={config.color} strokeWidth={2.6} fill={config.color} fillOpacity={0.35} />
+              : <Circle size={14} color="rgba(255,255,255,0.45)" strokeWidth={2.2} />}
+        </button>
+      </div>
 
       {/* ITEMS */}
       {visibleItems.map((item, index) => (

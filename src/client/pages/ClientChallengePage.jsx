@@ -1,4 +1,3 @@
-import PageVideoWidget from '../../modules/videos/PageVideoWidget'
 import { useState, useEffect } from 'react'
 import BetOnYourselfCard from '../../modules/challenges/BetOnYourselfCard'
 import ActiveChallengesModule from '../../modules/challenges/ActiveChallengesModule'
@@ -135,12 +134,7 @@ export default function ClientChallengePage({ db, client }) {
 
 
 
-{/* Video Widget voor Challenges */}
-<PageVideoWidget 
-  client={client}
-  db={db}
-  pageContext="challenges"
-/>
+{/* PageVideoWidget gemigreerd naar centrale WidgetSidebar in ClientDashboard. */}
 
 
         {/* Bet On Yourself Card - Full width on mobile */}

@@ -1,7 +1,8 @@
 // src/modules/manual-workout-builder/components/DayBuilder.jsx
 import { useState } from 'react'
-import { Trash2, Copy, Plus, Edit2, ChevronDown, ChevronUp, X, GripVertical, Dumbbell, Target, Clock } from 'lucide-react'
+import { Trash2, Copy, Plus, Edit2, ChevronDown, ChevronUp, X, GripVertical, Dumbbell, Target, Clock, Video, Activity } from 'lucide-react'
 import { ATTACHMENTS } from '../../workout/constants/attachments'
+import ExerciseVideoEditor from './ExerciseVideoEditor'
 
 export default function DayBuilder({
   day, dayNumber, isActive, onActivate, onUpdate, onDelete, onDuplicate,
@@ -12,6 +13,10 @@ export default function DayBuilder({
   const [tempName, setTempName] = useState(day.name)
   const [tempFocus, setTempFocus] = useState(day.focus)
   const [collapsed, setCollapsed] = useState(false)
+  // Which exercise's video is being edited via the popup modal. Tracks
+  // the whole exercise object so the modal can show name + current
+  // video_url / thumbnail_url without an extra fetch.
+  const [videoEditing, setVideoEditing] = useState(null)
 
   const handleSaveName = () => { onUpdate({ ...day, name: tempName || `Dag ${dayNumber}` }); setEditingName(false) }
   const handleSaveFocus = () => { onUpdate({ ...day, focus: tempFocus || '' }); setEditingFocus(false) }
@@ -50,17 +55,26 @@ export default function DayBuilder({
     <div
       onClick={onActivate}
       style={{
-        background: isActive ? 'linear-gradient(135deg, rgba(16,185,129,0.12) 0%, rgba(16,185,129,0.04) 100%)' : 'rgba(17,17,17,0.8)',
-        backdropFilter: 'blur(20px)', borderRadius: '16px',
-        border: isActive ? '2px solid rgba(16,185,129,0.4)' : '1px solid rgba(255,255,255,0.1)',
-        padding: isMobile ? '1rem' : '1.25rem', cursor: 'pointer', transition: 'all 0.3s ease',
-        position: 'relative', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent'
+        background: isActive
+          ? 'linear-gradient(135deg, rgba(249,115,22,0.10) 0%, rgba(234,88,12,0.04) 100%)'
+          : 'linear-gradient(135deg, rgba(23,23,23,0.9) 0%, rgba(10,10,10,0.9) 100%)',
+        backdropFilter: 'blur(10px)', borderRadius: '14px',
+        border: `1px solid ${isActive ? 'rgba(249,115,22,0.35)' : 'rgba(249,115,22,0.1)'}`,
+        padding: isMobile ? '1rem' : '1.25rem', cursor: 'pointer',
+        transition: 'all 0.2s cubic-bezier(0.4,0,0.2,1)',
+        position: 'relative', overflow: 'hidden',
+        touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent'
       }}
-      onMouseEnter={(e) => { if (!isActive && !isMobile) e.currentTarget.style.border = '1px solid rgba(255,255,255,0.2)' }}
-      onMouseLeave={(e) => { if (!isActive && !isMobile) e.currentTarget.style.border = '1px solid rgba(255,255,255,0.1)' }}
+      onMouseEnter={(e) => { if (!isMobile) { e.currentTarget.style.transform = 'translateX(4px)'; e.currentTarget.style.borderColor = 'rgba(249,115,22,0.3)' } }}
+      onMouseLeave={(e) => { if (!isMobile) { e.currentTarget.style.transform = 'translateX(0)'; e.currentTarget.style.borderColor = isActive ? 'rgba(249,115,22,0.35)' : 'rgba(249,115,22,0.1)' } }}
     >
+      {/* Oranje accentlijn links wanneer actief — zoals de workout-cards */}
+      {isActive && (
+        <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: '3px', background: 'linear-gradient(180deg, #f97316 0%, #ea580c 100%)', boxShadow: '2px 0 8px rgba(249,115,22,0.3)' }} />
+      )}
+
       {/* Day badge */}
-      <div style={{ position: 'absolute', top: '-10px', left: '16px', background: isActive ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)' : 'linear-gradient(135deg, #1f2937 0%, #111827 100%)', padding: '0.25rem 0.75rem', borderRadius: '20px', fontSize: '0.75rem', fontWeight: '700', color: '#fff', boxShadow: '0 2px 8px rgba(0,0,0,0.3)' }}>
+      <div style={{ position: 'absolute', top: '-10px', left: '16px', background: isActive ? 'linear-gradient(135deg, #f97316 0%, #ea580c 100%)' : 'linear-gradient(135deg, #1f2937 0%, #111827 100%)', padding: '0.25rem 0.75rem', borderRadius: '20px', fontSize: '0.75rem', fontWeight: '700', color: '#fff', boxShadow: '0 2px 8px rgba(0,0,0,0.3)' }}>
         DAG {dayNumber}
       </div>
 
@@ -72,9 +86,9 @@ export default function DayBuilder({
           {editingName ? (
             <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', marginBottom: '0.5rem' }} onClick={(e) => e.stopPropagation()}>
               <input type="text" value={tempName} onChange={(e) => setTempName(e.target.value)} placeholder="Bijv: PUSH A, LEGS..." autoFocus
-                style={{ flex: 1, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(16,185,129,0.3)', borderRadius: '8px', padding: '0.5rem', color: '#fff', fontSize: isMobile ? '1rem' : '1.1rem', fontWeight: '700', outline: 'none' }}
+                style={{ flex: 1, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(249,115,22,0.3)', borderRadius: '8px', padding: '0.5rem', color: '#fff', fontSize: isMobile ? '1rem' : '1.1rem', fontWeight: '700', outline: 'none' }}
                 onKeyDown={(e) => { if (e.key === 'Enter') handleSaveName(); if (e.key === 'Escape') handleCancelName() }} />
-              <button onClick={handleSaveName} style={{ padding: '0.5rem', background: 'rgba(16,185,129,0.2)', border: '1px solid rgba(16,185,129,0.3)', borderRadius: '8px', color: '#10b981', cursor: 'pointer', minWidth: '32px', minHeight: '32px' }}>✓</button>
+              <button onClick={handleSaveName} style={{ padding: '0.5rem', background: 'rgba(249,115,22,0.2)', border: '1px solid rgba(249,115,22,0.3)', borderRadius: '8px', color: '#f97316', cursor: 'pointer', minWidth: '32px', minHeight: '32px' }}>✓</button>
               <button onClick={handleCancelName} style={{ padding: '0.5rem', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: '8px', color: '#ef4444', cursor: 'pointer', minWidth: '32px', minHeight: '32px' }}>✕</button>
             </div>
           ) : (
@@ -93,9 +107,9 @@ export default function DayBuilder({
             <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', marginBottom: '0.5rem' }} onClick={(e) => e.stopPropagation()}>
               <Target size={14} color="rgba(255,255,255,0.5)" />
               <input type="text" value={tempFocus} onChange={(e) => setTempFocus(e.target.value)} placeholder="Bijv: chest, shoulders, triceps" autoFocus
-                style={{ flex: 1, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(16,185,129,0.3)', borderRadius: '6px', padding: '0.4rem', color: 'rgba(255,255,255,0.8)', fontSize: isMobile ? '0.8rem' : '0.85rem', outline: 'none' }}
+                style={{ flex: 1, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(249,115,22,0.3)', borderRadius: '6px', padding: '0.4rem', color: 'rgba(255,255,255,0.8)', fontSize: isMobile ? '0.8rem' : '0.85rem', outline: 'none' }}
                 onKeyDown={(e) => { if (e.key === 'Enter') handleSaveFocus(); if (e.key === 'Escape') handleCancelFocus() }} />
-              <button onClick={handleSaveFocus} style={{ padding: '0.4rem', background: 'rgba(16,185,129,0.2)', border: '1px solid rgba(16,185,129,0.3)', borderRadius: '6px', color: '#10b981', cursor: 'pointer', minWidth: '28px', minHeight: '28px' }}>✓</button>
+              <button onClick={handleSaveFocus} style={{ padding: '0.4rem', background: 'rgba(249,115,22,0.2)', border: '1px solid rgba(249,115,22,0.3)', borderRadius: '6px', color: '#f97316', cursor: 'pointer', minWidth: '28px', minHeight: '28px' }}>✓</button>
               <button onClick={handleCancelFocus} style={{ padding: '0.4rem', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: '6px', color: '#ef4444', cursor: 'pointer', minWidth: '28px', minHeight: '28px' }}>✕</button>
             </div>
           ) : (
@@ -137,29 +151,32 @@ export default function DayBuilder({
         <>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginTop: '1rem', marginBottom: '1rem', maxHeight: '400px', overflowY: 'auto', paddingRight: day.exercises.length > 4 ? '0.5rem' : 0 }}>
             {day.exercises.map((exercise, index) => (
-              <div key={exercise.id} onClick={(e) => e.stopPropagation()} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.625rem 0.75rem', background: 'rgba(255,255,255,0.03)', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.05)' }}>
+              <div key={exercise.id} onClick={(e) => e.stopPropagation()} style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', padding: '0.7rem 0.75rem', background: 'linear-gradient(135deg, rgba(23,23,23,0.9) 0%, rgba(10,10,10,0.9) 100%)', borderRadius: '12px', border: '1px solid rgba(249,115,22,0.1)' }}>
 
-                {/* Grip */}
-                <div style={{ cursor: 'grab', padding: '0.25rem', display: 'flex', alignItems: 'center', color: 'rgba(255,255,255,0.3)', flexShrink: 0 }}>
-                  <GripVertical size={14} />
+                {/* Genummerde oranje badge — zoals de exercise-card op de workout-pagina */}
+                <div style={{ width: 32, height: 32, flexShrink: 0, borderRadius: 10, background: 'linear-gradient(135deg, #f97316 0%, #ea580c 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, color: '#fff', fontSize: '0.85rem', boxShadow: '0 4px 12px rgba(249,115,22,0.3)' }}>
+                  {index + 1}
                 </div>
 
                 {/* Naam + inline inputs */}
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: isMobile ? '0.85rem' : '0.9rem', fontWeight: '600', color: '#fff', marginBottom: '0.35rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  <div style={{ fontSize: isMobile ? '0.9rem' : '0.95rem', fontWeight: '700', color: '#fff', marginBottom: '0.35rem', letterSpacing: '-0.01em', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     {exercise.name}
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', flexWrap: 'wrap' }}>
+                    <Target size={12} color="#f97316" style={{ flexShrink: 0 }} />
                     <input type="number" min={1} max={20} value={exercise.sets || 3}
                       onChange={(e) => handleExerciseField(exercise.id, 'sets', parseInt(e.target.value) || 1)}
                       style={{ ...inputStyle, width: '36px' }} onClick={(e) => e.stopPropagation()} />
                     <span style={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.3)', fontWeight: '600' }}>sets</span>
                     <span style={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.2)' }}>×</span>
+                    <Activity size={12} color="#3b82f6" style={{ flexShrink: 0 }} />
                     <input type="text" value={exercise.reps || '10'}
                       onChange={(e) => handleExerciseField(exercise.id, 'reps', e.target.value)}
                       style={{ ...inputStyle, width: '44px' }} onClick={(e) => e.stopPropagation()} />
                     <span style={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.3)', fontWeight: '600' }}>reps</span>
                     <span style={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.15)', margin: '0 0.1rem' }}>·</span>
+                    <Clock size={12} color="#10b981" style={{ flexShrink: 0 }} />
                     <input type="text" value={exercise.rust || exercise.rest || '90s'}
                       onChange={(e) => handleExerciseField(exercise.id, 'rust', e.target.value)}
                       style={{ ...inputStyle, width: '44px', color: 'rgba(255,255,255,0.45)' }} onClick={(e) => e.stopPropagation()} />
@@ -185,6 +202,24 @@ export default function DayBuilder({
                     style={{ background: 'transparent', border: 'none', cursor: index === day.exercises.length - 1 ? 'not-allowed' : 'pointer', opacity: index === day.exercises.length - 1 ? 0.25 : 0.6, padding: '0.1rem', color: 'rgba(255,255,255,0.6)', fontSize: '0.7rem', lineHeight: 1, minWidth: '20px', minHeight: '20px' }}>▼</button>
                 </div>
 
+                {/* Video editor — paste URL + thumbnail; lights up red when set. */}
+                <button
+                  onClick={(e) => { e.stopPropagation(); setVideoEditing(exercise) }}
+                  title={exercise.video_url ? 'Video bewerken' : 'Video toevoegen'}
+                  style={{
+                    padding: '0.4rem',
+                    background: exercise.video_url ? 'rgba(239,68,68,0.12)' : 'rgba(255,215,0,0.08)',
+                    border: `1px solid ${exercise.video_url ? 'rgba(239,68,68,0.4)' : 'rgba(255,215,0,0.25)'}`,
+                    borderRadius: 6,
+                    color: exercise.video_url ? '#ef4444' : 'rgba(255,215,0,0.7)',
+                    cursor: 'pointer',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    minHeight: 30, minWidth: 30, flexShrink: 0, touchAction: 'manipulation',
+                  }}
+                >
+                  <Video size={13} />
+                </button>
+
                 {/* Delete */}
                 <button onClick={(e) => { e.stopPropagation(); onDeleteExercise(exercise.id) }}
                   style={{ padding: '0.4rem', background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.15)', borderRadius: '6px', color: 'rgba(239,68,68,0.6)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '30px', minWidth: '30px', flexShrink: 0, touchAction: 'manipulation' }}>
@@ -202,15 +237,36 @@ export default function DayBuilder({
 
           {/* Add Exercise */}
           <button onClick={(e) => { e.stopPropagation(); onAddExercise() }}
-            style={{ width: '100%', padding: '0.75rem', background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.3)', borderRadius: '8px', color: '#10b981', fontSize: isMobile ? '0.85rem' : '0.9rem', fontWeight: '600', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', minHeight: '44px' }}
-            onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(16,185,129,0.2)'}
-            onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(16,185,129,0.1)'}
+            style={{ width: '100%', padding: '0.75rem', background: 'rgba(249,115,22,0.1)', border: '1px solid rgba(249,115,22,0.3)', borderRadius: '8px', color: '#f97316', fontSize: isMobile ? '0.85rem' : '0.9rem', fontWeight: '600', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', minHeight: '44px' }}
+            onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(249,115,22,0.2)'}
+            onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(249,115,22,0.1)'}
             onTouchStart={(e) => e.currentTarget.style.transform = 'scale(0.98)'}
             onTouchEnd={(e) => e.currentTarget.style.transform = 'scale(1)'}>
             <Plus size={18} />Oefening Toevoegen
           </button>
         </>
       )}
+
+      {/* Exercise video editor — pops up when the coach taps the video
+          button on any exercise row. Writes directly to the exercises
+          table; the client workout view already shows a play button when
+          video_url is set so no other wiring is needed. */}
+      <ExerciseVideoEditor
+        isOpen={!!videoEditing}
+        exercise={videoEditing}
+        isMobile={isMobile}
+        onClose={() => setVideoEditing(null)}
+        onSaved={(updated) => {
+          // Reflect locally on the row so the icon turns red without a
+          // full reload of the parent state.
+          if (onUpdateExercise) {
+            onUpdateExercise(updated.id, {
+              video_url: updated.video_url,
+              thumbnail_url: updated.thumbnail_url,
+            })
+          }
+        }}
+      />
     </div>
   )
 }

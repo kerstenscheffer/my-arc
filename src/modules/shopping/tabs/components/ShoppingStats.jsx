@@ -23,8 +23,8 @@ export default function ShoppingStats({
       label: 'Items',
       value: totalItems,
       subValue: `${checkedCount} afgevinkt`,
-      color: '#10b981',
-      gradient: 'linear-gradient(135deg, #10b981 0%, #059669 100%)'
+      color: '#FFD700',
+      gradient: 'linear-gradient(135deg, #FFD700 0%, #D4AF37 100%)'
     },
     {
       icon: Euro,
@@ -59,10 +59,10 @@ export default function ShoppingStats({
             style={{
               position: 'relative',
               background: '#000',
-              border: `2px solid rgba(${stat.color === '#10b981' ? '16, 185, 129' : stat.color === '#f59e0b' ? '245, 158, 11' : '59, 130, 246'}, 0.3)`,
+              border: `2px solid rgba(${stat.color === '#FFD700' ? '255, 215, 0' : stat.color === '#f59e0b' ? '245, 158, 11' : '59, 130, 246'}, 0.3)`,
               borderRadius: isMobile ? '16px' : '20px',
               padding: isMobile ? '1rem' : '1.25rem',
-              boxShadow: `0 8px 32px rgba(${stat.color === '#10b981' ? '16, 185, 129' : stat.color === '#f59e0b' ? '245, 158, 11' : '59, 130, 246'}, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.03)`,
+              boxShadow: `0 8px 32px rgba(${stat.color === '#FFD700' ? '255, 215, 0' : stat.color === '#f59e0b' ? '245, 158, 11' : '59, 130, 246'}, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.03)`,
               transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
               opacity: animate ? 1 : 0,
               transform: animate ? 'translateY(0) scale(1)' : 'translateY(10px) scale(0.95)',
@@ -93,21 +93,21 @@ export default function ShoppingStats({
                 width: isMobile ? '48px' : '56px',
                 height: isMobile ? '48px' : '56px',
                 borderRadius: isMobile ? '12px' : '14px',
-                background: `linear-gradient(135deg, rgba(${stat.color === '#10b981' ? '16, 185, 129' : stat.color === '#f59e0b' ? '245, 158, 11' : '59, 130, 246'}, 0.15) 0%, rgba(${stat.color === '#10b981' ? '16, 185, 129' : stat.color === '#f59e0b' ? '245, 158, 11' : '59, 130, 246'}, 0.08) 100%)`,
+                background: `linear-gradient(135deg, rgba(${stat.color === '#FFD700' ? '255, 215, 0' : stat.color === '#f59e0b' ? '245, 158, 11' : '59, 130, 246'}, 0.15) 0%, rgba(${stat.color === '#FFD700' ? '255, 215, 0' : stat.color === '#f59e0b' ? '245, 158, 11' : '59, 130, 246'}, 0.08) 100%)`,
                 backdropFilter: 'blur(12px)',
-                border: `1px solid rgba(${stat.color === '#10b981' ? '16, 185, 129' : stat.color === '#f59e0b' ? '245, 158, 11' : '59, 130, 246'}, 0.3)`,
+                border: `1px solid rgba(${stat.color === '#FFD700' ? '255, 215, 0' : stat.color === '#f59e0b' ? '245, 158, 11' : '59, 130, 246'}, 0.3)`,
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
                 flexShrink: 0,
-                boxShadow: `0 4px 16px rgba(${stat.color === '#10b981' ? '16, 185, 129' : stat.color === '#f59e0b' ? '245, 158, 11' : '59, 130, 246'}, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.05)`,
+                boxShadow: `0 4px 16px rgba(${stat.color === '#FFD700' ? '255, 215, 0' : stat.color === '#f59e0b' ? '245, 158, 11' : '59, 130, 246'}, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.05)`,
                 position: 'relative'
               }}>
                 <Icon 
                   size={isMobile ? 20 : 24} 
                   color={stat.color}
                   style={{ 
-                    filter: `drop-shadow(0 0 6px rgba(${stat.color === '#10b981' ? '16, 185, 129' : stat.color === '#f59e0b' ? '245, 158, 11' : '59, 130, 246'}, 0.6))`,
+                    filter: `drop-shadow(0 0 6px rgba(${stat.color === '#FFD700' ? '255, 215, 0' : stat.color === '#f59e0b' ? '245, 158, 11' : '59, 130, 246'}, 0.6))`,
                     strokeWidth: 2.5
                   }}
                 />
@@ -166,7 +166,7 @@ export default function ShoppingStats({
                   background: stat.gradient,
                   transition: 'width 1s cubic-bezier(0.4, 0, 0.2, 1)',
                   transitionDelay: '0.5s',
-                  boxShadow: `0 0 8px rgba(${stat.color === '#3b82f6' ? '59, 130, 246' : '16, 185, 129'}, 0.6)`
+                  boxShadow: `0 0 8px rgba(${stat.color === '#3b82f6' ? '59, 130, 246' : '255, 215, 0'}, 0.6)`
                 }} />
               </div>
             )}

@@ -5,7 +5,6 @@ import ShoppingService from './ShoppingService'
 import { ShoppingCart } from 'lucide-react'
 
 import WeekShoppingTab from './tabs/WeekShoppingTab'
-import PageVideoWidget from '../videos/PageVideoWidget'
 
 export default function ShoppingHub({ client, db, onNavigate }) {
   const [service] = useState(() => new ShoppingService(db))
@@ -99,8 +98,8 @@ export default function ShoppingHub({ client, db, onNavigate }) {
           <div style={{
             width: '32px',
             height: '32px',
-            border: '3px solid rgba(16, 185, 129, 0.15)',
-            borderTopColor: '#10b981',
+            border: '3px solid rgba(255, 215, 0, 0.15)',
+            borderTopColor: '#FFD700',
             borderRadius: '50%',
             animation: 'spin 0.8s linear infinite',
             margin: '0 auto 1rem'
@@ -130,8 +129,7 @@ export default function ShoppingHub({ client, db, onNavigate }) {
         db={db}
       />
 
-      {/* Coach video's voor boodschappen pagina */}
-      <PageVideoWidget client={client} db={db} pageContext="boodschappen" />
+      {/* Coach video's gemigreerd naar centrale WidgetSidebar in ClientDashboard. */}
       
       <style>{`
         @keyframes fadeIn {

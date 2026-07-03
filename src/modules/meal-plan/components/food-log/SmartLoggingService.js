@@ -12,7 +12,7 @@ export default class SmartLoggingService {
   // MAIN: Log a meal + enrich database
   // ═══════════════════════════════════════════
 
-  async logMeal(clientId, mealData) {
+  async logMeal(clientId, mealData, consumedAt = null) {
     try {
       console.log('🔍 [SERVICE] logMeal called with:', {
         name: mealData.name,
@@ -45,10 +45,10 @@ export default class SmartLoggingService {
       if (existingLog) {
         const newLogCount = existingLog.log_count + 1
         console.log('🔍 [SERVICE] Existing log found — inserting new row with log_count:', newLogCount)
-        result = await this.insertConsumedMeal(clientId, mealData, newLogCount)
+        result = await this.insertConsumedMeal(clientId, mealData, newLogCount, consumedAt)
       } else {
         console.log('🔍 [SERVICE] No existing log — inserting new row with log_count: 1')
-        result = await this.insertConsumedMeal(clientId, mealData, 1)
+        result = await this.insertConsumedMeal(clientId, mealData, 1, consumedAt)
       }
 
       console.log('🔍 [SERVICE] insertConsumedMeal returned row:', result ? {
@@ -73,6 +73,10 @@ export default class SmartLoggingService {
         await this.bumpIngredientUsage(mealData.sourceId, clientId)
       }
 
+      // Fire-and-forget portion learning for per-ingredient logs in grams.
+      this._trackPortion(clientId, mealData)
+        .catch(err => console.warn('⚠️ [SmartLogging] trackPortion failed:', err))
+
       console.log('✅ [SmartLogging] Complete:', result?.id)
       return result
     } catch (error) {
@@ -85,7 +89,7 @@ export default class SmartLoggingService {
   // INSERT consumed_meals row — NU MET amount + per_unit
   // ═══════════════════════════════════════════
 
-  async insertConsumedMeal(clientId, mealData, logCount = 1) {
+  async insertConsumedMeal(clientId, mealData, logCount = 1, consumedAt = null) {
     // Bepaal amount en per_unit
     // - per100g items (ingrediënten) → per_unit = 'gram', amount = totale gram
     // - meal/portion items → per_unit = 'portion', amount = aantal porties
@@ -116,7 +120,10 @@ export default class SmartLoggingService {
       fat: Math.round(mealData.fat || 0),
       amount: amount,
       per_unit: per_unit,
-      consumed_at: new Date().toISOString(),
+      // When the caller is logging a meal on a non-today date, consumedAt
+      // is the target day's ISO timestamp. Falls back to "now" so existing
+      // call-sites (today-flow) keep working unchanged.
+      consumed_at: consumedAt || new Date().toISOString(),
       source: mealData.source || 'manual_log',
       notes: mealData.notes || null,
       image_url: mealData.image_url || null,
@@ -475,5 +482,92 @@ export default class SmartLoggingService {
       if (keywords.some(k => name.includes(k))) return cat
     }
     return 'other'
+  }
+
+  // ═══════════════════════════════════════════
+  // PORTION LEARNING (per-client per-ingredient)
+  // ═══════════════════════════════════════════
+
+  async _trackPortion(clientId, mealData) {
+    if (!clientId || !mealData?.name) return
+    const perUnit = (mealData.per_unit || '').toLowerCase()
+    if (perUnit && perUnit !== 'gram' && perUnit !== 'g') return
+    if (!perUnit && !mealData.per100g) return
+    const grams = Math.round(parseFloat(mealData.amount))
+    if (!Number.isFinite(grams) || grams <= 0) return
+
+    const key = mealData.name.trim().toLowerCase()
+    if (!key) return
+
+    try {
+      const { data: existing } = await this.supabase
+        .from('client_ingredient_portions')
+        .select('id, use_count')
+        .eq('client_id', clientId)
+        .eq('ingredient_key', key)
+        .eq('portion_grams', grams)
+        .maybeSingle()
+
+      if (existing) {
+        await this.supabase
+          .from('client_ingredient_portions')
+          .update({
+            use_count: existing.use_count + 1,
+            last_used_at: new Date().toISOString()
+          })
+          .eq('id', existing.id)
+      } else {
+        await this.supabase
+          .from('client_ingredient_portions')
+          .insert({
+            client_id: clientId,
+            ingredient_key: key,
+            ingredient_name: mealData.name.trim(),
+            portion_grams: grams,
+            use_count: 1,
+            last_used_at: new Date().toISOString()
+          })
+      }
+    } catch (err) {
+      console.warn('⚠️ [SmartLogging] _trackPortion failed:', err)
+    }
+  }
+
+  async getPortionHistory(clientId, ingredientName, limit = 4) {
+    if (!clientId || !ingredientName) return []
+    try {
+      const key = ingredientName.trim().toLowerCase()
+      const { data, error } = await this.supabase
+        .from('client_ingredient_portions')
+        .select('portion_grams, use_count, last_used_at')
+        .eq('client_id', clientId)
+        .eq('ingredient_key', key)
+        .order('use_count', { ascending: false })
+        .order('last_used_at', { ascending: false })
+        .limit(limit)
+      if (error) throw error
+      return (data || []).map(r => Number(r.portion_grams))
+    } catch (err) {
+      console.warn('⚠️ [SmartLogging] getPortionHistory failed:', err)
+      return []
+    }
+  }
+
+  async forgetPortion(clientId, ingredientName, portionGrams) {
+    if (!clientId || !ingredientName || !portionGrams) return false
+    try {
+      const key = ingredientName.trim().toLowerCase()
+      const { error } = await this.supabase
+        .from('client_ingredient_portions')
+        .delete()
+        .eq('client_id', clientId)
+        .eq('ingredient_key', key)
+        .eq('portion_grams', Math.round(portionGrams))
+      if (error) throw error
+      return true
+    } catch (err) {
+      console.warn('⚠️ [SmartLogging] forgetPortion failed:', err)
+      return false
+    }
   }
 }

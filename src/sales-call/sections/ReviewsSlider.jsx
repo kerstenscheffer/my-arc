@@ -71,7 +71,7 @@ export default function ReviewsSlider({ isMobile }) {
           <span style={{
             color: '#e8a800',
             fontStyle: 'italic',
-            fontFamily: "'Playfair Display', Georgia, serif"
+            fontFamily: "'DM Sans', sans-serif"
           }}>Echte Resultaten</span>
         </h2>
 
@@ -117,7 +117,7 @@ export default function ReviewsSlider({ isMobile }) {
                 {/* Quote */}
                 <p style={{
                   fontSize: isMobile ? '1rem' : '1.15rem',
-                  fontFamily: "'Playfair Display', Georgia, serif",
+                  fontFamily: "'DM Sans', sans-serif",
                   fontStyle: 'italic',
                   fontWeight: '500',
                   color: '#333',

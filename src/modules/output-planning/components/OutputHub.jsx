@@ -11,18 +11,26 @@
 import { useEffect, useState } from 'react'
 import {
   Plus, Inbox, Package, CheckCircle, Video, Edit3, Trash2,
-  ChevronDown, ChevronRight,
+  ChevronDown, ChevronRight, CalendarPlus, X, Clock, GripVertical,
 } from 'lucide-react'
 
 import BatchService from '../../content-batches/BatchService'
 import BatchModal from '../../content-batches/components/BatchModal'
 import EditBatchItemModal from '../../content-batches/components/EditBatchItemModal'
+import ContentPlanningService from '../ContentPlanningService'
 
 import BatchesListView from './content-library/BatchesListView'
 import QuickIdeaModal from './QuickIdeaModal'
 import TeleprompterModal from './TeleprompterModal'
 
 const GOLD = '#FFD700'
+
+// Engelse dag-namen zoals output_day_items ze opslaat (agenda-grid).
+const DOW_NAMES = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday']
+const localDateStr = (d) => {
+  const y = d.getFullYear(), m = String(d.getMonth() + 1).padStart(2, '0'), day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
+}
 
 const formatDate = (iso) => {
   if (!iso) return ''
@@ -38,10 +46,11 @@ const snippet = (txt, max = 110) => {
   return s.length > max ? s.slice(0, max - 1) + '…' : s
 }
 
-export default function OutputHub({ db }) {
+export default function OutputHub({ db, onPlanned }) {
   const isMobile = typeof window !== 'undefined' && window.innerWidth <= 768
 
   const [batchService] = useState(() => new BatchService(db.supabase))
+  const [planningService] = useState(() => new ContentPlanningService(db.supabase))
 
   // Data
   const [ideas, setIdeas] = useState([])
@@ -70,6 +79,7 @@ export default function OutputHub({ db }) {
   const [ideaToEdit, setIdeaToEdit] = useState(null)
   const [showBatchModal, setShowBatchModal] = useState(false)
   const [teleScript, setTeleScript] = useState(null) // { script, title }
+  const [ideaToPlan, setIdeaToPlan] = useState(null) // idee dat in de agenda gepland wordt
   const [showEditBatchItem, setShowEditBatchItem] = useState(false)
   const [batchItemToEdit, setBatchItemToEdit] = useState(null)
 
@@ -209,6 +219,87 @@ export default function OutputHub({ db }) {
     }
   }
 
+  // ── Idee in de agenda plannen ──────────────────────────────────────────────
+  // Maakt een item in het week-plan (output_day_items) op de gekozen datum/tijd,
+  // met de titel + script van het idee. Verschijnt rechts in de Weekplanning.
+  const planIdeaToAgenda = async (idea, dateStr, time) => {
+    const user = await db.getCurrentUser()
+    if (!user) throw new Error('Niet ingelogd')
+    const d = new Date(`${dateStr}T00:00:00`)
+    const monday = planningService.getMonday(d)
+    const dayOfWeek = DOW_NAMES[d.getDay()]
+    await planningService.createQuickItem(user.id, localDateStr(monday), {
+      dayOfWeek,
+      time: time || null,
+      duration: 30,
+      title: idea.title || 'Idee',
+      description: idea.script ? snippet(idea.script, 200) : (idea.hook || null),
+      phase: 'post',
+      itemType: 'content',
+      sourceContentId: idea.id || null,  // koppel aan het idee → script opvraagbaar
+    })
+  }
+
+  // ── Slepen om te plannen (touch + muis) ─────────────────────────────────────
+  // HTML5 drag werkt niet op touch; daarom een eigen pointer-drag vanaf de
+  // sleep-greep. Een "ghost" volgt je vinger/cursor; bij loslaten zoeken we de
+  // agenda-cel onder de pointer (data-plan-day/hour) en sturen een event waar de
+  // Weekplanning op luistert.
+  const beginIdeaDrag = (e, idea) => {
+    if (e.pointerType === 'mouse' && e.button !== 0) return
+    e.preventDefault()
+    e.stopPropagation()
+
+    const ghost = document.createElement('div')
+    ghost.textContent = idea.title || 'Idee'
+    Object.assign(ghost.style, {
+      position: 'fixed', zIndex: '2147483600', pointerEvents: 'none',
+      left: `${e.clientX}px`, top: `${e.clientY}px`, transform: 'translate(-50%, -140%)',
+      background: GOLD, color: '#0a0a0a', fontWeight: '800', fontSize: '0.78rem',
+      padding: '0.4rem 0.7rem', borderRadius: '8px', maxWidth: '220px',
+      whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+      boxShadow: '0 10px 28px rgba(0,0,0,0.55)',
+    })
+    document.body.appendChild(ghost)
+    document.body.style.userSelect = 'none'
+
+    let lastCell = null
+    const highlight = (cell) => {
+      if (lastCell === cell) return
+      if (lastCell) lastCell.style.background = lastCell.__prevBg || ''
+      lastCell = cell
+      if (cell) { cell.__prevBg = cell.style.background; cell.style.background = 'rgba(255,215,0,0.28)' }
+    }
+    const cellAt = (x, y) => {
+      const el = document.elementFromPoint(x, y)
+      return el ? el.closest('[data-plan-day]') : null
+    }
+    const move = (ev) => {
+      ev.preventDefault()
+      ghost.style.left = `${ev.clientX}px`
+      ghost.style.top = `${ev.clientY}px`
+      highlight(cellAt(ev.clientX, ev.clientY))
+    }
+    const up = (ev) => {
+      document.removeEventListener('pointermove', move)
+      document.removeEventListener('pointerup', up)
+      document.removeEventListener('pointercancel', up)
+      document.body.style.userSelect = ''
+      const cell = cellAt(ev.clientX, ev.clientY)
+      highlight(null)
+      ghost.remove()
+      if (cell) {
+        const dayOfWeek = cell.getAttribute('data-plan-day')
+        const hour = parseInt(cell.getAttribute('data-plan-hour'), 10)
+        const time = `${String(Number.isFinite(hour) ? hour : 9).padStart(2, '0')}:00`
+        window.dispatchEvent(new CustomEvent('myarc:plan-idea', { detail: { idea, dayOfWeek, time } }))
+      }
+    }
+    document.addEventListener('pointermove', move, { passive: false })
+    document.addEventListener('pointerup', up)
+    document.addEventListener('pointercancel', up)
+  }
+
   // ── Batch actions ────────────────────────────────────────────────────────
   const handleEditBatchItem = (item) => {
     setBatchItemToEdit(item); setShowEditBatchItem(true)
@@ -263,125 +354,133 @@ export default function OutputHub({ db }) {
     </div>
   )
 
-  const ideaCard = (idea, inReady = false) => (
-    <div
-      key={idea.id}
+  // Compacte idee-card in de stijl van de meal-/workout-cards: korte inhoud
+  // bovenin (klikbaar = bewerken) + een strakke actie-rij onderaan met
+  // scheidingslijnen i.p.v. een kolom losse knoppen.
+  const DIVIDER = 'rgba(255,255,255,0.06)'
+  const ideaAction = ({ icon, label, color, onClick, disabled, bg }) => (
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      title={label}
       style={{
-        display: 'flex', gap: '0.55rem', alignItems: 'flex-start',
-        padding: isMobile ? '0.65rem 0.7rem' : '0.75rem 0.85rem',
-        background: 'rgba(255,255,255,0.025)',
-        border: '1px solid rgba(255,255,255,0.05)',
-        borderRadius: '10px',
+        flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4,
+        padding: isMobile ? '0.42rem 0.3rem' : '0.48rem 0.4rem',
+        background: bg || 'transparent', border: 'none',
+        color: disabled ? 'rgba(255,255,255,0.2)' : color,
+        fontSize: isMobile ? '0.62rem' : '0.66rem', fontWeight: 700,
+        cursor: disabled ? 'not-allowed' : 'pointer',
+        touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', minHeight: 34,
       }}
     >
-      <div
-        onClick={() => openEditIdea(idea)}
-        style={{ flex: 1, minWidth: 0, cursor: 'pointer' }}
-      >
-        <div style={{
-          fontSize: isMobile ? '0.92rem' : '1rem', fontWeight: 700, color: '#fff',
-          overflow: 'hidden', textOverflow: 'ellipsis',
-          display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical',
-          marginBottom: 3,
-        }}>
-          {idea.title || '(geen titel)'}
-        </div>
-        {idea.script && (
-          <div style={{
-            fontSize: '0.74rem', color: 'rgba(255,255,255,0.55)', lineHeight: 1.4,
-            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-          }}>
-            {snippet(idea.script)}
-          </div>
-        )}
-        <div style={{
-          marginTop: 6, display: 'flex', gap: '0.5rem',
-          fontSize: '0.65rem', color: 'rgba(255,255,255,0.4)',
-        }}>
-          {idea.created_at && <span>{formatDate(idea.created_at)}</span>}
-          {!idea.script && (
-            <span style={{ color: 'rgba(245,158,11,0.85)', fontWeight: 700 }}>geen script</span>
-          )}
-        </div>
-      </div>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 4, flexShrink: 0 }}>
-        <button
-          onClick={() => setTeleScript({ script: idea.script || '', title: idea.title || 'Idee' })}
-          disabled={!idea.script?.trim()}
-          style={{
-            padding: 8, minHeight: 40, minWidth: 40,
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            background: idea.script?.trim() ? GOLD : 'rgba(255,255,255,0.05)',
-            color: idea.script?.trim() ? '#000' : 'rgba(255,255,255,0.3)',
-            border: 'none', borderRadius: 6,
-            cursor: idea.script?.trim() ? 'pointer' : 'not-allowed',
-            touchAction: 'manipulation',
-          }}
-          title={idea.script?.trim() ? 'Teleprompter' : 'Voeg eerst een script toe'}
-        >
-          <Video size={14} />
-        </button>
-        <button
-          onClick={() => openEditIdea(idea)}
-          style={{
-            padding: 8, minHeight: 40, minWidth: 40,
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            background: 'transparent', border: '1px solid rgba(255,255,255,0.08)',
-            borderRadius: 6, color: 'rgba(255,255,255,0.7)', cursor: 'pointer',
-            touchAction: 'manipulation',
-          }}
-          title="Bewerken"
-        >
-          <Edit3 size={13} />
-        </button>
-        {inReady ? (
-          <button
-            onClick={() => markReadyBackToIdea(idea)}
-            style={{
-              padding: 8, minHeight: 40, minWidth: 40,
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              background: 'transparent', border: '1px solid rgba(255,255,255,0.08)',
-              borderRadius: 6, color: 'rgba(255,255,255,0.6)', cursor: 'pointer',
-              touchAction: 'manipulation',
-            }}
-            title="Terug naar Inbox"
-          >
-            <Inbox size={13} />
-          </button>
-        ) : (
-          <button
-            onClick={() => markIdeaReady(idea)}
-            disabled={!idea.script?.trim()}
-            style={{
-              padding: 8, minHeight: 40, minWidth: 40,
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              background: 'transparent', border: '1px solid rgba(255,255,255,0.08)',
-              borderRadius: 6,
-              color: idea.script?.trim() ? '#10b981' : 'rgba(255,255,255,0.2)',
-              cursor: idea.script?.trim() ? 'pointer' : 'not-allowed',
-              touchAction: 'manipulation',
-            }}
-            title="Markeer als klaar"
-          >
-            <CheckCircle size={13} />
-          </button>
-        )}
-        <button
-          onClick={() => deleteIdea(idea)}
-          style={{
-            padding: 8, minHeight: 40, minWidth: 40,
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            background: 'transparent', border: '1px solid rgba(255,255,255,0.08)',
-            borderRadius: 6, color: 'rgba(255,255,255,0.45)', cursor: 'pointer',
-            touchAction: 'manipulation',
-          }}
-          title="Verwijderen"
-        >
-          <Trash2 size={13} />
-        </button>
-      </div>
-    </div>
+      {icon}{label}
+    </button>
   )
+
+  const ideaCard = (idea, inReady = false) => {
+    const hasScript = !!idea.script?.trim()
+    return (
+      <div
+        key={idea.id}
+        style={{
+          background: 'rgba(255,255,255,0.025)',
+          border: `1px solid ${DIVIDER}`,
+          borderRadius: 12, overflow: 'hidden',
+          display: 'flex', flexDirection: 'column',
+        }}
+      >
+        {/* Sleep-greep + inhoud (klik = bewerken) */}
+        <div style={{ display: 'flex', alignItems: 'stretch' }}>
+          <button
+            onPointerDown={(e) => beginIdeaDrag(e, idea)}
+            title="Sleep naar een dag in de agenda om in te plannen"
+            aria-label="Sleep om in te plannen"
+            style={{
+              flexShrink: 0, touchAction: 'none', cursor: 'grab',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              padding: '0 0.25rem 0 0.5rem', background: 'transparent', border: 'none',
+              color: 'rgba(255,255,255,0.3)', WebkitTapHighlightColor: 'transparent',
+            }}
+          >
+            <GripVertical size={16} />
+          </button>
+          <div
+            onClick={() => openEditIdea(idea)}
+            style={{ flex: 1, minWidth: 0, cursor: 'pointer', padding: isMobile ? '0.6rem 0.7rem 0.6rem 0' : '0.65rem 0.8rem 0.65rem 0' }}
+          >
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: '0.4rem', minWidth: 0,
+          }}>
+            <div style={{
+              flex: 1, minWidth: 0,
+              fontSize: isMobile ? '0.85rem' : '0.9rem', fontWeight: 700, color: '#fff',
+              whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+            }}>
+              {idea.title || '(geen titel)'}
+            </div>
+            {!hasScript && (
+              <span style={{
+                flexShrink: 0, fontSize: '0.55rem', fontWeight: 800, color: 'rgba(245,158,11,0.9)',
+                background: 'rgba(245,158,11,0.12)', padding: '0.1rem 0.35rem', borderRadius: 5,
+                textTransform: 'uppercase', letterSpacing: '0.03em',
+              }}>
+                geen script
+              </span>
+            )}
+          </div>
+          {hasScript && (
+            <div style={{
+              marginTop: 3, fontSize: '0.7rem', color: 'rgba(255,255,255,0.5)', lineHeight: 1.35,
+              whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+            }}>
+              {snippet(idea.script)}
+            </div>
+          )}
+          {idea.created_at && (
+            <div style={{ marginTop: 4, fontSize: '0.58rem', color: 'rgba(255,255,255,0.3)', fontWeight: 600 }}>
+              {formatDate(idea.created_at)}
+            </div>
+          )}
+          </div>
+        </div>
+
+        {/* Actie-rij onderaan met verticale scheidingslijnen */}
+        <div style={{ display: 'flex', borderTop: `1px solid ${DIVIDER}` }}>
+          {ideaAction({
+            icon: <Video size={13} />, label: 'Tele',
+            color: hasScript ? GOLD : 'rgba(255,255,255,0.2)', disabled: !hasScript,
+            onClick: () => setTeleScript({ script: idea.script || '', title: idea.title || 'Idee' }),
+          })}
+          <div style={{ width: 1, background: DIVIDER, alignSelf: 'stretch' }} />
+          {ideaAction({
+            icon: <CalendarPlus size={12} />, label: 'Plan', color: GOLD,
+            onClick: () => setIdeaToPlan(idea),
+          })}
+          <div style={{ width: 1, background: DIVIDER, alignSelf: 'stretch' }} />
+          {ideaAction({
+            icon: <Edit3 size={12} />, label: 'Bewerk', color: 'rgba(255,255,255,0.7)',
+            onClick: () => openEditIdea(idea),
+          })}
+          <div style={{ width: 1, background: DIVIDER, alignSelf: 'stretch' }} />
+          {inReady
+            ? ideaAction({
+                icon: <Inbox size={12} />, label: 'Inbox', color: 'rgba(255,255,255,0.6)',
+                onClick: () => markReadyBackToIdea(idea),
+              })
+            : ideaAction({
+                icon: <CheckCircle size={12} />, label: 'Klaar',
+                color: hasScript ? '#10b981' : 'rgba(255,255,255,0.2)', disabled: !hasScript,
+                onClick: () => markIdeaReady(idea),
+              })}
+          <div style={{ width: 1, background: DIVIDER, alignSelf: 'stretch' }} />
+          {ideaAction({
+            icon: <Trash2 size={12} />, label: 'Wis', color: 'rgba(239,68,68,0.7)',
+            onClick: () => deleteIdea(idea),
+          })}
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div style={{
@@ -661,6 +760,85 @@ export default function OutputHub({ db }) {
         script={teleScript?.script}
         title={teleScript?.title}
       />
+
+      {ideaToPlan && (
+        <PlanIdeaModal
+          idea={ideaToPlan}
+          isMobile={isMobile}
+          onClose={() => setIdeaToPlan(null)}
+          onConfirm={async (dateStr, time) => {
+            await planIdeaToAgenda(ideaToPlan, dateStr, time)
+            setIdeaToPlan(null)
+            onPlanned?.()  // laat de agenda direct herladen
+          }}
+        />
+      )}
+    </div>
+  )
+}
+
+// ── Plan-modal: kies dag + tijd, idee gaat naar de Weekplanning (agenda) ──────
+function PlanIdeaModal({ idea, onClose, onConfirm, isMobile }) {
+  const today = new Date()
+  const [date, setDate] = useState(localDateStr(today))
+  const [time, setTime] = useState('09:00')
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
+
+  const submit = async () => {
+    if (!date) { setError('Kies een datum.'); return }
+    setSaving(true); setError('')
+    try {
+      await onConfirm(date, time)
+    } catch (e) {
+      setError(e?.message || 'Plannen mislukt'); setSaving(false)
+    }
+  }
+
+  const inputStyle = {
+    width: '100%', padding: '0.7rem 0.75rem', background: '#000',
+    border: '1px solid rgba(255,255,255,0.12)', borderRadius: 8, color: '#fff',
+    fontSize: '0.95rem', fontWeight: 600, outline: 'none', boxSizing: 'border-box', colorScheme: 'dark',
+  }
+
+  return (
+    <div onClick={onClose} style={{
+      position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(6px)',
+      zIndex: 10050, display: 'flex', alignItems: isMobile ? 'flex-end' : 'center', justifyContent: 'center',
+      padding: isMobile ? 0 : '1.5rem',
+    }}>
+      <div onClick={e => e.stopPropagation()} style={{
+        width: '100%', maxWidth: 420, background: '#0a0a0a',
+        border: '1px solid rgba(255,215,0,0.25)', borderRadius: isMobile ? '16px 16px 0 0' : 16,
+        padding: isMobile ? '1.1rem 1rem 1.5rem' : '1.3rem',
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.3rem' }}>
+          <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 900, color: '#fff', display: 'flex', alignItems: 'center', gap: 8 }}>
+            <CalendarPlus size={18} color={GOLD} /> Inplannen
+          </h3>
+          <button onClick={onClose} style={{ width: 32, height: 32, borderRadius: 8, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><X size={16} /></button>
+        </div>
+        <div style={{ fontSize: '0.85rem', color: 'rgba(255,255,255,0.6)', fontWeight: 600, marginBottom: '1rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+          {idea.title || 'Idee'}
+        </div>
+
+        <label style={{ display: 'block', fontSize: '0.62rem', fontWeight: 800, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '0.35rem' }}>Datum</label>
+        <input type="date" value={date} onChange={e => setDate(e.target.value)} style={{ ...inputStyle, marginBottom: '0.85rem' }} />
+
+        <label style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: '0.62rem', fontWeight: 800, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '0.35rem' }}><Clock size={11} /> Tijd</label>
+        <input type="time" value={time} onChange={e => setTime(e.target.value)} style={{ ...inputStyle, marginBottom: error ? '0.6rem' : '1.1rem' }} />
+
+        {error && <div style={{ fontSize: '0.82rem', fontWeight: 700, color: '#ef4444', marginBottom: '0.8rem' }}>{error}</div>}
+
+        <button onClick={submit} disabled={saving} style={{
+          width: '100%', padding: '0.85rem', borderRadius: 10, border: 'none',
+          background: saving ? 'rgba(255,215,0,0.35)' : 'linear-gradient(135deg,#FFD700,#D4AF37)',
+          color: '#0a0a0a', fontSize: '0.95rem', fontWeight: 900, cursor: saving ? 'default' : 'pointer',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+        }}>
+          <CalendarPlus size={16} /> {saving ? 'Plannen…' : 'Zet in agenda'}
+        </button>
+      </div>
     </div>
   )
 }

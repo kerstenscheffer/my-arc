@@ -39,8 +39,11 @@ class TemplateLibrary {
         .order('created_at', { ascending: false })
 
       if (error) throw error
-      console.log(`✅ Loaded ${data?.length || 0} templates for coach ${coachId}`)
-      return data || []
+      // full_week-plannen worden apart opgeslagen vanuit de Plan Analyzer en horen
+      // niet in deze setA/setB-gebaseerde template-tab. Filter ze eruit.
+      const templates = (data || []).filter(t => t.plan_type !== 'full_week')
+      console.log(`✅ Loaded ${templates.length} templates for coach ${coachId}`)
+      return templates
     } catch (error) {
       console.error('❌ Error loading templates:', error)
       return []
@@ -168,6 +171,28 @@ class TemplateLibrary {
       console.log(`📋 Template: ${template.name}`)
       console.log(`🎯 Target macros: ${userMacros.calories} kcal, ${userMacros.protein}g protein`)
 
+      const { data: clientData } = await this.supabase
+        .from('clients')
+        .select('allergies, hated_foods, loved_foods, dietary_type, cooking_skill, intolerances, workout_schedule, training_time, preferred_training_days, assigned_schema_id')
+        .eq('id', clientId)
+        .single()
+
+      let validSchemaDagKeys = null
+      if (clientData?.assigned_schema_id) {
+        const { data: schema } = await this.supabase
+          .from('workout_schemas')
+          .select('week_structure')
+          .eq('id', clientData.assigned_schema_id)
+          .single()
+        const ws = schema?.week_structure
+        if (ws && typeof ws === 'object') validSchemaDagKeys = new Set(Object.keys(ws))
+      }
+
+      const clientTrainingDays = this.resolveClientTrainingDays(clientData, validSchemaDagKeys)
+      const trainingTime = clientData?.training_time || null
+      console.log(`🗓️ Client training days (indices): ${JSON.stringify(clientTrainingDays)}`)
+      console.log(`⏰ Client training time: ${trainingTime || 'unknown'}`)
+
       const allMealIds = this.extractMealIds(template.week_structure)
       const meals = await this.loadMealsByIds(allMealIds)
 
@@ -178,11 +203,12 @@ class TemplateLibrary {
 
       console.log(`⚖️ Scale factor: ${scaleFactor.toFixed(3)} (${userMacros.calories} / ${templateTotal})`)
 
-      // buildScaledWeek with no client overrides (manual apply from coach)
       const scaledWeekStructure = this.buildScaledWeek(
         template.week_structure,
         meals,
-        scaleFactor
+        scaleFactor,
+        clientTrainingDays,
+        trainingTime
       )
 
       let finalWeekStructure = scaledWeekStructure
@@ -198,12 +224,6 @@ class TemplateLibrary {
           carbs: userMacros.carbs || 200,
           fat: userMacros.fat || 70
         }
-
-        const { data: clientData } = await this.supabase
-          .from('clients')
-          .select('allergies, hated_foods, loved_foods, dietary_type, cooking_skill, intolerances')
-          .eq('id', clientId)
-          .single()
 
         const clientRules = {
           allergies: this.parseStringToArray(clientData?.allergies),
@@ -259,18 +279,51 @@ class TemplateLibrary {
   }
 
   // ==========================================
-  // CORE: BUILD SCALED WEEK — v3.0
-  // Now accepts optional clientTrainingDays + trainingTime
-  // These override the template defaults when called from IntakeFlowService
+  // CLIENT TRAINING DAYS RESOLUTION
+  // Single source of truth: clients.workout_schedule (EN day keys).
+  // Falls back to preferred_training_days (NL abbreviations) when schedule is missing.
+  // Returns array of indices [0..6] (Monday=0) or empty array.
+  // ==========================================
+  resolveClientTrainingDays(clientData, validSchemaDagKeys = null) {
+    if (!clientData) return []
+    const EN_DAY_INDEX = { Monday: 0, Tuesday: 1, Wednesday: 2, Thursday: 3, Friday: 4, Saturday: 5, Sunday: 6 }
+    const NL_DAY_INDEX = { ma: 0, di: 1, wo: 2, do: 3, vr: 4, za: 5, zo: 6 }
+
+    const schedule = clientData.workout_schedule
+    if (schedule && typeof schedule === 'object') {
+      const idx = Object.entries(schedule)
+        .filter(([, dagKey]) => !validSchemaDagKeys || validSchemaDagKeys.has(dagKey))
+        .map(([day]) => EN_DAY_INDEX[day])
+        .filter(v => v !== undefined)
+        .sort((a, b) => a - b)
+      if (idx.length > 0) return idx
+    }
+
+    const preferred = clientData.preferred_training_days
+    if (Array.isArray(preferred) && preferred.length > 0) {
+      const idx = preferred
+        .map(d => NL_DAY_INDEX[String(d).toLowerCase()])
+        .filter(v => v !== undefined)
+        .sort((a, b) => a - b)
+      if (idx.length > 0) return idx
+    }
+
+    return []
+  }
+
+  // ==========================================
+  // CORE: BUILD SCALED WEEK — v3.1
+  // Training days come from the client (workout_schedule). Template's
+  // training_days is ignored — it lives at the wrong level.
   // ==========================================
 
   /**
    * Build a scaled week structure from a template.
    *
-   * @param {object} templateStructure - Template with setA, setB, training_days
+   * @param {object} templateStructure - Template with setA + setB
    * @param {object} mealMap - Map of meal_id → meal object
    * @param {number} scaleFactor - Calorie scale factor
-   * @param {number[]} clientTrainingDays - Optional: day indices 0=mon..6=sun from client intake
+   * @param {number[]} clientTrainingDays - Day indices 0=mon..6=sun from client.workout_schedule
    * @param {string} trainingTime - Optional: 'vroege_ochtend' | 'late_ochtend' | 'vroege_middag' |
    *                                          'late_middag' | 'vroege_avond' | 'late_avond'
    */
@@ -278,12 +331,13 @@ class TemplateLibrary {
     const days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday']
     const weekStructure = {}
 
-    // v3.0: Use client training days if provided, otherwise fall back to template
-    const trainingDays = clientTrainingDays !== null
-      ? clientTrainingDays
-      : (templateStructure.training_days || [0, 2, 4, 6])
+    let trainingDays = clientTrainingDays
+    if (!Array.isArray(trainingDays) || trainingDays.length === 0) {
+      console.warn('⚠️ No client training days provided — every day will use the rest-day set (setB). Fill in clients.workout_schedule to fix.')
+      trainingDays = []
+    }
 
-    console.log(`📅 Using training days (indices): ${trainingDays}`)
+    console.log(`📅 Using training days (indices): ${JSON.stringify(trainingDays)}`)
     console.log(`⏰ Training time: ${trainingTime || 'not specified'}`)
 
     // v3.0: Build timing config based on client's training time

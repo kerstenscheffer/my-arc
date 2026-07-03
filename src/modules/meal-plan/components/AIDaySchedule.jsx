@@ -3,13 +3,11 @@
 // ✅ FOOD LOG: Loads consumed_meals, combined totals, log button
 // ✅ EDIT: editingMeal state + FoodLogModal editMeal prop
 import React, { useState, useEffect } from 'react'
-import { Apple } from 'lucide-react'
 import DayScheduleHeader from './day-schedule/DayScheduleHeader'
 import DaySelector from './day-schedule/DaySelector'
 import DailyTotalsBar from './day-schedule/DailyTotalsBar'
-import MealTimelineDesktop from './day-schedule/MealTimelineDesktop'
 import MealTimelineMobile from './day-schedule/MealTimelineMobile'
-import ApplyTemplateModal from '../../client-meal-base/components/ApplyTemplateModal'
+import DayTemplatePickerModal from './DayTemplatePickerModal'
 import FoodLogModal from './food-log/FoodLogModal'
 import MealLoggingService from '../../meal-logging-wizard/MealLoggingService'
 
@@ -40,6 +38,10 @@ export default function AIDaySchedule({
   // its own at page-level (so they don't appear twice).
   hideDayPicker = false,
   hideTotalsBar = false,
+  // Trigger-teller die de FoodLogModal opent — telt mee zodra de FAB
+  // in AIMealDashboard wordt aangeraakt. Geeft een minimaal interface
+  // tussen ouder en kind zonder de showFoodLog-state op te tillen.
+  foodLogTrigger = 0,
 }) {
   const isFreeMode = mode === 'free'
   const isMobile = window.innerWidth <= 768
@@ -65,6 +67,14 @@ export default function AIDaySchedule({
     }
   }, [db])
 
+  // FAB-trigger uit AIMealDashboard: elke increment opent de food-log modal.
+  // De eerste render (foodLogTrigger=0) negeren we, anders zou de modal direct
+  // bij page-load openen.
+  useEffect(() => {
+    if (!foodLogTrigger) return
+    setShowFoodLog(true)
+  }, [foodLogTrigger])
+
   useEffect(() => {
     if (selectedDay) {
       const dayIndex = daysOfWeek.findIndex(d => d.key === selectedDay)
@@ -78,9 +88,41 @@ export default function AIDaySchedule({
       Object.entries(todayProgress.consumed_meals).forEach(([slot, data]) => {
         if (data?.consumed) newChecked[slot] = true
       })
-      setCheckedMeals(newChecked)
+      // Mergen i.p.v. vervangen, zodat een (lege) todayProgress de uit de DB
+      // herstelde vinkjes hieronder niet wegvaagt.
+      setCheckedMeals(prev => ({ ...prev, ...newChecked }))
     }
   }, [todayProgress])
+
+  // Herstel de afvink-status bij (her)laden van de pagina. De macro-totalen
+  // bleven wel staan (losse som uit consumed_meals), maar de vinkjes per maaltijd
+  // niet — die leidden we hier nu af uit de plan_check-rijen van vandaag, gematcht
+  // op meal_id (zodat snack1/snack2 los herkend worden), met slot als fallback.
+  useEffect(() => {
+    if (currentDay !== getTodayIndex() || !client?.id || !db?.supabase || displayMeals.length === 0) return
+    let alive = true
+    ;(async () => {
+      try {
+        const today = new Date().toISOString().split('T')[0]
+        const { data } = await db.supabase
+          .from('consumed_meals')
+          .select('meal_id, meal_type')
+          .eq('client_id', client.id)
+          .eq('source', 'plan_check')
+          .gte('consumed_at', `${today}T00:00:00`)
+          .lt('consumed_at', `${today}T23:59:59`)
+        if (!alive || !Array.isArray(data)) return
+        const restored = {}
+        for (const row of data) {
+          let m = row.meal_id ? displayMeals.find(dm => (dm.meal_id || dm.id) === row.meal_id) : null
+          if (!m && row.meal_type) m = displayMeals.find(dm => dm.slot === row.meal_type)
+          if (m) restored[m.slot] = true
+        }
+        if (Object.keys(restored).length > 0) setCheckedMeals(prev => ({ ...prev, ...restored }))
+      } catch (e) { console.warn('Vinkjes herstellen mislukt:', e) }
+    })()
+    return () => { alive = false }
+  }, [displayMeals, currentDay, client?.id, db])
 
   useEffect(() => {
     // OVERHAUL: free-mode skips plan loading entirely
@@ -129,9 +171,11 @@ export default function AIDaySchedule({
       await loggingService.deleteConsumedMeal(mealId)
       setConsumedMeals(prev => prev.filter(m => m.id !== mealId))
 
-      // Notify parent to update macro totals
+      // Alleen vandaag's totals updaten als we ECHT vandaag aan het editen
+      // zijn — anders trekken we de macros van een past-day delete af van
+      // vandaag (zelfde bug als bij logging).
       const deleted = consumedMeals.find(m => m.id === mealId)
-      if (deleted && onMealLogged) {
+      if (deleted && onMealLogged && currentDay === getTodayIndex()) {
         onMealLogged({
           calories: -(deleted.calories || 0),
           protein: -(deleted.protein || 0),
@@ -146,12 +190,16 @@ export default function AIDaySchedule({
 
   // ✅ FOOD LOG: Handle new meal logged
   const handleMealLogged = (loggedData) => {
-    // Add to local consumed list
     if (currentDay === getTodayIndex()) {
+      // Vandaag: lokaal toevoegen + parent's day-totals updaten.
       setConsumedMeals(prev => [...prev, loggedData])
+      if (onMealLogged) onMealLogged(loggedData)
     }
-    // Notify parent for macro update
-    if (onMealLogged) onMealLogged(loggedData)
+    // Vorige dag: NIET door-propagaten naar parent — die telt vandaag's
+    // macros, en als we 'm voor een past-day log óók zouden bumpen pakt
+    // vandaag macro's van een log die op maandag hoort. De timeline van
+    // de gekozen dag laad de FoodLogModal-callsite zelf opnieuw via
+    // loadConsumedMeals(currentDay).
   }
 
   const loadDayMeals = async (dayIndex) => {
@@ -243,61 +291,20 @@ export default function AIDaySchedule({
       width: '100%',
       maxWidth: '100%',
       overflowX: 'hidden',
-      borderTop: '1px solid rgba(255, 255, 255, 0.06)',
-      borderBottom: '1px solid rgba(255, 255, 255, 0.06)'
+      // Edge-to-edge borders weggehaald — kaartjes zweven nu zelf,
+      // wrapper hoeft geen frame meer te zijn.
+      paddingTop: 4,
     }}>
-      {!isFreeMode && (
-        <DayScheduleHeader
-          dayTemplates={dayTemplates}
-          onOpenTemplate={() => setShowApplyTemplate(true)}
-          isMobile={isMobile}
-        />
-      )}
-
-      {!hideDayPicker && (
-        <DaySelector
-          days={daysOfWeek}
-          currentDay={currentDay}
-          onDayClick={handleDayClick}
-          isToday={currentDay === getTodayIndex()}
-          isMobile={isMobile}
-        />
-      )}
+      {/* DayScheduleHeader (titel/datum/Template-knop) en de MA-ZO
+          DaySelector zijn verwijderd: navigatie en dagweergave zitten nu
+          in MealDayNavHeader bovenaan AIMealDashboard. */}
 
       {!hideTotalsBar && hasContent && (
         <DailyTotalsBar dailyTotals={combinedTotals} targets={clientTargets} isMobile={isMobile} />
       )}
 
-      {/* ✅ OVERHAUL: persistent primary log button (both modes) */}
-      {client && !loading && (
-        <div style={{
-          padding: isMobile ? '0.625rem 1rem' : '0.75rem 1.25rem',
-          borderBottom: '1px solid rgba(255, 255, 255, 0.04)',
-        }}>
-          <button
-            onClick={() => setShowFoodLog(true)}
-            style={{
-              width: '100%',
-              minHeight: '44px',
-              padding: '0.7rem 1rem',
-              background: 'linear-gradient(135deg, #FFD700 0%, #D4AF37 100%)',
-              color: '#0a0a0a',
-              border: 'none',
-              borderRadius: '10px',
-              fontSize: isMobile ? '0.85rem' : '0.9rem',
-              fontWeight: 800,
-              letterSpacing: '0.02em',
-              cursor: 'pointer',
-              touchAction: 'manipulation',
-              WebkitTapHighlightColor: 'transparent',
-              boxShadow: '0 4px 14px rgba(255, 215, 0, 0.25)',
-              transition: 'transform 0.15s ease, box-shadow 0.15s ease',
-            }}
-          >
-            + Maaltijd loggen
-          </button>
-        </div>
-      )}
+      {/* Wijde "+ Maaltijd loggen" knop weggehaald — vervangen door de
+          floating ronde + FAB in AIMealDashboard (één log-knop per pagina). */}
 
       {loading ? (
         <div style={{ textAlign: 'center', padding: '2rem', color: 'rgba(255,255,255,0.2)', fontSize: '0.8rem' }}>Laden...</div>
@@ -305,7 +312,7 @@ export default function AIDaySchedule({
         <div style={{ textAlign: 'center', padding: '2rem 1rem', color: 'rgba(255,255,255,0.2)', fontSize: '0.8rem' }}>
           Geen maaltijden gepland voor deze dag
         </div>
-      ) : isMobile ? (
+      ) : (
         <MealTimelineMobile
           meals={displayMeals}
           checkedMeals={checkedMeals}
@@ -395,138 +402,65 @@ export default function AIDaySchedule({
             }
           }}
         />
-      ) : (
-        <>
-          <MealTimelineDesktop
-            meals={displayMeals}
-            checkedMeals={checkedMeals}
-            onMealCheck={handleMealCheck}
-            onOpenInfo={onOpenInfo}
-            onOpenAlternatives={onOpenAlternatives}
-            isToday={currentDay === getTodayIndex()}
-            isMobile={isMobile}
-          />
-          {/* ✅ FOOD LOG: Log button for desktop too */}
-          {consumedMeals.map((meal) => (
-            <div key={`logged-desktop-${meal.id}`} style={{
-              borderBottom: '1px solid rgba(255, 255, 255, 0.04)',
-              padding: '0.75rem 1rem',
-              display: 'flex', alignItems: 'center', gap: '0.875rem',
-              minHeight: '60px',
-            }}>
-              {/* Thumbnail — 48x48 with gold apple placeholder */}
-              {meal.image_url ? (
-                <div style={{
-                  width: '48px', height: '48px',
-                  borderRadius: '12px',
-                  background: `url(${meal.image_url}) center/cover, #fff`,
-                  border: '1px solid rgba(255, 255, 255, 0.08)',
-                  flexShrink: 0,
-                }} />
-              ) : (
-                <div style={{
-                  width: '48px', height: '48px',
-                  borderRadius: '12px',
-                  background: 'rgba(255, 215, 0, 0.06)',
-                  border: '1px solid rgba(255, 215, 0, 0.15)',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  color: 'rgba(255, 215, 0, 0.55)',
-                  flexShrink: 0,
-                }}>
-                  <Apple size={22} strokeWidth={1.8} />
-                </div>
-              )}
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{
-                  display: 'flex', alignItems: 'center', gap: '0.4rem',
-                  marginBottom: '0.15rem',
-                }}>
-                  <span style={{
-                    fontSize: '0.92rem', fontWeight: '700', color: '#fff',
-                    whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
-                    letterSpacing: '-0.01em', minWidth: 0,
-                  }}>
-                    {meal.meal_name}
-                  </span>
-                  <span style={{
-                    fontSize: '0.5rem', fontWeight: '700',
-                    color: '#FFD700',
-                    background: 'rgba(255, 215, 0, 0.1)',
-                    padding: '0.1rem 0.4rem', borderRadius: '4px',
-                    textTransform: 'uppercase', letterSpacing: '0.06em',
-                    flexShrink: 0,
-                  }}>
-                    Gelogd
-                  </span>
-                </div>
-              </div>
-              <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.2rem', flexShrink: 0 }}>
-                <span style={{
-                  fontSize: '0.95rem', fontWeight: '800', color: '#FFD700',
-                  letterSpacing: '-0.01em',
-                }}>
-                  {Math.round(meal.calories || 0)}
-                </span>
-                <span style={{
-                  fontSize: '0.65rem', fontWeight: '600',
-                  color: 'rgba(255, 215, 0, 0.5)',
-                }}>
-                  kcal
-                </span>
-              </div>
-            </div>
-          ))}
-        </>
       )}
 
-      {/* ✅ FOOD LOG: Empty state with log button when no plan */}
+      {/* Empty state — knop weg, tekst blijft als hint. De FAB rechtsonder
+          is het enige aanknopingspunt voor "loggen". */}
       {!loading && displayMeals.length === 0 && consumedMeals.length === 0 && client && (
         <div style={{ textAlign: 'center', padding: '1.5rem 1rem' }}>
-          <div style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.2)', marginBottom: '0.75rem' }}>
-            {activePlan ? 'Geen maaltijden gepland voor deze dag' : 'Begin met loggen'}
+          <div style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.3)' }}>
+            {activePlan ? 'Geen maaltijden gepland voor deze dag' : 'Nog niks gelogd vandaag'}
           </div>
-          <button
-            onClick={() => setShowFoodLog(true)}
-            style={{
-              padding: '0.625rem 1.25rem',
-              background: 'rgba(255, 215, 0, 0.08)',
-              border: '1px solid rgba(255, 215, 0, 0.25)',
-              borderRadius: '8px',
-              color: '#FFD700',
-              fontSize: '0.75rem', fontWeight: '700',
-              cursor: 'pointer',
-              touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-              minHeight: '40px'
-            }}
-          >
-            + Maaltijd loggen
-          </button>
         </div>
       )}
       
       {showApplyTemplate && (
-        <ApplyTemplateModal isOpen={showApplyTemplate} onClose={() => setShowApplyTemplate(false)} dayTemplates={dayTemplates} currentDayKey={daysOfWeek[currentDay].key} activePlan={activePlan} db={db}
-          onSuccess={() => { setShowApplyTemplate(false); if (onPlanUpdate) onPlanUpdate(); loadDayMeals(currentDay) }} />
+        <DayTemplatePickerModal
+          isOpen={showApplyTemplate}
+          onClose={() => setShowApplyTemplate(false)}
+          dayTemplates={dayTemplates}
+          currentDayKey={daysOfWeek[currentDay]?.key}
+          activePlan={activePlan}
+          clientId={client?.id}
+          db={db}
+          isMobile={isMobile}
+          onSuccess={() => { setShowApplyTemplate(false); if (onPlanUpdate) onPlanUpdate(); loadDayMeals(currentDay) }}
+        />
       )}
 
       {/* ✅ FOOD LOG + EDIT: Modal with editMeal support */}
-      {showFoodLog && (
-        <FoodLogModal
-          isOpen={showFoodLog}
-          onClose={() => { setShowFoodLog(false); setDefaultMealMoment(null); setEditingMeal(null) }}
-          client={client}
-          db={db}
-          targets={clientTargets}
-          consumedToday={consumedToday}
-          onMealLogged={(data) => {
-            handleMealLogged(data)
-            // Reload consumed meals to reflect edit
-            if (data?._isEdit) loadConsumedMeals(currentDay)
-          }}
-          defaultMealMoment={defaultMealMoment}
-          editMeal={editingMeal}
-        />
-      )}
+      {showFoodLog && (() => {
+        // When the user is viewing a past day, stamp the meal at noon of
+        // that day so it lands in the right bucket without being timezone-
+        // sensitive. Today-flow falls back to "now" inside the service.
+        let consumedAtIso = null
+        if (currentDay !== getTodayIndex()) {
+          const diff = currentDay - getTodayIndex()
+          const target = new Date()
+          target.setDate(target.getDate() + diff)
+          target.setHours(12, 0, 0, 0)
+          consumedAtIso = target.toISOString()
+        }
+        return (
+          <FoodLogModal
+            isOpen={showFoodLog}
+            onClose={() => { setShowFoodLog(false); setDefaultMealMoment(null); setEditingMeal(null) }}
+            client={client}
+            db={db}
+            targets={clientTargets}
+            consumedToday={consumedToday}
+            onMealLogged={(data) => {
+              handleMealLogged(data)
+              // Always reload the day we're looking at — so a past-day
+              // log appears immediately in the timeline.
+              loadConsumedMeals(currentDay)
+            }}
+            defaultMealMoment={defaultMealMoment}
+            editMeal={editingMeal}
+            consumedAt={consumedAtIso}
+          />
+        )
+      })()}
     </div>
   )
 }

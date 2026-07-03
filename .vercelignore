@@ -1,0 +1,8 @@
+# Dode/test API-bestanden — geen runtime-endpoints. Uitgesloten van de deploy
+# zodat ze NIET meetellen voor de Vercel Hobby-limiet van 12 serverless
+# functions. De bestanden blijven gewoon in de repo staan.
+api/hello.js
+api/test.js
+api/stripe-webhook.backup.js
+api/stripe-webhook-complex.js
+api/calendly-webhook.js.backup

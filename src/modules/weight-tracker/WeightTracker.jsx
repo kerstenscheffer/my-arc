@@ -21,6 +21,7 @@ export default function WeightTracker({ client, db }) {
   const [stats, setStats] = useState(null)
   const [fridayData, setFridayData] = useState(null)
   const [todayEntry, setTodayEntry] = useState(null)
+  const [coachingPlan, setCoachingPlan] = useState(null)
   const [message, setMessage] = useState(null)
   
   const service = new WeightTrackerService(db)
@@ -32,13 +33,14 @@ export default function WeightTracker({ client, db }) {
     if (!client?.id) return
     setLoading(true)
     try {
-      const [h, s, c, t] = await Promise.all([
+      const [h, s, c, t, plan] = await Promise.all([
         service.getWeightHistory(client.id, 56),
         service.getWeightStats(client.id),
         service.getFridayCompliance(client.id),
-        service.getTodayEntry(client.id)
+        service.getTodayEntry(client.id),
+        service.getCoachingPlan(client.id),
       ])
-      setHistory(h || []); setStats(s || {}); setFridayData(c || {}); setTodayEntry(t)
+      setHistory(h || []); setStats(s || {}); setFridayData(c || {}); setTodayEntry(t); setCoachingPlan(plan)
       if (s?.current) setWeight(s.current)
       else if (client?.current_weight) setWeight(client.current_weight)
     } catch (e) {
@@ -113,7 +115,7 @@ export default function WeightTracker({ client, db }) {
         isFriday={isFriday} isMobile={isMobile}
         targetWeight={parseFloat(client?.target_weight) || 75}
       />
-      <WeightStatsGrid stats={stats} client={client} fridayData={fridayData} history={history} isMobile={isMobile} />
+      <WeightStatsGrid stats={stats} client={client} fridayData={fridayData} history={history} isMobile={isMobile} coachingPlan={coachingPlan} />
       <WeightHistory history={history} isMobile={isMobile} maxItems={14} />
       
       <style>{`

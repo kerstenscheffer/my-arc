@@ -18,10 +18,22 @@ export default function AIAlternativesModal({
   const [alternatives, setAlternatives] = useState([])
   const [favorites, setFavorites] = useState([])
   const [allMeals, setAllMeals] = useState([])
+  const [coachOptions, setCoachOptions] = useState([]) // door coach gecureerde swaps voor dit slot
   const [loading, setLoading] = useState(true)
   const [selectedMeal, setSelectedMeal] = useState(null)
 
+  // Slot van de huidige maaltijd → naar de 4 curatie-slots (snack1/2/3 → snack).
+  const slotKey = (() => {
+    const v = String(currentMeal?.slot || currentMeal?.timeSlot || currentMeal?.timing?.[0] || '').toLowerCase()
+    if (v.includes('breakfast') || v.includes('ontbijt')) return 'breakfast'
+    if (v.includes('lunch')) return 'lunch'
+    if (v.includes('dinner') || v.includes('diner')) return 'dinner'
+    return 'snack'
+  })()
+
   const filters = [
+    // "Door je coach" alleen tonen als er gecureerde opties zijn voor dit slot.
+    ...(coachOptions.length > 0 ? [{ id: 'coach', label: '⭐ Door je coach' }] : []),
     { id: 'smart', label: 'Beste match' },
     { id: 'similar-cal', label: 'Zelfde kcal' },
     { id: 'more-protein', label: 'Meer eiwit' },
@@ -60,9 +72,29 @@ export default function AIAlternativesModal({
         .select('*')
         .limit(200)
 
+      // Door de coach gecureerde swaps voor dit slot (client_swap_options).
+      // RLS scope't automatisch op de ingelogde client; we filteren op slot.
+      let curated = []
+      try {
+        const { data: opt } = await db.supabase
+          .from('client_swap_options')
+          .select('meal_ids')
+          .eq('meal_slot', slotKey)
+          .maybeSingle()
+        const ids = opt?.meal_ids || []
+        if (ids.length > 0) {
+          const { data: curatedMeals } = await db.supabase.from('ai_meals').select('*').in('id', ids)
+          // Behoud de volgorde waarin de coach ze koos.
+          curated = ids.map(id => (curatedMeals || []).find(m => m.id === id)).filter(Boolean)
+        }
+      } catch (e) { /* geen curatie → gewoon de normale pool */ }
+
       setAlternatives(smartAlts || [])
       setFavorites(favs || [])
       setAllMeals(meals || [])
+      setCoachOptions(curated)
+      // Heeft de coach opties ingesteld? Toon die als eerste.
+      if (curated.length > 0) setActiveFilter('coach')
     } catch (error) {
       console.error('Failed to load alternatives:', error)
     } finally {
@@ -76,6 +108,9 @@ export default function AIAlternativesModal({
     const currentProt = currentMeal?.protein || 0
 
     switch (activeFilter) {
+      case 'coach':
+        meals = coachOptions.filter(m => m.id !== currentMeal?.id)
+        break
       case 'smart':
         meals = alternatives
         break

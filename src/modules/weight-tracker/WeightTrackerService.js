@@ -178,6 +178,34 @@ export default class WeightTrackerService {
     }
   }
   
+  // Latest active client_journey met coaching_plan JSON. Levert de data
+  // die WeightStatsGrid nodig heeft om de verwachte plan-lijn te tekenen
+  // (start_weight, tdee, target_cal, adjustments…). Zelfde shape als wat
+  // CommandCenterService aan de coach-kant teruggeeft, zodat de chart-
+  // logica identiek blijft tussen coach- en klant-view.
+  async getCoachingPlan(clientId) {
+    try {
+      const { data, error } = await this.supabase
+        .from('client_journeys')
+        .select('start_date, total_weeks, coaching_plan')
+        .eq('client_id', clientId)
+        .not('coaching_plan', 'is', null)
+        .order('start_date', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+      if (error && error.code !== 'PGRST116') throw error
+      if (!data || !data.coaching_plan) return null
+      return {
+        startDate: data.start_date,
+        totalWeeks: data.total_weeks,
+        plan: data.coaching_plan,
+      }
+    } catch (error) {
+      console.error('❌ Get coaching plan failed:', error)
+      return null
+    }
+  }
+
   async getTodayEntry(clientId) {
     try {
       const today = new Date().toISOString().split('T')[0]

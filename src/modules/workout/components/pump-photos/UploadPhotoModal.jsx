@@ -319,7 +319,6 @@ export default function UploadPhotoModal({ client, db, onClose, onSuccess }) {
             ref={fileInputRef}
             type="file"
             accept="image/*"
-            capture="environment"
             onChange={handleFileSelect}
             style={{ display: 'none' }}
           />

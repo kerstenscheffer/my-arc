@@ -1,8 +1,8 @@
 // src/modules/workout/components/week-schedule/WorkoutIndicator.jsx
-// Toont per workout-dag een unieke foto + de naam van de workout-dag (niet
-// de spiergroep). Foto wordt deterministisch gekozen uit een pool zodat
-// dezelfde workout-naam altijd dezelfde foto krijgt, maar verschillende
-// dagen verschillende foto's.
+//
+// Toont per workout-dag een edge-to-edge foto-banner + de workout-titel
+// daaronder in dik wit. Foto wordt deterministisch gekozen uit een pool zodat
+// dezelfde workout-naam altijd dezelfde foto krijgt.
 
 // Pool van workout-foto's. Allemaal gevalideerd in eerdere versies; geen
 // duplicates onderling. Volgorde maakt niet uit — hash bepaalt mapping.
@@ -34,10 +34,16 @@ const getWorkoutImage = (workoutData) => {
   return WORKOUT_IMAGE_POOL[hashString(key) % WORKOUT_IMAGE_POOL.length]
 }
 
+// Max aantal karakters in de tile-titel zodat alle cards een vaste grootte
+// houden. Langer → afgekapt met ellipsis. CSS text-overflow is een vangnet
+// voor edge-cases, maar deze JS-truncatie zorgt voor deterministisch gedrag.
+const MAX_LABEL_CHARS = 8
+
 // Exact de titel die de coach in het schema heeft gezet (workoutData.name).
 // Geen herformattering — caps blijven caps, "PUSH A" blijft "PUSH A".
 const getWorkoutLabel = (workoutData) => {
-  return (workoutData?.name || workoutData?.focus || '').trim()
+  const raw = (workoutData?.name || workoutData?.focus || '').trim()
+  return raw.length > MAX_LABEL_CHARS ? `${raw.slice(0, MAX_LABEL_CHARS)}…` : raw
 }
 
 export default function WorkoutIndicator({ workoutData, isMobile }) {
@@ -45,11 +51,40 @@ export default function WorkoutIndicator({ workoutData, isMobile }) {
   const label = getWorkoutLabel(workoutData)
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: isMobile ? '0.275rem' : '0.325rem', width: '100%' }}>
-      <div style={{ width: isMobile ? '38px' : '44px', height: isMobile ? '44px' : '52px', borderRadius: '3px', background: `url(${img}) center/cover`, border: '1px solid rgba(255,255,255,0.07)', overflow: 'hidden', position: 'relative', flexShrink: 0 }}>
-        <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: '40%', background: 'linear-gradient(to bottom, transparent 0%, rgba(0,0,0,0.5) 100%)' }} />
+    <div style={{ width: '100%', display: 'flex', flexDirection: 'column' }}>
+      {/* Edge-to-edge foto-banner */}
+      <div style={{
+        width: '100%',
+        height: isMobile ? 30 : 36,
+        backgroundImage: `url(${img})`,
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+        position: 'relative',
+        flexShrink: 0,
+      }}>
+        {/* Subtiele donkere overgang onderaan zodat de titel-grens niet hard
+            tegen een lichte foto botst. */}
+        <div style={{
+          position: 'absolute', left: 0, right: 0, bottom: 0,
+          height: '50%',
+          background: 'linear-gradient(180deg, transparent 0%, rgba(0,0,0,0.45) 100%)',
+        }} />
       </div>
-      <div style={{ fontSize: isMobile ? '0.5rem' : '0.55rem', color: 'rgba(255,255,255,0.55)', fontWeight: '700', maxWidth: isMobile ? '44px' : '50px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textTransform: 'capitalize', lineHeight: 1 }}>
+
+      {/* Workout-titel — dik gedrukt vel wit */}
+      <div style={{
+        padding: isMobile ? '6px 4px 0' : '7px 6px 0',
+        fontSize: isMobile ? '0.66rem' : '0.72rem',
+        fontWeight: 900,
+        color: '#fff',
+        letterSpacing: '0.02em',
+        lineHeight: 1.15,
+        overflow: 'hidden',
+        textOverflow: 'ellipsis',
+        whiteSpace: 'nowrap',
+        textAlign: 'center',
+        maxWidth: '100%',
+      }}>
         {label}
       </div>
     </div>

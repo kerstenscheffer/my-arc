@@ -84,7 +84,9 @@ export default function ActionMenu({
   // Build menu items
   const menuItems = []
 
-  if (hasScript(contentPiece) && onViewScript) {
+  // Script-optie: via gekoppelde content-piece, een rechtstreeks ingepland idee
+  // (item.source_content_id), of een ouder ingepland idee met opgeslagen script.
+  if (onViewScript && (hasScript(contentPiece) || item?.source_content_id || (item?.item_type === 'content' && (item?.description || item?.script)))) {
     menuItems.push({ id: 'script', label: 'Bekijk Script', icon: ScrollText, color: '#FFD700' })
   }
   if (hasContentPiece(item) && onMoveToNextWeek) {

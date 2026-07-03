@@ -211,6 +211,9 @@ const videoService = {
               completed: assignment.status === 'completed',
               viewed_at: assignment.viewed_at,
               status: assignment.status,
+              // Cursus-info (context_data.course_id/course_title) zodat de
+              // client-widget cursus-video's kan groeperen onder hun cursus.
+              context_data: assignment.context_data || null,
               is_default: false
             })).filter(item => item.video !== null && item.video !== undefined)
           }
@@ -422,6 +425,137 @@ const videoService = {
       })
       return grouped
     } catch (error) { console.error('Failed to group videos:', error); return {} }
+  },
+
+  // ═══════════════════════════════════════════
+  // CURSUSSEN — bundel video's; toewijzing hergebruikt video_assignments
+  // ═══════════════════════════════════════════
+
+  getCoachCourses: async (coachId) => {
+    try {
+      const { data: courses, error } = await supabase
+        .from('video_courses')
+        .select('*, items:video_course_items(id, video_id, order_index)')
+        .eq('coach_id', coachId)
+        .eq('is_active', true)
+        .order('created_at', { ascending: false })
+      if (error) { console.error('Error fetching courses:', error); return [] }
+      return (courses || []).map(c => ({
+        ...c,
+        videoIds: (c.items || []).sort((a, b) => (a.order_index || 0) - (b.order_index || 0)).map(i => i.video_id),
+        videoCount: (c.items || []).length
+      }))
+    } catch (error) { console.error('Failed to fetch courses:', error); return [] }
+  },
+
+  createCourse: async (courseData, videoIds = []) => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return { success: false, error: 'Geen gebruiker ingelogd' }
+      const { data: course, error } = await supabase.from('video_courses').insert([{
+        coach_id: user.id,
+        title: courseData.title,
+        description: courseData.description || null,
+        thumbnail_url: courseData.thumbnail_url || null,
+        category_id: courseData.category_id || null,
+        is_active: true,
+        created_at: new Date().toISOString()
+      }]).select().single()
+      if (error) { console.error('Course creation error:', error); return { success: false, error: error.message } }
+      const res = await videoService.setCourseVideos(course.id, videoIds)
+      if (!res.success) return res
+      return { success: true, data: course }
+    } catch (error) {
+      console.error('Course creation failed:', error)
+      return { success: false, error: error.message }
+    }
+  },
+
+  updateCourse: async (courseId, updates, videoIds = null) => {
+    try {
+      const { error } = await supabase.from('video_courses').update(updates).eq('id', courseId)
+      if (error) { console.error('Course update error:', error); return { success: false, error: error.message } }
+      if (Array.isArray(videoIds)) {
+        const res = await videoService.setCourseVideos(courseId, videoIds)
+        if (!res.success) return res
+      }
+      return { success: true }
+    } catch (error) {
+      console.error('Course update failed:', error)
+      return { success: false, error: error.message }
+    }
+  },
+
+  // Vervangt de video-lijst van een cursus (simpel: leeg + opnieuw vullen, in volgorde).
+  setCourseVideos: async (courseId, videoIds = []) => {
+    try {
+      await supabase.from('video_course_items').delete().eq('course_id', courseId)
+      if (videoIds.length > 0) {
+        const rows = videoIds.map((vid, i) => ({ course_id: courseId, video_id: vid, order_index: i }))
+        const { error } = await supabase.from('video_course_items').insert(rows)
+        if (error) { console.error('Course items error:', error); return { success: false, error: error.message } }
+      }
+      return { success: true }
+    } catch (error) {
+      console.error('Set course videos failed:', error)
+      return { success: false, error: error.message }
+    }
+  },
+
+  deleteCourse: async (courseId) => {
+    try {
+      // Verwijder toewijzingen die bij deze cursus horen (context_data.course_id).
+      await supabase.from('video_assignments').delete().contains('context_data', { course_id: courseId })
+      const { error } = await supabase.from('video_courses').delete().eq('id', courseId)
+      if (error) { console.error('Course delete error:', error); return { success: false, error: error.message } }
+      return { success: true }
+    } catch (error) {
+      console.error('Course delete failed:', error)
+      return { success: false, error: error.message }
+    }
+  },
+
+  // Wijst een hele cursus toe: maakt voor elke video × client een video_assignment
+  // met context_data.course_id, zodat de client-kant ze als cursus kan groeperen.
+  // Hergebruikt exact dezelfde page/scheduling-logica als losse video's.
+  assignCourse: async (courseId, clientIds, assignmentData) => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return { success: false, error: 'Geen gebruiker ingelogd' }
+
+      const { data: course } = await supabase.from('video_courses').select('title').eq('id', courseId).single()
+      const { data: items, error: itemsErr } = await supabase
+        .from('video_course_items').select('video_id, order_index').eq('course_id', courseId).order('order_index', { ascending: true })
+      if (itemsErr) return { success: false, error: itemsErr.message }
+      const videoIds = (items || []).map(i => i.video_id)
+      if (videoIds.length === 0) return { success: false, error: 'Deze cursus heeft nog geen video’s' }
+
+      const baseContext = { ...(assignmentData.contextData || {}), course_id: courseId, course_title: course?.title || '' }
+      const assignments = []
+      for (const clientId of clientIds) {
+        videoIds.forEach((vid, idx) => {
+          assignments.push({
+            video_id: vid,
+            client_id: clientId,
+            assigned_by: user.id,
+            assignment_type: assignmentData.type || 'manual',
+            scheduled_for: assignmentData.scheduledFor || new Date().toISOString().split('T')[0],
+            time_of_day: assignmentData.timeOfDay || 'anytime',
+            status: 'pending',
+            page_context: assignmentData.pageContext || 'home',
+            context_data: { ...baseContext, course_order: idx },
+            notes: assignmentData.notes || '',
+            created_at: new Date().toISOString()
+          })
+        })
+      }
+      const { data, error } = await supabase.from('video_assignments').insert(assignments).select()
+      if (error) { console.error('Course assignment error:', error); return { success: false, error: error.message } }
+      return { success: true, data }
+    } catch (error) {
+      console.error('Course assignment failed:', error)
+      return { success: false, error: error.message }
+    }
   },
 
   extractYouTubeId: (url) => {

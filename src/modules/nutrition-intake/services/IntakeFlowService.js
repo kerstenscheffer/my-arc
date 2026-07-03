@@ -16,9 +16,22 @@
 // 5. Save plan as concept (is_active: false)
 // 6. Send coach notification: "plan ready for review"
 
+import { getClient as apiGetClient, updateClient as apiUpdateClient } from '../../../lib/publicIntakeApi'
+
 class IntakeFlowService {
   constructor(supabase) {
     this.supabase = supabase
+  }
+
+  // Publieke intake (geen sessie) mag de clients-tabel niet direct lezen
+  // of schrijven — dat loopt dan via /api/public-intake (service key).
+  async hasSession() {
+    try {
+      const { data: { session } } = await this.supabase.auth.getSession()
+      return !!session
+    } catch {
+      return false
+    }
   }
 
   // ========================================
@@ -39,14 +52,21 @@ class IntakeFlowService {
     }
 
     try {
+      const authenticated = await this.hasSession()
+
       // STEP 1: Map intake data to clients table
       console.log('\n📌 STEP 1: Mapping intake data to clients table...')
       const clientUpdate = this.mapIntakeToClientFields(intakeData)
 
-      const { error: updateError } = await this.supabase
-        .from('clients')
-        .update(clientUpdate)
-        .eq('id', clientId)
+      let updateError = null
+      if (authenticated) {
+        ({ error: updateError } = await this.supabase
+          .from('clients')
+          .update(clientUpdate)
+          .eq('id', clientId))
+      } else {
+        try { await apiUpdateClient(clientId, clientUpdate) } catch (e) { updateError = e }
+      }
 
       if (updateError) {
         console.error('❌ Failed to update client:', updateError)
@@ -58,11 +78,17 @@ class IntakeFlowService {
 
       // STEP 2: Load client data
       console.log('\n📌 STEP 2: Loading client data...')
-      const { data: client, error: clientError } = await this.supabase
-        .from('clients')
-        .select('*')
-        .eq('id', clientId)
-        .single()
+      let client = null
+      let clientError = null
+      if (authenticated) {
+        ({ data: client, error: clientError } = await this.supabase
+          .from('clients')
+          .select('*')
+          .eq('id', clientId)
+          .single())
+      } else {
+        try { client = await apiGetClient(clientId) } catch (e) { clientError = e }
+      }
 
       if (clientError || !client) {
         throw new Error(`Client not found: ${clientError?.message || 'no data'}`)
@@ -326,6 +352,7 @@ class IntakeFlowService {
         .from('meal_plan_templates')
         .select('*')
         .eq('coach_id', coachId)
+        .or('plan_type.is.null,plan_type.neq.full_week')
         .order('created_at', { ascending: false })
 
       if (error) throw error

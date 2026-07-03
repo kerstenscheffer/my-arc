@@ -8,8 +8,11 @@ import { createPortal } from 'react-dom'
 import {
   X, ChevronLeft, ChevronRight, ChevronDown, Calendar, Zap, TrendingUp,
   MessageCircle, Users, Phone, Trophy, Activity, BarChart3, PhoneCall,
-  Send, FileText, Percent, UserX, Eye,
+  Send, FileText, Percent, UserX, Eye, Download, LineChart as LineChartIcon,
+  RotateCcw,
 } from 'lucide-react'
+import { exportStatsPDF } from '../utils/exportStatsPDF'
+import GrowthChart from './GrowthChart'
 
 const GOLD = '#FFD700'
 const GOLD_DARK = '#D4AF37'
@@ -76,12 +79,40 @@ export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, 
   const [funnel, setFunnel] = useState(null)
   const [sourceBreakdown, setSourceBreakdown] = useState(null)
   const [reactionStats, setReactionStats] = useState(null)
+  const [timeSeries, setTimeSeries] = useState([])
+  const [callProposals, setCallProposals] = useState([])
+  const [avgBeforeCall, setAvgBeforeCall] = useState(null)
+  // Bump om de stats opnieuw te laden na het terugdraaien van een verplaatsing.
+  const [reloadKey, setReloadKey] = useState(0)
+  const [revertingId, setRevertingId] = useState(null)
+
+  // Draai één funnel-verplaatsing terug (soft): verdwijnt uit de stats, lead
+  // blijft op het bord staan. Daarna herladen we de cijfers.
+  const handleRevertMovement = async (movementId) => {
+    if (!movementId || !leadService?.revertMovement) return
+    setRevertingId(movementId)
+    try {
+      const res = await leadService.revertMovement(movementId, true)
+      if (res?.success) setReloadKey(k => k + 1)
+    } catch (e) {
+      console.error('Terugdraaien mislukt:', e)
+    } finally {
+      setRevertingId(null)
+    }
+  }
 
   // Resolve the [start, end) window once per render based on the mode.
   const { start, end } = (() => {
     if (periodMode === 'day') {
       const s = new Date(anchorDate); s.setHours(0, 0, 0, 0)
       const e = new Date(s); e.setDate(e.getDate() + 1)
+      return { start: s, end: e }
+    }
+    if (periodMode === 'month') {
+      const s = new Date(anchorDate.getFullYear(), anchorDate.getMonth(), 1)
+      s.setHours(0, 0, 0, 0)
+      const e = new Date(anchorDate.getFullYear(), anchorDate.getMonth() + 1, 1)
+      e.setHours(0, 0, 0, 0)
       return { start: s, end: e }
     }
     const s = mondayOf(anchorDate)
@@ -96,7 +127,14 @@ export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, 
     const load = async () => {
       setLoading(true)
       try {
-        const [a, f, srcs, rxn] = await Promise.all([
+        // Growth chart always shows a wider context window so the coach
+        // can spot trends. We take max(period, 30 days) ending at the
+        // period's end, so Day view still gets a meaningful trend line.
+        const chartEnd = new Date(end)
+        const chartStart = new Date(end)
+        chartStart.setDate(chartStart.getDate() - Math.max(30, Math.ceil((end - start) / 86400000)))
+
+        const [a, f, srcs, rxn, ts, props, avgB] = await Promise.all([
           leadService.getRangeActivity(coachId, start.toISOString(), end.toISOString()),
           leadService.getRangeFunnelStats(coachId, start.toISOString(), end.toISOString()),
           leadService.getRangeLeadSources
@@ -105,9 +143,21 @@ export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, 
           leadService.getRangeReactionStats
             ? leadService.getRangeReactionStats(coachId, start.toISOString(), end.toISOString())
             : Promise.resolve(null),
+          leadService.getDailyTimeSeries
+            ? leadService.getDailyTimeSeries(coachId, chartStart.toISOString(), chartEnd.toISOString())
+            : Promise.resolve([]),
+          leadService.getRangeCallProposals
+            ? leadService.getRangeCallProposals(coachId, start.toISOString(), end.toISOString())
+            : Promise.resolve([]),
+          leadService.getRangeAvgFollowupsBeforeCall
+            ? leadService.getRangeAvgFollowupsBeforeCall(coachId, start.toISOString(), end.toISOString())
+            : Promise.resolve(null),
         ])
         if (!cancelled) {
           setActivity(a); setFunnel(f); setSourceBreakdown(srcs); setReactionStats(rxn)
+          setTimeSeries(ts || [])
+          setCallProposals(props || [])
+          setAvgBeforeCall(avgB)
         }
       } catch (e) {
         console.error('WeekStatsModal load failed:', e)
@@ -121,34 +171,53 @@ export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, 
     load()
     return () => { cancelled = true }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isOpen, leadService, coachId, periodMode, +start, +end])
+  }, [isOpen, leadService, coachId, periodMode, +start, +end, reloadKey])
 
   if (!isOpen) return null
 
-  const stepDays = periodMode === 'day' ? 1 : 7
   const goPrev = () => {
-    const next = new Date(anchorDate); next.setDate(anchorDate.getDate() - stepDays)
+    const next = new Date(anchorDate)
+    if (periodMode === 'month') next.setMonth(next.getMonth() - 1)
+    else next.setDate(anchorDate.getDate() - (periodMode === 'day' ? 1 : 7))
     setAnchorDate(next)
   }
   const goNext = () => {
-    const next = new Date(anchorDate); next.setDate(anchorDate.getDate() + stepDays)
+    const next = new Date(anchorDate)
+    if (periodMode === 'month') next.setMonth(next.getMonth() + 1)
+    else next.setDate(anchorDate.getDate() + (periodMode === 'day' ? 1 : 7))
     setAnchorDate(next)
   }
   const goToday = () => setAnchorDate(new Date())
 
+  const sameMonth = (a, b) => {
+    const x = new Date(a), y = new Date(b)
+    return x.getFullYear() === y.getFullYear() && x.getMonth() === y.getMonth()
+  }
   const isCurrentPeriod = periodMode === 'day'
     ? sameDay(anchorDate, new Date())
-    : sameMonday(anchorDate, new Date())
+    : periodMode === 'month'
+      ? sameMonth(anchorDate, new Date())
+      : sameMonday(anchorDate, new Date())
   const todayMidnight = new Date(); todayMidnight.setHours(0, 0, 0, 0)
   const isFuturePeriod = periodMode === 'day'
     ? new Date(anchorDate).setHours(0,0,0,0) > todayMidnight.getTime()
-    : mondayOf(anchorDate).getTime() > mondayOf(new Date()).getTime()
+    : periodMode === 'month'
+      ? (anchorDate.getFullYear() > todayMidnight.getFullYear()
+        || (anchorDate.getFullYear() === todayMidnight.getFullYear()
+          && anchorDate.getMonth() > todayMidnight.getMonth()))
+      : mondayOf(anchorDate).getTime() > mondayOf(new Date()).getTime()
 
   const totalReplies = funnel?.replied?.count || 0
   const totalConvs = funnel?.conversation?.count || 0
   const totalCallProposed = funnel?.callProposed?.count || 0
   const totalCalls = funnel?.callScheduled?.count || 0
   const totalSales = funnel?.sale?.count || 0
+  const totalNoShows = funnel?.noShow?.count || 0
+  // Show rate = how many scheduled calls actually showed up
+  // (scheduled - no shows) / scheduled.
+  const showRate = totalCalls > 0
+    ? Math.round(((totalCalls - totalNoShows) / totalCalls) * 100)
+    : null
 
   // Reactie-stats — uses the lead-card counters as the source of truth:
   //   reply_count   > 0  → lead reacted (Reactie-knop)
@@ -162,9 +231,6 @@ export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, 
   const followupsInWindow  = reactionStats?.followupsInWindow ?? 0
 
   const responseRate = pct(reactedLeads, newLeadsInPeriod)
-  const callRate     = pct(totalCalls + totalCallProposed, newLeadsInPeriod)
-  const saleRate     = pct(totalSales, newLeadsInPeriod)
-  const closeRate    = pct(totalSales, totalCalls + totalCallProposed) // sales / calls
   // What share of leads needed a chase to get any reply at all.
   const chaseShare   = pct(followedLeads, newLeadsInPeriod)
 
@@ -200,8 +266,43 @@ export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, 
         }}>
           <BarChart3 size={17} color={GOLD} />
           <div style={{ flex: 1, color: '#fff', fontWeight: 800, fontSize: '0.95rem' }}>
-            Stats — {periodMode === 'day' ? 'Dag' : 'Week'}
+            Stats — {periodMode === 'day' ? 'Dag' : periodMode === 'month' ? 'Maand' : 'Week'}
           </div>
+          <button
+            onClick={() => {
+              const periodLabel = periodMode === 'day'
+                ? fmtDay(anchorDate)
+                : periodMode === 'month'
+                  ? anchorDate.toLocaleDateString('nl-NL', { month: 'long', year: 'numeric' })
+                  : `Week ${isoWeek(mondayOf(anchorDate))} · ${fmtRange(mondayOf(anchorDate))}`
+              const periodSubtitle = `${start.toLocaleDateString('nl-NL', { day: 'numeric', month: 'short', year: 'numeric' })} → ${new Date(end - 1).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short', year: 'numeric' })}`
+              exportStatsPDF({
+                periodLabel, periodSubtitle,
+                generatedAt: new Date().toLocaleString('nl-NL', { dateStyle: 'short', timeStyle: 'short' }),
+                activity, funnel, reactionStats, sourceBreakdown,
+                ratios: {
+                  responseRate, chaseShare,
+                  responseFraction: `${reactedLeads} / ${newLeadsInPeriod}`,
+                  chaseFraction:    `${followedLeads} / ${newLeadsInPeriod}`,
+                },
+              })
+            }}
+            disabled={loading}
+            title="Download als PDF"
+            style={{
+              ...iconBtn,
+              width: 'auto', padding: '0 0.65rem',
+              display: 'inline-flex', alignItems: 'center', gap: 5,
+              background: 'rgba(255,215,0,0.12)',
+              border: '1px solid rgba(255,215,0,0.35)',
+              color: GOLD, fontSize: '0.7rem', fontWeight: 800,
+              opacity: loading ? 0.4 : 1,
+              cursor: loading ? 'not-allowed' : 'pointer',
+            }}
+          >
+            <Download size={13} />
+            PDF
+          </button>
           <button onClick={onClose} title="Sluiten" style={iconBtn}>
             <X size={16} />
           </button>
@@ -212,8 +313,9 @@ export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, 
           flexShrink: 0, padding: '0.55rem 0.85rem 0',
           display: 'flex', gap: 4,
         }}>
-          {['day', 'week'].map(mode => {
+          {['day', 'week', 'month'].map(mode => {
             const active = periodMode === mode
+            const labels = { day: '📅 Dag', week: '🗓️ Week', month: '📆 Maand' }
             return (
               <button
                 key={mode}
@@ -229,7 +331,7 @@ export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, 
                   cursor: 'pointer', touchAction: 'manipulation',
                 }}
               >
-                {mode === 'day' ? '📅 Dag' : '🗓️ Week'}
+                {labels[mode]}
               </button>
             )
           })}
@@ -241,21 +343,28 @@ export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, 
           display: 'flex', alignItems: 'center', gap: '0.4rem',
           borderBottom: '1px solid rgba(255,255,255,0.04)',
         }}>
-          <button onClick={goPrev} title={periodMode === 'day' ? 'Vorige dag' : 'Vorige week'} style={navBtn}>
+          <button onClick={goPrev} title={periodMode === 'day' ? 'Vorige dag' : periodMode === 'month' ? 'Vorige maand' : 'Vorige week'} style={navBtn}>
             <ChevronLeft size={16} />
           </button>
           <div style={{ flex: 1, textAlign: 'center', minWidth: 0 }}>
             <div style={{ fontSize: '0.65rem', fontWeight: 800, color: GOLD, letterSpacing: '0.06em', textTransform: 'uppercase' }}>
               {periodMode === 'day'
                 ? (isCurrentPeriod ? 'Vandaag' : fmtDay(anchorDate).split(' ').slice(0, -2).join(' '))
-                : `Week ${isoWeek(mondayOf(anchorDate))}${isCurrentPeriod ? ' · Deze week' : ''}`
+                : periodMode === 'month'
+                  ? `${anchorDate.toLocaleDateString('nl-NL', { month: 'long', year: 'numeric' })}${isCurrentPeriod ? ' · Deze maand' : ''}`
+                  : `Week ${isoWeek(mondayOf(anchorDate))}${isCurrentPeriod ? ' · Deze week' : ''}`
               }
             </div>
             <div style={{ fontSize: '0.78rem', fontWeight: 600, color: '#fff', marginTop: 2 }}>
-              {periodMode === 'day' ? fmtDay(anchorDate) : fmtRange(mondayOf(anchorDate))}
+              {periodMode === 'day'
+                ? fmtDay(anchorDate)
+                : periodMode === 'month'
+                  ? `${new Date(anchorDate.getFullYear(), anchorDate.getMonth(), 1).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })} – ${new Date(anchorDate.getFullYear(), anchorDate.getMonth() + 1, 0).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })}`
+                  : fmtRange(mondayOf(anchorDate))
+              }
             </div>
           </div>
-          <button onClick={goNext} title={periodMode === 'day' ? 'Volgende dag' : 'Volgende week'} disabled={isFuturePeriod} style={{ ...navBtn, opacity: isFuturePeriod ? 0.3 : 1, cursor: isFuturePeriod ? 'not-allowed' : 'pointer' }}>
+          <button onClick={goNext} title={periodMode === 'day' ? 'Volgende dag' : periodMode === 'month' ? 'Volgende maand' : 'Volgende week'} disabled={isFuturePeriod} style={{ ...navBtn, opacity: isFuturePeriod ? 0.3 : 1, cursor: isFuturePeriod ? 'not-allowed' : 'pointer' }}>
             <ChevronRight size={16} />
           </button>
         </div>
@@ -311,7 +420,7 @@ export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, 
                 />
               </Grid>
 
-              <SectionTitle icon={<Percent size={13} color={GOLD} />} title="Conversie ratio's" />
+              <SectionTitle icon={<Percent size={13} color={GOLD} />} title="Kerncijfers" />
               <Grid>
                 <RatioCard
                   icon={<MessageCircle size={14} />} label="Response rate"
@@ -319,50 +428,136 @@ export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, 
                   subtext={`${reactedLeads} / ${newLeadsInPeriod}`}
                 />
                 <RatioCard
-                  icon={<Send size={14} />} label="Opvolg-share"
+                  icon={<Send size={14} />} label="Opvolg rate"
                   value={chaseShare} accent={GOLD_DARK}
                   subtext={`${followedLeads} / ${newLeadsInPeriod} kreeg follow-up`}
                 />
-                <RatioCard
-                  icon={<Phone size={14} />} label="Call rate"
-                  value={callRate} accent={GOLD_DARK}
-                  subtext={`${totalCalls + totalCallProposed} / ${newLeadsInPeriod}`}
-                />
-                <RatioCard
-                  icon={<Trophy size={14} />} label="Sale rate"
-                  value={saleRate} accent="#10b981"
-                  subtext={`${totalSales} / ${newLeadsInPeriod}`}
-                />
-                <RatioCard
-                  icon={<Trophy size={14} />} label="Close rate"
-                  value={closeRate} accent="#10b981"
-                  subtext={`${totalSales} / ${totalCalls + totalCallProposed} calls`}
-                />
-              </Grid>
-
-              <SectionTitle icon={<MessageCircle size={13} color={GOLD} />} title="Funnel" />
-              <Grid>
                 <StatCard
-                  icon={<MessageCircle size={14} />} label="Reacties"
-                  value={totalReplies} accent="#3b82f6"
-                />
-                <StatCard
-                  icon={<Users size={14} />} label="Gesprekken"
-                  value={totalConvs} accent="#8b5cf6"
-                />
-                <StatCard
-                  icon={<PhoneCall size={14} />} label="Call voorgesteld"
+                  icon={<PhoneCall size={14} />} label="Calls voorgesteld"
                   value={totalCallProposed} accent="#ef4444"
+                  details={funnel?.callProposed?.leads}
+                  onRevert={handleRevertMovement} revertingId={revertingId}
                 />
                 <StatCard
                   icon={<Phone size={14} />} label="Calls ingepland"
                   value={totalCalls} accent={GOLD_DARK}
+                  details={funnel?.callScheduled?.leads}
+                  onRevert={handleRevertMovement} revertingId={revertingId}
                 />
                 <StatCard
-                  icon={<Trophy size={14} />} label="Sales"
+                  icon={<Trophy size={14} />} label="Sales gemaakt"
                   value={totalSales} accent="#10b981" highlight={totalSales > 0}
+                  details={funnel?.sale?.leads}
+                  onRevert={handleRevertMovement} revertingId={revertingId}
+                />
+                <StatCard
+                  icon={<X size={14} />} label="No shows"
+                  value={totalNoShows} accent="#f97316"
+                  subtext={showRate != null ? `Show-rate ${showRate}%` : undefined}
+                  details={funnel?.noShow?.leads}
+                  onRevert={handleRevertMovement} revertingId={revertingId}
+                />
+                {/* Messaging-efficiency: hoeveel berichten kost het je
+                    gemiddeld om bij een call-voorstel te komen? */}
+                <StatCard
+                  icon={<Send size={14} />} label="Berichten/call"
+                  value={avgBeforeCall?.avgFollowups != null
+                    ? avgBeforeCall.avgFollowups.toFixed(1)
+                    : '—'}
+                  accent="#8b5cf6"
+                  subtext={avgBeforeCall?.count > 0
+                    ? `gem. over ${avgBeforeCall.count} call-lead${avgBeforeCall.count === 1 ? '' : 's'}`
+                    : 'geen calls in periode'}
+                />
+                {/* Total messages + avg per lead — drukt uit hoeveel
+                    je in deze periode hebt verstuurd. */}
+                <StatCard
+                  icon={<Send size={14} />} label="Berichten/lead"
+                  value={newLeadsInPeriod > 0
+                    ? (followupsInWindow / newLeadsInPeriod).toFixed(1)
+                    : '—'}
+                  accent="#3b82f6"
+                  subtext={`${followupsInWindow} berichten / ${newLeadsInPeriod} leads`}
                 />
               </Grid>
+
+              {/* Growth chart — input vs output over time. Window is wider
+                  than the period (min 30 days) so coach sees trends. */}
+              {timeSeries && timeSeries.length > 0 && (
+                <>
+                  <SectionTitle
+                    icon={<LineChartIcon size={13} color={GOLD} />}
+                    title={`Groei (${timeSeries.length}-daagse trend)`}
+                  />
+                  <div style={{
+                    padding: '0.75rem 0.85rem 0.5rem',
+                    background: 'rgba(255,255,255,0.02)',
+                    border: '1px solid rgba(255,255,255,0.04)',
+                    borderRadius: 10,
+                    marginBottom: '0.85rem',
+                  }}>
+                    <GrowthChart data={timeSeries} isMobile={isMobile} />
+                  </div>
+                </>
+              )}
+
+              {/* Call-voorstellen — exact wat ik gestuurd heb + uitkomst */}
+              {callProposals && callProposals.length > 0 && (
+                <>
+                  <SectionTitle
+                    icon={<PhoneCall size={13} color={GOLD} />}
+                    title={`Call-voorstellen (${callProposals.length})`}
+                  />
+                  <div style={{
+                    display: 'flex', flexDirection: 'column', gap: 5,
+                    marginBottom: '0.85rem',
+                  }}>
+                    {callProposals.map(p => (
+                      <div key={p.id} style={{
+                        padding: '0.55rem 0.7rem',
+                        background: 'rgba(255,255,255,0.025)',
+                        border: '1px solid rgba(255,255,255,0.05)',
+                        borderLeft: `3px solid ${p.outcome.color}`,
+                        borderRadius: 7,
+                      }}>
+                        <div style={{
+                          display: 'flex', alignItems: 'center', gap: 6,
+                          marginBottom: 4,
+                        }}>
+                          <span style={{
+                            fontSize: '0.72rem', fontWeight: 800, color: '#fff',
+                          }}>
+                            {p.lead_name}
+                          </span>
+                          <span style={{ fontSize: '0.55rem', color: 'rgba(255,255,255,0.4)' }}>
+                            · {new Date(p.created_at).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                          </span>
+                          <span style={{
+                            marginLeft: 'auto',
+                            padding: '1px 6px',
+                            background: `${p.outcome.color}1a`,
+                            border: `1px solid ${p.outcome.color}55`,
+                            borderRadius: 999,
+                            color: p.outcome.color,
+                            fontSize: '0.55rem', fontWeight: 800,
+                            textTransform: 'uppercase', letterSpacing: '0.04em',
+                          }}>
+                            {p.outcome.label}
+                          </span>
+                        </div>
+                        <div style={{
+                          fontSize: '0.72rem', color: 'rgba(255,255,255,0.8)',
+                          lineHeight: 1.4, whiteSpace: 'pre-wrap',
+                          display: '-webkit-box', WebkitLineClamp: 4,
+                          WebkitBoxOrient: 'vertical', overflow: 'hidden',
+                        }}>
+                          {p.content}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )}
 
               {/* Source breakdown — which campaigns / magnets brought leads in */}
               {sourceBreakdown && (sourceBreakdown.campaigns.length > 0 || sourceBreakdown.magnets.length > 0 || sourceBreakdown.noSource.total > 0) && (
@@ -432,7 +627,7 @@ export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, 
                     fontWeight: 700, fontSize: '0.78rem',
                     cursor: 'pointer', touchAction: 'manipulation',
                   }}>
-                    <Calendar size={14} /> Terug naar {periodMode === 'day' ? 'vandaag' : 'deze week'}
+                    <Calendar size={14} /> Terug naar {periodMode === 'day' ? 'vandaag' : periodMode === 'month' ? 'deze maand' : 'deze week'}
                   </button>
                 </div>
               )}
@@ -447,7 +642,7 @@ export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, 
                   color: 'rgba(255,255,255,0.4)',
                   fontSize: '0.85rem',
                 }}>
-                  Geen activiteit in deze {periodMode === 'day' ? 'dag' : 'week'}.
+                  Geen activiteit in deze {periodMode === 'day' ? 'dag' : periodMode === 'month' ? 'maand' : 'week'}.
                 </div>
               )}
             </>
@@ -505,14 +700,11 @@ function SourceRow({ icon, label, total, reached, stages, followupCount = 0, rep
   // is, without the noise of raw totals (a big campaign always wins).
   const avgFollow = total > 0 ? (followupCount / total).toFixed(1) : '0'
 
-  // Per-source ratios — same definitions as the top-level Conversie ratio's
-  // section, but scoped to this single source's lead cohort.
-  const calls = (s.callProposed || 0) + (s.callScheduled || 0)
-  const responseRate = pct(repliedLeads,  total)
-  const callRate     = pct(calls,         total)
-  const saleRate     = pct(s.sale,        total)
-  const closeRate    = pct(s.sale,        calls)
-  const chaseShare   = pct(followedLeads, total)
+  // Per-source ratios — same kerncijfers als de top-level sectie, gescoped
+  // op deze ene source z'n lead-cohort.
+  const scheduledCalls = s.callScheduled || 0
+  const responseRate = pct(repliedLeads,    total)
+  const chaseShare   = pct(followedLeads,   total)
 
   return (
     <div style={{
@@ -607,16 +799,16 @@ function SourceRow({ icon, label, total, reached, stages, followupCount = 0, rep
             gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))',
             gap: '0.35rem',
           }}>
-            <MiniRatio label="Response" value={responseRate}
+            <MiniRatio label="Response rate" value={responseRate}
               sub={`${repliedLeads} / ${total}`} accent="#3b82f6" />
-            <MiniRatio label="Opvolg-share" value={chaseShare}
+            <MiniRatio label="Opvolg rate" value={chaseShare}
               sub={`${followedLeads} / ${total}`} accent="#D4AF37" />
-            <MiniRatio label="Call rate" value={callRate}
-              sub={`${calls} / ${total}`} accent="#D4AF37" />
-            <MiniRatio label="Sale rate" value={saleRate}
-              sub={`${s.sale} / ${total}`} accent="#10b981" />
-            <MiniRatio label="Close rate" value={closeRate}
-              sub={`${s.sale} / ${calls} calls`} accent="#10b981" />
+            <MiniRatio label="Calls voorgesteld" value={s.callProposed || 0}
+              sub="aantal" accent="#ef4444" rawValue />
+            <MiniRatio label="Calls ingepland" value={scheduledCalls}
+              sub="aantal" accent="#D4AF37" rawValue />
+            <MiniRatio label="Sales gemaakt" value={s.sale || 0}
+              sub="aantal" accent="#10b981" rawValue />
           </div>
 
           {/* Outreach-message preview (campaigns) of magnet-description.
@@ -679,7 +871,7 @@ function SourceRow({ icon, label, total, reached, stages, followupCount = 0, rep
   )
 }
 
-function MiniRatio({ label, value, sub, accent }) {
+function MiniRatio({ label, value, sub, accent, rawValue = false }) {
   const hasValue = value !== null && value !== undefined
   return (
     <div style={{
@@ -694,7 +886,7 @@ function MiniRatio({ label, value, sub, accent }) {
           color: hasValue ? accent : 'rgba(255,255,255,0.25)',
           fontFamily: 'monospace', lineHeight: 1,
         }}>
-          {hasValue ? `${value}%` : '—'}
+          {hasValue ? (rawValue ? `${value}` : `${value}%`) : '—'}
         </span>
         <span style={{
           fontSize: '0.55rem', fontWeight: 700,
@@ -707,7 +899,7 @@ function MiniRatio({ label, value, sub, accent }) {
         height: 2, background: 'rgba(255,255,255,0.06)', borderRadius: 1,
       }}>
         <div style={{
-          width: `${hasValue ? Math.min(100, value) : 0}%`,
+          width: `${hasValue && !rawValue ? Math.min(100, value) : 0}%`,
           height: '100%', background: accent,
         }} />
       </div>
@@ -750,15 +942,25 @@ function StagePill({ label, value, color }) {
   )
 }
 
-function StatCard({ icon, label, value, accent = 'rgba(255,255,255,0.7)', highlight = false, subtext = null }) {
+function StatCard({ icon, label, value, accent = 'rgba(255,255,255,0.7)', highlight = false, subtext = null, details = null, onRevert = null, revertingId = null }) {
+  const [open, setOpen] = useState(false)
+  const [confirmId, setConfirmId] = useState(null)
+  const items = Array.isArray(details) ? details : []
+  const hasDetails = items.length > 0
   return (
-    <div style={{
-      padding: '0.6rem 0.7rem',
-      background: highlight ? 'rgba(16,185,129,0.1)' : 'rgba(255,255,255,0.025)',
-      border: `1px solid ${highlight ? 'rgba(16,185,129,0.35)' : 'rgba(255,255,255,0.05)'}`,
-      borderRadius: 8,
-      display: 'flex', flexDirection: 'column', gap: 2,
-    }}>
+    <div
+      onClick={hasDetails ? () => setOpen(o => !o) : undefined}
+      style={{
+        padding: '0.6rem 0.7rem',
+        background: highlight ? 'rgba(16,185,129,0.1)' : 'rgba(255,255,255,0.025)',
+        border: `1px solid ${open ? 'rgba(255,215,0,0.3)' : highlight ? 'rgba(16,185,129,0.35)' : 'rgba(255,255,255,0.05)'}`,
+        borderRadius: 8,
+        display: 'flex', flexDirection: 'column', gap: 2,
+        cursor: hasDetails ? 'pointer' : 'default',
+        gridColumn: open ? '1 / -1' : 'auto',
+        transition: 'border-color 0.15s ease',
+      }}
+    >
       <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', color: accent }}>
         {icon}
         <span style={{
@@ -766,6 +968,15 @@ function StatCard({ icon, label, value, accent = 'rgba(255,255,255,0.7)', highli
           color: 'rgba(255,255,255,0.55)',
           letterSpacing: '0.04em', textTransform: 'uppercase',
         }}>{label}</span>
+        {hasDetails && (
+          <ChevronDown
+            size={12}
+            style={{
+              marginLeft: 'auto', color: 'rgba(255,255,255,0.4)',
+              transform: open ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s ease',
+            }}
+          />
+        )}
       </div>
       <div style={{
         fontSize: '1.4rem', fontWeight: 900,
@@ -778,6 +989,72 @@ function StatCard({ icon, label, value, accent = 'rgba(255,255,255,0.7)', highli
       {subtext && (
         <div style={{ fontSize: '0.58rem', fontWeight: 600, color: 'rgba(255,255,255,0.35)', marginTop: 1 }}>
           {subtext}
+        </div>
+      )}
+      {open && hasDetails && (
+        <div style={{
+          marginTop: 6, paddingTop: 6,
+          borderTop: '1px solid rgba(255,255,255,0.07)',
+          display: 'flex', flexDirection: 'column', gap: 6,
+          maxHeight: 260, overflowY: 'auto',
+        }}>
+          {items.map((d, i) => {
+            const busy = revertingId && revertingId === d.id
+            const confirming = confirmId === d.id
+            return (
+              <div key={d.id || i} style={{
+                display: 'flex', alignItems: 'flex-start', gap: 8,
+                paddingBottom: 5,
+                borderBottom: i < items.length - 1 ? '1px solid rgba(255,255,255,0.04)' : 'none',
+              }}>
+                <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 1 }}>
+                  <div style={{ fontSize: '0.68rem', fontWeight: 800, color: '#fff' }}>{d.name}</div>
+                  <div style={{ fontSize: '0.6rem', fontWeight: 600, color: 'rgba(255,255,255,0.5)' }}>
+                    {d.from} <span style={{ color: accent }}>→</span> {d.to}
+                  </div>
+                  <div style={{ fontSize: '0.58rem', fontWeight: 600, color: 'rgba(255,255,255,0.35)' }}>
+                    {d.time} · door <span style={{ color: 'rgba(255,255,255,0.6)' }}>{d.by || 'Onbekend'}</span>
+                  </div>
+                </div>
+                {onRevert && d.id && (
+                  confirming ? (
+                    <div style={{ display: 'flex', gap: 4, flexShrink: 0 }} onClick={(e) => e.stopPropagation()}>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); setConfirmId(null); onRevert(d.id) }}
+                        disabled={busy}
+                        style={{
+                          fontSize: '0.55rem', fontWeight: 800, color: '#fff',
+                          background: 'rgba(239,68,68,0.85)', border: 'none', borderRadius: 5,
+                          padding: '3px 7px', cursor: busy ? 'wait' : 'pointer',
+                        }}
+                      >{busy ? '...' : 'Zeker?'}</button>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); setConfirmId(null) }}
+                        style={{
+                          fontSize: '0.55rem', fontWeight: 700, color: 'rgba(255,255,255,0.6)',
+                          background: 'transparent', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 5,
+                          padding: '3px 7px', cursor: 'pointer',
+                        }}
+                      >Nee</button>
+                    </div>
+                  ) : (
+                    <button
+                      title="Deze verandering terugdraaien (verdwijnt uit de stats)"
+                      onClick={(e) => { e.stopPropagation(); setConfirmId(d.id) }}
+                      style={{
+                        flexShrink: 0, display: 'inline-flex', alignItems: 'center', gap: 3,
+                        fontSize: '0.55rem', fontWeight: 700, color: 'rgba(255,255,255,0.45)',
+                        background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)',
+                        borderRadius: 5, padding: '3px 7px', cursor: 'pointer',
+                      }}
+                    >
+                      <RotateCcw size={10} /> Terugdraaien
+                    </button>
+                  )
+                )}
+              </div>
+            )
+          })}
         </div>
       )}
     </div>

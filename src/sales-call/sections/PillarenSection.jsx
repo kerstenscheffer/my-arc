@@ -1,64 +1,66 @@
 // src/sales-call/sections/PillarenSection.jsx
 // Dark section — 5 pillars with photos, compact effort-killer text
-import {
-  UtensilsCrossed,
-  Dumbbell,
-  Target,
-  BarChart3,
-  Moon
-} from 'lucide-react'
 
 const GOLD = '#ffba09'
-const GOLD_DARK = '#e8a800'
 
-const PILLARS = [
+// screenshot: app-screenshot per onderdeel. Vervang de /sales-screenshots/-paden
+// door je eigen beelden (in /public/sales-screenshots/). Tot dan: nette placeholder.
+// Geëxporteerd zodat de prijs-sectie dezelfde 5 onderdelen kan tonen (in sync).
+export const PILLARS = [
   {
-    icon: UtensilsCrossed,
-    label: 'Voeding',
     image: 'https://i.ibb.co/fVBpKfsJ/7.png',
-    title: 'Flexibel Leren Eten',
-    text: 'Open de app en je weet wat je kan eten, hoe je het maakt en **lekkere opties**. Ook als je uit eten gaat.'
+    screenshot: '/sales-screenshots/eten.png',
+    title: 'Altijd Weten Wat Te Eten',
+    bullets: [
+      { label: 'Structuur', text: 'vaste maaltijden in de app, jij weet elke dag wat je eet' },
+      { label: 'Flexibiliteit', text: 'samen blijven eten met je gezin of vriendin. Altijd een passende maaltijd klaar, van snel tot uitgebreid' },
+      { label: 'Makkelijk', text: 'vet verliezen zonder honger, futloosheid of terugvallen' },
+    ],
   },
   {
-    icon: Dumbbell,
-    label: 'Training',
-    image: 'https://i.ibb.co/6Rmd50GW/5.png',
-    title: 'Fitter Worden Op Jouw Tempo',
-    text: 'Training die bij je past en in lijn met jouw doelen. Om je blessures heen, van welk punt dan ook bouwen we op, **op jouw tempo**.'
-  },
-  {
-    icon: Target,
-    label: 'Coaching',
     image: 'https://i.ibb.co/3y8zGSYt/9.png',
-    title: 'Altijd Iemand Die Meekijkt',
-    text: 'Ik kijk mee, stuur bij, grijp in en leg uit. Via app, call of bericht, wanneer het jou past. **24/7 bereikbaar** voor vragen.'
+    screenshot: '/sales-screenshots/meedoen.png',
+    title: 'Gewoon Mee Blijven Doen',
+    bullets: [
+      { label: 'Verjaardagen & feestjes', text: 'leer hoe je meedoet zonder je vetverlies te slopen' },
+      { label: 'Uit eten, weekenden en vakanties', text: 'een aanpak die blijft werken naast je sociale leven' },
+      { label: 'Inbouwen, niet wegstrepen', text: 'leer hoe je je favoriete dingen blijft doen: een bakje chips voor de tv, een biertje tijdens het voetbal kijken' },
+    ],
   },
   {
-    icon: BarChart3,
-    label: 'Tracking',
+    image: 'https://i.ibb.co/6Rmd50GW/5.png',
+    screenshot: '/sales-screenshots/trainen.png',
+    title: 'In Shape In 3x Per Week',
+    bullets: [
+      { label: 'Tijd', text: 'effectieve workouts van minder dan een uur' },
+      { label: 'Plek', text: 'thuis of in de gym, past in jouw week' },
+      { label: 'Begeleiding', text: 'uitlegvideo\'s en persoonlijke bijsturing op je oefeningen' },
+    ],
+  },
+  {
     image: 'https://i.ibb.co/dd3bKQX/4.png',
-    title: 'Zien Dat Het Werkt',
-    text: 'Altijd inzicht in je vooruitgang. Gaat het goed? Gaan we zo door. Gaat het niet goed? **Lossen we het op** en gaan we verder.'
+    screenshot: '/sales-screenshots/tracking.png',
+    title: 'Zie Dat Het Werkt',
+    bullets: [
+      { label: 'Bewijs', text: 'duidelijk inzicht in je vooruitgang: kracht, gewicht en foto-tracking' },
+      { label: '0% Risico', text: 'zichtbaar verschil binnen 30 dagen of je investering terug' },
+    ],
   },
   {
-    icon: Moon,
-    label: 'Herstel',
     image: 'https://i.ibb.co/SwTcyFP4/8.png',
-    title: 'Meer Energie, Minder Moeite',
-    text: 'Je slaapt beter en hebt **meer energie**, met een simpel ritme dat past bij jouw leven.'
-  }
+    screenshot: '/sales-screenshots/coach.png',
+    title: 'Coach Naast Je',
+    bullets: [
+      { label: 'Wekelijks contact', text: 'elke 2 weken een videocall om je voortgang door te nemen' },
+      { label: 'Dagelijks bereikbaar', text: 'vragen of twijfel? Via de app krijg je snel antwoord' },
+      { label: 'Ik kijk mee', text: 'ik volg je progressie dagelijks en haak direct in als het nodig is' },
+    ],
+  },
 ]
 
-const renderBoldText = (text) => {
-  const parts = text.split(/\*\*(.*?)\*\*/)
-  return parts.map((part, i) =>
-    i % 2 === 1
-      ? <span key={i} style={{ color: '#fff', fontWeight: '700' }}>{part}</span>
-      : part
-  )
-}
-
-export default function PillarenSection({ isMobile }) {
+// eyebrow / title / subtitle zijn optioneel: zonder props valt de kop terug op
+// de sales-versie. De link-funnel (/start) geeft eigen "oplossing"-copy mee.
+export default function PillarenSection({ isMobile, eyebrow, title, subtitle }) {
   return (
     <section style={{
       scrollSnapAlign: 'start',
@@ -67,7 +69,7 @@ export default function PillarenSection({ isMobile }) {
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
-      padding: isMobile ? '2rem 1rem' : '3rem 2rem',
+      padding: isMobile ? '3rem 1rem' : '4rem 2rem',
       position: 'relative',
       overflow: 'hidden'
     }}>
@@ -97,91 +99,114 @@ export default function PillarenSection({ isMobile }) {
           <span style={{
             fontSize: isMobile ? '0.55rem' : '0.58rem', fontWeight: '800', letterSpacing: '0.15em',
             color: GOLD, display: 'inline-block', marginBottom: '0.65rem'
-          }}>HOE WE DAT DOEN</span>
+          }}>{eyebrow || 'HET SYSTEEM'}</span>
           <h2 style={{
-            fontSize: isMobile ? 'clamp(1.3rem, 6vw, 1.7rem)' : '2.2rem',
-            fontWeight: '900', color: '#fff', margin: 0, lineHeight: 1.2,
+            fontSize: isMobile ? 'clamp(1.6rem, 7.5vw, 2.1rem)' : '2.9rem',
+            fontWeight: '900', color: '#fff', margin: 0, lineHeight: 1.15,
             padding: isMobile ? '0 0.25rem' : 0,
           }}>
-            Naast je werk en sociale leven<br/>
-            je doelen bereiken met{' '}
-            <span style={{ fontStyle: 'italic', color: GOLD }}>
-              de 5 pilars
-            </span>
+            {title || (
+              <>
+                Het{' '}
+                <span style={{ color: '#fff' }}>
+                  5 Uur Per Week
+                </span>
+                <br/>Back In Shape Systeem
+              </>
+            )}
           </h2>
+          {subtitle && (
+            <p style={{
+              margin: isMobile ? '0.9rem auto 0' : '1.1rem auto 0', maxWidth: 620,
+              fontSize: isMobile ? '0.98rem' : '1.2rem', fontWeight: 600, lineHeight: 1.45,
+              color: 'rgba(255,255,255,0.78)',
+            }}>{subtitle}</p>
+          )}
         </div>
 
-        {/* Pillars grid — 5 cards on desktop, 2 cols on mobile (5th wraps
-            into the bottom row centered via auto-flow). */}
+        {/* Onderdeel-cards — verticale lijst, elk met genummerde titel +
+            duidelijke sub-bullets (label: tekst). */}
         <div style={{
-          display: 'grid',
-          gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(5, 1fr)',
-          gap: isMobile ? '0.5rem' : '0.8rem'
+          display: 'flex', flexDirection: 'column',
+          gap: isMobile ? '0.9rem' : '1.1rem',
+          maxWidth: 940, margin: '0 auto'
         }}>
-          {PILLARS.map((p, i) => {
-            const Icon = p.icon
-            return (
-              <div key={i} style={{
-                borderRadius: '14px',
+          {PILLARS.map((p, i) => (
+            <div key={i} style={{
+              borderRadius: '16px',
+              overflow: 'hidden',
+              background: 'transparent',
+              border: 'none',
+              display: 'flex',
+              // Mobiel: screenshot boven de tekst. Desktop: om en om links/rechts.
+              flexDirection: isMobile ? 'column' : (i % 2 === 0 ? 'row-reverse' : 'row'),
+            }}>
+              {/* Screenshot-kolom — beeld vult de kolom tot de card-randen,
+                  geen rand (lijkt los op de card te staan). */}
+              <div style={{
+                flex: isMobile ? 'none' : '0 0 44%',
+                position: 'relative',
+                background: 'transparent',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                minHeight: isMobile ? 160 : 0,
                 overflow: 'hidden',
-                background: 'rgba(255,255,255,0.02)',
-                border: '1px solid rgba(255,255,255,0.06)',
-                transition: 'all 0.3s ease'
               }}>
-                {/* Image */}
+                {/* Placeholder — standaard verborgen; verschijnt alleen als de
+                    screenshot niet laadt (dus geen rand om een geladen foto). */}
                 <div style={{
-                  width: '100%',
-                  height: isMobile ? '80px' : '100px',
-                  position: 'relative',
-                  overflow: 'hidden'
+                  position: 'absolute', inset: 10,
+                  borderRadius: 10, border: `1px dashed ${GOLD}44`,
+                  display: 'none', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+                  gap: 6, color: 'rgba(255,255,255,0.35)', textAlign: 'center', padding: '0.5rem',
                 }}>
-                  <img
-                    src={p.image}
-                    alt={p.label}
-                    style={{
-                      width: '100%', height: '100%',
-                      objectFit: 'cover',
-                      filter: 'brightness(0.8)'
-                    }}
-                  />
-                  <div style={{
-                    position: 'absolute',
-                    bottom: 0, left: 0, right: 0, height: '60%',
-                    background: 'linear-gradient(180deg, transparent, rgba(10,10,10,0.95))'
-                  }} />
-                  </div>
+                  <span style={{ fontSize: '1.6rem' }}>📱</span>
+                  <span style={{ fontSize: '0.62rem', fontWeight: 700, letterSpacing: '0.04em' }}>App-screenshot</span>
+                </div>
+                <img
+                  src={p.screenshot}
+                  alt={p.title}
+                  onError={(e) => {
+                    e.currentTarget.style.display = 'none'
+                    const ph = e.currentTarget.previousElementSibling
+                    if (ph) ph.style.display = 'flex'
+                  }}
+                  style={{
+                    position: 'relative', zIndex: 1, display: 'block',
+                    width: '100%', height: isMobile ? 'auto' : '100%',
+                    objectFit: 'cover',
+                  }}
+                />
+              </div>
 
-                {/* Text */}
-                <div style={{
-                  padding: '0.85rem 0.7rem 0.85rem',
-                  textAlign: 'center'
-                }}>
-                  <span style={{
-                    display: 'block',
-                    fontSize: '0.6rem',
-                    fontWeight: '800',
-                    color: GOLD,
-                    letterSpacing: '0.04em',
-                    marginBottom: '0.15rem'
-                  }}>{p.title}</span>
-                  <span style={{
-                    display: 'block',
-                    fontSize: '0.82rem',
-                    fontWeight: '800',
-                    color: '#fff',
-                    marginBottom: '0.4rem'
-                  }}>{p.label}</span>
-                  <p style={{
-                    fontSize: '0.65rem',
-                    color: 'rgba(255,255,255,0.35)',
-                    lineHeight: 1.45,
-                    margin: 0,
-                    fontWeight: '500'
-                  }}>{renderBoldText(p.text)}</p>
+              {/* Tekst-kolom: genummerde titel + sub-bullets */}
+              <div style={{ flex: 1, minWidth: 0, padding: isMobile ? '0.9rem 0.95rem 1rem' : '1.25rem 1.35rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: isMobile ? '0.65rem' : '0.85rem' }}>
+                  <div style={{
+                    flexShrink: 0, width: isMobile ? 28 : 32, height: isMobile ? 28 : 32, borderRadius: '50%',
+                    background: 'rgba(255,186,9,0.14)', border: `1.5px solid ${GOLD}66`,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    color: GOLD, fontWeight: '900', fontSize: isMobile ? '0.85rem' : '1rem',
+                  }}>{i + 1}</div>
+                  <h3 style={{
+                    flex: 1, minWidth: 0,
+                    fontSize: isMobile ? '1.2rem' : '1.5rem',
+                    fontWeight: '900', color: '#fff', margin: 0,
+                    lineHeight: 1.15, letterSpacing: '-0.01em',
+                  }}>{p.title}</h3>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: isMobile ? '0.5rem' : '0.6rem' }}>
+                  {p.bullets.map((b, j) => (
+                    <div key={j} style={{ display: 'flex', gap: '0.55rem', alignItems: 'flex-start' }}>
+                      <span style={{ flexShrink: 0, marginTop: isMobile ? 6 : 7, width: 6, height: 6, borderRadius: '50%', background: GOLD }} />
+                      <p style={{ margin: 0, fontSize: isMobile ? '0.85rem' : '0.95rem', color: 'rgba(255,255,255,0.7)', lineHeight: 1.45, fontWeight: '500' }}>
+                        <span style={{ color: '#fff', fontWeight: '800' }}>{b.label}:</span> {b.text}
+                      </p>
+                    </div>
+                  ))}
                 </div>
               </div>
-            )
-          })}
+            </div>
+          ))}
         </div>
       </div>
     </section>

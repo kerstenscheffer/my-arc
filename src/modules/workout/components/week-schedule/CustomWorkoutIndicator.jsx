@@ -1,4 +1,9 @@
 // src/modules/workout/components/week-schedule/CustomWorkoutIndicator.jsx
+//
+// Custom-workouts (cardio/cycling/etc. uit eigen pool) — edge-to-edge paarse
+// banner met emoji + workout-naam dik wit eronder. Visueel consistent met
+// WorkoutIndicator zodat alle week-tiles dezelfde verticale layout hebben.
+
 const getCustomWorkoutEmoji = (type) => {
   const emojis = {
     cardio: '❤️',
@@ -8,46 +13,49 @@ const getCustomWorkoutEmoji = (type) => {
     hiking: '🥾',
     yoga: '🧘',
     sports: '⚽',
-    custom: '💪'
+    custom: '💪',
   }
   return emojis[type] || '💪'
 }
 
+const MAX_LABEL_CHARS = 8
+
 export default function CustomWorkoutIndicator({ workout, isMobile }) {
   const emoji = getCustomWorkoutEmoji(workout.type)
-  
+  const rawName = (workout?.name || '').trim()
+  const label = rawName.length > MAX_LABEL_CHARS ? `${rawName.slice(0, MAX_LABEL_CHARS)}…` : rawName
+
   return (
-    <div style={{
-      display: 'flex',
-      flexDirection: 'column',
-      alignItems: 'center',
-      gap: isMobile ? '0.25rem' : '0.3rem'
-    }}>
+    <div style={{ width: '100%', display: 'flex', flexDirection: 'column' }}>
+      {/* Edge-to-edge paarse banner met emoji */}
       <div style={{
-        width: isMobile ? '28px' : '32px',
-        height: isMobile ? '28px' : '32px',
-        borderRadius: '8px',
-        background: 'rgba(168, 85, 247, 0.15)',
-        border: '1px solid rgba(168, 85, 247, 0.3)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        fontSize: isMobile ? '1.1rem' : '1.25rem',
-        boxShadow: '0 0 10px rgba(168, 85, 247, 0.2)'
+        width: '100%',
+        height: isMobile ? 30 : 36,
+        background: 'linear-gradient(135deg, rgba(168,85,247,0.28) 0%, rgba(168,85,247,0.12) 100%)',
+        borderBottom: '1px solid rgba(168,85,247,0.35)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        fontSize: isMobile ? '1.05rem' : '1.2rem',
+        position: 'relative',
+        flexShrink: 0,
       }}>
         {emoji}
       </div>
+
+      {/* Workout-naam — dik gedrukt vel wit */}
       <div style={{
-        fontSize: isMobile ? '0.55rem' : '0.6rem',
-        color: 'rgba(168, 85, 247, 0.9)',
-        lineHeight: 1.2,
-        maxWidth: isMobile ? '45px' : '55px',
+        padding: isMobile ? '6px 4px 0' : '7px 6px 0',
+        fontSize: isMobile ? '0.66rem' : '0.72rem',
+        fontWeight: 900,
+        color: '#fff',
+        letterSpacing: '0.02em',
+        lineHeight: 1.15,
         overflow: 'hidden',
         textOverflow: 'ellipsis',
         whiteSpace: 'nowrap',
-        fontWeight: '600'
+        textAlign: 'center',
+        maxWidth: '100%',
       }}>
-        {workout.duration}min
+        {label || `${workout?.duration || ''}min`}
       </div>
     </div>
   )

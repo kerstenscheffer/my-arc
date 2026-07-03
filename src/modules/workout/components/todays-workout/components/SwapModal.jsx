@@ -244,25 +244,31 @@ export default function SwapModal({ exercise, exerciseIndex, workoutDayKey, sche
     <>
       {createPortal(
         <div
-          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.97)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: isMobile ? '0' : '2rem', opacity: visible ? 1 : 0, transition: 'opacity 0.3s ease-out' }}
+          style={{ position: 'fixed', inset: 0, height: '100dvh', background: '#0a0a0a', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: isMobile ? '0' : '2rem', opacity: visible ? 1 : 0, transition: 'opacity 0.3s ease-out' }}
           onClick={(e) => { if (e.target === e.currentTarget) handleClose() }}
         >
-          <div style={{ maxWidth: isMobile ? '100%' : '600px', width: '100%', height: isMobile ? '100%' : 'auto', maxHeight: isMobile ? '100%' : '90vh', background: '#0a0a0a', border: isMobile ? 'none' : '1px solid rgba(255,215,0,0.15)', borderRadius: isMobile ? '0' : '20px', display: 'flex', flexDirection: 'column', boxShadow: '0 25px 80px rgba(0,0,0,0.8)', opacity: visible ? 1 : 0, transform: visible ? 'translateY(0) scale(1)' : 'translateY(20px) scale(0.98)', transition: 'all 0.4s cubic-bezier(0.4,0,0.2,1)', overflow: 'hidden' }}>
+          <div style={{ maxWidth: isMobile ? '100%' : '600px', width: '100%', height: isMobile ? '100dvh' : 'auto', maxHeight: isMobile ? '100dvh' : '90vh', background: '#0a0a0a', border: isMobile ? 'none' : '1px solid rgba(255,215,0,0.2)', borderRadius: isMobile ? '0' : '20px', display: 'flex', flexDirection: 'column', boxShadow: '0 25px 80px rgba(0,0,0,0.8)', opacity: visible ? 1 : 0, transform: visible ? 'translateY(0) scale(1)' : 'translateY(20px) scale(0.98)', transition: 'all 0.4s cubic-bezier(0.4,0,0.2,1)', overflow: 'hidden' }}>
 
             {/* HEADER */}
-            <div style={{ padding: isMobile ? '1rem' : '1.25rem', borderBottom: '1px solid rgba(255,255,255,0.06)', background: '#0a0a0a', position: 'sticky', top: 0, zIndex: 10 }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.875rem' }}>
-                <div>
-                  <h2 style={{ fontSize: isMobile ? '1rem' : '1.15rem', fontWeight: '800', color: '#fff', margin: 0, letterSpacing: '-0.02em', lineHeight: 1.2 }}>Wissel Oefening</h2>
-                  <div style={{ fontSize: isMobile ? '0.68rem' : '0.72rem', color: 'rgba(255,215,0,0.5)', fontWeight: '600', marginTop: '0.15rem' }}>{exercise.name}</div>
+            <div style={{
+              padding: isMobile ? '1rem' : '1.25rem',
+              paddingTop: `calc(env(safe-area-inset-top, 0px) + ${isMobile ? '1rem' : '1.25rem'})`,
+              borderBottom: '1px solid rgba(255,255,255,0.06)',
+              background: '#0a0a0a',
+              position: 'sticky', top: 0, zIndex: 10,
+            }}>
+              <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '0.875rem', gap: '0.75rem' }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <h2 style={{ fontSize: isMobile ? '1.1rem' : '1.25rem', fontWeight: 900, color: '#fff', margin: 0, letterSpacing: '-0.02em', lineHeight: 1.2 }}>Wissel Oefening</h2>
+                  <div style={{ fontSize: isMobile ? '0.78rem' : '0.85rem', color: '#FFD700', fontWeight: 700, marginTop: '0.3rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{exercise.name}</div>
                   {exercise._isWeeklyOverride && (
-                    <div style={{ fontSize: '0.58rem', color: 'rgba(255,255,255,0.3)', fontWeight: '600', marginTop: '0.1rem' }}>
+                    <div style={{ fontSize: isMobile ? '0.66rem' : '0.72rem', color: 'rgba(255,255,255,0.5)', fontWeight: 600, marginTop: '0.2rem' }}>
                       Origineel: {exercise._originalName}
                     </div>
                   )}
                 </div>
-                <button onClick={handleClose} style={{ width: '40px', height: '40px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '10px', color: 'rgba(255,255,255,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0, touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}>
-                  <X size={20} strokeWidth={2.5} />
+                <button onClick={handleClose} aria-label="Sluit" style={{ width: 44, height: 44, background: 'rgba(10,10,10,0.85)', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)', border: '1px solid rgba(255,215,0,0.3)', borderRadius: 12, color: '#FFD700', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0, touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}>
+                  <X size={20} strokeWidth={2.4} />
                 </button>
               </div>
 
@@ -331,13 +337,13 @@ export default function SwapModal({ exercise, exerciseIndex, workoutDayKey, sche
                 <div style={{ padding: '0.75rem', background: 'rgba(255,255,255,0.02)', borderRadius: '10px', border: '1px solid rgba(255,255,255,0.06)', marginBottom: '0.625rem' }}>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
                     <div>
-                      <div style={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.4)', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.375rem' }}>Locatie</div>
+                      <div style={{ fontSize: '0.72rem', color: 'rgba(255,255,255,0.6)', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '0.4rem' }}>Locatie</div>
                       <button onClick={() => setHomeOnlyFilter(!homeOnlyFilter)} style={{ padding: '0.5rem 0.75rem', background: homeOnlyFilter ? 'rgba(255,215,0,0.12)' : 'rgba(255,255,255,0.05)', border: 'none', borderRadius: '8px', color: homeOnlyFilter ? '#FFD700' : 'rgba(255,255,255,0.6)', fontSize: '0.8rem', fontWeight: '700', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.5rem', textTransform: 'uppercase', letterSpacing: '0.03em' }}>
                         <Home size={14} strokeWidth={2.5} />Thuis
                       </button>
                     </div>
                     <div>
-                      <div style={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.4)', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.375rem' }}>Type</div>
+                      <div style={{ fontSize: '0.72rem', color: 'rgba(255,255,255,0.6)', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '0.4rem' }}>Type</div>
                       <div style={{ display: 'flex', gap: '0.5rem' }}>
                         {['compound', 'isolation'].map(t => (
                           <button key={t} onClick={() => setSelectedType(selectedType === t ? null : t)} style={{ flex: 1, padding: '0.5rem', background: selectedType === t ? 'rgba(255,215,0,0.12)' : 'rgba(255,255,255,0.05)', border: 'none', borderRadius: '8px', color: selectedType === t ? '#FFD700' : 'rgba(255,255,255,0.6)', fontSize: '0.8rem', fontWeight: '700', cursor: 'pointer', textTransform: 'capitalize' }}>
@@ -347,7 +353,7 @@ export default function SwapModal({ exercise, exerciseIndex, workoutDayKey, sche
                       </div>
                     </div>
                     {activeExtraFiltersCount > 0 && (
-                      <button onClick={() => { setHomeOnlyFilter(false); setSelectedType(null) }} style={{ padding: '0.5rem', background: 'transparent', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '8px', color: 'rgba(255,255,255,0.5)', fontSize: '0.75rem', fontWeight: '600', cursor: 'pointer', textTransform: 'uppercase' }}>
+                      <button onClick={() => { setHomeOnlyFilter(false); setSelectedType(null) }} style={{ padding: '0.6rem', minHeight: 40, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, color: 'rgba(255,255,255,0.7)', fontSize: '0.8rem', fontWeight: 700, cursor: 'pointer', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                         Reset Extra Filters
                       </button>
                     )}
@@ -355,7 +361,7 @@ export default function SwapModal({ exercise, exerciseIndex, workoutDayKey, sche
                 </div>
               )}
 
-              <div style={{ fontSize: '0.7rem', color: 'rgba(255,215,0,0.5)', fontWeight: '600', textAlign: 'center' }}>
+              <div style={{ fontSize: isMobile ? '0.75rem' : '0.8rem', color: '#FFD700', fontWeight: 800, textAlign: 'center', opacity: 0.85, letterSpacing: '0.04em', textTransform: 'uppercase' }}>
                 {filteredAlternatives.length} resultaten
               </div>
             </div>
@@ -389,10 +395,14 @@ export default function SwapModal({ exercise, exerciseIndex, workoutDayKey, sche
                 ))
               )}
 
-              <div style={{ padding: isMobile ? '1rem' : '1.25rem', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+              <div style={{
+                padding: isMobile ? '1rem' : '1.25rem',
+                paddingBottom: `calc(env(safe-area-inset-bottom, 0px) + ${isMobile ? '1rem' : '1.25rem'})`,
+                borderTop: '1px solid rgba(255,255,255,0.06)',
+              }}>
                 <button onClick={() => setShowCustomModal(true)}
-                  style={{ width: '100%', padding: isMobile ? '0.875rem' : '1rem', background: 'transparent', border: '1px dashed rgba(255,215,0,0.3)', borderRadius: '12px', color: '#FFD700', fontSize: isMobile ? '0.8rem' : '0.85rem', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.05em', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}>
-                  <Plus size={18} strokeWidth={2.5} />Eigen Oefening
+                  style={{ width: '100%', minHeight: 54, padding: isMobile ? '0.9rem' : '1rem', background: 'linear-gradient(135deg, #FFD700 0%, #D4AF37 100%)', border: 'none', borderRadius: 14, color: '#0a0a0a', fontSize: isMobile ? '0.88rem' : '0.95rem', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.06em', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', boxShadow: '0 10px 24px rgba(255,215,0,0.3), 0 2px 6px rgba(0,0,0,0.5)' }}>
+                  <Plus size={20} strokeWidth={2.6} />Eigen Oefening
                 </button>
               </div>
             </div>
@@ -431,13 +441,13 @@ function ExerciseRow({ exercise, imageUrl, onSelect, onSelectPermanent, swapping
               {exercise.name}
             </h3>
             {exercise._isCustom && (
-              <span style={{ fontSize: '0.55rem', background: 'rgba(255,215,0,0.15)', color: '#FFD700', padding: '0.1rem 0.35rem', borderRadius: '3px', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '0.03em', lineHeight: 1, flexShrink: 0 }}>Eigen</span>
+              <span style={{ fontSize: '0.6rem', background: '#FFD700', color: '#000', padding: '0.15rem 0.45rem', borderRadius: 4, fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.06em', lineHeight: 1, flexShrink: 0 }}>Eigen</span>
             )}
             {exercise.home_friendly && !exercise._isCustom && (
-              <div style={{ padding: '0.15rem 0.35rem', background: 'rgba(16,185,129,0.15)', border: '1px solid rgba(16,185,129,0.3)', borderRadius: '4px', fontSize: '0.55rem', fontWeight: '800', color: '#10b981', textTransform: 'uppercase', letterSpacing: '0.03em', lineHeight: 1, flexShrink: 0 }}>Thuis</div>
+              <div style={{ padding: '0.15rem 0.45rem', background: '#10b981', borderRadius: 4, fontSize: '0.6rem', fontWeight: 900, color: '#000', textTransform: 'uppercase', letterSpacing: '0.06em', lineHeight: 1, flexShrink: 0 }}>Thuis</div>
             )}
           </div>
-          <div style={{ fontSize: isMobile ? '0.68rem' : '0.72rem', color: 'rgba(255,255,255,0.4)', fontWeight: '600', display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+          <div style={{ fontSize: isMobile ? '0.72rem' : '0.78rem', color: 'rgba(255,255,255,0.6)', fontWeight: 700, display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
             {exercise.equipment && <span style={{ textTransform: 'capitalize' }}>{exercise.equipment}</span>}
             {exercise.type && <span>• {exercise.type}</span>}
           </div>
@@ -453,11 +463,11 @@ function ExerciseRow({ exercise, imageUrl, onSelect, onSelectPermanent, swapping
       {showActions && (
         <div style={{ display: 'flex', gap: '0.5rem', padding: '0.5rem 1rem 0.625rem', background: 'rgba(255,215,0,0.02)' }}>
           <button onClick={() => { onSelect(); setShowActions(false) }}
-            style={{ flex: 1, padding: '0.5rem 0.75rem', background: 'rgba(255,215,0,0.08)', border: '1px solid rgba(255,215,0,0.2)', borderRadius: '7px', color: '#FFD700', fontSize: '0.7rem', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.04em', cursor: 'pointer', touchAction: 'manipulation', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.3rem', minHeight: '36px' }}>
+            style={{ flex: 1, padding: '0.6rem 0.85rem', background: 'rgba(255,215,0,0.14)', border: '1px solid rgba(255,215,0,0.35)', borderRadius: 8, color: '#FFD700', fontSize: '0.78rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.06em', cursor: 'pointer', touchAction: 'manipulation', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, minHeight: 44 }}>
             📅 Deze week
           </button>
           <button onClick={() => { onSelectPermanent(); setShowActions(false) }}
-            style={{ flex: 1, padding: '0.5rem 0.75rem', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '7px', color: 'rgba(255,255,255,0.5)', fontSize: '0.7rem', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.04em', cursor: 'pointer', touchAction: 'manipulation', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.3rem', minHeight: '36px' }}>
+            style={{ flex: 1, padding: '0.6rem 0.85rem', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 8, color: 'rgba(255,255,255,0.85)', fontSize: '0.78rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.06em', cursor: 'pointer', touchAction: 'manipulation', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, minHeight: 44 }}>
             📌 Permanent
           </button>
         </div>

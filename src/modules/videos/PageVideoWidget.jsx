@@ -4,8 +4,9 @@
 
 import React, { useState, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
-import { Play, X, Video, CheckCircle2 } from 'lucide-react'
+import { Play, X, Video, CheckCircle2, ChevronLeft, GraduationCap } from 'lucide-react'
 import videoService from './VideoService'
+import PageFilesBlock from './PageFilesBlock'
 
 const GREEN = '#10b981'
 
@@ -31,13 +32,22 @@ const isYouTubeShort = (url) => {
   return /youtube\.com\/shorts\//.test(url) || /m\.youtube\.com\/shorts\//.test(url)
 }
 
-export default function PageVideoWidget({ client, db, pageContext = 'home' }) {
+export default function PageVideoWidget({ client, db, pageContext = 'home', open: openProp, onOpenChange, onCountChange }) {
+  const controlled = typeof openProp === 'boolean' && typeof onOpenChange === 'function'
   const [videos, setVideos] = useState([])
+  const [filesCount, setFilesCount] = useState(0)
   const [loading, setLoading] = useState(true)
-  const [isOpen, setIsOpen] = useState(false)
+  const [isOpenInternal, setIsOpenInternal] = useState(false)
+  const isOpen = controlled ? openProp : isOpenInternal
+  const setIsOpen = (val) => {
+    const next = typeof val === 'function' ? val(isOpen) : val
+    if (controlled) onOpenChange(next); else setIsOpenInternal(next)
+  }
   const [playingItem, setPlayingItem] = useState(null)
   // Track locally which items are marked viewed (om UI bij te werken ZONDER reload)
   const [viewedIds, setViewedIds] = useState(new Set())
+  // Cursus waar de client op inzoomt (null = overzicht met alles)
+  const [selectedCourseId, setSelectedCourseId] = useState(null)
 
   const isMobile = window.innerWidth <= 768
 
@@ -49,15 +59,51 @@ export default function PageVideoWidget({ client, db, pageContext = 'home' }) {
   const loadData = async () => {
     setLoading(true)
     try {
-      const pageVideos = await videoService.getVideosForPage(client.id, pageContext, {}, db)
+      const [pageVideos, pageFiles] = await Promise.all([
+        videoService.getVideosForPage(client.id, pageContext, {}, db),
+        // Files-count via dezelfde service — als'm faalt blijft de widget
+        // gewoon werken met alleen videos.
+        (async () => {
+          try {
+            const m = await import('./FileService')
+            const files = await m.default.listForPage(pageContext)
+            return files
+          } catch { return [] }
+        })(),
+      ])
       setVideos(pageVideos || [])
+      setFilesCount((pageFiles || []).length)
     } catch (e) {
       console.error('Error loading page videos:', e)
       setVideos([])
+      setFilesCount(0)
     } finally {
       setLoading(false)
     }
   }
+
+  // ── Cursussen vs losse video's splitsen ──
+  // Video's die via een cursus zijn toegewezen (context_data.course_id) worden
+  // gegroepeerd onder hun cursus; de rest is "los".
+  const coursesMap = {} // course_id -> { id, title, items: [] }
+  const looseVideos = []
+  videos.forEach(item => {
+    const cid = item?.context_data?.course_id
+    if (cid) {
+      if (!coursesMap[cid]) coursesMap[cid] = { id: cid, title: item.context_data.course_title || 'Cursus', items: [] }
+      coursesMap[cid].items.push(item)
+    } else {
+      looseVideos.push(item)
+    }
+  })
+  const courseList = Object.values(coursesMap)
+  // Sorteer cursus-video's op de opgeslagen volgorde (course_order).
+  courseList.forEach(c => c.items.sort((a, b) => (a.context_data?.course_order ?? 0) - (b.context_data?.course_order ?? 0)))
+
+  const activeCourse = selectedCourseId ? coursesMap[selectedCourseId] : null
+  // Welke items tonen we als categorie-rijen? Bij inzoomen: alleen de cursus.
+  // Anders: alleen de losse video's (cursussen krijgen eigen tegels).
+  const itemsForCategories = activeCourse ? activeCourse.items : looseVideos
 
   // Group videos by category. We rely on the embedded video_category from
   // the JOIN in getVideosForPage — no separate categories call needed (that
@@ -66,7 +112,7 @@ export default function PageVideoWidget({ client, db, pageContext = 'home' }) {
   const categoryMap = {} // id -> { id, name, color, order_index }
   const uncategorized = []
 
-  videos.forEach(item => {
+  itemsForCategories.forEach(item => {
     const cat = item?.video?.video_category
     if (cat?.id) {
       if (!categoryMap[cat.id]) categoryMap[cat.id] = cat
@@ -80,12 +126,21 @@ export default function PageVideoWidget({ client, db, pageContext = 'home' }) {
   const orderedCategories = Object.values(categoryMap)
     .sort((a, b) => (a.order_index ?? 0) - (b.order_index ?? 0))
 
-  const hasContent = videos.length > 0
+  const hasContent = videos.length > 0 || filesCount > 0
 
   const handleClose = () => {
     setIsOpen(false)
     setPlayingItem(null)
+    setSelectedCourseId(null)
   }
+
+  // Live count voor sidebar-badge — aantal nog niet bekeken videos
+  useEffect(() => {
+    if (typeof onCountChange === 'function') {
+      const unseen = videos.filter(v => !viewedIds.has(v.id)).length
+      onCountChange(unseen)
+    }
+  }, [videos, viewedIds, onCountChange])
 
   // FIX: alleen locally markeren als viewed (geen reload die loop veroorzaakt)
   const handleVideoWatched = (itemId) => {
@@ -96,8 +151,8 @@ export default function PageVideoWidget({ client, db, pageContext = 'home' }) {
 
   return (
     <>
-      {/* FLOATING BADGE */}
-      {!isOpen && (
+      {/* FLOATING BADGE — alleen in uncontrolled mode (geen sidebar) */}
+      {!controlled && !isOpen && (
         <button
           onClick={() => setIsOpen(true)}
           style={{
@@ -230,6 +285,62 @@ export default function PageVideoWidget({ client, db, pageContext = 'home' }) {
             WebkitOverflowScrolling: 'touch'
           }}
         >
+          {/* Ingezoomd op een cursus → terug-knop bovenaan */}
+          {activeCourse && (
+            <button
+              onClick={() => setSelectedCourseId(null)}
+              style={{
+                display: 'flex', alignItems: 'center', gap: '0.4rem', width: '100%',
+                padding: isMobile ? '0.7rem 1rem' : '0.8rem 1.125rem',
+                background: 'rgba(16,185,129,0.06)', border: 'none',
+                borderBottom: '1px solid rgba(255,255,255,0.06)',
+                color: GREEN, fontSize: '0.72rem', fontWeight: 800, cursor: 'pointer',
+                textAlign: 'left', touchAction: 'manipulation'
+              }}
+            >
+              <ChevronLeft size={15} /> Terug naar alle video's
+            </button>
+          )}
+
+          {/* Overzicht (niet ingezoomd) → cursus-tegels bovenaan */}
+          {!activeCourse && courseList.length > 0 && (
+            <div style={{ padding: isMobile ? '0.75rem 0' : '0.875rem 0', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+              <div style={{ padding: isMobile ? '0 1rem 0.5rem' : '0 1.125rem 0.625rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <GraduationCap size={13} color={GREEN} />
+                <div style={{ fontSize: isMobile ? '0.62rem' : '0.68rem', fontWeight: 800, color: '#fff', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Cursussen</div>
+                <div style={{ fontSize: '0.55rem', color: 'rgba(255,255,255,0.25)', fontWeight: 700 }}>· {courseList.length}</div>
+              </div>
+              <div className="pvw-row" style={{ display: 'flex', gap: '0.5rem', padding: isMobile ? '0 1rem' : '0 1.125rem', overflowX: 'auto', WebkitOverflowScrolling: 'touch', scrollbarWidth: 'none' }}>
+                {courseList.map(course => {
+                  const watched = course.items.filter(it => viewedIds.has(it.id) || it.status === 'completed' || it.viewed_at).length
+                  const thumbItem = course.items[0]
+                  const vid = thumbItem?.video
+                  const ytId = vid ? extractYouTubeId(vid.video_url) : null
+                  const thumb = vid?.thumbnail_url || (ytId ? `https://img.youtube.com/vi/${ytId}/hqdefault.jpg` : null)
+                  return (
+                    <button key={course.id} onClick={() => setSelectedCourseId(course.id)} style={{
+                      flexShrink: 0, width: isMobile ? '160px' : '180px', background: '#111',
+                      border: `1px solid ${GREEN}33`, borderRadius: 8, overflow: 'hidden', cursor: 'pointer',
+                      padding: 0, textAlign: 'left', touchAction: 'manipulation'
+                    }}>
+                      <div style={{ position: 'relative', width: '100%', aspectRatio: '16 / 9', background: '#000' }}>
+                        {thumb && <img src={thumb} alt={course.title} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', opacity: 0.85 }} />}
+                        <div style={{ position: 'absolute', top: '0.3rem', left: '0.3rem', display: 'flex', alignItems: 'center', gap: 3, padding: '0.15rem 0.4rem', background: GREEN, borderRadius: 4, fontSize: '0.5rem', fontWeight: 900, color: '#000', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                          <GraduationCap size={10} /> Cursus
+                        </div>
+                      </div>
+                      <div style={{ padding: isMobile ? '0.4rem 0.5rem 0.5rem' : '0.5rem 0.6rem 0.625rem' }}>
+                        <div style={{ fontSize: isMobile ? '0.72rem' : '0.78rem', fontWeight: 800, color: '#fff', lineHeight: 1.3, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden', marginBottom: '0.2rem', minHeight: '1.9rem' }}>{course.title}</div>
+                        <div style={{ fontSize: '0.6rem', fontWeight: 700, color: 'rgba(255,255,255,0.4)' }}>{watched}/{course.items.length} bekeken</div>
+                      </div>
+                    </button>
+                  )
+                })}
+              </div>
+              <style>{`.pvw-row::-webkit-scrollbar { display: none; }`}</style>
+            </div>
+          )}
+
           {orderedCategories.map(cat => (
             <CategoryRow
               key={cat.id}
@@ -244,7 +355,7 @@ export default function PageVideoWidget({ client, db, pageContext = 'home' }) {
 
           {uncategorized.length > 0 && (
             <CategoryRow
-              title="Overige video's"
+              title={activeCourse ? activeCourse.title : "Overige video's"}
               color="rgba(255, 255, 255, 0.3)"
               items={uncategorized}
               viewedIds={viewedIds}
@@ -252,6 +363,16 @@ export default function PageVideoWidget({ client, db, pageContext = 'home' }) {
               isMobile={isMobile}
               isUncategorized
             />
+          )}
+
+          {/* Files-blok onderaan — toont PDFs die de coach aan deze page
+              heeft toegewezen (coach_files.default_pages). Verbergt zichzelf
+              automatisch wanneer er niks is. Tijdens cursus-inzoom verbergen
+              zodat je alleen de cursus-inhoud ziet. */}
+          {!activeCourse && (
+            <div style={{ padding: isMobile ? '0 1rem' : '0 1.125rem' }}>
+              <PageFilesBlock pageContext={pageContext} isMobile={isMobile} />
+            </div>
           )}
 
           <div style={{ height: '1.5rem' }} />

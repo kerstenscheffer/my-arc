@@ -152,7 +152,10 @@ class ExerciseServiceClass {
   async getExerciseVideo(exerciseName) {
     try {
       const details = await this.getExerciseDetails(exerciseName)
-      return details?.video_url || null
+      // Coach-eigen video heeft voorrang; valt anders terug op de externe
+      // creator-video (fallback_video_url) zodat de client altijd iets te
+      // zien krijgt van de juiste uitvoering.
+      return details?.video_url || details?.fallback_video_url || null
     } catch (error) {
       console.error('❌ ExerciseService.getExerciseVideo failed:', error)
       return null
@@ -327,6 +330,87 @@ class ExerciseServiceClass {
       return data
     } catch (error) {
       console.error('❌ ExerciseService.updateExerciseImage failed:', error)
+      throw error
+    }
+  }
+
+  // Set / clear the video (and optional thumbnail) on an exercise. Accepts
+  // either an exerciseId or exerciseName so it works from both flows: the
+  // DayBuilder rows (which have the id) and any other UI that only knows
+  // the name. Pass empty strings or null to clear.
+  //
+  // Resolves the target row in two steps so we get a clean error instead
+  // of PostgREST's "Cannot coerce the result to a single JSON object"
+  // when the name doesn't match anything in the library:
+  //   1. exact match on id OR name
+  //   2. fallback to case-insensitive ilike on the trimmed name
+  //   3. clear error if still no row
+  async updateExerciseVideo({ exerciseId, exerciseName, videoUrl, thumbnailUrl, source }) {
+    try {
+      const patch = {}
+      if (videoUrl !== undefined)     patch.video_url = videoUrl || null
+      if (thumbnailUrl !== undefined) patch.thumbnail_url = thumbnailUrl || null
+      if (Object.keys(patch).length === 0) return null
+
+      // Als de aanroeper expliciet meegeeft dat dit een custom_exercises-rij
+      // is, schrijven we daar direct naartoe en slaan we de lookup in
+      // `exercises` over. Voorkomt "exercise not found" voor per-client
+      // custom oefeningen die niet in de shared library staan.
+      if (source === 'custom_exercises' && exerciseId) {
+        const { data, error } = await this.supabase
+          .from('custom_exercises').update(patch).eq('id', exerciseId).select().single()
+        if (error) throw error
+        this.clearCache()
+        if (data?.name) this.clearCache(`exercise_video_${data.name}`)
+        return data
+      }
+
+      // Find target row first — maybeSingle returns null on 0 rows (no throw).
+      let targetRow = null
+      let targetTable = 'exercises'
+      if (exerciseId) {
+        const { data } = await this.supabase
+          .from('exercises').select('id, name').eq('id', exerciseId).maybeSingle()
+        targetRow = data
+      }
+      if (!targetRow && exerciseName) {
+        const trimmed = String(exerciseName).trim()
+        // Exact first, then case-insensitive fallback.
+        const { data: exact } = await this.supabase
+          .from('exercises').select('id, name').eq('name', trimmed).maybeSingle()
+        if (exact) targetRow = exact
+        else {
+          const { data: ci } = await this.supabase
+            .from('exercises').select('id, name').ilike('name', trimmed).limit(1)
+          if (ci?.length) targetRow = ci[0]
+        }
+      }
+      // Fallback naar custom_exercises als 'ie niet in de shared lib staat.
+      if (!targetRow && exerciseName) {
+        const trimmed = String(exerciseName).trim()
+        const { data: exact } = await this.supabase
+          .from('custom_exercises').select('id, name').eq('name', trimmed).maybeSingle()
+        if (exact) { targetRow = exact; targetTable = 'custom_exercises' }
+        else {
+          const { data: ci } = await this.supabase
+            .from('custom_exercises').select('id, name').ilike('name', trimmed).limit(1)
+          if (ci?.length) { targetRow = ci[0]; targetTable = 'custom_exercises' }
+        }
+      }
+      if (!targetRow) {
+        const e = new Error(`Oefening "${exerciseName || exerciseId}" niet gevonden in de exercises-tabel. Eerst toevoegen aan de bibliotheek voordat je 'r een video aan hangt.`)
+        e.code = 'EXERCISE_NOT_FOUND'
+        throw e
+      }
+
+      const { data, error } = await this.supabase
+        .from(targetTable).update(patch).eq('id', targetRow.id).select().single()
+      if (error) throw error
+      this.clearCache()
+      if (data?.name) this.clearCache(`exercise_video_${data.name}`)
+      return data
+    } catch (error) {
+      console.error('❌ ExerciseService.updateExerciseVideo failed:', error)
       throw error
     }
   }

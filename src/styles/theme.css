@@ -611,23 +611,29 @@ body {
   }
 }
 
-/* Scrollbar Styling */
+/* Scrollbar Styling — subtiel en neutraal (geen groene balken meer) */
 ::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+  width: 6px;
+  height: 6px;
 }
 
 ::-webkit-scrollbar-track {
-  background: var(--c-bg-dark);
+  background: transparent;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: var(--c-accent);
+  background: rgba(255, 255, 255, 0.12);
   border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: var(--c-accent-2);
+  background: rgba(255, 255, 255, 0.2);
+}
+
+/* Firefox — dunne, neutrale scrollbar i.p.v. de groene */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.12) transparent;
 }
 
 /* Tables */

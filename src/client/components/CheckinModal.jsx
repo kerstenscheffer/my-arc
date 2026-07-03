@@ -7,7 +7,7 @@ import React, { useEffect } from 'react'
 import { X } from 'lucide-react'
 import ClientCheckinForm from '../../modules/client-checkin/ClientCheckinForm'
 
-export default function CheckinModal({ isOpen, onClose, client, db, isMobile: propMobile }) {
+export default function CheckinModal({ isOpen, onClose, onSubmitted, client, db, isMobile: propMobile }) {
   const isMobile = propMobile ?? window.innerWidth <= 768
 
   // The "Sluiten"-button in the top bar is always available, so the user can
@@ -91,6 +91,11 @@ export default function CheckinModal({ isOpen, onClose, client, db, isMobile: pr
           db={db}
           client={client}
           onClose={onClose}
+          onSubmitted={() => {
+            onSubmitted?.()
+            // Modal sluit niet automatisch — zo blijft het succes-scherm
+            // (handled door form) zichtbaar tot user 'Sluit' tikt.
+          }}
         />
       </div>
 

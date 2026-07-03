@@ -93,7 +93,7 @@ export default function MacroOverview({ consumed, targets, isMobile: propMobile 
   }
 
   const Icon = current.icon
-  const ringSize = isMobile ? 80 : 100
+  const ringSize = isMobile ? 96 : 116
   const strokeWidth = isMobile ? 5 : 6
   const radius = (ringSize - strokeWidth) / 2
   const circumference = 2 * Math.PI * radius
@@ -186,23 +186,24 @@ export default function MacroOverview({ consumed, targets, isMobile: propMobile 
             />
           </svg>
 
-          {/* Center content */}
+          {/* Center content — toont %, doel-getal en eenheid zodat de
+              klant op één blik ziet hoeveel het macro-doel voor vandaag is. */}
           <div style={{
             position: 'absolute',
             inset: 0,
             display: 'flex',
             flexDirection: 'column',
             alignItems: 'center',
-            justifyContent: 'center'
+            justifyContent: 'center',
+            gap: 2,
           }}>
             <Icon
               size={isMobile ? 12 : 14}
               color={isComplete ? '#10b981' : 'rgba(16, 185, 129, 0.5)'}
               strokeWidth={2}
-              style={{ marginBottom: '0.1rem' }}
             />
             <div style={{
-              fontSize: isMobile ? '1.1rem' : '1.3rem',
+              fontSize: isMobile ? '1.05rem' : '1.25rem',
               fontWeight: '900',
               color: isComplete ? '#10b981' : '#fff',
               lineHeight: 1,
@@ -210,6 +211,42 @@ export default function MacroOverview({ consumed, targets, isMobile: propMobile 
               textShadow: isComplete ? '0 0 12px rgba(16, 185, 129, 0.5)' : 'none'
             }}>
               {percentage}%
+            </div>
+            {/* Subtiel scheidingslijntje */}
+            <div style={{
+              width: 18, height: 1,
+              background: 'rgba(255,255,255,0.18)',
+              margin: '1px 0',
+            }} />
+            {/* Doel-waarde — duidelijk leesbaar */}
+            <div style={{
+              fontSize: isMobile ? '0.78rem' : '0.88rem',
+              fontWeight: 800,
+              color: 'rgba(255,255,255,0.92)',
+              lineHeight: 1,
+              letterSpacing: '-0.02em',
+              display: 'flex', alignItems: 'baseline', gap: 2,
+            }}>
+              {current.target}
+              <span style={{
+                fontSize: isMobile ? '0.5rem' : '0.55rem',
+                color: 'rgba(255,255,255,0.45)',
+                fontWeight: 700,
+                textTransform: 'lowercase',
+              }}>
+                {current.unit === 'KCAL' ? 'kcal' : 'g'}
+              </span>
+            </div>
+            <div style={{
+              fontSize: '0.42rem',
+              color: 'rgba(255,255,255,0.32)',
+              fontWeight: 800,
+              textTransform: 'uppercase',
+              letterSpacing: '0.08em',
+              lineHeight: 1,
+              marginTop: -1,
+            }}>
+              Doel
             </div>
           </div>
         </div>
@@ -297,19 +334,19 @@ export default function MacroOverview({ consumed, targets, isMobile: propMobile 
               flexShrink: 0
             }} />
 
-            <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.15rem', flexShrink: 0 }}>
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.2rem', flexShrink: 0 }}>
               <span style={{
-                fontSize: isMobile ? '0.8rem' : '0.95rem',
-                fontWeight: '700',
-                color: 'rgba(255, 255, 255, 0.2)',
+                fontSize: isMobile ? '0.9rem' : '1.05rem',
+                fontWeight: '800',
+                color: 'rgba(255, 255, 255, 0.7)',
                 letterSpacing: '-0.02em'
               }}>
                 {current.target}
               </span>
               <span style={{
-                fontSize: isMobile ? '0.45rem' : '0.55rem',
+                fontSize: isMobile ? '0.5rem' : '0.6rem',
                 fontWeight: '700',
-                color: 'rgba(255, 255, 255, 0.12)',
+                color: 'rgba(255, 255, 255, 0.35)',
                 textTransform: 'uppercase'
               }}>
                 {current.unit} DOEL

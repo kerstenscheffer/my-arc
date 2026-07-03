@@ -4,12 +4,17 @@
 import React, { useState, useEffect } from 'react'
 import MealPlanService from './MealPlanService'
 import AIMealDashboard from './AIMealDashboard'
-import PageVideoWidget from '../videos/PageVideoWidget'
+import VoedingsGids from './VoedingsGids'
+import GelegenhedenHub from './GelegenhedenHub'
+import NutritionChoiceTrainer from '../lab/experiments/NutritionChoiceTrainer'
 
 export default function MealPlanMain({ client, onNavigate, db }) {
+  const isMobile = typeof window !== 'undefined' && window.innerWidth <= 768
   const [service] = useState(() => new MealPlanService(db))
   const [loading, setLoading] = useState(true)
   const [hasAIPlan, setHasAIPlan] = useState(false)
+  // 'plan' = bestaand meal-plan, 'gids' = Voedingsgids (issue 19ee0bf7).
+  const [tab, setTab] = useState('plan')
   
   // Check for AI plan
   useEffect(() => {
@@ -42,7 +47,7 @@ export default function MealPlanMain({ client, onNavigate, db }) {
     return (
       <div style={{
         minHeight: '100vh',
-        background: 'linear-gradient(180deg, #0a0a0a 0%, #171717 100%)',
+        background: '#0a0a0a',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center'
@@ -60,57 +65,35 @@ export default function MealPlanMain({ client, onNavigate, db }) {
     )
   }
   
-  // Route to AI Dashboard if AI plan exists (has its own PageVideoWidget)
-  if (hasAIPlan) {
-    return <AIMealDashboard client={client} onNavigate={onNavigate} db={db} />
-  }
-  
-  // Fallback - No meal plan
-  return (
+  // Plan-paneel: AI-dashboard als er een plan is, anders de fallback.
+  const planPanel = hasAIPlan ? (
+    <AIMealDashboard client={client} onNavigate={onNavigate} db={db} />
+  ) : (
     <div style={{
-      minHeight: '100vh',
-      background: 'linear-gradient(180deg, #0a0a0a 0%, #171717 100%)',
+      minHeight: '60vh',
+      background: '#0a0a0a',
       padding: '2rem',
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center'
     }}>
-      <div style={{
-        textAlign: 'center',
-        maxWidth: '500px'
-      }}>
-        <h2 style={{
-          fontSize: '1.5rem',
-          fontWeight: '700',
-          color: 'white',
-          marginBottom: '1rem'
-        }}>
+      <div style={{ textAlign: 'center', maxWidth: '500px' }}>
+        <h2 style={{ fontSize: '1.5rem', fontWeight: '700', color: 'white', marginBottom: '1rem' }}>
           Geen Meal Plan Actief
         </h2>
-        <p style={{
-          color: 'rgba(255, 255, 255, 0.6)',
-          marginBottom: '2rem'
-        }}>
+        <p style={{ color: 'rgba(255, 255, 255, 0.6)' }}>
           Vraag je coach om een AI meal plan voor je te genereren!
         </p>
-        <button
-          onClick={() => onNavigate('home')}
-          style={{
-            padding: '0.875rem 2rem',
-            background: 'linear-gradient(135deg, #D4AF37 0%, #FFD700 100%)',
-            border: '1px solid rgba(255, 215, 0, 0.3)',
-            borderRadius: '12px',
-            color: 'white',
-            fontWeight: '600',
-            cursor: 'pointer'
-          }}
-        >
-          Terug naar Home
-        </button>
       </div>
+    </div>
+  )
 
-      {/* Coach video's voor meal pagina — ook zichtbaar zonder actief plan */}
-      <PageVideoWidget client={client} db={db} pageContext="meal" />
+  // De tabs Voedingsgids / Gelegenheden / Slim kiezen zijn voor nu verborgen
+  // (op verzoek). Alleen het plan wordt getoond. De componenten + 'tab'-state
+  // blijven bestaan zodat we ze later weer kunnen aanzetten.
+  return (
+    <div style={{ minHeight: '100vh', background: '#0a0a0a' }}>
+      {planPanel}
     </div>
   )
 }

@@ -1,11 +1,15 @@
 import React, { useState, useMemo, useEffect } from 'react'
 import { Trash2, Plus, Check, ArrowLeft, X, ChevronLeft, Minus } from 'lucide-react'
+import MealLoggingService from '../MealLoggingService'
+import PortionPickerModal from './PortionPickerModal'
 
 /**
  * MealAssemblyView - Final meal assembly screen
  * Shows cart items, allows portion/amount adjustment, calculates totals, logs meal
  */
 export default function MealAssemblyView({
+  db,
+  client,
   cart,
   setCart,
   onComplete,
@@ -13,10 +17,17 @@ export default function MealAssemblyView({
   onClose
 }) {
   const isMobile = window.innerWidth <= 768
-  
+
   // State
   const [mealName, setMealName] = useState('')
   const [editingAmounts, setEditingAmounts] = useState({}) // Track edited amounts/portions
+  const [pickerItemId, setPickerItemId] = useState(null)
+
+  const portionService = useMemo(
+    () => (db?.supabase ? new MealLoggingService(db.supabase) : null),
+    [db]
+  )
+  const pickerItem = pickerItemId ? cart.find(i => i.id === pickerItemId) : null
   
   // Feedback state
   const [feedbackStatus, setFeedbackStatus] = useState(null) // 'loading', 'success', 'error'
@@ -179,6 +190,7 @@ export default function MealAssemblyView({
   }
   
   return (
+    <>
     <div style={{
       position: 'fixed',
       inset: 0,
@@ -470,18 +482,38 @@ export default function MealAssemblyView({
                           <Minus size={14} />
                         </button>
                         
-                        <div style={{
-                          fontSize: isMobile ? '0.85rem' : '0.9rem',
-                          color: '#10b981',
-                          fontWeight: '700',
-                          minWidth: item.type === 'meal' ? '45px' : '55px',
-                          textAlign: 'center'
-                        }}>
-                          {item.type === 'meal'
-                            ? `${currentValue}x`
-                            : `${currentValue}g`
-                          }
-                        </div>
+                        {item.type === 'meal' ? (
+                          <div style={{
+                            fontSize: isMobile ? '0.85rem' : '0.9rem',
+                            color: '#10b981',
+                            fontWeight: '700',
+                            minWidth: '45px',
+                            textAlign: 'center'
+                          }}>
+                            {currentValue}x
+                          </div>
+                        ) : (
+                          <button
+                            onClick={() => setPickerItemId(item.id)}
+                            disabled={feedbackStatus === 'loading'}
+                            style={{
+                              fontSize: isMobile ? '0.85rem' : '0.9rem',
+                              color: '#10b981',
+                              fontWeight: '700',
+                              minWidth: '55px',
+                              textAlign: 'center',
+                              background: 'rgba(16, 185, 129, 0.08)',
+                              border: '1px solid rgba(16, 185, 129, 0.25)',
+                              borderRadius: '8px',
+                              padding: '0.35rem 0.5rem',
+                              cursor: feedbackStatus === 'loading' ? 'not-allowed' : 'pointer',
+                              touchAction: 'manipulation',
+                              WebkitTapHighlightColor: 'transparent'
+                            }}
+                          >
+                            {currentValue}g
+                          </button>
+                        )}
                         
                         <button
                           onClick={() => handleAmountChange(item.id, item.type === 'meal' ? 0.25 : 10)}
@@ -958,5 +990,19 @@ export default function MealAssemblyView({
         }
       `}</style>
     </div>
+
+    <PortionPickerModal
+      isOpen={!!pickerItem}
+      onClose={() => setPickerItemId(null)}
+      onSelect={(grams) => {
+        if (!pickerItemId) return
+        setEditingAmounts(prev => ({ ...prev, [pickerItemId]: grams }))
+      }}
+      ingredientName={pickerItem?.name}
+      currentGrams={pickerItem ? (editingAmounts[pickerItem.id] ?? pickerItem.amount ?? 100) : null}
+      service={portionService}
+      clientId={client?.id}
+    />
+    </>
   )
 }

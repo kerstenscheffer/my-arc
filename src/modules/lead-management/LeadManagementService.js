@@ -46,11 +46,31 @@ async createLead(leadData) {
       campaign_id: cleanUuid(leadData.campaignId),
       // outreach_campaigns reference (new attribution model)
       outreach_campaign_id: cleanUuid(leadData.outreachCampaignId),
+      // lead magnet attribution (FK + mirror naar de legacy text[] zodat de
+      // kaart-banner en LeadDetailModalV2 'm direct tonen).
+      source_lead_magnet_id: cleanUuid(leadData.sourceLeadMagnetId),
+      lead_magnets_shared: Array.isArray(leadData.leadMagnetsShared) && leadData.leadMagnetsShared.length
+        ? leadData.leadMagnetsShared : null,
       utm_source: leadData.utmSource || null,
       utm_medium: leadData.utmMedium || null,
       utm_campaign: leadData.utmCampaign || null,
       referrer_url: leadData.referrerUrl || null,
+      team_id: cleanUuid(leadData.teamId),
       last_touched: new Date().toISOString()
+    }
+
+    // Team-tagging: een nieuwe lead krijgt de team_id van de coach, zodat álle
+    // teamleden hem via RLS (is_team_member) zien. Zonder dit blijft de lead
+    // alleen zichtbaar voor de maker (coach_id = auth.uid()) — precies waarom
+    // de andere coach z'n leads niet kon inzien.
+    if (!insertData.team_id && insertData.coach_id) {
+      const { data: membership } = await this.db.supabase
+        .from('coach_team_members')
+        .select('team_id')
+        .eq('coach_id', insertData.coach_id)
+        .limit(1)
+        .maybeSingle()
+      if (membership?.team_id) insertData.team_id = membership.team_id
     }
 
     let { data, error } = await this.db.supabase
@@ -75,6 +95,11 @@ async createLead(leadData) {
         insertData.campaign_id = null
         retried = true
       }
+      if (msg.includes('source_lead_magnet_id') && insertData.source_lead_magnet_id) {
+        console.warn('⚠️  source_lead_magnet_id FK invalid, retrying without it:', insertData.source_lead_magnet_id)
+        insertData.source_lead_magnet_id = null
+        retried = true
+      }
       if (retried) {
         ;({ data, error } = await this.db.supabase
           .from('call_leads')
@@ -95,6 +120,7 @@ async createLead(leadData) {
 
   async getLeads(coachId, filters = {}) {
     try {
+      console.log('🔍 [GETLEADS] called for coachId:', coachId, 'filters:', filters)
       let query = this.db.supabase
         .from('call_leads')
         .select(`
@@ -103,7 +129,8 @@ async createLead(leadData) {
           source_lead_magnet:lead_magnets!call_leads_source_lead_magnet_id_fkey(id, name),
           outreach_campaign:outreach_campaigns!call_leads_outreach_campaign_id_fkey(id, name, variant_tag)
         `)
-        .or(`coach_id.eq.${coachId},coach_id.is.null`)
+        // Geen coach_id filter — RLS bepaalt de toegang (team-membership of eigen leads).
+        // Voorheen: .or(`coach_id.eq.${coachId},coach_id.is.null`)
         .is('deleted_at', null)
         .order('created_at', { ascending: false })
 
@@ -113,6 +140,7 @@ async createLead(leadData) {
       if (filters.limit) query = query.limit(filters.limit)
 
       const { data, error } = await query
+      console.log('🔍 [GETLEADS] result count:', data?.length, 'error:', error?.message)
       if (error) throw error
       return data || []
     } catch (error) {
@@ -124,21 +152,70 @@ async createLead(leadData) {
 async updateLead(leadId, updates, coachId = null) {
   try {
     console.log('📝 UPDATE LEAD:', leadId, 'Updates:', Object.keys(updates))
-    
+
     if (updates.status === 'contacted' && !updates.last_contacted_at) {
       updates.last_contacted_at = new Date().toISOString()
     }
     updates.last_touched = new Date().toISOString()
 
+    // First-reply stamp: when reply_count is being bumped from 0 to >0
+    // and we haven't already stamped first_reply_at, set it to now. This
+    // is the metric-grade signal — "lead responded to outreach" — versus
+    // reply_count itself which tracks every back-and-forth message and
+    // is therefore conversation-volume, not response-rate.
+    // Bij elke wijziging van reply_count: bepaal het verschil (delta) t.o.v.
+    // de huidige waarde, zodat we élke losse reactie kunnen loggen (niet alleen
+    // de eerste). Ook de first_reply_at-stempel hangt hieraan.
+    let replyDelta = 0
+    if (updates.reply_count !== undefined) {
+      const newCount = Number(updates.reply_count) || 0
+      const { data: cur } = await this.db.supabase
+        .from('call_leads')
+        .select('reply_count, first_reply_at')
+        .eq('id', leadId).single()
+      const oldCount = Number(cur?.reply_count) || 0
+      replyDelta = newCount - oldCount
+      if (updates.first_reply_at === undefined) {
+        if (newCount > 0) {
+          if (cur && (!cur.first_reply_at) && oldCount === 0) {
+            updates.first_reply_at = new Date().toISOString()
+          }
+        } else {
+          // Coach clicked the counter back down to 0 — clear the stamp so
+          // a future first-click is again counted as a fresh response.
+          updates.first_reply_at = null
+        }
+      }
+      // NIEUWE REGEL: elke reactie (+1) reset de opvolg-teller naar 0. Een
+      // reactie betekent dat de lead reageerde, dus het "achterna zitten"
+      // (followup_count) begint weer bij 0. Alleen bij een positieve delta.
+      if (replyDelta > 0) {
+        if (updates.followup_count === undefined) updates.followup_count = 0
+        if (updates.last_followup_sent_at === undefined) updates.last_followup_sent_at = null
+      }
+    }
+
     const { data, error } = await this.db.supabase
       .from('call_leads')
-      .update(updates) 
+      .update(updates)
       .eq('id', leadId)
       .select()
       .single()
-  
+
     if (error) throw error
-  
+
+    // Log de losse reactie (élke +/- klik) met een timestamp. Best-effort:
+    // een fout hier mag het bijwerken van de lead nooit breken.
+    if (replyDelta !== 0) {
+      try {
+        await this.db.supabase.from('lead_reaction_events').insert({
+          lead_id: leadId,
+          coach_id: data?.coach_id || coachId || null,
+          delta: replyDelta,
+        })
+      } catch (e) { console.warn('reaction event log failed:', e?.message) }
+    }
+
     const shouldRestore = (
       updates.reply_count !== undefined || 
       updates.contacted_today_date !== undefined
@@ -147,15 +224,32 @@ async updateLead(leadId, updates, coachId = null) {
     if (shouldRestore && coachId) {
       console.log('🔄 Triggering restore check...')
       const restoreResult = await this.restoreFromStaleIfNeeded(leadId, coachId)
-      
+
       if (restoreResult.restored) {
         console.log('✅ Lead restored to:', restoreResult.restoredTo?.title)
       }
-      
-      return { 
-        ...data, 
-        restored: restoreResult.restored, 
-        restoredTo: restoreResult.restoredTo 
+
+      // Reactie (+1) op een lead die uit de "Follow up stil"-sectie wordt
+      // teruggezet: de lead heeft gereageerd, dus de opvolg-teller (= hoe vaak
+      // achterna gezeten zónder reactie) hoort terug naar 0. De verplaatsing
+      // naar insta-dm regelt restoreFromStaleIfNeeded al; dit reset alleen de count.
+      let resetFollowupCount = false
+      if (restoreResult.restored && replyDelta > 0 && this.isFollowupStilSectionTitle(restoreResult.restoredFrom)) {
+        try {
+          await this.db.supabase
+            .from('call_leads')
+            .update({ followup_count: 0, last_followup_sent_at: null })
+            .eq('id', leadId)
+          resetFollowupCount = true
+        } catch (e) { console.warn('followup_count reset failed:', e?.message) }
+      }
+
+      return {
+        ...data,
+        followup_count: resetFollowupCount ? 0 : data.followup_count,
+        followupReset: resetFollowupCount,
+        restored: restoreResult.restored,
+        restoredTo: restoreResult.restoredTo
       }
     }
 
@@ -414,9 +508,28 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
 
   async createSection(coachId, sectionData) {
     try {
+      // Nieuwe secties krijgen de team_id van de coach (eerste lidmaatschap).
+      // Daardoor zien alle teamleden de nieuwe kolom automatisch.
+      let teamId = sectionData.teamId || null
+      if (!teamId && coachId) {
+        const { data: membership } = await this.db.supabase
+          .from('coach_team_members')
+          .select('team_id')
+          .eq('coach_id', coachId)
+          .limit(1)
+          .maybeSingle()
+        teamId = membership?.team_id || null
+      }
+
       const { data, error } = await this.db.supabase
         .from('lead_sections')
-        .insert({ coach_id: coachId, title: sectionData.title, color: sectionData.color || '#10b981', position: sectionData.position || 0 })
+        .insert({
+          coach_id: coachId,
+          team_id: teamId,
+          title: sectionData.title,
+          color: sectionData.color || '#10b981',
+          position: sectionData.position || 0
+        })
         .select()
         .single()
 
@@ -430,10 +543,11 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
 
   async getSections(coachId) {
     try {
+      // Geen coach_id filter — RLS toont alle secties van het team waarin
+      // de coach zit (plus zijn eigen oude secties).
       const { data, error } = await this.db.supabase
         .from('lead_sections')
         .select('*')
-        .eq('coach_id', coachId)
         .order('position', { ascending: true })
 
       if (error) throw error
@@ -472,24 +586,44 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
     }
   }
 
+  // Haalt ALLE rijen op ondanks de PostgREST 1000-rijen limiet, door te
+  // pagineren met .range(). `build` moet telkens een VERSE query teruggeven.
+  async _fetchAllRows(build, pageSize = 1000) {
+    let out = []
+    for (let from = 0; ; from += pageSize) {
+      const { data, error } = await build().range(from, from + pageSize - 1)
+      if (error) { console.error('❌ _fetchAllRows error:', error.message); break }
+      out = out.concat(data || [])
+      if (!data || data.length < pageSize) break
+    }
+    return out
+  }
+
   async getKanbanBoard(coachId) {
     try {
+      console.log('🔍 [KANBAN] getKanbanBoard called for coachId:', coachId)
       const sections = await this.getSections(coachId)
-      
-      const { data: sectionItems } = await this.db.supabase
+      console.log('🔍 [KANBAN] sections loaded:', sections?.length, sections?.map(s => s.title))
+
+      // BELANGRIJK: gepagineerd ophalen. PostgREST geeft standaard max. 1000
+      // rijen per query terug. Met >1000 leads/koppelingen viel een deel van de
+      // section-links weg → die leads belandden onterecht in "Niet toegewezen".
+      const sectionItems = await this._fetchAllRows(() => this.db.supabase
         .from('lead_section_items')
-        .select('lead_id, section_id, position, previous_section_id, previous_section_title, previous_section_color, moved_to_stale_at')
-      
-      const { data: allLeads } = await this.db.supabase
+        .select('lead_id, section_id, position, previous_section_id, previous_section_title, previous_section_color, moved_to_stale_at'))
+      console.log('🔍 [KANBAN] section_items:', sectionItems?.length)
+
+      const allLeads = await this._fetchAllRows(() => this.db.supabase
         .from('call_leads')
         .select(`
           *,
           source_lead_magnet:lead_magnets!call_leads_source_lead_magnet_id_fkey(id, name),
           outreach_campaign:outreach_campaigns!call_leads_outreach_campaign_id_fkey(id, name, variant_tag)
         `)
-        .or(`coach_id.eq.${coachId},coach_id.is.null`)
+        // Geen coach_id filter — RLS bepaalt de toegang (team-membership of eigen leads).
         .is('deleted_at', null)
-        .order('created_at', { ascending: false })
+        .order('created_at', { ascending: false }))
+      console.log('🔍 [KANBAN] call_leads result:', allLeads?.length)
 
       const leadMap = new Map((allLeads || []).map(lead => [lead.id, lead]))
       const assignedLeadIds = new Set((sectionItems || []).map(item => item.lead_id))
@@ -687,7 +821,10 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
       // ================================================================
       // v7.1: EXPANDED EXCLUSIONS — snooze + sale + ghost sections
       // ================================================================
-      const staleSectionIds = new Set(Object.values(staleSections).map(s => s.id))
+      // Alleen de genummerde stil-secties (1/2/3) tellen als "stale" voor de
+      // verwerking — NIET de "Follow up stil"-doelsectie (anders zouden leads
+      // daar weer uit gehaald worden).
+      const staleSectionIds = new Set([staleSections[1], staleSections[2], staleSections[3]].filter(Boolean).map(s => s.id))
       const today = new Date().toISOString().split('T')[0]
 
       const EXCLUDE_FROM_STALE_PATTERNS = [
@@ -748,8 +885,12 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
         
         if (daysSinceActivity >= 1) {
           const targetDays = daysSinceActivity >= 3 ? 3 : daysSinceActivity >= 2 ? 2 : 1
-          const targetSection = staleSections[targetDays]
-          
+          // 3+ dagen stil én al opgevolgd → naar "Follow up stil" i.p.v.
+          // "3+ Dagen Stil", zodat de opvolg-werklijst zuiver blijft.
+          const targetSection = (targetDays >= 3 && (lead.followup_count || 0) >= 1 && staleSections.followupStil)
+            ? staleSections.followupStil
+            : staleSections[targetDays]
+
           if (targetSection) {
             if (lead.current_section_id === targetSection.id) continue
             
@@ -769,8 +910,19 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
         const daysSinceActivity = Math.floor((now - lastActivity) / (1000 * 60 * 60 * 24))
         
         const targetDays = daysSinceActivity >= 3 ? 3 : daysSinceActivity >= 2 ? 2 : 1
+
+        // Al-opgevolgde leads die 3+ dagen stil staan → naar "Follow up stil"
+        // (i.p.v. blijven hangen in "3+ Dagen Stil"). Moet vóór de gewone
+        // escalatie, anders blokkeert de "zelfde sectie"-check de verplaatsing.
+        if (targetDays >= 3 && (lead.followup_count || 0) >= 1 && staleSections.followupStil
+            && lead.current_section_id !== staleSections.followupStil.id) {
+          const moveResult = await this.moveToStaleSection(lead, staleSections.followupStil, coachId, true)
+          if (moveResult) { movedCount++; console.log(`  ✅ → Follow up stil "${leadName}"`) }
+          continue
+        }
+
         const targetSection = staleSections[targetDays]
-        
+
         if (!targetSection) continue
         if (lead.current_section_id === targetSection.id) continue
         
@@ -810,7 +962,15 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
     
     for (const section of sections) {
       const titleLower = (section.title || '').toLowerCase().trim()
-      
+
+      // "Follow up stil"-sectie: doel voor 3+-dagen-stille leads die al een
+      // opvolg-bericht hebben gekregen. EERST checken zodat 'ie niet als gewone
+      // stil-sectie wordt gezien.
+      if (titleLower.includes('stil') && (titleLower.includes('follow') || titleLower.includes('opvolg'))) {
+        staleSections.followupStil = section
+        continue
+      }
+
       if (titleLower.includes('1 dag') || titleLower.includes('1d stil') || titleLower === '1 dag stil') {
         staleSections[1] = section
         continue
@@ -832,8 +992,9 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
     try {
       const { data: leads, error: leadsError } = await this.db.supabase
         .from('call_leads')
-        .select('id, first_name, last_name, created_at, last_touched, contacted_today_date')
-        .or(`coach_id.eq.${coachId},coach_id.is.null`)
+        .select('id, first_name, last_name, created_at, last_touched, contacted_today_date, followup_count')
+        // Geen coach_id filter — RLS bepaalt de toegang (team-membership of eigen leads).
+        // Voorheen: .or(`coach_id.eq.${coachId},coach_id.is.null`)
         .is('deleted_at', null)
       
       if (leadsError) throw leadsError
@@ -956,6 +1117,14 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
       titleLower.includes('3 dag') || titleLower.includes('3+') ||
       titleLower.includes('stil') || titleLower.includes('stale') || titleLower.includes('inactive')
     )
+  }
+
+  // Specifiek de "Follow up stil"-sectie (subset van isStaleSectionByTitle).
+  // Hier hoort een binnenkomende reactie de opvolg-teller naar 0 te resetten.
+  isFollowupStilSectionTitle(sectionTitle) {
+    if (!sectionTitle) return false
+    const t = sectionTitle.toLowerCase()
+    return ['follow up stil', 'followup stil', 'opvolg stil', 'opgevolgd stil'].some(p => t.includes(p))
   }
 
   async clearPreviousSectionData(leadId) {
@@ -1087,6 +1256,7 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
         .select('*')
         .gte('moved_at', today.toISOString())
 
+      const NO_SHOW_KEYWORDS = ['no show', 'no-show', 'noshow']
       const funnelKeywords = {
         replied: ['replied', 'gereageerd', 'reactie', 'response', 'antwoord'],
         conversation: ['gesprek', 'conversation', 'kwalificatie', 'qualified', 'interesse'],
@@ -1096,20 +1266,29 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
       const funnel = {
         replied: { count: 0, leads: [] },
         conversation: { count: 0, leads: [] },
-        callScheduled: { count: 0, leads: [] }
+        callScheduled: { count: 0, leads: [] },
+        noShow: { count: 0, leads: [] },
       }
 
       ;(movements || []).forEach(mov => {
         const toSection = (mov.to_section_title || '').toLowerCase()
+        const leadInfo = {
+          name: mov.lead_name || 'Unknown',
+          from: mov.from_section_title || 'Unknown',
+          time: new Date(mov.moved_at).toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit' })
+        }
+        // Count no-shows BEFORE the negative-words filter — same reason as
+        // the range version.
+        if (NO_SHOW_KEYWORDS.some(kw => toSection.includes(kw))) {
+          funnel.noShow.count++
+          funnel.noShow.leads.push(leadInfo)
+          return
+        }
         if (NEGATIVE_FUNNEL_WORDS.some(w => toSection.includes(w))) return
         for (const [stage, keywords] of Object.entries(funnelKeywords)) {
           if (keywords.some(kw => toSection.includes(kw))) {
             funnel[stage].count++
-            funnel[stage].leads.push({
-              name: mov.lead_name || 'Unknown',
-              from: mov.from_section_title || 'Unknown',
-              time: new Date(mov.moved_at).toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit' })
-            })
+            funnel[stage].leads.push(leadInfo)
             break
           }
         }
@@ -1118,7 +1297,164 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
       return funnel
     } catch (error) {
       console.error('❌ Get funnel stats failed:', error)
-      return { replied: { count: 0, leads: [] }, conversation: { count: 0, leads: [] }, callScheduled: { count: 0, leads: [] } }
+      return { replied: { count: 0, leads: [] }, conversation: { count: 0, leads: [] }, callScheduled: { count: 0, leads: [] }, noShow: { count: 0, leads: [] } }
+    }
+  }
+
+  // All call-proposal messages logged in [startISO, endISO). Joins each
+  // message back to its lead's CURRENT section so the stats UI can show
+  // outcome: did this proposal land in "Sales Call" / "Klant" (worked)
+  // or is the lead still sitting in "Call voorgesteld" / a stale section
+  // (didn't convert)?
+  async getRangeCallProposals(coachId, startISO, endISO) {
+    try {
+      const { data: msgs, error } = await this.db.supabase
+        .from('lead_notes')
+        .select('id, lead_id, content, created_at')
+        .eq('coach_id', coachId)
+        .eq('note_type', 'call_proposal')
+        .is('deleted_at', null)
+        .gte('created_at', startISO)
+        .lt('created_at', endISO)
+        .order('created_at', { ascending: false })
+        .limit(50)
+      if (error) throw error
+      if (!msgs?.length) return []
+      const leadIds = [...new Set(msgs.map(m => m.lead_id))]
+      // Load lead names + their current section (via lead_section_items
+      // joined to lead_sections). Used purely for display + outcome.
+      const [{ data: leads }, { data: items }] = await Promise.all([
+        this.db.supabase.from('call_leads')
+          .select('id, first_name, last_name')
+          .in('id', leadIds),
+        this.db.supabase.from('lead_section_items')
+          .select('lead_id, lead_sections:section_id(id, title, color)')
+          .in('lead_id', leadIds),
+      ])
+      const leadMap = new Map((leads || []).map(l => [l.id, l]))
+      const sectionMap = new Map(
+        (items || []).map(i => [i.lead_id, i.lead_sections || null])
+      )
+      // Classify the outcome based on the lead's current section title.
+      const classify = (sec) => {
+        if (!sec) return { key: 'open', label: 'Open', color: '#6b7280' }
+        const t = (sec.title || '').toLowerCase()
+        if (NEGATIVE_FUNNEL_WORDS.some(w => t.includes(w))) {
+          return { key: 'lost', label: 'Verloren', color: '#ef4444' }
+        }
+        if (t.includes('sale') || t.includes('verkocht') || t.includes('klant') || t.includes('client') || t.includes('won') || t.includes('gewonnen')) {
+          return { key: 'sale', label: 'Sale', color: '#10b981' }
+        }
+        if (t.includes('sales call') || t.includes('ingepland') || t.includes('scheduled') || t.includes('booking') || t.includes('afspraak') || t.includes('meeting')) {
+          return { key: 'scheduled', label: 'Call ingepland', color: '#FFD700' }
+        }
+        if (t.includes('voorgesteld') || t.includes('voorstel')) {
+          return { key: 'proposed', label: 'Nog open', color: '#f59e0b' }
+        }
+        return { key: 'other', label: sec.title || 'Onbekend', color: sec.color || '#6b7280' }
+      }
+      return msgs.map(m => {
+        const lead = leadMap.get(m.lead_id)
+        const section = sectionMap.get(m.lead_id)
+        return {
+          id: m.id,
+          lead_id: m.lead_id,
+          lead_name: lead
+            ? `${lead.first_name || ''} ${lead.last_name || ''}`.trim() || 'Onbekend'
+            : 'Onbekend',
+          content: m.content,
+          created_at: m.created_at,
+          outcome: classify(section),
+        }
+      })
+    } catch (e) {
+      console.error('❌ Get call proposals failed:', e)
+      return []
+    }
+  }
+
+  // Daily time-series for the growth chart. Returns one row per day in
+  // [startISO, endISO) with: nieuwe leads created that day + a per-stage
+  // bucket of movement-counts (replied / callProposed / callScheduled /
+  // sale) + follow-ups sent that day.
+  //
+  // Negative-outcome sections (Sale verloren, Ghost, …) are excluded via
+  // the same NEGATIVE_FUNNEL_WORDS guard used elsewhere so the chart
+  // doesn't double-count a lost lead as a "sale".
+  async getDailyTimeSeries(coachId, startISO, endISO) {
+    try {
+      // Pull the underlying rows once, then bucket client-side per local
+      // calendar day. Avoids N queries (one per day) and lets us re-use
+      // the existing funnel-keyword logic.
+      const [{ data: leads }, { data: movements }, { data: followupLeads }] = await Promise.all([
+        this.db.supabase.from('call_leads')
+          .select('id, created_at')
+          .eq('coach_id', coachId)
+          .gte('created_at', startISO).lt('created_at', endISO)
+          .is('deleted_at', null),
+        this.db.supabase.from('lead_movements')
+          .select('moved_at, to_section_title')
+          .gte('moved_at', startISO).lt('moved_at', endISO),
+        this.db.supabase.from('call_leads')
+          .select('last_followup_sent_at')
+          .eq('coach_id', coachId)
+          .gte('last_followup_sent_at', startISO).lt('last_followup_sent_at', endISO),
+      ])
+
+      const NO_SHOW_KEYWORDS = ['no show', 'no-show', 'noshow']
+      const stages = {
+        replied:       ['replied', 'gereageerd', 'reactie', 'response', 'antwoord'],
+        callProposed:  ['voorgesteld', 'voorstel'],
+        callScheduled: ['sales call', 'ingepland', 'scheduled', 'booking', 'afspraak', 'meeting'],
+        sale:          ['sale', 'verkocht', 'klant', 'client', 'gewonnen', 'won', 'deal'],
+      }
+
+      // Build empty buckets for every day in the window so the chart has
+      // continuous X-axis even when a day has zero activity.
+      const startDay = new Date(startISO); startDay.setHours(0,0,0,0)
+      const endDay   = new Date(endISO);   endDay.setHours(0,0,0,0)
+      const buckets = {}
+      for (let d = new Date(startDay); d < endDay; d.setDate(d.getDate() + 1)) {
+        const key = d.toISOString().split('T')[0]
+        buckets[key] = {
+          date: key,
+          newLeads: 0, followups: 0,
+          replied: 0, callProposed: 0, callScheduled: 0, sale: 0,
+          noShow: 0,
+        }
+      }
+      const dayKey = (iso) => new Date(iso).toISOString().split('T')[0]
+
+      ;(leads || []).forEach(l => {
+        const k = dayKey(l.created_at)
+        if (buckets[k]) buckets[k].newLeads += 1
+      })
+      ;(followupLeads || []).forEach(f => {
+        if (!f.last_followup_sent_at) return
+        const k = dayKey(f.last_followup_sent_at)
+        if (buckets[k]) buckets[k].followups += 1
+      })
+      ;(movements || []).forEach(m => {
+        const t = (m.to_section_title || '').toLowerCase()
+        const k = dayKey(m.moved_at)
+        if (!buckets[k]) return
+        if (NO_SHOW_KEYWORDS.some(kw => t.includes(kw))) {
+          buckets[k].noShow += 1
+          return
+        }
+        if (NEGATIVE_FUNNEL_WORDS.some(w => t.includes(w))) return
+        for (const [stage, kws] of Object.entries(stages)) {
+          if (kws.some(kw => t.includes(kw))) {
+            buckets[k][stage] += 1
+            break
+          }
+        }
+      })
+
+      return Object.values(buckets).sort((a, b) => a.date.localeCompare(b.date))
+    } catch (e) {
+      console.error('❌ Get daily time series failed:', e)
+      return []
     }
   }
 
@@ -1129,19 +1465,66 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
   //   followup_count > 0  → coach had to chase (= no reply yet)
   // Window applies to lead.created_at — counts the cohort created in this
   // window, regardless of when the reply/follow-up happened later.
+  // Gemiddeld aantal opvolg-berichten voor leads die in de periode een
+  // call kregen voorgesteld (call_proposed of call_scheduled). Geeft de
+  // coach inzicht in messaging-efficiency: hoeveel berichten kost het je
+  // gemiddeld om bij een call-voorstel te komen?
+  async getRangeAvgFollowupsBeforeCall(coachId, startISO, endISO) {
+    try {
+      const CALL_KEYWORDS = ['voorgesteld', 'voorstel', 'sales call', 'ingepland', 'scheduled', 'booking', 'afspraak', 'meeting']
+      const NEG = NEGATIVE_FUNNEL_WORDS
+      const { data: moves, error } = await this.db.supabase
+        .from('lead_movements')
+        .select('lead_id, to_section_title, moved_at')
+        .gte('moved_at', startISO)
+        .lt('moved_at', endISO)
+      if (error) throw error
+
+      const callLeadIds = new Set()
+      ;(moves || []).forEach(m => {
+        const t = (m.to_section_title || '').toLowerCase()
+        if (NEG.some(w => t.includes(w))) return
+        if (CALL_KEYWORDS.some(k => t.includes(k))) callLeadIds.add(m.lead_id)
+      })
+      if (callLeadIds.size === 0) return { count: 0, avgFollowups: null }
+
+      const { data: leads, error: leadErr } = await this.db.supabase
+        .from('call_leads')
+        .select('id, followup_count')
+        .in('id', Array.from(callLeadIds))
+        .eq('coach_id', coachId)
+        .is('deleted_at', null)
+      if (leadErr) throw leadErr
+
+      const counts = (leads || []).map(l => Number(l.followup_count) || 0)
+      if (counts.length === 0) return { count: 0, avgFollowups: null }
+      const avg = counts.reduce((s, n) => s + n, 0) / counts.length
+      return { count: counts.length, avgFollowups: Math.round(avg * 10) / 10 }
+    } catch (e) {
+      console.error('❌ getRangeAvgFollowupsBeforeCall failed:', e)
+      return { count: 0, avgFollowups: null }
+    }
+  }
+
   async getRangeReactionStats(coachId, startISO, endISO) {
     try {
+      // GEEN coach_id-filter: net als getRangeFunnelStats leunen we op RLS, zodat
+      // ook de team-leads (toegevoegd door een andere coach in het team) meetellen.
+      // Voorheen zag je 0 nieuwe leads als een teamgenoot ze had aangemaakt.
       const { data: leads, error } = await this.db.supabase
         .from('call_leads')
-        .select('id, created_at, reply_count, followup_count, last_followup_sent_at')
-        .eq('coach_id', coachId)
+        .select('id, created_at, reply_count, followup_count, last_followup_sent_at, first_reply_at')
         .gte('created_at', startISO)
         .lt('created_at', endISO)
         .is('deleted_at', null)
       if (error) throw error
       const all = leads || []
       const newLeads = all.length
-      const reactedLeads   = all.filter(l => (l.reply_count    || 0) > 0).length
+      // "Reacted" = the lead has a first_reply_at stamp (was clicked from
+      // 0→1 at least once). Subsequent +'s on later days bump reply_count
+      // but DON'T re-mark this metric — that would conflate response-rate
+      // with conversation-engagement.
+      const reactedLeads   = all.filter(l => !!l.first_reply_at).length
       const followedLeads  = all.filter(l => (l.followup_count || 0) > 0).length
       const notReactedYet  = newLeads - reactedLeads
       // Follow-ups SENT in the window (regardless of lead creation date) —
@@ -1149,17 +1532,43 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
       const { count: followupsInWindow } = await this.db.supabase
         .from('call_leads')
         .select('id', { count: 'exact', head: true })
-        .eq('coach_id', coachId)
         .gte('last_followup_sent_at', startISO)
         .lt('last_followup_sent_at', endISO)
+        .is('deleted_at', null)
+      // Reacties IN het venster (ongeacht aanmaakdatum) — telt elke lead die
+      // in deze periode z'n eerste reactie kreeg (first_reply_at). Dit is de
+      // juiste maat voor "reacties deze week/maand"; reactedLeads telt alleen
+      // reacties op leads die óók in het venster zijn aangemaakt en mist dus
+      // reacties op oudere leads.
+      const { count: reactionsInWindow } = await this.db.supabase
+        .from('call_leads')
+        .select('id', { count: 'exact', head: true })
+        .gte('first_reply_at', startISO)
+        .lt('first_reply_at', endISO)
+        .is('deleted_at', null)
+      // Élke losse reactie in het venster (uit het reactie-logje) — telt ook
+      // de 2e/3e reactie van dezelfde lead. Som van de delta's (zodat een
+      // teruggeklikte misklik netjes wegvalt).
+      let reactionEventsInWindow = 0
+      try {
+        const { data: rxEvents } = await this.db.supabase
+          .from('lead_reaction_events')
+          .select('delta')
+          .gte('created_at', startISO)
+          .lt('created_at', endISO)
+        reactionEventsInWindow = (rxEvents || []).reduce((s, e) => s + (Number(e.delta) || 0), 0)
+        if (reactionEventsInWindow < 0) reactionEventsInWindow = 0
+      } catch (e) { console.warn('reaction events read failed:', e?.message) }
       return {
         newLeads,
         reactedLeads, notReactedYet, followedLeads,
         followupsInWindow: followupsInWindow || 0,
+        reactionsInWindow: reactionsInWindow || 0,
+        reactionEventsInWindow,
       }
     } catch (e) {
       console.error('❌ Get range reaction stats failed:', e)
-      return { newLeads: 0, reactedLeads: 0, notReactedYet: 0, followedLeads: 0, followupsInWindow: 0 }
+      return { newLeads: 0, reactedLeads: 0, notReactedYet: 0, followedLeads: 0, followupsInWindow: 0, reactionsInWindow: 0, reactionEventsInWindow: 0 }
     }
   }
 
@@ -1263,11 +1672,18 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
         .select('*')
         .gte('moved_at', startISO)
         .lt('moved_at', endISO)
+        .is('reverted_at', null)  // teruggedraaide verplaatsingen tellen niet mee
+        .order('moved_at', { ascending: false })  // nieuwste eerst → drill-down leest chronologisch
       // ORDER MATTERS — first match wins. We check `callProposed` ahead of
       // `callScheduled` so a section titled "Call voorgesteld" lands in the
       // proposed-bucket and "Sales Call" / "Ingepland" lands in the
       // scheduled-bucket. Generic 'call' is intentionally NOT in the
       // scheduled keywords because that would catch "Call voorgesteld" too.
+      // `noShow` is tracked separately and checked BEFORE the negative-words
+      // skip so we can count no-shows even though "no show" is in the
+      // NEGATIVE_FUNNEL_WORDS exclusion list (used to keep them out of the
+      // positive stages like `sale` / `callScheduled`).
+      const NO_SHOW_KEYWORDS = ['no show', 'no-show', 'noshow']
       const funnelKeywords = {
         replied:       ['replied', 'gereageerd', 'reactie', 'response', 'antwoord'],
         conversation:  ['gesprek', 'conversation', 'kwalificatie', 'qualified', 'interesse'],
@@ -1281,18 +1697,80 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
         callProposed:  { count: 0, leads: [] },
         callScheduled: { count: 0, leads: [] },
         sale:          { count: 0, leads: [] },
+        noShow:        { count: 0, leads: [] },
       }
+      // Funnel-rang van een sectietitel (zelfde first-match-volgorde als de
+      // funnelKeywords hieronder). Gebruikt om TERUGWAARTSE verplaatsingen niet
+      // als een nieuwe funnel-stap te tellen: een lead die van 'Sales Call'
+      // terug naar 'Call voorgesteld' wordt gesleept is géén nieuw voorstel.
+      // 0 = pre-funnel/neutraal (insta, gesprek, stil, no-show, niet toegewezen).
+      const stageRank = { replied: 1, conversation: 2, callProposed: 3, callScheduled: 4, sale: 5 }
+      const rankOf = (title) => {
+        const t = (title || '').toLowerCase()
+        for (const [stage, keywords] of Object.entries(funnelKeywords)) {
+          if (keywords.some(kw => t.includes(kw))) return stageRank[stage] || 0
+        }
+        return 0
+      }
+      // Per stap tellen we elke lead maximaal één keer binnen de periode, zodat
+      // heen-en-weer geschuif of dubbele movements de teller niet opblazen.
+      const seen = {
+        replied: new Set(), conversation: new Set(), callProposed: new Set(),
+        callScheduled: new Set(), sale: new Set(), noShow: new Set(),
+      }
+
+      // "Door wie" — resolve coach_id → naam voor de drill-down per stat. De
+      // ingelogde coach (coachId) wordt "Jij", teamleden krijgen hun
+      // profiles.full_name (bv. "Coach Horstink"). Best-effort: faalt dit, dan
+      // valt het terug op een neutraal label.
+      const coachIds = [...new Set((movements || []).map(m => m.coach_id).filter(Boolean))]
+      const coachNameMap = {}
+      if (coachIds.length) {
+        try {
+          const { data: profs } = await this.db.supabase
+            .from('profiles').select('id, full_name').in('id', coachIds)
+          ;(profs || []).forEach(p => { if (p.full_name) coachNameMap[p.id] = p.full_name })
+        } catch (e) { console.warn('coach name lookup failed:', e?.message) }
+      }
+      const coachLabel = (cid) => {
+        if (!cid) return 'Onbekend'
+        if (coachId && cid === coachId) return 'Jij'
+        return coachNameMap[cid] || 'Teamlid'
+      }
+
       ;(movements || []).forEach(mov => {
         const toSection = (mov.to_section_title || '').toLowerCase()
+        const fromRank = rankOf(mov.from_section_title)
+        const leadId = mov.lead_id
+        const leadInfo = {
+          id: mov.id,  // movement-id → nodig om deze stat-regel terug te kunnen draaien
+          leadId: mov.lead_id,
+          name: mov.lead_name || 'Unknown',
+          from: (mov.from_section_title || 'Unknown').trim(),
+          to: (mov.to_section_title || '—').trim(),
+          time: new Date(mov.moved_at).toLocaleString('nl-NL', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }),
+          at: mov.moved_at,
+          by: coachLabel(mov.coach_id),
+        }
+        if (NO_SHOW_KEYWORDS.some(kw => toSection.includes(kw))) {
+          if (leadId && seen.noShow.has(leadId)) return
+          if (leadId) seen.noShow.add(leadId)
+          funnel.noShow.count++
+          funnel.noShow.leads.push(leadInfo)
+          return
+        }
         if (NEGATIVE_FUNNEL_WORDS.some(w => toSection.includes(w))) return
         for (const [stage, keywords] of Object.entries(funnelKeywords)) {
           if (keywords.some(kw => toSection.includes(kw))) {
+            const toRank = stageRank[stage] || 0
+            // Terugwaartse/laterale verplaatsing vanaf een gelijke of latere
+            // stap → geen nieuwe funnel-stap, niet tellen.
+            if (fromRank >= toRank) break
+            // Unieke lead per stap.
+            if (leadId && seen[stage].has(leadId)) break
+            if (leadId) seen[stage].add(leadId)
             funnel[stage].count++
-            funnel[stage].leads.push({
-              name: mov.lead_name || 'Unknown',
-              from: mov.from_section_title || 'Unknown',
-              time: new Date(mov.moved_at).toLocaleString('nl-NL', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }),
-            })
+            funnel[stage].leads.push(leadInfo)
             break
           }
         }
@@ -1303,8 +1781,28 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
       return {
         replied: { count: 0, leads: [] }, conversation: { count: 0, leads: [] },
         callProposed: { count: 0, leads: [] }, callScheduled: { count: 0, leads: [] },
-        sale: { count: 0, leads: [] },
+        sale: { count: 0, leads: [] }, noShow: { count: 0, leads: [] },
       }
+    }
+  }
+
+  // Draai één funnel-verplaatsing terug vanuit de stats-drill-down. We zetten
+  // een soft-stempel (reverted_at) zodat de movement uit de tellingen verdwijnt
+  // maar de rij bewaard blijft (omkeerbaar). De lead zelf blijft staan waar 'ie
+  // staat op het bord — dit raakt alleen de statistiek.
+  // Geef revert=false mee om het terugdraaien ongedaan te maken.
+  async revertMovement(movementId, revert = true) {
+    try {
+      if (!movementId) return { success: false, error: 'geen movement-id' }
+      const { error } = await this.db.supabase
+        .from('lead_movements')
+        .update({ reverted_at: revert ? new Date().toISOString() : null })
+        .eq('id', movementId)
+      if (error) throw error
+      return { success: true, reverted: revert }
+    } catch (error) {
+      console.error('❌ Revert movement failed:', error)
+      return { success: false, error: error.message }
     }
   }
 
@@ -1317,7 +1815,7 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
       // Pull leads created in the window
       const { data: leads } = await this.db.supabase
         .from('call_leads')
-        .select('id, created_at, outreach_campaign_id, source_lead_magnet_id, followup_count, reply_count')
+        .select('id, created_at, outreach_campaign_id, source_lead_magnet_id, followup_count, reply_count, first_reply_at')
         .eq('coach_id', coachId)
         .gte('created_at', startISO)
         .lt('created_at', endISO)
@@ -1386,7 +1884,9 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
         const stages = perLeadStages.get(l.id) || emptyStages()
         const reached = reachedCall.has(l.id) ? 1 : 0
         const fc = l.followup_count || 0
-        const repliedOne = (l.reply_count || 0) > 0 ? 1 : 0
+        // Source breakdown — count a lead as "responded" only on the
+        // first-reply stamp, same convention as the global metrics.
+        const repliedOne = l.first_reply_at ? 1 : 0
         const followedOne = fc > 0 ? 1 : 0
         if (l.outreach_campaign_id) {
           const c = campMap.get(l.outreach_campaign_id)

@@ -33,8 +33,19 @@ export default function TaskCard({
   task, sectionColor, isMobile,
   onDragStart, onEdit, onDelete, onComplete, onStart, isActive,
   // Dag-schedule drag
-  onDragStartForDay
+  onDragStartForDay,
+  // True when this is a recurring task and the coach marked it done today.
+  // Non-recurring completion is detected via task.completed_at directly.
+  isDoneToday = false,
+  onUncomplete = null,
 }) {
+  // Per-task color (set via the modal's color picker) overrides the column
+  // color everywhere — accents, borders, the edit-bar tint. Falls back to
+  // the section color when not set so old cards look unchanged.
+  const accent = task.color || sectionColor
+  // Visual "done" state — applies to both permanently-completed non-recurring
+  // tasks AND recurring tasks completed today.
+  const isCompleted = task.status === 'completed' || !!task.completed_at || isDoneToday
   const [expanded, setExpanded] = useState(false)
   const [isEditing, setIsEditing] = useState(false)
   const [newStepText, setNewStepText] = useState('')
@@ -102,11 +113,11 @@ export default function TaskCard({
   // ── EDIT MODE ──────────────────────────────────────────────────────────────
   if (isEditing) {
     return (
-      <div style={{ background: '#0a0a0a', border: `1px solid ${sectionColor}40`, borderRadius: '8px', overflow: 'hidden' }}>
-        <div style={{ padding: '0.4rem 0.625rem', borderBottom: `1px solid ${sectionColor}25`, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <span style={{ fontSize: '0.5rem', fontWeight: '700', color: sectionColor, textTransform: 'uppercase', letterSpacing: '0.06em' }}>BEWERKEN</span>
+      <div style={{ background: '#0a0a0a', border: `1px solid ${accent}40`, borderRadius: '8px', overflow: 'hidden' }}>
+        <div style={{ padding: '0.4rem 0.625rem', borderBottom: `1px solid ${accent}25`, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <span style={{ fontSize: '0.5rem', fontWeight: '700', color: accent, textTransform: 'uppercase', letterSpacing: '0.06em' }}>BEWERKEN</span>
           <div style={{ display: 'flex', gap: '0.25rem' }}>
-            <button onClick={handleSaveEdit} style={{ padding: '0.25rem 0.4rem', background: `${sectionColor}15`, border: `1px solid ${sectionColor}30`, borderRadius: '4px', color: sectionColor, fontSize: '0.55rem', fontWeight: '700', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '2px', minHeight: '24px', touchAction: 'manipulation' }}><Save size={9} /> Opslaan</button>
+            <button onClick={handleSaveEdit} style={{ padding: '0.25rem 0.4rem', background: `${accent}15`, border: `1px solid ${accent}30`, borderRadius: '4px', color: accent, fontSize: '0.55rem', fontWeight: '700', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '2px', minHeight: '24px', touchAction: 'manipulation' }}><Save size={9} /> Opslaan</button>
             <button onClick={() => setIsEditing(false)} style={{ padding: '0.25rem 0.4rem', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '4px', color: 'rgba(255,255,255,0.4)', fontSize: '0.55rem', cursor: 'pointer', minHeight: '24px', touchAction: 'manipulation' }}>Annuleer</button>
           </div>
         </div>
@@ -159,18 +170,21 @@ export default function TaskCard({
       draggable
       onDragStart={handleDragStart}
       style={{
-        background: '#0a0a0a',
-        border: isThisWeek
-          ? '1px solid rgba(255,215,0,0.2)'
-          : isOverdue
-            ? '1px solid rgba(239,68,68,0.15)'
-            : '1px solid rgba(255,255,255,0.05)',
-        borderLeft: `3px solid ${isThisWeek ? '#FFD700' : isOverdue ? '#ef4444' : sectionColor}`,
+        background: isCompleted ? 'rgba(16,185,129,0.04)' : '#0a0a0a',
+        border: isCompleted
+          ? '1px solid rgba(16,185,129,0.3)'
+          : isThisWeek
+            ? '1px solid rgba(255,215,0,0.2)'
+            : isOverdue
+              ? '1px solid rgba(239,68,68,0.15)'
+              : '1px solid rgba(255,255,255,0.05)',
+        borderLeft: `3px solid ${isCompleted ? '#10b981' : isThisWeek ? '#FFD700' : isOverdue ? '#ef4444' : accent}`,
         borderRadius: '8px',
         overflow: 'hidden',
         cursor: 'grab',
         transform: 'translateZ(0)',
-        opacity: task.is_in_progress ? 1 : 1
+        opacity: isCompleted ? 0.55 : 1,
+        transition: 'opacity 0.15s ease, background 0.15s ease',
       }}
     >
       {/* ═══ HOOFD ROW — altijd zichtbaar ═══ */}
@@ -179,6 +193,31 @@ export default function TaskCard({
         padding: '0.4rem 0.5rem',
         minHeight: '36px'
       }}>
+        {/* Done-checkbox — toggleable. Tap to mark today done (recurring)
+            or permanently completed (non-recurring), tap again to undo. */}
+        <button
+          onClick={(e) => {
+            e.stopPropagation()
+            if (isCompleted) {
+              if (onUncomplete) onUncomplete(task.id)
+            } else {
+              if (onComplete) onComplete(task.id)
+            }
+          }}
+          title={isCompleted ? 'Uitvinken' : 'Voltooi'}
+          style={{
+            width: 18, height: 18, padding: 0, flexShrink: 0,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            background: isCompleted ? '#10b981' : 'transparent',
+            border: `1.5px solid ${isCompleted ? '#10b981' : 'rgba(255,255,255,0.25)'}`,
+            borderRadius: 4,
+            cursor: 'pointer', touchAction: 'manipulation',
+            WebkitTapHighlightColor: 'transparent',
+          }}
+        >
+          {isCompleted && <Check size={11} color="#fff" strokeWidth={3} />}
+        </button>
+
         {/* Titel — prominent, altijd volledig zichtbaar */}
         <span
           onClick={() => setExpanded(!expanded)}
@@ -186,10 +225,12 @@ export default function TaskCard({
             flex: 1,
             fontSize: '0.78rem',
             fontWeight: '700',
-            color: task.is_in_progress ? '#f59e0b' : '#fff',
+            color: isCompleted
+              ? 'rgba(255,255,255,0.55)'
+              : task.is_in_progress ? '#f59e0b' : '#fff',
             lineHeight: 1.3,
             cursor: 'pointer',
-            // Geen truncate — titel altijd volledig
+            textDecoration: isCompleted ? 'line-through' : 'none',
             wordBreak: 'break-word'
           }}
         >
@@ -221,7 +262,7 @@ export default function TaskCard({
       {steps.length > 0 && (
         <div style={{ padding: '0 0.5rem 0.3rem', display: 'flex', alignItems: 'center', gap: '0.375rem' }}>
           <div style={{ flex: 1, height: '2px', background: 'rgba(255,255,255,0.06)', borderRadius: '1px', overflow: 'hidden' }}>
-            <div style={{ height: '100%', width: `${Math.round((doneCount / steps.length) * 100)}%`, background: doneCount === steps.length ? '#10b981' : sectionColor, borderRadius: '1px', transition: 'width 0.3s ease' }} />
+            <div style={{ height: '100%', width: `${Math.round((doneCount / steps.length) * 100)}%`, background: doneCount === steps.length ? '#10b981' : accent, borderRadius: '1px', transition: 'width 0.3s ease' }} />
           </div>
           <span style={{ fontSize: '0.4rem', fontWeight: '700', color: 'rgba(255,255,255,0.2)' }}>{doneCount}/{steps.length}</span>
         </div>
@@ -289,7 +330,7 @@ export default function TaskCard({
                   <input autoFocus type="text" value={newStepText} onChange={(e) => setNewStepText(e.target.value)}
                     onKeyDown={(e) => { if (e.key === 'Enter') handleAddStep(); if (e.key === 'Escape') { setAddingStep(false); setNewStepText('') } }}
                     placeholder="Stap..." style={{ flex: 1, background: 'transparent', border: 'none', outline: 'none', color: '#fff', fontSize: '0.62rem', padding: 0 }} />
-                  <button onClick={handleAddStep} style={{ padding: '1px 4px', background: `${sectionColor}15`, border: `1px solid ${sectionColor}30`, borderRadius: '3px', color: sectionColor, fontSize: '0.45rem', fontWeight: '700', cursor: 'pointer', minHeight: '16px', touchAction: 'manipulation' }}>OK</button>
+                  <button onClick={handleAddStep} style={{ padding: '1px 4px', background: `${accent}15`, border: `1px solid ${accent}30`, borderRadius: '3px', color: accent, fontSize: '0.45rem', fontWeight: '700', cursor: 'pointer', minHeight: '16px', touchAction: 'manipulation' }}>OK</button>
                   <button onClick={() => { setAddingStep(false); setNewStepText('') }} style={{ padding: '1px', background: 'transparent', border: 'none', color: 'rgba(255,255,255,0.2)', cursor: 'pointer' }}><X size={8} /></button>
                 </div>
               ) : (

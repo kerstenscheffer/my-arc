@@ -43,6 +43,7 @@ export default function WeekPlanningView({
   goToPreviousWeek,
   goToNextWeek,
   onRefresh,
+  refreshSignal,
   isMobile: propIsMobile
 }) {
   const isMobile = propIsMobile ?? window.innerWidth <= 768
@@ -156,6 +157,25 @@ export default function WeekPlanningView({
       loadData()
     }
   }, [loadData, weekDays?.length])
+
+  // Extern refresh-signaal (bv. nadat in de ideeën-sectie een idee is ingepland)
+  // → herlaad de agenda direct, zonder hard refresh.
+  useEffect(() => {
+    if (refreshSignal) loadData()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [refreshSignal])
+
+  // Slepen-om-te-plannen vanuit de ideeën-sectie: die dispatcht een window-event
+  // met het idee + de dag/tijd van de cel waar je losliet.
+  useEffect(() => {
+    const handler = (e) => {
+      const { idea, dayOfWeek, time } = e.detail || {}
+      if (idea && dayOfWeek) handleIdeaDrop(idea, dayOfWeek, time)
+    }
+    window.addEventListener('myarc:plan-idea', handler)
+    return () => window.removeEventListener('myarc:plan-idea', handler)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentWeekMonday])
   
   useEffect(() => {
     if (weekDays?.length) {
@@ -173,6 +193,29 @@ export default function WeekPlanningView({
   // ITEM HANDLERS
   // ============================================
   
+  // Drag-to-plan: een idee uit de ideeën-sectie op een dag/tijd droppen →
+  // maakt een agenda-item (zelfde mechaniek als de Plan-knop) en herlaadt.
+  const handleIdeaDrop = async (idea, dayOfWeek, time) => {
+    try {
+      const user = await db.getCurrentUser()
+      if (!user) throw new Error('Not logged in')
+      const weekStart = formatDateString(currentWeekMonday)
+      await service.createQuickItem(user.id, weekStart, {
+        dayOfWeek,
+        time: time || null,
+        duration: 30,
+        title: idea?.title || 'Idee',
+        description: idea?.script || idea?.hook || null,
+        phase: 'post',
+        itemType: 'content',
+        sourceContentId: idea?.id || null,  // koppel aan het idee → script opvraagbaar
+      })
+      await loadData()
+    } catch (err) {
+      console.error('Failed to plan idea via drop:', err)
+    }
+  }
+
   const handleItemDrop = async (itemId, dayOfWeek, time) => {
     try {
       // Check if this is a batch item
@@ -437,26 +480,40 @@ const handleTimeSlotClick = (dayOfWeek, time) => {
   }
   
   const handleViewScript = async (item, piece) => {
-    const sourceId = piece?.source_content_id
-    if (!sourceId) return
-    
-    setLoadingScript(true)
-    try {
-      const { data: contentItem, error } = await db.supabase
-        .from('content_items')
-        .select('*')
-        .eq('id', sourceId)
-        .single()
-      
-      if (error) throw error
-      if (contentItem) {
-        setScriptContentItem(contentItem)
-        setShowScriptModal(true)
+    // Eerst de gekoppelde content-piece, anders een rechtstreeks ingepland idee.
+    const sourceId = piece?.source_content_id || item?.source_content_id
+
+    if (sourceId) {
+      setLoadingScript(true)
+      try {
+        const { data: contentItem, error } = await db.supabase
+          .from('content_items')
+          .select('*')
+          .eq('id', sourceId)
+          .single()
+        if (error) throw error
+        if (contentItem) {
+          setScriptContentItem(contentItem)
+          setShowScriptModal(true)
+          return
+        }
+      } catch (err) {
+        console.error('Failed to load script:', err)
+      } finally {
+        setLoadingScript(false)
       }
-    } catch (err) {
-      console.error('Failed to load script:', err)
-    } finally {
-      setLoadingScript(false)
+    }
+
+    // Fallback: ouder ingepland item zonder koppeling — toon het opgeslagen
+    // script (in description) read-only, zodat je het tóch kunt inzien.
+    if (item?.description || item?.script) {
+      setScriptContentItem({
+        id: null,
+        title: item.title || 'Script',
+        type: item.item_type || 'content',
+        script: item.script || item.description || '',
+      })
+      setShowScriptModal(true)
     }
   }
   
@@ -835,27 +892,6 @@ const handleTimeSlotClick = (dayOfWeek, time) => {
             <RefreshCw size={16} />
           </button>
           
-          {!isMobile && (
-            <button
-              onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                width: '36px',
-                height: '36px',
-                background: sidebarCollapsed ? GOLD.background : 'rgba(255, 255, 255, 0.05)',
-                border: `1px solid ${GOLD.border}`,
-                borderRadius: '8px',
-                color: sidebarCollapsed ? GOLD.primary : 'rgba(255, 255, 255, 0.6)',
-                cursor: 'pointer'
-              }}
-              title={sidebarCollapsed ? 'Toon sidebar' : 'Verberg sidebar'}
-            >
-              <Layers size={16} />
-            </button>
-          )}
-          
           <button
             onClick={() => {
               const day = isMobile ? weekDays[selectedDayIndex] : weekDays[0]
@@ -893,16 +929,9 @@ const handleTimeSlotClick = (dayOfWeek, time) => {
       }}>
         {!isMobile ? (
           <>
-            <UnscheduledSidebar
-              unscheduledPieces={unscheduledPieces}
-              isCollapsed={sidebarCollapsed}
-              onToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
-              onSchedulePiece={handleSchedulePiece}
-              onDeletePiece={handleDeletePiece}
-              onViewPiece={handleViewPiece}
-              isMobile={isMobile}
-            />
-            
+            {/* Oude "ideeën"-sidebar (UnscheduledSidebar) verwijderd — ideeën
+                worden nu beheerd in de Ideeën-sectie ernaast en van daaruit
+                ingepland. */}
             <div style={{ flex: 1, overflow: 'hidden' }}>
               <CalendarGrid
                 weekDays={weekDays}
@@ -915,6 +944,7 @@ const handleTimeSlotClick = (dayOfWeek, time) => {
                 selectedItemIds={selectedItemIds}
                 onToggleItemSelect={handleToggleItemSelect}
                 onItemDrop={handleItemDrop}
+                onIdeaDrop={handleIdeaDrop}
                 onTimeSlotClick={handleTimeSlotClick}
                 onItemToggleComplete={handleItemToggleComplete}
                 onItemEdit={handleItemEdit}

@@ -229,12 +229,12 @@ export default function ClientContextPanel({ db, clientId, isMobile, isFloating 
         }}
       >
         {isFloating && <GripVertical size={12} color="rgba(255,255,255,0.2)" style={{ flexShrink: 0 }} />}
-        <User size={12} color="#FFD700" style={{ flexShrink: 0 }} />
-        <span style={{ fontSize: '0.8rem', fontWeight: 800, color: '#fff', flex: 1, minWidth: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+        <User size={15} color="#FFD700" style={{ flexShrink: 0 }} />
+        <span style={{ fontSize: m ? '0.95rem' : '1.05rem', fontWeight: 800, color: '#fff', flex: 1, minWidth: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', letterSpacing: '-0.01em' }}>
           {cd.first_name} {cd.last_name}
         </span>
         {gl && (
-          <span style={{ fontSize: '0.35rem', fontWeight: 800, color: '#FFD700', background: 'rgba(255,215,0,0.08)', padding: '0.05rem 0.2rem', borderRadius: '2px', textTransform: 'uppercase', flexShrink: 0 }}>
+          <span style={{ fontSize: '0.62rem', fontWeight: 800, color: '#FFD700', background: 'rgba(255,215,0,0.12)', padding: '0.15rem 0.4rem', borderRadius: '4px', textTransform: 'uppercase', flexShrink: 0 }}>
             {guidanceLabels[gl]}
           </span>
         )}
@@ -259,11 +259,11 @@ export default function ClientContextPanel({ db, clientId, isMobile, isFloating 
               { id: 'sop', label: `MEAL SOP ${sopProgress > 0 ? `· ${sopProgress}%` : ''}` }
             ].map(tab => (
               <button key={tab.id} onClick={() => setActiveTab(tab.id)} style={{
-                flex: 1, padding: '0.4rem 0.5rem',
+                flex: 1, padding: m ? '0.6rem 0.5rem' : '0.7rem 0.5rem',
                 background: 'transparent', border: 'none',
                 borderBottom: `2px solid ${activeTab === tab.id ? '#FFD700' : 'transparent'}`,
-                color: activeTab === tab.id ? '#FFD700' : 'rgba(255,255,255,0.25)',
-                fontSize: '0.4rem', fontWeight: 800, letterSpacing: '0.07em',
+                color: activeTab === tab.id ? '#FFD700' : 'rgba(255,255,255,0.55)',
+                fontSize: m ? '0.78rem' : '0.82rem', fontWeight: 800, letterSpacing: '-0.01em',
                 cursor: 'pointer', touchAction: 'manipulation',
                 WebkitTapHighlightColor: 'transparent',
                 transition: 'color 0.15s ease'
@@ -374,8 +374,8 @@ export default function ClientContextPanel({ db, clientId, isMobile, isFloating 
                 {/* Progress bar */}
                 <div style={{ padding: '0.4rem 0.25rem 0.6rem' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.25rem' }}>
-                    <span style={{ fontSize: '0.38rem', color: 'rgba(255,255,255,0.2)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em' }}>VOORTGANG</span>
-                    <span style={{ fontSize: '0.38rem', color: '#FFD700', fontWeight: 800 }}>{sopProgress}%</span>
+                    <span style={{ fontSize: m?'0.72rem':'0.78rem', color: 'rgba(255,255,255,0.55)', fontWeight: 800, letterSpacing: '0.01em' }}>VOORTGANG</span>
+                    <span style={{ fontSize: m?'0.72rem':'0.78rem', color: '#FFD700', fontWeight: 800 }}>{sopProgress}%</span>
                   </div>
                   <div style={{ height: '2px', background: 'rgba(255,255,255,0.06)', borderRadius: '2px', overflow: 'hidden' }}>
                     <div style={{ height: '100%', width: `${sopProgress}%`, background: 'linear-gradient(90deg,#FFD700,#D4AF37)', borderRadius: '2px', transition: 'width 0.3s ease' }} />
@@ -416,17 +416,17 @@ export default function ClientContextPanel({ db, clientId, isMobile, isFloating 
                               ? <Check size={8} color="#000" strokeWidth={3.5} />
                               : isActive
                                 ? <div style={{ width: '5px', height: '5px', borderRadius: '50%', background: '#FFD700' }} />
-                                : <span style={{ fontSize: '0.35rem', color: 'rgba(255,255,255,0.2)', fontWeight: 800 }}>{step.id + 1}</span>
+                                : <span style={{ fontSize: '0.6rem', color: 'rgba(255,255,255,0.5)', fontWeight: 800 }}>{step.id + 1}</span>
                             }
                           </div>
                           <span style={{
-                            flex: 1, fontSize: '0.7rem', fontWeight: isActive ? 800 : 600,
-                            color: done ? 'rgba(255,255,255,0.3)' : isActive ? '#fff' : 'rgba(255,255,255,0.45)',
+                            flex: 1, fontSize: m?'0.82rem':'0.88rem', fontWeight: 800,
+                            color: done ? 'rgba(255,255,255,0.5)' : '#fff',
                             textDecoration: done ? 'line-through' : 'none'
                           }}>
                             {step.title}
                           </span>
-                          {isActive ? <ChevronDown size={10} color="rgba(255,255,255,0.2)" /> : <ChevronRight size={10} color="rgba(255,255,255,0.1)" />}
+                          {isActive ? <ChevronDown size={15} color="rgba(255,255,255,0.5)" /> : <ChevronRight size={15} color="rgba(255,255,255,0.4)" />}
                         </button>
 
                         {/* Checks */}
@@ -455,8 +455,8 @@ export default function ClientContextPanel({ db, clientId, isMobile, isFloating 
                                   {sopChecks[c.id] && <Check size={7} color="#000" strokeWidth={3.5} />}
                                 </div>
                                 <span style={{
-                                  fontSize: '0.65rem', fontWeight: 600,
-                                  color: sopChecks[c.id] ? 'rgba(255,255,255,0.25)' : 'rgba(255,255,255,0.7)',
+                                  fontSize: m?'0.75rem':'0.8rem', fontWeight: 700,
+                                  color: sopChecks[c.id] ? 'rgba(255,255,255,0.5)' : '#fff',
                                   textDecoration: sopChecks[c.id] ? 'line-through' : 'none'
                                 }}>
                                   {c.label}
@@ -471,10 +471,10 @@ export default function ClientContextPanel({ db, clientId, isMobile, isFloating 
                                 style={{
                                   marginTop: '0.2rem', padding: '0.3rem 0.5rem',
                                   background: 'rgba(255,215,0,0.08)', border: '1px solid rgba(255,215,0,0.2)',
-                                  borderRadius: '4px', color: '#FFD700',
-                                  fontSize: '0.55rem', fontWeight: 800,
+                                  borderRadius: '5px', color: '#FFD700',
+                                  fontSize: m?'0.75rem':'0.8rem', fontWeight: 800,
                                   cursor: 'pointer', touchAction: 'manipulation',
-                                  WebkitTapHighlightColor: 'transparent', minHeight: '28px'
+                                  WebkitTapHighlightColor: 'transparent', minHeight: '32px'
                                 }}
                               >
                                 Volgende stap →
@@ -494,8 +494,8 @@ export default function ClientContextPanel({ db, clientId, isMobile, isFloating 
                     style={{
                       marginTop: '0.75rem', width: '100%', padding: '0.3rem',
                       background: 'transparent', border: '1px solid rgba(255,255,255,0.06)',
-                      borderRadius: '4px', color: 'rgba(255,255,255,0.2)',
-                      fontSize: '0.45rem', fontWeight: 700,
+                      borderRadius: '5px', color: 'rgba(255,255,255,0.5)',
+                      fontSize: m?'0.68rem':'0.72rem', fontWeight: 700,
                       cursor: 'pointer', touchAction: 'manipulation',
                       WebkitTapHighlightColor: 'transparent'
                     }}
@@ -526,10 +526,10 @@ const iconBtnStyle = { width:'20px',height:'20px',borderRadius:'3px',background:
 
 function Section({ title, expanded, onToggle, children, m, color }) {
   return (
-    <div style={{ borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
-      <button onClick={onToggle} style={{ width:'100%',display:'flex',alignItems:'center',justifyContent:'space-between',padding:m?'0.3rem 0.75rem':'0.35rem 0.75rem',background:'transparent',border:'none',cursor:'pointer',touchAction:'manipulation',WebkitTapHighlightColor:'transparent' }}>
-        <span style={{ fontSize:'0.42rem',fontWeight:700,color:color||'rgba(255,255,255,0.2)',textTransform:'uppercase',letterSpacing:'0.06em' }}>{title}</span>
-        {expanded ? <ChevronDown size={10} color="rgba(255,255,255,0.15)" /> : <ChevronRight size={10} color="rgba(255,255,255,0.15)" />}
+    <div style={{ borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+      <button onClick={onToggle} style={{ width:'100%',display:'flex',alignItems:'center',justifyContent:'space-between',padding:m?'0.6rem 0.9rem':'0.7rem 1rem',background:'transparent',border:'none',cursor:'pointer',touchAction:'manipulation',WebkitTapHighlightColor:'transparent' }}>
+        <span style={{ fontSize:m?'0.85rem':'0.9rem',fontWeight:800,color:'#fff',letterSpacing:'-0.01em' }}>{title}</span>
+        {expanded ? <ChevronDown size={16} color="rgba(255,255,255,0.5)" /> : <ChevronRight size={16} color="rgba(255,255,255,0.5)" />}
       </button>
       {expanded && children}
     </div>
@@ -538,11 +538,11 @@ function Section({ title, expanded, onToggle, children, m, color }) {
 
 function FlushRow({ items, m }) {
   return (
-    <div style={{ display:'flex',borderTop:'1px solid rgba(255,255,255,0.03)' }}>
+    <div style={{ display:'flex',borderTop:'1px solid rgba(255,255,255,0.06)' }}>
       {items.map((item, i) => (
-        <div key={i} style={{ flex:1,textAlign:'center',padding:m?'0.3rem 0.1rem':'0.35rem 0.15rem',borderRight:i<items.length-1?'1px solid rgba(255,255,255,0.03)':'none' }}>
-          <div style={{ fontSize:'0.35rem',fontWeight:700,color:'rgba(255,255,255,0.15)',textTransform:'uppercase',letterSpacing:'0.05em',marginBottom:'0.05rem' }}>{item.l}</div>
-          <div style={{ fontSize:m?'0.65rem':'0.7rem',fontWeight:800,color:item.color||'#fff',lineHeight:1 }}>{item.v}</div>
+        <div key={i} style={{ flex:1,textAlign:'center',padding:m?'0.5rem 0.15rem':'0.6rem 0.2rem',borderRight:i<items.length-1?'1px solid rgba(255,255,255,0.06)':'none' }}>
+          <div style={{ fontSize:m?'0.62rem':'0.66rem',fontWeight:800,color:'rgba(255,255,255,0.55)',textTransform:'uppercase',letterSpacing:'0.02em',marginBottom:'0.2rem' }}>{item.l}</div>
+          <div style={{ fontSize:m?'0.95rem':'1.05rem',fontWeight:800,color:'#fff',lineHeight:1 }}>{item.v}</div>
         </div>
       ))}
     </div>
@@ -554,19 +554,19 @@ function MealCardStrip({ label, color, items, labelMap, m }) {
   return (
     <div style={{ padding:m?'0.35rem 0.5rem':'0.4rem 0.75rem',borderBottom:'1px solid rgba(255,255,255,0.03)' }}>
       <style>{`._ms::-webkit-scrollbar{display:none}`}</style>
-      <div style={{ fontSize:'0.35rem',fontWeight:700,color,textTransform:'uppercase',letterSpacing:'0.06em',marginBottom:'0.3rem',opacity:0.7 }}>{label}</div>
-      <div className="_ms" style={{ display:'flex',gap:'0.3rem',overflowX:'auto',WebkitOverflowScrolling:'touch',scrollbarWidth:'none',msOverflowStyle:'none' }}>
+      <div style={{ fontSize:m?'0.7rem':'0.75rem',fontWeight:800,color:'#fff',letterSpacing:'0.01em',marginBottom:'0.4rem' }}>{label}</div>
+      <div className="_ms" style={{ display:'flex',gap:'0.4rem',overflowX:'auto',WebkitOverflowScrolling:'touch',scrollbarWidth:'none',msOverflowStyle:'none' }}>
         {items.map(id => {
           const name  = labelMap[id] || id.replace(/_/g,' ')
           const image = SUB_IMAGES[id]
           return (
-            <div key={id} style={{ flexShrink:0,width:m?'64px':'72px',borderRadius:'5px',overflow:'hidden',border:`1px solid ${color}25`,background:'#111' }}>
+            <div key={id} style={{ flexShrink:0,width:m?'84px':'92px',borderRadius:'6px',overflow:'hidden',border:`1px solid rgba(255,255,255,0.12)`,background:'#111' }}>
               {image
-                ? <div style={{ width:'100%',height:m?'40px':'44px',backgroundImage:`url(${image})`,backgroundSize:'cover',backgroundPosition:'center' }} />
-                : <div style={{ width:'100%',height:m?'40px':'44px',background:`${color}10`,display:'flex',alignItems:'center',justifyContent:'center' }}><span style={{ fontSize:'1rem' }}>🍽️</span></div>
+                ? <div style={{ width:'100%',height:m?'52px':'58px',backgroundImage:`url(${image})`,backgroundSize:'cover',backgroundPosition:'center' }} />
+                : <div style={{ width:'100%',height:m?'52px':'58px',background:'rgba(255,255,255,0.05)',display:'flex',alignItems:'center',justifyContent:'center' }}><span style={{ fontSize:'1.2rem' }}>🍽️</span></div>
               }
-              <div style={{ padding:'0.2rem 0.25rem' }}>
-                <div style={{ fontSize:'0.38rem',fontWeight:700,color:'rgba(255,255,255,0.6)',lineHeight:1.25,display:'-webkit-box',WebkitLineClamp:2,WebkitBoxOrient:'vertical',overflow:'hidden' }}>{name}</div>
+              <div style={{ padding:'0.3rem 0.35rem' }}>
+                <div style={{ fontSize:m?'0.62rem':'0.68rem',fontWeight:700,color:'#fff',lineHeight:1.25,display:'-webkit-box',WebkitLineClamp:2,WebkitBoxOrient:'vertical',overflow:'hidden' }}>{name}</div>
               </div>
             </div>
           )
@@ -579,9 +579,9 @@ function MealCardStrip({ label, color, items, labelMap, m }) {
 function DataRow({ label, value, color, m }) {
   if (!value) return null
   return (
-    <div style={{ display:'flex',justifyContent:'space-between',alignItems:'flex-start',padding:m?'0.2rem 0.75rem':'0.25rem 0.75rem',gap:'0.5rem' }}>
-      <span style={{ fontSize:'0.35rem',fontWeight:700,color:'rgba(255,255,255,0.15)',textTransform:'uppercase',letterSpacing:'0.05em',flexShrink:0,paddingTop:'0.1rem' }}>{label}</span>
-      <span style={{ fontSize:m?'0.58rem':'0.62rem',fontWeight:600,color:color||'rgba(255,255,255,0.45)',textAlign:'right',lineHeight:1.35,display:'-webkit-box',WebkitLineClamp:3,WebkitBoxOrient:'vertical',overflow:'hidden' }}>{value}</span>
+    <div style={{ display:'flex',justifyContent:'space-between',alignItems:'flex-start',padding:m?'0.4rem 0.9rem':'0.45rem 1rem',gap:'0.75rem' }}>
+      <span style={{ fontSize:m?'0.7rem':'0.75rem',fontWeight:800,color:'rgba(255,255,255,0.55)',textTransform:'uppercase',letterSpacing:'0.01em',flexShrink:0,paddingTop:'0.05rem' }}>{label}</span>
+      <span style={{ fontSize:m?'0.82rem':'0.88rem',fontWeight:800,color:'#fff',textAlign:'right',lineHeight:1.35,display:'-webkit-box',WebkitLineClamp:4,WebkitBoxOrient:'vertical',overflow:'hidden' }}>{value}</span>
     </div>
   )
 }

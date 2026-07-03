@@ -3,9 +3,9 @@
 // titel, format (type), hook, script, b-rollen / ondersteunend beeld,
 // notities. New ideas land in `content_items` with status='idea'.
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { X, Save, Video, Plus, Trash2 } from 'lucide-react'
+import { X, Save, Video, Plus, Trash2, Check } from 'lucide-react'
 
 const GOLD = '#FFD700'
 
@@ -42,6 +42,22 @@ export default function QuickIdeaModal({
   const [sectionId, setSectionId] = useState('')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+  // Autosave-als-concept: id van de (concept-)rij + laatst-opgeslagen snapshot,
+  // zodat we niet dubbel inserten en niet onnodig opnieuw opslaan.
+  const [savedTick, setSavedTick] = useState(false)
+  const draftIdRef = useRef(null)   // synchroon → geen dubbele inserts
+  const baselineRef = useRef('')
+  const saveChainRef = useRef(Promise.resolve())
+
+  // Lock body scroll while the sheet is open — otherwise iOS Safari treats
+  // a swipe inside the sheet as a swipe on the page behind it and the user
+  // can't reach the bottom buttons.
+  useEffect(() => {
+    if (!isOpen) return
+    const prev = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => { document.body.style.overflow = prev }
+  }, [isOpen])
 
   useEffect(() => {
     if (!isOpen) return
@@ -66,7 +82,47 @@ export default function QuickIdeaModal({
       setBRolls([])
     }
     setError('')
+    draftIdRef.current = initial?.id || null
+    setSavedTick(false)
+    // Baseline = wat er bij openen al stond, zodat autosave niks doet tot je
+    // daadwerkelijk iets wijzigt (voorkomt ongewenst opslaan bij enkel openen).
+    const baseBRolls = Array.isArray(initial?.b_roll_list)
+      ? initial.b_roll_list.map(b => (typeof b === 'string' ? b : (b?.description || '')).trim()).filter(Boolean)
+      : []
+    baselineRef.current = JSON.stringify({
+      title: (initial?.title || '').trim(),
+      type: initial?.type || 'reel',
+      hook: (initial?.hook || '').trim(),
+      script: (initial?.script || '').trim(),
+      notes: (initial?.notes || '').trim(),
+      sectionId: initial?.section_id || defaultSectionId || '',
+      bRolls: baseBRolls,
+    })
   }, [isOpen, initial, defaultSectionId])
+
+  // Huidige inhoud als vergelijkbare snapshot (zelfde vorm als baseline).
+  const serialize = () => JSON.stringify({
+    title: title.trim(), type, hook: hook.trim(), script: script.trim(),
+    notes: notes.trim(), sectionId: sectionId || '',
+    bRolls: bRolls.map(b => (b.description || '').trim()).filter(Boolean),
+  })
+  const hasContent = !!(
+    title.trim() || hook.trim() || script.trim() || notes.trim() ||
+    bRolls.some(b => (b.description || '').trim())
+  )
+
+  // ── Autosave als concept (debounced) ──
+  // Slaat tijdens het uitwerken automatisch op, zodat een dichtklappende modal
+  // nooit je werk weggooit. Pas actief zodra je echt iets wijzigt.
+  useEffect(() => {
+    if (!isOpen) return
+    if (!hasContent) return
+    if (serialize() === baselineRef.current) return
+    setSavedTick(false) // er zijn onopgeslagen wijzigingen
+    const t = setTimeout(() => { enqueueSave(true) }, 900)
+    return () => clearTimeout(t)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, title, type, hook, script, notes, bRolls, sectionId])
 
   if (!isOpen) return null
 
@@ -77,9 +133,10 @@ export default function QuickIdeaModal({
     setBRolls(prev => prev.map(b => (b.id === id ? { ...b, description: val } : b)))
   const removeBRoll = (id) => setBRolls(prev => prev.filter(b => b.id !== id))
 
-  const persist = async () => {
-    if (!canSave) return null
-    setSaving(true); setError('')
+  const doPersist = async ({ silent = false } = {}) => {
+    if (!hasContent) return null
+    if (!silent) setSaving(true)
+    setError('')
     try {
       const user = await db.getCurrentUser()
       if (!user) throw new Error('Niet ingelogd')
@@ -91,7 +148,9 @@ export default function QuickIdeaModal({
 
       const payload = {
         coach_id: user.id,
-        title: title.trim(),
+        // Titel is verplicht in de DB — val terug op "(concept)" zodat een
+        // half-uitgewerkt idee zonder titel tóch veilig wordt bewaard.
+        title: title.trim() || '(concept)',
         type,
         hook: hook.trim() || null,
         script: script.trim() || null,
@@ -101,35 +160,64 @@ export default function QuickIdeaModal({
         status: 'idea',
         updated_at: new Date().toISOString(),
       }
-      if (initial?.id) {
-        const { data, error: err } = await db.supabase
-          .from('content_items').update(payload).eq('id', initial.id)
+
+      // Hergebruik de bestaande rij (bij bewerken) of de concept-rij die de
+      // autosave al aanmaakte — zo ontstaan er geen duplicaten.
+      const effectiveId = draftIdRef.current || initial?.id
+      let data
+      if (effectiveId) {
+        const { data: d, error: err } = await db.supabase
+          .from('content_items').update(payload).eq('id', effectiveId)
           .select().single()
         if (err) throw err
-        return data
+        data = d
       } else {
-        const { data, error: err } = await db.supabase
+        const { data: d, error: err } = await db.supabase
           .from('content_items').insert({ ...payload, created_at: new Date().toISOString() })
           .select().single()
         if (err) throw err
-        return data
+        data = d
+        draftIdRef.current = d.id
       }
+      baselineRef.current = serialize()
+      setSavedTick(true)
+      return data
     } catch (e) {
       console.error('QuickIdeaModal save failed:', e)
-      setError(e?.message || 'Opslaan mislukt')
+      if (!silent) setError(e?.message || 'Opslaan mislukt')
       return null
     } finally {
-      setSaving(false)
+      if (!silent) setSaving(false)
     }
   }
 
+  // Serialiseer alle opslag-acties (autosave + handmatig) zodat ze elkaar niet
+  // overlappen — voorkomt dubbele inserts.
+  const enqueueSave = (silent) => {
+    const next = saveChainRef.current.then(() => doPersist({ silent })).catch(() => null)
+    saveChainRef.current = next.then(() => {}, () => {})
+    return next
+  }
+
   const handleSave = async () => {
-    const item = await persist()
+    if (!title.trim()) { setError('Geef je idee eerst een titel.'); return }
+    const item = await enqueueSave(false)
     if (item) { onSaved?.(item); onClose?.() }
   }
   const handleSaveRecord = async () => {
-    const item = await persist()
+    if (!title.trim()) { setError('Geef je idee eerst een titel.'); return }
+    const item = await enqueueSave(false)
     if (item) { onSaveAndRecord?.(item); onClose?.() }
+  }
+
+  // Sluiten = eerst als concept flushen, dán pas sluiten. Zo verlies je nooit
+  // wat je net hebt getypt, ook niet bij een per ongeluk dichtgeklapte modal.
+  const closeWithSave = async () => {
+    if (hasContent && serialize() !== baselineRef.current) {
+      const item = await enqueueSave(true)
+      if (item) onSaved?.(item)
+    }
+    onClose?.()
   }
 
   const labelStyle = {
@@ -148,7 +236,7 @@ export default function QuickIdeaModal({
 
   const sheet = (
     <div
-      onClick={onClose}
+      onClick={closeWithSave}
       style={{
         position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)',
         zIndex: 2147483500, display: 'flex',
@@ -164,14 +252,32 @@ export default function QuickIdeaModal({
           padding: '1rem 1rem calc(1rem + env(safe-area-inset-bottom)) 1rem',
           display: 'flex', flexDirection: 'column', gap: '0.85rem',
           maxHeight: '92vh', overflow: 'auto',
+          // Keep swipe-scroll inside the sheet — without this iOS chains
+          // the touch up to the body once the sheet has nothing left to
+          // scroll, and the bottom Save button stays out of reach.
+          overscrollBehavior: 'contain',
+          WebkitOverflowScrolling: 'touch',
+          touchAction: 'pan-y',
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <div style={{ color: '#fff', fontSize: '1rem', fontWeight: 800 }}>
-            {initial?.id ? 'Idee bewerken' : 'Nieuw idee'}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', minWidth: 0 }}>
+            <div style={{ color: '#fff', fontSize: '1rem', fontWeight: 800 }}>
+              {initial?.id ? 'Idee bewerken' : 'Nieuw idee'}
+            </div>
+            {/* Concept-status zodat je ziet dat je werk veilig is */}
+            {savedTick && (
+              <span style={{
+                display: 'inline-flex', alignItems: 'center', gap: 3,
+                fontSize: '0.62rem', fontWeight: 700, color: '#10b981',
+                background: 'rgba(16,185,129,0.12)', padding: '0.15rem 0.45rem', borderRadius: 999,
+              }}>
+                <Check size={11} strokeWidth={3} /> Concept opgeslagen
+              </span>
+            )}
           </div>
           <button
-            onClick={onClose}
+            onClick={closeWithSave}
             style={{
               minWidth: 40, minHeight: 40, display: 'flex',
               alignItems: 'center', justifyContent: 'center',

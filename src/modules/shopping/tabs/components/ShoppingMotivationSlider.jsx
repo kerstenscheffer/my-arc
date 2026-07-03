@@ -48,9 +48,9 @@ export default function ShoppingMotivationSlider({ isMobile }) {
     <div style={{
       marginBottom: isMobile ? '1rem' : '1.25rem',
       padding: isMobile ? '1rem' : '1.25rem',
-      background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.12) 0%, rgba(16, 185, 129, 0.04) 100%)',
+      background: 'linear-gradient(135deg, rgba(255, 215, 0, 0.12) 0%, rgba(255, 215, 0, 0.04) 100%)',
       backdropFilter: 'blur(12px)',
-      border: '1px solid rgba(16, 185, 129, 0.3)',
+      border: '1px solid rgba(255, 215, 0, 0.3)',
       borderRadius: isMobile ? '14px' : '16px',
       position: 'relative',
       overflow: 'hidden',
@@ -58,7 +58,7 @@ export default function ShoppingMotivationSlider({ isMobile }) {
       display: 'flex',
       alignItems: 'center',
       gap: isMobile ? '0.875rem' : '1rem',
-      boxShadow: '0 8px 32px rgba(16, 185, 129, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.05)'
+      boxShadow: '0 8px 32px rgba(255, 215, 0, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.05)'
     }}>
       {/* Top accent line */}
       <div style={{
@@ -67,7 +67,7 @@ export default function ShoppingMotivationSlider({ isMobile }) {
         left: 0,
         right: 0,
         height: '2px',
-        background: 'linear-gradient(90deg, #10b981 0%, #059669 100%)',
+        background: 'linear-gradient(90deg, #FFD700 0%, #D4AF37 100%)',
         opacity: 0.6
       }} />
 
@@ -87,12 +87,12 @@ export default function ShoppingMotivationSlider({ isMobile }) {
         width: isMobile ? '48px' : '56px',
         height: isMobile ? '48px' : '56px',
         borderRadius: '12px',
-        background: 'rgba(16, 185, 129, 0.2)',
-        border: '1px solid rgba(16, 185, 129, 0.4)',
+        background: 'rgba(255, 215, 0, 0.2)',
+        border: '1px solid rgba(255, 215, 0, 0.4)',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        boxShadow: '0 0 20px rgba(16, 185, 129, 0.3)',
+        boxShadow: '0 0 20px rgba(255, 215, 0, 0.3)',
         flexShrink: 0,
         position: 'relative',
         zIndex: 2,
@@ -102,9 +102,9 @@ export default function ShoppingMotivationSlider({ isMobile }) {
       }}>
         <Icon 
           size={isMobile ? 24 : 28} 
-          color="#10b981" 
+          color="#FFD700" 
           strokeWidth={2.5}
-          style={{ filter: 'drop-shadow(0 2px 4px rgba(16, 185, 129, 0.6))' }}
+          style={{ filter: 'drop-shadow(0 2px 4px rgba(255, 215, 0, 0.6))' }}
         />
       </div>
 
@@ -145,10 +145,10 @@ export default function ShoppingMotivationSlider({ isMobile }) {
               height: '6px',
               borderRadius: '50%',
               background: index === currentIndex 
-                ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)' 
+                ? 'linear-gradient(135deg, #FFD700 0%, #D4AF37 100%)' 
                 : 'rgba(255, 255, 255, 0.2)',
               boxShadow: index === currentIndex 
-                ? '0 0 8px rgba(16, 185, 129, 0.6)' 
+                ? '0 0 8px rgba(255, 215, 0, 0.6)' 
                 : 'none',
               transition: 'all 0.3s ease'
             }}

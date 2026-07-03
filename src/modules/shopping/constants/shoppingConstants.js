@@ -39,8 +39,8 @@ export const CATEGORY_CONFIG = {
   vegetables: {
     label: 'Groenten',
     emoji: '🥬',
-    color: '#10b981',
-    gradient: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+    color: '#FFD700',
+    gradient: 'linear-gradient(135deg, #FFD700 0%, #D4AF37 100%)',
     keywords: [
       'broccoli', 'spinazie', 'spinach',
       'sla', 'lettuce', 'ijsbergsla',

@@ -72,6 +72,80 @@ const DEV_PRESET = {
   coachingLevel: 'A',
 }
 
+// Sticky goal + macro-header. Geeft de coach één centraal anker:
+// "waar werken we naartoe en hoe ziet de macro-output eruit". Net als de
+// coaching-periode-strip bovenin Coach Inside, maar dan inhoudelijk.
+function IntakeGoalMacroHeader({ cd, planState, result }) {
+  const goalLabels = {
+    afvallen: 'Afvallen', fat_loss: 'Afvallen', weight_loss: 'Afvallen',
+    spieren: 'Spieropbouw', muscle_gain: 'Spieropbouw',
+    recomp: 'Recomp', body_recomposition: 'Recomp',
+    fitness: 'Fitter worden', general_fitness: 'Fitter worden',
+    onderhouden: 'Onderhouden', maintain: 'Onderhouden',
+  }
+  const goalKey = cd?.primary_goal || planState?.mode || null
+  const goalLabel = goalKey ? (goalLabels[goalKey] || goalKey) : '— nog geen doel —'
+  const startW = result?.startWeight ?? cd?.current_weight ?? null
+  const goalW = result?.goalWeight ?? cd?.target_weight ?? null
+  const weeks = result?.weeksNeeded ?? null
+  const targetCal = result?.targetCal ?? cd?.target_calories ?? null
+  const prot = result?.prot ?? cd?.target_protein ?? null
+  const carbs = result?.carbs ?? cd?.target_carbs ?? null
+  const fat = result?.fat ?? cd?.target_fat ?? null
+
+  return (
+    <div style={{
+      display: 'flex', alignItems: 'stretch',
+      borderBottom: '1px solid rgba(255,215,0,0.18)',
+      background: 'linear-gradient(90deg, rgba(255,215,0,0.06) 0%, rgba(255,215,0,0.02) 100%)',
+      flexShrink: 0,
+    }}>
+      {/* Doel */}
+      <div style={{ flex: 1, padding: '6px 10px', borderRight: '1px solid rgba(255,255,255,0.06)' }}>
+        <div style={{ fontSize: '9px', fontWeight: 800, color: 'rgba(255,215,0,0.55)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 2 }}>Doel</div>
+        <div style={{ fontSize: '13px', fontWeight: 800, color: '#FFD700', lineHeight: 1.1 }}>{goalLabel}</div>
+        {(startW || goalW) && (
+          <div style={{ fontSize: '10px', color: 'rgba(255,255,255,0.45)', fontWeight: 600, marginTop: 1 }}>
+            {startW ? `${parseFloat(startW).toFixed(1)}kg` : '—'}
+            {goalW ? ` → ${parseFloat(goalW).toFixed(1)}kg` : ''}
+            {weeks ? ` · ${weeks} wkn` : ''}
+          </div>
+        )}
+      </div>
+      {/* Macro's */}
+      <div style={{ flex: 1.5, padding: '6px 10px', display: 'flex', alignItems: 'center', gap: 12 }}>
+        <div style={{ flexShrink: 0 }}>
+          <div style={{ fontSize: '9px', fontWeight: 800, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Target</div>
+          <div style={{ fontSize: '17px', fontWeight: 900, color: '#FFD700', lineHeight: 1, letterSpacing: '-0.01em' }}>
+            {targetCal != null ? Math.round(targetCal) : '—'}
+            <span style={{ fontSize: '9px', fontWeight: 600, color: 'rgba(255,215,0,0.45)', marginLeft: 2 }}>kcal</span>
+          </div>
+        </div>
+        <div style={{ display: 'flex', gap: 8, flex: 1, flexWrap: 'wrap' }}>
+          {[
+            { l: 'P', v: prot,  c: '#10b981' },
+            { l: 'C', v: carbs, c: '#3b82f6' },
+            { l: 'F', v: fat,   c: '#f59e0b' },
+          ].map(m => (
+            <div key={m.l} style={{
+              display: 'flex', alignItems: 'baseline', gap: 2,
+              padding: '2px 6px',
+              background: `${m.c}12`,
+              border: `1px solid ${m.c}30`,
+              borderRadius: 4,
+            }}>
+              <span style={{ fontSize: '11px', fontWeight: 800, color: m.c }}>
+                {m.v != null ? Math.round(m.v) : '—'}
+              </span>
+              <span style={{ fontSize: '8px', fontWeight: 700, color: `${m.c}90` }}>{m.l}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export default function IntakeCallPanel({ db, client, journey, weekNumber, totalWeeks, isMobile }) {
   const [cd, setCd] = useState(null)
   const [np, setNp] = useState(null)
@@ -455,6 +529,11 @@ export default function IntakeCallPanel({ db, client, journey, weekNumber, total
 
       {/* Rechter kolom: stappen */}
       <div style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+        {/* CENTRAAL DOEL + MACRO-HEADER — altijd zichtbaar bovenaan zodat
+            de coach tijdens iedere stap z'n eindbestemming voor ogen
+            heeft: doel + berekende target calorieën + P/C/F split. */}
+        <IntakeGoalMacroHeader cd={cd} planState={planState} result={result} />
+
         {/* Progress bar */}
         <div style={{ display: 'flex', borderBottom: `1px solid ${C.border}`, flexShrink: 0 }}>
           {STEPS.map((step, i) => {

@@ -1,10 +1,16 @@
 import { useState, useEffect } from 'react';
 import { Bell, X, TrendingUp, Award, Utensils, AlertCircle, Sparkles, CheckCircle } from 'lucide-react';
 
-export default function NotificationWidget({ db, clientId, currentPage = 'all' }) {
+export default function NotificationWidget({ db, clientId, currentPage = 'all', open: openProp, onOpenChange, onCountChange }) {
   const isMobile = window.innerWidth <= 768;
+  const controlled = typeof openProp === 'boolean' && typeof onOpenChange === 'function'
   const [notifications, setNotifications] = useState([]);
-  const [isExpanded, setIsExpanded] = useState(false);
+  const [isExpandedInternal, setIsExpandedInternal] = useState(false);
+  const isExpanded = controlled ? openProp : isExpandedInternal;
+  const setIsExpanded = (val) => {
+    const next = typeof val === 'function' ? val(isExpanded) : val
+    if (controlled) onOpenChange(next); else setIsExpandedInternal(next)
+  };
   const [hasUnread, setHasUnread] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [autoHideTimer, setAutoHideTimer] = useState(null);
@@ -104,9 +110,9 @@ export default function NotificationWidget({ db, clientId, currentPage = 'all' }
   const getPriorityColor = (priority) => {
     switch(priority) {
       case 'urgent': return '#ef4444';
-      case 'high': return '#f59e0b';
-      case 'normal': return '#8b5cf6';
-      default: return '#6b7280';
+      case 'high':   return '#f59e0b';
+      case 'normal': return '#FFD700';
+      default:       return 'rgba(255,255,255,0.45)';
     }
   };
 
@@ -119,6 +125,14 @@ export default function NotificationWidget({ db, clientId, currentPage = 'all' }
     }
   };
 
+  // Live count voor sidebar-badge — hook moet vóór de early return staan.
+  useEffect(() => {
+    if (typeof onCountChange === 'function') {
+      const active = notifications.filter(n => n.status === 'active').length
+      onCountChange(active)
+    }
+  }, [notifications, onCountChange])
+
   if (!db?.notifications || !clientId) return null;
 
   // Get highest priority for bell color
@@ -130,8 +144,8 @@ export default function NotificationWidget({ db, clientId, currentPage = 'all' }
 
   return (
     <>
-      {/* Cleaner Floating Bell Button */}
-      <button
+      {/* Cleaner Floating Bell Button — alleen tonen in uncontrolled mode */}
+      {!controlled && <button
         onClick={handleBellClick}
         style={{ 
           position: 'fixed',
@@ -206,114 +220,131 @@ export default function NotificationWidget({ db, clientId, currentPage = 'all' }
             border: '1.5px solid rgba(0, 0, 0, 0.3)',
             boxShadow: '0 1px 4px rgba(239, 68, 68, 0.5)'
           }}>
-            {notifications.filter(n => n.status === 'active').length < 10 
-              ? notifications.filter(n => n.status === 'active').length 
+            {notifications.filter(n => n.status === 'active').length < 10
+              ? notifications.filter(n => n.status === 'active').length
               : '•'}
           </span>
         )}
-      </button>
+      </button>}
 
-      {/* Cleaner Notification Panel */}
+      {/* Notification Panel — gouden styling */}
       {isExpanded && (
         <div style={{
           position: 'fixed',
           bottom: '160px',
           right: '20px',
           width: '90%',
-          maxWidth: '380px',
+          maxWidth: '400px',
           maxHeight: '60vh',
-          background: 'rgba(17, 17, 17, 0.95)',
-          borderRadius: '16px',
-          boxShadow: '0 4px 20px rgba(0, 0, 0, 0.3)',
+          background: '#0a0a0a',
+          borderRadius: 18,
+          boxShadow: '0 24px 60px rgba(0, 0, 0, 0.7), 0 0 0 1px rgba(255,215,0,0.08)',
           zIndex: 999,
           display: 'flex',
           flexDirection: 'column',
           overflow: 'hidden',
           backdropFilter: 'blur(16px)',
           WebkitBackdropFilter: 'blur(16px)',
-          border: '0.5px solid rgba(255, 255, 255, 0.08)',
+          border: '1px solid rgba(255,215,0,0.22)',
           animation: 'slideInUp 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
         }}>
-          {/* Cleaner Header */}
+          {/* Gouden accent-strip bovenaan */}
           <div style={{
-            padding: isMobile ? '1rem' : '1.25rem',
-            background: 'rgba(0, 0, 0, 0.2)',
-            borderBottom: '0.5px solid rgba(255, 255, 255, 0.05)',
+            height: 2,
+            background: 'linear-gradient(90deg, transparent 0%, rgba(255,215,0,0.7) 50%, transparent 100%)',
+          }} />
+
+          {/* Header — goud */}
+          <div style={{
+            padding: isMobile ? '1rem 1.1rem' : '1.15rem 1.3rem',
+            background: 'rgba(255,215,0,0.04)',
+            borderBottom: '1px solid rgba(255,215,0,0.18)',
             display: 'flex',
             justifyContent: 'space-between',
-            alignItems: 'center'
+            alignItems: 'center',
+            gap: 12,
           }}>
             <div style={{
               display: 'flex',
               alignItems: 'center',
-              gap: '0.75rem'
+              gap: '0.7rem',
+              minWidth: 0, flex: 1,
             }}>
-              <img 
+              <img
                 src={coachAvatar}
                 alt={coachName}
                 style={{
-                  width: isMobile ? '36px' : '40px',
-                  height: isMobile ? '36px' : '40px',
-                  borderRadius: '12px',
-                  border: '0.5px solid rgba(255, 255, 255, 0.1)',
-                  objectFit: 'cover'
+                  width: isMobile ? 38 : 42,
+                  height: isMobile ? 38 : 42,
+                  borderRadius: '50%',
+                  border: '2px solid rgba(255,215,0,0.45)',
+                  objectFit: 'cover',
+                  flexShrink: 0,
+                  boxShadow: '0 4px 12px rgba(255,215,0,0.2)',
                 }}
               />
-              <div>
-                <h3 style={{
-                  margin: 0,
-                  fontSize: isMobile ? '0.95rem' : '1rem',
-                  fontWeight: '600',
-                  color: 'rgba(255, 255, 255, 0.9)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.4rem'
+              <div style={{ minWidth: 0 }}>
+                <div style={{
+                  fontSize: '0.58rem', fontWeight: 800, color: '#FFD700',
+                  textTransform: 'uppercase', letterSpacing: '0.12em',
+                  opacity: 0.85, marginBottom: 2,
+                  display: 'flex', alignItems: 'center', gap: 5,
+                }}>
+                  <Bell size={10} strokeWidth={2.6} /> Meldingen
+                </div>
+                <div style={{
+                  fontSize: isMobile ? '1rem' : '1.1rem',
+                  fontWeight: 900, color: '#fff',
+                  letterSpacing: '-0.02em',
+                  lineHeight: 1.1,
+                  whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
                 }}>
                   {coachName}
-                  <Sparkles size={14} style={{ color: 'rgba(139, 92, 246, 0.6)' }} />
-                </h3>
-                <p style={{
-                  margin: 0,
-                  fontSize: isMobile ? '0.7rem' : '0.75rem',
-                  color: 'rgba(255, 255, 255, 0.4)'
+                </div>
+                <div style={{
+                  fontSize: '0.7rem', fontWeight: 700,
+                  color: 'rgba(255,255,255,0.5)',
+                  marginTop: 1,
                 }}>
-                  {notifications.filter(n => n.status === 'active').length} nieuwe berichten
-                </p>
+                  {notifications.filter(n => n.status === 'active').length} actie{notifications.filter(n => n.status === 'active').length === 1 ? '' : 'f'}
+                </div>
               </div>
             </div>
             <button
               onClick={() => setIsExpanded(false)}
+              aria-label="Sluiten"
               style={{
-                width: '32px',
-                height: '32px',
-                borderRadius: '8px',
-                border: '0.5px solid rgba(255, 255, 255, 0.08)',
-                background: 'transparent',
+                width: 34, height: 34,
+                borderRadius: 10,
+                border: '1px solid rgba(255,255,255,0.08)',
+                background: 'rgba(255,255,255,0.04)',
+                color: 'rgba(255,255,255,0.7)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
                 cursor: 'pointer',
-                transition: 'all 0.2s ease'
+                transition: 'all 0.15s ease',
+                flexShrink: 0,
               }}
               onMouseEnter={(e) => {
-                if (!isMobile) {
-                  e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)';
-                }
+                e.currentTarget.style.background = 'rgba(239,68,68,0.12)';
+                e.currentTarget.style.borderColor = 'rgba(239,68,68,0.35)';
+                e.currentTarget.style.color = '#fff';
               }}
               onMouseLeave={(e) => {
-                if (!isMobile) {
-                  e.currentTarget.style.background = 'transparent';
-                }
+                e.currentTarget.style.background = 'rgba(255,255,255,0.04)';
+                e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)';
+                e.currentTarget.style.color = 'rgba(255,255,255,0.7)';
               }}
             >
-              <X size={16} style={{ color: 'rgba(255, 255, 255, 0.4)' }} />
+              <X size={15} strokeWidth={2.4} />
             </button>
           </div>
 
-          {/* Auto-hide timer indicator - Subtler */}
+          {/* Auto-hide timer indicator — goud */}
           <div style={{
-            height: '1px',
-            background: 'rgba(255, 255, 255, 0.05)',
+            height: 2,
+            background: 'rgba(255,255,255,0.04)',
             position: 'relative',
             overflow: 'hidden'
           }}>
@@ -323,7 +354,7 @@ export default function NotificationWidget({ db, clientId, currentPage = 'all' }
               left: 0,
               height: '100%',
               width: '100%',
-              background: 'rgba(139, 92, 246, 0.3)',
+              background: 'linear-gradient(90deg, rgba(255,215,0,0.7) 0%, rgba(212,175,55,0.5) 100%)',
               animation: 'timerShrink 10s linear',
               transformOrigin: 'left'
             }} />
@@ -362,124 +393,117 @@ export default function NotificationWidget({ db, clientId, currentPage = 'all' }
                 </p>
               </div>
             ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: isMobile ? '0.5rem' : '0.75rem' }}>
-                {notifications.map((notification, index) => (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: isMobile ? '0.65rem' : '0.85rem' }}>
+                {notifications.map((notification, index) => {
+                  const pc = getPriorityColor(notification.priority);
+                  const isActive = notification.status === 'active';
+                  return (
                   <div
                     key={notification.id}
                     id={`notification-${notification.id}`}
-                    onClick={() => notification.status === 'active' && handleMarkAsRead(notification.id)}
+                    onClick={() => isActive && handleMarkAsRead(notification.id)}
                     style={{
-                      padding: isMobile ? '0.875rem' : '1rem',
-                      borderRadius: '12px',
-                      background: notification.priority === 'urgent'
-                        ? 'rgba(239, 68, 68, 0.08)'
-                        : notification.priority === 'high'
-                        ? 'rgba(245, 158, 11, 0.08)'
-                        : 'rgba(0, 0, 0, 0.3)',
-                      border: `0.5px solid ${
-                        notification.priority === 'urgent'
-                          ? 'rgba(239, 68, 68, 0.15)'
-                          : notification.priority === 'high'
-                          ? 'rgba(245, 158, 11, 0.15)'
-                          : 'rgba(255, 255, 255, 0.05)'
-                      }`,
-                      backdropFilter: 'blur(8px)',
-                      cursor: notification.status === 'active' ? 'pointer' : 'default',
+                      padding: isMobile ? '0.9rem 0.95rem' : '1rem 1.1rem',
+                      paddingLeft: isMobile ? '1.05rem' : '1.2rem',
+                      borderRadius: 12,
+                      background: 'rgba(255,255,255,0.03)',
+                      border: `1px solid ${pc}30`,
+                      borderLeft: `3px solid ${pc}`,
+                      cursor: isActive ? 'pointer' : 'default',
                       transition: 'all 0.2s ease',
-                      opacity: notification.status === 'read' ? 0.5 : 1,
+                      opacity: notification.status === 'read' ? 0.55 : 1,
                       animation: `slideInRight 0.3s ease ${index * 0.05}s both`,
                       position: 'relative',
-                      overflow: 'hidden'
                     }}
                     onMouseEnter={(e) => {
-                      if (notification.status === 'active' && !isMobile) {
+                      if (isActive && !isMobile) {
                         e.currentTarget.style.transform = 'translateX(-2px)';
-                        e.currentTarget.style.background = 
-                          notification.priority === 'urgent'
-                            ? 'rgba(239, 68, 68, 0.1)'
-                            : notification.priority === 'high'
-                            ? 'rgba(245, 158, 11, 0.1)'
-                            : 'rgba(0, 0, 0, 0.4)';
+                        e.currentTarget.style.background = 'rgba(255,255,255,0.05)';
+                        e.currentTarget.style.borderColor = `${pc}60`;
                       }
                     }}
                     onMouseLeave={(e) => {
                       if (!isMobile) {
                         e.currentTarget.style.transform = 'translateX(0)';
-                        e.currentTarget.style.background = 
-                          notification.priority === 'urgent'
-                            ? 'rgba(239, 68, 68, 0.08)'
-                            : notification.priority === 'high'
-                            ? 'rgba(245, 158, 11, 0.08)'
-                            : 'rgba(0, 0, 0, 0.3)';
+                        e.currentTarget.style.background = 'rgba(255,255,255,0.03)';
+                        e.currentTarget.style.borderColor = `${pc}30`;
                       }
                     }}
                   >
-                    {/* Priority indicator line - Subtler */}
                     <div style={{
-                      position: 'absolute',
-                      left: 0,
-                      top: 0,
-                      bottom: 0,
-                      width: '2px',
-                      background: getPriorityColor(notification.priority),
-                      opacity: 0.5,
-                      borderRadius: '2px'
-                    }} />
-
-                    <div style={{ 
-                      display: 'flex', 
-                      gap: isMobile ? '0.75rem' : '1rem', 
+                      display: 'flex',
+                      gap: isMobile ? '0.7rem' : '0.85rem',
                       alignItems: 'flex-start',
-                      paddingLeft: '0.5rem'
                     }}>
                       <div style={{
-                        width: isMobile ? '32px' : '36px',
-                        height: isMobile ? '32px' : '36px',
-                        borderRadius: '10px',
-                        background: `linear-gradient(135deg, ${getPriorityColor(notification.priority)}15 0%, ${getPriorityColor(notification.priority)}08 100%)`,
-                        border: `0.5px solid ${getPriorityColor(notification.priority)}20`,
+                        width: isMobile ? 36 : 40,
+                        height: isMobile ? 36 : 40,
+                        borderRadius: '50%',
+                        background: `linear-gradient(135deg, ${pc}22 0%, ${pc}0a 100%)`,
+                        border: `1px solid ${pc}55`,
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
                         flexShrink: 0,
-                        color: getPriorityColor(notification.priority)
+                        color: pc,
+                        boxShadow: isActive ? `0 0 12px ${pc}30` : 'none',
                       }}>
                         {getIcon(notification.type)}
                       </div>
 
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <h4 style={{
-                          margin: '0 0 0.25rem 0',
-                          fontSize: isMobile ? '0.85rem' : '0.9rem',
-                          fontWeight: '600',
-                          color: 'rgba(255, 255, 255, 0.9)'
+                          margin: '0 0 0.3rem 0',
+                          fontSize: isMobile ? '0.95rem' : '1rem',
+                          fontWeight: 900,
+                          color: '#fff',
+                          letterSpacing: '-0.015em',
+                          lineHeight: 1.25,
                         }}>
                           {notification.title}
                         </h4>
                         <p style={{
                           margin: '0 0 0.5rem 0',
-                          fontSize: isMobile ? '0.75rem' : '0.8rem',
-                          color: 'rgba(255, 255, 255, 0.6)',
-                          lineHeight: '1.4'
+                          fontSize: isMobile ? '0.82rem' : '0.88rem',
+                          color: 'rgba(255, 255, 255, 0.75)',
+                          fontWeight: 500,
+                          lineHeight: 1.5,
+                          whiteSpace: 'pre-wrap',
                         }}>
                           {notification.message}
                         </p>
-                        
-                        <div style={{ 
-                          display: 'flex', 
-                          gap: '0.5rem', 
+
+                        <div style={{
+                          display: 'flex',
+                          gap: '0.5rem',
                           alignItems: 'center',
                           flexWrap: 'wrap'
                         }}>
+                          {(notification.priority === 'urgent' || notification.priority === 'high') && (
+                            <span style={{
+                              padding: '0.15rem 0.55rem',
+                              borderRadius: 6,
+                              background: `${pc}1a`,
+                              border: `1px solid ${pc}55`,
+                              color: pc,
+                              fontSize: '0.62rem',
+                              fontWeight: 800,
+                              textTransform: 'uppercase',
+                              letterSpacing: '0.06em',
+                            }}>
+                              {notification.priority === 'urgent' ? 'Urgent' : 'Belangrijk'}
+                            </span>
+                          )}
                           {notification.source === 'smart' && (
                             <span style={{
-                              padding: '0.15rem 0.5rem',
-                              borderRadius: '8px',
-                              background: 'rgba(139, 92, 246, 0.1)',
-                              color: 'rgba(139, 92, 246, 0.8)',
-                              fontSize: isMobile ? '0.65rem' : '0.7rem',
-                              fontWeight: '600',
-                              border: '0.5px solid rgba(139, 92, 246, 0.2)'
+                              padding: '0.15rem 0.55rem',
+                              borderRadius: 6,
+                              background: 'rgba(255,215,0,0.1)',
+                              color: '#FFD700',
+                              fontSize: '0.62rem',
+                              fontWeight: 800,
+                              border: '1px solid rgba(255,215,0,0.3)',
+                              textTransform: 'uppercase', letterSpacing: '0.06em',
                             }}>
                               AI Insight
                             </span>
@@ -489,10 +513,11 @@ export default function NotificationWidget({ db, clientId, currentPage = 'all' }
                               display: 'flex',
                               alignItems: 'center',
                               gap: '0.25rem',
-                              fontSize: isMobile ? '0.65rem' : '0.7rem',
-                              color: 'rgba(255, 255, 255, 0.4)'
+                              fontSize: '0.65rem',
+                              color: 'rgba(255, 255, 255, 0.4)',
+                              fontWeight: 700,
                             }}>
-                              <CheckCircle size={12} />
+                              <CheckCircle size={11} strokeWidth={2.4} />
                               Gelezen
                             </span>
                           )}
@@ -501,38 +526,41 @@ export default function NotificationWidget({ db, clientId, currentPage = 'all' }
 
                       <button
                         onClick={(e) => handleDismiss(e, notification.id)}
+                        aria-label="Wegklikken"
                         style={{
-                          width: '28px',
-                          height: '28px',
-                          borderRadius: '8px',
-                          border: 'none',
-                          background: 'transparent',
+                          width: 28, height: 28,
+                          borderRadius: 7,
+                          border: '1px solid rgba(255,255,255,0.08)',
+                          background: 'rgba(255,255,255,0.02)',
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
                           cursor: 'pointer',
                           flexShrink: 0,
                           transition: 'all 0.2s ease',
-                          opacity: 0.5
+                          color: 'rgba(255, 255, 255, 0.5)',
                         }}
                         onMouseEnter={(e) => {
                           if (!isMobile) {
-                            e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)';
-                            e.currentTarget.style.opacity = '1';
+                            e.currentTarget.style.background = 'rgba(239,68,68,0.12)';
+                            e.currentTarget.style.borderColor = 'rgba(239,68,68,0.3)';
+                            e.currentTarget.style.color = '#fff';
                           }
                         }}
                         onMouseLeave={(e) => {
                           if (!isMobile) {
-                            e.currentTarget.style.background = 'transparent';
-                            e.currentTarget.style.opacity = '0.5';
+                            e.currentTarget.style.background = 'rgba(255,255,255,0.02)';
+                            e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)';
+                            e.currentTarget.style.color = 'rgba(255, 255, 255, 0.5)';
                           }
                         }}
                       >
-                        <X size={14} style={{ color: 'rgba(255, 255, 255, 0.6)' }} />
+                        <X size={13} strokeWidth={2.4} />
                       </button>
                     </div>
                   </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>

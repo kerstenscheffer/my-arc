@@ -3,8 +3,9 @@
 import React, { useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { X, CheckCircle, Circle, Trash2, Pencil, Check, Zap, ChevronRight, Copy } from 'lucide-react'
+import TemplateLibrary from '../../../meal-templates/TemplateLibrary'
 
-export default function PlanSwitcherModal({ db, clientId, coachId, activePlanId, onSelect, onClose, isMobile }) {
+export default function PlanSwitcherModal({ db, clientId, coachId, activePlanId, onSelect, onClose, isMobile, embedded = false }) {
   const m = isMobile
   const [tab, setTab] = useState('client')
 
@@ -44,6 +45,7 @@ export default function PlanSwitcherModal({ db, clientId, coachId, activePlanId,
       let query = db.supabase
         .from('meal_plan_templates')
         .select('id, name, emoji, description, daily_calories, daily_protein, daily_carbs, daily_fat, base_macros, week_structure, created_at, meals_per_day')
+        .or('plan_type.is.null,plan_type.neq.full_week')
         .order('created_at', { ascending: false })
 
       if (coachId) {
@@ -98,6 +100,41 @@ export default function PlanSwitcherModal({ db, clientId, coachId, activePlanId,
     try {
       // Macros uit base_macros of directe kolommen
       const macros = template.base_macros || {}
+
+      // Expand setA/setB → per-dag, mét volledige meal-objecten (anders
+      // verschijnen er geen namen in de agenda omdat templates alleen
+      // meal_id-referenties bevatten). Trainingsdagen uit workout_schedule
+      // van de client.
+      const lib = new TemplateLibrary(db.supabase)
+      const mealIds = lib.extractMealIds(template.week_structure)
+      const meals = await lib.loadMealsByIds(mealIds)
+
+      const { data: clientData } = await db.supabase
+        .from('clients')
+        .select('workout_schedule, training_time, preferred_training_days, assigned_schema_id')
+        .eq('id', clientId)
+        .single()
+
+      let validDagKeys = null
+      if (clientData?.assigned_schema_id) {
+        const { data: schema } = await db.supabase
+          .from('workout_schemas')
+          .select('week_structure')
+          .eq('id', clientData.assigned_schema_id)
+          .single()
+        if (schema?.week_structure && typeof schema.week_structure === 'object') {
+          validDagKeys = new Set(Object.keys(schema.week_structure))
+        }
+      }
+      const clientTrainingDays = lib.resolveClientTrainingDays(clientData, validDagKeys)
+      const trainingTime = clientData?.training_time || null
+
+      // scaleFactor = 1 → kopie van de template-macros, geen herschaling
+      // naar client-targets (dat doet Activate-flow later).
+      const expandedWeek = lib.buildScaledWeek(
+        template.week_structure, meals, 1, clientTrainingDays, trainingTime
+      )
+
       const newPlan = {
         client_id: clientId,
         template_name: `${template.emoji || '📋'} ${template.name} (kopie)`,
@@ -106,7 +143,7 @@ export default function PlanSwitcherModal({ db, clientId, coachId, activePlanId,
         daily_protein: template.daily_protein || macros.protein,
         daily_carbs: template.daily_carbs || macros.carbs,
         daily_fat: template.daily_fat || macros.fat,
-        week_structure: template.week_structure || {},
+        week_structure: expandedWeek,
         is_active: false,
         created_via: 'template_copy',
         ai_generated: false,
@@ -128,34 +165,25 @@ export default function PlanSwitcherModal({ db, clientId, coachId, activePlanId,
   const formatDate = (d) => d ? new Date(d).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short', year: '2-digit' }) : '—'
 
   const tabStyle = (active) => ({
-    flex: 1, padding: '0.5rem 0.25rem',
+    flex: 1, padding: m ? '0.6rem 0.25rem' : '0.7rem 0.25rem',
     background: 'none', border: 'none',
     borderBottom: `2px solid ${active ? '#FFD700' : 'transparent'}`,
-    color: active ? '#FFD700' : 'rgba(255,255,255,0.3)',
-    fontSize: '0.55rem', fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase',
+    color: active ? '#FFD700' : 'rgba(255,255,255,0.6)',
+    fontSize: m ? '0.8rem' : '0.85rem', fontWeight: 800, letterSpacing: '-0.01em',
     cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
     transition: 'all 0.15s ease'
   })
 
   const modal = (
     <div
-      onClick={(e) => e.target === e.currentTarget && onClose()}
-      style={{
-        position: 'fixed', inset: 0, zIndex: 9999,
-        background: 'rgba(0,0,0,0.85)',
-        display: 'flex', alignItems: m ? 'flex-end' : 'center', justifyContent: 'center',
-        padding: m ? 0 : '1rem'
-      }}
+      onClick={embedded ? undefined : (e) => e.target === e.currentTarget && onClose()}
+      style={embedded
+        ? { display: 'flex', flexDirection: 'column', height: '100%', width: '100%', background: '#0a0a0a' }
+        : { position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(0,0,0,0.85)', display: 'flex', alignItems: m ? 'flex-end' : 'center', justifyContent: 'center', padding: m ? 0 : '1rem' }}
     >
-      <div style={{
-        background: '#0a0a0a',
-        border: '1px solid rgba(255,255,255,0.08)',
-        borderRadius: m ? '16px 16px 0 0' : '12px',
-        width: m ? '100%' : '520px',
-        maxHeight: m ? '85vh' : '80vh',
-        display: 'flex', flexDirection: 'column',
-        overflow: 'hidden'
-      }}>
+      <div style={embedded
+        ? { background: '#0a0a0a', width: '100%', height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden' }
+        : { background: '#0a0a0a', border: '1px solid rgba(255,255,255,0.08)', borderRadius: m ? '16px 16px 0 0' : '12px', width: m ? '100%' : '520px', maxHeight: m ? '85vh' : '80vh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
 
         {/* Header */}
         <div style={{
@@ -163,7 +191,7 @@ export default function PlanSwitcherModal({ db, clientId, coachId, activePlanId,
           padding: m ? '0.875rem 1rem 0.5rem' : '0.875rem 1.25rem 0.5rem',
           flexShrink: 0
         }}>
-          <div style={{ fontSize: m ? '0.9rem' : '1rem', fontWeight: 800, color: '#fff' }}>
+          <div style={{ fontSize: m ? '1rem' : '1.1rem', fontWeight: 800, color: '#fff', letterSpacing: '-0.01em' }}>
             Maaltijdplannen
           </div>
           <div style={{ flex: 1 }} />
@@ -224,11 +252,11 @@ export default function PlanSwitcherModal({ db, clientId, coachId, activePlanId,
                         ) : (
                           <>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
-                              <span style={{ fontSize: m ? '0.78rem' : '0.85rem', fontWeight: 700, color: isActive ? '#FFD700' : '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '180px' }}>
+                              <span style={{ fontSize: m ? '0.9rem' : '0.95rem', fontWeight: 800, color: isActive ? '#FFD700' : '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', letterSpacing: '-0.01em' }}>
                                 {plan.template_name || 'Naamloos plan'}
                               </span>
                               {isActive && <Tag gold>ACTIEF</Tag>}
-                              {plan.ai_generated && <Zap size={10} color="rgba(255,215,0,0.4)" />}
+                              {plan.ai_generated && <Zap size={12} color="rgba(255,215,0,0.6)" />}
                             </div>
                             <Meta items={[plan.daily_calories && `${plan.daily_calories} kcal`, plan.daily_protein && `${plan.daily_protein}g eiwit`, formatDate(plan.created_at), plan.created_via]} />
                           </>
@@ -236,32 +264,32 @@ export default function PlanSwitcherModal({ db, clientId, coachId, activePlanId,
                       </div>
                       {!isRenaming && (
                         <div style={{ display: 'flex', gap: '0.25rem', alignItems: 'center', flexShrink: 0 }}>
-                          <Btn onClick={() => handleRenameStart(plan)}><Pencil size={11} /></Btn>
+                          <Btn onClick={() => handleRenameStart(plan)}><Pencil size={13} /></Btn>
                           <Btn
                             danger={isConfirmDel}
                             onClick={() => isConfirmDel ? handleDelete(plan.id) : setConfirmDelete(plan.id)}
                             onBlur={() => setTimeout(() => setConfirmDelete(null), 200)}
                           >
-                            {isConfirmDel ? <span style={{ fontSize: '0.45rem', fontWeight: 700, padding: '0 0.1rem' }}>Zeker?</span> : <Trash2 size={11} />}
+                            {isConfirmDel ? <span style={{ fontSize: '0.62rem', fontWeight: 800, padding: '0 0.2rem' }}>Zeker?</span> : <Trash2 size={13} />}
                           </Btn>
                           {!isActive && (
                             <button
                               onClick={() => handleActivate(plan.id)}
                               disabled={!!activating}
                               style={{
-                                background: 'rgba(255,215,0,0.06)', border: '1px solid rgba(255,215,0,0.2)',
-                                borderRadius: '4px', padding: '0.25rem 0.5rem', cursor: 'pointer',
-                                color: '#FFD700', fontSize: '0.45rem', fontWeight: 700,
-                                textTransform: 'uppercase', letterSpacing: '0.05em',
-                                display: 'flex', alignItems: 'center', gap: '0.2rem', minHeight: '28px',
+                                background: 'rgba(255,215,0,0.1)', border: '1px solid rgba(255,215,0,0.35)',
+                                borderRadius: '6px', padding: '0.4rem 0.7rem', cursor: 'pointer',
+                                color: '#FFD700', fontSize: m ? '0.72rem' : '0.78rem', fontWeight: 800,
+                                letterSpacing: '-0.01em',
+                                display: 'flex', alignItems: 'center', gap: '0.2rem', minHeight: '32px',
                                 touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
                                 opacity: activating && activating !== plan.id ? 0.4 : 1
                               }}
                             >
-                              {activating === plan.id ? 'Activeren...' : <><span>Activeer</span><ChevronRight size={10} /></>}
+                              {activating === plan.id ? 'Activeren…' : <><span>Activeer</span><ChevronRight size={13} /></>}
                             </button>
                           )}
-                          <Btn onClick={() => { onSelect(plan.id); onClose() }}><ChevronRight size={12} /></Btn>
+                          <Btn onClick={() => { onSelect(plan.id); onClose() }}><ChevronRight size={14} /></Btn>
                         </div>
                       )}
                     </div>
@@ -286,13 +314,13 @@ export default function PlanSwitcherModal({ db, clientId, coachId, activePlanId,
                 return (
                   <div key={tmpl.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)', borderLeft: '3px solid transparent' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: m ? '0.75rem 1rem' : '0.75rem 1.25rem' }}>
-                      <div style={{ flexShrink: 0, fontSize: '1rem', lineHeight: 1 }}>{tmpl.emoji || '📋'}</div>
+                      <div style={{ flexShrink: 0, fontSize: '1.2rem', lineHeight: 1 }}>{tmpl.emoji || '📋'}</div>
                       <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontSize: m ? '0.78rem' : '0.85rem', fontWeight: 700, color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '200px' }}>
+                        <div style={{ fontSize: m ? '0.9rem' : '0.95rem', fontWeight: 800, color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', letterSpacing: '-0.01em' }}>
                           {tmpl.name || 'Naamloos template'}
                         </div>
                         {tmpl.description && (
-                          <div style={{ fontSize: '0.5rem', color: 'rgba(255,255,255,0.3)', marginTop: '0.1rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '220px' }}>
+                          <div style={{ fontSize: m ? '0.65rem' : '0.7rem', color: 'rgba(255,255,255,0.55)', marginTop: '0.15rem', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                             {tmpl.description}
                           </div>
                         )}
@@ -302,18 +330,18 @@ export default function PlanSwitcherModal({ db, clientId, coachId, activePlanId,
                         onClick={() => !isCopied && handleCopyTemplate(tmpl)}
                         disabled={isCopying || isCopied}
                         style={{
-                          background: isCopied ? 'rgba(16,185,129,0.1)' : 'rgba(255,255,255,0.04)',
-                          border: `1px solid ${isCopied ? 'rgba(16,185,129,0.3)' : 'rgba(255,255,255,0.08)'}`,
-                          borderRadius: '4px', padding: '0.25rem 0.5rem',
+                          background: isCopied ? 'rgba(16,185,129,0.12)' : 'rgba(255,215,0,0.1)',
+                          border: `1px solid ${isCopied ? 'rgba(16,185,129,0.4)' : 'rgba(255,215,0,0.35)'}`,
+                          borderRadius: '6px', padding: '0.4rem 0.7rem',
                           cursor: isCopied ? 'default' : 'pointer',
-                          color: isCopied ? '#10b981' : 'rgba(255,255,255,0.5)',
-                          fontSize: '0.45rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em',
-                          display: 'flex', alignItems: 'center', gap: '0.25rem', minHeight: '28px', flexShrink: 0,
+                          color: isCopied ? '#10b981' : '#FFD700',
+                          fontSize: m ? '0.72rem' : '0.78rem', fontWeight: 800, letterSpacing: '-0.01em',
+                          display: 'flex', alignItems: 'center', gap: '0.3rem', minHeight: '32px', flexShrink: 0,
                           touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
                           transition: 'all 0.2s ease', opacity: isCopying ? 0.6 : 1
                         }}
                       >
-                        {isCopied ? <><Check size={11} /> Gekopieerd</> : isCopying ? 'Kopiëren...' : <><Copy size={11} /> Gebruik</>}
+                        {isCopied ? <><Check size={13} /> Gekopieerd</> : isCopying ? 'Kopiëren…' : <><Copy size={13} /> Gebruik</>}
                       </button>
                     </div>
                   </div>
@@ -325,7 +353,7 @@ export default function PlanSwitcherModal({ db, clientId, coachId, activePlanId,
 
         {/* Footer */}
         <div style={{ padding: m ? '0.5rem 1rem' : '0.5rem 1.25rem', borderTop: '1px solid rgba(255,255,255,0.04)', flexShrink: 0 }}>
-          <div style={{ fontSize: '0.4rem', color: 'rgba(255,255,255,0.12)', fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase' }}>
+          <div style={{ fontSize: m ? '0.62rem' : '0.66rem', color: 'rgba(255,255,255,0.4)', fontWeight: 600 }}>
             {tab === 'client' ? 'Activeer = client ziet dit plan · → = bekijk in analyzer' : 'Gebruik = kopieert als nieuw concept voor deze client'}
           </div>
         </div>
@@ -333,21 +361,22 @@ export default function PlanSwitcherModal({ db, clientId, coachId, activePlanId,
     </div>
   )
 
+  if (embedded) return modal
   return createPortal(modal, document.body)
 }
 
 function Placeholder({ text }) {
-  return <div style={{ padding: '2rem', textAlign: 'center', color: 'rgba(255,255,255,0.2)', fontSize: '0.65rem' }}>{text}</div>
+  return <div style={{ padding: '2rem', textAlign: 'center', color: 'rgba(255,255,255,0.4)', fontSize: '0.8rem', fontWeight: 600 }}>{text}</div>
 }
 
 function Meta({ items }) {
   const filtered = (items || []).filter(Boolean)
   return (
-    <div style={{ display: 'flex', gap: '0.4rem', marginTop: '0.2rem', flexWrap: 'wrap', alignItems: 'center' }}>
+    <div style={{ display: 'flex', gap: '0.45rem', marginTop: '0.3rem', flexWrap: 'wrap', alignItems: 'center' }}>
       {filtered.map((item, i) => (
         <React.Fragment key={i}>
-          <span style={{ fontSize: '0.45rem', color: 'rgba(255,255,255,0.25)', fontWeight: 700 }}>{item}</span>
-          {i < filtered.length - 1 && <span style={{ fontSize: '0.45rem', color: 'rgba(255,255,255,0.12)' }}>·</span>}
+          <span style={{ fontSize: '0.68rem', color: 'rgba(255,255,255,0.65)', fontWeight: 700 }}>{item}</span>
+          {i < filtered.length - 1 && <span style={{ fontSize: '0.68rem', color: 'rgba(255,255,255,0.25)' }}>·</span>}
         </React.Fragment>
       ))}
     </div>
@@ -357,11 +386,11 @@ function Meta({ items }) {
 function Tag({ children, gold }) {
   return (
     <span style={{
-      fontSize: '0.4rem', fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase',
-      color: gold ? '#FFD700' : 'rgba(255,255,255,0.35)',
-      background: gold ? 'rgba(255,215,0,0.1)' : 'rgba(255,255,255,0.06)',
-      border: `1px solid ${gold ? 'rgba(255,215,0,0.2)' : 'rgba(255,255,255,0.08)'}`,
-      borderRadius: '3px', padding: '0.1rem 0.3rem'
+      fontSize: '0.6rem', fontWeight: 800, letterSpacing: '0.04em', textTransform: 'uppercase',
+      color: gold ? '#FFD700' : 'rgba(255,255,255,0.5)',
+      background: gold ? 'rgba(255,215,0,0.12)' : 'rgba(255,255,255,0.06)',
+      border: `1px solid ${gold ? 'rgba(255,215,0,0.3)' : 'rgba(255,255,255,0.08)'}`,
+      borderRadius: '4px', padding: '0.12rem 0.4rem'
     }}>{children}</span>
   )
 }
@@ -372,9 +401,9 @@ function Btn({ children, onClick, onBlur, gold, danger, disabled }) {
       background: danger ? 'rgba(239,68,68,0.12)' : gold ? 'rgba(255,215,0,0.1)' : 'none',
       border: `1px solid ${danger ? 'rgba(239,68,68,0.3)' : gold ? 'rgba(255,215,0,0.2)' : 'rgba(255,255,255,0.06)'}`,
       borderRadius: '4px', padding: '0.25rem', cursor: 'pointer',
-      color: danger ? '#ef4444' : gold ? '#FFD700' : 'rgba(255,255,255,0.25)',
+      color: danger ? '#ef4444' : gold ? '#FFD700' : 'rgba(255,255,255,0.55)',
       display: 'flex', alignItems: 'center', justifyContent: 'center',
-      minHeight: '28px', minWidth: '28px',
+      minHeight: '30px', minWidth: '30px',
       touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
       transition: 'all 0.15s ease', opacity: disabled ? 0.4 : 1
     }}>{children}</button>

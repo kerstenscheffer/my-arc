@@ -2,7 +2,7 @@
 // v1.1 — Categorieën: algemeen, status, whatsapp, call_prep
 import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { createPortal } from 'react-dom'
-import { X, GripVertical, Minus, Maximize2, Plus, Loader2, MessageCircle, BarChart2, Phone, FileText } from 'lucide-react'
+import { X, GripVertical, Minus, Maximize2, Plus, Loader2, MessageCircle, BarChart2, Phone, FileText, History } from 'lucide-react'
 
 const STATUS_OPTIONS = [
   { id: 'on_track',        label: 'Op schema',      color: '#FFD700' },
@@ -12,10 +12,15 @@ const STATUS_OPTIONS = [
 ]
 
 const CATEGORIES = [
-  { id: 'algemeen',  label: 'Algemeen',  icon: FileText,       color: '#FFD700' },
-  { id: 'status',    label: 'Status',    icon: BarChart2,      color: '#10b981' },
-  { id: 'whatsapp',  label: 'WhatsApp',  icon: MessageCircle,  color: '#25D366' },
-  { id: 'call_prep', label: 'Call prep', icon: Phone,          color: '#6366f1' },
+  { id: 'algemeen',   label: 'Algemeen',   icon: FileText,       color: '#FFD700' },
+  { id: 'status',     label: 'Status',     icon: BarChart2,      color: '#10b981' },
+  { id: 'whatsapp',   label: 'WhatsApp',   icon: MessageCircle,  color: '#25D366' },
+  { id: 'call_prep',  label: 'Call prep',  icon: Phone,          color: '#6366f1' },
+  // Auto-log entries die geschreven worden wanneer de coach doel of macro's
+  // van de client aanpast (zie clientChangeLogger). Heeft een ander icoon
+  // zodat ze in de tijdlijn duidelijk onderscheidbaar zijn van handmatige
+  // notes.
+  { id: 'change_log', label: 'Wijziging',  icon: History,        color: '#a855f7' },
 ]
 
 const DEFAULT_POS  = { x: Math.max(0, window.innerWidth  - 420), y: 80 }

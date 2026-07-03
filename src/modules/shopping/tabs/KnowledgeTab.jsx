@@ -12,8 +12,8 @@ export default function KnowledgeTab({ db, client }) {
       title: 'High-Pro On The Go',
       description: 'Tankstation & AH to go protein hacks',
       icon: ShoppingCart,
-      color: '#10b981',
-      gradient: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+      color: '#FFD700',
+      gradient: 'linear-gradient(135deg, #FFD700 0%, #D4AF37 100%)',
       savings: '€200/jaar besparing'
     },
     {
@@ -81,7 +81,7 @@ export default function KnowledgeTab({ db, client }) {
                 backdropFilter: 'blur(10px)',
                 borderRadius: '16px',
                 padding: isMobile ? '1.25rem' : '1.5rem',
-                border: '1px solid rgba(16, 185, 129, 0.08)',
+                border: '1px solid rgba(255, 215, 0, 0.08)',
                 cursor: 'pointer',
                 transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
                 textAlign: 'left',
@@ -96,7 +96,7 @@ export default function KnowledgeTab({ db, client }) {
               onMouseLeave={(e) => {
                 e.currentTarget.style.transform = 'translateY(0)'
                 e.currentTarget.style.boxShadow = 'none'
-                e.currentTarget.style.border = '1px solid rgba(16, 185, 129, 0.08)'
+                e.currentTarget.style.border = '1px solid rgba(255, 215, 0, 0.08)'
               }}
             >
               {/* Background gradient */}

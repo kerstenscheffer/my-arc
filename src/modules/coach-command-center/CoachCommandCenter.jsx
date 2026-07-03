@@ -2,11 +2,12 @@
 // CoachCommandCenter.jsx - v3.5
 // + onOpenWorkoutPanel prop toegevoegd voor Workout SOP widget
 import React, { useState, useEffect, useRef } from 'react'
-import { Search, Users, AlertTriangle, Loader2, ArrowLeft, Video, X } from 'lucide-react'
+import { Search, Users, AlertTriangle, Loader2, ArrowLeft, Video, X, UserPlus } from 'lucide-react'
 import CommandCenterService from './CommandCenterService'
 import ClientWeightCard from './components/ClientWeightCard'
 import ClientJourneyTimeline from '../client-journey/ClientJourneyTimeline'
 import CoachVideoFeedback from '../video-feedback/CoachVideoFeedback'
+import AddClientModal from './components/AddClientModal'
 
 export default function CoachCommandCenter({ db, onSelectClient, setActiveTab, onNavigatePlan, onNavigateWorkout, onOpenMealPanel, onOpenWorkoutPanel }) {
   console.log('🏋️ CoachCommandCenter render — onOpenMealPanel:', typeof onOpenMealPanel, '— onOpenWorkoutPanel:', typeof onOpenWorkoutPanel)
@@ -19,6 +20,7 @@ export default function CoachCommandCenter({ db, onSelectClient, setActiveTab, o
   const [urgencyFilter, setUrgencyFilter] = useState('all')
   const [stats, setStats] = useState({ total: 0, active: 0, inactive: 0, urgent: 0, warning: 0, ok: 0, fridayMissing: 0 })
   const [activeView, setActiveView] = useState('clients')
+  const [showAddClient, setShowAddClient] = useState(false)
   const [journeyClient, setJourneyClient] = useState(null)
   const [coachId, setCoachId] = useState(null)
   const serviceRef = useRef(new CommandCenterService(db))
@@ -39,14 +41,40 @@ export default function CoachCommandCenter({ db, onSelectClient, setActiveTab, o
     }
   }
 
+  // Progressieve laad-strategie: lijst meteen tonen (zonder data), dan
+  // weight + coaching logs + rest in achtergrond. setLoading=false
+  // gebeurt zodra clients binnen zijn — niet pas na de 18-maand
+  // weight-query voor ALLE klanten (= de oude flessenhals).
   const loadData = async () => {
     setLoading(true)
     try {
       const user = await db.getCurrentUser().catch(() => null)
       if (user) setCoachId(user.id)
 
-      const [clients, coachingLogDataEarly] = await Promise.all([
-        db.getAllClients(),
+      // ── Stap 1: klanten op (snelste query) → lijst tonen ──
+      const clients = await db.getAllClients()
+      const clientIds = clients.map(c => c.id)
+
+      const emptyClientShape = (client) => ({
+        ...client,
+        weightData:        { latest: null, history: [], daysSinceWeighin: null, fridayCount: 0, weightStatus: 'unknown', fridayMissing: false, totalLogs: 0 },
+        photoData:         { photos: [], totalCount: 0, progressCount: 0, lastPhotoDate: null, lastPhoto: null },
+        workoutData:       { workouts: [], totalWorkouts: 0, completedWorkouts: 0, lastWorkoutDate: null, daysSinceWorkout: null },
+        exerciseProgress:  {},
+        circumferenceData: { entries: [], latest: null, previous: null },
+        mealData:          { plan: null, targets: null, todayMeals: [], todayTotals: { calories: 0, protein: 0, carbs: 0, fat: 0 }, dailyLog: {}, loggingDays: 0, avgCalories: 0 },
+        coachingPlan:      null,
+        latestCoachingLog: null,
+      })
+
+      const phase0 = clients.map(emptyClientShape)
+      setClientsWithData(phase0)
+      setStats(computeStats(phase0))
+      setLoading(false)   // ← lijst is meteen zichtbaar
+
+      // ── Stap 2: weight + coaching logs (kritisch voor urgentie-sortering) ──
+      const [dataWithWeight, coachingLogDataEarly] = await Promise.all([
+        service.getClientsWeightData(clients),
         db.supabase
           .from('client_coaching_logs')
           .select('id, client_id, status, note, created_at')
@@ -57,26 +85,22 @@ export default function CoachCommandCenter({ db, onSelectClient, setActiveTab, o
             return byClient
           })
       ])
-      const clientIds = clients.map(c => c.id)
 
-      const dataWithWeight = await service.getClientsWeightData(clients)
+      const weightByClient = {}
+      dataWithWeight.forEach(c => { if (c?.weightData) weightByClient[c.id] = c.weightData })
 
-      const phase1 = dataWithWeight.map(client => ({
-        ...client,
-        photoData:         { photos: [], totalCount: 0, progressCount: 0, lastPhotoDate: null, lastPhoto: null },
-        workoutData:       { workouts: [], totalWorkouts: 0, completedWorkouts: 0, lastWorkoutDate: null, daysSinceWorkout: null },
-        exerciseProgress:  {},
-        circumferenceData: { entries: [], latest: null, previous: null },
-        mealData:          { plan: null, targets: null, todayMeals: [], todayTotals: { calories: 0, protein: 0, carbs: 0, fat: 0 }, dailyLog: {}, loggingDays: 0, avgCalories: 0 },
-        coachingPlan:      null,
-        latestCoachingLog: coachingLogDataEarly[client.id] || null
-      }))
+      setClientsWithData(prev => {
+        const merged = prev.map(c => ({
+          ...c,
+          weightData: weightByClient[c.id] || c.weightData,
+          latestCoachingLog: coachingLogDataEarly[c.id] || c.latestCoachingLog,
+        }))
+        const sorted = service.sortByUrgency(merged)
+        setStats(computeStats(sorted))
+        return sorted
+      })
 
-      const sorted1 = service.sortByUrgency(phase1)
-      setClientsWithData(sorted1)
-      setStats(computeStats(sorted1))
-      setLoading(false)
-
+      // ── Stap 3: rich data (photos, workouts, meals, plan, etc.) ──
       const [photoData, workoutData, mealData, coachingPlanData, exerciseProgress, circumferenceData] = await Promise.all([
         service.getClientsPhotoData(clientIds),
         service.getClientsWorkoutData(clientIds),
@@ -96,8 +120,9 @@ export default function CoachCommandCenter({ db, onSelectClient, setActiveTab, o
           exerciseProgress: exerciseProgress[client.id] || {},
           circumferenceData: circumferenceData[client.id] || { entries: [], latest: null, previous: null }
         }))
-        setStats(computeStats(service.sortByUrgency(updated)))
-        return service.sortByUrgency(updated)
+        const sorted = service.sortByUrgency(updated)
+        setStats(computeStats(sorted))
+        return sorted
       })
 
     } catch (error) { console.error('❌ Error loading:', error); setLoading(false) }
@@ -171,14 +196,38 @@ export default function CoachCommandCenter({ db, onSelectClient, setActiveTab, o
 
   return (
     <div style={{ maxWidth: '1400px', margin: '0 auto', paddingBottom: isMobile ? '100px' : '2rem' }}>
-      {/* COMPACT HEADER */}
-      <div style={{ padding: isMobile ? '0.75rem 1rem' : '1rem 2rem', borderBottom: '1px solid rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', gap: isMobile ? '0.5rem' : '0.75rem' }}>
-        <h1 style={{ fontSize: isMobile ? '1.1rem' : '1.35rem', fontWeight: '800', color: '#FFD700', margin: 0, letterSpacing: '-0.02em', whiteSpace: 'nowrap', flexShrink: 0 }}>⚡ Command</h1>
-        <span style={{ fontSize: '0.6rem', fontWeight: '700', color: 'rgba(255,215,0,0.5)', whiteSpace: 'nowrap', flexShrink: 0 }}>{stats.active}/{stats.total}</span>
+      {/* COMPACT HEADER — glass + pills, zelfde stijl als ClientDashboard */}
+      <div style={{
+        padding: isMobile ? '0.75rem 1rem' : '0.9rem 2rem',
+        borderBottom: '1px solid rgba(255,255,255,0.06)',
+        background: 'rgba(10,10,10,0.92)',
+        backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)',
+        display: 'flex', alignItems: 'center', gap: isMobile ? '0.5rem' : '0.75rem'
+      }}>
+        <h1 style={{ fontSize: isMobile ? '1.2rem' : '1.4rem', fontWeight: 900, color: '#FFD700', margin: 0, letterSpacing: '-0.02em', whiteSpace: 'nowrap', flexShrink: 0 }}>⚡ Command</h1>
+        <span style={{ fontSize: '0.62rem', fontWeight: 800, color: 'rgba(0,0,0,0.85)', background: '#FFD700', padding: '2px 7px', borderRadius: 6, letterSpacing: '0.02em', whiteSpace: 'nowrap', flexShrink: 0 }}>{stats.active}/{stats.total}</span>
         <div style={{ flex: 1 }} />
-        <button onClick={() => setActiveView('clients')} style={{ padding: isMobile ? '0.35rem 0.625rem' : '0.4rem 0.75rem', background: activeView === 'clients' ? 'rgba(255,215,0,0.12)' : 'transparent', border: activeView === 'clients' ? '1px solid rgba(255,215,0,0.25)' : '1px solid transparent', borderRadius: '6px', color: activeView === 'clients' ? '#FFD700' : 'rgba(255,255,255,0.35)', fontSize: isMobile ? '0.7rem' : '0.75rem', fontWeight: '600', cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', display: 'flex', alignItems: 'center', gap: '0.25rem', minHeight: '32px' }}><Users size={13} /> Clients</button>
-        <button onClick={() => setActiveView('video')} style={{ padding: isMobile ? '0.35rem 0.5rem' : '0.4rem 0.625rem', background: activeView === 'video' ? 'rgba(255,215,0,0.12)' : 'transparent', border: activeView === 'video' ? '1px solid rgba(255,215,0,0.25)' : '1px solid transparent', borderRadius: '6px', color: activeView === 'video' ? '#FFD700' : 'rgba(255,255,255,0.25)', fontSize: isMobile ? '0.7rem' : '0.75rem', fontWeight: '600', cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', display: 'flex', alignItems: 'center', gap: '0.25rem', minHeight: '32px' }}><Video size={13} /></button>
-        <button onClick={() => { setSearchOpen(!searchOpen); if (searchOpen) setSearchQuery('') }} style={{ width: '32px', height: '32px', borderRadius: '6px', background: searchOpen ? 'rgba(255,215,0,0.12)' : 'transparent', border: searchOpen ? '1px solid rgba(255,215,0,0.25)' : '1px solid rgba(255,255,255,0.08)', color: searchOpen ? '#FFD700' : 'rgba(255,255,255,0.35)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', flexShrink: 0 }}>{searchOpen ? <X size={14} /> : <Search size={14} />}</button>
+        <button onClick={() => setActiveView('clients')} style={{ padding: isMobile ? '0.4rem 0.7rem' : '0.45rem 0.85rem', background: activeView === 'clients' ? 'rgba(255,215,0,0.14)' : 'transparent', border: 'none', borderRadius: 14, color: activeView === 'clients' ? '#FFD700' : 'rgba(255,255,255,0.4)', fontSize: isMobile ? '0.7rem' : '0.75rem', fontWeight: activeView === 'clients' ? 800 : 600, cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', display: 'flex', alignItems: 'center', gap: '0.3rem', minHeight: '36px' }}><Users size={14} /> Clients</button>
+        <button onClick={() => setActiveView('video')} style={{ padding: isMobile ? '0.4rem 0.6rem' : '0.45rem 0.7rem', background: activeView === 'video' ? 'rgba(255,215,0,0.14)' : 'transparent', border: 'none', borderRadius: 14, color: activeView === 'video' ? '#FFD700' : 'rgba(255,255,255,0.3)', fontSize: isMobile ? '0.7rem' : '0.75rem', fontWeight: activeView === 'video' ? 800 : 600, cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', display: 'flex', alignItems: 'center', gap: '0.3rem', minHeight: '36px' }}><Video size={14} /></button>
+        <button onClick={() => { setSearchOpen(!searchOpen); if (searchOpen) setSearchQuery('') }} style={{ width: '36px', height: '36px', borderRadius: 12, background: searchOpen ? 'rgba(255,215,0,0.14)' : 'rgba(255,255,255,0.04)', border: 'none', color: searchOpen ? '#FFD700' : 'rgba(255,255,255,0.4)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', flexShrink: 0 }}>{searchOpen ? <X size={15} /> : <Search size={15} />}</button>
+        <button
+          onClick={() => setShowAddClient(true)}
+          title="Nieuwe klant toevoegen"
+          aria-label="Nieuwe klant toevoegen"
+          style={{
+            width: '36px', height: '36px', borderRadius: 12,
+            background: 'linear-gradient(135deg, #FFD700 0%, #D4AF37 100%)',
+            border: 'none',
+            color: '#0a0a0a',
+            cursor: 'pointer',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+            flexShrink: 0,
+            boxShadow: '0 4px 12px rgba(255,215,0,0.32)',
+          }}
+        >
+          <UserPlus size={15} strokeWidth={2.6} />
+        </button>
       </div>
 
       {searchOpen && (
@@ -194,13 +243,13 @@ export default function CoachCommandCenter({ db, onSelectClient, setActiveTab, o
           {/* FILTER BAR */}
           <div style={{ padding: isMobile ? '0.5rem 1rem' : '0.625rem 2rem', borderBottom: '1px solid rgba(255,255,255,0.04)', display: 'flex', gap: isMobile ? '0.25rem' : '0.375rem', overflowX: 'auto', WebkitOverflowScrolling: 'touch', alignItems: 'center' }}>
             {[{ id: 'active', label: 'Actief', count: stats.active, color: '#10b981' }, { id: 'inactive', label: 'Inactief', count: stats.inactive, color: '#6b7280' }, { id: 'all', label: 'Alle', count: stats.total, color: '#FFD700' }].map(btn => (
-              <button key={btn.id} onClick={() => { setStatusFilter(btn.id); setUrgencyFilter('all') }} style={{ padding: isMobile ? '0.3rem 0.5rem' : '0.35rem 0.625rem', background: statusFilter === btn.id ? `${btn.color}18` : 'transparent', border: statusFilter === btn.id ? `1px solid ${btn.color}40` : '1px solid transparent', borderRadius: '6px', color: statusFilter === btn.id ? btn.color : 'rgba(255,255,255,0.35)', fontSize: isMobile ? '0.65rem' : '0.7rem', fontWeight: '600', cursor: 'pointer', whiteSpace: 'nowrap', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', display: 'flex', alignItems: 'center', gap: '0.2rem', minHeight: '28px' }}>
-                {btn.label}<span style={{ fontSize: '0.55rem', fontWeight: '700', opacity: statusFilter === btn.id ? 1 : 0.5 }}>{btn.count}</span>
+              <button key={btn.id} onClick={() => { setStatusFilter(btn.id); setUrgencyFilter('all') }} style={{ padding: isMobile ? '0.35rem 0.7rem' : '0.4rem 0.8rem', background: statusFilter === btn.id ? `${btn.color}1f` : 'rgba(255,255,255,0.03)', border: 'none', borderRadius: 14, color: statusFilter === btn.id ? btn.color : 'rgba(255,255,255,0.4)', fontSize: isMobile ? '0.65rem' : '0.7rem', fontWeight: statusFilter === btn.id ? 800 : 600, cursor: 'pointer', whiteSpace: 'nowrap', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', display: 'flex', alignItems: 'center', gap: '0.25rem', minHeight: '30px' }}>
+                {btn.label}<span style={{ fontSize: '0.55rem', fontWeight: 800, opacity: statusFilter === btn.id ? 1 : 0.5 }}>{btn.count}</span>
               </button>
             ))}
             <div style={{ width: '1px', height: '16px', background: 'rgba(255,255,255,0.08)', margin: '0 0.125rem', flexShrink: 0 }} />
             {statusFilter === 'active' && [{ id: 'all', label: 'Alle', count: stats.active, color: '#FFD700' }, { id: 'urgent', label: '🔴', count: stats.urgent, color: '#ef4444' }, { id: 'warning', label: '🟡', count: stats.warning, color: '#f59e0b' }, { id: 'ok', label: '🟢', count: stats.ok, color: '#10b981' }].map(btn => (
-              <button key={btn.id} onClick={() => setUrgencyFilter(btn.id)} style={{ padding: isMobile ? '0.3rem 0.4rem' : '0.35rem 0.5rem', background: urgencyFilter === btn.id ? `${btn.color}15` : 'transparent', border: urgencyFilter === btn.id ? `1px solid ${btn.color}35` : '1px solid transparent', borderRadius: '6px', color: urgencyFilter === btn.id ? btn.color : 'rgba(255,255,255,0.3)', fontSize: isMobile ? '0.65rem' : '0.7rem', fontWeight: '600', cursor: 'pointer', whiteSpace: 'nowrap', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', display: 'flex', alignItems: 'center', gap: '0.15rem', minHeight: '28px' }}>
+              <button key={btn.id} onClick={() => setUrgencyFilter(btn.id)} style={{ padding: isMobile ? '0.35rem 0.55rem' : '0.4rem 0.65rem', background: urgencyFilter === btn.id ? `${btn.color}1f` : 'rgba(255,255,255,0.03)', border: 'none', borderRadius: 14, color: urgencyFilter === btn.id ? btn.color : 'rgba(255,255,255,0.35)', fontSize: isMobile ? '0.65rem' : '0.7rem', fontWeight: urgencyFilter === btn.id ? 800 : 600, cursor: 'pointer', whiteSpace: 'nowrap', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', display: 'flex', alignItems: 'center', gap: '0.2rem', minHeight: '30px' }}>
                 {btn.label}<span style={{ fontSize: '0.55rem', opacity: 0.6 }}>{btn.count}</span>
               </button>
             ))}
@@ -249,6 +298,15 @@ export default function CoachCommandCenter({ db, onSelectClient, setActiveTab, o
           )}
         </>
       )}
+
+      <AddClientModal
+        open={showAddClient}
+        db={db}
+        coachId={coachId}
+        isMobile={isMobile}
+        onClose={() => setShowAddClient(false)}
+        onCreated={() => { loadData() }}
+      />
     </div>
   )
 }

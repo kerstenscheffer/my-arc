@@ -1,6 +1,7 @@
 // src/coach/tabs/client-info/components/AddClientModal.jsx
 import { useState } from 'react'
 import { X, User, Mail, Phone, Lock, Copy, Check } from 'lucide-react'
+import { signUpNewClient } from '../../../../lib/supabase'
 
 export default function AddClientModal({ db, onClose, onSuccess, isMobile }) {
   const [formData, setFormData] = useState({
@@ -54,18 +55,16 @@ export default function AddClientModal({ db, onClose, onSuccess, isMobile }) {
     try {
       console.log('Creating client account...')
       
-      // First create the auth user in Supabase
-      const { data: authData, error: authError } = await db.supabase.auth.signUp({
-        email: formData.email,
-        password: formData.password,
-        options: {
-          data: {
-            first_name: formData.firstName,
-            last_name: formData.lastName,
-            role: 'client'
-          }
+      // First create the auth user — geïsoleerde client, behoudt de coach-sessie
+      const { data: authData, error: authError } = await signUpNewClient(
+        formData.email,
+        formData.password,
+        {
+          first_name: formData.firstName,
+          last_name: formData.lastName,
+          role: 'client'
         }
-      })
+      )
       
       if (authError) throw authError
       

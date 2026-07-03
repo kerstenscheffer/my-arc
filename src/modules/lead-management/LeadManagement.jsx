@@ -4,9 +4,9 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { 
-  Users, BarChart3, Settings, RefreshCw, Download, LayoutGrid, 
+  Users, BarChart3, Settings, RefreshCw, Download, LayoutGrid,
   Target, MessageCircle, TrendingUp, ClipboardList, ChevronDown,
-  Flame
+  Flame, MoreHorizontal
 } from 'lucide-react'
 import LeadOverview from './components/LeadOverview'
 import LeadManagementService from './LeadManagementService'
@@ -46,6 +46,7 @@ const TABS = [
 
 export default function LeadManagement({ db, isMobile, coachId, user }) {
   const [activeView, setActiveView] = useState('kanban')
+  const [moreTabsOpen, setMoreTabsOpen] = useState(false)
   const [leads, setLeads] = useState([])
   const [selectedLeads, setSelectedLeads] = useState([])
   const [loading, setLoading] = useState(true)
@@ -454,43 +455,83 @@ export default function LeadManagement({ db, isMobile, coachId, user }) {
           padding: isMobile ? '0.5rem 1rem' : '0.5rem 1.5rem',
           borderBottom: '1px solid rgba(255, 255, 255, 0.04)',
           display: 'flex',
-          gap: isMobile ? '0.25rem' : '0.375rem',
-          overflowX: 'auto',
-          WebkitOverflowScrolling: 'touch'
+          gap: isMobile ? '0.4rem' : '0.5rem',
+          // overflow zichtbaar zodat de ⋯-dropdown niet wordt afgeknipt (nog
+          // maar 2 items: Kanban + Meer, dus horizontaal scrollen is overbodig).
+          overflowX: 'visible',
+          position: 'relative', zIndex: 30,
         }}
       >
-        {TABS.map(tab => {
-          const Icon = tab.icon
-          const isActive = activeView === tab.id
+        {/* Kanban — prominent, altijd zichtbaar (de hoofd-view). */}
+        {(() => {
+          const kanban = TABS.find(t => t.id === 'kanban')
+          const KIcon = kanban.icon
+          const isActive = activeView === 'kanban'
           return (
             <button
-              key={tab.id}
-              onClick={() => setActiveView(tab.id)}
+              onClick={() => setActiveView('kanban')}
               style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.3rem',
-                padding: isMobile ? '0.3rem 0.5rem' : '0.35rem 0.625rem',
-                background: isActive ? `${G.primary}18` : 'transparent',
-                border: isActive ? `1px solid ${G.borderActive}` : '1px solid transparent',
-                borderRadius: '6px',
-                color: isActive ? G.primary : 'rgba(255, 255, 255, 0.35)',
-                fontSize: isMobile ? '0.65rem' : '0.7rem',
-                fontWeight: isActive ? '700' : '600',
-                cursor: 'pointer',
-                whiteSpace: 'nowrap',
-                minHeight: '28px',
-                touchAction: 'manipulation',
-                WebkitTapHighlightColor: 'transparent',
-                transition: 'all 0.15s ease',
-                flexShrink: 0
+                display: 'flex', alignItems: 'center', gap: '0.4rem',
+                padding: isMobile ? '0.45rem 0.8rem' : '0.5rem 1rem',
+                background: isActive ? `${G.primary}22` : 'rgba(255,255,255,0.04)',
+                border: isActive ? `1.5px solid ${G.primary}` : '1px solid rgba(255,255,255,0.1)',
+                borderRadius: '8px',
+                color: isActive ? G.primary : 'rgba(255,255,255,0.6)',
+                fontSize: isMobile ? '0.78rem' : '0.85rem', fontWeight: 800,
+                cursor: 'pointer', whiteSpace: 'nowrap', minHeight: '34px', flexShrink: 0,
+                touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
               }}
             >
-              <Icon size={12} />
-              {tab.label}
+              <KIcon size={15} /> Kanban
             </button>
           )
-        })}
+        })()}
+
+        {/* Overige tabs — achter een ⋯-dropdown (worden bijna niet gebruikt). */}
+        {(() => {
+          const others = TABS.filter(t => t.id !== 'kanban')
+          const activeOther = others.find(t => t.id === activeView)
+          const ActiveIcon = activeOther?.icon
+          return (
+            <div style={{ position: 'relative', flexShrink: 0 }}>
+              <button
+                onClick={() => setMoreTabsOpen(o => !o)}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: '0.4rem',
+                  padding: isMobile ? '0.45rem 0.7rem' : '0.5rem 0.85rem',
+                  background: activeOther ? `${G.primary}18` : 'rgba(255,255,255,0.04)',
+                  border: activeOther ? `1.5px solid ${G.primary}` : '1px solid rgba(255,255,255,0.1)',
+                  borderRadius: '8px',
+                  color: activeOther ? G.primary : 'rgba(255,255,255,0.6)',
+                  fontSize: isMobile ? '0.78rem' : '0.85rem', fontWeight: 800,
+                  cursor: 'pointer', whiteSpace: 'nowrap', minHeight: '34px',
+                  touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+                }}
+              >
+                {ActiveIcon ? <ActiveIcon size={15} /> : <MoreHorizontal size={16} />}
+                {activeOther ? activeOther.label : 'Meer'}
+                <ChevronDown size={13} style={{ transform: moreTabsOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s ease' }} />
+              </button>
+              {moreTabsOpen && (
+                <>
+                  <div onClick={() => setMoreTabsOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 2147483646 }} />
+                  <div style={{ position: 'absolute', top: '100%', left: 0, marginTop: 4, zIndex: 2147483647, background: '#141414', border: `1px solid ${G.primary}33`, borderRadius: 10, overflow: 'hidden', minWidth: 180, boxShadow: '0 10px 30px rgba(0,0,0,0.6)' }}>
+                    {others.map(tab => {
+                      const Icon = tab.icon
+                      const isAct = activeView === tab.id
+                      return (
+                        <button key={tab.id} onClick={() => { setActiveView(tab.id); setMoreTabsOpen(false) }}
+                          style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '0.6rem', padding: '0.65rem 0.85rem', background: isAct ? `${G.primary}12` : 'transparent', border: 'none', color: isAct ? G.primary : 'rgba(255,255,255,0.7)', fontSize: '0.82rem', fontWeight: isAct ? 800 : 600, cursor: 'pointer', textAlign: 'left', touchAction: 'manipulation' }}>
+                          <Icon size={14} style={{ opacity: 0.8, flexShrink: 0 }} /> {tab.label}
+                        </button>
+                      )
+                    })}
+                  </div>
+                </>
+              )}
+            </div>
+          )
+        })()}
       </div>
 
       {/* ═══ CONTENT ═══ */}

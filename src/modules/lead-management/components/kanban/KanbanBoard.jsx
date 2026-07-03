@@ -5,19 +5,43 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { createPortal } from 'react-dom'
-import { Plus, Settings, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, GripVertical, Save, RotateCcw, Users, Instagram, Search, X, ArrowUp, Clock, Maximize2, Minimize2, CheckCircle, Send } from 'lucide-react'
+import { Plus, Settings, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, GripVertical, Save, RotateCcw, Users, Instagram, Search, X, ArrowUp, ArrowUpDown, Clock, Maximize2, Minimize2, CheckCircle, Send, Zap } from 'lucide-react'
 import KanbanCard from './KanbanCard'
 import AddLeadModal from './AddLeadModal'
+import RapidAddLeadsModal from './RapidAddLeadsModal'
 import SectionModal from './SectionModal'
-import DailyStatsBar from '../DailyStatsBar'
+import PeriodStatsBar from '../PeriodStatsBar'
 import WarmUpBoard from './WarmUpBoard'
 import { exportDailyReport } from '../../utils/exportDailyReport'
 import SalesCallModal from './SalesCallModal'
 import LeadDetailModalV2 from './LeadDetailModalV2'
 import OutreachLoggerModal from '../OutreachLoggerModal'
 import LeadSourceModal from './LeadSourceModal'
+import CallProposalModal from './CallProposalModal'
 
 const SNOOZE_SECTION_PATTERNS = ['later follow', 'later opvolg', 'follow up', 'followup', 'snooze', 'parkeer']
+
+// "Follow up stil"-sectie herkennen — apart van snooze. Bevat 'stil' samen met
+// een opvolg-woord, zodat het NIET botst met de snooze-detectie (die ook op
+// 'follow up' matcht). "Later Follow Up" (snooze) bevat geen 'stil' en blijft
+// dus snooze; "3+ Dagen Stil" bevat geen opvolg-woord en blijft een stil-sectie.
+const FOLLOWUP_STIL_PATTERNS = ['follow up stil', 'followup stil', 'opvolg stil', 'opgevolgd stil']
+const isFollowupStilTitle = (title) => {
+  const t = (title || '').toLowerCase()
+  return FOLLOWUP_STIL_PATTERNS.some(p => t.includes(p)) || (t.includes('stil') && (t.includes('follow') || t.includes('opvolg')))
+}
+// "3 dagen stil"-sectie herkennen (de bron voor de auto-verplaatsing).
+const isThreeDaysSilentTitle = (title) => {
+  const t = (title || '').toLowerCase()
+  return (t.includes('3+') || t.includes('3 dag') || t.includes('3d')) && t.includes('stil')
+}
+// Elke "stil/stale"-sectie herkennen (1/2/3 dag stil, inactief). Spiegelt
+// service.isStaleSectionByTitle — gebruikt voor de optimistische reply-restore.
+const isStaleTitle = (title) => {
+  const t = (title || '').toLowerCase().trim()
+  return t.includes('1 dag') || t.includes('2 dag') || t.includes('3 dag') ||
+         t.includes('3+') || t.includes('stil') || t.includes('stale') || t.includes('inactive')
+}
 
 // Gold theme tokens (consistent with CoachHub)
 const G = {
@@ -37,12 +61,120 @@ export default function KanbanBoard({
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [showAddLead, setShowAddLead] = useState(false)
+  const [showRapidAdd, setShowRapidAdd] = useState(false)
   const [showSectionModal, setShowSectionModal] = useState(false)
   const [selectedSection, setSelectedSection] = useState(null)
   const [selectedSectionForLead, setSelectedSectionForLead] = useState(null)
   const [expandedSections, setExpandedSections] = useState({})
+  // boardFilter shape: {
+  //   sort: string,
+  //   types: Set<'magnet'|'outreach'>,        // leeg = alle types
+  //   temps: Set<'hot'|'warm'|'cold'|'none'>, // leeg = alle temps
+  //   followups: Set<number>,                 // leeg = alle aantallen opvolg
+  // }
+  // Eén overkoepelende filter voor het HELE bord (i.p.v. per sectie). Dezelfde
+  // dimensies (type, temperatuur, opvolg-aantal, sortering) gelden nu in alle
+  // secties tegelijk.
+  const [boardFilter, setBoardFilter] = useState({ sort: 'default', types: new Set(), temps: new Set(), followups: new Set() })
+  const [showBoardFilter, setShowBoardFilter] = useState(false)
+  const boardFilterRef = useRef(null)
+
+  const toggleBoardSet = (key, value) => setBoardFilter(cur => {
+    const next = new Set(cur[key])
+    if (next.has(value)) next.delete(value); else next.add(value)
+    return { ...cur, [key]: next }
+  })
+  const setBoardSort = (sort) => setBoardFilter(cur => ({ ...cur, sort }))
+  const resetBoardFilter = () => setBoardFilter({ sort: 'default', types: new Set(), temps: new Set(), followups: new Set() })
+
+  // Sluit de globale filter-dropdown bij een klik/touch buiten (document-niveau,
+  // betrouwbaar ook binnen transform-ouders zoals de kanban-kolommen).
+  useEffect(() => {
+    if (!showBoardFilter) return
+    const onDown = (e) => {
+      if (boardFilterRef.current && !boardFilterRef.current.contains(e.target)) setShowBoardFilter(false)
+    }
+    document.addEventListener('mousedown', onDown)
+    document.addEventListener('touchstart', onDown)
+    return () => {
+      document.removeEventListener('mousedown', onDown)
+      document.removeEventListener('touchstart', onDown)
+    }
+  }, [showBoardFilter])
+  // Globale "hot leads" toggle — overschrijft de per-sectie temperatuur-
+  // filter zodat de coach in één klik hot leads ALLE secties kan zien.
+  const [globalHotOnly, setGlobalHotOnly] = useState(false)
+  // Globale "calls voorgesteld" toggle — toont alleen leads waar de coach
+  // al een call_proposal-bericht heeft gestuurd (via lead_notes).
+  const [globalCallProposedOnly, setGlobalCallProposedOnly] = useState(false)
+  const [callProposedLeadIds, setCallProposedLeadIds] = useState(() => new Set())
+
+  // Eenmalig lijst van leads met een call-proposal note ophalen. Reload
+  // gebeurt elke keer dat we de toggle aanzetten — zo blijft de set vers
+  // ook als de coach intussen nieuwe proposals heeft gestuurd.
+  useEffect(() => {
+    if (!globalCallProposedOnly || !coachId || !leadService?.db?.supabase) return
+    let cancelled = false
+    leadService.db.supabase
+      .from('lead_notes')
+      .select('lead_id')
+      .eq('coach_id', coachId)
+      .eq('note_type', 'call_proposal')
+      .is('deleted_at', null)
+      .then(({ data, error }) => {
+        if (cancelled) return
+        if (error) { console.error('load call_proposal notes failed:', error); return }
+        setCallProposedLeadIds(new Set((data || []).map(r => r.lead_id)))
+      })
+    return () => { cancelled = true }
+  }, [globalCallProposedOnly, coachId, leadService])
+
+  const sectionPassesFilter = (lead, filter, section = null) => {
+    // Globale hot-only override — als actief, alleen hot leads tonen,
+    // ongeacht de per-sectie temperatuur-filter.
+    if (globalHotOnly && lead.lead_temperature !== 'hot') return false
+    // Globale call-proposed override — toon leads die een call voorgesteld
+    // hebben gekregen. Dat is: ze staan NU in de "Call voorgesteld"-sectie,
+    // óf ze zijn vanuit die sectie naar "stil" geschoven (previous_section),
+    // óf er is een tracked call_proposal-note voor verstuurd. (Eerder keken we
+    // alleen naar de note, waardoor handmatig verplaatste leads wegvielen.)
+    if (globalCallProposedOnly) {
+      const proposedRe = /voorgesteld|voorstel/i
+      const inProposedSection = proposedRe.test(section?.title || '')
+      const cameFromProposed = proposedRe.test(lead.previous_section_title || '')
+      const hasProposalNote = callProposedLeadIds.has(lead.id)
+      if (!(inProposedSection || cameFromProposed || hasProposalNote)) return false
+    }
+
+    // Type-filter — een lead heeft EITHER een lead_magnet OR een
+    // outreach_campaign (zelden allebei). De coach kan beide aanvinken =
+    // alles toegestaan, of slechts één voor exclusieve focus.
+    if (filter.types.size > 0) {
+      const isMagnet = !!lead.source_lead_magnet_id
+      const isOutreach = !!lead.outreach_campaign_id
+      const matches =
+        (filter.types.has('magnet') && isMagnet) ||
+        (filter.types.has('outreach') && isOutreach)
+      if (!matches) return false
+    }
+    // Temperatuur-filter — null/empty count als 'none'. Geskipt als
+    // globalHotOnly al actief is.
+    if (!globalHotOnly && filter.temps.size > 0) {
+      const t = lead.lead_temperature || 'none'
+      if (!filter.temps.has(t)) return false
+    }
+    // Opvolg-filter — alleen leads met EXACT (een van) de gekozen aantallen
+    // opvolg-berichten. Leeg = alle aantallen toegestaan.
+    if (filter.followups && filter.followups.size > 0) {
+      if (!filter.followups.has(Number(lead.followup_count) || 0)) return false
+    }
+    return true
+  }
   const [activityData, setActivityData] = useState({})
   const [funnelData, setFunnelData] = useState({})
+  // Bumpt bij elke reactie/DM-edit zodat de bovenste PeriodStatsBar direct
+  // herlaadt (niet pas bij een periode-wissel).
+  const [statsRefreshKey, setStatsRefreshKey] = useState(0)
   const [draggedLead, setDraggedLead] = useState(null)
   const [dragOverSectionId, setDragOverSectionId] = useState(null)
   const [draggedSection, setDraggedSection] = useState(null)
@@ -98,6 +230,10 @@ export default function KanbanBoard({
   // Holds the just-created lead so we can prompt for its source. Cleared
   // when the source modal closes (whether attributed or skipped).
   const [leadForSource, setLeadForSource] = useState(null)
+  // Set when a lead just got dropped into a "Call voorgesteld" section
+  // — opens the proposal-text logger so the coach can save the exact
+  // message they sent for later review in the stats.
+  const [leadForProposal, setLeadForProposal] = useState(null)
   const handleSourceAttributed = (leadId, updates) => {
     // Mirror the new attribution into local state so any open detail modal
     // or card label reflects it without a full board reload.
@@ -112,6 +248,10 @@ export default function KanbanBoard({
   const [staleCheckDone, setStaleCheckDone] = useState(false)
   const [staleCheckResult, setStaleCheckResult] = useState(null)
   const [snoozeSection, setSnoozeSection] = useState(null)
+  // "Follow up stil"-sectie: leads die 3 dagen stil staan en al 1x opgevolgd
+  // zijn, gaan hierheen zodat de opvolg-werklijst zuiver blijft.
+  const [followupStilSection, setFollowupStilSection] = useState(null)
+  const followupStilAutoCreatedRef = useRef(false)
   // Tracks whether we've already attempted to auto-create the default snooze
   // section this session, so the effect below stays idempotent if it re-fires
   // (e.g. after sections state updates).
@@ -247,11 +387,13 @@ export default function KanbanBoard({
     setHighlightedLeadId(newLead.id)
     setTimeout(() => setHighlightedLeadId(null), 3000)
     loadActivityData()
+    setStatsRefreshKey(k => k + 1)  // nieuwe lead → stat-bar direct bijwerken
   }
 
   const handleRealtimeLeadDelete = (deletedLead) => {
     setSections(prev => prev.map(section => ({ ...section, leads: (section.leads || []).filter(l => l.id !== deletedLead.id) })))
     loadActivityData()
+    setStatsRefreshKey(k => k + 1)
   }
 
   // ========================================
@@ -266,7 +408,8 @@ export default function KanbanBoard({
 
   useEffect(() => {
     if (sections.length === 0) return
-    const found = sections.find(s => SNOOZE_SECTION_PATTERNS.some(p => (s.title || '').toLowerCase().includes(p)))
+    // Sluit de "Follow up stil"-sectie expliciet uit van de snooze-detectie.
+    const found = sections.find(s => !isFollowupStilTitle(s.title) && SNOOZE_SECTION_PATTERNS.some(p => (s.title || '').toLowerCase().includes(p)))
     if (found) {
       setSnoozeSection(found)
       return
@@ -299,6 +442,39 @@ export default function KanbanBoard({
     })()
   }, [sections, coachId, leadService, loading])
 
+  // "Follow up stil"-sectie vinden, of eenmalig auto-aanmaken (zelfde patroon
+  // als snooze). Hierheen verplaatsen leads die 3 dagen stil staan zodra ze
+  // hun opvolg-bericht krijgen.
+  useEffect(() => {
+    if (sections.length === 0) return
+    const found = sections.find(s => isFollowupStilTitle(s.title))
+    if (found) { setFollowupStilSection(found); return }
+    setFollowupStilSection(null)
+    if (!coachId || !leadService || followupStilAutoCreatedRef.current || loading) return
+    followupStilAutoCreatedRef.current = true
+    ;(async () => {
+      try {
+        const ns = await leadService.createSection(coachId, {
+          title: '📵 Follow up stil',
+          color: '#f97316',
+          position: sections.filter(s => s.id !== 'unassigned').length,
+        })
+        const sectionWithLeads = { ...ns, leads: [] }
+        const update = (prev) => {
+          const u = prev.find(s => s.id === 'unassigned')
+          const others = prev.filter(s => s.id !== 'unassigned')
+          return [...others, sectionWithLeads, ...(u ? [u] : [])]
+        }
+        setSections(update)
+        setOriginalSections(update)
+        setFollowupStilSection(sectionWithLeads)
+      } catch (e) {
+        console.error('Auto-create Follow up stil section failed:', e)
+        followupStilAutoCreatedRef.current = false
+      }
+    })()
+  }, [sections, coachId, leadService, loading])
+
   useEffect(() => {
     const handleScroll = () => setShowScrollTop(window.scrollY > 300)
     window.addEventListener('scroll', handleScroll, { passive: true })
@@ -307,9 +483,30 @@ export default function KanbanBoard({
 
   const scrollToTop = () => window.scrollTo({ top: 0, behavior: 'smooth' })
 
-  // CONTACTED TODAY SORTING — PRESERVED
+  // Overkoepelende sort + filter (geldt voor alle secties). Filters eerst, dan sort.
   const getSortedLeads = (section) => {
-    const leads = section.leads || []
+    const f = boardFilter
+    const leads = (section.leads || []).filter(lead => sectionPassesFilter(lead, f, section))
+    const mode = f.sort || 'default'
+    const num = (v) => Number(v) || 0
+    const t = (v) => v ? new Date(v).getTime() : 0
+
+    if (mode === 'followup-asc') {
+      return [...leads].sort((a, b) => num(a.followup_count) - num(b.followup_count))
+    }
+    if (mode === 'followup-desc') {
+      return [...leads].sort((a, b) => num(b.followup_count) - num(a.followup_count))
+    }
+    if (mode === 'reply-asc') {
+      return [...leads].sort((a, b) => num(a.reply_count) - num(b.reply_count))
+    }
+    if (mode === 'created-desc') {
+      return [...leads].sort((a, b) => t(b.created_at) - t(a.created_at))
+    }
+    if (mode === 'created-asc') {
+      return [...leads].sort((a, b) => t(a.created_at) - t(b.created_at))
+    }
+    // default
     const today = new Date().toISOString().split('T')[0]
     return [...leads].sort((a, b) => {
       const aToday = a.contacted_today_date?.split('T')[0] === today
@@ -319,6 +516,15 @@ export default function KanbanBoard({
       return (a.position || 0) - (b.position || 0)
     })
   }
+
+  const SECTION_SORT_OPTIONS = [
+    { id: 'default',       label: 'Standaard' },
+    { id: 'followup-asc',  label: 'Weinig opvolgingen ↑' },
+    { id: 'followup-desc', label: 'Veel opvolgingen ↓' },
+    { id: 'reply-asc',     label: 'Geen reactie eerst' },
+    { id: 'created-desc',  label: 'Nieuwste eerst' },
+    { id: 'created-asc',   label: 'Oudste eerst' },
+  ]
 
   const getContactedTodayCount = (section) => {
     const today = new Date().toISOString().split('T')[0]
@@ -653,6 +859,19 @@ export default function KanbanBoard({
           void _csId
           setMagnetPickerLead({ lead: cleanLead, sectionColor: targetSection.color })
         }
+        // Auto-open the call-proposal logger when the drop landed in a
+        // section whose title signals "I proposed a call". Keyword-based
+        // so any custom section a coach renames (e.g. "Voorstel call · A")
+        // still triggers it. Skipped for the negative-outcome sections
+        // (Sale verloren / Lost) — those are dead-end buckets.
+        const t = (targetSection.title || '').toLowerCase()
+        const isProposalDrop = (t.includes('voorgesteld') || t.includes('voorstel'))
+          && !t.includes('verloren') && !t.includes('lost')
+        if (isProposalDrop) {
+          const { currentSectionId: _x, ...cleanLead } = draggedLead
+          void _x
+          setLeadForProposal(cleanLead)
+        }
       } catch (error) { console.error('❌ Move lead failed:', error); await loadBoard(true) }
       setDraggedLead(null)
     }
@@ -696,7 +915,7 @@ export default function KanbanBoard({
       setExpandedSections(prev => ({ ...prev, [selectedSectionForLead]: true }))
       setHighlightedLeadId(newLead.id)
       setTimeout(() => setHighlightedLeadId(null), 3000)
-      loadActivityData(); setShowAddLead(false); setSelectedSectionForLead(null)
+      loadActivityData(); setStatsRefreshKey(k => k + 1); setShowAddLead(false); setSelectedSectionForLead(null)
       // Prompt the coach to attribute the source while it's fresh.
       setLeadForSource(newLead)
     } catch (error) {
@@ -704,6 +923,21 @@ export default function KanbanBoard({
       const msg = error?.message || error?.details || JSON.stringify(error)
       alert(`Lead toevoegen mislukt — ${msg}\n\ncoachId: ${coachId || '(leeg!)'}`)
     }
+  }
+
+  // ── Rapid-add modal callbacks: optimistisch de board-state bijwerken.
+  const handleRapidAdded = (newLead, sectionId) => {
+    if (!newLead || !sectionId) return
+    setSections(prev => prev.map(s => s.id === sectionId
+      ? { ...s, leads: [newLead, ...(s.leads || []).filter(l => l.id !== newLead.id)] }
+      : s))
+    setExpandedSections(prev => ({ ...prev, [sectionId]: true }))
+    setStatsRefreshKey(k => k + 1)
+  }
+  const handleRapidRemoved = (leadId) => {
+    if (!leadId) return
+    setSections(prev => prev.map(s => ({ ...s, leads: (s.leads || []).filter(l => l.id !== leadId) })))
+    setStatsRefreshKey(k => k + 1)
   }
 
   // ── Quick-add directly from the search bar when no match was found.
@@ -722,6 +956,22 @@ export default function KanbanBoard({
   }
   // Lead-magnets workflow: matches "Lead magnets", "Lead magnet", "Magnets",
   // etc. — case-insensitive whole-name lookup so coach can rename loosely.
+  // Genormaliseerde set van bestaande lead-namen/handles op het bord — gebruikt
+  // door de snel-toevoegen modal om dubbele invoer te blokkeren.
+  const getExistingLeadNames = () => {
+    const s = new Set()
+    const norm = (v) => (v || '').toString().trim().toLowerCase().replace(/^@+/, '')
+    sections.forEach(sec => (sec.leads || []).forEach(l => {
+      // Alleen op de VOLLEDIGE naam matchen (niet losse voornaam) + handle,
+      // anders krijg je valse "bestaat al" bij verschillende mensen met
+      // dezelfde voornaam.
+      const full = `${l.first_name || ''} ${l.last_name || ''}`.trim()
+      if (full) s.add(norm(full))
+      if (l.instagram_handle) s.add(norm(l.instagram_handle))
+    }))
+    return s
+  }
+
   const findLeadMagnetsSection = () => {
     const re = /lead\s*magnets?|^\s*magnets?\s*$/i
     return sections.find(s => s.id !== 'unassigned' && re.test(s.title || ''))
@@ -763,6 +1013,7 @@ export default function KanbanBoard({
         if (el?.scrollIntoView) el.scrollIntoView({ behavior: 'smooth', block: 'center' })
       }, 250)
       loadActivityData()
+      setStatsRefreshKey(k => k + 1)  // nieuwe lead → stat-bar direct bijwerken
       setLeadForSource(newLead)
     } catch (error) {
       console.error('❌ Quick add from search failed:', error)
@@ -784,28 +1035,121 @@ export default function KanbanBoard({
     if (updates.contacted_today_date !== undefined || updates.reply_count !== undefined) {
       let currentSectionId = null
       for (const sec of sections) { if ((sec.leads || []).some(l => l.id === lead.id)) { currentSectionId = sec.id; break } }
-      if (!currentSectionId) { await leadService.updateLead(lead.id, updates, coachId); await loadBoard(false); return }
+      if (!currentSectionId) { await leadService.updateLead(lead.id, updates, coachId); setStatsRefreshKey(k => k + 1); await loadBoard(false); return }
+
+      // OPTIMISTISCHE restore bij een reactie op een lead in een stil-sectie.
+      // Doel = de vorige sectie als die bekend is; anders val terug op de
+      // "Gesprek insta"-sectie (het actieve gesprek). Zonder deze fallback bleef
+      // een stille lead zónder previous_section_id staan (bv. dukkie99).
+      const curSection = sections.find(s => s.id === currentSectionId)
+      const isStaleReply = updates.reply_count !== undefined && curSection && isStaleTitle(curSection.title)
+      let restoreTarget = null
+      if (isStaleReply) {
+        const prevValid = lead.previous_section_id && sections.some(s => s.id === lead.previous_section_id)
+        restoreTarget = prevValid
+          ? lead.previous_section_id
+          : (findInstagramConversationSection()?.id || null)
+      }
+      // Nieuwe regel: elke reactie (+1) reset de opvolg-teller direct naar 0 —
+      // ook in de board-state, anders synct de card 'm terug naar de oude waarde.
+      const replyReset = updates.reply_count !== undefined ? { followup_count: 0, last_followup_sent_at: null } : {}
+      if (restoreTarget && restoreTarget !== currentSectionId) {
+        setSections(prev => prev.map(s => {
+          if (s.id === currentSectionId) return { ...s, leads: (s.leads || []).filter(l => l.id !== lead.id) }
+          if (s.id === restoreTarget) return { ...s, leads: [{ ...lead, ...updates, ...replyReset }, ...(s.leads || []).filter(l => l.id !== lead.id)] }
+          return s
+        }))
+        setExpandedSections(prev => ({ ...prev, [restoreTarget]: true }))
+        setHighlightedLeadId(lead.id)
+        setTimeout(() => setHighlightedLeadId(null), 2000)
+      }
+
       try {
         const result = await leadService.updateLead(lead.id, updates, coachId)
         if (result.restored && result.restoredTo) {
+          // Server restaureerde zelf (previous_section_id-pad) → plaats op de
+          // juiste sectie + neem eventueel de gereset followup_count over.
+          const restoredLead = { ...lead, ...updates, followup_count: result.followup_count }
           setSections(prev => prev.map(s => {
-            if (s.id === currentSectionId) return { ...s, leads: (s.leads || []).filter(l => l.id !== lead.id) }
-            if (s.id === result.restoredTo.id) return { ...s, leads: [{ ...lead, ...updates }, ...(s.leads || []).filter(l => l.id !== lead.id)] }
-            return s
+            const leads = (s.leads || []).filter(l => l.id !== lead.id)
+            if (s.id === result.restoredTo.id) return { ...s, leads: [restoredLead, ...leads] }
+            return { ...s, leads }
           }))
           setExpandedSections(prev => ({ ...prev, [result.restoredTo.id]: true }))
           setHighlightedLeadId(lead.id)
           setTimeout(() => setHighlightedLeadId(null), 2000)
+        } else if (restoreTarget && restoreTarget !== currentSectionId) {
+          // Server restaureerde niet (geen previous_section_id) → persisteer onze
+          // fallback-verplaatsing zodat 'ie ook na reload op de juiste plek staat.
+          try { await leadService.moveLeadToSection(lead.id, restoreTarget, 0, coachId) }
+          catch (e) { console.error('❌ Fallback-restore persist mislukt:', e); await loadBoard(false) }
         } else {
-          setSections(prev => prev.map(s => ({ ...s, leads: (s.leads || []).map(l => l.id === lead.id ? { ...l, ...updates } : l) })))
+          setSections(prev => prev.map(s => ({ ...s, leads: (s.leads || []).map(l => l.id === lead.id ? { ...l, ...updates, ...replyReset } : l) })))
         }
+        setStatsRefreshKey(k => k + 1)  // bovenste stat-bar direct bijwerken
         loadActivityData()
       } catch (error) { console.error('❌ Update lead failed:', error); await loadBoard(false) }
       return
     }
     
-    await leadService.updateLead(lead.id, updates, coachId)
+    // Opvolg +1 vanuit een "3 dagen stil"-sectie → DIRECT naar "Follow up stil".
+    // We bepalen dit op basis van de sectie waarin de kaart staat (section-param,
+    // betrouwbaarder dan zoeken in de state) en verplaatsen OPTIMISTISCH (vóór de
+    // netwerk-calls) zodat het meteen zichtbaar is.
+    const isFollowupBump = updates.followup_count !== undefined && !!updates.last_followup_sent_at
+    const moveToStil = isFollowupBump && followupStilSection && section
+      && section.id !== followupStilSection.id && isThreeDaysSilentTitle(section.title)
+
+    if (moveToStil) {
+      setSections(prev => prev.map(s => {
+        if (s.id === section.id) return { ...s, leads: (s.leads || []).filter(l => l.id !== lead.id) }
+        if (s.id === followupStilSection.id) return { ...s, leads: [{ ...lead, ...updates }, ...(s.leads || []).filter(l => l.id !== lead.id)] }
+        return s
+      }))
+      setExpandedSections(prev => ({ ...prev, [followupStilSection.id]: true }))
+      setHighlightedLeadId(lead.id)
+      setTimeout(() => setHighlightedLeadId(null), 2000)
+    } else if (updates.followup_count !== undefined) {
+      // Geen stil-move: werk de teller optimistisch bij in de sectie-state.
+      // Zo herberekent een actieve per-sectie opvolg-filter direct → een lead
+      // die niet meer aan het gekozen aantal voldoet verdwijnt meteen.
+      setSections(prev => prev.map(s => ({
+        ...s,
+        leads: (s.leads || []).map(l => l.id === lead.id ? { ...l, ...updates } : l),
+      })))
+    }
+
+    try {
+      await leadService.updateLead(lead.id, updates, coachId)
+      if (moveToStil) await leadService.moveLeadToSection(lead.id, followupStilSection.id, 0, coachId)
+    } catch (e) {
+      console.error('❌ Follow-up update/verplaatsing mislukt:', e)
+      await loadBoard(false) // herstel UI bij fout
+    }
+    if (updates.followup_count !== undefined) setStatsRefreshKey(k => k + 1)
     loadActivityData()
+  }
+
+  // Verplaats een lead naar een sectie via de dropdown op de card (alternatief
+  // voor slepen — handig als de doelsectie niet in beeld staat). Spiegelt de
+  // optimistische move uit onColumnDrop.
+  const handleMoveLeadToSection = async (lead, fromSectionId, targetSectionId) => {
+    if (!targetSectionId || targetSectionId === fromSectionId) return
+    try {
+      await leadService.moveLeadToSection(lead.id, targetSectionId, 0, coachId)
+      setSections(prev => prev.map(section => {
+        if (section.id === fromSectionId) return { ...section, leads: (section.leads || []).filter(l => l.id !== lead.id) }
+        if (section.id === targetSectionId) return { ...section, leads: [lead, ...(section.leads || []).filter(l => l.id !== lead.id)] }
+        return section
+      }))
+      setExpandedSections(prev => ({ ...prev, [targetSectionId]: true }))
+      setHighlightedLeadId(lead.id)
+      setTimeout(() => setHighlightedLeadId(null), 2000)
+      loadActivityData()
+    } catch (error) {
+      console.error('❌ Move lead via dropdown failed:', error)
+      await loadBoard(false)
+    }
   }
 
   const handleLeadDelete = async (lead) => {
@@ -814,6 +1158,7 @@ export default function KanbanBoard({
       await leadService.deleteLead(lead.id)
       setSections(prev => prev.map(section => ({ ...section, leads: (section.leads || []).filter(l => l.id !== lead.id) })))
       loadActivityData()
+      setStatsRefreshKey(k => k + 1)
     } catch (error) { console.error('❌ Delete failed:', error); await loadBoard(false) }
   }
 
@@ -847,6 +1192,7 @@ export default function KanbanBoard({
           onDelete={() => handleLeadDelete(lead)}
           onSnooze={snoozeSection && !isThisSnooze ? handleSnoozeLead : null}
           sections={sections} currentSectionId={section.id}
+          onMoveToSection={(targetSectionId) => handleMoveLeadToSection(lead, section.id, targetSectionId)}
           sectionTitle={section.title}
           onSalesCallClick={(lead) => setSalesCallLead(lead)}
           coachId={coachId} db={db} onRefresh={loadBoard}
@@ -864,10 +1210,13 @@ export default function KanbanBoard({
     return (
       <div style={{ display: 'flex', gap: '0.75rem', overflowX: 'auto', paddingBottom: '0.75rem', WebkitOverflowScrolling: 'touch' }}>
         {sections.map((section) => {
-          const totalLeads = section.leads?.length || 0
-          const visibleLeads = getVisibleLeads(section)
-          const hasMore = totalLeads > MAX_VISIBLE_LEADS
           const isExpanded = expandedSections[section.id]
+          // De teller toont het aantal leads dat de actieve filter doorstaat
+          // (bv. "hoeveel met x opvolg"). Zonder filter = gewoon alle leads.
+          const sortedLeads = getSortedLeads(section)
+          const totalLeads = sortedLeads.length
+          const visibleLeads = (isExpanded || totalLeads <= MAX_VISIBLE_LEADS) ? sortedLeads : sortedLeads.slice(0, MAX_VISIBLE_LEADS)
+          const hasMore = totalLeads > MAX_VISIBLE_LEADS
           const isUnassigned = section.id === 'unassigned'
           const reIdx = getReorderableSections().findIndex(s => s.id === section.id)
           const canLeft = !isUnassigned && reIdx > 0
@@ -1029,13 +1378,17 @@ export default function KanbanBoard({
         </>
       ) : (
         <div>
-          <DailyStatsBar leadService={leadService} coachId={coachId} sections={sections} isMobile={isMobile} onExportPDF={handleExportPDF} />
+          <PeriodStatsBar leadService={leadService} coachId={coachId} isMobile={isMobile} refreshKey={statsRefreshKey} />
 
-          {/* ═══ ONE TOOLBAR ROW: Search + Warm-Up + Fullscreen + Sectie ═══ */}
+          {/* ═══ ONE TOOLBAR ROW: Search + Warm-Up + Fullscreen + Sectie ═══
+              Sticky: blijft bovenaan in beeld tijdens het scrollen door de
+              secties, zodat de zoekbalk altijd bereikbaar is. */}
           <div style={{
             display: 'flex', alignItems: 'center', gap: '0.375rem',
+            position: 'sticky', top: 0, zIndex: 300,
+            background: 'rgba(10,10,10,0.95)', backdropFilter: 'blur(8px)',
+            paddingTop: '0.45rem', paddingBottom: '0.45rem',
             marginBottom: '0.5rem',
-            position: 'relative', zIndex: 100
           }}>
             {/* Search */}
             <div style={{
@@ -1058,6 +1411,155 @@ export default function KanbanBoard({
               )}
             </div>
 
+            {/* Globale hot-leads toggle — toont alleen hot leads in ALLE
+                secties. Overschrijft per-sectie temperatuur-filter. */}
+            <button
+              onClick={() => setGlobalHotOnly(v => !v)}
+              title={globalHotOnly ? 'Toon alle leads weer' : 'Toon alleen hot leads (overal)'}
+              style={{
+                display: 'inline-flex', alignItems: 'center', gap: '0.3rem',
+                padding: isMobile ? '0.3rem 0.5rem' : '0.35rem 0.625rem',
+                background: globalHotOnly ? 'rgba(239,68,68,0.15)' : 'rgba(255,255,255,0.03)',
+                border: `1px solid ${globalHotOnly ? 'rgba(239,68,68,0.45)' : 'rgba(255,255,255,0.06)'}`,
+                borderRadius: '6px',
+                color: globalHotOnly ? '#fca5a5' : 'rgba(255,255,255,0.5)',
+                fontSize: isMobile ? '0.7rem' : '0.72rem', fontWeight: 700,
+                cursor: 'pointer', minHeight: '28px',
+                touchAction: 'manipulation',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              🔥 {isMobile ? 'Hot' : 'Hot leads'}
+            </button>
+
+            {/* Calls-voorgesteld toggle — toont alleen leads waar de coach
+                al een call_proposal-bericht voor heeft gestuurd. */}
+            <button
+              onClick={() => setGlobalCallProposedOnly(v => !v)}
+              title={globalCallProposedOnly ? 'Toon alle leads weer' : 'Toon alleen leads waar al een call voorgesteld is'}
+              style={{
+                display: 'inline-flex', alignItems: 'center', gap: '0.3rem',
+                padding: isMobile ? '0.3rem 0.5rem' : '0.35rem 0.625rem',
+                background: globalCallProposedOnly ? 'rgba(212,175,55,0.15)' : 'rgba(255,255,255,0.03)',
+                border: `1px solid ${globalCallProposedOnly ? 'rgba(212,175,55,0.45)' : 'rgba(255,255,255,0.06)'}`,
+                borderRadius: '6px',
+                color: globalCallProposedOnly ? '#D4AF37' : 'rgba(255,255,255,0.5)',
+                fontSize: isMobile ? '0.7rem' : '0.72rem', fontWeight: 700,
+                cursor: 'pointer', minHeight: '28px',
+                touchAction: 'manipulation',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              📞 {isMobile ? 'Voorgest.' : 'Call voorgesteld'}
+            </button>
+
+            {/* Overkoepelende filter voor het HELE bord — Type, Temperatuur,
+                Opvolg-aantal en Sortering, in alle secties tegelijk. */}
+            {(() => {
+              const counts = [...new Set(sections.flatMap(s => (s.leads || []).map(l => Number(l.followup_count) || 0)))].sort((a, b) => a - b)
+              const hasFilter = boardFilter.sort !== 'default' || boardFilter.types.size > 0 || boardFilter.temps.size > 0 || boardFilter.followups.size > 0
+              const filterCount = boardFilter.types.size + boardFilter.temps.size + boardFilter.followups.size + (boardFilter.sort !== 'default' ? 1 : 0)
+              const GOLD = '#FFD700'
+              return (
+                <div style={{ position: 'relative' }} ref={boardFilterRef}>
+                  <button
+                    onClick={() => setShowBoardFilter(v => !v)}
+                    title="Filter & sorteer alle leads (hele bord)"
+                    style={{
+                      display: 'inline-flex', alignItems: 'center', gap: '0.3rem',
+                      padding: isMobile ? '0.3rem 0.5rem' : '0.35rem 0.625rem',
+                      background: hasFilter ? 'rgba(255,215,0,0.15)' : 'rgba(255,255,255,0.03)',
+                      border: `1px solid ${hasFilter ? 'rgba(255,215,0,0.45)' : 'rgba(255,255,255,0.06)'}`,
+                      borderRadius: '6px',
+                      color: hasFilter ? GOLD : 'rgba(255,255,255,0.5)',
+                      fontSize: isMobile ? '0.7rem' : '0.72rem', fontWeight: 700,
+                      cursor: 'pointer', minHeight: '28px', touchAction: 'manipulation', whiteSpace: 'nowrap',
+                    }}
+                  >
+                    <ArrowUpDown size={12} /> Filter
+                    {filterCount > 0 && (
+                      <span style={{ background: GOLD, color: '#000', borderRadius: 8, padding: '0 5px', fontSize: '0.6rem', fontWeight: 900 }}>{filterCount}</span>
+                    )}
+                  </button>
+                  {showBoardFilter && (
+                    <div style={{
+                      position: 'absolute', top: 'calc(100% + 0.3rem)', left: 0,
+                      zIndex: 200, minWidth: 230,
+                      background: '#111', border: '1px solid rgba(255,215,0,0.3)',
+                      borderRadius: 8, overflow: 'hidden', boxShadow: '0 8px 24px rgba(0,0,0,0.6)',
+                    }}>
+                      {/* Type-filter */}
+                      <div style={{ padding: '0.5rem 0.65rem 0.4rem', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                        <div style={{ fontSize: '0.5rem', fontWeight: 800, color: 'rgba(255,255,255,0.35)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '0.3rem' }}>Type lead</div>
+                        {[{ id: 'magnet', label: 'Lead-magnet' }, { id: 'outreach', label: 'Zelf bericht' }].map(opt => {
+                          const active = boardFilter.types.has(opt.id)
+                          return (
+                            <label key={opt.id} style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', padding: '0.3rem 0.1rem', cursor: 'pointer', color: active ? GOLD : 'rgba(255,255,255,0.65)', fontSize: '0.72rem', fontWeight: active ? 700 : 500 }}>
+                              <input type="checkbox" checked={active} onChange={() => toggleBoardSet('types', opt.id)} style={{ accentColor: GOLD, width: 14, height: 14 }} />
+                              {opt.label}
+                            </label>
+                          )
+                        })}
+                      </div>
+
+                      {/* Temperatuur-filter */}
+                      <div style={{ padding: '0.5rem 0.65rem 0.4rem', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                        <div style={{ fontSize: '0.5rem', fontWeight: 800, color: 'rgba(255,255,255,0.35)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '0.3rem' }}>Temperatuur</div>
+                        {[{ id: 'hot', label: '🔥 Hot' }, { id: 'warm', label: '🌤 Warm' }, { id: 'cold', label: '❄️ Cold' }, { id: 'none', label: '— Geen' }].map(opt => {
+                          const active = boardFilter.temps.has(opt.id)
+                          return (
+                            <label key={opt.id} style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', padding: '0.3rem 0.1rem', cursor: 'pointer', color: active ? GOLD : 'rgba(255,255,255,0.65)', fontSize: '0.72rem', fontWeight: active ? 700 : 500 }}>
+                              <input type="checkbox" checked={active} onChange={() => toggleBoardSet('temps', opt.id)} style={{ accentColor: GOLD, width: 14, height: 14 }} />
+                              {opt.label}
+                            </label>
+                          )
+                        })}
+                      </div>
+
+                      {/* Opvolg-berichten filter */}
+                      {counts.length > 0 && (
+                        <div style={{ padding: '0.5rem 0.65rem 0.4rem', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                          <div style={{ fontSize: '0.5rem', fontWeight: 800, color: 'rgba(255,255,255,0.35)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '0.3rem' }}>Opvolg-berichten</div>
+                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.3rem' }}>
+                            {counts.map(n => {
+                              const active = boardFilter.followups.has(n)
+                              return (
+                                <button key={n} onClick={() => toggleBoardSet('followups', n)}
+                                  style={{ padding: '0.25rem 0.5rem', background: active ? 'rgba(255,215,0,0.2)' : 'rgba(255,255,255,0.03)', border: `1px solid ${active ? GOLD : 'rgba(255,255,255,0.08)'}`, borderRadius: '5px', color: active ? GOLD : 'rgba(255,255,255,0.6)', fontSize: '0.7rem', fontWeight: active ? 800 : 600, cursor: 'pointer', minHeight: 26, touchAction: 'manipulation' }}>
+                                  {n}×
+                                </button>
+                              )
+                            })}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Sorteer */}
+                      <div style={{ padding: '0.4rem 0' }}>
+                        <div style={{ fontSize: '0.5rem', fontWeight: 800, color: 'rgba(255,255,255,0.35)', textTransform: 'uppercase', letterSpacing: '0.06em', padding: '0 0.65rem 0.2rem' }}>Sorteer</div>
+                        {SECTION_SORT_OPTIONS.map(opt => {
+                          const active = (boardFilter.sort || 'default') === opt.id
+                          return (
+                            <button key={opt.id} onClick={() => setBoardSort(opt.id)}
+                              style={{ display: 'block', width: '100%', padding: '0.4rem 0.65rem', background: active ? 'rgba(255,215,0,0.12)' : 'transparent', border: 'none', color: active ? GOLD : 'rgba(255,255,255,0.7)', fontSize: '0.72rem', fontWeight: active ? 700 : 500, textAlign: 'left', cursor: 'pointer', minHeight: 30 }}>
+                              {opt.label}
+                            </button>
+                          )
+                        })}
+                      </div>
+
+                      {hasFilter && (
+                        <button onClick={() => { resetBoardFilter(); setShowBoardFilter(false) }}
+                          style={{ display: 'block', width: '100%', padding: '0.5rem 0.65rem', background: 'rgba(239,68,68,0.06)', border: 'none', borderTop: '1px solid rgba(255,255,255,0.05)', color: '#fca5a5', fontSize: '0.65rem', fontWeight: 700, textAlign: 'center', cursor: 'pointer' }}>
+                          Reset filters
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )
+            })()}
+
             {/* Mijn berichten — outreach loggen + metrics in één scherm */}
             <button onClick={() => setShowOutreachLogger(true)}
               style={{
@@ -1076,6 +1578,21 @@ export default function KanbanBoard({
               title="Bekijk je berichten en log hoeveel je vandaag verstuurde">
               <Send size={11} />
               {isMobile ? 'DMs' : 'Mijn berichten'}
+            </button>
+
+            {/* Snel leads toevoegen — tempo-flow met toetsenbord */}
+            <button onClick={() => setShowRapidAdd(true)}
+              style={{
+                padding: '0 0.6rem', height: '28px',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.3rem',
+                background: 'rgba(255,215,0,0.14)', border: '1px solid rgba(255,215,0,0.4)',
+                borderRadius: '6px', color: '#FFD700', fontSize: '0.62rem', fontWeight: 800,
+                cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+                flexShrink: 0, whiteSpace: 'nowrap',
+              }}
+              title="Snel meerdere leads toevoegen (campagne of lead magnet)">
+              <Zap size={11} />
+              {isMobile ? 'Snel' : 'Snel toevoegen'}
             </button>
 
             {/* Warm-Up icon */}
@@ -1249,9 +1766,26 @@ export default function KanbanBoard({
             </div>
           )}
 
+
           {renderKanbanColumns(false)}
 
           {showAddLead && <AddLeadModal isMobile={isMobile} onClose={() => { setShowAddLead(false); setSelectedSectionForLead(null) }} onSubmit={handleAddLead} />}
+          {showRapidAdd && (
+            <RapidAddLeadsModal
+              isOpen={showRapidAdd}
+              onClose={() => setShowRapidAdd(false)}
+              isMobile={isMobile}
+              leadService={leadService}
+              db={db || leadService?.db}
+              coachId={coachId}
+              campaigns={campaigns}
+              instaSectionId={findInstagramConversationSection()?.id || sections.find(s => s.id !== 'unassigned')?.id}
+              magnetsSectionId={findLeadMagnetsSection()?.id || findInstagramConversationSection()?.id || sections.find(s => s.id !== 'unassigned')?.id}
+              existingNames={getExistingLeadNames()}
+              onAdded={handleRapidAdded}
+              onRemoved={handleRapidRemoved}
+            />
+          )}
           {showSectionModal && <SectionModal isMobile={isMobile} section={selectedSection} onClose={() => { setShowSectionModal(false); setSelectedSection(null) }} onSubmit={selectedSection ? (u) => handleUpdateSection(selectedSection.id, u) : handleCreateSection} onDelete={selectedSection ? () => handleDeleteSection(selectedSection.id) : null} />}
         </div>
       )}
@@ -1325,7 +1859,7 @@ export default function KanbanBoard({
               <WarmUpBoard leadService={leadService} coachId={coachId} isMobile={isMobile} sections={sections} />
             ) : (
               <>
-                <DailyStatsBar leadService={leadService} coachId={coachId} sections={sections} isMobile={isMobile} onExportPDF={handleExportPDF} />
+                <PeriodStatsBar leadService={leadService} coachId={coachId} isMobile={isMobile} refreshKey={statsRefreshKey} />
                 {/* Fullscreen toolbar */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem', marginBottom: '0.5rem' }}>
                   <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: '0.35rem', padding: '0.3rem 0.5rem', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '6px', minHeight: '28px' }}>
@@ -1344,6 +1878,22 @@ export default function KanbanBoard({
           </div>
 
           {showAddLead && <AddLeadModal isMobile={isMobile} onClose={() => { setShowAddLead(false); setSelectedSectionForLead(null) }} onSubmit={handleAddLead} />}
+          {showRapidAdd && (
+            <RapidAddLeadsModal
+              isOpen={showRapidAdd}
+              onClose={() => setShowRapidAdd(false)}
+              isMobile={isMobile}
+              leadService={leadService}
+              db={db || leadService?.db}
+              coachId={coachId}
+              campaigns={campaigns}
+              instaSectionId={findInstagramConversationSection()?.id || sections.find(s => s.id !== 'unassigned')?.id}
+              magnetsSectionId={findLeadMagnetsSection()?.id || findInstagramConversationSection()?.id || sections.find(s => s.id !== 'unassigned')?.id}
+              existingNames={getExistingLeadNames()}
+              onAdded={handleRapidAdded}
+              onRemoved={handleRapidRemoved}
+            />
+          )}
           {showSectionModal && <SectionModal isMobile={isMobile} section={selectedSection} onClose={() => { setShowSectionModal(false); setSelectedSection(null) }} onSubmit={selectedSection ? (u) => handleUpdateSection(selectedSection.id, u) : handleCreateSection} onDelete={selectedSection ? () => handleDeleteSection(selectedSection.id) : null} />}
         </div>,
         document.body
@@ -1381,6 +1931,18 @@ export default function KanbanBoard({
         db={leadService.db}
         coachId={coachId}
         onAttributed={handleSourceAttributed}
+      />
+
+      {/* Auto-prompt: log the exact message after dropping a lead into a
+          "Call voorgesteld" section, so the stats modal can later show
+          which proposal-wording actually converts. */}
+      <CallProposalModal
+        isOpen={!!leadForProposal}
+        onClose={() => setLeadForProposal(null)}
+        lead={leadForProposal}
+        db={leadService.db}
+        coachId={coachId}
+        isMobile={isMobile}
       />
 
       {/* Drop-triggered magnet picker — opens after dragging a lead into the

@@ -87,13 +87,21 @@ export default function CoachingPeriodPanel({ client, coachId, isMobile, onClien
     if (!draftStart || !draftWeeks || draftWeeks <= 0) return
     setBusy(true)
     try {
+      // Sync goal_deadline mee zodat de Doelen-tab + de rode plan-lijn in
+      // de gewicht-grafiek automatisch op het einde van het traject vallen.
+      // Verstoort niet als de coach later handmatig een andere deadline
+      // zet — pas bij de volgende period-save wordt het weer gelijkgetrokken.
+      const startMs = new Date(draftStart + 'T00:00:00').getTime()
+      const weeks = parseInt(draftWeeks, 10)
+      const trajectEnd = new Date(startMs + weeks * 7 * 86400000).toISOString().split('T')[0]
       const payload = {
         coaching_start_date: draftStart,
-        coaching_total_weeks: parseInt(draftWeeks, 10),
+        coaching_total_weeks: weeks,
         coaching_status: 'active',
         coaching_paused_at: null,
         coaching_pause_reason: null,
         payment_plan: draftPayment || null,
+        goal_deadline: trajectEnd,
       }
       const { error } = await supabase.from('clients').update(payload).eq('id', client.id)
       if (error) throw error

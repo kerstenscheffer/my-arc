@@ -45,5 +45,11 @@
 	</array>
 	<key>UIViewControllerBasedStatusBarAppearance</key>
 	<true/>
+	<key>NSCameraUsageDescription</key>
+	<string>MY ARC gebruikt je camera voor profielfoto's en voortgangsfoto's.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>MY ARC gebruikt je foto-bibliotheek om profielfoto's en voortgangsfoto's te kiezen.</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>MY ARC slaat voortgangsfoto's op in je foto-bibliotheek.</string>
 </dict>
 </plist>

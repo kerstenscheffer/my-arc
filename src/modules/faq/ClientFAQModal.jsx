@@ -40,9 +40,15 @@ function scoreMatch(node, query) {
 }
 
 // ─── COMPONENT ───────────────────────────────────────────────────────────────
-export default function ClientFAQModal({ onNavigate, coachPhoto, coachWhatsApp }) {
+export default function ClientFAQModal({ onNavigate, coachPhoto, coachWhatsApp, open: openProp, onOpenChange }) {
   const isMobile = window.innerWidth <= 768
-  const [isOpen, setIsOpen]   = useState(false)
+  const controlled = typeof openProp === 'boolean' && typeof onOpenChange === 'function'
+  const [isOpenInternal, setIsOpenInternal] = useState(false)
+  const isOpen = controlled ? openProp : isOpenInternal
+  const setIsOpen = (val) => {
+    const next = typeof val === 'function' ? val(isOpen) : val
+    if (controlled) onOpenChange(next); else setIsOpenInternal(next)
+  }
   const [path, setPath]       = useState([])
   const [tree, setTree]       = useState([])
   const [leaves, setLeaves]   = useState([])
@@ -111,8 +117,8 @@ export default function ClientFAQModal({ onNavigate, coachPhoto, coachWhatsApp }
 
   return createPortal(
     <>
-      {/* ── FLOATING BADGE ── */}
-      {!isOpen && (
+      {/* ── FLOATING BADGE — alleen in uncontrolled mode (geen sidebar) ── */}
+      {!controlled && !isOpen && (
         <button
           onClick={() => setIsOpen(true)}
           style={{

@@ -16,15 +16,21 @@ export const est8Rep = (weight, reps) => {
 }
 
 // ── Muscle group base colors ──
+// Echt distincte hues per spiergroep — anders zijn lijnen niet uit elkaar te
+// halen in de grafiek. Goud blijft voor "back" om de brand-kleur behouden te
+// houden als visueel anker (back-days zijn meest voorkomend). Andere kleuren
+// gekozen op contrast + leesbaarheid op donkere achtergrond.
+// Binnen één groep blijft `shadeColor` de lichtheid variëren voor multi-
+// oefening days, maar de hue blijft consistent per spiergroep.
 export const MUSCLE_COLORS = {
-  chest:     '#f97316',
-  back:      '#3b82f6',
-  shoulders: '#eab308',
-  biceps:    '#a855f7',
-  triceps:   '#ec4899',
-  legs:      '#10b981',
-  core:      '#94a3b8',
-  other:     '#6b7280',
+  chest:     '#ef4444', // rood
+  back:      '#FFD700', // goud (brand-anker)
+  shoulders: '#f59e0b', // oranje/amber
+  biceps:    '#a855f7', // paars
+  triceps:   '#06b6d4', // cyaan
+  legs:      '#10b981', // groen
+  core:      '#ec4899', // roze
+  other:     '#94a3b8', // grijs/slate
 }
 
 export const MUSCLE_LABELS = {

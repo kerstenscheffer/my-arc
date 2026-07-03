@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { User, Phone, Mail, MapPin, Settings, Bell, Globe, Shield, LogOut, Edit, Save, X, Camera, Target, ChevronRight, Trash2, AlertTriangle } from 'lucide-react'
 import DatabaseService from '../../services/DatabaseService'
+import PortalSwitchButton from '../../components/PortalSwitchButton'
 const db = DatabaseService
 
 const GOLD = '#FFD700'
@@ -423,6 +424,18 @@ export default function ClientProfile({ client, user, onClientUpdate }) {
             </button>
           </div>
         )}
+      </div>
+
+      {/* Portal switch (coach <-> client) — gemigreerd uit de header
+          die we hebben weggehaald. Hier hoort 'ie als dichter bij
+          "account-acties" naast logout. */}
+      <div style={{ marginBottom: '0.6rem' }}>
+        <PortalSwitchButton target="coach" db={db} style={{
+          width: '100%',
+          padding: '0.875rem',
+          fontSize: '0.875rem',
+          fontWeight: 600,
+        }} />
       </div>
 
       {/* Logout */}

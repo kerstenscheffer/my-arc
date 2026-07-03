@@ -165,10 +165,32 @@ const getDefaultMoment = () => {
   return 'snack'
 }
 
-const GRAM_OPTIONS = [
-  { id: 'gram', label: '1 gram', grams: 1 },
-  { id: '100g', label: '100 gram', grams: 100 }
-]
+const DEFAULT_GRAM_PRESETS = [1, 30, 50, 100]
+
+const buildGramOptions = (learnedGrams = []) => {
+  // Always keep "1 gram" as the exact option, then fill remaining 3 slots
+  // first from learned values (sorted by use_count via order they're loaded),
+  // then from defaults.
+  const result = [{ id: 'gram', label: '1 gram', grams: 1 }]
+  const others = []
+  for (const g of learnedGrams) {
+    const n = Math.round(Number(g))
+    if (!Number.isFinite(n) || n <= 0 || n === 1) continue
+    if (!others.includes(n)) others.push(n)
+    if (others.length >= 3) break
+  }
+  for (const g of DEFAULT_GRAM_PRESETS) {
+    if (others.length >= 3) break
+    if (g === 1) continue
+    if (!others.includes(g)) others.push(g)
+  }
+  for (const g of others) {
+    result.push({ id: `g${g}`, label: `${g} gram`, grams: g })
+  }
+  return result
+}
+
+const GRAM_OPTIONS = buildGramOptions()
 
 const MEAL_OPTIONS = [
   { id: 'portion', label: '1 portie', grams: 1, isMultiplier: true }
@@ -178,16 +200,41 @@ const MEAL_OPTIONS = [
 // MAIN COMPONENT
 // ═══════════════════════════════════════════
 
-export default function AmountPicker({ item, remaining, onLog, onCancel, isMobile, defaultMealMoment }) {
+export default function AmountPicker({ item, remaining, onLog, onCancel, isMobile, defaultMealMoment, db, client, loggingService }) {
   if (!item) return null
 
   // Bepaal of dit een per100g item is (ingrediënt) of een portie item (meal)
   const isPer100g = item.per100g === true
 
-  const servingOptions = isPer100g ? GRAM_OPTIONS : MEAL_OPTIONS
+  const [gramOptions, setGramOptions] = useState(GRAM_OPTIONS)
+  const servingOptions = isPer100g ? gramOptions : MEAL_OPTIONS
 
   // Initial state
   const [selectedServing, setSelectedServing] = useState(servingOptions[0])
+  // Wanneer een portie-preset z'n eigen macros heeft (bv. "1 eiwit (los)"
+  // gebruikt egg-white macros ipv het gemiddelde hele-ei profiel), zetten
+  // we die hier neer. Math gebruikt deze macros als per-100g-basis ipv de
+  // item-macros. Wordt geleegd zodra de gebruiker via de dropdown een
+  // andere portie kiest.
+  const [baseMacrosOverride, setBaseMacrosOverride] = useState(null)
+
+  // Load learned portion sizes per ingredient and rebuild dropdown
+  useEffect(() => {
+    if (!isPer100g || !loggingService || !client?.id || !item?.name) return
+    let cancelled = false
+    loggingService.getPortionHistory(client.id, item.name, 4).then(learned => {
+      if (cancelled) return
+      const next = buildGramOptions(learned)
+      setGramOptions(next)
+      // Keep currently-selected grams if it's still in the list, else fall back
+      // to the matching option or first.
+      setSelectedServing(prev => {
+        const stillThere = next.find(o => o.grams === prev.grams)
+        return stillThere || next[0]
+      })
+    })
+    return () => { cancelled = true }
+  }, [item?.name, client?.id, loggingService, isPer100g])
 
   // 🎯 BELANGRIJK: gebruik opgeslagen amount uit recent als die er is
   // Anders: default 100g voor per100g, 1 portie voor meal
@@ -216,10 +263,33 @@ export default function AmountPicker({ item, remaining, onLog, onCancel, isMobil
   let factor
   let totalGrams // alleen relevant voor per100g/gram items
 
-  if (item._savedAmount !== undefined && item._savedAmount !== null && item._savedAmount > 0) {
-    // Recent item — macros zijn totalen voor _savedAmount, schaal lineair
-    factor = quantity / item._savedAmount
+  // Corrupt-data-detectie: in zeldzame gevallen heeft een recent-item een
+  // anker van bv. amount=3 met per_unit='gram' terwijl calories=465. Dat
+  // impliceert 155 kcal per gram — fysiek onmogelijk (max ~9 kcal/g voor
+  // pure oliën). Vermoedelijk een unit-count die per ongeluk als gram is
+  // opgeslagen. Bij zulke rows valt de math terug op per-100g.
+  //
+  // We KIJKEN niet meer puur naar "< 10 gram" — dat trof onterecht
+  // legitieme kleine porties zoals 5g olijfolie (8.2 kcal/g, OK).
+  const impliedDensity = (isPer100g
+    && item._savedAmount > 0
+    && (item._savedPerUnit === 'gram' || !item._savedPerUnit))
+    ? Math.abs((item.calories || 0) / item._savedAmount)
+    : 0
+  const savedAmountSuspect = impliedDensity > 12
+  const useSavedAnchor =
+    !savedAmountSuspect
+    && item._savedAmount !== undefined
+    && item._savedAmount !== null
+    && item._savedAmount > 0
+
+  if (useSavedAnchor) {
+    // Recent item — macros zijn totalen voor _savedAmount, schaal lineair.
+    // totalGrams (of voor portion: quantity) gedeeld door savedAmount geeft
+    // de juiste factor ook als de gebruiker via de dropdown een ander
+    // portiegrootte-unit kiest.
     totalGrams = selectedServing.isMultiplier ? quantity : quantity * selectedServing.grams
+    factor = totalGrams / item._savedAmount
   } else if (isPer100g) {
     // Vers ingrediënt — macros per 100g
     totalGrams = selectedServing.isMultiplier ? quantity : quantity * selectedServing.grams
@@ -230,11 +300,20 @@ export default function AmountPicker({ item, remaining, onLog, onCancel, isMobil
     factor = quantity
   }
 
+  // Wanneer er een preset-specifieke macro-basis is (bv. eigeel/eiwit los),
+  // gebruiken we die per-100g-waarden in plaats van item.*; de factor blijft
+  // hetzelfde dus quantity-aanpassingen schalen netjes mee.
+  const macroBase = baseMacrosOverride || {
+    calories: item.calories || 0,
+    protein: item.protein || 0,
+    carbs: item.carbs || 0,
+    fat: item.fat || 0,
+  }
   const macros = {
-    calories: Math.round((item.calories || 0) * factor),
-    protein: Math.round((item.protein || 0) * factor * 10) / 10,
-    carbs: Math.round((item.carbs || 0) * factor * 10) / 10,
-    fat: Math.round((item.fat || 0) * factor * 10) / 10
+    calories: Math.round((macroBase.calories || 0) * factor),
+    protein: Math.round((macroBase.protein || 0) * factor * 10) / 10,
+    carbs: Math.round((macroBase.carbs || 0) * factor * 10) / 10,
+    fat: Math.round((macroBase.fat || 0) * factor * 10) / 10
   }
 
   const totalG = macros.protein + macros.carbs + macros.fat
@@ -250,9 +329,15 @@ export default function AmountPicker({ item, remaining, onLog, onCancel, isMobil
       let amountToSave = null
 
       if (item._savedAmount !== undefined && item._savedAmount !== null) {
-        // Recent item — gebruik dezelfde unit als opgeslagen
+        // Recent item — gebruik dezelfde unit als opgeslagen.
+        // Belangrijk: voor per100g-items moet `amount` het totaal in grammen
+        // zijn, niet `quantity`. Anders gaat de `× grams` uit de dropdown
+        // verloren (bv. dropdown "100 gram" × quantity 3 = 300g, maar zonder
+        // deze schaling wordt het als amount=3 weggeschreven terwijl de
+        // macros voor 300g zijn berekend). Dat triggerde een corrupt-data-
+        // detectie bij latere relogs.
         per_unit = item._savedPerUnit || (isPer100g ? 'gram' : 'portion')
-        amountToSave = quantity
+        amountToSave = isPer100g ? totalGrams : quantity
       } else if (isPer100g) {
         per_unit = 'gram'
         amountToSave = totalGrams
@@ -299,11 +384,6 @@ export default function AmountPicker({ item, remaining, onLog, onCancel, isMobil
   }
 
   const currentMealLabel = MEAL_MOMENTS.find(m => m.id === mealMoment)?.label || 'Ontbijt'
-
-  // ── Dynamische portielabel ──
-  const portionLabel = item._savedAmount !== undefined && item._savedAmount !== null
-    ? (item._savedPerUnit === 'portion' ? '1 portie' : '1 gram')
-    : selectedServing.label
 
   // ── Row ──
   const Row = ({ label, children }) => (
@@ -382,47 +462,37 @@ export default function AmountPicker({ item, remaining, onLog, onCancel, isMobil
         )}
       </div>
 
-      {/* Portiegrootte — locked voor recents */}
+      {/* Portiegrootte — dropdown ook voor recents */}
       <Row label="Portiegrootte">
-        {item._savedAmount !== undefined && item._savedAmount !== null ? (
-          <div style={{
-            padding: '0.5rem 0.75rem',
-            color: 'rgba(255, 255, 255, 0.6)',
-            fontSize: isMobile ? '0.8rem' : '0.85rem', fontWeight: '600'
-          }}>
-            {portionLabel}
-          </div>
-        ) : (
-          <div style={{ position: 'relative' }}>
-            <DropdownBtn
-              label={selectedServing.label}
-              onClick={() => setShowServingDropdown(!showServingDropdown)}
-              active={showServingDropdown}
+        <div style={{ position: 'relative' }}>
+          <DropdownBtn
+            label={selectedServing.label}
+            onClick={() => setShowServingDropdown(!showServingDropdown)}
+            active={showServingDropdown}
+          />
+          {showServingDropdown && (
+            <DropdownMenu
+              options={servingOptions}
+              selected={selectedServing.id}
+              onSelect={(opt) => {
+                setSelectedServing(opt)
+                setShowServingDropdown(false)
+                // Dropdown-keuze betekent dat de gebruiker bewust van een
+                // preset-shortcut wegnavigeert — overrider macro-basis
+                // legen zodat we weer met de gewone item-macros rekenen.
+                setBaseMacrosOverride(null)
+                if (opt.id === 'gram') setQuantity(item.defaultPortion || 100)
+                else setQuantity(1)
+              }}
+              onClose={() => setShowServingDropdown(false)}
             />
-            {showServingDropdown && (
-              <DropdownMenu
-                options={servingOptions}
-                selected={selectedServing.id}
-                onSelect={(opt) => {
-                  setSelectedServing(opt)
-                  setShowServingDropdown(false)
-                  if (opt.id === 'gram') setQuantity(item.defaultPortion || 100)
-                  else setQuantity(1)
-                }}
-                onClose={() => setShowServingDropdown(false)}
-              />
-            )}
-          </div>
-        )}
+          )}
+        </div>
       </Row>
 
-      {/* Aantal — label respects category unit (ml for drinks, gram default) */}
+      {/* Aantal — unit zit nu in Portiegrootte, dus dit is gewoon de multiplier */}
       {(() => {
-        const cfg = isPer100g ? findPortionConfig(item.name) : null
-        const unit = cfg?.displayUnit || 'g'
-        const aantalLabel = item._savedPerUnit === 'gram'
-          ? (unit === 'ml' ? 'Aantal ml' : 'Aantal gram')
-          : 'Aantal porties'
+        const aantalLabel = isPer100g ? 'Aantal' : 'Aantal porties'
         return (
           <Row label={aantalLabel}>
             <button onClick={() => setShowQuantityPicker(true)} style={{
@@ -441,75 +511,73 @@ export default function AmountPicker({ item, remaining, onLog, onCancel, isMobil
         )
       })()}
 
-      {/* ✅ Snel kiezen — category-aware presets ("1 glas 250 ml", "1 appel 180 g", etc.) */}
-      {(() => {
-        if (!isPer100g) return null
+      {/* Quick-pick portion presets — toon natuurlijke porties voor bekende
+          ingrediënten (1 ei, 2 eieren, 1 schaaltje kwark, 1 glas melk, …).
+          Tapping zet de portiegrootte op gram en stelt het juiste aantal in.
+          Alleen voor per100g ingrediënten — meals (porties) volgen een eigen
+          schaal en hebben hier geen baat bij. */}
+      {isPer100g && (() => {
         const cfg = findPortionConfig(item.name)
-        if (!cfg || cfg.presets.length === 0) return null
-        const unit = cfg.displayUnit  // 'g' | 'ml' | 'stuks'
+        const presets = cfg?.presets || []
+        if (presets.length === 0) return null
+        const isPresetActive = (preset) =>
+          selectedServing.id === 'gram' && Math.abs(quantity - preset.grams) < 0.5
         return (
           <div style={{
-            padding: isMobile ? '0.625rem 1rem 0.875rem' : '0.75rem 1.5rem 1rem',
-            borderBottom: '1px solid rgba(255, 255, 255, 0.06)',
+            padding: isMobile ? '0.625rem 1rem 0.75rem' : '0.75rem 1.5rem 0.875rem',
+            borderBottom: '1px solid rgba(255,255,255,0.06)',
           }}>
             <div style={{
-              fontSize: isMobile ? '0.5rem' : '0.55rem',
-              fontWeight: '800', color: 'rgba(255, 215, 0, 0.55)',
-              textTransform: 'uppercase', letterSpacing: '0.06em',
-              marginBottom: '0.5rem',
+              fontSize: '0.55rem', fontWeight: 800,
+              color: 'rgba(255,255,255,0.35)',
+              letterSpacing: '0.06em', textTransform: 'uppercase',
+              marginBottom: '0.4rem',
             }}>
-              Snel kiezen
+              Snelle portie
             </div>
             <div style={{
-              display: 'flex',
+              display: 'flex', gap: '0.4rem',
               flexWrap: 'wrap',
-              gap: '0.4rem',
+              paddingBottom: 2,
             }}>
-              {cfg.presets.map((p, i) => {
-                const isGramServing = selectedServing.id === 'gram' || selectedServing.grams === 1
-                const active = isGramServing && Math.abs(quantity - p.grams) < 0.01
-                // Show ml or g in the chip suffix; for stuks-categories (where the
-                // label already says "1 appel"/"2 stuks") we still expose the gram
-                // value as a small fact so user knows the underlying weight.
-                const suffix =
-                  unit === 'ml'    ? `${p.grams} ml` :
-                  unit === 'stuks' ? `${p.grams} g`  :
-                                     `${p.grams} g`
+              {presets.map((p, i) => {
+                const active = isPresetActive(p)
                 return (
                   <button
-                    key={i}
+                    key={`${p.label}-${i}`}
                     onClick={() => {
-                      const gramServing = servingOptions.find(s => s.id === 'gram') || servingOptions[0]
-                      setSelectedServing(gramServing)
+                      // Force gram-serving (id 'gram', grams 1) so quantity = grams.
+                      const gramOpt = gramOptions.find(o => o.id === 'gram') || gramOptions[0]
+                      setSelectedServing(gramOpt)
                       setQuantity(p.grams)
+                      // Pas de per-100g basis aan als de preset een eigen
+                      // macro-profiel heeft (bv. eigeel/eiwit los), anders
+                      // val terug op de standaard item-macros.
+                      setBaseMacrosOverride(p.override || null)
+                      if (navigator.vibrate) navigator.vibrate(15)
                     }}
                     style={{
                       padding: isMobile ? '0.45rem 0.7rem' : '0.5rem 0.8rem',
-                      background: active
-                        ? 'rgba(255, 215, 0, 0.18)'
-                        : 'rgba(255, 215, 0, 0.05)',
-                      border: `1px solid ${active ? 'rgba(255, 215, 0, 0.5)' : 'rgba(255, 215, 0, 0.18)'}`,
-                      borderRadius: '8px',
-                      color: active ? '#FFD700' : 'rgba(255, 255, 255, 0.85)',
-                      fontSize: isMobile ? '0.7rem' : '0.75rem',
-                      fontWeight: active ? '800' : '700',
+                      background: active ? 'rgba(255,215,0,0.18)' : 'rgba(255,255,255,0.04)',
+                      border: `1px solid ${active ? 'rgba(255,215,0,0.45)' : 'rgba(255,255,255,0.1)'}`,
+                      borderRadius: 999,
+                      color: active ? '#FFD700' : 'rgba(255,255,255,0.75)',
+                      fontSize: isMobile ? '0.72rem' : '0.78rem',
+                      fontWeight: 700,
                       cursor: 'pointer',
-                      minHeight: '36px',
                       touchAction: 'manipulation',
                       WebkitTapHighlightColor: 'transparent',
-                      transition: 'all 0.15s ease',
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: '0.35rem',
+                      whiteSpace: 'nowrap',
+                      minHeight: 30,
                     }}
                   >
                     {p.label}
                     <span style={{
-                      fontSize: isMobile ? '0.55rem' : '0.6rem',
-                      fontWeight: '600',
-                      color: active ? 'rgba(255, 215, 0, 0.7)' : 'rgba(255, 255, 255, 0.4)',
+                      marginLeft: 4, opacity: 0.55,
+                      fontSize: isMobile ? '0.62rem' : '0.68rem',
+                      fontWeight: 600,
                     }}>
-                      {suffix}
+                      · {p.grams}{cfg.displayUnit === 'ml' ? 'ml' : 'g'}
                     </span>
                   </button>
                 )
@@ -577,6 +645,57 @@ export default function AmountPicker({ item, remaining, onLog, onCancel, isMobil
           ))}
         </div>
       </div>
+
+      {/* Samenstelling — toon de ingrediënten van een vaste maaltijd zodat je
+          ziet waaruit hij bestaat (i.p.v. de misleidende "100 gram"-portie).
+          Hoeveelheden schalen mee met het gekozen aantal porties (factor). */}
+      {!isPer100g && Array.isArray(item.ingredients) && item.ingredients.length > 0 && (
+        <div style={{
+          padding: isMobile ? '0 1rem 1rem' : '0 1.5rem 1.25rem',
+          borderBottom: '1px solid rgba(255,255,255,0.06)'
+        }}>
+          <div style={{
+            fontSize: '0.58rem', fontWeight: 700, color: 'rgba(255,255,255,0.3)',
+            textTransform: 'uppercase', letterSpacing: '0.06em', margin: '0 0 0.5rem'
+          }}>
+            Samenstelling ({item.ingredients.length})
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
+            {item.ingredients.map((ing, i) => {
+              const nm = ing.name || ing.ingredient_name || 'Ingrediënt'
+              const baseAmt = Number(ing.amount) || 0
+              const scaled = baseAmt > 0 ? Math.round(baseAmt * (factor || 1)) : 0
+              const unit = ing.unit || 'g'
+              return (
+                <div key={i} style={{
+                  display: 'flex', alignItems: 'center', gap: '0.55rem',
+                  padding: '0.35rem 0'
+                }}>
+                  <div style={{
+                    width: 30, height: 30, borderRadius: 7, flexShrink: 0, overflow: 'hidden',
+                    background: 'rgba(255,255,255,0.05)', display: 'flex',
+                    alignItems: 'center', justifyContent: 'center'
+                  }}>
+                    {ing.image_url
+                      ? <img src={ing.image_url} alt={nm} style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={e => { e.currentTarget.style.display = 'none' }} />
+                      : <span style={{ fontSize: '0.85rem', fontWeight: 800, color: 'rgba(255,215,0,0.6)' }}>{nm.charAt(0).toUpperCase()}</span>}
+                  </div>
+                  <span style={{
+                    flex: 1, minWidth: 0, fontSize: isMobile ? '0.82rem' : '0.88rem',
+                    fontWeight: 600, color: 'rgba(255,255,255,0.8)',
+                    whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'
+                  }}>{nm}</span>
+                  {scaled > 0 && (
+                    <span style={{ fontSize: '0.78rem', fontWeight: 700, color: 'rgba(255,255,255,0.5)', flexShrink: 0 }}>
+                      {scaled}{unit === 'gram' ? 'g' : ` ${unit}`}
+                    </span>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
 
       <div style={{ flex: 1 }} />
 

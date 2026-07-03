@@ -26,8 +26,8 @@ export default function BudgetTab({ client, db, planCost, isMobile }) {
       <div style={{ padding: '2rem', textAlign: 'center' }}>
         <div style={{
           width: '24px', height: '24px',
-          border: '2px solid rgba(16, 185, 129, 0.15)',
-          borderTopColor: '#10b981',
+          border: '2px solid rgba(255, 215, 0, 0.15)',
+          borderTopColor: '#FFD700',
           borderRadius: '50%',
           animation: 'spin 0.8s linear infinite',
           margin: '0 auto'
@@ -48,7 +48,7 @@ export default function BudgetTab({ client, db, planCost, isMobile }) {
           <div style={{
             fontSize: isMobile ? '1rem' : '1.15rem',
             fontWeight: 800,
-            color: '#10b981',
+            color: '#FFD700',
             letterSpacing: '-0.02em'
           }}>
             {showSetup ? 'Budget Aanpassen' : 'Hoeveel bespaar jij?'}
@@ -96,7 +96,7 @@ export default function BudgetTab({ client, db, planCost, isMobile }) {
           <div style={{
             fontSize: isMobile ? '1.5rem' : '1.75rem',
             fontWeight: 800,
-            color: '#10b981',
+            color: '#FFD700',
             letterSpacing: '-0.03em',
             lineHeight: 1
           }}>
@@ -133,7 +133,7 @@ export default function BudgetTab({ client, db, planCost, isMobile }) {
               <div style={{ fontSize: '0.4rem', fontWeight: 700, color: 'rgba(255, 255, 255, 0.15)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '0.1rem' }}>
                 Nu met MY ARC
               </div>
-              <div style={{ fontSize: isMobile ? '0.85rem' : '0.95rem', fontWeight: 800, color: '#10b981', lineHeight: 1 }}>
+              <div style={{ fontSize: isMobile ? '0.85rem' : '0.95rem', fontWeight: 800, color: '#FFD700', lineHeight: 1 }}>
                 €{savings.planCost}
                 <span style={{ fontSize: '0.4rem', fontWeight: 500, opacity: 0.5, marginLeft: '0.05rem' }}>/w</span>
               </div>
@@ -158,7 +158,7 @@ export default function BudgetTab({ client, db, planCost, isMobile }) {
             display: 'flex',
             borderTop: '1px solid rgba(255, 255, 255, 0.06)',
             borderBottom: '1px solid rgba(255, 255, 255, 0.06)',
-            background: 'rgba(16, 185, 129, 0.02)'
+            background: 'rgba(255, 215, 0, 0.02)'
           }}>
             {[
               { label: 'Per maand', value: `€${savings.monthly}` },
@@ -172,7 +172,7 @@ export default function BudgetTab({ client, db, planCost, isMobile }) {
                 borderRight: i < 3 ? '1px solid rgba(255, 255, 255, 0.04)' : 'none'
               }}>
                 <div style={{ fontSize: '0.4rem', fontWeight: 700, color: 'rgba(255, 255, 255, 0.15)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '0.1rem' }}>{s.label}</div>
-                <div style={{ fontSize: isMobile ? '0.65rem' : '0.75rem', fontWeight: 800, color: 'rgba(16, 185, 129, 0.7)', lineHeight: 1 }}>{s.value}</div>
+                <div style={{ fontSize: isMobile ? '0.65rem' : '0.75rem', fontWeight: 800, color: 'rgba(255, 215, 0, 0.7)', lineHeight: 1 }}>{s.value}</div>
               </div>
             ))}
           </div>
@@ -209,7 +209,7 @@ export default function BudgetTab({ client, db, planCost, isMobile }) {
           }}>
             <span style={{ fontSize: '0.7rem', color: 'rgba(255, 255, 255, 0.4)', flex: 1 }}>{row.label}</span>
             <span style={{ fontSize: '0.6rem', fontWeight: 700, color: 'rgba(255, 255, 255, 0.2)', width: '40px', textAlign: 'right', textDecoration: 'line-through' }}>{row.before}</span>
-            <span style={{ fontSize: '0.6rem', fontWeight: 800, color: '#10b981', width: '40px', textAlign: 'right' }}>{row.after}</span>
+            <span style={{ fontSize: '0.6rem', fontWeight: 800, color: '#FFD700', width: '40px', textAlign: 'right' }}>{row.after}</span>
             <span style={{ fontSize: '0.6rem', fontWeight: 800, color: '#FFD700', width: '50px', textAlign: 'right' }}>+{row.saved}</span>
           </div>
         ))}
@@ -242,7 +242,7 @@ export default function BudgetTab({ client, db, planCost, isMobile }) {
               <span style={{ fontSize: '0.6rem', color: 'rgba(255, 255, 255, 0.3)', fontWeight: 600 }}>
                 {new Date(week.week_start).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })}
               </span>
-              <span style={{ fontSize: '0.6rem', fontWeight: 800, color: '#10b981' }}>
+              <span style={{ fontSize: '0.6rem', fontWeight: 800, color: '#FFD700' }}>
                 +€{parseFloat(week.saved_amount).toFixed(0)}
               </span>
               <span style={{ fontSize: '0.55rem', fontWeight: 700, color: 'rgba(255, 255, 255, 0.2)' }}>

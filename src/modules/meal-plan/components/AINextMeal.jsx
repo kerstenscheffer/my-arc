@@ -3,6 +3,7 @@
 // Props IDENTIEK: { nextMeal, todayMeals, onOpenInfo, onOpenAlternatives, onFinishMeal, onOpenDaySchedule, db }
 import React, { useState, useEffect } from 'react'
 import { Info, RefreshCw, Check, Apple } from 'lucide-react'
+import { foodImageFallback } from '../foodImageFallback'
 
 export default function AINextMeal({ 
   nextMeal,
@@ -23,14 +24,7 @@ export default function AINextMeal({
   
   const getMealImage = (meal) => {
     if (meal?.image_url) return meal.image_url
-    const mealType = meal?.slot || meal?.timeSlot || 'meal'
-    const fallbacks = {
-      breakfast: 'https://images.unsplash.com/photo-1525351484163-7529414344d8?w=1200&h=600&fit=crop&q=85',
-      lunch: 'https://images.unsplash.com/photo-1547592166-23ac45744acd?w=1200&h=600&fit=crop&q=85',
-      dinner: 'https://images.unsplash.com/photo-1555939594-58d7cb561ad1?w=1200&h=600&fit=crop&q=85',
-      snack: 'https://images.unsplash.com/photo-1490474504059-bf2db5ab2348?w=1200&h=600&fit=crop&q=85'
-    }
-    return fallbacks[mealType] || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=1200&h=600&fit=crop&q=85'
+    return foodImageFallback(meal?.name || meal?.title, meal?.slot || meal?.timeSlot, 800)
   }
   
   const getLastMeal = () => {

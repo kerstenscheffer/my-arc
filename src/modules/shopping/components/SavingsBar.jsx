@@ -47,7 +47,7 @@ export default function SavingsBar({ savings, isMobile }) {
         <span style={{
           fontSize: isMobile ? '1.5rem' : '1.75rem',
           fontWeight: 800,
-          color: '#10b981',
+          color: '#FFD700',
           letterSpacing: '-0.03em',
           lineHeight: 1
         }}>
@@ -66,7 +66,7 @@ export default function SavingsBar({ savings, isMobile }) {
         <span style={{
           fontSize: isMobile ? '0.6rem' : '0.65rem',
           fontWeight: 800,
-          color: 'rgba(16, 185, 129, 0.6)'
+          color: 'rgba(255, 215, 0, 0.6)'
         }}>
           -{savings.percentSaved}%
         </span>
@@ -84,7 +84,7 @@ export default function SavingsBar({ savings, isMobile }) {
           top: 0,
           height: '100%',
           width: `${Math.min(progressPercent, 100)}%`,
-          background: '#10b981',
+          background: '#FFD700',
           borderRadius: '0 2px 2px 0',
           transition: 'width 0.5s ease'
         }} />
@@ -117,7 +117,7 @@ export default function SavingsBar({ savings, isMobile }) {
             <div style={{
               fontSize: isMobile ? '0.65rem' : '0.75rem',
               fontWeight: 800,
-              color: 'rgba(16, 185, 129, 0.7)',
+              color: 'rgba(255, 215, 0, 0.7)',
               lineHeight: 1
             }}>
               {s.value}

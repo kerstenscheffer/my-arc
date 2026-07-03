@@ -3,10 +3,10 @@
 // 4th view in WorkoutColumn — multi-exercise est8Rep over time.
 // v1: chart + range selector + default legend. No fullscreen, no custom legend (yet).
 // ============================================================
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import {
   ArrowLeft, BarChart3, Loader, Maximize2, Minimize2,
-  ChevronRight, Eye, EyeOff, ChevronUp, ChevronDown, RotateCcw
+  ChevronRight, Eye, EyeOff, ChevronDown
 } from 'lucide-react'
 import {
   ResponsiveContainer, LineChart, Line, XAxis, YAxis,
@@ -14,7 +14,7 @@ import {
 } from 'recharts'
 import {
   buildChartData, toRechartsData,
-  MUSCLE_LABELS, MUSCLE_COLORS
+  MUSCLE_LABELS, MUSCLE_COLORS, MUSCLE_ORDER,
 } from './workoutChartUtils'
 
 const RANGES = [
@@ -27,15 +27,9 @@ const RANGES = [
 // Y-axis SPAN presets — how big is the visible kg window.
 // 'auto' = data-tight (lo+hi padded). 'data' (vol) = 0 to actual data max.
 // Numeric spans = fixed-size window that can be panned up/down.
-const Y_SPANS = [
-  { id: 'auto', label: 'auto', span: null },
-  { id: '5',    label: '5',    span: 5 },
-  { id: '10',   label: '10',   span: 10 },
-  { id: '20',   label: '20',   span: 20 },
-  { id: '50',   label: '50',   span: 50 },
-  { id: '100',  label: '100',  span: 100 },
-  { id: 'vol',  label: 'vol',  span: 'data' },
-]
+// Y_SPANS + Y-pan controls verwijderd. Nieuwe view-mode toggle (per-spiergroep
+// vs % verandering) lost het schaal-probleem fundamenteler op: tight auto-scale
+// per groep, of normalize-naar-% voor cross-group overzicht.
 
 // 30d/90d use the prop (already loaded). 1y/all need own fetch.
 const NEEDS_FETCH = { '30d': false, '90d': false, '1y': true, 'all': true }
@@ -270,14 +264,14 @@ const CustomLegend = ({
               }} />
               <span style={{
                 flex: 1, minWidth: 0,
-                fontSize: '0.7rem', fontWeight: '700',
-                color: isGroupHidden ? 'rgba(255,255,255,0.3)' : '#fff',
-                textTransform: 'uppercase', letterSpacing: '0.04em',
+                fontSize: '0.78rem', fontWeight: 800,
+                color: isGroupHidden ? 'rgba(255,255,255,0.35)' : '#fff',
+                textTransform: 'uppercase', letterSpacing: '0.06em',
               }}>
                 {groupLabel}
                 <span style={{
-                  marginLeft: '0.4rem', fontWeight: '500', fontSize: '0.6rem',
-                  color: 'rgba(255,255,255,0.3)', textTransform: 'none',
+                  marginLeft: '0.5rem', fontWeight: 600, fontSize: '0.68rem',
+                  color: 'rgba(255,255,255,0.45)', textTransform: 'none',
                 }}>
                   ({exercises.length})
                 </span>
@@ -330,8 +324,8 @@ const CustomLegend = ({
                   }} />
                   <span style={{
                     flex: 1, minWidth: 0,
-                    fontSize: '0.65rem', fontWeight: '500',
-                    color: isHidden ? 'rgba(255,255,255,0.25)' : 'rgba(255,255,255,0.8)',
+                    fontSize: '0.72rem', fontWeight: 600,
+                    color: isHidden ? 'rgba(255,255,255,0.3)' : 'rgba(255,255,255,0.92)',
                     textDecoration: isHidden ? 'line-through' : 'none',
                     whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
                   }}>
@@ -345,9 +339,10 @@ const CustomLegend = ({
                     isMobile={isMobile}
                   />
                   <span style={{
-                    fontSize: '0.62rem', fontWeight: '700',
-                    color: isHidden ? 'rgba(255,255,255,0.2)' : '#fff',
-                    minWidth: '38px', textAlign: 'right', flexShrink: 0,
+                    fontSize: '0.72rem', fontWeight: 800,
+                    color: isHidden ? 'rgba(255,255,255,0.25)' : '#FFD700',
+                    minWidth: 44, textAlign: 'right', flexShrink: 0,
+                    fontVariantNumeric: 'tabular-nums',
                   }}>
                     {lastValue ? `${Math.round(lastValue)}kg` : '—'}
                   </span>
@@ -370,11 +365,23 @@ export default function WorkoutOverviewChart({
   const [fetching, setFetching]         = useState(false)
   const [fetchError, setFetchError]     = useState(null)
   const [fullscreen, setFullscreen]     = useState(false)
+  // Data-zoom + pan voor de chart (alleen actief in fullscreen).
+  // `zoom`: hoeveel we ingezoomd zijn op de DATA (1 = full extent,
+  //   2 = de helft, 4 = kwart). Y-domein krimpt evenredig zodat
+  //   recharts vanzelf fijnere ticks rendert (5kg → 1kg sprongen).
+  // `xOffset` / `yOffset`: relatieve verschuiving van het venster
+  //   (-0.5 tot 0.5 van de volledige data-range).
+  const [zoom, setZoom]                 = useState(1)
+  const [xOffset, setXOffset]           = useState(0)
+  const [yOffset, setYOffset]           = useState(0)
   const [hiddenExercises, setHiddenEx]  = useState(() => new Set())
   const [hiddenGroups, setHiddenGroups] = useState(() => new Set())
   const [collapsedGroups, setCollapsed] = useState(() => new Set())
-  const [ySpanId, setYSpanId]           = useState('auto')  // see Y_SPANS
-  const [yOffset, setYOffset]           = useState(0)       // bottom of window when span is numeric
+  // View-mode: 'group' = één spiergroep tegelijk tonen (auto-scaled),
+  // 'percent' = alle lijnen normaliseren naar % verandering sinds start
+  // (alle exercises passen samen op één Y-as).
+  const [viewMode, setViewMode]         = useState('group')
+  const [selectedGroup, setSelectedGroup] = useState(null)
 
   const toggleExercise = (name) => setHiddenEx(prev => {
     const next = new Set(prev)
@@ -440,60 +447,69 @@ export default function WorkoutOverviewChart({
   }, [range, extendedCache, exerciseProgress])
 
   // Build chart data
+  // minSessions = 2: oefeningen met <2 sessies in range worden eruit gefilterd.
+  // Eerder stond dit op 3 — dat betekende dat klanten met minder data hun
+  // lijnen niet zagen verschijnen totdat ze "inzoomden" naar een breder
+  // bereik. Met 2 sessies zijn er al meerdere data-punten voor een lijn.
   const chartResult = useMemo(() => {
     if (!muscleMap || !sourceProgress) return null
-    return buildChartData(sourceProgress, muscleMap, range, 3)
+    return buildChartData(sourceProgress, muscleMap, range, 2)
   }, [muscleMap, sourceProgress, range])
 
-  const rechartsData = useMemo(() => {
-    if (!chartResult) return []
-    return toRechartsData(chartResult.datasets, chartResult.allDates)
-  }, [chartResult])
+  // rechartsData wordt verderop in de render-tree gebruikt; we genereren'm
+  // pas ná `finalDatasets` (na de percent-transform). Zie onder useMemo voor
+  // finalDatasets — daar wordt een tweede useMemo op gestapeld.
 
   const isLoading = muscleMap === null || (NEEDS_FETCH[range] && !extendedCache[range])
 
-  // ── Header ──
+  // ── Header — section-title niveau, consistent met andere page-headers ──
   const Header = () => (
     <div style={{
-      padding: isMobile ? '0.625rem 0.75rem' : '0.75rem 1rem',
+      padding: isMobile ? '0.85rem 1rem' : '1rem 1.25rem',
       borderBottom: '1px solid rgba(255,255,255,0.06)',
-      display: 'flex', alignItems: 'center', gap: '0.4rem',
-      flexShrink: 0
+      display: 'flex', alignItems: 'center', gap: '0.6rem',
+      flexShrink: 0,
     }}>
       {onBack && !fullscreen && (
         <button
           onClick={onBack}
+          aria-label="Terug"
           style={{
-            display: 'flex', alignItems: 'center',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            width: 36, height: 36,
             background: 'transparent', border: 'none',
-            color: '#f97316', cursor: 'pointer', padding: 0,
-            touchAction: 'manipulation'
+            color: '#FFD700', cursor: 'pointer', padding: 0,
+            touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+            flexShrink: 0,
           }}
         >
-          <ArrowLeft size={14} />
+          <ArrowLeft size={18} strokeWidth={2.4} />
         </button>
       )}
-      <BarChart3 size={14} color="#f97316" />
+      <BarChart3 size={isMobile ? 20 : 22} color="#FFD700" strokeWidth={2.2} style={{ flexShrink: 0 }} />
       <span style={{
-        fontSize: '0.7rem', fontWeight: '700', color: '#f97316',
-        textTransform: 'uppercase', letterSpacing: '0.05em', flex: 1
+        fontSize: isMobile ? '1.1rem' : '1.25rem',
+        fontWeight: 900, color: '#fff',
+        letterSpacing: '-0.02em',
+        flex: 1, minWidth: 0,
       }}>
         Krachtoverzicht
       </span>
       <button
         onClick={() => setFullscreen(f => !f)}
         title={fullscreen ? 'Verlaat fullscreen (Esc)' : 'Fullscreen'}
+        aria-label={fullscreen ? 'Verlaat fullscreen' : 'Fullscreen'}
         style={{
           display: 'flex', alignItems: 'center', justifyContent: 'center',
-          width: '26px', height: '26px',
-          background: 'rgba(249,115,22,0.08)',
-          border: '1px solid rgba(249,115,22,0.2)',
-          borderRadius: '5px', color: '#f97316',
+          width: 38, height: 38,
+          background: 'rgba(255,215,0,0.1)',
+          border: '1px solid rgba(255,215,0,0.3)',
+          borderRadius: 10, color: '#FFD700',
           cursor: 'pointer', touchAction: 'manipulation',
-          WebkitTapHighlightColor: 'transparent', flexShrink: 0
+          WebkitTapHighlightColor: 'transparent', flexShrink: 0,
         }}
       >
-        {fullscreen ? <Minimize2 size={12} /> : <Maximize2 size={12} />}
+        {fullscreen ? <Minimize2 size={16} strokeWidth={2.4} /> : <Maximize2 size={16} strokeWidth={2.4} />}
       </button>
     </div>
   )
@@ -503,7 +519,7 @@ export default function WorkoutOverviewChart({
     <div style={{
       display: 'flex',
       borderBottom: '1px solid rgba(255,255,255,0.04)',
-      flexShrink: 0
+      flexShrink: 0,
     }}>
       {RANGES.map(r => {
         const active = range === r.id
@@ -514,17 +530,20 @@ export default function WorkoutOverviewChart({
             disabled={fetching}
             style={{
               flex: 1,
-              padding: isMobile ? '0.45rem 0' : '0.5rem 0',
-              background: active ? 'rgba(249,115,22,0.1)' : 'transparent',
+              minHeight: 40,
+              padding: isMobile ? '0.55rem 0' : '0.6rem 0',
+              background: active ? 'rgba(255,215,0,0.1)' : 'transparent',
               border: 'none',
-              borderBottom: active ? '2px solid #f97316' : '2px solid transparent',
-              color: active ? '#f97316' : 'rgba(255,255,255,0.4)',
-              fontSize: '0.65rem',
-              fontWeight: active ? '700' : '500',
+              borderBottom: active ? '2px solid #FFD700' : '2px solid transparent',
+              color: active ? '#FFD700' : 'rgba(255,255,255,0.55)',
+              fontSize: isMobile ? '0.72rem' : '0.78rem',
+              fontWeight: active ? 800 : 600,
+              letterSpacing: '0.04em',
+              textTransform: 'uppercase',
               cursor: fetching ? 'wait' : 'pointer',
               touchAction: 'manipulation',
               WebkitTapHighlightColor: 'transparent',
-              transition: 'all 0.15s ease'
+              transition: 'all 0.15s ease',
             }}
           >
             {r.label}
@@ -534,200 +553,370 @@ export default function WorkoutOverviewChart({
     </div>
   )
 
-  // ── Y-axis SPAN selector ──
-  const YBar = () => (
+  // ── View-mode toggle: GROEP vs %. Duidelijk welke actief is. ──
+  const ModeToggle = () => (
     <div style={{
       display: 'flex',
-      alignItems: 'center',
-      borderBottom: '1px solid rgba(255,255,255,0.04)',
-      padding: '0 0.5rem',
+      gap: 6,
+      padding: isMobile ? '0.5rem 0.75rem 0.4rem' : '0.6rem 1rem 0.5rem',
+      borderBottom: viewMode === 'percent' ? '1px solid rgba(255,255,255,0.04)' : 'none',
       flexShrink: 0,
-      gap: '0.25rem',
     }}>
-      <span style={{
-        fontSize: '0.5rem', fontWeight: '700',
-        color: 'rgba(255,255,255,0.3)', textTransform: 'uppercase',
-        letterSpacing: '0.06em', flexShrink: 0,
-      }}>
-        Y-VENSTER
-      </span>
-      {Y_SPANS.map(p => {
-        const active = ySpanId === p.id
+      {[
+        { id: 'group',   label: 'Per spiergroep' },
+        { id: 'percent', label: '% verandering' },
+      ].map(m => {
+        const active = viewMode === m.id
         return (
           <button
-            key={p.id}
-            onClick={() => changeSpan(p.id)}
+            key={m.id}
+            onClick={() => setViewMode(m.id)}
             style={{
               flex: 1,
-              padding: isMobile ? '0.3rem 0' : '0.35rem 0',
-              background: active ? 'rgba(249,115,22,0.12)' : 'transparent',
-              border: 'none',
-              borderRadius: '4px',
-              color: active ? '#f97316' : 'rgba(255,255,255,0.4)',
-              fontSize: '0.6rem',
-              fontWeight: active ? '700' : '500',
+              minHeight: 40,
+              padding: isMobile ? '0.55rem 0.5rem' : '0.65rem 0.75rem',
+              background: active
+                ? 'linear-gradient(135deg, #FFD700 0%, #D4AF37 100%)'
+                : 'rgba(255,255,255,0.04)',
+              border: `1px solid ${active ? 'transparent' : 'rgba(255,255,255,0.08)'}`,
+              borderRadius: 10,
+              color: active ? '#0a0a0a' : 'rgba(255,255,255,0.7)',
+              fontSize: isMobile ? '0.72rem' : '0.78rem',
+              fontWeight: active ? 900 : 700,
+              letterSpacing: '0.03em',
+              textTransform: 'uppercase',
               cursor: 'pointer',
               touchAction: 'manipulation',
               WebkitTapHighlightColor: 'transparent',
+              boxShadow: active ? '0 4px 12px rgba(255,215,0,0.25)' : 'none',
               transition: 'all 0.15s ease',
             }}
           >
-            {p.label}
+            {m.label}
           </button>
         )
       })}
     </div>
   )
 
-  // ── Pan controls (only when span is numeric) ──
-  const YPanBar = () => {
-    if (!isNumericSpan) return null
-    const [lo, hi] = yDomain
-    return (
-      <div style={{
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        borderBottom: '1px solid rgba(255,255,255,0.04)',
-        padding: '0.25rem 0.5rem',
-        flexShrink: 0,
-        gap: '0.4rem',
-      }}>
-        <button
-          onClick={panDown}
-          disabled={yOffset === 0}
-          title="Venster omlaag"
-          style={{
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            gap: '0.25rem',
-            padding: '0.3rem 0.6rem',
-            background: yOffset === 0 ? 'rgba(255,255,255,0.03)' : 'rgba(249,115,22,0.1)',
-            border: '1px solid ' + (yOffset === 0 ? 'rgba(255,255,255,0.05)' : 'rgba(249,115,22,0.2)'),
-            borderRadius: '5px',
-            color: yOffset === 0 ? 'rgba(255,255,255,0.2)' : '#f97316',
-            fontSize: '0.62rem', fontWeight: '700',
-            cursor: yOffset === 0 ? 'not-allowed' : 'pointer',
-            touchAction: 'manipulation',
-            WebkitTapHighlightColor: 'transparent',
-          }}
-        >
-          <ChevronDown size={12} /> -{panStep}
-        </button>
-        <span style={{
-          fontSize: '0.62rem', fontWeight: '700',
-          color: 'rgba(255,255,255,0.7)',
-          flex: 1, textAlign: 'center',
-        }}>
-          {lo}–{hi} kg
-        </span>
-        <button
-          onClick={panUp}
-          title="Venster omhoog"
-          style={{
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            gap: '0.25rem',
-            padding: '0.3rem 0.6rem',
-            background: 'rgba(249,115,22,0.1)',
-            border: '1px solid rgba(249,115,22,0.2)',
-            borderRadius: '5px',
-            color: '#f97316',
-            fontSize: '0.62rem', fontWeight: '700',
-            cursor: 'pointer',
-            touchAction: 'manipulation',
-            WebkitTapHighlightColor: 'transparent',
-          }}
-        >
-          <ChevronUp size={12} /> +{panStep}
-        </button>
-        <button
-          onClick={resetView}
-          title="Reset naar auto"
-          style={{
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            width: '28px', height: '26px',
-            background: 'transparent',
-            border: '1px solid rgba(255,255,255,0.08)',
-            borderRadius: '5px',
-            color: 'rgba(255,255,255,0.5)',
-            cursor: 'pointer',
-            touchAction: 'manipulation',
-            WebkitTapHighlightColor: 'transparent',
-          }}
-        >
-          <RotateCcw size={12} />
-        </button>
-      </div>
-    )
-  }
+  // ── Group-chips: horizontale rij met één spiergroep tegelijk geselecteerd.
+  // Alleen zichtbaar in 'group' mode. Scrollt op mobile als'ie niet past. ──
+  const GroupChips = ({ groups }) => (
+    <div style={{
+      display: 'flex',
+      gap: 6,
+      padding: isMobile ? '0 0.75rem 0.6rem' : '0 1rem 0.7rem',
+      overflowX: 'auto',
+      WebkitOverflowScrolling: 'touch',
+      flexShrink: 0,
+      borderBottom: '1px solid rgba(255,255,255,0.04)',
+      paddingBottom: isMobile ? '0.6rem' : '0.7rem',
+    }}>
+      {groups.map(g => {
+        const active = selectedGroup === g
+        const color = MUSCLE_COLORS[g] || MUSCLE_COLORS.other
+        return (
+          <button
+            key={g}
+            onClick={() => setSelectedGroup(g)}
+            style={{
+              flexShrink: 0,
+              minHeight: 36,
+              padding: isMobile ? '0.45rem 0.85rem' : '0.5rem 1rem',
+              background: active ? `${color}22` : 'rgba(255,255,255,0.03)',
+              border: `1.5px solid ${active ? color : 'rgba(255,255,255,0.08)'}`,
+              borderRadius: 999,
+              color: active ? color : 'rgba(255,255,255,0.65)',
+              fontSize: isMobile ? '0.72rem' : '0.78rem',
+              fontWeight: active ? 900 : 700,
+              cursor: 'pointer',
+              touchAction: 'manipulation',
+              WebkitTapHighlightColor: 'transparent',
+              display: 'flex', alignItems: 'center', gap: 6,
+              transition: 'all 0.15s ease',
+            }}
+          >
+            <span style={{
+              width: 8, height: 8, borderRadius: '50%',
+              background: color, flexShrink: 0,
+            }} />
+            {MUSCLE_LABELS[g] || g}
+          </button>
+        )
+      })}
+    </div>
+  )
 
   // ── Empty / loading / error states ──
   const StateBlock = ({ children }) => (
     <div style={{
       flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center',
-      padding: '2rem 1rem', textAlign: 'center',
-      color: 'rgba(255,255,255,0.4)', fontSize: '0.75rem'
+      padding: '2.5rem 1rem', textAlign: 'center',
+      color: 'rgba(255,255,255,0.55)', fontSize: isMobile ? '0.85rem' : '0.9rem',
+      fontWeight: 600,
     }}>
       {children}
     </div>
   )
 
-  // Filtered datasets for rendering Lines
+  // Beschikbare spiergroepen (= alleen groepen die data hebben in deze range).
+  const availableGroups = useMemo(() => {
+    if (!chartResult?.byMuscleGroup) return []
+    return MUSCLE_ORDER.filter(g => chartResult.byMuscleGroup[g]?.length > 0)
+  }, [chartResult])
+
+  // Auto-select eerste beschikbare groep wanneer er nog geen / een ongeldige
+  // gekozen is. Behoudt selectie als die nog steeds bestaat na range-switch.
+  useEffect(() => {
+    if (viewMode !== 'group') return
+    if (selectedGroup && availableGroups.includes(selectedGroup)) return
+    if (availableGroups.length > 0) setSelectedGroup(availableGroups[0])
+  }, [viewMode, selectedGroup, availableGroups])
+
+  // Filter datasets:
+  //   group-mode  → alleen de geselecteerde spiergroep
+  //   percent-mode → alle groepen, behalve handmatig verborgen
   const visibleDatasets = useMemo(() => {
     if (!chartResult) return []
-    return chartResult.datasets.filter(ds =>
-      !hiddenGroups.has(ds.muscleGroup) && !hiddenExercises.has(ds.exercise)
-    )
-  }, [chartResult, hiddenGroups, hiddenExercises])
+    return chartResult.datasets.filter(ds => {
+      if (hiddenExercises.has(ds.exercise)) return false
+      if (viewMode === 'group') return ds.muscleGroup === selectedGroup
+      return !hiddenGroups.has(ds.muscleGroup)
+    })
+  }, [chartResult, hiddenGroups, hiddenExercises, viewMode, selectedGroup])
 
-  const currentSpan = Y_SPANS.find(s => s.id === ySpanId) || Y_SPANS[0]
-  const isNumericSpan = typeof currentSpan.span === 'number'
+  // In percent-mode normaliseren we naar % verandering t.o.v. de eerste
+  // datapoint per oefening, zodat alle lijnen op één Y-as passen.
+  const finalDatasets = useMemo(() => {
+    if (viewMode !== 'percent') return visibleDatasets
+    return visibleDatasets.map(ds => {
+      const firstNonNull = ds.points.find(p => p.value != null)?.value
+      if (!firstNonNull || firstNonNull === 0) return ds
+      return {
+        ...ds,
+        points: ds.points.map(p => ({
+          ...p,
+          value: p.value != null ? ((p.value / firstNonNull) - 1) * 100 : null,
+        })),
+      }
+    })
+  }, [visibleDatasets, viewMode])
 
-  // Data extents of currently visible datasets (memoized, used for auto/vol/centering)
+  // Data-extents van de uiteindelijke datasets (dus na percent-transform).
   const dataExtents = useMemo(() => {
-    if (visibleDatasets.length === 0) return null
+    if (finalDatasets.length === 0) return null
     let mn = Infinity, mx = -Infinity
-    for (const ds of visibleDatasets) {
+    for (const ds of finalDatasets) {
       for (const p of ds.points) {
+        if (p.value == null) continue
         if (p.value < mn) mn = p.value
         if (p.value > mx) mx = p.value
       }
     }
     return Number.isFinite(mn) ? { mn, mx } : null
-  }, [visibleDatasets])
+  }, [finalDatasets])
 
-  // Y-axis domain by mode:
-  //   'auto'    → data-tight (mn-pad, mx+pad)
-  //   numeric   → fixed-size window from yOffset (panable)
-  //   'data'    → 0 to actual data max + 5%
-  const yDomain = useMemo(() => {
-    if (isNumericSpan) return [yOffset, yOffset + currentSpan.span]
+  // Auto-tight basis-Y-domain (zonder zoom): kleine padding rond data zodat
+  // lijnen niet tegen de rand plakken. In percent-mode mag negatief.
+  const baseYDomain = useMemo(() => {
     if (!dataExtents) return [0, 'auto']
     const { mn, mx } = dataExtents
-    if (currentSpan.span === 'data') return [0, Math.ceil(mx * 1.05)]
     const range = mx - mn
-    const pad = Math.max(range * 0.15, 2)
-    return [Math.max(0, Math.floor(mn - pad)), Math.ceil(mx + pad)]
-  }, [isNumericSpan, currentSpan, yOffset, dataExtents])
+    const pad = Math.max(range * 0.12, viewMode === 'percent' ? 5 : 2)
+    const lo = viewMode === 'percent'
+      ? Math.floor(mn - pad)
+      : Math.max(0, Math.floor(mn - pad))
+    const hi = Math.ceil(mx + pad)
+    return [lo, hi]
+  }, [dataExtents, viewMode])
 
-  // Pan step = half window (overlap so you don't lose context)
-  const panStep = isNumericSpan ? Math.max(1, Math.round(currentSpan.span / 2)) : 0
-  const panUp   = () => setYOffset(o => o + panStep)
-  const panDown = () => setYOffset(o => Math.max(0, o - panStep))
-  const resetView = () => { setYSpanId('auto'); setYOffset(0) }
+  // Visible Y-domain: pas zoom + yOffset toe op basis-domein. Hoe hoger
+  // de zoom, hoe smaller het Y-venster → recharts kiest vanzelf fijnere
+  // ticks (1kg sprongen op zoom 4+).
+  const yDomain = useMemo(() => {
+    const [lo, hi] = baseYDomain
+    if (typeof lo !== 'number' || typeof hi !== 'number') return baseYDomain
+    if (!fullscreen || zoom <= 1.001) return baseYDomain
+    const full = hi - lo
+    const span = full / zoom
+    const center = (lo + hi) / 2 + yOffset * full
+    return [
+      Math.round((center - span / 2) * 10) / 10,
+      Math.round((center + span / 2) * 10) / 10,
+    ]
+  }, [baseYDomain, fullscreen, zoom, yOffset])
 
-  // Switching span: preserve the visible center so the user keeps focus on the same area.
-  const changeSpan = (id) => {
-    const next = Y_SPANS.find(s => s.id === id)
-    if (next && typeof next.span === 'number') {
-      const [lo, hi] = yDomain
-      const loN = typeof lo === 'number' ? lo : 0
-      const hiN = typeof hi === 'number' ? hi : (loN + next.span)
-      const center = (loN + hiN) / 2
-      setYOffset(Math.max(0, Math.round(center - next.span / 2)))
-    }
-    setYSpanId(id)
+  // Full recharts row-data.
+  const fullRechartsData = useMemo(() => {
+    if (!chartResult) return []
+    return toRechartsData(finalDatasets, chartResult.allDates)
+  }, [chartResult, finalDatasets])
+
+  // Visible slice voor de X-as: in fullscreen pakken we 1/zoom van de rijen,
+  // gecentreerd op (midden + xOffset). Buiten fullscreen of bij zoom=1
+  // gewoon de volledige data.
+  const rechartsData = useMemo(() => {
+    if (!fullscreen || zoom <= 1.001) return fullRechartsData
+    const n = fullRechartsData.length
+    if (n === 0) return fullRechartsData
+    const windowSize = Math.max(2, Math.round(n / zoom))
+    const centerIdx = Math.round(n / 2 + xOffset * n)
+    const startIdx = Math.max(0, Math.min(n - windowSize, centerIdx - Math.floor(windowSize / 2)))
+    const endIdx = startIdx + windowSize
+    return fullRechartsData.slice(startIdx, endIdx)
+  }, [fullRechartsData, fullscreen, zoom, xOffset])
+
+  // ── Gestures ──
+  // Cyclus-helpers voor swipe-navigatie:
+  //   - group-mode    → vorige/volgende spiergroep
+  //   - percent-mode  → vorige/volgende tijdsrange
+  const cycleGroup = (dir) => {
+    if (availableGroups.length < 2) return
+    const idx = availableGroups.indexOf(selectedGroup)
+    const next = (idx + dir + availableGroups.length) % availableGroups.length
+    setSelectedGroup(availableGroups[next])
+    if (navigator.vibrate) navigator.vibrate(15)
+  }
+  const cycleRange = (dir) => {
+    const idx = RANGES.findIndex(r => r.id === range)
+    const next = idx + dir
+    if (next < 0 || next >= RANGES.length) return
+    setRange(RANGES[next].id)
+    if (navigator.vibrate) navigator.vibrate(15)
   }
 
+  // Body scroll lock + reset zoom/pan zodra fullscreen opent.
+  useEffect(() => {
+    if (!fullscreen) return
+    const prev = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    setZoom(1)
+    setXOffset(0)
+    setYOffset(0)
+    return () => { document.body.style.overflow = prev }
+  }, [fullscreen])
+
+  // Houdt de container-afmetingen bij voor px-naar-offset conversie
+  // tijdens dragging.
+  const chartAreaRef = useRef(null)
+
+  // ── Touch-gesture refs ──
+  const gestureRef = useRef({
+    pinchDist: null,    // distance bij 2-finger start
+    pinchScale: null,   // zoom op moment van 2-finger start
+    dragStart: null,    // {x,y,panX,panY} bij 1-finger start
+    tapStart: null,     // {x,y,time} voor tap/swipe-detectie
+    lastTap: 0,         // timestamp vorige tap (voor dubbel-tap)
+  })
+
+  const touchDistance = (touches) => {
+    if (touches.length < 2) return 0
+    const dx = touches[0].clientX - touches[1].clientX
+    const dy = touches[0].clientY - touches[1].clientY
+    return Math.sqrt(dx * dx + dy * dy)
+  }
+
+  const handleChartTouchStart = (e) => {
+    const g = gestureRef.current
+    if (e.touches.length === 2 && fullscreen) {
+      g.pinchDist = touchDistance(e.touches)
+      g.pinchScale = zoom
+      g.dragStart = null
+      g.tapStart = null
+    } else if (e.touches.length === 1) {
+      const t = e.touches[0]
+      g.dragStart = {
+        x: t.clientX, y: t.clientY,
+        xOff: xOffset, yOff: yOffset,
+      }
+      g.tapStart = { x: t.clientX, y: t.clientY, time: Date.now() }
+    }
+  }
+
+  const handleChartTouchMove = (e) => {
+    const g = gestureRef.current
+    if (e.touches.length === 2 && g.pinchDist != null) {
+      const newDist = touchDistance(e.touches)
+      const factor = newDist / g.pinchDist
+      const newZoom = Math.max(1, Math.min(10, g.pinchScale * factor))
+      setZoom(newZoom)
+      // Clamp offsets opnieuw op nieuwe zoom-level (anders kun je voorbij
+      // de data-randen schuiven tijdens uitzoomen).
+      const maxOff = (1 - 1 / newZoom) / 2
+      setXOffset(o => Math.max(-maxOff, Math.min(maxOff, o)))
+      setYOffset(o => Math.max(-maxOff, Math.min(maxOff, o)))
+      e.preventDefault()
+      return
+    }
+    // 1-vinger drag in fullscreen wanneer ingezoomd → pan binnen het
+    // venster. Bij zoom = 1 is er geen ruimte om te pannen.
+    if (e.touches.length === 1 && g.dragStart && fullscreen && zoom > 1.02) {
+      const t = e.touches[0]
+      const dx = t.clientX - g.dragStart.x
+      const dy = t.clientY - g.dragStart.y
+      const rect = chartAreaRef.current?.getBoundingClientRect()
+      const w = rect?.width || window.innerWidth
+      const h = rect?.height || window.innerHeight
+      // Drag-distance → fractie van zichtbare window → fractie van full range
+      // (delen door zoom omdat het zichtbare venster 1/zoom van het totaal is).
+      const dxFrac = -(dx / w) / zoom
+      const dyFrac =  (dy / h) / zoom
+      const maxOff = (1 - 1 / zoom) / 2
+      const nextX = Math.max(-maxOff, Math.min(maxOff, g.dragStart.xOff + dxFrac))
+      const nextY = Math.max(-maxOff, Math.min(maxOff, g.dragStart.yOff + dyFrac))
+      setXOffset(nextX)
+      setYOffset(nextY)
+      e.preventDefault()
+    }
+  }
+
+  const handleChartTouchEnd = (e) => {
+    const g = gestureRef.current
+    if (e.touches.length < 2) g.pinchDist = null
+
+    if (g.tapStart) {
+      const last = e.changedTouches[0]
+      const dx = (last?.clientX || 0) - g.tapStart.x
+      const dy = (last?.clientY || 0) - g.tapStart.y
+      const dt = Date.now() - g.tapStart.time
+      const movement = Math.sqrt(dx * dx + dy * dy)
+
+      // Tap (klein, snel)
+      if (movement < 10 && dt < 280) {
+        if (!fullscreen) {
+          // Normale mode → tap opent fullscreen
+          setFullscreen(true)
+        } else {
+          // Fullscreen → dubbel-tap = zoom-toggle op tap-positie
+          const now = Date.now()
+          if (now - g.lastTap < 300) {
+            setZoom(z => z > 1.5 ? 1 : 2)
+            setXOffset(0)
+            setYOffset(0)
+            g.lastTap = 0
+          } else {
+            g.lastTap = now
+          }
+        }
+      }
+      // Horizontale swipe alleen in NORMALE mode = cycle groep/range. In
+      // fullscreen is drag voor panning, dus geen swipe-cyclus.
+      else if (!fullscreen && movement >= 50 && dt < 700
+               && Math.abs(dx) > Math.abs(dy) * 1.5) {
+        const dir = dx < 0 ? +1 : -1
+        if (viewMode === 'group') cycleGroup(dir)
+        else cycleRange(dir)
+      }
+      g.tapStart = null
+      g.dragStart = null
+    }
+  }
+
+  // In fullscreen-mode pakt de chart de hele viewport via `inset: 0`.
+  // In de inline-mode (op een normale pagina) heeft de parent geen vaste
+  // hoogte, dus `height: 100%` faalde stil en de chart collapseerde tot een
+  // krap streepje. Hier laten we de root content-gestuurd zijn en geven we
+  // straks de chart-area een vaste hoogte.
   const rootStyle = fullscreen
     ? {
         display: 'flex', flexDirection: 'column',
@@ -738,22 +927,26 @@ export default function WorkoutOverviewChart({
       }
     : {
         display: 'flex', flexDirection: 'column',
-        height: '100%', overflow: 'hidden',
         background: '#0a0a0a',
+        border: '1px solid rgba(255,255,255,0.06)',
+        borderRadius: 14,
+        overflow: 'hidden',
       }
 
   return (
     <div style={rootStyle}>
       <Header />
       <RangeBar />
-      <YBar />
-      <YPanBar />
+      <ModeToggle />
+      {viewMode === 'group' && availableGroups.length > 0 && (
+        <GroupChips groups={availableGroups} />
+      )}
 
       {/* Body */}
       {isLoading ? (
         <StateBlock>
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem' }}>
-            <Loader size={20} style={{ animation: 'spinChart 0.8s linear infinite' }} color="#f97316" />
+            <Loader size={20} style={{ animation: 'spinChart 0.8s linear infinite' }} color="#FFD700" />
             <span>Laden...</span>
           </div>
         </StateBlock>
@@ -766,29 +959,52 @@ export default function WorkoutOverviewChart({
             : 'Te weinig data — minstens 3 sessies per oefening nodig.'}
         </StateBlock>
       ) : (
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
-          <div style={{ flex: 1, minHeight: isMobile ? '220px' : '300px', padding: '0.5rem 0.25rem 0' }}>
+        <div style={{
+          display: 'flex', flexDirection: 'column',
+          // Inline-mode: laat content zelf z'n ruimte pakken (root heeft geen
+          // fixed height meer). Fullscreen: vul resterende ruimte.
+          flex: fullscreen ? 1 : '0 0 auto',
+          minHeight: 0,
+        }}>
+          <div
+            ref={chartAreaRef}
+            onTouchStart={handleChartTouchStart}
+            onTouchMove={handleChartTouchMove}
+            onTouchEnd={handleChartTouchEnd}
+            onClick={!fullscreen ? () => setFullscreen(true) : undefined}
+            style={{
+              // Vaste hoogte voor de chart-area zodat de grafiek niet meer
+              // collapseert op pagina's zonder fixed parent-height.
+              height: fullscreen ? undefined : (isMobile ? 340 : 440),
+              flex: fullscreen ? 1 : undefined,
+              minHeight: fullscreen ? (isMobile ? 220 : 300) : undefined,
+              padding: '0.5rem 0.25rem 0',
+              touchAction: fullscreen ? 'none' : 'pan-y',
+              cursor: fullscreen ? (zoom > 1.05 ? 'zoom-out' : 'default') : 'zoom-in',
+              overflow: 'hidden',
+              position: 'relative',
+            }}>
             <ResponsiveContainer width="100%" height="100%">
               <LineChart
                 data={rechartsData}
-                margin={{ top: 8, right: 12, bottom: 4, left: -10 }}
+                margin={{ top: 8, right: 12, bottom: 4, left: 4 }}
               >
                 <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" />
                 <XAxis
                   dataKey="date"
                   tickFormatter={formatDateTick}
                   stroke="rgba(255,255,255,0.25)"
-                  tick={{ fontSize: 10, fill: 'rgba(255,255,255,0.4)' }}
+                  tick={{ fontSize: 11, fill: 'rgba(255,255,255,0.85)', fontWeight: 600 }}
                   tickLine={{ stroke: 'rgba(255,255,255,0.1)' }}
                   axisLine={{ stroke: 'rgba(255,255,255,0.1)' }}
                 />
                 <YAxis
                   stroke="rgba(255,255,255,0.25)"
-                  tick={{ fontSize: 10, fill: 'rgba(255,255,255,0.4)' }}
+                  tick={{ fontSize: 11, fill: '#fff', fontWeight: 700 }}
                   tickLine={{ stroke: 'rgba(255,255,255,0.1)' }}
                   axisLine={{ stroke: 'rgba(255,255,255,0.1)' }}
-                  unit="kg"
-                  width={42}
+                  unit={viewMode === 'percent' ? '%' : 'kg'}
+                  width={viewMode === 'percent' ? 60 : 54}
                   domain={yDomain}
                   allowDataOverflow={true}
                 />
@@ -796,15 +1012,15 @@ export default function WorkoutOverviewChart({
                   content={<CustomTooltip />}
                   cursor={{ stroke: 'rgba(255,255,255,0.1)', strokeWidth: 1 }}
                 />
-                {visibleDatasets.map(ds => (
+                {finalDatasets.map(ds => (
                   <Line
                     key={ds.exercise}
                     type="monotone"
                     dataKey={ds.exercise}
                     stroke={ds.color}
-                    strokeWidth={2}
-                    dot={<PrDot />}
-                    activeDot={{ r: 4.5, strokeWidth: 0 }}
+                    strokeWidth={2.6}
+                    dot={viewMode === 'percent' ? false : <PrDot />}
+                    activeDot={{ r: 5, strokeWidth: 0 }}
                     connectNulls
                     isAnimationActive={false}
                   />
@@ -812,9 +1028,13 @@ export default function WorkoutOverviewChart({
               </LineChart>
             </ResponsiveContainer>
           </div>
+          {/* Legend toont in group-mode alleen de geselecteerde groep, in
+              percent-mode alle groepen (gebruiker mag exercises uitschakelen). */}
           <CustomLegend
             datasets={chartResult.datasets}
-            legendGroups={chartResult.byMuscleGroup}
+            legendGroups={viewMode === 'group' && selectedGroup
+              ? { [selectedGroup]: chartResult.byMuscleGroup[selectedGroup] || [] }
+              : chartResult.byMuscleGroup}
             hiddenExercises={hiddenExercises}
             hiddenGroups={hiddenGroups}
             collapsedGroups={collapsedGroups}

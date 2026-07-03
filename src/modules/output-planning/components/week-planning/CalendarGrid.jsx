@@ -24,6 +24,7 @@ export default function CalendarGrid({
   selectedItemIds = new Set(),
   onToggleItemSelect,
   onItemDrop,
+  onIdeaDrop,
   onTimeSlotClick,
   onItemToggleComplete,
   onItemEdit,
@@ -158,15 +159,20 @@ export default function CalendarGrid({
     setHoveredSlot({ dayOfWeek, hour })
   }
   
-  // Handle drop
+  // Handle drop — bestaand item verplaatsen OF een idee uit de ideeën-sectie
+  // op deze dag/tijd inplannen (drag-to-plan).
   const handleDrop = (e, dayOfWeek, hour) => {
     e.preventDefault()
     setHoveredSlot(null)
-    
+    if (!dayOfWeek) return
+    const time = `${hour.toString().padStart(2, '0')}:00`
+
     const itemId = e.dataTransfer.getData('itemId')
-    if (itemId && dayOfWeek) {
-      const time = `${hour.toString().padStart(2, '0')}:00`
-      onItemDrop(itemId, dayOfWeek, time)
+    if (itemId) { onItemDrop(itemId, dayOfWeek, time); return }
+
+    const ideaRaw = e.dataTransfer.getData('application/x-myarc-idea')
+    if (ideaRaw && onIdeaDrop) {
+      try { onIdeaDrop(JSON.parse(ideaRaw), dayOfWeek, time) } catch (err) { console.error('Idea drop parse failed', err) }
     }
   }
   
@@ -225,17 +231,22 @@ export default function CalendarGrid({
             >
               <div style={{
                 fontSize: '0.7rem',
-                fontWeight: '600',
-                color: isToday ? GOLD.primary : 'rgba(255, 255, 255, 0.4)',
+                fontWeight: '700',
+                color: isToday ? GOLD.primary : (idx >= 5 ? 'rgba(255,255,255,0.28)' : 'rgba(255, 255, 255, 0.45)'),
                 textTransform: 'uppercase',
-                marginBottom: '0.25rem'
+                letterSpacing: '0.04em',
+                marginBottom: '0.3rem'
               }}>
                 {DAYS_FULL[idx]?.substring(0, 3)}
               </div>
               <div style={{
-                fontSize: '1.125rem',
-                fontWeight: '700',
-                color: isToday ? GOLD.primary : '#fff'
+                margin: '0 auto',
+                width: '30px', height: '30px', borderRadius: '50%',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontSize: '1.05rem',
+                fontWeight: '800',
+                color: isToday ? '#000' : (idx >= 5 ? 'rgba(255,255,255,0.6)' : '#fff'),
+                background: isToday ? `linear-gradient(135deg, ${GOLD.primary} 0%, ${GOLD.secondary} 100%)` : 'transparent',
               }}>
                 {new Date(day.date).getDate()}
               </div>
@@ -320,6 +331,8 @@ export default function CalendarGrid({
                   return (
                     <div
                       key={hourIdx}
+                      data-plan-day={day.dayOfWeek}
+                      data-plan-hour={hour}
                       onDragOver={(e) => handleDragOver(e, day.dayOfWeek, hour)}
                       onDrop={(e) => handleDrop(e, day.dayOfWeek, hour)}
                       onDragLeave={handleDragLeave}

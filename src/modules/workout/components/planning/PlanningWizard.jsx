@@ -5,8 +5,12 @@ import { X, Zap, Check, ChevronRight, ChevronLeft, Edit2, Trash2 } from 'lucide-
 
 export default function PlanningWizard({ workoutService, clientId, schema, onComplete, onClose }) {
   const isMobile = window.innerWidth <= 768
-  const [step, setStep] = useState(1)
+  // De wizard begint bij stap 2: de stap-1 "Hoeveel dagen per week"-vraag
+  // is verwijderd omdat de coach dit samen met de client afstemt. De
+  // client zelf kiest hier alleen WELKE dagen ze trainen.
+  const [step, setStep] = useState(2)
   const [targetDaysPerWeek, setTargetDaysPerWeek] = useState(null)
+  const TOTAL_STEPS = 4 // was 5 — stap 1 (days-per-week) is verwijderd
   const [selectedDays, setSelectedDays] = useState([])
   const [workoutAssignments, setWorkoutAssignments] = useState({})
   const [customWorkouts, setCustomWorkouts] = useState([])
@@ -141,7 +145,7 @@ export default function PlanningWizard({ workoutService, clientId, schema, onCom
         {/* HEADER */}
         <div style={{ padding: isMobile ? '1rem' : '1.25rem', borderBottom: '1px solid rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
           <div>
-            <div style={{ fontSize: '0.58rem', fontWeight: '700', color: 'rgba(255,215,0,0.5)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '0.2rem' }}>Stap {step} van 5</div>
+            <div style={{ fontSize: '0.58rem', fontWeight: '700', color: 'rgba(255,215,0,0.5)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '0.2rem' }}>Stap {step - 1} van {TOTAL_STEPS}</div>
             <h2 style={{ fontSize: isMobile ? '1rem' : '1.1rem', fontWeight: '800', color: '#fff', margin: 0, letterSpacing: '-0.01em' }}>Plan Je Workout Week</h2>
           </div>
           <button onClick={onClose} style={{ width: '40px', height: '40px', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '8px', color: 'rgba(255,255,255,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}>
@@ -151,7 +155,7 @@ export default function PlanningWizard({ workoutService, clientId, schema, onCom
 
         {/* Progress bar */}
         <div style={{ height: '2px', background: 'rgba(255,255,255,0.04)', flexShrink: 0 }}>
-          <div style={{ height: '100%', width: `${(step / 5) * 100}%`, background: '#FFD700', transition: 'width 0.3s ease' }} />
+          <div style={{ height: '100%', width: `${((step - 1) / TOTAL_STEPS) * 100}%`, background: '#FFD700', transition: 'width 0.3s ease' }} />
         </div>
 
         {/* CONTENT */}
@@ -174,11 +178,12 @@ export default function PlanningWizard({ workoutService, clientId, schema, onCom
             </div>
           )}
 
-          {/* STAP 2 */}
+          {/* STAP 2 — nu de eerste interactieve stap (stap 1/days-per-week
+              is verwijderd; coach bepaalt het aantal samen met de client). */}
           {step === 2 && (
             <div>
               <h3 style={{ fontSize: isMobile ? '1.05rem' : '1.15rem', fontWeight: '800', color: '#fff', margin: '0 0 0.375rem', letterSpacing: '-0.01em' }}>Welke dagen train je?</h3>
-              <p style={{ fontSize: '0.78rem', color: 'rgba(255,255,255,0.35)', margin: '0 0 1.25rem' }}>Selecteer {targetDaysPerWeek} dagen</p>
+              <p style={{ fontSize: '0.78rem', color: 'rgba(255,255,255,0.35)', margin: '0 0 1.25rem' }}>Tik de dagen aan die jullie hebben afgesproken</p>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
                 {weekDays.map(day => {
                   const selected = selectedDays.includes(day)
@@ -193,8 +198,8 @@ export default function PlanningWizard({ workoutService, clientId, schema, onCom
                   )
                 })}
               </div>
-              <div style={{ marginTop: '0.75rem', padding: '0.5rem 1rem', background: selectedDays.length === targetDaysPerWeek ? 'rgba(255,215,0,0.05)' : 'rgba(255,255,255,0.02)', border: `1px solid ${selectedDays.length === targetDaysPerWeek ? 'rgba(255,215,0,0.2)' : 'rgba(255,255,255,0.05)'}`, borderRadius: '7px', textAlign: 'center', fontSize: '0.68rem', fontWeight: '700', color: selectedDays.length === targetDaysPerWeek ? 'rgba(255,215,0,0.7)' : 'rgba(255,255,255,0.25)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                {selectedDays.length} / {targetDaysPerWeek} geselecteerd
+              <div style={{ marginTop: '0.75rem', padding: '0.5rem 1rem', background: selectedDays.length > 0 ? 'rgba(255,215,0,0.05)' : 'rgba(255,255,255,0.02)', border: `1px solid ${selectedDays.length > 0 ? 'rgba(255,215,0,0.2)' : 'rgba(255,255,255,0.05)'}`, borderRadius: '7px', textAlign: 'center', fontSize: '0.68rem', fontWeight: '700', color: selectedDays.length > 0 ? 'rgba(255,215,0,0.7)' : 'rgba(255,255,255,0.25)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                {selectedDays.length === 0 ? 'Selecteer minstens 1 dag' : `${selectedDays.length} ${selectedDays.length === 1 ? 'dag' : 'dagen'} geselecteerd`}
               </div>
             </div>
           )}
@@ -317,8 +322,8 @@ export default function PlanningWizard({ workoutService, clientId, schema, onCom
 
         {/* FOOTER */}
         <div style={{ padding: isMobile ? '0.875rem 1rem' : '1rem 1.5rem', borderTop: '1px solid rgba(255,255,255,0.06)', display: 'flex', gap: '0.5rem', flexShrink: 0, background: '#0a0a0a' }}>
-          {step > 1 && (
-            <button onClick={() => setStep(p => Math.max(p - 1, 1))} style={{ flex: 1, padding: isMobile ? '0.75rem' : '0.875rem', background: 'transparent', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '8px', color: 'rgba(255,255,255,0.4)', fontSize: isMobile ? '0.75rem' : '0.82rem', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.04em', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.3rem', minHeight: '46px', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}>
+          {step > 2 && (
+            <button onClick={() => setStep(p => Math.max(p - 1, 2))} style={{ flex: 1, padding: isMobile ? '0.75rem' : '0.875rem', background: 'transparent', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '8px', color: 'rgba(255,255,255,0.4)', fontSize: isMobile ? '0.75rem' : '0.82rem', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.04em', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.3rem', minHeight: '46px', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}>
               <ChevronLeft size={14} strokeWidth={2.5} />Terug
             </button>
           )}

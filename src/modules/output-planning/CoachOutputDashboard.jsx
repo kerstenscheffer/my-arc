@@ -97,6 +97,9 @@ export default function CoachOutputDashboard({ db }) {
   // stats still loaded for potential future use, but currently no display.
   const [, setStats] = useState(null)
   const [isFullscreen, setIsFullscreen] = useState(false)
+  // Bumpt na een actie in de ideeën-sectie (bv. inplannen) zodat de agenda
+  // direct herlaadt zonder hard refresh.
+  const [agendaRefresh, setAgendaRefresh] = useState(0)
   
   // Service instance
   const [service] = useState(() => new OutputService(db))
@@ -339,18 +342,36 @@ export default function CoachOutputDashboard({ db }) {
         ) : (
           <div style={{
             flex: inFullscreen ? 1 : 'none',
-            overflow: inFullscreen ? 'auto' : 'visible',
+            // Desktop: het grid scrollt zelf NIET — elke kolom scrollt apart
+            // (zie kolom-styles hieronder), zodat de agenda blijft staan terwijl
+            // je door de ideeën scrollt. Mobiel blijft normaal mee-scrollen.
+            overflow: isMobile ? 'visible' : 'hidden',
             display: 'grid',
             // Mobile: stack (content top, week-planning bottom).
             // Desktop: two columns side-by-side — content left, planning right.
             gridTemplateColumns: isMobile ? '1fr' : 'minmax(0, 5fr) minmax(0, 7fr)',
             gap: isMobile ? '0.75rem' : '1rem',
             padding: isMobile ? '0.5rem' : '0.75rem',
+            alignItems: isMobile ? 'stretch' : 'start',
           }}>
-            <div style={{ minWidth: 0 }}>
-              <OutputHub db={db} />
+            <div style={{
+              minWidth: 0,
+              // Eigen scroll voor de ideeën-kolom (desktop).
+              ...(isMobile ? {} : {
+                height: inFullscreen ? '100%' : 'calc(100vh - 130px)',
+                overflowY: 'auto',
+              }),
+            }}>
+              <OutputHub db={db} onPlanned={() => setAgendaRefresh(n => n + 1)} />
             </div>
-            <div style={{ minWidth: 0 }}>
+            <div style={{
+              minWidth: 0,
+              // Vaste agenda-kolom met eigen scroll (desktop) → blijft op z'n plek.
+              ...(isMobile ? {} : {
+                height: inFullscreen ? '100%' : 'calc(100vh - 130px)',
+                overflowY: 'auto',
+              }),
+            }}>
               <WeekPlanningView
                 db={db}
                 weekDays={weekDays}
@@ -358,6 +379,7 @@ export default function CoachOutputDashboard({ db }) {
                 goToPreviousWeek={goToPreviousWeek}
                 goToNextWeek={goToNextWeek}
                 onRefresh={refreshDayItems}
+                refreshSignal={agendaRefresh}
                 isMobile={isMobile}
                 problems={[]}
                 pdfs={[]}

@@ -1,6 +1,6 @@
 // src/modules/workout/components/WeekSchedule.jsx
 import useIsMobile from '../../../hooks/useIsMobile'
-import { AlertCircle, Calendar } from 'lucide-react'
+import { AlertCircle } from 'lucide-react'
 import { useState, useEffect } from 'react'
 import WeekGrid from './week-schedule/WeekGrid'
 import ActionButtons from './week-schedule/ActionButtons'
@@ -8,7 +8,7 @@ import ActionButtons from './week-schedule/ActionButtons'
 export default function WeekSchedule({
   weekSchedule, schema, swapMode, selectedWorkout,
   completedWorkouts = [], todayIndex, onDayClick,
-  clientId, db, workoutService, onScheduleUpdate, onOpenWizard
+  clientId, db, workoutService, onScheduleUpdate,
 }) {
   const isMobile = useIsMobile()
   const [localSwapMode, setLocalSwapMode] = useState(false)
@@ -71,6 +71,27 @@ export default function WeekSchedule({
       if (navigator.vibrate) navigator.vibrate([100, 50, 100, 50, 100])
       alert('⚠️ Opslaan mislukt.')
     } finally { setSaving(false) }
+  }
+
+  // Verschuif workout van `day` één positie in `direction` (-1 = vorige dag,
+  // +1 = volgende dag). Bezet → swap; leeg → move.
+  const handleShift = (day, direction) => {
+    const sourceIdx = weekDays.indexOf(day)
+    const targetIdx = sourceIdx + direction
+    if (sourceIdx < 0 || targetIdx < 0 || targetIdx >= weekDays.length) return
+    const sourceWorkout = tempSchedule[day]
+    if (!sourceWorkout) return
+    const targetDay = weekDays[targetIdx]
+    const targetWorkout = tempSchedule[targetDay]
+    const next = { ...tempSchedule }
+    if (targetWorkout) {
+      next[targetDay] = sourceWorkout
+      next[day] = targetWorkout
+    } else {
+      next[targetDay] = sourceWorkout
+      delete next[day]
+    }
+    handleAutoSave(next)
   }
 
   const handleSwapClick = (day, workoutKey) => {
@@ -143,17 +164,16 @@ export default function WeekSchedule({
         </div>
       )}
 
-      {/* Hint above the grid — readable size, clear instruction so users
-          discover the hidden drag-gesture before they see the cards. */}
+      {/* Sectie-titel — groot dik wit boven het week-grid */}
       <div style={{
-        textAlign: 'center',
-        padding: isMobile ? '0.25rem 1rem 0.625rem' : '0.375rem 1rem 0.75rem',
-        fontSize: isMobile ? '0.78rem' : '0.85rem',
-        color: 'rgba(255,255,255,0.55)',
-        fontWeight: '600',
-        letterSpacing: '-0.005em',
+        padding: isMobile ? '0.5rem 1rem 0.875rem' : '0.5rem 1.25rem 1rem',
+        fontSize: isMobile ? '1.15rem' : '1.3rem',
+        fontWeight: 900,
+        color: '#fff',
+        letterSpacing: '-0.02em',
+        lineHeight: 1.15,
       }}>
-        Houd vast en sleep om te wisselen
+        Jouw week planning
       </div>
 
       {/* WeekGrid */}
@@ -163,34 +183,9 @@ export default function WeekSchedule({
           completedWorkouts={completedWorkouts} selectedWorkout={selectedWorkout}
           selectedForSwap={selectedForSwap} swapMode={swapMode} localSwapMode={localSwapMode}
           getWorkoutData={getWorkoutData} onDayClick={onDayClick} onSwapClick={handleSwapClick}
-          onScheduleUpdate={handleAutoSave} isMobile={isMobile}
+          onShift={handleShift}
+          isMobile={isMobile}
         />
-      </div>
-
-      {/* Single planning button — wizard only. Custom-week flow lives in
-          the header "Plan" pencil (ClientPlanEditor) to avoid 3 paths. */}
-      <div style={{ marginTop: '0.625rem', padding: isMobile ? '0 0.75rem' : '0 1rem' }}>
-        <button
-          onClick={onOpenWizard}
-          style={{
-            width: '100%', padding: isMobile ? '0.6rem 0.75rem' : '0.7rem 1rem',
-            background: 'transparent',
-            border: '1px solid rgba(255,255,255,0.08)',
-            borderRadius: isMobile ? '6px' : '8px',
-            color: 'rgba(255,255,255,0.55)',
-            fontSize: isMobile ? '0.75rem' : '0.8rem',
-            fontWeight: '600',
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center', justifyContent: 'center',
-            gap: isMobile ? '0.4rem' : '0.45rem',
-            minHeight: '40px',
-            touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-          }}
-        >
-          <Calendar size={14} strokeWidth={2} />
-          Plan Je Week
-        </button>
       </div>
 
       {localSwapMode && (

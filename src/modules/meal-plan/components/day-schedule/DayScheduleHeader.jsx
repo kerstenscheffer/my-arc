@@ -3,7 +3,19 @@
 import React from 'react'
 import { Calendar, Copy } from 'lucide-react'
 
-export default function DayScheduleHeader({ dayTemplates, onOpenTemplate, isMobile }) {
+export default function DayScheduleHeader({ dayTemplates, onOpenTemplate, isMobile, displayDate }) {
+  // `displayDate` is the Date object for whichever day is currently selected
+  // in the schedule. Falls back to today when omitted so existing call-sites
+  // that never passed it keep their old behaviour.
+  const dateToShow = displayDate instanceof Date ? displayDate : new Date()
+  const todayMid = new Date(); todayMid.setHours(0, 0, 0, 0)
+  const targetMid = new Date(dateToShow); targetMid.setHours(0, 0, 0, 0)
+  const diffDays = Math.round((targetMid - todayMid) / (1000 * 60 * 60 * 24))
+  let relativeLabel = null
+  if (diffDays === 0) relativeLabel = 'Vandaag'
+  else if (diffDays === -1) relativeLabel = 'Gisteren'
+  else if (diffDays === 1) relativeLabel = 'Morgen'
+  else if (diffDays < 0) relativeLabel = `${Math.abs(diffDays)} dagen terug`
   return (
     <div style={{
       display: 'flex',
@@ -29,7 +41,7 @@ export default function DayScheduleHeader({ dayTemplates, onOpenTemplate, isMobi
             lineHeight: 1,
             marginBottom: '0.1rem'
           }}>
-            Dagschema
+            Dagschema {relativeLabel ? `· ${relativeLabel}` : ''}
           </div>
           <div style={{
             fontSize: isMobile ? '0.85rem' : '0.95rem',
@@ -38,36 +50,57 @@ export default function DayScheduleHeader({ dayTemplates, onOpenTemplate, isMobi
             letterSpacing: '-0.01em',
             lineHeight: 1.2
           }}>
-            {new Date().toLocaleDateString('nl-NL', { 
-              weekday: 'long', 
-              day: 'numeric', 
-              month: 'long' 
+            {dateToShow.toLocaleDateString('nl-NL', {
+              weekday: 'long',
+              day: 'numeric',
+              month: 'long'
             })}
           </div>
         </div>
       </div>
 
-      {dayTemplates.length > 0 && (
-        <button
-          onClick={onOpenTemplate}
-          style={{
-            padding: isMobile ? '0.4rem 0.625rem' : '0.5rem 0.75rem',
-            background: 'transparent',
-            border: '1px solid rgba(255, 255, 255, 0.08)',
-            borderRadius: '8px',
-            color: 'rgba(255, 255, 255, 0.4)',
-            fontSize: isMobile ? '0.65rem' : '0.7rem',
-            fontWeight: '700',
-            cursor: 'pointer',
-            display: 'flex', alignItems: 'center', gap: '0.3rem',
-            touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-            minHeight: '36px'
-          }}
-        >
-          <Copy size={isMobile ? 11 : 12} />
-          Template
-        </button>
-      )}
+      {/* Altijd zichtbaar zodat de client de feature ontdekt — wanneer er
+          geen templates klaar staan tonen we 'm disabled met een tooltip. */}
+      {(() => {
+        const hasTemplates = (dayTemplates || []).length > 0
+        return (
+          <button
+            onClick={hasTemplates ? onOpenTemplate : undefined}
+            disabled={!hasTemplates}
+            title={hasTemplates
+              ? 'Kies een dag-template om op deze dag toe te passen'
+              : 'Nog geen dag-templates beschikbaar. Vraag je coach om er een aan te maken.'}
+            style={{
+              padding: isMobile ? '0.45rem 0.7rem' : '0.55rem 0.85rem',
+              background: hasTemplates ? 'rgba(255,215,0,0.1)' : 'rgba(255,255,255,0.03)',
+              border: `1px solid ${hasTemplates ? 'rgba(255,215,0,0.35)' : 'rgba(255,255,255,0.08)'}`,
+              borderRadius: '8px',
+              color: hasTemplates ? '#FFD700' : 'rgba(255,255,255,0.25)',
+              fontSize: isMobile ? '0.7rem' : '0.75rem',
+              fontWeight: 800,
+              cursor: hasTemplates ? 'pointer' : 'not-allowed',
+              display: 'flex', alignItems: 'center', gap: '0.35rem',
+              touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+              minHeight: '36px',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            <Copy size={isMobile ? 12 : 13} />
+            {isMobile ? 'Template' : 'Kies dag-template'}
+            {hasTemplates && (
+              <span style={{
+                marginLeft: 4,
+                padding: '1px 5px',
+                background: 'rgba(255,215,0,0.18)',
+                borderRadius: 3,
+                fontSize: '0.55rem', fontWeight: 800,
+              }}>
+                {dayTemplates.length}
+              </span>
+            )}
+          </button>
+        )
+      })()}
     </div>
   )
 }

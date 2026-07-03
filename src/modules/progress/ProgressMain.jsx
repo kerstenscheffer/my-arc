@@ -2,7 +2,7 @@
 // v6.2 - overflow hidden fix
 
 import React, { useState, useEffect } from 'react'
-import { Loader2, Scale, Camera } from 'lucide-react'
+import { Loader2, Camera, Calendar, Sparkles, ChevronDown, ChevronUp, Coffee, Sun, Moon } from 'lucide-react'
 
 import ProgressPhotos from '../progress-photos/ProgressPhotos'
 import WeightTrackerService from '../weight-tracker/WeightTrackerService'
@@ -12,13 +12,136 @@ import WeightHistory from '../weight-tracker/components/WeightHistory'
 import CircumferenceMeasurements from '../weight-tracker/components/CircumferenceMeasurements'
 import RecentProgressPhotos from './components/RecentProgressPhotos'
 import ProgressChallengeSidebar from '../../client/components/ProgressChallengeSidebar'
-import PageVideoWidget from '../videos/PageVideoWidget'
 import { useChallenge } from '../../hooks/useChallenge'
+
+// Dag-banner content (datum + dagelijkse tip) — selectie is deterministisch per
+// dag-van-het-jaar zodat'ie consistent is binnen een dag.
+const TRACKING_TIPS = [
+  'Wegen op een vast moment werkt beter dan elke dag op een ander tijdstip.',
+  'Eén bad-meting is een datapunt, geen trend. Kijk naar de week-lijn.',
+  'Foto naast cijfer — wat de weegschaal niet ziet, ziet de spiegel wel.',
+  'Vloeistof-balans schommelt 1–2 kg per dag. Vertrouw je 7-daags gemiddelde.',
+  'Maandag is geen heilige weeg-dag. Vrijdag werkt voor sommigen beter.',
+  'Een plateau is data, geen falen. Kijk naar omtrek en spiegel.',
+  'Vandaag ook? Klein moment, lange-termijn voordeel.',
+  'Trots op gisteren? Houd vandaag dezelfde lijn vast.',
+  'Even checken: was je laatste foto al meer dan 2 weken geleden?',
+  'Sleep + stress beïnvloeden je gewicht ~1 kg. Zie het in context.',
+]
+const pickTrackingTip = () => {
+  const start = new Date(new Date().getFullYear(), 0, 0)
+  const diff = Date.now() - start.getTime()
+  const dayOfYear = Math.floor(diff / 86400000)
+  return TRACKING_TIPS[dayOfYear % TRACKING_TIPS.length]
+}
+
+const getDutchDate = () => {
+  const d = new Date()
+  const days = ['Zondag', 'Maandag', 'Dinsdag', 'Woensdag', 'Donderdag', 'Vrijdag', 'Zaterdag']
+  const months = ['januari', 'februari', 'maart', 'april', 'mei', 'juni',
+                  'juli', 'augustus', 'september', 'oktober', 'november', 'december']
+  return `${days[d.getDay()]}, ${d.getDate()} ${months[d.getMonth()]}`
+}
+
+// Tracking-header — sticky met grote gouden DAG-naam + datum-pill ernaast.
+function TrackingHeader({ client, isMobile }) {
+  const days = ['Zondag', 'Maandag', 'Dinsdag', 'Woensdag', 'Donderdag', 'Vrijdag', 'Zaterdag']
+  const months = ['januari', 'februari', 'maart', 'april', 'mei', 'juni',
+                  'juli', 'augustus', 'september', 'oktober', 'november', 'december']
+  const today = new Date()
+  const dayName = days[today.getDay()]
+  const dateLabel = `${today.getDate()} ${months[today.getMonth()]}`
+
+  return (
+    <div style={{
+      position: 'sticky', top: 0, zIndex: 50,
+      background: 'rgba(10,10,10,0.92)',
+      backdropFilter: 'blur(16px)',
+      WebkitBackdropFilter: 'blur(16px)',
+      paddingTop: 'env(safe-area-inset-top, 0)',
+      borderBottom: '1px solid rgba(255,255,255,0.06)',
+    }}>
+      <div style={{
+        padding: isMobile ? '0.85rem 1rem' : '1rem 1.5rem',
+        textAlign: 'center',
+      }}>
+        <div style={{
+          fontSize: isMobile ? '1.2rem' : '1.35rem',
+          fontWeight: 900, color: '#FFD700', letterSpacing: '-0.02em',
+          lineHeight: 1.1,
+          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+        }}>
+          {dayName}
+          <span style={{
+            fontSize: '0.62rem', fontWeight: 800,
+            color: 'rgba(0,0,0,0.85)', background: '#FFD700',
+            padding: '2px 7px', borderRadius: 4,
+            letterSpacing: '0.04em', textTransform: 'uppercase',
+          }}>
+            {dateLabel}
+          </span>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// Coach-tip bovenaan de tracking pagina — foto links, vaste boodschap rechts.
+// Vervangt de rotating daily-tip: deze tekst is een vast reminder over week-
+// gemiddeldes ipv dagelijkse schommelingen.
+const COACH_PHOTO_URL = 'https://i.ibb.co/mCQzTZrZ/ea169061-c9f1-4b4d-ab88-fc746cbde003.jpg'
+const COACH_TRACKING_MESSAGE = 'Het is normaal dat je gewicht schommelt en hoeft niks te betekenen. We focussen op jouw week gemiddelde en sturen vanuit daar bij.'
+
+function TrackingTipBlock({ isMobile }) {
+  return (
+    <div style={{
+      padding: isMobile ? '1rem 1rem 0' : '1.25rem 1.5rem 0',
+    }}>
+      <div style={{
+        display: 'flex', gap: isMobile ? 12 : 14,
+        alignItems: 'flex-start',
+      }}>
+        <img
+          src={COACH_PHOTO_URL}
+          alt="Coach"
+          style={{
+            width: isMobile ? 48 : 56,
+            height: isMobile ? 48 : 56,
+            borderRadius: '50%',
+            objectFit: 'cover',
+            border: '2px solid rgba(255,215,0,0.45)',
+            flexShrink: 0,
+            boxShadow: '0 4px 12px rgba(255,215,0,0.18)',
+          }}
+        />
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{
+            fontSize: isMobile ? '0.62rem' : '0.68rem',
+            fontWeight: 800, color: '#FFD700',
+            textTransform: 'uppercase', letterSpacing: '0.1em',
+            marginBottom: 4,
+          }}>
+            Bericht van Kersten
+          </div>
+          <div style={{
+            fontSize: isMobile ? '0.85rem' : '0.92rem',
+            color: 'rgba(255,255,255,0.85)',
+            fontWeight: 500, lineHeight: 1.5,
+          }}>
+            {COACH_TRACKING_MESSAGE}
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
 
 export default function ProgressMain({ db, client }) {
   const [weightService] = useState(() => new WeightTrackerService(db))
   const { isInChallenge, challengeData } = useChallenge(db, client?.id)
-  const [activeTab, setActiveTab] = useState('weight')
+  // Foto-sectie als dropdown: wanneer open, verbergen we de rest van de pagina
+  // — zelfde patroon als TodaysWorkoutCard's expand-mode.
+  const [photosOpen, setPhotosOpen] = useState(false)
   const [weight, setWeight] = useState(70.0)
   const [weightStats, setWeightStats] = useState(null)
   const [fridayData, setFridayData] = useState(null)
@@ -140,7 +263,7 @@ export default function ProgressMain({ db, client }) {
   }
 
   return (
-    <div style={{ maxWidth: '1000px', margin: '0 auto', position: 'relative', overflow: 'hidden' }}>
+    <div style={{ maxWidth: '1000px', margin: '0 auto', position: 'relative', overflow: 'hidden', paddingBottom: isMobile ? '5rem' : '2rem' }}>
       {isInChallenge && challengeData && <ProgressChallengeSidebar challengeData={challengeData} isMobile={isMobile} />}
 
       {/* Toast */}
@@ -162,8 +285,16 @@ export default function ProgressMain({ db, client }) {
         </div>
       )}
 
+      {/* ═══ ZONE 0: DAG-BANNER ═══ */}
+      {!photosOpen && (
+        <>
+          <TrackingHeader client={client} isMobile={isMobile} />
+          <TrackingTipBlock isMobile={isMobile} />
+        </>
+      )}
+
       {/* ═══ ZONE 1: FRIDAY ALERT ═══ */}
-      {isFriday && !todayEntry && (
+      {!photosOpen && isFriday && !todayEntry && (
         <div style={{
           display: 'flex', alignItems: 'center', gap: isMobile ? '0.5rem' : '0.625rem',
           padding: isMobile ? '0.4rem 1rem' : '0.5rem 1.5rem',
@@ -177,73 +308,202 @@ export default function ProgressMain({ db, client }) {
         </div>
       )}
 
-      {/* ═══ ZONE 2: HERO — Ring + Picker + Save ═══ */}
-      <WeightProgressRing
-        weight={weight} onWeightChange={setWeight} onSave={handleSaveWeight}
-        saving={saving} todayEntry={todayEntry} progressPercent={progressPercent}
-        isFriday={isFriday} isMobile={isMobile}
-        targetWeight={parseFloat(client?.target_weight) || 75}
-      />
-
-      {/* ═══ ZONE 3: TAB BAR ═══ */}
-      <div style={{
-        display: 'flex', background: '#000',
-        borderTop: '4px solid rgba(255,255,255,0.02)',
-        borderBottom: '1px solid rgba(255,255,255,0.06)'
-      }}>
-        <button onClick={() => setActiveTab('weight')} style={{
-          flex: 1, background: 'transparent', border: 'none',
-          borderBottom: activeTab === 'weight' ? '2px solid #FFD700' : '2px solid transparent',
-          borderRight: '1px solid rgba(255,255,255,0.04)', borderRadius: 0,
-          padding: isMobile ? '0.5rem 0' : '0.6rem 0',
-          color: activeTab === 'weight' ? '#FFD700' : 'rgba(255,255,255,0.3)',
-          cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.3rem',
-          touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', minHeight: '36px',
-          fontSize: isMobile ? '0.6rem' : '0.65rem',
-          fontWeight: activeTab === 'weight' ? '700' : '600',
-          textTransform: 'uppercase', letterSpacing: '0.05em'
-        }}>
-          <Scale size={isMobile ? 12 : 13} />
-          Gewicht
-          {todayEntry && <div style={{ width: '4px', height: '4px', borderRadius: '50%', background: '#10b981' }} />}
-        </button>
-
-        <button onClick={() => setActiveTab('photos')} style={{
-          flex: 1, background: 'transparent', border: 'none',
-          borderBottom: activeTab === 'photos' ? '2px solid #FFD700' : '2px solid transparent',
-          borderRadius: 0, padding: isMobile ? '0.5rem 0' : '0.6rem 0',
-          color: activeTab === 'photos' ? '#FFD700' : 'rgba(255,255,255,0.3)',
-          cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.3rem',
-          touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', minHeight: '36px',
-          fontSize: isMobile ? '0.6rem' : '0.65rem',
-          fontWeight: activeTab === 'photos' ? '700' : '600',
-          textTransform: 'uppercase', letterSpacing: '0.05em'
-        }}>
-          <Camera size={isMobile ? 12 : 13} />
-          Foto's
-          {photoCount > 0 && <span style={{ fontSize: '0.5rem', fontWeight: '700', color: 'rgba(255,215,0,0.4)' }}>{photoCount}</span>}
-        </button>
-      </div>
-
-      {/* ═══ ZONE 4: CONTENT ═══ */}
-      {activeTab === 'weight' && (
-        <>
-          <WeightHistory history={weightHistory} isMobile={isMobile} maxItems={14} />
-          <WeightStatsGrid stats={weightStats} client={client} fridayData={fridayData} history={weightHistory} isMobile={isMobile} />
-          <div style={{ borderTop: '1px solid rgba(255,255,255,0.04)' }}>
-            <CircumferenceMeasurements weightService={weightService} clientId={client?.id} isMobile={isMobile} onSave={loadAllData} />
-          </div>
-        </>
+      {/* ═══ ZONE 2: GEWICHT — Ring + Picker + Save ═══ */}
+      {!photosOpen && (
+        <WeightProgressRing
+          weight={weight} onWeightChange={setWeight} onSave={handleSaveWeight}
+          saving={saving} todayEntry={todayEntry} progressPercent={progressPercent}
+          isFriday={isFriday} isMobile={isMobile}
+          targetWeight={parseFloat(client?.target_weight) || 75}
+        />
       )}
 
-      {activeTab === 'photos' && (
+      {/* ═══ ZONE 3: FOTO-KNOP — TodaysWorkoutCard-stijl: foto-banner bovenaan,
+            info-rij eronder, gouden cirkel-chevron rechts ═══ */}
+      {!photosOpen && (() => {
+        // Pak de laatste progress-foto als banner-image, fallback op een
+        // generieke gym-shot zodat de knop nooit leeg is.
+        const bannerUrl =
+          (recentPhotos.find(p => p.photo_url) || {}).photo_url
+          || 'https://images.unsplash.com/photo-1517836357463-d25dfeac3438?w=800&h=400&fit=crop&q=80'
+        const photoH = isMobile ? 110 : 140
+        return (
+          <div
+            onClick={() => setPhotosOpen(true)}
+            style={{
+              marginTop: isMobile ? '4rem' : '5rem',
+              padding: isMobile ? '0 1rem' : '0 1.5rem',
+              cursor: 'pointer',
+              touchAction: 'manipulation',
+              WebkitTapHighlightColor: 'transparent',
+            }}
+          >
+            {/* Foto-banner — full width, rounded, met subtiele bottom-gradient */}
+            <div style={{
+              width: '100%',
+              height: photoH,
+              borderRadius: 14,
+              position: 'relative',
+              overflow: 'hidden',
+              marginBottom: isMobile ? '0.65rem' : '0.85rem',
+            }}>
+              <div style={{
+                position: 'absolute', inset: 0,
+                backgroundImage: `url(${bannerUrl})`,
+                backgroundSize: 'cover',
+                backgroundPosition: 'center',
+              }} />
+              <div style={{
+                position: 'absolute', inset: 0,
+                background: 'linear-gradient(180deg, transparent 45%, rgba(0,0,0,0.55) 100%)',
+              }} />
+              {photoCount === 0 && (
+                <div style={{
+                  position: 'absolute', inset: 0,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  background: 'rgba(10,10,10,0.5)',
+                }}>
+                  <Camera size={photoH / 3} color="rgba(255,215,0,0.8)" strokeWidth={1.6} />
+                </div>
+              )}
+            </div>
+
+            {/* Info-rij — label + titel + meta links, gouden chevron-cirkel rechts */}
+            <div style={{
+              display: 'flex', alignItems: 'center',
+              gap: isMobile ? '0.6rem' : '0.85rem',
+            }}>
+              <div style={{
+                flex: 1, minWidth: 0,
+                display: 'flex', flexDirection: 'column', justifyContent: 'center',
+              }}>
+                <div style={{
+                  fontSize: isMobile ? '0.55rem' : '0.6rem',
+                  fontWeight: 800,
+                  color: '#FFD700',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.1em',
+                  lineHeight: 1, marginBottom: 4, opacity: 0.85,
+                }}>
+                  Progressie
+                </div>
+                <h2 style={{
+                  fontSize: isMobile ? '1.05rem' : '1.2rem',
+                  fontWeight: 900, color: '#fff',
+                  margin: 0, marginBottom: 5,
+                  letterSpacing: '-0.02em',
+                  lineHeight: 1.15,
+                }}>
+                  Progress foto's
+                </h2>
+                <div style={{
+                  display: 'flex', gap: isMobile ? '0.6rem' : '0.8rem',
+                  alignItems: 'baseline',
+                  fontSize: isMobile ? '0.7rem' : '0.76rem',
+                  color: 'rgba(255,255,255,0.55)',
+                  fontWeight: 600,
+                }}>
+                  {photoCount > 0
+                    ? <>
+                        <span style={{ color: '#FFD700', fontWeight: 800 }}>{photoCount}</span>
+                        <span>{photoCount === 1 ? 'foto' : "foto's"}</span>
+                        <span style={{ opacity: 0.5 }}>·</span>
+                        <span>open om te bekijken</span>
+                      </>
+                    : <span>Open om foto toe te voegen</span>}
+                </div>
+              </div>
+
+              {/* Chevron — gouden cirkel-knop, identiek aan TodaysWorkoutCard */}
+              <div style={{
+                flexShrink: 0,
+                width: isMobile ? 42 : 48, height: isMobile ? 42 : 48,
+                borderRadius: '50%',
+                background: 'linear-gradient(135deg, #FFD700 0%, #D4AF37 100%)',
+                border: 'none',
+                boxShadow: '0 6px 16px rgba(255,215,0,0.35), 0 2px 6px rgba(0,0,0,0.4)',
+                color: '#0a0a0a',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                transition: 'transform 0.2s ease, box-shadow 0.2s ease',
+              }}>
+                <ChevronDown size={isMobile ? 22 : 26} strokeWidth={3} />
+              </div>
+            </div>
+          </div>
+        )
+      })()}
+
+      {/* ═══ ZONE 4: GEWICHT-CONTENT — alleen wanneer foto-dropdown gesloten ═══
+            Volgorde: stat-bar bovenaan (zwevend), daaronder de historie. */}
+      {!photosOpen && (
+        <div style={{ marginTop: isMobile ? '4.25rem' : '5.25rem' }}>
+          <WeightStatsGrid stats={weightStats} client={client} fridayData={fridayData} history={weightHistory} isMobile={isMobile} />
+          <div style={{ marginTop: isMobile ? '4rem' : '5rem' }}>
+            <WeightHistory history={weightHistory} isMobile={isMobile} maxItems={200} />
+          </div>
+          <div style={{
+            marginTop: isMobile ? '4rem' : '5rem',
+            borderTop: '1px solid rgba(255,255,255,0.04)',
+          }}>
+            <CircumferenceMeasurements weightService={weightService} clientId={client?.id} isMobile={isMobile} onSave={loadAllData} />
+          </div>
+        </div>
+      )}
+
+      {/* ═══ FOTO-DROPDOWN — vervangt rest van pagina ═══ */}
+      {photosOpen && (
         <>
+          {/* Header met collapse-knop */}
+          <div style={{
+            padding: isMobile ? '0.95rem 1rem' : '1.15rem 1.5rem',
+            borderBottom: '1px solid rgba(255,255,255,0.06)',
+            display: 'flex', alignItems: 'center', gap: 12,
+          }}>
+            <button
+              onClick={() => setPhotosOpen(false)}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 8,
+                padding: '0.4rem 0.7rem',
+                background: 'transparent',
+                border: '1px solid rgba(255,255,255,0.12)',
+                borderRadius: 8,
+                color: 'rgba(255,255,255,0.75)',
+                cursor: 'pointer',
+                fontSize: isMobile ? '0.7rem' : '0.75rem',
+                fontWeight: 800,
+                textTransform: 'uppercase',
+                letterSpacing: '0.05em',
+                touchAction: 'manipulation',
+                WebkitTapHighlightColor: 'transparent',
+              }}
+            >
+              <ChevronUp size={isMobile ? 14 : 15} strokeWidth={2.4} />
+              Sluiten
+            </button>
+            <div style={{
+              flex: 1,
+              fontSize: isMobile ? '0.95rem' : '1.05rem',
+              fontWeight: 900, color: '#fff',
+              letterSpacing: '-0.015em',
+            }}>
+              Progress foto's
+            </div>
+            {photoCount > 0 && (
+              <div style={{
+                fontSize: isMobile ? '0.7rem' : '0.78rem',
+                color: 'rgba(255,215,0,0.7)', fontWeight: 800,
+                fontVariantNumeric: 'tabular-nums',
+              }}>
+                {photoCount}
+              </div>
+            )}
+          </div>
           <RecentProgressPhotos photos={recentPhotos} onUpload={handlePhotoUpload} todayData={todayData} isFriday={isFriday} isMobile={isMobile} />
           <ProgressPhotos db={db} client={client} />
         </>
       )}
 
-      <PageVideoWidget client={client} db={db} pageContext="tracking" />
+      {/* PageVideoWidget gemigreerd naar centrale WidgetSidebar in ClientDashboard. */}
 
       {/* ═══ ANGLE PICKER MODAL — for progress photos ═══ */}
       {anglePicker && (

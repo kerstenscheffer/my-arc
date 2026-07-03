@@ -1563,6 +1563,8 @@ class ContentPlanningService {
           description: data.description || null,
           phase: data.phase || 'post',
           item_type: data.itemType || 'task',
+          // Koppeling naar het originele idee zodat het script opvraagbaar is.
+          source_content_id: data.sourceContentId || null,
           completed: false
         })
         .select()

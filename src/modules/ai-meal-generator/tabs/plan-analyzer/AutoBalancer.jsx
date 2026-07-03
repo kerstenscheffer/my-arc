@@ -6,7 +6,7 @@ import React, { useState, useMemo } from 'react'
 import { createPortal } from 'react-dom'
 import { X, Zap, ArrowRight, Check } from 'lucide-react'
 
-export default function AutoBalancer({ dayData, targets, dayIndex, onApply, onClose, isMobile }) {
+export default function AutoBalancer({ dayData, targets, dayIndex, onApply, onClose, isMobile, embedded = false }) {
   const [mode, setMode] = useState('all')
   const [applied, setApplied] = useState(false)
   const m = isMobile
@@ -353,5 +353,10 @@ export default function AutoBalancer({ dayData, targets, dayIndex, onApply, onCl
     </div>
   )
 
+  // Embedded: render inline in een getransformeerde container zodat de
+  // fixed-modal binnen het dock-paneel valt i.p.v. over het hele scherm.
+  if (embedded) return (
+    <div style={{ position: 'relative', width: '100%', height: '100%', transform: 'translateZ(0)', overflow: 'hidden' }}>{modal}</div>
+  )
   return createPortal(modal, document.body)
 }

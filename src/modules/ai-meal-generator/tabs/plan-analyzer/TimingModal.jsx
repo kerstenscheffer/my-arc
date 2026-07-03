@@ -16,7 +16,7 @@ const SLOT_CONFIG = {
 
 const SLOTS = ['breakfast', 'snack1', 'lunch', 'snack2', 'dinner', 'snack3']
 
-export default function TimingModal({ weekData, onApply, onClose, isMobile }) {
+export default function TimingModal({ weekData, onApply, onClose, isMobile, embedded = false }) {
   const m = isMobile
 
   // Initialiseer tijden vanuit bestaande data (eerste dag met een waarde per slot)
@@ -57,18 +57,12 @@ export default function TimingModal({ weekData, onApply, onClose, isMobile }) {
   }
 
   const modal = (
-    <div onClick={onClose} style={{
-      position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.92)',
-      zIndex: 10000, display: 'flex', alignItems: 'flex-end', justifyContent: 'center'
-    }}>
-      <div onClick={e => e.stopPropagation()} style={{
-        background: '#0a0a0a',
-        borderRadius: '16px 16px 0 0',
-        width: '100%', maxWidth: '480px',
-        display: 'flex', flexDirection: 'column', overflow: 'hidden',
-        border: '1px solid rgba(255,255,255,0.06)',
-        borderBottom: 'none'
-      }}>
+    <div onClick={embedded ? undefined : onClose} style={embedded
+      ? { display: 'flex', flexDirection: 'column', height: '100%', width: '100%', background: '#0a0a0a' }
+      : { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.92)', zIndex: 10000, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
+      <div onClick={e => e.stopPropagation()} style={embedded
+        ? { background: '#0a0a0a', width: '100%', height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden' }
+        : { background: '#0a0a0a', borderRadius: '16px 16px 0 0', width: '100%', maxWidth: '480px', display: 'flex', flexDirection: 'column', overflow: 'hidden', border: '1px solid rgba(255,255,255,0.06)', borderBottom: 'none' }}>
 
         {/* Header */}
         <div style={{
@@ -77,12 +71,12 @@ export default function TimingModal({ weekData, onApply, onClose, isMobile }) {
           borderBottom: '1px solid rgba(255,255,255,0.06)'
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-            <Clock size={14} color="#FFD700" />
+            <Clock size={16} color="#FFD700" />
             <div>
-              <div style={{ fontSize: m ? '0.85rem' : '0.95rem', fontWeight: 800, color: '#fff' }}>
+              <div style={{ fontSize: m ? '1rem' : '1.1rem', fontWeight: 800, color: '#fff', letterSpacing: '-0.01em' }}>
                 Maaltijdtijden
               </div>
-              <div style={{ fontSize: '0.45rem', color: 'rgba(255,255,255,0.3)' }}>
+              <div style={{ fontSize: m ? '0.66rem' : '0.7rem', color: 'rgba(255,255,255,0.5)', fontWeight: 600, marginTop: 1 }}>
                 Wordt toegepast op alle 7 dagen
               </div>
             </div>
@@ -109,8 +103,8 @@ export default function TimingModal({ weekData, onApply, onClose, isMobile }) {
                 borderLeft: `3px solid ${cfg.color}`,
                 borderRadius: '0 6px 6px 0'
               }}>
-                <span style={{ fontSize: '0.9rem', lineHeight: 1, flexShrink: 0 }}>{cfg.icon}</span>
-                <span style={{ flex: 1, fontSize: m ? '0.65rem' : '0.7rem', fontWeight: 600, color: 'rgba(255,255,255,0.6)' }}>
+                <span style={{ fontSize: '1.1rem', lineHeight: 1, flexShrink: 0 }}>{cfg.icon}</span>
+                <span style={{ flex: 1, fontSize: m ? '0.85rem' : '0.9rem', fontWeight: 800, color: '#fff', letterSpacing: '-0.01em' }}>
                   {cfg.label}
                 </span>
                 <input
@@ -118,17 +112,17 @@ export default function TimingModal({ weekData, onApply, onClose, isMobile }) {
                   value={times[slot] || cfg.default}
                   onChange={e => setTimes(prev => ({ ...prev, [slot]: e.target.value }))}
                   style={{
-                    background: `${cfg.color}10`,
-                    border: `1px solid ${cfg.color}30`,
-                    borderRadius: '5px',
-                    color: cfg.color,
-                    fontSize: m ? '0.75rem' : '0.8rem',
+                    background: 'rgba(255,255,255,0.06)',
+                    border: '1px solid rgba(255,215,0,0.3)',
+                    borderRadius: '6px',
+                    color: '#fff',
+                    fontSize: m ? '0.9rem' : '0.95rem',
                     fontWeight: 800,
-                    padding: '0.25rem 0.5rem',
+                    padding: '0.4rem 0.6rem',
                     fontFamily: 'inherit',
                     outline: 'none',
                     cursor: 'pointer',
-                    minWidth: '90px'
+                    minWidth: '100px'
                   }}
                 />
               </div>
@@ -144,12 +138,12 @@ export default function TimingModal({ weekData, onApply, onClose, isMobile }) {
         }}>
           <button onClick={onClose} style={{
             flex: 1, padding: '0.5rem',
-            background: 'rgba(255,255,255,0.03)',
-            border: '1px solid rgba(255,255,255,0.08)',
-            borderRadius: '6px', color: 'rgba(255,255,255,0.3)',
-            fontSize: '0.65rem', fontWeight: 700, cursor: 'pointer',
+            background: 'rgba(255,255,255,0.04)',
+            border: '1px solid rgba(255,255,255,0.1)',
+            borderRadius: '6px', color: '#fff',
+            fontSize: m ? '0.8rem' : '0.85rem', fontWeight: 800, cursor: 'pointer',
             touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-            minHeight: '44px', fontFamily: 'inherit'
+            minHeight: '46px', fontFamily: 'inherit'
           }}>
             Annuleren
           </button>
@@ -157,7 +151,7 @@ export default function TimingModal({ weekData, onApply, onClose, isMobile }) {
             flex: 2, padding: '0.5rem',
             background: applied ? '#10b981' : '#FFD700',
             border: 'none', borderRadius: '6px',
-            color: '#000', fontSize: '0.7rem', fontWeight: 800,
+            color: '#000', fontSize: m ? '0.85rem' : '0.9rem', fontWeight: 800,
             cursor: 'pointer',
             display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.35rem',
             touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
@@ -171,5 +165,6 @@ export default function TimingModal({ weekData, onApply, onClose, isMobile }) {
     </div>
   )
 
+  if (embedded) return modal
   return createPortal(modal, document.body)
 }

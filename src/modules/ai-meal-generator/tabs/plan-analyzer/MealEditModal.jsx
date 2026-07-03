@@ -4,6 +4,7 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { X, Search, Plus, Trash2, Save, Copy, Zap, ChefHat } from 'lucide-react'
+import { resolveFoodImage } from '../../../meal-plan/foodImageFallback'
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
@@ -16,7 +17,7 @@ const LABEL_GROUPS = [
   { label: 'Smaak',     color: '#a855f7', options: ['comfort_food','sweet','savory','spicy','creamy','fresh','warm','indulgent'] },
 ]
 
-export default function MealEditModal({ db, meal, slot, dayIndex, onSave, onClose, isMobile }) {
+export default function MealEditModal({ db, meal, slot, dayIndex, onSave, onClose, isMobile, embedded = false }) {
   const m = isMobile
   const [activeTab, setActiveTab] = useState('ingredients')
   const [mealName, setMealName]         = useState(meal?.name || meal?.meal_name || '')
@@ -31,6 +32,7 @@ export default function MealEditModal({ db, meal, slot, dayIndex, onSave, onClos
   const [searchResults, setSearchResults] = useState([])
   const [searching, setSearching]         = useState(false)
   const [showSearch, setShowSearch]       = useState(false)
+  const [searchFullBase, setSearchFullBase] = useState(false)
   const searchRef = useRef(null)
   const debounceRef = useRef(null)
   const [showLabels, setShowLabels] = useState(false)
@@ -55,7 +57,7 @@ export default function MealEditModal({ db, meal, slot, dayIndex, onSave, onClos
         if (!item?.ingredient_id || !UUID_REGEX.test(item.ingredient_id)) return null
         const d = dbRows[item.ingredient_id]; if (!d) return null
         const amount = item.amount || d.default_portion_gram || 100
-        return { ingredient_id: item.ingredient_id, name: d.name, amount, unit: item.unit || 'gram', cal: d.calories_per_100g, prot: d.protein_per_100g, carbs: d.carbs_per_100g, fat: d.fat_per_100g, min: d.min_portion_gram || 0, max: d.max_portion_gram || 500, scalable: d.scalable !== false }
+        return { ingredient_id: item.ingredient_id, name: d.name, amount, unit: item.unit || 'gram', cal: d.calories_per_100g, prot: d.protein_per_100g, carbs: d.carbs_per_100g, fat: d.fat_per_100g, min: d.min_portion_gram || 0, max: Infinity, scalable: d.scalable !== false }
       }).filter(Boolean)
       setIngredients(built)
 
@@ -82,33 +84,71 @@ export default function MealEditModal({ db, meal, slot, dayIndex, onSave, onClos
 
   const calcMacros = (ings) => {
     let cal = 0, prot = 0, carbs = 0, fat = 0
-    ings.forEach(i => { const f = i.amount / 100; cal += (i.cal||0)*f; prot += (i.prot||0)*f; carbs += (i.carbs||0)*f; fat += (i.fat||0)*f })
+    ings.forEach(i => { const f = (parseFloat(i.amount) || 0) / 100; cal += (i.cal||0)*f; prot += (i.prot||0)*f; carbs += (i.carbs||0)*f; fat += (i.fat||0)*f })
     return { calories: Math.round(cal), protein: Math.round(prot*10)/10, carbs: Math.round(carbs*10)/10, fat: Math.round(fat*10)/10 }
   }
 
   const liveMacros = calcMacros(ingredients)
   const origMacros = { calories: Math.round(meal?.calories||0), protein: Math.round((meal?.protein||0)*10)/10, carbs: Math.round((meal?.carbs||0)*10)/10, fat: Math.round((meal?.fat||0)*10)/10 }
 
+  // Tijdens typen: rauwe string accepteren (incl. leeg) zodat de
+  // gebruiker cijfers kan wissen zonder dat het systeem direct 0 of het
+  // minimum invult. Clampen pas op blur — anders kun je geen nieuw
+  // getal typen omdat elke keystroke een geldige waarde forceert.
   const updateAmount = (idx, newVal) => {
-    const ing = ingredients[idx]
-    setIngredients(prev => prev.map((i, n) => n === idx ? { ...i, amount: Math.min(ing.max, Math.max(ing.min, parseFloat(newVal)||0)) } : i))
+    setIngredients(prev => prev.map((i, n) => n === idx ? { ...i, amount: newVal } : i))
+  }
+  const commitAmount = (idx) => {
+    setIngredients(prev => prev.map((i, n) => {
+      if (n !== idx) return i
+      const raw = parseFloat(i.amount)
+      const safe = Number.isFinite(raw) ? Math.min(i.max, Math.max(i.min, raw)) : (i.min || 0)
+      return { ...i, amount: safe }
+    }))
+  }
+  // Stapgrootte schaalt mee met de portie: <50g→5, ≥50→10, ≥100→25, ≥200→50, ≥500→100
+  const stepFor = (v) => v >= 500 ? 100 : v >= 200 ? 50 : v >= 100 ? 25 : v >= 50 ? 10 : 5
+  const stepAmount = (idx, dir) => {
+    setIngredients(prev => prev.map((i, n) => {
+      if (n !== idx) return i
+      const cur = parseFloat(i.amount) || 0
+      const next = Math.min(i.max, Math.max(i.min, cur + dir * stepFor(cur)))
+      return { ...i, amount: next }
+    }))
   }
   const removeIngredient = (idx) => setIngredients(prev => prev.filter((_, n) => n !== idx))
+
+  // Standaard: alleen de canonieke, coach-samengestelde set (source='coach').
+  // Met fullBase=true wordt die filter losgelaten en doorzoekt hij óók de
+  // ~37k openfoodfacts-rijen — bedoeld voor wanneer er geen canoniek
+  // ingrediënt te vinden is. Canonieke hits komen bovenaan.
+  const runSearch = async (val, fullBase) => {
+    if (!val.trim() || !db?.supabase) { setSearchResults([]); return }
+    setSearching(true)
+    let query = db.supabase
+      .from('ai_ingredients')
+      .select('id, name, calories_per_100g, protein_per_100g, carbs_per_100g, fat_per_100g, min_portion_gram, max_portion_gram, default_portion_gram, scalable, source')
+      .ilike('name', `%${val}%`)
+    if (!fullBase) query = query.eq('source', 'coach')
+    const { data } = await query.order('source', { ascending: true }).limit(fullBase ? 40 : 20)
+    setSearchResults(data || []); setSearching(false)
+  }
 
   const handleSearch = (val) => {
     setSearchQuery(val)
     clearTimeout(debounceRef.current)
-    debounceRef.current = setTimeout(async () => {
-      if (!val.trim() || !db?.supabase) { setSearchResults([]); return }
-      setSearching(true)
-      const { data } = await db.supabase.from('ai_ingredients').select('id, name, calories_per_100g, protein_per_100g, carbs_per_100g, fat_per_100g, min_portion_gram, max_portion_gram, default_portion_gram, scalable').ilike('name', `%${val}%`).limit(20)
-      setSearchResults(data || []); setSearching(false)
-    }, 300)
+    debounceRef.current = setTimeout(() => runSearch(val, searchFullBase), 300)
+  }
+
+  const toggleFullBase = () => {
+    const next = !searchFullBase
+    setSearchFullBase(next)
+    if (searchQuery.trim()) runSearch(searchQuery, next)
   }
 
   const addIngredient = (row) => {
     if (ingredients.some(i => i.ingredient_id === row.id)) return
-    setIngredients(prev => [...prev, { ingredient_id: row.id, name: row.name, amount: row.default_portion_gram||100, unit: 'gram', cal: row.calories_per_100g, prot: row.protein_per_100g, carbs: row.carbs_per_100g, fat: row.fat_per_100g, min: row.min_portion_gram||0, max: row.max_portion_gram||500, scalable: row.scalable!==false }])
+    setIngredients(prev => [...prev, { ingredient_id: row.id, name: row.name, amount: row.default_portion_gram||100, unit: 'gram', cal: row.calories_per_100g, prot: row.protein_per_100g, carbs: row.carbs_per_100g, fat: row.fat_per_100g, min: row.min_portion_gram||0, max: Infinity, scalable: row.scalable!==false }])
     setDbCache(prev => ({ ...prev, [row.id]: row }))
     setSearchQuery(''); setSearchResults([]); setShowSearch(false)
   }
@@ -126,7 +166,7 @@ export default function MealEditModal({ db, meal, slot, dayIndex, onSave, onClos
     const macros = calcMacros(ingredients)
     return {
       ...meal, name: mealName, meal_name: mealName, ...macros,
-      ingredients_list: ingredients.map(i => ({ ingredient_id: i.ingredient_id, amount: i.amount, unit: i.unit||'gram' })),
+      ingredients_list: ingredients.map(i => ({ ingredient_id: i.ingredient_id, amount: parseFloat(i.amount) || 0, unit: i.unit||'gram' })),
       preparation_steps: prepSteps.filter(s => s.trim().length > 0),
       tips: tips || meal?.tips || null,
       original_calories: meal.original_calories || meal.calories,
@@ -164,58 +204,37 @@ export default function MealEditModal({ db, meal, slot, dayIndex, onSave, onClos
   }
 
   const modal = (
-    <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.95)', zIndex: 10000, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
-      <div onClick={e => e.stopPropagation()} style={{ background: '#0a0a0a', borderRadius: m ? '16px 16px 0 0' : '12px', width: '100%', maxWidth: '620px', maxHeight: m ? '95vh' : '90vh', display: 'flex', flexDirection: 'column', overflow: 'hidden', border: '1px solid rgba(255,255,255,0.06)', ...(m?{}:{margin:'auto',alignSelf:'center'}) }}>
+    <div onClick={embedded ? undefined : onClose} style={embedded
+      ? {}
+      : { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.95)', zIndex: 10000, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
+      <div onClick={e => e.stopPropagation()} style={embedded
+        ? { background: '#0a0a0a', width: '100%', maxHeight: m ? '68vh' : '58vh', display: 'flex', flexDirection: 'column', overflow: 'hidden', borderTop: '1px solid rgba(255,215,0,0.18)' }
+        : { background: '#0a0a0a', borderRadius: m ? '16px 16px 0 0' : '12px', width: '100%', maxWidth: '620px', maxHeight: m ? '95vh' : '90vh', display: 'flex', flexDirection: 'column', overflow: 'hidden', border: '1px solid rgba(255,255,255,0.06)', ...(m?{}:{margin:'auto',alignSelf:'center'}) }}>
 
         {/* Header */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: m ? '0.625rem 0.75rem' : '0.75rem 1rem', borderBottom: '1px solid rgba(255,255,255,0.06)', flexShrink: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: m ? '0.45rem 0.7rem' : '0.5rem 0.85rem', borderBottom: '1px solid rgba(255,255,255,0.06)', flexShrink: 0 }}>
           <div style={{ flex: 1, minWidth: 0 }}>
-            <input value={mealName} onChange={e => setMealName(e.target.value)} style={{ background: 'transparent', border: 'none', outline: 'none', color: '#fff', fontSize: m ? '0.9rem' : '1rem', fontWeight: 800, width: '100%', fontFamily: 'inherit', borderBottom: '1px solid rgba(255,215,0,0.2)', paddingBottom: '0.1rem' }} />
-            <div style={{ fontSize: m?'0.45rem':'0.5rem', color: 'rgba(255,255,255,0.25)', marginTop: '0.15rem' }}>Zichtbaar voor de client</div>
-            <div style={{ marginTop: '0.4rem' }}>
-              <div style={{ fontSize: '0.38rem', fontWeight: 700, color: 'rgba(255,215,0,0.4)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '0.15rem' }}>🔒 COACH NAAM</div>
-              <input value={internalName} onChange={e => setInternalName(e.target.value)} placeholder="bijv. LC - Haver Ei Banaan" style={{ width: '100%', background: 'rgba(255,215,0,0.04)', border: '1px solid rgba(255,215,0,0.15)', borderRadius: '4px', color: '#FFD700', fontSize: m?'0.6rem':'0.65rem', fontWeight: 600, padding: '0.25rem 0.4rem', fontFamily: 'inherit', outline: 'none', boxSizing: 'border-box' }} />
-            </div>
+            <input value={mealName} onChange={e => setMealName(e.target.value)} style={{ background: 'transparent', border: 'none', outline: 'none', color: '#fff', fontSize: m ? '0.9rem' : '0.95rem', fontWeight: 800, width: '100%', fontFamily: 'inherit', borderBottom: '1px solid rgba(255,215,0,0.2)', paddingBottom: '0.1rem' }} />
           </div>
           <button onClick={onClose} style={{ width: '32px', height: '32px', borderRadius: '6px', flexShrink: 0, background: 'transparent', border: '1px solid rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.3)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}><X size={16} /></button>
         </div>
 
-        {/* Macro bar */}
-        <div style={{ display: 'flex', borderBottom: '1px solid rgba(255,255,255,0.04)', flexShrink: 0 }}>
-          {[{label:'KCAL',val:liveMacros.calories,orig:origMacros.calories,color:'#FFD700'},{label:'EIWIT',val:liveMacros.protein,orig:origMacros.protein,color:'#10b981'},{label:'KOOLH',val:liveMacros.carbs,orig:origMacros.carbs,color:'#3b82f6'},{label:'VET',val:liveMacros.fat,orig:origMacros.fat,color:'#f59e0b'}].map((s,i) => {
-            const diff = s.val - s.orig; const hasDiff = Math.abs(diff) >= 1
-            return (
-              <div key={i} style={{ flex: 1, padding: m?'0.4rem 0.5rem':'0.5rem 0.75rem', textAlign: 'center', borderRight: i<3?'1px solid rgba(255,255,255,0.04)':'none' }}>
-                <div style={{ fontSize: m?'0.9rem':'1rem', fontWeight: 800, color: s.color, lineHeight: 1 }}>{s.val}</div>
-                <div style={{ fontSize: '0.38rem', fontWeight: 700, color: 'rgba(255,255,255,0.2)', textTransform: 'uppercase', letterSpacing: '0.06em', marginTop: '0.1rem' }}>{s.label}</div>
-                {hasDiff && <div style={{ fontSize: '0.38rem', fontWeight: 700, color: diff>0?'#10b981':'#ef4444', marginTop: '0.05rem' }}>{diff>0?'+':''}{Math.round(diff)}</div>}
-              </div>
-            )
-          })}
-        </div>
+        {/* Body: ingrediënten links, macro-totalen rechts */}
+        <div style={{ flex: 1, display: 'flex', overflow: 'hidden', minHeight: 0 }}>
 
-        {/* Tab switcher */}
-        <div style={{ display: 'flex', borderBottom: '1px solid rgba(255,255,255,0.04)', flexShrink: 0 }}>
-          {[{id:'ingredients',label:'Ingrediënten'},{id:'recipe',label:'👨‍🍳 Recept'}].map(tab => (
-            <button key={tab.id} onClick={() => setActiveTab(tab.id)} style={{ flex: 1, padding: m?'0.4rem 0':'0.5rem 0', background: 'transparent', border: 'none', borderBottom: activeTab===tab.id?'2px solid #FFD700':'2px solid transparent', color: activeTab===tab.id?'#FFD700':'rgba(255,255,255,0.3)', fontSize: m?'0.55rem':'0.6rem', fontWeight: activeTab===tab.id?700:500, cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}>
-              {tab.label}
-            </button>
-          ))}
-        </div>
-
-        {/* Content */}
-        <div style={{ flex: 1, overflowY: 'auto', WebkitOverflowScrolling: 'touch' }}>
+          {/* LINKS — ingrediënten (scrollt) */}
+          <div style={{ flex: 1, minWidth: 0, overflowY: 'auto', WebkitOverflowScrolling: 'touch' }}>
 
           {/* INGREDIËNTEN */}
-          {activeTab === 'ingredients' && (
+          {(
             loadingInit ? (
               <div style={{ padding: '2rem', textAlign: 'center', fontSize: '0.6rem', color: 'rgba(255,255,255,0.2)' }}>Laden...</div>
             ) : (
               <>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: m?'0.4rem 0.75rem':'0.5rem 1rem', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
-                  <span style={{ fontSize: '0.45rem', fontWeight: 700, color: 'rgba(255,255,255,0.2)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>INGREDIËNTEN ({ingredients.length})</span>
-                  <button onClick={() => { setShowSearch(!showSearch); setTimeout(() => searchRef.current?.focus(), 100) }} style={{ display: 'flex', alignItems: 'center', gap: '0.2rem', padding: '0.25rem 0.5rem', background: showSearch?'rgba(255,215,0,0.08)':'rgba(255,255,255,0.03)', border: `1px solid ${showSearch?'rgba(255,215,0,0.25)':'rgba(255,255,255,0.08)'}`, borderRadius: '4px', color: showSearch?'#FFD700':'rgba(255,255,255,0.3)', fontSize: '0.5rem', fontWeight: 700, cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}>
-                    <Plus size={10} /> Toevoegen
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: m?'0.4rem 0.75rem':'0.45rem 0.85rem', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                  <span style={{ fontSize: m?'0.65rem':'0.7rem', fontWeight: 800, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Ingrediënten ({ingredients.length})</span>
+                  <button onClick={() => { setShowSearch(!showSearch); setTimeout(() => searchRef.current?.focus(), 100) }} style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', padding: '0.4rem 0.7rem', background: showSearch?'rgba(255,215,0,0.12)':'rgba(255,255,255,0.04)', border: `1px solid ${showSearch?'rgba(255,215,0,0.3)':'rgba(255,255,255,0.1)'}`, borderRadius: 6, color: showSearch?'#FFD700':'rgba(255,255,255,0.7)', fontSize: m?'0.7rem':'0.75rem', fontWeight: 700, cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}>
+                    <Plus size={13} /> Toevoegen
                   </button>
                 </div>
 
@@ -226,6 +245,16 @@ export default function MealEditModal({ db, meal, slot, dayIndex, onSave, onClos
                       <input ref={searchRef} type="text" value={searchQuery} onChange={e => handleSearch(e.target.value)} placeholder="Zoek ingrediënt..." style={{ flex: 1, background: 'transparent', border: 'none', outline: 'none', color: '#fff', fontSize: m?'0.75rem':'0.8rem', fontFamily: 'inherit' }} />
                       {searching && <div style={{ width: '10px', height: '10px', borderRadius: '50%', border: '1.5px solid rgba(255,255,255,0.1)', borderTopColor: '#FFD700', animation: 'spin 0.8s linear infinite' }} />}
                     </div>
+                    {/* Toggle: canonieke set vs. hele database (voor wanneer er geen canoniek ingrediënt te vinden is) */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginTop: '0.4rem' }}>
+                      <button onClick={toggleFullBase} style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', padding: '0.25rem 0.55rem', background: searchFullBase?'rgba(168,85,247,0.12)':'rgba(255,255,255,0.04)', border: `1px solid ${searchFullBase?'rgba(168,85,247,0.4)':'rgba(255,255,255,0.1)'}`, borderRadius: '5px', color: searchFullBase?'#c084fc':'rgba(255,255,255,0.45)', fontSize: m?'0.55rem':'0.6rem', fontWeight: 700, cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', fontFamily: 'inherit' }}>
+                        <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: searchFullBase?'#c084fc':'rgba(255,255,255,0.2)' }} />
+                        {searchFullBase ? 'Hele database' : 'Alleen canoniek'}
+                      </button>
+                      <span style={{ fontSize: m?'0.5rem':'0.52rem', color: 'rgba(255,255,255,0.25)', fontWeight: 600 }}>
+                        {searchFullBase ? 'óók openfoodfacts — controleer macro’s' : 'gecureerde coach-set'}
+                      </span>
+                    </div>
                     {searchResults.length > 0 && (
                       <div
                         onWheel={e => e.stopPropagation()}
@@ -233,12 +262,17 @@ export default function MealEditModal({ db, meal, slot, dayIndex, onSave, onClos
                         {searchResults.map(row => {
                           const added = ingredients.some(i => i.ingredient_id === row.id)
                           return (
-                            <button key={row.id} onClick={() => !added && addIngredient(row)} style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: m?'0.35rem 0.6rem':'0.4rem 0.75rem', background: added?'rgba(16,185,129,0.05)':'rgba(255,255,255,0.02)', border: 'none', borderBottom: '1px solid rgba(255,255,255,0.03)', cursor: added?'default':'pointer', textAlign: 'left', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}>
-                              <span style={{ fontSize: m?'0.65rem':'0.7rem', fontWeight: 600, color: added?'#10b981':'#fff' }}>{row.name}</span>
-                              <div style={{ display: 'flex', gap: '0.3rem', alignItems: 'center', flexShrink: 0 }}>
-                                <span style={{ fontSize: '0.5rem', fontWeight: 800, color: '#FFD700' }}>{row.calories_per_100g}/100g</span>
-                                <span style={{ fontSize: '0.5rem', color: '#10b981' }}>{row.protein_per_100g}E</span>
-                                {added ? <span style={{ fontSize: '0.45rem', color: '#10b981' }}>✓</span> : <Plus size={10} color="rgba(255,215,0,0.5)" />}
+                            <button key={row.id} onClick={() => !added && addIngredient(row)} style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: m?'0.5rem 0.75rem':'0.6rem 0.85rem', background: added?'rgba(16,185,129,0.08)':'rgba(255,255,255,0.025)', border: 'none', borderBottom: '1px solid rgba(255,255,255,0.04)', cursor: added?'default':'pointer', textAlign: 'left', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', gap: '0.5rem' }}>
+                              <span style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', minWidth: 0 }}>
+                                <span style={{ fontSize: m?'0.8rem':'0.85rem', fontWeight: 700, color: added?'#10b981':'#fff', letterSpacing: '-0.01em', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{row.name}</span>
+                                {row.source && row.source !== 'coach' && (
+                                  <span style={{ flexShrink: 0, fontSize: '0.45rem', fontWeight: 800, color: '#c084fc', background: 'rgba(168,85,247,0.12)', border: '1px solid rgba(168,85,247,0.3)', padding: '0.05rem 0.25rem', borderRadius: '3px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>extern</span>
+                                )}
+                              </span>
+                              <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexShrink: 0 }}>
+                                <span style={{ fontSize: m?'0.65rem':'0.7rem', fontWeight: 800, color: '#FFD700' }}>{row.calories_per_100g}<span style={{ fontSize: '0.7em', opacity: 0.6 }}>/100g</span></span>
+                                <span style={{ fontSize: m?'0.65rem':'0.7rem', color: '#10b981', fontWeight: 700 }}>{row.protein_per_100g}E</span>
+                                {added ? <span style={{ fontSize: '0.85rem', color: '#10b981', fontWeight: 900 }}>✓</span> : <Plus size={14} color="rgba(255,215,0,0.6)" />}
                               </div>
                             </button>
                           )
@@ -251,103 +285,59 @@ export default function MealEditModal({ db, meal, slot, dayIndex, onSave, onClos
                 {ingredients.length === 0 && <div style={{ padding: '1.5rem', textAlign: 'center', fontSize: '0.6rem', color: 'rgba(255,255,255,0.2)' }}>Geen ingrediënten — voeg er een toe</div>}
 
                 {ingredients.map((ing, idx) => (
-                  <div key={`${ing.ingredient_id}-${idx}`} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: m?'0.4rem 0.75rem':'0.5rem 1rem', borderBottom: '1px solid rgba(255,255,255,0.03)', background: idx%2===0?'transparent':'rgba(255,255,255,0.01)' }}>
+                  <div key={`${ing.ingredient_id}-${idx}`} style={{ display: 'flex', alignItems: 'center', gap: '0.55rem', padding: m?'0.4rem 0.75rem':'0.45rem 0.85rem', borderBottom: '1px solid rgba(255,255,255,0.04)', background: idx%2===0?'transparent':'rgba(255,255,255,0.015)' }}>
+                    <div style={{ width: m?30:34, height: m?30:34, flexShrink: 0, borderRadius: 6, background: `url(${resolveFoodImage(ing, { size: 80 })}) center/cover`, border: '1px solid rgba(255,255,255,0.08)' }} />
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: m?'0.65rem':'0.7rem', fontWeight: 600, color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{ing.name}</div>
-                      <div style={{ fontSize: '0.4rem', color: 'rgba(255,255,255,0.2)', marginTop: '0.05rem' }}>{Math.round(ing.cal)}/100g · {Math.round(ing.prot)}E · {Math.round(ing.carbs)}K · {Math.round(ing.fat)}V</div>
+                      <div style={{ fontSize: m?'0.78rem':'0.82rem', fontWeight: 700, color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', letterSpacing: '-0.01em' }}>{ing.name}</div>
+                      <div style={{ fontSize: m?'0.58rem':'0.6rem', color: 'rgba(255,255,255,0.4)', marginTop: 1, fontWeight: 600 }}>{Math.round(ing.cal)}/100g · {Math.round(ing.prot)}E · {Math.round(ing.carbs)}K · {Math.round(ing.fat)}V</div>
                     </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.2rem', flexShrink: 0 }}>
-                      <input type="number" value={ing.amount} min={ing.min} max={ing.max} onChange={e => updateAmount(idx, e.target.value)} style={{ width: m?'52px':'60px', textAlign: 'right', padding: '0.2rem 0.3rem', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,215,0,0.2)', borderRadius: '4px', color: '#FFD700', fontSize: m?'0.7rem':'0.75rem', fontWeight: 800, fontFamily: 'inherit', outline: 'none' }} />
-                      <span style={{ fontSize: '0.45rem', color: 'rgba(255,255,255,0.2)', minWidth: '16px' }}>g</span>
+                    <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.3rem', flexShrink: 0 }}>
+                      <button onClick={() => stepAmount(idx, -1)} style={stepAmtBtn(m)}>−</button>
+                      <span style={{ display: 'inline-flex', alignItems: 'baseline' }}>
+                        <input type="number" value={ing.amount} min={ing.min} max={ing.max} onChange={e => updateAmount(idx, e.target.value)} onBlur={() => commitAmount(idx)} onFocus={e => e.target.select()} style={{ width: m?'40px':'46px', textAlign: 'right', padding: 0, background: 'transparent', border: 'none', color: '#fff', fontSize: m?'0.95rem':'1.05rem', fontWeight: 900, fontFamily: 'inherit', outline: 'none' }} />
+                        <span style={{ fontSize: m?'0.72rem':'0.78rem', color: '#fff', fontWeight: 800, marginLeft: 1 }}>g</span>
+                      </span>
+                      <button onClick={() => stepAmount(idx, 1)} style={stepAmtBtn(m)}>+</button>
                     </div>
-                    <div style={{ flexShrink: 0, textAlign: 'right', minWidth: m?'40px':'48px' }}>
-                      <div style={{ fontSize: m?'0.6rem':'0.65rem', fontWeight: 800, color: '#FFD700' }}>{Math.round(ing.cal*ing.amount/100)}</div>
-                      <div style={{ fontSize: '0.38rem', color: '#10b981' }}>{Math.round(ing.prot*ing.amount/100*10)/10}E</div>
-                    </div>
-                    <button onClick={() => removeIngredient(idx)} style={{ width: '28px', height: '28px', flexShrink: 0, background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: '4px', color: '#ef4444', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}><Trash2 size={11} /></button>
+                    <button onClick={() => removeIngredient(idx)} style={{ width: 30, height: 30, flexShrink: 0, background: 'transparent', border: 'none', color: 'rgba(239,68,68,0.7)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}><Trash2 size={14} /></button>
                   </div>
                 ))}
               </>
             )
           )}
 
-          {/* RECEPT */}
-          {activeTab === 'recipe' && (
-            <div style={{ padding: m?'0.5rem 0.75rem':'0.75rem 1rem' }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
-                <span style={{ fontSize: '0.45rem', fontWeight: 700, color: 'rgba(255,255,255,0.2)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-                  BEREIDINGSSTAPPEN ({prepSteps.filter(s=>s.trim()).length})
-                </span>
-                <button onClick={addStep} style={{ display: 'flex', alignItems: 'center', gap: '0.2rem', padding: '0.25rem 0.5rem', background: 'rgba(255,215,0,0.06)', border: '1px solid rgba(255,215,0,0.2)', borderRadius: '4px', color: '#FFD700', fontSize: '0.5rem', fontWeight: 700, cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}>
-                  <Plus size={10} /> Stap toevoegen
-                </button>
-              </div>
+          </div>
 
-              {prepSteps.length === 0 && (
-                <div style={{ padding: '1rem 0', textAlign: 'center', fontSize: '0.6rem', color: 'rgba(255,255,255,0.2)' }}>Nog geen stappen — klik op "+ Stap toevoegen"</div>
-              )}
-
-              {prepSteps.map((step, idx) => (
-                <div key={idx} style={{ display: 'flex', gap: '0.4rem', alignItems: 'flex-start', marginBottom: '0.4rem', padding: '0.4rem 0.5rem', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)', borderRadius: '6px' }}>
-                  <div style={{ width: '20px', height: '20px', borderRadius: '50%', flexShrink: 0, background: 'rgba(255,215,0,0.1)', border: '1px solid rgba(255,215,0,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.55rem', fontWeight: 800, color: '#FFD700', marginTop: '0.15rem' }}>
-                    {idx + 1}
-                  </div>
-                  <textarea value={step} onChange={e => updateStep(idx, e.target.value)} placeholder={`Stap ${idx+1}...`} rows={2} style={{ flex: 1, background: 'transparent', border: 'none', outline: 'none', color: '#fff', fontSize: m?'0.72rem':'0.78rem', fontFamily: 'inherit', resize: 'vertical', lineHeight: 1.4, minHeight: '36px' }} />
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem', flexShrink: 0 }}>
-                    <button onClick={() => moveStep(idx,-1)} disabled={idx===0} style={stepBtn(idx===0)}>↑</button>
-                    <button onClick={() => moveStep(idx,1)} disabled={idx===prepSteps.length-1} style={stepBtn(idx===prepSteps.length-1)}>↓</button>
-                    <button onClick={() => removeStep(idx)} style={{...stepBtn(false),color:'#ef4444',borderColor:'rgba(239,68,68,0.2)'}}>✕</button>
-                  </div>
+          {/* RECHTS — macro-totalen, live update via liveMacros */}
+          <div style={{ width: m?78:96, flexShrink: 0, borderLeft: '1px solid rgba(255,255,255,0.06)', background: 'rgba(0,0,0,0.25)', display: 'flex', flexDirection: 'column' }}>
+            {[
+              { label: 'kcal',  val: liveMacros.calories, orig: origMacros.calories, unit: ''  },
+              { label: 'Eiwit', val: liveMacros.protein,  orig: origMacros.protein,  unit: 'g' },
+              { label: 'Koolh', val: liveMacros.carbs,    orig: origMacros.carbs,    unit: 'g' },
+              { label: 'Vet',   val: liveMacros.fat,      orig: origMacros.fat,      unit: 'g' },
+            ].map((s, i) => {
+              const diff = s.val - s.orig
+              const hasDiff = Math.abs(diff) >= 1
+              return (
+                <div key={i} style={{ flex: 1, padding: m?'0.35rem 0.5rem':'0.45rem 0.6rem', display: 'flex', flexDirection: 'column', justifyContent: 'center', borderBottom: i<3?'1px solid rgba(255,255,255,0.05)':'none' }}>
+                  <span style={{ fontSize: m?'0.5rem':'0.55rem', fontWeight: 800, color: 'rgba(255,215,0,0.5)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>{s.label}</span>
+                  <span style={{ fontSize: m?'1rem':'1.15rem', fontWeight: 900, color: '#FFD700', lineHeight: 1.15, letterSpacing: '-0.02em' }}>
+                    {Math.round(s.val)}<span style={{ fontSize: '0.55em', opacity: 0.6 }}>{s.unit}</span>
+                    {hasDiff && <span style={{ fontSize: '0.5em', fontWeight: 800, marginLeft: 3, color: diff>0?'#10b981':'#ef4444' }}>{diff>0?'+':''}{Math.round(diff)}</span>}
+                  </span>
                 </div>
-              ))}
-
-              <div style={{ marginTop: '0.75rem', borderTop: '1px solid rgba(255,255,255,0.04)', paddingTop: '0.75rem' }}>
-                <div style={{ fontSize: '0.45rem', fontWeight: 700, color: 'rgba(255,255,255,0.2)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '0.35rem' }}>TIP / OPMERKING</div>
-                <textarea value={tips} onChange={e => setTips(e.target.value)} placeholder="Bereidingstip, variatie of opmerking..." rows={3} style={{ width: '100%', boxSizing: 'border-box', padding: '0.5rem 0.625rem', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '6px', color: 'rgba(255,255,255,0.7)', fontSize: m?'0.72rem':'0.78rem', fontFamily: 'inherit', outline: 'none', resize: 'vertical', lineHeight: 1.5 }} />
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Labels */}
-        <div style={{ borderTop: '1px solid rgba(255,255,255,0.04)', background: 'rgba(255,255,255,0.01)' }}>
-          <button onClick={() => setShowLabels(!showLabels)} style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: m?'0.4rem 0.75rem':'0.5rem 1rem', background: 'transparent', border: 'none', cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-              <span style={{ fontSize: '0.45rem', fontWeight: 700, color: 'rgba(255,255,255,0.2)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>LABELS</span>
-              {selectedLabels.length > 0 && (
-                <div style={{ display: 'flex', gap: '0.15rem', flexWrap: 'wrap' }}>
-                  {selectedLabels.slice(0,4).map(l => <span key={l} style={{ fontSize: '0.38rem', fontWeight: 700, color: '#FFD700', background: 'rgba(255,215,0,0.08)', padding: '0.05rem 0.3rem', borderRadius: '2px' }}>{l.replace(/_/g,' ')}</span>)}
-                  {selectedLabels.length > 4 && <span style={{ fontSize: '0.38rem', color: 'rgba(255,255,255,0.2)' }}>+{selectedLabels.length-4}</span>}
-                </div>
-              )}
-            </div>
-            <span style={{ fontSize: '0.5rem', color: 'rgba(255,255,255,0.2)' }}>{showLabels?'▲':'▼'}</span>
-          </button>
-          {showLabels && (
-            <div style={{ padding: m?'0 0.75rem 0.5rem':'0 1rem 0.625rem' }}>
-              {LABEL_GROUPS.map(group => (
-                <div key={group.label} style={{ marginBottom: '0.4rem' }}>
-                  <div style={{ fontSize: '0.38rem', fontWeight: 700, color: group.color, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '0.2rem', opacity: 0.7 }}>{group.label}</div>
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.2rem' }}>
-                    {group.options.map(opt => {
-                      const active = selectedLabels.includes(opt)
-                      return <button key={opt} onClick={() => setSelectedLabels(prev => prev.includes(opt)?prev.filter(l=>l!==opt):[...prev,opt])} style={{ padding: '0.15rem 0.4rem', background: active?`${group.color}18`:'rgba(255,255,255,0.03)', border: `1px solid ${active?group.color+'50':'rgba(255,255,255,0.06)'}`, borderRadius: '3px', color: active?group.color:'rgba(255,255,255,0.25)', fontSize: m?'0.5rem':'0.55rem', fontWeight: active?700:500, cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', fontFamily: 'inherit' }}>{opt.replace(/_/g,' ')}</button>
-                    })}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
+              )
+            })}
+          </div>
         </div>
 
         {/* Footer */}
-        <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)', flexShrink: 0, padding: m?'0.625rem 0.75rem':'0.75rem 1rem', background: 'rgba(0,0,0,0.3)' }}>
-          {saveError && <div style={{ fontSize: '0.5rem', color: '#ef4444', marginBottom: '0.4rem', padding: '0.3rem 0.5rem', background: 'rgba(239,68,68,0.08)', borderRadius: '4px' }}>{saveError}</div>}
-          <div style={{ fontSize: '0.4rem', fontWeight: 700, color: 'rgba(255,255,255,0.2)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '0.4rem' }}>OPSLAAN ALS</div>
-          <div style={{ display: 'flex', gap: '0.35rem' }}>
-            <button onClick={() => handleSave('plan')} disabled={saving} style={saveBtn(m,'rgba(255,255,255,0.06)','rgba(255,255,255,0.08)','#fff',saving)}><Zap size={12}/><div><div style={{fontSize:m?'0.55rem':'0.6rem',fontWeight:800}}>Alleen plan</div><div style={{fontSize:'0.38rem',opacity:0.5}}>Niet in database</div></div></button>
-            <button onClick={() => handleSave('permanent')} disabled={saving||!meal.id} style={saveBtn(m,'rgba(255,215,0,0.08)','rgba(255,215,0,0.2)','#FFD700',saving||!meal.id)}><Save size={12}/><div><div style={{fontSize:m?'0.55rem':'0.6rem',fontWeight:800}}>Overschrijven</div><div style={{fontSize:'0.38rem',opacity:0.5}}>Permanent in DB</div></div></button>
-            <button onClick={() => handleSave('copy')} disabled={saving} style={saveBtn(m,'rgba(16,185,129,0.08)','rgba(16,185,129,0.2)','#10b981',saving)}><Copy size={12}/><div><div style={{fontSize:m?'0.55rem':'0.6rem',fontWeight:800}}>Kopie opslaan</div><div style={{fontSize:'0.38rem',opacity:0.5}}>Nieuwe meal in DB</div></div></button>
+        <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)', flexShrink: 0, background: 'rgba(0,0,0,0.3)' }}>
+          {saveError && <div style={{ fontSize: '0.55rem', color: '#ef4444', margin: m?'0.4rem 0.6rem 0':'0.4rem 0.85rem 0', padding: '0.3rem 0.5rem', background: 'rgba(239,68,68,0.08)', borderRadius: '4px' }}>{saveError}</div>}
+          <div style={{ display: 'flex' }}>
+            <button onClick={() => handleSave('plan')} disabled={saving} style={saveBtn(m,'#fff',saving,false)} title="Alleen in dit plan — niet in database"><Zap size={13}/><span>Plan</span></button>
+            <button onClick={() => handleSave('permanent')} disabled={saving||!meal.id} style={saveBtn(m,'#FFD700',saving||!meal.id,true)} title="Overschrijf permanent in database"><Save size={13}/><span>Overschrijf</span></button>
+            <button onClick={() => handleSave('copy')} disabled={saving} style={saveBtn(m,'#10b981',saving,true)} title="Sla op als nieuwe meal in database"><Copy size={13}/><span>Kopie</span></button>
           </div>
         </div>
       </div>
@@ -355,13 +345,19 @@ export default function MealEditModal({ db, meal, slot, dayIndex, onSave, onClos
     </div>
   )
 
+  if (embedded) return modal
   return createPortal(modal, document.body)
+}
+
+function stepAmtBtn(m) {
+  const s = m ? 24 : 26
+  return { width: s, height: s, flexShrink: 0, padding: 0, background: 'transparent', border: 'none', color: 'rgba(255,215,0,0.7)', fontSize: m?'1.3rem':'1.4rem', fontWeight: 700, lineHeight: 1, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', fontFamily: 'inherit' }
 }
 
 function stepBtn(disabled) {
   return { width: '20px', height: '20px', padding: 0, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '3px', color: disabled?'rgba(255,255,255,0.1)':'rgba(255,255,255,0.4)', cursor: disabled?'not-allowed':'pointer', fontSize: '0.6rem', display: 'flex', alignItems: 'center', justifyContent: 'center', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }
 }
 
-function saveBtn(m, bg, border, color, disabled) {
-  return { flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.3rem', flexDirection: 'column', padding: m?'0.5rem 0.25rem':'0.625rem 0.5rem', background: disabled?'rgba(255,255,255,0.02)':bg, border: `1px solid ${disabled?'rgba(255,255,255,0.05)':border}`, borderRadius: '6px', color: disabled?'rgba(255,255,255,0.15)':color, cursor: disabled?'not-allowed':'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', minHeight: m?'52px':'56px', fontFamily: 'inherit', transition: 'all 0.15s ease' }
+function saveBtn(m, color, disabled, divider) {
+  return { flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5, padding: m?'0.55rem 0.3rem':'0.65rem 0.4rem', background: 'transparent', border: 'none', borderLeft: divider ? '1px solid rgba(255,255,255,0.06)' : 'none', color: disabled?'rgba(255,255,255,0.18)':color, fontSize: m?'0.66rem':'0.72rem', fontWeight: 800, cursor: disabled?'not-allowed':'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', fontFamily: 'inherit', letterSpacing: '-0.01em' }
 }

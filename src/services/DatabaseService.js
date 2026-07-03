@@ -1,7 +1,7 @@
 // src/services/DatabaseService.js
 // 🔧 FIXED VERSION - Met correcte tabel namen en error handling
 
-import { supabase } from '../lib/supabase'
+import { supabase, signUpNewClient } from '../lib/supabase'
 import { extendDatabaseService } from './DatabaseServiceOptimized'
 import NotificationService from '../modules/notifications/NotificationService';
 
@@ -383,24 +383,17 @@ async createClient(clientData, trainerId) {
     // Generate temp password
     const tempPassword = clientData.password || `Welcome${Math.floor(Math.random() * 9000) + 1000}!`
     
-    // Save current coach session
-    const { data: { session: coachSession } } = await this.supabase.auth.getSession()
-    const coachAccessToken = coachSession?.access_token
-    const coachRefreshToken = coachSession?.refresh_token
-    
-    // Create auth user
-    const { data: authData, error: authError } = await this.supabase.auth.signUp({
-      email: clientData.email,
-      password: tempPassword,
-      options: { 
-        emailRedirectTo: window.location.origin,
-        data: {
-          first_name: clientData.first_name,
-          last_name: clientData.last_name,
-          role: 'client'
-        }
+    // Create auth user op een geïsoleerde client — vervangt de
+    // coach-sessie niet, dus sessie-restore is niet meer nodig
+    const { data: authData, error: authError } = await signUpNewClient(
+      clientData.email,
+      tempPassword,
+      {
+        first_name: clientData.first_name,
+        last_name: clientData.last_name,
+        role: 'client'
       }
-    })
+    )
 
     if (authError) {
       // Als user al bestaat, haal de auth ID op
@@ -432,14 +425,6 @@ async createClient(clientData, trainerId) {
         return { success: true, client: data }
       }
       throw authError
-    }
-    
-    // Restore coach session als nodig
-    if (coachAccessToken && coachRefreshToken) {
-      await this.supabase.auth.setSession({
-        access_token: coachAccessToken,
-        refresh_token: coachRefreshToken
-      })
     }
     
     // ALTIJD client record aanmaken
@@ -2906,6 +2891,7 @@ async getMealPlanTemplates() {
     const { data, error } = await supabase
       .from('meal_plan_templates')
       .select('*')
+      .or('plan_type.is.null,plan_type.neq.full_week')
       .order('created_at', { ascending: false })
     
     if (error) throw error

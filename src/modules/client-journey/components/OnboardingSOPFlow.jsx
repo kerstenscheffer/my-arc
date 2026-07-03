@@ -1,6 +1,8 @@
 // src/modules/client-journey/components/OnboardingSOPFlow.jsx
 import React, { useState, useEffect } from 'react'
-import { Check, Copy, ChevronRight, ChevronDown, AlertTriangle } from 'lucide-react'
+import { createPortal } from 'react-dom'
+import { Check, Copy, ChevronRight, ChevronDown, AlertTriangle, X, ExternalLink } from 'lucide-react'
+import IntakeCallPanel from './calls/IntakeCallPanel'
 
 function getWAUrl(client) {
   let phone = client?.phone || client?.phone_number || ''
@@ -105,6 +107,25 @@ export default function OnboardingSOPFlow({ db, selectedClient, onStartSetup, on
 
   const [currentStep, setCurrentStep] = useState(selectedClient?.onboarding_step ?? 0)
   const [checks, setChecks] = useState(selectedClient?.onboarding_checks ?? {})
+  // Intake Call Panel modaal — opent vanuit step 4 zodat de coach 'm kan
+  // invullen zonder de hele SOP eerst af te ronden. Autosave is no-op
+  // wanneer er nog geen journey is, dus state is sessie-only tot de
+  // journey aangemaakt wordt.
+  const [showIntakeCall, setShowIntakeCall] = useState(false)
+  const [existingJourney, setExistingJourney] = useState(null)
+  useEffect(() => {
+    if (!db?.supabase || !selectedClient?.id) return
+    let cancelled = false
+    db.supabase
+      .from('client_journeys')
+      .select('*')
+      .eq('client_id', selectedClient.id)
+      .eq('is_active', true)
+      .limit(1)
+      .maybeSingle()
+      .then(({ data }) => { if (!cancelled) setExistingJourney(data) })
+    return () => { cancelled = true }
+  }, [db, selectedClient?.id])
   const [vars, setVars] = useState({
     naam: selectedClient?.first_name || '',
     email: selectedClient?.email || '',
@@ -478,6 +499,27 @@ export default function OnboardingSOPFlow({ db, selectedClient, onStartSetup, on
                         </button>
                       ))}
 
+                      {/* Intake Call Panel knop bij stap 4 — coach kan
+                          'm direct openen zonder de rest van de SOP eerst
+                          af te ronden. */}
+                      {step.id === 4 && (
+                        <button
+                          onClick={() => setShowIntakeCall(true)}
+                          style={{
+                            marginTop: '0.25rem',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.35rem',
+                            padding: '0.4rem 0.6rem', borderRadius: '5px',
+                            background: `${GOLD}10`, border: `1px solid ${GOLD}30`,
+                            color: GOLD, fontSize: '0.6rem', fontWeight: 800,
+                            cursor: 'pointer', touchAction: 'manipulation',
+                            WebkitTapHighlightColor: 'transparent', minHeight: '34px'
+                          }}
+                        >
+                          <ExternalLink size={11} />
+                          Open Intake Call Panel
+                        </button>
+                      )}
+
                       {/* Meal SOP knop bij stap 5 */}
                       {step.id === 5 && (
                         <button
@@ -567,6 +609,55 @@ export default function OnboardingSOPFlow({ db, selectedClient, onStartSetup, on
           )
         })}
       </div>
+
+      {/* Intake Call Panel modaal — full-screen overlay zodat de coach
+          tijdens de SOP een tussendoor het hele intake-call-panel kan
+          invullen (macro's + doel zijn altijd zichtbaar in de header). */}
+      {showIntakeCall && createPortal(
+        <div style={{
+          position: 'fixed', inset: 0,
+          background: 'rgba(0,0,0,0.92)',
+          zIndex: 2147483600,
+          display: 'flex', flexDirection: 'column',
+        }}>
+          <div style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+            padding: '0.6rem 1rem',
+            background: '#0a0a0a',
+            borderBottom: '1px solid rgba(255,215,0,0.2)',
+            flexShrink: 0,
+          }}>
+            <span style={{ color: '#FFD700', fontWeight: 800, fontSize: '0.85rem', letterSpacing: '-0.01em' }}>
+              Intake Call Panel — {selectedClient?.first_name || 'klant'}
+            </span>
+            <button
+              onClick={() => setShowIntakeCall(false)}
+              style={{
+                width: 36, height: 36,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                background: 'rgba(255,255,255,0.06)',
+                border: '1px solid rgba(255,255,255,0.1)',
+                borderRadius: 8,
+                color: 'rgba(255,255,255,0.6)',
+                cursor: 'pointer', touchAction: 'manipulation',
+              }}
+            >
+              <X size={16} />
+            </button>
+          </div>
+          <div style={{ flex: 1, overflow: 'hidden' }}>
+            <IntakeCallPanel
+              db={db}
+              client={selectedClient}
+              journey={existingJourney}
+              weekNumber={1}
+              totalWeeks={existingJourney?.total_weeks || 12}
+              isMobile={isMobile}
+            />
+          </div>
+        </div>,
+        document.body
+      )}
     </div>
   )
 }

@@ -482,6 +482,8 @@ export default function MobileTimelineView({
               return (
                 <div
                   key={hourIdx}
+                  data-plan-day={selectedDay?.dayOfWeek}
+                  data-plan-hour={hour}
                   onDragOver={(e) => e.preventDefault()}
                   onDrop={(e) => handleDrop(e, hour)}
                   onClick={() => selectedDay && onTimeSlotClick(selectedDay.dayOfWeek, `${hour.toString().padStart(2, '0')}:00`)}

@@ -11,7 +11,7 @@ const valToIdx = (v) => Math.round((parseFloat(v) - MIN) * 10)
 const idxToVal = (i) => Math.round((MIN * 10 + i)) / 10
 const TOTAL = valToIdx(MAX) + 1
 
-function HorizontalPicker({ value, onChange, disabled }) {
+function HorizontalPicker({ value, onChange, disabled, savedLabel = false }) {
   const isMobile = window.innerWidth <= 768
   const ref = useRef(null)
   const wrapRef = useRef(null)
@@ -97,23 +97,49 @@ function HorizontalPicker({ value, onChange, disabled }) {
       boxSizing: 'border-box',
       minWidth: 0,
       contain: 'layout',
-      opacity: disabled ? 0.5 : 1,
+      // Geen faded look meer bij disabled — het getal moet er prominent
+      // blijven uitspringen. Alleen interactie uit.
       transition: 'opacity 0.2s ease',
       pointerEvents: disabled ? 'none' : 'auto',
     }}>
 
-      {/* Huidig getal */}
+      {/* Huidig getal — center, met compact gouden "Opgeslagen" pill ernaast
+          wanneer al gelogd vandaag. */}
       <div style={{
-        textAlign: 'center',
-        fontSize: isMobile ? '2.2rem' : '2.8rem',
-        fontWeight: '900',
-        color: '#FFD700',
-        letterSpacing: '-0.03em',
-        lineHeight: 1,
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        gap: isMobile ? 8 : 10,
         marginBottom: '0.75rem',
       }}>
-        {current.toFixed(1)}
-        <span style={{ fontSize: '0.38em', color: 'rgba(255,215,0,0.4)', marginLeft: '0.2rem' }}>kg</span>
+        <div style={{
+          fontSize: isMobile ? '2.2rem' : '2.8rem',
+          fontWeight: 900,
+          color: '#FFD700',
+          letterSpacing: '-0.03em',
+          lineHeight: 1,
+          fontVariantNumeric: 'tabular-nums',
+        }}>
+          {current.toFixed(1)}
+          <span style={{ fontSize: '0.38em', color: 'rgba(255,215,0,0.5)', marginLeft: '0.2rem' }}>kg</span>
+        </div>
+        {savedLabel && (
+          <span style={{
+            display: 'inline-flex', alignItems: 'center', gap: 4,
+            padding: isMobile ? '3px 8px' : '4px 10px',
+            background: 'linear-gradient(135deg, #FFD700 0%, #D4AF37 100%)',
+            color: '#0a0a0a',
+            border: 'none',
+            borderRadius: 999,
+            fontSize: isMobile ? '0.58rem' : '0.62rem',
+            fontWeight: 900,
+            letterSpacing: '0.08em',
+            textTransform: 'uppercase',
+            boxShadow: '0 4px 12px rgba(255,215,0,0.32)',
+            whiteSpace: 'nowrap',
+          }}>
+            <Check size={isMobile ? 9 : 10} strokeWidth={3.2} />
+            Opgeslagen
+          </span>
+        )}
       </div>
 
       {/* Scroller */}
@@ -249,6 +275,7 @@ export default function WeightProgressRing({
         value={weight}
         onChange={onWeightChange}
         disabled={showSavedState}
+        savedLabel={showSavedState}
       />
 
       {/* Fine-tune ±0.1 — alleen wanneer aanpassen mogelijk */}
@@ -308,42 +335,25 @@ export default function WeightProgressRing({
           </button>
         )}
 
-        {/* SAVED STATE — flush 2-column rij, vertical divider */}
+        {/* SAVED STATE — alleen "Aanpassen" — opgeslagen status zit al in banner boven */}
         {showSavedState && (
-          <div style={{ display: 'flex', minHeight: '48px' }}>
-            <div style={{
-              flex: 1,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '0.4rem',
-              padding: isMobile ? '0.875rem 0.5rem' : '1rem 0.75rem',
-              color: '#10b981',
-              ...labelStyle,
-            }}>
-              <Check size={isMobile ? 12 : 13} strokeWidth={2.5} />
-              <span>Opgeslagen</span>
-            </div>
-            <div style={{ width: '1px', background: 'rgba(255,255,255,0.06)' }} />
-            <button onClick={startEdit} style={{
-              flex: 1,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '0.4rem',
-              padding: isMobile ? '0.875rem 0.5rem' : '1rem 0.75rem',
-              background: 'transparent',
-              border: 'none',
-              color: '#FFD700',
-              cursor: 'pointer',
-              touchAction: 'manipulation',
-              WebkitTapHighlightColor: 'transparent',
-              ...labelStyle,
-            }}>
-              <Pencil size={isMobile ? 11 : 12} strokeWidth={2.5} />
-              <span>Aanpassen</span>
-            </button>
-          </div>
+          <button onClick={startEdit} style={{
+            display: 'flex', width: '100%',
+            alignItems: 'center', justifyContent: 'center',
+            gap: '0.4rem',
+            padding: isMobile ? '0.875rem' : '1rem',
+            minHeight: '48px',
+            background: 'transparent',
+            border: 'none',
+            color: 'rgba(255,255,255,0.55)',
+            cursor: 'pointer',
+            touchAction: 'manipulation',
+            WebkitTapHighlightColor: 'transparent',
+            ...labelStyle,
+          }}>
+            <Pencil size={isMobile ? 11 : 12} strokeWidth={2.5} />
+            <span>Aanpassen</span>
+          </button>
         )}
 
         {/* EDIT MODE — flush 2-column rij */}

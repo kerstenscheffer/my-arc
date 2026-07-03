@@ -11,6 +11,36 @@ const formatDate = (d) => { if (!d) return '-'; const dt = new Date(d); return d
 
 export default function WeightColumn({ client, weightData, circumData, photos, coachingPlan, isMobile, onPhotoClick }) {
   const history = weightData?.history || []
+  // 'dag' = dag-op-dag logs · 'week' = week-op-week gemiddelden + verschil
+  const [weightView, setWeightView] = React.useState('dag')
+
+  // Week-op-week: groepeer logs per kalenderweek (maandag-start), gemiddelde
+  // per week + verschil t.o.v. de week ervoor. Nieuwste week bovenaan.
+  const weeklyAverages = React.useMemo(() => {
+    if (!history || history.length === 0) return []
+    const mondayOf = (date) => {
+      const d = new Date(date); const day = d.getDay(); const diff = day === 0 ? -6 : 1 - day
+      d.setDate(d.getDate() + diff); d.setHours(0, 0, 0, 0)
+      return d.toISOString().split('T')[0]
+    }
+    const map = {}
+    history.forEach(e => {
+      const w = parseFloat(e.weight)
+      if (!Number.isFinite(w)) return
+      const wk = mondayOf(e.date)
+      if (!map[wk]) map[wk] = []
+      map[wk].push(w)
+    })
+    const weeks = Object.keys(map).sort().map(wk => {
+      const arr = map[wk]
+      const avg = Math.round((arr.reduce((t, v) => t + v, 0) / arr.length) * 10) / 10
+      const end = new Date(wk); end.setDate(end.getDate() + 6)
+      return { start: wk, end: end.toISOString().split('T')[0], avg, count: arr.length }
+    })
+    return weeks
+      .map((w, i) => ({ ...w, diff: i > 0 ? Math.round((w.avg - weeks[i - 1].avg) * 10) / 10 : null }))
+      .reverse()
+  }, [history])
   const circumFields = [
     { key: 'waist_cm', label: 'Buik' }, { key: 'bicep_cm', label: 'Arm' },
     { key: 'chest_cm', label: 'Borst' }, { key: 'thigh_cm', label: 'Bovenbeen' }
@@ -173,16 +203,64 @@ export default function WeightColumn({ client, weightData, circumData, photos, c
         {history.length > 0 && <WeightStatsGrid stats={weightData?.stats || {}} client={client} fridayData={{ friday_count: weightData?.fridayCount || 0, total_fridays: 8 }} history={history} isMobile={isMobile} coachingPlan={coachingPlan} />}
         {history.length > 0 && (
           <div style={{ padding: isMobile ? '0.5rem 0.75rem' : '0.625rem 1rem', borderTop: '1px solid rgba(255,255,255,0.04)' }}>
-            <div style={{ fontSize: '0.45rem', fontWeight: '700', color: 'rgba(255,215,0,0.35)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.375rem' }}>Gewicht</div>
-            {history.slice(0, 8).map((e, idx) => (
-              <div key={e.date} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.275rem 0', borderBottom: idx < 7 ? '1px solid rgba(255,255,255,0.03)' : 'none' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
-                  <span style={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.4)' }}>{formatDate(e.date)}</span>
-                  {e.is_friday_weighin && <span style={{ fontSize: '0.45rem', padding: '0.05rem 0.2rem', background: 'rgba(255,215,0,0.1)', borderRadius: '3px', color: '#FFD700', fontWeight: '700' }}>VR</span>}
-                </div>
-                <span style={{ fontSize: '0.7rem', fontWeight: '700', color: idx === 0 ? '#FFD700' : '#fff' }}>{e.weight.toFixed(1)} kg</span>
+            <div style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+              marginBottom: '0.375rem',
+            }}>
+              <div style={{ fontSize: '0.45rem', fontWeight: '700', color: 'rgba(255,215,0,0.35)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                Gewicht
               </div>
-            ))}
+              {/* Selectie: dag-op-dag of week-op-week */}
+              <div style={{ display: 'flex', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 5, overflow: 'hidden' }}>
+                {[{ id: 'dag', label: 'Dag' }, { id: 'week', label: 'Week' }].map(opt => {
+                  const active = weightView === opt.id
+                  return (
+                    <button key={opt.id} onClick={(e) => { e.stopPropagation(); setWeightView(opt.id) }}
+                      style={{ padding: '0.15rem 0.5rem', background: active ? 'rgba(255,215,0,0.16)' : 'transparent', border: 'none', color: active ? '#FFD700' : 'rgba(255,255,255,0.4)', fontSize: '0.5rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.04em', cursor: 'pointer', touchAction: 'manipulation' }}>
+                      {opt.label}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+
+            {/* DAG-OP-DAG — alle metingen scrollbaar */}
+            {weightView === 'dag' && (
+              <div style={{ maxHeight: isMobile ? 220 : 280, overflowY: 'auto', WebkitOverflowScrolling: 'touch' }}>
+                {history.map((e, idx) => (
+                  <div key={`${e.date}-${idx}`} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.275rem 0', borderBottom: idx < history.length - 1 ? '1px solid rgba(255,255,255,0.03)' : 'none' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                      <span style={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.4)' }}>{formatDate(e.date)}</span>
+                      {e.is_friday_weighin && <span style={{ fontSize: '0.45rem', padding: '0.05rem 0.2rem', background: 'rgba(255,215,0,0.1)', borderRadius: '3px', color: '#FFD700', fontWeight: '700' }}>VR</span>}
+                    </div>
+                    <span style={{ fontSize: '0.7rem', fontWeight: '700', color: idx === 0 ? '#FFD700' : '#fff' }}>{e.weight.toFixed(1)} kg</span>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* WEEK-OP-WEEK — gemiddelde per week + verschil t.o.v. vorige week */}
+            {weightView === 'week' && (
+              <div style={{ maxHeight: isMobile ? 220 : 280, overflowY: 'auto', WebkitOverflowScrolling: 'touch' }}>
+                {weeklyAverages.length === 0 ? (
+                  <div style={{ padding: '0.75rem 0', textAlign: 'center', color: 'rgba(255,255,255,0.2)', fontSize: '0.65rem' }}>Onvoldoende data</div>
+                ) : weeklyAverages.map((w, idx) => {
+                  const diffColor = w.diff === null ? 'rgba(255,255,255,0.3)' : w.diff < 0 ? '#10b981' : w.diff > 0 ? '#ef4444' : 'rgba(255,255,255,0.4)'
+                  return (
+                    <div key={w.start} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.3rem 0', borderBottom: idx < weeklyAverages.length - 1 ? '1px solid rgba(255,255,255,0.03)' : 'none' }}>
+                      <div style={{ display: 'flex', flexDirection: 'column' }}>
+                        <span style={{ fontSize: '0.62rem', color: 'rgba(255,255,255,0.45)' }}>{formatDate(w.start)} – {formatDate(w.end)}</span>
+                        <span style={{ fontSize: '0.45rem', color: 'rgba(255,255,255,0.25)' }}>{w.count} meting{w.count === 1 ? '' : 'en'}</span>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.35rem' }}>
+                        <span style={{ fontSize: '0.72rem', fontWeight: '800', color: idx === 0 ? '#FFD700' : '#fff' }}>{w.avg.toFixed(1)} kg</span>
+                        {w.diff !== null && <span style={{ fontSize: '0.52rem', fontWeight: '700', color: diffColor, minWidth: 38, textAlign: 'right' }}>{w.diff > 0 ? '+' : ''}{w.diff}</span>}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
           </div>
         )}
         {circumData?.latest && (

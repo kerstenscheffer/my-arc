@@ -71,13 +71,25 @@ const PORTION_PRESETS = [
   ]},
 
   // ═══ Whole-unit foods (display in stuks where natural) ════════════
+  // Dooier en eiwit hebben een eigen `override` met de per-100g macros van
+  // dat specifieke deel — zonder override zou het systeem het gemiddelde
+  // hele-ei-profiel toepassen (~155 kcal/100g) en zo bij eiwit fout fat
+  // doorrekenen. Het eigeel bevat alle vetten van het ei.
   { match: /\b(eier|eieren|egg|eggs)\b|^ei$|\bei\s/i, displayUnit: 'stuks', presets: [
     { label: '1 ei',           grams: 60 },
     { label: '2 eieren',       grams: 120 },
     { label: '3 eieren',       grams: 180 },
     { label: '5 eieren',       grams: 300 },
-    { label: '1 dooier',       grams: 20 },
-    { label: '1 eiwit (los)',  grams: 33 },
+    {
+      label: '1 dooier', grams: 20,
+      // Per 100g eigeel: USDA referentiewaarden.
+      override: { calories: 322, protein: 16, carbs: 3.6, fat: 27 },
+    },
+    {
+      label: '1 eiwit (los)', grams: 33,
+      // Per 100g eiwit: bijna alleen eiwit, nauwelijks koolhydraten, géén vet.
+      override: { calories: 52, protein: 11, carbs: 0.7, fat: 0.2 },
+    },
   ]},
   { match: /\b(banaan|banana)\b/i, displayUnit: 'stuks', presets: [
     { label: '½ banaan',       grams: 60 },
@@ -163,6 +175,13 @@ const PORTION_PRESETS = [
     { label: '3 crackers', grams: 24 },
     { label: '5 crackers', grams: 40 },
   ]},
+  // Wraps — kleine wrap ≈ 40g, grote wrap ≈ 60g (snel-kies opties).
+  { match: /\b(wrap|wraps|tortilla|tortillawrap|tortilla.?wrap)\b/i, displayUnit: 'stuks', presets: [
+    { label: '1 kleine wrap', grams: 40 },
+    { label: '1 grote wrap',  grams: 60 },
+    { label: '2 kleine wraps', grams: 80 },
+    { label: '2 grote wraps',  grams: 120 },
+  ]},
   { match: /\b(rijst|rice)\b/i, presets: [
     { label: '½ portie (droog)',     grams: 60 },
     { label: '1 portie (droog)',     grams: 75 },
@@ -180,11 +199,22 @@ const PORTION_PRESETS = [
   ]},
 
   // ═══ Protein (gram) ═══════════════════════════════════════════════
-  { match: /\b(kipfilet|kalkoenfilet|kipham|chicken\s?filet)\b/i, presets: [
+  // Specific eerst: gesneden / plakjes / ham — dunne plakjes (~15g)
+  { match: /\b(kip|kalkoen)(filet)?\s*(plakjes|plakje|gesneden|sneetjes|sneetje)\b/i, presets: [
     { label: '1 plakje',  grams: 15 },
     { label: '3 plakjes', grams: 45 },
+    { label: '5 plakjes', grams: 75 },
+  ]},
+  { match: /\b(kipham|kalkoenham|chicken\s?ham)\b/i, presets: [
+    { label: '1 plakje',  grams: 15 },
+    { label: '3 plakjes', grams: 45 },
+    { label: '5 plakjes', grams: 75 },
+  ]},
+  // Generiek: hele filet/stuk
+  { match: /\b(kipfilet|kalkoenfilet|chicken\s?filet)\b/i, presets: [
     { label: '½ filet',   grams: 75 },
     { label: '1 filet',   grams: 150 },
+    { label: '1½ filet',  grams: 225 },
   ]},
   { match: /\b(rundergehakt|gehakt)\b/i, presets: [
     { label: 'kleine portie',  grams: 80 },

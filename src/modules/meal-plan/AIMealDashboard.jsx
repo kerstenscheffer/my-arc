@@ -12,11 +12,15 @@ import AIWeekPlanner from './components/AIWeekPlanner'
 import MealSetupWizard from './components/wizard/MealSetupWizard'
 
 // New (overhaul) — header + macro hero + more sheet
-import MealPageHeader from './components/MealPageHeader'
+import MealDayNavHeader from './components/MealDayNavHeader'
+import MealDaySummaryModal from './components/MealDaySummaryModal'
 import MacroHero from './components/MacroHero'
+import MealLogFAB from './components/MealLogFAB'
+import DonePanel from './components/DonePanel'
 import MoreActionsSheet from './components/MoreActionsSheet'
-import RemainingPill from './components/RemainingPill'
-import { resolveMealMode, updateMealMode } from './mealViewMode'
+// `RemainingPill` is verwijderd uit de UI (kcal-totaal staat al in MacroHero
+// + nieuwe samenvattingsmodal). `resolveMealMode` / `updateMealMode` zijn
+// ook weg — Plan/Free toggle is geschrapt; we tonen altijd plan-mode.
 
 // Day-of-week metadata used by both the lifted DaySelector and downstream timeline.
 const DAYS_OF_WEEK = [
@@ -28,6 +32,10 @@ const DAYS_OF_WEEK = [
   { id: 5, name: 'Za', key: 'saturday' },
   { id: 6, name: 'Zo', key: 'sunday' },
 ]
+// Voeding-foto-banner onder de dag-header (zelfde idee als de boodschappen-
+// pagina). Vaste, sfeer-zettende foto van gezonde voeding.
+const MEAL_BANNER_URL = 'https://images.unsplash.com/photo-1512621776951-a57141f2eefd?w=900&h=400&fit=crop&q=80'
+
 const getTodayIndex = () => {
   const day = new Date().getDay()
   return day === 0 ? 6 : day - 1
@@ -55,7 +63,6 @@ import AIFavoritesModal from './components/AIFavoritesModal'
 import AIMealHistoryModal from './components/AIMealHistoryModal'
 
 // Video Widget
-import PageVideoWidget from '../videos/PageVideoWidget'
 
 // ✅ NIEUW: Supplement Panel
 import SupplementPlanPanel from '../supplements/SupplementPlanPanel'
@@ -76,11 +83,15 @@ export default function AIMealDashboard({ client, onNavigate, db }) {
   const [dayTemplates, setDayTemplates] = useState([])
   const [showWeekPlanner, setShowWeekPlanner] = useState(false)
   const [showWizard, setShowWizard] = useState(false)
+  // Counter dat AIDaySchedule's FoodLogModal triggert wanneer de FAB
+  // wordt ingedrukt. Increment = open.
+  const [foodLogTrigger, setFoodLogTrigger] = useState(0)
   
   const [modals, setModals] = useState({
     alternatives: null,
     info: null,
     history: false,
+    summary: false,
     favorites: false,
     supplements: false,
     weekOverview: false,
@@ -88,30 +99,28 @@ export default function AIMealDashboard({ client, onNavigate, db }) {
     documents: false,
   })
 
-  // ── Meal view mode (Plan / Free) — phase 1 of overhaul ──
-  // null while resolving; once resolved holds 'plan' | 'free'.
-  const [mealMode, setMealMode] = useState(null)
-  const [modeUpdating, setModeUpdating] = useState(false)
+  // Meal view mode: standaard 'plan' (toont plan-slots). Als het meal-plan is
+  // uitgeschakeld (`clients.meal_plan_visible = false`) valt 'm terug op 'free'
+  // — food-logging blijft werken, alleen de geplande slots verdwijnen. De coach
+  // kan dit togglen via client-insight; de client zelf via de knop op deze pagina.
+  const [mealPlanVisible, setMealPlanVisible] = useState(client?.meal_plan_visible !== false)
+  const [savingVisibility, setSavingVisibility] = useState(false)
+  useEffect(() => { setMealPlanVisible(client?.meal_plan_visible !== false) }, [client?.meal_plan_visible])
+  const mealMode = mealPlanVisible ? 'plan' : 'free'
 
-  useEffect(() => {
-    if (!client || mealMode !== null) return
-    const hasActivePlan = !!dashboardData?.activePlan
-    setMealMode(resolveMealMode(client, hasActivePlan))
-  }, [client, dashboardData?.activePlan, mealMode])
-
-  const handleModeChange = async (next) => {
-    if (next === mealMode || modeUpdating || !client?.id) return
-    const prev = mealMode
-    setMealMode(next)        // optimistic
-    setModeUpdating(true)
+  const toggleMealPlanVisible = async () => {
+    if (savingVisibility || !client?.id) return
+    const next = !mealPlanVisible
+    setMealPlanVisible(next)
+    setSavingVisibility(true)
     try {
-      await updateMealMode(db, client.id, next)
-    } catch (err) {
-      console.error('Failed to update meal_view_mode, reverting:', err)
-      setMealMode(prev)
-    } finally {
-      setModeUpdating(false)
+      const { error } = await db.supabase.from('clients').update({ meal_plan_visible: next }).eq('id', client.id)
+      if (error) throw error
+    } catch (e) {
+      console.error('meal_plan_visible update failed:', e)
+      setMealPlanVisible(!next) // rollback
     }
+    setSavingVisibility(false)
   }
   
   useEffect(() => {
@@ -422,7 +431,7 @@ export default function AIMealDashboard({ client, onNavigate, db }) {
     return (
       <div style={{
         minHeight: '100vh',
-        background: 'linear-gradient(180deg, #0a0a0a 0%, #171717 100%)',
+        background: '#0a0a0a',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center'
@@ -439,13 +448,13 @@ export default function AIMealDashboard({ client, onNavigate, db }) {
     )
   }
   
-  // In plan-mode without an active plan: show empty state.
-  // In free-mode: keep rendering the dashboard so users can still log meals.
-  if (!dashboardData?.activePlan && (mealMode || 'plan') === 'plan') {
+  // Geen actief meal-plan: rustige empty state. Plan/Free-modus is geschrapt,
+  // dus de "Schakel naar Free"-knop is verwijderd. Coach maakt eerst plan.
+  if (!dashboardData?.activePlan) {
     return (
       <div style={{
         minHeight: '100vh',
-        background: 'linear-gradient(180deg, #0a0a0a 0%, #171717 100%)',
+        background: '#0a0a0a',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
@@ -469,50 +478,30 @@ export default function AIMealDashboard({ client, onNavigate, db }) {
           }}>
             Geen actief meal plan
           </h2>
-
           <p style={{
             fontSize: isMobile ? '1rem' : '1.125rem',
             color: 'rgba(255, 255, 255, 0.6)',
             marginBottom: '1.5rem',
-            lineHeight: 1.6
+            lineHeight: 1.6,
           }}>
-            Je coach heeft nog geen AI meal plan voor je aangemaakt.
-            Wissel naar <strong style={{ color: '#FFD700' }}>Free</strong> modus om alleen meals te loggen.
+            Je coach werkt aan jouw plan. Zodra het klaar staat verschijnt hier
+            je dagschema.
           </p>
-
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-            <button
-              onClick={() => handleModeChange('free')}
-              style={{
-                padding: isMobile ? '0.875rem 2rem' : '1rem 2.5rem',
-                background: 'linear-gradient(135deg, #FFD700 0%, #D4AF37 100%)',
-                border: 'none',
-                borderRadius: '14px',
-                color: '#0a0a0a',
-                fontSize: isMobile ? '1rem' : '1.05rem',
-                fontWeight: '800',
-                cursor: 'pointer',
-                boxShadow: '0 10px 30px rgba(255, 215, 0, 0.25)'
-              }}
-            >
-              Schakel naar Free modus
-            </button>
-            <button
-              onClick={() => onNavigate('home')}
-              style={{
-                padding: isMobile ? '0.75rem 2rem' : '0.875rem 2.5rem',
-                background: 'transparent',
-                border: '1px solid rgba(255, 255, 255, 0.1)',
-                borderRadius: '14px',
-                color: 'rgba(255, 255, 255, 0.6)',
-                fontSize: '0.95rem',
-                fontWeight: '600',
-                cursor: 'pointer'
-              }}
-            >
-              Terug naar Home
-            </button>
-          </div>
+          <button
+            onClick={() => onNavigate('home')}
+            style={{
+              padding: isMobile ? '0.75rem 2rem' : '0.875rem 2.5rem',
+              background: 'transparent',
+              border: '1px solid rgba(255, 255, 255, 0.1)',
+              borderRadius: '14px',
+              color: 'rgba(255, 255, 255, 0.6)',
+              fontSize: '0.95rem',
+              fontWeight: '600',
+              cursor: 'pointer',
+            }}
+          >
+            Terug naar Home
+          </button>
         </div>
       </div>
     )
@@ -522,44 +511,42 @@ export default function AIMealDashboard({ client, onNavigate, db }) {
   return (
     <div style={{
       minHeight: '100vh',
-      background: 'linear-gradient(180deg, #0a0a0a 0%, #171717 100%)',
+      // Flat #0a0a0a matched de rest van ClientDashboard. De oude gradient
+      // (→ #171717) liet onderaan een lichtere strook zien tegen het
+      // donkere parent-blok dat erdoor uitkwam — daar kwam het "andere
+      // zwart blok onderaan" vandaan.
+      background: '#0a0a0a',
       paddingTop: 0,
-      paddingBottom: isMobile ? '6rem' : '2rem',
+      // ClientDashboard's <main> heeft al 120px buffer voor de floating
+      // navbar, maar de meal-pagina heeft een rij MealLogFAB op bottom:110
+      // én eindigt met week-overzichten waarvan de onderste content vaak
+      // gedeeltelijk onder de bar verdween. Extra 180px geeft de klant
+      // ruimte om er voorbij te scrollen.
+      paddingBottom: 180,
       overflowX: 'hidden',
       maxWidth: '100vw',
       animation: 'fadeIn 0.5s ease'
     }}>
 
-      {/* ════ NEW HEADER (overhaul phase 2) ════ */}
-      <MealPageHeader
-        mode={mealMode}
-        onModeChange={handleModeChange}
-        modeLoading={modeUpdating}
-        onOpenHistory={() => setModals(prev => ({ ...prev, history: true }))}
-        onOpenMore={() => setModals(prev => ({ ...prev, more: true }))}
+      {/* ════ GECONSOLIDEERDE DAG-HEADER ════
+          Pijlen ⇄ + klikbare dagnaam (opent agenda/samenvatting modal).
+          Vervangt: MealPageHeader (Plan/Free toggle + history/more iconen)
+          en de oude RemainingPill — alles wat over kcal/datums/gem ging
+          zit nu in MealDaySummaryModal. */}
+      <MealDayNavHeader
+        selectedDay={selectedDay}
+        onDayChange={handleDayChange}
+        onOpenSummary={() => setModals(prev => ({ ...prev, summary: true }))}
         isMobile={isMobile}
       />
 
-      {/* ════ TODAY BUDGET — "Je mag nog eten: X kcal" + progress bar (Food-app style) ════ */}
-      {(() => {
-        const t = dashboardData?.dailyTotals?.targets
-        const c = dashboardData?.dailyTotals?.consumed
-        if (!t?.calories) return null
-        const remaining = {
-          kcal:    Math.round(t.calories - (c?.calories || 0)),
-          protein: t.protein ? Math.round(t.protein - (c?.protein || 0)) : null,
-        }
-        return (
-          <RemainingPill
-            remaining={remaining}
-            consumed={c}
-            target={t}
-            isMobile={isMobile}
-          />
-        )
-      })()}
-
-      {/* DaySelector removed — history modal (header icon) handles other days. */}
+      {/* ════ VOEDING-FOTO-BANNER — net onder de dag (zoals boodschappen) ════ */}
+      <div style={{ padding: isMobile ? '0 0.75rem 0.6rem' : '0 1.5rem 0.75rem' }}>
+        <div style={{ width: '100%', height: isMobile ? 110 : 150, borderRadius: 14, position: 'relative', overflow: 'hidden' }}>
+          <div style={{ position: 'absolute', inset: 0, backgroundImage: `url(${MEAL_BANNER_URL})`, backgroundSize: 'cover', backgroundPosition: 'center' }} />
+          <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, transparent 45%, rgba(0,0,0,0.6) 100%)' }} />
+        </div>
+      </div>
 
       {/* ════ NEW MACRO HERO — selected-day aware ════ */}
       {(() => {
@@ -575,18 +562,61 @@ export default function AIMealDashboard({ client, onNavigate, db }) {
             selectedDate={selectedDate}
             selectedIsToday={selectedIsToday}
             isMobile={isMobile}
-            onWeekDetail={() => setModals(prev => ({ ...prev, weekOverview: true }))}
+            variant="hero"
           />
         )
       })()}
 
+      {/* ════ MAALTIJDPLAN TONEN — toggle direct onder de koolh/vet-regel ════ */}
+      <div style={{
+        padding: isMobile ? '0 0.9rem 0.5rem' : '0 1.5rem 0.6rem', maxWidth: 1400, margin: '0 auto',
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem',
+      }}>
+        <span style={{ fontSize: isMobile ? '0.82rem' : '0.9rem', fontWeight: 800, color: '#fff' }}>Maaltijdplan tonen</span>
+        <button
+          onClick={toggleMealPlanVisible}
+          disabled={savingVisibility}
+          role="switch"
+          aria-checked={mealPlanVisible}
+          style={{
+            width: 46, height: 26, borderRadius: 999, flexShrink: 0, position: 'relative',
+            background: mealPlanVisible ? '#FFD700' : 'rgba(255,255,255,0.14)',
+            border: 'none', cursor: savingVisibility ? 'default' : 'pointer',
+            transition: 'background 0.2s ease', opacity: savingVisibility ? 0.6 : 1,
+            touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+          }}>
+          <span style={{
+            position: 'absolute', top: 3, left: mealPlanVisible ? 23 : 3,
+            width: 20, height: 20, borderRadius: '50%', background: mealPlanVisible ? '#000' : '#fff',
+            transition: 'left 0.2s ease',
+          }} />
+        </button>
+      </div>
+
       {/* Challenge Sidebar - Floating Widget */}
       <MealChallengeSidebar client={client} db={db} />
+
+      {/* "Klaar voor vandaag" — als alle geplande maaltijden gelogd zijn.
+          Toont een rustig groene (of amber bij over-budget) banner zodat
+          de dag een afgerond gevoel krijgt. Verschijnt alleen op de dag
+          van vandaag, niet bij andere dagen. */}
+      {(() => {
+        const todayIdx = getTodayIndex()
+        const selectedIdx = dayKeyToIndex(selectedDay)
+        if (selectedIdx !== todayIdx) return null
+        const plan = dashboardData.todayMeals || []
+        if (plan.length === 0) return null
+        const allDone = plan.every(m => m.isConsumed)
+        if (!allDone) return null
+        const t = dashboardData?.dailyTotals?.targets || {}
+        const c = dashboardData?.dailyTotals?.consumed || {}
+        const remaining = (t.calories || 0) - (c.calories || 0)
+        return <DonePanel kcalRemaining={remaining} isMobile={isMobile} />
+      })()}
 
       {/* ════ TIMELINE (overhaul phase 5: direct AIDaySchedule, mode-aware) ════ */}
       <AIDaySchedule
         mode={mealMode || 'plan'}
-        hideDayPicker
         hideTotalsBar
         activePlan={dashboardData.activePlan}
         todayMeals={dashboardData.todayMeals || []}
@@ -612,6 +642,13 @@ export default function AIMealDashboard({ client, onNavigate, db }) {
         client={client}
         onMealLogged={handleMealLogged}
         targets={dashboardData.dailyTotals?.targets}
+        foodLogTrigger={foodLogTrigger}
+      />
+
+      {/* Eén ronde gele log-knop — vervangt alle inline log-knoppen. */}
+      <MealLogFAB
+        onClick={() => setFoodLogTrigger(n => n + 1)}
+        isMobile={isMobile}
       />
 
       {/* Week Planner */}
@@ -625,13 +662,9 @@ export default function AIMealDashboard({ client, onNavigate, db }) {
         />
       )}
       
-      {/* Video Widget — floating sidebar, no wrapper needed */}
-      <PageVideoWidget
-        client={client}
-        db={db}
-        pageContext="meals"
-      />
-      
+      {/* Video Widget — gemigreerd naar centrale WidgetSidebar in ClientDashboard.
+          Hier weggehaald om dubbele floating-knop te voorkomen. */}
+
       {/* MODALS */}
       {modals.alternatives && (
         <AIAlternativesModal
@@ -677,6 +710,26 @@ export default function AIMealDashboard({ client, onNavigate, db }) {
           db={db}
           clientId={client.id}
           service={service}
+        />
+      )}
+
+      {/* Geconsolideerde dag-/agenda-modal die opent vanuit MealDayNavHeader. */}
+      {modals.summary && (
+        <MealDaySummaryModal
+          isOpen={modals.summary}
+          onClose={() => setModals(prev => ({ ...prev, summary: false }))}
+          db={db}
+          clientId={client.id}
+          selectedDay={selectedDay}
+          onDayChange={handleDayChange}
+          onOpenFullHistory={() => setModals(prev => ({ ...prev, summary: false, history: true }))}
+          targets={dashboardData?.dailyTotals?.targets || {
+            calories: client.target_calories || 0,
+            protein:  client.target_protein  || 0,
+            carbs:    client.target_carbs    || 0,
+            fat:      client.target_fat      || 0,
+          }}
+          isMobile={isMobile}
         />
       )}
 

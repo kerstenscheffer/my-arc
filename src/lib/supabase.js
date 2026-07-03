@@ -31,6 +31,28 @@ export const supabase = (() => {
 
 // ===== AUTH FUNCTIONS =====
 
+/**
+ * Maak een auth-user aan ZONDER de huidige (coach-)sessie te vervangen.
+ * supabase.auth.signUp op de gedeelde client logt je direct in als de
+ * nieuwe user — daarom draait dit op een wegwerp-client die niets in
+ * localStorage opslaat. Geeft hetzelfde { data, error } terug als signUp.
+ */
+export async function signUpNewClient(email, password, metadata = {}) {
+  const tempClient = createClient(supabaseUrl, supabaseKey, {
+    auth: {
+      persistSession: false,
+      autoRefreshToken: false,
+      detectSessionInUrl: false,
+      storageKey: 'sb-temp-client-signup'
+    }
+  })
+  return tempClient.auth.signUp({
+    email,
+    password,
+    options: { emailRedirectTo: undefined, data: metadata }
+  })
+}
+
 export async function signIn(email, password) {
   console.log('SignIn attempt with:', email)
   const { data, error } = await supabase.auth.signInWithPassword({ email, password })
@@ -68,12 +90,12 @@ export async function createClientAccount(clientData, trainerId) {
   try {
     console.log('🔥 Creating client with auth:', clientData)
 
-    // STAP 1: Maak Supabase auth user
+    // STAP 1: Maak Supabase auth user (zonder de coach-sessie te vervangen)
     const tempPassword = `Welcome123!`
-    const { data: authResponse, error: signUpError } = await supabase.auth.signUp({
-      email: clientData.email,
-      password: tempPassword
-    })
+    const { data: authResponse, error: signUpError } = await signUpNewClient(
+      clientData.email,
+      tempPassword
+    )
 
     if (signUpError) {
       console.error('❌ Auth creation failed:', signUpError)

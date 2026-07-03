@@ -112,12 +112,11 @@ const SECTIONS = [
   }
 ]
 
-export default function ClientCheckinForm({ db, client }) {
+export default function ClientCheckinForm({ db, client, onSubmitted, onClose }) {
   const isMobile = window.innerWidth <= 768
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
   const [submitted, setSubmitted] = useState(false)
-  const [hasCheckinThisWeek, setHasCheckinThisWeek] = useState(false)
   const [currentSectionIdx, setCurrentSectionIdx] = useState(0)
   const [formData, setFormData] = useState({})
   const [saving, setSaving] = useState(false)
@@ -133,16 +132,14 @@ export default function ClientCheckinForm({ db, client }) {
   const checkExistingCheckin = async () => {
     setLoading(true)
     try {
-      const hasCheckin = await service.hasCheckinThisWeek(client.id)
-      setHasCheckinThisWeek(hasCheckin)
-
-      if (hasCheckin) {
-        const latest = await service.getLatestCheckin(client.id)
-        if (latest) {
-          setFormData(latest)
-          setSubmitted(latest.status === 'submitted' || latest.status === 'reviewed')
-        }
-      }
+      // We vullen het formulier NOOIT voor met de scores van een vorige
+      // check-in — de wizard hoort altijd leeg/vers te openen. We checken
+      // of er sinds de laatste VRIJDAG al een check-in is ingediend; zo ja,
+      // tonen we het success-scherm i.p.v. de wizard (voorkomt dubbele
+      // check-ins binnen de cyclus). De check-in-cyclus reset elke vrijdag,
+      // dus elke vrijdag wordt er weer een nieuwe check-in opgevraagd.
+      const hasCheckin = await service.hasCheckinSinceLastFriday(client.id)
+      setSubmitted(hasCheckin)
     } catch (error) {
       console.error('Error checking existing check-in:', error)
     } finally {
@@ -211,19 +208,36 @@ export default function ClientCheckinForm({ db, client }) {
     }
 
     setSubmitting(true)
+
+    // Stap 1 — alléén de daadwerkelijke opslag. Alleen híer mag een fout als
+    // "versturen mislukt" getoond worden.
     try {
       await service.createCheckin({
         client_id: client.id,
         ...buildPayload(),
       })
-      setSubmitted(true)
-      setHasCheckinThisWeek(true)
     } catch (error) {
       console.error('Checkin submit failed:', error)
       alert('Fout bij versturen: ' + (error?.message || error?.details || JSON.stringify(error)))
-    } finally {
       setSubmitting(false)
+      return
     }
+
+    // Stap 2 — vanaf hier ís de check-in opgeslagen. Een fout in UI-vervolg
+    // (state-updates of de parent-callback) mag NOOIT als "versturen mislukt"
+    // verschijnen — dat was precies de verwarrende foutcode die de client zag.
+    setSubmitted(true)
+    try {
+      // Signaal naar parent zodat de reminder-widget meteen weet dat de
+      // check-in binnen is — anders blijft de pill hangen tot de volgende load.
+      onSubmitted?.()
+    } catch (cbErr) {
+      console.error('onSubmitted-callback faalde (check-in is wel opgeslagen):', cbErr)
+    }
+    setSubmitting(false)
+    // Succes-scherm even tonen en dan de modal vanzelf sluiten, zodat er na
+    // het invullen niks blijft hangen.
+    setTimeout(() => { try { onClose?.() } catch {} }, 2400)
   }
 
   const calculateOverallScore = () => {
