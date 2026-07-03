@@ -2,9 +2,7 @@
 // v4.0 — Sidebar layout: linker icon nav + compacte builder rechts
 
 import React, { useState, useEffect, useCallback, useRef } from 'react'
-import { createPortal } from 'react-dom'
 import { BarChart3, FileText, ChevronLeft, ChevronRight, AlertTriangle, Zap, Grid3X3, Calendar, List, Download, MessageSquare, Play, Check, Loader, Clock, RotateCcw, RotateCw, Copy, X, Plus, Repeat, Bookmark } from 'lucide-react'
-import DayTemplatesSectionWrapper from '../../client-meal-base/components/DayTemplatesSectionWrapper'
 import DayNavigator, { DAYS } from './plan-analyzer/DayNavigator'
 import DayMacroBar from './plan-analyzer/DayMacroBar'
 import MealCard from './plan-analyzer/MealCard'
@@ -63,7 +61,6 @@ export default function PlanAnalyzer({
   const [showBalancer, setShowBalancer] = useState(false)
   const [showWeekBalancer, setShowWeekBalancer] = useState(false)
   const [showFloatingClient, setShowFloatingClient] = useState(false)
-  const [showDayTemplates, setShowDayTemplates] = useState(false)
   const [showBestSwaps, setShowBestSwaps] = useState(false)
   // Welke sectie staat gedokt in het middenpaneel (naast de knoppenbalk).
   // null = dicht → dag+maaltijden krijgt de volle breedte.
@@ -1104,60 +1101,8 @@ export default function PlanAnalyzer({
           onClose={() => setShowPlanSwitcher(false)} isMobile={m} />
       )}
 
-      {/* Day-templates overlay verwijderd (2026-07-03) — op verzoek uitgezet. */}
-      {false && showDayTemplates && resolvedClientId && createPortal(
-        <div
-          onClick={(e) => { if (e.target === e.currentTarget) setShowDayTemplates(false) }}
-          style={{
-            position: 'fixed', inset: 0,
-            background: 'rgba(0,0,0,0.88)',
-            zIndex: 2147483600,
-            display: 'flex', flexDirection: 'column',
-          }}
-        >
-          <div style={{
-            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-            padding: '0.7rem 1rem',
-            background: '#0a0a0a',
-            borderBottom: '1px solid rgba(255,215,0,0.2)',
-            flexShrink: 0,
-          }}>
-            <span style={{ color: '#FFD700', fontWeight: 800, fontSize: '0.9rem', letterSpacing: '-0.01em' }}>
-              Dag-templates {clientRecord?.first_name ? `· ${clientRecord.first_name}` : ''}
-            </span>
-            <button
-              onClick={() => setShowDayTemplates(false)}
-              style={{
-                width: 36, height: 36,
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                background: 'rgba(255,255,255,0.06)',
-                border: '1px solid rgba(255,255,255,0.1)',
-                borderRadius: 8, color: 'rgba(255,255,255,0.6)',
-                cursor: 'pointer', touchAction: 'manipulation',
-              }}
-            >
-              <X size={16} />
-            </button>
-          </div>
-          <div style={{ flex: 1, overflowY: 'auto', WebkitOverflowScrolling: 'touch', background: '#0a0a0a' }}
-               onClick={(e) => e.stopPropagation()}>
-            <DayTemplatesSectionWrapper
-              db={db}
-              clientId={resolvedClientId}
-              activePlan={planMeta ? { id: planMeta.id } : null}
-              onPlanUpdate={() => { /* reload via parent if needed */ }}
-              onNavigateToDay={(dayKey) => {
-                const idx = DAYS.findIndex(d => d.key === dayKey)
-                if (idx >= 0) { setActiveDay(idx); setViewMode('day') }
-                setShowDayTemplates(false)
-              }}
-            />
-          </div>
-        </div>,
-        document.body
-      )}
 
-      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+<style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
     </div>
   )
 }
