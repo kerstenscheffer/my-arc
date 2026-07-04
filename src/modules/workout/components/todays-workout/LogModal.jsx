@@ -3,13 +3,12 @@
 // Was modal — nu een **inline component**. Renders direct in de pagina flow:
 // geen backdrop, geen close-knop, geen body scroll-lock. Component-naam blijft
 // LogModal voor compat met bestaande imports.
-import { CheckCircle, Check, MessageSquare, ChevronDown, Zap, ThumbsUp, Moon, TrendingDown, Thermometer, Plus, Camera, Timer, Video } from 'lucide-react'
+import { CheckCircle, Check, MessageSquare, ChevronDown, Zap, ThumbsUp, Moon, TrendingDown, Thermometer, Plus, Camera, Timer } from 'lucide-react'
 import { useState, useEffect, useRef } from 'react'
 import ExerciseList from './components/ExerciseList'
 import WorkoutFlowWizard from './WorkoutFlowWizard'
 import CustomExerciseModal from './components/CustomExerciseModal'
 import PumpGalleryModal from './PumpGalleryModal'
-import ClientFeedbackModal from './components/ClientFeedbackModal'
 
 export default function LogModal({
   workout, todaysLogs, onClose, onLogsUpdate, client, schema, db,
@@ -25,7 +24,6 @@ export default function LogModal({
   const [showWorkoutFlow, setShowWorkoutFlow] = useState(false)
   const [showCustomModal, setShowCustomModal] = useState(false)
   const [showPumpGallery, setShowPumpGallery] = useState(false)
-  const [showFeedback, setShowFeedback] = useState(false)
   // Timer-state komt van TodaysWorkoutMain (zie props) zodat'ie ook doortikt
   // wanneer de dropdown gesloten wordt en auto-stopt bij de laatste log. Local
   // alias zodat de bestaande naam-referenties hieronder ongewijzigd blijven.
@@ -203,26 +201,6 @@ export default function LogModal({
   return (
     <div style={{ display: 'flex', flexDirection: 'column', width: '100%', paddingTop: isMobile ? 14 : 18, paddingBottom: isMobile ? 120 : 130 }}>
 
-      {/* ── Video-feedback naar coach — duidelijke knop, opent ClientFeedbackModal ── */}
-      <div style={{ display: 'flex', justifyContent: 'center', padding: isMobile ? '0 1rem 0.6rem' : '0 1.25rem 0.75rem' }}>
-        <button
-          onClick={() => setShowFeedback(true)}
-          style={{
-            display: 'flex', alignItems: 'center', gap: 8,
-            padding: isMobile ? '0.65rem 1.1rem' : '0.75rem 1.35rem',
-            background: 'rgba(255,215,0,0.1)',
-            border: '1px solid rgba(255,215,0,0.4)',
-            borderRadius: 12,
-            color: '#FFD700',
-            fontSize: isMobile ? '0.78rem' : '0.85rem', fontWeight: 800,
-            cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-            boxShadow: '0 4px 14px rgba(255,215,0,0.18)',
-          }}
-        >
-          <Video size={16} /> Video insturen naar je coach
-        </button>
-      </div>
-
       {/* ── CONTENT — exercise list ── */}
       <div style={{ width: '100%' }}>
 
@@ -294,11 +272,11 @@ export default function LogModal({
             // 76/84 groot). Horizontaal gecentreerd op die knop, met een gaatje
             // erboven zodat de timer er netjes bovenop zit.
             position: 'fixed',
-            left: isMobile ? 28 : 39,
+            left: isMobile ? 22 : 33,
             bottom: `calc(env(safe-area-inset-bottom, 0px) + ${isMobile ? 112 : 124}px)`,
             zIndex: 89,
-            width: isMobile ? 56 : 62,
-            height: isMobile ? 56 : 62,
+            width: isMobile ? 68 : 74,
+            height: isMobile ? 68 : 74,
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             background: 'transparent', border: 'none', padding: 0,
             filter: timerFinished
@@ -312,17 +290,15 @@ export default function LogModal({
         >
           {/* Lucide Timer-icoon = de visuele "cirkel" zelf. */}
           <Timer
-            size={isMobile ? 56 : 62}
-            strokeWidth={1.6}
+            size={isMobile ? 68 : 74}
+            strokeWidth={1.5}
             color={timerFinished ? '#10b981' : '#FFD700'}
             style={{ position: 'absolute', inset: 0 }}
           />
-          {/* Live tijd-display binnen de wijzerplaat. De Timer-icoon heeft
-              een steeltje bovenop dus we offsetten het label iets naar
-              onder voor optische balans. */}
+          {/* Live tijd-display binnen de wijzerplaat. */}
           <div style={{
             position: 'relative', zIndex: 2,
-            marginTop: isMobile ? 6 : 7,
+            marginTop: isMobile ? 8 : 9,
             display: 'flex', flexDirection: 'column', alignItems: 'center',
             gap: 0,
           }}>
@@ -330,7 +306,7 @@ export default function LogModal({
               <Check size={isMobile ? 9 : 10} color="#10b981" strokeWidth={3} style={{ marginBottom: -1 }} />
             )}
             <span style={{
-              fontSize: isMobile ? '0.66rem' : '0.74rem',
+              fontSize: isMobile ? '0.72rem' : '0.82rem',
               fontWeight: 900,
               color: timerFinished ? '#10b981' : timerRunning ? '#fff' : 'rgba(255,255,255,0.55)',
               fontVariantNumeric: 'tabular-nums',
@@ -369,17 +345,6 @@ export default function LogModal({
         db={db}
         stats={buildPumpStats()}
       />
-
-      {/* Video-feedback naar coach. ClientFeedbackModal is per-oefening; voor
-          een workout-brede video geven we de workoutnaam als context mee. */}
-      {showFeedback && (
-        <ClientFeedbackModal
-          exercise={{ name: workout?.name || workout?.dayName || 'Workout' }}
-          client={client}
-          db={db}
-          onClose={() => setShowFeedback(false)}
-        />
-      )}
 
       <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
     </div>
