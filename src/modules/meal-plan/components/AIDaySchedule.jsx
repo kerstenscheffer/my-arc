@@ -42,6 +42,9 @@ export default function AIDaySchedule({
   // in AIMealDashboard wordt aangeraakt. Geeft een minimaal interface
   // tussen ouder en kind zonder de showFoodLog-state op te tillen.
   foodLogTrigger = 0,
+  // Callback waarmee AIMealDashboard op de hoogte gesteld wordt als een
+  // verleden-dag-log gewijzigd is (zodat MacroHero-cache ongeldig gemaakt wordt).
+  onPastDayUpdate,
 }) {
   const isFreeMode = mode === 'free'
   const isMobile = window.innerWidth <= 768
@@ -147,13 +150,17 @@ export default function AIDaySchedule({
       const targetDate = new Date(today)
       targetDate.setDate(today.getDate() + diff)
       const dateStr = targetDate.toISOString().split('T')[0]
+      // Use next-day midnight as upper bound to include the full last second.
+      const nd = new Date(targetDate)
+      nd.setDate(targetDate.getDate() + 1)
+      const nextDateStr = nd.toISOString().split('T')[0]
 
       const { data, error } = await db.supabase
         .from('consumed_meals')
         .select('*')
         .eq('client_id', client.id)
         .gte('consumed_at', `${dateStr}T00:00:00`)
-        .lt('consumed_at', `${dateStr}T23:59:59`)
+        .lt('consumed_at', `${nextDateStr}T00:00:00`)
         .order('consumed_at', { ascending: true })
 
       if (error) throw error
@@ -169,12 +176,12 @@ export default function AIDaySchedule({
     if (!loggingService) return
     try {
       await loggingService.deleteConsumedMeal(mealId)
+      const deleted = consumedMeals.find(m => m.id === mealId)
       setConsumedMeals(prev => prev.filter(m => m.id !== mealId))
 
       // Alleen vandaag's totals updaten als we ECHT vandaag aan het editen
       // zijn — anders trekken we de macros van een past-day delete af van
       // vandaag (zelfde bug als bij logging).
-      const deleted = consumedMeals.find(m => m.id === mealId)
       if (deleted && onMealLogged && currentDay === getTodayIndex()) {
         onMealLogged({
           calories: -(deleted.calories || 0),
@@ -182,6 +189,10 @@ export default function AIDaySchedule({
           carbs: -(deleted.carbs || 0),
           fat: -(deleted.fat || 0)
         })
+      }
+      // Notify parent to refresh MacroHero cache for past days.
+      if (deleted && onPastDayUpdate && currentDay !== getTodayIndex()) {
+        onPastDayUpdate()
       }
     } catch (err) {
       console.error('Failed to delete consumed meal:', err)
@@ -255,6 +266,22 @@ export default function AIDaySchedule({
   
   const handleMealCheck = async (meal) => {
     if (checkedMeals[meal.slot]) {
+      // Find the corresponding plan_check record so we can delete it.
+      // Without this, the record stays in consumed_meals: MacroHero keeps
+      // showing the calories AND the restore effect re-checks the slot on
+      // the next re-render — the "stuck on completed" bug.
+      const mealId = meal.meal_id || meal.id
+      const planCheckRecord = mealId
+        ? consumedMeals.find(m => m.source === 'plan_check' && m.meal_id === mealId)
+        : consumedMeals.find(m => m.source === 'plan_check' && m.meal_type === meal.slot?.replace(/\d+$/, ''))
+      if (planCheckRecord && db?.supabase) {
+        try {
+          await db.supabase.from('consumed_meals').delete().eq('id', planCheckRecord.id)
+          setConsumedMeals(prev => prev.filter(m => m.id !== planCheckRecord.id))
+        } catch (e) {
+          console.error('Failed to remove plan_check on uncheck:', e)
+        }
+      }
       await onUncheckMeal(meal.slot)
       setCheckedMeals(prev => ({ ...prev, [meal.slot]: false }))
     } else {
@@ -454,6 +481,8 @@ export default function AIDaySchedule({
               // Always reload the day we're looking at — so a past-day
               // log appears immediately in the timeline.
               loadConsumedMeals(currentDay)
+              // Notify parent to refresh MacroHero for past days.
+              if (currentDay !== getTodayIndex() && onPastDayUpdate) onPastDayUpdate()
             }}
             defaultMealMoment={defaultMealMoment}
             editMeal={editingMeal}

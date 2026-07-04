@@ -99,6 +99,10 @@ export default function AIMealDashboard({ client, onNavigate, db }) {
     documents: false,
   })
 
+  // Incremented when a meal is logged/deleted on a past day; causes MacroHero
+  // to clear its day-cache and re-fetch fresh totals for that day.
+  const [pastDayRefreshKey, setPastDayRefreshKey] = useState(0)
+
   // Meal view mode: standaard 'plan' (toont plan-slots). Als het meal-plan is
   // uitgeschakeld (`clients.meal_plan_visible = false`) valt 'm terug op 'free'
   // — food-logging blijft werken, alleen de geplande slots verdwijnen. De coach
@@ -563,6 +567,7 @@ export default function AIMealDashboard({ client, onNavigate, db }) {
             selectedIsToday={selectedIsToday}
             isMobile={isMobile}
             variant="hero"
+            refreshKey={pastDayRefreshKey}
           />
         )
       })()}
@@ -643,6 +648,7 @@ export default function AIMealDashboard({ client, onNavigate, db }) {
         onMealLogged={handleMealLogged}
         targets={dashboardData.dailyTotals?.targets}
         foodLogTrigger={foodLogTrigger}
+        onPastDayUpdate={() => setPastDayRefreshKey(k => k + 1)}
       />
 
       {/* Eén ronde gele log-knop — vervangt alle inline log-knoppen. */}

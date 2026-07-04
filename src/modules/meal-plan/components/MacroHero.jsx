@@ -26,12 +26,16 @@ const fmt = (n) => Math.round(n || 0).toLocaleString('nl-NL')
 // Fetch totals for a specific day (used when looking at a non-today day).
 const fetchDayTotals = async (db, clientId, dateStr) => {
   if (!db?.supabase || !clientId || !dateStr) return null
+  // Use next-day midnight as upper bound to include the full last second.
+  const [yr, mo, dy] = dateStr.split('-').map(Number)
+  const nd = new Date(yr, mo - 1, dy + 1)
+  const nextDateStr = `${nd.getFullYear()}-${String(nd.getMonth() + 1).padStart(2, '0')}-${String(nd.getDate()).padStart(2, '0')}`
   const { data, error } = await db.supabase
     .from('consumed_meals')
     .select('calories, protein, carbs, fat')
     .eq('client_id', clientId)
     .gte('consumed_at', `${dateStr}T00:00:00`)
-    .lt('consumed_at', `${dateStr}T23:59:59`)
+    .lt('consumed_at', `${nextDateStr}T00:00:00`)
   if (error) return null
   return (data || []).reduce((t, m) => ({
     calories: t.calories + (m.calories || 0),
@@ -286,6 +290,9 @@ export default function MacroHero({
   selectedDate, selectedIsToday = true,
   variant = 'detail',  // 'hero' = oude stijl (kcal+eiwit groot, koolh/vet zwarte balk),
                        // 'detail' = compacte 3-blok layout (plan-analyzer).
+  // Increment to force a cache clear + re-fetch for the current day
+  // (used when a meal is logged or deleted on a past day).
+  refreshKey = 0,
 }) {
   const isMobile = propMobile ?? window.innerWidth <= 768
 
@@ -293,6 +300,17 @@ export default function MacroHero({
   const [dayCache, setDayCache] = useState({})
   const [dayLoading, setDayLoading] = useState(false)
   const dateKey = toIsoDate(selectedDate)
+
+  // When refreshKey changes, clear the cached value for the current day
+  // so the next effect re-fetches fresh data.
+  useEffect(() => {
+    if (!dateKey) return
+    setDayCache(prev => {
+      if (prev[dateKey] === undefined) return prev
+      const { [dateKey]: _, ...rest } = prev
+      return rest
+    })
+  }, [refreshKey]) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (selectedIsToday) return
