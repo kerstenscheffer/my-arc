@@ -67,6 +67,9 @@ import AIMealHistoryModal from './components/AIMealHistoryModal'
 // ✅ NIEUW: Supplement Panel
 import SupplementPlanPanel from '../supplements/SupplementPlanPanel'
 
+// Coach meal suggestions slider (issue f57b5a95)
+import CoachMealSuggestions from './components/CoachMealSuggestions'
+
 // ✅ NIEUW: Weekly Nutrition Overview
 import WeeklyNutritionOverview from './components/food-log/WeeklyNutritionOverview'
 
@@ -597,6 +600,9 @@ export default function AIMealDashboard({ client, onNavigate, db }) {
           }} />
         </button>
       </div>
+
+      {/* Coach meal suggestions — gefilterd op tijd van de dag */}
+      <CoachMealSuggestions db={db} isMobile={isMobile} />
 
       {/* Challenge Sidebar - Floating Widget */}
       <MealChallengeSidebar client={client} db={db} />
