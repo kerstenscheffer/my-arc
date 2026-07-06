@@ -1,5 +1,5 @@
 // src/modules/public-intake/PublicIntakePage.jsx
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import IntakePhase1 from './components/IntakePhase1'
 import IntakePhase3 from './components/IntakePhase3'
 import DatabaseService from '../../services/DatabaseService'
@@ -228,6 +228,68 @@ export default function PublicIntakePage() {
     return () => clearTimeout(t)
   }, [personalData, phase])
 
+  // ══════════ DIRECT OPSLAAN + HERVATTEN VIA EMAIL ══════════
+  // Elk antwoord wordt meteen bewaard (lokaal + server-concept per email), zodat
+  // niemand z'n antwoorden kwijtraakt als 'ie halverwege stopt. Bij terugkomst +
+  // email-invoer worden de eerdere antwoorden hersteld.
+  const DRAFT_LS_KEY = 'myarc_intake_draft'
+  const resumedRef = useRef(new Set())
+  const [draftRestored, setDraftRestored] = useState(false)
+
+  // 1) Herstel direct van dit apparaat (localStorage) bij binnenkomst.
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(DRAFT_LS_KEY)
+      if (!raw) return
+      const d = JSON.parse(raw)
+      if (d.personalData && Object.keys(d.personalData).length) setPersonalData(d.personalData)
+      if (d.workoutData && Object.keys(d.workoutData).length) setWorkoutData(d.workoutData)
+      const urlPhase = new URLSearchParams(window.location.search).get('phase')
+      if (!urlPhase && typeof d.phase === 'number' && d.phase > 0) { setPhase(d.phase); setDraftRestored(true) }
+    } catch {}
+  }, [])
+
+  // 2) Sla elke wijziging DIRECT op — lokaal (instant) + server-concept (per email, debounced).
+  useEffect(() => {
+    const hasAny = Object.keys(personalData || {}).length || Object.keys(workoutData || {}).length
+    if (!hasAny) return
+    try { localStorage.setItem(DRAFT_LS_KEY, JSON.stringify({ personalData, workoutData, phase })) } catch {}
+    const email = (personalData?.email || '').trim().toLowerCase()
+    if (!email.includes('@')) return
+    const t = setTimeout(() => {
+      supabase.from('intake_drafts')
+        .upsert({ email, data: { personalData, workoutData }, phase, updated_at: new Date().toISOString() }, { onConflict: 'email' })
+        .then(({ error }) => { if (error) console.warn('Draft opslaan mislukt:', error) })
+    }, 700)
+    return () => clearTimeout(t)
+  }, [personalData, workoutData, phase])
+
+  // 3) Hervat via email: zodra een geldig email herkend wordt, haal server-concept op
+  //    en vul lege velden aan (overschrijft niet wat de bezoeker nu typt).
+  useEffect(() => {
+    const email = (personalData?.email || '').trim().toLowerCase()
+    if (!email.includes('@') || resumedRef.current.has(email)) return
+    resumedRef.current.add(email)
+    supabase.rpc('get_intake_draft', { p_email: email }).then(({ data, error }) => {
+      if (error || !Array.isArray(data) || !data.length) return
+      const row = data[0]
+      const srvP = row?.data?.personalData || {}
+      const srvW = row?.data?.workoutData || {}
+      if (!Object.keys(srvP).length && !Object.keys(srvW).length) return
+      setPersonalData(prev => ({ ...srvP, ...prev }))
+      setWorkoutData(prev => ({ ...srvW, ...prev }))
+      if (typeof row.phase === 'number' && row.phase > phase) setPhase(row.phase)
+      setDraftRestored(true)
+    })
+  }, [personalData?.email])
+
+  // Herstel-melding automatisch verbergen na een paar seconden.
+  useEffect(() => {
+    if (!draftRestored) return
+    const t = setTimeout(() => setDraftRestored(false), 6000)
+    return () => clearTimeout(t)
+  }, [draftRestored])
+
   // ── Phase 1 complete ──
   const handlePhase1Complete = async (data) => {
     setPersonalData(data)
@@ -401,6 +463,19 @@ export default function PublicIntakePage() {
 
   return (
     <div style={{ minHeight: '100vh', background: '#000' }}>
+
+      {/* Herstel-melding: eerdere antwoorden teruggezet. */}
+      {draftRestored && (
+        <div style={{
+          position: 'fixed', top: 12, left: '50%', transform: 'translateX(-50%)', zIndex: 9999,
+          display: 'flex', alignItems: 'center', gap: '0.5rem', maxWidth: '92vw',
+          background: '#10b981', color: '#fff', padding: '0.55rem 0.9rem', borderRadius: 10,
+          fontSize: '0.8rem', fontWeight: 700, boxShadow: '0 6px 20px rgba(0,0,0,0.4)',
+        }}>
+          <span>✓ Je eerdere antwoorden zijn hersteld — je gaat verder waar je gebleven was.</span>
+          <button onClick={() => setDraftRestored(false)} style={{ background: 'transparent', border: 'none', color: '#fff', cursor: 'pointer', fontWeight: 900, fontSize: '1rem', lineHeight: 1, flexShrink: 0 }}>×</button>
+        </div>
+      )}
 
       {/* ── Header ── */}
       <div style={{
