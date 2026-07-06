@@ -328,7 +328,7 @@ export default function ProgressMain({ db, client }) {
         const bannerUrl =
           (recentPhotos.find(p => p.photo_url) || {}).photo_url
           || 'https://images.unsplash.com/photo-1517836357463-d25dfeac3438?w=800&h=400&fit=crop&q=80'
-        const photoH = isMobile ? 110 : 140
+        const photoH = isMobile ? 240 : 320
         // Front-foto's op tijd (oud → nieuw). Bij 2+ tonen we een before/after
         // preview: LINKS de laatste front-foto, RECHTS de eerste.
         const frontPhotos = recentPhotos
