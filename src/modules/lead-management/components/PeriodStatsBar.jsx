@@ -85,15 +85,12 @@ export default function PeriodStatsBar({ leadService, coachId, isMobile, refresh
       if (!silent) setLoading(true)
       try {
         const { start, end } = rangeFor(period, customRange)
-        // Grafiek-range: minstens 30 dagen (of de periode-lengte) eindigend op nu,
-        // zodat er altijd een zinvolle trendlijn te zien is — zelfde als in de modal.
-        const endD = new Date(end)
-        const chartStart = new Date(endD)
-        chartStart.setDate(chartStart.getDate() - Math.max(30, Math.ceil((endD - new Date(start)) / 86400000)))
+        // Grafiek beweegt mee met de gekozen periode: exact dezelfde range als de
+        // stats (Vandaag = vandaag, Deze week = deze week, enz.).
         const [funnel, react, ts] = await Promise.all([
           leadService.getRangeFunnelStats(coachId, start, end),
           leadService.getRangeReactionStats ? leadService.getRangeReactionStats(coachId, start, end) : Promise.resolve(null),
-          leadService.getDailyTimeSeries ? leadService.getDailyTimeSeries(coachId, chartStart.toISOString(), endD.toISOString()) : Promise.resolve([]),
+          leadService.getDailyTimeSeries ? leadService.getDailyTimeSeries(coachId, start, end) : Promise.resolve([]),
         ])
         if (!alive) return
         setTimeSeries(ts || [])
