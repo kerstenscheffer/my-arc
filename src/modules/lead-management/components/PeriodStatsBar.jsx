@@ -5,9 +5,8 @@
 // de stats voor die periode laadt. Data uit dezelfde range-methodes als de
 // week-analytics modal (getRangeFunnelStats + getRangeReactionStats).
 import { useState, useEffect } from 'react'
-import { ChevronDown, BarChart3, BookOpen } from 'lucide-react'
+import { ChevronDown, BarChart3 } from 'lucide-react'
 import WeekStatsModal from './WeekStatsModal'
-import { SOPModal } from './DailyStatsBar'
 
 const GOLD = '#FFD700'
 
@@ -74,7 +73,6 @@ export default function PeriodStatsBar({ leadService, coachId, isMobile, refresh
   const [customRange, setCustomRange] = useState({ start: '', end: '' })
   const [open, setOpen] = useState(false)
   const [showWeek, setShowWeek] = useState(false)
-  const [showSOP, setShowSOP] = useState(false)
   const [loading, setLoading] = useState(true)
   const [s, setS] = useState({ nieuw: 0, follow: 0, reacties: 0, voorgesteld: 0, ingepland: 0, sales: 0, noshow: 0 })
 
@@ -177,6 +175,11 @@ export default function PeriodStatsBar({ leadService, coachId, isMobile, refresh
                     </label>
                   </div>
                 )}
+                {/* Volledige stats — opent de uitgebreide stats-modal */}
+                <button onClick={() => { setShowWeek(true); setOpen(false) }}
+                  style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.7rem 0.85rem', borderTop: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,215,0,0.06)', border: 'none', borderTopWidth: 1, borderTopStyle: 'solid', borderTopColor: 'rgba(255,255,255,0.08)', color: GOLD, fontSize: '0.85rem', fontWeight: 800, cursor: 'pointer', textAlign: 'left', touchAction: 'manipulation' }}>
+                  <BarChart3 size={15} /> Volledige stats
+                </button>
               </div>
             </>
           )}
@@ -195,18 +198,9 @@ export default function PeriodStatsBar({ leadService, coachId, isMobile, refresh
         ))}
 
         <div style={{ flex: 1, minWidth: 0 }} />
-
-        {/* Week-analytics + SOP — belangrijk, groot en duidelijk */}
-        <button onClick={() => setShowWeek(true)} style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: '0.4rem', padding: isMobile ? '0.4rem 0.65rem' : '0.45rem 0.85rem', background: 'rgba(255,215,0,0.12)', border: `1.5px solid ${GOLD}`, borderRadius: 8, color: GOLD, fontSize: isMobile ? '0.72rem' : '0.82rem', fontWeight: 900, cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', whiteSpace: 'nowrap' }}>
-          <BarChart3 size={14} /> Volledige stats
-        </button>
-        <button onClick={() => setShowSOP(true)} style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: '0.4rem', padding: isMobile ? '0.4rem 0.65rem' : '0.45rem 0.85rem', background: 'rgba(255,255,255,0.06)', border: '1.5px solid rgba(255,255,255,0.2)', borderRadius: 8, color: '#fff', fontSize: isMobile ? '0.72rem' : '0.82rem', fontWeight: 900, cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', whiteSpace: 'nowrap' }}>
-          <BookOpen size={14} /> SOP
-        </button>
       </div>
 
       <WeekStatsModal isOpen={showWeek} onClose={() => setShowWeek(false)} leadService={leadService} coachId={coachId} isMobile={isMobile} />
-      {showSOP && <SOPModal isMobile={isMobile} onClose={() => setShowSOP(false)} />}
     </div>
   )
 }

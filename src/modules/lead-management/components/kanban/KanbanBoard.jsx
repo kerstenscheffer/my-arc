@@ -11,6 +11,7 @@ import AddLeadModal from './AddLeadModal'
 import RapidAddLeadsModal from './RapidAddLeadsModal'
 import SectionModal from './SectionModal'
 import PeriodStatsBar from '../PeriodStatsBar'
+import LeadMoreMenu from '../LeadMoreMenu'
 import WarmUpBoard from './WarmUpBoard'
 import { exportDailyReport } from '../../utils/exportDailyReport'
 import SalesCallModal from './SalesCallModal'
@@ -51,10 +52,11 @@ const G = {
   text: 'rgba(255, 215, 0, 0.6)'
 }
 
-export default function KanbanBoard({ 
+export default function KanbanBoard({
   leadService, db, coachId, isMobile, onUnsavedChanges, coachName = 'Coach',
-  campaigns = [], activeCampaign = null
-}) { 
+  campaigns = [], activeCampaign = null,
+  leadViews = [], activeLeadView = 'kanban', onSelectLeadView, onOpenSOP,
+}) {
   const [viewMode, setViewMode] = useState('leads')
   const [sections, setSections] = useState([])
   const [originalSections, setOriginalSections] = useState([])
@@ -1637,6 +1639,8 @@ export default function KanbanBoard({
               style={{ width: 30, height: 30, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8, color: 'rgba(255,255,255,0.5)', cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}>
               <Maximize2 size={15} />
             </button>
+            {/* Meer — view-switcher + SOP (verplaatst uit de tabs-rij) */}
+            <LeadMoreMenu views={leadViews} activeView={activeLeadView} onSelect={onSelectLeadView} onOpenSOP={onOpenSOP} isMobile={isMobile} />
           </div>
 
           {/* Search results dropdown — absolute in de sticky wrapper (scrollt mee) */}
