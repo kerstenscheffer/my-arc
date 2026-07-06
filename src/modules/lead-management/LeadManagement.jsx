@@ -17,6 +17,8 @@ import campaignTrackingService from './CampaignTrackingService'
 import DMBibleModal from './components/DMBibleModal'
 import LeadAnalyticsDashboard from '../lead-analytics/LeadAnalyticsDashboard'
 import IntakeTab from './components/IntakeTab'
+import LeadMoreMenu from './components/LeadMoreMenu'
+import { SOPModal } from './components/DailyStatsBar'
 
 // GOLD THEME (consistent with CoachHub)
 const G = {
@@ -47,6 +49,7 @@ const TABS = [
 export default function LeadManagement({ db, isMobile, coachId, user }) {
   const [activeView, setActiveView] = useState('kanban')
   const [moreTabsOpen, setMoreTabsOpen] = useState(false)
+  const [showSOP, setShowSOP] = useState(false)
   const [leads, setLeads] = useState([])
   const [selectedLeads, setSelectedLeads] = useState([])
   const [loading, setLoading] = useState(true)
@@ -376,91 +379,13 @@ export default function LeadManagement({ db, isMobile, coachId, user }) {
       </div>
       )}
 
-      {/* ═══ ROW 2: PILL FILTER STRIP ═══ */}
-      <div 
-        ref={scrollRef}
-        style={{
-          padding: isMobile ? '0.5rem 1rem' : '0.5rem 1.5rem',
-          borderBottom: '1px solid rgba(255, 255, 255, 0.04)',
-          display: 'flex',
-          gap: isMobile ? '0.4rem' : '0.5rem',
-          // overflow zichtbaar zodat de ⋯-dropdown niet wordt afgeknipt (nog
-          // maar 2 items: Kanban + Meer, dus horizontaal scrollen is overbodig).
-          overflowX: 'visible',
-          position: 'relative', zIndex: 30,
-        }}
-      >
-        {/* Kanban — prominent, altijd zichtbaar (de hoofd-view). */}
-        {(() => {
-          const kanban = TABS.find(t => t.id === 'kanban')
-          const KIcon = kanban.icon
-          const isActive = activeView === 'kanban'
-          return (
-            <button
-              onClick={() => setActiveView('kanban')}
-              style={{
-                display: 'flex', alignItems: 'center', gap: '0.3rem',
-                padding: isMobile ? '0.32rem 0.6rem' : '0.35rem 0.75rem',
-                background: isActive ? `${G.primary}22` : 'rgba(255,255,255,0.04)',
-                border: isActive ? `1.5px solid ${G.primary}` : '1px solid rgba(255,255,255,0.1)',
-                borderRadius: '7px',
-                color: isActive ? G.primary : 'rgba(255,255,255,0.6)',
-                fontSize: isMobile ? '0.72rem' : '0.78rem', fontWeight: 800,
-                cursor: 'pointer', whiteSpace: 'nowrap', minHeight: '30px', flexShrink: 0,
-                touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-              }}
-            >
-              <KIcon size={13} /> Kanban
-            </button>
-          )
-        })()}
-
-        {/* Overige tabs — achter een ⋯-dropdown (worden bijna niet gebruikt). */}
-        {(() => {
-          const others = TABS.filter(t => t.id !== 'kanban')
-          const activeOther = others.find(t => t.id === activeView)
-          const ActiveIcon = activeOther?.icon
-          return (
-            <div style={{ position: 'relative', flexShrink: 0 }}>
-              <button
-                onClick={() => setMoreTabsOpen(o => !o)}
-                style={{
-                  display: 'flex', alignItems: 'center', gap: '0.3rem',
-                  padding: isMobile ? '0.32rem 0.55rem' : '0.35rem 0.7rem',
-                  background: activeOther ? `${G.primary}18` : 'rgba(255,255,255,0.04)',
-                  border: activeOther ? `1.5px solid ${G.primary}` : '1px solid rgba(255,255,255,0.1)',
-                  borderRadius: '7px',
-                  color: activeOther ? G.primary : 'rgba(255,255,255,0.6)',
-                  fontSize: isMobile ? '0.72rem' : '0.78rem', fontWeight: 800,
-                  cursor: 'pointer', whiteSpace: 'nowrap', minHeight: '30px',
-                  touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-                }}
-              >
-                {ActiveIcon ? <ActiveIcon size={13} /> : <MoreHorizontal size={14} />}
-                {activeOther ? activeOther.label : 'Meer'}
-                <ChevronDown size={12} style={{ transform: moreTabsOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s ease' }} />
-              </button>
-              {moreTabsOpen && (
-                <>
-                  <div onClick={() => setMoreTabsOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 2147483646 }} />
-                  <div style={{ position: 'absolute', top: '100%', left: 0, marginTop: 4, zIndex: 2147483647, background: '#141414', border: `1px solid ${G.primary}33`, borderRadius: 10, overflow: 'hidden', minWidth: 180, boxShadow: '0 10px 30px rgba(0,0,0,0.6)' }}>
-                    {others.map(tab => {
-                      const Icon = tab.icon
-                      const isAct = activeView === tab.id
-                      return (
-                        <button key={tab.id} onClick={() => { setActiveView(tab.id); setMoreTabsOpen(false) }}
-                          style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '0.6rem', padding: '0.65rem 0.85rem', background: isAct ? `${G.primary}12` : 'transparent', border: 'none', color: isAct ? G.primary : 'rgba(255,255,255,0.7)', fontSize: '0.82rem', fontWeight: isAct ? 800 : 600, cursor: 'pointer', textAlign: 'left', touchAction: 'manipulation' }}>
-                          <Icon size={14} style={{ opacity: 0.8, flexShrink: 0 }} /> {tab.label}
-                        </button>
-                      )
-                    })}
-                  </div>
-                </>
-              )}
-            </div>
-          )
-        })()}
-      </div>
+      {/* Nav-rij: alleen op de ANDERE views (op de kanban-view zit "Meer" in de
+          toolbar). Zo kun je vanaf elke view terug naar Kanban of een andere view. */}
+      {activeView !== 'kanban' && (
+        <div style={{ padding: isMobile ? '0.5rem 1rem' : '0.5rem 1.5rem', borderBottom: '1px solid rgba(255,255,255,0.04)', display: 'flex', alignItems: 'center', gap: '0.5rem', position: 'relative', zIndex: 30 }}>
+          <LeadMoreMenu views={TABS} activeView={activeView} onSelect={setActiveView} onOpenSOP={() => setShowSOP(true)} isMobile={isMobile} align="left" />
+        </div>
+      )}
 
       {/* ═══ CONTENT ═══ */}
       <div style={{
@@ -475,6 +400,10 @@ export default function LeadManagement({ db, isMobile, coachId, user }) {
             campaigns={campaigns}
             activeCampaign={activeCampaign}
             onCampaignChange={handleCampaignChange}
+            leadViews={TABS}
+            activeLeadView={activeView}
+            onSelectLeadView={setActiveView}
+            onOpenSOP={() => setShowSOP(true)}
           />
         )}
 
@@ -551,6 +480,7 @@ export default function LeadManagement({ db, isMobile, coachId, user }) {
       </div>
 
       <DMBibleModal isMobile={isMobile} db={db} coachId={coachId} />
+      {showSOP && <SOPModal isMobile={isMobile} onClose={() => setShowSOP(false)} />}
 
       <style>{`
         @keyframes lmSpin {

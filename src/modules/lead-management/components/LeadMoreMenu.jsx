@@ -8,7 +8,7 @@ import { MoreHorizontal, ChevronDown, BookOpen } from 'lucide-react'
 
 const GOLD = '#FFD700'
 
-export default function LeadMoreMenu({ views = [], activeView, onSelect, onOpenSOP, isMobile }) {
+export default function LeadMoreMenu({ views = [], activeView, onSelect, onOpenSOP, isMobile, align = 'right' }) {
   const [open, setOpen] = useState(false)
   return (
     <div style={{ position: 'relative', flexShrink: 0 }}>
@@ -26,7 +26,7 @@ export default function LeadMoreMenu({ views = [], activeView, onSelect, onOpenS
       {open && (
         <>
           <div onClick={() => setOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 2147483646 }} />
-          <div style={{ position: 'absolute', top: '100%', right: 0, marginTop: 4, zIndex: 2147483647, background: '#141414', border: '1px solid rgba(255,215,0,0.25)', borderRadius: 10, overflow: 'hidden', minWidth: 200, boxShadow: '0 10px 30px rgba(0,0,0,0.6)' }}>
+          <div style={{ position: 'absolute', top: '100%', [align === 'left' ? 'left' : 'right']: 0, marginTop: 4, zIndex: 2147483647, background: '#141414', border: '1px solid rgba(255,215,0,0.25)', borderRadius: 10, overflow: 'hidden', minWidth: 200, boxShadow: '0 10px 30px rgba(0,0,0,0.6)' }}>
             {views.map(v => {
               const Icon = v.icon
               const isAct = activeView === v.id
