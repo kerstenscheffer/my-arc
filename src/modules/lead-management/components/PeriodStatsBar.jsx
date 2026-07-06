@@ -85,15 +85,11 @@ export default function PeriodStatsBar({ leadService, coachId, isMobile, refresh
       if (!silent) setLoading(true)
       try {
         const { start, end } = rangeFor(period, customRange)
-        console.log('[PeriodStatsBar] laden — period:', period, 'range:', start, '→', end, 'getDailyTimeSeries?', typeof leadService.getDailyTimeSeries)
-        const [funnel, react, ts] = await Promise.all([
+        const [funnel, react] = await Promise.all([
           leadService.getRangeFunnelStats(coachId, start, end),
           leadService.getRangeReactionStats ? leadService.getRangeReactionStats(coachId, start, end) : Promise.resolve(null),
-          leadService.getDailyTimeSeries ? leadService.getDailyTimeSeries(coachId, start, end) : Promise.resolve([]),
         ])
         if (!alive) return
-        console.log('[PeriodStatsBar] timeSeries lengte:', Array.isArray(ts) ? ts.length : '(geen array)', '— sample:', Array.isArray(ts) ? ts.slice(0, 3) : ts)
-        setTimeSeries(Array.isArray(ts) ? ts : [])
         const next = {
           nieuw: react?.newLeads || 0,
           follow: react?.followupsInWindow || 0,
@@ -120,6 +116,17 @@ export default function PeriodStatsBar({ leadService, coachId, isMobile, refresh
     // refreshKey verandert bij elke reactie/DM/lead-mutatie in het bord, zodat
     // de bovenste stat-bar direct meeloopt (i.p.v. pas bij periode-wissel).
   }, [period, customRange, coachId, leadService, refreshKey])
+
+  // Grafiek staat VAST op deze maand — los van de periode-dropdown.
+  useEffect(() => {
+    if (!leadService || !coachId || !leadService.getDailyTimeSeries) return
+    let alive = true
+    const { start, end } = rangeFor('month')
+    leadService.getDailyTimeSeries(coachId, start, end)
+      .then(ts => { if (alive) setTimeSeries(Array.isArray(ts) ? ts : []) })
+      .catch(e => console.error('[PeriodStatsBar] grafiek laden mislukt:', e))
+    return () => { alive = false }
+  }, [coachId, leadService, refreshKey])
 
   const periodLabel = period === 'custom' ? 'Aangepast' : (PERIODS.find(p => p.id === period)?.label || 'Week')
   const items = [
@@ -206,7 +213,7 @@ export default function PeriodStatsBar({ leadService, coachId, isMobile, refresh
         <div style={{ flex: 1, minWidth: 0 }} />
       </div>
 
-      {/* Groei-grafiek — beweegt mee met de periode-dropdown. Altijd getoond;
+      {/* Groei-grafiek — staat vast op DEZE MAAND (los van de periode-dropdown).
           GrowthChart toont zelf "Nog geen data" bij een lege reeks. */}
       <div style={{ marginTop: isMobile ? '0.7rem' : '0.85rem', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 12, padding: isMobile ? '0.6rem 0.5rem 0.4rem' : '0.75rem 0.85rem 0.5rem' }}>
         <GrowthChart data={timeSeries} isMobile={isMobile} />
