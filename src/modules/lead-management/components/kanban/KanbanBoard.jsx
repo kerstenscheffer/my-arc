@@ -285,6 +285,27 @@ export default function KanbanBoard({
     window.addEventListener('pointermove', move); window.addEventListener('pointerup', end)
     window.addEventListener('touchmove', move, { passive: false }); window.addEventListener('touchend', end)
   }
+  // Houd de zoekbalk ALTIJD binnen het scherm: bij laden en bij resize/device-
+  // wissel wordt een opgeslagen positie die (deels) buiten beeld valt terug in
+  // beeld geclampt. Zo verdwijnt 'ie nooit uit je scherm.
+  useEffect(() => {
+    const clampIntoView = () => {
+      if (!searchBarPos) return
+      const el = toolbarRef.current
+      const w = el?.offsetWidth || 320
+      const h = el?.offsetHeight || 44
+      const left = Math.max(4, Math.min(window.innerWidth - w - 4, searchBarPos.left))
+      const top = Math.max(4, Math.min(window.innerHeight - h - 4, searchBarPos.top))
+      if (left !== searchBarPos.left || top !== searchBarPos.top) {
+        const pos = { left, top }
+        setSearchBarPos(pos)
+        try { localStorage.setItem('leadSearchBarPos', JSON.stringify(pos)) } catch {}
+      }
+    }
+    clampIntoView()
+    window.addEventListener('resize', clampIntoView)
+    return () => window.removeEventListener('resize', clampIntoView)
+  }, [searchBarPos])
   const [staleCheckDone, setStaleCheckDone] = useState(false)
   const [staleCheckResult, setStaleCheckResult] = useState(null)
   const [snoozeSection, setSnoozeSection] = useState(null)
