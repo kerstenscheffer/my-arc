@@ -88,11 +88,33 @@ export default function ProductivityKanban({
   // keep both buckets (sections vs scheduledTasks) in sync regardless of
   // whether the change was schedule/unschedule/move.
   const handleAgendaTaskUpdate = async (taskId, updates) => {
+    // OPTIMISTISCH: pas de move meteen toe in de lokale state zodat de agenda
+    // de nieuwe positie/tijd DIRECT toont, zonder te wachten op de DB-ronde +
+    // reload (anders "verspringt" de kaart even terug naar de oude plek).
+    setScheduledTasks(prev => {
+      const out = {}
+      let moved = null
+      Object.entries(prev || {}).forEach(([day, tasks]) => {
+        out[day] = (tasks || []).filter(t => {
+          if (t.id === taskId) { moved = { ...t, ...updates }; return false }
+          return true
+        })
+      })
+      if (moved) {
+        const targetDay = updates.scheduled_day || moved.scheduled_day
+        if (targetDay) {
+          if (!out[targetDay]) out[targetDay] = []
+          out[targetDay] = [...out[targetDay], moved]
+        }
+      }
+      return out
+    })
     try {
       await productivityService.updateTask(taskId, updates)
       await loadBoard(false)
     } catch (err) {
       console.error('Agenda task update failed:', err)
+      await loadBoard(false) // herstel de echte staat als het opslaan faalde
     }
   }
   const handleAgendaTaskDelete = async (taskId) => {
