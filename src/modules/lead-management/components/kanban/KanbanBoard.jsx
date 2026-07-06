@@ -1455,11 +1455,6 @@ export default function KanbanBoard({
             border: '1px solid rgba(255,255,255,0.08)',
             boxShadow: '0 4px 14px rgba(0,0,0,0.4)',
           }}>
-            {/* Warm-Up */}
-            <button onClick={() => setViewMode('warmup')} title="Warm-Up Board"
-              style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: 5, padding: '0.45rem 0.65rem', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8, color: 'rgba(255,255,255,0.65)', fontSize: '0.68rem', fontWeight: 700, cursor: 'pointer', minHeight: 30, touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}>
-              <Instagram size={14} /> Warm-Up
-            </button>
             {/* Search */}
             <div style={{
               flex: 1, minWidth: 120, display: 'flex', alignItems: 'center', gap: '0.35rem',
@@ -1639,8 +1634,6 @@ export default function KanbanBoard({
               style={{ width: 30, height: 30, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8, color: 'rgba(255,255,255,0.5)', cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}>
               <Maximize2 size={15} />
             </button>
-            {/* Meer — view-switcher + SOP (verplaatst uit de tabs-rij) */}
-            <LeadMoreMenu views={leadViews} activeView={activeLeadView} onSelect={onSelectLeadView} onOpenSOP={onOpenSOP} isMobile={isMobile} />
           </div>
 
           {/* Search results dropdown — absolute in de sticky wrapper (scrollt mee) */}
