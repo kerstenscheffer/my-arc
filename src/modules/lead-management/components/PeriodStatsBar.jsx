@@ -7,6 +7,7 @@
 import { useState, useEffect } from 'react'
 import { ChevronDown, BarChart3 } from 'lucide-react'
 import WeekStatsModal from './WeekStatsModal'
+import GrowthChart from './GrowthChart'
 
 const GOLD = '#FFD700'
 
