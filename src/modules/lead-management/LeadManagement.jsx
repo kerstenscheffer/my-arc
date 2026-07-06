@@ -327,38 +327,16 @@ export default function LeadManagement({ db, isMobile, coachId, user }) {
       margin: '0 auto',
       transform: 'translateZ(0)'
     }}>
-      {/* ═══ ROW 1: DATUM-HEADER (zoals de meal-pagina) ═══ */}
+      {/* Datum + stats staan nu samengevoegd in de PeriodStatsBar (in de kanban-
+          view). Deze rij toont alleen nog de actieve campagne wanneer relevant. */}
+      {activeCampaign && activeView !== 'campaigns' && (
       <div style={{
-        padding: isMobile ? '0.75rem 1rem' : '0.75rem 1.5rem',
+        padding: isMobile ? '0.5rem 1rem' : '0.5rem 1.5rem',
         borderBottom: '1px solid rgba(255, 255, 255, 0.06)',
         display: 'flex',
         alignItems: 'center',
         gap: isMobile ? '0.5rem' : '0.75rem'
       }}>
-        {(() => {
-          const t = new Date()
-          const dn = t.toLocaleDateString('nl-NL', { weekday: 'long' })
-          const dayName = dn.charAt(0).toUpperCase() + dn.slice(1)
-          const dateLabel = t.toLocaleDateString('nl-NL', { day: 'numeric', month: 'long' })
-          return (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 3, minWidth: 0 }}>
-              <div style={{ fontSize: isMobile ? '1.15rem' : '1.3rem', fontWeight: 900, color: '#FFD700', letterSpacing: '-0.02em', lineHeight: 1.1, display: 'flex', alignItems: 'center', gap: 8, whiteSpace: 'nowrap' }}>
-                {dayName}
-                <span style={{ fontSize: '0.65rem', fontWeight: 800, color: 'rgba(0,0,0,0.85)', background: '#FFD700', padding: '2px 7px', borderRadius: 4, letterSpacing: '0.04em', textTransform: 'uppercase' }}>
-                  Vandaag
-                </span>
-              </div>
-              <div style={{ fontSize: isMobile ? '0.78rem' : '0.85rem', fontWeight: 600, color: 'rgba(255,255,255,0.6)', lineHeight: 1 }}>
-                {dateLabel}
-              </div>
-            </div>
-          )
-        })()}
-
-        <div style={{ flex: 1 }} />
-
-        {/* Active campaign indicator */}
-        {activeCampaign && activeView !== 'campaigns' && (
           <button
             onClick={() => setActiveView('campaigns')}
             style={{
@@ -395,8 +373,8 @@ export default function LeadManagement({ db, isMobile, coachId, user }) {
               {activeCampaign.name}
             </span>
           </button>
-        )}
       </div>
+      )}
 
       {/* ═══ ROW 2: PILL FILTER STRIP ═══ */}
       <div 

@@ -1441,55 +1441,30 @@ export default function KanbanBoard({
         <div>
           <PeriodStatsBar leadService={leadService} coachId={coachId} isMobile={isMobile} refreshKey={statsRefreshKey} />
 
-          {/* Bord-acties (meal-card knopstijl: flat, icon+label, dunne dividers). */}
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', margin: '0.4rem 0 0.3rem', gap: '0.5rem' }}>
-            <div style={{ display: 'flex', alignItems: 'stretch', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 10, overflow: 'hidden', width: 'fit-content' }}>
-              <button onClick={() => setViewMode('warmup')} title="Warm-Up Board"
-                style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5, padding: '0.5rem 0.85rem', background: 'transparent', border: 'none', color: 'rgba(255,255,255,0.65)', fontSize: '0.68rem', fontWeight: 700, cursor: 'pointer', minHeight: 32, touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}>
-                <Instagram size={14} /> Warm-Up
-              </button>
-              <div style={{ width: 1, background: 'rgba(255,255,255,0.06)', alignSelf: 'stretch' }} />
-              <button onClick={() => { setSelectedSection(null); setShowSectionModal(true) }} title="Nieuwe sectie toevoegen"
-                style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5, padding: '0.5rem 0.85rem', background: 'transparent', border: 'none', color: 'rgba(255,255,255,0.65)', fontSize: '0.68rem', fontWeight: 700, cursor: 'pointer', minHeight: 32, touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}>
-                <Plus size={14} /> Sectie
-              </button>
-            </div>
-            <button onClick={() => setIsFullscreen(true)} title="Volledig scherm"
-              style={{ width: 32, height: 32, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 8, color: 'rgba(255,255,255,0.5)', cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}>
-              <Maximize2 size={15} />
-            </button>
-          </div>
-
-          {/* Spacer: houdt de plek vast nu de toolbar fixed zweeft. */}
-          <div style={{ height: isMobile ? 46 : 42, flexShrink: 0 }} />
-          {/* ═══ ONE TOOLBAR ROW: Search + Warm-Up + Fullscreen + Sectie ═══
-              Zweeft vast in beeld (fixed) en is sleepbaar via de grip, zodat de
-              zoekbalk altijd bereikbaar is en je 'm kunt verplaatsen. */}
-          {createPortal(
-          <div ref={toolbarRef} style={{
-            display: 'flex', alignItems: 'center', gap: '0.3rem',
-            position: 'fixed', zIndex: 320,
-            ...(searchBarPos
-              ? { top: searchBarPos.top, left: searchBarPos.left, width: 'min(94vw, 480px)' }
-              : { top: isMobile ? 6 : 8, left: '50%', transform: 'translateX(-50%)', width: 'min(94vw, 480px)' }),
+          {/* ═══ STICKY ACTIE-RIJ: [Warm-Up] [zoekbalk] [Sectie] [fullscreen] ═══
+              position:sticky → vaste plek in de flow tussen Warm-Up en Sectie,
+              maar blijft in beeld zodra je naar onder scrollt. De resultaten-
+              dropdown zit in dezelfde sticky wrapper en scrollt dus mee. */}
+          <div style={{ position: 'sticky', top: 0, zIndex: 320, margin: '0.4rem 0' }}>
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: '0.3rem', flexWrap: 'wrap',
+            padding: '0.4rem', borderRadius: 12,
             background: 'rgba(10,10,10,0.97)', backdropFilter: 'blur(8px)',
-            padding: '0.35rem', borderRadius: 12,
             border: '1px solid rgba(255,255,255,0.08)',
-            boxShadow: '0 6px 20px rgba(0,0,0,0.5)',
+            boxShadow: '0 4px 14px rgba(0,0,0,0.4)',
           }}>
-            {/* Sleep-grip */}
-            <div onPointerDown={startSearchDrag} onTouchStart={startSearchDrag}
-              title="Sleep om de zoekbalk te verplaatsen"
-              style={{ flexShrink: 0, display: 'flex', alignItems: 'center', padding: '0 0.05rem', cursor: 'grab', touchAction: 'none', color: 'rgba(255,215,0,0.7)' }}>
-              <GripVertical size={18} />
-            </div>
+            {/* Warm-Up */}
+            <button onClick={() => setViewMode('warmup')} title="Warm-Up Board"
+              style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: 5, padding: '0.45rem 0.65rem', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8, color: 'rgba(255,255,255,0.65)', fontSize: '0.68rem', fontWeight: 700, cursor: 'pointer', minHeight: 30, touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}>
+              <Instagram size={14} /> Warm-Up
+            </button>
             {/* Search */}
             <div style={{
-              flex: 1, display: 'flex', alignItems: 'center', gap: '0.35rem',
+              flex: 1, minWidth: 120, display: 'flex', alignItems: 'center', gap: '0.35rem',
               padding: isMobile ? '0.3rem 0.5rem' : '0.35rem 0.625rem',
               background: 'rgba(255,255,255,0.03)',
               border: showSearchResults && searchResults.length > 0 ? '1px solid rgba(16,185,129,0.3)' : '1px solid rgba(255,255,255,0.06)',
-              borderRadius: '6px', transition: 'all 0.2s ease', minHeight: '28px'
+              borderRadius: '6px', transition: 'all 0.2s ease', minHeight: '30px'
             }}>
               <Search size={12} color={searchQuery ? '#10b981' : 'rgba(255,255,255,0.2)'} style={{ flexShrink: 0 }} />
               <input ref={searchInputRef} type="text" value={searchQuery}
@@ -1651,14 +1626,25 @@ export default function KanbanBoard({
               }}>
               <Send size={16} />
             </button>
-          </div>, document.body)}
 
-          {/* Search results dropdown */}
-          {showSearchResults && createPortal((
+            {/* Sectie */}
+            <button onClick={() => { setSelectedSection(null); setShowSectionModal(true) }} title="Nieuwe sectie toevoegen"
+              style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: 5, padding: '0.45rem 0.65rem', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8, color: 'rgba(255,255,255,0.65)', fontSize: '0.68rem', fontWeight: 700, cursor: 'pointer', minHeight: 30, touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}>
+              <Plus size={14} /> Sectie
+            </button>
+            {/* Fullscreen */}
+            <button onClick={() => setIsFullscreen(true)} title="Volledig scherm"
+              style={{ width: 30, height: 30, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8, color: 'rgba(255,255,255,0.5)', cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}>
+              <Maximize2 size={15} />
+            </button>
+          </div>
+
+          {/* Search results dropdown — absolute in de sticky wrapper (scrollt mee) */}
+          {showSearchResults && (
             <>
               <div onClick={() => setShowSearchResults(false)} style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 40 }} />
               {searchResults.length > 0 ? (
-                <div style={{ position: 'fixed', zIndex: 1000, top: (searchBarPos ? searchBarPos.top : (isMobile ? 6 : 8)) + (isMobile ? 52 : 50), left: searchBarPos ? searchBarPos.left : '50%', transform: searchBarPos ? 'none' : 'translateX(-50%)', width: 'min(94vw, 640px)' }}>
+                <div style={{ position: 'absolute', zIndex: 1000, top: 'calc(100% + 6px)', left: 0, right: 0 }}>
                   <div style={{ background: '#111', border: '1px solid rgba(16,185,129,0.2)', borderRadius: '8px', overflow: 'hidden', boxShadow: '0 8px 24px rgba(0,0,0,0.5)', maxHeight: '60vh', overflowY: 'auto' }}>
                     <div style={{ padding: '0.5rem 0.85rem', borderBottom: '1px solid rgba(255,255,255,0.06)', fontSize: '0.62rem', fontWeight: '800', color: '#10b981', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
                       {searchResults.length} RESULTATEN
@@ -1679,7 +1665,7 @@ export default function KanbanBoard({
                 const q = searchQuery.trim()
                 const display = q.startsWith('@') ? q : `"${q}"`
                 return (
-                  <div style={{ position: 'fixed', zIndex: 1000, top: (searchBarPos ? searchBarPos.top : (isMobile ? 6 : 8)) + (isMobile ? 52 : 50), left: searchBarPos ? searchBarPos.left : '50%', transform: searchBarPos ? 'none' : 'translateX(-50%)', width: 'min(94vw, 640px)' }}>
+                  <div style={{ position: 'absolute', zIndex: 1000, top: 'calc(100% + 6px)', left: 0, right: 0 }}>
                     <div style={{ background: '#111', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '6px', overflow: 'hidden' }}>
                       <div style={{ padding: '0.45rem 0.625rem', borderBottom: '1px solid rgba(255,255,255,0.04)', fontSize: '0.6rem', color: 'rgba(255,255,255,0.35)', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
                         <Search size={10} />
@@ -1773,7 +1759,8 @@ export default function KanbanBoard({
                 )
               })()}
             </>
-          ), document.body)}
+          )}
+          </div>
 
           {/* Inline notifications — ultra compact, borderLeft only */}
           {staleCheckResult && staleCheckResult.moved > 0 && (

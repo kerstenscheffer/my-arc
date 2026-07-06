@@ -109,20 +109,24 @@ export default function PeriodStatsBar({ leadService, coachId, isMobile, refresh
     <div style={{ padding: isMobile ? '0.6rem 0.75rem' : '0.7rem 1rem', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
       <div style={{ display: 'flex', alignItems: 'center', columnGap: isMobile ? '0.85rem' : '1.25rem', flexWrap: 'wrap', rowGap: '0.65rem' }}>
 
-        {/* Periode-selector — bold goud + dikke witte pijl, geen vak */}
+        {/* Datum-header + periode-selector samengevoegd: grote gouden dropdown
+            (Vandaag / Deze week / Deze maand) met de datum-regel eronder. */}
         <div style={{ position: 'relative', flexShrink: 0 }}>
           <button
             onClick={() => setOpen(o => !o)}
             style={{
-              display: 'flex', alignItems: 'center', gap: '0.35rem',
+              display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 2,
               padding: 0, background: 'transparent', border: 'none',
-              color: GOLD, fontSize: isMobile ? '1.05rem' : '1.2rem', fontWeight: 900,
               cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-              letterSpacing: '-0.01em',
             }}
           >
-            {periodLabel}
-            <ChevronDown size={isMobile ? 18 : 20} color="#fff" strokeWidth={3.5} style={{ transform: open ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s ease' }} />
+            <span style={{ display: 'flex', alignItems: 'center', gap: 6, color: GOLD, fontSize: isMobile ? '1.15rem' : '1.3rem', fontWeight: 900, letterSpacing: '-0.02em', lineHeight: 1.1, whiteSpace: 'nowrap' }}>
+              {periodLabel}
+              <ChevronDown size={isMobile ? 18 : 20} color="#fff" strokeWidth={3.5} style={{ transform: open ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s ease' }} />
+            </span>
+            <span style={{ fontSize: isMobile ? '0.7rem' : '0.78rem', fontWeight: 600, color: 'rgba(255,255,255,0.5)', lineHeight: 1, whiteSpace: 'nowrap' }}>
+              {subLabelFor(period)}
+            </span>
           </button>
           {open && (
             <>
