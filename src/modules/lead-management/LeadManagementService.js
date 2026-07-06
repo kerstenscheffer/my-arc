@@ -1412,9 +1412,12 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
       // Build empty buckets for every day in the window so the chart has
       // continuous X-axis even when a day has zero activity.
       const startDay = new Date(startISO); startDay.setHours(0,0,0,0)
-      const endDay   = new Date(endISO);   endDay.setHours(0,0,0,0)
+      // Vergelijk met de ECHTE eind-tijd (niet afgerond op middernacht), anders
+      // valt de huidige/laatste dag weg — bv. bij "Vandaag" (end = nu) zou de lus
+      // 0 keer draaien. Zo krijgt de dag van `endISO` altijd een emmer.
+      const endTs = new Date(endISO)
       const buckets = {}
-      for (let d = new Date(startDay); d < endDay; d.setDate(d.getDate() + 1)) {
+      for (let d = new Date(startDay); d < endTs; d.setDate(d.getDate() + 1)) {
         const key = d.toISOString().split('T')[0]
         buckets[key] = {
           date: key,
