@@ -12,10 +12,23 @@ import { SOPModal } from './DailyStatsBar'
 const GOLD = '#FFD700'
 
 const PERIODS = [
-  { id: 'day', label: 'Dag' },
-  { id: 'week', label: 'Week' },
-  { id: 'month', label: 'Maand' },
+  { id: 'day', label: 'Vandaag' },
+  { id: 'week', label: 'Deze week' },
+  { id: 'month', label: 'Deze maand' },
 ]
+
+// Datum/periode-subtekst onder de dropdown (zoals de meal-pagina datum-regel).
+function subLabelFor(period) {
+  const now = new Date()
+  if (period === 'day') return now.toLocaleDateString('nl-NL', { weekday: 'long', day: 'numeric', month: 'long' })
+  if (period === 'week') {
+    const s = new Date(now); const d = s.getDay(); s.setDate(s.getDate() + (d === 0 ? -6 : 1 - d)); s.setHours(0, 0, 0, 0)
+    const e = new Date(s); e.setDate(s.getDate() + 6)
+    const fmt = (x) => x.toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })
+    return `${fmt(s)} – ${fmt(e)}`
+  }
+  return now.toLocaleDateString('nl-NL', { month: 'long', year: 'numeric' })
+}
 
 function rangeFor(period) {
   const now = new Date()
