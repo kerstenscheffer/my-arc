@@ -7,7 +7,6 @@
 import { useState, useEffect } from 'react'
 import { ChevronDown, BarChart3 } from 'lucide-react'
 import WeekStatsModal from './WeekStatsModal'
-import GrowthChart from './GrowthChart'
 
 const GOLD = '#FFD700'
 
@@ -76,7 +75,6 @@ export default function PeriodStatsBar({ leadService, coachId, isMobile, refresh
   const [showWeek, setShowWeek] = useState(false)
   const [loading, setLoading] = useState(true)
   const [s, setS] = useState({ nieuw: 0, follow: 0, reacties: 0, voorgesteld: 0, ingepland: 0, sales: 0, noshow: 0 })
-  const [timeSeries, setTimeSeries] = useState([])
 
   useEffect(() => {
     if (!leadService || !coachId) return
@@ -85,15 +83,11 @@ export default function PeriodStatsBar({ leadService, coachId, isMobile, refresh
       if (!silent) setLoading(true)
       try {
         const { start, end } = rangeFor(period, customRange)
-        // Grafiek beweegt mee met de gekozen periode: exact dezelfde range als de
-        // stats (Vandaag = vandaag, Deze week = deze week, enz.).
-        const [funnel, react, ts] = await Promise.all([
+        const [funnel, react] = await Promise.all([
           leadService.getRangeFunnelStats(coachId, start, end),
           leadService.getRangeReactionStats ? leadService.getRangeReactionStats(coachId, start, end) : Promise.resolve(null),
-          leadService.getDailyTimeSeries ? leadService.getDailyTimeSeries(coachId, start, end) : Promise.resolve([]),
         ])
         if (!alive) return
-        setTimeSeries(ts || [])
         const next = {
           nieuw: react?.newLeads || 0,
           follow: react?.followupsInWindow || 0,
@@ -205,13 +199,6 @@ export default function PeriodStatsBar({ leadService, coachId, isMobile, refresh
 
         <div style={{ flex: 1, minWidth: 0 }} />
       </div>
-
-      {/* Groei-grafiek — zelfde als in Volledige stats, nu ook bovenaan de pagina */}
-      {timeSeries && timeSeries.length > 0 && (
-        <div style={{ marginTop: isMobile ? '0.7rem' : '0.85rem', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 12, padding: isMobile ? '0.6rem 0.5rem 0.4rem' : '0.75rem 0.85rem 0.5rem' }}>
-          <GrowthChart data={timeSeries} isMobile={isMobile} />
-        </div>
-      )}
 
       <WeekStatsModal isOpen={showWeek} onClose={() => setShowWeek(false)} leadService={leadService} coachId={coachId} isMobile={isMobile} />
     </div>
