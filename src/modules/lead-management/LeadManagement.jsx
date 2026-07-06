@@ -327,7 +327,7 @@ export default function LeadManagement({ db, isMobile, coachId, user }) {
       margin: '0 auto',
       transform: 'translateZ(0)'
     }}>
-      {/* ═══ ROW 1: COMPACT HEADER — title left, actions right ═══ */}
+      {/* ═══ ROW 1: DATUM-HEADER (zoals de meal-pagina) ═══ */}
       <div style={{
         padding: isMobile ? '0.75rem 1rem' : '0.75rem 1.5rem',
         borderBottom: '1px solid rgba(255, 255, 255, 0.06)',
@@ -335,27 +335,14 @@ export default function LeadManagement({ db, isMobile, coachId, user }) {
         alignItems: 'center',
         gap: isMobile ? '0.5rem' : '0.75rem'
       }}>
-        <Flame size={isMobile ? 16 : 18} color={G.primary} />
-        <h1 style={{
-          fontSize: isMobile ? '1.1rem' : '1.35rem',
-          fontWeight: '800',
-          color: G.primary,
-          margin: 0,
-          whiteSpace: 'nowrap',
-          flexShrink: 0,
-          letterSpacing: '-0.02em'
-        }}>
-          Leads
-        </h1>
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.5rem', minWidth: 0 }}>
+          <span style={{ fontSize: isMobile ? '1.1rem' : '1.3rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.02em' }}>Vandaag</span>
+          <span style={{ fontSize: isMobile ? '0.78rem' : '0.88rem', fontWeight: 600, color: 'rgba(255,255,255,0.45)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+            {new Date().toLocaleDateString('nl-NL', { weekday: 'long', day: 'numeric', month: 'long' })}
+          </span>
+        </div>
 
-        {/* Lead count */}
-        <span style={{
-          fontSize: isMobile ? '0.65rem' : '0.7rem',
-          fontWeight: '700',
-          color: 'rgba(255, 255, 255, 0.25)',
-        }}>
-          {stats.total_leads}
-        </span>
+        <div style={{ flex: 1 }} />
 
         {/* Active campaign indicator */}
         {activeCampaign && activeView !== 'campaigns' && (
@@ -396,56 +383,6 @@ export default function LeadManagement({ db, isMobile, coachId, user }) {
             </span>
           </button>
         )}
-
-        <div style={{ flex: 1 }} />
-
-        {/* Refresh */}
-        <button
-          onClick={handleRefresh}
-          disabled={refreshing}
-          style={{
-            width: '32px',
-            height: '32px',
-            borderRadius: '6px',
-            background: 'transparent',
-            border: '1px solid rgba(255, 255, 255, 0.06)',
-            color: refreshing ? G.primary : 'rgba(255, 255, 255, 0.3)',
-            cursor: refreshing ? 'not-allowed' : 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            touchAction: 'manipulation',
-            WebkitTapHighlightColor: 'transparent',
-            transition: 'all 0.2s ease',
-            opacity: refreshing ? 0.5 : 1
-          }}
-        >
-          <RefreshCw size={13} style={{
-            animation: refreshing ? 'lmSpin 1s linear infinite' : 'none'
-          }} />
-        </button>
-
-        {/* Export */}
-        <button
-          onClick={handleExport}
-          style={{
-            width: '32px',
-            height: '32px',
-            borderRadius: '6px',
-            background: 'transparent',
-            border: '1px solid rgba(255, 255, 255, 0.06)',
-            color: 'rgba(255, 255, 255, 0.3)',
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            touchAction: 'manipulation',
-            WebkitTapHighlightColor: 'transparent',
-            transition: 'all 0.2s ease'
-          }}
-        >
-          <Download size={13} />
-        </button>
       </div>
 
       {/* ═══ ROW 2: PILL FILTER STRIP ═══ */}
@@ -471,18 +408,18 @@ export default function LeadManagement({ db, isMobile, coachId, user }) {
             <button
               onClick={() => setActiveView('kanban')}
               style={{
-                display: 'flex', alignItems: 'center', gap: '0.4rem',
-                padding: isMobile ? '0.45rem 0.8rem' : '0.5rem 1rem',
+                display: 'flex', alignItems: 'center', gap: '0.3rem',
+                padding: isMobile ? '0.32rem 0.6rem' : '0.35rem 0.75rem',
                 background: isActive ? `${G.primary}22` : 'rgba(255,255,255,0.04)',
                 border: isActive ? `1.5px solid ${G.primary}` : '1px solid rgba(255,255,255,0.1)',
-                borderRadius: '8px',
+                borderRadius: '7px',
                 color: isActive ? G.primary : 'rgba(255,255,255,0.6)',
-                fontSize: isMobile ? '0.78rem' : '0.85rem', fontWeight: 800,
-                cursor: 'pointer', whiteSpace: 'nowrap', minHeight: '34px', flexShrink: 0,
+                fontSize: isMobile ? '0.72rem' : '0.78rem', fontWeight: 800,
+                cursor: 'pointer', whiteSpace: 'nowrap', minHeight: '30px', flexShrink: 0,
                 touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
               }}
             >
-              <KIcon size={15} /> Kanban
+              <KIcon size={13} /> Kanban
             </button>
           )
         })()}
@@ -497,20 +434,20 @@ export default function LeadManagement({ db, isMobile, coachId, user }) {
               <button
                 onClick={() => setMoreTabsOpen(o => !o)}
                 style={{
-                  display: 'flex', alignItems: 'center', gap: '0.4rem',
-                  padding: isMobile ? '0.45rem 0.7rem' : '0.5rem 0.85rem',
+                  display: 'flex', alignItems: 'center', gap: '0.3rem',
+                  padding: isMobile ? '0.32rem 0.55rem' : '0.35rem 0.7rem',
                   background: activeOther ? `${G.primary}18` : 'rgba(255,255,255,0.04)',
                   border: activeOther ? `1.5px solid ${G.primary}` : '1px solid rgba(255,255,255,0.1)',
-                  borderRadius: '8px',
+                  borderRadius: '7px',
                   color: activeOther ? G.primary : 'rgba(255,255,255,0.6)',
-                  fontSize: isMobile ? '0.78rem' : '0.85rem', fontWeight: 800,
-                  cursor: 'pointer', whiteSpace: 'nowrap', minHeight: '34px',
+                  fontSize: isMobile ? '0.72rem' : '0.78rem', fontWeight: 800,
+                  cursor: 'pointer', whiteSpace: 'nowrap', minHeight: '30px',
                   touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
                 }}
               >
-                {ActiveIcon ? <ActiveIcon size={15} /> : <MoreHorizontal size={16} />}
+                {ActiveIcon ? <ActiveIcon size={13} /> : <MoreHorizontal size={14} />}
                 {activeOther ? activeOther.label : 'Meer'}
-                <ChevronDown size={13} style={{ transform: moreTabsOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s ease' }} />
+                <ChevronDown size={12} style={{ transform: moreTabsOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s ease' }} />
               </button>
               {moreTabsOpen && (
                 <>

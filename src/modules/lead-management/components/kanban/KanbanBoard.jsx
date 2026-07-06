@@ -1441,19 +1441,21 @@ export default function KanbanBoard({
         <div>
           <PeriodStatsBar leadService={leadService} coachId={coachId} isMobile={isMobile} refreshKey={statsRefreshKey} />
 
-          {/* Bord-acties: Warm-Up, + Sectie en fullscreen (verplaatst uit de
-              zoekbalk zodat die compact blijft). */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', padding: '0.4rem 0.1rem 0.2rem' }}>
-            <button onClick={() => setViewMode('warmup')} title="Warm-Up Board"
-              style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', padding: '0.4rem 0.7rem', background: 'rgba(225,48,108,0.1)', border: '1px solid rgba(225,48,108,0.3)', borderRadius: 8, color: '#E1306C', fontSize: '0.72rem', fontWeight: 700, cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}>
-              <Instagram size={14} /> Warm-Up
-            </button>
-            <button onClick={() => { setSelectedSection(null); setShowSectionModal(true) }} title="Nieuwe sectie toevoegen"
-              style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', padding: '0.4rem 0.7rem', background: 'rgba(16,185,129,0.12)', border: '1px solid rgba(16,185,129,0.4)', borderRadius: 8, color: '#10b981', fontSize: '0.72rem', fontWeight: 700, cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}>
-              <Plus size={14} /> Sectie
-            </button>
+          {/* Bord-acties (meal-card knopstijl: flat, icon+label, dunne dividers). */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', margin: '0.4rem 0 0.3rem', gap: '0.5rem' }}>
+            <div style={{ display: 'flex', alignItems: 'stretch', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 10, overflow: 'hidden', width: 'fit-content' }}>
+              <button onClick={() => setViewMode('warmup')} title="Warm-Up Board"
+                style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5, padding: '0.5rem 0.85rem', background: 'transparent', border: 'none', color: 'rgba(255,255,255,0.65)', fontSize: '0.68rem', fontWeight: 700, cursor: 'pointer', minHeight: 32, touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}>
+                <Instagram size={14} /> Warm-Up
+              </button>
+              <div style={{ width: 1, background: 'rgba(255,255,255,0.06)', alignSelf: 'stretch' }} />
+              <button onClick={() => { setSelectedSection(null); setShowSectionModal(true) }} title="Nieuwe sectie toevoegen"
+                style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5, padding: '0.5rem 0.85rem', background: 'transparent', border: 'none', color: 'rgba(255,255,255,0.65)', fontSize: '0.68rem', fontWeight: 700, cursor: 'pointer', minHeight: 32, touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}>
+                <Plus size={14} /> Sectie
+              </button>
+            </div>
             <button onClick={() => setIsFullscreen(true)} title="Volledig scherm"
-              style={{ marginLeft: 'auto', width: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, color: 'rgba(255,255,255,0.5)', cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}>
+              style={{ width: 32, height: 32, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 8, color: 'rgba(255,255,255,0.5)', cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}>
               <Maximize2 size={15} />
             </button>
           </div>
