@@ -1409,6 +1409,7 @@ export default function KanbanBoard({
           {/* ═══ ONE TOOLBAR ROW: Search + Warm-Up + Fullscreen + Sectie ═══
               Zweeft vast in beeld (fixed) en is sleepbaar via de grip, zodat de
               zoekbalk altijd bereikbaar is en je 'm kunt verplaatsen. */}
+          {createPortal(
           <div style={{
             display: 'flex', alignItems: 'center', gap: '0.375rem',
             position: 'fixed', zIndex: 320,
@@ -1649,10 +1650,10 @@ export default function KanbanBoard({
               style={{ padding: '0 0.5rem', height: '28px', background: '#10b981', border: 'none', borderRadius: '6px', color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.2rem', fontSize: '0.6rem', fontWeight: '700', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', flexShrink: 0, whiteSpace: 'nowrap' }}>
               <Plus size={10} /> Sectie
             </button>
-          </div>
+          </div>, document.body)}
 
           {/* Search results dropdown */}
-          {showSearchResults && (
+          {showSearchResults && createPortal((
             <>
               <div onClick={() => setShowSearchResults(false)} style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 40 }} />
               {searchResults.length > 0 ? (
@@ -1771,7 +1772,7 @@ export default function KanbanBoard({
                 )
               })()}
             </>
-          )}
+          ), document.body)}
 
           {/* Inline notifications — ultra compact, borderLeft only */}
           {staleCheckResult && staleCheckResult.moved > 0 && (
