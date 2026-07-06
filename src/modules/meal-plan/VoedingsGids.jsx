@@ -6,6 +6,7 @@
 // die de coach zelf al heeft gezet (clean/whole_food/high_protein vs
 // processed/calorie_dense), gewogen naar het gekozen doel. Niets verzonnen.
 import React, { useState, useEffect, useMemo } from 'react'
+import { resolveFoodImage } from './foodImageFallback'
 
 const GOLD = '#FFD700'
 
@@ -241,12 +242,8 @@ function GidsCard({ ing, isMobile }) {
         overflow: 'hidden', background: `${catColor}22`, border: `1px solid ${catColor}55`,
         display: 'flex', alignItems: 'center', justifyContent: 'center',
       }}>
-        {ing.image_url ? (
-          <img src={ing.image_url} alt={ing.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-            onError={(e) => { e.target.style.display = 'none' }} />
-        ) : (
-          <span style={{ color: catColor, fontWeight: 900, fontSize: '1.3rem' }}>{(ing.name || '?').charAt(0).toUpperCase()}</span>
-        )}
+        <img src={resolveFoodImage(ing)} alt={ing.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+          onError={(e) => { e.currentTarget.style.display = 'none' }} />
       </div>
 
       {/* Midden: naam + chips + macro's */}
