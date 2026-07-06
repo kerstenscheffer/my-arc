@@ -43,39 +43,35 @@ export default function UploadSection({ onUpload, todayData = {}, isFriday = fal
         </div>
       )}
 
-      {/* ── UPLOAD ACTION BAR — flush, full width ── */}
-      <div style={{
-        display: 'flex',
-        background: 'rgba(10, 10, 10, 0.95)',
-        borderBottom: '1px solid rgba(255, 255, 255, 0.06)'
-      }}>
-        {/* Upload button — gold accent */}
+      {/* ── UPLOAD KNOP — echte gevulde gouden knop ── */}
+      <div style={{ padding: isMobile ? '0.75rem 1rem' : '0.85rem 1.5rem' }}>
         <button
           onClick={() => fileInputRef.current?.click()}
           disabled={uploading}
           style={{
-            flex: 1,
-            background: 'rgba(255, 215, 0, 0.1)',
-            border: 'none', borderRadius: 0,
-            padding: isMobile ? '0.55rem 0' : '0.65rem 0',
-            color: '#FFD700',
-            fontSize: isMobile ? '0.68rem' : '0.75rem',
-            fontWeight: '800',
+            width: '100%',
+            background: uploading ? 'rgba(255, 215, 0, 0.2)' : 'linear-gradient(90deg, #FFD700 0%, #D4AF37 100%)',
+            border: 'none', borderRadius: 12,
+            padding: isMobile ? '0.8rem' : '0.9rem',
+            color: uploading ? '#FFD700' : '#000',
+            fontSize: isMobile ? '0.85rem' : '0.9rem',
+            fontWeight: 800,
+            letterSpacing: '-0.01em',
             cursor: uploading ? 'wait' : 'pointer',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            gap: '0.35rem',
+            gap: '0.45rem',
+            minHeight: '48px',
+            boxShadow: uploading ? 'none' : '0 2px 14px rgba(255, 215, 0, 0.28)',
             transition: 'all 0.2s ease',
             touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-            minHeight: '40px',
-            opacity: uploading ? 0.6 : 1
           }}
-          onTouchStart={(e) => { if (!uploading && isMobile) e.currentTarget.style.background = 'rgba(255, 215, 0, 0.18)' }}
-          onTouchEnd={(e) => { if (isMobile) e.currentTarget.style.background = 'rgba(255, 215, 0, 0.1)' }}
+          onTouchStart={(e) => { if (!uploading && isMobile) e.currentTarget.style.filter = 'brightness(0.92)' }}
+          onTouchEnd={(e) => { if (isMobile) e.currentTarget.style.filter = 'none' }}
         >
           {uploading ? (
-            <><div style={{ width: '14px', height: '14px', border: '2px solid rgba(255,255,255,0.2)', borderTopColor: '#FFD700', borderRadius: '50%', animation: 'spin 1s linear infinite' }} /> Uploaden...</>
+            <><div style={{ width: '16px', height: '16px', border: '2px solid rgba(255,215,0,0.25)', borderTopColor: '#FFD700', borderRadius: '50%', animation: 'spin 1s linear infinite' }} /> Uploaden…</>
           ) : (
-            <><Upload size={isMobile ? 14 : 15} /> Upload Progressie Foto</>
+            <><Upload size={isMobile ? 16 : 17} /> Upload Progressie Foto</>
           )}
         </button>
       </div>

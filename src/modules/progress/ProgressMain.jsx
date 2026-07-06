@@ -2,7 +2,7 @@
 // v6.2 - overflow hidden fix
 
 import React, { useState, useEffect } from 'react'
-import { Loader2, Camera, Calendar, Sparkles, ChevronDown, ChevronUp, Coffee, Sun, Moon } from 'lucide-react'
+import { Loader2, Camera, Calendar, Sparkles, ChevronDown, ChevronUp, Coffee, Sun, Moon, GitCompareArrows } from 'lucide-react'
 
 import ProgressPhotos from '../progress-photos/ProgressPhotos'
 import WeightTrackerService from '../weight-tracker/WeightTrackerService'
@@ -11,6 +11,7 @@ import WeightStatsGrid from '../weight-tracker/components/WeightStatsGrid'
 import WeightHistory from '../weight-tracker/components/WeightHistory'
 import CircumferenceMeasurements from '../weight-tracker/components/CircumferenceMeasurements'
 import RecentProgressPhotos from './components/RecentProgressPhotos'
+import PhotoCompareModal from './components/PhotoCompareModal'
 import ProgressChallengeSidebar from '../../client/components/ProgressChallengeSidebar'
 import { useChallenge } from '../../hooks/useChallenge'
 
@@ -142,6 +143,7 @@ export default function ProgressMain({ db, client }) {
   // Foto-sectie als dropdown: wanneer open, verbergen we de rest van de pagina
   // — zelfde patroon als TodaysWorkoutCard's expand-mode.
   const [photosOpen, setPhotosOpen] = useState(false)
+  const [showCompare, setShowCompare] = useState(false)
   const [weight, setWeight] = useState(70.0)
   const [weightStats, setWeightStats] = useState(null)
   const [fridayData, setFridayData] = useState(null)
@@ -499,11 +501,37 @@ export default function ProgressMain({ db, client }) {
             )}
           </div>
           <RecentProgressPhotos photos={recentPhotos} onUpload={handlePhotoUpload} todayData={todayData} isFriday={isFriday} isMobile={isMobile} />
+
+          {/* Vergelijk-knop — opent de voor/na vergelijk-modal */}
+          <div style={{ padding: isMobile ? '0 1rem 0.75rem' : '0 1.5rem 0.85rem' }}>
+            <button
+              onClick={() => setShowCompare(true)}
+              style={{
+                width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.45rem',
+                padding: isMobile ? '0.8rem' : '0.9rem',
+                background: 'rgba(255,215,0,0.08)',
+                border: '1px solid rgba(255,215,0,0.4)',
+                borderRadius: 12,
+                color: '#FFD700',
+                fontSize: isMobile ? '0.85rem' : '0.9rem', fontWeight: 800, letterSpacing: '-0.01em',
+                cursor: 'pointer', minHeight: '48px',
+                touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+              }}
+            >
+              <GitCompareArrows size={isMobile ? 16 : 17} /> Vergelijk foto's
+            </button>
+          </div>
+
           <ProgressPhotos db={db} client={client} />
         </>
       )}
 
       {/* PageVideoWidget gemigreerd naar centrale WidgetSidebar in ClientDashboard. */}
+
+      {/* ═══ VERGELIJK MODAL ═══ */}
+      {showCompare && (
+        <PhotoCompareModal db={db} client={client} isMobile={isMobile} onClose={() => setShowCompare(false)} />
+      )}
 
       {/* ═══ ANGLE PICKER MODAL — for progress photos ═══ */}
       {anglePicker && (
