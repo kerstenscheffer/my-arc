@@ -245,6 +245,30 @@ export default function KanbanBoard({
   const searchInputRef = useRef(null)
   const leadRefs = useRef({})
   const [showScrollTop, setShowScrollTop] = useState(false)
+  // Zoek-toolbar: zweeft vast in beeld (fixed) en is sleepbaar. Positie
+  // onthouden in localStorage. null = standaard bovenaan.
+  const [searchBarPos, setSearchBarPos] = useState(() => {
+    try { const s = JSON.parse(localStorage.getItem('leadSearchBarPos') || 'null'); if (s && typeof s.top === 'number') return s } catch {}
+    return null
+  })
+  const startSearchDrag = (e) => {
+    e.preventDefault(); e.stopPropagation()
+    const p = e.touches?.[0] || e
+    const cur = searchBarPos || { top: 8, left: 8 }
+    const start = { x: p.clientX, y: p.clientY, top: cur.top, left: cur.left }
+    const move = (ev) => {
+      const q = ev.touches?.[0] || ev
+      setSearchBarPos({
+        top: Math.max(4, Math.min(window.innerHeight - 60, start.top + (q.clientY - start.y))),
+        left: Math.max(4, Math.min(window.innerWidth - 90, start.left + (q.clientX - start.x))),
+      })
+    }
+    const end = () => {
+      window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', end)
+      setSearchBarPos(prev => { try { localStorage.setItem('leadSearchBarPos', JSON.stringify(prev)) } catch {} ; return prev })
+    }
+    window.addEventListener('pointermove', move); window.addEventListener('pointerup', end)
+  }
   const [staleCheckDone, setStaleCheckDone] = useState(false)
   const [staleCheckResult, setStaleCheckResult] = useState(null)
   const [snoozeSection, setSnoozeSection] = useState(null)
@@ -1380,16 +1404,28 @@ export default function KanbanBoard({
         <div>
           <PeriodStatsBar leadService={leadService} coachId={coachId} isMobile={isMobile} refreshKey={statsRefreshKey} />
 
+          {/* Spacer: houdt de plek vast nu de toolbar fixed zweeft. */}
+          <div style={{ height: isMobile ? 46 : 42, flexShrink: 0 }} />
           {/* ═══ ONE TOOLBAR ROW: Search + Warm-Up + Fullscreen + Sectie ═══
-              Sticky: blijft bovenaan in beeld tijdens het scrollen door de
-              secties, zodat de zoekbalk altijd bereikbaar is. */}
+              Zweeft vast in beeld (fixed) en is sleepbaar via de grip, zodat de
+              zoekbalk altijd bereikbaar is en je 'm kunt verplaatsen. */}
           <div style={{
             display: 'flex', alignItems: 'center', gap: '0.375rem',
-            position: 'sticky', top: 0, zIndex: 300,
-            background: 'rgba(10,10,10,0.95)', backdropFilter: 'blur(8px)',
-            paddingTop: '0.45rem', paddingBottom: '0.45rem',
-            marginBottom: '0.5rem',
+            position: 'fixed', zIndex: 320,
+            ...(searchBarPos
+              ? { top: searchBarPos.top, left: searchBarPos.left, width: 'min(94vw, 640px)' }
+              : { top: isMobile ? 6 : 8, left: '50%', transform: 'translateX(-50%)', width: 'min(94vw, 640px)' }),
+            background: 'rgba(10,10,10,0.97)', backdropFilter: 'blur(8px)',
+            padding: '0.4rem 0.4rem', borderRadius: 10,
+            border: '1px solid rgba(255,255,255,0.08)',
+            boxShadow: '0 6px 20px rgba(0,0,0,0.5)',
           }}>
+            {/* Sleep-grip */}
+            <div onPointerDown={startSearchDrag} onTouchStart={startSearchDrag}
+              title="Sleep om de zoekbalk te verplaatsen"
+              style={{ flexShrink: 0, display: 'flex', alignItems: 'center', padding: '0 0.1rem', cursor: 'grab', touchAction: 'none', color: 'rgba(255,215,0,0.6)' }}>
+              <GripVertical size={16} />
+            </div>
             {/* Search */}
             <div style={{
               flex: 1, display: 'flex', alignItems: 'center', gap: '0.35rem',
@@ -1620,18 +1656,18 @@ export default function KanbanBoard({
             <>
               <div onClick={() => setShowSearchResults(false)} style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 40 }} />
               {searchResults.length > 0 ? (
-                <div style={{ position: 'relative', zIndex: 1000, marginTop: '-0.375rem', marginBottom: '0.5rem' }}>
-                  <div style={{ background: '#111', border: '1px solid rgba(16,185,129,0.2)', borderRadius: '8px', overflow: 'hidden', boxShadow: '0 8px 24px rgba(0,0,0,0.5)', maxHeight: '250px', overflowY: 'auto' }}>
-                    <div style={{ padding: '0.35rem 0.625rem', borderBottom: '1px solid rgba(255,255,255,0.06)', fontSize: '0.45rem', fontWeight: '700', color: '#10b981', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                <div style={{ position: 'fixed', zIndex: 1000, top: (searchBarPos ? searchBarPos.top : (isMobile ? 6 : 8)) + (isMobile ? 52 : 50), left: searchBarPos ? searchBarPos.left : '50%', transform: searchBarPos ? 'none' : 'translateX(-50%)', width: 'min(94vw, 640px)' }}>
+                  <div style={{ background: '#111', border: '1px solid rgba(16,185,129,0.2)', borderRadius: '8px', overflow: 'hidden', boxShadow: '0 8px 24px rgba(0,0,0,0.5)', maxHeight: '60vh', overflowY: 'auto' }}>
+                    <div style={{ padding: '0.5rem 0.85rem', borderBottom: '1px solid rgba(255,255,255,0.06)', fontSize: '0.62rem', fontWeight: '800', color: '#10b981', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
                       {searchResults.length} RESULTATEN
                     </div>
                     {searchResults.map(lead => (
-                      <button key={lead.id} onClick={() => scrollToLead(lead.id, lead.sectionId)} style={{ width: '100%', padding: '0.4rem 0.625rem', background: 'transparent', border: 'none', borderBottom: '1px solid rgba(255,255,255,0.03)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem', textAlign: 'left' }} onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(16,185,129,0.06)'} onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}>
+                      <button key={lead.id} onClick={() => scrollToLead(lead.id, lead.sectionId)} style={{ width: '100%', padding: '0.75rem 0.85rem', background: 'transparent', border: 'none', borderBottom: '1px solid rgba(255,255,255,0.05)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem', textAlign: 'left', minHeight: 52 }} onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(16,185,129,0.06)'} onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}>
                         <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ color: '#fff', fontWeight: '700', fontSize: '0.75rem' }}>{lead.first_name} {lead.last_name}</div>
-                          {lead.instagram_handle && <span style={{ fontSize: '0.55rem', color: '#E1306C' }}>@{lead.instagram_handle}</span>}
+                          <div style={{ color: '#fff', fontWeight: '800', fontSize: '0.95rem', letterSpacing: '-0.01em' }}>{lead.first_name} {lead.last_name}</div>
+                          {lead.instagram_handle && <span style={{ fontSize: '0.7rem', color: '#E1306C', fontWeight: 600 }}>@{lead.instagram_handle}</span>}
                         </div>
-                        <span style={{ padding: '2px 5px', background: `${lead.sectionColor}12`, border: `1px solid ${lead.sectionColor}25`, borderRadius: '3px', fontSize: '0.5rem', fontWeight: '600', color: lead.sectionColor, whiteSpace: 'nowrap' }}>{lead.sectionTitle?.substring(0, 12)}</span>
+                        <span style={{ padding: '3px 8px', background: `${lead.sectionColor}12`, border: `1px solid ${lead.sectionColor}25`, borderRadius: '5px', fontSize: '0.62rem', fontWeight: '700', color: lead.sectionColor, whiteSpace: 'nowrap', flexShrink: 0 }}>{lead.sectionTitle?.substring(0, 14)}</span>
                       </button>
                     ))}
                   </div>
@@ -1641,7 +1677,7 @@ export default function KanbanBoard({
                 const q = searchQuery.trim()
                 const display = q.startsWith('@') ? q : `"${q}"`
                 return (
-                  <div style={{ position: 'relative', zIndex: 1000, marginTop: '-0.375rem', marginBottom: '0.5rem' }}>
+                  <div style={{ position: 'fixed', zIndex: 1000, top: (searchBarPos ? searchBarPos.top : (isMobile ? 6 : 8)) + (isMobile ? 52 : 50), left: searchBarPos ? searchBarPos.left : '50%', transform: searchBarPos ? 'none' : 'translateX(-50%)', width: 'min(94vw, 640px)' }}>
                     <div style={{ background: '#111', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '6px', overflow: 'hidden' }}>
                       <div style={{ padding: '0.45rem 0.625rem', borderBottom: '1px solid rgba(255,255,255,0.04)', fontSize: '0.6rem', color: 'rgba(255,255,255,0.35)', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
                         <Search size={10} />
@@ -1794,17 +1830,18 @@ export default function KanbanBoard({
       {showScrollTop && createPortal(
         <button onClick={scrollToTop}
           style={{
-            position: 'fixed', bottom: isMobile ? '90px' : '32px',
+            position: 'fixed', bottom: isMobile ? '96px' : '32px',
             left: '50%', transform: 'translateX(-50%)',
-            padding: isMobile ? '0.5rem 1rem' : '0.5rem 1.25rem',
-            background: '#10b981', border: 'none', borderRadius: '20px',
-            color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.35rem',
-            fontSize: '0.7rem', fontWeight: '700',
-            zIndex: 99999, minHeight: '36px',
+            padding: isMobile ? '0.85rem 1.5rem' : '0.8rem 1.6rem',
+            background: 'linear-gradient(135deg, #FFD700 0%, #D4AF37 100%)', border: 'none', borderRadius: '999px',
+            color: '#0a0a0a', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.45rem',
+            fontSize: isMobile ? '0.9rem' : '0.85rem', fontWeight: '800',
+            boxShadow: '0 6px 20px rgba(255,215,0,0.4), 0 2px 6px rgba(0,0,0,0.4)',
+            zIndex: 99999, minHeight: isMobile ? '52px' : '46px',
             touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
             animation: 'kbFadeUp 0.2s ease'
           }}>
-          <ArrowUp size={14} /> Naar boven
+          <ArrowUp size={isMobile ? 20 : 18} strokeWidth={2.6} /> Naar boven
         </button>,
         document.body
       )}
