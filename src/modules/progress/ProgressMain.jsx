@@ -198,7 +198,7 @@ export default function ProgressMain({ db, client }) {
   }
 
   const getRecentPhotos = async (id) => {
-    try { const { data } = await db.supabase.from('ch8_progress_photos').select('*').eq('client_id', id).order('created_at', { ascending: false }).limit(20); return data || [] }
+    try { const { data } = await db.supabase.from('ch8_progress_photos').select('*').eq('client_id', id).order('created_at', { ascending: false }).limit(300); return data || [] }
     catch { return [] }
   }
 
@@ -329,6 +329,15 @@ export default function ProgressMain({ db, client }) {
           (recentPhotos.find(p => p.photo_url) || {}).photo_url
           || 'https://images.unsplash.com/photo-1517836357463-d25dfeac3438?w=800&h=400&fit=crop&q=80'
         const photoH = isMobile ? 110 : 140
+        // Front-foto's op tijd (oud → nieuw). Bij 2+ tonen we een before/after
+        // preview: LINKS de laatste front-foto, RECHTS de eerste.
+        const frontPhotos = recentPhotos
+          .filter(p => (p.metadata?.subtype || '').toLowerCase() === 'front' && p.photo_url)
+          .sort((a, b) => new Date(a.created_at) - new Date(b.created_at))
+        const hasBeforeAfter = frontPhotos.length >= 2
+        const leftPhoto = hasBeforeAfter ? frontPhotos[frontPhotos.length - 1] : null  // laatste
+        const rightPhoto = hasBeforeAfter ? frontPhotos[0] : null                       // eerste
+        const baLabel = { position: 'absolute', top: 6, fontSize: isMobile ? '0.5rem' : '0.55rem', fontWeight: 900, letterSpacing: '0.08em', padding: '0.1rem 0.4rem', borderRadius: 5 }
         return (
           <div
             onClick={() => setPhotosOpen(true)}
@@ -349,15 +358,29 @@ export default function ProgressMain({ db, client }) {
               overflow: 'hidden',
               marginBottom: isMobile ? '0.65rem' : '0.85rem',
             }}>
-              <div style={{
-                position: 'absolute', inset: 0,
-                backgroundImage: `url(${bannerUrl})`,
-                backgroundSize: 'cover',
-                backgroundPosition: 'center',
-              }} />
+              {hasBeforeAfter ? (
+                <div style={{ position: 'absolute', inset: 0, display: 'flex' }}>
+                  <div style={{ flex: 1, position: 'relative', overflow: 'hidden', borderRight: '2px solid rgba(0,0,0,0.65)' }}>
+                    <div style={{ position: 'absolute', inset: 0, backgroundImage: `url(${leftPhoto.photo_url})`, backgroundSize: 'cover', backgroundPosition: 'center top' }} />
+                    <span style={{ ...baLabel, left: 6, background: '#FFD700', color: '#000' }}>NU</span>
+                  </div>
+                  <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
+                    <div style={{ position: 'absolute', inset: 0, backgroundImage: `url(${rightPhoto.photo_url})`, backgroundSize: 'cover', backgroundPosition: 'center top' }} />
+                    <span style={{ ...baLabel, right: 6, background: 'rgba(0,0,0,0.7)', color: '#fff' }}>START</span>
+                  </div>
+                </div>
+              ) : (
+                <div style={{
+                  position: 'absolute', inset: 0,
+                  backgroundImage: `url(${bannerUrl})`,
+                  backgroundSize: 'cover',
+                  backgroundPosition: 'center',
+                }} />
+              )}
               <div style={{
                 position: 'absolute', inset: 0,
                 background: 'linear-gradient(180deg, transparent 45%, rgba(0,0,0,0.55) 100%)',
+                pointerEvents: 'none',
               }} />
               {photoCount === 0 && (
                 <div style={{
