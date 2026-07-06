@@ -335,12 +335,25 @@ export default function LeadManagement({ db, isMobile, coachId, user }) {
         alignItems: 'center',
         gap: isMobile ? '0.5rem' : '0.75rem'
       }}>
-        <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.5rem', minWidth: 0 }}>
-          <span style={{ fontSize: isMobile ? '1.1rem' : '1.3rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.02em' }}>Vandaag</span>
-          <span style={{ fontSize: isMobile ? '0.78rem' : '0.88rem', fontWeight: 600, color: 'rgba(255,255,255,0.45)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-            {new Date().toLocaleDateString('nl-NL', { weekday: 'long', day: 'numeric', month: 'long' })}
-          </span>
-        </div>
+        {(() => {
+          const t = new Date()
+          const dn = t.toLocaleDateString('nl-NL', { weekday: 'long' })
+          const dayName = dn.charAt(0).toUpperCase() + dn.slice(1)
+          const dateLabel = t.toLocaleDateString('nl-NL', { day: 'numeric', month: 'long' })
+          return (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 3, minWidth: 0 }}>
+              <div style={{ fontSize: isMobile ? '1.15rem' : '1.3rem', fontWeight: 900, color: '#FFD700', letterSpacing: '-0.02em', lineHeight: 1.1, display: 'flex', alignItems: 'center', gap: 8, whiteSpace: 'nowrap' }}>
+                {dayName}
+                <span style={{ fontSize: '0.65rem', fontWeight: 800, color: 'rgba(0,0,0,0.85)', background: '#FFD700', padding: '2px 7px', borderRadius: 4, letterSpacing: '0.04em', textTransform: 'uppercase' }}>
+                  Vandaag
+                </span>
+              </div>
+              <div style={{ fontSize: isMobile ? '0.78rem' : '0.85rem', fontWeight: 600, color: 'rgba(255,255,255,0.6)', lineHeight: 1 }}>
+                {dateLabel}
+              </div>
+            </div>
+          )
+        })()}
 
         <div style={{ flex: 1 }} />
 
