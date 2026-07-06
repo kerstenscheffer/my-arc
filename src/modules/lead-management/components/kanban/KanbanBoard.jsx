@@ -5,7 +5,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { createPortal } from 'react-dom'
-import { Plus, Settings, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, GripVertical, Save, RotateCcw, Users, Instagram, Search, X, ArrowUp, ArrowUpDown, Clock, Maximize2, Minimize2, CheckCircle, Send, Zap } from 'lucide-react'
+import { Plus, Settings, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, GripVertical, Save, RotateCcw, Users, Instagram, Search, X, ArrowUp, ArrowUpDown, Clock, Maximize2, Minimize2, CheckCircle, Send, Zap, Flame, Phone, SlidersHorizontal } from 'lucide-react'
 import KanbanCard from './KanbanCard'
 import AddLeadModal from './AddLeadModal'
 import RapidAddLeadsModal from './RapidAddLeadsModal'
@@ -251,23 +251,39 @@ export default function KanbanBoard({
     try { const s = JSON.parse(localStorage.getItem('leadSearchBarPos') || 'null'); if (s && typeof s.top === 'number') return s } catch {}
     return null
   })
+  const toolbarRef = useRef(null)
+  // Slepen zonder re-render: tijdens het bewegen manipuleren we de DOM direct
+  // (geen setState → geen re-render van het zware bord → botersmooth). Pas bij
+  // loslaten committen we de positie naar state + localStorage.
   const startSearchDrag = (e) => {
     e.preventDefault(); e.stopPropagation()
+    const el = toolbarRef.current
+    if (!el) return
+    const rect = el.getBoundingClientRect()
     const p = e.touches?.[0] || e
-    const cur = searchBarPos || { top: 8, left: 8 }
-    const start = { x: p.clientX, y: p.clientY, top: cur.top, left: cur.left }
+    const offX = p.clientX - rect.left
+    const offY = p.clientY - rect.top
+    el.style.transform = 'none'
+    el.style.transition = 'none'
+    el.style.willChange = 'left, top'
+    let last = { left: rect.left, top: rect.top }
     const move = (ev) => {
       const q = ev.touches?.[0] || ev
-      setSearchBarPos({
-        top: Math.max(4, Math.min(window.innerHeight - 60, start.top + (q.clientY - start.y))),
-        left: Math.max(4, Math.min(window.innerWidth - 90, start.left + (q.clientX - start.x))),
-      })
+      const left = Math.max(4, Math.min(window.innerWidth - rect.width - 4, q.clientX - offX))
+      const top = Math.max(4, Math.min(window.innerHeight - rect.height - 4, q.clientY - offY))
+      el.style.left = left + 'px'
+      el.style.top = top + 'px'
+      last = { left, top }
     }
     const end = () => {
       window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', end)
-      setSearchBarPos(prev => { try { localStorage.setItem('leadSearchBarPos', JSON.stringify(prev)) } catch {} ; return prev })
+      window.removeEventListener('touchmove', move); window.removeEventListener('touchend', end)
+      el.style.willChange = 'auto'
+      setSearchBarPos(last)
+      try { localStorage.setItem('leadSearchBarPos', JSON.stringify(last)) } catch {}
     }
     window.addEventListener('pointermove', move); window.addEventListener('pointerup', end)
+    window.addEventListener('touchmove', move, { passive: false }); window.addEventListener('touchend', end)
   }
   const [staleCheckDone, setStaleCheckDone] = useState(false)
   const [staleCheckResult, setStaleCheckResult] = useState(null)
@@ -1404,28 +1420,45 @@ export default function KanbanBoard({
         <div>
           <PeriodStatsBar leadService={leadService} coachId={coachId} isMobile={isMobile} refreshKey={statsRefreshKey} />
 
+          {/* Bord-acties: Warm-Up, + Sectie en fullscreen (verplaatst uit de
+              zoekbalk zodat die compact blijft). */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', padding: '0.4rem 0.1rem 0.2rem' }}>
+            <button onClick={() => setViewMode('warmup')} title="Warm-Up Board"
+              style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', padding: '0.4rem 0.7rem', background: 'rgba(225,48,108,0.1)', border: '1px solid rgba(225,48,108,0.3)', borderRadius: 8, color: '#E1306C', fontSize: '0.72rem', fontWeight: 700, cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}>
+              <Instagram size={14} /> Warm-Up
+            </button>
+            <button onClick={() => { setSelectedSection(null); setShowSectionModal(true) }} title="Nieuwe sectie toevoegen"
+              style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', padding: '0.4rem 0.7rem', background: 'rgba(16,185,129,0.12)', border: '1px solid rgba(16,185,129,0.4)', borderRadius: 8, color: '#10b981', fontSize: '0.72rem', fontWeight: 700, cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}>
+              <Plus size={14} /> Sectie
+            </button>
+            <button onClick={() => setIsFullscreen(true)} title="Volledig scherm"
+              style={{ marginLeft: 'auto', width: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, color: 'rgba(255,255,255,0.5)', cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}>
+              <Maximize2 size={15} />
+            </button>
+          </div>
+
           {/* Spacer: houdt de plek vast nu de toolbar fixed zweeft. */}
           <div style={{ height: isMobile ? 46 : 42, flexShrink: 0 }} />
           {/* ═══ ONE TOOLBAR ROW: Search + Warm-Up + Fullscreen + Sectie ═══
               Zweeft vast in beeld (fixed) en is sleepbaar via de grip, zodat de
               zoekbalk altijd bereikbaar is en je 'm kunt verplaatsen. */}
           {createPortal(
-          <div style={{
-            display: 'flex', alignItems: 'center', gap: '0.375rem',
+          <div ref={toolbarRef} style={{
+            display: 'flex', alignItems: 'center', gap: '0.3rem',
             position: 'fixed', zIndex: 320,
             ...(searchBarPos
-              ? { top: searchBarPos.top, left: searchBarPos.left, width: 'min(94vw, 640px)' }
-              : { top: isMobile ? 6 : 8, left: '50%', transform: 'translateX(-50%)', width: 'min(94vw, 640px)' }),
+              ? { top: searchBarPos.top, left: searchBarPos.left, width: 'min(94vw, 480px)' }
+              : { top: isMobile ? 6 : 8, left: '50%', transform: 'translateX(-50%)', width: 'min(94vw, 480px)' }),
             background: 'rgba(10,10,10,0.97)', backdropFilter: 'blur(8px)',
-            padding: '0.4rem 0.4rem', borderRadius: 10,
+            padding: '0.35rem', borderRadius: 12,
             border: '1px solid rgba(255,255,255,0.08)',
             boxShadow: '0 6px 20px rgba(0,0,0,0.5)',
           }}>
             {/* Sleep-grip */}
             <div onPointerDown={startSearchDrag} onTouchStart={startSearchDrag}
               title="Sleep om de zoekbalk te verplaatsen"
-              style={{ flexShrink: 0, display: 'flex', alignItems: 'center', padding: '0 0.1rem', cursor: 'grab', touchAction: 'none', color: 'rgba(255,215,0,0.6)' }}>
-              <GripVertical size={16} />
+              style={{ flexShrink: 0, display: 'flex', alignItems: 'center', padding: '0 0.05rem', cursor: 'grab', touchAction: 'none', color: 'rgba(255,215,0,0.7)' }}>
+              <GripVertical size={18} />
             </div>
             {/* Search */}
             <div style={{
@@ -1448,46 +1481,34 @@ export default function KanbanBoard({
               )}
             </div>
 
-            {/* Globale hot-leads toggle — toont alleen hot leads in ALLE
-                secties. Overschrijft per-sectie temperatuur-filter. */}
+            {/* Hot-leads toggle (icon-only) */}
             <button
               onClick={() => setGlobalHotOnly(v => !v)}
               title={globalHotOnly ? 'Toon alle leads weer' : 'Toon alleen hot leads (overal)'}
               style={{
-                display: 'inline-flex', alignItems: 'center', gap: '0.3rem',
-                padding: isMobile ? '0.3rem 0.5rem' : '0.35rem 0.625rem',
-                background: globalHotOnly ? 'rgba(239,68,68,0.15)' : 'rgba(255,255,255,0.03)',
-                border: `1px solid ${globalHotOnly ? 'rgba(239,68,68,0.45)' : 'rgba(255,255,255,0.06)'}`,
-                borderRadius: '6px',
-                color: globalHotOnly ? '#fca5a5' : 'rgba(255,255,255,0.5)',
-                fontSize: isMobile ? '0.7rem' : '0.72rem', fontWeight: 700,
-                cursor: 'pointer', minHeight: '28px',
-                touchAction: 'manipulation',
-                whiteSpace: 'nowrap',
+                width: 30, height: 30, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                background: globalHotOnly ? 'rgba(239,68,68,0.18)' : 'rgba(255,255,255,0.04)',
+                border: `1px solid ${globalHotOnly ? 'rgba(239,68,68,0.5)' : 'rgba(255,255,255,0.08)'}`,
+                borderRadius: 8, color: globalHotOnly ? '#f87171' : 'rgba(255,255,255,0.5)',
+                cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
               }}
             >
-              🔥 {isMobile ? 'Hot' : 'Hot leads'}
+              <Flame size={16} />
             </button>
 
-            {/* Calls-voorgesteld toggle — toont alleen leads waar de coach
-                al een call_proposal-bericht voor heeft gestuurd. */}
+            {/* Call-voorgesteld toggle (icon-only) */}
             <button
               onClick={() => setGlobalCallProposedOnly(v => !v)}
               title={globalCallProposedOnly ? 'Toon alle leads weer' : 'Toon alleen leads waar al een call voorgesteld is'}
               style={{
-                display: 'inline-flex', alignItems: 'center', gap: '0.3rem',
-                padding: isMobile ? '0.3rem 0.5rem' : '0.35rem 0.625rem',
-                background: globalCallProposedOnly ? 'rgba(212,175,55,0.15)' : 'rgba(255,255,255,0.03)',
-                border: `1px solid ${globalCallProposedOnly ? 'rgba(212,175,55,0.45)' : 'rgba(255,255,255,0.06)'}`,
-                borderRadius: '6px',
-                color: globalCallProposedOnly ? '#D4AF37' : 'rgba(255,255,255,0.5)',
-                fontSize: isMobile ? '0.7rem' : '0.72rem', fontWeight: 700,
-                cursor: 'pointer', minHeight: '28px',
-                touchAction: 'manipulation',
-                whiteSpace: 'nowrap',
+                width: 30, height: 30, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                background: globalCallProposedOnly ? 'rgba(212,175,55,0.18)' : 'rgba(255,255,255,0.04)',
+                border: `1px solid ${globalCallProposedOnly ? 'rgba(212,175,55,0.5)' : 'rgba(255,255,255,0.08)'}`,
+                borderRadius: 8, color: globalCallProposedOnly ? '#D4AF37' : 'rgba(255,255,255,0.5)',
+                cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
               }}
             >
-              📞 {isMobile ? 'Voorgest.' : 'Call voorgesteld'}
+              <Phone size={16} />
             </button>
 
             {/* Overkoepelende filter voor het HELE bord — Type, Temperatuur,
@@ -1498,24 +1519,23 @@ export default function KanbanBoard({
               const filterCount = boardFilter.types.size + boardFilter.temps.size + boardFilter.followups.size + (boardFilter.sort !== 'default' ? 1 : 0)
               const GOLD = '#FFD700'
               return (
-                <div style={{ position: 'relative' }} ref={boardFilterRef}>
+                <div style={{ position: 'relative', flexShrink: 0 }} ref={boardFilterRef}>
                   <button
                     onClick={() => setShowBoardFilter(v => !v)}
                     title="Filter & sorteer alle leads (hele bord)"
                     style={{
-                      display: 'inline-flex', alignItems: 'center', gap: '0.3rem',
-                      padding: isMobile ? '0.3rem 0.5rem' : '0.35rem 0.625rem',
-                      background: hasFilter ? 'rgba(255,215,0,0.15)' : 'rgba(255,255,255,0.03)',
-                      border: `1px solid ${hasFilter ? 'rgba(255,215,0,0.45)' : 'rgba(255,255,255,0.06)'}`,
-                      borderRadius: '6px',
+                      position: 'relative',
+                      width: 30, height: 30, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      background: hasFilter ? 'rgba(255,215,0,0.18)' : 'rgba(255,255,255,0.04)',
+                      border: `1px solid ${hasFilter ? 'rgba(255,215,0,0.5)' : 'rgba(255,255,255,0.08)'}`,
+                      borderRadius: 8,
                       color: hasFilter ? GOLD : 'rgba(255,255,255,0.5)',
-                      fontSize: isMobile ? '0.7rem' : '0.72rem', fontWeight: 700,
-                      cursor: 'pointer', minHeight: '28px', touchAction: 'manipulation', whiteSpace: 'nowrap',
+                      cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
                     }}
                   >
-                    <ArrowUpDown size={12} /> Filter
+                    <SlidersHorizontal size={16} />
                     {filterCount > 0 && (
-                      <span style={{ background: GOLD, color: '#000', borderRadius: 8, padding: '0 5px', fontSize: '0.6rem', fontWeight: 900 }}>{filterCount}</span>
+                      <span style={{ position: 'absolute', top: -5, right: -5, minWidth: 15, height: 15, background: GOLD, color: '#000', borderRadius: 8, padding: '0 3px', fontSize: '0.55rem', fontWeight: 900, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{filterCount}</span>
                     )}
                   </button>
                   {showBoardFilter && (
@@ -1597,58 +1617,16 @@ export default function KanbanBoard({
               )
             })()}
 
-            {/* Mijn berichten — outreach loggen + metrics in één scherm */}
+            {/* Mijn berichten (icon-only) */}
             <button onClick={() => setShowOutreachLogger(true)}
+              title="Bekijk je berichten en log hoeveel je vandaag verstuurde"
               style={{
-                padding: '0 0.6rem', height: '28px',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                gap: '0.3rem',
-                background: 'rgba(225,48,108,0.12)',
-                border: '1px solid rgba(225,48,108,0.35)',
-                borderRadius: '6px',
-                color: '#E1306C',
-                fontSize: '0.62rem', fontWeight: '800',
-                cursor: 'pointer',
+                width: 30, height: 30, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                background: 'rgba(225,48,108,0.14)', border: '1px solid rgba(225,48,108,0.4)',
+                borderRadius: 8, color: '#E1306C', cursor: 'pointer',
                 touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-                flexShrink: 0, whiteSpace: 'nowrap',
-              }}
-              title="Bekijk je berichten en log hoeveel je vandaag verstuurde">
-              <Send size={11} />
-              {isMobile ? 'DMs' : 'Mijn berichten'}
-            </button>
-
-            {/* Snel leads toevoegen — tempo-flow met toetsenbord */}
-            <button onClick={() => setShowRapidAdd(true)}
-              style={{
-                padding: '0 0.6rem', height: '28px',
-                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.3rem',
-                background: 'rgba(255,215,0,0.14)', border: '1px solid rgba(255,215,0,0.4)',
-                borderRadius: '6px', color: '#FFD700', fontSize: '0.62rem', fontWeight: 800,
-                cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-                flexShrink: 0, whiteSpace: 'nowrap',
-              }}
-              title="Snel meerdere leads toevoegen (campagne of lead magnet)">
-              <Zap size={11} />
-              {isMobile ? 'Snel' : 'Snel toevoegen'}
-            </button>
-
-            {/* Warm-Up icon */}
-            <button onClick={() => setViewMode('warmup')}
-              style={{ width: '28px', height: '28px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'transparent', border: '1px solid rgba(225,48,108,0.15)', borderRadius: '6px', color: 'rgba(225,48,108,0.5)', cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', flexShrink: 0 }}
-              title="Warm-Up Board">
-              <Instagram size={12} />
-            </button>
-
-            {/* Fullscreen */}
-            <button onClick={() => setIsFullscreen(true)}
-              style={{ width: '28px', height: '28px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'transparent', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '6px', color: 'rgba(255,255,255,0.25)', cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', flexShrink: 0 }}>
-              <Maximize2 size={12} />
-            </button>
-
-            {/* + Sectie */}
-            <button onClick={() => { setSelectedSection(null); setShowSectionModal(true) }}
-              style={{ padding: '0 0.5rem', height: '28px', background: '#10b981', border: 'none', borderRadius: '6px', color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.2rem', fontSize: '0.6rem', fontWeight: '700', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', flexShrink: 0, whiteSpace: 'nowrap' }}>
-              <Plus size={10} /> Sectie
+              }}>
+              <Send size={16} />
             </button>
           </div>, document.body)}
 
