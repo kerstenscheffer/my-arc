@@ -257,8 +257,7 @@ export default function PublicIntakePage() {
     const email = (personalData?.email || '').trim().toLowerCase()
     if (!email.includes('@')) return
     const t = setTimeout(() => {
-      supabase.from('intake_drafts')
-        .upsert({ email, data: { personalData, workoutData }, phase, updated_at: new Date().toISOString() }, { onConflict: 'email' })
+      supabase.rpc('save_intake_draft', { p_email: email, p_data: { personalData, workoutData }, p_phase: phase })
         .then(({ error }) => { if (error) console.warn('Draft opslaan mislukt:', error) })
     }, 700)
     return () => clearTimeout(t)
