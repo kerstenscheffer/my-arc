@@ -15,22 +15,32 @@ const PERIODS = [
   { id: 'day', label: 'Vandaag' },
   { id: 'week', label: 'Deze week' },
   { id: 'month', label: 'Deze maand' },
+  { id: 'lastMonth', label: 'Vorige maand' },
+  { id: 'custom', label: 'Aangepaste datum' },
 ]
 
+const dmFmt = (x) => x.toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })
+
 // Datum/periode-subtekst onder de dropdown (zoals de meal-pagina datum-regel).
-function subLabelFor(period) {
+function subLabelFor(period, custom) {
   const now = new Date()
   if (period === 'day') return now.toLocaleDateString('nl-NL', { weekday: 'long', day: 'numeric', month: 'long' })
   if (period === 'week') {
     const s = new Date(now); const d = s.getDay(); s.setDate(s.getDate() + (d === 0 ? -6 : 1 - d)); s.setHours(0, 0, 0, 0)
     const e = new Date(s); e.setDate(s.getDate() + 6)
-    const fmt = (x) => x.toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })
-    return `${fmt(s)} – ${fmt(e)}`
+    return `${dmFmt(s)} – ${dmFmt(e)}`
+  }
+  if (period === 'lastMonth') {
+    return new Date(now.getFullYear(), now.getMonth() - 1, 1).toLocaleDateString('nl-NL', { month: 'long', year: 'numeric' })
+  }
+  if (period === 'custom') {
+    if (custom?.start && custom?.end) return `${dmFmt(new Date(custom.start))} – ${dmFmt(new Date(custom.end))}`
+    return 'Kies een periode →'
   }
   return now.toLocaleDateString('nl-NL', { month: 'long', year: 'numeric' })
 }
 
-function rangeFor(period) {
+function rangeFor(period, custom) {
   const now = new Date()
   const start = new Date(now)
   if (period === 'day') {
@@ -40,6 +50,18 @@ function rangeFor(period) {
     const diff = day === 0 ? -6 : 1 - day // maandag-start
     start.setDate(start.getDate() + diff)
     start.setHours(0, 0, 0, 0)
+  } else if (period === 'lastMonth') {
+    const s = new Date(now.getFullYear(), now.getMonth() - 1, 1, 0, 0, 0, 0)
+    const e = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0, 0) // begin deze maand = eind vorige
+    return { start: s.toISOString(), end: e.toISOString() }
+  } else if (period === 'custom') {
+    if (custom?.start && custom?.end) {
+      const s = new Date(custom.start + 'T00:00:00')
+      const e = new Date(custom.end + 'T23:59:59')
+      return { start: s.toISOString(), end: e.toISOString() }
+    }
+    start.setHours(0, 0, 0, 0) // nog geen datums → val terug op vandaag
+    return { start: start.toISOString(), end: now.toISOString() }
   } else {
     start.setDate(1)
     start.setHours(0, 0, 0, 0)
@@ -49,6 +71,7 @@ function rangeFor(period) {
 
 export default function PeriodStatsBar({ leadService, coachId, isMobile, refreshKey = 0 }) {
   const [period, setPeriod] = useState('day')
+  const [customRange, setCustomRange] = useState({ start: '', end: '' })
   const [open, setOpen] = useState(false)
   const [showWeek, setShowWeek] = useState(false)
   const [showSOP, setShowSOP] = useState(false)
@@ -61,7 +84,7 @@ export default function PeriodStatsBar({ leadService, coachId, isMobile, refresh
     const load = async (silent = false) => {
       if (!silent) setLoading(true)
       try {
-        const { start, end } = rangeFor(period)
+        const { start, end } = rangeFor(period, customRange)
         const [funnel, react] = await Promise.all([
           leadService.getRangeFunnelStats(coachId, start, end),
           leadService.getRangeReactionStats ? leadService.getRangeReactionStats(coachId, start, end) : Promise.resolve(null),
@@ -92,9 +115,9 @@ export default function PeriodStatsBar({ leadService, coachId, isMobile, refresh
     return () => { alive = false; clearInterval(id) }
     // refreshKey verandert bij elke reactie/DM/lead-mutatie in het bord, zodat
     // de bovenste stat-bar direct meeloopt (i.p.v. pas bij periode-wissel).
-  }, [period, coachId, leadService, refreshKey])
+  }, [period, customRange, coachId, leadService, refreshKey])
 
-  const periodLabel = PERIODS.find(p => p.id === period)?.label || 'Week'
+  const periodLabel = period === 'custom' ? 'Aangepast' : (PERIODS.find(p => p.id === period)?.label || 'Week')
   const items = [
     { label: 'Nieuwe leads', value: s.nieuw },
     { label: 'Follow-ups', value: s.follow },
@@ -125,19 +148,35 @@ export default function PeriodStatsBar({ leadService, coachId, isMobile, refresh
               <ChevronDown size={isMobile ? 18 : 20} color="#fff" strokeWidth={3.5} style={{ transform: open ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s ease' }} />
             </span>
             <span style={{ fontSize: isMobile ? '0.7rem' : '0.78rem', fontWeight: 600, color: 'rgba(255,255,255,0.5)', lineHeight: 1, whiteSpace: 'nowrap' }}>
-              {subLabelFor(period)}
+              {subLabelFor(period, customRange)}
             </span>
           </button>
           {open && (
             <>
               <div onClick={() => setOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 2147483646 }} />
-              <div style={{ position: 'absolute', top: '100%', left: 0, marginTop: 6, zIndex: 2147483647, background: '#141414', border: '1px solid rgba(255,215,0,0.25)', borderRadius: 10, overflow: 'hidden', minWidth: 130, boxShadow: '0 10px 30px rgba(0,0,0,0.6)' }}>
+              <div style={{ position: 'absolute', top: '100%', left: 0, marginTop: 6, zIndex: 2147483647, background: '#141414', border: '1px solid rgba(255,215,0,0.25)', borderRadius: 10, overflow: 'hidden', minWidth: 170, boxShadow: '0 10px 30px rgba(0,0,0,0.6)' }}>
                 {PERIODS.map(p => (
-                  <button key={p.id} onClick={() => { setPeriod(p.id); setOpen(false) }}
+                  <button key={p.id} onClick={() => { setPeriod(p.id); if (p.id !== 'custom') setOpen(false) }}
                     style={{ width: '100%', textAlign: 'left', padding: '0.65rem 0.85rem', background: p.id === period ? 'rgba(255,215,0,0.1)' : 'transparent', border: 'none', color: p.id === period ? GOLD : 'rgba(255,255,255,0.75)', fontSize: '0.9rem', fontWeight: p.id === period ? 800 : 600, cursor: 'pointer' }}>
                     {p.label}
                   </button>
                 ))}
+                {period === 'custom' && (
+                  <div style={{ padding: '0.6rem 0.85rem 0.75rem', borderTop: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,215,0,0.03)', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                    <label style={{ display: 'flex', flexDirection: 'column', gap: 3, fontSize: '0.62rem', fontWeight: 700, color: 'rgba(255,255,255,0.45)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                      Van
+                      <input type="date" value={customRange.start} max={customRange.end || undefined}
+                        onChange={e => setCustomRange(r => ({ ...r, start: e.target.value }))}
+                        style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,215,0,0.3)', borderRadius: 6, color: '#fff', fontSize: '0.8rem', fontWeight: 700, padding: '0.35rem 0.5rem', fontFamily: 'inherit', outline: 'none', colorScheme: 'dark' }} />
+                    </label>
+                    <label style={{ display: 'flex', flexDirection: 'column', gap: 3, fontSize: '0.62rem', fontWeight: 700, color: 'rgba(255,255,255,0.45)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                      Tot
+                      <input type="date" value={customRange.end} min={customRange.start || undefined}
+                        onChange={e => setCustomRange(r => ({ ...r, end: e.target.value }))}
+                        style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,215,0,0.3)', borderRadius: 6, color: '#fff', fontSize: '0.8rem', fontWeight: 700, padding: '0.35rem 0.5rem', fontFamily: 'inherit', outline: 'none', colorScheme: 'dark' }} />
+                    </label>
+                  </div>
+                )}
               </div>
             </>
           )}
@@ -159,7 +198,7 @@ export default function PeriodStatsBar({ leadService, coachId, isMobile, refresh
 
         {/* Week-analytics + SOP — belangrijk, groot en duidelijk */}
         <button onClick={() => setShowWeek(true)} style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: '0.4rem', padding: isMobile ? '0.4rem 0.65rem' : '0.45rem 0.85rem', background: 'rgba(255,215,0,0.12)', border: `1.5px solid ${GOLD}`, borderRadius: 8, color: GOLD, fontSize: isMobile ? '0.72rem' : '0.82rem', fontWeight: 900, cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', whiteSpace: 'nowrap' }}>
-          <BarChart3 size={14} /> Week
+          <BarChart3 size={14} /> Volledige stats
         </button>
         <button onClick={() => setShowSOP(true)} style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: '0.4rem', padding: isMobile ? '0.4rem 0.65rem' : '0.45rem 0.85rem', background: 'rgba(255,255,255,0.06)', border: '1.5px solid rgba(255,255,255,0.2)', borderRadius: 8, color: '#fff', fontSize: isMobile ? '0.72rem' : '0.82rem', fontWeight: 900, cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', whiteSpace: 'nowrap' }}>
           <BookOpen size={14} /> SOP
