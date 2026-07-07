@@ -3,15 +3,31 @@
 // (/myintake en /nutritionintake). Vervangt de directe anon-queries op
 // clients, zodat de anon RLS-policies op clients dicht kunnen.
 //
-// Draait op de service_role key (SUPABASE_SERVICE_KEY in Vercel env);
-// valt terug op de anon key zolang die env var nog niet gezet is —
-// dan werken de calls alleen zolang de anon-policies op clients open staan.
+// Voorkeur: service_role key (bypasst RLS). De env-varnaam verschilt per
+// Vercel-setup — de officiële Supabase-integratie gebruikt
+// SUPABASE_SERVICE_ROLE_KEY, niet SUPABASE_SERVICE_KEY. We proberen alle
+// gangbare namen. Als absolute terugval de PUBLIEKE anon-key (die staat ook
+// in de client-bundle, dus veilig om te embedden). Zo crasht dit endpoint
+// NOOIT meer bij module-load door een ontbrekende env-var — dat was de
+// oorzaak van de lege "find-client failed (500)". De anon-terugval werkt
+// zolang de clients-policies read_all/update_all open staan.
 import { createClient } from '@supabase/supabase-js';
 
-const supabase = createClient(
-  process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_KEY || process.env.VITE_SUPABASE_ANON_KEY
-);
+const SUPABASE_URL =
+  process.env.SUPABASE_URL ||
+  process.env.VITE_SUPABASE_URL ||
+  process.env.NEXT_PUBLIC_SUPABASE_URL ||
+  'https://xlaycpwpnhjmulfsnynh.supabase.co';
+
+const SUPABASE_KEY =
+  process.env.SUPABASE_SERVICE_ROLE_KEY ||
+  process.env.SUPABASE_SERVICE_KEY ||
+  process.env.SUPABASE_ANON_KEY ||
+  process.env.VITE_SUPABASE_ANON_KEY ||
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhsYXljcHdwbmhqbXVsZnNueW5oIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUwMTEzNDUsImV4cCI6MjA3MDU4NzM0NX0.19WRJrOO4Yll95w9j8qa8ZgoXFiwPK39farBuNSyd6c';
+
+const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 // Alleen intake-gerelateerde kolommen mogen via dit endpoint geschreven
 // worden. Nooit: email, status, trainer_id, coach_id, auth_user_id, id.
