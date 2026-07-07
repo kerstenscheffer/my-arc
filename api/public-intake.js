@@ -15,19 +15,35 @@ import { createClient } from '@supabase/supabase-js';
 
 // Versie-marker — curl `/api/public-intake?diag=1` geeft dit terug. Zo zie je
 // meteen of een deploy de nieuwe code écht live heeft (i.p.v. gokken).
-const VERSION = 'pi-2026-07-07-diag1';
+const VERSION = 'pi-2026-07-07-diag2-urlvalidate';
 
 const HARDCODED_ANON =
   'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhsYXljcHdwbmhqbXVsZnNueW5oIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUwMTEzNDUsImV4cCI6MjA3MDU4NzM0NX0.19WRJrOO4Yll95w9j8qa8ZgoXFiwPK39farBuNSyd6c';
 
+// Een env-var kan gezet zijn maar KAPOT (bv. SUPABASE_URL met een spatie/newline
+// of een verkeerde waarde → createClient gooit "Invalid supabaseUrl"). Daarom
+// valideren we en slaan we ongeldige waarden over i.p.v. er blind op te vertrouwen.
+function isValidHttpUrl(u) {
+  if (!u || typeof u !== 'string') return false;
+  try {
+    const p = new URL(u.trim());
+    return p.protocol === 'https:' || p.protocol === 'http:';
+  } catch { return false; }
+}
+
 function pickUrl() {
-  if (process.env.SUPABASE_URL) return { name: 'SUPABASE_URL', val: process.env.SUPABASE_URL };
-  if (process.env.VITE_SUPABASE_URL) return { name: 'VITE_SUPABASE_URL', val: process.env.VITE_SUPABASE_URL };
-  if (process.env.NEXT_PUBLIC_SUPABASE_URL) return { name: 'NEXT_PUBLIC_SUPABASE_URL', val: process.env.NEXT_PUBLIC_SUPABASE_URL };
+  const cands = [
+    ['SUPABASE_URL', process.env.SUPABASE_URL],
+    ['VITE_SUPABASE_URL', process.env.VITE_SUPABASE_URL],
+    ['NEXT_PUBLIC_SUPABASE_URL', process.env.NEXT_PUBLIC_SUPABASE_URL],
+  ];
+  for (const [name, val] of cands) if (isValidHttpUrl(val)) return { name, val: val.trim() };
   return { name: 'HARDCODED_URL', val: 'https://xlaycpwpnhjmulfsnynh.supabase.co' };
 }
 
 function pickKey() {
+  // Supabase legacy anon/service keys zijn JWT's → beginnen met "eyJ".
+  // Een waarde die daar niet aan voldoet is kapot; overslaan.
   const order = [
     ['SUPABASE_SERVICE_ROLE_KEY', process.env.SUPABASE_SERVICE_ROLE_KEY],
     ['SUPABASE_SERVICE_KEY', process.env.SUPABASE_SERVICE_KEY],
@@ -35,7 +51,7 @@ function pickKey() {
     ['VITE_SUPABASE_ANON_KEY', process.env.VITE_SUPABASE_ANON_KEY],
     ['NEXT_PUBLIC_SUPABASE_ANON_KEY', process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY],
   ];
-  for (const [name, val] of order) if (val && val.trim()) return { name, val };
+  for (const [name, val] of order) if (val && val.trim().startsWith('eyJ')) return { name, val: val.trim() };
   return { name: 'HARDCODED_ANON', val: HARDCODED_ANON };
 }
 
