@@ -13,21 +13,55 @@
 // zolang de clients-policies read_all/update_all open staan.
 import { createClient } from '@supabase/supabase-js';
 
-const SUPABASE_URL =
-  process.env.SUPABASE_URL ||
-  process.env.VITE_SUPABASE_URL ||
-  process.env.NEXT_PUBLIC_SUPABASE_URL ||
-  'https://xlaycpwpnhjmulfsnynh.supabase.co';
+// Versie-marker — curl `/api/public-intake?diag=1` geeft dit terug. Zo zie je
+// meteen of een deploy de nieuwe code écht live heeft (i.p.v. gokken).
+const VERSION = 'pi-2026-07-07-diag1';
 
-const SUPABASE_KEY =
-  process.env.SUPABASE_SERVICE_ROLE_KEY ||
-  process.env.SUPABASE_SERVICE_KEY ||
-  process.env.SUPABASE_ANON_KEY ||
-  process.env.VITE_SUPABASE_ANON_KEY ||
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
+const HARDCODED_ANON =
   'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhsYXljcHdwbmhqbXVsZnNueW5oIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUwMTEzNDUsImV4cCI6MjA3MDU4NzM0NX0.19WRJrOO4Yll95w9j8qa8ZgoXFiwPK39farBuNSyd6c';
 
-const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
+function pickUrl() {
+  if (process.env.SUPABASE_URL) return { name: 'SUPABASE_URL', val: process.env.SUPABASE_URL };
+  if (process.env.VITE_SUPABASE_URL) return { name: 'VITE_SUPABASE_URL', val: process.env.VITE_SUPABASE_URL };
+  if (process.env.NEXT_PUBLIC_SUPABASE_URL) return { name: 'NEXT_PUBLIC_SUPABASE_URL', val: process.env.NEXT_PUBLIC_SUPABASE_URL };
+  return { name: 'HARDCODED_URL', val: 'https://xlaycpwpnhjmulfsnynh.supabase.co' };
+}
+
+function pickKey() {
+  const order = [
+    ['SUPABASE_SERVICE_ROLE_KEY', process.env.SUPABASE_SERVICE_ROLE_KEY],
+    ['SUPABASE_SERVICE_KEY', process.env.SUPABASE_SERVICE_KEY],
+    ['SUPABASE_ANON_KEY', process.env.SUPABASE_ANON_KEY],
+    ['VITE_SUPABASE_ANON_KEY', process.env.VITE_SUPABASE_ANON_KEY],
+    ['NEXT_PUBLIC_SUPABASE_ANON_KEY', process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY],
+  ];
+  for (const [name, val] of order) if (val && val.trim()) return { name, val };
+  return { name: 'HARDCODED_ANON', val: HARDCODED_ANON };
+}
+
+// Lazy singleton — bouw de client PAS in de handler (binnen try/catch), zodat
+// een fout hier nooit een ongevangen module-load crash (FUNCTION_INVOCATION_FAILED)
+// geeft, maar een nette JSON-fout met uitleg.
+let _supabase = null;
+function getClient() {
+  if (!_supabase) _supabase = createClient(pickUrl().val, pickKey().val);
+  return _supabase;
+}
+
+// Diagnose zonder secrets te lekken: alleen namen + of ze gezet zijn (+ lengte).
+function envDiag() {
+  const names = [
+    'SUPABASE_URL', 'VITE_SUPABASE_URL', 'NEXT_PUBLIC_SUPABASE_URL',
+    'SUPABASE_SERVICE_ROLE_KEY', 'SUPABASE_SERVICE_KEY', 'SUPABASE_ANON_KEY',
+    'VITE_SUPABASE_ANON_KEY', 'NEXT_PUBLIC_SUPABASE_ANON_KEY',
+  ];
+  const env = {};
+  for (const n of names) {
+    const v = process.env[n];
+    env[n] = v ? `set(len=${v.length})` : 'MISSING';
+  }
+  return { version: VERSION, urlSource: pickUrl().name, keySource: pickKey().name, env };
+}
 
 // Alleen intake-gerelateerde kolommen mogen via dit endpoint geschreven
 // worden. Nooit: email, status, trainer_id, coach_id, auth_user_id, id.
@@ -54,12 +88,19 @@ const ALLOWED_UPDATE_FIELDS = new Set([
 ]);
 
 export default async function handler(req, res) {
+  // Diagnose-route: GET of ?diag=1 → laat versie + env-status zien zonder
+  // secrets. Zo controleer je met één curl of de nieuwe code live staat.
+  if (req.method === 'GET' || req.query?.diag === '1' || (req.body && req.body.action === 'diag')) {
+    return res.status(200).json(envDiag());
+  }
+
   if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method not allowed' });
+    return res.status(405).json({ error: 'Method not allowed', version: VERSION });
   }
 
   try {
     const { action } = req.body || {};
+    const supabase = getClient();
 
     if (action === 'find-client') {
       const email = (req.body.email || '').toLowerCase().trim();
@@ -112,9 +153,29 @@ export default async function handler(req, res) {
       return res.status(200).json({ success: true });
     }
 
-    return res.status(400).json({ error: `unknown action: ${action}` });
+    return res.status(400).json({ error: `unknown action: ${action}`, version: VERSION });
   } catch (error) {
-    console.error('❌ public-intake error:', error);
-    return res.status(500).json({ error: error.message || 'internal error' });
+    // Rijke log in Vercel Functions + volledige uitleg in de JSON-respons,
+    // zodat de browserconsole precies laat zien WAAROM het faalt (env, key-bron,
+    // Supabase-foutmelding) i.p.v. een blinde "(500)".
+    const diag = envDiag();
+    console.error('❌ public-intake error:', {
+      message: error?.message,
+      name: error?.name,
+      code: error?.code,
+      hint: error?.hint,
+      keySource: diag.keySource,
+      urlSource: diag.urlSource,
+      env: diag.env,
+      stack: error?.stack,
+    });
+    return res.status(500).json({
+      error: error?.message || 'internal error',
+      code: error?.code || null,
+      hint: error?.hint || null,
+      keySource: diag.keySource,
+      urlSource: diag.urlSource,
+      version: VERSION,
+    });
   }
 }
