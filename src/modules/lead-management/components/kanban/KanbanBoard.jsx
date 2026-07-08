@@ -3,7 +3,7 @@
 // ALL LOGIC PRESERVED 1:1 FROM v6.4
 // STYLING: Compact headers, flush rows, no gradients, no glow, no boxShadow animations
 
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useLayoutEffect, useCallback, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { Plus, Settings, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, GripVertical, Save, RotateCcw, Users, Instagram, Search, X, ArrowUp, ArrowUpDown, Clock, Maximize2, Minimize2, CheckCircle, Send, Zap, Flame, Phone, SlidersHorizontal } from 'lucide-react'
 import KanbanCard from './KanbanCard'
@@ -256,30 +256,44 @@ export default function KanbanBoard({
   // oude sticky-versie.
   const toolbarRef = useRef(null)
   const barSlotRef = useRef(null)
-  const [barBox, setBarBox] = useState(null)     // { top, left, width } van de fixed balk
-  const [barHeight, setBarHeight] = useState(0)  // hoogte om de placeholder te vullen (geen sprong)
+  const naturalTopRef = useRef(0)                 // document-offset van de natuurlijke plek
+  const [barHoriz, setBarHoriz] = useState({ left: 8, width: 0 })  // links/breedte (wijzigt alleen bij resize)
+  const [barHeight, setBarHeight] = useState(0)   // hoogte om de placeholder te vullen (geen sprong)
   const PIN_OFFSET = isMobile ? 8 : 12
-  useEffect(() => {
-    let raf = 0
-    const measure = () => {
-      raf = 0
+  // Webshop-header-gedrag. De balk staat hard op z'n natuurlijke plek en schuift
+  // 1:1 met de pagina mee (top = natuurlijk − scroll); zodra dat onder PIN_OFFSET
+  // zakt klemt 'ie daar vast en blijft in beeld. De top wordt DIRECT in de DOM
+  // gezet (geen setState → geen re-render van het zware bord → botersmooth).
+  // left/width veranderen alleen bij resize. Portal naar body voorkomt dat een
+  // ouder met overflow/transform 'm vangt — dát brak de oude sticky-versie.
+  useLayoutEffect(() => {
+    const positionTop = () => {
+      const el = toolbarRef.current
+      if (!el) return
+      el.style.top = Math.max(PIN_OFFSET, naturalTopRef.current - window.scrollY) + 'px'
+    }
+    const measureLayout = () => {
       const slot = barSlotRef.current
       if (!slot) return
       const r = slot.getBoundingClientRect()
-      setBarBox({ top: Math.max(PIN_OFFSET, Math.round(r.top)), left: Math.round(r.left), width: Math.round(r.width) })
+      naturalTopRef.current = r.top + window.scrollY
+      const left = Math.round(r.left), width = Math.round(r.width)
+      setBarHoriz(prev => (prev.left !== left || prev.width !== width) ? { left, width } : prev)
       const h = toolbarRef.current?.offsetHeight
       if (h && h !== barHeight) setBarHeight(h)
+      positionTop()
     }
-    const onScrollResize = () => { if (!raf) raf = requestAnimationFrame(measure) }
-    measure()
-    window.addEventListener('scroll', onScrollResize, { passive: true })
-    window.addEventListener('resize', onScrollResize)
+    let raf = 0
+    const onScroll = () => { if (!raf) raf = requestAnimationFrame(() => { raf = 0; positionTop() }) }
+    measureLayout()
+    window.addEventListener('scroll', onScroll, { passive: true })
+    window.addEventListener('resize', measureLayout)
     return () => {
-      window.removeEventListener('scroll', onScrollResize)
-      window.removeEventListener('resize', onScrollResize)
+      window.removeEventListener('scroll', onScroll)
+      window.removeEventListener('resize', measureLayout)
       if (raf) cancelAnimationFrame(raf)
     }
-  }, [barHeight, PIN_OFFSET, loading, sections.length])
+  }, [barHeight, PIN_OFFSET, loading, sections.length, statsRefreshKey])
   const [staleCheckDone, setStaleCheckDone] = useState(false)
   const [staleCheckResult, setStaleCheckResult] = useState(null)
   const [snoozeSection, setSnoozeSection] = useState(null)
@@ -1424,9 +1438,9 @@ export default function KanbanBoard({
           {createPortal(
           <div ref={toolbarRef} style={{
             position: 'fixed', zIndex: 500,
-            top: barBox ? barBox.top : (isMobile ? 68 : 76),
-            left: barBox ? barBox.left : 8,
-            width: barBox ? barBox.width : 'calc(100vw - 16px)',
+            top: isMobile ? 68 : 76,   // initieel; useLayoutEffect zet de echte top vóór paint
+            left: barHoriz.left,
+            width: barHoriz.width || 'calc(100vw - 16px)',
           }}>
           <div style={{
             display: 'flex', alignItems: 'center', gap: '0.3rem', flexWrap: 'wrap',
