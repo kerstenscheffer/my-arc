@@ -1443,18 +1443,42 @@ export default function KanbanBoard({
         <div>
           <PeriodStatsBar leadService={leadService} coachId={coachId} isMobile={isMobile} refreshKey={statsRefreshKey} />
 
-          {/* ═══ STICKY ACTIE-RIJ: [Warm-Up] [zoekbalk] [Sectie] [fullscreen] ═══
-              position:sticky → vaste plek in de flow tussen Warm-Up en Sectie,
-              maar blijft in beeld zodra je naar onder scrollt. De resultaten-
-              dropdown zit in dezelfde sticky wrapper en scrollt dus mee. */}
-          <div style={{ position: 'sticky', top: 0, zIndex: 320, margin: '0.4rem 0' }}>
+          {/* ═══ ZWEVENDE ACTIE-RIJ: [sleep] [zoekbalk] [hot] [call] [filter] [Sectie] [fullscreen] ═══
+              position:fixed via createPortal(document.body) → kleeft aan het
+              scherm en blijft ALTIJD in beeld tijdens scrollen (net als de
+              "Naar boven"-knop). Sleepbaar aan het handvat; positie onthouden
+              in localStorage (searchBarPos). Portal naar body voorkomt dat een
+              ouder met overflow/transform 'm vangt — dát was waarom sticky niet
+              werkte. */}
+          {createPortal(
+          <div ref={toolbarRef} style={{
+            position: 'fixed', zIndex: 500,
+            width: isMobile ? 'calc(100vw - 12px)' : 'min(700px, calc(100vw - 24px))',
+            ...(searchBarPos
+              ? { top: searchBarPos.top, left: searchBarPos.left }
+              : { top: isMobile ? 68 : 76, left: '50%', transform: 'translateX(-50%)' }),
+          }}>
           <div style={{
             display: 'flex', alignItems: 'center', gap: '0.3rem', flexWrap: 'wrap',
             padding: '0.4rem', borderRadius: 12,
             background: 'rgba(10,10,10,0.97)', backdropFilter: 'blur(8px)',
             border: '1px solid rgba(255,255,255,0.08)',
-            boxShadow: '0 4px 14px rgba(0,0,0,0.4)',
+            boxShadow: '0 8px 24px rgba(0,0,0,0.55)',
           }}>
+            {/* Sleep-handvat — pak hier vast om de balk te verplaatsen */}
+            <button
+              onMouseDown={startSearchDrag}
+              onTouchStart={startSearchDrag}
+              title="Sleep de zoekbalk naar waar je wilt"
+              style={{
+                width: 26, height: 30, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                background: 'transparent', border: 'none', borderRadius: 6,
+                color: 'rgba(255,255,255,0.3)', cursor: 'grab', touchAction: 'none', WebkitTapHighlightColor: 'transparent',
+              }}
+            >
+              <GripVertical size={16} />
+            </button>
+
             {/* Search */}
             <div style={{
               flex: 1, minWidth: 120, display: 'flex', alignItems: 'center', gap: '0.35rem',
@@ -1757,7 +1781,7 @@ export default function KanbanBoard({
               })()}
             </>
           )}
-          </div>
+          </div>, document.body)}
 
           {/* Inline notifications — ultra compact, borderLeft only */}
           {staleCheckResult && staleCheckResult.moved > 0 && (
