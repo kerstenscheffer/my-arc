@@ -3,7 +3,7 @@
 // prop `highlight` → highlight-variant met dikke gouden linker-accent-rand.
 // (Max één highlight-kaart per scherm — dat is een contract-regel, niet
 //  afdwingbaar in code; houd je eraan.)
-import { colors, radius, space } from './tokens'
+import { colors, radius, space, shadow } from './tokens'
 
 export default function Card({ highlight = false, style, children, ...rest }) {
   return (
@@ -14,6 +14,8 @@ export default function Card({ highlight = false, style, children, ...rest }) {
         padding: space[4],
         border: `1px solid ${highlight ? colors.accent : colors.borderSubtle}`,
         borderLeft: highlight ? `4px solid ${colors.accent}` : `1px solid ${colors.borderSubtle}`,
+        // Highlight-kaart krijgt dezelfde subtiele gouden gloed als een actief element.
+        boxShadow: highlight ? shadow.glow : 'none',
         boxSizing: 'border-box',
         ...style,
       }}

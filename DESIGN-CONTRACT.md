@@ -1,5 +1,7 @@
 # DESIGN CONTRACT — MY ARC (klant-app + coachhub)
 
+**Bron van waarheid: de workout-dagpagina van de klant-app. Bij twijfel wint die pagina.**
+
 > Dit is de wet voor alle UI in dit project. Elke pagina, component en refactor
 > moet hieraan voldoen. Referentie: de Workout-pagina van de klant-app.
 > Bij twijfel: kijk hoe de Workout-pagina het doet.
@@ -37,6 +39,14 @@ of willekeurige pixel-waardes in componenten.
   --radius-pill: 999px;
   --border-subtle: rgba(255, 255, 255, 0.08);
   --border-active: var(--accent);
+
+  /* Signatuur uit de workout-pagina (echte waardes, geen schatting) */
+  --glow: 0 6px 18px rgba(255, 215, 0, 0.22);                                  /* actief element / knop */
+  --glow-strong: 0 10px 24px rgba(255, 215, 0, 0.3), 0 2px 6px rgba(0,0,0,0.5);/* prominente knop */
+  --overlay: rgba(0, 0, 0, 0.95);                                             /* modal-overlay */
+  --overlay-blur: blur(20px);                                                 /* modal backdrop-filter */
+  --gradient-image: linear-gradient(180deg, transparent 0%, rgba(0,0,0,0.45) 100%); /* tekst-op-foto */
+  --gradient-accent: linear-gradient(90deg, #ffd700 0%, #ffa500 100%);        /* progressbalk / gouden vlak */
 
   /* Spacing-schaal: alleen 4, 8, 12, 16, 24, 32 px */
   --space-1: 4px;
@@ -107,9 +117,21 @@ Nooit meer dan 3 tekstgroottes op één scherm.
 eyebrow + chevron. Standaard ingeklapt.
 
 **Primaire knop:** gele achtergrond, zwarte bold tekst, radius 12px,
-min-hoogte 48px. Eén primaire knop per scherm.
+min-hoogte 48px, **gouden gloed** (`--glow`). Eén primaire knop per scherm.
 
 **Secundaire knop:** transparant, gele outline of gele tekst.
+
+**ImageCard (foto-kaart):** foto als achtergrond (`cover`, `center`) + de
+leesbaarheids-gradient `--gradient-image` eroverheen. Onderin: eyebrow + titel
+(met tekst-shadow). Optioneel: badge rechtsboven (bijv. percentage, gouden pill
+met zwarte tekst) en een progressiebalk onderaan (`--gradient-accent`). Actieve
+staat (bijv. "vandaag"): gouden rand + `--glow`. Compacte variant voor kleine
+tegels (zoals de week-dag-kaartjes). Basis: de hero- en dag-kaartjes van de
+workout-pagina.
+
+**Modal:** overlay `--overlay` + `backdrop-filter: --overlay-blur`. Sluitknop
+rechtsboven (≥44px), sluit ook via overlay-klik en Escape. Mobiel = bottom
+sheet, desktop = gecentreerd.
 
 **Empty state:** gedempte tekst (--text-muted) die zegt wat je kunt doen +
 de actie erbij. Nooit een leeg vlak, nooit alleen "Geen data".

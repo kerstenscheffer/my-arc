@@ -7,7 +7,7 @@
 import { useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { X } from 'lucide-react'
-import { colors, radius, space } from './tokens'
+import { colors, radius, space, overlay } from './tokens'
 
 export default function Modal({
   isOpen,
@@ -34,7 +34,7 @@ export default function Modal({
       onClick={onClose}
       style={{
         position: 'fixed', inset: 0, zIndex: 2147483500,
-        background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(4px)',
+        background: overlay.color, backdropFilter: overlay.blur, WebkitBackdropFilter: overlay.blur,
         display: 'flex',
         alignItems: mobile ? 'flex-end' : 'center',
         justifyContent: 'center',

@@ -4,12 +4,16 @@
 // oogopslag te checken is tegen de workout-referentie — op telefoon én desktop.
 import { useState } from 'react'
 import { Inbox } from 'lucide-react'
-import { colors, radius, space, type } from './tokens'
+import { colors, radius, space, type, shadow } from './tokens'
 import Card from './Card'
 import Button from './Button'
 import Modal from './Modal'
 import Eyebrow from './Eyebrow'
 import EmptyState from './EmptyState'
+import ImageCard from './ImageCard'
+
+const DEMO_IMG = 'https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=800&h=400&fit=crop&q=70'
+const DEMO_IMG_SM = 'https://images.unsplash.com/photo-1581009146145-b5ef050c2e1e?w=300&h=300&fit=crop&q=60'
 
 const SwatchGrid = () => {
   const items = [
@@ -113,6 +117,34 @@ export default function UiDemo() {
               Op telefoon komt deze van onderen (bottom sheet), op desktop gecentreerd.
             </div>
           </Modal>
+        </Section>
+
+        <Section label="Foto-kaart" title="ImageCard">
+          <ImageCard
+            image={DEMO_IMG}
+            eyebrow="Vandaag"
+            title="Upper body"
+            badge="85%"
+            progress={85}
+            onClick={() => {}}
+            style={{ marginBottom: space[4] }}
+          />
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(90px, 1fr))', gap: space[3] }}>
+            {['Ma', 'Di', 'Wo', 'Do'].map((d, i) => (
+              <ImageCard key={d} image={DEMO_IMG_SM} compact active={i === 1} title={d} />
+            ))}
+          </div>
+        </Section>
+
+        <Section label="Gloed" title="Gouden glow">
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: space[6] }}>
+            {[['glow', shadow.glow], ['glowStrong', shadow.glowStrong]].map(([name, val]) => (
+              <div key={name} style={{ display: 'flex', flexDirection: 'column', gap: space[2], alignItems: 'center' }}>
+                <div style={{ width: 120, height: 56, borderRadius: radius.btn, background: colors.accent, boxShadow: val }} />
+                <span style={type.statLabel}>{name}</span>
+              </div>
+            ))}
+          </div>
         </Section>
 
         <Section label="Lege staat" title="EmptyState">

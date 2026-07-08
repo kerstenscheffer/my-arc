@@ -3,7 +3,7 @@
 //  variant="primary"   → goud vlak, zwarte bold tekst (max één per scherm)
 //  variant="secondary" → transparant, gouden tekst + gouden outline
 // Ingebouwde disabled- en loading-staat (spinner). Touch target ≥48px.
-import { colors, radius, space } from './tokens'
+import { colors, radius, space, shadow } from './tokens'
 
 export default function Button({
   variant = 'primary',
@@ -41,6 +41,8 @@ export default function Button({
         background: isPrimary ? colors.accent : 'transparent',
         color: isPrimary ? colors.onAccent : colors.accent,
         border: isPrimary ? '1px solid transparent' : `1px solid ${colors.accent}`,
+        // Gouden gloed op de primaire knop (uit de workout-pagina).
+        boxShadow: isPrimary && !off ? shadow.glow : 'none',
         ...style,
       }}
       {...rest}

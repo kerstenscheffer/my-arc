@@ -41,6 +41,14 @@
   --space-page: 16px;
   --space-section: 32px;
   --space-card: 16px;
+
+  /* Signatuur uit de workout-pagina (bron van waarheid) */
+  --glow: 0 6px 18px rgba(255, 215, 0, 0.22);
+  --glow-strong: 0 10px 24px rgba(255, 215, 0, 0.3), 0 2px 6px rgba(0, 0, 0, 0.5);
+  --overlay: rgba(0, 0, 0, 0.95);
+  --overlay-blur: blur(20px);
+  --gradient-image: linear-gradient(180deg, transparent 0%, rgba(0, 0, 0, 0.45) 100%);
+  --gradient-accent: linear-gradient(90deg, #ffd700 0%, #ffa500 100%);
 }
 
 /* Spinner-animatie voor de loading-staat van de gedeelde Button. */
