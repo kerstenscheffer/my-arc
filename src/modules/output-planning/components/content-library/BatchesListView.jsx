@@ -56,6 +56,7 @@ export default function BatchesListView({
   onEditItem,
   onPlanItem,
   onViewItem,
+  onPlanBatch,
   onDeleteBatch,
   isMobile,
 }) {
@@ -153,9 +154,23 @@ export default function BatchesListView({
                       <span style={{ color: '#10b981' }}> · {completedCount} klaar</span>
                     )}
                   </span>
-                  {batch.created_at && <span>{formatDate(batch.created_at)}</span>}
+                  {batch.shoot_date
+                    ? <span style={{ color: GOLD, fontWeight: 700 }}>🎬 {formatDate(batch.shoot_date)}</span>
+                    : (batch.created_at && <span>{formatDate(batch.created_at)}</span>)}
                 </div>
               </div>
+              {onPlanBatch && (
+                <span
+                  onClick={(e) => { e.stopPropagation(); onPlanBatch(batch) }}
+                  style={{
+                    padding: '8px', borderRadius: 6, cursor: 'pointer',
+                    color: batch.shoot_date ? GOLD : 'rgba(255,255,255,0.55)',
+                  }}
+                  title={batch.shoot_date ? 'Opnamemoment aanpassen' : 'Hele batch inplannen'}
+                >
+                  <CalendarPlus size={16} />
+                </span>
+              )}
               {onDeleteBatch && (
                 <span
                   onClick={(e) => { e.stopPropagation(); onDeleteBatch(batch) }}

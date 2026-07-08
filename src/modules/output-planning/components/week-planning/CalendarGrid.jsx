@@ -11,6 +11,7 @@ import {
   formatTime
 } from './constants'
 import ContentBlock from './content-block/ContentBlock'
+import BatchShootCard from '../../../content-batches/components/BatchShootCard'
 import { getItemColor } from '../../../content-batches/constants'
 
 export default function CalendarGrid({
@@ -36,7 +37,9 @@ export default function CalendarGrid({
   onUnschedule,
   onOpenCaption,
   onViewBatchItem,
-  onEditBatchItem
+  onEditBatchItem,
+  batchShoots = [],
+  onViewShoot
 }) {
   console.log('📊 CalendarGrid render - multiSelectMode:', multiSelectMode, 'selectedItemIds size:', selectedItemIds?.size)
   
@@ -114,8 +117,18 @@ export default function CalendarGrid({
         scheduled_time: item.planned_time || '12:00'
       }))
     
+    // Opnamemomenten (hele batch) op deze dag → als één kaart-pseudo-item
+    const dayNames = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday']
+    const shootsForDay = batchShoots
+      .filter(b => {
+        if (!b.shoot_date) return false
+        const d = new Date(b.shoot_date + 'T00:00:00')
+        return dayNames[d.getDay()] === dayOfWeek
+      })
+      .map(b => ({ id: 'shoot_' + b.id, isShoot: true, scheduled_time: (b.shoot_time || '10:00').slice(0, 5), batch: b }))
+
     // Combine and sort by time
-    return [...regularItems, ...batchItemsForDay]
+    return [...regularItems, ...batchItemsForDay, ...shootsForDay]
       .sort((a, b) => (a.scheduled_time || '12:00').localeCompare(b.scheduled_time || '12:00'))
   }
   
@@ -353,11 +366,20 @@ export default function CalendarGrid({
                     >
                       {/* Stack items within this hour slot - UPDATED: Handle batch items */}
                       {hourItems.map((item, itemIdx) => {
+                        // OPNAMEMOMENT: één kaart voor de hele batch
+                        if (item.isShoot) {
+                          return (
+                            <div key={item.id} style={{ marginBottom: '2px' }}>
+                              <BatchShootCard batch={item.batch} onView={onViewShoot} isMobile={false} />
+                            </div>
+                          )
+                        }
+
                         const piece = getPiece(item)
-                        
+
                         // BATCH ITEM DETECTION
                         const isBatchItem = item.isBatchItem || false
-                        
+
                         return (
                           <div
                             key={item.id}

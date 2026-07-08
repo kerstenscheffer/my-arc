@@ -24,6 +24,7 @@ import VideoBlueprint from '../VideoBlueprint'
 import CaptionModal from './content-block/CaptionModal'
 import BatchItemViewModal from '../../../content-batches/components/BatchItemViewModal'
 import BatchItemEditModal from '../../../content-batches/components/BatchItemEditModal'
+import BatchShootViewModal from '../../../content-batches/components/BatchShootViewModal'
 import { GOLD } from './constants'
 
 // Import services
@@ -59,6 +60,8 @@ export default function WeekPlanningView({
   const [contentPieces, setContentPieces] = useState([])
   const [salesPieces, setSalesPieces] = useState([])
   const [batchItems, setBatchItems] = useState([])  // NEW
+  const [batchShoots, setBatchShoots] = useState([])  // hele-batch opnamemomenten deze week
+  const [shootView, setShootView] = useState(null)    // batch voor Inzien-modal
   const [unscheduledPieces, setUnscheduledPieces] = useState([])
   const [weekPlanId, setWeekPlanId] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -139,12 +142,15 @@ export default function WeekPlanningView({
       
       // Load batch items for this week
       const batchItemsData = await batchService.getBatchItemsForWeek(user.id, weekStart)
-      
+      // Load hele-batch opnamemomenten (shoot_date) voor deze week
+      const shootsData = await batchService.getBatchShootsForWeek(user.id, weekStart)
+
       setWeekPlanId(overview.weekPlan?.id)
       setItems(overview.items || [])
       setContentPieces(overview.contentPieces || [])
       setSalesPieces(overview.salesPieces || [])
       setBatchItems(batchItemsData || [])  // NEW
+      setBatchShoots(shootsData || [])
       setUnscheduledPieces(overview.unscheduledPieces || [])
       setDataLoaded(true)
       
@@ -179,6 +185,7 @@ export default function WeekPlanningView({
     await loadData()
     onRefresh?.()
   }
+  const handleViewShoot = (batch) => setShootView(batch)
 
   // Slepen-om-te-plannen vanuit de ideeën-sectie: die dispatcht een window-event
   // met het idee + de dag/tijd van de cel waar je losliet.
@@ -972,6 +979,8 @@ const handleTimeSlotClick = (dayOfWeek, time) => {
                 onOpenCaption={handleOpenCaption}
                 onViewBatchItem={handleViewBatchItem}
                 onEditBatchItem={handleEditBatchItem}
+                batchShoots={batchShoots}
+                onViewShoot={handleViewShoot}
               />
             </div>
           </>
@@ -1001,6 +1010,8 @@ const handleTimeSlotClick = (dayOfWeek, time) => {
             onOpenCaption={handleOpenCaption}
             onViewBatchItem={handleViewBatchItem}
             onEditBatchItem={handleEditBatchItem}
+            batchShoots={batchShoots}
+            onViewShoot={handleViewShoot}
             onAddClick={() => {
               const day = weekDays[selectedDayIndex]
               setAddModalData({ dayOfWeek: day?.dayOfWeek || 'monday', time: '09:00' })
@@ -1082,6 +1093,14 @@ const handleTimeSlotClick = (dayOfWeek, time) => {
         item={editBatchItem?.item}
         format={editBatchItem?.format}
         onSave={handleSaveBatchItemEdit}
+        isMobile={isMobile}
+      />
+
+      {/* Opnamemoment Inzien — alle items van de batch */}
+      <BatchShootViewModal
+        isOpen={!!shootView}
+        onClose={() => setShootView(null)}
+        batch={shootView}
         isMobile={isMobile}
       />
       

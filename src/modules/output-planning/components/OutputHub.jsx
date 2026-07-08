@@ -20,6 +20,7 @@ import EditBatchItemModal from '../../content-batches/components/EditBatchItemMo
 import PlanBatchItemModal from '../../content-batches/components/PlanBatchItemModal'
 import BatchItemViewModal from '../../content-batches/components/BatchItemViewModal'
 import BatchItemEditModal from '../../content-batches/components/BatchItemEditModal'
+import PlanBatchModal from '../../content-batches/components/PlanBatchModal'
 import ContentPlanningService from '../ContentPlanningService'
 
 import BatchesListView from './content-library/BatchesListView'
@@ -88,6 +89,7 @@ export default function OutputHub({ db, onPlanned }) {
   const [batchItemToPlan, setBatchItemToPlan] = useState(null)   // item dat in de agenda gepland wordt
   const [itemView, setItemView] = useState(null)                 // { item, format } voor Inzien
   const [itemEdit, setItemEdit] = useState(null)                 // { item, format } voor dynamisch Bewerken
+  const [batchToPlan, setBatchToPlan] = useState(null)           // hele batch als opnamemoment inplannen
 
   // ── Load ─────────────────────────────────────────────────────────────────
   const loadAll = async () => {
@@ -316,6 +318,12 @@ export default function OutputHub({ db, onPlanned }) {
   const handleSaveDynamicEdit = async (itemId, updates) => {
     await batchService.updateBatchItem(itemId, updates)
     await loadAll()
+  }
+  // Hele batch als opnamemoment in de agenda → herlaad lijst + agenda.
+  const handlePlanBatchShoot = async (batchId, date, time) => {
+    await batchService.planBatchShoot(batchId, date, time)
+    await loadAll()
+    onPlanned?.()
   }
   const handleSaveBatchItemEdit = async (itemId, updates) => {
     try {
@@ -715,6 +723,7 @@ export default function OutputHub({ db, onPlanned }) {
                 onEditItem={handleEditBatchItem}
                 onViewItem={(item, batch) => setItemView({ item, format: batch?.format || null })}
                 onPlanItem={(item) => setBatchItemToPlan(item)}
+                onPlanBatch={(batch) => setBatchToPlan(batch)}
                 onDeleteBatch={handleDeleteBatch}
                 isMobile={isMobile}
               />
@@ -810,6 +819,15 @@ export default function OutputHub({ db, onPlanned }) {
         item={itemEdit?.item}
         format={itemEdit?.format}
         onSave={handleSaveDynamicEdit}
+        isMobile={isMobile}
+      />
+
+      {/* Hele batch als opnamemoment inplannen */}
+      <PlanBatchModal
+        isOpen={!!batchToPlan}
+        onClose={() => setBatchToPlan(null)}
+        batch={batchToPlan}
+        onSave={handlePlanBatchShoot}
         isMobile={isMobile}
       />
 

@@ -18,6 +18,7 @@ import {
   formatTime
 } from './constants'
 import ContentBlock, { ContentBlockCompact } from './ContentBlock'
+import BatchShootCard from '../../../content-batches/components/BatchShootCard'
 
 export default function MobileTimelineView({
   weekDays,
@@ -44,6 +45,8 @@ export default function MobileTimelineView({
   onOpenCaption,
   onViewBatchItem,
   onEditBatchItem,
+  batchShoots = [],
+  onViewShoot,
   onAddClick
 }) {
   const timelineRef = useRef(null)
@@ -128,8 +131,18 @@ export default function MobileTimelineView({
         scheduled_time: item.planned_time || '12:00'
       }))
     
+    // Opnamemomenten (hele batch) op deze dag → als één kaart
+    const dayNames = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday']
+    const shootsForDay = batchShoots
+      .filter(b => {
+        if (!b.shoot_date) return false
+        const d = new Date(b.shoot_date + 'T00:00:00')
+        return dayNames[d.getDay()] === selectedDay.dayOfWeek
+      })
+      .map(b => ({ id: 'shoot_' + b.id, isShoot: true, scheduled_time: (b.shoot_time || '10:00').slice(0, 5), batch: b }))
+
     // Combine and sort
-    return [...regularItems, ...batchItemsForDay]
+    return [...regularItems, ...batchItemsForDay, ...shootsForDay]
       .sort((a, b) => (a.scheduled_time || '12:00').localeCompare(b.scheduled_time || '12:00'))
   }
   
@@ -509,10 +522,19 @@ export default function MobileTimelineView({
             {scheduledItems.map(item => {
               const position = getTimePosition(item.scheduled_time)
               if (position === null) return null
-              
+
+              // OPNAMEMOMENT: één kaart voor de hele batch
+              if (item.isShoot) {
+                return (
+                  <div key={item.id} style={{ position: 'absolute', top: `${position}px`, left: '4px', right: '4px', zIndex: 5 }}>
+                    <BatchShootCard batch={item.batch} onView={onViewShoot} isMobile={true} />
+                  </div>
+                )
+              }
+
               const piece = getPiece(item)
               const isBatchItem = item.isBatchItem || false
-              
+
               return (
                 <div
                   key={item.id}

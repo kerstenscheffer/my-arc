@@ -302,6 +302,67 @@ class BatchService {
   }
 
   // ============================================
+  // BATCH SHOOT (hele batch als één opnamemoment in de agenda)
+  // ============================================
+
+  // Plan de HELE batch op één dag + tijd (opnamemoment). Zet shoot_date/-time
+  // op de batch; de losse items houden hun eigen (evt. lege) planning.
+  async planBatchShoot(batchId, date, time = '10:00') {
+    try {
+      const { data, error } = await this.supabase
+        .from('content_batches')
+        .update({ shoot_date: date, shoot_time: time, status: 'planned', updated_at: new Date().toISOString() })
+        .eq('id', batchId)
+        .select()
+        .single()
+      if (error) throw error
+      return data
+    } catch (error) {
+      console.error('❌ Plan batch shoot failed:', error)
+      throw error
+    }
+  }
+
+  // Haal het opnamemoment weer weg.
+  async unplanBatchShoot(batchId) {
+    try {
+      const { error } = await this.supabase
+        .from('content_batches')
+        .update({ shoot_date: null, shoot_time: null, updated_at: new Date().toISOString() })
+        .eq('id', batchId)
+      if (error) throw error
+      return true
+    } catch (error) {
+      console.error('❌ Unplan batch shoot failed:', error)
+      throw error
+    }
+  }
+
+  // Alle batches met een opnamemoment in deze week (incl. format + items),
+  // voor de agenda-weergave als één kaart.
+  async getBatchShootsForWeek(coachId, weekStart) {
+    try {
+      const weekEnd = new Date(weekStart)
+      weekEnd.setDate(weekEnd.getDate() + 7)
+      const { data, error } = await this.supabase
+        .from('content_batches')
+        .select('*, format:content_formats(id, name, icon, color, fields), batch_items(*)')
+        .eq('coach_id', coachId)
+        .gte('shoot_date', weekStart)
+        .lt('shoot_date', weekEnd.toISOString().split('T')[0])
+        .order('shoot_date')
+      if (error) throw error
+      return (data || []).map(b => ({
+        ...b,
+        batch_items: (b.batch_items || []).slice().sort((a, z) => (a.item_number || 0) - (z.item_number || 0)),
+      }))
+    } catch (error) {
+      console.error('❌ Get batch shoots for week failed:', error)
+      return []
+    }
+  }
+
+  // ============================================
   // BATCH ITEM OPERATIONS
   // ============================================
 
