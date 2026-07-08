@@ -171,6 +171,15 @@ export default function WeekPlanningView({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [refreshSignal])
 
+  // Batch-item op de agenda: Inzien / Bewerken (met de custom format-velden).
+  const handleViewBatchItem = (item) => setViewBatchItem({ item, format: item?.batch?.format || null })
+  const handleEditBatchItem = (item) => setEditBatchItem({ item, format: item?.batch?.format || null })
+  const handleSaveBatchItemEdit = async (itemId, updates) => {
+    await batchService.updateBatchItem(itemId, updates)
+    await loadData()
+    onRefresh?.()
+  }
+
   // Slepen-om-te-plannen vanuit de ideeën-sectie: die dispatcht een window-event
   // met het idee + de dag/tijd van de cel waar je losliet.
   useEffect(() => {
@@ -961,6 +970,8 @@ const handleTimeSlotClick = (dayOfWeek, time) => {
                 onMoveToPrevWeek={handleMoveToPrevWeek}
                 onUnschedule={handleUnschedule}
                 onOpenCaption={handleOpenCaption}
+                onViewBatchItem={handleViewBatchItem}
+                onEditBatchItem={handleEditBatchItem}
               />
             </div>
           </>
@@ -988,6 +999,8 @@ const handleTimeSlotClick = (dayOfWeek, time) => {
             onMoveToPrevWeek={handleMoveToPrevWeek}
             onUnschedule={handleUnschedule}
             onOpenCaption={handleOpenCaption}
+            onViewBatchItem={handleViewBatchItem}
+            onEditBatchItem={handleEditBatchItem}
             onAddClick={() => {
               const day = weekDays[selectedDayIndex]
               setAddModalData({ dayOfWeek: day?.dayOfWeek || 'monday', time: '09:00' })
@@ -1049,6 +1062,26 @@ const handleTimeSlotClick = (dayOfWeek, time) => {
         onClose={() => { setShowCaptionModal(false); setCaptionPiece(null) }}
         contentPiece={captionPiece}
         onSave={handleSaveCaption}
+        isMobile={isMobile}
+      />
+
+      {/* Batch-item Inzien op de agenda */}
+      <BatchItemViewModal
+        isOpen={!!viewBatchItem}
+        onClose={() => setViewBatchItem(null)}
+        item={viewBatchItem?.item}
+        format={viewBatchItem?.format}
+        onPlan={null}
+        isMobile={isMobile}
+      />
+
+      {/* Batch-item Bewerken op de agenda (custom velden) */}
+      <BatchItemEditModal
+        isOpen={!!editBatchItem}
+        onClose={() => setEditBatchItem(null)}
+        item={editBatchItem?.item}
+        format={editBatchItem?.format}
+        onSave={handleSaveBatchItemEdit}
         isMobile={isMobile}
       />
       

@@ -2,7 +2,7 @@
 // Expanded view - full details with actions, z-index 100
 // UPDATED: Batch item support with location, caption, notes display
 
-import { Check, ChevronUp, ScrollText, MessageSquare, MapPin, StickyNote } from 'lucide-react'
+import { Check, ChevronUp, ScrollText, MessageSquare, MapPin, StickyNote, Eye, Pencil } from 'lucide-react'
 import { PHASE_ICONS, formatTime, getTitle, hasScript } from './constants'
 import ActionMenu from './ActionMenu'
 
@@ -34,6 +34,8 @@ export default function ExpandedCard({
   onDelete,
   onDeleteRecurringTemplate,
   onOpenCaption,
+  onViewBatchItem,
+  onEditBatchItem,
   isMobile = false
 }) {
   const PhaseIcon = PHASE_ICONS[item?.phase || 'post']
@@ -466,6 +468,38 @@ export default function ExpandedCard({
             onDeleteRecurringTemplate={onDeleteRecurringTemplate}
             isMobile={isMobile}
           />
+        )}
+
+        {/* Inzien — toont de custom format-velden */}
+        {isBatchItem && onViewBatchItem && (
+          <button
+            onClick={(e) => { e.stopPropagation(); onViewBatchItem(item) }}
+            style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.25rem',
+              padding: '0.3rem 0.5rem', borderRadius: '4px',
+              background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.15)',
+              color: '#fff', fontSize: '0.65rem', fontWeight: '700', cursor: 'pointer',
+              touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent'
+            }}
+          >
+            <Eye size={12} strokeWidth={2.5} /> Inzien
+          </button>
+        )}
+
+        {/* Bewerken — dynamische custom velden */}
+        {isBatchItem && onEditBatchItem && (
+          <button
+            onClick={(e) => { e.stopPropagation(); onEditBatchItem(item) }}
+            style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.25rem',
+              padding: '0.3rem 0.5rem', borderRadius: '4px',
+              background: 'rgba(59,130,246,0.18)', border: '1px solid rgba(59,130,246,0.4)',
+              color: '#3b82f6', fontSize: '0.65rem', fontWeight: '700', cursor: 'pointer',
+              touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent'
+            }}
+          >
+            <Pencil size={12} strokeWidth={2.5} /> Bewerken
+          </button>
         )}
 
         {/* Simple Delete for batch items */}

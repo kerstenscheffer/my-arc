@@ -42,6 +42,8 @@ export default function MobileTimelineView({
   onMoveToPrevWeek,
   onUnschedule,
   onOpenCaption,
+  onViewBatchItem,
+  onEditBatchItem,
   onAddClick
 }) {
   const timelineRef = useRef(null)
@@ -423,6 +425,8 @@ export default function MobileTimelineView({
                   onMoveToPrevWeek={onMoveToPrevWeek}
                   onUnschedule={onUnschedule}
                   onOpenCaption={onOpenCaption}
+                  onViewBatchItem={onViewBatchItem}
+                  onEditBatchItem={onEditBatchItem}
                   isMobile={true}
                 />
               )
@@ -531,6 +535,8 @@ export default function MobileTimelineView({
                     onMoveToPrevWeek={onMoveToPrevWeek}
                     onUnschedule={onUnschedule}
                     onOpenCaption={onOpenCaption}
+                  onViewBatchItem={onViewBatchItem}
+                  onEditBatchItem={onEditBatchItem}
                     showTime={true}
                     isMobile={true}
                   />

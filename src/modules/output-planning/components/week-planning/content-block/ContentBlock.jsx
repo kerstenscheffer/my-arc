@@ -28,6 +28,8 @@ export default function ContentBlock({
   onMoveToPrevWeek,
   onUnschedule,
   onOpenCaption,
+  onViewBatchItem,
+  onEditBatchItem,
   isDragging = false,
   isMobile = false
 }) {
@@ -127,6 +129,8 @@ export default function ContentBlock({
           onDelete={onDelete}
           onOpenCaption={onOpenCaption}
           onDeleteRecurringTemplate={onDeleteRecurringTemplate}
+          onViewBatchItem={onViewBatchItem}
+          onEditBatchItem={onEditBatchItem}
           isMobile={isMobile}
         />
       ) : (
@@ -169,6 +173,8 @@ export function ContentBlockCompact({
   onMoveToPrevWeek,
   onUnschedule,
   onOpenCaption,
+  onViewBatchItem,
+  onEditBatchItem,
   isMobile = false
 }) {
   const [isExpanded, setIsExpanded] = useState(false)
@@ -263,6 +269,8 @@ export function ContentBlockCompact({
           onDelete={onDelete}
           onDeleteRecurringTemplate={onDeleteRecurringTemplate}
           onOpenCaption={onOpenCaption}
+          onViewBatchItem={onViewBatchItem}
+          onEditBatchItem={onEditBatchItem}
           isMobile={isMobile}
         />
       ) : (

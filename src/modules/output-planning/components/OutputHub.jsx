@@ -19,6 +19,7 @@ import BatchModal from '../../content-batches/components/BatchModal'
 import EditBatchItemModal from '../../content-batches/components/EditBatchItemModal'
 import PlanBatchItemModal from '../../content-batches/components/PlanBatchItemModal'
 import BatchItemViewModal from '../../content-batches/components/BatchItemViewModal'
+import BatchItemEditModal from '../../content-batches/components/BatchItemEditModal'
 import ContentPlanningService from '../ContentPlanningService'
 
 import BatchesListView from './content-library/BatchesListView'
@@ -86,6 +87,7 @@ export default function OutputHub({ db, onPlanned }) {
   const [batchItemToEdit, setBatchItemToEdit] = useState(null)
   const [batchItemToPlan, setBatchItemToPlan] = useState(null)   // item dat in de agenda gepland wordt
   const [itemView, setItemView] = useState(null)                 // { item, format } voor Inzien
+  const [itemEdit, setItemEdit] = useState(null)                 // { item, format } voor dynamisch Bewerken
 
   // ── Load ─────────────────────────────────────────────────────────────────
   const loadAll = async () => {
@@ -305,8 +307,15 @@ export default function OutputHub({ db, onPlanned }) {
   }
 
   // ── Batch actions ────────────────────────────────────────────────────────
-  const handleEditBatchItem = (item) => {
-    setBatchItemToEdit(item); setShowEditBatchItem(true)
+  const handleEditBatchItem = (item, batch) => {
+    // Heeft de batch een custom format? Bewerk dan de dynamische velden.
+    // Anders (oude batches) de klassieke edit-modal.
+    if (batch?.format) setItemEdit({ item, format: batch.format })
+    else { setBatchItemToEdit(item); setShowEditBatchItem(true) }
+  }
+  const handleSaveDynamicEdit = async (itemId, updates) => {
+    await batchService.updateBatchItem(itemId, updates)
+    await loadAll()
   }
   const handleSaveBatchItemEdit = async (itemId, updates) => {
     try {
@@ -791,6 +800,16 @@ export default function OutputHub({ db, onPlanned }) {
         onClose={() => setBatchItemToPlan(null)}
         batchItem={batchItemToPlan}
         onSave={handlePlanBatchItem}
+        isMobile={isMobile}
+      />
+
+      {/* Bewerken — dynamische custom velden */}
+      <BatchItemEditModal
+        isOpen={!!itemEdit}
+        onClose={() => setItemEdit(null)}
+        item={itemEdit?.item}
+        format={itemEdit?.format}
+        onSave={handleSaveDynamicEdit}
         isMobile={isMobile}
       />
 
