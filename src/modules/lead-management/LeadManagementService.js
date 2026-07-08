@@ -990,37 +990,40 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
 
   async getLeadsWithLastActivity(coachId) {
     try {
-      const { data: leads, error: leadsError } = await this.db.supabase
+      // BELANGRIJK: alles gepagineerd ophalen. PostgREST kapt elke query af op
+      // 1000 rijen. Met >1000 leads/movements viel de stil-zet-check stil: een
+      // deel van de leads werd nooit opgehaald en "laatste activiteit" klopte
+      // niet meer (movements > 1000). Daarom nu overal via _fetchAllRows().
+      const leads = await this._fetchAllRows(() => this.db.supabase
         .from('call_leads')
         .select('id, first_name, last_name, created_at, last_touched, contacted_today_date, followup_count')
         // Geen coach_id filter — RLS bepaalt de toegang (team-membership of eigen leads).
-        // Voorheen: .or(`coach_id.eq.${coachId},coach_id.is.null`)
-        .is('deleted_at', null)
-      
-      if (leadsError) throw leadsError
-      
-      const { data: sectionItems } = await this.db.supabase
+        .is('deleted_at', null))
+
+      const sectionItems = await this._fetchAllRows(() => this.db.supabase
         .from('lead_section_items')
-        .select('lead_id, section_id, previous_section_id, previous_section_title, previous_section_color')
-      
+        .select('lead_id, section_id, previous_section_id, previous_section_title, previous_section_color'))
+
       const sectionMap = new Map((sectionItems || []).map(item => [item.lead_id, item]))
-      
-      const { data: movements } = await this.db.supabase
+
+      // Gesorteerd op moved_at desc; over alle pagina's blijft de volgorde
+      // behouden, dus de eerste keer dat we een lead_id zien = de laatste move.
+      const movements = await this._fetchAllRows(() => this.db.supabase
         .from('lead_movements')
         .select('lead_id, moved_at')
-        .order('moved_at', { ascending: false })
-      
+        .order('moved_at', { ascending: false }))
+
       const latestMovement = new Map()
       ;(movements || []).forEach(m => {
         if (!latestMovement.has(m.lead_id)) latestMovement.set(m.lead_id, m.moved_at)
       })
-      
-      const { data: notes } = await this.db.supabase
+
+      const notes = await this._fetchAllRows(() => this.db.supabase
         .from('lead_notes')
         .select('lead_id, created_at')
         .is('deleted_at', null)
-        .order('created_at', { ascending: false })
-      
+        .order('created_at', { ascending: false }))
+
       const latestNote = new Map()
       ;(notes || []).forEach(n => {
         if (!latestNote.has(n.lead_id)) latestNote.set(n.lead_id, n.created_at)
