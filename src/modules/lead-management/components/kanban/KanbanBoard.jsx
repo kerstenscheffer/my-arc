@@ -1456,10 +1456,13 @@ export default function KanbanBoard({
             border: '1px solid rgba(255,255,255,0.08)',
             boxShadow: '0 8px 24px rgba(0,0,0,0.55)',
           }}>
-            {/* Search */}
+            {/* Search — op mobiel op een eigen rij ONDER de knoppen (order:2 +
+                volle breedte) zodat het zoekveld veel breder is; op desktop
+                gewoon vooraan op één rij (order:0). */}
             <div style={{
               flex: 1, minWidth: 120, display: 'flex', alignItems: 'center', gap: '0.35rem',
-              padding: isMobile ? '0.3rem 0.5rem' : '0.35rem 0.625rem',
+              order: isMobile ? 2 : 0, ...(isMobile ? { flexBasis: '100%' } : {}),
+              padding: isMobile ? '0.4rem 0.6rem' : '0.35rem 0.625rem',
               background: 'rgba(255,255,255,0.03)',
               border: showSearchResults && searchResults.length > 0 ? '1px solid rgba(16,185,129,0.3)' : '1px solid rgba(255,255,255,0.06)',
               borderRadius: '6px', transition: 'all 0.2s ease', minHeight: '30px'
@@ -1468,7 +1471,7 @@ export default function KanbanBoard({
               <input ref={searchInputRef} type="text" value={searchQuery}
                 onChange={(e) => handleSearch(e.target.value)}
                 onFocus={() => searchQuery && setShowSearchResults(true)}
-                placeholder={isMobile ? 'Zoek lead...' : 'Zoek op naam, Instagram, email...'}
+                placeholder={isMobile ? 'Zoek op naam of Instagram...' : 'Zoek op naam, Instagram, email...'}
                 style={{ flex: 1, background: 'transparent', border: 'none', outline: 'none', color: '#fff', fontSize: isMobile ? '0.7rem' : '0.75rem', minWidth: 0 }} />
               {searchQuery && (
                 <button onClick={() => { setSearchQuery(''); setSearchResults([]); setShowSearchResults(false) }} style={{ padding: '2px', background: 'rgba(255,255,255,0.06)', border: 'none', borderRadius: '3px', color: 'rgba(255,255,255,0.4)', cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
