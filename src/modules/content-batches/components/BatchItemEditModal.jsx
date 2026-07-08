@@ -36,7 +36,7 @@ export default function BatchItemEditModal({ isOpen, onClose, onSave, item, form
   }
 
   return (
-    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: isMobile ? 'flex-end' : 'center', justifyContent: 'center', zIndex: 2200, padding: isMobile ? 0 : '2rem' }}>
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: isMobile ? 'flex-end' : 'center', justifyContent: 'center', zIndex: 2300, padding: isMobile ? 0 : '2rem' }}>
       <div style={{ width: isMobile ? '100%' : '90%', maxWidth: 560, maxHeight: isMobile ? '92vh' : '88vh', background: 'linear-gradient(135deg, #1a1a1a 0%, #0a0a0a 100%)', border: `1px solid ${GOLD.border}`, borderRadius: isMobile ? '16px 16px 0 0' : 16, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '1rem 1.25rem', borderBottom: `1px solid ${GOLD.border}`, background: `linear-gradient(135deg, ${(format?.color || GOLD.primary)}18 0%, rgba(0,0,0,0.3) 100%)` }}>
           <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800, color: '#fff' }}>Item bewerken{format?.name ? ` · ${format.name}` : ''}</h3>

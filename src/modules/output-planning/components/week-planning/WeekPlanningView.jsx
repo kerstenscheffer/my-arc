@@ -183,9 +183,29 @@ export default function WeekPlanningView({
   const handleSaveBatchItemEdit = async (itemId, updates) => {
     await batchService.updateBatchItem(itemId, updates)
     await loadData()
+    await reloadShootView()
     onRefresh?.()
   }
   const handleViewShoot = (batch) => setShootView(batch)
+  // Herlaad de opnamemomenten en houd de open Inzien-modal in sync.
+  const reloadShootView = async () => {
+    try {
+      const user = await db.getCurrentUser()
+      const weekStart = formatDateString(currentWeekMonday)
+      const shoots = await batchService.getBatchShootsForWeek(user.id, weekStart)
+      setBatchShoots(shoots)
+      setShootView(prev => prev ? (shoots.find(s => s.id === prev.id) || prev) : prev)
+    } catch (e) { console.error('reloadShootView failed', e) }
+  }
+  // Afrond-knop in de opname-modal: item klaar/niet-klaar togglen.
+  const handleToggleShootItem = async (item) => {
+    const done = item.status === 'posted' || item.status === 'completed'
+    await batchService.updateBatchItem(item.id, { status: done ? 'ready' : 'posted' })
+    await reloadShootView()
+    onRefresh?.()
+  }
+  // Bewerk-knop in de opname-modal: open de dynamische edit-modal.
+  const handleEditShootItem = (item) => setEditBatchItem({ item, format: shootView?.format || null })
 
   // Slepen-om-te-plannen vanuit de ideeën-sectie: die dispatcht een window-event
   // met het idee + de dag/tijd van de cel waar je losliet.
@@ -1096,11 +1116,13 @@ const handleTimeSlotClick = (dayOfWeek, time) => {
         isMobile={isMobile}
       />
 
-      {/* Opnamemoment Inzien — alle items van de batch */}
+      {/* Opnamemoment Inzien — alle items van de batch, met afrond + bewerk */}
       <BatchShootViewModal
         isOpen={!!shootView}
         onClose={() => setShootView(null)}
         batch={shootView}
+        onToggleComplete={handleToggleShootItem}
+        onEditItem={handleEditShootItem}
         isMobile={isMobile}
       />
       

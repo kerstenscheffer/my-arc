@@ -2,7 +2,7 @@
 // Inzien van een heel opnamemoment: alle items van de batch met hun ingevulde
 // format-velden onder elkaar. Handig om vlak vóór het opnemen alles te zien.
 
-import { X, Clapperboard } from 'lucide-react'
+import { X, Clapperboard, Check, Pencil } from 'lucide-react'
 
 const GOLD = { primary: '#FFD700', border: 'rgba(255,215,0,0.3)' }
 
@@ -15,7 +15,7 @@ function renderValue(field, value) {
   return String(value)
 }
 
-export default function BatchShootViewModal({ isOpen, onClose, batch, isMobile = false }) {
+export default function BatchShootViewModal({ isOpen, onClose, batch, onToggleComplete, onEditItem, isMobile = false }) {
   if (!isOpen || !batch) return null
   const fields = batch.format?.fields || []
   const items = batch.batch_items || []
@@ -42,11 +42,32 @@ export default function BatchShootViewModal({ isOpen, onClose, batch, isMobile =
             const rows = fields.length
               ? fields.map(f => ({ label: f.label, type: f.type, val: renderValue(f, item.field_values?.[f.key]) })).filter(r => r.val)
               : [{ label: 'Titel', val: item.title }].filter(r => r.val)
+            const done = item.status === 'posted' || item.status === 'completed'
             return (
-              <div key={item.id || idx} style={{ padding: '0.85rem', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 10 }}>
+              <div key={item.id || idx} style={{
+                padding: '0.85rem', borderRadius: 10,
+                background: done ? 'rgba(16,185,129,0.08)' : 'rgba(255,255,255,0.03)',
+                border: `1px solid ${done ? 'rgba(16,185,129,0.35)' : 'rgba(255,255,255,0.08)'}`,
+              }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: rows.length ? 8 : 0 }}>
-                  <span style={{ width: 22, height: 22, flexShrink: 0, borderRadius: 5, background: `${accent}25`, color: accent, fontWeight: 800, fontSize: '0.72rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{item.item_number || idx + 1}</span>
-                  <span style={{ fontSize: '0.9rem', fontWeight: 700, color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.title || `Item ${idx + 1}`}</span>
+                  <span style={{ width: 22, height: 22, flexShrink: 0, borderRadius: 5, background: done ? 'rgba(16,185,129,0.2)' : `${accent}25`, color: done ? '#10b981' : accent, fontWeight: 800, fontSize: '0.72rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{item.item_number || idx + 1}</span>
+                  <span style={{ flex: 1, minWidth: 0, fontSize: '0.9rem', fontWeight: 700, color: done ? 'rgba(255,255,255,0.5)' : '#fff', textDecoration: done ? 'line-through' : 'none', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.title || `Item ${idx + 1}`}</span>
+                  {onEditItem && (
+                    <button onClick={() => onEditItem(item)} title="Bewerken" style={{ width: 34, height: 34, flexShrink: 0, background: 'rgba(255,215,0,0.12)', border: '1px solid rgba(255,215,0,0.35)', borderRadius: 7, color: GOLD.primary, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <Pencil size={14} />
+                    </button>
+                  )}
+                  {onToggleComplete && (
+                    <button onClick={() => onToggleComplete(item)} title={done ? 'Markeer als niet klaar' : 'Markeer als klaar'} style={{
+                      minWidth: 34, height: 34, flexShrink: 0, padding: '0 0.6rem', borderRadius: 7, cursor: 'pointer',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5,
+                      background: done ? '#10b981' : 'rgba(16,185,129,0.15)',
+                      border: done ? 'none' : '1px solid rgba(16,185,129,0.4)',
+                      color: done ? '#fff' : '#10b981', fontSize: '0.72rem', fontWeight: 800,
+                    }}>
+                      <Check size={14} strokeWidth={3} />{!isMobile && (done ? 'Klaar' : 'Afrond')}
+                    </button>
+                  )}
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 6, paddingLeft: 30 }}>
                   {rows.map((r, i) => (
