@@ -247,67 +247,39 @@ export default function KanbanBoard({
   const searchInputRef = useRef(null)
   const leadRefs = useRef({})
   const [showScrollTop, setShowScrollTop] = useState(false)
-  // Zoek-toolbar: zweeft vast in beeld (fixed) en is sleepbaar. Positie
-  // onthouden in localStorage. null = standaard bovenaan.
-  const [searchBarPos, setSearchBarPos] = useState(() => {
-    try { const s = JSON.parse(localStorage.getItem('leadSearchBarPos') || 'null'); if (s && typeof s.top === 'number') return s } catch {}
-    return null
-  })
+  // Zoek-toolbar "pin-on-scroll": bovenaan de pagina staat de balk op z'n
+  // natuurlijke plek; zodra die plek voorbij de bovenrand scrolt, klemt 'ie
+  // vast (fixed) en beweegt mee in beeld. We meten een in-flow placeholder
+  // (barSlotRef) en zetten top = max(PIN_OFFSET, natuurlijke top). left/width
+  // volgen de placeholder zodat 'ie exact boven z'n eigen plek zit. Portal naar
+  // body voorkomt dat een ouder met overflow/transform 'm vangt — dát brak de
+  // oude sticky-versie.
   const toolbarRef = useRef(null)
-  // Slepen zonder re-render: tijdens het bewegen manipuleren we de DOM direct
-  // (geen setState → geen re-render van het zware bord → botersmooth). Pas bij
-  // loslaten committen we de positie naar state + localStorage.
-  const startSearchDrag = (e) => {
-    e.preventDefault(); e.stopPropagation()
-    const el = toolbarRef.current
-    if (!el) return
-    const rect = el.getBoundingClientRect()
-    const p = e.touches?.[0] || e
-    const offX = p.clientX - rect.left
-    const offY = p.clientY - rect.top
-    el.style.transform = 'none'
-    el.style.transition = 'none'
-    el.style.willChange = 'left, top'
-    let last = { left: rect.left, top: rect.top }
-    const move = (ev) => {
-      const q = ev.touches?.[0] || ev
-      const left = Math.max(4, Math.min(window.innerWidth - rect.width - 4, q.clientX - offX))
-      const top = Math.max(4, Math.min(window.innerHeight - rect.height - 4, q.clientY - offY))
-      el.style.left = left + 'px'
-      el.style.top = top + 'px'
-      last = { left, top }
-    }
-    const end = () => {
-      window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', end)
-      window.removeEventListener('touchmove', move); window.removeEventListener('touchend', end)
-      el.style.willChange = 'auto'
-      setSearchBarPos(last)
-      try { localStorage.setItem('leadSearchBarPos', JSON.stringify(last)) } catch {}
-    }
-    window.addEventListener('pointermove', move); window.addEventListener('pointerup', end)
-    window.addEventListener('touchmove', move, { passive: false }); window.addEventListener('touchend', end)
-  }
-  // Houd de zoekbalk ALTIJD binnen het scherm: bij laden en bij resize/device-
-  // wissel wordt een opgeslagen positie die (deels) buiten beeld valt terug in
-  // beeld geclampt. Zo verdwijnt 'ie nooit uit je scherm.
+  const barSlotRef = useRef(null)
+  const [barBox, setBarBox] = useState(null)     // { top, left, width } van de fixed balk
+  const [barHeight, setBarHeight] = useState(0)  // hoogte om de placeholder te vullen (geen sprong)
+  const PIN_OFFSET = isMobile ? 8 : 12
   useEffect(() => {
-    const clampIntoView = () => {
-      if (!searchBarPos) return
-      const el = toolbarRef.current
-      const w = el?.offsetWidth || 320
-      const h = el?.offsetHeight || 44
-      const left = Math.max(4, Math.min(window.innerWidth - w - 4, searchBarPos.left))
-      const top = Math.max(4, Math.min(window.innerHeight - h - 4, searchBarPos.top))
-      if (left !== searchBarPos.left || top !== searchBarPos.top) {
-        const pos = { left, top }
-        setSearchBarPos(pos)
-        try { localStorage.setItem('leadSearchBarPos', JSON.stringify(pos)) } catch {}
-      }
+    let raf = 0
+    const measure = () => {
+      raf = 0
+      const slot = barSlotRef.current
+      if (!slot) return
+      const r = slot.getBoundingClientRect()
+      setBarBox({ top: Math.max(PIN_OFFSET, Math.round(r.top)), left: Math.round(r.left), width: Math.round(r.width) })
+      const h = toolbarRef.current?.offsetHeight
+      if (h && h !== barHeight) setBarHeight(h)
     }
-    clampIntoView()
-    window.addEventListener('resize', clampIntoView)
-    return () => window.removeEventListener('resize', clampIntoView)
-  }, [searchBarPos])
+    const onScrollResize = () => { if (!raf) raf = requestAnimationFrame(measure) }
+    measure()
+    window.addEventListener('scroll', onScrollResize, { passive: true })
+    window.addEventListener('resize', onScrollResize)
+    return () => {
+      window.removeEventListener('scroll', onScrollResize)
+      window.removeEventListener('resize', onScrollResize)
+      if (raf) cancelAnimationFrame(raf)
+    }
+  }, [barHeight, PIN_OFFSET, loading, sections.length])
   const [staleCheckDone, setStaleCheckDone] = useState(false)
   const [staleCheckResult, setStaleCheckResult] = useState(null)
   const [snoozeSection, setSnoozeSection] = useState(null)
@@ -1443,20 +1415,18 @@ export default function KanbanBoard({
         <div>
           <PeriodStatsBar leadService={leadService} coachId={coachId} isMobile={isMobile} refreshKey={statsRefreshKey} />
 
-          {/* ═══ ZWEVENDE ACTIE-RIJ: [sleep] [zoekbalk] [hot] [call] [filter] [Sectie] [fullscreen] ═══
-              position:fixed via createPortal(document.body) → kleeft aan het
-              scherm en blijft ALTIJD in beeld tijdens scrollen (net als de
-              "Naar boven"-knop). Sleepbaar aan het handvat; positie onthouden
-              in localStorage (searchBarPos). Portal naar body voorkomt dat een
-              ouder met overflow/transform 'm vangt — dát was waarom sticky niet
-              werkte. */}
+          {/* ═══ PIN-ON-SCROLL ACTIE-RIJ ═══
+              barSlotRef = in-flow placeholder die de ruimte vasthoudt (zodat de
+              inhoud niet verspringt). De echte balk is fixed via createPortal
+              (body) en zit met top=max(PIN_OFFSET, natuurlijke top) exact boven
+              die placeholder; zodra je voorbij scrollt klemt 'ie bovenin vast. */}
+          <div ref={barSlotRef} style={{ height: barHeight || 46, margin: '0.4rem 0' }} />
           {createPortal(
           <div ref={toolbarRef} style={{
             position: 'fixed', zIndex: 500,
-            width: isMobile ? 'calc(100vw - 12px)' : 'min(700px, calc(100vw - 24px))',
-            ...(searchBarPos
-              ? { top: searchBarPos.top, left: searchBarPos.left }
-              : { top: isMobile ? 68 : 76, left: '50%', transform: 'translateX(-50%)' }),
+            top: barBox ? barBox.top : (isMobile ? 68 : 76),
+            left: barBox ? barBox.left : 8,
+            width: barBox ? barBox.width : 'calc(100vw - 16px)',
           }}>
           <div style={{
             display: 'flex', alignItems: 'center', gap: '0.3rem', flexWrap: 'wrap',
@@ -1465,20 +1435,6 @@ export default function KanbanBoard({
             border: '1px solid rgba(255,255,255,0.08)',
             boxShadow: '0 8px 24px rgba(0,0,0,0.55)',
           }}>
-            {/* Sleep-handvat — pak hier vast om de balk te verplaatsen */}
-            <button
-              onMouseDown={startSearchDrag}
-              onTouchStart={startSearchDrag}
-              title="Sleep de zoekbalk naar waar je wilt"
-              style={{
-                width: 26, height: 30, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                background: 'transparent', border: 'none', borderRadius: 6,
-                color: 'rgba(255,255,255,0.3)', cursor: 'grab', touchAction: 'none', WebkitTapHighlightColor: 'transparent',
-              }}
-            >
-              <GripVertical size={16} />
-            </button>
-
             {/* Search */}
             <div style={{
               flex: 1, minWidth: 120, display: 'flex', alignItems: 'center', gap: '0.35rem',
