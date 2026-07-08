@@ -257,22 +257,29 @@ export default function KanbanBoard({
   const toolbarRef = useRef(null)
   const barSlotRef = useRef(null)
   const naturalTopRef = useRef(0)                 // document-offset van de natuurlijke plek
+  const goalsBarElRef = useRef(null)              // de vaste doelen-balk (WeekGoalsBar) bovenin
   const [barHoriz, setBarHoriz] = useState({ left: 8, width: 0 })  // links/breedte (wijzigt alleen bij resize)
   const [barHeight, setBarHeight] = useState(0)   // hoogte om de placeholder te vullen (geen sprong)
-  const PIN_OFFSET = isMobile ? 8 : 12
   // Webshop-header-gedrag. De balk staat hard op z'n natuurlijke plek en schuift
-  // 1:1 met de pagina mee (top = natuurlijk − scroll); zodra dat onder PIN_OFFSET
-  // zakt klemt 'ie daar vast en blijft in beeld. De top wordt DIRECT in de DOM
-  // gezet (geen setState → geen re-render van het zware bord → botersmooth).
-  // left/width veranderen alleen bij resize. Portal naar body voorkomt dat een
-  // ouder met overflow/transform 'm vangt — dát brak de oude sticky-versie.
+  // 1:1 met de pagina mee (top = natuurlijk − scroll); zodra dat onder de vastklem-
+  // hoogte zakt klemt 'ie daar vast en blijft in beeld. De vastklem-hoogte is
+  // DYNAMISCH: net onder de vaste doelen-balk (WeekGoalsBar), die over de content
+  // zweeft — zo schuift 'ie er nooit meer achter (ook met notch/safe-area). De top
+  // wordt DIRECT in de DOM gezet (geen setState → geen re-render → botersmooth).
   useLayoutEffect(() => {
+    const GAP = 6
+    const currentPinOffset = () => {
+      const gb = goalsBarElRef.current
+      const h = gb ? gb.getBoundingClientRect().height : 0
+      return h > 0 ? Math.round(h + GAP) : (isMobile ? 8 : 12)
+    }
     const positionTop = () => {
       const el = toolbarRef.current
       if (!el) return
-      el.style.top = Math.max(PIN_OFFSET, naturalTopRef.current - window.scrollY) + 'px'
+      el.style.top = Math.max(currentPinOffset(), naturalTopRef.current - window.scrollY) + 'px'
     }
     const measureLayout = () => {
+      goalsBarElRef.current = document.querySelector('[data-goalsbar="1"]')
       const slot = barSlotRef.current
       if (!slot) return
       const r = slot.getBoundingClientRect()
@@ -293,7 +300,7 @@ export default function KanbanBoard({
       window.removeEventListener('resize', measureLayout)
       if (raf) cancelAnimationFrame(raf)
     }
-  }, [barHeight, PIN_OFFSET, loading, sections.length, statsRefreshKey])
+  }, [barHeight, loading, sections.length, statsRefreshKey, isMobile])
   const [staleCheckDone, setStaleCheckDone] = useState(false)
   const [staleCheckResult, setStaleCheckResult] = useState(null)
   const [snoozeSection, setSnoozeSection] = useState(null)

@@ -149,7 +149,7 @@ export default function WeekGoalsBar({ db, coachId, isMobile: propMobile }) {
   // Collapsed strip — always rendered. Height kept small so it doesn't
   // dominate the screen but the gold accent + counter pull the eye.
   return (
-    <div style={{
+    <div data-goalsbar="1" style={{
       position: 'fixed', top: 0, left: 0, right: 0,
       zIndex: 950,
       paddingTop: 'env(safe-area-inset-top)',
