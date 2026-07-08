@@ -5,8 +5,14 @@
 // kaart een titel heeft en de "compleet"-check werkt.
 
 import { useState } from 'react'
-import { ChevronDown, ChevronUp, Check } from 'lucide-react'
+import { ChevronDown, ChevronUp, Check, Plus, X } from 'lucide-react'
 import { GOLD } from '../../output-planning/components/week-planning/constants'
+
+// Haal een leesbare string uit een veldwaarde (string of array) voor titel/label.
+function toText(raw) {
+  if (Array.isArray(raw)) return (raw.find(v => v && String(v).trim()) || '')
+  return typeof raw === 'string' ? raw : (raw == null ? '' : String(raw))
+}
 
 export default function DynamicItemsBuilder({ format, items, onItemsChange, isMobile = false }) {
   const [expanded, setExpanded] = useState(0)
@@ -18,18 +24,15 @@ export default function DynamicItemsBuilder({ format, items, onItemsChange, isMo
     const fv = { ...(next[index].fieldValues || {}), [key]: value }
     next[index] = { ...next[index], fieldValues: fv }
     // Eerste veld = titel van het item (voor kaart-label + compleet-check).
-    if (key === firstKey) next[index].title = typeof value === 'string' ? value : (next[index].title || '')
+    if (key === firstKey) next[index].title = toText(value)
     onItemsChange(next)
   }
 
   const itemLabel = (item, i) => {
-    const v = item.fieldValues?.[firstKey]
-    return (typeof v === 'string' && v.trim()) ? v : `Item ${i + 1}`
+    const v = toText(item.fieldValues?.[firstKey])
+    return v.trim() ? v : `Item ${i + 1}`
   }
-  const isComplete = (item) => {
-    const v = item.fieldValues?.[firstKey]
-    return typeof v === 'string' && v.trim().length > 0
-  }
+  const isComplete = (item) => toText(item.fieldValues?.[firstKey]).trim().length > 0
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
@@ -111,6 +114,24 @@ function FieldInput({ field, value, onChange, isFirst }) {
         <option value="">— kies —</option>
         {(field.options || []).map(o => <option key={o} value={o}>{o}</option>)}
       </select>
+    </div>
+  }
+  if (field.type === 'list') {
+    const rows = Array.isArray(value) && value.length ? value : ['']
+    const setRow = (i, v) => onChange(rows.map((x, idx) => idx === i ? v : x))
+    const addRow = () => onChange([...rows, ''])
+    const removeRow = (i) => { const next = rows.filter((_, idx) => idx !== i); onChange(next.length ? next : ['']) }
+    return <div>{label}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+        {rows.map((it, i) => (
+          <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <span style={{ width: 20, textAlign: 'right', color: GOLD.primary, fontWeight: 800, fontSize: '0.85rem', flexShrink: 0 }}>{i + 1}.</span>
+            <input value={it} onChange={e => setRow(i, e.target.value)} placeholder={`Punt ${i + 1}`} style={{ ...input, flex: 1 }} />
+            <button onClick={() => removeRow(i)} title="Regel verwijderen" style={{ width: 30, height: 30, flexShrink: 0, background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.25)', borderRadius: 6, color: '#ef4444', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><X size={13} /></button>
+          </div>
+        ))}
+        <button onClick={addRow} style={{ alignSelf: 'flex-start', display: 'flex', alignItems: 'center', gap: 5, padding: '0.4rem 0.7rem', background: 'rgba(255,215,0,0.08)', border: `1px dashed ${GOLD.border || 'rgba(255,215,0,0.3)'}`, borderRadius: 6, color: GOLD.primary, fontSize: '0.78rem', fontWeight: 700, cursor: 'pointer' }}><Plus size={13} /> Regel toevoegen</button>
+      </div>
     </div>
   }
   if (field.type === 'checklist') {

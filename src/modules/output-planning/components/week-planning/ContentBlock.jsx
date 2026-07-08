@@ -38,6 +38,10 @@ function hexToColorObj(hex) {
 function renderFieldValue(field, value) {
   if (value == null || value === '') return null
   if (field.type === 'checklist' && Array.isArray(value)) return value.length ? value.join(', ') : null
+  if (field.type === 'list' && Array.isArray(value)) {
+    const clean = value.filter(v => v && String(v).trim())
+    return clean.length ? clean.map((v, i) => `${i + 1}. ${v}`).join('   ') : null
+  }
   return String(value)
 }
 

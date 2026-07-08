@@ -2,11 +2,12 @@
 // Veldtypes voor zelf-gedefinieerde batch-formats + kleine helpers.
 
 export const FIELD_TYPES = [
-  { id: 'text',      label: 'Korte regel',   hint: 'Eén regel tekst (bv. titel, hoek)' },
-  { id: 'textarea',  label: 'Lang tekstvak', hint: 'Meerdere regels (bv. script)' },
-  { id: 'select',    label: 'Keuzelijst',    hint: 'Kies uit vaste opties' },
-  { id: 'date',      label: 'Datum',         hint: 'Een datum kiezen' },
-  { id: 'checklist', label: 'Checklist',     hint: 'Vinkjes uit vaste opties' },
+  { id: 'text',      label: 'Korte regel',    hint: 'Eén regel tekst (bv. titel, hoek)' },
+  { id: 'textarea',  label: 'Lang tekstvak',  hint: 'Meerdere regels (bv. script)' },
+  { id: 'list',      label: 'Opsomming (1,2,3)', hint: 'Genummerde lijst — voeg zelf regels toe' },
+  { id: 'select',    label: 'Keuzelijst',     hint: 'Kies uit vaste opties' },
+  { id: 'date',      label: 'Datum',          hint: 'Een datum kiezen' },
+  { id: 'checklist', label: 'Checklist',      hint: 'Vinkjes uit vaste opties' },
 ]
 
 export function fieldTypeLabel(id) {
