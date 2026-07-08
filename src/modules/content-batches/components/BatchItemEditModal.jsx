@@ -2,7 +2,7 @@
 // Bewerk de ingevulde velden van een batch-item OP BASIS VAN het custom format
 // (dynamisch). Slaat field_values + title (= eerste veld) op via onSave.
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { X, Plus, Check } from 'lucide-react'
 
 const GOLD = { primary: '#FFD700', border: 'rgba(255,215,0,0.3)', background: 'rgba(255,215,0,0.1)' }
@@ -13,6 +13,12 @@ export default function BatchItemEditModal({ isOpen, onClose, onSave, item, form
   const [values, setValues] = useState(() => ({ ...(item?.field_values || {}) }))
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState(null)
+
+  // Herlaad de huidige veldwaarden zodra er een ander item wordt geopend
+  // (useState-initializer draait maar één keer → anders bleven de velden leeg).
+  useEffect(() => {
+    setValues({ ...(item?.field_values || {}) })
+  }, [item?.id])
 
   if (!isOpen || !item) return null
 
