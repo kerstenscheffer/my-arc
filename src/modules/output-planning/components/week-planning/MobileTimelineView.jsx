@@ -215,8 +215,8 @@ export default function MobileTimelineView({
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            width: '36px',
-            height: '36px',
+            width: '44px',
+            height: '44px',
             background: 'rgba(255, 255, 255, 0.05)',
             border: '1px solid rgba(255, 255, 255, 0.1)',
             borderRadius: '8px',
@@ -260,18 +260,23 @@ export default function MobileTimelineView({
                   display: 'flex',
                   flexDirection: 'column',
                   alignItems: 'center',
-                  padding: '0.375rem 0.5rem',
-                  background: isSelected 
+                  justifyContent: 'center',
+                  gap: 2,
+                  flex: 1,
+                  padding: '0.4rem 0.25rem',
+                  minWidth: 42,
+                  minHeight: 48,
+                  background: isSelected
                     ? `linear-gradient(135deg, ${GOLD.background} 0%, rgba(0,0,0,0.3) 100%)`
                     : 'transparent',
-                  border: isSelected 
+                  border: isSelected
                     ? `1px solid ${GOLD.border}`
                     : '1px solid transparent',
-                  borderRadius: '8px',
+                  borderRadius: '10px',
                   cursor: 'pointer',
                   touchAction: 'manipulation',
                   WebkitTapHighlightColor: 'transparent',
-                  minWidth: '36px'
+                  position: 'relative',
                 }}
               >
                 <span style={{
@@ -319,8 +324,8 @@ export default function MobileTimelineView({
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            width: '36px',
-            height: '36px',
+            width: '44px',
+            height: '44px',
             background: 'rgba(255, 255, 255, 0.05)',
             border: '1px solid rgba(255, 255, 255, 0.1)',
             borderRadius: '8px',

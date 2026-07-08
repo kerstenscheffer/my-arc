@@ -100,6 +100,8 @@ export default function CoachOutputDashboard({ db }) {
   // Bumpt na een actie in de ideeën-sectie (bv. inplannen) zodat de agenda
   // direct herlaadt zonder hard refresh.
   const [agendaRefresh, setAgendaRefresh] = useState(0)
+  // Mobiel: één sectie tegelijk (i.p.v. beide gestapeld) via een segment-schakelaar.
+  const [mobileTab, setMobileTab] = useState('hub') // 'hub' | 'agenda'
   
   // Service instance
   const [service] = useState(() => new OutputService(db))
@@ -295,9 +297,38 @@ export default function CoachOutputDashboard({ db }) {
             compact week-pill that lives in the header row above. */}
       </div>
       
-      {/* Tab Navigation - MOBILE OPTIMIZED */}
-      {/* Tab-bar removed — Problemen + PDFs are gone; Content + Weekplanning
-          are merged into the single unified layout below. */}
+      {/* Mobiel: segment-schakelaar — toon één sectie tegelijk (duimzone + één
+          primaire taak per scherm). Desktop toont beide kolommen naast elkaar. */}
+      {isMobile && (
+        <div style={{
+          display: 'flex', gap: 4, marginBottom: '0.6rem', padding: 3,
+          background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)',
+          borderRadius: 12,
+        }}>
+          {[
+            { id: 'hub', label: 'Ideeën & Batches' },
+            { id: 'agenda', label: 'Agenda' },
+          ].map(t => {
+            const active = mobileTab === t.id
+            return (
+              <button
+                key={t.id}
+                onClick={() => setMobileTab(t.id)}
+                style={{
+                  flex: 1, minHeight: 44, borderRadius: 9, cursor: 'pointer',
+                  border: active ? `1px solid ${GOLD.border}` : '1px solid transparent',
+                  background: active ? GOLD.background : 'transparent',
+                  color: active ? GOLD.primary : 'rgba(255,255,255,0.6)',
+                  fontSize: '0.82rem', fontWeight: 800, touchAction: 'manipulation',
+                  WebkitTapHighlightColor: 'transparent',
+                }}
+              >
+                {t.label}
+              </button>
+            )
+          })}
+        </div>
+      )}
 
       {/* Content Area */}
       <div style={{
@@ -354,21 +385,24 @@ export default function CoachOutputDashboard({ db }) {
             padding: isMobile ? '0.5rem' : '0.75rem',
             alignItems: isMobile ? 'stretch' : 'start',
           }}>
+            {(!isMobile || mobileTab === 'hub') && (
             <div style={{
               minWidth: 0,
               // Eigen scroll voor de ideeën-kolom (desktop).
               ...(isMobile ? {} : {
-                height: inFullscreen ? '100%' : 'calc(100vh - 130px)',
+                height: inFullscreen ? '100%' : 'calc(100dvh - 130px)',
                 overflowY: 'auto',
               }),
             }}>
-              <OutputHub db={db} onPlanned={() => setAgendaRefresh(n => n + 1)} />
+              <OutputHub db={db} onPlanned={() => { setAgendaRefresh(n => n + 1); if (isMobile) setMobileTab('agenda') }} />
             </div>
+            )}
+            {(!isMobile || mobileTab === 'agenda') && (
             <div style={{
               minWidth: 0,
               // Vaste agenda-kolom met eigen scroll (desktop) → blijft op z'n plek.
               ...(isMobile ? {} : {
-                height: inFullscreen ? '100%' : 'calc(100vh - 130px)',
+                height: inFullscreen ? '100%' : 'calc(100dvh - 130px)',
                 overflowY: 'auto',
               }),
             }}>
@@ -386,6 +420,7 @@ export default function CoachOutputDashboard({ db }) {
                 content={content}
               />
             </div>
+            )}
           </div>
         )}
       </div>
@@ -396,9 +431,11 @@ export default function CoachOutputDashboard({ db }) {
     <>
       {/* Normal View */}
       <div style={{
-        minHeight: '100vh',
-        background: 'linear-gradient(180deg, #0a0a0a 0%, #111 100%)',
-        padding: isMobile ? '0.75rem' : '1.5rem',
+        minHeight: '100dvh',
+        background: '#0a0a0a',
+        padding: isMobile
+          ? '0.75rem 0.75rem calc(env(safe-area-inset-bottom, 0px) + 5rem)'
+          : '1.5rem',
         boxSizing: 'border-box',
         width: '100%',
         overflowX: 'hidden'
