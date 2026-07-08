@@ -44,16 +44,17 @@ export default function ContentBlock({
   let isStory = false
   
   if (isBatchItem) {
-    // BATCH ITEM: Use getItemColor from batch constants
-    const colorHex = getItemColor(item.post_format, item.content_type)
-    
+    // BATCH ITEM: custom format-kleur heeft voorrang (bv. Talking head = goud);
+    // val alleen terug op de oude POST_FORMATS-kleur voor legacy-batches.
+    const colorHex = item?.batch?.format?.color || getItemColor(item.post_format, item.content_type)
+
     // Convert hex color to color object format
     color = {
       primary: colorHex,
       bg: `${colorHex}15`,
       border: `${colorHex}40`
     }
-    
+
     formatIcon = getFormatIcon(item.post_format)
     isStory = item.content_type === 'story'
   } else {

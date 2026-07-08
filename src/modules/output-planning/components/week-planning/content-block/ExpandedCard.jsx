@@ -74,12 +74,12 @@ export default function ExpandedCard({
     <div
       style={{
         background: isSelected
-          ? 'rgba(139, 92, 246, 0.2)'
+          ? 'rgba(255,255,255,0.1)'
           : isCompleted
             ? 'rgba(16, 185, 129, 0.15)'
             : `linear-gradient(135deg, ${color.bg} 0%, rgba(0,0,0,0.4) 100%)`,
         border: isSelected
-          ? '1px solid rgba(139, 92, 246, 0.6)'
+          ? '1px solid rgba(255,255,255,0.35)'
           : isCompleted
             ? '1px solid rgba(16, 185, 129, 0.4)'
             : `1px solid ${color.border}`,
@@ -297,8 +297,8 @@ export default function ExpandedCard({
               alignItems: 'center',
               gap: '0.2rem',
               padding: '0.15rem 0.3rem',
-              background: 'rgba(139, 92, 246, 0.2)',
-              border: '1px solid rgba(139, 92, 246, 0.3)',
+              background: 'rgba(255,255,255,0.1)',
+              border: '1px solid rgba(255,255,255,0.18)',
               borderRadius: '4px'
             }}
           >
@@ -415,8 +415,8 @@ export default function ExpandedCard({
               gap: '0.25rem',
               padding: '0.3rem 0.5rem',
               borderRadius: '4px',
-              background: hasCaption ? 'rgba(139, 92, 246, 0.2)' : 'rgba(139, 92, 246, 0.1)',
-              border: hasCaption ? '1px solid rgba(139, 92, 246, 0.4)' : '1px solid rgba(139, 92, 246, 0.3)',
+              background: hasCaption ? 'rgba(255,255,255,0.1)' : 'rgba(255,255,255,0.06)',
+              border: hasCaption ? '1px solid rgba(255,255,255,0.25)' : '1px solid rgba(255,255,255,0.18)',
               color: 'rgba(255,255,255,0.75)',
               fontSize: '0.65rem',
               fontWeight: '600',
