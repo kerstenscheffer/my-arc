@@ -3,6 +3,7 @@ import './styles/theme.css'
 import { createRoot } from 'react-dom/client'
 import './index.css'
 import './styles/ai-generator.css'
+import './ui/tokens.css'   // design-contract tokens (goud), additief — laadt op elke pagina
 import App from './App.jsx'
 
 // Mount application

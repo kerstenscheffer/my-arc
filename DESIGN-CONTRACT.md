@@ -22,10 +22,12 @@ of willekeurige pixel-waardes in componenten.
   --text-muted: #6b7280;      /* empty states, timestamps, stat-labels */
 
   /* Accent — geel is schaars en betekent altijd iets */
-  --accent: #f5c518;
+  --accent: #ffd700;
   --on-accent: #000000;       /* tekst óp geel is altijd zwart */
 
   /* Semantisch (spaarzaam gebruiken) */
+  /* Groen (--success) betekent uitsluitend succes/behaald/afgerond.
+     Nooit als accent, decoratie of merk-kleur. */
   --success: #22c55e;
   --danger: #ef4444;
 

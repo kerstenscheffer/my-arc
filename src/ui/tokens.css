@@ -1,0 +1,47 @@
+/* src/ui/tokens.css
+   Design-contract tokens als CSS-variabelen, zodat ook .css-bestanden hieruit
+   kunnen putten. Additief: gebruikt nieuwe namen (--bg, --surface, --accent…)
+   die NIET botsen met de bestaande theme.css (--c-*). Verandert dus nog niets
+   zichtbaars aan bestaande pagina's. theme.css blijft in deze fase ongewijzigd. */
+
+:root {
+  /* Oppervlakken */
+  --bg: #000000;
+  --surface: #141414;
+  --surface-hover: #1e1e1e;
+
+  /* Tekst — exact 3 niveaus */
+  --text-primary: #ffffff;
+  --text-secondary: #9ca3af;
+  --text-muted: #6b7280;
+
+  /* Accent — goud, schaars, betekent altijd iets */
+  --accent: #ffd700;
+  --on-accent: #000000;
+
+  /* Semantisch (spaarzaam) — groen = uitsluitend succes/behaald/afgerond */
+  --success: #22c55e;
+  --danger: #ef4444;
+
+  /* Vorm */
+  --radius-card: 16px;
+  --radius-btn: 12px;
+  --radius-pill: 999px;
+  --border-subtle: rgba(255, 255, 255, 0.08);
+  --border-active: var(--accent);
+
+  /* Spacing-schaal: alleen 4, 8, 12, 16, 24, 32 px */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-6: 24px;
+  --space-8: 32px;
+
+  --space-page: 16px;
+  --space-section: 32px;
+  --space-card: 16px;
+}
+
+/* Spinner-animatie voor de loading-staat van de gedeelde Button. */
+@keyframes ui-spin { to { transform: rotate(360deg); } }
