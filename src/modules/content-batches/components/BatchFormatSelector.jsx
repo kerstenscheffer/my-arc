@@ -1,7 +1,11 @@
 // src/modules/content-batches/components/BatchFormatSelector.jsx
-// Step 1: Select post format, content type (post/story), and batch settings
+// Stap 1: kies één van je EIGEN formats (leeg bij start) of maak er een via
+// "+ Format toevoegen". Daarna: post/story + batch-instellingen.
 
-import { POST_FORMATS, getItemColor } from '../constants'
+import { useState, useEffect, useCallback } from 'react'
+import { Plus, Pencil, Layers } from 'lucide-react'
+import BatchService from '../BatchService'
+import FormatBuilderModal from './FormatBuilderModal'
 import { GOLD } from '../../output-planning/components/week-planning/constants'
 
 export default function BatchFormatSelector({
@@ -13,404 +17,147 @@ export default function BatchFormatSelector({
   onContentTypeChange,
   onBatchNameChange,
   onItemCountChange,
-  isMobile = false
+  db,
+  isMobile = false,
 }) {
-  const formats = Object.values(POST_FORMATS)
+  const [formats, setFormats] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [builderOpen, setBuilderOpen] = useState(false)
+  const [editingFormat, setEditingFormat] = useState(null)
+
+  const loadFormats = useCallback(async () => {
+    setLoading(true)
+    try {
+      const user = await db.getCurrentUser()
+      const svc = new BatchService(db.supabase)
+      setFormats(await svc.getFormats(user.id))
+    } catch (e) {
+      console.error('Formats laden mislukt:', e)
+    } finally {
+      setLoading(false)
+    }
+  }, [db])
+
+  useEffect(() => { loadFormats() }, [loadFormats])
+
+  const handleSaved = (saved) => {
+    loadFormats()
+    if (saved) onFormatSelect(saved)   // net gemaakt format meteen selecteren
+  }
+
+  const accent = selectedFormat?.color || GOLD.primary
 
   return (
-    <div style={{
-      display: 'flex',
-      flexDirection: 'column',
-      gap: isMobile ? '1.5rem' : '2rem'
-    }}>
-      {/* Format Grid - ALL formats visible */}
+    <div style={{ display: 'flex', flexDirection: 'column', gap: isMobile ? '1.5rem' : '2rem' }}>
+      {/* Formats */}
       <div>
-        <h3 style={{
-          margin: '0 0 1rem',
-          fontSize: isMobile ? '1rem' : '1.125rem',
-          fontWeight: '700',
-          color: '#fff'
-        }}>
-          Selecteer Post Format
-        </h3>
-        
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(4, 1fr)',
-          gap: isMobile ? '0.75rem' : '1rem'
-        }}>
-          {formats.map(format => {
-            const Icon = format.icon
-            const isSelected = selectedFormat?.id === format.id
-            const previewColor = getItemColor(format.id, contentType)
-            
-            return (
-              <button
-                key={format.id}
-                onClick={() => onFormatSelect(format)}
-                style={{
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  gap: '0.75rem',
-                  padding: isMobile ? '1rem' : '1.25rem',
-                  background: isSelected
-                    ? `linear-gradient(135deg, ${previewColor}20 0%, rgba(0,0,0,0.4) 100%)`
-                    : 'rgba(255, 255, 255, 0.03)',
-                  border: isSelected
-                    ? `2px solid ${previewColor}`
-                    : '1px solid rgba(255, 255, 255, 0.1)',
-                  borderRadius: '12px',
-                  cursor: 'pointer',
-                  transition: 'all 0.3s ease',
-                  touchAction: 'manipulation',
-                  WebkitTapHighlightColor: 'transparent',
-                  minHeight: isMobile ? '120px' : '140px'
-                }}
-                onMouseEnter={(e) => {
-                  if (!isMobile && !isSelected) {
-                    e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)'
-                    e.currentTarget.style.transform = 'translateY(-2px)'
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  if (!isMobile && !isSelected) {
-                    e.currentTarget.style.background = 'rgba(255, 255, 255, 0.03)'
-                    e.currentTarget.style.transform = 'translateY(0)'
-                  }
-                }}
-              >
-                {/* Icon */}
-                <div style={{
-                  width: isMobile ? '48px' : '56px',
-                  height: isMobile ? '48px' : '56px',
-                  borderRadius: '12px',
-                  background: isSelected
-                    ? `${previewColor}30`
-                    : 'rgba(255, 255, 255, 0.05)',
-                  border: `1px solid ${isSelected ? previewColor + '60' : 'rgba(255, 255, 255, 0.1)'}`,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center'
-                }}>
-                  <Icon 
-                    size={isMobile ? 24 : 28} 
-                    color={isSelected ? previewColor : 'rgba(255, 255, 255, 0.6)'}
-                    strokeWidth={2}
-                  />
-                </div>
+        <h3 style={{ margin: '0 0 1rem', fontSize: '1.1rem', fontWeight: 700, color: '#fff' }}>Kies een format</h3>
 
-                {/* Label */}
-                <div style={{
-                  textAlign: 'center',
-                  flex: 1,
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '0.25rem'
+        {loading ? (
+          <div style={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.85rem', padding: '1rem' }}>Laden…</div>
+        ) : (
+          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(4, 1fr)', gap: isMobile ? '0.75rem' : '1rem' }}>
+            {formats.map(format => {
+              const isSelected = selectedFormat?.id === format.id
+              const c = format.color || GOLD.primary
+              return (
+                <button key={format.id} onClick={() => onFormatSelect(format)} style={{
+                  position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.6rem',
+                  padding: isMobile ? '1rem' : '1.1rem', minHeight: isMobile ? 110 : 128,
+                  background: isSelected ? `linear-gradient(135deg, ${c}22 0%, rgba(0,0,0,0.4) 100%)` : 'rgba(255,255,255,0.03)',
+                  border: isSelected ? `2px solid ${c}` : '1px solid rgba(255,255,255,0.1)',
+                  borderRadius: 12, cursor: 'pointer', transition: 'all 0.2s ease',
+                  touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
                 }}>
-                  <span style={{
-                    fontSize: isMobile ? '0.85rem' : '0.9rem',
-                    fontWeight: '700',
-                    color: isSelected ? previewColor : '#fff'
-                  }}>
-                    {format.label}
+                  {/* edit */}
+                  <span onClick={(e) => { e.stopPropagation(); setEditingFormat(format); setBuilderOpen(true) }}
+                    title="Format bewerken"
+                    style={{ position: 'absolute', top: 6, left: 6, width: 24, height: 24, borderRadius: 6, background: 'rgba(0,0,0,0.4)', border: '1px solid rgba(255,255,255,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'rgba(255,255,255,0.5)' }}>
+                    <Pencil size={11} />
                   </span>
-                  <span style={{
-                    fontSize: '0.7rem',
-                    color: 'rgba(255, 255, 255, 0.4)',
-                    lineHeight: '1.3'
-                  }}>
-                    {format.estimatedTime}
-                  </span>
-                </div>
-
-                {/* Selected indicator */}
-                {isSelected && (
-                  <div style={{
-                    position: 'absolute',
-                    top: '8px',
-                    right: '8px',
-                    width: '24px',
-                    height: '24px',
-                    borderRadius: '50%',
-                    background: previewColor,
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    color: '#000',
-                    fontSize: '0.75rem',
-                    fontWeight: '700'
-                  }}>
-                    ✓
+                  {isSelected && (
+                    <span style={{ position: 'absolute', top: 6, right: 6, width: 22, height: 22, borderRadius: '50%', background: c, color: '#000', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.7rem', fontWeight: 700 }}>✓</span>
+                  )}
+                  <div style={{ width: isMobile ? 44 : 52, height: isMobile ? 44 : 52, borderRadius: 12, background: `${c}25`, border: `1px solid ${c}60`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <Layers size={isMobile ? 22 : 26} color={c} strokeWidth={2} />
                   </div>
-                )}
-              </button>
-            )
-          })}
-        </div>
+                  <span style={{ fontSize: isMobile ? '0.82rem' : '0.88rem', fontWeight: 700, color: isSelected ? c : '#fff', textAlign: 'center', lineHeight: 1.2 }}>{format.name}</span>
+                  <span style={{ fontSize: '0.68rem', color: 'rgba(255,255,255,0.4)' }}>{(format.fields || []).length} velden</span>
+                </button>
+              )
+            })}
+
+            {/* + Format toevoegen */}
+            <button onClick={() => { setEditingFormat(null); setBuilderOpen(true) }} style={{
+              display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '0.6rem',
+              padding: isMobile ? '1rem' : '1.1rem', minHeight: isMobile ? 110 : 128,
+              background: 'rgba(255,215,0,0.05)', border: `1px dashed ${GOLD.border}`, borderRadius: 12,
+              cursor: 'pointer', color: GOLD.primary, touchAction: 'manipulation',
+            }}>
+              <div style={{ width: isMobile ? 44 : 52, height: isMobile ? 44 : 52, borderRadius: 12, background: 'rgba(255,215,0,0.1)', border: `1px solid ${GOLD.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <Plus size={isMobile ? 22 : 26} color={GOLD.primary} />
+              </div>
+              <span style={{ fontSize: isMobile ? '0.82rem' : '0.88rem', fontWeight: 700 }}>Format toevoegen</span>
+            </button>
+          </div>
+        )}
+
+        {!loading && formats.length === 0 && (
+          <p style={{ marginTop: '0.85rem', fontSize: '0.8rem', color: 'rgba(255,255,255,0.4)' }}>
+            Nog geen formats. Maak er één via <strong style={{ color: GOLD.primary }}>Format toevoegen</strong> — je velden worden bewaard zodat je ze steeds hergebruikt.
+          </p>
+        )}
       </div>
 
-      {/* Content Type Toggle - Only shows when format selected */}
+      {/* Post / Story + instellingen — pas zichtbaar als een format gekozen is */}
       {selectedFormat && (
-        <div>
-          <h3 style={{
-            margin: '0 0 0.75rem',
-            fontSize: isMobile ? '1rem' : '1.125rem',
-            fontWeight: '700',
-            color: '#fff'
-          }}>
-            Plaats als Post of Story?
-          </h3>
-          
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: '1fr 1fr',
-            gap: '1rem',
-            maxWidth: '500px'
-          }}>
-            {/* Post Option */}
-            <button
-              onClick={() => onContentTypeChange('post')}
-              style={{
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                gap: '0.75rem',
-                padding: isMobile ? '1.25rem' : '1.5rem',
-                background: contentType === 'post'
-                  ? `linear-gradient(135deg, ${selectedFormat.postColor}20 0%, rgba(0,0,0,0.4) 100%)`
-                  : 'rgba(255, 255, 255, 0.03)',
-                border: contentType === 'post'
-                  ? `2px solid ${selectedFormat.postColor}`
-                  : '1px solid rgba(255, 255, 255, 0.1)',
-                borderRadius: '12px',
-                cursor: 'pointer',
-                transition: 'all 0.3s ease',
-                touchAction: 'manipulation'
-              }}
-            >
-              <div style={{
-                fontSize: '2rem'
-              }}>
-                📄
-              </div>
-              <div style={{ textAlign: 'center' }}>
-                <div style={{
-                  fontSize: '0.95rem',
-                  fontWeight: '700',
-                  color: contentType === 'post' ? selectedFormat.postColor : '#fff',
-                  marginBottom: '0.25rem'
+        <>
+          <div>
+            <h3 style={{ margin: '0 0 0.75rem', fontSize: '1.05rem', fontWeight: 700, color: '#fff' }}>Plaats als Post of Story?</h3>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', maxWidth: 480 }}>
+              {[{ id: 'post', emoji: '📄', label: 'Feed Post', c: accent }, { id: 'story', emoji: '📱', label: 'Instagram Story', c: '#ec4899' }].map(opt => (
+                <button key={opt.id} onClick={() => onContentTypeChange(opt.id)} style={{
+                  display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem', padding: '1.1rem',
+                  background: contentType === opt.id ? `linear-gradient(135deg, ${opt.c}22 0%, rgba(0,0,0,0.4) 100%)` : 'rgba(255,255,255,0.03)',
+                  border: contentType === opt.id ? `2px solid ${opt.c}` : '1px solid rgba(255,255,255,0.1)',
+                  borderRadius: 12, cursor: 'pointer', touchAction: 'manipulation',
                 }}>
-                  Feed Post
-                </div>
-                <div style={{
-                  fontSize: '0.7rem',
-                  color: 'rgba(255, 255, 255, 0.5)'
-                }}>
-                  Kleur: <span style={{
-                    display: 'inline-block',
-                    width: '12px',
-                    height: '12px',
-                    borderRadius: '50%',
-                    background: selectedFormat.postColor,
-                    marginLeft: '4px',
-                    verticalAlign: 'middle'
-                  }} />
-                </div>
-              </div>
-            </button>
-
-            {/* Story Option */}
-            <button
-              onClick={() => onContentTypeChange('story')}
-              style={{
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                gap: '0.75rem',
-                padding: isMobile ? '1.25rem' : '1.5rem',
-                background: contentType === 'story'
-                  ? 'linear-gradient(135deg, rgba(236, 72, 153, 0.2) 0%, rgba(0,0,0,0.4) 100%)'
-                  : 'rgba(255, 255, 255, 0.03)',
-                border: contentType === 'story'
-                  ? '2px solid #ec4899'
-                  : '1px solid rgba(255, 255, 255, 0.1)',
-                borderRadius: '12px',
-                cursor: 'pointer',
-                transition: 'all 0.3s ease',
-                touchAction: 'manipulation'
-              }}
-            >
-              <div style={{
-                fontSize: '2rem'
-              }}>
-                📱
-              </div>
-              <div style={{ textAlign: 'center' }}>
-                <div style={{
-                  fontSize: '0.95rem',
-                  fontWeight: '700',
-                  color: contentType === 'story' ? '#ec4899' : '#fff',
-                  marginBottom: '0.25rem'
-                }}>
-                  Instagram Story
-                </div>
-                <div style={{
-                  fontSize: '0.7rem',
-                  color: 'rgba(255, 255, 255, 0.5)'
-                }}>
-                  Kleur: <span style={{
-                    display: 'inline-block',
-                    width: '12px',
-                    height: '12px',
-                    borderRadius: '50%',
-                    background: '#ec4899',
-                    marginLeft: '4px',
-                    verticalAlign: 'middle'
-                  }} />
-                </div>
-              </div>
-            </button>
+                  <span style={{ fontSize: '1.8rem' }}>{opt.emoji}</span>
+                  <span style={{ fontSize: '0.9rem', fontWeight: 700, color: contentType === opt.id ? opt.c : '#fff' }}>{opt.label}</span>
+                </button>
+              ))}
+            </div>
           </div>
 
-          {/* Preview */}
-          <div style={{
-            marginTop: '1rem',
-            padding: '1rem',
-            background: 'rgba(0, 0, 0, 0.3)',
-            border: '1px solid rgba(255, 255, 255, 0.1)',
-            borderRadius: '8px',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.75rem'
-          }}>
-            <div style={{
-              fontSize: '1.25rem'
-            }}>
-              {contentType === 'story' ? '📱' : '📄'}
-            </div>
-            <div style={{ flex: 1 }}>
-              <div style={{
-                fontSize: '0.85rem',
-                fontWeight: '600',
-                color: getItemColor(selectedFormat.id, contentType)
-              }}>
-                {selectedFormat.label} als {contentType === 'story' ? 'Story' : 'Post'}
+          <div>
+            <h3 style={{ margin: '0 0 0.75rem', fontSize: '1.05rem', fontWeight: 700, color: '#fff' }}>Batch-instellingen</h3>
+            <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '1rem', maxWidth: 560 }}>
+              <div>
+                <label style={settingLabel}>Batch-naam (optioneel)</label>
+                <input type="text" value={batchName} onChange={e => onBatchNameChange(e.target.value)} placeholder={`${selectedFormat.name} week 1`} style={settingInput} />
               </div>
-              <div style={{
-                fontSize: '0.75rem',
-                color: 'rgba(255, 255, 255, 0.5)',
-                marginTop: '0.25rem'
-              }}>
-                {selectedFormat.description}
+              <div>
+                <label style={settingLabel}>Aantal items</label>
+                <input type="number" min="1" max="30" value={itemCount} onChange={e => onItemCountChange(Math.max(1, Math.min(30, parseInt(e.target.value) || 7)))} style={settingInput} />
               </div>
             </div>
           </div>
-        </div>
+        </>
       )}
 
-      {/* Batch Settings - Only shows when format selected */}
-      {selectedFormat && (
-        <div>
-          <h3 style={{
-            margin: '0 0 0.75rem',
-            fontSize: isMobile ? '1rem' : '1.125rem',
-            fontWeight: '700',
-            color: '#fff'
-          }}>
-            Batch Instellingen
-          </h3>
-
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr',
-            gap: '1rem',
-            maxWidth: '600px'
-          }}>
-            {/* Batch Name */}
-            <div>
-              <label style={{
-                display: 'block',
-                fontSize: '0.8rem',
-                fontWeight: '600',
-                color: 'rgba(255, 255, 255, 0.7)',
-                marginBottom: '0.5rem'
-              }}>
-                Batch Naam (optioneel)
-              </label>
-              <input
-                type="text"
-                value={batchName}
-                onChange={(e) => onBatchNameChange(e.target.value)}
-                placeholder={`${selectedFormat.label} Week 1`}
-                style={{
-                  width: '100%',
-                  padding: '0.75rem',
-                  background: 'rgba(0, 0, 0, 0.4)',
-                  border: '1px solid rgba(255, 255, 255, 0.2)',
-                  borderRadius: '8px',
-                  color: '#fff',
-                  fontSize: '0.9rem',
-                  outline: 'none'
-                }}
-              />
-            </div>
-
-            {/* Item Count */}
-            <div>
-              <label style={{
-                display: 'block',
-                fontSize: '0.8rem',
-                fontWeight: '600',
-                color: 'rgba(255, 255, 255, 0.7)',
-                marginBottom: '0.5rem'
-              }}>
-                Aantal Items
-              </label>
-              <input
-                type="number"
-                value={itemCount}
-                onChange={(e) => onItemCountChange(Math.max(1, Math.min(30, parseInt(e.target.value) || 7)))}
-                min="1"
-                max="30"
-                style={{
-                  width: '100%',
-                  padding: '0.75rem',
-                  background: 'rgba(0, 0, 0, 0.4)',
-                  border: '1px solid rgba(255, 255, 255, 0.2)',
-                  borderRadius: '8px',
-                  color: '#fff',
-                  fontSize: '0.9rem',
-                  outline: 'none'
-                }}
-              />
-            </div>
-          </div>
-
-          {/* Format Info */}
-          <div style={{
-            marginTop: '1rem',
-            padding: '1rem',
-            background: `${GOLD.background}`,
-            border: `1px solid ${GOLD.border}`,
-            borderRadius: '8px',
-            fontSize: '0.8rem',
-            color: 'rgba(255, 255, 255, 0.7)',
-            lineHeight: '1.5'
-          }}>
-            <div style={{
-              fontWeight: '700',
-              color: GOLD.primary,
-              marginBottom: '0.5rem'
-            }}>
-              📊 Geschatte tijd: {selectedFormat.estimatedTime}
-            </div>
-            <div>
-              Voor {itemCount} {contentType === 'story' ? 'stories' : 'posts'}
-            </div>
-          </div>
-        </div>
+      {builderOpen && (
+        <FormatBuilderModal
+          isOpen={builderOpen}
+          existing={editingFormat}
+          db={db}
+          isMobile={isMobile}
+          onClose={() => { setBuilderOpen(false); setEditingFormat(null) }}
+          onSaved={handleSaved}
+        />
       )}
     </div>
   )
 }
+
+const settingLabel = { display: 'block', fontSize: '0.78rem', fontWeight: 600, color: 'rgba(255,255,255,0.7)', marginBottom: '0.5rem' }
+const settingInput = { width: '100%', boxSizing: 'border-box', padding: '0.75rem', background: 'rgba(0,0,0,0.4)', border: '1px solid rgba(255,255,255,0.2)', borderRadius: 8, color: '#fff', fontSize: '0.9rem', outline: 'none' }

@@ -6,7 +6,7 @@
 import { useState } from 'react'
 import { X, ChevronLeft, ChevronRight } from 'lucide-react'
 import BatchFormatSelector from './BatchFormatSelector'
-import BatchItemsBuilder from './BatchItemsBuilder'
+import DynamicItemsBuilder from './DynamicItemsBuilder'
 import BatchPlanningOptions from './BatchPlanningOptions'
 import { GOLD } from '../../output-planning/components/week-planning/constants'
 
@@ -50,18 +50,10 @@ export default function BatchModal({
       const newItems = Array.from({ length: itemCount }, (_, i) => ({
         itemNumber: i + 1,
         title: '',
-        location: '',
-        caption: '',
-        hook: '',
-        script: '',
-        notes: '',
+        // Waarden van de custom-format-velden komen hierin ({veld_key: waarde}).
+        fieldValues: {},
         storyGoal: contentType === 'story' ? 'autoriteit' : null,
         storyTopic: contentType === 'story' ? 'progressie' : null,
-        // Blueprint fields
-        blueprintSteps: null,
-        bRollList: null,
-        editNotes: null,
-        productieChecklist: null
       }))
       setItems(newItems)
     }
@@ -79,8 +71,9 @@ export default function BatchModal({
     try {
       // UPDATED: Include blueprint data per item
       const batchData = {
-        batchName: batchName || `${selectedFormat.label} Batch`,
-        postFormat: selectedFormat.id,
+        batchName: batchName || `${selectedFormat.name || 'Format'} batch`,
+        postFormat: selectedFormat.name || null,   // leesbaar label (legacy kolom)
+        formatId: selectedFormat.id,                // koppeling naar het custom format
         contentType,
         totalItems: itemCount,
         planningType,
@@ -88,11 +81,7 @@ export default function BatchModal({
         items: items.map((item, index) => ({
           ...item,
           plannedDate: planningType === 'manual' ? manualDates[index] : null,
-          // Blueprint data (camelCase for service layer)
-          blueprintSteps: item.blueprintSteps || null,
-          bRollList: item.bRollList || null,
-          editNotes: item.editNotes || null,
-          productieChecklist: item.productieChecklist || null
+          fieldValues: item.fieldValues || {},
         }))
       }
 
@@ -187,7 +176,7 @@ export default function BatchModal({
               fontSize: isMobile ? '0.8rem' : '0.85rem',
               color: 'rgba(255, 255, 255, 0.5)'
             }}>
-              {selectedFormat ? selectedFormat.label : 'Kies je content type'}
+              {selectedFormat ? (selectedFormat.name || 'Format') : 'Kies een format'}
             </p>
           </div>
 

@@ -9,6 +9,74 @@ class BatchService {
   }
 
   // ============================================
+  // FORMAT OPERATIONS (zelf-gedefinieerde formats + velden)
+  // ============================================
+
+  // Alle eigen formats van de coach (nieuwste eerst binnen sort_order).
+  async getFormats(coachId) {
+    try {
+      const { data, error } = await this.supabase
+        .from('content_formats')
+        .select('*')
+        .eq('coach_id', coachId)
+        .order('sort_order', { ascending: true })
+        .order('created_at', { ascending: false })
+      if (error) throw error
+      return data || []
+    } catch (error) {
+      console.error('❌ Get formats failed:', error)
+      return []
+    }
+  }
+
+  // Maak een nieuw herbruikbaar format. fields = [{key,label,type,options?}].
+  async createFormat(coachId, { name, icon = null, color = '#FFD700', fields = [], sortOrder = 0 }) {
+    try {
+      const { data, error } = await this.supabase
+        .from('content_formats')
+        .insert({ coach_id: coachId, name, icon, color, fields, sort_order: sortOrder })
+        .select()
+        .single()
+      if (error) throw error
+      console.log('✅ Format created:', data.id)
+      return data
+    } catch (error) {
+      console.error('❌ Create format failed:', error)
+      throw error
+    }
+  }
+
+  async updateFormat(formatId, updates) {
+    try {
+      const { data, error } = await this.supabase
+        .from('content_formats')
+        .update({ ...updates, updated_at: new Date().toISOString() })
+        .eq('id', formatId)
+        .select()
+        .single()
+      if (error) throw error
+      return data
+    } catch (error) {
+      console.error('❌ Update format failed:', error)
+      throw error
+    }
+  }
+
+  async deleteFormat(formatId) {
+    try {
+      const { error } = await this.supabase
+        .from('content_formats')
+        .delete()
+        .eq('id', formatId)
+      if (error) throw error
+      return true
+    } catch (error) {
+      console.error('❌ Delete format failed:', error)
+      throw error
+    }
+  }
+
+  // ============================================
   // BATCH OPERATIONS
   // ============================================
 
@@ -23,6 +91,7 @@ class BatchService {
       const {
         batchName,
         postFormat,
+        formatId = null,           // NEW: verwijzing naar een custom content_format
         contentType,
         totalItems = 7,
         planningType = 'ready',
@@ -37,6 +106,7 @@ class BatchService {
           coach_id: coachId,
           batch_name: batchName,
           post_format: postFormat,
+          format_id: formatId,       // NEW
           content_type: contentType,
           total_items: totalItems,
           planning_type: planningType,
@@ -69,7 +139,9 @@ class BatchService {
           blueprint_steps: item.blueprintSteps || null,
           b_roll_list: item.bRollList || null,
           productie_checklist: item.productieChecklist || null,
-          edit_notes: item.editNotes || null
+          edit_notes: item.editNotes || null,
+          // NEW: ingevulde waarden van de custom-format-velden ({veld_key: waarde})
+          field_values: item.fieldValues || {}
         }))
 
         const { data: createdItems, error: itemsError } = await this.supabase
@@ -134,7 +206,7 @@ class BatchService {
     try {
       const { data, error } = await this.supabase
         .from('content_batches')
-        .select('*, batch_items(*)')
+        .select('*, format:content_formats(id, name, icon, color, fields), batch_items(*)')
         .eq('coach_id', coachId)
         .order('created_at', { ascending: false })
       if (error) throw error
@@ -247,7 +319,9 @@ class BatchService {
           batch:content_batches(
             batch_name,
             post_format,
-            content_type
+            content_type,
+            format_id,
+            format:content_formats(id, name, icon, color, fields)
           )
         `)
         .gte('planned_date', weekStart)
@@ -280,7 +354,9 @@ class BatchService {
             batch_name,
             post_format,
             content_type,
-            coach_id
+            coach_id,
+            format_id,
+            format:content_formats(id, name, icon, color, fields)
           )
         `)
         .eq('batch.coach_id', coachId)
