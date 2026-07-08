@@ -83,7 +83,7 @@ export default function ExpandedCard({
           : isCompleted
             ? '1px solid rgba(16, 185, 129, 0.4)'
             : `1px solid ${color.border}`,
-        borderLeft: `3px solid ${isSelected ? '#8b5cf6' : isCompleted ? '#10b981' : color.primary}`,
+        borderLeft: `3px solid ${isSelected ? 'rgba(255,255,255,0.75)' : isCompleted ? '#10b981' : color.primary}`,
         borderRadius: '6px',
         padding: '0.5rem',
         display: 'flex',
@@ -127,8 +127,8 @@ export default function ExpandedCard({
               width: '18px',
               height: '18px',
               borderRadius: '4px',
-              background: isSelected ? '#8b5cf6' : 'rgba(255, 255, 255, 0.1)',
-              border: `2px solid ${isSelected ? '#8b5cf6' : 'rgba(255, 255, 255, 0.3)'}`,
+              background: isSelected ? 'rgba(255,255,255,0.75)' : 'rgba(255, 255, 255, 0.1)',
+              border: `2px solid ${isSelected ? 'rgba(255,255,255,0.75)' : 'rgba(255, 255, 255, 0.3)'}`,
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
@@ -302,12 +302,12 @@ export default function ExpandedCard({
               borderRadius: '4px'
             }}
           >
-            <MessageSquare size={10} color="#8b5cf6" />
+            <MessageSquare size={10} color="rgba(255,255,255,0.75)" />
             <span
               style={{
                 fontSize: '0.55rem',
                 fontWeight: '600',
-                color: '#8b5cf6'
+                color: 'rgba(255,255,255,0.75)'
               }}
             >
               Caption
@@ -417,7 +417,7 @@ export default function ExpandedCard({
               borderRadius: '4px',
               background: hasCaption ? 'rgba(139, 92, 246, 0.2)' : 'rgba(139, 92, 246, 0.1)',
               border: hasCaption ? '1px solid rgba(139, 92, 246, 0.4)' : '1px solid rgba(139, 92, 246, 0.3)',
-              color: '#8b5cf6',
+              color: 'rgba(255,255,255,0.75)',
               fontSize: '0.65rem',
               fontWeight: '600',
               cursor: 'pointer',
@@ -493,8 +493,8 @@ export default function ExpandedCard({
             style={{
               display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.25rem',
               padding: '0.3rem 0.5rem', borderRadius: '4px',
-              background: 'rgba(59,130,246,0.18)', border: '1px solid rgba(59,130,246,0.4)',
-              color: '#3b82f6', fontSize: '0.65rem', fontWeight: '700', cursor: 'pointer',
+              background: 'rgba(255,215,0,0.16)', border: '1px solid rgba(255,215,0,0.45)',
+              color: '#FFD700', fontSize: '0.65rem', fontWeight: '700', cursor: 'pointer',
               touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent'
             }}
           >

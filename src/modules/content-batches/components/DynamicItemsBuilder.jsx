@@ -61,19 +61,19 @@ export default function DynamicItemsBuilder({ format, items, onItemsChange, isMo
         const complete = isComplete(item)
         return (
           <div key={index} style={{
-            background: complete ? 'rgba(16,185,129,0.08)' : 'rgba(255,255,255,0.03)',
-            border: `1px solid ${complete ? 'rgba(16,185,129,0.3)' : 'rgba(255,255,255,0.1)'}`,
+            background: complete ? 'rgba(255,215,0,0.08)' : 'rgba(255,255,255,0.03)',
+            border: `1px solid ${complete ? 'rgba(255,215,0,0.3)' : 'rgba(255,255,255,0.1)'}`,
             borderRadius: 12, overflow: 'hidden',
           }}>
             <div onClick={() => setExpanded(open ? -1 : index)} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '1rem', cursor: 'pointer' }}>
               <div style={{
                 width: 30, height: 30, borderRadius: 8, flexShrink: 0,
-                background: complete ? 'rgba(16,185,129,0.2)' : 'rgba(255,255,255,0.1)',
-                border: `1px solid ${complete ? 'rgba(16,185,129,0.4)' : 'rgba(255,255,255,0.2)'}`,
+                background: complete ? 'rgba(255,215,0,0.2)' : 'rgba(255,255,255,0.1)',
+                border: `1px solid ${complete ? 'rgba(255,215,0,0.4)' : 'rgba(255,255,255,0.2)'}`,
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
-                fontSize: '0.85rem', fontWeight: 700, color: complete ? '#10b981' : 'rgba(255,255,255,0.6)',
+                fontSize: '0.85rem', fontWeight: 700, color: complete ? '#FFD700' : 'rgba(255,255,255,0.6)',
               }}>{complete ? '✓' : index + 1}</div>
-              <span style={{ flex: 1, minWidth: 0, fontSize: '0.9rem', fontWeight: 600, color: complete ? '#10b981' : 'rgba(255,255,255,0.75)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              <span style={{ flex: 1, minWidth: 0, fontSize: '0.9rem', fontWeight: 600, color: complete ? '#FFD700' : 'rgba(255,255,255,0.75)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                 {itemLabel(item, index)}
               </span>
               {open ? <ChevronUp size={18} color="rgba(255,255,255,0.5)" /> : <ChevronDown size={18} color="rgba(255,255,255,0.5)" />}
@@ -144,11 +144,11 @@ function FieldInput({ field, value, onChange, isFirst }) {
           return (
             <button key={o} onClick={() => toggle(o)} style={{
               display: 'flex', alignItems: 'center', gap: 8, padding: '0.5rem 0.6rem',
-              background: on ? 'rgba(16,185,129,0.1)' : 'rgba(0,0,0,0.3)',
-              border: `1px solid ${on ? 'rgba(16,185,129,0.35)' : 'rgba(255,255,255,0.12)'}`,
+              background: on ? 'rgba(255,215,0,0.1)' : 'rgba(0,0,0,0.3)',
+              border: `1px solid ${on ? 'rgba(255,215,0,0.35)' : 'rgba(255,255,255,0.12)'}`,
               borderRadius: 6, cursor: 'pointer', textAlign: 'left',
             }}>
-              <span style={{ width: 18, height: 18, borderRadius: 4, flexShrink: 0, background: on ? '#10b981' : 'transparent', border: on ? 'none' : '2px solid #444', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <span style={{ width: 18, height: 18, borderRadius: 4, flexShrink: 0, background: on ? '#FFD700' : 'transparent', border: on ? 'none' : '2px solid #444', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 {on && <Check size={12} strokeWidth={3} color="#000" />}
               </span>
               <span style={{ fontSize: '0.82rem', color: on ? '#fff' : 'rgba(255,255,255,0.7)' }}>{o}</span>

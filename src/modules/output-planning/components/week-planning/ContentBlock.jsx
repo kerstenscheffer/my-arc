@@ -184,7 +184,7 @@ export default function ContentBlock({
   const menuItems = []
 
   if (item?.isBatchItem && onViewBatchItem) menuItems.push({ id: 'viewBatch', label: 'Inzien', icon: Eye, color: '#fff' })
-  if (item?.isBatchItem && onEditBatchItem) menuItems.push({ id: 'editBatch', label: 'Bewerken', icon: Pencil, color: '#3b82f6' })
+  if (item?.isBatchItem && onEditBatchItem) menuItems.push({ id: 'editBatch', label: 'Bewerken', icon: Pencil, color: '#FFD700' })
 
   if (hasScript && onViewScript) {
     menuItems.push({
@@ -200,7 +200,7 @@ export default function ContentBlock({
       id: 'nextWeek',
       label: 'Volgende week',
       icon: ChevronRight,
-      color: '#3b82f6'
+      color: '#FFD700'
     })
   }
   
@@ -596,13 +596,13 @@ export function ContentBlockCompact({
   const menuItems = []
 
   if (item?.isBatchItem && onViewBatchItem) menuItems.push({ id: 'viewBatch', label: 'Inzien', icon: Eye, color: '#fff' })
-  if (item?.isBatchItem && onEditBatchItem) menuItems.push({ id: 'editBatch', label: 'Bewerken', icon: Pencil, color: '#3b82f6' })
+  if (item?.isBatchItem && onEditBatchItem) menuItems.push({ id: 'editBatch', label: 'Bewerken', icon: Pencil, color: '#FFD700' })
 
   if (hasScript && onViewScript) {
     menuItems.push({ id: 'script', label: 'Bekijk Script', icon: ScrollText, color: '#FFD700' })
   }
   if (hasContentPiece && onMoveToNextWeek) {
-    menuItems.push({ id: 'nextWeek', label: 'Volgende week', icon: ChevronRight, color: '#3b82f6' })
+    menuItems.push({ id: 'nextWeek', label: 'Volgende week', icon: ChevronRight, color: '#FFD700' })
   }
   if (hasContentPiece && onMoveToPrevWeek) {
     menuItems.push({ id: 'prevWeek', label: 'Vorige week', icon: ChevronLeft, color: '#8b5cf6' })

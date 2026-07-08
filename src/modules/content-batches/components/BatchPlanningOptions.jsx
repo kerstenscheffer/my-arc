@@ -7,10 +7,11 @@
 import { Save, Clapperboard, CalendarCheck, Check } from 'lucide-react'
 import { GOLD } from '../../output-planning/components/week-planning/constants'
 
+const GOLDC = '#FFD700'
 const MODES = [
-  { id: 'save',  icon: Save,           color: '#10b981', title: 'Opslaan bij batches', desc: 'Zet de batch klaar zonder iets in de agenda. Je plant later in.' },
-  { id: 'shoot', icon: Clapperboard,   color: GOLD.primary, title: 'Opnamemoment plannen', desc: 'Alle items samen als één kaart op één dag & tijd — zo zie je wanneer je ze in één keer opneemt.' },
-  { id: 'pick',  icon: CalendarCheck,  color: '#3b82f6', title: 'Kies items voor agenda', desc: 'Vink zelf aan welke items (bv. 1 en 2) in de agenda komen, met dag & tijd. De rest wordt opgeslagen.' },
+  { id: 'save',  icon: Save,           color: GOLDC, title: 'Opslaan bij batches', desc: 'Zet de batch klaar zonder iets in de agenda. Je plant later in.' },
+  { id: 'shoot', icon: Clapperboard,   color: GOLDC, title: 'Opnamemoment plannen', desc: 'Alle items samen als één kaart op één dag & tijd — zo zie je wanneer je ze in één keer opneemt.' },
+  { id: 'pick',  icon: CalendarCheck,  color: GOLDC, title: 'Kies items voor agenda', desc: 'Vink zelf aan welke items (bv. 1 en 2) in de agenda komen, met dag & tijd. De rest wordt opgeslagen.' },
 ]
 
 export default function BatchPlanningOptions({
@@ -86,8 +87,8 @@ export default function BatchPlanningOptions({
 
       {/* Kies items — checkbox + dag/tijd per item */}
       {planMode === 'pick' && (
-        <div style={{ padding: '1rem', background: 'rgba(59,130,246,0.08)', border: '1px solid rgba(59,130,246,0.3)', borderRadius: 12 }}>
-          <h4 style={{ margin: '0 0 0.25rem', fontSize: '0.95rem', fontWeight: 800, color: '#3b82f6', display: 'flex', alignItems: 'center', gap: 8 }}>
+        <div style={{ padding: '1rem', background: 'rgba(255,215,0,0.08)', border: '1px solid rgba(255,215,0,0.3)', borderRadius: 12 }}>
+          <h4 style={{ margin: '0 0 0.25rem', fontSize: '0.95rem', fontWeight: 800, color: '#FFD700', display: 'flex', alignItems: 'center', gap: 8 }}>
             <CalendarCheck size={16} /> Kies wat in de agenda komt
           </h4>
           <p style={{ margin: '0 0 0.9rem', fontSize: '0.78rem', color: 'rgba(255,255,255,0.55)' }}>
@@ -100,17 +101,17 @@ export default function BatchPlanningOptions({
                 <div key={i} style={{
                   display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 8,
                   padding: '0.6rem 0.7rem', borderRadius: 8,
-                  background: sched.selected ? 'rgba(59,130,246,0.12)' : 'rgba(0,0,0,0.25)',
-                  border: `1px solid ${sched.selected ? 'rgba(59,130,246,0.4)' : 'rgba(255,255,255,0.08)'}`,
+                  background: sched.selected ? 'rgba(255,215,0,0.12)' : 'rgba(0,0,0,0.25)',
+                  border: `1px solid ${sched.selected ? 'rgba(255,215,0,0.4)' : 'rgba(255,255,255,0.08)'}`,
                 }}>
                   <button onClick={() => onItemScheduleChange(i, { selected: !sched.selected })} style={{
                     width: 22, height: 22, flexShrink: 0, borderRadius: 5, cursor: 'pointer',
-                    background: sched.selected ? '#3b82f6' : 'transparent',
+                    background: sched.selected ? '#FFD700' : 'transparent',
                     border: sched.selected ? 'none' : '2px solid #444',
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  }}>{sched.selected && <Check size={13} strokeWidth={3} color="#fff" />}</button>
+                  }}>{sched.selected && <Check size={13} strokeWidth={3} color="#000" />}</button>
                   <span style={{ flex: 1, minWidth: 120, fontSize: '0.82rem', fontWeight: 600, color: sched.selected ? '#fff' : 'rgba(255,255,255,0.6)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    <span style={{ color: '#3b82f6', fontWeight: 800, marginRight: 6 }}>{i + 1}.</span>{itemLabel(item, i)}
+                    <span style={{ color: '#FFD700', fontWeight: 800, marginRight: 6 }}>{i + 1}.</span>{itemLabel(item, i)}
                   </span>
                   {sched.selected && (
                     <div style={{ display: 'flex', gap: 6 }}>

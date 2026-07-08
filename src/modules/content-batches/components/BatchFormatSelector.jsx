@@ -115,7 +115,7 @@ export default function BatchFormatSelector({
           <div>
             <h3 style={{ margin: '0 0 0.75rem', fontSize: '1.05rem', fontWeight: 700, color: '#fff' }}>Plaats als Post of Story?</h3>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', maxWidth: 480 }}>
-              {[{ id: 'post', emoji: '📄', label: 'Feed Post', c: accent }, { id: 'story', emoji: '📱', label: 'Instagram Story', c: '#ec4899' }].map(opt => (
+              {[{ id: 'post', emoji: '📄', label: 'Feed Post', c: accent }, { id: 'story', emoji: '📱', label: 'Instagram Story', c: '#FFD700' }].map(opt => (
                 <button key={opt.id} onClick={() => onContentTypeChange(opt.id)} style={{
                   display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem', padding: '1.1rem',
                   background: contentType === opt.id ? `linear-gradient(135deg, ${opt.c}22 0%, rgba(0,0,0,0.4) 100%)` : 'rgba(255,255,255,0.03)',
