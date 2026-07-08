@@ -741,7 +741,13 @@ export default function OutputHub({ db, onPlanned }) {
       <BatchModal
         isOpen={showBatchModal}
         onClose={() => setShowBatchModal(false)}
-        onSave={() => setShowBatchModal(false)}
+        onSave={async (batchData) => {
+          // Sla de batch + items ECHT op (voorheen deed onSave niets → batch
+          // verdween). De useEffect op showBatchModal ververst daarna de lijst.
+          const user = await db.getCurrentUser()
+          await batchService.createBatch(user.id, batchData)
+          setShowBatchModal(false)
+        }}
         db={db}
         isMobile={isMobile}
       />

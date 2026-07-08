@@ -280,15 +280,15 @@ export default function BatchModal({
               onContentTypeChange={setContentType}
               onBatchNameChange={setBatchName}
               onItemCountChange={setItemCount}
+              db={db}
               isMobile={isMobile}
             />
           )}
 
-          {/* Step 2: Items Builder */}
+          {/* Step 2: Items Builder — dynamische velden van het gekozen format */}
           {currentStep === 2 && (
-            <BatchItemsBuilder
+            <DynamicItemsBuilder
               format={selectedFormat}
-              contentType={contentType}
               items={items}
               onItemsChange={setItems}
               isMobile={isMobile}

@@ -28,6 +28,39 @@ const PhaseIcons = {
   post: Send
 }
 
+// Maak een kleur-object (zoals CONTENT_COLORS) uit een hex, voor batch-items
+// die de kleur van hun custom format erven.
+function hexToColorObj(hex) {
+  return { bg: `${hex}14`, border: `${hex}55`, primary: hex }
+}
+
+// Toon één veldwaarde leesbaar (checklist = komma-lijst).
+function renderFieldValue(field, value) {
+  if (value == null || value === '') return null
+  if (field.type === 'checklist' && Array.isArray(value)) return value.length ? value.join(', ') : null
+  return String(value)
+}
+
+// Paneel met de ingevulde format-velden van een batch-item (label: waarde).
+function BatchFieldPanel({ fmt, fieldValues, isMobile }) {
+  const fields = fmt?.fields || []
+  const rows = fields
+    .map(f => ({ label: f.label, val: renderFieldValue(f, fieldValues?.[f.key]) }))
+    .filter(r => r.val)
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 3, paddingTop: 6, marginTop: 2, borderTop: '1px solid rgba(255,255,255,0.08)' }}>
+      {rows.length === 0 ? (
+        <span style={{ fontSize: '0.62rem', color: 'rgba(255,255,255,0.4)' }}>Nog geen velden ingevuld.</span>
+      ) : rows.map((r, i) => (
+        <div key={i} style={{ fontSize: isMobile ? '0.62rem' : '0.66rem', lineHeight: 1.35 }}>
+          <span style={{ color: 'rgba(255,255,255,0.45)', fontWeight: 700 }}>{r.label}: </span>
+          <span style={{ color: 'rgba(255,255,255,0.85)' }}>{r.val}</span>
+        </div>
+      ))}
+    </div>
+  )
+}
+
 export default function ContentBlock({ 
   item, 
   contentPiece,
@@ -58,14 +91,19 @@ export default function ContentBlock({
     item?.description?.includes('praat_video')
   )
   
-  const color = isStory 
-    ? CONTENT_COLORS.pink  // Use existing pink from constants
-    : CONTENT_COLORS[contentPiece?.color || item?.color || 'blue']
-  
+  // Batch-item met custom format → erf de format-kleur; anders story/piece kleur.
+  const batchFmt = item?.isBatchItem ? item?.batch?.format : null
+  const [showFields, setShowFields] = useState(false)
+  const color = batchFmt?.color
+    ? hexToColorObj(batchFmt.color)
+    : isStory
+      ? CONTENT_COLORS.pink  // Use existing pink from constants
+      : CONTENT_COLORS[contentPiece?.color || item?.color || 'blue']
+
   const phase = PHASES[item?.phase || 'post']
   const PhaseIcon = PhaseIcons[item?.phase || 'post'] || Send
   const isCompleted = item?.completed
-  
+
   const title = contentPiece?.title || item?.title || item?.label || 'Untitled'
   const height = item?.duration_minutes ? Math.max(30, item.duration_minutes) : 30
   
@@ -247,21 +285,37 @@ export default function ContentBlock({
           </span>
         )}
         
-        {/* Title */}
-        <span style={{
-          fontSize: isMobile ? '0.7rem' : '0.75rem',
-          fontWeight: '600',
-          color: isCompleted ? 'rgba(255, 255, 255, 0.5)' : '#fff',
-          textDecoration: isCompleted ? 'line-through' : 'none',
-          overflow: 'hidden',
-          textOverflow: 'ellipsis',
-          whiteSpace: 'nowrap',
-          flex: 1,
-          minWidth: 0
-        }}>
+        {/* Title — bij batch-items klikbaar om de veld-info te tonen */}
+        <span
+          onClick={batchFmt ? (e) => { e.stopPropagation(); e.preventDefault(); setShowFields(v => !v) } : undefined}
+          style={{
+            fontSize: isMobile ? '0.7rem' : '0.75rem',
+            fontWeight: '600',
+            color: isCompleted ? 'rgba(255, 255, 255, 0.5)' : '#fff',
+            textDecoration: isCompleted ? 'line-through' : 'none',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap',
+            flex: 1,
+            minWidth: 0,
+            cursor: batchFmt ? 'pointer' : 'inherit'
+          }}>
           {title}
         </span>
-        
+
+        {/* Format-badge (batch-item) */}
+        {batchFmt && (
+          <span style={{
+            flexShrink: 0, padding: '0.1rem 0.35rem', borderRadius: 4,
+            background: `${batchFmt.color}22`, border: `1px solid ${batchFmt.color}55`,
+            color: batchFmt.color, fontSize: '0.5rem', fontWeight: 800,
+            textTransform: 'uppercase', letterSpacing: '0.03em',
+            maxWidth: 90, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'
+          }}>
+            {batchFmt.name}
+          </span>
+        )}
+
         {/* Quick indicators */}
         {hasScript && !showMenu && (
           <ScrollText 
@@ -410,6 +464,11 @@ export default function ContentBlock({
           )}
         </div>
       )}
+
+      {/* Batch-item veld-info — klik op de titel om te tonen/verbergen */}
+      {batchFmt && showFields && (
+        <BatchFieldPanel fmt={batchFmt} fieldValues={item?.field_values} isMobile={isMobile} />
+      )}
     </div>
   )
 }
@@ -445,16 +504,19 @@ export function ContentBlockCompact({
     item?.description?.includes('praat_video')
   )
   
-  const color = isStory 
-    ? CONTENT_COLORS.pink  // Use existing pink from constants
-    : CONTENT_COLORS[contentPiece?.color || item?.color || 'blue']
-  
+  const batchFmt = item?.isBatchItem ? item?.batch?.format : null
+  const color = batchFmt?.color
+    ? hexToColorObj(batchFmt.color)
+    : isStory
+      ? CONTENT_COLORS.pink  // Use existing pink from constants
+      : CONTENT_COLORS[contentPiece?.color || item?.color || 'blue']
+
   const phase = PHASES[item?.phase || 'post']
   const PhaseIcon = PhaseIcons[item?.phase || 'post'] || Send
   const isCompleted = item?.completed
-  
+
   const title = contentPiece?.title || item?.title || item?.label || 'Untitled'
-  
+
   const hasContentPiece = !!item?.content_piece_id
   const hasScript = !!(contentPiece?.source_content_id)
   
@@ -604,8 +666,8 @@ export function ContentBlockCompact({
           alignItems: 'center',
           gap: '0.375rem'
         }}>
-          <span style={{ color: phase.color, fontWeight: '600' }}>
-            {phase.label}
+          <span style={{ color: batchFmt ? batchFmt.color : phase.color, fontWeight: '600' }}>
+            {batchFmt ? batchFmt.name : phase.label}
           </span>
           {item?.scheduled_time && (
             <>
