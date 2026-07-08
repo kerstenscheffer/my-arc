@@ -34,7 +34,9 @@ export default function CalendarGrid({
   onMoveToNextWeek,
   onMoveToPrevWeek,
   onUnschedule,
-  onOpenCaption
+  onOpenCaption,
+  onViewBatchItem,
+  onEditBatchItem
 }) {
   console.log('📊 CalendarGrid render - multiSelectMode:', multiSelectMode, 'selectedItemIds size:', selectedItemIds?.size)
   
@@ -378,6 +380,8 @@ export default function CalendarGrid({
                               onMoveToPrevWeek={onMoveToPrevWeek}
                               onUnschedule={onUnschedule}
                               onOpenCaption={onOpenCaption}
+                              onViewBatchItem={onViewBatchItem}
+                              onEditBatchItem={onEditBatchItem}
                               isMobile={false}
                             />
                           </div>

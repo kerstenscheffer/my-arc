@@ -5,8 +5,19 @@
 
 import { useState } from 'react'
 import {
-  Plus, ChevronDown, ChevronRight, Edit3, Trash2, CalendarPlus, Package,
+  Plus, ChevronDown, ChevronRight, Edit3, Trash2, CalendarPlus, Package, Eye,
 } from 'lucide-react'
+
+// Korte preview van de ingevulde format-velden (naast/onder de titel).
+function fieldPreview(item, format) {
+  const fields = format?.fields || []
+  for (const f of fields) {
+    const v = item.field_values?.[f.key]
+    if (Array.isArray(v)) { const c = v.filter(Boolean); if (c.length) return c.join(' · ') }
+    else if (v && String(v).trim() && item.title !== String(v)) return String(v)
+  }
+  return item.hook || ''
+}
 
 const GOLD = '#FFD700'
 
@@ -44,6 +55,7 @@ export default function BatchesListView({
   onCreateBatch,
   onEditItem,
   onPlanItem,
+  onViewItem,
   onDeleteBatch,
   isMobile,
 }) {
@@ -200,12 +212,12 @@ export default function BatchesListView({
                       }}>
                         {item.title || '(geen titel)'}
                       </div>
-                      {item.hook && (
+                      {fieldPreview(item, batch.format) && (
                         <div style={{
                           fontSize: '0.72rem', color: 'rgba(255,255,255,0.55)',
                           overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
                         }}>
-                          {item.hook}
+                          {fieldPreview(item, batch.format)}
                         </div>
                       )}
                       <div style={{ marginTop: 5, display: 'flex', gap: '0.45rem', alignItems: 'center' }}>
@@ -218,6 +230,21 @@ export default function BatchesListView({
                       </div>
                     </div>
                     <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
+                      {onViewItem && (
+                        <button
+                          onClick={() => onViewItem(item, batch)}
+                          style={{
+                            padding: 8, minHeight: 44, minWidth: 44,
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            background: 'transparent', border: '1px solid rgba(255,255,255,0.08)',
+                            borderRadius: 6, color: 'rgba(255,255,255,0.7)', cursor: 'pointer',
+                            touchAction: 'manipulation',
+                          }}
+                          title="Inzien"
+                        >
+                          <Eye size={14} />
+                        </button>
+                      )}
                       {onEditItem && (
                         <button
                           onClick={() => onEditItem(item, batch)}

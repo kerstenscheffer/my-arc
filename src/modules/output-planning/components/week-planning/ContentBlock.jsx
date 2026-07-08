@@ -16,6 +16,8 @@ import {
   ChevronLeft,
   CalendarOff,
   ScrollText,
+  Eye,
+  Pencil,
   X
 } from 'lucide-react'
 import { CONTENT_COLORS, PHASES, formatTime } from './constants'
@@ -65,8 +67,8 @@ function BatchFieldPanel({ fmt, fieldValues, isMobile }) {
   )
 }
 
-export default function ContentBlock({ 
-  item, 
+export default function ContentBlock({
+  item,
   contentPiece,
   onToggleComplete,
   onDelete,
@@ -74,6 +76,8 @@ export default function ContentBlock({
   onMoveToNextWeek,
   onMoveToPrevWeek,
   onUnschedule,
+  onViewBatchItem,
+  onEditBatchItem,
   isDragging = false,
   isCompact = false,
   showTime = true,
@@ -167,12 +171,21 @@ export default function ContentBlock({
       case 'delete':
         onDelete?.(item)
         break
+      case 'viewBatch':
+        onViewBatchItem?.(item)
+        break
+      case 'editBatch':
+        onEditBatchItem?.(item)
+        break
     }
   }
   
   // Menu items based on what's available
   const menuItems = []
-  
+
+  if (item?.isBatchItem && onViewBatchItem) menuItems.push({ id: 'viewBatch', label: 'Inzien', icon: Eye, color: '#fff' })
+  if (item?.isBatchItem && onEditBatchItem) menuItems.push({ id: 'editBatch', label: 'Bewerken', icon: Pencil, color: '#3b82f6' })
+
   if (hasScript && onViewScript) {
     menuItems.push({
       id: 'script',
@@ -481,8 +494,8 @@ export default function ContentBlock({
 // COMPACT VERSION - For mobile timeline
 // ============================================
 
-export function ContentBlockCompact({ 
-  item, 
+export function ContentBlockCompact({
+  item,
   contentPiece,
   onToggleComplete,
   onDelete,
@@ -490,6 +503,8 @@ export function ContentBlockCompact({
   onMoveToNextWeek,
   onMoveToPrevWeek,
   onUnschedule,
+  onViewBatchItem,
+  onEditBatchItem,
   isMobile = false
 }) {
   const [showMenu, setShowMenu] = useState(false)
@@ -568,12 +583,21 @@ export function ContentBlockCompact({
       case 'delete':
         onDelete?.(item)
         break
+      case 'viewBatch':
+        onViewBatchItem?.(item)
+        break
+      case 'editBatch':
+        onEditBatchItem?.(item)
+        break
     }
   }
   
   // Build menu items
   const menuItems = []
-  
+
+  if (item?.isBatchItem && onViewBatchItem) menuItems.push({ id: 'viewBatch', label: 'Inzien', icon: Eye, color: '#fff' })
+  if (item?.isBatchItem && onEditBatchItem) menuItems.push({ id: 'editBatch', label: 'Bewerken', icon: Pencil, color: '#3b82f6' })
+
   if (hasScript && onViewScript) {
     menuItems.push({ id: 'script', label: 'Bekijk Script', icon: ScrollText, color: '#FFD700' })
   }

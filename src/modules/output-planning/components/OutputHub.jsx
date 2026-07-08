@@ -17,6 +17,8 @@ import {
 import BatchService from '../../content-batches/BatchService'
 import BatchModal from '../../content-batches/components/BatchModal'
 import EditBatchItemModal from '../../content-batches/components/EditBatchItemModal'
+import PlanBatchItemModal from '../../content-batches/components/PlanBatchItemModal'
+import BatchItemViewModal from '../../content-batches/components/BatchItemViewModal'
 import ContentPlanningService from '../ContentPlanningService'
 
 import BatchesListView from './content-library/BatchesListView'
@@ -82,6 +84,8 @@ export default function OutputHub({ db, onPlanned }) {
   const [ideaToPlan, setIdeaToPlan] = useState(null) // idee dat in de agenda gepland wordt
   const [showEditBatchItem, setShowEditBatchItem] = useState(false)
   const [batchItemToEdit, setBatchItemToEdit] = useState(null)
+  const [batchItemToPlan, setBatchItemToPlan] = useState(null)   // item dat in de agenda gepland wordt
+  const [itemView, setItemView] = useState(null)                 // { item, format } voor Inzien
 
   // ── Load ─────────────────────────────────────────────────────────────────
   const loadAll = async () => {
@@ -313,6 +317,12 @@ export default function OutputHub({ db, onPlanned }) {
     } finally {
       setShowEditBatchItem(false); setBatchItemToEdit(null)
     }
+  }
+  // Plan één batch-item in de agenda (datum + tijd) → herlaad lijst + agenda.
+  const handlePlanBatchItem = async (itemId, date, time) => {
+    await batchService.planBatchItem(itemId, date, time)
+    await loadAll()
+    onPlanned?.()   // agenda direct verversen
   }
   const handleDeleteBatch = async (batch) => {
     if (!window.confirm(`Batch "${batch.batch_name || 'Naamloos'}" + alle items verwijderen?`)) return
@@ -694,6 +704,8 @@ export default function OutputHub({ db, onPlanned }) {
                 loading={false}
                 onCreateBatch={null}   /* button lives in the top bar */
                 onEditItem={handleEditBatchItem}
+                onViewItem={(item, batch) => setItemView({ item, format: batch?.format || null })}
+                onPlanItem={(item) => setBatchItemToPlan(item)}
                 onDeleteBatch={handleDeleteBatch}
                 isMobile={isMobile}
               />
@@ -760,6 +772,25 @@ export default function OutputHub({ db, onPlanned }) {
         onClose={() => { setShowEditBatchItem(false); setBatchItemToEdit(null) }}
         onSave={handleSaveBatchItemEdit}
         batchItem={batchItemToEdit}
+        isMobile={isMobile}
+      />
+
+      {/* Inzien — toont de ingevulde format-velden */}
+      <BatchItemViewModal
+        isOpen={!!itemView}
+        onClose={() => setItemView(null)}
+        item={itemView?.item}
+        format={itemView?.format}
+        onPlan={(item) => setBatchItemToPlan(item)}
+        isMobile={isMobile}
+      />
+
+      {/* Inplannen — datum + tijd kiezen voor één item */}
+      <PlanBatchItemModal
+        isOpen={!!batchItemToPlan}
+        onClose={() => setBatchItemToPlan(null)}
+        batchItem={batchItemToPlan}
+        onSave={handlePlanBatchItem}
         isMobile={isMobile}
       />
 

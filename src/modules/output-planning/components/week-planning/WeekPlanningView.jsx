@@ -22,6 +22,8 @@ import SchedulePieceModal from './SchedulePieceModal'
 import AddItemModal from './AddItemModal'
 import VideoBlueprint from '../VideoBlueprint'
 import CaptionModal from './content-block/CaptionModal'
+import BatchItemViewModal from '../../../content-batches/components/BatchItemViewModal'
+import BatchItemEditModal from '../../../content-batches/components/BatchItemEditModal'
 import { GOLD } from './constants'
 
 // Import services
@@ -84,6 +86,10 @@ export default function WeekPlanningView({
   const [scriptContentItem, setScriptContentItem] = useState(null)
   const [loadingScript, setLoadingScript] = useState(false)
   
+  // Batch-item Inzien/Bewerken op de agenda ({ item, format })
+  const [viewBatchItem, setViewBatchItem] = useState(null)
+  const [editBatchItem, setEditBatchItem] = useState(null)
+
   // Caption Modal State
   const [showCaptionModal, setShowCaptionModal] = useState(false)
   const [captionPiece, setCaptionPiece] = useState(null)
