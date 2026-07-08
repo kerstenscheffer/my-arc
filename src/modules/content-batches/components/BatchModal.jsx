@@ -26,9 +26,11 @@ export default function BatchModal({
   const [batchName, setBatchName] = useState('')
   const [itemCount, setItemCount] = useState(7)
   const [items, setItems] = useState([])
-  const [planningType, setPlanningType] = useState('ready')
-  const [recurringPattern, setRecurringPattern] = useState(null)
-  const [manualDates, setManualDates] = useState([])
+  // Planning stap 3: 'save' (bij batches) | 'shoot' (opnamemoment) | 'pick' (kies items)
+  const [planMode, setPlanMode] = useState('save')
+  const [shootDate, setShootDate] = useState('')
+  const [shootTime, setShootTime] = useState('10:00')
+  const [itemSchedule, setItemSchedule] = useState([]) // [{ selected, date, time }]
   
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState(null)
@@ -39,7 +41,11 @@ export default function BatchModal({
   const canGoNext = () => {
     if (currentStep === 1) return selectedFormat !== null
     if (currentStep === 2) return items.length === itemCount && items.every(i => i.title?.trim())
-    if (currentStep === 3) return true
+    if (currentStep === 3) {
+      if (planMode === 'shoot') return !!shootDate
+      if (planMode === 'pick') return itemSchedule.every(s => !s.selected || !!s.date)
+      return true // 'save'
+    }
     return false
   }
 
@@ -56,6 +62,7 @@ export default function BatchModal({
         storyTopic: contentType === 'story' ? 'progressie' : null,
       }))
       setItems(newItems)
+      setItemSchedule(Array.from({ length: itemCount }, () => ({ selected: false, date: '', time: '12:00' })))
     }
     setCurrentStep(prev => Math.min(prev + 1, 3))
   }
@@ -70,19 +77,28 @@ export default function BatchModal({
 
     try {
       // UPDATED: Include blueprint data per item
+      // Per item bepalen of het ingepland wordt (alleen bij 'pick' + aangevinkt).
+      const scheduledItems = items.map((item, index) => {
+        const s = itemSchedule[index]
+        const plan = planMode === 'pick' && s?.selected
+        return {
+          ...item,
+          plannedDate: plan ? (s.date || null) : null,
+          plannedTime: plan ? (s.time || '12:00') : '12:00',
+          fieldValues: item.fieldValues || {},
+        }
+      })
+
       const batchData = {
         batchName: batchName || `${selectedFormat.name || 'Format'} batch`,
         postFormat: selectedFormat.name || null,   // leesbaar label (legacy kolom)
         formatId: selectedFormat.id,                // koppeling naar het custom format
         contentType,
         totalItems: itemCount,
-        planningType,
-        recurringPattern,
-        items: items.map((item, index) => ({
-          ...item,
-          plannedDate: planningType === 'manual' ? manualDates[index] : null,
-          fieldValues: item.fieldValues || {},
-        }))
+        planningType: planMode === 'save' ? 'ready' : 'manual',
+        shootDate: planMode === 'shoot' ? (shootDate || null) : null,
+        shootTime: planMode === 'shoot' ? (shootTime || null) : null,
+        items: scheduledItems,
       }
 
       await onSave(batchData)
@@ -105,9 +121,10 @@ export default function BatchModal({
     setBatchName('')
     setItemCount(7)
     setItems([])
-    setPlanningType('ready')
-    setRecurringPattern(null)
-    setManualDates([])
+    setPlanMode('save')
+    setShootDate('')
+    setShootTime('10:00')
+    setItemSchedule([])
     setError(null)
   }
 
@@ -295,16 +312,18 @@ export default function BatchModal({
             />
           )}
 
-          {/* Step 3: Planning Options */}
+          {/* Step 3: Planning Options — duidelijke keuzes */}
           {currentStep === 3 && (
             <BatchPlanningOptions
-              planningType={planningType}
-              recurringPattern={recurringPattern}
-              manualDates={manualDates}
-              itemCount={itemCount}
-              onPlanningTypeChange={setPlanningType}
-              onRecurringPatternChange={setRecurringPattern}
-              onManualDatesChange={setManualDates}
+              planMode={planMode}
+              onPlanModeChange={setPlanMode}
+              shootDate={shootDate}
+              shootTime={shootTime}
+              onShootChange={(field, value) => field === 'date' ? setShootDate(value) : setShootTime(value)}
+              items={items}
+              itemSchedule={itemSchedule}
+              onItemScheduleChange={(i, patch) => setItemSchedule(prev => prev.map((s, idx) => idx === i ? { ...s, ...patch } : s))}
+              format={selectedFormat}
               isMobile={isMobile}
             />
           )}

@@ -96,6 +96,8 @@ class BatchService {
         totalItems = 7,
         planningType = 'ready',
         recurringPattern = null,
+        shootDate = null,           // NEW: opnamemoment (hele batch samen)
+        shootTime = null,
         items = [] // Array of item data
       } = batchData
 
@@ -111,6 +113,8 @@ class BatchService {
           total_items: totalItems,
           planning_type: planningType,
           recurring_pattern: recurringPattern,
+          shoot_date: shootDate,      // NEW
+          shoot_time: shootTime,      // NEW
           status: planningType === 'ready' ? 'ready' : 'draft'
         })
         .select()
