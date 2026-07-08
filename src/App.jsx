@@ -1,4 +1,5 @@
 // src/App.jsx
+import UiDemo from './ui/UiDemo'   // interne controle-pagina (route /ui-demo, niet in menu's)
 import InfoPage from './pages/InfoPage'
 import SalesInfoPage from './pages/SalesInfoPage'
 import SalesSlider from './pages/SalesSlider'
@@ -95,6 +96,11 @@ function App() {
   // ==============================================
   // PUBLIC ROUTES (No Authentication Required)
   // ==============================================
+
+  // Interne UI-controle-pagina (Fase 1 fundament) — niet gelinkt in menu's.
+  if (currentPath === '/ui-demo') {
+    return <UiDemo />
+  }
 
   // InfoPage moved to /info and /home only (link-in-bio page)
   if (currentPath === '/info' || currentPath === '/home') {
