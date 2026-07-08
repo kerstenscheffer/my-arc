@@ -743,10 +743,13 @@ export default function OutputHub({ db, onPlanned }) {
         onClose={() => setShowBatchModal(false)}
         onSave={async (batchData) => {
           // Sla de batch + items ECHT op (voorheen deed onSave niets → batch
-          // verdween). De useEffect op showBatchModal ververst daarna de lijst.
+          // verdween). onPlanned() laat óók de AGENDA direct herladen, zodat een
+          // zojuist ingepland item meteen zichtbaar is (voorheen bleef de agenda
+          // op de oude data staan).
           const user = await db.getCurrentUser()
           await batchService.createBatch(user.id, batchData)
           setShowBatchModal(false)
+          onPlanned?.()
         }}
         db={db}
         isMobile={isMobile}
