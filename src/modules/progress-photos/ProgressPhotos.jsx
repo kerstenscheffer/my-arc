@@ -37,6 +37,11 @@ export default function ProgressPhotos({ db, client }) {
     catch (e) { console.error('Delete failed:', e); alert('Kon foto niet verwijderen') }
   }
 
+  const handleUpdateSubtype = async (photoId, subtype) => {
+    try { await service.updatePhotoSubtype(photoId, subtype); setRefreshKey(p => p + 1) }
+    catch (e) { console.error('Update subtype failed:', e); alert('Kon hoek niet aanpassen') }
+  }
+
   if (loading) {
     return (
       <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '200px' }}>
@@ -48,7 +53,7 @@ export default function ProgressPhotos({ db, client }) {
 
   return (
     <div>
-      <PhotoGallery photos={recentPhotos} onDelete={handleDelete} isMobile={isMobile} />
+      <PhotoGallery photos={recentPhotos} onDelete={handleDelete} onUpdateSubtype={handleUpdateSubtype} isMobile={isMobile} />
       <PhotoStats weeklyStats={weeklyStats} todayData={todayData} isMobile={isMobile} />
     </div>
   )

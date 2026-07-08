@@ -354,6 +354,37 @@ export default function AgendaView({
     return parseInt(task.estimated_minutes, 10) || DEFAULT_DURATION
   }
 
+  // Compute side-by-side column positions for overlapping tasks in one day.
+  // Each entry gets .col (0-based) and .maxCols (total columns in its overlap group).
+  const computeTaskLayout = (tasks) => {
+    if (!tasks.length) return []
+    const events = tasks.map(t => ({
+      task: t,
+      start: timeToMinutes(t.scheduled_start_time) ?? 0,
+      end: (timeToMinutes(t.scheduled_start_time) ?? 0) + Math.max(duration(t), 22),
+      col: 0,
+      maxCols: 1,
+    }))
+    for (let i = 0; i < events.length; i++) {
+      const used = new Set()
+      for (let j = 0; j < i; j++) {
+        if (events[j].end > events[i].start) used.add(events[j].col)
+      }
+      let c = 0; while (used.has(c)) c++
+      events[i].col = c
+    }
+    for (let i = 0; i < events.length; i++) {
+      let max = events[i].col
+      for (let j = 0; j < events.length; j++) {
+        if (j !== i && events[j].end > events[i].start && events[j].start < events[i].end) {
+          max = Math.max(max, events[j].col)
+        }
+      }
+      events[i].maxCols = max + 1
+    }
+    return events
+  }
+
   const onDayDragOver = (e, dayId, dayEl) => {
     e.preventDefault()
     e.dataTransfer.dropEffect = 'move'
@@ -582,7 +613,7 @@ export default function AgendaView({
     )
   }
 
-  const renderTaskBlock = (task) => {
+  const renderTaskBlock = (task, col = 0, maxCols = 1) => {
     const top = timeToMinutes(task.scheduled_start_time)
     if (top == null) return null
     const persistedDur = duration(task)
@@ -646,12 +677,14 @@ export default function AgendaView({
         }}
         style={{
           position: 'absolute',
-          top: `${top}px`, left: '3px', right: '3px',
+          top: `${top}px`,
+          left: maxCols > 1 ? `calc(${col * (100 / maxCols)}% + 2px)` : '3px',
+          right: maxCols > 1 ? `calc(${(maxCols - 1 - col) * (100 / maxCols)}% + 2px)` : '3px',
           height: `${Math.max(effectiveDur, 22)}px`,
           background: isCompletedBlock
             ? 'linear-gradient(135deg, rgba(16,185,129,0.2) 0%, rgba(16,185,129,0.08) 100%)'
-            : `linear-gradient(135deg, ${color}33 0%, ${color}1a 100%)`,
-          border: isCompletedBlock ? '1px solid rgba(16,185,129,0.55)' : `1px solid ${color}66`,
+            : `linear-gradient(135deg, ${color}cc 0%, ${color}aa 100%)`,
+          border: isCompletedBlock ? '1px solid rgba(16,185,129,0.55)' : `1px solid ${color}bb`,
           borderLeft: `3px solid ${isCompletedBlock ? '#10b981' : color}`,
           borderRadius: '6px',
           padding: effectiveDur < 30 ? '0.15rem 0.4rem' : '0.3rem 0.5rem',
@@ -1135,7 +1168,7 @@ export default function AgendaView({
                   }}
                 >
                   {renderReservedBlocks(day.id)}
-                  {dayTasks.map(t => renderTaskBlock(t))}
+                  {computeTaskLayout(dayTasks).map(({ task, col, maxCols }) => renderTaskBlock(task, col, maxCols))}
                   {dropPreview?.dayId === day.id && renderDropPreview(dropPreview)}
                   {renderTodayLine(day.id)}
                 </div>

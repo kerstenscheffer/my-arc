@@ -175,7 +175,7 @@ export default function ProgressMain({ db, client }) {
       const [stats, friday, history, entry, photos, recent] = await Promise.all([
         weightService.getWeightStats(client.id),
         weightService.getFridayCompliance(client.id),
-        weightService.getWeightHistory(client.id, 56),
+        weightService.getWeightHistory(client.id, 730),
         weightService.getTodayEntry(client.id),
         getPhotoCount(client.id),
         getRecentPhotos(client.id)

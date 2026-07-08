@@ -94,7 +94,7 @@ export default function WeightStatsGrid({ stats = {}, client = {}, fridayData = 
   // we voegen lege chart-punten toe (weight=null) zodat alleen "expected"
   // wordt getekend tot de einddatum.
   const chartData = useMemo(() => {
-    const data = sortedHistory.slice(-30).map(e => ({
+    const data = sortedHistory.map(e => ({
       date: new Date(e.date).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' }),
       rawDate: e.date,
       weight: parseFloat(e.weight),

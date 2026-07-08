@@ -368,15 +368,19 @@ export default function PublicIntakePage() {
         setErrorType('SAVE_FAILED'); setSaving(false); return
       }
 
-      // training_time direct opslaan in user_workout_preferences
+      // training_time direct opslaan in user_workout_preferences (niet-blokkerend)
       if (data.training_time) {
         const userId = existingClient.auth_user_id || clientId
-        await supabase.from('user_workout_preferences').upsert({
-          user_id: userId,
-          training_time: data.training_time,
-          default_days_per_week: data.preferred_training_days?.length || null,
-        }, { onConflict: 'user_id' })
-        console.log('✅ training_time opgeslagen:', data.training_time)
+        try {
+          await supabase.from('user_workout_preferences').upsert({
+            user_id: userId,
+            training_time: data.training_time,
+            default_days_per_week: data.preferred_training_days?.length || null,
+          }, { onConflict: 'user_id' })
+          console.log('✅ training_time opgeslagen:', data.training_time)
+        } catch (e) {
+          console.warn('⚠️ training_time opslaan mislukt (niet-blokkerend):', e)
+        }
       }
 
       console.log('✅ Opgeslagen! Naar phase 2...')

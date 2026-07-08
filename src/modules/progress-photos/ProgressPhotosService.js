@@ -375,6 +375,32 @@ class ProgressPhotosService {
     }
   }
 
+  // === UPDATE PHOTO SUBTYPE ===
+
+  async updatePhotoSubtype(photoId, subtype) {
+    try {
+      const STANDARD = ['front', 'side', 'back']
+      const dbPhotoType = STANDARD.includes(subtype) ? subtype : 'front'
+
+      const { data: current, error: fetchErr } = await this.supabase
+        .from(this.tableName).select('metadata').eq('id', photoId).single()
+      if (fetchErr) throw fetchErr
+
+      const { error } = await this.supabase
+        .from(this.tableName)
+        .update({
+          photo_type: dbPhotoType,
+          metadata: { ...(current?.metadata || {}), subtype },
+        })
+        .eq('id', photoId)
+      if (error) throw error
+      return true
+    } catch (e) {
+      console.error('updatePhotoSubtype failed:', e)
+      throw e
+    }
+  }
+
   // === GET PHOTO BY ID ===
   
   async getPhotoById(photoId) {

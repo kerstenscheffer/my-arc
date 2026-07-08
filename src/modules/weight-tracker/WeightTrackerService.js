@@ -48,7 +48,7 @@ export default class WeightTrackerService {
     }
   }
   
-  async getWeightHistory(clientId, days = 56) {
+  async getWeightHistory(clientId, days = 730) {
     try {
       const startDate = new Date()
       startDate.setDate(startDate.getDate() - days)
