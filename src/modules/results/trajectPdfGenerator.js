@@ -12,7 +12,7 @@ const COACH_PHOTO = 'https://i.ibb.co/mCQzTZrZ/ea169061-c9f1-4b4d-ab88-fc746cbde
 const INTRO_THUMB = {
   workout: '/intro-workout.jpg',
   meal: '/intro-meal.jpg',
-  coach: '/coach-kersten.png',
+  coach: '/intro-coach.jpg',
 }
 
 const fmtDate = (d) => {
@@ -253,7 +253,8 @@ export function generateTrajectHTML(data, meta = {}) {
   .toc-txt { flex: 1; }
   .toc-t { font-family: 'Poppins', sans-serif; font-weight: 800; font-size: 17px; color: #fff; }
   .toc-d { font-size: 14px; color: #9ca3af; margin-top: 3px; line-height: 1.5; }
-  .toc-thumb { width: 58px; height: 72px; object-fit: cover; border-radius: 10px; flex-shrink: 0; }
+  .toc-thumb { width: 58px; height: 72px; object-fit: cover; object-position: center; border-radius: 10px; flex-shrink: 0; background: #0a0a0a; }
+  .toc-thumb.toc-coach { object-position: center top; }
   .toc-mini { position: relative; width: 58px; height: 72px; flex-shrink: 0; display: flex; background: #111; }
   .toc-mini .tm-half { width: 50%; overflow: hidden; }
   .toc-mini .tm-half.l { border-top-left-radius: 10px; border-bottom-left-radius: 10px; }
