@@ -996,7 +996,7 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
       // niet meer (movements > 1000). Daarom nu overal via _fetchAllRows().
       const leads = await this._fetchAllRows(() => this.db.supabase
         .from('call_leads')
-        .select('id, first_name, last_name, created_at, last_touched, contacted_today_date, followup_count')
+        .select('id, first_name, last_name, created_at, last_touched, contacted_today_date, followup_count, lead_temperature')
         // Geen coach_id filter — RLS bepaalt de toegang (team-membership of eigen leads).
         .is('deleted_at', null))
 
@@ -1052,6 +1052,54 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
       
     } catch (error) {
       console.error('❌ Get leads with activity failed:', error)
+      return []
+    }
+  }
+
+  // Urgente opvolg-meldingen voor de kanban: leads die HOT zijn óf in een
+  // "Call voorgesteld"-sectie staan, en al > `hoursThreshold` uur geen
+  // beweging/reactie/opvolging hadden. Vandaag-gecontacteerde en
+  // sale/lost/ghost-leads vallen weg. Meest urgent eerst.
+  async getUrgentFollowups(coachId, hoursThreshold = 24) {
+    try {
+      const [leads, sections] = await Promise.all([
+        this.getLeadsWithLastActivity(coachId),
+        this.getSections(coachId),
+      ])
+      const titleById = new Map((sections || []).map(s => [s.id, s.title || '']))
+      const proposedRe = /voorgesteld|voorstel/i
+      const excludeRe = /sale|verkocht|gewonnen|won|klant|client|ghost|geghost|lost|verloren|afgewezen|no show|niet bereikbaar/i
+      const today = new Date().toISOString().split('T')[0]
+      const now = Date.now()
+      const cutoff = hoursThreshold * 3600 * 1000
+
+      const urgent = []
+      for (const lead of leads) {
+        const sectionTitle = titleById.get(lead.current_section_id) || ''
+        if (excludeRe.test(sectionTitle)) continue
+        if (lead.contacted_today_date && String(lead.contacted_today_date).split('T')[0] === today) continue
+
+        const isHot = String(lead.lead_temperature || '').toLowerCase() === 'hot'
+        const isProposed = proposedRe.test(sectionTitle) || proposedRe.test(lead.previous_section_title || '')
+        if (!isHot && !isProposed) continue
+
+        const ref = lead.last_activity ? new Date(lead.last_activity) : new Date(lead.created_at)
+        const silentMs = now - ref.getTime()
+        if (!(silentMs >= cutoff)) continue
+
+        urgent.push({
+          id: lead.id,
+          name: `${lead.first_name || ''} ${lead.last_name || ''}`.trim() || 'Naamloze lead',
+          sectionId: lead.current_section_id,
+          sectionTitle,
+          reason: isHot ? 'hot' : 'call',
+          hoursSilent: Math.floor(silentMs / 3600000),
+        })
+      }
+      urgent.sort((a, b) => b.hoursSilent - a.hoursSilent)
+      return urgent
+    } catch (error) {
+      console.error('❌ Get urgent followups failed:', error)
       return []
     }
   }
