@@ -11,6 +11,7 @@ import WeightStatsGrid from '../weight-tracker/components/WeightStatsGrid'
 import WeightHistory from '../weight-tracker/components/WeightHistory'
 import CircumferenceMeasurements from '../weight-tracker/components/CircumferenceMeasurements'
 import RecentProgressPhotos from './components/RecentProgressPhotos'
+import BeforeAfterCard from './components/BeforeAfterCard'
 import PhotoCompareModal from './components/PhotoCompareModal'
 import ProgressChallengeSidebar from '../../client/components/ProgressChallengeSidebar'
 import { useChallenge } from '../../hooks/useChallenge'
@@ -524,6 +525,11 @@ export default function ProgressMain({ db, client }) {
             )}
           </div>
           <RecentProgressPhotos photos={recentPhotos} onUpload={handlePhotoUpload} todayData={todayData} isFriday={isFriday} isMobile={isMobile} />
+
+          {/* Automatische before/after-transformatiekaart met MA-overlay */}
+          <div style={{ padding: isMobile ? '0 1rem' : '0 1.5rem' }}>
+            <BeforeAfterCard client={client} db={db} isMobile={isMobile} />
+          </div>
 
           {/* Vergelijk-knop — opent de voor/na vergelijk-modal */}
           <div style={{ padding: isMobile ? '0 1rem 0.75rem' : '0 1.5rem 0.85rem' }}>
