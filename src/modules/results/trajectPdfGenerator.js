@@ -11,6 +11,7 @@ const fmtDate = (d) => {
 }
 const monthsBetween = (a, b) => (b.getFullYear() - a.getFullYear()) * 12 + (b.getMonth() - a.getMonth()) - (b.getDate() < a.getDate() ? 1 : 0)
 const esc = (s) => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]))
+const truncate = (s, n = 20) => { const t = String(s ?? ''); return t.length > n ? t.slice(0, n - 1).trimEnd() + '…' : t }
 
 // Kleur per spiergroep (zoals in het kracht-overzicht).
 const MUSCLE_COLOR = {
@@ -149,7 +150,7 @@ export function generateTrajectHTML(data, meta = {}) {
       ? `<span class="ex-kg">${showFrom ? `<span class="from">${esc(ex.start)}</span><span class="ar">→</span>` : ''}${esc(ex.end)}kg</span>`
       : '<span class="ex-kg muted">—</span>'
     return `<div class="ex">
-          <div class="ex-name">${esc(ex.name)}<span class="ex-count">${esc(ex.count)}×</span></div>
+          <div class="ex-name"><span class="ex-nm" title="${esc(ex.name)}">${esc(truncate(ex.name, 20))}</span><span class="ex-count">${esc(ex.count)}×</span></div>
           <div class="ex-right">${sparkHTML(ex.series, baseColor)}${kg}</div>
         </div>`
   }).join('')}
@@ -202,12 +203,15 @@ export function generateTrajectHTML(data, meta = {}) {
   .muscle-h .dot { width: 9px; height: 9px; border-radius: 3px; flex-shrink: 0; }
   .ex { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 6px 0; border-top: 1px solid rgba(255,255,255,.05); }
   .ex:first-of-type { border-top: none; }
-  .ex-name { font-size: 13px; font-weight: 700; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .ex-count { color: #6b7280; font-size: 11px; margin-left: 6px; }
+  .ex-name { flex: 1 1 auto; min-width: 0; display: flex; align-items: baseline; font-size: 13px; font-weight: 700; overflow: hidden; }
+  .ex-nm { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .ex-count { color: #6b7280; font-size: 11px; margin-left: 6px; flex-shrink: 0; }
   .ex-right { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
   .spark { display: flex; align-items: flex-end; gap: 1px; height: 20px; }
   .sbar { width: 3px; border-radius: 1px; display: block; }
-  .ex-kg { font-family: 'Poppins', sans-serif; font-weight: 800; font-size: 14px; color: ${GOLD}; line-height: 1; min-width: 34px; text-align: right; }
+  .ex-kg { font-family: 'Poppins', sans-serif; font-weight: 800; font-size: 14px; color: ${GOLD}; line-height: 1; white-space: nowrap; text-align: right; }
+  .ex-kg .from { color: #9ca3af; font-weight: 700; }
+  .ex-kg .ar { color: ${GOLD}; margin: 0 3px; }
   .ex-kg.muted { color: #6b7280; }
   /* Inleiding */
   .intro { font-size: 17px; line-height: 1.7; color: #d1d5db; margin-bottom: 30px; max-width: 155mm; }
