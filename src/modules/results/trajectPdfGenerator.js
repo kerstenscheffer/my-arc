@@ -1,5 +1,6 @@
 // src/modules/results/trajectPdfGenerator.js
 // Bouwt de eind-van-traject-PDF (HTML → print → PDF) in MY ARC-stijl.
+// Koppen gebruiken 'Anton' (zware condensed athletic font) om het MA-logo te matchen.
 
 const GOLD = '#ffd700'
 const LOGO = '/ma-coaching-logo.png'
@@ -41,6 +42,17 @@ export function generateTrajectHTML(data, meta = {}) {
     photoLabels = { left: 'Maand 1', right: `Maand ${m}` }
   }
 
+  // Cover-visual: de transformatiefoto (before | after) met de MA-overlay eroverheen.
+  const coverPhoto = photoPair ? `
+    <div class="cover-photo">
+      <div class="ba-half"><img src="${esc(photoPair.first.photo_url)}"/><span class="m-lbl left">${photoLabels.left}</span></div>
+      <div class="ba-half"><img src="${esc(photoPair.last.photo_url)}"/><span class="m-lbl right">${photoLabels.right}</span></div>
+      <img class="overlay" src="${LOGO}"/>
+    </div>` : `
+    <div class="cover-photo cover-photo--empty">
+      <img class="cover-logo" src="${LOGO}"/>
+    </div>`
+
   const weightBlock = weight ? `
     <div class="stat-row">
       <div class="stat"><div class="stat-num">${esc(weight.first.weight)}<span>kg</span></div><div class="stat-lbl">Start</div></div>
@@ -66,46 +78,44 @@ export function generateTrajectHTML(data, meta = {}) {
   }).join('')}
     </div>`).join('') : `<div class="empty">Geen kracht-data.</div>`
 
-  const photoBlock = photoPair ? `
-    <div class="ba">
-      <div class="ba-half"><img src="${esc(photoPair.first.photo_url)}"/><span class="ba-lbl left">${photoLabels.left}</span></div>
-      <div class="ba-half"><img src="${esc(photoPair.last.photo_url)}"/><span class="ba-lbl right">${photoLabels.right}</span></div>
-    </div>` : `<div class="empty">Nog geen before/after-foto's.</div>`
-
   return `<!DOCTYPE html><html lang="nl"><head><meta charset="utf-8"><title>Traject — ${clientName}</title>
 <style>
-  @page { size: A4; margin: 0; }
+  @import url('https://fonts.googleapis.com/css2?family=Poppins:ital,wght@0,400;0,600;0,700;0,800;0,900;1,800;1,900&display=swap');
   * { margin: 0; padding: 0; box-sizing: border-box; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-  body { font-family: 'Inter', Arial, sans-serif; background: #000; color: #fff; }
+  @page { size: A4; margin: 0; }
+  body { font-family: 'Poppins', Arial, sans-serif; background: #000; color: #fff; }
   .page { width: 210mm; min-height: 297mm; padding: 22mm 18mm; background: #000; page-break-after: always; position: relative; }
   .page:last-child { page-break-after: auto; }
-  .eyebrow { font-size: 11px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: ${GOLD}; }
-  h1 { font-size: 40px; font-weight: 900; letter-spacing: -.02em; margin: 6px 0; }
-  h2 { font-size: 24px; font-weight: 800; letter-spacing: -.02em; margin-bottom: 18px; }
+  .display { font-family: 'Poppins', sans-serif; font-weight: 900; }
+  .eyebrow { font-family: 'Poppins', sans-serif; font-weight: 800; font-size: 12px; letter-spacing: .16em; text-transform: uppercase; color: ${GOLD}; }
+  h1 { font-family: 'Poppins', sans-serif; font-weight: 900; font-size: 50px; line-height: 1; letter-spacing: -.02em; text-transform: uppercase; margin: 8px 0 6px; }
+  h2 { font-family: 'Poppins', sans-serif; font-weight: 800; font-size: 27px; letter-spacing: -.02em; text-transform: uppercase; margin-bottom: 18px; }
   .muted { color: #9ca3af; }
   .empty { color: #6b7280; padding: 24px 0; }
   /* Cover */
-  .cover { display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; }
-  .cover img { width: 240px; margin-bottom: 30px; }
-  .cover .name { font-size: 30px; font-weight: 800; color: ${GOLD}; margin-top: 4px; }
-  .cover .period { color: #9ca3af; margin-top: 10px; font-size: 14px; }
+  .cover { padding: 0; display: flex; flex-direction: column; }
+  .cover-head { padding: 20mm 18mm 10mm; text-align: center; }
+  .cover-head .name { font-family: 'Poppins', sans-serif; font-weight: 800; font-size: 30px; text-transform: uppercase; letter-spacing: -.01em; color: ${GOLD}; margin-top: 2px; }
+  .cover-head .period { color: #9ca3af; margin-top: 8px; font-size: 13px; font-weight: 600; letter-spacing: .04em; }
+  .cover-photo { flex: 1; position: relative; display: flex; gap: 6px; overflow: hidden; background: #111; margin: 0 0 0 0; }
+  .cover-photo .ba-half { flex: 1; position: relative; overflow: hidden; }
+  .cover-photo .ba-half img { width: 100%; height: 100%; object-fit: cover; }
+  .cover-photo .overlay { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; pointer-events: none; }
+  .cover-photo .m-lbl { position: absolute; bottom: 30mm; font-family: 'Poppins', sans-serif; font-weight: 900; font-style: italic; font-size: 28px; color: #fff; text-shadow: 0 2px 10px rgba(0,0,0,.9); z-index: 2; }
+  .cover-photo .m-lbl.left { left: 16px; } .cover-photo .m-lbl.right { right: 16px; }
+  .cover-photo--empty { align-items: center; justify-content: center; }
+  .cover-photo .cover-logo { width: 240px; opacity: .9; }
   /* Weight */
   .stat-row { display: flex; align-items: center; gap: 24px; margin-bottom: 24px; }
-  .stat-num { font-size: 46px; font-weight: 900; letter-spacing: -.03em; }
-  .stat-num span { font-size: 18px; color: #9ca3af; margin-left: 4px; }
+  .stat-num { font-family: 'Poppins', sans-serif; font-weight: 900; font-size: 48px; letter-spacing: -.03em; }
+  .stat-num span { font-size: 18px; color: #9ca3af; margin-left: 4px; font-weight: 700; }
   .stat-lbl { font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: #6b7280; font-weight: 700; }
   .arrow { font-size: 34px; color: ${GOLD}; }
-  .diff { margin-left: auto; font-size: 26px; font-weight: 900; color: #ef4444; }
+  .diff { margin-left: auto; font-family: 'Poppins', sans-serif; font-weight: 900; font-size: 28px; color: #ef4444; }
   .diff.good { color: #22c55e; }
-  /* Photos */
-  .ba { display: flex; gap: 8px; height: 210mm; }
-  .ba-half { flex: 1; position: relative; overflow: hidden; border-radius: 10px; background: #111; }
-  .ba-half img { width: 100%; height: 100%; object-fit: cover; }
-  .ba-lbl { position: absolute; bottom: 16px; font-style: italic; font-weight: 900; font-size: 28px; color: #fff; text-shadow: 0 2px 8px rgba(0,0,0,.9); }
-  .ba-lbl.left { left: 16px; } .ba-lbl.right { right: 16px; }
   /* Strength */
   .muscle { margin-bottom: 18px; border: 1px solid rgba(255,255,255,.08); border-radius: 14px; padding: 14px 16px; background: #141414; }
-  .muscle-h { font-size: 13px; font-weight: 800; color: ${GOLD}; text-transform: uppercase; letter-spacing: .06em; margin-bottom: 10px; }
+  .muscle-h { font-family: 'Poppins', sans-serif; font-weight: 800; font-size: 15px; color: ${GOLD}; text-transform: uppercase; letter-spacing: .04em; margin-bottom: 10px; }
   .ex { display: flex; align-items: center; justify-content: space-between; padding: 8px 0; border-top: 1px solid rgba(255,255,255,.05); }
   .ex:first-of-type { border-top: none; }
   .ex-name { font-size: 15px; font-weight: 700; }
@@ -122,11 +132,13 @@ export function generateTrajectHTML(data, meta = {}) {
 </style></head><body>
 
   <div class="page cover">
-    <img src="${LOGO}" alt="MA Coaching"/>
-    <div class="eyebrow">Transformatie</div>
-    <h1>Jouw traject</h1>
-    <div class="name">${clientName}</div>
-    ${periodStr ? `<div class="period">${esc(periodStr)}</div>` : ''}
+    <div class="cover-head">
+      <div class="eyebrow">Transformatie</div>
+      <h1>Jouw traject</h1>
+      <div class="name">${clientName}</div>
+      ${periodStr ? `<div class="period">${esc(periodStr)}</div>` : ''}
+    </div>
+    ${coverPhoto}
   </div>
 
   <div class="page">
@@ -134,12 +146,6 @@ export function generateTrajectHTML(data, meta = {}) {
     <h2>Gewichtsprogressie</h2>
     ${weightBlock}
     <div class="logo-foot"><img src="${LOGO}"/></div>
-  </div>
-
-  <div class="page">
-    <div class="eyebrow">Foto's</div>
-    <h2>Before / after</h2>
-    ${photoBlock}
   </div>
 
   <div class="page">
@@ -168,14 +174,14 @@ export function openTrajectForPrint(data, meta) {
   const win = window.open('', '_blank', 'width=900,height=700')
   if (win) {
     win.document.write(html); win.document.close()
-    win.onload = () => setTimeout(() => win.print(), 700)
+    win.onload = () => setTimeout(() => win.print(), 900)
   } else {
     const iframe = document.createElement('iframe')
     iframe.style.cssText = 'position:fixed;width:0;height:0;border:0'
     document.body.appendChild(iframe)
     const doc = iframe.contentDocument || iframe.contentWindow.document
     doc.open(); doc.write(html); doc.close()
-    setTimeout(() => { iframe.contentWindow.focus(); iframe.contentWindow.print(); setTimeout(() => document.body.removeChild(iframe), 1500) }, 800)
+    setTimeout(() => { iframe.contentWindow.focus(); iframe.contentWindow.print(); setTimeout(() => document.body.removeChild(iframe), 1500) }, 1000)
   }
   if (document.body.contains(loading)) document.body.removeChild(loading)
 }
