@@ -283,22 +283,19 @@ class IntakeFlowService {
   // ========================================
 
   async sendCoachNotification(coachId, clientId, notification) {
-    const { data, error } = await this.supabase
-      .from('coach_notifications')
-      .insert([{
-        coach_id: coachId,
-        client_id: clientId,
-        type: notification.type || 'info',
-        priority: notification.priority || 'normal',
-        title: notification.title,
-        message: notification.message,
-        action_type: notification.action_type || null,
-        action_data: notification.action_data || null,
-        read_status: false,
-        created_at: new Date().toISOString()
-      }])
-      .select()
-      .single()
+    // De intake draait op de PUBLIEKE pagina als anon → een directe insert in
+    // coach_notifications wordt door RLS geweigerd (en de .select() eiste óók
+    // leesrechten). Daarom via de afgeschermde RPC: die leidt de coach server-
+    // side af uit de klant, dus anon kan geen willekeurige coach spammen.
+    const { data, error } = await this.supabase.rpc('create_intake_notification', {
+      p_client_id: clientId,
+      p_type: notification.type || 'info',
+      p_priority: notification.priority || 'normal',
+      p_title: notification.title,
+      p_message: notification.message,
+      p_action_type: notification.action_type || null,
+      p_action_data: notification.action_data || null,
+    })
 
     if (error) throw error
     return data
