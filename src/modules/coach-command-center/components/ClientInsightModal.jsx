@@ -69,6 +69,34 @@ function ColWrapper({ id, children, isLast, collapsed, onToggle }) {
   )
 }
 
+// Groepeer de foto's per MAAND (relatief vanaf de eerste foto) en binnen elke
+// maand per DAG, zodat foto's van dezelfde dag (voor/zij/achter) bij elkaar
+// staan. Elke item houdt z'n originele index in de `photos`-array vast, zodat
+// klikken de juiste foto in de zoom opent.
+function groupPhotosByMonthAndDay(photos) {
+  if (!photos?.length) return []
+  const items = photos
+    .map((p, idx) => ({ p, idx, d: p.photo_date ? new Date(p.photo_date) : null }))
+    .filter(x => x.d && !isNaN(x.d))
+    .sort((a, b) => a.d - b.d) // oud → nieuw
+  if (!items.length) return []
+  const first = items[0].d
+  const monthOf = (d) =>
+    (d.getFullYear() - first.getFullYear()) * 12 + (d.getMonth() - first.getMonth())
+    - (d.getDate() < first.getDate() ? 1 : 0) + 1
+  const months = []
+  const byMonth = new Map()
+  for (const x of items) {
+    const m = monthOf(x.d)
+    if (!byMonth.has(m)) { const mo = { month: m, days: [], _map: new Map() }; byMonth.set(m, mo); months.push(mo) }
+    const mo = byMonth.get(m)
+    const dayKey = x.p.photo_date.slice(0, 10)
+    if (!mo._map.has(dayKey)) { const day = { date: dayKey, items: [] }; mo._map.set(dayKey, day); mo.days.push(day) }
+    mo._map.get(dayKey).items.push(x)
+  }
+  return months
+}
+
 export default function ClientInsightModal({ isOpen, onClose, client, isMobile, onNavigatePlan, onNavigateWorkout, db, coachId, onOpenMealPanel, onOpenWorkoutPanel }) {
   const [selectedPhotoIndex, setSelectedPhotoIndex] = useState(0)
   const [photoZoom, setPhotoZoom] = useState(false)
@@ -529,23 +557,40 @@ export default function ClientInsightModal({ isOpen, onClose, client, isMobile, 
                 <X size={20} />
               </button>
             </div>
-            {/* Grid */}
+            {/* Grid — per maand (vanaf eerste foto), binnen maand per dag gegroepeerd */}
             <div style={{ flex: 1, overflowY: 'auto', WebkitOverflowScrolling: 'touch' }}>
-              <div style={{ display: 'grid', gridTemplateColumns: `repeat(auto-fill, minmax(${isMobile ? 100 : 140}px, 1fr))`, gap: isMobile ? '0.5rem' : '0.75rem' }}>
-                {photos.map((p, idx) => (
-                  <div key={p.id} style={{ position: 'relative', borderRadius: 10, overflow: 'hidden', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)' }}>
-                    <div onClick={() => { setSelectedPhotoIndex(idx); setPhotoZoom(true) }} style={{ aspectRatio: '3 / 4', cursor: 'pointer' }}>
-                      <img src={p.photo_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
-                    </div>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6, padding: '0.35rem 0.45rem' }}>
-                      <span style={{ fontSize: '0.62rem', color: 'rgba(255,255,255,0.55)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{formatDate(p.photo_date)}</span>
-                      <button onClick={(e) => { e.stopPropagation(); downloadPhoto(p, idx) }} title="Download foto" style={{ width: 28, height: 28, flexShrink: 0, borderRadius: 7, background: 'rgba(255,215,0,0.14)', border: '1px solid rgba(255,215,0,0.4)', color: '#FFD700', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0, touchAction: 'manipulation' }}>
-                        <Download size={13} />
-                      </button>
-                    </div>
+              {groupPhotosByMonthAndDay(photos).map(mo => (
+                <div key={mo.month} style={{ marginBottom: '1.5rem' }}>
+                  {/* Maand-kop */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, margin: '0 0 0.75rem', position: 'sticky', top: 0, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(6px)', padding: '0.35rem 0', zIndex: 1 }}>
+                    <span style={{ fontSize: '0.62rem', fontWeight: 900, color: '#FFD700', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Maand {mo.month}</span>
+                    <div style={{ flex: 1, height: 1, background: 'rgba(255,215,0,0.15)' }} />
                   </div>
-                ))}
-              </div>
+                  {/* Dag-clusters */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.9rem' }}>
+                    {mo.days.map(day => (
+                      <div key={day.date}>
+                        <div style={{ fontSize: '0.66rem', fontWeight: 700, color: 'rgba(255,255,255,0.55)', marginBottom: '0.4rem' }}>{formatDate(day.date)}</div>
+                        <div style={{ display: 'grid', gridTemplateColumns: `repeat(auto-fill, minmax(${isMobile ? 100 : 140}px, 1fr))`, gap: isMobile ? '0.5rem' : '0.75rem' }}>
+                          {day.items.map(({ p, idx }) => (
+                            <div key={p.id} style={{ position: 'relative', borderRadius: 10, overflow: 'hidden', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)' }}>
+                              <div onClick={() => { setSelectedPhotoIndex(idx); setPhotoZoom(true) }} style={{ aspectRatio: '3 / 4', cursor: 'pointer' }}>
+                                <img src={p.photo_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+                              </div>
+                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6, padding: '0.35rem 0.45rem' }}>
+                                <span style={{ fontSize: '0.6rem', color: 'rgba(255,255,255,0.5)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.photo_type || 'foto'}</span>
+                                <button onClick={(e) => { e.stopPropagation(); downloadPhoto(p, idx) }} title="Download foto" style={{ width: 28, height: 28, flexShrink: 0, borderRadius: 7, background: 'rgba(255,215,0,0.14)', border: '1px solid rgba(255,215,0,0.4)', color: '#FFD700', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0, touchAction: 'manipulation' }}>
+                                  <Download size={13} />
+                                </button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
         </div>
