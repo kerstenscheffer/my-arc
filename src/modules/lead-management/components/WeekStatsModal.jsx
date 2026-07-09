@@ -85,6 +85,7 @@ export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, 
   // Bump om de stats opnieuw te laden na het terugdraaien van een verplaatsing.
   const [reloadKey, setReloadKey] = useState(0)
   const [revertingId, setRevertingId] = useState(null)
+  const [deletingId, setDeletingId] = useState(null)
 
   // Draai één funnel-verplaatsing terug (soft): verdwijnt uit de stats, lead
   // blijft op het bord staan. Daarna herladen we de cijfers.
@@ -98,6 +99,19 @@ export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, 
       console.error('Terugdraaien mislukt:', e)
     } finally {
       setRevertingId(null)
+    }
+  }
+
+  const handleDeleteMovement = async (movementId) => {
+    if (!movementId || !leadService?.deleteMovement) return
+    setDeletingId(movementId)
+    try {
+      const res = await leadService.deleteMovement(movementId)
+      if (res?.success) setReloadKey(k => k + 1)
+    } catch (e) {
+      console.error('Verwijderen mislukt:', e)
+    } finally {
+      setDeletingId(null)
     }
   }
 
@@ -437,18 +451,21 @@ export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, 
                   value={totalCallProposed} accent="#ef4444"
                   details={funnel?.callProposed?.leads}
                   onRevert={handleRevertMovement} revertingId={revertingId}
+                  onDelete={handleDeleteMovement} deletingId={deletingId}
                 />
                 <StatCard
                   icon={<Phone size={14} />} label="Calls ingepland"
                   value={totalCalls} accent={GOLD_DARK}
                   details={funnel?.callScheduled?.leads}
                   onRevert={handleRevertMovement} revertingId={revertingId}
+                  onDelete={handleDeleteMovement} deletingId={deletingId}
                 />
                 <StatCard
                   icon={<Trophy size={14} />} label="Sales gemaakt"
                   value={totalSales} accent="#10b981" highlight={totalSales > 0}
                   details={funnel?.sale?.leads}
                   onRevert={handleRevertMovement} revertingId={revertingId}
+                  onDelete={handleDeleteMovement} deletingId={deletingId}
                 />
                 <StatCard
                   icon={<X size={14} />} label="No shows"
@@ -456,6 +473,7 @@ export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, 
                   subtext={showRate != null ? `Show-rate ${showRate}%` : undefined}
                   details={funnel?.noShow?.leads}
                   onRevert={handleRevertMovement} revertingId={revertingId}
+                  onDelete={handleDeleteMovement} deletingId={deletingId}
                 />
                 {/* Messaging-efficiency: hoeveel berichten kost het je
                     gemiddeld om bij een call-voorstel te komen? */}
@@ -942,7 +960,7 @@ function StagePill({ label, value, color }) {
   )
 }
 
-function StatCard({ icon, label, value, accent = 'rgba(255,255,255,0.7)', highlight = false, subtext = null, details = null, onRevert = null, revertingId = null }) {
+function StatCard({ icon, label, value, accent = 'rgba(255,255,255,0.7)', highlight = false, subtext = null, details = null, onRevert = null, revertingId = null, onDelete = null, deletingId = null }) {
   const [open, setOpen] = useState(false)
   const [confirmId, setConfirmId] = useState(null)
   const items = Array.isArray(details) ? details : []
@@ -999,8 +1017,11 @@ function StatCard({ icon, label, value, accent = 'rgba(255,255,255,0.7)', highli
           maxHeight: 260, overflowY: 'auto',
         }}>
           {items.map((d, i) => {
-            const busy = revertingId && revertingId === d.id
+            const busyRevert = revertingId && revertingId === d.id
+            const busyDelete = deletingId && deletingId === d.id
+            const busy = busyRevert || busyDelete
             const confirming = confirmId === d.id
+            const canAct = (onRevert || onDelete) && d.id
             return (
               <div key={d.id || i} style={{
                 display: 'flex', alignItems: 'flex-start', gap: 8,
@@ -1016,18 +1037,34 @@ function StatCard({ icon, label, value, accent = 'rgba(255,255,255,0.7)', highli
                     {d.time} · door <span style={{ color: 'rgba(255,255,255,0.6)' }}>{d.by || 'Onbekend'}</span>
                   </div>
                 </div>
-                {onRevert && d.id && (
+                {canAct && (
                   confirming ? (
-                    <div style={{ display: 'flex', gap: 4, flexShrink: 0 }} onClick={(e) => e.stopPropagation()}>
-                      <button
-                        onClick={(e) => { e.stopPropagation(); setConfirmId(null); onRevert(d.id) }}
-                        disabled={busy}
-                        style={{
-                          fontSize: '0.55rem', fontWeight: 800, color: '#fff',
-                          background: 'rgba(239,68,68,0.85)', border: 'none', borderRadius: 5,
-                          padding: '3px 7px', cursor: busy ? 'wait' : 'pointer',
-                        }}
-                      >{busy ? '...' : 'Zeker?'}</button>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 3, flexShrink: 0 }} onClick={(e) => e.stopPropagation()}>
+                      {onRevert && (
+                        <button
+                          onClick={(e) => { e.stopPropagation(); setConfirmId(null); onRevert(d.id) }}
+                          disabled={busy}
+                          title="Verplaatsing ongedaan maken (rij blijft bewaard)"
+                          style={{
+                            fontSize: '0.55rem', fontWeight: 800, color: '#fff',
+                            background: 'rgba(212,175,55,0.7)', border: 'none', borderRadius: 5,
+                            padding: '3px 7px', cursor: busy ? 'wait' : 'pointer',
+                            display: 'inline-flex', alignItems: 'center', gap: 3,
+                          }}
+                        ><RotateCcw size={8} />{busyRevert ? '...' : 'Ongedaan'}</button>
+                      )}
+                      {onDelete && (
+                        <button
+                          onClick={(e) => { e.stopPropagation(); setConfirmId(null); onDelete(d.id) }}
+                          disabled={busy}
+                          title="Stat permanent verwijderen"
+                          style={{
+                            fontSize: '0.55rem', fontWeight: 800, color: '#fff',
+                            background: 'rgba(239,68,68,0.75)', border: 'none', borderRadius: 5,
+                            padding: '3px 7px', cursor: busy ? 'wait' : 'pointer',
+                          }}
+                        >{busyDelete ? '...' : 'Verwijder'}</button>
+                      )}
                       <button
                         onClick={(e) => { e.stopPropagation(); setConfirmId(null) }}
                         style={{
@@ -1039,7 +1076,7 @@ function StatCard({ icon, label, value, accent = 'rgba(255,255,255,0.7)', highli
                     </div>
                   ) : (
                     <button
-                      title="Deze verandering terugdraaien (verdwijnt uit de stats)"
+                      title="Bewerken — ongedaan maken of verwijderen"
                       onClick={(e) => { e.stopPropagation(); setConfirmId(d.id) }}
                       style={{
                         flexShrink: 0, display: 'inline-flex', alignItems: 'center', gap: 3,
@@ -1048,7 +1085,7 @@ function StatCard({ icon, label, value, accent = 'rgba(255,255,255,0.7)', highli
                         borderRadius: 5, padding: '3px 7px', cursor: 'pointer',
                       }}
                     >
-                      <RotateCcw size={10} /> Terugdraaien
+                      <RotateCcw size={10} /> Aanpassen
                     </button>
                   )
                 )}

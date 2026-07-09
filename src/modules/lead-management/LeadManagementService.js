@@ -1812,6 +1812,21 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
     }
   }
 
+  async deleteMovement(movementId) {
+    try {
+      if (!movementId) return { success: false, error: 'geen movement-id' }
+      const { error } = await this.db.supabase
+        .from('lead_movements')
+        .delete()
+        .eq('id', movementId)
+      if (error) throw error
+      return { success: true }
+    } catch (error) {
+      console.error('❌ Delete movement failed:', error)
+      return { success: false, error: error.message }
+    }
+  }
+
   // Breakdown of new leads grouped by source within [start, end). Returns
   // two arrays — by outreach campaign and by lead magnet — each with
   // counts of total new leads in the window and how many of those reached

@@ -204,8 +204,8 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
 
         {/* Header row */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1rem', flexWrap: 'wrap' }}>
-          <Activity size={24} color="#f97316" />
-          <h1 style={{ fontSize: isMobile ? '1.5rem' : '2rem', fontWeight: '800', background: 'linear-gradient(135deg, #f97316 0%, #ea580c 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', margin: 0 }}>
+          <Activity size={24} color="#FFD700" />
+          <h1 style={{ fontSize: isMobile ? '1.5rem' : '2rem', fontWeight: '800', background: 'linear-gradient(135deg, #FFD700 0%, #D4AF37 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', margin: 0 }}>
             Manual Workout Builder
           </h1>
 
@@ -286,7 +286,7 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
           </div>
           <div>
             <label style={{ display: 'block', color: 'rgba(255,255,255,0.7)', fontSize: '0.85rem', marginBottom: '0.25rem' }}>Days Per Week</label>
-            <div style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '10px', padding: '0.75rem', color: '#f97316', fontSize: isMobile ? '0.9rem' : '1rem', minHeight: '44px', display: 'flex', alignItems: 'center', fontWeight: '600' }}>
+            <div style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '10px', padding: '0.75rem', color: '#FFD700', fontSize: isMobile ? '0.9rem' : '1rem', minHeight: '44px', display: 'flex', alignItems: 'center', fontWeight: '600' }}>
               {workoutPlan.days.length} dagen
             </div>
           </div>
@@ -297,7 +297,7 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
           <button onClick={() => setShowTemplateManager(true)} style={{ padding: '0.5rem 1rem', background: 'rgba(139,92,246,0.2)', border: '1px solid rgba(139,92,246,0.3)', borderRadius: '10px', color: '#8b5cf6', fontSize: isMobile ? '0.85rem' : '0.9rem', fontWeight: '600', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.5rem', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', minHeight: '44px' }}>
             <FileText size={16} /> Templates
           </button>
-          <button onClick={saveAsTemplate} disabled={saving || workoutPlan.days.length === 0 || !workoutPlan.name} style={{ padding: '0.5rem 1rem', background: 'rgba(249,115,22,0.2)', border: '1px solid rgba(249,115,22,0.3)', borderRadius: '10px', color: '#f97316', fontSize: isMobile ? '0.85rem' : '0.9rem', fontWeight: '600', cursor: saving || !workoutPlan.name ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', gap: '0.5rem', opacity: workoutPlan.days.length === 0 || !workoutPlan.name ? 0.5 : 1, touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', minHeight: '44px' }}>
+          <button onClick={saveAsTemplate} disabled={saving || workoutPlan.days.length === 0 || !workoutPlan.name} style={{ padding: '0.5rem 1rem', background: 'rgba(212,175,55,0.15)', border: '1px solid rgba(212,175,55,0.35)', borderRadius: '10px', color: '#FFD700', fontSize: isMobile ? '0.85rem' : '0.9rem', fontWeight: '600', cursor: saving || !workoutPlan.name ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', gap: '0.5rem', opacity: workoutPlan.days.length === 0 || !workoutPlan.name ? 0.5 : 1, touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', minHeight: '44px' }}>
             <Save size={16} /> {saving ? 'Opslaan...' : 'Save Template'}
           </button>
 
@@ -323,11 +323,11 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
             onUpdateExercise={(exerciseId, updates) => updateExercise(day.id, exerciseId, updates)}
             onDeleteExercise={(exerciseId) => deleteExercise(day.id, exerciseId)} isMobile={isMobile} />
         ))}
-        <button onClick={addDay} style={{ background: 'rgba(249,115,22,0.1)', border: '2px dashed rgba(249,115,22,0.3)', borderRadius: '16px', padding: isMobile ? '2rem' : '3rem', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', cursor: 'pointer', minHeight: isMobile ? '150px' : '200px', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}
-          onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(249,115,22,0.2)'; e.currentTarget.style.borderColor = 'rgba(249,115,22,0.5)' }}
-          onMouseLeave={(e) => { e.currentTarget.style.background = 'rgba(249,115,22,0.1)'; e.currentTarget.style.borderColor = 'rgba(249,115,22,0.3)' }}>
-          <Plus size={32} color="#f97316" />
-          <span style={{ color: '#f97316', fontSize: isMobile ? '0.9rem' : '1rem', fontWeight: '600' }}>Nieuwe Dag Toevoegen</span>
+        <button onClick={addDay} style={{ background: 'rgba(212,175,55,0.07)', border: '2px dashed rgba(212,175,55,0.3)', borderRadius: '16px', padding: isMobile ? '2rem' : '3rem', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', cursor: 'pointer', minHeight: isMobile ? '150px' : '200px', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}
+          onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(212,175,55,0.15)'; e.currentTarget.style.borderColor = 'rgba(212,175,55,0.5)' }}
+          onMouseLeave={(e) => { e.currentTarget.style.background = 'rgba(212,175,55,0.07)'; e.currentTarget.style.borderColor = 'rgba(212,175,55,0.3)' }}>
+          <Plus size={32} color="#FFD700" />
+          <span style={{ color: '#FFD700', fontSize: isMobile ? '0.9rem' : '1rem', fontWeight: '600' }}>Nieuwe Dag Toevoegen</span>
         </button>
       </div>
 
