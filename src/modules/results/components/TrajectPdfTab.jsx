@@ -67,6 +67,7 @@ const labelStyle = { display: 'block', fontSize: 13, fontWeight: 700, color: 'rg
 
 export default function TrajectPdfTab({ client, db }) {
   const [journeyText, setJourneyText] = useState('')
+  const [workoutText, setWorkoutText] = useState('')
   const [coachText, setCoachText] = useState('')
   const [planText, setPlanText] = useState('')
   const [options, setOptions] = useState(null)      // { front:[], side:[], back:[] }
@@ -106,6 +107,7 @@ export default function TrajectPdfTab({ client, db }) {
       openTrajectForPrint(data, {
         clientName: `${client.first_name || ''} ${client.last_name || ''}`.trim() || 'Klant',
         journeyText,
+        workoutText,
         coachText,
         planText,
       })
@@ -146,6 +148,12 @@ export default function TrajectPdfTab({ client, db }) {
       </label>
       <textarea value={journeyText} onChange={e => setJourneyText(e.target.value)} rows={7}
         placeholder="Hoe kwam de klant binnen, welke punten waren lastig, en wat hebben jullie samen bereikt?…" style={textareaStyle} />
+
+      <label style={labelStyle}>
+        Bericht bij de workout/kracht-pagina <span style={{ color: 'rgba(255,255,255,0.4)', fontWeight: 500 }}>(optioneel)</span>
+      </label>
+      <textarea value={workoutText} onChange={e => setWorkoutText(e.target.value)} rows={5}
+        placeholder="Bijv. wat je opviel aan de krachtprogressie, sterke punten en waar je trots op bent…" style={textareaStyle} />
 
       <label style={labelStyle}>
         Woord van je coach <span style={{ color: 'rgba(255,255,255,0.4)', fontWeight: 500 }}>(optioneel)</span>

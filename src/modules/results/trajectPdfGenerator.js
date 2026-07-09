@@ -4,6 +4,7 @@
 
 const GOLD = '#ffd700'
 const LOGO = '/ma-coaching-logo.png'
+const COACH_PHOTO = '/coach-kersten.png'
 
 const fmtDate = (d) => {
   if (!d) return ''
@@ -63,6 +64,14 @@ export function generateTrajectHTML(data, meta = {}) {
   const hasPlan = !!(meta.planText || '').trim()
   const planText = esc(meta.planText || '').replace(/\n/g, '<br>')
   const hasClosing = hasCoachText || hasPlan
+  const hasWorkout = !!(meta.workoutText || '').trim()
+  const workoutText = esc(meta.workoutText || '').replace(/\n/g, '<br>')
+
+  // Coach-bericht: vaste coachfoto + tekst als bericht.
+  const coachMsg = (bodyHtml) => `<div class="coach-msg">
+    <img class="cm-photo" src="${COACH_PHOTO}"/>
+    <div class="cm-body">${bodyHtml}</div>
+  </div>`
   const periodStr = period ? `${fmtDate(period.start)} t/m ${fmtDate(period.end)}` : ''
 
   // Inleiding-thumbnails: elke kaart een mini before/after in homepage-stijl
@@ -245,8 +254,13 @@ export function generateTrajectHTML(data, meta = {}) {
   .ba-card .bc-lbl { position: absolute; bottom: 9%; left: 0; right: 0; text-align: center; font-family: 'Poppins', sans-serif; font-weight: 900; font-style: italic; font-size: 14px; color: #fff; z-index: 2; }
   /* Coach message */
   .msg { font-size: 17px; line-height: 1.7; color: #e5e7eb; white-space: pre-wrap; }
-  .plan { margin-top: 26px; border-top: 1px solid rgba(255,215,0,.25); padding-top: 20px; }
-  .plan-h { font-family: 'Poppins', sans-serif; font-weight: 800; font-size: 16px; color: ${GOLD}; text-transform: uppercase; letter-spacing: .04em; margin-bottom: 12px; }
+  .coach-msg { display: flex; gap: 18px; align-items: flex-start; background: #141414; border: 1px solid rgba(255,215,0,.18); border-radius: 16px; padding: 18px 20px; }
+  .cm-photo { width: 92px; height: 115px; border-radius: 12px; object-fit: cover; object-position: center top; flex-shrink: 0; border: 2px solid rgba(255,215,0,.35); background: #f0f0f0; }
+  .cm-body { flex: 1; min-width: 0; }
+  .cm-text { font-size: 15px; line-height: 1.65; color: #e5e7eb; white-space: pre-wrap; }
+  .cm-wrap { margin-top: 18px; }
+  .plan { margin-top: 20px; border-top: 1px solid rgba(255,215,0,.25); padding-top: 16px; }
+  .plan-h { font-family: 'Poppins', sans-serif; font-weight: 800; font-size: 15px; color: ${GOLD}; text-transform: uppercase; letter-spacing: .04em; margin-bottom: 10px; }
 </style></head><body>
 
   <div class="page cover">
@@ -279,24 +293,24 @@ export function generateTrajectHTML(data, meta = {}) {
     <div class="eyebrow">Kracht</div>
     <h2>Krachtprogressie per spiergroep</h2>
     ${strengthBlock}
+    ${hasWorkout ? `<div class="cm-wrap">${coachMsg(`<div class="cm-text">${workoutText}</div>`)}</div>` : ''}
     <div class="foot"><img src="${LOGO}"/></div>
   </div>
 
   ${hasJourney ? `<div class="page">
     <div class="eyebrow">Voeding</div>
     <h2>Voedingsprogressie</h2>
-    <div class="msg">${journeyText}</div>
+    ${coachMsg(`<div class="cm-text">${journeyText}</div>`)}
     <div class="foot"><img src="${LOGO}"/></div>
   </div>` : ''}
 
   ${hasClosing ? `<div class="page">
     <div class="eyebrow">Van je coach</div>
     <h2>Coach-woord &amp; plan</h2>
-    ${hasCoachText ? `<div class="msg">${coachText}</div>` : ''}
-    ${hasPlan ? `<div class="plan">
-      <div class="plan-h">Jouw plan &amp; vooruitzicht</div>
-      <div class="msg">${planText}</div>
-    </div>` : ''}
+    ${coachMsg(`
+      ${hasCoachText ? `<div class="cm-text">${coachText}</div>` : ''}
+      ${hasPlan ? `<div class="plan"><div class="plan-h">Jouw plan &amp; vooruitzicht</div><div class="cm-text">${planText}</div></div>` : ''}
+    `)}
     <div class="foot"><img src="${LOGO}"/></div>
   </div>` : ''}
 
