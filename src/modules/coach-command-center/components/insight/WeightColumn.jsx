@@ -4,12 +4,12 @@
 // Props: { client, weightData, circumData, photos, coachingPlan, isMobile, onPhotoClick }
 // ============================================
 import React from 'react'
-import { Scale, Target, Ruler, Camera, TrendingDown } from 'lucide-react'
+import { Scale, Target, Ruler, Camera, TrendingDown, Download } from 'lucide-react'
 import WeightStatsGrid from '../../../weight-tracker/components/WeightStatsGrid'
 
 const formatDate = (d) => { if (!d) return '-'; const dt = new Date(d); return dt.toLocaleDateString('nl-NL', { day: 'numeric', month: 'short', year: dt.getFullYear() !== new Date().getFullYear() ? 'numeric' : undefined }) }
 
-export default function WeightColumn({ client, weightData, circumData, photos, coachingPlan, isMobile, onPhotoClick }) {
+export default function WeightColumn({ client, weightData, circumData, photos, coachingPlan, isMobile, onPhotoClick, onDownloadPhoto }) {
   const history = weightData?.history || []
   // 'dag' = dag-op-dag logs · 'week' = week-op-week gemiddelden + verschil
   const [weightView, setWeightView] = React.useState('dag')
@@ -291,13 +291,25 @@ export default function WeightColumn({ client, weightData, circumData, photos, c
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}><Camera size={12} color="rgba(168,85,247,0.5)" /><span style={{ fontSize: '0.45rem', fontWeight: '700', color: 'rgba(168,85,247,0.4)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Foto's</span></div>
               <span style={{ fontSize: '0.5rem', color: 'rgba(255,255,255,0.2)' }}>{photos.length}</span>
             </div>
-            <div style={{ display: 'flex', gap: '0.25rem', overflowX: 'auto', WebkitOverflowScrolling: 'touch', paddingBottom: '0.25rem' }}>
+            <div style={{ display: 'flex', gap: '0.3rem', overflowX: 'auto', WebkitOverflowScrolling: 'touch', paddingBottom: '0.25rem' }}>
               {photos.slice(0, 6).map((p, idx) => (
-                <div key={p.id} onClick={() => onPhotoClick(idx)} style={{ width: '48px', height: '48px', borderRadius: '6px', overflow: 'hidden', border: '1px solid rgba(255,255,255,0.06)', cursor: 'pointer', flexShrink: 0 }}>
-                  <img src={p.photo_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                <div key={p.id} style={{ position: 'relative', width: '52px', height: '52px', borderRadius: '6px', overflow: 'hidden', border: '1px solid rgba(255,255,255,0.06)', flexShrink: 0 }}>
+                  <img src={p.photo_url} alt="" onClick={() => onPhotoClick(idx)} style={{ width: '100%', height: '100%', objectFit: 'cover', cursor: 'pointer', display: 'block' }} />
+                  {/* Download-knopje op de foto-kaart */}
+                  {onDownloadPhoto && (
+                    <button
+                      onClick={(e) => { e.stopPropagation(); onDownloadPhoto(idx) }}
+                      title="Download foto"
+                      style={{ position: 'absolute', bottom: 2, right: 2, width: 20, height: 20, borderRadius: 5, background: 'rgba(0,0,0,0.65)', border: '1px solid rgba(255,215,0,0.5)', color: '#FFD700', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0, touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}
+                    >
+                      <Download size={11} />
+                    </button>
+                  )}
                 </div>
               ))}
-              {photos.length > 6 && <div style={{ width: '48px', height: '48px', borderRadius: '6px', background: 'rgba(255,255,255,0.04)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.6rem', color: 'rgba(255,255,255,0.3)', flexShrink: 0 }}>+{photos.length - 6}</div>}
+              {photos.length > 6 && (
+                <div onClick={() => onPhotoClick(6)} style={{ width: '52px', height: '52px', borderRadius: '6px', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.62rem', fontWeight: 700, color: 'rgba(255,215,0,0.8)', flexShrink: 0, cursor: 'pointer' }}>+{photos.length - 6}</div>
+              )}
             </div>
           </div>
         )}

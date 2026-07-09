@@ -2,7 +2,7 @@
 // ClientInsightModal.jsx - v8.3
 // + onOpenMealPanel prop toegevoegd voor Meal Plan SOP widget
 import React, { useState, useRef, useCallback } from 'react'
-import { X, Scale, Dumbbell, UtensilsCrossed, ChevronLeft, ChevronRight, ChevronDown, TrendingUp, User, BookOpen, ClipboardCheck, Bell } from 'lucide-react'
+import { X, Scale, Dumbbell, UtensilsCrossed, ChevronLeft, ChevronRight, ChevronDown, TrendingUp, User, BookOpen, ClipboardCheck, Bell, Download } from 'lucide-react'
 import WeightColumn from './insight/WeightColumn'
 import WorkoutColumn from './insight/WorkoutColumn'
 import MealsColumn from './insight/MealsColumn'
@@ -102,6 +102,27 @@ export default function ClientInsightModal({ isOpen, onClose, client, isMobile, 
   const circumData       = effectiveClient.circumferenceData || { entries: [], latest: null, previous: null }
   const mealData         = effectiveClient.mealData || { plan: null, targets: null, todayMeals: [], todayTotals: { calories: 0, protein: 0, carbs: 0, fat: 0 }, dailyLog: {}, loggingDays: 0, avgCalories: 0 }
   const photos           = photoData?.photos?.filter(p => (p.metadata?.category || 'progress') === 'progress') || []
+
+  // Download een foto naar het apparaat. Via blob (i.p.v. <a download> op een
+  // externe URL) omdat Supabase-storage-URLs anders in een tab openen i.p.v.
+  // downloaden. Valt bij een fout terug op openen in een nieuw tabblad.
+  const downloadPhoto = async (photo, index = 0) => {
+    if (!photo?.photo_url) return
+    const base = `${(effectiveClient.first_name || 'client')}_${(photo.photo_date || '').slice(0,10) || (index + 1)}`.replace(/[^\w.-]+/g, '-').toLowerCase()
+    const ext = (photo.photo_url.split('?')[0].match(/\.(jpg|jpeg|png|webp)$/i)?.[1] || 'jpg').toLowerCase()
+    try {
+      const res = await fetch(photo.photo_url)
+      const blob = await res.blob()
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url; a.download = `myarc-${base}.${ext}`
+      document.body.appendChild(a); a.click(); a.remove()
+      setTimeout(() => URL.revokeObjectURL(url), 2000)
+    } catch (e) {
+      console.error('Download mislukt, open in tab:', e)
+      window.open(photo.photo_url, '_blank')
+    }
+  }
 
   const formatDate = (d) => {
     if (!d) return '-'
@@ -338,6 +359,7 @@ export default function ClientInsightModal({ isOpen, onClose, client, isMobile, 
                     client={effectiveClient} weightData={weightData} circumData={circumData}
                     photos={photos} coachingPlan={effectiveClient.coachingPlan} isMobile={false}
                     onPhotoClick={(idx) => { setSelectedPhotoIndex(idx); setPhotoZoom(true) }}
+                    onDownloadPhoto={(idx) => downloadPhoto(photos[idx], idx)}
                   />
                 </ColWrapper>
                 <ColWrapper id="workout" collapsed={collapsed} onToggle={toggleCollapse}>
@@ -438,6 +460,7 @@ export default function ClientInsightModal({ isOpen, onClose, client, isMobile, 
                   client={effectiveClient} weightData={weightData} circumData={circumData}
                   photos={photos} coachingPlan={effectiveClient.coachingPlan} isMobile={true}
                   onPhotoClick={(idx) => { setSelectedPhotoIndex(idx); setPhotoZoom(true) }}
+                  onDownloadPhoto={(idx) => downloadPhoto(photos[idx], idx)}
                 />
               )}
               {mobileTab === 'workout' && (
@@ -513,10 +536,30 @@ export default function ClientInsightModal({ isOpen, onClose, client, isMobile, 
               </button>
             </>
           )}
-          <div style={{ marginTop: '0.75rem', textAlign: 'center' }}>
-            <div style={{ fontSize: '0.8rem', fontWeight: '600', color: 'rgba(255,255,255,0.7)' }}>{formatDate(photos[selectedPhotoIndex]?.photo_date)}</div>
-            <div style={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.3)', marginTop: '0.15rem' }}>{selectedPhotoIndex + 1} / {photos.length}</div>
+          <div style={{ marginTop: '0.75rem', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem' }}>
+            <div style={{ textAlign: 'center' }}>
+              <div style={{ fontSize: '0.8rem', fontWeight: '600', color: 'rgba(255,255,255,0.7)' }}>{formatDate(photos[selectedPhotoIndex]?.photo_date)}</div>
+              <div style={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.3)', marginTop: '0.15rem' }}>{selectedPhotoIndex + 1} / {photos.length}</div>
+            </div>
+            {/* Downloadknop voor de huidige foto */}
+            <button
+              onClick={(e) => { e.stopPropagation(); downloadPhoto(photos[selectedPhotoIndex], selectedPhotoIndex) }}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', minHeight: 44, padding: '0 1.1rem', borderRadius: 12, background: '#FFD700', color: '#000', border: 'none', fontSize: '0.85rem', fontWeight: 800, cursor: 'pointer', boxShadow: '0 6px 18px rgba(255,215,0,0.22)', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}
+            >
+              <Download size={16} /> Download foto
+            </button>
           </div>
+
+          {/* Thumbnail-strip — ALLE foto's, klik om te bekijken */}
+          {photos.length > 1 && (
+            <div onClick={e => e.stopPropagation()} style={{ display: 'flex', gap: '0.4rem', marginTop: '0.75rem', overflowX: 'auto', maxWidth: '92vw', padding: '0.25rem', WebkitOverflowScrolling: 'touch' }}>
+              {photos.map((p, idx) => (
+                <div key={p.id} onClick={() => setSelectedPhotoIndex(idx)} style={{ width: 52, height: 52, flexShrink: 0, borderRadius: 8, overflow: 'hidden', cursor: 'pointer', border: idx === selectedPhotoIndex ? '2px solid #FFD700' : '2px solid rgba(255,255,255,0.15)', opacity: idx === selectedPhotoIndex ? 1 : 0.6 }}>
+                  <img src={p.photo_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
 
