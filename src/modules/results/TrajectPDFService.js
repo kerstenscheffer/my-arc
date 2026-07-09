@@ -116,6 +116,9 @@ export default class TrajectPDFService {
     ].filter(Boolean).map(d => new Date(d)).sort((a, b) => a - b)
     const period = allDates.length ? { start: allDates[0], end: allDates[allDates.length - 1] } : null
 
-    return { weight, photoPair, strength, period }
+    return {
+      weight, photoPair, strength, period,
+      photos: usePh.map(p => ({ url: p.photo_url, date: p.photo_date })),
+    }
   }
 }

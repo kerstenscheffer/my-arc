@@ -32,8 +32,16 @@ function weightChartSVG(series) {
 export function generateTrajectHTML(data, meta = {}) {
   const { weight, photoPair, strength = [], period } = data || {}
   const clientName = esc(meta.clientName || 'Klant')
+  const firstName = esc((meta.clientName || '').trim().split(/\s+/)[0] || 'daar')
+  const hasCoachText = !!(meta.coachText || '').trim()
   const coachText = esc(meta.coachText || '').replace(/\n/g, '<br>')
-  const periodStr = period ? `${fmtDate(period.start)} — ${fmtDate(period.end)}` : ''
+  const periodStr = period ? `${fmtDate(period.start)} t/m ${fmtDate(period.end)}` : ''
+
+  // Thumbnails voor de inleiding-kaartjes (uit de voortgangsfoto's).
+  const pics = (data?.photos || []).map(p => p.url).filter(Boolean)
+  const pickPic = (frac) => pics.length ? pics[Math.min(pics.length - 1, Math.round(frac * (pics.length - 1)))] : null
+  const thumbs = [pickPic(1), pickPic(0.5), pickPic(0)] // after, midden, before
+  const thumbTag = (i) => thumbs[i] ? `<img class="toc-thumb" src="${esc(thumbs[i])}"/>` : ''
 
   // Foto-maandlabels
   let photoLabels = { left: 'Maand 1', right: 'Maand 2' }
@@ -78,7 +86,7 @@ export function generateTrajectHTML(data, meta = {}) {
   }).join('')}
     </div>`).join('') : `<div class="empty">Geen kracht-data.</div>`
 
-  return `<!DOCTYPE html><html lang="nl"><head><meta charset="utf-8"><title>Traject — ${clientName}</title>
+  return `<!DOCTYPE html><html lang="nl"><head><meta charset="utf-8"><title>Traject van ${clientName}</title>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Poppins:ital,wght@0,400;0,600;0,700;0,800;0,900;1,800;1,900&display=swap');
   * { margin: 0; padding: 0; box-sizing: border-box; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
@@ -101,11 +109,12 @@ export function generateTrajectHTML(data, meta = {}) {
   .cover-head .name { font-family: 'Poppins', sans-serif; font-weight: 800; font-size: 30px; text-transform: uppercase; letter-spacing: -.01em; color: ${GOLD}; margin-top: 2px; }
   .cover-head .period { color: #9ca3af; margin-top: 8px; font-size: 13px; font-weight: 600; letter-spacing: .04em; }
   /* 4:5-kaart, identiek aan de tracking-pagina */
-  .cover-photo { position: relative; width: 174mm; height: 217.5mm; overflow: hidden; background: #111; }
+  .cover-photo { position: relative; width: 174mm; height: 217.5mm; background: transparent; border-radius: 18px; }
   .cover-photo .ba-half { position: absolute; top: 0; bottom: 0; width: 50%; overflow: hidden; }
-  .cover-photo .ba-half.l { left: 0; } .cover-photo .ba-half.r { right: 0; }
+  .cover-photo .ba-half.l { left: 0; border-top-left-radius: 18px; border-bottom-left-radius: 18px; }
+  .cover-photo .ba-half.r { right: 0; border-top-right-radius: 18px; border-bottom-right-radius: 18px; }
   .cover-photo .ba-half img { width: 100%; height: 100%; object-fit: cover; }
-  .cover-photo .overlay { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: fill; pointer-events: none; z-index: 1; }
+  .cover-photo .overlay { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: fill; pointer-events: none; z-index: 1; border-radius: 18px; }
   .cover-photo .m-lbl { position: absolute; bottom: 13%; left: 0; right: 0; text-align: center; font-family: 'Poppins', sans-serif; font-weight: 900; font-style: italic; font-size: 30px; color: #fff; text-shadow: 0 2px 10px rgba(0,0,0,.9); z-index: 2; }
   .cover-photo--empty { display: flex; align-items: center; justify-content: center; }
   /* Weight */
@@ -128,6 +137,15 @@ export function generateTrajectHTML(data, meta = {}) {
   .ex-prog .end { color: #fff; }
   .ex-prog .gain { color: #22c55e; font-size: 13px; }
   .ex-prog .muted { font-weight: 500; font-size: 13px; }
+  /* Inleiding */
+  .intro { font-size: 17px; line-height: 1.7; color: #d1d5db; margin-bottom: 30px; max-width: 155mm; }
+  .toc { display: flex; flex-direction: column; gap: 12px; }
+  .toc-item { display: flex; align-items: center; gap: 16px; border: 1px solid rgba(255,255,255,.08); border-radius: 14px; padding: 14px 16px; background: #141414; }
+  .toc-n { font-family: 'Poppins', sans-serif; font-weight: 900; font-size: 22px; color: ${GOLD}; line-height: 1; min-width: 34px; }
+  .toc-txt { flex: 1; }
+  .toc-t { font-family: 'Poppins', sans-serif; font-weight: 800; font-size: 17px; color: #fff; }
+  .toc-d { font-size: 14px; color: #9ca3af; margin-top: 3px; line-height: 1.5; }
+  .toc-thumb { width: 58px; height: 72px; object-fit: cover; border-radius: 10px; flex-shrink: 0; }
   /* Coach message */
   .msg { font-size: 17px; line-height: 1.7; color: #e5e7eb; white-space: pre-wrap; }
 </style></head><body>
@@ -140,6 +158,19 @@ export function generateTrajectHTML(data, meta = {}) {
       ${periodStr ? `<div class="period">${esc(periodStr)}</div>` : ''}
     </div>
     ${coverPhoto}
+  </div>
+
+  <div class="page">
+    <div class="eyebrow">Inleiding</div>
+    <h2>Jouw traject in beeld</h2>
+    <p class="intro">Beste ${firstName}, in dit rapport blikken we samen terug op jouw traject. Van je eerste tot je laatste dag hebben we alles bijgehouden. Hieronder zie je zwart-op-wit wat er is veranderd. Wees trots op wat je hebt neergezet.</p>
+    <div class="toc">
+      <div class="toc-item"><div class="toc-n">01</div><div class="toc-txt"><div class="toc-t">Transformatie</div><div class="toc-d">Je before/after naast elkaar, op de voorpagina.</div></div>${thumbTag(0)}</div>
+      <div class="toc-item"><div class="toc-n">02</div><div class="toc-txt"><div class="toc-t">Gewichtsprogressie</div><div class="toc-d">Je gewicht van de eerste tot de laatste weging.</div></div>${thumbTag(1)}</div>
+      <div class="toc-item"><div class="toc-n">03</div><div class="toc-txt"><div class="toc-t">Krachtprogressie per spiergroep</div><div class="toc-d">Je meest gedane oefeningen, van startgewicht naar eindgewicht.</div></div>${thumbTag(2)}</div>
+      ${hasCoachText ? `<div class="toc-item"><div class="toc-n">04</div><div class="toc-txt"><div class="toc-t">Een woord van je coach</div><div class="toc-d">Een persoonlijke boodschap om mee af te sluiten.</div></div></div>` : ''}
+    </div>
+    <div class="foot"><img src="${LOGO}"/></div>
   </div>
 
   <div class="page">
