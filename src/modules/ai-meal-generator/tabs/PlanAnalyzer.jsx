@@ -499,16 +499,28 @@ export default function PlanAnalyzer({
   }
 
   const handlePDF = async () => {
-    if (!planMeta?.id) return
+    if (!weekData || weekData.length === 0) { alert('Geen plan om te exporteren.'); return }
     setLoadingPdf(true)
     try {
-      const { data, error } = await db.supabase.from('client_meal_plans').select('*').eq('id', planMeta.id).single()
-      if (error || !data) throw new Error('Plan laden mislukt')
+      let plan
+      if (planMeta?.id) {
+        // Opgeslagen plan → gebruik de DB-versie (met week_structure).
+        const { data, error } = await db.supabase.from('client_meal_plans').select('*').eq('id', planMeta.id).single()
+        if (error || !data) throw new Error('Plan laden mislukt')
+        plan = data
+      } else {
+        // Net gegenereerd / nog niet opgeslagen plan → bouw de week_structure
+        // uit de huidige weekData (bevat ook de laatste swaps). Voorheen deed de
+        // knop hier stilletjes niks omdat er nog geen planMeta.id was.
+        const week_structure = {}
+        weekData.forEach(d => { week_structure[d.dayId] = { ...(d.meals || {}), totals: d.totals, is_training_day: d.is_training_day } })
+        plan = { week_structure, template_name: planMeta?.name || 'Weekplan' }
+      }
       const clientName = clientRecord?.first_name || 'Client'
       const today = new Date(); const nextWeek = new Date(today.getTime() + 7 * 24 * 60 * 60 * 1000)
       const weekRange = `${today.toLocaleDateString('nl-NL')} - ${nextWeek.toLocaleDateString('nl-NL')}`
-      await openMealPlanForPrint(data, clientName, weekRange)
-    } catch (err) { alert('PDF maken mislukt. Probeer opnieuw.') }
+      await openMealPlanForPrint(plan, clientName, weekRange)
+    } catch (err) { console.error('❌ PDF-export fout:', err); alert('PDF maken mislukt: ' + (err?.message || 'onbekende fout')) }
     setLoadingPdf(false)
   }
 
