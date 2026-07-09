@@ -200,7 +200,7 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
 
   return (
     <div style={{ padding: isMobile ? '1rem' : '1.5rem', maxWidth: '1400px', margin: '0 auto' }}>
-      <div style={{ background: 'rgba(17,17,17,0.8)', backdropFilter: 'blur(20px)', borderRadius: '16px', border: '1px solid rgba(255,255,255,0.1)', padding: isMobile ? '1rem' : '1.5rem', marginBottom: '1.5rem' }}>
+      <div style={{ background: '#141414', borderRadius: '16px', border: '1px solid rgba(255,255,255,0.08)', padding: isMobile ? '1rem' : '1.5rem', marginBottom: '1.5rem' }}>
 
         {/* Header row */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1rem', flexWrap: 'wrap' }}>
@@ -294,7 +294,7 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
 
         {/* Action buttons */}
         <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-          <button onClick={() => setShowTemplateManager(true)} style={{ padding: '0.5rem 1rem', background: 'rgba(139,92,246,0.2)', border: '1px solid rgba(139,92,246,0.3)', borderRadius: '10px', color: '#8b5cf6', fontSize: isMobile ? '0.85rem' : '0.9rem', fontWeight: '600', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.5rem', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', minHeight: '44px' }}>
+          <button onClick={() => setShowTemplateManager(true)} style={{ padding: '0.5rem 1rem', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: '12px', color: 'rgba(255,255,255,0.8)', fontSize: isMobile ? '0.85rem' : '0.9rem', fontWeight: '600', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.5rem', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', minHeight: '44px' }}>
             <FileText size={16} /> Templates
           </button>
           <button onClick={saveAsTemplate} disabled={saving || workoutPlan.days.length === 0 || !workoutPlan.name} style={{ padding: '0.5rem 1rem', background: 'rgba(212,175,55,0.15)', border: '1px solid rgba(212,175,55,0.35)', borderRadius: '10px', color: '#FFD700', fontSize: isMobile ? '0.85rem' : '0.9rem', fontWeight: '600', cursor: saving || !workoutPlan.name ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', gap: '0.5rem', opacity: workoutPlan.days.length === 0 || !workoutPlan.name ? 0.5 : 1, touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', minHeight: '44px' }}>
@@ -307,7 +307,7 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
             </button>
           )}
 
-          <button onClick={() => setShowClientAssigner(true)} disabled={workoutPlan.days.length === 0} style={{ padding: '0.5rem 1rem', background: 'rgba(59,130,246,0.2)', border: '1px solid rgba(59,130,246,0.3)', borderRadius: '10px', color: '#3b82f6', fontSize: isMobile ? '0.85rem' : '0.9rem', fontWeight: '600', cursor: workoutPlan.days.length === 0 ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', gap: '0.5rem', opacity: workoutPlan.days.length === 0 ? 0.5 : 1, touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', minHeight: '44px' }}>
+          <button onClick={() => setShowClientAssigner(true)} disabled={workoutPlan.days.length === 0} style={{ padding: '0.5rem 1rem', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: '12px', color: 'rgba(255,255,255,0.8)', fontSize: isMobile ? '0.85rem' : '0.9rem', fontWeight: '600', cursor: workoutPlan.days.length === 0 ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', gap: '0.5rem', opacity: workoutPlan.days.length === 0 ? 0.5 : 1, touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', minHeight: '44px' }}>
             <Users size={16} /> Assign to Clients
           </button>
         </div>
@@ -321,7 +321,8 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
             onDelete={() => deleteDay(day.id)} onDuplicate={() => duplicateDay(day.id)}
             onAddExercise={() => { setActiveDay(day.id); setShowExerciseSelector(true) }}
             onUpdateExercise={(exerciseId, updates) => updateExercise(day.id, exerciseId, updates)}
-            onDeleteExercise={(exerciseId) => deleteExercise(day.id, exerciseId)} isMobile={isMobile} />
+            onDeleteExercise={(exerciseId) => deleteExercise(day.id, exerciseId)} isMobile={isMobile}
+            db={db} client={selectedClient} />
         ))}
         <button onClick={addDay} style={{ background: 'rgba(212,175,55,0.07)', border: '2px dashed rgba(212,175,55,0.3)', borderRadius: '16px', padding: isMobile ? '2rem' : '3rem', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', cursor: 'pointer', minHeight: isMobile ? '150px' : '200px', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}
           onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(212,175,55,0.15)'; e.currentTarget.style.borderColor = 'rgba(212,175,55,0.5)' }}
