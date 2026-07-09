@@ -11,6 +11,7 @@ const GOLD = '#FFD700'
 export default function TrajectPdfTab({ client, db }) {
   const [journeyText, setJourneyText] = useState('')
   const [coachText, setCoachText] = useState('')
+  const [planText, setPlanText] = useState('')
   const [loading, setLoading] = useState(false)
 
   const generate = async () => {
@@ -23,6 +24,7 @@ export default function TrajectPdfTab({ client, db }) {
         clientName: `${client.first_name || ''} ${client.last_name || ''}`.trim() || 'Klant',
         journeyText,
         coachText,
+        planText,
       })
     } catch (e) {
       console.error('Traject-PDF mislukt:', e)
@@ -56,13 +58,24 @@ export default function TrajectPdfTab({ client, db }) {
       />
 
       <label style={{ display: 'block', fontSize: 13, fontWeight: 700, color: 'rgba(255,255,255,0.7)', marginBottom: 8 }}>
-        Afsluitende tekst / woord van je coach <span style={{ color: 'rgba(255,255,255,0.4)', fontWeight: 500 }}>(optioneel)</span>
+        Woord van je coach <span style={{ color: 'rgba(255,255,255,0.4)', fontWeight: 500 }}>(optioneel)</span>
       </label>
       <textarea
         value={coachText}
         onChange={e => setCoachText(e.target.value)}
         placeholder="Bijv. wat je van het traject vond, wat de klant heeft laten zien, en wat je meegeeft voor de toekomst…"
-        rows={7}
+        rows={6}
+        style={{ width: '100%', boxSizing: 'border-box', padding: '0.9rem', background: 'rgba(0,0,0,0.4)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 12, color: '#fff', fontSize: 15, lineHeight: 1.5, outline: 'none', resize: 'vertical', fontFamily: 'inherit', marginBottom: 20 }}
+      />
+
+      <label style={{ display: 'block', fontSize: 13, fontWeight: 700, color: 'rgba(255,255,255,0.7)', marginBottom: 8 }}>
+        Plan / vooruitzicht <span style={{ color: 'rgba(255,255,255,0.4)', fontWeight: 500 }}>(optioneel — komt onder het coach-woord)</span>
+      </label>
+      <textarea
+        value={planText}
+        onChange={e => setPlanText(e.target.value)}
+        placeholder="Het nieuwe vooruitzicht voor de klant: doelen, focus en volgende stappen voor de komende periode…"
+        rows={6}
         style={{ width: '100%', boxSizing: 'border-box', padding: '0.9rem', background: 'rgba(0,0,0,0.4)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 12, color: '#fff', fontSize: 15, lineHeight: 1.5, outline: 'none', resize: 'vertical', fontFamily: 'inherit', marginBottom: 20 }}
       />
 

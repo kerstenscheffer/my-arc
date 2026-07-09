@@ -42,27 +42,23 @@ export function generateTrajectHTML(data, meta = {}) {
   const hasClosing = hasCoachText || hasPlan
   const periodStr = period ? `${fmtDate(period.start)} t/m ${fmtDate(period.end)}` : ''
 
-  // Inleiding-thumbnails: kaart 1 = mini back-transformatie in homepage-stijl
-  // (before | after + MA-overlay); overige kaarten krijgen een goud icoon.
-  const backPair = angles.back?.before ? angles.back : (angles.front?.before ? angles.front : null)
-  const miniBack = backPair ? `<div class="toc-mini">
-      <div class="tm-half l"><img src="${esc(backPair.before.photo_url)}"/></div>
-      <div class="tm-half r"><img src="${esc((backPair.after || backPair.before).photo_url)}"/></div>
+  // Inleiding-thumbnails: elke kaart een mini before/after in homepage-stijl
+  // (before | after + MA-overlay). Verschillende hoeken zodat ze variëren.
+  const availPairs = ['front', 'side', 'back'].map(k => angles[k]).filter(p => p?.before)
+  const fallbackPair = availPairs[0] || (photoPair ? { before: photoPair.first, after: photoPair.last } : null)
+  const pairFor = (k) => (angles[k]?.before ? angles[k] : fallbackPair)
+  const miniOf = (pair) => pair && pair.before ? `<div class="toc-mini">
+      <div class="tm-half l"><img src="${esc(pair.before.photo_url)}"/></div>
+      <div class="tm-half r"><img src="${esc((pair.after || pair.before).photo_url)}"/></div>
       <img class="tm-ov" src="${LOGO}"/>
     </div>` : ''
-  const ICON = {
-    chart: '<svg viewBox="0 0 24 24"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>',
-    food: '<svg viewBox="0 0 24 24"><path d="M3 2v7a2 2 0 0 0 2 2 2 2 0 0 0 2-2V2"/><path d="M7 2v20"/><path d="M21 15V2a5 5 0 0 0-5 5v6c0 1.1.9 2 2 2h3Zm0 0v7"/></svg>',
-    target: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>',
-  }
-  const iconTile = (svg) => `<div class="toc-icon">${svg}</div>`
 
   // Inhoudsopgave (dynamisch: optionele secties tellen mee in de nummering).
   const sections = [
-    { t: 'Gewicht- & fotoprogressie', d: 'Je gewicht over de maanden, met front, side en back naast elkaar.', tail: miniBack },
-    { t: 'Krachtprogressie per spiergroep', d: 'Je meest gedane oefeningen, van startgewicht naar eindgewicht.', tail: iconTile(ICON.chart) },
-    ...(hasJourney ? [{ t: 'Voedingsprogressie', d: 'Jouw verhaal: hoe je binnenkwam en wat we hebben bereikt.', tail: iconTile(ICON.food) }] : []),
-    ...(hasClosing ? [{ t: 'Coach-woord & plan', d: 'Een persoonlijke boodschap en je vooruitzicht voor de komende tijd.', tail: iconTile(ICON.target) }] : []),
+    { t: 'Gewicht- & fotoprogressie', d: 'Je gewicht over de maanden, met front, side en back naast elkaar.', tail: miniOf(pairFor('back')) },
+    { t: 'Krachtprogressie per spiergroep', d: 'Je meest gedane oefeningen, van startgewicht naar eindgewicht.', tail: miniOf(pairFor('front')) },
+    ...(hasJourney ? [{ t: 'Voedingsprogressie', d: 'Jouw verhaal: hoe je binnenkwam en wat we hebben bereikt.', tail: miniOf(pairFor('side')) }] : []),
+    ...(hasClosing ? [{ t: 'Coach-woord & plan', d: 'Een persoonlijke boodschap en je vooruitzicht voor de komende tijd.', tail: miniOf(pairFor('front')) }] : []),
   ]
   const tocHtml = sections.map((s, i) => `
       <div class="toc-item">
@@ -71,19 +67,25 @@ export function generateTrajectHTML(data, meta = {}) {
         ${s.tail || ''}
       </div>`).join('')
 
-  // Front/side/back before-after kolommen.
+  // Back/side/front als cover-stijl kaarten (before | after + MA-overlay).
   const ANGLE_LABELS = { front: 'Front', side: 'Side', back: 'Back' }
-  const angleCols = ['front', 'side', 'back'].map(k => {
+  const pairLabels = (pair) => {
+    if (!pair?.after) return { l: 'Maand 1', r: '' }
+    const m = Math.max(1, monthsBetween(new Date(pair.before.photo_date), new Date(pair.after.photo_date)) + 1)
+    return { l: 'Maand 1', r: `Maand ${m}` }
+  }
+  const coverCard = (pair) => {
+    const lb = pairLabels(pair)
+    return `<div class="ba-card">
+      <div class="bc-half l"><img src="${esc(pair.before.photo_url)}"/>${lb.l ? `<span class="bc-lbl">${lb.l}</span>` : ''}</div>
+      <div class="bc-half r"><img src="${esc((pair.after || pair.before).photo_url)}"/>${lb.r ? `<span class="bc-lbl">${lb.r}</span>` : ''}</div>
+      <img class="bc-ov" src="${LOGO}"/>
+    </div>`
+  }
+  const angleCols = ['back', 'side', 'front'].map(k => {
     const p = angles[k]
     if (!p || !p.before) return ''
-    const cell = (photo, lbl) => photo ? `<div class="ba-cell"><img src="${esc(photo.photo_url)}"/><span class="ba-cap">${lbl}</span></div>` : ''
-    return `<div class="ba-col">
-      <div class="ba-col-h">${ANGLE_LABELS[k]}</div>
-      <div class="ba-col-imgs">
-        ${cell(p.before, 'Start')}
-        ${cell(p.after, 'Nu')}
-      </div>
-    </div>`
+    return `<div class="ba-col"><div class="ba-col-h">${ANGLE_LABELS[k]}</div>${coverCard(p)}</div>`
   }).join('')
   const hasAngles = ['front', 'side', 'back'].some(k => angles[k]?.before)
 
@@ -190,20 +192,31 @@ export function generateTrajectHTML(data, meta = {}) {
   .toc-t { font-family: 'Poppins', sans-serif; font-weight: 800; font-size: 17px; color: #fff; }
   .toc-d { font-size: 14px; color: #9ca3af; margin-top: 3px; line-height: 1.5; }
   .toc-thumb { width: 58px; height: 72px; object-fit: cover; border-radius: 10px; flex-shrink: 0; }
+  .toc-mini { position: relative; width: 58px; height: 72px; flex-shrink: 0; display: flex; background: #111; }
+  .toc-mini .tm-half { width: 50%; overflow: hidden; }
+  .toc-mini .tm-half.l { border-top-left-radius: 10px; border-bottom-left-radius: 10px; }
+  .toc-mini .tm-half.r { border-top-right-radius: 10px; border-bottom-right-radius: 10px; }
+  .toc-mini .tm-half img { width: 100%; height: 100%; object-fit: cover; }
+  .toc-mini .tm-ov { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: fill; border-radius: 10px; }
   /* Progressie-pagina (foto + gewicht) */
   .pcol { display: flex; flex-direction: column; }
   .wprog { flex: 0 0 auto; margin-bottom: 14px; }
   .wprog .stat-row { margin-bottom: 10px; }
   .wprog svg { display: block; height: 42mm; width: auto; max-width: 100%; margin: 0 auto; }
-  .ba-grid { flex: 1 1 0; min-height: 0; display: flex; gap: 10px; }
+  .ba-grid { flex: 1 1 0; min-height: 0; display: flex; gap: 12px; align-items: flex-start; }
   .ba-col { flex: 1; display: flex; flex-direction: column; min-width: 0; }
   .ba-col-h { font-family: 'Poppins', sans-serif; font-weight: 800; font-size: 14px; color: ${GOLD}; text-transform: uppercase; letter-spacing: .04em; text-align: center; margin-bottom: 8px; }
-  .ba-col-imgs { flex: 1 1 0; min-height: 0; display: flex; flex-direction: column; gap: 8px; }
-  .ba-cell { flex: 1 1 0; min-height: 0; position: relative; border-radius: 10px; overflow: hidden; background: #111; }
-  .ba-cell img { width: 100%; height: 100%; object-fit: cover; }
-  .ba-cap { position: absolute; bottom: 6px; left: 6px; font-family: 'Poppins', sans-serif; font-size: 11px; font-weight: 800; color: #fff; background: rgba(0,0,0,.55); padding: 2px 8px; border-radius: 6px; letter-spacing: .04em; text-transform: uppercase; }
+  .ba-card { position: relative; width: 100%; aspect-ratio: 4 / 5; background: #111; }
+  .ba-card .bc-half { position: absolute; top: 0; bottom: 0; width: 50%; overflow: hidden; }
+  .ba-card .bc-half.l { left: 0; border-top-left-radius: 12px; border-bottom-left-radius: 12px; }
+  .ba-card .bc-half.r { right: 0; border-top-right-radius: 12px; border-bottom-right-radius: 12px; }
+  .ba-card .bc-half img { width: 100%; height: 100%; object-fit: cover; }
+  .ba-card .bc-ov { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: fill; border-radius: 12px; z-index: 1; }
+  .ba-card .bc-lbl { position: absolute; bottom: 9%; left: 0; right: 0; text-align: center; font-family: 'Poppins', sans-serif; font-weight: 900; font-style: italic; font-size: 14px; color: #fff; text-shadow: 0 1px 6px rgba(0,0,0,.9); z-index: 2; }
   /* Coach message */
   .msg { font-size: 17px; line-height: 1.7; color: #e5e7eb; white-space: pre-wrap; }
+  .plan { margin-top: 26px; border-top: 1px solid rgba(255,215,0,.25); padding-top: 20px; }
+  .plan-h { font-family: 'Poppins', sans-serif; font-weight: 800; font-size: 16px; color: ${GOLD}; text-transform: uppercase; letter-spacing: .04em; margin-bottom: 12px; }
 </style></head><body>
 
   <div class="page cover">
@@ -232,13 +245,6 @@ export function generateTrajectHTML(data, meta = {}) {
     <div class="foot"><img src="${LOGO}"/></div>
   </div>
 
-  ${hasJourney ? `<div class="page">
-    <div class="eyebrow">Voeding</div>
-    <h2>Voedingsprogressie</h2>
-    <div class="msg">${journeyText}</div>
-    <div class="foot"><img src="${LOGO}"/></div>
-  </div>` : ''}
-
   <div class="page">
     <div class="eyebrow">Kracht</div>
     <h2>Krachtprogressie per spiergroep</h2>
@@ -246,10 +252,21 @@ export function generateTrajectHTML(data, meta = {}) {
     <div class="foot"><img src="${LOGO}"/></div>
   </div>
 
-  ${coachText ? `<div class="page">
+  ${hasJourney ? `<div class="page">
+    <div class="eyebrow">Voeding</div>
+    <h2>Voedingsprogressie</h2>
+    <div class="msg">${journeyText}</div>
+    <div class="foot"><img src="${LOGO}"/></div>
+  </div>` : ''}
+
+  ${hasClosing ? `<div class="page">
     <div class="eyebrow">Van je coach</div>
-    <h2>Een woord voor jou</h2>
-    <div class="msg">${coachText}</div>
+    <h2>Coach-woord &amp; plan</h2>
+    ${hasCoachText ? `<div class="msg">${coachText}</div>` : ''}
+    ${hasPlan ? `<div class="plan">
+      <div class="plan-h">Jouw plan &amp; vooruitzicht</div>
+      <div class="msg">${planText}</div>
+    </div>` : ''}
     <div class="foot"><img src="${LOGO}"/></div>
   </div>` : ''}
 
