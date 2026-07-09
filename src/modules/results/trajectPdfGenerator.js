@@ -4,7 +4,8 @@
 
 const GOLD = '#ffd700'
 const LOGO = '/ma-coaching-logo.png'
-const COACH_PHOTO = '/coach-kersten.png'
+// Zelfde avatar als het coach-bericht op de client-home (ronde face-crop).
+const COACH_PHOTO = 'https://i.ibb.co/mCQzTZrZ/ea169061-c9f1-4b4d-ab88-fc746cbde003.jpg'
 
 const fmtDate = (d) => {
   if (!d) return ''
@@ -67,10 +68,14 @@ export function generateTrajectHTML(data, meta = {}) {
   const hasWorkout = !!(meta.workoutText || '').trim()
   const workoutText = esc(meta.workoutText || '').replace(/\n/g, '<br>')
 
-  // Coach-bericht: vaste coachfoto + tekst als bericht.
+  // Coach-bericht in de stijl van de client-home: ronde avatar + "BERICHT VAN
+  // KERSTEN" in goud + de tekst.
   const coachMsg = (bodyHtml) => `<div class="coach-msg">
     <img class="cm-photo" src="${COACH_PHOTO}"/>
-    <div class="cm-body">${bodyHtml}</div>
+    <div class="cm-body">
+      <div class="cm-head">Bericht van Kersten</div>
+      ${bodyHtml}
+    </div>
   </div>`
   const periodStr = period ? `${fmtDate(period.start)} t/m ${fmtDate(period.end)}` : ''
 
@@ -254,11 +259,12 @@ export function generateTrajectHTML(data, meta = {}) {
   .ba-card .bc-lbl { position: absolute; bottom: 9%; left: 0; right: 0; text-align: center; font-family: 'Poppins', sans-serif; font-weight: 900; font-style: italic; font-size: 14px; color: #fff; z-index: 2; }
   /* Coach message */
   .msg { font-size: 17px; line-height: 1.7; color: #e5e7eb; white-space: pre-wrap; }
-  .coach-msg { display: flex; gap: 18px; align-items: flex-start; background: #141414; border: 1px solid rgba(255,215,0,.18); border-radius: 16px; padding: 18px 20px; }
-  .cm-photo { width: 92px; height: 115px; border-radius: 12px; object-fit: cover; object-position: center top; flex-shrink: 0; border: 2px solid rgba(255,215,0,.35); background: #f0f0f0; }
+  .coach-msg { display: flex; gap: 14px; align-items: flex-start; }
+  .cm-photo { width: 56px; height: 56px; border-radius: 50%; object-fit: cover; flex-shrink: 0; border: 2px solid rgba(255,215,0,.45); background: #f0f0f0; }
   .cm-body { flex: 1; min-width: 0; }
-  .cm-text { font-size: 15px; line-height: 1.65; color: #e5e7eb; white-space: pre-wrap; }
-  .cm-wrap { margin-top: 18px; }
+  .cm-head { font-family: 'Poppins', sans-serif; font-weight: 800; font-size: 11px; color: ${GOLD}; text-transform: uppercase; letter-spacing: .1em; margin-bottom: 6px; }
+  .cm-text { font-size: 15px; line-height: 1.6; color: rgba(255,255,255,.78); font-weight: 500; white-space: pre-wrap; }
+  .cm-wrap { margin-top: 22px; }
   .plan { margin-top: 20px; border-top: 1px solid rgba(255,215,0,.25); padding-top: 16px; }
   .plan-h { font-family: 'Poppins', sans-serif; font-weight: 800; font-size: 15px; color: ${GOLD}; text-transform: uppercase; letter-spacing: .04em; margin-bottom: 10px; }
 </style></head><body>
