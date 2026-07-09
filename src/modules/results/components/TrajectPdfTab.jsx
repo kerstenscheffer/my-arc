@@ -64,8 +64,12 @@ const pickBtn = (on) => ({
 
 const textareaStyle = { width: '100%', boxSizing: 'border-box', padding: '0.9rem', background: 'rgba(0,0,0,0.4)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 12, color: '#fff', fontSize: 15, lineHeight: 1.5, outline: 'none', resize: 'vertical', fontFamily: 'inherit', marginBottom: 20 }
 const labelStyle = { display: 'block', fontSize: 13, fontWeight: 700, color: 'rgba(255,255,255,0.7)', marginBottom: 8 }
+const optHint = { color: 'rgba(255,255,255,0.4)', fontWeight: 500 }
 
 export default function TrajectPdfTab({ client, db }) {
+  const [coverText, setCoverText] = useState('')
+  const [introText, setIntroText] = useState('')
+  const [photoText, setPhotoText] = useState('')
   const [journeyText, setJourneyText] = useState('')
   const [workoutText, setWorkoutText] = useState('')
   const [coachText, setCoachText] = useState('')
@@ -106,6 +110,9 @@ export default function TrajectPdfTab({ client, db }) {
       const data = await svc.getTrajectData(client.id, selection)
       openTrajectForPrint(data, {
         clientName: `${client.first_name || ''} ${client.last_name || ''}`.trim() || 'Klant',
+        coverText,
+        introText,
+        photoText,
         journeyText,
         workoutText,
         coachText,
@@ -143,27 +150,34 @@ export default function TrajectPdfTab({ client, db }) {
         )}
       </div>
 
-      <label style={labelStyle}>
-        Voedingsprogressie / jouw verhaal <span style={{ color: 'rgba(255,255,255,0.4)', fontWeight: 500 }}>(optioneel)</span>
-      </label>
-      <textarea value={journeyText} onChange={e => setJourneyText(e.target.value)} rows={7}
-        placeholder="Hoe kwam de klant binnen, welke punten waren lastig, en wat hebben jullie samen bereikt?…" style={textareaStyle} />
+      <div style={{ fontSize: 14, fontWeight: 800, color: '#fff', marginBottom: 4 }}>Berichten per pagina</div>
+      <div style={{ fontSize: 12.5, color: 'rgba(255,255,255,0.45)', marginBottom: 16 }}>Elk bericht komt als "Bericht van Kersten" (met je foto) op die pagina. Leeg = geen bericht op die pagina.</div>
 
-      <label style={labelStyle}>
-        Bericht bij de workout/kracht-pagina <span style={{ color: 'rgba(255,255,255,0.4)', fontWeight: 500 }}>(optioneel)</span>
-      </label>
-      <textarea value={workoutText} onChange={e => setWorkoutText(e.target.value)} rows={5}
+      <label style={labelStyle}>Cover <span style={optHint}>(optioneel)</span></label>
+      <textarea value={coverText} onChange={e => setCoverText(e.target.value)} rows={3}
+        placeholder="Kort welkomstwoord op de voorpagina…" style={textareaStyle} />
+
+      <label style={labelStyle}>Inleiding <span style={optHint}>(optioneel)</span></label>
+      <textarea value={introText} onChange={e => setIntroText(e.target.value)} rows={3}
+        placeholder="Bericht bij de inleiding-pagina…" style={textareaStyle} />
+
+      <label style={labelStyle}>Foto- & gewichtsprogressie <span style={optHint}>(optioneel)</span></label>
+      <textarea value={photoText} onChange={e => setPhotoText(e.target.value)} rows={4}
+        placeholder="Wat je opviel aan de foto's en het gewichtsverloop…" style={textareaStyle} />
+
+      <label style={labelStyle}>Krachtprogressie <span style={optHint}>(optioneel)</span></label>
+      <textarea value={workoutText} onChange={e => setWorkoutText(e.target.value)} rows={4}
         placeholder="Bijv. wat je opviel aan de krachtprogressie, sterke punten en waar je trots op bent…" style={textareaStyle} />
 
-      <label style={labelStyle}>
-        Woord van je coach <span style={{ color: 'rgba(255,255,255,0.4)', fontWeight: 500 }}>(optioneel)</span>
-      </label>
+      <label style={labelStyle}>Voedingsprogressie / jouw verhaal <span style={optHint}>(optioneel)</span></label>
+      <textarea value={journeyText} onChange={e => setJourneyText(e.target.value)} rows={6}
+        placeholder="Hoe kwam de klant binnen, welke punten waren lastig, en wat hebben jullie samen bereikt?…" style={textareaStyle} />
+
+      <label style={labelStyle}>Woord van je coach <span style={optHint}>(optioneel)</span></label>
       <textarea value={coachText} onChange={e => setCoachText(e.target.value)} rows={6}
         placeholder="Bijv. wat je van het traject vond, wat de klant heeft laten zien, en wat je meegeeft voor de toekomst…" style={textareaStyle} />
 
-      <label style={labelStyle}>
-        Plan / vooruitzicht <span style={{ color: 'rgba(255,255,255,0.4)', fontWeight: 500 }}>(optioneel — komt onder het coach-woord)</span>
-      </label>
+      <label style={labelStyle}>Plan / vooruitzicht <span style={optHint}>(optioneel — komt onder het coach-woord)</span></label>
       <textarea value={planText} onChange={e => setPlanText(e.target.value)} rows={6}
         placeholder="Het nieuwe vooruitzicht voor de klant: doelen, focus en volgende stappen voor de komende periode…" style={textareaStyle} />
 

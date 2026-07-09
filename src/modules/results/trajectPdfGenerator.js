@@ -7,6 +7,14 @@ const LOGO = '/ma-coaching-logo.png'
 // Zelfde avatar als het coach-bericht op de client-home (ronde face-crop).
 const COACH_PHOTO = 'https://i.ibb.co/mCQzTZrZ/ea169061-c9f1-4b4d-ab88-fc746cbde003.jpg'
 
+// Thematische thumbnails voor de inleiding-kaartjes (workout / maaltijd / coach).
+// workout + meal worden nog aangeleverd; zet ze in /public op deze paden.
+const INTRO_THUMB = {
+  workout: '/intro-workout.jpg',
+  meal: '/intro-meal.jpg',
+  coach: '/coach-kersten.png',
+}
+
 const fmtDate = (d) => {
   if (!d) return ''
   try { return new Date(d).toLocaleDateString('nl-NL', { day: 'numeric', month: 'long', year: 'numeric' }) } catch { return '' }
@@ -67,6 +75,12 @@ export function generateTrajectHTML(data, meta = {}) {
   const hasClosing = hasCoachText || hasPlan
   const hasWorkout = !!(meta.workoutText || '').trim()
   const workoutText = esc(meta.workoutText || '').replace(/\n/g, '<br>')
+  const hasCover = !!(meta.coverText || '').trim()
+  const coverText = esc(meta.coverText || '').replace(/\n/g, '<br>')
+  const hasIntro = !!(meta.introText || '').trim()
+  const introText = esc(meta.introText || '').replace(/\n/g, '<br>')
+  const hasPhoto = !!(meta.photoText || '').trim()
+  const photoText = esc(meta.photoText || '').replace(/\n/g, '<br>')
 
   // Coach-bericht in de stijl van de client-home: ronde avatar + "BERICHT VAN
   // KERSTEN" in goud + de tekst.
@@ -89,13 +103,15 @@ export function generateTrajectHTML(data, meta = {}) {
       <div class="tm-half r"><img src="${esc((pair.after || pair.before).photo_url)}"/></div>
       <img class="tm-ov" src="${LOGO}"/>
     </div>` : ''
+  const singleThumb = (url, extra = '') => `<img class="toc-thumb ${extra}" src="${esc(url)}" onerror="this.style.display='none'"/>`
 
   // Inhoudsopgave (dynamisch: optionele secties tellen mee in de nummering).
+  // Kaart 1 = transformatie (back); kracht = workout; voeding = maaltijd; coach = jij.
   const sections = [
     { t: 'Gewicht- & fotoprogressie', d: 'Je gewicht over de maanden, met front, side en back naast elkaar.', tail: miniOf(pairFor('back')) },
-    { t: 'Krachtprogressie per spiergroep', d: 'Je meest gedane oefeningen, van startgewicht naar eindgewicht.', tail: miniOf(pairFor('front')) },
-    ...(hasJourney ? [{ t: 'Voedingsprogressie', d: 'Jouw verhaal: hoe je binnenkwam en wat we hebben bereikt.', tail: miniOf(pairFor('side')) }] : []),
-    ...(hasClosing ? [{ t: 'Coach-woord & plan', d: 'Een persoonlijke boodschap en je vooruitzicht voor de komende tijd.', tail: miniOf(pairFor('front')) }] : []),
+    { t: 'Krachtprogressie per spiergroep', d: 'Je meest gedane oefeningen, van startgewicht naar eindgewicht.', tail: singleThumb(INTRO_THUMB.workout) },
+    ...(hasJourney ? [{ t: 'Voedingsprogressie', d: 'Jouw verhaal: hoe je binnenkwam en wat we hebben bereikt.', tail: singleThumb(INTRO_THUMB.meal) }] : []),
+    ...(hasClosing ? [{ t: 'Coach-woord & plan', d: 'Een persoonlijke boodschap en je vooruitzicht voor de komende tijd.', tail: singleThumb(INTRO_THUMB.coach, 'toc-coach') }] : []),
   ]
   const tocHtml = sections.map((s, i) => `
       <div class="toc-item">
@@ -202,6 +218,8 @@ export function generateTrajectHTML(data, meta = {}) {
   .cover-photo .overlay { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: fill; pointer-events: none; z-index: 1; border-radius: 18px; }
   .cover-photo .m-lbl { position: absolute; bottom: 13%; left: 0; right: 0; text-align: center; font-family: 'Poppins', sans-serif; font-weight: 900; font-style: italic; font-size: 30px; color: #fff; z-index: 2; }
   .cover-photo--empty { display: flex; align-items: center; justify-content: center; }
+  .cover.has-msg .cover-photo { width: 150mm; height: 187.5mm; }
+  .cover-msg { width: 100%; box-sizing: border-box; padding: 16px 18mm 0; }
   /* Weight */
   .stat-row { display: flex; align-items: center; gap: 24px; margin-bottom: 24px; }
   .stat-num { font-family: 'Poppins', sans-serif; font-weight: 900; font-size: 48px; letter-spacing: -.03em; }
@@ -269,7 +287,7 @@ export function generateTrajectHTML(data, meta = {}) {
   .plan-h { font-family: 'Poppins', sans-serif; font-weight: 800; font-size: 15px; color: ${GOLD}; text-transform: uppercase; letter-spacing: .04em; margin-bottom: 10px; }
 </style></head><body>
 
-  <div class="page cover">
+  <div class="page cover${hasCover ? ' has-msg' : ''}">
     <div class="cover-head">
       <div class="eyebrow">Transformatie</div>
       <h1>Jouw traject</h1>
@@ -277,6 +295,7 @@ export function generateTrajectHTML(data, meta = {}) {
       ${periodStr ? `<div class="period">${esc(periodStr)}</div>` : ''}
     </div>
     ${coverPhoto}
+    ${hasCover ? `<div class="cover-msg">${coachMsg(`<div class="cm-text">${coverText}</div>`)}</div>` : ''}
   </div>
 
   <div class="page">
@@ -284,6 +303,7 @@ export function generateTrajectHTML(data, meta = {}) {
     <h2>Jouw traject in beeld</h2>
     <p class="intro">Beste ${firstName}, in dit rapport blikken we samen terug op jouw traject. Van je eerste tot je laatste dag hebben we alles bijgehouden. Hieronder zie je zwart-op-wit wat er is veranderd. Wees trots op wat je hebt neergezet.</p>
     <div class="toc">${tocHtml}</div>
+    ${hasIntro ? `<div class="cm-wrap">${coachMsg(`<div class="cm-text">${introText}</div>`)}</div>` : ''}
     <div class="foot"><img src="${LOGO}"/></div>
   </div>
 
@@ -292,6 +312,7 @@ export function generateTrajectHTML(data, meta = {}) {
     <h2>Foto- &amp; gewichtsprogressie</h2>
     <div class="wprog">${weightBlock}</div>
     ${hasAngles ? `<div class="ba-grid">${angleCols}</div>` : `<div class="empty">Nog geen front/side/back-foto's.</div>`}
+    ${hasPhoto ? `<div class="cm-wrap">${coachMsg(`<div class="cm-text">${photoText}</div>`)}</div>` : ''}
     <div class="foot"><img src="${LOGO}"/></div>
   </div>
 
