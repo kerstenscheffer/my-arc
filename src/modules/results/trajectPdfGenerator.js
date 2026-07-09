@@ -1,6 +1,6 @@
 // src/modules/results/trajectPdfGenerator.js
 // Bouwt de eind-van-traject-PDF (HTML → print → PDF) in MY ARC-stijl.
-// Koppen gebruiken 'Anton' (zware condensed athletic font) om het MA-logo te matchen.
+// Koppen gebruiken 'Poppins' (zwaar, 800/900) als merk-font.
 
 const GOLD = '#ffd700'
 const LOGO = '/ma-coaching-logo.png'
@@ -42,16 +42,16 @@ export function generateTrajectHTML(data, meta = {}) {
     photoLabels = { left: 'Maand 1', right: `Maand ${m}` }
   }
 
-  // Cover-visual: de transformatiefoto (before | after) met de MA-overlay eroverheen.
+  // Cover-visual: exact als de tracking-pagina (BeforeAfterCard) — 4:5-kaart met
+  // de before/after-foto's en de MA-logo-overlay er gecentreerd overheen, plus
+  // "Maand 1 / Maand X" op de foto.
   const coverPhoto = photoPair ? `
     <div class="cover-photo">
-      <div class="ba-half"><img src="${esc(photoPair.first.photo_url)}"/><span class="m-lbl left">${photoLabels.left}</span></div>
-      <div class="ba-half"><img src="${esc(photoPair.last.photo_url)}"/><span class="m-lbl right">${photoLabels.right}</span></div>
+      <div class="ba-half l"><img src="${esc(photoPair.first.photo_url)}"/><span class="m-lbl">${photoLabels.left}</span></div>
+      <div class="ba-half r"><img src="${esc(photoPair.last.photo_url)}"/><span class="m-lbl">${photoLabels.right}</span></div>
       <img class="overlay" src="${LOGO}"/>
     </div>` : `
-    <div class="cover-photo cover-photo--empty">
-      <img class="cover-logo" src="${LOGO}"/>
-    </div>`
+    <div class="cover-photo cover-photo--empty"><img class="overlay" src="${LOGO}"/></div>`
 
   const weightBlock = weight ? `
     <div class="stat-row">
@@ -84,8 +84,11 @@ export function generateTrajectHTML(data, meta = {}) {
   * { margin: 0; padding: 0; box-sizing: border-box; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   @page { size: A4; margin: 0; }
   body { font-family: 'Poppins', Arial, sans-serif; background: #000; color: #fff; }
-  .page { width: 210mm; min-height: 297mm; padding: 22mm 18mm; background: #000; page-break-after: always; position: relative; }
+  .page { width: 210mm; height: 297mm; overflow: hidden; padding: 22mm 18mm 30mm; background: #000; page-break-after: always; position: relative; }
   .page:last-child { page-break-after: auto; }
+  /* Vaste footer per pagina */
+  .foot { position: absolute; left: 0; right: 0; bottom: 12mm; height: 16mm; display: flex; align-items: center; justify-content: center; }
+  .foot img { height: 16mm; width: 60mm; object-fit: cover; object-position: center bottom; opacity: .9; }
   .display { font-family: 'Poppins', sans-serif; font-weight: 900; }
   .eyebrow { font-family: 'Poppins', sans-serif; font-weight: 800; font-size: 12px; letter-spacing: .16em; text-transform: uppercase; color: ${GOLD}; }
   h1 { font-family: 'Poppins', sans-serif; font-weight: 900; font-size: 50px; line-height: 1; letter-spacing: -.02em; text-transform: uppercase; margin: 8px 0 6px; }
@@ -93,18 +96,18 @@ export function generateTrajectHTML(data, meta = {}) {
   .muted { color: #9ca3af; }
   .empty { color: #6b7280; padding: 24px 0; }
   /* Cover */
-  .cover { padding: 0; display: flex; flex-direction: column; }
-  .cover-head { padding: 20mm 18mm 10mm; text-align: center; }
+  .cover { padding: 0; display: flex; flex-direction: column; align-items: center; }
+  .cover-head { padding: 12mm 18mm 8mm; text-align: center; }
   .cover-head .name { font-family: 'Poppins', sans-serif; font-weight: 800; font-size: 30px; text-transform: uppercase; letter-spacing: -.01em; color: ${GOLD}; margin-top: 2px; }
   .cover-head .period { color: #9ca3af; margin-top: 8px; font-size: 13px; font-weight: 600; letter-spacing: .04em; }
-  .cover-photo { flex: 1; position: relative; display: flex; gap: 6px; overflow: hidden; background: #111; margin: 0 0 0 0; }
-  .cover-photo .ba-half { flex: 1; position: relative; overflow: hidden; }
+  /* 4:5-kaart, identiek aan de tracking-pagina */
+  .cover-photo { position: relative; width: 174mm; height: 217.5mm; overflow: hidden; background: #111; }
+  .cover-photo .ba-half { position: absolute; top: 0; bottom: 0; width: 50%; overflow: hidden; }
+  .cover-photo .ba-half.l { left: 0; } .cover-photo .ba-half.r { right: 0; }
   .cover-photo .ba-half img { width: 100%; height: 100%; object-fit: cover; }
-  .cover-photo .overlay { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; pointer-events: none; }
-  .cover-photo .m-lbl { position: absolute; bottom: 30mm; font-family: 'Poppins', sans-serif; font-weight: 900; font-style: italic; font-size: 28px; color: #fff; text-shadow: 0 2px 10px rgba(0,0,0,.9); z-index: 2; }
-  .cover-photo .m-lbl.left { left: 16px; } .cover-photo .m-lbl.right { right: 16px; }
-  .cover-photo--empty { align-items: center; justify-content: center; }
-  .cover-photo .cover-logo { width: 240px; opacity: .9; }
+  .cover-photo .overlay { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: fill; pointer-events: none; z-index: 1; }
+  .cover-photo .m-lbl { position: absolute; bottom: 13%; left: 0; right: 0; text-align: center; font-family: 'Poppins', sans-serif; font-weight: 900; font-style: italic; font-size: 30px; color: #fff; text-shadow: 0 2px 10px rgba(0,0,0,.9); z-index: 2; }
+  .cover-photo--empty { display: flex; align-items: center; justify-content: center; }
   /* Weight */
   .stat-row { display: flex; align-items: center; gap: 24px; margin-bottom: 24px; }
   .stat-num { font-family: 'Poppins', sans-serif; font-weight: 900; font-size: 48px; letter-spacing: -.03em; }
@@ -127,8 +130,6 @@ export function generateTrajectHTML(data, meta = {}) {
   .ex-prog .muted { font-weight: 500; font-size: 13px; }
   /* Coach message */
   .msg { font-size: 17px; line-height: 1.7; color: #e5e7eb; white-space: pre-wrap; }
-  .logo-foot { position: absolute; bottom: 14mm; left: 0; right: 0; text-align: center; }
-  .logo-foot img { width: 120px; opacity: .9; }
 </style></head><body>
 
   <div class="page cover">
@@ -145,21 +146,21 @@ export function generateTrajectHTML(data, meta = {}) {
     <div class="eyebrow">Gewicht</div>
     <h2>Gewichtsprogressie</h2>
     ${weightBlock}
-    <div class="logo-foot"><img src="${LOGO}"/></div>
+    <div class="foot"><img src="${LOGO}"/></div>
   </div>
 
   <div class="page">
     <div class="eyebrow">Kracht</div>
     <h2>Krachtprogressie per spiergroep</h2>
     ${strengthBlock}
-    <div class="logo-foot"><img src="${LOGO}"/></div>
+    <div class="foot"><img src="${LOGO}"/></div>
   </div>
 
   ${coachText ? `<div class="page">
     <div class="eyebrow">Van je coach</div>
     <h2>Een woord voor jou</h2>
     <div class="msg">${coachText}</div>
-    <div class="logo-foot"><img src="${LOGO}"/></div>
+    <div class="foot"><img src="${LOGO}"/></div>
   </div>` : ''}
 
 </body></html>`
