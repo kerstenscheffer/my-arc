@@ -72,6 +72,7 @@ function ColWrapper({ id, children, isLast, collapsed, onToggle }) {
 export default function ClientInsightModal({ isOpen, onClose, client, isMobile, onNavigatePlan, onNavigateWorkout, db, coachId, onOpenMealPanel, onOpenWorkoutPanel }) {
   const [selectedPhotoIndex, setSelectedPhotoIndex] = useState(0)
   const [photoZoom, setPhotoZoom] = useState(false)
+  const [showGallery, setShowGallery] = useState(false)  // volledig foto-overzicht (grid)
   const [mobileTab, setMobileTab] = useState('weight')
   const [showHeader, setShowHeader] = useState(false)
   const [splitRatio, setSplitRatio] = useState(60)
@@ -360,6 +361,7 @@ export default function ClientInsightModal({ isOpen, onClose, client, isMobile, 
                     photos={photos} coachingPlan={effectiveClient.coachingPlan} isMobile={false}
                     onPhotoClick={(idx) => { setSelectedPhotoIndex(idx); setPhotoZoom(true) }}
                     onDownloadPhoto={(idx) => downloadPhoto(photos[idx], idx)}
+                    onOpenGallery={() => setShowGallery(true)}
                   />
                 </ColWrapper>
                 <ColWrapper id="workout" collapsed={collapsed} onToggle={toggleCollapse}>
@@ -461,6 +463,7 @@ export default function ClientInsightModal({ isOpen, onClose, client, isMobile, 
                   photos={photos} coachingPlan={effectiveClient.coachingPlan} isMobile={true}
                   onPhotoClick={(idx) => { setSelectedPhotoIndex(idx); setPhotoZoom(true) }}
                   onDownloadPhoto={(idx) => downloadPhoto(photos[idx], idx)}
+                  onOpenGallery={() => setShowGallery(true)}
                 />
               )}
               {mobileTab === 'workout' && (
@@ -509,6 +512,45 @@ export default function ClientInsightModal({ isOpen, onClose, client, isMobile, 
       </div>
 
       {/* ═══ PHOTO ZOOM ═══ */}
+      {/* ═══ FOTO-GALERIJ (volledig overzicht) ═══ */}
+      {showGallery && photos.length > 0 && (
+        <div onClick={() => setShowGallery(false)} style={{
+          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.95)', backdropFilter: 'blur(8px)',
+          zIndex: 10450, display: 'flex', flexDirection: 'column', padding: isMobile ? '0.75rem' : '1.5rem'
+        }}>
+          <div onClick={e => e.stopPropagation()} style={{ display: 'flex', flexDirection: 'column', width: '100%', maxWidth: 1000, margin: '0 auto', flex: 1, minHeight: 0 }}>
+            {/* Header */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.9rem' }}>
+              <div>
+                <div style={{ fontSize: isMobile ? '1rem' : '1.15rem', fontWeight: 800, color: '#fff' }}>Alle foto's</div>
+                <div style={{ fontSize: '0.72rem', color: 'rgba(255,255,255,0.5)' }}>{effectiveClient.first_name} · {photos.length} foto's</div>
+              </div>
+              <button onClick={() => setShowGallery(false)} aria-label="Sluiten" style={{ width: 44, height: 44, borderRadius: 12, background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.15)', color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', touchAction: 'manipulation' }}>
+                <X size={20} />
+              </button>
+            </div>
+            {/* Grid */}
+            <div style={{ flex: 1, overflowY: 'auto', WebkitOverflowScrolling: 'touch' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: `repeat(auto-fill, minmax(${isMobile ? 100 : 140}px, 1fr))`, gap: isMobile ? '0.5rem' : '0.75rem' }}>
+                {photos.map((p, idx) => (
+                  <div key={p.id} style={{ position: 'relative', borderRadius: 10, overflow: 'hidden', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)' }}>
+                    <div onClick={() => { setSelectedPhotoIndex(idx); setPhotoZoom(true) }} style={{ aspectRatio: '3 / 4', cursor: 'pointer' }}>
+                      <img src={p.photo_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6, padding: '0.35rem 0.45rem' }}>
+                      <span style={{ fontSize: '0.62rem', color: 'rgba(255,255,255,0.55)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{formatDate(p.photo_date)}</span>
+                      <button onClick={(e) => { e.stopPropagation(); downloadPhoto(p, idx) }} title="Download foto" style={{ width: 28, height: 28, flexShrink: 0, borderRadius: 7, background: 'rgba(255,215,0,0.14)', border: '1px solid rgba(255,215,0,0.4)', color: '#FFD700', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0, touchAction: 'manipulation' }}>
+                        <Download size={13} />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {photoZoom && photos.length > 0 && (
         <div onClick={() => setPhotoZoom(false)} style={{
           position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.97)',

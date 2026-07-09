@@ -4,12 +4,12 @@
 // Props: { client, weightData, circumData, photos, coachingPlan, isMobile, onPhotoClick }
 // ============================================
 import React from 'react'
-import { Scale, Target, Ruler, Camera, TrendingDown, Download } from 'lucide-react'
+import { Scale, Target, Ruler, Camera, TrendingDown, Download, Maximize2 } from 'lucide-react'
 import WeightStatsGrid from '../../../weight-tracker/components/WeightStatsGrid'
 
 const formatDate = (d) => { if (!d) return '-'; const dt = new Date(d); return dt.toLocaleDateString('nl-NL', { day: 'numeric', month: 'short', year: dt.getFullYear() !== new Date().getFullYear() ? 'numeric' : undefined }) }
 
-export default function WeightColumn({ client, weightData, circumData, photos, coachingPlan, isMobile, onPhotoClick, onDownloadPhoto }) {
+export default function WeightColumn({ client, weightData, circumData, photos, coachingPlan, isMobile, onPhotoClick, onDownloadPhoto, onOpenGallery }) {
   const history = weightData?.history || []
   // 'dag' = dag-op-dag logs · 'week' = week-op-week gemiddelden + verschil
   const [weightView, setWeightView] = React.useState('dag')
@@ -289,7 +289,14 @@ export default function WeightColumn({ client, weightData, circumData, photos, c
           <div style={{ padding: isMobile ? '0.5rem 0.75rem' : '0.625rem 1rem', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.375rem' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}><Camera size={12} color="rgba(168,85,247,0.5)" /><span style={{ fontSize: '0.45rem', fontWeight: '700', color: 'rgba(168,85,247,0.4)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Foto's</span></div>
-              <span style={{ fontSize: '0.5rem', color: 'rgba(255,255,255,0.2)' }}>{photos.length}</span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                <span style={{ fontSize: '0.5rem', color: 'rgba(255,255,255,0.2)' }}>{photos.length}</span>
+                {onOpenGallery && (
+                  <button onClick={onOpenGallery} title="Alle foto's — vergroot overzicht" style={{ display: 'inline-flex', alignItems: 'center', gap: 4, minHeight: 26, padding: '0 0.5rem', borderRadius: 7, background: 'rgba(255,215,0,0.12)', border: '1px solid rgba(255,215,0,0.35)', color: '#FFD700', fontSize: '0.55rem', fontWeight: 800, cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}>
+                    <Maximize2 size={11} /> Overzicht
+                  </button>
+                )}
+              </div>
             </div>
             <div style={{ display: 'flex', gap: '0.3rem', overflowX: 'auto', WebkitOverflowScrolling: 'touch', paddingBottom: '0.25rem' }}>
               {photos.slice(0, 6).map((p, idx) => (
