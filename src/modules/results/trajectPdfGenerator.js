@@ -12,6 +12,28 @@ const fmtDate = (d) => {
 const monthsBetween = (a, b) => (b.getFullYear() - a.getFullYear()) * 12 + (b.getMonth() - a.getMonth()) - (b.getDate() < a.getDate() ? 1 : 0)
 const esc = (s) => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]))
 
+// Kleur per spiergroep (zoals in het kracht-overzicht).
+const MUSCLE_COLOR = {
+  chest: '#ef4444', back: '#FFD700', legs: '#10b981', shoulders: '#f59e0b',
+  biceps: '#a855f7', triceps: '#06b6d4', glutes: '#ec4899', abs: '#ec4899', overig: '#94a3b8',
+}
+
+// Mini staafgrafiek (sparkline) van de gewichtsprogressie van één oefening.
+function sparkHTML(series, baseColor) {
+  const vals = (series || []).filter(v => typeof v === 'number' && !isNaN(v))
+  if (vals.length < 2) return ''
+  const slice = vals.slice(-12)
+  const mn = Math.min(...slice), mx = Math.max(...slice), rng = mx - mn || 1
+  const minH = 5, maxH = 20
+  const ratio = slice[slice.length - 1] / (slice[0] || slice[slice.length - 1] || 1)
+  const accent = ratio >= 1.05 ? '#22c55e' : ratio <= 0.95 ? '#ef4444' : baseColor
+  return `<div class="spark">${slice.map((v, i) => {
+    const h = (minH + ((v - mn) / rng) * (maxH - minH)).toFixed(1)
+    const last = i === slice.length - 1
+    return `<span class="sbar" style="height:${h}px;background:${last ? accent : baseColor};opacity:${last ? 1 : 0.35}"></span>`
+  }).join('')}</div>`
+}
+
 // Kleine SVG-lijngrafiek voor het gewichtverloop.
 function weightChartSVG(series) {
   if (!series || series.length < 2) return ''
@@ -117,20 +139,22 @@ export function generateTrajectHTML(data, meta = {}) {
     ${weightChartSVG(weight.series)}
   ` : `<div class="empty">Geen gewicht-data.</div>`
 
-  const strengthBlock = strength.length ? `<div class="muscle-grid">${strength.map(g => `
-    <div class="muscle">
-      <div class="muscle-h">${esc(g.label)}</div>
+  const strengthBlock = strength.length ? `<div class="muscle-grid">${strength.map(g => {
+    const baseColor = MUSCLE_COLOR[g.muscle] || GOLD
+    return `<div class="muscle">
+      <div class="muscle-h"><span class="dot" style="background:${baseColor}"></span>${esc(g.label)}</div>
       ${g.exercises.map(ex => {
-    const has = ex.start != null && ex.end != null
-    const gain = has ? Math.round((ex.end - ex.start) * 10) / 10 : null
+    const showFrom = ex.start != null && ex.end != null && ex.start !== ex.end
+    const kg = ex.end != null
+      ? `<span class="ex-kg">${showFrom ? `<span class="from">${esc(ex.start)}</span><span class="ar">→</span>` : ''}${esc(ex.end)}kg</span>`
+      : '<span class="ex-kg muted">—</span>'
     return `<div class="ex">
           <div class="ex-name">${esc(ex.name)}<span class="ex-count">${esc(ex.count)}×</span></div>
-          <div class="ex-prog">${has
-        ? `<span>${esc(ex.start)}kg</span><span class="ar">→</span><span class="end">${esc(ex.end)}kg</span>${gain > 0 ? `<span class="gain">+${esc(gain)}kg</span>` : ''}`
-        : '<span class="muted">geen gewicht gelogd</span>'}</div>
+          <div class="ex-right">${sparkHTML(ex.series, baseColor)}${kg}</div>
         </div>`
   }).join('')}
-    </div>`).join('')}</div>` : `<div class="empty">Geen kracht-data.</div>`
+    </div>`
+  }).join('')}</div>` : `<div class="empty">Geen kracht-data.</div>`
 
   return `<!DOCTYPE html><html lang="nl"><head><meta charset="utf-8"><title>Traject van ${clientName}</title>
 <style>
@@ -174,16 +198,17 @@ export function generateTrajectHTML(data, meta = {}) {
   /* Strength */
   .muscle-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
   .muscle { border: 1px solid rgba(255,255,255,.08); border-radius: 12px; padding: 11px 13px; background: #141414; }
-  .muscle-h { font-family: 'Poppins', sans-serif; font-weight: 800; font-size: 13px; color: ${GOLD}; text-transform: uppercase; letter-spacing: .04em; margin-bottom: 7px; }
+  .muscle-h { font-family: 'Poppins', sans-serif; font-weight: 800; font-size: 13px; color: ${GOLD}; text-transform: uppercase; letter-spacing: .04em; margin-bottom: 7px; display: flex; align-items: center; gap: 7px; }
+  .muscle-h .dot { width: 9px; height: 9px; border-radius: 3px; flex-shrink: 0; }
   .ex { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 6px 0; border-top: 1px solid rgba(255,255,255,.05); }
   .ex:first-of-type { border-top: none; }
-  .ex-name { font-size: 13px; font-weight: 700; min-width: 0; }
+  .ex-name { font-size: 13px; font-weight: 700; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .ex-count { color: #6b7280; font-size: 11px; margin-left: 6px; }
-  .ex-prog { display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 700; white-space: nowrap; }
-  .ex-prog .ar { color: ${GOLD}; }
-  .ex-prog .end { color: #fff; }
-  .ex-prog .gain { color: #22c55e; font-size: 12px; }
-  .ex-prog .muted { font-weight: 500; font-size: 12px; }
+  .ex-right { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+  .spark { display: flex; align-items: flex-end; gap: 1px; height: 20px; }
+  .sbar { width: 3px; border-radius: 1px; display: block; }
+  .ex-kg { font-family: 'Poppins', sans-serif; font-weight: 800; font-size: 14px; color: ${GOLD}; line-height: 1; min-width: 34px; text-align: right; }
+  .ex-kg.muted { color: #6b7280; }
   /* Inleiding */
   .intro { font-size: 17px; line-height: 1.7; color: #d1d5db; margin-bottom: 30px; max-width: 155mm; }
   .toc { display: flex; flex-direction: column; gap: 12px; }

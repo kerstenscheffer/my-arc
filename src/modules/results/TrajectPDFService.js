@@ -145,6 +145,7 @@ export default class TrajectPDFService {
       ;(byMuscle[muscle] ||= []).push({
         name: e.name, count: e.count,
         start: start?.weight ?? null, end: end?.weight ?? null,
+        series: e.entries.map(x => Number(x.weight)).filter(v => !isNaN(v)),
       })
     }
     // Per spiergroep de 2 meest gedane oefeningen, in vaste volgorde.
