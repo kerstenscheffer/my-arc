@@ -4,10 +4,11 @@ import ResultsService from './ResultsService'
 import WinsTab from './components/WinsTab'
 import ExportTab from './components/ExportTab'
 import CardGeneratorTab from './components/CardGeneratorTab'
+import TrajectPdfTab from './components/TrajectPdfTab'
 
 const isMobile = window.innerWidth <= 768
 const GOLD = '#FFD700'
-const TABS = ['card generator', 'export', 'wins & reviews']
+const TABS = ['card generator', 'export', 'traject pdf', 'wins & reviews']
 
 const GOAL_LABELS = {
   weight_loss: { label: 'Vet verlies',  color: '#10b981' },
@@ -126,10 +127,11 @@ export default function ResultsHub({ db }) {
         </div>
 
         {/* Tab content */}
-        <div style={{ flex: 1, overflowY: tab === 'card generator' ? 'auto' : tab === 'export' ? 'auto' : 'hidden', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+        <div style={{ flex: 1, overflowY: (tab === 'card generator' || tab === 'export' || tab === 'traject pdf') ? 'auto' : 'hidden', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
           {tab === 'wins & reviews' && <div style={{ flex: 1, overflowY: 'auto' }}><WinsTab client={selectedClient} service={service} /></div>}
           {tab === 'export' && <ExportTab client={selectedClient} data={data} />}
           {tab === 'card generator' && <CardGeneratorTab client={selectedClient} data={data} db={db} />}
+          {tab === 'traject pdf' && <TrajectPdfTab client={selectedClient} db={db} />}
         </div>
       </div>
     </div>
