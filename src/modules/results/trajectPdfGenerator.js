@@ -30,18 +30,62 @@ function weightChartSVG(series) {
 }
 
 export function generateTrajectHTML(data, meta = {}) {
-  const { weight, photoPair, strength = [], period } = data || {}
+  const { weight, photoPair, angles = {}, strength = [], period } = data || {}
   const clientName = esc(meta.clientName || 'Klant')
   const firstName = esc((meta.clientName || '').trim().split(/\s+/)[0] || 'daar')
   const hasCoachText = !!(meta.coachText || '').trim()
   const coachText = esc(meta.coachText || '').replace(/\n/g, '<br>')
+  const hasJourney = !!(meta.journeyText || '').trim()
+  const journeyText = esc(meta.journeyText || '').replace(/\n/g, '<br>')
+  const hasPlan = !!(meta.planText || '').trim()
+  const planText = esc(meta.planText || '').replace(/\n/g, '<br>')
+  const hasClosing = hasCoachText || hasPlan
   const periodStr = period ? `${fmtDate(period.start)} t/m ${fmtDate(period.end)}` : ''
 
-  // Thumbnails voor de inleiding-kaartjes (uit de voortgangsfoto's).
-  const pics = (data?.photos || []).map(p => p.url).filter(Boolean)
-  const pickPic = (frac) => pics.length ? pics[Math.min(pics.length - 1, Math.round(frac * (pics.length - 1)))] : null
-  const thumbs = [pickPic(1), pickPic(0.5), pickPic(0)] // after, midden, before
-  const thumbTag = (i) => thumbs[i] ? `<img class="toc-thumb" src="${esc(thumbs[i])}"/>` : ''
+  // Inleiding-thumbnails: kaart 1 = mini back-transformatie in homepage-stijl
+  // (before | after + MA-overlay); overige kaarten krijgen een goud icoon.
+  const backPair = angles.back?.before ? angles.back : (angles.front?.before ? angles.front : null)
+  const miniBack = backPair ? `<div class="toc-mini">
+      <div class="tm-half l"><img src="${esc(backPair.before.photo_url)}"/></div>
+      <div class="tm-half r"><img src="${esc((backPair.after || backPair.before).photo_url)}"/></div>
+      <img class="tm-ov" src="${LOGO}"/>
+    </div>` : ''
+  const ICON = {
+    chart: '<svg viewBox="0 0 24 24"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>',
+    food: '<svg viewBox="0 0 24 24"><path d="M3 2v7a2 2 0 0 0 2 2 2 2 0 0 0 2-2V2"/><path d="M7 2v20"/><path d="M21 15V2a5 5 0 0 0-5 5v6c0 1.1.9 2 2 2h3Zm0 0v7"/></svg>',
+    target: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>',
+  }
+  const iconTile = (svg) => `<div class="toc-icon">${svg}</div>`
+
+  // Inhoudsopgave (dynamisch: optionele secties tellen mee in de nummering).
+  const sections = [
+    { t: 'Gewicht- & fotoprogressie', d: 'Je gewicht over de maanden, met front, side en back naast elkaar.', tail: miniBack },
+    { t: 'Krachtprogressie per spiergroep', d: 'Je meest gedane oefeningen, van startgewicht naar eindgewicht.', tail: iconTile(ICON.chart) },
+    ...(hasJourney ? [{ t: 'Voedingsprogressie', d: 'Jouw verhaal: hoe je binnenkwam en wat we hebben bereikt.', tail: iconTile(ICON.food) }] : []),
+    ...(hasClosing ? [{ t: 'Coach-woord & plan', d: 'Een persoonlijke boodschap en je vooruitzicht voor de komende tijd.', tail: iconTile(ICON.target) }] : []),
+  ]
+  const tocHtml = sections.map((s, i) => `
+      <div class="toc-item">
+        <div class="toc-n">${String(i + 1).padStart(2, '0')}</div>
+        <div class="toc-txt"><div class="toc-t">${esc(s.t)}</div><div class="toc-d">${esc(s.d)}</div></div>
+        ${s.tail || ''}
+      </div>`).join('')
+
+  // Front/side/back before-after kolommen.
+  const ANGLE_LABELS = { front: 'Front', side: 'Side', back: 'Back' }
+  const angleCols = ['front', 'side', 'back'].map(k => {
+    const p = angles[k]
+    if (!p || !p.before) return ''
+    const cell = (photo, lbl) => photo ? `<div class="ba-cell"><img src="${esc(photo.photo_url)}"/><span class="ba-cap">${lbl}</span></div>` : ''
+    return `<div class="ba-col">
+      <div class="ba-col-h">${ANGLE_LABELS[k]}</div>
+      <div class="ba-col-imgs">
+        ${cell(p.before, 'Start')}
+        ${cell(p.after, 'Nu')}
+      </div>
+    </div>`
+  }).join('')
+  const hasAngles = ['front', 'side', 'back'].some(k => angles[k]?.before)
 
   // Foto-maandlabels
   let photoLabels = { left: 'Maand 1', right: 'Maand 2' }
@@ -146,6 +190,18 @@ export function generateTrajectHTML(data, meta = {}) {
   .toc-t { font-family: 'Poppins', sans-serif; font-weight: 800; font-size: 17px; color: #fff; }
   .toc-d { font-size: 14px; color: #9ca3af; margin-top: 3px; line-height: 1.5; }
   .toc-thumb { width: 58px; height: 72px; object-fit: cover; border-radius: 10px; flex-shrink: 0; }
+  /* Progressie-pagina (foto + gewicht) */
+  .pcol { display: flex; flex-direction: column; }
+  .wprog { flex: 0 0 auto; margin-bottom: 14px; }
+  .wprog .stat-row { margin-bottom: 10px; }
+  .wprog svg { display: block; height: 42mm; width: auto; max-width: 100%; margin: 0 auto; }
+  .ba-grid { flex: 1 1 0; min-height: 0; display: flex; gap: 10px; }
+  .ba-col { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+  .ba-col-h { font-family: 'Poppins', sans-serif; font-weight: 800; font-size: 14px; color: ${GOLD}; text-transform: uppercase; letter-spacing: .04em; text-align: center; margin-bottom: 8px; }
+  .ba-col-imgs { flex: 1 1 0; min-height: 0; display: flex; flex-direction: column; gap: 8px; }
+  .ba-cell { flex: 1 1 0; min-height: 0; position: relative; border-radius: 10px; overflow: hidden; background: #111; }
+  .ba-cell img { width: 100%; height: 100%; object-fit: cover; }
+  .ba-cap { position: absolute; bottom: 6px; left: 6px; font-family: 'Poppins', sans-serif; font-size: 11px; font-weight: 800; color: #fff; background: rgba(0,0,0,.55); padding: 2px 8px; border-radius: 6px; letter-spacing: .04em; text-transform: uppercase; }
   /* Coach message */
   .msg { font-size: 17px; line-height: 1.7; color: #e5e7eb; white-space: pre-wrap; }
 </style></head><body>
@@ -164,21 +220,24 @@ export function generateTrajectHTML(data, meta = {}) {
     <div class="eyebrow">Inleiding</div>
     <h2>Jouw traject in beeld</h2>
     <p class="intro">Beste ${firstName}, in dit rapport blikken we samen terug op jouw traject. Van je eerste tot je laatste dag hebben we alles bijgehouden. Hieronder zie je zwart-op-wit wat er is veranderd. Wees trots op wat je hebt neergezet.</p>
-    <div class="toc">
-      <div class="toc-item"><div class="toc-n">01</div><div class="toc-txt"><div class="toc-t">Transformatie</div><div class="toc-d">Je before/after naast elkaar, op de voorpagina.</div></div>${thumbTag(0)}</div>
-      <div class="toc-item"><div class="toc-n">02</div><div class="toc-txt"><div class="toc-t">Gewichtsprogressie</div><div class="toc-d">Je gewicht van de eerste tot de laatste weging.</div></div>${thumbTag(1)}</div>
-      <div class="toc-item"><div class="toc-n">03</div><div class="toc-txt"><div class="toc-t">Krachtprogressie per spiergroep</div><div class="toc-d">Je meest gedane oefeningen, van startgewicht naar eindgewicht.</div></div>${thumbTag(2)}</div>
-      ${hasCoachText ? `<div class="toc-item"><div class="toc-n">04</div><div class="toc-txt"><div class="toc-t">Een woord van je coach</div><div class="toc-d">Een persoonlijke boodschap om mee af te sluiten.</div></div></div>` : ''}
-    </div>
+    <div class="toc">${tocHtml}</div>
     <div class="foot"><img src="${LOGO}"/></div>
   </div>
 
-  <div class="page">
-    <div class="eyebrow">Gewicht</div>
-    <h2>Gewichtsprogressie</h2>
-    ${weightBlock}
+  <div class="page pcol">
+    <div class="eyebrow">Progressie</div>
+    <h2>Foto- &amp; gewichtsprogressie</h2>
+    <div class="wprog">${weightBlock}</div>
+    ${hasAngles ? `<div class="ba-grid">${angleCols}</div>` : `<div class="empty">Nog geen front/side/back-foto's.</div>`}
     <div class="foot"><img src="${LOGO}"/></div>
   </div>
+
+  ${hasJourney ? `<div class="page">
+    <div class="eyebrow">Voeding</div>
+    <h2>Voedingsprogressie</h2>
+    <div class="msg">${journeyText}</div>
+    <div class="foot"><img src="${LOGO}"/></div>
+  </div>` : ''}
 
   <div class="page">
     <div class="eyebrow">Kracht</div>

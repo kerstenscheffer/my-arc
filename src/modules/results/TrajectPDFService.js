@@ -67,6 +67,19 @@ export default class TrajectPDFService {
     const usePh = front.length >= 2 ? front : ph
     const photoPair = usePh.length >= 2 ? { first: usePh[0], last: usePh[usePh.length - 1] } : null
 
+    // Front/side/back before-after paren voor de progressie-pagina.
+    const ofType = (t, syn = []) => ph.filter(p => {
+      const pt = (p.photo_type || '').toLowerCase()
+      const st = (p.metadata?.subtype || '').toLowerCase()
+      return [t, ...syn].some(k => pt === k || st.includes(k))
+    })
+    const anglePair = (arr) => arr.length ? { before: arr[0], after: arr.length >= 2 ? arr[arr.length - 1] : null } : null
+    const angles = {
+      front: anglePair(ofType('front', ['voor'])),
+      side: anglePair(ofType('side', ['zij'])),
+      back: anglePair(ofType('back', ['rug', 'achter'])),
+    }
+
     // ── Kracht ──
     const { data: sessions } = await sb
       .from('workout_sessions').select('id, workout_date').eq('client_id', clientId)
@@ -117,7 +130,7 @@ export default class TrajectPDFService {
     const period = allDates.length ? { start: allDates[0], end: allDates[allDates.length - 1] } : null
 
     return {
-      weight, photoPair, strength, period,
+      weight, photoPair, angles, strength, period,
       photos: usePh.map(p => ({ url: p.photo_url, date: p.photo_date })),
     }
   }

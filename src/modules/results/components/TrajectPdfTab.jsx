@@ -9,6 +9,7 @@ import { openTrajectForPrint } from '../trajectPdfGenerator'
 const GOLD = '#FFD700'
 
 export default function TrajectPdfTab({ client, db }) {
+  const [journeyText, setJourneyText] = useState('')
   const [coachText, setCoachText] = useState('')
   const [loading, setLoading] = useState(false)
 
@@ -20,6 +21,7 @@ export default function TrajectPdfTab({ client, db }) {
       const data = await svc.getTrajectData(client.id)
       openTrajectForPrint(data, {
         clientName: `${client.first_name || ''} ${client.last_name || ''}`.trim() || 'Klant',
+        journeyText,
         coachText,
       })
     } catch (e) {
@@ -38,11 +40,23 @@ export default function TrajectPdfTab({ client, db }) {
       <h2 style={{ fontSize: 22, fontWeight: 800, color: '#fff', letterSpacing: '-0.02em', margin: '4px 0 6px' }}>Eind-van-traject rapport</h2>
       <p style={{ fontSize: 14, lineHeight: 1.5, color: 'rgba(255,255,255,0.55)', marginBottom: 20 }}>
         Voor <strong style={{ color: '#fff' }}>{client.first_name} {client.last_name}</strong>. Bevat automatisch:
-        gewichtsprogressie, before/after-foto's en krachtprogressie per spiergroep (2 meest gedane oefeningen, start → eind).
+        transformatiefoto's (front/side/back), gewichtsprogressie en krachtprogressie per spiergroep (2 meest gedane oefeningen, start → eind).
+        De twee tekstvakken hieronder vul je zelf in.
       </p>
 
       <label style={{ display: 'block', fontSize: 13, fontWeight: 700, color: 'rgba(255,255,255,0.7)', marginBottom: 8 }}>
-        Jouw afsluitende tekst (komt op de laatste pagina)
+        Voedingsprogressie / jouw verhaal <span style={{ color: 'rgba(255,255,255,0.4)', fontWeight: 500 }}>(optioneel)</span>
+      </label>
+      <textarea
+        value={journeyText}
+        onChange={e => setJourneyText(e.target.value)}
+        placeholder="Hoe kwam de klant binnen, welke punten waren lastig, en wat hebben jullie samen bereikt?…"
+        rows={7}
+        style={{ width: '100%', boxSizing: 'border-box', padding: '0.9rem', background: 'rgba(0,0,0,0.4)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 12, color: '#fff', fontSize: 15, lineHeight: 1.5, outline: 'none', resize: 'vertical', fontFamily: 'inherit', marginBottom: 20 }}
+      />
+
+      <label style={{ display: 'block', fontSize: 13, fontWeight: 700, color: 'rgba(255,255,255,0.7)', marginBottom: 8 }}>
+        Afsluitende tekst / woord van je coach <span style={{ color: 'rgba(255,255,255,0.4)', fontWeight: 500 }}>(optioneel)</span>
       </label>
       <textarea
         value={coachText}
