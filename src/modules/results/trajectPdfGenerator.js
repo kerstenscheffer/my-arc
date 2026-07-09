@@ -117,7 +117,7 @@ export function generateTrajectHTML(data, meta = {}) {
     ${weightChartSVG(weight.series)}
   ` : `<div class="empty">Geen gewicht-data.</div>`
 
-  const strengthBlock = strength.length ? strength.map(g => `
+  const strengthBlock = strength.length ? `<div class="muscle-grid">${strength.map(g => `
     <div class="muscle">
       <div class="muscle-h">${esc(g.label)}</div>
       ${g.exercises.map(ex => {
@@ -130,7 +130,7 @@ export function generateTrajectHTML(data, meta = {}) {
         : '<span class="muted">geen gewicht gelogd</span>'}</div>
         </div>`
   }).join('')}
-    </div>`).join('') : `<div class="empty">Geen kracht-data.</div>`
+    </div>`).join('')}</div>` : `<div class="empty">Geen kracht-data.</div>`
 
   return `<!DOCTYPE html><html lang="nl"><head><meta charset="utf-8"><title>Traject van ${clientName}</title>
 <style>
@@ -161,7 +161,7 @@ export function generateTrajectHTML(data, meta = {}) {
   .cover-photo .ba-half.r { right: 0; border-top-right-radius: 18px; border-bottom-right-radius: 18px; }
   .cover-photo .ba-half img { width: 100%; height: 100%; object-fit: cover; }
   .cover-photo .overlay { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: fill; pointer-events: none; z-index: 1; border-radius: 18px; }
-  .cover-photo .m-lbl { position: absolute; bottom: 13%; left: 0; right: 0; text-align: center; font-family: 'Poppins', sans-serif; font-weight: 900; font-style: italic; font-size: 30px; color: #fff; text-shadow: 0 2px 10px rgba(0,0,0,.9); z-index: 2; }
+  .cover-photo .m-lbl { position: absolute; bottom: 13%; left: 0; right: 0; text-align: center; font-family: 'Poppins', sans-serif; font-weight: 900; font-style: italic; font-size: 30px; color: #fff; z-index: 2; }
   .cover-photo--empty { display: flex; align-items: center; justify-content: center; }
   /* Weight */
   .stat-row { display: flex; align-items: center; gap: 24px; margin-bottom: 24px; }
@@ -172,17 +172,18 @@ export function generateTrajectHTML(data, meta = {}) {
   .diff { margin-left: auto; font-family: 'Poppins', sans-serif; font-weight: 900; font-size: 28px; color: #ef4444; }
   .diff.good { color: #22c55e; }
   /* Strength */
-  .muscle { margin-bottom: 18px; border: 1px solid rgba(255,255,255,.08); border-radius: 14px; padding: 14px 16px; background: #141414; }
-  .muscle-h { font-family: 'Poppins', sans-serif; font-weight: 800; font-size: 15px; color: ${GOLD}; text-transform: uppercase; letter-spacing: .04em; margin-bottom: 10px; }
-  .ex { display: flex; align-items: center; justify-content: space-between; padding: 8px 0; border-top: 1px solid rgba(255,255,255,.05); }
+  .muscle-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .muscle { border: 1px solid rgba(255,255,255,.08); border-radius: 12px; padding: 11px 13px; background: #141414; }
+  .muscle-h { font-family: 'Poppins', sans-serif; font-weight: 800; font-size: 13px; color: ${GOLD}; text-transform: uppercase; letter-spacing: .04em; margin-bottom: 7px; }
+  .ex { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 6px 0; border-top: 1px solid rgba(255,255,255,.05); }
   .ex:first-of-type { border-top: none; }
-  .ex-name { font-size: 15px; font-weight: 700; }
-  .ex-count { color: #6b7280; font-size: 12px; margin-left: 8px; }
-  .ex-prog { display: flex; align-items: center; gap: 8px; font-size: 15px; font-weight: 700; }
+  .ex-name { font-size: 13px; font-weight: 700; min-width: 0; }
+  .ex-count { color: #6b7280; font-size: 11px; margin-left: 6px; }
+  .ex-prog { display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 700; white-space: nowrap; }
   .ex-prog .ar { color: ${GOLD}; }
   .ex-prog .end { color: #fff; }
-  .ex-prog .gain { color: #22c55e; font-size: 13px; }
-  .ex-prog .muted { font-weight: 500; font-size: 13px; }
+  .ex-prog .gain { color: #22c55e; font-size: 12px; }
+  .ex-prog .muted { font-weight: 500; font-size: 12px; }
   /* Inleiding */
   .intro { font-size: 17px; line-height: 1.7; color: #d1d5db; margin-bottom: 30px; max-width: 155mm; }
   .toc { display: flex; flex-direction: column; gap: 12px; }
@@ -212,7 +213,7 @@ export function generateTrajectHTML(data, meta = {}) {
   .ba-card .bc-half.r { right: 0; border-top-right-radius: 12px; border-bottom-right-radius: 12px; }
   .ba-card .bc-half img { width: 100%; height: 100%; object-fit: cover; }
   .ba-card .bc-ov { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: fill; border-radius: 12px; z-index: 1; }
-  .ba-card .bc-lbl { position: absolute; bottom: 9%; left: 0; right: 0; text-align: center; font-family: 'Poppins', sans-serif; font-weight: 900; font-style: italic; font-size: 14px; color: #fff; text-shadow: 0 1px 6px rgba(0,0,0,.9); z-index: 2; }
+  .ba-card .bc-lbl { position: absolute; bottom: 9%; left: 0; right: 0; text-align: center; font-family: 'Poppins', sans-serif; font-weight: 900; font-style: italic; font-size: 14px; color: #fff; z-index: 2; }
   /* Coach message */
   .msg { font-size: 17px; line-height: 1.7; color: #e5e7eb; white-space: pre-wrap; }
   .plan { margin-top: 26px; border-top: 1px solid rgba(255,215,0,.25); padding-top: 20px; }

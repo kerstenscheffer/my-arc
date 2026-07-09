@@ -41,7 +41,28 @@ function topSetWeight(sets) {
 export default class TrajectPDFService {
   constructor(supabase) { this.supabase = supabase }
 
-  async getTrajectData(clientId) {
+  // Alle voortgangsfoto's gegroepeerd per hoek (voor de fotokiezer in de tab).
+  async getPhotoOptions(clientId) {
+    const { data: photos } = await this.supabase
+      .from('ch8_progress_photos').select('id, photo_url, photo_type, photo_date, metadata')
+      .eq('client_id', clientId).order('photo_date', { ascending: true })
+    const ph = (photos || []).filter(p => p.photo_url && p.id != null)
+    const ofType = (t, syn = []) => ph.filter(p => {
+      const pt = (p.photo_type || '').toLowerCase()
+      const st = (p.metadata?.subtype || '').toLowerCase()
+      return [t, ...syn].some(k => pt === k || st.includes(k))
+    })
+    const map = (arr) => arr.map(p => ({ id: p.id, url: p.photo_url, date: p.photo_date }))
+    return {
+      front: map(ofType('front', ['voor'])),
+      side: map(ofType('side', ['zij'])),
+      back: map(ofType('back', ['rug', 'achter'])),
+    }
+  }
+
+  // selection (optioneel): { front: {before, after}, side: {...}, back: {...} }
+  // waarbij before/after foto-id's zijn. Niet gekozen → automatisch eerste/laatste.
+  async getTrajectData(clientId, selection = {}) {
     const sb = this.supabase
 
     // ── Gewicht ──
@@ -54,9 +75,9 @@ export default class TrajectPDFService {
       diff: Math.round((Number(w[w.length - 1].weight) - Number(w[0].weight)) * 10) / 10,
     } : null
 
-    // ── Foto's (voorkant, eerste + laatste) ──
+    // ── Foto's ──
     const { data: photos } = await sb
-      .from('ch8_progress_photos').select('photo_url, photo_type, photo_date, metadata')
+      .from('ch8_progress_photos').select('id, photo_url, photo_type, photo_date, metadata')
       .eq('client_id', clientId).order('photo_date', { ascending: true })
     const ph = (photos || []).filter(p => p.photo_url)
     const isFront = (p) => {
@@ -65,20 +86,33 @@ export default class TrajectPDFService {
     }
     const front = ph.filter(isFront)
     const usePh = front.length >= 2 ? front : ph
-    const photoPair = usePh.length >= 2 ? { first: usePh[0], last: usePh[usePh.length - 1] } : null
 
-    // Front/side/back before-after paren voor de progressie-pagina.
+    // Front/side/back before-after paren. Handmatige selectie (foto-id's) gaat vóór.
     const ofType = (t, syn = []) => ph.filter(p => {
       const pt = (p.photo_type || '').toLowerCase()
       const st = (p.metadata?.subtype || '').toLowerCase()
       return [t, ...syn].some(k => pt === k || st.includes(k))
     })
-    const anglePair = (arr) => arr.length ? { before: arr[0], after: arr.length >= 2 ? arr[arr.length - 1] : null } : null
-    const angles = {
-      front: anglePair(ofType('front', ['voor'])),
-      side: anglePair(ofType('side', ['zij'])),
-      back: anglePair(ofType('back', ['rug', 'achter'])),
+    const anglePair = (arr, sel) => {
+      if (!arr.length) return null
+      if (sel && (sel.before != null || sel.after != null)) {
+        const find = (id) => arr.find(p => p.id === id)
+        const before = find(sel.before) || arr[0]
+        const after = find(sel.after) || (arr.length >= 2 ? arr[arr.length - 1] : null)
+        return { before, after }
+      }
+      return { before: arr[0], after: arr.length >= 2 ? arr[arr.length - 1] : null }
     }
+    const angles = {
+      front: anglePair(ofType('front', ['voor']), selection.front),
+      side: anglePair(ofType('side', ['zij']), selection.side),
+      back: anglePair(ofType('back', ['rug', 'achter']), selection.back),
+    }
+
+    // Cover volgt de Front-keuze; anders eerste/laatste voorkantfoto.
+    const photoPair = angles.front?.before
+      ? { first: angles.front.before, last: angles.front.after || angles.front.before }
+      : (usePh.length >= 2 ? { first: usePh[0], last: usePh[usePh.length - 1] } : null)
 
     // ── Kracht ──
     const { data: sessions } = await sb
