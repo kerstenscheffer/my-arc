@@ -350,48 +350,9 @@ export default function ProgressMain({ db, client }) {
               WebkitTapHighlightColor: 'transparent',
             }}
           >
-            {/* Foto-banner — full width, rounded, met subtiele bottom-gradient */}
-            <div style={{
-              width: '100%',
-              height: photoH,
-              borderRadius: 14,
-              position: 'relative',
-              overflow: 'hidden',
-              marginBottom: isMobile ? '0.65rem' : '0.85rem',
-            }}>
-              {hasBeforeAfter ? (
-                <div style={{ position: 'absolute', inset: 0, display: 'flex' }}>
-                  <div style={{ flex: 1, position: 'relative', overflow: 'hidden', borderRight: '2px solid rgba(0,0,0,0.65)' }}>
-                    <div style={{ position: 'absolute', inset: 0, backgroundImage: `url(${leftPhoto.photo_url})`, backgroundSize: 'cover', backgroundPosition: 'center top' }} />
-                    <span style={{ ...baLabel, left: 6, background: '#FFD700', color: '#000' }}>NU</span>
-                  </div>
-                  <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
-                    <div style={{ position: 'absolute', inset: 0, backgroundImage: `url(${rightPhoto.photo_url})`, backgroundSize: 'cover', backgroundPosition: 'center top' }} />
-                    <span style={{ ...baLabel, right: 6, background: 'rgba(0,0,0,0.7)', color: '#fff' }}>START</span>
-                  </div>
-                </div>
-              ) : (
-                <div style={{
-                  position: 'absolute', inset: 0,
-                  backgroundImage: `url(${bannerUrl})`,
-                  backgroundSize: 'cover',
-                  backgroundPosition: 'center',
-                }} />
-              )}
-              <div style={{
-                position: 'absolute', inset: 0,
-                background: 'linear-gradient(180deg, transparent 45%, rgba(0,0,0,0.55) 100%)',
-                pointerEvents: 'none',
-              }} />
-              {photoCount === 0 && (
-                <div style={{
-                  position: 'absolute', inset: 0,
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  background: 'rgba(10,10,10,0.5)',
-                }}>
-                  <Camera size={photoH / 3} color="rgba(255,215,0,0.8)" strokeWidth={1.6} />
-                </div>
-              )}
+            {/* Branded 4:5 before/after-kaart als preview (MA-overlay + maand-labels) */}
+            <div style={{ maxWidth: isMobile ? '100%' : 420, margin: '0 auto', marginBottom: isMobile ? '0.65rem' : '0.85rem' }}>
+              <BeforeAfterCard bare client={client} db={db} isMobile={isMobile} fallbackUrl={bannerUrl} />
             </div>
 
             {/* Info-rij — label + titel + meta links, gouden chevron-cirkel rechts */}
@@ -525,11 +486,6 @@ export default function ProgressMain({ db, client }) {
             )}
           </div>
           <RecentProgressPhotos photos={recentPhotos} onUpload={handlePhotoUpload} todayData={todayData} isFriday={isFriday} isMobile={isMobile} />
-
-          {/* Automatische before/after-transformatiekaart met MA-overlay */}
-          <div style={{ padding: isMobile ? '0 1rem' : '0 1.5rem' }}>
-            <BeforeAfterCard client={client} db={db} isMobile={isMobile} />
-          </div>
 
           {/* Vergelijk-knop — opent de voor/na vergelijk-modal */}
           <div style={{ padding: isMobile ? '0 1rem 0.75rem' : '0 1.5rem 0.85rem' }}>
