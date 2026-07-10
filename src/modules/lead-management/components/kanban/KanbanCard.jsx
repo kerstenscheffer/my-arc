@@ -392,12 +392,12 @@ export default function KanbanCard({
         onDragStart={onDragStart}
         onClick={handleCardClick}
         style={{
-          // Zachte, rustige kaart in de stijl van de meal-cards.
-          background: 'rgba(255,255,255,0.025)',
-          border: '1px solid rgba(255,255,255,0.06)',
+          // Solide kaart (niet doorzichtig) in de app-stijl.
+          background: '#141414',
+          border: '1px solid rgba(255,255,255,0.08)',
           // Gekleurd accent links = de sectie (goud als de lead call-ready is).
           borderLeft: `3px solid ${isCallReady ? '#D4AF37' : sectionColor}`,
-          borderRadius: 12,
+          borderRadius: 14,
           overflow: 'hidden',
           opacity: contactedToday ? 0.6 : 1,
           cursor: 'pointer',
@@ -460,7 +460,7 @@ export default function KanbanCard({
                 position: 'absolute',
                 left: '50%', top: '100%', transform: 'translate(-50%, 4px)',
                 background: '#10b981', color: '#fff',
-                fontSize: '0.55rem', fontWeight: 800,
+                fontSize: '0.6rem', fontWeight: 800,
                 padding: '2px 6px', borderRadius: 3,
                 letterSpacing: '0.04em', textTransform: 'uppercase',
                 whiteSpace: 'nowrap',
@@ -485,7 +485,7 @@ export default function KanbanCard({
               background: tempConfig.bg,
               border: `1px solid ${tempConfig.border}`,
               borderRadius: '3px',
-              fontSize: '0.45rem',
+              fontSize: '0.6rem',
               fontWeight: '700',
               color: tempConfig.color,
               letterSpacing: '0.05em',
@@ -538,7 +538,7 @@ export default function KanbanCard({
                 background: `${actionColor}1f`,
                 border: `1px solid ${actionColor}55`,
                 borderRadius: '3px',
-                fontSize: '0.5rem',
+                fontSize: '0.6rem',
                 fontWeight: '700',
                 color: actionColor,
               }}
@@ -557,7 +557,7 @@ export default function KanbanCard({
               borderRadius: '3px'
             }}>
               <Flame size={9} color="#D4AF37" />
-              <span style={{ fontSize: '0.45rem', fontWeight: '700', color: '#D4AF37', letterSpacing: '0.04em' }}>CALL</span>
+              <span style={{ fontSize: '0.6rem', fontWeight: '700', color: '#D4AF37', letterSpacing: '0.04em' }}>CALL</span>
             </span>
           )}
 
@@ -575,7 +575,7 @@ export default function KanbanCard({
               border: '1px solid rgba(255,215,0,0.25)',
               borderRadius: '3px'
             }}>
-              <span style={{ fontSize: '0.45rem', fontWeight: '700', color: '#FFD700', letterSpacing: '0.04em' }}>SALES</span>
+              <span style={{ fontSize: '0.6rem', fontWeight: '700', color: '#FFD700', letterSpacing: '0.04em' }}>SALES</span>
             </span>
           )}
 
@@ -647,7 +647,7 @@ export default function KanbanCard({
                   onClick={(e) => e.stopPropagation()}
                   style={{ position: 'fixed', top: movePos.top, left: movePos.left, background: '#111', border: '1px solid rgba(255,255,255,0.12)', borderRadius: '8px', boxShadow: '0 10px 30px rgba(0,0,0,0.7)', zIndex: 2147483600, minWidth: '170px', maxHeight: '260px', overflowY: 'auto' }}
                 >
-                  <div style={{ padding: '6px 10px', fontSize: '0.55rem', fontWeight: 800, color: 'rgba(255,255,255,0.35)', textTransform: 'uppercase', letterSpacing: '0.06em', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+                  <div style={{ padding: '6px 10px', fontSize: '0.6rem', fontWeight: 800, color: 'rgba(255,255,255,0.35)', textTransform: 'uppercase', letterSpacing: '0.06em', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
                     Verplaats naar
                   </div>
                   {sections.filter(s => s.id !== 'unassigned' && s.id !== currentSectionId).map(section => (
@@ -688,7 +688,7 @@ export default function KanbanCard({
                 }}
               >
                 <ArrowLeftCircle size={9} color={previousSectionColor} style={{ flexShrink: 0 }} />
-                <span style={{ fontSize: '0.55rem', fontWeight: '600', color: previousSectionColor, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                <span style={{ fontSize: '0.6rem', fontWeight: '600', color: previousSectionColor, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                   {previousSectionTitle}
                 </span>
                 <span style={{ fontSize: '0.4rem', color: previousSectionColor }}>▼</span>
@@ -700,7 +700,7 @@ export default function KanbanCard({
                     <div key={section.id} onClick={async (e) => { e.stopPropagation(); setShowReturnDropdown(false); await onEdit({ previous_section_id: section.id, previous_section_title: section.title, previous_section_color: section.color }) }} style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 10px', cursor: 'pointer', borderBottom: '1px solid rgba(255,255,255,0.04)', fontSize: '0.7rem', color: 'rgba(255,255,255,0.7)' }} onMouseEnter={(e) => e.currentTarget.style.background = `${section.color}15`} onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}>
                       <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: section.color, flexShrink: 0 }} />
                       {section.title}
-                      {section.id === lead.previous_section_id && <span style={{ marginLeft: 'auto', fontSize: '0.55rem', color: section.color }}>✓</span>}
+                      {section.id === lead.previous_section_id && <span style={{ marginLeft: 'auto', fontSize: '0.6rem', color: section.color }}>✓</span>}
                     </div>
                   ))}
                 </div>,
@@ -721,7 +721,7 @@ export default function KanbanCard({
                 border: '1px solid rgba(255,215,0,0.32)',
                 borderRadius: 6,
                 color: '#FFD700',
-                fontSize: '0.58rem', fontWeight: 700,
+                fontSize: '0.6rem', fontWeight: 700,
                 maxWidth: 170,
               }}
             >
@@ -757,7 +757,7 @@ export default function KanbanCard({
                   border: '1px solid rgba(168,85,247,0.38)',
                   borderRadius: 6,
                   color: '#c4a4f7',
-                  fontSize: '0.58rem', fontWeight: 700,
+                  fontSize: '0.6rem', fontWeight: 700,
                   maxWidth: 170,
                 }}
               >

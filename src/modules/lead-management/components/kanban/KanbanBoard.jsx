@@ -1771,7 +1771,7 @@ export default function KanbanBoard({
             {/* Lead-suggesties — in-flow (order:3), pal ONDER de zoekbalk; duwt
                 de sectie-slider (order:4) omlaag i.p.v. eroverheen. */}
             {showSearchResults && (
-              <div style={{ order: 3, flexBasis: '100%', width: '100%', marginTop: 6, position: 'relative', zIndex: 1000 }}>
+              <div style={{ order: 3, flexBasis: '100%', width: '100%', marginTop: -2, position: 'relative', zIndex: 1000 }}>
               <div onClick={() => setShowSearchResults(false)} style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 40 }} />
               {searchResults.length > 0 ? (
                 <div style={{ width: '100%' }}>
