@@ -9602,10 +9602,26 @@ async uploadPumpPhoto(clientId, file, caption = '', workoutDate = null) {
       .single()
     
     if (error) throw error
-    
+
+    // Spiegel de pump-foto ook naar ch8_progress_photos zodat 'ie op de
+    // foto-tracking pagina verschijnt (categorie 'workout'). Niet-fataal:
+    // een fout hier mag de pump-upload nooit blokkeren. pump_photo_id in
+    // metadata voorkomt dubbele rijen bij backfill en koppelt de delete.
+    try {
+      await this.supabase.from('ch8_progress_photos').insert({
+        client_id: clientId,
+        photo_date: data.workout_date || workoutDate || new Date().toISOString().split('T')[0],
+        photo_type: 'front',
+        photo_url: photoUrl,
+        metadata: { category: 'workout', subtype: 'pump', source: 'pump_photo', pump_photo_id: data.id, caption: caption || null }
+      })
+    } catch (mirrorErr) {
+      console.warn('⚠️ Pump-foto spiegelen naar foto-tracking mislukt:', mirrorErr)
+    }
+
     console.log('✅ Pump photo uploaded:', data.id)
     return { data, error: null }
-    
+
   } catch (error) {
     console.error('❌ Error uploading pump photo:', error)
     return { data: null, error }
@@ -9634,9 +9650,19 @@ async deletePumpPhoto(photoId, photoUrl) {
       .from('pump_photos')
       .delete()
       .eq('id', photoId)
-    
+
     if (error) throw error
-    
+
+    // Verwijder ook de gespiegelde rij in de foto-tracking (indien aanwezig).
+    try {
+      await this.supabase
+        .from('ch8_progress_photos')
+        .delete()
+        .eq('metadata->>pump_photo_id', photoId)
+    } catch (mirrorErr) {
+      console.warn('⚠️ Gespiegelde pump-foto verwijderen mislukt:', mirrorErr)
+    }
+
     console.log('✅ Pump photo deleted')
     return { error: null }
     
