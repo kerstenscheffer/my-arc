@@ -1303,26 +1303,28 @@ export default function KanbanBoard({
     return (
       <>
         {isMobile && sections.length > 1 && isFullscreenView && (
-          <div style={{ display: 'flex', gap: 6, overflowX: 'auto', WebkitOverflowScrolling: 'touch', marginBottom: 2, paddingBottom: 8 }}>
-            {sections.map((s) => {
-              const active = s.id === mobileSecId
-              const n = getSortedLeads(s).length
-              return (
-                <button key={s.id} onClick={() => setActiveMobileSectionId(s.id)} style={{
-                  flexShrink: 0, display: 'inline-flex', alignItems: 'center', gap: 6,
-                  minHeight: 40, padding: '0 0.7rem', borderRadius: 10, cursor: 'pointer',
-                  background: active ? `${s.color}22` : 'rgba(255,255,255,0.04)',
-                  border: `1px solid ${active ? s.color : 'rgba(255,255,255,0.08)'}`,
-                  color: active ? s.color : 'rgba(255,255,255,0.7)',
-                  fontSize: '0.72rem', fontWeight: 700, whiteSpace: 'nowrap',
-                  touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-                }}>
-                  <span style={{ width: 7, height: 7, borderRadius: '50%', background: s.color, flexShrink: 0 }} />
-                  {s.title}
-                  <span style={{ fontSize: '0.64rem', fontWeight: 800, opacity: 0.7 }}>{n}</span>
-                </button>
-              )
-            })}
+          <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch', marginBottom: 2, paddingBottom: 8 }}>
+            <div style={{ display: 'inline-flex', background: '#161616', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 10, overflow: 'hidden' }}>
+              {sections.map((s, i) => {
+                const active = s.id === mobileSecId
+                const n = getSortedLeads(s).length
+                return (
+                  <button key={s.id} onClick={() => setActiveMobileSectionId(s.id)} style={{
+                    flexShrink: 0, display: 'inline-flex', alignItems: 'center', gap: 6,
+                    minHeight: 40, padding: '0 0.8rem', border: 'none',
+                    borderLeft: i === 0 ? 'none' : '1px solid rgba(255,255,255,0.1)',
+                    background: active ? `${s.color}26` : 'transparent',
+                    color: active ? s.color : 'rgba(255,255,255,0.6)',
+                    fontSize: '0.72rem', fontWeight: 800, whiteSpace: 'nowrap', cursor: 'pointer',
+                    touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+                  }}>
+                    <span style={{ width: 7, height: 7, borderRadius: '50%', background: s.color, flexShrink: 0 }} />
+                    {s.title}
+                    <span style={{ fontSize: '0.64rem', fontWeight: 800, opacity: 0.7 }}>{n}</span>
+                  </button>
+                )
+              })}
+            </div>
           </div>
         )}
         <div style={{ display: 'flex', gap: '0.75rem', overflowX: isMobile ? 'visible' : 'auto', paddingBottom: '0.75rem', WebkitOverflowScrolling: 'touch' }}>
@@ -1513,6 +1515,7 @@ export default function KanbanBoard({
           }}>
           <div style={{
             display: 'flex', alignItems: 'center', gap: '0.3rem', flexWrap: 'wrap',
+            justifyContent: isMobile ? 'center' : 'flex-start',
             padding: '0.4rem', borderRadius: 12,
             background: 'rgba(10,10,10,0.97)', backdropFilter: 'blur(8px)',
             border: '1px solid rgba(255,255,255,0.08)',
@@ -1738,26 +1741,28 @@ export default function KanbanBoard({
           {isMobile && sections.length > 1 && (() => {
             const activeSecId = sections.some(s => s.id === activeMobileSectionId) ? activeMobileSectionId : sections[0]?.id
             return (
-              <div style={{ display: 'flex', gap: 6, overflowX: 'auto', WebkitOverflowScrolling: 'touch', marginTop: 6, paddingBottom: 2 }}>
-                {sections.map((s) => {
-                  const active = s.id === activeSecId
-                  const n = getSortedLeads(s).length
-                  return (
-                    <button key={s.id} onClick={() => setActiveMobileSectionId(s.id)} style={{
-                      flexShrink: 0, display: 'inline-flex', alignItems: 'center', gap: 6,
-                      minHeight: 34, padding: '0 0.7rem', borderRadius: 9, cursor: 'pointer',
-                      background: active ? `${s.color}22` : 'rgba(255,255,255,0.04)',
-                      border: `1px solid ${active ? s.color : 'rgba(255,255,255,0.08)'}`,
-                      color: active ? s.color : 'rgba(255,255,255,0.7)',
-                      fontSize: '0.72rem', fontWeight: 700, whiteSpace: 'nowrap',
-                      touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-                    }}>
-                      <span style={{ width: 7, height: 7, borderRadius: '50%', background: s.color, flexShrink: 0 }} />
-                      {s.title}
-                      <span style={{ fontSize: '0.64rem', fontWeight: 800, opacity: 0.7 }}>{n}</span>
-                    </button>
-                  )
-                })}
+              <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch', marginTop: 6, paddingBottom: 2 }}>
+                <div style={{ display: 'inline-flex', background: '#161616', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 10, overflow: 'hidden' }}>
+                  {sections.map((s, i) => {
+                    const active = s.id === activeSecId
+                    const n = getSortedLeads(s).length
+                    return (
+                      <button key={s.id} onClick={() => setActiveMobileSectionId(s.id)} style={{
+                        flexShrink: 0, display: 'inline-flex', alignItems: 'center', gap: 6,
+                        minHeight: 34, padding: '0 0.8rem', border: 'none',
+                        borderLeft: i === 0 ? 'none' : '1px solid rgba(255,255,255,0.1)',
+                        background: active ? `${s.color}26` : 'transparent',
+                        color: active ? s.color : 'rgba(255,255,255,0.6)',
+                        fontSize: '0.72rem', fontWeight: 800, whiteSpace: 'nowrap', cursor: 'pointer',
+                        touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+                      }}>
+                        <span style={{ width: 7, height: 7, borderRadius: '50%', background: s.color, flexShrink: 0 }} />
+                        {s.title}
+                        <span style={{ fontSize: '0.64rem', fontWeight: 800, opacity: 0.7 }}>{n}</span>
+                      </button>
+                    )
+                  })}
+                </div>
               </div>
             )
           })()}

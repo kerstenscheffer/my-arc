@@ -140,90 +140,50 @@ export default function PeriodStatsBar({ leadService, coachId, isMobile, refresh
 
   return (
     <div style={{ padding: isMobile ? '0.6rem 0.75rem' : '0.7rem 1rem', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-      <div style={{ display: 'flex', alignItems: 'center', columnGap: isMobile ? '0.85rem' : '1.25rem', flexWrap: 'wrap', rowGap: '0.65rem' }}>
-
-        {/* Datum-header + periode-selector samengevoegd: grote gouden dropdown
-            (Vandaag / Deze week / Deze maand) met de datum-regel eronder. */}
-        <div style={{ position: 'relative', flexShrink: 0 }}>
-          <button
-            onClick={() => setOpen(o => !o)}
-            style={{
-              display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 2,
-              padding: 0, background: 'transparent', border: 'none',
-              cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-            }}
-          >
-            <span style={{ display: 'flex', alignItems: 'center', gap: 6, color: GOLD, fontSize: isMobile ? '1.15rem' : '1.3rem', fontWeight: 900, letterSpacing: '-0.02em', lineHeight: 1.1, whiteSpace: 'nowrap' }}>
-              {periodLabel}
-              <ChevronDown size={isMobile ? 18 : 20} color="#fff" strokeWidth={3.5} style={{ transform: open ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s ease' }} />
-            </span>
-            <span style={{ fontSize: isMobile ? '0.7rem' : '0.78rem', fontWeight: 600, color: 'rgba(255,255,255,0.5)', lineHeight: 1, whiteSpace: 'nowrap' }}>
-              {subLabelFor(period, customRange)}
-            </span>
-          </button>
-          {open && (
-            <>
-              <div onClick={() => setOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 2147483646 }} />
-              <div style={{ position: 'absolute', top: '100%', left: 0, marginTop: 6, zIndex: 2147483647, background: '#141414', border: '1px solid rgba(255,215,0,0.25)', borderRadius: 10, overflow: 'hidden', minWidth: 170, boxShadow: '0 10px 30px rgba(0,0,0,0.6)' }}>
-                {PERIODS.map(p => (
-                  <button key={p.id} onClick={() => { setPeriod(p.id); if (p.id !== 'custom') setOpen(false) }}
-                    style={{ width: '100%', textAlign: 'left', padding: '0.65rem 0.85rem', background: p.id === period ? 'rgba(255,215,0,0.1)' : 'transparent', border: 'none', color: p.id === period ? GOLD : 'rgba(255,255,255,0.75)', fontSize: '0.9rem', fontWeight: p.id === period ? 800 : 600, cursor: 'pointer' }}>
-                    {p.label}
-                  </button>
-                ))}
-                {period === 'custom' && (
-                  <div style={{ padding: '0.6rem 0.85rem 0.75rem', borderTop: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,215,0,0.03)', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                    <label style={{ display: 'flex', flexDirection: 'column', gap: 3, fontSize: '0.62rem', fontWeight: 700, color: 'rgba(255,255,255,0.45)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                      Van
-                      <input type="date" value={customRange.start} max={customRange.end || undefined}
-                        onChange={e => setCustomRange(r => ({ ...r, start: e.target.value }))}
-                        style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,215,0,0.3)', borderRadius: 6, color: '#fff', fontSize: '0.8rem', fontWeight: 700, padding: '0.35rem 0.5rem', fontFamily: 'inherit', outline: 'none', colorScheme: 'dark' }} />
-                    </label>
-                    <label style={{ display: 'flex', flexDirection: 'column', gap: 3, fontSize: '0.62rem', fontWeight: 700, color: 'rgba(255,255,255,0.45)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                      Tot
-                      <input type="date" value={customRange.end} min={customRange.start || undefined}
-                        onChange={e => setCustomRange(r => ({ ...r, end: e.target.value }))}
-                        style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,215,0,0.3)', borderRadius: 6, color: '#fff', fontSize: '0.8rem', fontWeight: 700, padding: '0.35rem 0.5rem', fontFamily: 'inherit', outline: 'none', colorScheme: 'dark' }} />
-                    </label>
-                  </div>
-                )}
-                {/* Volledige stats — opent de uitgebreide stats-modal */}
-                <button onClick={() => { setShowWeek(true); setOpen(false) }}
-                  style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.7rem 0.85rem', borderTop: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,215,0,0.06)', border: 'none', borderTopWidth: 1, borderTopStyle: 'solid', borderTopColor: 'rgba(255,255,255,0.08)', color: GOLD, fontSize: '0.85rem', fontWeight: 800, cursor: 'pointer', textAlign: 'left', touchAction: 'manipulation' }}>
-                  <BarChart3 size={15} /> Volledige stats
-                </button>
-              </div>
-            </>
-          )}
+      {/* Rij 1 — periode als aaneengesloten segmented control + volledig */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, overflowX: 'auto', WebkitOverflowScrolling: 'touch', paddingBottom: 2 }}>
+        <div style={{ display: 'inline-flex', flexShrink: 0, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 10, overflow: 'hidden' }}>
+          {PERIODS.filter(p => p.id !== 'lastMonth').map((p, i) => {
+            const active = period === p.id
+            return (
+              <button key={p.id} onClick={() => setPeriod(p.id)} style={{
+                minHeight: 32, padding: '0 0.8rem', border: 'none',
+                borderLeft: i === 0 ? 'none' : '1px solid rgba(255,255,255,0.1)',
+                background: active ? 'rgba(255,215,0,0.16)' : 'transparent',
+                color: active ? GOLD : 'rgba(255,255,255,0.6)',
+                fontSize: '0.72rem', fontWeight: 800, cursor: 'pointer', whiteSpace: 'nowrap',
+                touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+              }}>{PERIOD_SHORT[p.id] || p.label}</button>
+            )
+          })}
         </div>
-
-        {/* Stats — kaal, geen vak: groot getal + klein label */}
-        {items.map((it) => (
-          <div key={it.label} style={{ flexShrink: 0, textAlign: 'left' }}>
-            <div style={{ fontSize: isMobile ? '1.25rem' : '1.5rem', fontWeight: 900, color: it.color || '#fff', lineHeight: 1, fontVariantNumeric: 'tabular-nums', opacity: loading ? 0.45 : 1 }}>
-              {it.value}
-            </div>
-            <div style={{ fontSize: '0.6rem', fontWeight: 700, color: 'rgba(255,255,255,0.45)', marginTop: 3, lineHeight: 1.1, textTransform: 'uppercase', letterSpacing: '0.03em', whiteSpace: 'nowrap' }}>
-              {it.label}
-            </div>
-          </div>
-        ))}
-
-        <div style={{ flex: 1, minWidth: 0 }} />
-
-        {/* Grafiek-knop — grafiek is standaard verborgen, tonen op aanvraag. */}
-        <button onClick={() => setChartOpen(v => !v)} title={chartOpen ? 'Grafiek verbergen' : 'Grafiek tonen'}
-          style={{ flexShrink: 0, display: 'inline-flex', alignItems: 'center', gap: 6, minHeight: 34, padding: '0 0.7rem', borderRadius: 9, cursor: 'pointer', background: chartOpen ? 'rgba(255,215,0,0.14)' : 'rgba(255,255,255,0.04)', border: `1px solid ${chartOpen ? 'rgba(255,215,0,0.4)' : 'rgba(255,255,255,0.08)'}`, color: chartOpen ? GOLD : 'rgba(255,255,255,0.6)', fontSize: '0.62rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.03em', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}>
-          <TrendingUp size={14} /> Grafiek
+        <button onClick={() => setShowWeek(true)} style={pill(false)} title="Volledige statistieken">
+          <BarChart3 size={13} /> Volledig
         </button>
       </div>
 
-      {/* Groei-grafiek — alleen zichtbaar wanneer de coach 'm opent. */}
-      {chartOpen && (
-        <div style={{ marginTop: isMobile ? '0.7rem' : '0.85rem', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 12, padding: isMobile ? '0.6rem 0.5rem 0.4rem' : '0.75rem 0.85rem 0.5rem' }}>
-          <GrowthChart data={timeSeries} isMobile={isMobile} />
+      {/* Aangepaste datum-range — alleen bij 'Datum' */}
+      {period === 'custom' && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8, flexWrap: 'wrap' }}>
+          <input type="date" value={customRange.start} max={customRange.end || undefined}
+            onChange={e => setCustomRange(r => ({ ...r, start: e.target.value }))} style={dateInput} />
+          <span style={{ color: 'rgba(255,255,255,0.3)', fontSize: '0.8rem' }}>–</span>
+          <input type="date" value={customRange.end} min={customRange.start || undefined}
+            onChange={e => setCustomRange(r => ({ ...r, end: e.target.value }))} style={dateInput} />
         </div>
       )}
+
+      {/* Rij 2 — stats: gekleurd icoon (welke) + getal; label als tooltip */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? 14 : 22, overflowX: 'auto', WebkitOverflowScrolling: 'touch', marginTop: 10, paddingBottom: 2 }}>
+        {items.map((it) => (
+          <div key={it.label} title={it.label} style={{ display: 'inline-flex', alignItems: 'center', gap: 5, flexShrink: 0 }}>
+            <it.Icon size={16} color={it.color} strokeWidth={2.4} style={{ flexShrink: 0 }} />
+            <span style={{ fontSize: isMobile ? '1.05rem' : '1.25rem', fontWeight: 900, color: '#fff', fontVariantNumeric: 'tabular-nums', lineHeight: 1, opacity: loading ? 0.45 : 1 }}>
+              {it.value}
+            </span>
+          </div>
+        ))}
+      </div>
 
       <WeekStatsModal isOpen={showWeek} onClose={() => setShowWeek(false)} leadService={leadService} coachId={coachId} isMobile={isMobile} />
     </div>
