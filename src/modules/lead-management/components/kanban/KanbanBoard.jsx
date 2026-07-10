@@ -1510,16 +1510,18 @@ export default function KanbanBoard({
           <div ref={toolbarRef} style={{
             position: 'fixed', zIndex: 500,
             top: isMobile ? 68 : 76,   // initieel; useLayoutEffect zet de echte top vóór paint
-            left: barHoriz.left,
-            width: barHoriz.width || 'calc(100vw - 16px)',
+            left: isMobile ? 0 : barHoriz.left,
+            width: isMobile ? '100vw' : (barHoriz.width || 'calc(100vw - 16px)'),
           }}>
           <div style={{
             display: 'flex', alignItems: 'center', gap: '0.3rem', flexWrap: 'wrap',
             justifyContent: isMobile ? 'center' : 'flex-start',
-            padding: '0.4rem', borderRadius: 12,
+            padding: isMobile ? '0.45rem 8px' : '0.4rem',
+            borderRadius: isMobile ? 0 : 12,
             background: 'rgba(10,10,10,0.97)', backdropFilter: 'blur(8px)',
-            border: '1px solid rgba(255,255,255,0.08)',
-            boxShadow: '0 8px 24px rgba(0,0,0,0.55)',
+            border: isMobile ? 'none' : '1px solid rgba(255,255,255,0.08)',
+            borderBottom: '1px solid rgba(255,255,255,0.08)',
+            boxShadow: isMobile ? '0 6px 16px rgba(0,0,0,0.5)' : '0 8px 24px rgba(0,0,0,0.55)',
           }}>
             {/* Uitgeklapte stats (mobiel) — opent BINNEN de balk, tussen de
                 knoppen (order:0) en de zoekbalk (order:2) via order:1, volle breedte. */}
@@ -1734,38 +1736,38 @@ export default function KanbanBoard({
               style={{ width: 30, height: 30, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8, color: 'rgba(255,255,255,0.5)', cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}>
               <Maximize2 size={15} />
             </button>
-          </div>
 
-          {/* Stage-switcher (mobiel) — tweede rij in de gepinde balk, dus pint
-              mee met de zoek/actie-rij. Tik een stage → één-stage-weergave. */}
-          {isMobile && sections.length > 1 && (() => {
-            const activeSecId = sections.some(s => s.id === activeMobileSectionId) ? activeMobileSectionId : sections[0]?.id
-            return (
-              <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch', marginTop: 6, paddingBottom: 2 }}>
-                <div style={{ display: 'inline-flex', background: '#161616', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 10, overflow: 'hidden' }}>
-                  {sections.map((s, i) => {
-                    const active = s.id === activeSecId
-                    const n = getSortedLeads(s).length
-                    return (
-                      <button key={s.id} onClick={() => setActiveMobileSectionId(s.id)} style={{
-                        flexShrink: 0, display: 'inline-flex', alignItems: 'center', gap: 6,
-                        minHeight: 34, padding: '0 0.8rem', border: 'none',
-                        borderLeft: i === 0 ? 'none' : '1px solid rgba(255,255,255,0.1)',
-                        background: active ? `${s.color}26` : 'transparent',
-                        color: active ? s.color : 'rgba(255,255,255,0.6)',
-                        fontSize: '0.72rem', fontWeight: 800, whiteSpace: 'nowrap', cursor: 'pointer',
-                        touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-                      }}>
-                        <span style={{ width: 7, height: 7, borderRadius: '50%', background: s.color, flexShrink: 0 }} />
-                        {s.title}
-                        <span style={{ fontSize: '0.64rem', fontWeight: 800, opacity: 0.7 }}>{n}</span>
-                      </button>
-                    )
-                  })}
+            {/* Stage-switcher (mobiel) — rij BINNEN de balk (order:3), sluit aan
+                op de zoekbalk (zelfde achtergrond, geen losse strook eronder). */}
+            {isMobile && sections.length > 1 && (() => {
+              const activeSecId = sections.some(s => s.id === activeMobileSectionId) ? activeMobileSectionId : sections[0]?.id
+              return (
+                <div style={{ order: 3, flexBasis: '100%', width: '100%', overflowX: 'auto', WebkitOverflowScrolling: 'touch', marginTop: 6 }}>
+                  <div style={{ display: 'inline-flex', background: '#161616', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 10, overflow: 'hidden' }}>
+                    {sections.map((s, i) => {
+                      const active = s.id === activeSecId
+                      const n = getSortedLeads(s).length
+                      return (
+                        <button key={s.id} onClick={() => setActiveMobileSectionId(s.id)} style={{
+                          flexShrink: 0, display: 'inline-flex', alignItems: 'center', gap: 6,
+                          minHeight: 34, padding: '0 0.8rem', border: 'none',
+                          borderLeft: i === 0 ? 'none' : '1px solid rgba(255,255,255,0.1)',
+                          background: active ? `${s.color}26` : 'transparent',
+                          color: active ? s.color : 'rgba(255,255,255,0.6)',
+                          fontSize: '0.72rem', fontWeight: 800, whiteSpace: 'nowrap', cursor: 'pointer',
+                          touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+                        }}>
+                          <span style={{ width: 7, height: 7, borderRadius: '50%', background: s.color, flexShrink: 0 }} />
+                          {s.title}
+                          <span style={{ fontSize: '0.64rem', fontWeight: 800, opacity: 0.7 }}>{n}</span>
+                        </button>
+                      )
+                    })}
+                  </div>
                 </div>
-              </div>
-            )
-          })()}
+              )
+            })()}
+          </div>
 
           {/* Search results dropdown — absolute in de sticky wrapper (scrollt mee) */}
           {showSearchResults && (
