@@ -5,7 +5,7 @@
 
 import { useState, useEffect, useLayoutEffect, useCallback, useRef } from 'react'
 import { createPortal } from 'react-dom'
-import { Plus, Settings, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, GripVertical, Save, RotateCcw, Users, Instagram, Search, X, ArrowUp, ArrowUpDown, Clock, Maximize2, Minimize2, CheckCircle, Send, Zap, Flame, Phone, SlidersHorizontal, Bell } from 'lucide-react'
+import { Plus, Settings, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, GripVertical, Save, RotateCcw, Users, Instagram, Search, X, ArrowUp, ArrowUpDown, Clock, Maximize2, Minimize2, CheckCircle, Send, Zap, Flame, Phone, SlidersHorizontal, Bell, BarChart3 } from 'lucide-react'
 import KanbanCard from './KanbanCard'
 import AddLeadModal from './AddLeadModal'
 import RapidAddLeadsModal from './RapidAddLeadsModal'
@@ -70,6 +70,8 @@ export default function KanbanBoard({
   const [expandedSections, setExpandedSections] = useState({})
   // Mobiel: welke stage/sectie staat actief in de één-stage-weergave.
   const [activeMobileSectionId, setActiveMobileSectionId] = useState(null)
+  // Bovenste stats-balk in/uitklapbaar (mobiel standaard dicht = rustiger).
+  const [showStats, setShowStats] = useState(!isMobile)
   // boardFilter shape: {
   //   sort: string,
   //   types: Set<'magnet'|'outreach'>,        // leeg = alle types
@@ -1500,7 +1502,7 @@ export default function KanbanBoard({
         </>
       ) : (
         <div>
-          <PeriodStatsBar leadService={leadService} coachId={coachId} isMobile={isMobile} refreshKey={statsRefreshKey} />
+          {showStats && <PeriodStatsBar leadService={leadService} coachId={coachId} isMobile={isMobile} refreshKey={statsRefreshKey} />}
 
           {/* ═══ PIN-ON-SCROLL ACTIE-RIJ ═══
               barSlotRef = in-flow placeholder die de ruimte vasthoudt (zodat de
