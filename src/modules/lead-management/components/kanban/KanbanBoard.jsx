@@ -1301,7 +1301,13 @@ export default function KanbanBoard({
     return (
       <>
         {isMobile && sections.length > 1 && (
-          <div style={{ display: 'flex', gap: 6, overflowX: 'auto', paddingBottom: 8, WebkitOverflowScrolling: 'touch', marginBottom: 2 }}>
+          <div style={{
+            display: 'flex', gap: 6, overflowX: 'auto', WebkitOverflowScrolling: 'touch', marginBottom: 2,
+            ...(isFullscreenView
+              ? { paddingBottom: 8 }
+              // Pint mee onder de gepinde actiebalk (zelfde gedrag als de zoekbalk).
+              : { position: 'sticky', top: 68 + (barHeight || 46), zIndex: 400, background: '#0a0a0a', padding: '6px 0 8px' }),
+          }}>
             {sections.map((s) => {
               const active = s.id === mobileSecId
               const n = getSortedLeads(s).length
