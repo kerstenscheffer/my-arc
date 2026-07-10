@@ -5,7 +5,7 @@
 // de stats voor die periode laadt. Data uit dezelfde range-methodes als de
 // week-analytics modal (getRangeFunnelStats + getRangeReactionStats).
 import { useState, useEffect } from 'react'
-import { ChevronDown, BarChart3 } from 'lucide-react'
+import { ChevronDown, BarChart3, TrendingUp, UserPlus, Send, MessageCircle, Phone, CalendarCheck, Trophy, UserX } from 'lucide-react'
 import WeekStatsModal from './WeekStatsModal'
 import GrowthChart from './GrowthChart'
 
@@ -77,6 +77,7 @@ export default function PeriodStatsBar({ leadService, coachId, isMobile, refresh
   const [loading, setLoading] = useState(true)
   const [s, setS] = useState({ nieuw: 0, follow: 0, reacties: 0, voorgesteld: 0, ingepland: 0, sales: 0, noshow: 0 })
   const [timeSeries, setTimeSeries] = useState([])
+  const [chartOpen, setChartOpen] = useState(false)
 
   useEffect(() => {
     if (!leadService || !coachId) return
@@ -122,16 +123,20 @@ export default function PeriodStatsBar({ leadService, coachId, isMobile, refresh
     // de bovenste stat-bar direct meeloopt (i.p.v. pas bij periode-wissel).
   }, [period, customRange, coachId, leadService, refreshKey])
 
-  const periodLabel = period === 'custom' ? 'Aangepast' : (PERIODS.find(p => p.id === period)?.label || 'Week')
+  // Elke stat een eigen lucide-icoon + kleur, zodat je zonder label ziet welke
+  // het is (label blijft als tooltip). Zo passen ze compact op één rij.
   const items = [
-    { label: 'Nieuwe leads', value: s.nieuw },
-    { label: 'Follow-ups', value: s.follow },
-    { label: 'Reacties', value: s.reacties },
-    { label: 'Call voorgesteld', value: s.voorgesteld },
-    { label: 'Call ingepland', value: s.ingepland },
-    { label: 'Sales', value: s.sales, color: GOLD },
-    { label: 'No-shows', value: s.noshow, color: '#ef4444' },
+    { label: 'Nieuwe leads',     value: s.nieuw,       Icon: UserPlus,      color: '#3b82f6' },
+    { label: 'Follow-ups',       value: s.follow,      Icon: Send,          color: '#f59e0b' },
+    { label: 'Reacties',         value: s.reacties,    Icon: MessageCircle, color: '#10b981' },
+    { label: 'Call voorgesteld', value: s.voorgesteld, Icon: Phone,         color: '#a855f7' },
+    { label: 'Call ingepland',   value: s.ingepland,   Icon: CalendarCheck, color: '#06b6d4' },
+    { label: 'Sales',            value: s.sales,       Icon: Trophy,        color: GOLD },
+    { label: 'No-shows',         value: s.noshow,      Icon: UserX,         color: '#ef4444' },
   ]
+  const PERIOD_SHORT = { day: 'Vandaag', week: 'Week', month: 'Maand', lastMonth: 'Vorige', custom: 'Datum' }
+  const pill = (active) => ({ flexShrink: 0, minHeight: 32, padding: '0 0.7rem', borderRadius: 9, cursor: 'pointer', fontSize: '0.72rem', fontWeight: 800, display: 'inline-flex', alignItems: 'center', gap: 5, touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', background: active ? 'rgba(255,215,0,0.16)' : 'rgba(255,255,255,0.04)', border: `1px solid ${active ? 'rgba(255,215,0,0.45)' : 'rgba(255,255,255,0.08)'}`, color: active ? GOLD : 'rgba(255,255,255,0.62)' })
+  const dateInput = { background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,215,0,0.3)', borderRadius: 6, color: '#fff', fontSize: '0.8rem', fontWeight: 700, padding: '0.35rem 0.5rem', fontFamily: 'inherit', outline: 'none', colorScheme: 'dark' }
 
   return (
     <div style={{ padding: isMobile ? '0.6rem 0.75rem' : '0.7rem 1rem', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
@@ -205,13 +210,20 @@ export default function PeriodStatsBar({ leadService, coachId, isMobile, refresh
         ))}
 
         <div style={{ flex: 1, minWidth: 0 }} />
+
+        {/* Grafiek-knop — grafiek is standaard verborgen, tonen op aanvraag. */}
+        <button onClick={() => setChartOpen(v => !v)} title={chartOpen ? 'Grafiek verbergen' : 'Grafiek tonen'}
+          style={{ flexShrink: 0, display: 'inline-flex', alignItems: 'center', gap: 6, minHeight: 34, padding: '0 0.7rem', borderRadius: 9, cursor: 'pointer', background: chartOpen ? 'rgba(255,215,0,0.14)' : 'rgba(255,255,255,0.04)', border: `1px solid ${chartOpen ? 'rgba(255,215,0,0.4)' : 'rgba(255,255,255,0.08)'}`, color: chartOpen ? GOLD : 'rgba(255,255,255,0.6)', fontSize: '0.62rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.03em', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}>
+          <TrendingUp size={14} /> Grafiek
+        </button>
       </div>
 
-      {/* Groei-grafiek — volgt de periode-dropdown (Vandaag toont de maand).
-          GrowthChart toont zelf "Nog geen data" bij een lege reeks. */}
-      <div style={{ marginTop: isMobile ? '0.7rem' : '0.85rem', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 12, padding: isMobile ? '0.6rem 0.5rem 0.4rem' : '0.75rem 0.85rem 0.5rem' }}>
-        <GrowthChart data={timeSeries} isMobile={isMobile} />
-      </div>
+      {/* Groei-grafiek — alleen zichtbaar wanneer de coach 'm opent. */}
+      {chartOpen && (
+        <div style={{ marginTop: isMobile ? '0.7rem' : '0.85rem', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 12, padding: isMobile ? '0.6rem 0.5rem 0.4rem' : '0.75rem 0.85rem 0.5rem' }}>
+          <GrowthChart data={timeSeries} isMobile={isMobile} />
+        </div>
+      )}
 
       <WeekStatsModal isOpen={showWeek} onClose={() => setShowWeek(false)} leadService={leadService} coachId={coachId} isMobile={isMobile} />
     </div>

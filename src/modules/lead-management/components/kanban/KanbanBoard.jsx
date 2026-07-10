@@ -1496,7 +1496,7 @@ export default function KanbanBoard({
         </>
       ) : (
         <div>
-          {showStats && <PeriodStatsBar leadService={leadService} coachId={coachId} isMobile={isMobile} refreshKey={statsRefreshKey} />}
+          {!isMobile && showStats && <PeriodStatsBar leadService={leadService} coachId={coachId} isMobile={isMobile} refreshKey={statsRefreshKey} />}
 
           {/* ═══ PIN-ON-SCROLL ACTIE-RIJ ═══
               barSlotRef = in-flow placeholder die de ruimte vasthoudt (zodat de
@@ -1518,6 +1518,13 @@ export default function KanbanBoard({
             border: '1px solid rgba(255,255,255,0.08)',
             boxShadow: '0 8px 24px rgba(0,0,0,0.55)',
           }}>
+            {/* Uitgeklapte stats (mobiel) — opent BINNEN de balk, tussen de
+                knoppen (order:0) en de zoekbalk (order:2) via order:1, volle breedte. */}
+            {isMobile && showStats && (
+              <div style={{ order: 1, flexBasis: '100%', width: '100%' }}>
+                <PeriodStatsBar leadService={leadService} coachId={coachId} isMobile={isMobile} refreshKey={statsRefreshKey} />
+              </div>
+            )}
             {/* Search — op mobiel op een eigen rij ONDER de knoppen (order:2 +
                 volle breedte) zodat het zoekveld veel breder is; op desktop
                 gewoon vooraan op één rij (order:0). */}
