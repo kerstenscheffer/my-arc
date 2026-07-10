@@ -5,6 +5,14 @@ import DatabaseService from '../../services/DatabaseService'
 
 const SLOT_KEYS = ['breakfast', 'snack1', 'lunch', 'snack2', 'dinner', 'snack3']
 
+// ingredients_list kan een JSON-string of een array zijn — normaliseer.
+const parseIngList = (raw) => {
+  if (!raw) return []
+  if (Array.isArray(raw)) return raw
+  if (typeof raw === 'string') { try { return JSON.parse(raw) || [] } catch { return [] } }
+  return []
+}
+
 class MealPlanPDFService {
   constructor(db) {
     this.db = db || DatabaseService
@@ -30,6 +38,19 @@ class MealPlanPDFService {
     console.log(`📊 Found ${mealIds.size} unique meals to enrich`)
     const meals = await this.getMealDetails(Array.from(mealIds))
 
+    // Verzamel ingredient-id's uit de SLOTS zelf (dit is de bron van waarheid
+    // van het plan — inclusief door de coach toegevoegde/aangepaste meals die
+    // niet 1-op-1 uit ai_meals komen) en haal die ingrediënten in één keer op.
+    const ingredientIds = new Set()
+    days.forEach(day => {
+      const dayData = mealPlan.week_structure[day]
+      if (!dayData) return
+      SLOT_KEYS.forEach(slot => {
+        parseIngList(dayData[slot]?.ingredients_list).forEach(it => { if (it?.ingredient_id) ingredientIds.add(it.ingredient_id) })
+      })
+    })
+    const ingredientMap = await this.getIngredientDetails(Array.from(ingredientIds))
+
     const enrichedWeekStructure = {}
 
     for (const day of days) {
@@ -49,7 +70,7 @@ class MealPlanPDFService {
           enrichedWeekStructure[day][slot] = null
           continue
         }
-        enrichedWeekStructure[day][slot] = await this.enrichMealSlot(slotData, meals)
+        enrichedWeekStructure[day][slot] = await this.enrichMealSlot(slotData, meals, ingredientMap)
       }
 
       console.log(`✅ ${day}: training=${enrichedWeekStructure[day].is_training_day}, slots=${SLOT_KEYS.filter(s => enrichedWeekStructure[day][s]).join(',')}`)
@@ -104,27 +125,34 @@ class MealPlanPDFService {
     }
   }
 
-  async enrichMealSlot(slot, meals) {
+  // Haal ai_ingredients op voor een set id's → map (id → rij).
+  async getIngredientDetails(ids) {
+    const map = {}
+    const validIds = (ids || []).filter(id => /^[0-9a-f-]{36}$/i.test(id))
+    if (validIds.length === 0) return map
+    try {
+      const { data } = await this.db.supabase.from('ai_ingredients').select('*').in('id', validIds)
+      ;(data || []).forEach(r => { map[r.id] = r })
+    } catch (e) { console.error('getIngredientDetails error:', e) }
+    return map
+  }
+
+  async enrichMealSlot(slot, meals, ingredientMap = {}) {
     const mealId = slot.meal_id || slot.id
     const meal = mealId ? meals[mealId] : null
 
-    if (!meal) {
-      // Geen DB data — gebruik wat er al in de slot zit
-      return {
-        ...slot,
-        ingredients: [],
-        name: slot.name || slot.meal_name || 'Maaltijd',
-      }
-    }
-
-    const ingList = typeof meal.ingredients_list === 'string'
-      ? JSON.parse(meal.ingredients_list || '[]')
-      : (meal.ingredients_list || [])
+    // BRON VAN WAARHEID = de slot zelf. De coach kan een meal in het plan
+    // aanpassen of toevoegen zonder ai_meals te overschrijven; die edits leven
+    // in slot.ingredients_list. Val alleen terug op de ai_meals-versie als de
+    // slot zelf geen ingrediënten draagt.
+    const slotIng = parseIngList(slot.ingredients_list)
+    const mealIng = parseIngList(meal?.ingredients_list)
+    const ingList = slotIng.length ? slotIng : mealIng
 
     const scaleFactor = slot.scale_factor || 1
 
     const enrichedIngredients = ingList.map(item => {
-      const ingredient = meal.ingredients_detailed?.find(i => i.id === item.ingredient_id)
+      const ingredient = ingredientMap[item.ingredient_id] || meal?.ingredients_detailed?.find(i => i.id === item.ingredient_id)
       if (!ingredient) return { name: item.name || 'Onbekend', amount: item.amount || 0, unit: item.unit || 'gram', amount_scaled: (item.amount || 0) * scaleFactor }
       const scaledAmount = (item.amount || 100) * scaleFactor
       const factor = scaledAmount / 100
@@ -145,16 +173,16 @@ class MealPlanPDFService {
 
     return {
       ...slot,          // ✅ slot eerst — preserved timing/function/icon
-      meal_details: meal,
+      meal_details: meal || null,
       ingredients: enrichedIngredients,
-      name: slot.name || slot.meal_name || meal.name,
-      image_url: slot.image_url || meal.image_url,
-      prep_time: meal.prep_time_min || 0,
-      cook_time: meal.cook_time_min || 0,
-      total_cost: (meal.total_cost || 0) * scaleFactor,
-      tips: meal.tips,
-      preparation_steps: meal.preparation_steps || [],
-      allergens: meal.allergens || []
+      name: slot.name || slot.meal_name || meal?.name || 'Maaltijd',
+      image_url: slot.image_url || meal?.image_url,
+      prep_time: meal?.prep_time_min || 0,
+      cook_time: meal?.cook_time_min || 0,
+      total_cost: (meal?.total_cost || 0) * scaleFactor,
+      tips: slot.tips || meal?.tips,
+      preparation_steps: slot.preparation_steps || meal?.preparation_steps || [],
+      allergens: meal?.allergens || []
     }
   }
 

@@ -343,10 +343,16 @@ export default function PlanAnalyzer({
   // ════════════ PERSIST ════════════
 
   const persistWeekData = async (updated) => {
-    if (planMeta?.id) {
+    const planId = planMeta?.id || selectedConceptId || null
+    if (planId) {
       const ws = {}
       updated.forEach(d => { ws[d.dayId] = { ...d.meals, totals: d.totals, is_training_day: d.is_training_day } })
-      await db.supabase.from('client_meal_plans').update({ week_structure: ws }).eq('id', planMeta.id)
+      const { error } = await db.supabase.from('client_meal_plans').update({ week_structure: ws }).eq('id', planId)
+      if (error) console.error('❌ Plan-aanpassing opslaan mislukt:', error)
+    } else {
+      // Nog geen opgeslagen plan (net gegenereerd). Edits leven in weekData en
+      // komen zo in de PDF; opslaan gebeurt via "Opslaan"/activeren.
+      console.info('ℹ️ Geen plan-id — aanpassing niet naar DB gepersisteerd (nog niet opgeslagen plan).')
     }
     if (setPlanModifications) { const mods = {}; updated.forEach((d, i) => { mods[i] = d }); setPlanModifications(mods) }
   }
@@ -502,20 +508,13 @@ export default function PlanAnalyzer({
     if (!weekData || weekData.length === 0) { alert('Geen plan om te exporteren.'); return }
     setLoadingPdf(true)
     try {
-      let plan
-      if (planMeta?.id) {
-        // Opgeslagen plan → gebruik de DB-versie (met week_structure).
-        const { data, error } = await db.supabase.from('client_meal_plans').select('*').eq('id', planMeta.id).single()
-        if (error || !data) throw new Error('Plan laden mislukt')
-        plan = data
-      } else {
-        // Net gegenereerd / nog niet opgeslagen plan → bouw de week_structure
-        // uit de huidige weekData (bevat ook de laatste swaps). Voorheen deed de
-        // knop hier stilletjes niks omdat er nog geen planMeta.id was.
-        const week_structure = {}
-        weekData.forEach(d => { week_structure[d.dayId] = { ...(d.meals || {}), totals: d.totals, is_training_day: d.is_training_day } })
-        plan = { week_structure, template_name: planMeta?.name || 'Weekplan' }
-      }
+      // Bouw de PDF ALTIJD uit de huidige weekData (wat de coach op het scherm
+      // ziet — inclusief de laatste, nog niet opgeslagen swaps/edits). Voorheen
+      // haalde 'ie voor opgeslagen plannen de DB-versie op, waardoor verse
+      // aanpassingen (nieuwe meals) niet in de PDF terechtkwamen.
+      const week_structure = {}
+      weekData.forEach(d => { week_structure[d.dayId] = { ...(d.meals || {}), totals: d.totals, is_training_day: d.is_training_day } })
+      const plan = { week_structure, template_name: planMeta?.name || 'Weekplan' }
       const clientName = clientRecord?.first_name || 'Client'
       const today = new Date(); const nextWeek = new Date(today.getTime() + 7 * 24 * 60 * 60 * 1000)
       const weekRange = `${today.toLocaleDateString('nl-NL')} - ${nextWeek.toLocaleDateString('nl-NL')}`
