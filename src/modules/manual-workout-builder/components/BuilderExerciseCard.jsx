@@ -4,7 +4,6 @@
 // coach-bewerking: sets/reps/rust aanpasbaar, materiaal-suggestie, volgorde,
 // video koppelen en verwijderen.
 import { Video, Trash2, ChevronUp, ChevronDown } from 'lucide-react'
-import { ATTACHMENTS } from '../../workout/constants/attachments'
 import useExerciseImage from '../hooks/useExerciseImage'
 
 export default function BuilderExerciseCard({
@@ -15,12 +14,13 @@ export default function BuilderExerciseCard({
   const hasVid = hasVideo || !!exercise.video_url
 
   const statInput = {
-    width: 40, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)',
-    borderRadius: 7, color: '#FFD700', fontSize: isMobile ? '0.8rem' : '0.85rem', fontWeight: 800,
-    textAlign: 'center', outline: 'none', padding: '3px 2px', touchAction: 'manipulation',
+    width: 30, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)',
+    borderRadius: 6, color: '#FFD700', fontSize: '0.72rem', fontWeight: 800,
+    textAlign: 'center', outline: 'none', padding: '2px 1px', touchAction: 'manipulation',
     fontVariantNumeric: 'tabular-nums',
   }
-  const statLbl = { fontSize: '0.56rem', fontWeight: 700, color: 'rgba(255,255,255,0.35)', textTransform: 'uppercase', letterSpacing: '0.04em' }
+  const statLbl = { fontSize: '0.52rem', fontWeight: 700, color: 'rgba(255,255,255,0.35)', textTransform: 'uppercase', letterSpacing: '0.03em' }
+  const ctrlBtn = (color) => ({ background: 'transparent', border: 'none', cursor: 'pointer', padding: 0, color, display: 'flex', alignItems: 'center', justifyContent: 'center', minWidth: 30, minHeight: 30, touchAction: 'manipulation' })
 
   const stop = (e) => e.stopPropagation()
 
@@ -75,66 +75,49 @@ export default function BuilderExerciseCard({
             )}
           </div>
 
-          {/* Bewerkbare sets / reps / rust */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? 8 : 12, flexWrap: 'wrap' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+          {/* Bewerkbare sets / reps / rust — compact */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
               <input type="number" min={1} max={20} value={exercise.sets ?? 3} onClick={stop}
                 onChange={(e) => onField('sets', parseInt(e.target.value) || 1)} style={statInput} />
               <span style={statLbl}>sets</span>
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
               <input type="text" value={exercise.reps ?? '10'} onClick={stop}
-                onChange={(e) => onField('reps', e.target.value)} style={{ ...statInput, width: 48 }} />
+                onChange={(e) => onField('reps', e.target.value)} style={{ ...statInput, width: 38 }} />
               <span style={statLbl}>reps</span>
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
               <input type="text" value={exercise.rust ?? exercise.rest ?? '90s'} onClick={stop}
-                onChange={(e) => onField('rust', e.target.value)} style={{ ...statInput, width: 48, color: 'rgba(255,255,255,0.6)' }} />
+                onChange={(e) => onField('rust', e.target.value)} style={{ ...statInput, width: 40, color: 'rgba(255,255,255,0.6)' }} />
               <span style={statLbl}>rust</span>
             </div>
-          </div>
-
-          {/* Materiaal-suggestie */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }} onClick={stop}>
-            {(() => { const att = ATTACHMENTS.find(a => a.id === exercise.suggested_attachment); return att ? <div style={{ width: 15, height: 15, borderRadius: 3, backgroundImage: `url(${att.img})`, backgroundSize: 'cover', backgroundPosition: 'center', flexShrink: 0, opacity: 0.6 }} /> : null })()}
-            <select value={exercise.suggested_attachment || ''} onChange={(e) => onField('suggested_attachment', e.target.value || null)}
-              style={{ background: 'transparent', border: 'none', borderBottom: '1px solid rgba(255,255,255,0.08)', color: exercise.suggested_attachment ? 'rgba(255,215,0,0.6)' : 'rgba(255,255,255,0.28)', fontSize: '0.62rem', fontWeight: 600, outline: 'none', cursor: 'pointer', padding: '2px 0', maxWidth: 150 }}>
-              <option value="">+ Materiaal aanbevelen</option>
-              {ATTACHMENTS.map(a => <option key={a.id} value={a.id}>{a.nl}</option>)}
-            </select>
           </div>
         </div>
 
         {/* Volgorde */}
-        <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 2, flexShrink: 0, paddingRight: 6 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 0, flexShrink: 0 }}>
           <button onClick={(e) => { stop(e); onMove('up') }} disabled={index === 0}
-            style={{ background: 'transparent', border: 'none', cursor: index === 0 ? 'not-allowed' : 'pointer', opacity: index === 0 ? 0.2 : 0.55, padding: 2, color: 'rgba(255,255,255,0.7)', display: 'flex', minWidth: 26, minHeight: 26, alignItems: 'center', justifyContent: 'center' }}>
+            style={{ ...ctrlBtn('rgba(255,255,255,0.6)'), opacity: index === 0 ? 0.2 : 0.6, minHeight: 24, cursor: index === 0 ? 'not-allowed' : 'pointer' }}>
             <ChevronUp size={16} />
           </button>
           <button onClick={(e) => { stop(e); onMove('down') }} disabled={index === total - 1}
-            style={{ background: 'transparent', border: 'none', cursor: index === total - 1 ? 'not-allowed' : 'pointer', opacity: index === total - 1 ? 0.2 : 0.55, padding: 2, color: 'rgba(255,255,255,0.7)', display: 'flex', minWidth: 26, minHeight: 26, alignItems: 'center', justifyContent: 'center' }}>
+            style={{ ...ctrlBtn('rgba(255,255,255,0.6)'), opacity: index === total - 1 ? 0.2 : 0.6, minHeight: 24, cursor: index === total - 1 ? 'not-allowed' : 'pointer' }}>
             <ChevronDown size={16} />
           </button>
         </div>
-      </div>
 
-      {/* Actie-rij: video koppelen + verwijderen */}
-      <div style={{ display: 'flex', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
-        <button onClick={(e) => { stop(e); onVideo() }} style={{
-          flex: 3, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, minHeight: 38,
-          background: 'transparent', border: 'none', cursor: 'pointer', touchAction: 'manipulation',
-          color: hasVid ? '#FFD700' : 'rgba(255,255,255,0.6)', fontSize: isMobile ? '0.7rem' : '0.75rem', fontWeight: 700,
-        }}>
-          <Video size={13} /> {hasVid ? 'Video ✓' : 'Video'}
-        </button>
-        <div style={{ width: 1, background: 'rgba(255,255,255,0.06)' }} />
-        <button onClick={(e) => { stop(e); onDelete() }} style={{
-          flex: 2, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, minHeight: 38,
-          background: 'transparent', border: 'none', cursor: 'pointer', touchAction: 'manipulation',
-          color: 'rgba(239,68,68,0.75)', fontSize: isMobile ? '0.7rem' : '0.75rem', fontWeight: 700,
-        }}>
-          <Trash2 size={13} /> Verwijder
-        </button>
+        {/* Video koppelen + verwijderen */}
+        <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 6, flexShrink: 0, padding: '0 8px 0 4px' }}>
+          <button onClick={(e) => { stop(e); onVideo() }} title={hasVid ? 'Video bewerken' : 'Video toevoegen'}
+            style={ctrlBtn(hasVid ? '#FFD700' : 'rgba(255,255,255,0.5)')}>
+            <Video size={16} />
+          </button>
+          <button onClick={(e) => { stop(e); onDelete() }} title="Verwijder oefening"
+            style={{ ...ctrlBtn('#ef4444'), background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.25)', borderRadius: 8 }}>
+            <Trash2 size={15} />
+          </button>
+        </div>
       </div>
 
       <style>{`@keyframes mwb-spin { to { transform: rotate(360deg); } }`}</style>
