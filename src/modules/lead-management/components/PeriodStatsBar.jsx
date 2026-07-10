@@ -198,7 +198,7 @@ export default function PeriodStatsBar({ leadService, coachId, isMobile, refresh
             <div style={{ fontSize: isMobile ? '1.25rem' : '1.5rem', fontWeight: 900, color: it.color || '#fff', lineHeight: 1, fontVariantNumeric: 'tabular-nums', opacity: loading ? 0.45 : 1 }}>
               {it.value}
             </div>
-            <div style={{ fontSize: isMobile ? '0.55rem' : '0.6rem', fontWeight: 700, color: 'rgba(255,255,255,0.45)', marginTop: 3, lineHeight: 1.1, textTransform: 'uppercase', letterSpacing: '0.03em', whiteSpace: 'nowrap' }}>
+            <div style={{ fontSize: '0.6rem', fontWeight: 700, color: 'rgba(255,255,255,0.45)', marginTop: 3, lineHeight: 1.1, textTransform: 'uppercase', letterSpacing: '0.03em', whiteSpace: 'nowrap' }}>
               {it.label}
             </div>
           </div>

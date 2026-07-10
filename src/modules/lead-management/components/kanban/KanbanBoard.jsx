@@ -68,6 +68,8 @@ export default function KanbanBoard({
   const [selectedSection, setSelectedSection] = useState(null)
   const [selectedSectionForLead, setSelectedSectionForLead] = useState(null)
   const [expandedSections, setExpandedSections] = useState({})
+  // Mobiel: welke stage/sectie staat actief in de één-stage-weergave.
+  const [activeMobileSectionId, setActiveMobileSectionId] = useState(null)
   // boardFilter shape: {
   //   sort: string,
   //   types: Set<'magnet'|'outreach'>,        // leeg = alle types
@@ -1289,10 +1291,40 @@ export default function KanbanBoard({
   // RENDER: KANBAN COLUMNS — STYLING UPGRADED
   // ========================================
   const renderKanbanColumns = (isFullscreenView = false) => {
-    const colW = isFullscreenView ? (isMobile ? '300px' : '350px') : (isMobile ? '280px' : '320px')
+    // Mobiel: kolom vult de volle breedte en je ziet één stage tegelijk (switcher
+    // hierboven). Desktop: horizontale scroll van alle kolommen zoals voorheen.
+    const colW = isMobile ? '100%' : (isFullscreenView ? '350px' : '320px')
+    const mobileSecId = (isMobile && sections.length)
+      ? (sections.some(s => s.id === activeMobileSectionId) ? activeMobileSectionId : sections[0].id)
+      : null
+    const renderList = isMobile ? sections.filter(s => s.id === mobileSecId) : sections
     return (
-      <div style={{ display: 'flex', gap: '0.75rem', overflowX: 'auto', paddingBottom: '0.75rem', WebkitOverflowScrolling: 'touch' }}>
-        {sections.map((section) => {
+      <>
+        {isMobile && sections.length > 1 && (
+          <div style={{ display: 'flex', gap: 6, overflowX: 'auto', paddingBottom: 8, WebkitOverflowScrolling: 'touch', marginBottom: 2 }}>
+            {sections.map((s) => {
+              const active = s.id === mobileSecId
+              const n = getSortedLeads(s).length
+              return (
+                <button key={s.id} onClick={() => setActiveMobileSectionId(s.id)} style={{
+                  flexShrink: 0, display: 'inline-flex', alignItems: 'center', gap: 6,
+                  minHeight: 40, padding: '0 0.7rem', borderRadius: 10, cursor: 'pointer',
+                  background: active ? `${s.color}22` : 'rgba(255,255,255,0.04)',
+                  border: `1px solid ${active ? s.color : 'rgba(255,255,255,0.08)'}`,
+                  color: active ? s.color : 'rgba(255,255,255,0.7)',
+                  fontSize: '0.72rem', fontWeight: 700, whiteSpace: 'nowrap',
+                  touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+                }}>
+                  <span style={{ width: 7, height: 7, borderRadius: '50%', background: s.color, flexShrink: 0 }} />
+                  {s.title}
+                  <span style={{ fontSize: '0.64rem', fontWeight: 800, opacity: 0.7 }}>{n}</span>
+                </button>
+              )
+            })}
+          </div>
+        )}
+        <div style={{ display: 'flex', gap: '0.75rem', overflowX: isMobile ? 'visible' : 'auto', paddingBottom: '0.75rem', WebkitOverflowScrolling: 'touch' }}>
+        {renderList.map((section) => {
           const isExpanded = expandedSections[section.id]
           // De teller toont het aantal leads dat de actieve filter doorstaat
           // (bv. "hoeveel met x opvolg"). Zonder filter = gewoon alle leads.
@@ -1424,7 +1456,8 @@ export default function KanbanBoard({
             </div>
           )
         })}
-      </div>
+        </div>
+      </>
     )
   }
 

@@ -587,13 +587,13 @@ export default function KanbanCard({
               title="Lead verwijderen"
               style={{
                 flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                width: 22, height: 22, padding: 0,
+                width: isMobile ? 32 : 22, height: isMobile ? 32 : 22, padding: 0,
                 background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.25)',
-                borderRadius: 5, color: 'rgba(239,68,68,0.85)', cursor: 'pointer',
+                borderRadius: isMobile ? 8 : 5, color: 'rgba(239,68,68,0.85)', cursor: 'pointer',
                 touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
               }}
             >
-              <Trash2 size={12} />
+              <Trash2 size={isMobile ? 15 : 12} />
             </button>
           )}
         </div>

@@ -172,7 +172,7 @@ export default function DailyStatsBar({
               <div style={{
                 position: 'absolute', top: '50%', left: '50%',
                 transform: 'translate(-50%, -50%)',
-                fontSize: '0.5rem', fontWeight: '800',
+                fontSize: '0.6rem', fontWeight: '800',
                 color: isGoalMet ? G.light : G.primary,
                 fontFamily: 'monospace'
               }}>
@@ -186,14 +186,14 @@ export default function DailyStatsBar({
                 <div style={{ fontSize: '0.85rem', fontWeight: '800', color: isGoalMet ? G.light : '#fff', fontFamily: 'monospace' }}>
                   {stats.newOutreach}
                 </div>
-                <div style={{ fontSize: '0.4rem', fontWeight: '700', color: 'rgba(255,255,255,0.2)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>NIEUW</div>
+                <div style={{ fontSize: '0.6rem', fontWeight: '700', color: 'rgba(255,255,255,0.2)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>NIEUW</div>
               </div>
 
               <div style={{ width: '1px', height: '20px', background: 'rgba(255,255,255,0.06)' }} />
 
               <div style={{ textAlign: 'center' }}>
                 <div style={{ fontSize: '0.85rem', fontWeight: '800', color: '#fff', fontFamily: 'monospace' }}>{stats.followUps}</div>
-                <div style={{ fontSize: '0.4rem', fontWeight: '700', color: 'rgba(255,255,255,0.2)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>FOLLOW</div>
+                <div style={{ fontSize: '0.6rem', fontWeight: '700', color: 'rgba(255,255,255,0.2)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>FOLLOW</div>
               </div>
 
               <div style={{ width: '1px', height: '20px', background: 'rgba(255,255,255,0.06)' }} />
@@ -236,7 +236,7 @@ export default function DailyStatsBar({
                 border: `1px solid ${G.border}`,
                 borderRadius: '5px',
                 color: G.primary,
-                fontSize: '0.55rem', fontWeight: '700',
+                fontSize: '0.6rem', fontWeight: '700',
                 cursor: 'pointer',
                 touchAction: 'manipulation',
                 WebkitTapHighlightColor: 'transparent',
@@ -255,7 +255,7 @@ export default function DailyStatsBar({
                 border: '1px solid rgba(139,92,246,0.2)',
                 borderRadius: '5px',
                 color: '#a855f7',
-                fontSize: '0.55rem', fontWeight: '700',
+                fontSize: '0.6rem', fontWeight: '700',
                 cursor: 'pointer',
                 touchAction: 'manipulation',
                 WebkitTapHighlightColor: 'transparent',
@@ -274,7 +274,7 @@ export default function DailyStatsBar({
                 border: `1px solid ${G.border}`,
                 borderRadius: '5px',
                 color: G.primary,
-                fontSize: '0.55rem', fontWeight: '700',
+                fontSize: '0.6rem', fontWeight: '700',
                 cursor: 'pointer',
                 touchAction: 'manipulation',
                 WebkitTapHighlightColor: 'transparent',
@@ -334,22 +334,22 @@ export default function DailyStatsBar({
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
             <Flame size={13} color={G.primary} />
             <span style={{ fontSize: '0.65rem', fontWeight: '700', color: G.light }}>Dagelijks Overzicht</span>
-            <span style={{ fontSize: '0.45rem', color: 'rgba(255,255,255,0.2)' }}>
+            <span style={{ fontSize: '0.6rem', color: 'rgba(255,255,255,0.2)' }}>
               {new Date().toLocaleDateString('nl-NL', { weekday: 'short', day: 'numeric', month: 'short' })}
             </span>
           </div>
           
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
             <button onClick={() => setShowWeek(true)}
-              style={{ display: 'flex', alignItems: 'center', gap: '3px', padding: '4px 8px', background: G.bg, border: `1px solid ${G.border}`, borderRadius: '5px', color: G.primary, fontSize: '0.55rem', fontWeight: '700', cursor: 'pointer', touchAction: 'manipulation', minHeight: '26px' }}>
+              style={{ display: 'flex', alignItems: 'center', gap: '3px', padding: '4px 8px', background: G.bg, border: `1px solid ${G.border}`, borderRadius: '5px', color: G.primary, fontSize: '0.6rem', fontWeight: '700', cursor: 'pointer', touchAction: 'manipulation', minHeight: '26px' }}>
               <BarChart3 size={10} /> WEEK
             </button>
             <button onClick={() => setShowSOP(true)}
-              style={{ display: 'flex', alignItems: 'center', gap: '3px', padding: '4px 8px', background: 'rgba(139,92,246,0.08)', border: '1px solid rgba(139,92,246,0.2)', borderRadius: '5px', color: '#a855f7', fontSize: '0.55rem', fontWeight: '700', cursor: 'pointer', touchAction: 'manipulation', minHeight: '26px' }}>
+              style={{ display: 'flex', alignItems: 'center', gap: '3px', padding: '4px 8px', background: 'rgba(139,92,246,0.08)', border: '1px solid rgba(139,92,246,0.2)', borderRadius: '5px', color: '#a855f7', fontSize: '0.6rem', fontWeight: '700', cursor: 'pointer', touchAction: 'manipulation', minHeight: '26px' }}>
               <BookOpen size={10} /> SOP
             </button>
             <button onClick={handleExport}
-              style={{ display: 'flex', alignItems: 'center', gap: '3px', padding: '4px 8px', background: G.bg, border: `1px solid ${G.border}`, borderRadius: '5px', color: G.primary, fontSize: '0.55rem', fontWeight: '700', cursor: 'pointer', touchAction: 'manipulation', minHeight: '26px' }}>
+              style={{ display: 'flex', alignItems: 'center', gap: '3px', padding: '4px 8px', background: G.bg, border: `1px solid ${G.border}`, borderRadius: '5px', color: G.primary, fontSize: '0.6rem', fontWeight: '700', cursor: 'pointer', touchAction: 'manipulation', minHeight: '26px' }}>
               <FileText size={10} /> PDF
             </button>
             <button onClick={() => setIsExpanded(false)}
@@ -384,12 +384,12 @@ export default function DailyStatsBar({
             {isGoalMet ? (
               <>
                 <Flame size={13} color={G.light} style={{ marginBottom: '2px' }} />
-                <span style={{ fontSize: '0.5rem', fontWeight: '700', color: G.light, textTransform: 'uppercase' }}>Doel!</span>
+                <span style={{ fontSize: '0.6rem', fontWeight: '700', color: G.light, textTransform: 'uppercase' }}>Doel!</span>
               </>
             ) : (
               <>
                 <div style={{ fontSize: '0.85rem', fontWeight: '800', color: G.primary, fontFamily: 'monospace' }}>{remaining}</div>
-                <span style={{ fontSize: '0.4rem', fontWeight: '700', color: 'rgba(255,255,255,0.2)', textTransform: 'uppercase' }}>TE GAAN</span>
+                <span style={{ fontSize: '0.6rem', fontWeight: '700', color: 'rgba(255,255,255,0.2)', textTransform: 'uppercase' }}>TE GAAN</span>
               </>
             )}
           </div>
@@ -420,7 +420,7 @@ function StatCard({ icon, label, value, highlight = false, progress = null, subt
     }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: '3px', marginBottom: '2px' }}>
         <span style={{ color: highlight ? G.primary : 'rgba(255,255,255,0.25)' }}>{icon}</span>
-        <span style={{ fontSize: '0.4rem', fontWeight: '700', color: 'rgba(255,255,255,0.2)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{label}</span>
+        <span style={{ fontSize: '0.6rem', fontWeight: '700', color: 'rgba(255,255,255,0.2)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{label}</span>
       </div>
       <div style={{ fontSize: '0.85rem', fontWeight: '800', color: highlight ? G.light : '#fff', fontFamily: 'monospace' }}>{value}</div>
       {progress !== null && (
@@ -428,7 +428,7 @@ function StatCard({ icon, label, value, highlight = false, progress = null, subt
           <div style={{ height: '100%', width: `${progress}%`, background: G.primary, borderRadius: '1px' }} />
         </div>
       )}
-      {subtext && <div style={{ fontSize: '0.4rem', color: 'rgba(255,255,255,0.2)', marginTop: '2px' }}>{subtext}</div>}
+      {subtext && <div style={{ fontSize: '0.6rem', color: 'rgba(255,255,255,0.2)', marginTop: '2px' }}>{subtext}</div>}
     </div>
   )
 }
@@ -496,7 +496,7 @@ export function SOPModal({ isMobile, onClose }) {
               background: allDone ? 'rgba(16,185,129,0.12)' : 'rgba(139,92,246,0.08)',
               border: `1px solid ${allDone ? 'rgba(16,185,129,0.25)' : 'rgba(139,92,246,0.15)'}`,
               borderRadius: '3px',
-              fontSize: '0.45rem', fontWeight: '700',
+              fontSize: '0.6rem', fontWeight: '700',
               color: allDone ? '#10b981' : '#a855f7'
             }}>
               {checkedCount}/{totalSteps}
@@ -538,7 +538,7 @@ export function SOPModal({ isMobile, onClose }) {
                     flexShrink: 0
                   }} />
                   <span style={{
-                    fontSize: '0.4rem', fontWeight: '700',
+                    fontSize: '0.6rem', fontWeight: '700',
                     color: phaseChecked ? '#10b981' : phase.color,
                     textTransform: 'uppercase', letterSpacing: '0.06em'
                   }}>
