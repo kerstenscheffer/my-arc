@@ -1302,14 +1302,8 @@ export default function KanbanBoard({
     const renderList = isMobile ? sections.filter(s => s.id === mobileSecId) : sections
     return (
       <>
-        {isMobile && sections.length > 1 && (
-          <div style={{
-            display: 'flex', gap: 6, overflowX: 'auto', WebkitOverflowScrolling: 'touch', marginBottom: 2,
-            ...(isFullscreenView
-              ? { paddingBottom: 8 }
-              // Pint mee onder de gepinde actiebalk (zelfde gedrag als de zoekbalk).
-              : { position: 'sticky', top: 68 + (barHeight || 46), zIndex: 400, background: '#0a0a0a', padding: '6px 0 8px' }),
-          }}>
+        {isMobile && sections.length > 1 && isFullscreenView && (
+          <div style={{ display: 'flex', gap: 6, overflowX: 'auto', WebkitOverflowScrolling: 'touch', marginBottom: 2, paddingBottom: 8 }}>
             {sections.map((s) => {
               const active = s.id === mobileSecId
               const n = getSortedLeads(s).length
@@ -1714,6 +1708,12 @@ export default function KanbanBoard({
               <Send size={16} />
             </button>
 
+            {/* Stats in/uitklappen — houdt de pagina rustig, stats op aanvraag */}
+            <button onClick={() => setShowStats(v => !v)} title={showStats ? 'Statistieken verbergen' : 'Statistieken tonen'}
+              style={{ width: 30, height: 30, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: showStats ? 'rgba(255,215,0,0.14)' : 'rgba(255,255,255,0.04)', border: `1px solid ${showStats ? 'rgba(255,215,0,0.4)' : 'rgba(255,255,255,0.08)'}`, borderRadius: 8, color: showStats ? '#FFD700' : 'rgba(255,255,255,0.5)', cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}>
+              <BarChart3 size={15} />
+            </button>
+
             {/* Sectie */}
             <button onClick={() => { setSelectedSection(null); setShowSectionModal(true) }} title="Nieuwe sectie toevoegen"
               style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: 5, padding: '0.45rem 0.65rem', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8, color: 'rgba(255,255,255,0.65)', fontSize: '0.68rem', fontWeight: 700, cursor: 'pointer', minHeight: 30, touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}>
@@ -1725,6 +1725,35 @@ export default function KanbanBoard({
               <Maximize2 size={15} />
             </button>
           </div>
+
+          {/* Stage-switcher (mobiel) — tweede rij in de gepinde balk, dus pint
+              mee met de zoek/actie-rij. Tik een stage → één-stage-weergave. */}
+          {isMobile && sections.length > 1 && (() => {
+            const activeSecId = sections.some(s => s.id === activeMobileSectionId) ? activeMobileSectionId : sections[0]?.id
+            return (
+              <div style={{ display: 'flex', gap: 6, overflowX: 'auto', WebkitOverflowScrolling: 'touch', marginTop: 6, paddingBottom: 2 }}>
+                {sections.map((s) => {
+                  const active = s.id === activeSecId
+                  const n = getSortedLeads(s).length
+                  return (
+                    <button key={s.id} onClick={() => setActiveMobileSectionId(s.id)} style={{
+                      flexShrink: 0, display: 'inline-flex', alignItems: 'center', gap: 6,
+                      minHeight: 34, padding: '0 0.7rem', borderRadius: 9, cursor: 'pointer',
+                      background: active ? `${s.color}22` : 'rgba(255,255,255,0.04)',
+                      border: `1px solid ${active ? s.color : 'rgba(255,255,255,0.08)'}`,
+                      color: active ? s.color : 'rgba(255,255,255,0.7)',
+                      fontSize: '0.72rem', fontWeight: 700, whiteSpace: 'nowrap',
+                      touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+                    }}>
+                      <span style={{ width: 7, height: 7, borderRadius: '50%', background: s.color, flexShrink: 0 }} />
+                      {s.title}
+                      <span style={{ fontSize: '0.64rem', fontWeight: 800, opacity: 0.7 }}>{n}</span>
+                    </button>
+                  )
+                })}
+              </div>
+            )
+          })()}
 
           {/* Search results dropdown — absolute in de sticky wrapper (scrollt mee) */}
           {showSearchResults && (
