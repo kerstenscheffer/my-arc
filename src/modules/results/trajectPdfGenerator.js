@@ -284,6 +284,7 @@ export function generateTrajectHTML(data, meta = {}) {
   .cm-head { font-family: 'Poppins', sans-serif; font-weight: 800; font-size: 11px; color: ${GOLD}; text-transform: uppercase; letter-spacing: .1em; margin-bottom: 6px; }
   .cm-text { font-size: 15px; line-height: 1.6; color: rgba(255,255,255,.78); font-weight: 500; white-space: pre-wrap; }
   .cm-wrap { margin-top: 22px; }
+  .cm-top { flex: 0 0 auto; margin-bottom: 20px; }
   .plan { margin-top: 20px; border-top: 1px solid rgba(255,215,0,.25); padding-top: 16px; }
   .plan-h { font-family: 'Poppins', sans-serif; font-weight: 800; font-size: 15px; color: ${GOLD}; text-transform: uppercase; letter-spacing: .04em; margin-bottom: 10px; }
 </style></head><body>
@@ -311,17 +312,17 @@ export function generateTrajectHTML(data, meta = {}) {
   <div class="page pcol">
     <div class="eyebrow">Progressie</div>
     <h2>Foto- &amp; gewichtsprogressie</h2>
+    ${hasPhoto ? `<div class="cm-top">${coachMsg(`<div class="cm-text">${photoText}</div>`)}</div>` : ''}
     <div class="wprog">${weightBlock}</div>
     ${hasAngles ? `<div class="ba-grid">${angleCols}</div>` : `<div class="empty">Nog geen front/side/back-foto's.</div>`}
-    ${hasPhoto ? `<div class="cm-wrap">${coachMsg(`<div class="cm-text">${photoText}</div>`)}</div>` : ''}
     <div class="foot"><img src="${LOGO}"/></div>
   </div>
 
   <div class="page">
     <div class="eyebrow">Kracht</div>
     <h2>Krachtprogressie per spiergroep</h2>
+    ${hasWorkout ? `<div class="cm-top">${coachMsg(`<div class="cm-text">${workoutText}</div>`)}</div>` : ''}
     ${strengthBlock}
-    ${hasWorkout ? `<div class="cm-wrap">${coachMsg(`<div class="cm-text">${workoutText}</div>`)}</div>` : ''}
     <div class="foot"><img src="${LOGO}"/></div>
   </div>
 
