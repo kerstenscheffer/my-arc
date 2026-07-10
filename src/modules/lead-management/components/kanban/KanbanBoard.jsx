@@ -1742,7 +1742,7 @@ export default function KanbanBoard({
             {isMobile && sections.length > 1 && (() => {
               const activeSecId = sections.some(s => s.id === activeMobileSectionId) ? activeMobileSectionId : sections[0]?.id
               return (
-                <div style={{ order: 3, flexBasis: '100%', width: '100%', overflowX: 'auto', WebkitOverflowScrolling: 'touch', marginTop: 6 }}>
+                <div style={{ order: 4, flexBasis: '100%', width: '100%', overflowX: 'auto', WebkitOverflowScrolling: 'touch', marginTop: 6 }}>
                   <div style={{ display: 'inline-flex', background: '#161616', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 10, overflow: 'hidden' }}>
                     {sections.map((s, i) => {
                       const active = s.id === activeSecId
@@ -1767,14 +1767,14 @@ export default function KanbanBoard({
                 </div>
               )
             })()}
-          </div>
 
-          {/* Search results dropdown — absolute in de sticky wrapper (scrollt mee) */}
-          {showSearchResults && (
-            <>
+            {/* Lead-suggesties — in-flow (order:3), pal ONDER de zoekbalk; duwt
+                de sectie-slider (order:4) omlaag i.p.v. eroverheen. */}
+            {showSearchResults && (
+              <div style={{ order: 3, flexBasis: '100%', width: '100%', marginTop: 6, position: 'relative', zIndex: 1000 }}>
               <div onClick={() => setShowSearchResults(false)} style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 40 }} />
               {searchResults.length > 0 ? (
-                <div style={{ position: 'absolute', zIndex: 1000, top: 'calc(100% + 6px)', left: 0, right: 0 }}>
+                <div style={{ width: '100%' }}>
                   <div style={{ background: '#111', border: '1px solid rgba(16,185,129,0.2)', borderRadius: '8px', overflow: 'hidden', boxShadow: '0 8px 24px rgba(0,0,0,0.5)', maxHeight: '60vh', overflowY: 'auto' }}>
                     <div style={{ padding: '0.5rem 0.85rem', borderBottom: '1px solid rgba(255,255,255,0.06)', fontSize: '0.62rem', fontWeight: '800', color: '#10b981', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
                       {searchResults.length} RESULTATEN
@@ -1795,7 +1795,7 @@ export default function KanbanBoard({
                 const q = searchQuery.trim()
                 const display = q.startsWith('@') ? q : `"${q}"`
                 return (
-                  <div style={{ position: 'absolute', zIndex: 1000, top: 'calc(100% + 6px)', left: 0, right: 0 }}>
+                  <div style={{ width: '100%' }}>
                     <div style={{ background: '#111', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '6px', overflow: 'hidden' }}>
                       <div style={{ padding: '0.45rem 0.625rem', borderBottom: '1px solid rgba(255,255,255,0.04)', fontSize: '0.6rem', color: 'rgba(255,255,255,0.35)', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
                         <Search size={10} />
@@ -1888,8 +1888,9 @@ export default function KanbanBoard({
                   </div>
                 )
               })()}
-            </>
-          )}
+              </div>
+            )}
+          </div>
           </div>, document.body)}
 
           {/* Inline notifications — ultra compact, borderLeft only */}
