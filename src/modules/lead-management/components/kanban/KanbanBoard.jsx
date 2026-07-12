@@ -1412,7 +1412,7 @@ export default function KanbanBoard({
                     <Settings size={11} />
                   </button>
                 )}
-                <button onClick={() => { window.alert('DEBUG: + tik ontvangen — modal wordt geopend'); setShowSearchResults(false); setSelectedSectionForLead(section.id); setShowAddLead(true) }}
+                <button onClick={() => { console.log('🟢 DEBUG: + tik ontvangen — section', section.id, '→ showAddLead=true'); setShowSearchResults(false); setSelectedSectionForLead(section.id); setShowAddLead(true) }}
                   style={{ width: '24px', height: '24px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: `${section.color}10`, border: `1px solid ${section.color}25`, borderRadius: '5px', color: section.color, cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}>
                   <Plus size={11} />
                 </button>
