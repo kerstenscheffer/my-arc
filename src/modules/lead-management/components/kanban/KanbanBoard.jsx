@@ -1412,7 +1412,7 @@ export default function KanbanBoard({
                     <Settings size={11} />
                   </button>
                 )}
-                <button onClick={() => { setShowSearchResults(false); setSelectedSectionForLead(section.id); setShowAddLead(true) }}
+                <button onClick={() => { window.alert('DEBUG: + tik ontvangen — modal wordt geopend'); setShowSearchResults(false); setSelectedSectionForLead(section.id); setShowAddLead(true) }}
                   style={{ width: '24px', height: '24px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: `${section.color}10`, border: `1px solid ${section.color}25`, borderRadius: '5px', color: section.color, cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}>
                   <Plus size={11} />
                 </button>
@@ -1701,7 +1701,7 @@ export default function KanbanBoard({
 
                       {hasFilter && (
                         <button onClick={() => { resetBoardFilter(); setShowBoardFilter(false) }}
-                          style={{ display: 'block', width: '100%', padding: '0.5rem 0.65rem', background: 'rgba(239,68,68,0.06)', border: 'none', borderTop: '1px solid rgba(255,255,255,0.05)', color: '#fca5a5', fontSize: '0.65rem', fontWeight: 700, textAlign: 'center', cursor: 'pointer' }}>
+                          style={{ display: 'block', width: '100%', padding: '0.5rem 0.65rem', background: 'rgba(239,68,68,0.06)', borderBottom: 'none', borderRight: 'none', borderLeft: 'none', borderTop: '1px solid rgba(255,255,255,0.05)', color: '#fca5a5', fontSize: '0.65rem', fontWeight: 700, textAlign: 'center', cursor: 'pointer' }}>
                           Reset filters
                         </button>
                       )}
@@ -1778,12 +1778,12 @@ export default function KanbanBoard({
               <div onClick={() => setShowSearchResults(false)} style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 40 }} />
               {searchResults.length > 0 ? (
                 <div style={{ width: '100%' }}>
-                  <div style={{ background: '#111', border: '1px solid rgba(16,185,129,0.2)', borderRadius: '8px', overflow: 'hidden', boxShadow: '0 8px 24px rgba(0,0,0,0.5)', maxHeight: '60vh', overflowY: 'auto' }}>
+                  <div style={{ background: '#111', border: '1px solid rgba(16,185,129,0.2)', borderRadius: '8px', overflowX: 'hidden', boxShadow: '0 8px 24px rgba(0,0,0,0.5)', maxHeight: '60vh', overflowY: 'auto' }}>
                     <div style={{ padding: '0.5rem 0.85rem', borderBottom: '1px solid rgba(255,255,255,0.06)', fontSize: '0.62rem', fontWeight: '800', color: '#10b981', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
                       {searchResults.length} RESULTATEN
                     </div>
                     {searchResults.map(lead => (
-                      <button key={lead.id} onClick={() => scrollToLead(lead.id, lead.sectionId)} style={{ width: '100%', padding: '0.75rem 0.85rem', background: 'transparent', border: 'none', borderBottom: '1px solid rgba(255,255,255,0.05)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem', textAlign: 'left', minHeight: 52 }} onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(16,185,129,0.06)'} onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}>
+                      <button key={lead.id} onClick={() => scrollToLead(lead.id, lead.sectionId)} style={{ width: '100%', padding: '0.75rem 0.85rem', background: 'transparent', borderTop: 'none', borderRight: 'none', borderLeft: 'none', borderBottom: '1px solid rgba(255,255,255,0.05)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem', textAlign: 'left', minHeight: 52 }} onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(16,185,129,0.06)'} onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}>
                         <div style={{ flex: 1, minWidth: 0 }}>
                           <div style={{ color: '#fff', fontWeight: '800', fontSize: '0.95rem', letterSpacing: '-0.01em' }}>{lead.first_name} {lead.last_name}</div>
                           {lead.instagram_handle && <span style={{ fontSize: '0.7rem', color: '#E1306C', fontWeight: 600 }}>@{lead.instagram_handle}</span>}
@@ -1982,7 +1982,7 @@ export default function KanbanBoard({
                   <button
                     key={l.id}
                     onClick={() => { setShowUrgent(false); scrollToLead(l.id, l.sectionId) }}
-                    style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '0.7rem 0.75rem', minHeight: 56, background: 'transparent', border: 'none', borderBottom: '1px solid rgba(255,255,255,0.05)', cursor: 'pointer', textAlign: 'left' }}
+                    style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '0.7rem 0.75rem', minHeight: 56, background: 'transparent', borderTop: 'none', borderRight: 'none', borderLeft: 'none', borderBottom: '1px solid rgba(255,255,255,0.05)', cursor: 'pointer', textAlign: 'left' }}
                   >
                     <span style={{ width: 30, height: 30, flexShrink: 0, borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', background: isHot ? 'rgba(239,68,68,0.15)' : 'rgba(255,215,0,0.15)', border: `1px solid ${isHot ? 'rgba(239,68,68,0.4)' : 'rgba(255,215,0,0.4)'}` }}>
                       {isHot ? <Flame size={15} color="#f87171" /> : <Phone size={15} color="#FFD700" />}
