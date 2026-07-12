@@ -6,6 +6,9 @@ const PRESET_COLORS = ['#10b981', '#3b82f6', '#8b5cf6', '#f59e0b', '#ef4444', '#
 export default function SectionModal({ isMobile, section, onClose, onSubmit, onDelete }) {
   const [formData, setFormData] = useState({ title: '', color: '#10b981' })
   const [errors, setErrors] = useState({})
+  // Guard tegen mobiele click-through die de modal meteen weer sluit.
+  const [armed, setArmed] = useState(false)
+  useEffect(() => { const t = setTimeout(() => setArmed(true), 300); return () => clearTimeout(t) }, [])
 
   useEffect(() => {
     if (section) {
@@ -27,7 +30,7 @@ export default function SectionModal({ isMobile, section, onClose, onSubmit, onD
   const isEdit = !!section
 
   return (
-    <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0, 0, 0, 0.8)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: isMobile ? '1rem' : '2rem' }} onClick={(e) => { if (e.target === e.currentTarget) onClose() }}>
+    <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0, 0, 0, 0.8)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2147483550, padding: isMobile ? '1rem' : '2rem' }} onClick={(e) => { if (armed && e.target === e.currentTarget) onClose() }}>
       <div style={{ background: '#111', border: '1px solid rgba(255, 255, 255, 0.15)', borderRadius: '16px', width: '100%', maxWidth: '450px', maxHeight: '90vh', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
         
         <div style={{ padding: isMobile ? '1rem' : '1.5rem', borderBottom: '1px solid rgba(255, 255, 255, 0.1)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { X } from 'lucide-react'
 
@@ -24,6 +24,12 @@ export default function AddLeadModal({ isMobile, onClose, onSubmit }) {
 
   const [errors, setErrors] = useState({})
 
+  // Op mobiel vuurt de tik die de "+"-knop indrukt daarna nog een synthetische
+  // klik af op de nét-verschenen backdrop (click-through), die de modal meteen
+  // weer zou sluiten. Pas na een korte guard mag de backdrop sluiten.
+  const [armed, setArmed] = useState(false)
+  useEffect(() => { const t = setTimeout(() => setArmed(true), 300); return () => clearTimeout(t) }, [])
+
   const handleSubmit = (e) => {
     e.preventDefault()
 
@@ -42,7 +48,7 @@ export default function AddLeadModal({ isMobile, onClose, onSubmit }) {
   // Render via portal so the modal escapes any transform/overflow parents
   // in the kanban tree and centers in the actual viewport.
   return createPortal(
-    <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0, 0, 0, 0.8)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: isMobile ? '1rem' : '2rem' }} onClick={(e) => { if (e.target === e.currentTarget) onClose() }}>
+    <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0, 0, 0, 0.8)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2147483550, padding: isMobile ? '1rem' : '2rem' }} onClick={(e) => { if (armed && e.target === e.currentTarget) onClose() }}>
       <div style={{ background: '#111', border: '1px solid rgba(255, 255, 255, 0.15)', borderRadius: '16px', width: '100%', maxWidth: '500px', maxHeight: '90vh', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
         
         <div style={{ padding: isMobile ? '1rem' : '1.5rem', borderBottom: '1px solid rgba(255, 255, 255, 0.1)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
