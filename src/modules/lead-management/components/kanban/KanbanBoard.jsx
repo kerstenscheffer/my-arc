@@ -1412,7 +1412,7 @@ export default function KanbanBoard({
                     <Settings size={11} />
                   </button>
                 )}
-                <button onClick={() => { setSelectedSectionForLead(section.id); setShowAddLead(true) }}
+                <button onClick={() => { setShowSearchResults(false); setSelectedSectionForLead(section.id); setShowAddLead(true) }}
                   style={{ width: '24px', height: '24px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: `${section.color}10`, border: `1px solid ${section.color}25`, borderRadius: '5px', color: section.color, cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}>
                   <Plus size={11} />
                 </button>
@@ -1512,6 +1512,7 @@ export default function KanbanBoard({
             top: isMobile ? 68 : 76,   // initieel; useLayoutEffect zet de echte top vóór paint
             left: isMobile ? 0 : barHoriz.left,
             width: isMobile ? '100vw' : (barHoriz.width || 'calc(100vw - 16px)'),
+            background: 'rgba(10,10,10,0.97)',
           }}>
           <div style={{
             display: 'flex', alignItems: 'center', gap: '0.3rem', flexWrap: 'wrap',
