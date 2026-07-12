@@ -1520,7 +1520,9 @@ export default function KanbanBoard({
             padding: isMobile ? '0.45rem 8px' : '0.4rem',
             borderRadius: isMobile ? 0 : 12,
             background: 'rgba(10,10,10,0.97)', backdropFilter: 'blur(8px)',
-            border: isMobile ? 'none' : '1px solid rgba(255,255,255,0.08)',
+            borderTop: isMobile ? 'none' : '1px solid rgba(255,255,255,0.08)',
+            borderLeft: isMobile ? 'none' : '1px solid rgba(255,255,255,0.08)',
+            borderRight: isMobile ? 'none' : '1px solid rgba(255,255,255,0.08)',
             borderBottom: '1px solid rgba(255,255,255,0.08)',
             boxShadow: isMobile ? '0 6px 16px rgba(0,0,0,0.5)' : '0 8px 24px rgba(0,0,0,0.55)',
           }}>
