@@ -745,6 +745,10 @@ export default function KanbanBoard({
   }
 
   const scrollToLead = (leadId, sectionId) => {
+    // Op mobiel is alleen de actieve stage in de DOM — schakel eerst naar de
+    // sectie van deze lead, anders bestaat de kaart niet en kan 'ie er niet
+    // naartoe scrollen.
+    if (isMobile && sectionId) setActiveMobileSectionId(sectionId)
     setExpandedSections(prev => ({ ...prev, [sectionId]: true }))
     setHighlightedLeadId(leadId)
     setShowSearchResults(false)
@@ -761,7 +765,7 @@ export default function KanbanBoard({
           el.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' })
         }
       }
-    }, 200)
+    }, isMobile ? 350 : 200)
     setTimeout(() => setHighlightedLeadId(null), 3000)
   }
 
