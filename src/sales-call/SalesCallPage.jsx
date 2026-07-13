@@ -2,13 +2,12 @@
 // Main wrapper — snap scroll + Enter key navigation
 import { useEffect, useRef, useState } from 'react'
 import HeroSection from './sections/HeroSection'
-// import TransformationSassus from './sections/TransformationSassus' // reviews verwijderd
 import PillarenSection from './sections/PillarenSection'
-// import TransformationConsumer from './sections/TransformationConsumer' // reviews verwijderd
+import TransformatieReviews from './sections/TransformatieReviews'
 import GarantiePrijsSection from './sections/GarantiePrijsSection'
 
 const GOLD = '#ffba09'
-const SECTION_COUNT = 5
+const SECTION_COUNT = 4
 
 export default function SalesCallPage() {
   const containerRef = useRef(null)
@@ -87,11 +86,8 @@ export default function SalesCallPage() {
         }}
       >
         <HeroSection isMobile={isMobile} />
-        {/* Reviews/transformaties verwijderd op verzoek. Eén regel terugzetten
-            om ze weer te tonen. */}
-        {/* <TransformationSassus isMobile={isMobile} /> */}
         <PillarenSection isMobile={isMobile} />
-        {/* <TransformationConsumer isMobile={isMobile} /> */}
+        <TransformatieReviews isMobile={isMobile} />
         <GarantiePrijsSection isMobile={isMobile} />
       </div>
 
