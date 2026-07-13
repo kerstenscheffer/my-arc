@@ -3,11 +3,10 @@
 import { useEffect, useRef, useState } from 'react'
 import HeroSection from './sections/HeroSection'
 import PillarenSection from './sections/PillarenSection'
-import TransformatieReviews from './sections/TransformatieReviews'
 import GarantiePrijsSection from './sections/GarantiePrijsSection'
 
 const GOLD = '#ffba09'
-const SECTION_COUNT = 4
+const SECTION_COUNT = 3
 
 export default function SalesCallPage() {
   const containerRef = useRef(null)
@@ -87,7 +86,6 @@ export default function SalesCallPage() {
       >
         <HeroSection isMobile={isMobile} />
         <PillarenSection isMobile={isMobile} />
-        <TransformatieReviews isMobile={isMobile} />
         <GarantiePrijsSection isMobile={isMobile} />
       </div>
 

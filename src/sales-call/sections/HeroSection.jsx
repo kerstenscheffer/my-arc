@@ -1,6 +1,5 @@
 // src/sales-call/sections/HeroSection.jsx
 // Hero — review cards matching screenshot style exactly
-import PhotoFan from './PhotoFan'
 
 const GOLD_DARK = '#e8a800'
 const TP_GREEN = '#00B67A'
@@ -85,13 +84,32 @@ export default function HeroSection({ isMobile }) {
           color: '#fff',
           fontSize: isMobile ? 'clamp(2rem, 8.5vw, 2.6rem)' : 'clamp(2.8rem, 4.8vw, 3.8rem)',
         }}>
-          5 uur per week in shape programma
+          Van zachte buik naar droog en gespierd <span style={{ borderBottom: '4px solid #ffba09', paddingBottom: '2px', whiteSpace: 'nowrap' }}>in 16 weken</span>
         </h1>
       </div>
 
-      {/* Boog */}
-      <div style={{ marginBottom: isMobile ? '2.75rem' : '3.5rem' }}>
-        <PhotoFan isMobile={isMobile} />
+      {/* Before/after transformaties onder de titel — echte resultaten */}
+      <div style={{
+        display: 'flex', justifyContent: 'center',
+        gap: isMobile ? '0.75rem' : '1.25rem',
+        padding: `0 ${SECTION_PAD_X}`, width: '100%', maxWidth: 640,
+        marginBottom: isMobile ? '2.75rem' : '3.5rem',
+      }}>
+        {['/review-transformatie-1.png', '/review-transformatie-2.png'].map((src, i) => (
+          <div key={i} style={{
+            flex: 1, maxWidth: isMobile ? 168 : 240,
+            borderRadius: 16, overflow: 'hidden', aspectRatio: '4 / 5',
+            boxShadow: '0 14px 34px rgba(0,0,0,0.55)',
+            border: '1px solid rgba(255,255,255,0.08)',
+          }}>
+            <img
+              src={src}
+              alt="Transformatie — maand 1 naar maand 3"
+              onError={(e) => { e.currentTarget.style.opacity = 0 }}
+              style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+            />
+          </div>
+        ))}
       </div>
 
       {/* ═══ Subtekst onder de boog — kleiner, ondergeschikt aan de titel ═══ */}
