@@ -1412,7 +1412,7 @@ export default function KanbanBoard({
                     <Settings size={11} />
                   </button>
                 )}
-                <button onClick={() => { console.log('🟢 DEBUG: + tik ontvangen — section', section.id, '→ showAddLead=true'); setShowSearchResults(false); setSelectedSectionForLead(section.id); setShowAddLead(true) }}
+                <button onClick={() => { setShowSearchResults(false); setSelectedSectionForLead(section.id); setShowAddLead(true) }}
                   style={{ width: '24px', height: '24px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: `${section.color}10`, border: `1px solid ${section.color}25`, borderRadius: '5px', color: section.color, cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}>
                   <Plus size={11} />
                 </button>
@@ -1775,7 +1775,6 @@ export default function KanbanBoard({
                 de sectie-slider (order:4) omlaag i.p.v. eroverheen. */}
             {showSearchResults && (
               <div style={{ order: 3, flexBasis: '100%', width: '100%', marginTop: -2, position: 'relative', zIndex: 1000 }}>
-              <div onClick={() => setShowSearchResults(false)} style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 40 }} />
               {searchResults.length > 0 ? (
                 <div style={{ width: '100%' }}>
                   <div style={{ background: '#111', border: '1px solid rgba(16,185,129,0.2)', borderRadius: '8px', overflowX: 'hidden', boxShadow: '0 8px 24px rgba(0,0,0,0.5)', maxHeight: '60vh', overflowY: 'auto' }}>
