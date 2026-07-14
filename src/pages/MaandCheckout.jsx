@@ -26,9 +26,9 @@ const REVIEWS = [
 
 // Transformatie-reviews (before/after) met resultaat-tekst.
 const TRANSFORMATIONS = [
-  { src: '/review-transformatie-3.png', caption: 'Van 85 naar 78,5 kg (en dalend)' },
-  { src: '/review-transformatie-1.png', caption: '-10 kg zonder honger' },
-  { src: '/review-transformatie-2.png', caption: '-5 kg vet & veel sterker' },
+  { src: '/review-transformatie-3.png', caption: 'Van 85 naar 78,5 (en dalend)' },
+  { src: '/review-transformatie-1.png', caption: 'Van 96 naar 84' },
+  { src: '/review-transformatie-2.png', caption: 'Van 65 naar 60,2 (& veel sterker)' },
 ]
 
 // De 5 pilaren met app-screenshots + korte omschrijving (info uit de sales-pagina).
@@ -120,34 +120,28 @@ export default function MaandCheckout() {
     }}>
       <div style={{
         maxWidth: 520, margin: '0 auto',
-        padding: isMobile ? '2rem 1.25rem 3rem' : '3rem 2rem 4rem',
+        padding: isMobile ? '3.5rem 1.25rem 4.5rem' : '4.5rem 2rem 5.5rem',
       }}>
 
         {/* ══ HEADER ══ */}
-        <div style={{ textAlign: 'center', marginBottom: isMobile ? '2rem' : '2.5rem' }}>
-          <div style={{
-            fontSize: isMobile ? '0.6rem' : '0.65rem',
-            fontWeight: 800, color: 'rgba(255,186,9,0.5)',
-            letterSpacing: '0.15em', textTransform: 'uppercase', marginBottom: 6,
-          }}>MY ARC FITNESS</div>
+        <div style={{ textAlign: 'center', marginBottom: isMobile ? '4rem' : '5.5rem' }}>
+          <img
+            src="/ma-logo-header.png"
+            alt="MA Coaching"
+            style={{ width: isMobile ? 130 : 160, height: 'auto', display: 'block', margin: `0 auto ${isMobile ? '1.25rem' : '1.5rem'}` }}
+          />
           <h1 style={{
-            fontSize: isMobile ? '1.5rem' : '2.1rem',
-            fontWeight: 900, lineHeight: 1.15, letterSpacing: '-0.02em', marginBottom: 8, color: '#fff',
+            fontSize: isMobile ? '1.6rem' : '2.2rem',
+            fontWeight: 900, lineHeight: 1.15, letterSpacing: '-0.02em', margin: 0, color: '#fff',
           }}>
-            Van zachte buik naar droog en gespierd <span style={{ borderBottom: '4px solid #ffba09', paddingBottom: '2px', whiteSpace: 'nowrap' }}>in 16 weken</span>
+            De start van jouw 3 maand <span style={{ color: '#ffba09' }}>(en levenslange)</span> transformatie
           </h1>
-          <p style={{
-            fontSize: isMobile ? '0.85rem' : '0.95rem',
-            color: 'rgba(255,255,255,0.4)', fontWeight: 500,
-          }}>
-            3 maanden coaching · €99 per maand · stop wanneer je wilt na 3 maanden.
-          </p>
         </div>
 
         {/* ══ TRANSFORMATIE-REVIEWS (3 before/after + resultaat) ══ */}
         <div style={{
           display: 'flex', gap: isMobile ? '0.45rem' : '0.75rem', justifyContent: 'center',
-          alignItems: 'flex-start', marginBottom: isMobile ? '1.5rem' : '1.75rem',
+          alignItems: 'flex-start', marginBottom: isMobile ? '4rem' : '5.5rem',
         }}>
           {TRANSFORMATIONS.map((t, i) => (
             <div key={i} style={{ flex: 1, minWidth: 0, maxWidth: isMobile ? 'none' : 165, display: 'flex', flexDirection: 'column', gap: isMobile ? 6 : 8 }}>
@@ -163,26 +157,26 @@ export default function MaandCheckout() {
                 />
               </div>
               <span style={{
-                textAlign: 'center', color: '#ffba09', fontWeight: 800,
-                fontSize: isMobile ? '0.62rem' : '0.75rem', lineHeight: 1.25,
+                textAlign: 'center', color: '#fff', fontWeight: 800,
+                fontSize: isMobile ? '0.78rem' : '0.92rem', lineHeight: 1.25,
               }}>{t.caption}</span>
             </div>
           ))}
         </div>
 
-        <div style={{ marginBottom: isMobile ? '2rem' : '2.5rem' }}>
+        <div style={{ marginBottom: isMobile ? '4rem' : '5.5rem' }}>
           <div style={{
             textAlign: 'center', color: '#fff', fontWeight: 900,
             fontSize: isMobile ? '1.6rem' : '2rem', letterSpacing: '-0.02em',
             lineHeight: 1.1, marginBottom: isMobile ? '1.25rem' : '1.5rem',
           }}>Wat je krijgt</div>
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: isMobile ? '1rem' : '1.15rem' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
             {PILLAR_PHOTOS.map((p, i) => (
-              <div key={i} style={{ display: 'flex', gap: isMobile ? '0.85rem' : '1.1rem', alignItems: 'center' }}>
+              <div key={i} style={{ display: 'flex', gap: isMobile ? '0.5rem' : '0.65rem', alignItems: 'center' }}>
                 {/* Screenshot — los op de pagina, geen container */}
                 <div style={{
-                  flexShrink: 0, width: isMobile ? 60 : 72, aspectRatio: '3 / 4',
+                  flexShrink: 0, width: isMobile ? 118 : 142, aspectRatio: '3 / 4',
                   borderRadius: 10, overflow: 'hidden',
                   filter: 'drop-shadow(0 8px 16px rgba(0,0,0,0.5))',
                 }}>
@@ -190,7 +184,7 @@ export default function MaandCheckout() {
                     src={p.screenshot}
                     alt={p.title}
                     onError={(e) => { e.currentTarget.style.opacity = 0 }}
-                    style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+                    style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block' }}
                   />
                 </div>
 
@@ -199,7 +193,7 @@ export default function MaandCheckout() {
                   <div style={{
                     fontSize: isMobile ? '0.95rem' : '1.05rem', fontWeight: 800,
                     color: '#fff', lineHeight: 1.2, marginBottom: 3,
-                  }}>{p.title}</div>
+                  }}><span style={{ color: '#ffba09' }}>{i + 1}.</span> {p.title}</div>
                   <p style={{
                     margin: 0, fontSize: isMobile ? '0.78rem' : '0.85rem',
                     color: 'rgba(255,255,255,0.85)', fontWeight: 500, lineHeight: 1.4,
@@ -211,14 +205,14 @@ export default function MaandCheckout() {
         </div>
 
         {/* ══ OFFER — compacte platte tekst (sales-stijl, geen card) ══ */}
-        <div style={{ textAlign: 'center', marginBottom: isMobile ? '1.75rem' : '2.25rem' }}>
+        <div style={{ textAlign: 'center', marginBottom: isMobile ? '4rem' : '5.5rem' }}>
           {/* Prijs */}
           <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'center', gap: 5 }}>
             <span style={{ fontSize: isMobile ? '2.9rem' : '3.4rem', fontWeight: 900, color: '#fff', lineHeight: 1, letterSpacing: '-0.02em' }}>€99</span>
             <span style={{ fontSize: isMobile ? '1rem' : '1.2rem', color: 'rgba(255,255,255,0.4)', fontWeight: 700 }}>/mnd</span>
           </div>
           <div style={{ fontSize: isMobile ? '0.82rem' : '0.9rem', color: 'rgba(255,255,255,0.45)', fontWeight: 600, marginTop: 8 }}>
-            3 maanden × €99 = <span style={{ color: '#fff', fontWeight: 800 }}>€297 totaal</span> · stop wanneer je wilt
+            3 maanden × €99 = <span style={{ color: '#fff', fontWeight: 800 }}>€297 totaal</span>
           </div>
 
           {/* Garantie — de belofte in goud, zoals de sales-pagina */}
@@ -234,7 +228,7 @@ export default function MaandCheckout() {
           border: '1px solid rgba(255,255,255,0.08)',
           background: 'rgba(255,255,255,0.02)',
           padding: isMobile ? '1.5rem 1.25rem' : '1.75rem 1.5rem',
-          marginBottom: isMobile ? '1.5rem' : '2rem',
+          marginBottom: isMobile ? '4rem' : '5.5rem',
         }}>
           <div style={{
             fontSize: isMobile ? '0.85rem' : '0.9rem',
