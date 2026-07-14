@@ -33,11 +33,11 @@ const TRANSFORMATIONS = [
 
 // De 5 pilaren met app-screenshots + korte omschrijving (info uit de sales-pagina).
 const PILLAR_PHOTOS = [
-  { screenshot: '/sales-screenshots/eten.png',    title: 'Altijd weten wat je eet', desc: 'Vaste maaltijden in de app. Vet verliezen zonder honger.' },
-  { screenshot: '/sales-screenshots/meedoen.png', title: 'Gewoon mee blijven doen', desc: 'Feestjes, uit eten en weekenden blijven gewoon mogelijk.' },
-  { screenshot: '/sales-screenshots/trainen.png', title: 'In shape in 3x per week',  desc: 'Workouts onder het uur, thuis of in de gym, met bijsturing.' },
+  { screenshot: '/sales-screenshots/eten.png',    title: 'Altijd weten wat je eet', desc: 'Vaste maaltijden en vervang-opties in de app. Weten wat je kan eten voor jouw doel.' },
+  { screenshot: '/sales-screenshots/meedoen.png', title: 'Gewoon mee blijven doen', desc: 'Feestjes, uit eten en weekenden horen erbij. Ik leer je hoe.' },
+  { screenshot: '/sales-screenshots/trainen.png', title: 'In shape in 3x per week',  desc: 'Workouts efficiënt of optimaal, thuis of in de gym. Ik maak het op maat voor jouw situatie en doelen.' },
   { screenshot: '/sales-screenshots/tracking.png', title: 'Zie dat het werkt',       desc: 'Kracht, gewicht en foto-tracking. Zichtbaar verschil in 30 dagen.' },
-  { screenshot: '/sales-screenshots/coach.png',   title: 'Coach naast je',           desc: 'Elke 2 weken een videocall en dagelijks bereikbaar in de app.' },
+  { screenshot: '/sales-screenshots/coach.png',   title: 'Coach naast je',           desc: 'Elke week een videocall en dagelijks bereikbaar in de app.' },
 ]
 
 export default function MaandCheckout() {
@@ -171,20 +171,20 @@ export default function MaandCheckout() {
             lineHeight: 1.1, marginBottom: isMobile ? '1.25rem' : '1.5rem',
           }}>Wat je krijgt</div>
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: isMobile ? '0.9rem' : '1.1rem' }}>
             {PILLAR_PHOTOS.map((p, i) => (
               <div key={i} style={{ display: 'flex', gap: isMobile ? '0.5rem' : '0.65rem', alignItems: 'center' }}>
                 {/* Screenshot — los op de pagina, geen container */}
                 <div style={{
-                  flexShrink: 0, width: isMobile ? 118 : 142, aspectRatio: '3 / 4',
-                  borderRadius: 10, overflow: 'hidden',
+                  flexShrink: 0, width: isMobile ? 118 : 142,
+                  borderRadius: 10, overflow: 'hidden', display: 'flex',
                   filter: 'drop-shadow(0 8px 16px rgba(0,0,0,0.5))',
                 }}>
                   <img
                     src={p.screenshot}
                     alt={p.title}
                     onError={(e) => { e.currentTarget.style.opacity = 0 }}
-                    style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block' }}
+                    style={{ width: '100%', height: 'auto', display: 'block' }}
                   />
                 </div>
 
