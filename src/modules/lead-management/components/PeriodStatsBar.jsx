@@ -5,7 +5,7 @@
 // de stats voor die periode laadt. Data uit dezelfde range-methodes als de
 // week-analytics modal (getRangeFunnelStats + getRangeReactionStats).
 import { useState, useEffect } from 'react'
-import { ChevronDown, BarChart3, TrendingUp, UserPlus, Send, MessageCircle, Phone, CalendarCheck, Trophy, UserX } from 'lucide-react'
+import { ChevronDown, BarChart3, TrendingUp, UserPlus, Send, MessageCircle, Phone, CalendarCheck, Trophy, UserX, Euro } from 'lucide-react'
 import WeekStatsModal from './WeekStatsModal'
 import GrowthChart from './GrowthChart'
 
@@ -75,7 +75,7 @@ export default function PeriodStatsBar({ leadService, coachId, isMobile, refresh
   const [open, setOpen] = useState(false)
   const [showWeek, setShowWeek] = useState(false)
   const [loading, setLoading] = useState(true)
-  const [s, setS] = useState({ nieuw: 0, follow: 0, reacties: 0, voorgesteld: 0, ingepland: 0, sales: 0, noshow: 0 })
+  const [s, setS] = useState({ nieuw: 0, follow: 0, reacties: 0, voorgesteld: 0, ingepland: 0, sales: 0, omzet: 0, noshow: 0 })
   const [timeSeries, setTimeSeries] = useState([])
   const [chartOpen, setChartOpen] = useState(false)
 
@@ -107,6 +107,7 @@ export default function PeriodStatsBar({ leadService, coachId, isMobile, refresh
           voorgesteld: funnel?.callProposed?.count || 0,
           ingepland: funnel?.callScheduled?.count || 0,
           sales: funnel?.sale?.count || 0,
+          omzet: funnel?.sale?.omzet || 0,
           noshow: funnel?.noShow?.count || 0,
         }
         setS(next)
@@ -132,6 +133,7 @@ export default function PeriodStatsBar({ leadService, coachId, isMobile, refresh
     { label: 'Call voorgesteld', value: s.voorgesteld, Icon: Phone,         color: '#a855f7' },
     { label: 'Call ingepland',   value: s.ingepland,   Icon: CalendarCheck, color: '#06b6d4' },
     { label: 'Sales',            value: s.sales,       Icon: Trophy,        color: GOLD },
+    { label: 'Omzet',            value: '€' + Math.round(s.omzet || 0).toLocaleString('nl-NL'), Icon: Euro, color: '#22c55e' },
     { label: 'No-shows',         value: s.noshow,      Icon: UserX,         color: '#ef4444' },
   ]
   const PERIOD_SHORT = { day: 'Vandaag', week: 'Week', month: 'Maand', lastMonth: 'Vorige', custom: 'Datum' }

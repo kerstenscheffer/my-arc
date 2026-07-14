@@ -1750,7 +1750,7 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
         conversation:  { count: 0, leads: [] },
         callProposed:  { count: 0, leads: [] },
         callScheduled: { count: 0, leads: [] },
-        sale:          { count: 0, leads: [] },
+        sale:          { count: 0, leads: [], omzet: 0 },
         noShow:        { count: 0, leads: [] },
       }
       // Funnel-rang van een sectietitel (zelfde first-match-volgorde als de
@@ -1796,6 +1796,10 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
         const toSection = (mov.to_section_title || '').toLowerCase()
         const fromRank = rankOf(mov.from_section_title)
         const leadId = mov.lead_id
+        // Omzet: elke movement met een ingevulde order-waarde telt mee (die
+        // wordt alleen bij een sale gezet). Vóór de early-returns zodat 'ie
+        // altijd meetelt, ook als de sectie geen puur "Sale"-label heeft.
+        if (mov.order_value != null) funnel.sale.omzet += Number(mov.order_value) || 0
         const leadInfo = {
           id: mov.id,  // movement-id → nodig om deze stat-regel terug te kunnen draaien
           leadId: mov.lead_id,
@@ -1835,8 +1839,27 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
       return {
         replied: { count: 0, leads: [] }, conversation: { count: 0, leads: [] },
         callProposed: { count: 0, leads: [] }, callScheduled: { count: 0, leads: [] },
-        sale: { count: 0, leads: [] }, noShow: { count: 0, leads: [] },
+        sale: { count: 0, leads: [], omzet: 0 }, noShow: { count: 0, leads: [] },
       }
+    }
+  }
+
+  // Zet de order-waarde (omzet) op de meest recente movement van een lead —
+  // aangeroepen wanneer een lead naar een sale-sectie is verplaatst.
+  async setMovementOrderValue(leadId, orderValue) {
+    try {
+      const { data: rows } = await this.db.supabase
+        .from('lead_movements').select('id')
+        .eq('lead_id', leadId).is('reverted_at', null)
+        .order('moved_at', { ascending: false }).limit(1)
+      const movId = rows?.[0]?.id
+      if (!movId) return { error: 'geen movement gevonden' }
+      const { error } = await this.db.supabase
+        .from('lead_movements').update({ order_value: orderValue }).eq('id', movId)
+      return { error }
+    } catch (error) {
+      console.error('❌ setMovementOrderValue failed:', error)
+      return { error }
     }
   }
 

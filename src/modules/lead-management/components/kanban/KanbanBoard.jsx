@@ -8,6 +8,7 @@ import { createPortal } from 'react-dom'
 import { Plus, Settings, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, GripVertical, Save, RotateCcw, Users, Instagram, Search, X, ArrowUp, ArrowUpDown, Clock, Maximize2, Minimize2, CheckCircle, Send, Zap, Flame, Phone, SlidersHorizontal, Bell, BarChart3 } from 'lucide-react'
 import KanbanCard from './KanbanCard'
 import AddLeadModal from './AddLeadModal'
+import SaleValueModal from './SaleValueModal'
 import RapidAddLeadsModal from './RapidAddLeadsModal'
 import SectionModal from './SectionModal'
 import PeriodStatsBar from '../PeriodStatsBar'
@@ -70,6 +71,8 @@ export default function KanbanBoard({
   const [expandedSections, setExpandedSections] = useState({})
   // Mobiel: welke stage/sectie staat actief in de één-stage-weergave.
   const [activeMobileSectionId, setActiveMobileSectionId] = useState(null)
+  // Sale-modal: opent na een move naar een sale-sectie om de omzet in te voeren.
+  const [saleModalLead, setSaleModalLead] = useState(null)
   // Bovenste stats-balk in/uitklapbaar (mobiel standaard dicht = rustiger).
   const [showStats, setShowStats] = useState(!isMobile)
   // boardFilter shape: {
@@ -942,6 +945,8 @@ export default function KanbanBoard({
         setHighlightedLeadId(draggedLead.id)
         setTimeout(() => setHighlightedLeadId(null), 2000)
         loadActivityData()
+        // Sale-sectie → open de omzet-modal om de order-waarde in te voeren.
+        if (isSaleSectionTitle(targetSection.title)) setSaleModalLead({ id: draggedLead.id, name: leadFullName(draggedLead) })
         // Auto-open the magnet picker when this drop landed in the
         // Lead-magnets section. Strip the dragged-lead's transient
         // currentSectionId before handing it to the modal.
@@ -1224,6 +1229,16 @@ export default function KanbanBoard({
   // Verplaats een lead naar een sectie via de dropdown op de card (alternatief
   // voor slepen — handig als de doelsectie niet in beeld staat). Spiegelt de
   // optimistische move uit onColumnDrop.
+  // Is dit een positieve sale-sectie? (zelfde keywords als de omzet-stat, met
+  // uitsluiting van verloren/no-show zodat die geen omzet-modal triggeren.)
+  const isSaleSectionTitle = (title) => {
+    const t = (title || '').toLowerCase()
+    const SALE = ['sale', 'verkocht', 'klant', 'client', 'gewonnen', 'won', 'deal']
+    const NEG = ['verloren', 'lost', 'no show', 'no-show', 'noshow', 'afgehaakt', 'geannuleerd', 'refund']
+    return SALE.some(w => t.includes(w)) && !NEG.some(w => t.includes(w))
+  }
+  const leadFullName = (l) => `${l?.first_name || ''} ${l?.last_name || ''}`.trim() || (l?.instagram_handle ? `@${l.instagram_handle}` : 'deze lead')
+
   const handleMoveLeadToSection = async (lead, fromSectionId, targetSectionId) => {
     if (!targetSectionId || targetSectionId === fromSectionId) return
     try {
@@ -1237,6 +1252,8 @@ export default function KanbanBoard({
       setHighlightedLeadId(lead.id)
       setTimeout(() => setHighlightedLeadId(null), 2000)
       loadActivityData()
+      const tgt = sections.find(s => s.id === targetSectionId)
+      if (tgt && isSaleSectionTitle(tgt.title)) setSaleModalLead({ id: lead.id, name: leadFullName(lead) })
     } catch (error) {
       console.error('❌ Move lead via dropdown failed:', error)
       await loadBoard(false)
@@ -2138,6 +2155,24 @@ export default function KanbanBoard({
           coachId={coachId}
           isMobile={isMobile}
           onClose={() => setShowOutreachLogger(false)}
+        />
+      )}
+
+      {/* Sale-modal: na een move naar een sale-sectie → order-waarde invoeren
+          (voor de omzet-statistiek). Overslaan mag; dan telt de sale zonder omzet. */}
+      {saleModalLead && (
+        <SaleValueModal
+          isMobile={isMobile}
+          leadName={saleModalLead.name}
+          onClose={() => setSaleModalLead(null)}
+          onSave={async (value) => {
+            const lead = saleModalLead
+            setSaleModalLead(null)
+            if (value != null && lead?.id) {
+              try { await leadService.setMovementOrderValue(lead.id, value) } catch (e) { console.error('Omzet opslaan mislukt:', e) }
+              setStatsRefreshKey(k => k + 1)
+            }
+          }}
         />
       )}
 
