@@ -24,13 +24,20 @@ const REVIEWS = [
   { name: 'Consumer', date: 'nov 2025', text: 'Zeer professionele aanpak! Alles duidelijk en gestructureerd in een overzichtelijke app. Feedback en motivatie op de juiste momenten. Absolute aanrader!' },
 ]
 
-// Compacte 5 pilaren met app-screenshots (zelfde beelden als de sales-pagina).
+// Transformatie-reviews (before/after) met resultaat-tekst.
+const TRANSFORMATIONS = [
+  { src: '/review-transformatie-3.png', caption: 'Van 85 naar 78,5 kg (en dalend)' },
+  { src: '/review-transformatie-1.png', caption: '-10 kg zonder honger' },
+  { src: '/review-transformatie-2.png', caption: '-5 kg vet & veel sterker' },
+]
+
+// De 5 pilaren met app-screenshots + korte omschrijving (info uit de sales-pagina).
 const PILLAR_PHOTOS = [
-  { screenshot: '/sales-screenshots/eten.png',    label: 'Voeding' },
-  { screenshot: '/sales-screenshots/meedoen.png', label: 'Sociaal leven' },
-  { screenshot: '/sales-screenshots/trainen.png', label: 'Trainen' },
-  { screenshot: '/sales-screenshots/tracking.png', label: 'Tracking' },
-  { screenshot: '/sales-screenshots/coach.png',   label: 'Coach' },
+  { screenshot: '/sales-screenshots/eten.png',    title: 'Altijd weten wat je eet', desc: 'Vaste maaltijden in de app. Vet verliezen zonder honger.' },
+  { screenshot: '/sales-screenshots/meedoen.png', title: 'Gewoon mee blijven doen', desc: 'Feestjes, uit eten en weekenden blijven gewoon mogelijk.' },
+  { screenshot: '/sales-screenshots/trainen.png', title: 'In shape in 3x per week',  desc: 'Workouts onder het uur, thuis of in de gym, met bijsturing.' },
+  { screenshot: '/sales-screenshots/tracking.png', title: 'Zie dat het werkt',       desc: 'Kracht, gewicht en foto-tracking. Zichtbaar verschil in 30 dagen.' },
+  { screenshot: '/sales-screenshots/coach.png',   title: 'Coach naast je',           desc: 'Elke 2 weken een videocall en dagelijks bereikbaar in de app.' },
 ]
 
 export default function MaandCheckout() {
@@ -137,63 +144,70 @@ export default function MaandCheckout() {
           </p>
         </div>
 
-        {/* ══ TESTIMONIALS (3 before/after) + COMPACTE 5 PILAREN ══ */}
+        {/* ══ TRANSFORMATIE-REVIEWS (3 before/after + resultaat) ══ */}
         <div style={{
-          display: 'flex', gap: isMobile ? '0.5rem' : '0.75rem', justifyContent: 'center',
-          overflowX: isMobile ? 'auto' : 'visible', paddingBottom: isMobile ? 4 : 0,
-          marginBottom: isMobile ? '1.4rem' : '1.75rem',
+          display: 'flex', gap: isMobile ? '0.45rem' : '0.75rem', justifyContent: 'center',
+          alignItems: 'flex-start', marginBottom: isMobile ? '1.5rem' : '1.75rem',
         }}>
-          {['/review-transformatie-3.png', '/review-transformatie-1.png', '/review-transformatie-2.png'].map((src, i) => (
-            <div key={i} style={{
-              flexShrink: 0, width: isMobile ? 150 : 160,
-              borderRadius: 14, overflow: 'hidden', aspectRatio: '4 / 5',
-              boxShadow: '0 10px 26px rgba(0,0,0,0.5)', border: '1px solid rgba(255,186,9,0.2)',
-            }}>
-              <img
-                src={src}
-                alt="Transformatie — maand 1 naar maand 3"
-                onError={(e) => { e.currentTarget.style.opacity = 0 }}
-                style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
-              />
-            </div>
-          ))}
-        </div>
-
-        <div style={{
-          display: 'flex', gap: isMobile ? '0.5rem' : '0.7rem',
-          justifyContent: 'center', overflowX: isMobile ? 'auto' : 'visible',
-          marginBottom: isMobile ? '2rem' : '2.5rem', paddingBottom: isMobile ? 4 : 0,
-        }}>
-          {PILLAR_PHOTOS.map((p, i) => (
-            <div key={i} style={{
-              flexShrink: 0, width: isMobile ? 84 : 105,
-              display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6,
-            }}>
+          {TRANSFORMATIONS.map((t, i) => (
+            <div key={i} style={{ flex: 1, minWidth: 0, maxWidth: isMobile ? 'none' : 165, display: 'flex', flexDirection: 'column', gap: isMobile ? 6 : 8 }}>
               <div style={{
-                width: '100%', aspectRatio: '3 / 4', borderRadius: 10, overflow: 'hidden',
-                background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,186,9,0.18)',
-                position: 'relative',
+                width: '100%', borderRadius: isMobile ? 10 : 14, overflow: 'hidden', aspectRatio: '4 / 5',
+                boxShadow: '0 10px 26px rgba(0,0,0,0.5)', border: '1px solid rgba(255,186,9,0.2)',
               }}>
-                <span style={{
-                  position: 'absolute', top: 5, left: 5, zIndex: 2,
-                  width: 16, height: 16, borderRadius: '50%',
-                  background: 'rgba(255,186,9,0.95)', color: '#000',
-                  fontSize: '0.55rem', fontWeight: 900,
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                }}>{i + 1}</span>
                 <img
-                  src={p.screenshot}
-                  alt={p.label}
+                  src={t.src}
+                  alt="Transformatie — maand 1 naar maand 3"
                   onError={(e) => { e.currentTarget.style.opacity = 0 }}
                   style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
                 />
               </div>
               <span style={{
-                fontSize: isMobile ? '0.6rem' : '0.66rem', fontWeight: 800,
-                color: 'rgba(255,255,255,0.85)', textAlign: 'center', lineHeight: 1.15,
-              }}>{p.label}</span>
+                textAlign: 'center', color: '#ffba09', fontWeight: 800,
+                fontSize: isMobile ? '0.62rem' : '0.75rem', lineHeight: 1.25,
+              }}>{t.caption}</span>
             </div>
           ))}
+        </div>
+
+        <div style={{ marginBottom: isMobile ? '2rem' : '2.5rem' }}>
+          <div style={{
+            textAlign: 'center', color: '#fff', fontWeight: 900,
+            fontSize: isMobile ? '1.6rem' : '2rem', letterSpacing: '-0.02em',
+            lineHeight: 1.1, marginBottom: isMobile ? '1.25rem' : '1.5rem',
+          }}>Wat je krijgt</div>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: isMobile ? '1rem' : '1.15rem' }}>
+            {PILLAR_PHOTOS.map((p, i) => (
+              <div key={i} style={{ display: 'flex', gap: isMobile ? '0.85rem' : '1.1rem', alignItems: 'center' }}>
+                {/* Screenshot — los op de pagina, geen container */}
+                <div style={{
+                  flexShrink: 0, width: isMobile ? 60 : 72, aspectRatio: '3 / 4',
+                  borderRadius: 10, overflow: 'hidden',
+                  filter: 'drop-shadow(0 8px 16px rgba(0,0,0,0.5))',
+                }}>
+                  <img
+                    src={p.screenshot}
+                    alt={p.title}
+                    onError={(e) => { e.currentTarget.style.opacity = 0 }}
+                    style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+                  />
+                </div>
+
+                {/* Titel + korte omschrijving (wit) */}
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{
+                    fontSize: isMobile ? '0.95rem' : '1.05rem', fontWeight: 800,
+                    color: '#fff', lineHeight: 1.2, marginBottom: 3,
+                  }}>{p.title}</div>
+                  <p style={{
+                    margin: 0, fontSize: isMobile ? '0.78rem' : '0.85rem',
+                    color: 'rgba(255,255,255,0.85)', fontWeight: 500, lineHeight: 1.4,
+                  }}>{p.desc}</p>
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
 
         {/* ══ OFFER — compacte platte tekst (sales-stijl, geen card) ══ */}
@@ -282,7 +296,7 @@ export default function MaandCheckout() {
               letterSpacing: '0.01em',
             }}
           >
-            {loading ? 'Even geduld...' : 'Start Nu — €99/maand'}
+            {loading ? 'Even geduld...' : 'Start Nu · €99/maand'}
           </button>
 
           <div style={{
