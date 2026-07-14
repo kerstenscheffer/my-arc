@@ -7,10 +7,7 @@
 // Stripe: reuse van /api/create-subscription-session (no API change).
 
 import { useState, useEffect, useRef } from 'react'
-import {
-  UtensilsCrossed, Dumbbell, Target, BarChart3, Moon,
-  Star, Lock, Mail, User, Phone,
-} from 'lucide-react'
+import { Star, Lock, Mail, User, Phone } from 'lucide-react'
 
 // Stripe recurring price · €99/mnd · product prod_TaoKNtzQpYqwch
 const STRIPE_MAAND_PRICE_ID = 'price_1SdciJJ3V4uXn1OkxOMcGNiX'
@@ -27,12 +24,13 @@ const REVIEWS = [
   { name: 'Consumer', date: 'nov 2025', text: 'Zeer professionele aanpak! Alles duidelijk en gestructureerd in een overzichtelijke app. Feedback en motivatie op de juiste momenten. Absolute aanrader!' },
 ]
 
-const PILLARS = [
-  { icon: UtensilsCrossed, text: 'Fuel Your Gains Meal System' },
-  { icon: Dumbbell,        text: 'Built To Grow Training System' },
-  { icon: Target,          text: 'Coach In Your Corner' },
-  { icon: BarChart3,       text: 'Trust The Process Tracker' },
-  { icon: Moon,            text: 'Recovery King Protocol' },
+// Compacte 5 pilaren met app-screenshots (zelfde beelden als de sales-pagina).
+const PILLAR_PHOTOS = [
+  { screenshot: '/sales-screenshots/eten.png',    label: 'Voeding' },
+  { screenshot: '/sales-screenshots/meedoen.png', label: 'Sociaal leven' },
+  { screenshot: '/sales-screenshots/trainen.png', label: 'Trainen' },
+  { screenshot: '/sales-screenshots/tracking.png', label: 'Tracking' },
+  { screenshot: '/sales-screenshots/coach.png',   label: 'Coach' },
 ]
 
 export default function MaandCheckout() {
@@ -126,14 +124,10 @@ export default function MaandCheckout() {
             letterSpacing: '0.15em', textTransform: 'uppercase', marginBottom: 6,
           }}>MY ARC FITNESS</div>
           <h1 style={{
-            fontSize: isMobile ? '1.75rem' : '2.5rem',
-            fontWeight: 900, lineHeight: 1.1, letterSpacing: '-0.02em', marginBottom: 6,
+            fontSize: isMobile ? '1.5rem' : '2.1rem',
+            fontWeight: 900, lineHeight: 1.15, letterSpacing: '-0.02em', marginBottom: 8, color: '#fff',
           }}>
-            <span style={{ color: '#fff' }}>Maand </span>
-            <span style={{
-              background: 'linear-gradient(135deg, #ffba09, #d4a006)',
-              WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
-            }}>Plan</span>
+            Van zachte buik naar droog en gespierd <span style={{ borderBottom: '4px solid #ffba09', paddingBottom: '2px', whiteSpace: 'nowrap' }}>in 16 weken</span>
           </h1>
           <p style={{
             fontSize: isMobile ? '0.85rem' : '0.95rem',
@@ -143,100 +137,80 @@ export default function MaandCheckout() {
           </p>
         </div>
 
-        {/* ══ PRICING CARD ══ */}
+        {/* ══ TESTIMONIALS (3 before/after) + COMPACTE 5 PILAREN ══ */}
         <div style={{
-          borderRadius: isMobile ? 18 : 22,
-          border: '1px solid rgba(255,186,9,0.3)',
-          background: 'rgba(255,255,255,0.02)',
-          overflow: 'hidden', position: 'relative',
-          marginBottom: isMobile ? '1.5rem' : '2rem',
+          display: 'flex', gap: isMobile ? '0.5rem' : '0.75rem', justifyContent: 'center',
+          overflowX: isMobile ? 'auto' : 'visible', paddingBottom: isMobile ? 4 : 0,
+          marginBottom: isMobile ? '1.4rem' : '1.75rem',
         }}>
-          {/* Gold top accent */}
-          <div style={{
-            position: 'absolute', top: 0, left: 0, right: 0, height: 3,
-            background: 'linear-gradient(90deg, #ffba09, #d4a006, #ffba09)',
-          }} />
-
-          {/* What you get */}
-          <div style={{ padding: isMobile ? '1.75rem 1.5rem 1.25rem' : '2rem 2rem 1.5rem' }}>
-            <span style={{
-              fontSize: isMobile ? '0.6rem' : '0.65rem',
-              fontWeight: 800, color: 'rgba(255,186,9,0.5)',
-              letterSpacing: '0.12em', textTransform: 'uppercase',
-              display: 'block', marginBottom: isMobile ? '0.85rem' : '1rem',
-            }}>WAT JE KRIJGT</span>
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: isMobile ? '0.55rem' : '0.65rem' }}>
-              {PILLARS.map((item, idx) => {
-                const Icon = item.icon
-                return (
-                  <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-                    <div style={{
-                      width: isMobile ? 26 : 30, height: isMobile ? 26 : 30,
-                      borderRadius: '50%', background: 'rgba(255,186,9,0.08)',
-                      border: '1px solid rgba(255,186,9,0.2)',
-                      display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-                    }}>
-                      <Icon size={isMobile ? 12 : 14} color="#ffba09" strokeWidth={2} />
-                    </div>
-                    <span style={{ fontSize: isMobile ? '0.82rem' : '0.88rem', color: 'rgba(255,255,255,0.65)', fontWeight: 500 }}>
-                      {item.text}
-                    </span>
-                  </div>
-                )
-              })}
+          {['/review-transformatie-3.png', '/review-transformatie-1.png', '/review-transformatie-2.png'].map((src, i) => (
+            <div key={i} style={{
+              flexShrink: 0, width: isMobile ? 150 : 160,
+              borderRadius: 14, overflow: 'hidden', aspectRatio: '4 / 5',
+              boxShadow: '0 10px 26px rgba(0,0,0,0.5)', border: '1px solid rgba(255,186,9,0.2)',
+            }}>
+              <img
+                src={src}
+                alt="Transformatie — maand 1 naar maand 3"
+                onError={(e) => { e.currentTarget.style.opacity = 0 }}
+                style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+              />
             </div>
+          ))}
+        </div>
+
+        <div style={{
+          display: 'flex', gap: isMobile ? '0.5rem' : '0.7rem',
+          justifyContent: 'center', overflowX: isMobile ? 'auto' : 'visible',
+          marginBottom: isMobile ? '2rem' : '2.5rem', paddingBottom: isMobile ? 4 : 0,
+        }}>
+          {PILLAR_PHOTOS.map((p, i) => (
+            <div key={i} style={{
+              flexShrink: 0, width: isMobile ? 84 : 105,
+              display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6,
+            }}>
+              <div style={{
+                width: '100%', aspectRatio: '3 / 4', borderRadius: 10, overflow: 'hidden',
+                background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,186,9,0.18)',
+                position: 'relative',
+              }}>
+                <span style={{
+                  position: 'absolute', top: 5, left: 5, zIndex: 2,
+                  width: 16, height: 16, borderRadius: '50%',
+                  background: 'rgba(255,186,9,0.95)', color: '#000',
+                  fontSize: '0.55rem', fontWeight: 900,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                }}>{i + 1}</span>
+                <img
+                  src={p.screenshot}
+                  alt={p.label}
+                  onError={(e) => { e.currentTarget.style.opacity = 0 }}
+                  style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+                />
+              </div>
+              <span style={{
+                fontSize: isMobile ? '0.6rem' : '0.66rem', fontWeight: 800,
+                color: 'rgba(255,255,255,0.85)', textAlign: 'center', lineHeight: 1.15,
+              }}>{p.label}</span>
+            </div>
+          ))}
+        </div>
+
+        {/* ══ OFFER — compacte platte tekst (sales-stijl, geen card) ══ */}
+        <div style={{ textAlign: 'center', marginBottom: isMobile ? '1.75rem' : '2.25rem' }}>
+          {/* Prijs */}
+          <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'center', gap: 5 }}>
+            <span style={{ fontSize: isMobile ? '2.9rem' : '3.4rem', fontWeight: 900, color: '#fff', lineHeight: 1, letterSpacing: '-0.02em' }}>€99</span>
+            <span style={{ fontSize: isMobile ? '1rem' : '1.2rem', color: 'rgba(255,255,255,0.4)', fontWeight: 700 }}>/mnd</span>
+          </div>
+          <div style={{ fontSize: isMobile ? '0.82rem' : '0.9rem', color: 'rgba(255,255,255,0.45)', fontWeight: 600, marginTop: 8 }}>
+            3 maanden × €99 = <span style={{ color: '#fff', fontWeight: 800 }}>€297 totaal</span> · stop wanneer je wilt
           </div>
 
-          {/* Divider */}
-          <div style={{ height: 1, background: 'linear-gradient(90deg, transparent, rgba(255,186,9,0.15), transparent)', margin: '0 1.5rem' }} />
-
-          {/* Guarantees */}
-          <div style={{
-            padding: isMobile ? '1rem 1.5rem 0' : '1.15rem 2rem 0',
-            display: 'flex', gap: isMobile ? '0.75rem' : '1rem',
-          }}>
-            <div style={{
-              flex: 1, display: 'flex', alignItems: 'center', gap: '0.45rem',
-              padding: isMobile ? '0.55rem 0.65rem' : '0.6rem 0.75rem',
-              borderRadius: 10, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)',
-            }}>
-              <svg xmlns="http://www.w3.org/2000/svg" width={isMobile ? 16 : 18} height={isMobile ? 16 : 18} viewBox="0 0 24 24" fill="none" stroke="#ffba09" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/>
-                <path d="m9 12 2 2 4-4"/>
-              </svg>
-              <div>
-                <div style={{ fontSize: isMobile ? '0.65rem' : '0.7rem', fontWeight: 800, color: 'rgba(255,255,255,0.6)' }}>28 Dagen Proberen</div>
-                <div style={{ fontSize: isMobile ? '0.55rem' : '0.58rem', color: 'rgba(255,255,255,0.25)', fontWeight: 500 }}>Niet tevreden? Geld terug.</div>
-              </div>
-            </div>
-            <div style={{
-              flex: 1, display: 'flex', alignItems: 'center', gap: '0.45rem',
-              padding: isMobile ? '0.55rem 0.65rem' : '0.6rem 0.75rem',
-              borderRadius: 10, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)',
-            }}>
-              <svg xmlns="http://www.w3.org/2000/svg" width={isMobile ? 16 : 18} height={isMobile ? 16 : 18} viewBox="0 0 24 24" fill="none" stroke="#ffba09" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
-              </svg>
-              <div>
-                <div style={{ fontSize: isMobile ? '0.65rem' : '0.7rem', fontWeight: 800, color: 'rgba(255,255,255,0.6)' }}>3 Maanden</div>
-                <div style={{ fontSize: isMobile ? '0.55rem' : '0.58rem', color: 'rgba(255,255,255,0.25)', fontWeight: 500 }}>Geen langetermijn-vastlegging</div>
-              </div>
-            </div>
-          </div>
-
-          {/* Price */}
-          <div style={{ padding: isMobile ? '1.25rem 1.5rem 1.5rem' : '1.5rem 2rem 1.75rem', textAlign: 'center' }}>
-            <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'center', gap: 4 }}>
-              <span style={{ fontSize: isMobile ? '2.75rem' : '3.25rem', fontWeight: 900, color: '#fff', lineHeight: 1 }}>€99</span>
-              <span style={{ fontSize: isMobile ? '0.95rem' : '1.05rem', color: 'rgba(255,255,255,0.3)', fontWeight: 600 }}>/mnd</span>
-            </div>
-            <div style={{ fontSize: isMobile ? '0.75rem' : '0.8rem', color: 'rgba(255,255,255,0.4)', fontWeight: 500, marginTop: 6 }}>
-              3 maanden × €99 = €297 totaal
-            </div>
-            <div style={{ fontSize: isMobile ? '0.7rem' : '0.75rem', color: '#ffba09', fontWeight: 700, marginTop: 4 }}>
-              Eerste betaling vandaag · maandelijks automatisch
-            </div>
+          {/* Garantie — de belofte in goud, zoals de sales-pagina */}
+          <div style={{ fontSize: isMobile ? '1.05rem' : '1.2rem', color: '#fff', fontWeight: 700, lineHeight: 1.45, maxWidth: 470, margin: isMobile ? '1.6rem auto 0' : '2rem auto 0' }}>
+            Geen zichtbaar verschil binnen 30 dagen?{' '}
+            <span style={{ color: '#ffba09' }}>Dan krijg je je investering terug en loop je weg met 30 dagen gratis coaching.</span>
           </div>
         </div>
 

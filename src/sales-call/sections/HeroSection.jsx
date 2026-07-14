@@ -1,10 +1,6 @@
 // src/sales-call/sections/HeroSection.jsx
 // Hero — review cards matching screenshot style exactly
-import { PILLARS } from './PillarenSection'
-
-// Korte pilaar-labels voor het compacte strookje in de hero (zelfde volgorde
-// als PILLARS). De uitgebreide titels staan in de pilaren-sectie zelf.
-const PILLAR_SHORT = ['Voeding', 'Sociaal leven', 'Trainen', 'Tracking', 'Coach']
+import PhotoFan from './PhotoFan'
 
 const GOLD_DARK = '#e8a800'
 const TP_GREEN = '#00B67A'
@@ -79,7 +75,7 @@ export default function HeroSection({ isMobile }) {
         textAlign: 'center',
         padding: `0 ${SECTION_PAD_X}`,
         maxWidth: '900px',
-        marginBottom: isMobile ? '1.5rem' : '2rem'
+        marginBottom: isMobile ? '2.75rem' : '3.5rem'
       }}>
         <h1 style={{
           fontWeight: '900',
@@ -89,69 +85,13 @@ export default function HeroSection({ isMobile }) {
           color: '#fff',
           fontSize: isMobile ? 'clamp(2rem, 8.5vw, 2.6rem)' : 'clamp(2.8rem, 4.8vw, 3.8rem)',
         }}>
-          Van zachte buik naar droog en gespierd <span style={{ borderBottom: '4px solid #ffba09', paddingBottom: '2px', whiteSpace: 'nowrap' }}>in 16 weken</span>
+          5 uur per week in shape programma
         </h1>
       </div>
 
-      {/* Onder de titel: testimonial-transformatie + compacte 5 pilaren */}
-      <div style={{
-        display: 'flex', flexDirection: 'column', alignItems: 'center',
-        gap: isMobile ? '1.1rem' : '1.4rem',
-        padding: `0 ${SECTION_PAD_X}`, width: '100%', maxWidth: 760,
-        marginBottom: isMobile ? '1.75rem' : '2.25rem',
-      }}>
-        {/* Testimonial before/after (Maand 1 → Maand 3) */}
-        <div style={{
-          width: '100%', maxWidth: isMobile ? 215 : 250,
-          borderRadius: 16, overflow: 'hidden', aspectRatio: '4 / 5',
-          boxShadow: '0 14px 34px rgba(0,0,0,0.55)',
-          border: '1px solid rgba(255,255,255,0.08)',
-        }}>
-          <img
-            src="/review-transformatie-3.png"
-            alt="Transformatie — maand 1 naar maand 3"
-            onError={(e) => { e.currentTarget.style.opacity = 0 }}
-            style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
-          />
-        </div>
-
-        {/* Compacte 5 pilaren — screenshot-thumb + korte titel */}
-        <div style={{
-          display: 'flex', gap: isMobile ? '0.5rem' : '0.85rem',
-          width: '100%', justifyContent: 'center',
-          overflowX: isMobile ? 'auto' : 'visible', paddingBottom: isMobile ? 4 : 0,
-        }}>
-          {PILLARS.map((p, i) => (
-            <div key={i} style={{
-              flexShrink: 0, width: isMobile ? 88 : 118,
-              display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6,
-            }}>
-              <div style={{
-                width: '100%', aspectRatio: '3 / 4', borderRadius: 10, overflow: 'hidden',
-                background: '#111', border: '1px solid rgba(255,255,255,0.08)',
-                position: 'relative',
-              }}>
-                <span style={{
-                  position: 'absolute', top: 5, left: 5, zIndex: 2,
-                  width: 16, height: 16, borderRadius: '50%',
-                  background: 'rgba(255,186,9,0.9)', color: '#000',
-                  fontSize: '0.55rem', fontWeight: 900,
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                }}>{i + 1}</span>
-                <img
-                  src={p.screenshot}
-                  alt={p.title}
-                  onError={(e) => { e.currentTarget.style.opacity = 0 }}
-                  style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
-                />
-              </div>
-              <span style={{
-                fontSize: isMobile ? '0.6rem' : '0.68rem', fontWeight: 800, color: '#fff',
-                textAlign: 'center', lineHeight: 1.15, letterSpacing: '-0.01em',
-              }}>{PILLAR_SHORT[i]}</span>
-            </div>
-          ))}
-        </div>
+      {/* Boog */}
+      <div style={{ marginBottom: isMobile ? '2.75rem' : '3.5rem' }}>
+        <PhotoFan isMobile={isMobile} />
       </div>
 
       {/* ═══ Subtekst onder de boog — kleiner, ondergeschikt aan de titel ═══ */}
@@ -172,7 +112,7 @@ export default function HeroSection({ isMobile }) {
         display: 'flex',
         alignItems: 'center',
         gap: '0.5rem',
-        marginTop: isMobile ? '1.75rem' : '2.25rem',
+        marginTop: isMobile ? '3.5rem' : '4.5rem',
         marginBottom: isMobile ? '1.25rem' : '1.5rem'
       }}>
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
