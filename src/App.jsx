@@ -26,6 +26,7 @@ import TwelveWeekCheckout from './pages/TwelveWeekCheckout'
 import MonthlySubscriptionCheckout from './pages/MonthlySubscriptionCheckout'
 import MaandCheckout from './pages/MaandCheckout'
 import SixMonthSubscriptionCheckout from './pages/SixMonthSubscriptionCheckout'
+import PaymentSuccessRedirect from './pages/PaymentSuccessRedirect'
 import Homepage from './pages/Homepage'
 import LeadPicGenerator from './modules/lead-pic-generator/LeadPicGenerator'
 import LeadMessageFlow from './modules/lead-magnet/LeadMessageFlow'
@@ -184,74 +185,9 @@ function App() {
     return <SixMonthSubscriptionCheckout />
   }
 
-  // Success page after payment
+  // Success page after payment — bevestigt kort en stuurt door naar /myintake
   if (currentPath === '/success') {
-    return (
-      <div style={{
-        minHeight: '100vh',
-        background: 'linear-gradient(180deg, #0a0a0a 0%, #171717 100%)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        padding: '2rem',
-        textAlign: 'center'
-      }}>
-        <div style={{
-          maxWidth: '500px',
-          background: 'rgba(17, 17, 17, 0.8)',
-          backdropFilter: 'blur(10px)',
-          borderRadius: '20px',
-          padding: '3rem',
-          border: '2px solid #10b981'
-        }}>
-          <div style={{
-            fontSize: '4rem',
-            marginBottom: '1rem'
-          }}>
-            🎉
-          </div>
-          <h1 style={{
-            fontSize: '2rem',
-            fontWeight: '700',
-            color: '#10b981',
-            marginBottom: '1rem'
-          }}>
-            Betaling Succesvol!
-          </h1>
-          <p style={{
-            color: 'rgba(255, 255, 255, 0.7)',
-            marginBottom: '2rem',
-            lineHeight: '1.6'
-          }}>
-            Welkom bij MY ARC! Je ontvangt binnen enkele minuten een email met je login gegevens.
-          </p>
-          <button
-            onClick={() => window.location.href = '/'}
-            style={{
-              padding: '1rem 2rem',
-              background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-              border: 'none',
-              borderRadius: '10px',
-              color: '#fff',
-              fontSize: '1rem',
-              fontWeight: '600',
-              cursor: 'pointer',
-              transition: 'all 0.3s ease'
-            }}
-            onMouseEnter={(e) => {
-              e.target.style.transform = 'translateY(-2px)'
-              e.target.style.boxShadow = '0 8px 20px rgba(16, 185, 129, 0.3)'
-            }}
-            onMouseLeave={(e) => {
-              e.target.style.transform = 'translateY(0)'
-              e.target.style.boxShadow = 'none'
-            }}
-          >
-            Naar Homepage
-          </button>
-        </div>
-      </div>
-    )
+    return <PaymentSuccessRedirect />
   }
 
   // Meal preferences form
