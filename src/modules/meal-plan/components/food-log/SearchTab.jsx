@@ -6,6 +6,7 @@
 import React, { useState, useRef, useEffect } from 'react'
 import { Search, Loader, Apple, X, ChevronRight, UtensilsCrossed, Plus, Copy, BadgeCheck } from 'lucide-react'
 import FatSecretService from './FatSecretService'
+import { foodImageFallback } from '../../foodImageFallback'
 
 const MODES = [
   { id: 'products', label: 'Alle producten' },
@@ -691,27 +692,15 @@ function ResultIcon({ item, accent }) {
   const isVerified = item.source === 'myarc'
   const verifyColor = item.isGeneric ? accent : '#3b82f6'
 
+  const effectiveImg = item.image_url || foodImageFallback(item.name || item.product_name, null, 200)
+
   return (
     <div style={{ position: 'relative', flexShrink: 0 }}>
-      {item.image_url ? (
-        <div style={{
-          width: '56px', height: '56px', borderRadius: '12px',
-          background: `url(${item.image_url}) center/cover, #fff`,
-          border: '1px solid rgba(255, 255, 255, 0.08)'
-        }} />
-      ) : (
-        <div style={{
-          width: '56px', height: '56px', borderRadius: '12px',
-          background: 'rgba(255, 215, 0, 0.06)',
-          border: '1px solid rgba(255, 215, 0, 0.15)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          color: 'rgba(255, 215, 0, 0.55)'
-        }}>
-          {item.type === 'meal'
-            ? <UtensilsCrossed size={22} strokeWidth={1.8} />
-            : <Apple size={24} strokeWidth={1.8} />}
-        </div>
-      )}
+      <div style={{
+        width: '56px', height: '56px', borderRadius: '12px',
+        background: `url(${effectiveImg}) center/cover, #1a1a1a`,
+        border: '1px solid rgba(255, 255, 255, 0.08)'
+      }} />
       {isVerified && (
         <div style={{
           position: 'absolute', bottom: '-2px', right: '-2px',

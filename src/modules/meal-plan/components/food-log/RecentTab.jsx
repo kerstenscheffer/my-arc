@@ -3,6 +3,7 @@
 //          from ai_ingredients lookup so old/legacy logs show thumbnails too.
 import React, { useState, useEffect } from 'react'
 import { Plus, Copy, ChevronRight, UtensilsCrossed } from 'lucide-react'
+import { foodImageFallback } from '../../foodImageFallback'
 
 // Bulk-resolve missing meal photos by querying multiple image sources.
 // Order of preference: ai_meals (curated) → ai_ingredients (popular) →
@@ -321,33 +322,11 @@ export default function RecentTab({ client, db, onSelect, onQuickLog, onCopyYest
             }}
           >
             {/* ✅ IMAGE: zelfde patroon als SearchTab ResultIcon */}
-            {meal.image_url ? (
-              <div style={{
-                width: '40px', height: '40px', borderRadius: '8px', flexShrink: 0,
-                background: `url(${meal.image_url}) center/cover`,
-                border: '1px solid rgba(255, 255, 255, 0.06)'
-              }} />
-            ) : meal.count > 1 ? (
-              <div style={{
-                width: '40px', height: '40px', borderRadius: '8px', flexShrink: 0,
-                background: 'rgba(255, 215, 0, 0.06)',
-                border: '1px solid rgba(255, 215, 0, 0.15)',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                fontSize: '0.55rem', fontWeight: '800', color: accent
-              }}>
-                {meal.count}x
-              </div>
-            ) : (
-              <div style={{
-                width: '40px', height: '40px', borderRadius: '8px', flexShrink: 0,
-                background: 'rgba(255, 255, 255, 0.04)',
-                border: '1px solid rgba(255, 255, 255, 0.06)',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                color: 'rgba(255, 255, 255, 0.15)'
-              }}>
-                <UtensilsCrossed size={14} />
-              </div>
-            )}
+            <div style={{
+              width: '40px', height: '40px', borderRadius: '8px', flexShrink: 0,
+              background: `url(${meal.image_url || foodImageFallback(meal.meal_name, null, 100)}) center/cover, #1a1a1a`,
+              border: '1px solid rgba(255, 255, 255, 0.06)'
+            }} />
 
             <div style={{ flex: 1, minWidth: 0 }}>
               {/* Name + count badge (als er ook een image is) */}
@@ -361,8 +340,8 @@ export default function RecentTab({ client, db, onSelect, onQuickLog, onCopyYest
                 }}>
                   {meal.meal_name}
                 </span>
-                {/* Count badge naast naam als er een image is */}
-                {meal.image_url && meal.count > 1 && (
+                {/* Count badge naast naam */}
+                {meal.count > 1 && (
                   <span style={{
                     fontSize: '0.45rem', fontWeight: '800', color: accent,
                     background: 'rgba(255, 215, 0, 0.1)',
