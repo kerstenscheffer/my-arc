@@ -58,8 +58,6 @@ const REVIEWS = [
 ]
 
 export default function HeroSection({ isMobile }) {
-  const doubled = [...REVIEWS, ...REVIEWS]
-
   // Mobile-tuned constants — pulled out so they're easy to tweak together.
   const SECTION_PAD_X = isMobile ? '1rem' : '2rem'
 
@@ -161,52 +159,6 @@ export default function HeroSection({ isMobile }) {
         </div>
       </div>
 
-      {/* ═══ Auto-sliding reviews — bewust subtiel (minder opvallend) ═══ */}
-      <div style={{ width: '100%', position: 'relative', overflow: 'hidden', opacity: 0.6 }}>
-        <div style={{ position: 'absolute', top: 0, left: 0, width: '150px', height: '100%', background: 'linear-gradient(90deg, #0a0a0a 0%, transparent 100%)', zIndex: 3, pointerEvents: 'none' }} />
-        <div style={{ position: 'absolute', top: 0, right: 0, width: '150px', height: '100%', background: 'linear-gradient(270deg, #0a0a0a 0%, transparent 100%)', zIndex: 3, pointerEvents: 'none' }} />
-        <div style={{ display: 'flex', gap: '0.6rem', animation: 'slideReviews 45s linear infinite', width: 'max-content' }}>
-          {doubled.map((r, i) => (
-            <div key={i} style={{ width: '165px', flexShrink: 0, background: '#fff', borderRadius: '12px', padding: '0.6rem 0.65rem 0.5rem', border: '1px solid rgba(0,0,0,0.06)', boxShadow: '0 1px 6px rgba(0,0,0,0.03)' }}>
-              <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
-                  <div style={{ width: '28px', height: '28px', borderRadius: '50%', overflow: 'hidden', flexShrink: 0 }}>
-                    {r.photo ? (
-                      <img src={r.photo} alt={r.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                        onError={(e) => { e.target.style.display = 'none'; e.target.parentElement.style.background = '#ddd'; e.target.parentElement.innerHTML = `<span style="color:#888;font-size:0.55rem;font-weight:700;display:flex;align-items:center;justify-content:center;width:100%;height:100%">${r.name.charAt(0)}</span>` }}
-                      />
-                    ) : (
-                      <div style={{ width: '100%', height: '100%', background: '#ddd', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                        <span style={{ color: '#888', fontSize: '0.55rem', fontWeight: '700' }}>{r.name.charAt(0)}</span>
-                      </div>
-                    )}
-                  </div>
-                  <div>
-                    <span style={{ fontSize: '0.68rem', fontWeight: '800', color: '#1a1a1a', display: 'block', lineHeight: 1.2 }}>{r.name}</span>
-                    <span style={{ fontSize: '0.5rem', fontWeight: '700', color: GOLD_DARK, display: 'block' }}>{r.date}</span>
-                  </div>
-                </div>
-                <div style={{ display: 'flex', gap: '1px', marginTop: '2px' }}>
-                  {[1,2,3,4,5].map(s => (
-                    <svg key={s} width={11} height={11} viewBox="0 0 24 24" fill="#FFD700">
-                      <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
-                    </svg>
-                  ))}
-                </div>
-              </div>
-              <p style={{ fontSize: '0.68rem', fontWeight: '800', color: '#1a1a1a', margin: '0 0 0.3rem', lineHeight: 1.25 }}>"{r.headline}"</p>
-              <p style={{ fontSize: '0.52rem', color: 'rgba(0,0,0,0.3)', fontWeight: '400', lineHeight: 1.35, margin: 0, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{r.quote}</p>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      <style>{`
-        @keyframes slideReviews {
-          0% { transform: translateX(0); }
-          100% { transform: translateX(-50%); }
-        }
-      `}</style>
     </section>
   )
 }
