@@ -363,48 +363,39 @@ export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, 
         {/* Header */}
         <div style={{
           flexShrink: 0,
-          padding: isMobile ? 'calc(0.7rem + env(safe-area-inset-top)) 0.85rem 0.7rem' : '0.9rem 1rem',
-          display: 'flex', alignItems: 'center', gap: '0.55rem',
+          padding: isMobile ? 'calc(0.6rem + env(safe-area-inset-top)) 0.75rem 0.6rem' : '0.75rem 1rem',
+          display: 'flex', alignItems: 'center', gap: 6,
           borderBottom: '1px solid rgba(255,255,255,0.06)',
           background: 'rgba(0,0,0,0.5)',
         }}>
-          <BarChart3 size={17} color={GOLD} />
-          <div style={{ flex: 1, color: '#fff', fontWeight: 800, fontSize: '0.95rem' }}>
-            Stats — {periodMode === 'day' ? 'Dag' : periodMode === 'month' ? 'Maand' : 'Week'}
+          <BarChart3 size={16} color={GOLD} style={{ flexShrink: 0 }} />
+          <div style={{ flex: 1, color: '#fff', fontWeight: 800, fontSize: '0.9rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+            Stats
           </div>
           <button
             onClick={openRevenuePanel}
             title="Terugkerende omzet & cashflow"
             style={{
-              ...iconBtn,
-              width: 'auto', padding: '0 0.65rem',
-              display: 'inline-flex', alignItems: 'center', gap: 5,
-              background: 'rgba(34,197,94,0.14)',
-              border: '1px solid rgba(34,197,94,0.4)',
-              color: '#22c55e', fontSize: '0.7rem', fontWeight: 800,
-              cursor: 'pointer',
+              width: 36, height: 36, flexShrink: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+              background: 'rgba(34,197,94,0.14)', border: '1px solid rgba(34,197,94,0.4)', borderRadius: 10,
+              color: '#22c55e', cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
             }}
           >
-            <TrendingUp size={13} />
-            Revenue
+            <TrendingUp size={16} />
           </button>
           <button
             onClick={openKpiPanel}
             disabled={loading}
             title="KPI-doelen instellen (dag/week)"
             style={{
-              ...iconBtn,
-              width: 'auto', padding: '0 0.65rem',
-              display: 'inline-flex', alignItems: 'center', gap: 5,
-              background: 'rgba(255,215,0,0.12)',
-              border: '1px solid rgba(255,215,0,0.35)',
-              color: GOLD, fontSize: '0.7rem', fontWeight: 800,
-              opacity: loading ? 0.4 : 1,
+              width: 36, height: 36, flexShrink: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+              background: 'rgba(255,215,0,0.12)', border: '1px solid rgba(255,215,0,0.35)', borderRadius: 10,
+              color: GOLD, opacity: loading ? 0.4 : 1,
               cursor: loading ? 'not-allowed' : 'pointer',
+              touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
             }}
           >
-            <Target size={13} />
-            Doelen
+            <Target size={16} />
           </button>
           <button
             onClick={async () => {
@@ -449,53 +440,51 @@ export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, 
               }
             }}
             disabled={loading || pdfBusy}
-            title="Download als PDF"
+            title={pdfBusy ? 'Bezig…' : 'Download als PDF'}
             style={{
-              ...iconBtn,
-              width: 'auto', padding: '0 0.65rem',
-              display: 'inline-flex', alignItems: 'center', gap: 5,
-              background: 'rgba(255,215,0,0.12)',
-              border: '1px solid rgba(255,215,0,0.35)',
-              color: GOLD, fontSize: '0.7rem', fontWeight: 800,
+              width: 36, height: 36, flexShrink: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+              background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10,
+              color: 'rgba(255,255,255,0.7)',
               opacity: (loading || pdfBusy) ? 0.4 : 1,
               cursor: (loading || pdfBusy) ? 'not-allowed' : 'pointer',
+              touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
             }}
           >
-            <Download size={13} />
-            {pdfBusy ? 'Bezig…' : 'PDF'}
+            <Download size={16} />
           </button>
-          <button onClick={onClose} title="Sluiten" style={iconBtn}>
+          <button onClick={onClose} title="Sluiten" style={{
+            width: 36, height: 36, flexShrink: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+            background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10,
+            color: 'rgba(255,255,255,0.6)', cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+          }}>
             <X size={16} />
           </button>
         </div>
 
-        {/* Period mode toggle */}
-        <div style={{
-          flexShrink: 0, padding: '0.55rem 0.85rem 0',
-          display: 'flex', gap: 4,
-        }}>
-          {['day', 'week', 'month'].map(mode => {
-            const active = periodMode === mode
-            const labels = { day: '📅 Dag', week: '🗓️ Week', month: '📆 Maand' }
-            return (
-              <button
-                key={mode}
-                onClick={() => setPeriodMode(mode)}
-                style={{
-                  flex: 1, padding: '0.4rem',
-                  background: active ? 'rgba(255,215,0,0.14)' : 'rgba(255,255,255,0.03)',
-                  border: `1px solid ${active ? 'rgba(255,215,0,0.45)' : 'rgba(255,255,255,0.06)'}`,
-                  borderRadius: 6,
-                  color: active ? GOLD : 'rgba(255,255,255,0.5)',
-                  fontSize: '0.72rem', fontWeight: 800,
-                  letterSpacing: '0.04em', textTransform: 'uppercase',
-                  cursor: 'pointer', touchAction: 'manipulation',
-                }}
-              >
-                {labels[mode]}
-              </button>
-            )
-          })}
+        {/* Period mode toggle — segmented control in de stijl van de kanban-toolbar */}
+        <div style={{ flexShrink: 0, padding: '0.6rem 0.85rem 0' }}>
+          <div style={{ display: 'inline-flex', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 12, padding: 3, gap: 3 }}>
+            {['day', 'week', 'month'].map(mode => {
+              const active = periodMode === mode
+              const labels = { day: 'Dag', week: 'Week', month: 'Maand' }
+              return (
+                <button
+                  key={mode}
+                  onClick={() => setPeriodMode(mode)}
+                  style={{
+                    minHeight: 34, padding: '0 1.15rem', border: 'none', borderRadius: 9,
+                    background: active ? 'rgba(255,215,0,0.16)' : 'transparent',
+                    color: active ? GOLD : 'rgba(255,255,255,0.55)',
+                    fontSize: '0.8rem', fontWeight: 800,
+                    cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+                    transition: 'all 0.15s ease',
+                  }}
+                >
+                  {labels[mode]}
+                </button>
+              )
+            })}
+          </div>
         </div>
 
         {/* Period navigator */}
