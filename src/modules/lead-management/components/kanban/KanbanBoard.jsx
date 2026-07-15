@@ -23,6 +23,11 @@ import CallProposalModal from './CallProposalModal'
 
 const SNOOZE_SECTION_PATTERNS = ['later follow', 'later opvolg', 'follow up', 'followup', 'snooze', 'parkeer']
 
+// "Nieuwe volgers"-kolom — hier krijgt elke card een DM-Run knop (75 volgers
+// snel opvolgen via Instagram DM). Vaste section_id zodat de knop + de teller
+// nergens anders verschijnen.
+const NIEUWE_VOLGERS_SECTION_ID = '68c7837a-a779-49df-9c66-cce76fb39e39'
+
 // "Follow up stil"-sectie herkennen — apart van snooze. Bevat 'stil' samen met
 // een opvolg-woord, zodat het NIET botst met de snooze-detectie (die ook op
 // 'follow up' matcht). "Later Follow Up" (snooze) bevat geen 'stil' en blijft
@@ -1213,6 +1218,14 @@ export default function KanbanBoard({
         ...s,
         leads: (s.leads || []).map(l => l.id === lead.id ? { ...l, ...updates } : l),
       })))
+    } else if (updates.last_contacted_at !== undefined) {
+      // DM-Run (Nieuwe volgers): markeer de lead optimistisch als gecontacteerd,
+      // zodat de card-status én de "X van Y gedaan"-teller in de kolomheader
+      // direct meelopen (board-state is de bron voor die teller).
+      setSections(prev => prev.map(s => ({
+        ...s,
+        leads: (s.leads || []).map(l => l.id === lead.id ? { ...l, ...updates } : l),
+      })))
     }
 
     try {
@@ -1372,6 +1385,10 @@ export default function KanbanBoard({
           const isLeadDrop = dragOverSectionId === section.id
           const isThisSnooze = isSnoozeSectionById(section.id)
           const contactedCount = getContactedTodayCount(section)
+          // DM-Run voortgang — alleen in de "Nieuwe volgers"-kolom.
+          const isNieuweVolgers = section.id === NIEUWE_VOLGERS_SECTION_ID
+          const dmTotal = isNieuweVolgers ? (section.leads || []).length : 0
+          const dmDoneCount = isNieuweVolgers ? (section.leads || []).filter(l => l.last_contacted_at).length : 0
 
           return (
             <div key={section.id}
@@ -1420,6 +1437,17 @@ export default function KanbanBoard({
                 }}>
                   {totalLeads}
                 </span>
+
+                {/* DM-Run voortgang — "X van Y gedaan", alleen bij Nieuwe volgers */}
+                {isNieuweVolgers && dmTotal > 0 && (
+                  <span style={{
+                    fontSize: '0.4rem', fontWeight: 800, letterSpacing: '0.08em',
+                    textTransform: 'uppercase', color: section.color, opacity: 0.2,
+                    flexShrink: 0, whiteSpace: 'nowrap',
+                  }}>
+                    {dmDoneCount} van {dmTotal} gedaan
+                  </span>
+                )}
 
                 {/* Contacted today count */}
                 {contactedCount > 0 && (

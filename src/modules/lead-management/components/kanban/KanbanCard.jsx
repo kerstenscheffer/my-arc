@@ -15,6 +15,14 @@ import DMConversationModal from "../../../dm-conversation/components/DMConversat
 import LeadDetailModalV2 from "./LeadDetailModalV2"
 
 // ============================================
+// DM-RUN (Nieuwe volgers kolom)
+// ============================================
+// Alleen in deze kolom krijgt elke card een DM-Run knop: 1 tik → bericht op
+// klembord + Instagram-profiel open + lead als 'contacted' gemarkeerd.
+const NIEUWE_VOLGERS_SECTION_ID = '68c7837a-a779-49df-9c66-cce76fb39e39'
+const DM_RUN_MESSAGE = 'Hey! Zag dat je me bent gaan volgen, welkom. Mag ik vragen waar je op dit moment het meest tegenaan loopt qua voeding of training?'
+
+// ============================================
 // CRM CONFIG
 // ============================================
 const LEAD_MAGNET_OPTIONS = [
@@ -83,6 +91,10 @@ export default function KanbanCard({
   const [snoozingLead, setSnoozingLead] = useState(false)
   const [contactedToday, setContactedToday] = useState(false)
   const [updatingContacted, setUpdatingContacted] = useState(false)
+  // DM-Run status (alleen relevant in de "Nieuwe volgers"-kolom). Bron van
+  // waarheid = lead.last_contacted_at; lokaal voor optimistische feedback.
+  const [dmDone, setDmDone] = useState(!!lead.last_contacted_at)
+  const [dmBusy, setDmBusy] = useState(false)
 
   useEffect(() => {
     setReplyCount(lead.reply_count || 0)
@@ -93,6 +105,9 @@ export default function KanbanCard({
   useEffect(() => {
     setLocalTemp(lead.lead_temperature || 'cold')
   }, [lead.lead_temperature])
+  useEffect(() => {
+    setDmDone(!!lead.last_contacted_at)
+  }, [lead.last_contacted_at])
 
   // Close dropdowns on outside click
   // NOTE: magnet picker uses createPortal with its own backdrop, so NOT handled here
@@ -211,6 +226,7 @@ export default function KanbanCard({
     lead.qual_open_checked
   ].filter(Boolean).length
   const isCallReady = qualScore >= 3
+  const isNieuweVolgers = currentSectionId === NIEUWE_VOLGERS_SECTION_ID
 
   const getDaysSinceStale = () => {
     if (!lead.moved_to_stale_at) return null
@@ -263,6 +279,51 @@ export default function KanbanCard({
       console.error('Update contacted today failed:', error)
     } finally {
       setUpdatingContacted(false)
+    }
+  }
+
+  // DM-Run: één tik doet 3 dingen — bericht kopiëren, Instagram openen en de
+  // lead als 'contacted' markeren. Optimistisch: card gaat direct op "Gedaan",
+  // rollback bij een opslag-fout.
+  const handleDMRun = async (e) => {
+    e.stopPropagation()
+    if (dmDone || dmBusy) return
+    setDmBusy(true)
+
+    // 1) Bericht naar het klembord (met oude-Safari fallback).
+    try {
+      await navigator.clipboard.writeText(DM_RUN_MESSAGE)
+    } catch {
+      const ta = document.createElement('textarea')
+      ta.value = DM_RUN_MESSAGE
+      ta.style.position = 'fixed'; ta.style.opacity = '0'
+      document.body.appendChild(ta)
+      ta.select()
+      try { document.execCommand('copy') } catch {}
+      document.body.removeChild(ta)
+    }
+
+    // 2) Instagram openen: eerst de app-deeplink, na 800ms fallback naar web.
+    // Als de app opent (tab wordt verborgen) annuleren we de web-fallback.
+    const handle = (lead.first_name || '').trim().toLowerCase()
+    if (handle) {
+      const web = `https://instagram.com/${handle}`
+      const timer = setTimeout(() => { window.open(web, '_blank') }, 800)
+      const cancel = () => { clearTimeout(timer); document.removeEventListener('visibilitychange', cancel) }
+      document.addEventListener('visibilitychange', cancel)
+      window.location.href = `instagram://user?username=${handle}`
+    }
+
+    // 3) Optimistisch markeren + persisteren via het bestaande onEdit-pad
+    // (updateLead stempelt last_contacted_at bij status 'contacted').
+    setDmDone(true)
+    try {
+      await onEdit({ status: 'contacted', last_contacted_at: new Date().toISOString() })
+    } catch (error) {
+      console.error('DM-Run markeren mislukt:', error)
+      setDmDone(false)
+    } finally {
+      setDmBusy(false)
     }
   }
 
@@ -399,7 +460,7 @@ export default function KanbanCard({
           borderLeft: `3px solid ${isCallReady ? '#D4AF37' : sectionColor}`,
           borderRadius: 14,
           overflow: 'hidden',
-          opacity: contactedToday ? 0.6 : 1,
+          opacity: contactedToday ? 0.6 : (isNieuweVolgers && dmDone ? 0.5 : 1),
           cursor: 'pointer',
           transition: 'all 0.2s ease',
           transform: 'translateZ(0)'
@@ -577,6 +638,31 @@ export default function KanbanCard({
             }}>
               <span style={{ fontSize: '0.6rem', fontWeight: '700', color: '#FFD700', letterSpacing: '0.04em' }}>SALES</span>
             </span>
+          )}
+
+          {/* DM-Run knop — alleen in de "Nieuwe volgers"-kolom. Goud = nog te
+              doen, groen "Gedaan" = al gecontacteerd (niet meer klikbaar). */}
+          {isNieuweVolgers && (
+            <button
+              data-no-click
+              onClick={dmDone ? (e) => e.stopPropagation() : handleDMRun}
+              disabled={dmDone || dmBusy}
+              title={dmDone ? 'Al gecontacteerd' : 'Kopieer bericht + open Instagram'}
+              style={{
+                flexShrink: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 4,
+                minHeight: 28, padding: isMobile ? '0 0.7rem' : '0 0.6rem',
+                background: dmDone ? 'rgba(16,185,129,0.14)' : 'rgba(255,215,0,0.14)',
+                border: `1px solid ${dmDone ? 'rgba(16,185,129,0.4)' : 'rgba(255,215,0,0.4)'}`,
+                borderRadius: 8,
+                color: dmDone ? '#10b981' : '#FFD700',
+                fontSize: isMobile ? '0.62rem' : '0.6rem', fontWeight: 800, letterSpacing: '0.04em',
+                cursor: dmDone ? 'default' : 'pointer',
+                opacity: dmBusy ? 0.6 : 1,
+                touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+              }}
+            >
+              {dmDone ? <><CheckCircle size={12} /> Gedaan</> : <><Send size={12} /> DM</>}
+            </button>
           )}
 
           {/* Verwijder-knop — vraagt bevestiging via onDelete (handleLeadDelete). */}
