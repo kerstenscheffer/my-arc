@@ -26,26 +26,26 @@ export default function GarantiePrijsSection({ isMobile }) {
     }}>
       <div style={{ maxWidth: '620px', width: '100%' }}>
 
-        {/* ═══ Transformaties — compact, rij van drie ═══ */}
-        <div style={{ display: 'flex', gap: isMobile ? '0.5rem' : '0.75rem', marginBottom: isMobile ? '2.5rem' : '3.25rem' }}>
+        {/* ═══ Transformaties — bewust compact (de prijs domineert) ═══ */}
+        <div style={{ display: 'flex', gap: isMobile ? '0.45rem' : '0.6rem', maxWidth: isMobile ? '78%' : '75%', margin: `0 auto ${isMobile ? '2.5rem' : '3.25rem'}` }}>
           {TRANSFORMS.map((t) => (
-            <div key={t.src} style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-              <div style={{ borderRadius: '9px', overflow: 'hidden', filter: 'drop-shadow(0 6px 14px rgba(0,0,0,0.5))' }}>
+            <div key={t.src} style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+              <div style={{ borderRadius: '8px', overflow: 'hidden', filter: 'drop-shadow(0 6px 14px rgba(0,0,0,0.5))' }}>
                 <img src={t.src} alt={t.caption} style={{ width: '100%', height: 'auto', display: 'block' }} />
               </div>
-              <p style={{ margin: 0, fontSize: isMobile ? '0.58rem' : '0.72rem', fontWeight: '700', color: 'rgba(255,255,255,0.7)', lineHeight: 1.25, textAlign: 'center' }}>
+              <p style={{ margin: 0, fontSize: isMobile ? '0.52rem' : '0.64rem', fontWeight: '700', color: 'rgba(255,255,255,0.65)', lineHeight: 1.2, textAlign: 'center' }}>
                 {t.caption}
               </p>
             </div>
           ))}
         </div>
 
-        {/* ═══ Prijs — grootste element van dit scherm ═══ */}
+        {/* ═══ Prijs — veruit het grootste element van dit scherm ═══ */}
         <div style={{ textAlign: 'center', marginBottom: isMobile ? '2rem' : '2.5rem' }}>
-          <div style={{ fontSize: isMobile ? '3.5rem' : '5rem', fontWeight: '900', color: GOLD, lineHeight: 1, letterSpacing: '-0.02em' }}>
+          <div style={{ fontSize: isMobile ? '4.2rem' : '6.2rem', fontWeight: '900', color: GOLD, lineHeight: 1, letterSpacing: '-0.03em' }}>
             €297
           </div>
-          <div style={{ marginTop: isMobile ? '0.6rem' : '0.8rem', fontSize: isMobile ? '1rem' : '1.2rem', fontWeight: '700', color: '#fff', lineHeight: 1.3 }}>
+          <div style={{ marginTop: isMobile ? '0.7rem' : '0.95rem', fontSize: isMobile ? '0.95rem' : '1.15rem', fontWeight: '700', color: '#fff', lineHeight: 1.3 }}>
             3 maanden, het volledige traject
           </div>
         </div>

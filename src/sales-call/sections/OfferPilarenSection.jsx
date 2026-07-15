@@ -46,7 +46,7 @@ export default function OfferPilarenSection({ isMobile }) {
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
-      padding: isMobile ? '3rem 1rem' : '4rem 2rem',
+      padding: isMobile ? '4rem 1rem' : '5.5rem 2rem',
       position: 'relative',
       overflow: 'hidden'
     }}>
@@ -69,10 +69,10 @@ export default function OfferPilarenSection({ isMobile }) {
 
       <div style={{ maxWidth: '1000px', width: '100%', position: 'relative', zIndex: 2 }}>
         {/* Header */}
-        <div style={{ textAlign: 'center', marginBottom: isMobile ? '1.75rem' : '2.75rem' }}>
+        <div style={{ textAlign: 'center', marginBottom: isMobile ? '1.25rem' : '1.75rem' }}>
           <span style={{
             fontSize: isMobile ? '0.55rem' : '0.58rem', fontWeight: '800', letterSpacing: '0.15em',
-            color: GOLD, display: 'inline-block', marginBottom: '0.65rem'
+            color: 'rgba(255,255,255,0.5)', display: 'inline-block', marginBottom: '0.65rem'
           }}>HET SYSTEEM</span>
           <h2 style={{
             fontSize: isMobile ? 'clamp(1.6rem, 7.5vw, 2.1rem)' : '2.9rem',
@@ -86,7 +86,7 @@ export default function OfferPilarenSection({ isMobile }) {
         {/* Pilaar-cards — verticale lijst, om en om links/rechts op desktop */}
         <div style={{
           display: 'flex', flexDirection: 'column',
-          gap: isMobile ? '1.4rem' : '1.6rem',
+          gap: isMobile ? '1rem' : '1.05rem',
           maxWidth: 940, margin: '0 auto'
         }}>
           {PILAREN.map((p, i) => (
@@ -96,12 +96,14 @@ export default function OfferPilarenSection({ isMobile }) {
               flexDirection: isMobile ? 'column' : (i % 2 === 0 ? 'row-reverse' : 'row'),
               alignItems: 'center',
             }}>
-              {/* Beeld-kolom — 1 of 2 screenshots naast elkaar */}
+              {/* Beeld-kolom — max 40% van de breedte; bewust ondergeschikt aan de titel */}
               <div style={{
-                flex: isMobile ? 'none' : '0 0 44%',
-                width: isMobile ? '100%' : undefined,
+                flex: isMobile ? 'none' : '0 0 40%',
+                maxWidth: isMobile ? '60%' : '40%',
+                width: isMobile ? '60%' : undefined,
+                margin: isMobile ? '0 auto' : undefined,
                 display: 'flex',
-                gap: isMobile ? '0.5rem' : '0.65rem',
+                gap: isMobile ? '0.4rem' : '0.55rem',
                 alignItems: 'center', justifyContent: 'center',
               }}>
                 {p.images.map((src) => (
@@ -117,35 +119,35 @@ export default function OfferPilarenSection({ isMobile }) {
               </div>
 
               {/* Tekst-kolom */}
-              <div style={{ flex: 1, minWidth: 0, padding: isMobile ? '1rem 0.5rem 0' : '1.25rem 1.35rem' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: isMobile ? '0.5rem' : '0.6rem' }}>
+              <div style={{ flex: 1, minWidth: 0, padding: isMobile ? '0.6rem 0.5rem 0' : '0.5rem 1.35rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? '0.65rem' : '0.75rem', marginBottom: isMobile ? '0.4rem' : '0.5rem' }}>
                   <div style={{
-                    flexShrink: 0, width: isMobile ? 28 : 32, height: isMobile ? 28 : 32, borderRadius: '50%',
+                    flexShrink: 0, width: isMobile ? 34 : 42, height: isMobile ? 34 : 42, borderRadius: '50%',
                     background: 'rgba(255,186,9,0.14)', border: `1.5px solid ${GOLD}66`,
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    color: GOLD, fontWeight: '900', fontSize: isMobile ? '0.85rem' : '1rem',
+                    color: GOLD, fontWeight: '900', fontSize: isMobile ? '1.05rem' : '1.35rem',
                   }}>{i + 1}</div>
                   <h3 style={{
                     flex: 1, minWidth: 0,
-                    fontSize: isMobile ? '1.15rem' : '1.45rem',
+                    fontSize: isMobile ? '1.5rem' : '2.1rem',
                     fontWeight: '900', color: '#fff', margin: 0,
-                    lineHeight: 1.15, letterSpacing: '-0.01em',
+                    lineHeight: 1.1, letterSpacing: '-0.02em',
                   }}>{p.title}</h3>
                 </div>
 
-                {/* Subkop */}
+                {/* Subkop — kleiner, ondergeschikt aan de pilaarnaam */}
                 <p style={{
-                  margin: `0 0 ${isMobile ? '0.75rem' : '0.9rem'}`,
-                  fontSize: isMobile ? '0.9rem' : '1rem',
-                  fontWeight: '600', color: 'rgba(255,255,255,0.7)', lineHeight: 1.4,
+                  margin: `0 0 ${isMobile ? '0.5rem' : '0.6rem'}`,
+                  fontSize: isMobile ? '0.82rem' : '0.9rem',
+                  fontWeight: '600', color: 'rgba(255,255,255,0.65)', lineHeight: 1.4,
                 }}>{p.subtitle}</p>
 
-                {/* Bullets (max 3) */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: isMobile ? '0.5rem' : '0.6rem' }}>
+                {/* Bullets (max 3) — bewust klein */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: isMobile ? '0.4rem' : '0.5rem' }}>
                   {p.bullets.map((b, j) => (
-                    <div key={j} style={{ display: 'flex', gap: '0.55rem', alignItems: 'flex-start' }}>
-                      <span style={{ flexShrink: 0, marginTop: isMobile ? 6 : 7, width: 6, height: 6, borderRadius: '50%', background: GOLD }} />
-                      <p style={{ margin: 0, fontSize: isMobile ? '0.85rem' : '0.95rem', color: 'rgba(255,255,255,0.7)', lineHeight: 1.45, fontWeight: '500' }}>
+                    <div key={j} style={{ display: 'flex', gap: '0.5rem', alignItems: 'flex-start' }}>
+                      <span style={{ flexShrink: 0, marginTop: isMobile ? 5 : 6, width: 5, height: 5, borderRadius: '50%', background: 'rgba(255,255,255,0.45)' }} />
+                      <p style={{ margin: 0, fontSize: isMobile ? '0.76rem' : '0.84rem', color: 'rgba(255,255,255,0.65)', lineHeight: 1.4, fontWeight: '500' }}>
                         <span style={{ color: '#fff', fontWeight: '800' }}>{b.label}:</span> {b.text}
                       </p>
                     </div>
@@ -157,7 +159,7 @@ export default function OfferPilarenSection({ isMobile }) {
                   <div style={{
                     marginTop: isMobile ? '0.9rem' : '1.1rem',
                     paddingLeft: '0.85rem',
-                    borderLeft: `2px solid ${GOLD}`,
+                    borderLeft: '2px solid rgba(255,255,255,0.25)',
                   }}>
                     <p style={{ margin: 0, fontSize: isMobile ? '0.9rem' : '1rem', fontStyle: 'italic', color: '#fff', fontWeight: '600', lineHeight: 1.4 }}>
                       "{p.quote.text}"

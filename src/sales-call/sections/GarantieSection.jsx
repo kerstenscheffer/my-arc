@@ -13,7 +13,7 @@ export default function GarantieSection({ isMobile }) {
       justifyContent: 'center',
       background: '#0a0a0a',
       overflow: 'hidden',
-      padding: isMobile ? '3rem 1.5rem' : '4rem 2rem',
+      padding: isMobile ? '5rem 1.5rem' : '7rem 2rem',
       position: 'relative'
     }}>
       {/* Subtle radial glow */}
@@ -26,15 +26,10 @@ export default function GarantieSection({ isMobile }) {
         pointerEvents: 'none'
       }} />
 
-      <div style={{ maxWidth: '640px', width: '100%', textAlign: 'center', position: 'relative', zIndex: 2 }}>
-        <span style={{
-          fontSize: isMobile ? '0.55rem' : '0.58rem', fontWeight: '800', letterSpacing: '0.15em',
-          color: GOLD, display: 'inline-block', marginBottom: isMobile ? '1.25rem' : '1.75rem'
-        }}>GARANTIE</span>
-
+      <div style={{ maxWidth: '680px', width: '100%', textAlign: 'center', position: 'relative', zIndex: 2 }}>
         <p style={{
           margin: 0,
-          fontSize: isMobile ? '1.4rem' : '2rem',
+          fontSize: isMobile ? '1.5rem' : '2.2rem',
           fontWeight: '800',
           color: '#fff',
           lineHeight: 1.4,

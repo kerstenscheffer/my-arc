@@ -1,7 +1,6 @@
 // src/sales-call/sections/HeroSection.jsx
 // Hero — review cards matching screenshot style exactly
 
-const GOLD_DARK = '#e8a800'
 const TP_GREEN = '#00B67A'
 
 // 3 echte transformaties — in de hero onder de titel.
@@ -71,7 +70,7 @@ export default function HeroSection({ isMobile }) {
       alignItems: 'center',
       justifyContent: 'center',
       overflow: 'hidden',
-      padding: isMobile ? '1.2rem 0' : 0,
+      padding: isMobile ? '3rem 0' : '4.5rem 0',
       background: '#0a0a0a',
       position: 'relative'
     }}>
@@ -82,7 +81,7 @@ export default function HeroSection({ isMobile }) {
         style={{
           width: isMobile ? '104px' : '132px',
           height: 'auto',
-          marginBottom: isMobile ? '1.5rem' : '2rem',
+          marginBottom: isMobile ? '1rem' : '1.25rem',
           flexShrink: 0
         }}
       />
@@ -92,7 +91,7 @@ export default function HeroSection({ isMobile }) {
         textAlign: 'center',
         padding: `0 ${SECTION_PAD_X}`,
         maxWidth: '900px',
-        marginBottom: isMobile ? '2.75rem' : '3.5rem'
+        marginBottom: isMobile ? '1.5rem' : '1.75rem'
       }}>
         <h1 style={{
           fontWeight: '900',
@@ -105,11 +104,11 @@ export default function HeroSection({ isMobile }) {
           Het in shape komen &amp; blijven systeem
         </h1>
         <div style={{
-          fontWeight: '800',
-          color: '#fff',
-          lineHeight: 1.35,
-          marginTop: isMobile ? '0.75rem' : '0.95rem',
-          fontSize: isMobile ? '1.05rem' : '1.35rem',
+          fontWeight: '500',
+          color: 'rgba(255,255,255,0.65)',
+          lineHeight: 1.4,
+          marginTop: isMobile ? '0.5rem' : '0.65rem',
+          fontSize: isMobile ? '1.05rem' : '1.6rem',
         }}>
           In 3 maanden in shape met een aanpak die je daarna niet meer kwijtraakt.
         </div>
@@ -123,7 +122,7 @@ export default function HeroSection({ isMobile }) {
               <div style={{ borderRadius: '9px', overflow: 'hidden', filter: 'drop-shadow(0 8px 18px rgba(0,0,0,0.5))' }}>
                 <img src={t.src} alt={t.caption} style={{ width: '100%', height: 'auto', display: 'block' }} />
               </div>
-              <p style={{ margin: 0, fontSize: isMobile ? '0.5rem' : '0.62rem', fontWeight: '800', color: '#fff', lineHeight: 1.25, textAlign: 'center' }}>
+              <p style={{ margin: 0, fontSize: isMobile ? '0.5rem' : '0.62rem', fontWeight: '700', color: 'rgba(255,255,255,0.85)', lineHeight: 1.25, textAlign: 'center' }}>
                 {t.caption}
               </p>
             </div>
@@ -136,8 +135,8 @@ export default function HeroSection({ isMobile }) {
         display: 'flex',
         alignItems: 'center',
         gap: '0.5rem',
-        marginTop: isMobile ? '2rem' : '2.5rem',
-        marginBottom: isMobile ? '1.25rem' : '1.5rem'
+        marginTop: isMobile ? '1.25rem' : '1.5rem',
+        marginBottom: 0
       }}>
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
           <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" fill={TP_GREEN}/>
