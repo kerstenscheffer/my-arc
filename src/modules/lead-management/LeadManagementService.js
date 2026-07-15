@@ -1738,6 +1738,9 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
       // NEGATIVE_FUNNEL_WORDS exclusion list (used to keep them out of the
       // positive stages like `sale` / `callScheduled`).
       const NO_SHOW_KEYWORDS = ['no show', 'no-show', 'noshow']
+      // Call afgewezen — negatief eindpunt op de call-fase. Apart geteld (met een
+      // reden-breakdown), net als no-show.
+      const REJECTED_KEYWORDS = ['afgewezen', 'geweigerd', 'call afgewezen', 'rejected']
       const funnelKeywords = {
         replied:       ['replied', 'gereageerd', 'reactie', 'response', 'antwoord'],
         conversation:  ['gesprek', 'conversation', 'kwalificatie', 'qualified', 'interesse'],
@@ -1752,6 +1755,7 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
         callScheduled: { count: 0, leads: [] },
         sale:          { count: 0, leads: [], omzet: 0 },
         noShow:        { count: 0, leads: [] },
+        callRejected:  { count: 0, leads: [], reasons: {} },
       }
       // Funnel-rang van een sectietitel (zelfde first-match-volgorde als de
       // funnelKeywords hieronder). Gebruikt om TERUGWAARTSE verplaatsingen niet
@@ -1770,7 +1774,7 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
       // heen-en-weer geschuif of dubbele movements de teller niet opblazen.
       const seen = {
         replied: new Set(), conversation: new Set(), callProposed: new Set(),
-        callScheduled: new Set(), sale: new Set(), noShow: new Set(),
+        callScheduled: new Set(), sale: new Set(), noShow: new Set(), callRejected: new Set(),
       }
 
       // "Door wie" — resolve coach_id → naam voor de drill-down per stat. De
@@ -1817,6 +1821,15 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
           funnel.noShow.leads.push(leadInfo)
           return
         }
+        if (REJECTED_KEYWORDS.some(kw => toSection.includes(kw))) {
+          if (leadId && seen.callRejected.has(leadId)) return
+          if (leadId) seen.callRejected.add(leadId)
+          const reason = (mov.rejection_reason || '').trim() || 'Onbekend'
+          funnel.callRejected.reasons[reason] = (funnel.callRejected.reasons[reason] || 0) + 1
+          funnel.callRejected.count++
+          funnel.callRejected.leads.push({ ...leadInfo, reason })
+          return
+        }
         if (NEGATIVE_FUNNEL_WORDS.some(w => toSection.includes(w))) return
         for (const [stage, keywords] of Object.entries(funnelKeywords)) {
           if (keywords.some(kw => toSection.includes(kw))) {
@@ -1840,6 +1853,7 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
         replied: { count: 0, leads: [] }, conversation: { count: 0, leads: [] },
         callProposed: { count: 0, leads: [] }, callScheduled: { count: 0, leads: [] },
         sale: { count: 0, leads: [], omzet: 0 }, noShow: { count: 0, leads: [] },
+        callRejected: { count: 0, leads: [], reasons: {} },
       }
     }
   }
@@ -1864,6 +1878,25 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
       return { error }
     } catch (error) {
       console.error('❌ setMovementOrderValue failed:', error)
+      return { error }
+    }
+  }
+
+  // Zet de afwijzings-reden op de meest recente movement van een lead —
+  // aangeroepen wanneer een lead naar een "Call afgewezen"-sectie is verplaatst.
+  async setMovementRejectionReason(leadId, reason) {
+    try {
+      const { data: rows } = await this.db.supabase
+        .from('lead_movements').select('id')
+        .eq('lead_id', leadId).is('reverted_at', null)
+        .order('moved_at', { ascending: false }).limit(1)
+      const movId = rows?.[0]?.id
+      if (!movId) return { error: 'geen movement gevonden' }
+      const { error } = await this.db.supabase
+        .from('lead_movements').update({ rejection_reason: reason || null }).eq('id', movId)
+      return { error }
+    } catch (error) {
+      console.error('❌ setMovementRejectionReason failed:', error)
       return { error }
     }
   }

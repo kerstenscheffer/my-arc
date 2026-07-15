@@ -84,6 +84,11 @@ const ICON_NODES = {
     ['line', { x1: 17, x2: 22, y1: 8, y2: 13 }],
     ['line', { x1: 22, x2: 17, y1: 8, y2: 13 }],
   ],
+  phoneOff: [
+    ['path', { d: 'M10.1 13.9a14 14 0 0 0 3.732 2.668 1 1 0 0 0 1.213-.303l.355-.465A2 2 0 0 1 17 15h3a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2 18 18 0 0 1-12.728-5.272' }],
+    ['path', { d: 'M22 2 2 22' }],
+    ['path', { d: 'M4.76 13.582A18 18 0 0 1 2 4a2 2 0 0 1 2-2h3a2 2 0 0 1 2 2v3a2 2 0 0 1-.8 1.6l-.468.351a1 1 0 0 0-.292 1.233 14 14 0 0 0 .244.473' }],
+  ],
 }
 
 // Bouwt een standalone SVG-string uit een icon-node-array met de gewenste kleur.
@@ -215,6 +220,7 @@ export async function exportStatsPDF(payload) {
     { label: 'Sales',            value: funnel?.sale?.count || 0,            hex: '#FFD700', rgb: [255, 215, 0],   node: ICON_NODES.trophy },
     { label: 'Omzet',            value: '€' + omzet.toLocaleString('nl-NL'), hex: '#22c55e', rgb: [34, 197, 94], node: ICON_NODES.euro },
     { label: 'No-shows',         value: funnel?.noShow?.count || 0,          hex: '#ef4444', rgb: [239, 68, 68],   node: ICON_NODES.userX },
+    { label: 'Call afgewezen',   value: funnel?.callRejected?.count || 0,    hex: '#f97316', rgb: [249, 115, 22],  node: ICON_NODES.phoneOff },
   ]
   // Iconen vooraf parallel naar PNG renderen; mislukt er één, dan tekent die
   // kaart gewoon zonder icoon.
@@ -257,7 +263,8 @@ export async function exportStatsPDF(payload) {
     doc.setTextColor(...GRAY)
     doc.text(c.label.toUpperCase(), x + cardW / 2, cy + 61, { align: 'center' })
   })
-  y += 2 * cardH + ROW_GAP + 18
+  const CARD_ROWS = Math.ceil(headlineCards.length / COLS)
+  y += CARD_ROWS * cardH + (CARD_ROWS - 1) * ROW_GAP + 18
 
   // ─── KERNCIJFERS (percentages) ─────────────────────────────────────────────
   // De totale AANTALLEN staan al in het overzicht bovenaan (nieuwe leads, sales,
@@ -289,6 +296,23 @@ export async function exportStatsPDF(payload) {
       },
     }))
     y = doc.lastAutoTable.finalY + 16
+  }
+
+  // ─── CALL AFGEWEZEN — REDENEN ──────────────────────────────────────────────
+  if (funnel?.callRejected?.count > 0 && funnel.callRejected.reasons) {
+    const reasonRows = Object.entries(funnel.callRejected.reasons).sort((a, b) => b[1] - a[1])
+    if (reasonRows.length > 0) {
+      section('Call afgewezen — redenen',
+        'Waarom prospects de call afwezen. Stuur op de meest voorkomende reden.')
+      autoTable(doc, darkTable({
+        startY: y,
+        head: [['Reden', 'Aantal']],
+        body: reasonRows.map(([r, n]) => [r, String(n)]),
+        headStyles: { fillColor: [249, 115, 22], textColor: BLACK, fontStyle: 'bold' },
+        columnStyles: { 1: { halign: 'right', fontStyle: 'bold', cellWidth: 60, textColor: WHITE } },
+      }))
+      y = doc.lastAutoTable.finalY + 16
+    }
   }
 
   // ─── SOURCE BREAKDOWN ──────────────────────────────────────────────────────

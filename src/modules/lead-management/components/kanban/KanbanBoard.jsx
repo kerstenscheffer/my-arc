@@ -9,6 +9,7 @@ import { Plus, Settings, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, Grip
 import KanbanCard from './KanbanCard'
 import AddLeadModal from './AddLeadModal'
 import SaleValueModal from './SaleValueModal'
+import RejectionReasonModal from './RejectionReasonModal'
 import RapidAddLeadsModal from './RapidAddLeadsModal'
 import SectionModal from './SectionModal'
 import PeriodStatsBar from '../PeriodStatsBar'
@@ -78,6 +79,7 @@ export default function KanbanBoard({
   const [activeMobileSectionId, setActiveMobileSectionId] = useState(null)
   // Sale-modal: opent na een move naar een sale-sectie om de omzet in te voeren.
   const [saleModalLead, setSaleModalLead] = useState(null)
+  const [rejectionLead, setRejectionLead] = useState(null)
   // Bovenste stats-balk in/uitklapbaar (mobiel standaard dicht = rustiger).
   const [showStats, setShowStats] = useState(!isMobile)
   // boardFilter shape: {
@@ -956,6 +958,8 @@ export default function KanbanBoard({
         loadActivityData()
         // Sale-sectie → open de omzet-modal om de order-waarde in te voeren.
         if (isSaleSectionTitle(targetSection.title)) setSaleModalLead({ id: draggedLead.id, name: leadFullName(draggedLead) })
+        // Call afgewezen-sectie → open de reden-modal.
+        if (isRejectedSectionTitle(targetSection.title)) setRejectionLead({ id: draggedLead.id, name: leadFullName(draggedLead) })
         // Auto-open the magnet picker when this drop landed in the
         // Lead-magnets section. Strip the dragged-lead's transient
         // currentSectionId before handing it to the modal.
@@ -1251,8 +1255,13 @@ export default function KanbanBoard({
   const isSaleSectionTitle = (title) => {
     const t = (title || '').toLowerCase()
     const SALE = ['sale', 'verkocht', 'klant', 'client', 'gewonnen', 'won', 'deal']
-    const NEG = ['verloren', 'lost', 'no show', 'no-show', 'noshow', 'afgehaakt', 'geannuleerd', 'refund']
+    const NEG = ['verloren', 'lost', 'no show', 'no-show', 'noshow', 'afgehaakt', 'geannuleerd', 'refund', 'afgewezen', 'geweigerd']
     return SALE.some(w => t.includes(w)) && !NEG.some(w => t.includes(w))
+  }
+  // Call afgewezen-sectie? → opent de reden-modal.
+  const isRejectedSectionTitle = (title) => {
+    const t = (title || '').toLowerCase()
+    return ['afgewezen', 'geweigerd', 'rejected'].some(w => t.includes(w))
   }
   const leadFullName = (l) => `${l?.first_name || ''} ${l?.last_name || ''}`.trim() || (l?.instagram_handle ? `@${l.instagram_handle}` : 'deze lead')
 
@@ -1271,6 +1280,8 @@ export default function KanbanBoard({
       loadActivityData()
       const tgt = sections.find(s => s.id === targetSectionId)
       if (tgt && isSaleSectionTitle(tgt.title)) setSaleModalLead({ id: lead.id, name: leadFullName(lead) })
+      // Call afgewezen → open de reden-modal.
+      if (tgt && isRejectedSectionTitle(tgt.title)) setRejectionLead({ id: lead.id, name: leadFullName(lead) })
       // Call voorgesteld → open de bericht-modal (zelfde gedrag als drag-drop,
       // dat op mobiel via de dropdown niet gebeurde).
       const tt = (tgt?.title || '').toLowerCase()
@@ -2223,6 +2234,23 @@ export default function KanbanBoard({
             setSaleModalLead(null)
             if (value != null && lead?.id) {
               try { await leadService.setMovementOrderValue(lead.id, value, paymentType, durationMonths) } catch (e) { console.error('Omzet opslaan mislukt:', e) }
+              setStatsRefreshKey(k => k + 1)
+            }
+          }}
+        />
+      )}
+
+      {/* Call afgewezen → reden vastleggen voor de stats-breakdown. Overslaan mag. */}
+      {rejectionLead && (
+        <RejectionReasonModal
+          isMobile={isMobile}
+          leadName={rejectionLead.name}
+          onClose={() => setRejectionLead(null)}
+          onSave={async (reason) => {
+            const lead = rejectionLead
+            setRejectionLead(null)
+            if (lead?.id) {
+              try { await leadService.setMovementRejectionReason(lead.id, reason) } catch (e) { console.error('Afwijzingsreden opslaan mislukt:', e) }
               setStatsRefreshKey(k => k + 1)
             }
           }}

@@ -5,7 +5,7 @@
 // de stats voor die periode laadt. Data uit dezelfde range-methodes als de
 // week-analytics modal (getRangeFunnelStats + getRangeReactionStats).
 import { useState, useEffect } from 'react'
-import { ChevronDown, BarChart3, TrendingUp, UserPlus, Send, MessageCircle, Phone, CalendarCheck, Trophy, UserX, Euro } from 'lucide-react'
+import { ChevronDown, BarChart3, TrendingUp, UserPlus, Send, MessageCircle, Phone, CalendarCheck, Trophy, UserX, Euro, PhoneOff } from 'lucide-react'
 import WeekStatsModal from './WeekStatsModal'
 import GrowthChart from './GrowthChart'
 import { kpiTargetFor, kpiColor, fmtTarget } from '../kpiConfig'
@@ -76,7 +76,7 @@ export default function PeriodStatsBar({ leadService, coachId, isMobile, refresh
   const [open, setOpen] = useState(false)
   const [showWeek, setShowWeek] = useState(false)
   const [loading, setLoading] = useState(true)
-  const [s, setS] = useState({ nieuw: 0, follow: 0, reacties: 0, voorgesteld: 0, ingepland: 0, sales: 0, omzet: 0, noshow: 0 })
+  const [s, setS] = useState({ nieuw: 0, follow: 0, reacties: 0, voorgesteld: 0, ingepland: 0, sales: 0, omzet: 0, noshow: 0, afgewezen: 0 })
   const [timeSeries, setTimeSeries] = useState([])
   const [chartOpen, setChartOpen] = useState(false)
   // KPI-doelen (per coach) + een key om ze te herladen na opslaan in de modal.
@@ -115,6 +115,7 @@ export default function PeriodStatsBar({ leadService, coachId, isMobile, refresh
           sales: funnel?.sale?.count || 0,
           omzet: funnel?.sale?.omzet || 0,
           noshow: funnel?.noShow?.count || 0,
+          afgewezen: funnel?.callRejected?.count || 0,
         }
         setS(next)
       } catch (e) { console.error('[PeriodStatsBar] laden mislukt:', e) }
@@ -141,6 +142,7 @@ export default function PeriodStatsBar({ leadService, coachId, isMobile, refresh
     { key: 'sales',       label: 'Sales',            value: s.sales,       num: s.sales,     Icon: Trophy,        color: GOLD },
     { key: 'omzet',       label: 'Omzet',            value: '€' + Math.round(s.omzet || 0).toLocaleString('nl-NL'), num: s.omzet, Icon: Euro, color: '#22c55e' },
     { key: 'noshow',      label: 'No-shows',         value: s.noshow,      num: s.noshow,    Icon: UserX,         color: '#ef4444' },
+    { key: 'afgewezen',   label: 'Call afgewezen',   value: s.afgewezen,   num: s.afgewezen, Icon: PhoneOff,      color: '#f97316' },
   ]
   const PERIOD_SHORT = { day: 'Vandaag', week: 'Week', month: 'Maand', lastMonth: 'Vorige', custom: 'Datum' }
   const pill = (active) => ({ flexShrink: 0, minHeight: 32, padding: '0 0.7rem', borderRadius: 9, cursor: 'pointer', fontSize: '0.72rem', fontWeight: 800, display: 'inline-flex', alignItems: 'center', gap: 5, touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', background: active ? 'rgba(255,215,0,0.16)' : 'rgba(255,255,255,0.04)', border: `1px solid ${active ? 'rgba(255,215,0,0.45)' : 'rgba(255,255,255,0.08)'}`, color: active ? GOLD : 'rgba(255,255,255,0.62)' })

@@ -9,7 +9,7 @@ import {
   X, ChevronLeft, ChevronRight, ChevronDown, Calendar, Zap, TrendingUp,
   MessageCircle, Users, Phone, Trophy, Activity, BarChart3, PhoneCall,
   Send, FileText, Percent, UserX, Eye, Download, LineChart as LineChartIcon,
-  RotateCcw, Target, Save, UserPlus, CalendarCheck, Euro,
+  RotateCcw, Target, Save, UserPlus, CalendarCheck, Euro, PhoneOff,
 } from 'lucide-react'
 import { exportStatsPDF } from '../utils/exportStatsPDF'
 import GrowthChart from './GrowthChart'
@@ -347,7 +347,7 @@ export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, 
   const noShowRate = totalCalls > 0 ? Math.round((totalNoShows / totalCalls) * 100) : null
   const closeRate = shownCalls > 0 ? Math.round((totalSales / shownCalls) * 100) : null
   const pct1 = (v) => (v == null ? '—' : `${v}%`)
-  const STAGE_ACCENT = { callProposed: '#a855f7', callScheduled: '#06b6d4', sale: '#10b981', noShow: '#f97316' }
+  const STAGE_ACCENT = { callProposed: '#a855f7', callScheduled: '#06b6d4', sale: '#10b981', noShow: '#f97316', callRejected: '#f97316' }
   const countItems = [
     { label: 'Nieuwe leads', value: newLeadsInPeriod,          Icon: UserPlus,      color: '#3b82f6' },
     { label: 'Follow-ups',   value: activity?.followUps ?? 0,  Icon: Send,          color: '#f59e0b' },
@@ -357,6 +357,7 @@ export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, 
     { label: 'Sales',        value: totalSales,                Icon: Trophy,        color: '#FFD700', stage: 'sale' },
     { label: 'Omzet',        value: '€' + Math.round(funnel?.sale?.omzet || 0).toLocaleString('nl-NL'), Icon: Euro, color: '#22c55e' },
     { label: 'No-shows',     value: totalNoShows,              Icon: UserX,         color: '#ef4444', stage: 'noShow' },
+    { label: 'Afgewezen',    value: funnel?.callRejected?.count ?? 0, Icon: PhoneOff, color: '#f97316', stage: 'callRejected' },
   ]
   const pctItems = [
     { label: 'Response',      value: pct1(responseRate),        Icon: MessageCircle, color: '#3b82f6' },
@@ -562,6 +563,7 @@ export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, 
                 <DrillPanel
                   leads={funnel?.[drillStage]?.leads}
                   accent={STAGE_ACCENT[drillStage]}
+                  reasons={drillStage === 'callRejected' ? funnel?.callRejected?.reasons : null}
                   onRevert={handleRevertMovement} revertingId={revertingId}
                   onDelete={handleDeleteMovement} deletingId={deletingId}
                 />
@@ -1236,14 +1238,24 @@ function StatFlow({ items, activeStage, onToggle }) {
 
 // Drill-down lijst onder de aantallen-rij: leads van een funnel-stap, met
 // terugdraaien/verwijderen (zelfde acties als voorheen in de StatCard).
-function DrillPanel({ leads, accent = '#FFD700', onRevert, revertingId, onDelete, deletingId }) {
+function DrillPanel({ leads, accent = '#FFD700', reasons = null, onRevert, revertingId, onDelete, deletingId }) {
   const [confirmId, setConfirmId] = useState(null)
   const items = Array.isArray(leads) ? leads : []
+  const reasonEntries = reasons ? Object.entries(reasons).sort((a, b) => b[1] - a[1]) : []
   if (!items.length) {
     return <div style={{ padding: '0.4rem 0.2rem 0.8rem', fontSize: '0.7rem', color: 'rgba(255,255,255,0.35)' }}>Geen items in deze periode.</div>
   }
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 260, overflowY: 'auto', padding: '0.55rem 0.7rem', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 8, margin: '0 0 0.7rem' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 300, overflowY: 'auto', padding: '0.55rem 0.7rem', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 8, margin: '0 0 0.7rem' }}>
+      {reasonEntries.length > 0 && (
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, paddingBottom: 6, marginBottom: 2, borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+          {reasonEntries.map(([r, n]) => (
+            <span key={r} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: '0.6rem', fontWeight: 800, color: accent, background: `${accent}18`, border: `1px solid ${accent}40`, borderRadius: 6, padding: '2px 7px' }}>
+              {r} <span style={{ color: '#fff' }}>{n}</span>
+            </span>
+          ))}
+        </div>
+      )}
       {items.map((d, i) => {
         const busyRevert = revertingId && revertingId === d.id
         const busyDelete = deletingId && deletingId === d.id
@@ -1255,6 +1267,7 @@ function DrillPanel({ leads, accent = '#FFD700', onRevert, revertingId, onDelete
             <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 1 }}>
               <div style={{ fontSize: '0.68rem', fontWeight: 800, color: '#fff' }}>{d.name}</div>
               <div style={{ fontSize: '0.6rem', fontWeight: 600, color: 'rgba(255,255,255,0.5)' }}>{d.from} <span style={{ color: accent }}>→</span> {d.to}</div>
+              {d.reason && <div style={{ fontSize: '0.58rem', fontWeight: 700, color: accent }}>Reden: {d.reason}</div>}
               <div style={{ fontSize: '0.58rem', fontWeight: 600, color: 'rgba(255,255,255,0.35)' }}>{d.time} · door <span style={{ color: 'rgba(255,255,255,0.6)' }}>{d.by || 'Onbekend'}</span></div>
             </div>
             {canAct && (confirming ? (
