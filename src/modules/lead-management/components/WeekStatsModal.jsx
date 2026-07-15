@@ -95,6 +95,10 @@ export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, 
   const [kpiTargets, setKpiTargets] = useState({})
   const [kpiDraft, setKpiDraft] = useState({})
   const [kpiSaving, setKpiSaving] = useState(false)
+  // Revenue/cashflow-paneel.
+  const [showRevenue, setShowRevenue] = useState(false)
+  const [revenue, setRevenue] = useState(null)
+  const [revLoading, setRevLoading] = useState(false)
 
   // Preview-blob-URL opruimen wanneer 'ie sluit of de modal ontmount.
   useEffect(() => () => { if (pdfPreview?.url) URL.revokeObjectURL(pdfPreview.url) }, [pdfPreview])
@@ -124,6 +128,20 @@ export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, 
     // Alleen cijfers toestaan (leeg = doel wissen).
     const clean = value.replace(/[^0-9]/g, '')
     setKpiDraft(prev => ({ ...prev, [key]: { ...(prev[key] || {}), [period]: clean } }))
+  }
+
+  const openRevenuePanel = async () => {
+    setShowRevenue(true)
+    setRevLoading(true)
+    try {
+      const r = await leadService.getRevenueProjection(coachId, 12)
+      setRevenue(r)
+    } catch (e) {
+      console.error('Revenue laden mislukt:', e)
+      setRevenue(null)
+    } finally {
+      setRevLoading(false)
+    }
   }
 
   const saveKpiPanel = async () => {
@@ -354,6 +372,22 @@ export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, 
           <div style={{ flex: 1, color: '#fff', fontWeight: 800, fontSize: '0.95rem' }}>
             Stats — {periodMode === 'day' ? 'Dag' : periodMode === 'month' ? 'Maand' : 'Week'}
           </div>
+          <button
+            onClick={openRevenuePanel}
+            title="Terugkerende omzet & cashflow"
+            style={{
+              ...iconBtn,
+              width: 'auto', padding: '0 0.65rem',
+              display: 'inline-flex', alignItems: 'center', gap: 5,
+              background: 'rgba(34,197,94,0.14)',
+              border: '1px solid rgba(34,197,94,0.4)',
+              color: '#22c55e', fontSize: '0.7rem', fontWeight: 800,
+              cursor: 'pointer',
+            }}
+          >
+            <TrendingUp size={13} />
+            Revenue
+          </button>
           <button
             onClick={openKpiPanel}
             disabled={loading}
@@ -842,6 +876,66 @@ export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, 
               <button onClick={saveKpiPanel} disabled={kpiSaving} style={{ flex: 2, minHeight: 42, borderRadius: 10, border: 'none', background: 'linear-gradient(135deg,#FFD700,#D4AF37)', color: '#000', fontWeight: 900, cursor: kpiSaving ? 'wait' : 'pointer', opacity: kpiSaving ? 0.6 : 1, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6, touchAction: 'manipulation' }}>
                 <Save size={15} /> {kpiSaving ? 'Opslaan…' : 'Doelen opslaan'}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {showRevenue && (
+        <div
+          onClick={() => setShowRevenue(false)}
+          style={{ position: 'fixed', inset: 0, zIndex: 2147483560, background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(6px)', display: 'flex', alignItems: isMobile ? 'flex-end' : 'center', justifyContent: 'center', padding: isMobile ? 0 : '1.5rem' }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{ width: '100%', maxWidth: 560, maxHeight: isMobile ? '92vh' : '85vh', display: 'flex', flexDirection: 'column', background: '#111', border: '1px solid rgba(34,197,94,0.25)', borderRadius: isMobile ? '16px 16px 0 0' : 16, overflow: 'hidden' }}
+          >
+            <div style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: 8, padding: isMobile ? 'calc(0.7rem + env(safe-area-inset-top)) 0.9rem 0.7rem' : '0.9rem 1rem', borderBottom: '1px solid rgba(255,255,255,0.08)', background: 'rgba(0,0,0,0.5)' }}>
+              <TrendingUp size={17} color="#22c55e" />
+              <div style={{ flex: 1, color: '#fff', fontWeight: 800, fontSize: '0.95rem' }}>Terugkerende omzet</div>
+              <button onClick={() => setShowRevenue(false)} title="Sluiten" style={iconBtn}><X size={16} /></button>
+            </div>
+            <div style={{ flex: 1, overflowY: 'auto', padding: '1rem' }}>
+              {revLoading ? (
+                <div style={{ padding: '2rem', textAlign: 'center', color: 'rgba(255,255,255,0.5)' }}>Laden…</div>
+              ) : (!revenue || revenue.saleCount === 0) ? (
+                <div style={{ padding: '2rem 1rem', textAlign: 'center', color: 'rgba(255,255,255,0.4)', fontSize: '0.85rem', lineHeight: 1.5 }}>
+                  Nog geen sales met een bedrag vastgelegd. Sleep een lead naar een sale-sectie en vul de order-waarde + betaalwijze in.
+                </div>
+              ) : (() => {
+                const eur = (n) => '€' + Math.round(n || 0).toLocaleString('nl-NL')
+                const maxAmount = Math.max(1, ...revenue.months.map(m => m.amount))
+                const cards = [
+                  { label: 'MRR deze maand', value: eur(revenue.mrr), color: '#22c55e', hint: `${revenue.activeMonthly} lopend maandplan${revenue.activeMonthly === 1 ? '' : 'nen'}` },
+                  { label: 'Actieve plannen', value: revenue.activeMonthly, color: '#06b6d4' },
+                  { label: 'Geboekt totaal', value: eur(revenue.totalBooked), color: '#FFD700', hint: `${revenue.saleCount} sale${revenue.saleCount === 1 ? '' : 's'}` },
+                ]
+                return (
+                  <>
+                    <div style={{ display: 'flex', gap: 8, marginBottom: '1.1rem' }}>
+                      {cards.map(c => (
+                        <div key={c.label} style={{ flex: 1, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 12, padding: '0.7rem 0.5rem', textAlign: 'center' }}>
+                          <div style={{ fontSize: isMobile ? '1rem' : '1.2rem', fontWeight: 900, color: c.color, lineHeight: 1.1 }}>{c.value}</div>
+                          <div style={{ fontSize: '0.58rem', fontWeight: 800, letterSpacing: '0.03em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.45)', marginTop: 4 }}>{c.label}</div>
+                          {c.hint && <div style={{ fontSize: '0.56rem', color: 'rgba(255,255,255,0.3)', marginTop: 2 }}>{c.hint}</div>}
+                        </div>
+                      ))}
+                    </div>
+                    <div style={{ fontSize: '0.7rem', fontWeight: 800, letterSpacing: '0.05em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.4)', marginBottom: 8 }}>Cashflow komende 12 maanden</div>
+                    {revenue.months.map(m => (
+                      <div key={m.key} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '0.3rem 0' }}>
+                        <div style={{ width: 66, fontSize: '0.72rem', color: 'rgba(255,255,255,0.6)', textTransform: 'capitalize' }}>{m.label}</div>
+                        <div style={{ flex: 1, height: 8, background: 'rgba(255,255,255,0.05)', borderRadius: 4, overflow: 'hidden' }}>
+                          <div style={{ width: `${Math.round((m.amount / maxAmount) * 100)}%`, height: '100%', background: '#22c55e', borderRadius: 4 }} />
+                        </div>
+                        <div style={{ width: 66, textAlign: 'right', fontSize: '0.75rem', fontWeight: 800, color: m.amount > 0 ? '#fff' : 'rgba(255,255,255,0.3)' }}>{eur(m.amount)}</div>
+                      </div>
+                    ))}
+                    <div style={{ marginTop: '0.8rem', fontSize: '0.66rem', color: 'rgba(255,255,255,0.35)', lineHeight: 1.5 }}>
+                      Vooruitbetaald = volledige bedrag in de sale-maand. Maandelijks = totaal ÷ looptijd, gespreid over de maanden.
+                    </div>
+                  </>
+                )
+              })()}
             </div>
           </div>
         </div>

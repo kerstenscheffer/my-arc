@@ -1868,6 +1868,79 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
     }
   }
 
+  // ── REVENUE / CASHFLOW ──────────────────────────────────────────────────
+  // Berekent op basis van alle sales (order_value + payment_type + looptijd):
+  //   - mrr:           maandelijks terugkerende omzet die NU loopt (som van de
+  //                    maandbedragen van maandplannen die deze maand actief zijn)
+  //   - activeMonthly: aantal lopende maandplannen
+  //   - totalBooked:   totale geboekte contractwaarde (alle sales)
+  //   - months:        cashflow-projectie per maand (vooruitbetaald = alles in de
+  //                    sale-maand; maandelijks = totaal/looptijd, gespreid)
+  async getRevenueProjection(coachId, monthsAhead = 12) {
+    try {
+      const { data } = await this.db.supabase
+        .from('lead_movements')
+        .select('order_value, payment_type, duration_months, moved_at')
+        .not('order_value', 'is', null)
+        .is('reverted_at', null)
+      const sales = (data || []).map(r => ({
+        total: Number(r.order_value) || 0,
+        type: r.payment_type || 'prepaid',
+        months: Math.max(1, Number(r.duration_months) || 1),
+        date: new Date(r.moved_at),
+      })).filter(s => s.total > 0 && !isNaN(s.date?.getTime?.()))
+
+      const monthKey = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+      const startOfMonth = (d, add = 0) => new Date(d.getFullYear(), d.getMonth() + add, 1)
+
+      // Cashflow per maand opbouwen.
+      const cash = {}
+      sales.forEach(s => {
+        if (s.type === 'monthly' && s.months > 1) {
+          const per = s.total / s.months
+          for (let i = 0; i < s.months; i++) {
+            const k = monthKey(startOfMonth(s.date, i))
+            cash[k] = (cash[k] || 0) + per
+          }
+        } else {
+          const k = monthKey(s.date)
+          cash[k] = (cash[k] || 0) + s.total
+        }
+      })
+
+      // MRR nu + actieve maandplannen (maandplannen die deze maand nog lopen).
+      const now = new Date()
+      const curMonth = startOfMonth(now)
+      let mrr = 0, activeMonthly = 0
+      sales.forEach(s => {
+        if (s.type === 'monthly' && s.months > 1) {
+          const start = startOfMonth(s.date)
+          const end = startOfMonth(s.date, s.months) // exclusief
+          if (curMonth >= start && curMonth < end) { mrr += s.total / s.months; activeMonthly++ }
+        }
+      })
+
+      const totalBooked = sales.reduce((a, s) => a + s.total, 0)
+
+      // Projectie: deze maand t/m monthsAhead vooruit.
+      const months = []
+      for (let i = 0; i < monthsAhead; i++) {
+        const d = startOfMonth(now, i)
+        const k = monthKey(d)
+        months.push({
+          key: k,
+          label: d.toLocaleDateString('nl-NL', { month: 'short', year: 'numeric' }),
+          amount: Math.round(cash[k] || 0),
+        })
+      }
+
+      return { mrr: Math.round(mrr), activeMonthly, totalBooked: Math.round(totalBooked), months, saleCount: sales.length }
+    } catch (error) {
+      console.error('❌ getRevenueProjection failed:', error)
+      return { mrr: 0, activeMonthly: 0, totalBooked: 0, months: [], saleCount: 0 }
+    }
+  }
+
   // ── KPI-DOELEN ──────────────────────────────────────────────────────────
   // Per coach een dag- én week-doel per stat (lead_kpi_targets). Retourneert
   // een map { stat_key: { day, week } } zodat de stats-bar en -modal 'm direct
