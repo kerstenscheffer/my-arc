@@ -425,7 +425,7 @@ export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, 
             title="Terugkerende omzet & cashflow"
             style={{
               width: 36, height: 36, flexShrink: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-              background: 'rgba(34,197,94,0.14)', border: '1px solid rgba(34,197,94,0.4)', borderRadius: 10,
+              background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10,
               color: '#22c55e', cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
             }}
           >
@@ -437,7 +437,7 @@ export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, 
             title="KPI-doelen instellen (dag/week)"
             style={{
               width: 36, height: 36, flexShrink: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-              background: 'rgba(255,215,0,0.12)', border: '1px solid rgba(255,215,0,0.35)', borderRadius: 10,
+              background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10,
               color: GOLD, opacity: loading ? 0.4 : 1,
               cursor: loading ? 'not-allowed' : 'pointer',
               touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
