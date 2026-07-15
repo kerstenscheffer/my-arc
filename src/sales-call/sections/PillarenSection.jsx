@@ -51,7 +51,7 @@ export const PILLARS = [
     screenshot: '/sales-screenshots/coach.png',
     title: 'Coach Naast Je',
     bullets: [
-      { label: 'Wekelijks contact', text: 'elke 2 weken een videocall om je voortgang door te nemen' },
+      { label: 'Wekelijks contact', text: 'elke week een videocall om je voortgang door te nemen' },
       { label: 'Dagelijks bereikbaar', text: 'vragen of twijfel? Via de app krijg je snel antwoord' },
       { label: 'Ik kijk mee', text: 'ik volg je progressie dagelijks en haak direct in als het nodig is' },
     ],
@@ -105,15 +105,7 @@ export default function PillarenSection({ isMobile, eyebrow, title, subtitle }) 
             fontWeight: '900', color: '#fff', margin: 0, lineHeight: 1.15,
             padding: isMobile ? '0 0.25rem' : 0,
           }}>
-            {title || (
-              <>
-                Het{' '}
-                <span style={{ color: '#fff' }}>
-                  5 Uur Per Week
-                </span>
-                <br/>Back In Shape Systeem
-              </>
-            )}
+            {title || 'Het In Shape Komen & Blijven Systeem'}
           </h2>
           {subtitle && (
             <p style={{

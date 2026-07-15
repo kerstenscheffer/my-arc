@@ -2,12 +2,12 @@
 // Main wrapper — snap scroll + Enter key navigation
 import { useEffect, useRef, useState } from 'react'
 import HeroSection from './sections/HeroSection'
-import PillarenSection from './sections/PillarenSection'
-// import TransformationConsumer from './sections/TransformationConsumer' // reviews verwijderd
+import OfferPilarenSection from './sections/OfferPilarenSection'
+import GarantieSection from './sections/GarantieSection'
 import GarantiePrijsSection from './sections/GarantiePrijsSection'
 
 const GOLD = '#ffba09'
-const SECTION_COUNT = 3
+const SECTION_COUNT = 4
 
 export default function SalesCallPage() {
   const containerRef = useRef(null)
@@ -86,7 +86,8 @@ export default function SalesCallPage() {
         }}
       >
         <HeroSection isMobile={isMobile} />
-        <PillarenSection isMobile={isMobile} />
+        <OfferPilarenSection isMobile={isMobile} />
+        <GarantieSection isMobile={isMobile} />
         <GarantiePrijsSection isMobile={isMobile} />
       </div>
 
@@ -112,9 +113,7 @@ export default function SalesCallPage() {
               width: current === i ? '9px' : '5px',
               height: current === i ? '9px' : '5px',
               borderRadius: '50%',
-              background: current === i
-                ? GOLD
-                : ([0, 2, 4].includes(i) ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.15)'),
+              background: current === i ? GOLD : 'rgba(255,255,255,0.3)',
               border: 'none',
               cursor: 'pointer',
               transition: 'all 0.3s ease',

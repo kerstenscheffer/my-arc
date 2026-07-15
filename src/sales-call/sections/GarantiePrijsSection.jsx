@@ -1,14 +1,14 @@
 // src/sales-call/sections/GarantiePrijsSection.jsx
-// Closing section — recap van de 5 onderdelen (foto + beknopte tekst, geen cards)
-// + 3 prijs-tiers + garantie. Presentation mode (no buttons).
-import PhotoFan from './PhotoFan'
-
+// Prijs-scherm (slotsectie) — 3 transformaties compact → prijs → case study →
+// Trustpilot. Geen knoppen, geen urgentie. De €297 is het grootste element.
 const GOLD = '#ffba09'
 const TP_GREEN = '#00B67A'
 
-// Eén prijs: 3 maanden voor €297.
-const PRICES = [
-  { duration: '3 maanden', amount: '€297' },
+// Dezelfde 3 transformaties als in de hero, maar compact (rij van drie).
+const TRANSFORMS = [
+  { src: '/review-transformatie-3.png', caption: 'Van 85 naar 78,5 kg' },
+  { src: '/review-transformatie-1.png', caption: 'Zachte buik → sixpack' },
+  { src: '/review-transformatie-2.png', caption: 'Spier op, vet omlaag' },
 ]
 
 export default function GarantiePrijsSection({ isMobile }) {
@@ -24,37 +24,41 @@ export default function GarantiePrijsSection({ isMobile }) {
       overflow: 'hidden',
       padding: isMobile ? '3rem 1.25rem' : '4rem 2rem'
     }}>
-      <div style={{ maxWidth: '560px', width: '100%' }}>
+      <div style={{ maxWidth: '620px', width: '100%' }}>
 
-        {/* ═══ Pakket — 5 foto's overlappend als één fan ═══ */}
-        <div style={{ textAlign: 'center', fontSize: isMobile ? '1.5rem' : '2rem', fontWeight: '900', color: '#fff', lineHeight: 1.15, letterSpacing: '-0.01em', marginBottom: isMobile ? '1.25rem' : '1.5rem' }}>5 uur per week in shape programma</div>
-        <div style={{ marginBottom: isMobile ? '3rem' : '4rem' }}>
-          <PhotoFan isMobile={isMobile} />
+        {/* ═══ Transformaties — compact, rij van drie ═══ */}
+        <div style={{ display: 'flex', gap: isMobile ? '0.5rem' : '0.75rem', marginBottom: isMobile ? '2.5rem' : '3.25rem' }}>
+          {TRANSFORMS.map((t) => (
+            <div key={t.src} style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+              <div style={{ borderRadius: '9px', overflow: 'hidden', filter: 'drop-shadow(0 6px 14px rgba(0,0,0,0.5))' }}>
+                <img src={t.src} alt={t.caption} style={{ width: '100%', height: 'auto', display: 'block' }} />
+              </div>
+              <p style={{ margin: 0, fontSize: isMobile ? '0.58rem' : '0.72rem', fontWeight: '700', color: 'rgba(255,255,255,0.7)', lineHeight: 1.25, textAlign: 'center' }}>
+                {t.caption}
+              </p>
+            </div>
+          ))}
         </div>
 
-        {/* ═══ Prijs — platte tekst, geen cards ═══ */}
-        <div style={{ textAlign: 'center', marginBottom: isMobile ? '5.5rem' : '7rem' }}>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: isMobile ? '1.1rem' : '1.4rem' }}>
-            {PRICES.map((pr) => (
-              <div key={pr.duration} style={{ fontSize: isMobile ? '1.5rem' : '1.9rem', fontWeight: '900', color: '#fff', lineHeight: 1.2, letterSpacing: '-0.01em' }}>
-                {pr.duration}{' '}
-                {pr.was && (
-                  <span style={{ color: 'rgba(255,255,255,0.4)', textDecoration: 'line-through', textDecorationThickness: '2px', marginRight: '0.4rem', fontWeight: '700' }}>{pr.was}</span>
-                )}
-                <span style={{ color: GOLD }}>{pr.amount}</span>
-              </div>
-            ))}
+        {/* ═══ Prijs — grootste element van dit scherm ═══ */}
+        <div style={{ textAlign: 'center', marginBottom: isMobile ? '2rem' : '2.5rem' }}>
+          <div style={{ fontSize: isMobile ? '3.5rem' : '5rem', fontWeight: '900', color: GOLD, lineHeight: 1, letterSpacing: '-0.02em' }}>
+            €297
+          </div>
+          <div style={{ marginTop: isMobile ? '0.6rem' : '0.8rem', fontSize: isMobile ? '1rem' : '1.2rem', fontWeight: '700', color: '#fff', lineHeight: 1.3 }}>
+            3 maanden, het volledige traject
           </div>
         </div>
 
-        {/* ═══ Garantie — geen kop, alleen de belofte ═══ */}
-        <div style={{ textAlign: 'center', fontSize: isMobile ? '1.25rem' : '1.5rem', color: '#fff', fontWeight: '700', lineHeight: 1.45, maxWidth: '540px', marginLeft: 'auto', marginRight: 'auto' }}>
-          Geen zichtbaar verschil binnen 30 dagen?{' '}
-          <span style={{ color: GOLD }}>Dan krijg je je investering terug en loop je weg met 30 dagen gratis coaching.</span>
+        {/* ═══ Case study-regel ═══ */}
+        <div style={{ textAlign: 'center', marginBottom: isMobile ? '1.5rem' : '1.85rem' }}>
+          <p style={{ margin: 0, fontSize: isMobile ? '0.85rem' : '0.95rem', fontStyle: 'italic', color: 'rgba(255,255,255,0.6)', fontWeight: '500', lineHeight: 1.4 }}>
+            Hessel: van 79,8 naar 74,4 kg in 8 weken.
+          </p>
         </div>
 
-        {/* ═══ Trustpilot — kleine social proof onder de garantie ═══ */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', marginTop: isMobile ? '1.5rem' : '1.85rem' }}>
+        {/* ═══ Trustpilot — kleine social proof ═══ */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}>
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
             <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" fill={TP_GREEN}/>
           </svg>

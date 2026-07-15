@@ -115,15 +115,15 @@ export default function HeroSection({ isMobile }) {
         </div>
       </div>
 
-      {/* ═══ 3 transformaties — onder de titel ═══ */}
-      <div style={{ width: '100%', maxWidth: isMobile ? '100%' : '760px', padding: `0 ${SECTION_PAD_X}` }}>
-        <div style={{ display: 'flex', gap: isMobile ? '0.5rem' : '0.9rem' }}>
+      {/* ═══ 3 transformaties — onder de titel, bewust klein (titel domineert) ═══ */}
+      <div style={{ width: isMobile ? '70%' : '100%', maxWidth: isMobile ? '100%' : '532px', margin: '0 auto' }}>
+        <div style={{ display: 'flex', gap: isMobile ? '0.4rem' : '0.65rem' }}>
           {TRANSFORMS.map((t) => (
-            <div key={t.src} style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-              <div style={{ borderRadius: '10px', overflow: 'hidden', filter: 'drop-shadow(0 8px 18px rgba(0,0,0,0.5))' }}>
+            <div key={t.src} style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+              <div style={{ borderRadius: '9px', overflow: 'hidden', filter: 'drop-shadow(0 8px 18px rgba(0,0,0,0.5))' }}>
                 <img src={t.src} alt={t.caption} style={{ width: '100%', height: 'auto', display: 'block' }} />
               </div>
-              <p style={{ margin: 0, fontSize: isMobile ? '0.6rem' : '0.78rem', fontWeight: '800', color: '#fff', lineHeight: 1.3, textAlign: 'center' }}>
+              <p style={{ margin: 0, fontSize: isMobile ? '0.5rem' : '0.62rem', fontWeight: '800', color: '#fff', lineHeight: 1.25, textAlign: 'center' }}>
                 {t.caption}
               </p>
             </div>
