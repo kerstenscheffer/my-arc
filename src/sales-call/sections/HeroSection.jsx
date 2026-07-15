@@ -1,15 +1,14 @@
 // src/sales-call/sections/HeroSection.jsx
 // Hero — review cards matching screenshot style exactly
-import PhotoFan from './PhotoFan'
 
 const GOLD_DARK = '#e8a800'
 const TP_GREEN = '#00B67A'
 
-// 3 echte transformaties — in de hero tussen de foto-boog en de review-slider.
+// 3 echte transformaties — in de hero onder de titel.
 const TRANSFORMS = [
-  { src: '/review-transformatie-3.png', caption: 'Saskia verloor 5 kilo in 3 maanden.' },
+  { src: '/review-transformatie-3.png', caption: 'Saskia ging van 85 naar 78,5 en dalend.' },
   { src: '/review-transformatie-1.png', caption: 'Kersten: van zachte buik naar sixpack.' },
-  { src: '/review-transformatie-2.png', caption: 'Nitish bouwde spier op, vet omlaag.' },
+  { src: '/review-transformatie-2.png', caption: 'Nitish bouwde spier terwijl zijn vet % daalde.' },
 ]
 
 const REVIEWS = [
@@ -116,12 +115,7 @@ export default function HeroSection({ isMobile }) {
         </div>
       </div>
 
-      {/* Boog */}
-      <div style={{ marginBottom: isMobile ? '1.75rem' : '2.25rem' }}>
-        <PhotoFan isMobile={isMobile} />
-      </div>
-
-      {/* ═══ 3 transformaties — tussen de boog en de review-slider ═══ */}
+      {/* ═══ 3 transformaties — onder de titel ═══ */}
       <div style={{ width: '100%', maxWidth: isMobile ? '100%' : '760px', padding: `0 ${SECTION_PAD_X}` }}>
         <div style={{ display: 'flex', gap: isMobile ? '0.5rem' : '0.9rem' }}>
           {TRANSFORMS.map((t) => (
