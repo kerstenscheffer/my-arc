@@ -5,6 +5,13 @@ import PhotoFan from './PhotoFan'
 const GOLD_DARK = '#e8a800'
 const TP_GREEN = '#00B67A'
 
+// 3 echte transformaties — in de hero tussen de foto-boog en de review-slider.
+const TRANSFORMS = [
+  { src: '/review-transformatie-3.png', caption: 'Saskia verloor 5 kilo in 3 maanden.' },
+  { src: '/review-transformatie-1.png', caption: 'Kersten: van zachte buik naar sixpack.' },
+  { src: '/review-transformatie-2.png', caption: 'Nitish bouwde spier op, vet omlaag.' },
+]
+
 const REVIEWS = [
   {
     name: 'Sassus',
@@ -71,18 +78,15 @@ export default function HeroSection({ isMobile }) {
       background: '#0a0a0a',
       position: 'relative'
     }}>
-      {/* ═══ Logo — bovenaan de pagina ═══ */}
+      {/* ═══ Logo — bovenaan de content (in de flow, botst niet met de tekst) ═══ */}
       <img
         src="/ma-logo-header.png"
         alt="MY ARC"
         style={{
-          position: 'absolute',
-          top: isMobile ? '16px' : '26px',
-          left: '50%',
-          transform: 'translateX(-50%)',
-          width: isMobile ? '108px' : '138px',
+          width: isMobile ? '104px' : '132px',
           height: 'auto',
-          zIndex: 5
+          marginBottom: isMobile ? '1.5rem' : '2rem',
+          flexShrink: 0
         }}
       />
 
@@ -93,53 +97,46 @@ export default function HeroSection({ isMobile }) {
         maxWidth: '900px',
         marginBottom: isMobile ? '2.75rem' : '3.5rem'
       }}>
-        <div style={{
-          fontSize: isMobile ? '0.7rem' : '0.85rem',
-          fontWeight: '800',
-          letterSpacing: '0.14em',
-          textTransform: 'uppercase',
-          color: GOLD_DARK,
-          marginBottom: isMobile ? '0.9rem' : '1.1rem'
-        }}>
-          Het in shape komen &amp; blijven systeem
-        </div>
         <h1 style={{
           fontWeight: '900',
           lineHeight: 1.1,
           margin: 0,
           letterSpacing: '-0.02em',
           color: '#fff',
-          fontSize: isMobile ? 'clamp(2.1rem, 8vw, 2.7rem)' : 'clamp(2.8rem, 4.6vw, 3.8rem)',
+          fontSize: isMobile ? 'clamp(2rem, 7.8vw, 2.6rem)' : 'clamp(2.6rem, 4.4vw, 3.6rem)',
         }}>
-          In 3 maanden in shape
+          Het in shape komen &amp; blijven systeem
         </h1>
         <div style={{
           fontWeight: '800',
           color: '#fff',
           lineHeight: 1.35,
-          marginTop: isMobile ? '0.7rem' : '0.9rem',
-          fontSize: isMobile ? '1.05rem' : '1.4rem',
+          marginTop: isMobile ? '0.75rem' : '0.95rem',
+          fontSize: isMobile ? '1.05rem' : '1.35rem',
         }}>
-          met een aanpak die je daarna niet meer kwijtraakt.
+          In 3 maanden in shape met een aanpak die je daarna niet meer kwijtraakt.
         </div>
       </div>
 
       {/* Boog */}
-      <div style={{ marginBottom: isMobile ? '2.75rem' : '3.5rem' }}>
+      <div style={{ marginBottom: isMobile ? '1.75rem' : '2.25rem' }}>
         <PhotoFan isMobile={isMobile} />
       </div>
 
-      {/* ═══ Subtekst onder de boog — kleiner, ondergeschikt aan de titel ═══ */}
-      <div style={{ textAlign: 'center', padding: `0 ${SECTION_PAD_X}`, maxWidth: '640px' }}>
-        <p style={{
-          fontWeight: '600',
-          lineHeight: 1.4,
-          margin: 0,
-          color: 'rgba(255,255,255,0.78)',
-          fontSize: isMobile ? '0.95rem' : '1.15rem',
-        }}>
-          In 5 uur per week naar een strakker en sterker lichaam zonder je sociale leven in te leveren.
-        </p>
+      {/* ═══ 3 transformaties — tussen de boog en de review-slider ═══ */}
+      <div style={{ width: '100%', maxWidth: isMobile ? '100%' : '760px', padding: `0 ${SECTION_PAD_X}` }}>
+        <div style={{ display: 'flex', gap: isMobile ? '0.5rem' : '0.9rem' }}>
+          {TRANSFORMS.map((t) => (
+            <div key={t.src} style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+              <div style={{ borderRadius: '10px', overflow: 'hidden', filter: 'drop-shadow(0 8px 18px rgba(0,0,0,0.5))' }}>
+                <img src={t.src} alt={t.caption} style={{ width: '100%', height: 'auto', display: 'block' }} />
+              </div>
+              <p style={{ margin: 0, fontSize: isMobile ? '0.6rem' : '0.78rem', fontWeight: '800', color: '#fff', lineHeight: 1.3, textAlign: 'center' }}>
+                {t.caption}
+              </p>
+            </div>
+          ))}
+        </div>
       </div>
 
       {/* ═══ Trustpilot badge ═══ */}
@@ -147,7 +144,7 @@ export default function HeroSection({ isMobile }) {
         display: 'flex',
         alignItems: 'center',
         gap: '0.5rem',
-        marginTop: isMobile ? '3.5rem' : '4.5rem',
+        marginTop: isMobile ? '2rem' : '2.5rem',
         marginBottom: isMobile ? '1.25rem' : '1.5rem'
       }}>
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
