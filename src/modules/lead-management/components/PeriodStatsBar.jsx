@@ -8,6 +8,7 @@ import { useState, useEffect } from 'react'
 import { ChevronDown, BarChart3, TrendingUp, UserPlus, Send, MessageCircle, Phone, CalendarCheck, Trophy, UserX, Euro } from 'lucide-react'
 import WeekStatsModal from './WeekStatsModal'
 import GrowthChart from './GrowthChart'
+import { kpiTargetFor, kpiColor, fmtTarget } from '../kpiConfig'
 
 const GOLD = '#FFD700'
 
@@ -78,6 +79,9 @@ export default function PeriodStatsBar({ leadService, coachId, isMobile, refresh
   const [s, setS] = useState({ nieuw: 0, follow: 0, reacties: 0, voorgesteld: 0, ingepland: 0, sales: 0, omzet: 0, noshow: 0 })
   const [timeSeries, setTimeSeries] = useState([])
   const [chartOpen, setChartOpen] = useState(false)
+  // KPI-doelen (per coach) + een key om ze te herladen na opslaan in de modal.
+  const [targets, setTargets] = useState({})
+  const [targetsKey, setTargetsKey] = useState(0)
 
   useEffect(() => {
     if (!leadService || !coachId) return
@@ -89,12 +93,14 @@ export default function PeriodStatsBar({ leadService, coachId, isMobile, refresh
         // Grafiek volgt de gekozen periode — behalve "Vandaag" (1 dag = 1 punt),
         // dan tonen we de hele maand zodat er een zinvolle trendlijn is.
         const chartRange = rangeFor(period === 'day' ? 'month' : period, customRange)
-        const [funnel, react, ts] = await Promise.all([
+        const [funnel, react, ts, kpiT] = await Promise.all([
           leadService.getRangeFunnelStats(coachId, start, end),
           leadService.getRangeReactionStats ? leadService.getRangeReactionStats(coachId, start, end) : Promise.resolve(null),
           leadService.getDailyTimeSeries ? leadService.getDailyTimeSeries(coachId, chartRange.start, chartRange.end) : Promise.resolve([]),
+          leadService.getKpiTargets ? leadService.getKpiTargets(coachId) : Promise.resolve({}),
         ])
         if (!alive) return
+        setTargets(kpiT || {})
         setTimeSeries(Array.isArray(ts) ? ts : [])
         const next = {
           nieuw: react?.newLeads || 0,
@@ -122,19 +128,19 @@ export default function PeriodStatsBar({ leadService, coachId, isMobile, refresh
     return () => { alive = false; clearInterval(id) }
     // refreshKey verandert bij elke reactie/DM/lead-mutatie in het bord, zodat
     // de bovenste stat-bar direct meeloopt (i.p.v. pas bij periode-wissel).
-  }, [period, customRange, coachId, leadService, refreshKey])
+  }, [period, customRange, coachId, leadService, refreshKey, targetsKey])
 
   // Elke stat een eigen lucide-icoon + kleur, zodat je zonder label ziet welke
   // het is (label blijft als tooltip). Zo passen ze compact op één rij.
   const items = [
-    { label: 'Nieuwe leads',     value: s.nieuw,       Icon: UserPlus,      color: '#3b82f6' },
-    { label: 'Follow-ups',       value: s.follow,      Icon: Send,          color: '#f59e0b' },
-    { label: 'Reacties',         value: s.reacties,    Icon: MessageCircle, color: '#10b981' },
-    { label: 'Call voorgesteld', value: s.voorgesteld, Icon: Phone,         color: '#a855f7' },
-    { label: 'Call ingepland',   value: s.ingepland,   Icon: CalendarCheck, color: '#06b6d4' },
-    { label: 'Sales',            value: s.sales,       Icon: Trophy,        color: GOLD },
-    { label: 'Omzet',            value: '€' + Math.round(s.omzet || 0).toLocaleString('nl-NL'), Icon: Euro, color: '#22c55e' },
-    { label: 'No-shows',         value: s.noshow,      Icon: UserX,         color: '#ef4444' },
+    { key: 'nieuw',       label: 'Nieuwe leads',     value: s.nieuw,       num: s.nieuw,     Icon: UserPlus,      color: '#3b82f6' },
+    { key: 'follow',      label: 'Follow-ups',       value: s.follow,      num: s.follow,    Icon: Send,          color: '#f59e0b' },
+    { key: 'reacties',    label: 'Reacties',         value: s.reacties,    num: s.reacties,  Icon: MessageCircle, color: '#10b981' },
+    { key: 'voorgesteld', label: 'Call voorgesteld', value: s.voorgesteld, num: s.voorgesteld, Icon: Phone,       color: '#a855f7' },
+    { key: 'ingepland',   label: 'Call ingepland',   value: s.ingepland,   num: s.ingepland, Icon: CalendarCheck, color: '#06b6d4' },
+    { key: 'sales',       label: 'Sales',            value: s.sales,       num: s.sales,     Icon: Trophy,        color: GOLD },
+    { key: 'omzet',       label: 'Omzet',            value: '€' + Math.round(s.omzet || 0).toLocaleString('nl-NL'), num: s.omzet, Icon: Euro, color: '#22c55e' },
+    { key: 'noshow',      label: 'No-shows',         value: s.noshow,      num: s.noshow,    Icon: UserX,         color: '#ef4444' },
   ]
   const PERIOD_SHORT = { day: 'Vandaag', week: 'Week', month: 'Maand', lastMonth: 'Vorige', custom: 'Datum' }
   const pill = (active) => ({ flexShrink: 0, minHeight: 32, padding: '0 0.7rem', borderRadius: 9, cursor: 'pointer', fontSize: '0.72rem', fontWeight: 800, display: 'inline-flex', alignItems: 'center', gap: 5, touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', background: active ? 'rgba(255,215,0,0.16)' : 'rgba(255,255,255,0.04)', border: `1px solid ${active ? 'rgba(255,215,0,0.45)' : 'rgba(255,255,255,0.08)'}`, color: active ? GOLD : 'rgba(255,255,255,0.62)' })
@@ -177,17 +183,28 @@ export default function PeriodStatsBar({ leadService, coachId, isMobile, refresh
 
       {/* Rij 2 — stats: gekleurd icoon (welke) + getal; label als tooltip */}
       <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? 14 : 22, overflowX: 'auto', WebkitOverflowScrolling: 'touch', marginTop: 10, paddingBottom: 2 }}>
-        {items.map((it) => (
-          <div key={it.label} title={it.label} style={{ display: 'inline-flex', alignItems: 'center', gap: 5, flexShrink: 0 }}>
-            <it.Icon size={16} color={it.color} strokeWidth={2.4} style={{ flexShrink: 0 }} />
-            <span style={{ fontSize: isMobile ? '1.05rem' : '1.25rem', fontWeight: 900, color: '#fff', fontVariantNumeric: 'tabular-nums', lineHeight: 1, opacity: loading ? 0.45 : 1 }}>
-              {it.value}
-            </span>
-          </div>
-        ))}
+        {items.map((it) => {
+          // Doel voor de huidige periode (alleen dag/week). Bepaalt de kleur van
+          // het getal en toont "/ doel" erachter.
+          const target = kpiTargetFor(targets, it.key, period)
+          const col = target != null ? kpiColor(it.num, target) : null
+          return (
+            <div key={it.label} title={target != null ? `${it.label} — doel ${fmtTarget(it.key, target)}` : it.label} style={{ display: 'inline-flex', alignItems: 'center', gap: 5, flexShrink: 0 }}>
+              <it.Icon size={16} color={it.color} strokeWidth={2.4} style={{ flexShrink: 0 }} />
+              <span style={{ fontSize: isMobile ? '1.05rem' : '1.25rem', fontWeight: 900, color: col || '#fff', fontVariantNumeric: 'tabular-nums', lineHeight: 1, opacity: loading ? 0.45 : 1 }}>
+                {it.value}
+                {target != null && (
+                  <span style={{ fontSize: isMobile ? '0.7rem' : '0.8rem', fontWeight: 700, color: col || 'rgba(255,255,255,0.5)', opacity: 0.85 }}>
+                    {' / '}{fmtTarget(it.key, target)}
+                  </span>
+                )}
+              </span>
+            </div>
+          )
+        })}
       </div>
 
-      <WeekStatsModal isOpen={showWeek} onClose={() => setShowWeek(false)} leadService={leadService} coachId={coachId} isMobile={isMobile} />
+      <WeekStatsModal isOpen={showWeek} onClose={() => setShowWeek(false)} leadService={leadService} coachId={coachId} isMobile={isMobile} onTargetsSaved={() => setTargetsKey(k => k + 1)} />
     </div>
   )
 }

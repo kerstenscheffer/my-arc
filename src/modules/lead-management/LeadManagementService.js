@@ -1863,6 +1863,54 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
     }
   }
 
+  // ── KPI-DOELEN ──────────────────────────────────────────────────────────
+  // Per coach een dag- én week-doel per stat (lead_kpi_targets). Retourneert
+  // een map { stat_key: { day, week } } zodat de stats-bar en -modal 'm direct
+  // kunnen gebruiken. Faalt de query, dan geven we een lege map terug.
+  async getKpiTargets(coachId) {
+    try {
+      if (!coachId) return {}
+      const { data, error } = await this.db.supabase
+        .from('lead_kpi_targets')
+        .select('stat_key, day_target, week_target')
+        .eq('coach_id', coachId)
+      if (error) throw error
+      const map = {}
+      ;(data || []).forEach(r => {
+        map[r.stat_key] = {
+          day: r.day_target != null ? Number(r.day_target) : null,
+          week: r.week_target != null ? Number(r.week_target) : null,
+        }
+      })
+      return map
+    } catch (error) {
+      console.error('❌ getKpiTargets failed:', error)
+      return {}
+    }
+  }
+
+  // Slaat een lijst doelen op: [{ stat_key, day_target, week_target }, ...].
+  // Upsert per (coach_id, stat_key); lege waarden worden als null bewaard.
+  async saveKpiTargets(coachId, targets) {
+    try {
+      if (!coachId || !Array.isArray(targets)) return { error: 'ongeldige input' }
+      const rows = targets.map(t => ({
+        coach_id: coachId,
+        stat_key: t.stat_key,
+        day_target: (t.day_target === '' || t.day_target == null) ? null : Number(t.day_target),
+        week_target: (t.week_target === '' || t.week_target == null) ? null : Number(t.week_target),
+        updated_at: new Date().toISOString(),
+      }))
+      const { error } = await this.db.supabase
+        .from('lead_kpi_targets')
+        .upsert(rows, { onConflict: 'coach_id,stat_key' })
+      return { error }
+    } catch (error) {
+      console.error('❌ saveKpiTargets failed:', error)
+      return { error }
+    }
+  }
+
   // Draai één funnel-verplaatsing terug vanuit de stats-drill-down. We zetten
   // een soft-stempel (reverted_at) zodat de movement uit de tellingen verdwijnt
   // maar de rij bewaard blijft (omkeerbaar). De lead zelf blijft staan waar 'ie

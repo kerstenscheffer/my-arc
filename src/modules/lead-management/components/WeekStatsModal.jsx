@@ -9,10 +9,11 @@ import {
   X, ChevronLeft, ChevronRight, ChevronDown, Calendar, Zap, TrendingUp,
   MessageCircle, Users, Phone, Trophy, Activity, BarChart3, PhoneCall,
   Send, FileText, Percent, UserX, Eye, Download, LineChart as LineChartIcon,
-  RotateCcw,
+  RotateCcw, Target, Save,
 } from 'lucide-react'
 import { exportStatsPDF } from '../utils/exportStatsPDF'
 import GrowthChart from './GrowthChart'
+import { KPI_STATS, kpiTargetFor, kpiColor, fmtTarget } from '../kpiConfig'
 
 const GOLD = '#FFD700'
 const GOLD_DARK = '#D4AF37'
@@ -67,7 +68,7 @@ const pct = (num, den) => {
   return Math.round((num / den) * 100)
 }
 
-export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, isMobile: propMobile }) {
+export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, isMobile: propMobile, onTargetsSaved }) {
   const isMobile = propMobile ?? (typeof window !== 'undefined' && window.innerWidth <= 768)
   // periodMode: 'day' = single day window, 'week' = Monday→Sunday window.
   // anchorDate is the reference point — for 'day' it's the chosen day,
@@ -89,9 +90,63 @@ export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, 
   // PDF-preview: { url, filename } zodra de export klaar is; null = geen preview.
   const [pdfPreview, setPdfPreview] = useState(null)
   const [pdfBusy, setPdfBusy] = useState(false)
+  // KPI-doelen: paneel open/dicht, geladen map + bewerkbaar concept + saving-flag.
+  const [showKpi, setShowKpi] = useState(false)
+  const [kpiTargets, setKpiTargets] = useState({})
+  const [kpiDraft, setKpiDraft] = useState({})
+  const [kpiSaving, setKpiSaving] = useState(false)
 
   // Preview-blob-URL opruimen wanneer 'ie sluit of de modal ontmount.
   useEffect(() => () => { if (pdfPreview?.url) URL.revokeObjectURL(pdfPreview.url) }, [pdfPreview])
+
+  // KPI-doelen laden zodra de modal opent.
+  useEffect(() => {
+    if (!isOpen || !coachId || !leadService?.getKpiTargets) return
+    let alive = true
+    leadService.getKpiTargets(coachId).then(m => { if (alive) setKpiTargets(m || {}) })
+    return () => { alive = false }
+  }, [isOpen, coachId, leadService])
+
+  const openKpiPanel = () => {
+    const draft = {}
+    KPI_STATS.forEach(st => {
+      const t = kpiTargets[st.key] || {}
+      draft[st.key] = {
+        day: t.day != null ? String(t.day) : '',
+        week: t.week != null ? String(t.week) : '',
+      }
+    })
+    setKpiDraft(draft)
+    setShowKpi(true)
+  }
+
+  const setKpiField = (key, period, value) => {
+    // Alleen cijfers toestaan (leeg = doel wissen).
+    const clean = value.replace(/[^0-9]/g, '')
+    setKpiDraft(prev => ({ ...prev, [key]: { ...(prev[key] || {}), [period]: clean } }))
+  }
+
+  const saveKpiPanel = async () => {
+    if (kpiSaving) return
+    setKpiSaving(true)
+    const rows = KPI_STATS.map(st => ({
+      stat_key: st.key,
+      day_target: kpiDraft[st.key]?.day ?? '',
+      week_target: kpiDraft[st.key]?.week ?? '',
+    }))
+    try {
+      const { error } = await leadService.saveKpiTargets(coachId, rows)
+      if (error) throw error
+      const fresh = await leadService.getKpiTargets(coachId)
+      setKpiTargets(fresh || {})
+      setShowKpi(false)
+      if (onTargetsSaved) onTargetsSaved()
+    } catch (e) {
+      console.error('KPI opslaan mislukt:', e)
+    } finally {
+      setKpiSaving(false)
+    }
+  }
 
   // Draai één funnel-verplaatsing terug (soft): verdwijnt uit de stats, lead
   // blijft op het bord staan. Daarna herladen we de cijfers.
@@ -254,6 +309,16 @@ export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, 
   // What share of leads needed a chase to get any reply at all.
   const chaseShare   = pct(followedLeads, newLeadsInPeriod)
 
+  // Huidige waarde per KPI-stat (voor de doelen-preview in het paneel). Zelfde
+  // bronnen als de stats-bar, zodat de getallen 1-op-1 overeenkomen.
+  const kpiValues = {
+    nieuw:     newLeadsInPeriod,
+    reacties:  reactionStats?.reactionEventsInWindow ?? reactionStats?.reactionsInWindow ?? reactedLeads ?? 0,
+    ingepland: totalCalls,
+    sales:     totalSales,
+    omzet:     Math.round(funnel?.sale?.omzet || 0),
+  }
+
   const modal = (
     <div
       onClick={onClose}
@@ -288,6 +353,24 @@ export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, 
           <div style={{ flex: 1, color: '#fff', fontWeight: 800, fontSize: '0.95rem' }}>
             Stats — {periodMode === 'day' ? 'Dag' : periodMode === 'month' ? 'Maand' : 'Week'}
           </div>
+          <button
+            onClick={openKpiPanel}
+            disabled={loading}
+            title="KPI-doelen instellen (dag/week)"
+            style={{
+              ...iconBtn,
+              width: 'auto', padding: '0 0.65rem',
+              display: 'inline-flex', alignItems: 'center', gap: 5,
+              background: 'rgba(255,215,0,0.12)',
+              border: '1px solid rgba(255,215,0,0.35)',
+              color: GOLD, fontSize: '0.7rem', fontWeight: 800,
+              opacity: loading ? 0.4 : 1,
+              cursor: loading ? 'not-allowed' : 'pointer',
+            }}
+          >
+            <Target size={13} />
+            Doelen
+          </button>
           <button
             onClick={async () => {
               if (pdfBusy || loading) return
@@ -702,6 +785,66 @@ export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, 
   return createPortal(
     <>
       {modal}
+      {showKpi && (
+        <div
+          onClick={() => setShowKpi(false)}
+          style={{ position: 'fixed', inset: 0, zIndex: 2147483560, background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(6px)', display: 'flex', alignItems: isMobile ? 'flex-end' : 'center', justifyContent: 'center', padding: isMobile ? 0 : '1.5rem' }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{ width: '100%', maxWidth: 560, maxHeight: isMobile ? '92vh' : '85vh', display: 'flex', flexDirection: 'column', background: '#111', border: '1px solid rgba(255,215,0,0.25)', borderRadius: isMobile ? '16px 16px 0 0' : 16, overflow: 'hidden' }}
+          >
+            {/* Header */}
+            <div style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: 8, padding: isMobile ? 'calc(0.7rem + env(safe-area-inset-top)) 0.9rem 0.7rem' : '0.9rem 1rem', borderBottom: '1px solid rgba(255,255,255,0.08)', background: 'rgba(0,0,0,0.5)' }}>
+              <Target size={17} color={GOLD} />
+              <div style={{ flex: 1, color: '#fff', fontWeight: 800, fontSize: '0.95rem' }}>KPI-doelen</div>
+              <button onClick={() => setShowKpi(false)} title="Sluiten" style={iconBtn}><X size={16} /></button>
+            </div>
+            {/* Uitleg + kleurlegenda */}
+            <div style={{ flexShrink: 0, padding: '0.6rem 1rem', fontSize: '0.72rem', color: 'rgba(255,255,255,0.55)', lineHeight: 1.5, borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+              Stel per stat een <b style={{ color: '#fff' }}>dag</b>- en <b style={{ color: '#fff' }}>week</b>-doel in. Op de bar: <span style={{ color: '#22c55e', fontWeight: 700 }}>groen</span> = gehaald, <span style={{ color: '#f59e0b', fontWeight: 700 }}>geel</span> = onderweg, <span style={{ color: '#ef4444', fontWeight: 700 }}>rood</span> = achter. Leeg = geen doel.
+            </div>
+            {/* Rijen */}
+            <div style={{ flex: 1, overflowY: 'auto', padding: '0.25rem 1rem 1rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '0.5rem 0 0.3rem', position: 'sticky', top: 0, background: '#111', zIndex: 1 }}>
+                <div style={{ flex: 1 }} />
+                <div style={{ width: 72, textAlign: 'center', fontSize: '0.6rem', fontWeight: 800, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.4)' }}>Dag</div>
+                <div style={{ width: 72, textAlign: 'center', fontSize: '0.6rem', fontWeight: 800, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.4)' }}>Week</div>
+              </div>
+              {KPI_STATS.map(st => {
+                const val = kpiValues[st.key] || 0
+                const tgt = kpiTargetFor(kpiTargets, st.key, periodMode)
+                const col = tgt != null ? kpiColor(val, tgt) : null
+                const draft = kpiDraft[st.key] || { day: '', week: '' }
+                const shown = st.key === 'omzet' ? '€' + Math.round(val).toLocaleString('nl-NL') : val
+                return (
+                  <div key={st.key} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '0.55rem 0', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: '0.82rem', fontWeight: 700, color: '#fff' }}>{st.label}</div>
+                      <div style={{ fontSize: '0.66rem', fontWeight: 700, color: col || 'rgba(255,255,255,0.4)' }}>
+                        {periodMode === 'month'
+                          ? `${shown} nu · doel alleen dag/week`
+                          : (tgt != null ? `${shown} / ${fmtTarget(st.key, tgt)}` : `${shown} · geen doel`)}
+                      </div>
+                    </div>
+                    <input inputMode="numeric" value={draft.day} onChange={e => setKpiField(st.key, 'day', e.target.value)} placeholder="—"
+                      style={{ width: 72, minHeight: 38, textAlign: 'center', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,215,0,0.25)', borderRadius: 8, color: '#fff', fontSize: '0.9rem', fontWeight: 800, fontFamily: 'inherit', outline: 'none' }} />
+                    <input inputMode="numeric" value={draft.week} onChange={e => setKpiField(st.key, 'week', e.target.value)} placeholder="—"
+                      style={{ width: 72, minHeight: 38, textAlign: 'center', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,215,0,0.25)', borderRadius: 8, color: '#fff', fontSize: '0.9rem', fontWeight: 800, fontFamily: 'inherit', outline: 'none' }} />
+                  </div>
+                )
+              })}
+            </div>
+            {/* Footer */}
+            <div style={{ flexShrink: 0, display: 'flex', gap: 8, padding: isMobile ? '0.75rem 1rem calc(0.75rem + env(safe-area-inset-bottom))' : '0.75rem 1rem', borderTop: '1px solid rgba(255,255,255,0.08)' }}>
+              <button onClick={() => setShowKpi(false)} style={{ flex: 1, minHeight: 42, borderRadius: 10, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.65)', fontWeight: 700, cursor: 'pointer', touchAction: 'manipulation' }}>Annuleren</button>
+              <button onClick={saveKpiPanel} disabled={kpiSaving} style={{ flex: 2, minHeight: 42, borderRadius: 10, border: 'none', background: 'linear-gradient(135deg,#FFD700,#D4AF37)', color: '#000', fontWeight: 900, cursor: kpiSaving ? 'wait' : 'pointer', opacity: kpiSaving ? 0.6 : 1, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6, touchAction: 'manipulation' }}>
+                <Save size={15} /> {kpiSaving ? 'Opslaan…' : 'Doelen opslaan'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       {pdfPreview && (
         <div
           onClick={() => setPdfPreview(null)}
