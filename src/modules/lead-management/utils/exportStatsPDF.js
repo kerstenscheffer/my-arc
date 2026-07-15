@@ -140,6 +140,33 @@ export async function exportStatsPDF(payload) {
   doc.text(right, pageW - margin, 72, { align: 'right' })
   y = 100
 
+  // Sectiekop met gouden titel + optionele uitleg-regel eronder ("wat zie je
+  // hier en waarom is het belangrijk"). Zo weet de coach per blok wat 'ie leest.
+  const section = (label, description) => {
+    if (y > 700) { doc.addPage(); y = margin }
+    doc.setTextColor(...GOLD)
+    doc.setFontSize(11)
+    doc.setFont('helvetica', 'bold')
+    doc.text(label.toUpperCase(), margin, y)
+    doc.setDrawColor(...GOLD)
+    doc.setLineWidth(0.6)
+    doc.line(margin, y + 4, pageW - margin, y + 4)
+    y += 14
+    if (description) {
+      doc.setFont('helvetica', 'normal')
+      doc.setFontSize(8)
+      doc.setTextColor(...MUTED)
+      const lines = doc.splitTextToSize(description, pageW - 2 * margin)
+      doc.text(lines, margin, y + 2)
+      y += lines.length * 10 + 6
+    } else {
+      y += 4
+    }
+  }
+
+  section('Overzicht — totalen deze periode',
+    'De belangrijkste aantallen in één oogopslag: van nieuwe leads bovenaan de funnel tot sales en omzet onderaan.')
+
   // ─── HEADLINE — exact dezelfde 8 stats als de kanban-stats-balk (icoon +
   // kleur + getal), in een 4×2 raster. Zo herkent de coach de PDF direct van
   // het scherm. Datavelden komen 1-op-1 uit dezelfde bronnen als de balk.
@@ -198,95 +225,35 @@ export async function exportStatsPDF(payload) {
   })
   y += 2 * cardH + ROW_GAP + 18
 
-  // Small helper: section title.
-  const section = (label) => {
-    if (y > 720) { doc.addPage(); y = margin }
-    doc.setTextColor(...GOLD)
-    doc.setFontSize(11)
-    doc.setFont('helvetica', 'bold')
-    doc.text(label.toUpperCase(), margin, y)
-    doc.setDrawColor(...GOLD)
-    doc.setLineWidth(0.6)
-    doc.line(margin, y + 4, pageW - margin, y + 4)
-    y += 16
-  }
-
-  // ─── ACTIVITY ──────────────────────────────────────────────────────────────
-  section('Activiteit')
-  autoTable(doc, {
-    startY: y,
-    head: [['Statistiek', 'Waarde']],
-    body: [
-      ['Nieuwe leads',    String(activity?.newOutreach || 0)],
-      ['Follow-ups',      String(activity?.followUps || 0)],
-      ['Verplaatsingen',  String(activity?.totalMovements || 0)],
-    ],
-    theme: 'grid',
-    styles: { fontSize: 9, cellPadding: 6 },
-    headStyles: { fillColor: GOLD, textColor: DARK, fontStyle: 'bold' },
-    margin: { left: margin, right: margin },
-  })
-  y = doc.lastAutoTable.finalY + 14
-
-  // ─── REACTIE ───────────────────────────────────────────────────────────────
-  if (reactionStats) {
-    section('Reactie')
-    autoTable(doc, {
-      startY: y,
-      head: [['Statistiek', 'Waarde']],
-      body: [
-        ['Gereageerd (reply_count > 0)',  String(reactionStats.reactedLeads || 0)],
-        ['Niet gereageerd',               String(reactionStats.notReactedYet || 0)],
-        ['Leads die follow-up kregen',    String(reactionStats.followedLeads || 0)],
-        ['Opvolg verstuurd in periode',   String(reactionStats.followupsInWindow || 0)],
-        ['Totaal nieuwe leads in periode', String(reactionStats.newLeads || 0)],
-      ],
-      theme: 'grid',
-      styles: { fontSize: 9, cellPadding: 6 },
-      headStyles: { fillColor: BLUE, textColor: 255, fontStyle: 'bold' },
-      margin: { left: margin, right: margin },
-    })
-    y = doc.lastAutoTable.finalY + 14
-  }
-
-  // ─── RATIOS ────────────────────────────────────────────────────────────────
+  // ─── KERNCIJFERS (percentages) ─────────────────────────────────────────────
+  // De totale AANTALLEN staan al in het overzicht bovenaan (nieuwe leads, sales,
+  // omzet, no-shows...). Hier draait alles om de VERHOUDINGEN. De losse
+  // Activiteit-/Reactie-/Funnel-tabellen zijn bewust weg: dat was dubbel met het
+  // overzicht en "verplaatsingen" is niet actiegericht. Dit is de getrimde versie.
   if (ratios) {
-    section("Kerncijfers")
+    section('Kerncijfers — percentages',
+      'De verhoudingen die er echt toe doen. Percentage met de onderliggende aantallen erachter, en waarom je erop stuurt.')
     autoTable(doc, {
       startY: y,
-      head: [['Stat', 'Waarde', 'Detail']],
+      head: [['Kerncijfer', '%', 'Aantal', 'Waarom belangrijk']],
       body: [
-        ['Response rate',  fmtPct(ratios.responseRate), ratios.responseFraction || ''],
-        ['Opvolg rate',    fmtPct(ratios.chaseShare),   ratios.chaseFraction || ''],
+        ['Response rate', fmtPct(ratios.responseRate), ratios.responseFraction || '—', 'Reageert je outreach? (reacties / nieuwe leads)'],
+        ['Show-up rate',  fmtPct(ratios.showRate),     ratios.showFraction || '—',     'Ingeplande calls die ook echt komen opdagen'],
+        ['No-show rate',  fmtPct(ratios.noShowRate),   ratios.noShowFraction || '—',   'Calls die niet komen opdagen — hoe lager, hoe beter'],
+        ['Opvolg rate',   fmtPct(ratios.chaseShare),   ratios.chaseFraction || '—',    'Aandeel leads dat een follow-up nodig had'],
       ],
       theme: 'grid',
-      styles: { fontSize: 9, cellPadding: 6 },
+      styles: { fontSize: 9, cellPadding: 6, valign: 'middle' },
       headStyles: { fillColor: GREEN, textColor: 255, fontStyle: 'bold' },
-      columnStyles: { 1: { halign: 'right', fontStyle: 'bold' } },
+      columnStyles: {
+        0: { fontStyle: 'bold', cellWidth: 95 },
+        1: { halign: 'right', fontStyle: 'bold', cellWidth: 42 },
+        2: { halign: 'right', cellWidth: 58, textColor: MUTED },
+        3: { textColor: MUTED, fontSize: 8 },
+      },
       margin: { left: margin, right: margin },
     })
-    y = doc.lastAutoTable.finalY + 14
-  }
-
-  // ─── FUNNEL ────────────────────────────────────────────────────────────────
-  if (funnel) {
-    section('Funnel')
-    autoTable(doc, {
-      startY: y,
-      head: [['Fase', 'Movements']],
-      body: [
-        ['Calls voorgesteld', String(funnel.callProposed?.count  || 0)],
-        ['Calls ingepland',   String(funnel.callScheduled?.count || 0)],
-        ['Sales gemaakt',     String(funnel.sale?.count          || 0)],
-        ['No shows',          String(funnel.noShow?.count        || 0)],
-      ],
-      theme: 'grid',
-      styles: { fontSize: 9, cellPadding: 6 },
-      headStyles: { fillColor: PURPLE, textColor: 255, fontStyle: 'bold' },
-      columnStyles: { 1: { halign: 'right' } },
-      margin: { left: margin, right: margin },
-    })
-    y = doc.lastAutoTable.finalY + 14
+    y = doc.lastAutoTable.finalY + 16
   }
 
   // ─── SOURCE BREAKDOWN ──────────────────────────────────────────────────────
@@ -296,7 +263,8 @@ export async function exportStatsPDF(payload) {
       ...(sourceBreakdown.magnets || []).map(m => ({ ...m, type: 'Lead magnet' })),
     ]
     if (allSources.length > 0) {
-      section('Bron-breakdown')
+      section('Bron-breakdown',
+        'Per campagne en lead-magnet: hoeveel leads en hun response-, call- en sale-percentage. Zo zie je welke bron het beste presteert.')
       const rows = allSources.map(s => {
         // Match the on-screen labels: "Call ingepl." uses scheduled only.
         const scheduledCalls = s.stages?.callScheduled || 0

@@ -290,14 +290,19 @@ export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, 
                   ? anchorDate.toLocaleDateString('nl-NL', { month: 'long', year: 'numeric' })
                   : `Week ${isoWeek(mondayOf(anchorDate))} · ${fmtRange(mondayOf(anchorDate))}`
               const periodSubtitle = `${start.toLocaleDateString('nl-NL', { day: 'numeric', month: 'short', year: 'numeric' })} → ${new Date(end - 1).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short', year: 'numeric' })}`
+              const noShowRate = totalCalls > 0 ? Math.round((totalNoShows / totalCalls) * 100) : null
               exportStatsPDF({
                 periodLabel, periodSubtitle,
                 generatedAt: new Date().toLocaleString('nl-NL', { dateStyle: 'short', timeStyle: 'short' }),
                 activity, funnel, reactionStats, sourceBreakdown,
                 ratios: {
-                  responseRate, chaseShare,
+                  responseRate, chaseShare, showRate, noShowRate,
+                  newLeads:         newLeadsInPeriod,
+                  reactedLeads,
                   responseFraction: `${reactedLeads} / ${newLeadsInPeriod}`,
                   chaseFraction:    `${followedLeads} / ${newLeadsInPeriod}`,
+                  showFraction:     totalCalls > 0 ? `${totalCalls - totalNoShows} / ${totalCalls}` : '—',
+                  noShowFraction:   totalCalls > 0 ? `${totalNoShows} / ${totalCalls}` : '—',
                 },
               })
             }}
