@@ -9,7 +9,7 @@ import {
   X, ChevronLeft, ChevronRight, ChevronDown, Calendar, Zap, TrendingUp,
   MessageCircle, Users, Phone, Trophy, Activity, BarChart3, PhoneCall,
   Send, FileText, Percent, UserX, Eye, Download, LineChart as LineChartIcon,
-  RotateCcw, Target, Save,
+  RotateCcw, Target, Save, UserPlus, CalendarCheck, Euro,
 } from 'lucide-react'
 import { exportStatsPDF } from '../utils/exportStatsPDF'
 import GrowthChart from './GrowthChart'
@@ -99,6 +99,8 @@ export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, 
   const [showRevenue, setShowRevenue] = useState(false)
   const [revenue, setRevenue] = useState(null)
   const [revLoading, setRevLoading] = useState(false)
+  // Welke funnel-stap staat open in de drill-down (voor terugdraaien/verwijderen).
+  const [drillStage, setDrillStage] = useState(null)
 
   // Preview-blob-URL opruimen wanneer 'ie sluit of de modal ontmount.
   useEffect(() => () => { if (pdfPreview?.url) URL.revokeObjectURL(pdfPreview.url) }, [pdfPreview])
@@ -338,6 +340,33 @@ export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, 
     omzet:       Math.round(funnel?.sale?.omzet || 0),
   }
 
+  // Twee strakke stat-rijen (aantallen + percentages), in de stijl van de
+  // stats-bar — geen vakjes meer.
+  const shownCalls = Math.max(0, totalCalls - totalNoShows)
+  const proposedToScheduled = totalCallProposed > 0 ? Math.round((totalCalls / totalCallProposed) * 100) : null
+  const noShowRate = totalCalls > 0 ? Math.round((totalNoShows / totalCalls) * 100) : null
+  const closeRate = shownCalls > 0 ? Math.round((totalSales / shownCalls) * 100) : null
+  const pct1 = (v) => (v == null ? '—' : `${v}%`)
+  const STAGE_ACCENT = { callProposed: '#a855f7', callScheduled: '#06b6d4', sale: '#10b981', noShow: '#f97316' }
+  const countItems = [
+    { label: 'Nieuwe leads', value: newLeadsInPeriod,          Icon: UserPlus,      color: '#3b82f6' },
+    { label: 'Follow-ups',   value: activity?.followUps ?? 0,  Icon: Send,          color: '#f59e0b' },
+    { label: 'Reacties',     value: kpiValues.reacties,        Icon: MessageCircle, color: '#10b981' },
+    { label: 'Voorgesteld',  value: totalCallProposed,         Icon: PhoneCall,     color: '#a855f7', stage: 'callProposed' },
+    { label: 'Ingepland',    value: totalCalls,                Icon: CalendarCheck, color: '#06b6d4', stage: 'callScheduled' },
+    { label: 'Sales',        value: totalSales,                Icon: Trophy,        color: '#FFD700', stage: 'sale' },
+    { label: 'Omzet',        value: '€' + Math.round(funnel?.sale?.omzet || 0).toLocaleString('nl-NL'), Icon: Euro, color: '#22c55e' },
+    { label: 'No-shows',     value: totalNoShows,              Icon: UserX,         color: '#ef4444', stage: 'noShow' },
+  ]
+  const pctItems = [
+    { label: 'Response',      value: pct1(responseRate),        Icon: MessageCircle, color: '#3b82f6' },
+    { label: 'Opvolg',        value: pct1(chaseShare),          Icon: Send,          color: '#f59e0b' },
+    { label: 'Voorstel→call', value: pct1(proposedToScheduled), Icon: PhoneCall,     color: '#a855f7' },
+    { label: 'Show-up',       value: pct1(showRate),            Icon: CalendarCheck, color: '#06b6d4' },
+    { label: 'No-show',       value: pct1(noShowRate),          Icon: UserX,         color: '#ef4444' },
+    { label: 'Close rate',    value: pct1(closeRate),           Icon: Trophy,        color: '#22c55e' },
+  ]
+
   const modal = (
     <div
       onClick={onClose}
@@ -360,18 +389,37 @@ export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, 
           overflow: 'hidden',
         }}
       >
-        {/* Header */}
+        {/* Header — titel, Dag/Week/Maand én de actie-knoppen op één regel */}
         <div style={{
           flexShrink: 0,
-          padding: isMobile ? 'calc(0.6rem + env(safe-area-inset-top)) 0.75rem 0.6rem' : '0.75rem 1rem',
+          padding: isMobile ? 'calc(0.6rem + env(safe-area-inset-top)) 0.75rem 0.6rem' : '0.7rem 1rem',
           display: 'flex', alignItems: 'center', gap: 6,
           borderBottom: '1px solid rgba(255,255,255,0.06)',
           background: 'rgba(0,0,0,0.5)',
+          overflowX: 'auto', WebkitOverflowScrolling: 'touch',
         }}>
           <BarChart3 size={16} color={GOLD} style={{ flexShrink: 0 }} />
-          <div style={{ flex: 1, color: '#fff', fontWeight: 800, fontSize: '0.9rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+          <div style={{ flexShrink: 0, color: '#fff', fontWeight: 800, fontSize: '0.9rem', whiteSpace: 'nowrap' }}>
             Stats
           </div>
+          {/* Dag/Week/Maand — segment-control op dezelfde regel */}
+          <div style={{ display: 'inline-flex', flexShrink: 0, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 10, padding: 3, gap: 3, marginLeft: 4 }}>
+            {['day', 'week', 'month'].map(mode => {
+              const active = periodMode === mode
+              const labels = { day: 'Dag', week: 'Week', month: 'Maand' }
+              return (
+                <button key={mode} onClick={() => setPeriodMode(mode)} style={{
+                  minHeight: 30, padding: isMobile ? '0 0.6rem' : '0 0.85rem', border: 'none', borderRadius: 7,
+                  background: active ? 'rgba(255,215,0,0.16)' : 'transparent',
+                  color: active ? GOLD : 'rgba(255,255,255,0.55)',
+                  fontSize: isMobile ? '0.72rem' : '0.76rem', fontWeight: 800,
+                  cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+                  transition: 'all 0.15s ease',
+                }}>{labels[mode]}</button>
+              )
+            })}
+          </div>
+          <div style={{ flex: 1, minWidth: 8 }} />
           <button
             onClick={openRevenuePanel}
             title="Terugkerende omzet & cashflow"
@@ -461,32 +509,6 @@ export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, 
           </button>
         </div>
 
-        {/* Period mode toggle — segmented control in de stijl van de kanban-toolbar */}
-        <div style={{ flexShrink: 0, padding: '0.55rem 0.75rem 0' }}>
-          <div style={{ display: 'inline-flex', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 11, padding: 3, gap: 3 }}>
-            {['day', 'week', 'month'].map(mode => {
-              const active = periodMode === mode
-              const labels = { day: 'Dag', week: 'Week', month: 'Maand' }
-              return (
-                <button
-                  key={mode}
-                  onClick={() => setPeriodMode(mode)}
-                  style={{
-                    minHeight: 32, padding: '0 0.95rem', border: 'none', borderRadius: 8,
-                    background: active ? 'rgba(255,215,0,0.16)' : 'transparent',
-                    color: active ? GOLD : 'rgba(255,255,255,0.55)',
-                    fontSize: '0.78rem', fontWeight: 800,
-                    cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-                    transition: 'all 0.15s ease',
-                  }}
-                >
-                  {labels[mode]}
-                </button>
-              )
-            })}
-          </div>
-        </div>
-
         {/* Period navigator */}
         <div style={{
           flexShrink: 0, padding: '0.55rem 0.85rem 0.7rem',
@@ -532,108 +554,22 @@ export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, 
 
           {!loading && activity && (
             <>
-              <SectionTitle icon={<Activity size={13} color={GOLD} />} title="Activiteit" />
-              <Grid>
-                <StatCard
-                  icon={<Zap size={14} />} label="Nieuwe leads"
-                  value={activity.newOutreach} accent={GOLD}
+              {/* Aantallen — strakke rij zoals de stats-bar (klik funnel-stap
+                  voor de drill-down met terugdraaien/verwijderen). */}
+              <SectionTitle icon={<BarChart3 size={13} color={GOLD} />} title="Aantallen" />
+              <StatFlow items={countItems} activeStage={drillStage} onToggle={(st) => setDrillStage(prev => prev === st ? null : st)} />
+              {drillStage && (
+                <DrillPanel
+                  leads={funnel?.[drillStage]?.leads}
+                  accent={STAGE_ACCENT[drillStage]}
+                  onRevert={handleRevertMovement} revertingId={revertingId}
+                  onDelete={handleDeleteMovement} deletingId={deletingId}
                 />
-                <StatCard
-                  icon={<TrendingUp size={14} />} label="Follow-ups"
-                  value={activity.followUps}
-                />
-                <StatCard
-                  icon={<Activity size={14} />} label="Verplaatsingen"
-                  value={activity.totalMovements}
-                />
-              </Grid>
+              )}
 
-              <SectionTitle icon={<MessageCircle size={13} color={GOLD} />} title="Reactie" />
-              <Grid>
-                <StatCard
-                  icon={<MessageCircle size={14} />} label="Gereageerd"
-                  value={reactedLeads} accent="#3b82f6"
-                  subtext={newLeadsInPeriod > 0
-                    ? `van ${newLeadsInPeriod} nieuwe leads`
-                    : 'geen nieuwe leads'}
-                />
-                <StatCard
-                  icon={<UserX size={14} />} label="Niet gereageerd"
-                  value={notReactedLeads} accent="#6b7280"
-                  subtext={newLeadsInPeriod > 0 ? 'reply_count = 0' : '—'}
-                />
-                <StatCard
-                  icon={<Send size={14} />} label="Opvolg verstuurd"
-                  value={followupsInWindow}
-                  accent={GOLD_DARK}
-                  subtext={`naar ${followedLeads} leads totaal`}
-                />
-              </Grid>
-
-              <SectionTitle icon={<Percent size={13} color={GOLD} />} title="Kerncijfers" />
-              <Grid>
-                <RatioCard
-                  icon={<MessageCircle size={14} />} label="Response rate"
-                  value={responseRate} accent="#3b82f6"
-                  subtext={`${reactedLeads} / ${newLeadsInPeriod}`}
-                />
-                <RatioCard
-                  icon={<Send size={14} />} label="Opvolg rate"
-                  value={chaseShare} accent={GOLD_DARK}
-                  subtext={`${followedLeads} / ${newLeadsInPeriod} kreeg follow-up`}
-                />
-                <StatCard
-                  icon={<PhoneCall size={14} />} label="Calls voorgesteld"
-                  value={totalCallProposed} accent="#ef4444"
-                  details={funnel?.callProposed?.leads}
-                  onRevert={handleRevertMovement} revertingId={revertingId}
-                  onDelete={handleDeleteMovement} deletingId={deletingId}
-                />
-                <StatCard
-                  icon={<Phone size={14} />} label="Calls ingepland"
-                  value={totalCalls} accent={GOLD_DARK}
-                  details={funnel?.callScheduled?.leads}
-                  onRevert={handleRevertMovement} revertingId={revertingId}
-                  onDelete={handleDeleteMovement} deletingId={deletingId}
-                />
-                <StatCard
-                  icon={<Trophy size={14} />} label="Sales gemaakt"
-                  value={totalSales} accent="#10b981" highlight={totalSales > 0}
-                  details={funnel?.sale?.leads}
-                  onRevert={handleRevertMovement} revertingId={revertingId}
-                  onDelete={handleDeleteMovement} deletingId={deletingId}
-                />
-                <StatCard
-                  icon={<X size={14} />} label="No shows"
-                  value={totalNoShows} accent="#f97316"
-                  subtext={showRate != null ? `Show-rate ${showRate}%` : undefined}
-                  details={funnel?.noShow?.leads}
-                  onRevert={handleRevertMovement} revertingId={revertingId}
-                  onDelete={handleDeleteMovement} deletingId={deletingId}
-                />
-                {/* Messaging-efficiency: hoeveel berichten kost het je
-                    gemiddeld om bij een call-voorstel te komen? */}
-                <StatCard
-                  icon={<Send size={14} />} label="Berichten/call"
-                  value={avgBeforeCall?.avgFollowups != null
-                    ? avgBeforeCall.avgFollowups.toFixed(1)
-                    : '—'}
-                  accent="#8b5cf6"
-                  subtext={avgBeforeCall?.count > 0
-                    ? `gem. over ${avgBeforeCall.count} call-lead${avgBeforeCall.count === 1 ? '' : 's'}`
-                    : 'geen calls in periode'}
-                />
-                {/* Total messages + avg per lead — drukt uit hoeveel
-                    je in deze periode hebt verstuurd. */}
-                <StatCard
-                  icon={<Send size={14} />} label="Berichten/lead"
-                  value={newLeadsInPeriod > 0
-                    ? (followupsInWindow / newLeadsInPeriod).toFixed(1)
-                    : '—'}
-                  accent="#3b82f6"
-                  subtext={`${followupsInWindow} berichten / ${newLeadsInPeriod} leads`}
-                />
-              </Grid>
+              {/* Percentages — tweede strakke rij. */}
+              <SectionTitle icon={<Percent size={13} color={GOLD} />} title="Percentages" />
+              <StatFlow items={pctItems} activeStage={null} onToggle={() => {}} />
 
               {/* Growth chart — input vs output over time. Window is wider
                   than the period (min 30 days) so coach sees trends. */}
@@ -1270,6 +1206,69 @@ function StagePill({ label, value, color }) {
       }}>
         {label}
       </div>
+    </div>
+  )
+}
+
+// Compacte stat-rij in de stijl van de stats-bar: gekleurd icoon + bold wit
+// getal + klein label. Items met een `stage` zijn klikbaar → drill-down eronder.
+function StatFlow({ items, activeStage, onToggle }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'flex-start', gap: 18, overflowX: 'auto', WebkitOverflowScrolling: 'touch', padding: '2px 0 8px' }}>
+      {items.map(it => {
+        const clickable = !!it.stage
+        const on = clickable && activeStage === it.stage
+        return (
+          <div key={it.label} onClick={clickable ? () => onToggle(it.stage) : undefined} title={it.label}
+            style={{ display: 'flex', flexDirection: 'column', gap: 3, flexShrink: 0, cursor: clickable ? 'pointer' : 'default' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+              <it.Icon size={16} color={it.color} strokeWidth={2.4} style={{ flexShrink: 0 }} />
+              <span style={{ fontSize: '1.15rem', fontWeight: 900, color: '#fff', fontVariantNumeric: 'tabular-nums', lineHeight: 1 }}>{it.value}</span>
+              {clickable && <ChevronDown size={12} color={on ? '#FFD700' : 'rgba(255,255,255,0.35)'} style={{ transform: on ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s ease' }} />}
+            </div>
+            <span style={{ fontSize: '0.56rem', fontWeight: 800, letterSpacing: '0.04em', textTransform: 'uppercase', color: on ? '#FFD700' : 'rgba(255,255,255,0.4)', whiteSpace: 'nowrap' }}>{it.label}</span>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
+// Drill-down lijst onder de aantallen-rij: leads van een funnel-stap, met
+// terugdraaien/verwijderen (zelfde acties als voorheen in de StatCard).
+function DrillPanel({ leads, accent = '#FFD700', onRevert, revertingId, onDelete, deletingId }) {
+  const [confirmId, setConfirmId] = useState(null)
+  const items = Array.isArray(leads) ? leads : []
+  if (!items.length) {
+    return <div style={{ padding: '0.4rem 0.2rem 0.8rem', fontSize: '0.7rem', color: 'rgba(255,255,255,0.35)' }}>Geen items in deze periode.</div>
+  }
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 260, overflowY: 'auto', padding: '0.55rem 0.7rem', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 8, margin: '0 0 0.7rem' }}>
+      {items.map((d, i) => {
+        const busyRevert = revertingId && revertingId === d.id
+        const busyDelete = deletingId && deletingId === d.id
+        const busy = busyRevert || busyDelete
+        const confirming = confirmId === d.id
+        const canAct = (onRevert || onDelete) && d.id
+        return (
+          <div key={d.id || i} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, paddingBottom: 5, borderBottom: i < items.length - 1 ? '1px solid rgba(255,255,255,0.04)' : 'none' }}>
+            <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 1 }}>
+              <div style={{ fontSize: '0.68rem', fontWeight: 800, color: '#fff' }}>{d.name}</div>
+              <div style={{ fontSize: '0.6rem', fontWeight: 600, color: 'rgba(255,255,255,0.5)' }}>{d.from} <span style={{ color: accent }}>→</span> {d.to}</div>
+              <div style={{ fontSize: '0.58rem', fontWeight: 600, color: 'rgba(255,255,255,0.35)' }}>{d.time} · door <span style={{ color: 'rgba(255,255,255,0.6)' }}>{d.by || 'Onbekend'}</span></div>
+            </div>
+            {canAct && (confirming ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 3, flexShrink: 0 }}>
+                {onRevert && <button onClick={() => { setConfirmId(null); onRevert(d.id) }} disabled={busy} title="Verplaatsing ongedaan maken (rij blijft bewaard)" style={{ fontSize: '0.55rem', fontWeight: 800, color: '#fff', background: 'rgba(212,175,55,0.7)', border: 'none', borderRadius: 5, padding: '3px 7px', cursor: busy ? 'wait' : 'pointer', display: 'inline-flex', alignItems: 'center', gap: 3 }}><RotateCcw size={8} />{busyRevert ? '...' : 'Ongedaan'}</button>}
+                {onDelete && <button onClick={() => { setConfirmId(null); onDelete(d.id) }} disabled={busy} title="Stat permanent verwijderen" style={{ fontSize: '0.55rem', fontWeight: 800, color: '#fff', background: 'rgba(239,68,68,0.75)', border: 'none', borderRadius: 5, padding: '3px 7px', cursor: busy ? 'wait' : 'pointer' }}>{busyDelete ? '...' : 'Verwijder'}</button>}
+                <button onClick={() => setConfirmId(null)} style={{ fontSize: '0.55rem', fontWeight: 700, color: 'rgba(255,255,255,0.6)', background: 'transparent', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 5, padding: '3px 7px', cursor: 'pointer' }}>Nee</button>
+              </div>
+            ) : (
+              <button onClick={() => setConfirmId(d.id)} title="Bewerken — ongedaan maken of verwijderen" style={{ flexShrink: 0, display: 'inline-flex', alignItems: 'center', gap: 3, fontSize: '0.55rem', fontWeight: 700, color: 'rgba(255,255,255,0.45)', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 5, padding: '3px 7px', cursor: 'pointer' }}><RotateCcw size={10} /> Aanpassen</button>
+            ))}
+          </div>
+        )
+      })}
     </div>
   )
 }
