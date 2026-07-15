@@ -22,6 +22,28 @@ import LeadDetailModalV2 from "./LeadDetailModalV2"
 const NIEUWE_VOLGERS_SECTION_ID = '68c7837a-a779-49df-9c66-cce76fb39e39'
 const DM_RUN_MESSAGE = 'Hey! Zag dat je me bent gaan volgen, welkom. Mag ik vragen waar je op dit moment het meest tegenaan loopt qua voeding of training?'
 
+// Synchroon kopiëren via execCommand — betrouwbaar binnen dezelfde tik, óók
+// vlak voordat we naar de Instagram-app/-tab springen (moderne clipboard-API
+// kan falen zodra de pagina focus verliest). Best-effort, geeft succes terug.
+function copyToClipboardSync(text) {
+  try {
+    const ta = document.createElement('textarea')
+    ta.value = text
+    ta.readOnly = false
+    ta.contentEditable = 'true'
+    ta.style.position = 'fixed'
+    ta.style.top = '0'; ta.style.left = '0'; ta.style.opacity = '0'
+    document.body.appendChild(ta)
+    ta.focus()
+    ta.select()
+    try { ta.setSelectionRange(0, text.length) } catch {}
+    let ok = false
+    try { ok = document.execCommand('copy') } catch {}
+    document.body.removeChild(ta)
+    return ok
+  } catch { return false }
+}
+
 // ============================================
 // CRM CONFIG
 // ============================================
@@ -290,29 +312,18 @@ export default function KanbanCard({
     if (dmDone || dmBusy) return
     setDmBusy(true)
 
-    // 1) Bericht naar het klembord (met oude-Safari fallback).
-    try {
-      await navigator.clipboard.writeText(DM_RUN_MESSAGE)
-    } catch {
-      const ta = document.createElement('textarea')
-      ta.value = DM_RUN_MESSAGE
-      ta.style.position = 'fixed'; ta.style.opacity = '0'
-      document.body.appendChild(ta)
-      ta.select()
-      try { document.execCommand('copy') } catch {}
-      document.body.removeChild(ta)
-    }
+    // 1) Bericht naar het klembord — synchroon (execCommand) zodat het staat
+    // vóór we naar Instagram springen; daarnaast nog een best-effort moderne
+    // clipboard-call (niet ge-await, zodat de tik-context voor stap 2 intact blijft).
+    copyToClipboardSync(DM_RUN_MESSAGE)
+    try { navigator.clipboard?.writeText(DM_RUN_MESSAGE)?.catch(() => {}) } catch {}
 
-    // 2) Instagram openen: eerst de app-deeplink, na 800ms fallback naar web.
-    // Als de app opent (tab wordt verborgen) annuleren we de web-fallback.
+    // 2) DM-chat direct openen. ig.me/m/{handle} opent de conversatie met deze
+    // gebruiker (in de Instagram-app als 'ie geïnstalleerd is, anders web) —
+    // op basis van de username, dus geen thread-id nodig. Nieuw tabblad zodat
+    // het bord blijft staan voor de volgende lead.
     const handle = (lead.first_name || '').trim().toLowerCase()
-    if (handle) {
-      const web = `https://instagram.com/${handle}`
-      const timer = setTimeout(() => { window.open(web, '_blank') }, 800)
-      const cancel = () => { clearTimeout(timer); document.removeEventListener('visibilitychange', cancel) }
-      document.addEventListener('visibilitychange', cancel)
-      window.location.href = `instagram://user?username=${handle}`
-    }
+    if (handle) window.open(`https://ig.me/m/${handle}`, '_blank')
 
     // 3) Optimistisch markeren + persisteren via het bestaande onEdit-pad
     // (updateLead stempelt last_contacted_at bij status 'contacted').
@@ -647,7 +658,7 @@ export default function KanbanCard({
               data-no-click
               onClick={dmDone ? (e) => e.stopPropagation() : handleDMRun}
               disabled={dmDone || dmBusy}
-              title={dmDone ? 'Al gecontacteerd' : 'Kopieer bericht + open Instagram'}
+              title={dmDone ? 'Al gecontacteerd' : 'Kopieer bericht + open DM-chat'}
               style={{
                 flexShrink: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 4,
                 minHeight: 28, padding: isMobile ? '0 0.7rem' : '0 0.6rem',
