@@ -17,7 +17,8 @@ const WORK_HOURS = [
   { id: '8-17', label: '8:00 — 17:00' },
   { id: '9-18', label: '9:00 — 18:00' },
   { id: 'wisselend', label: 'Wisselend / Ploegen' },
-  { id: 'flexibel', label: 'Flexibel / Eigen planning' }
+  { id: 'flexibel', label: 'Flexibel / Eigen planning' },
+  { id: 'geen_vaste', label: 'Geen vaste tijden — op call afstemmen' }
 ]
 
 const LUNCH_OPTIONS = [

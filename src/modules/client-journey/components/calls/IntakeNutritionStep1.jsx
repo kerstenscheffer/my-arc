@@ -31,6 +31,7 @@ export default function IntakeNutritionStep1({ cd, np, prac, getRemovals, getAdd
 
   const guidanceLabels = { strict: 'Strict coachplan', flexible: 'Flexibel plan', free: 'Vrij met richtlijnen' }
   const workLabels = { thuis: 'Thuiswerker', kantoor: 'Kantoor', fysiek: 'Fysiek werk', student: 'Student', wisselend: 'Wisselend', anders: 'Anders' }
+  const hourLabels = { '7-16': '7:00–16:00', '8-17': '8:00–17:00', '9-18': '9:00–18:00', wisselend: 'Wisselend/ploegen', flexibel: 'Flexibel', geen_vaste: 'Geen vaste tijden' }
   const lunchLabels = { echte_pauze: 'Echte pauze', aan_bureau: 'Aan bureau', geen_pauze: 'Geen pauze' }
   const snackLabels = { makkelijk: 'Ja makkelijk', soms: 'Soms even snel', nee: 'Nee niet echt' }
   const cookLabels = { graag: 'Kookt graag', neutraal: 'Neutraal', niet_graag: 'Simpel & snel' }
@@ -96,7 +97,7 @@ export default function IntakeNutritionStep1({ cd, np, prac, getRemovals, getAdd
           <Label text="LEVENSSITUATIE" />
           <StatBar isMobile={isMobile} stats={[
             { label: 'WERK', value: workLabels[lc.work_situation] || lc.work_situation },
-            { label: 'UREN', value: lc.work_hours || '—' },
+            { label: 'UREN', value: hourLabels[lc.work_hours] || lc.work_hours || '—' },
             { label: 'BUDGET', value: lc.weekly_budget ? `€${lc.weekly_budget}` : '—', unit: '/wk' }
           ]} />
           <StatBar isMobile={isMobile} stats={[
