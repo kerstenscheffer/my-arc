@@ -68,8 +68,24 @@ export default function HeroSection({ isMobile }) {
       justifyContent: 'center',
       overflow: 'hidden',
       padding: isMobile ? '1.2rem 0' : 0,
-      background: '#0a0a0a'
+      background: '#0a0a0a',
+      position: 'relative'
     }}>
+      {/* ═══ Logo — bovenaan de pagina ═══ */}
+      <img
+        src="/ma-logo-header.png"
+        alt="MY ARC"
+        style={{
+          position: 'absolute',
+          top: isMobile ? '16px' : '26px',
+          left: '50%',
+          transform: 'translateX(-50%)',
+          width: isMobile ? '108px' : '138px',
+          height: 'auto',
+          zIndex: 5
+        }}
+      />
+
       {/* ═══ Titel + boog — gelijk aan de slotsectie ═══ */}
       <div style={{
         textAlign: 'center',

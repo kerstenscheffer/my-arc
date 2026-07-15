@@ -6,11 +6,9 @@ import PhotoFan from './PhotoFan'
 const GOLD = '#ffba09'
 const TP_GREEN = '#00B67A'
 
-// 3 tiers — duur + totaalprijs (langste bovenaan), met optionele oude prijs.
+// Eén prijs: 3 maanden voor €297.
 const PRICES = [
-  { duration: '12 maanden', amount: '€1750', was: '€2400' },
-  { duration: '6 maanden', amount: '€997', was: '€1200' },
-  { duration: '4 maanden', amount: '€597' },
+  { duration: '3 maanden', amount: '€297' },
 ]
 
 export default function GarantiePrijsSection({ isMobile }) {
