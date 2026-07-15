@@ -86,6 +86,12 @@ export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, 
   const [reloadKey, setReloadKey] = useState(0)
   const [revertingId, setRevertingId] = useState(null)
   const [deletingId, setDeletingId] = useState(null)
+  // PDF-preview: { url, filename } zodra de export klaar is; null = geen preview.
+  const [pdfPreview, setPdfPreview] = useState(null)
+  const [pdfBusy, setPdfBusy] = useState(false)
+
+  // Preview-blob-URL opruimen wanneer 'ie sluit of de modal ontmount.
+  useEffect(() => () => { if (pdfPreview?.url) URL.revokeObjectURL(pdfPreview.url) }, [pdfPreview])
 
   // Draai één funnel-verplaatsing terug (soft): verdwijnt uit de stats, lead
   // blijft op het bord staan. Daarna herladen we de cijfers.
@@ -283,30 +289,39 @@ export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, 
             Stats — {periodMode === 'day' ? 'Dag' : periodMode === 'month' ? 'Maand' : 'Week'}
           </div>
           <button
-            onClick={() => {
-              const periodLabel = periodMode === 'day'
-                ? fmtDay(anchorDate)
-                : periodMode === 'month'
-                  ? anchorDate.toLocaleDateString('nl-NL', { month: 'long', year: 'numeric' })
-                  : `Week ${isoWeek(mondayOf(anchorDate))} · ${fmtRange(mondayOf(anchorDate))}`
-              const periodSubtitle = `${start.toLocaleDateString('nl-NL', { day: 'numeric', month: 'short', year: 'numeric' })} → ${new Date(end - 1).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short', year: 'numeric' })}`
-              const noShowRate = totalCalls > 0 ? Math.round((totalNoShows / totalCalls) * 100) : null
-              exportStatsPDF({
-                periodLabel, periodSubtitle,
-                generatedAt: new Date().toLocaleString('nl-NL', { dateStyle: 'short', timeStyle: 'short' }),
-                activity, funnel, reactionStats, sourceBreakdown,
-                ratios: {
-                  responseRate, chaseShare, showRate, noShowRate,
-                  newLeads:         newLeadsInPeriod,
-                  reactedLeads,
-                  responseFraction: `${reactedLeads} / ${newLeadsInPeriod}`,
-                  chaseFraction:    `${followedLeads} / ${newLeadsInPeriod}`,
-                  showFraction:     totalCalls > 0 ? `${totalCalls - totalNoShows} / ${totalCalls}` : '—',
-                  noShowFraction:   totalCalls > 0 ? `${totalNoShows} / ${totalCalls}` : '—',
-                },
-              })
+            onClick={async () => {
+              if (pdfBusy || loading) return
+              setPdfBusy(true)
+              try {
+                const periodLabel = periodMode === 'day'
+                  ? fmtDay(anchorDate)
+                  : periodMode === 'month'
+                    ? anchorDate.toLocaleDateString('nl-NL', { month: 'long', year: 'numeric' })
+                    : `Week ${isoWeek(mondayOf(anchorDate))} · ${fmtRange(mondayOf(anchorDate))}`
+                const periodSubtitle = `${start.toLocaleDateString('nl-NL', { day: 'numeric', month: 'short', year: 'numeric' })} → ${new Date(end - 1).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short', year: 'numeric' })}`
+                const noShowRate = totalCalls > 0 ? Math.round((totalNoShows / totalCalls) * 100) : null
+                const res = await exportStatsPDF({
+                  periodLabel, periodSubtitle,
+                  generatedAt: new Date().toLocaleString('nl-NL', { dateStyle: 'short', timeStyle: 'short' }),
+                  activity, funnel, reactionStats, sourceBreakdown,
+                  ratios: {
+                    responseRate, chaseShare, showRate, noShowRate,
+                    newLeads:         newLeadsInPeriod,
+                    reactedLeads,
+                    responseFraction: `${reactedLeads} / ${newLeadsInPeriod}`,
+                    chaseFraction:    `${followedLeads} / ${newLeadsInPeriod}`,
+                    showFraction:     totalCalls > 0 ? `${totalCalls - totalNoShows} / ${totalCalls}` : '—',
+                    noShowFraction:   totalCalls > 0 ? `${totalNoShows} / ${totalCalls}` : '—',
+                  },
+                })
+                if (res?.url) setPdfPreview({ url: res.url, filename: res.filename })
+              } catch (e) {
+                console.error('PDF-export mislukt:', e)
+              } finally {
+                setPdfBusy(false)
+              }
             }}
-            disabled={loading}
+            disabled={loading || pdfBusy}
             title="Download als PDF"
             style={{
               ...iconBtn,
@@ -315,12 +330,12 @@ export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, 
               background: 'rgba(255,215,0,0.12)',
               border: '1px solid rgba(255,215,0,0.35)',
               color: GOLD, fontSize: '0.7rem', fontWeight: 800,
-              opacity: loading ? 0.4 : 1,
-              cursor: loading ? 'not-allowed' : 'pointer',
+              opacity: (loading || pdfBusy) ? 0.4 : 1,
+              cursor: (loading || pdfBusy) ? 'not-allowed' : 'pointer',
             }}
           >
             <Download size={13} />
-            PDF
+            {pdfBusy ? 'Bezig…' : 'PDF'}
           </button>
           <button onClick={onClose} title="Sluiten" style={iconBtn}>
             <X size={16} />
@@ -675,7 +690,65 @@ export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, 
     </div>
   )
 
-  return createPortal(modal, document.body)
+  return createPortal(
+    <>
+      {modal}
+      {pdfPreview && (
+        <div
+          onClick={() => setPdfPreview(null)}
+          style={{
+            position: 'fixed', inset: 0, zIndex: 2147483550,
+            background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(6px)',
+            display: 'flex', padding: isMobile ? 0 : '1.5rem',
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              flex: 1, display: 'flex', flexDirection: 'column',
+              maxWidth: 900, width: '100%', margin: '0 auto',
+              background: '#111', borderRadius: isMobile ? 0 : 14, overflow: 'hidden',
+              border: '1px solid rgba(255,215,0,0.25)',
+            }}
+          >
+            {/* Header met download-knop */}
+            <div style={{
+              flexShrink: 0, display: 'flex', alignItems: 'center', gap: 8,
+              padding: isMobile ? 'calc(0.6rem + env(safe-area-inset-top)) 0.85rem 0.6rem' : '0.7rem 1rem',
+              borderBottom: '1px solid rgba(255,255,255,0.08)', background: 'rgba(0,0,0,0.5)',
+            }}>
+              <Eye size={16} color={GOLD} />
+              <div style={{ flex: 1, color: '#fff', fontWeight: 800, fontSize: '0.9rem' }}>PDF-voorbeeld</div>
+              <a
+                href={pdfPreview.url} download={pdfPreview.filename}
+                style={{
+                  display: 'inline-flex', alignItems: 'center', gap: 5, textDecoration: 'none',
+                  padding: '0 0.75rem', height: 32, borderRadius: 8,
+                  background: 'linear-gradient(135deg,#FFD700,#D4AF37)', color: '#000',
+                  fontWeight: 900, fontSize: '0.72rem',
+                }}
+              >
+                <Download size={13} /> Download
+              </a>
+              <button onClick={() => setPdfPreview(null)} title="Sluiten" style={iconBtn}><X size={16} /></button>
+            </div>
+            {/* Het voorbeeld zelf */}
+            <iframe
+              title="PDF-voorbeeld" src={pdfPreview.url}
+              style={{ flex: 1, width: '100%', border: 'none', background: '#525659' }}
+            />
+            {/* Fallback voor mobiel waar een iframe geen PDF toont */}
+            <div style={{ flexShrink: 0, textAlign: 'center', padding: '0.5rem', borderTop: '1px solid rgba(255,255,255,0.08)' }}>
+              <a href={pdfPreview.url} target="_blank" rel="noreferrer" style={{ color: 'rgba(255,255,255,0.55)', fontSize: '0.72rem' }}>
+                Voorbeeld niet zichtbaar? Open in nieuw tabblad →
+              </a>
+            </div>
+          </div>
+        </div>
+      )}
+    </>,
+    document.body
+  )
 }
 
 const iconBtn = {

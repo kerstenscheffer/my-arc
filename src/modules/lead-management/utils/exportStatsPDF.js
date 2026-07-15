@@ -346,5 +346,12 @@ export async function exportStatsPDF(payload) {
 
   // Filename: stats-2026-05-27.pdf (anchor date) or range.
   const safeLabel = (periodLabel || 'periode').replace(/[^a-z0-9\-]/gi, '_').slice(0, 40)
-  doc.save(`leadstats-${safeLabel}.pdf`)
+  const filename = `leadstats-${safeLabel}.pdf`
+
+  // Niet meteen downloaden: geef een preview-blob + filename terug zodat de
+  // aanroeper eerst een voorbeeld kan tonen, met een eigen download-knop.
+  // (opts.download === true → toch direct opslaan, als fallback.)
+  const blob = doc.output('blob')
+  const url = URL.createObjectURL(blob)
+  return { blob, url, filename }
 }
