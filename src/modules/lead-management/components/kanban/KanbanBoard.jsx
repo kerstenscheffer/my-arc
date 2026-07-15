@@ -5,7 +5,7 @@
 
 import { useState, useEffect, useLayoutEffect, useCallback, useRef } from 'react'
 import { createPortal } from 'react-dom'
-import { Plus, Settings, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, GripVertical, Save, RotateCcw, Users, Instagram, Search, X, ArrowUp, ArrowUpDown, Clock, Maximize2, Minimize2, CheckCircle, Send, Zap, Flame, Phone, SlidersHorizontal, Bell, BarChart3 } from 'lucide-react'
+import { Plus, Settings, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, GripVertical, Save, RotateCcw, Users, Instagram, Search, X, ArrowUp, ArrowUpDown, Clock, Maximize2, Minimize2, CheckCircle, Send, Zap, Flame, Thermometer, Phone, SlidersHorizontal, Bell, BarChart3 } from 'lucide-react'
 import KanbanCard from './KanbanCard'
 import AddLeadModal from './AddLeadModal'
 import SaleValueModal from './SaleValueModal'
@@ -118,6 +118,8 @@ export default function KanbanBoard({
   // Globale "hot leads" toggle — overschrijft de per-sectie temperatuur-
   // filter zodat de coach in één klik hot leads ALLE secties kan zien.
   const [globalHotOnly, setGlobalHotOnly] = useState(false)
+  // Globale "warm leads" toggle — zelfde idee als hot, maar op warm.
+  const [globalWarmOnly, setGlobalWarmOnly] = useState(false)
   // Globale "calls voorgesteld" toggle — toont alleen leads waar de coach
   // al een call_proposal-bericht heeft gestuurd (via lead_notes).
   const [globalCallProposedOnly, setGlobalCallProposedOnly] = useState(false)
@@ -147,6 +149,8 @@ export default function KanbanBoard({
     // Globale hot-only override — als actief, alleen hot leads tonen,
     // ongeacht de per-sectie temperatuur-filter.
     if (globalHotOnly && lead.lead_temperature !== 'hot') return false
+    // Globale warm-only override — zelfde als hot, maar op warm.
+    if (globalWarmOnly && lead.lead_temperature !== 'warm') return false
     // Globale call-proposed override — toon leads die een call voorgesteld
     // hebben gekregen. Dat is: ze staan NU in de "Call voorgesteld"-sectie,
     // óf ze zijn vanuit die sectie naar "stil" geschoven (previous_section),
@@ -173,7 +177,7 @@ export default function KanbanBoard({
     }
     // Temperatuur-filter — null/empty count als 'none'. Geskipt als
     // globalHotOnly al actief is.
-    if (!globalHotOnly && filter.temps.size > 0) {
+    if (!globalHotOnly && !globalWarmOnly && filter.temps.size > 0) {
       const t = lead.lead_temperature || 'none'
       if (!filter.temps.has(t)) return false
     }
@@ -1630,9 +1634,9 @@ export default function KanbanBoard({
               )}
             </button>
 
-            {/* Hot-leads toggle (icon-only) */}
+            {/* Hot-leads toggle (icon-only). Hot en warm sluiten elkaar uit. */}
             <button
-              onClick={() => setGlobalHotOnly(v => !v)}
+              onClick={() => setGlobalHotOnly(v => { const nv = !v; if (nv) setGlobalWarmOnly(false); return nv })}
               title={globalHotOnly ? 'Toon alle leads weer' : 'Toon alleen hot leads (overal)'}
               style={{
                 width: 30, height: 30, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -1643,6 +1647,21 @@ export default function KanbanBoard({
               }}
             >
               <Flame size={16} />
+            </button>
+
+            {/* Warm-leads toggle (icon-only). Warm en hot sluiten elkaar uit. */}
+            <button
+              onClick={() => setGlobalWarmOnly(v => { const nv = !v; if (nv) setGlobalHotOnly(false); return nv })}
+              title={globalWarmOnly ? 'Toon alle leads weer' : 'Toon alleen warm leads (overal)'}
+              style={{
+                width: 30, height: 30, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                background: globalWarmOnly ? 'rgba(245,158,11,0.18)' : 'rgba(255,255,255,0.04)',
+                border: `1px solid ${globalWarmOnly ? 'rgba(245,158,11,0.5)' : 'rgba(255,255,255,0.08)'}`,
+                borderRadius: 8, color: globalWarmOnly ? '#fbbf24' : 'rgba(255,255,255,0.5)',
+                cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+              }}
+            >
+              <Thermometer size={16} />
             </button>
 
             {/* Call-voorgesteld toggle (icon-only) */}
