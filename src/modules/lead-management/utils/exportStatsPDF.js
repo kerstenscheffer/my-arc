@@ -24,6 +24,14 @@ const PURPLE= [139, 92, 246]
 const DARK  = [10, 10, 10]
 const LIGHT = [245, 245, 245]
 const MUTED = [120, 120, 120]
+// Zwarte-pagina-thema
+const BLACK   = [0, 0, 0]
+const WHITE   = [255, 255, 255]
+const GRAY    = [176, 176, 176]   // secundaire tekst op zwart
+const CARD    = [18, 18, 18]      // kaart-achtergrond
+const ROW      = [14, 14, 14]     // tabelrij
+const ROW_ALT  = [24, 24, 24]     // zebra-rij
+const LINE      = [44, 44, 44]    // subtiele lijnen
 
 const fmtPct = (v) => (v === null || v === undefined ? '—' : `${v}%`)
 const fmtDelta = (v) => {
@@ -119,33 +127,60 @@ export async function exportStatsPDF(payload) {
 
   const doc = new jsPDF({ unit: 'pt', format: 'a4' })
   const pageW = doc.internal.pageSize.getWidth()
+  const pageH = doc.internal.pageSize.getHeight()
   const margin = 40
   let y = margin
 
+  // Zwarte pagina-achtergrond. Elke pagina wordt gevuld: pagina 1 hier, latere
+  // pagina's via de willDrawPage-hook (autoTable) of newPage() (handmatig).
+  const paintBg = () => { doc.setFillColor(...BLACK); doc.rect(0, 0, pageW, pageH, 'F') }
+  paintBg()
+  const painted = new Set([1]) // pagina 1 is al zwart; niet nogmaals overschilderen
+  const bgHook = () => {
+    const p = doc.internal.getCurrentPageInfo().pageNumber
+    if (!painted.has(p)) { paintBg(); painted.add(p) }
+  }
+  const newPage = () => {
+    doc.addPage(); paintBg()
+    painted.add(doc.internal.getCurrentPageInfo().pageNumber)
+    y = margin
+  }
+  // Gedeelde donkere tabelstijl: witte tekst op zwart, subtiele lijnen, zebra.
+  // De willDrawPage-hook maakt door autoTable toegevoegde pagina's ook zwart.
+  const darkTable = (extra = {}) => ({
+    theme: 'grid',
+    styles: { textColor: WHITE, fillColor: ROW, lineColor: LINE, lineWidth: 0.5, fontSize: 9, cellPadding: 6, valign: 'middle' },
+    alternateRowStyles: { fillColor: ROW_ALT },
+    margin: { left: margin, right: margin },
+    willDrawPage: bgHook,
+    ...extra,
+  })
+
   // ─── HEADER ────────────────────────────────────────────────────────────────
-  doc.setFillColor(...DARK)
-  doc.rect(0, 0, pageW, 80, 'F')
   doc.setTextColor(...GOLD)
   doc.setFontSize(22)
   doc.setFont('helvetica', 'bold')
-  doc.text('Lead-management stats', margin, 38)
-  doc.setFontSize(11)
-  doc.setTextColor(255, 255, 255)
-  doc.text(periodLabel || '—', margin, 58)
+  doc.text('Lead-management stats', margin, 44)
+  doc.setFontSize(12)
+  doc.setTextColor(...WHITE)
+  doc.text(periodLabel || '—', margin, 64)
   doc.setFontSize(9)
-  doc.setTextColor(180, 180, 180)
-  doc.text(periodSubtitle || '', margin, 72)
+  doc.setTextColor(...GRAY)
+  doc.text(periodSubtitle || '', margin, 78)
   doc.setFontSize(8)
   const right = (coachName ? `${coachName} · ` : '') + `Gegenereerd ${generatedAt}`
-  doc.text(right, pageW - margin, 72, { align: 'right' })
-  y = 100
+  doc.text(right, pageW - margin, 78, { align: 'right' })
+  // Gouden scheidingslijn onder de header
+  doc.setDrawColor(...GOLD); doc.setLineWidth(1)
+  doc.line(margin, 90, pageW - margin, 90)
+  y = 114
 
   // Sectiekop met gouden titel + optionele uitleg-regel eronder ("wat zie je
   // hier en waarom is het belangrijk"). Zo weet de coach per blok wat 'ie leest.
   const section = (label, description) => {
-    if (y > 700) { doc.addPage(); y = margin }
+    if (y > 700) newPage()
     doc.setTextColor(...GOLD)
-    doc.setFontSize(11)
+    doc.setFontSize(12)
     doc.setFont('helvetica', 'bold')
     doc.text(label.toUpperCase(), margin, y)
     doc.setDrawColor(...GOLD)
@@ -155,7 +190,7 @@ export async function exportStatsPDF(payload) {
     if (description) {
       doc.setFont('helvetica', 'normal')
       doc.setFontSize(8)
-      doc.setTextColor(...MUTED)
+      doc.setTextColor(...GRAY)
       const lines = doc.splitTextToSize(description, pageW - 2 * margin)
       doc.text(lines, margin, y + 2)
       y += lines.length * 10 + 6
@@ -200,27 +235,29 @@ export async function exportStatsPDF(payload) {
     const row = Math.floor(i / COLS)
     const x = margin + col * (cardW + GAP)
     const cy = y + row * (cardH + ROW_GAP)
-    // Kaart-achtergrond
-    doc.setFillColor(20, 20, 20)
-    doc.roundedRect(x, cy, cardW, cardH, 6, 6, 'F')
+    // Kaart-achtergrond + subtiele rand voor contrast op zwart
+    doc.setFillColor(...CARD)
+    doc.setDrawColor(...LINE)
+    doc.setLineWidth(0.5)
+    doc.roundedRect(x, cy, cardW, cardH, 6, 6, 'FD')
     // Kleuraccent bovenaan
     doc.setFillColor(...c.rgb)
     doc.roundedRect(x, cy, cardW, 3, 1.5, 1.5, 'F')
-    // Icoon (gecentreerd bovenin)
+    // Icoon (gecentreerd bovenin) — de kleur zit in het icoon
     const png = iconPngs[i]
     if (png) {
       const iconSize = 17
       try { doc.addImage(png, 'PNG', x + cardW / 2 - iconSize / 2, cy + 11, iconSize, iconSize) } catch { /* skip icoon */ }
     }
-    // Groot getal
+    // Groot getal — wit, zoals de stats-balk op het scherm
     doc.setFont('helvetica', 'bold')
     doc.setFontSize(17)
-    doc.setTextColor(...c.rgb)
+    doc.setTextColor(...WHITE)
     doc.text(String(c.value), x + cardW / 2, cy + 46, { align: 'center' })
     // Label
     doc.setFont('helvetica', 'bold')
     doc.setFontSize(6.5)
-    doc.setTextColor(180, 180, 180)
+    doc.setTextColor(...GRAY)
     doc.text(c.label.toUpperCase(), x + cardW / 2, cy + 61, { align: 'center' })
   })
   y += 2 * cardH + ROW_GAP + 18
@@ -233,7 +270,7 @@ export async function exportStatsPDF(payload) {
   if (ratios) {
     section('Kerncijfers — percentages',
       'De verhoudingen die er echt toe doen. Percentage met de onderliggende aantallen erachter, en waarom je erop stuurt.')
-    autoTable(doc, {
+    autoTable(doc, darkTable({
       startY: y,
       head: [['Kerncijfer', '%', 'Aantal', 'Waarom belangrijk']],
       body: [
@@ -242,17 +279,14 @@ export async function exportStatsPDF(payload) {
         ['No-show rate',  fmtPct(ratios.noShowRate),   ratios.noShowFraction || '—',   'Calls die niet komen opdagen — hoe lager, hoe beter'],
         ['Opvolg rate',   fmtPct(ratios.chaseShare),   ratios.chaseFraction || '—',    'Aandeel leads dat een follow-up nodig had'],
       ],
-      theme: 'grid',
-      styles: { fontSize: 9, cellPadding: 6, valign: 'middle' },
-      headStyles: { fillColor: GREEN, textColor: 255, fontStyle: 'bold' },
+      headStyles: { fillColor: GREEN, textColor: BLACK, fontStyle: 'bold' },
       columnStyles: {
-        0: { fontStyle: 'bold', cellWidth: 95 },
-        1: { halign: 'right', fontStyle: 'bold', cellWidth: 42 },
-        2: { halign: 'right', cellWidth: 58, textColor: MUTED },
-        3: { textColor: MUTED, fontSize: 8 },
+        0: { fontStyle: 'bold', cellWidth: 95, textColor: WHITE },
+        1: { halign: 'right', fontStyle: 'bold', cellWidth: 42, textColor: WHITE },
+        2: { halign: 'right', cellWidth: 58, textColor: GRAY },
+        3: { textColor: GRAY, fontSize: 8 },
       },
-      margin: { left: margin, right: margin },
-    })
+    }))
     y = doc.lastAutoTable.finalY + 16
   }
 
@@ -283,15 +317,14 @@ export async function exportStatsPDF(payload) {
           fmtPct(saleRate),
         ]
       })
-      autoTable(doc, {
+      autoTable(doc, darkTable({
         startY: y,
         head: [['Type', 'Naam', 'Leads', 'Reactie', 'Ingepl.', 'Sales', 'Resp%', 'Call ingepl.%', 'Sale%']],
         body: rows,
-        theme: 'grid',
-        styles: { fontSize: 8, cellPadding: 5 },
-        headStyles: { fillColor: GOLD, textColor: DARK, fontStyle: 'bold' },
+        styles: { textColor: WHITE, fillColor: ROW, lineColor: LINE, lineWidth: 0.5, fontSize: 8, cellPadding: 5, valign: 'middle' },
+        headStyles: { fillColor: GOLD, textColor: BLACK, fontStyle: 'bold' },
         columnStyles: {
-          0: { cellWidth: 50 },
+          0: { cellWidth: 50, textColor: GRAY },
           1: { cellWidth: 110 },
           2: { halign: 'right' },
           3: { halign: 'right' },
@@ -301,17 +334,17 @@ export async function exportStatsPDF(payload) {
           7: { halign: 'right', fontStyle: 'bold' },
           8: { halign: 'right', fontStyle: 'bold' },
         },
-        margin: { left: margin, right: margin },
-      })
+      }))
       y = doc.lastAutoTable.finalY + 14
 
       // Add per-campaign message-text appendix on a fresh page if any.
       const campaignsWithMsg = (sourceBreakdown.campaigns || []).filter(c => c.messageText)
       if (campaignsWithMsg.length > 0) {
-        doc.addPage(); y = margin
-        section('Outreach-berichten')
+        newPage()
+        section('Outreach-berichten',
+          'De letterlijke outreach-tekst per campagne.')
         for (const c of campaignsWithMsg) {
-          if (y > 720) { doc.addPage(); y = margin }
+          if (y > 720) newPage()
           doc.setFontSize(10)
           doc.setTextColor(...GOLD)
           doc.setFont('helvetica', 'bold')
@@ -319,12 +352,12 @@ export async function exportStatsPDF(payload) {
           y += 12
           if (c.platform || c.purpose) {
             doc.setFontSize(8)
-            doc.setTextColor(...MUTED)
+            doc.setTextColor(...GRAY)
             doc.text(`${c.platform || ''}${c.platform && c.purpose ? ' · ' : ''}${c.purpose || ''}`, margin, y)
             y += 10
           }
           doc.setFontSize(9)
-          doc.setTextColor(60, 60, 60)
+          doc.setTextColor(...WHITE)
           doc.setFont('helvetica', 'normal')
           const lines = doc.splitTextToSize(c.messageText, pageW - 2 * margin)
           doc.text(lines, margin, y)
