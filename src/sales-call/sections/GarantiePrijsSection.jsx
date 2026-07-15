@@ -22,12 +22,12 @@ export default function GarantiePrijsSection({ isMobile }) {
       justifyContent: 'center',
       background: '#0a0a0a',
       overflow: 'hidden',
-      padding: isMobile ? '3rem 1.25rem' : '4rem 2rem'
+      padding: isMobile ? '4.5rem 1.25rem' : '6rem 2rem'
     }}>
       <div style={{ maxWidth: '620px', width: '100%' }}>
 
         {/* ═══ Transformaties — bewust compact (de prijs domineert) ═══ */}
-        <div style={{ display: 'flex', gap: isMobile ? '0.45rem' : '0.6rem', maxWidth: isMobile ? '78%' : '75%', margin: `0 auto ${isMobile ? '2.5rem' : '3.25rem'}` }}>
+        <div style={{ display: 'flex', gap: isMobile ? '0.45rem' : '0.6rem', maxWidth: isMobile ? '78%' : '75%', margin: `0 auto ${isMobile ? '1.75rem' : '2rem'}` }}>
           {TRANSFORMS.map((t) => (
             <div key={t.src} style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
               <div style={{ borderRadius: '8px', overflow: 'hidden', filter: 'drop-shadow(0 6px 14px rgba(0,0,0,0.5))' }}>
@@ -41,7 +41,7 @@ export default function GarantiePrijsSection({ isMobile }) {
         </div>
 
         {/* ═══ Prijs — veruit het grootste element van dit scherm ═══ */}
-        <div style={{ textAlign: 'center', marginBottom: isMobile ? '2rem' : '2.5rem' }}>
+        <div style={{ textAlign: 'center', marginBottom: isMobile ? '1.25rem' : '1.5rem' }}>
           <div style={{ fontSize: isMobile ? '4.2rem' : '6.2rem', fontWeight: '900', color: GOLD, lineHeight: 1, letterSpacing: '-0.03em' }}>
             €297
           </div>
@@ -51,7 +51,7 @@ export default function GarantiePrijsSection({ isMobile }) {
         </div>
 
         {/* ═══ Case study-regel ═══ */}
-        <div style={{ textAlign: 'center', marginBottom: isMobile ? '1.5rem' : '1.85rem' }}>
+        <div style={{ textAlign: 'center', marginBottom: isMobile ? '1rem' : '1.25rem' }}>
           <p style={{ margin: 0, fontSize: isMobile ? '0.85rem' : '0.95rem', fontStyle: 'italic', color: 'rgba(255,255,255,0.6)', fontWeight: '500', lineHeight: 1.4 }}>
             Hessel: van 79,8 naar 74,4 kg in 8 weken.
           </p>
