@@ -300,18 +300,27 @@ export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, 
                     : `Week ${isoWeek(mondayOf(anchorDate))} · ${fmtRange(mondayOf(anchorDate))}`
                 const periodSubtitle = `${start.toLocaleDateString('nl-NL', { day: 'numeric', month: 'short', year: 'numeric' })} → ${new Date(end - 1).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short', year: 'numeric' })}`
                 const noShowRate = totalCalls > 0 ? Math.round((totalNoShows / totalCalls) * 100) : null
+                const shownCalls = Math.max(0, totalCalls - totalNoShows)
+                const proposedToScheduled = totalCallProposed > 0 ? Math.round((totalCalls / totalCallProposed) * 100) : null
+                const closeRate = shownCalls > 0 ? Math.round((totalSales / shownCalls) * 100) : null
+                const omzetVal = Math.round(funnel?.sale?.omzet || 0)
+                const amountPerCall = totalCalls > 0 ? Math.round(omzetVal / totalCalls) : null
                 const res = await exportStatsPDF({
                   periodLabel, periodSubtitle,
                   generatedAt: new Date().toLocaleString('nl-NL', { dateStyle: 'short', timeStyle: 'short' }),
                   activity, funnel, reactionStats, sourceBreakdown,
                   ratios: {
                     responseRate, chaseShare, showRate, noShowRate,
+                    proposedToScheduled, closeRate, amountPerCall,
                     newLeads:         newLeadsInPeriod,
                     reactedLeads,
                     responseFraction: `${reactedLeads} / ${newLeadsInPeriod}`,
                     chaseFraction:    `${followedLeads} / ${newLeadsInPeriod}`,
                     showFraction:     totalCalls > 0 ? `${totalCalls - totalNoShows} / ${totalCalls}` : '—',
                     noShowFraction:   totalCalls > 0 ? `${totalNoShows} / ${totalCalls}` : '—',
+                    proposedFraction: totalCallProposed > 0 ? `${totalCalls} / ${totalCallProposed}` : '—',
+                    closeFraction:    shownCalls > 0 ? `${totalSales} / ${shownCalls}` : '—',
+                    amountPerCallFraction: totalCalls > 0 ? `€${omzetVal.toLocaleString('nl-NL')} / ${totalCalls}` : '—',
                   },
                 })
                 if (res?.url) setPdfPreview({ url: res.url, filename: res.filename })

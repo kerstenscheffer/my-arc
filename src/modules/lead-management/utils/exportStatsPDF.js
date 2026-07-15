@@ -157,23 +157,20 @@ export async function exportStatsPDF(payload) {
   })
 
   // ─── HEADER ────────────────────────────────────────────────────────────────
-  doc.setTextColor(...GOLD)
-  doc.setFontSize(22)
+  // Eén grote, bold witte titel met de periode erin — geen dubbele periode meer.
   doc.setFont('helvetica', 'bold')
-  doc.text('Lead-management stats', margin, 44)
-  doc.setFontSize(12)
+  doc.setFontSize(20)
   doc.setTextColor(...WHITE)
-  doc.text(periodLabel || '—', margin, 64)
-  doc.setFontSize(9)
-  doc.setTextColor(...GRAY)
-  doc.text(periodSubtitle || '', margin, 78)
+  doc.text(`Lead stat (${periodLabel || '—'})`, margin, 50)
+  doc.setFont('helvetica', 'normal')
   doc.setFontSize(8)
+  doc.setTextColor(...GRAY)
   const right = (coachName ? `${coachName} · ` : '') + `Gegenereerd ${generatedAt}`
-  doc.text(right, pageW - margin, 78, { align: 'right' })
+  doc.text(right, pageW - margin, 68, { align: 'right' })
   // Gouden scheidingslijn onder de header
   doc.setDrawColor(...GOLD); doc.setLineWidth(1)
-  doc.line(margin, 90, pageW - margin, 90)
-  y = 114
+  doc.line(margin, 80, pageW - margin, 80)
+  y = 104
 
   // Sectiekop met gouden titel + optionele uitleg-regel eronder ("wat zie je
   // hier en waarom is het belangrijk"). Zo weet de coach per blok wat 'ie leest.
@@ -270,20 +267,24 @@ export async function exportStatsPDF(payload) {
   if (ratios) {
     section('Kerncijfers — percentages',
       'De verhoudingen die er echt toe doen. Percentage met de onderliggende aantallen erachter, en waarom je erop stuurt.')
+    const eurFmt = (v) => (v === null || v === undefined ? '—' : '€' + Number(v).toLocaleString('nl-NL'))
     autoTable(doc, darkTable({
       startY: y,
-      head: [['Kerncijfer', '%', 'Aantal', 'Waarom belangrijk']],
+      head: [['Kerncijfer', 'Waarde', 'Detail', 'Waarom belangrijk']],
       body: [
-        ['Response rate', fmtPct(ratios.responseRate), ratios.responseFraction || '—', 'Reageert je outreach? (reacties / nieuwe leads)'],
-        ['Show-up rate',  fmtPct(ratios.showRate),     ratios.showFraction || '—',     'Ingeplande calls die ook echt komen opdagen'],
-        ['No-show rate',  fmtPct(ratios.noShowRate),   ratios.noShowFraction || '—',   'Calls die niet komen opdagen — hoe lager, hoe beter'],
-        ['Opvolg rate',   fmtPct(ratios.chaseShare),   ratios.chaseFraction || '—',    'Aandeel leads dat een follow-up nodig had'],
+        ['Response rate',          fmtPct(ratios.responseRate),        ratios.responseFraction || '—', 'Reageert je outreach? (reacties / nieuwe leads)'],
+        ['Voorstel → ingepland',   fmtPct(ratios.proposedToScheduled), ratios.proposedFraction || '—', 'Boekt een voorgestelde call ook echt een afspraak'],
+        ['Show-up rate',           fmtPct(ratios.showRate),            ratios.showFraction || '—',     'Ingeplande calls die ook echt komen opdagen'],
+        ['No-show rate',           fmtPct(ratios.noShowRate),          ratios.noShowFraction || '—',   'Calls die niet komen opdagen — hoe lager, hoe beter'],
+        ['Close rate',             fmtPct(ratios.closeRate),           ratios.closeFraction || '—',    'Gehouden calls die sluiten in een sale (sales / getoond)'],
+        ['Bedrag per sales call',  eurFmt(ratios.amountPerCall),       ratios.amountPerCallFraction || '—', 'Wat een ingeplande call gemiddeld oplevert (omzet / calls)'],
+        ['Opvolg rate',            fmtPct(ratios.chaseShare),          ratios.chaseFraction || '—',    'Aandeel leads dat een follow-up nodig had'],
       ],
       headStyles: { fillColor: GREEN, textColor: BLACK, fontStyle: 'bold' },
       columnStyles: {
-        0: { fontStyle: 'bold', cellWidth: 95, textColor: WHITE },
-        1: { halign: 'right', fontStyle: 'bold', cellWidth: 42, textColor: WHITE },
-        2: { halign: 'right', cellWidth: 58, textColor: GRAY },
+        0: { fontStyle: 'bold', cellWidth: 108, textColor: WHITE },
+        1: { halign: 'right', fontStyle: 'bold', cellWidth: 50, textColor: WHITE },
+        2: { halign: 'right', cellWidth: 70, textColor: GRAY },
         3: { textColor: GRAY, fontSize: 8 },
       },
     }))
