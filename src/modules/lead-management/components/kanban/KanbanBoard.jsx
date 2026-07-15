@@ -1254,6 +1254,12 @@ export default function KanbanBoard({
       loadActivityData()
       const tgt = sections.find(s => s.id === targetSectionId)
       if (tgt && isSaleSectionTitle(tgt.title)) setSaleModalLead({ id: lead.id, name: leadFullName(lead) })
+      // Call voorgesteld → open de bericht-modal (zelfde gedrag als drag-drop,
+      // dat op mobiel via de dropdown niet gebeurde).
+      const tt = (tgt?.title || '').toLowerCase()
+      const isProposalMove = (tt.includes('voorgesteld') || tt.includes('voorstel'))
+        && !tt.includes('verloren') && !tt.includes('lost')
+      if (isProposalMove) setLeadForProposal(lead)
     } catch (error) {
       console.error('❌ Move lead via dropdown failed:', error)
       await loadBoard(false)
