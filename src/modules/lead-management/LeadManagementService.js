@@ -1846,7 +1846,7 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
 
   // Zet de order-waarde (omzet) op de meest recente movement van een lead —
   // aangeroepen wanneer een lead naar een sale-sectie is verplaatst.
-  async setMovementOrderValue(leadId, orderValue) {
+  async setMovementOrderValue(leadId, orderValue, paymentType = null, durationMonths = null) {
     try {
       const { data: rows } = await this.db.supabase
         .from('lead_movements').select('id')
@@ -1854,8 +1854,13 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
         .order('moved_at', { ascending: false }).limit(1)
       const movId = rows?.[0]?.id
       if (!movId) return { error: 'geen movement gevonden' }
+      const patch = { order_value: orderValue }
+      // Betaalwijze (vooruitbetaald/maandelijks) + looptijd, zodat we later de
+      // cashflow kunnen berekenen (wanneer komt hoeveel binnen).
+      if (paymentType !== undefined) patch.payment_type = paymentType
+      if (durationMonths !== undefined) patch.duration_months = durationMonths
       const { error } = await this.db.supabase
-        .from('lead_movements').update({ order_value: orderValue }).eq('id', movId)
+        .from('lead_movements').update(patch).eq('id', movId)
       return { error }
     } catch (error) {
       console.error('❌ setMovementOrderValue failed:', error)
