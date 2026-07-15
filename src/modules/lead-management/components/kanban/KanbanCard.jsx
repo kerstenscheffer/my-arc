@@ -318,12 +318,19 @@ export default function KanbanCard({
     copyToClipboardSync(DM_RUN_MESSAGE)
     try { navigator.clipboard?.writeText(DM_RUN_MESSAGE)?.catch(() => {}) } catch {}
 
-    // 2) DM-chat direct openen. ig.me/m/{handle} opent de conversatie met deze
-    // gebruiker (in de Instagram-app als 'ie geïnstalleerd is, anders web) —
-    // op basis van de username, dus geen thread-id nodig. Nieuw tabblad zodat
-    // het bord blijft staan voor de volgende lead.
+    // 2) Profiel openen — betrouwbaar (Instagram laat direct-in-nieuwe-chat via
+    // username niet toe). App-deeplink eerst; opent de app niet binnen 800ms
+    // (niet geïnstalleerd), dan fallback naar web. Als de app wél opent (pagina
+    // wordt verborgen) annuleren we de web-fallback. Vanaf het profiel is het
+    // één tik op "Bericht" → plakken (staat al op klembord) → sturen.
     const handle = (lead.first_name || '').trim().toLowerCase()
-    if (handle) window.open(`https://ig.me/m/${handle}`, '_blank')
+    if (handle) {
+      const web = `https://www.instagram.com/${handle}`
+      const timer = setTimeout(() => { window.open(web, '_blank') }, 800)
+      const cancel = () => { clearTimeout(timer); document.removeEventListener('visibilitychange', cancel) }
+      document.addEventListener('visibilitychange', cancel)
+      window.location.href = `instagram://user?username=${handle}`
+    }
 
     // 3) Optimistisch markeren + persisteren via het bestaande onEdit-pad
     // (updateLead stempelt last_contacted_at bij status 'contacted').
@@ -658,7 +665,7 @@ export default function KanbanCard({
               data-no-click
               onClick={dmDone ? (e) => e.stopPropagation() : handleDMRun}
               disabled={dmDone || dmBusy}
-              title={dmDone ? 'Al gecontacteerd' : 'Kopieer bericht + open DM-chat'}
+              title={dmDone ? 'Al gecontacteerd' : 'Kopieer bericht + open profiel'}
               style={{
                 flexShrink: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 4,
                 minHeight: 28, padding: isMobile ? '0 0.7rem' : '0 0.6rem',
