@@ -4,11 +4,12 @@
 // opgeslagen in lead_kpi_targets (per coach).
 
 export const KPI_STATS = [
-  { key: 'nieuw',     label: 'Nieuwe leads' },
-  { key: 'reacties',  label: 'Reacties' },
-  { key: 'ingepland', label: 'Call ingepland' },
-  { key: 'sales',     label: 'Sales' },
-  { key: 'omzet',     label: 'Omzet', euro: true },
+  { key: 'nieuw',       label: 'Nieuwe leads' },
+  { key: 'reacties',    label: 'Reacties' },
+  { key: 'voorgesteld', label: 'Call voorgesteld' },
+  { key: 'ingepland',   label: 'Call ingepland' },
+  { key: 'sales',       label: 'Sales' },
+  { key: 'omzet',       label: 'Omzet', euro: true },
 ]
 
 export const KPI_KEYS = KPI_STATS.map(s => s.key)

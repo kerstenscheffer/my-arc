@@ -182,19 +182,18 @@ export default function PeriodStatsBar({ leadService, coachId, isMobile, refresh
       )}
 
       {/* Rij 2 — stats: gekleurd icoon (welke) + getal; label als tooltip */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? 14 : 22, overflowX: 'auto', WebkitOverflowScrolling: 'touch', marginTop: 10, paddingBottom: 2 }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: isMobile ? 'center' : 'flex-start', gap: isMobile ? 7 : 18, overflowX: 'auto', WebkitOverflowScrolling: 'touch', marginTop: 10, paddingBottom: 2 }}>
         {items.map((it) => {
-          // Doel voor de huidige periode (alleen dag/week). Bepaalt de kleur van
-          // het getal en toont "/ doel" erachter.
+          // Doel voor de huidige periode (alleen dag/week). Toont "/ doel"
+          // erachter; het getal blijft altijd bold wit (geen kleur).
           const target = kpiTargetFor(targets, it.key, period)
-          const col = target != null ? kpiColor(it.num, target) : null
           return (
-            <div key={it.label} title={target != null ? `${it.label} — doel ${fmtTarget(it.key, target)}` : it.label} style={{ display: 'inline-flex', alignItems: 'center', gap: 5, flexShrink: 0 }}>
-              <it.Icon size={16} color={it.color} strokeWidth={2.4} style={{ flexShrink: 0 }} />
-              <span style={{ fontSize: isMobile ? '1.05rem' : '1.25rem', fontWeight: 900, color: col || '#fff', fontVariantNumeric: 'tabular-nums', lineHeight: 1, opacity: loading ? 0.45 : 1 }}>
+            <div key={it.label} title={target != null ? `${it.label} — doel ${fmtTarget(it.key, target)}` : it.label} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
+              <it.Icon size={15} color={it.color} strokeWidth={2.4} style={{ flexShrink: 0 }} />
+              <span style={{ fontSize: isMobile ? '0.95rem' : '1.25rem', fontWeight: 900, color: '#fff', fontVariantNumeric: 'tabular-nums', lineHeight: 1, opacity: loading ? 0.45 : 1 }}>
                 {it.value}
                 {target != null && (
-                  <span style={{ fontSize: isMobile ? '0.7rem' : '0.8rem', fontWeight: 700, color: col || 'rgba(255,255,255,0.5)', opacity: 0.85 }}>
+                  <span style={{ fontSize: isMobile ? '0.65rem' : '0.8rem', fontWeight: 700, color: 'rgba(255,255,255,0.4)' }}>
                     {' / '}{fmtTarget(it.key, target)}
                   </span>
                 )}

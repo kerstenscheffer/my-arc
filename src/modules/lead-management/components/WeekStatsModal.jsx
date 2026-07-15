@@ -312,11 +312,12 @@ export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, 
   // Huidige waarde per KPI-stat (voor de doelen-preview in het paneel). Zelfde
   // bronnen als de stats-bar, zodat de getallen 1-op-1 overeenkomen.
   const kpiValues = {
-    nieuw:     newLeadsInPeriod,
-    reacties:  reactionStats?.reactionEventsInWindow ?? reactionStats?.reactionsInWindow ?? reactedLeads ?? 0,
-    ingepland: totalCalls,
-    sales:     totalSales,
-    omzet:     Math.round(funnel?.sale?.omzet || 0),
+    nieuw:       newLeadsInPeriod,
+    reacties:    reactionStats?.reactionEventsInWindow ?? reactionStats?.reactionsInWindow ?? reactedLeads ?? 0,
+    voorgesteld: totalCallProposed,
+    ingepland:   totalCalls,
+    sales:       totalSales,
+    omzet:       Math.round(funnel?.sale?.omzet || 0),
   }
 
   const modal = (
