@@ -93,16 +93,35 @@ export default function HeroSection({ isMobile }) {
         maxWidth: '900px',
         marginBottom: isMobile ? '2.75rem' : '3.5rem'
       }}>
+        <div style={{
+          fontSize: isMobile ? '0.7rem' : '0.85rem',
+          fontWeight: '800',
+          letterSpacing: '0.14em',
+          textTransform: 'uppercase',
+          color: GOLD_DARK,
+          marginBottom: isMobile ? '0.9rem' : '1.1rem'
+        }}>
+          Het in shape komen &amp; blijven systeem
+        </div>
         <h1 style={{
           fontWeight: '900',
           lineHeight: 1.1,
           margin: 0,
           letterSpacing: '-0.02em',
           color: '#fff',
-          fontSize: isMobile ? 'clamp(2rem, 8.5vw, 2.6rem)' : 'clamp(2.8rem, 4.8vw, 3.8rem)',
+          fontSize: isMobile ? 'clamp(2.1rem, 8vw, 2.7rem)' : 'clamp(2.8rem, 4.6vw, 3.8rem)',
         }}>
-          5 uur per week in shape programma
+          In 3 maanden in shape
         </h1>
+        <div style={{
+          fontWeight: '800',
+          color: '#fff',
+          lineHeight: 1.35,
+          marginTop: isMobile ? '0.7rem' : '0.9rem',
+          fontSize: isMobile ? '1.05rem' : '1.4rem',
+        }}>
+          met een aanpak die je daarna niet meer kwijtraakt.
+        </div>
       </div>
 
       {/* Boog */}
