@@ -31,7 +31,87 @@ const fmtDelta = (v) => {
   return `${v > 0 ? '+' : ''}${v}`
 }
 
-export function exportStatsPDF(payload) {
+// Lucide icon-tekeningen (viewBox 0 0 24 24), exact overgenomen uit lucide-react,
+// zodat de PDF-headline dezelfde iconen toont als de stats-balk in de kanban.
+const ICON_NODES = {
+  userPlus: [
+    ['path', { d: 'M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2' }],
+    ['circle', { cx: 9, cy: 7, r: 4 }],
+    ['line', { x1: 19, x2: 19, y1: 8, y2: 14 }],
+    ['line', { x1: 22, x2: 16, y1: 11, y2: 11 }],
+  ],
+  send: [
+    ['path', { d: 'M14.536 21.686a.5.5 0 0 0 .937-.024l6.5-19a.496.496 0 0 0-.635-.635l-19 6.5a.5.5 0 0 0-.024.937l7.93 3.18a2 2 0 0 1 1.112 1.11z' }],
+    ['path', { d: 'm21.854 2.147-10.94 10.939' }],
+  ],
+  messageCircle: [
+    ['path', { d: 'M2.992 16.342a2 2 0 0 1 .094 1.167l-1.065 3.29a1 1 0 0 0 1.236 1.168l3.413-.998a2 2 0 0 1 1.099.092 10 10 0 1 0-4.777-4.719' }],
+  ],
+  phone: [
+    ['path', { d: 'M13.832 16.568a1 1 0 0 0 1.213-.303l.355-.465A2 2 0 0 1 17 15h3a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2A18 18 0 0 1 2 4a2 2 0 0 1 2-2h3a2 2 0 0 1 2 2v3a2 2 0 0 1-.8 1.6l-.468.351a1 1 0 0 0-.292 1.233 14 14 0 0 0 6.392 6.384' }],
+  ],
+  calendarCheck: [
+    ['path', { d: 'M8 2v4' }],
+    ['path', { d: 'M16 2v4' }],
+    ['rect', { width: 18, height: 18, x: 3, y: 4, rx: 2 }],
+    ['path', { d: 'M3 10h18' }],
+    ['path', { d: 'm9 16 2 2 4-4' }],
+  ],
+  trophy: [
+    ['path', { d: 'M10 14.66v1.626a2 2 0 0 1-.976 1.696A5 5 0 0 0 7 21.978' }],
+    ['path', { d: 'M14 14.66v1.626a2 2 0 0 0 .976 1.696A5 5 0 0 1 17 21.978' }],
+    ['path', { d: 'M18 9h1.5a1 1 0 0 0 0-5H18' }],
+    ['path', { d: 'M4 22h16' }],
+    ['path', { d: 'M6 9a6 6 0 0 0 12 0V3a1 1 0 0 0-1-1H7a1 1 0 0 0-1 1z' }],
+    ['path', { d: 'M6 9H4.5a1 1 0 0 1 0-5H6' }],
+  ],
+  euro: [
+    ['path', { d: 'M4 10h12' }],
+    ['path', { d: 'M4 14h9' }],
+    ['path', { d: 'M19 6a7.7 7.7 0 0 0-5.2-2A7.9 7.9 0 0 0 6 12c0 4.4 3.5 8 7.8 8 2 0 3.8-.8 5.2-2' }],
+  ],
+  userX: [
+    ['path', { d: 'M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2' }],
+    ['circle', { cx: 9, cy: 7, r: 4 }],
+    ['line', { x1: 17, x2: 22, y1: 8, y2: 13 }],
+    ['line', { x1: 22, x2: 17, y1: 8, y2: 13 }],
+  ],
+}
+
+// Bouwt een standalone SVG-string uit een icon-node-array met de gewenste kleur.
+function iconToSvg(nodes, color, strokeWidth = 2.2, size = 128) {
+  const inner = nodes.map(([tag, attrs]) =>
+    `<${tag} ${Object.entries(attrs).map(([k, v]) => `${k}="${v}"`).join(' ')} />`
+  ).join('')
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="${strokeWidth}" stroke-linecap="round" stroke-linejoin="round">${inner}</svg>`
+}
+
+// Rendert een SVG-string naar een PNG-dataURL via een canvas. Faalt dit
+// (bv. tainted canvas), dan resolven we naar null en tekent de kaart zonder icoon.
+function svgToPngDataUrl(svg, sizePx = 128) {
+  return new Promise((resolve) => {
+    try {
+      const img = new Image()
+      const blob = new Blob([svg], { type: 'image/svg+xml;charset=utf-8' })
+      const url = URL.createObjectURL(blob)
+      img.onload = () => {
+        try {
+          const canvas = document.createElement('canvas')
+          canvas.width = sizePx; canvas.height = sizePx
+          const ctx = canvas.getContext('2d')
+          ctx.drawImage(img, 0, 0, sizePx, sizePx)
+          const data = canvas.toDataURL('image/png')
+          URL.revokeObjectURL(url)
+          resolve(data)
+        } catch { URL.revokeObjectURL(url); resolve(null) }
+      }
+      img.onerror = () => { URL.revokeObjectURL(url); resolve(null) }
+      img.src = url
+    } catch { resolve(null) }
+  })
+}
+
+export async function exportStatsPDF(payload) {
   const {
     periodLabel, periodSubtitle, coachName, generatedAt,
     activity, reactionStats, ratios, funnel, sourceBreakdown,
@@ -60,37 +140,63 @@ export function exportStatsPDF(payload) {
   doc.text(right, pageW - margin, 72, { align: 'right' })
   y = 100
 
-  // ─── HEADLINE — prominent big-number summary right under the header.
-  // Coach should see "wat is er deze periode gebeurd" in 1 oogopslag,
-  // zonder eerst door tabellen heen te scannen.
+  // ─── HEADLINE — exact dezelfde 8 stats als de kanban-stats-balk (icoon +
+  // kleur + getal), in een 4×2 raster. Zo herkent de coach de PDF direct van
+  // het scherm. Datavelden komen 1-op-1 uit dezelfde bronnen als de balk.
+  const omzet = Math.round(funnel?.sale?.omzet || 0)
+  const reacties = reactionStats?.reactionEventsInWindow
+    ?? reactionStats?.reactionsInWindow
+    ?? reactionStats?.reactedLeads ?? 0
   const headlineCards = [
-    { label: 'Nieuwe leads',       value: activity?.newOutreach || 0,        color: GOLD },
-    { label: 'Gereageerd',         value: reactionStats?.reactedLeads || 0,  color: BLUE },
-    { label: 'Call voorgesteld',   value: funnel?.callProposed?.count || 0,  color: RED },
-    { label: 'Calls ingepland',    value: funnel?.callScheduled?.count || 0, color: GOLD },
-    { label: 'Sales',              value: funnel?.sale?.count || 0,          color: GREEN },
+    { label: 'Nieuwe leads',     value: activity?.newOutreach || 0,          hex: '#3b82f6', rgb: [59, 130, 246],  node: ICON_NODES.userPlus },
+    { label: 'Follow-ups',       value: activity?.followUps || 0,            hex: '#f59e0b', rgb: [245, 158, 11],  node: ICON_NODES.send },
+    { label: 'Reacties',         value: reacties,                            hex: '#10b981', rgb: [16, 185, 129],  node: ICON_NODES.messageCircle },
+    { label: 'Call voorgesteld', value: funnel?.callProposed?.count || 0,    hex: '#a855f7', rgb: [168, 85, 247],  node: ICON_NODES.phone },
+    { label: 'Call ingepland',   value: funnel?.callScheduled?.count || 0,   hex: '#06b6d4', rgb: [6, 182, 212],   node: ICON_NODES.calendarCheck },
+    { label: 'Sales',            value: funnel?.sale?.count || 0,            hex: '#FFD700', rgb: [255, 215, 0],   node: ICON_NODES.trophy },
+    { label: 'Omzet',            value: '€' + omzet.toLocaleString('nl-NL'), hex: '#22c55e', rgb: [34, 197, 94], node: ICON_NODES.euro },
+    { label: 'No-shows',         value: funnel?.noShow?.count || 0,          hex: '#ef4444', rgb: [239, 68, 68],   node: ICON_NODES.userX },
   ]
-  const cardW = (pageW - margin * 2 - (headlineCards.length - 1) * 6) / headlineCards.length
+  // Iconen vooraf parallel naar PNG renderen; mislukt er één, dan tekent die
+  // kaart gewoon zonder icoon.
+  const iconPngs = await Promise.all(
+    headlineCards.map(c => svgToPngDataUrl(iconToSvg(c.node, c.hex)))
+  )
+
+  const COLS = 4
+  const GAP = 8
+  const ROW_GAP = 8
+  const cardW = (pageW - margin * 2 - (COLS - 1) * GAP) / COLS
+  const cardH = 72
   headlineCards.forEach((c, i) => {
-    const x = margin + i * (cardW + 6)
-    // Card background
+    const col = i % COLS
+    const row = Math.floor(i / COLS)
+    const x = margin + col * (cardW + GAP)
+    const cy = y + row * (cardH + ROW_GAP)
+    // Kaart-achtergrond
     doc.setFillColor(20, 20, 20)
-    doc.roundedRect(x, y, cardW, 64, 6, 6, 'F')
-    // Color accent stripe on top
-    doc.setFillColor(...c.color)
-    doc.roundedRect(x, y, cardW, 3, 1.5, 1.5, 'F')
-    // Big number
+    doc.roundedRect(x, cy, cardW, cardH, 6, 6, 'F')
+    // Kleuraccent bovenaan
+    doc.setFillColor(...c.rgb)
+    doc.roundedRect(x, cy, cardW, 3, 1.5, 1.5, 'F')
+    // Icoon (gecentreerd bovenin)
+    const png = iconPngs[i]
+    if (png) {
+      const iconSize = 17
+      try { doc.addImage(png, 'PNG', x + cardW / 2 - iconSize / 2, cy + 11, iconSize, iconSize) } catch { /* skip icoon */ }
+    }
+    // Groot getal
     doc.setFont('helvetica', 'bold')
-    doc.setFontSize(24)
-    doc.setTextColor(...c.color)
-    doc.text(String(c.value), x + cardW / 2, y + 36, { align: 'center' })
+    doc.setFontSize(17)
+    doc.setTextColor(...c.rgb)
+    doc.text(String(c.value), x + cardW / 2, cy + 46, { align: 'center' })
     // Label
     doc.setFont('helvetica', 'bold')
-    doc.setFontSize(7)
+    doc.setFontSize(6.5)
     doc.setTextColor(180, 180, 180)
-    doc.text(c.label.toUpperCase(), x + cardW / 2, y + 52, { align: 'center' })
+    doc.text(c.label.toUpperCase(), x + cardW / 2, cy + 61, { align: 'center' })
   })
-  y += 64 + 18
+  y += 2 * cardH + ROW_GAP + 18
 
   // Small helper: section title.
   const section = (label) => {
