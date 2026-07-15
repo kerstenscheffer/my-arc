@@ -462,8 +462,8 @@ export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, 
         </div>
 
         {/* Period mode toggle — segmented control in de stijl van de kanban-toolbar */}
-        <div style={{ flexShrink: 0, padding: '0.6rem 0.85rem 0' }}>
-          <div style={{ display: 'inline-flex', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 12, padding: 3, gap: 3 }}>
+        <div style={{ flexShrink: 0, padding: '0.55rem 0.75rem 0' }}>
+          <div style={{ display: 'inline-flex', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 11, padding: 3, gap: 3 }}>
             {['day', 'week', 'month'].map(mode => {
               const active = periodMode === mode
               const labels = { day: 'Dag', week: 'Week', month: 'Maand' }
@@ -472,10 +472,10 @@ export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, 
                   key={mode}
                   onClick={() => setPeriodMode(mode)}
                   style={{
-                    minHeight: 34, padding: '0 1.15rem', border: 'none', borderRadius: 9,
+                    minHeight: 32, padding: '0 0.95rem', border: 'none', borderRadius: 8,
                     background: active ? 'rgba(255,215,0,0.16)' : 'transparent',
                     color: active ? GOLD : 'rgba(255,255,255,0.55)',
-                    fontSize: '0.8rem', fontWeight: 800,
+                    fontSize: '0.78rem', fontWeight: 800,
                     cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
                     transition: 'all 0.15s ease',
                   }}
