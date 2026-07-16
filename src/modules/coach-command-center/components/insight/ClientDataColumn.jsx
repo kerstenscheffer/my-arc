@@ -6,7 +6,7 @@
 // ============================================
 import React, { useState, useRef } from 'react'
 import { User, Save, Edit3, Check, X, Plus, Minus, Flame, RefreshCw } from 'lucide-react'
-import { applyMacroRules, calcTDEE, calcBMR, surplusRuleFor, normalizeGoal, DEFAULT_ACTIVITY } from '../../../macros/macroRules'
+import { applyMacroRules, computeMacros, calcTDEE, calcBMR, surplusRuleFor, normalizeGoal, DEFAULT_ACTIVITY } from '../../../macros/macroRules'
 import ClientActionsManager from './ClientActionsManager'
 import { logClientChanges, pickTrackedFields } from '../../utils/clientChangeLogger'
 
@@ -464,6 +464,9 @@ function MacroRulesBlock({ client, db, onClientUpdate, isMobile }) {
   // Preview-state: berekende macros worden hier opgeslagen totdat de coach
   // ze expliciet bevestigt.
   const [pendingMacros, setPendingMacros] = useState(null)
+  // Handmatige doel-kcal invoer: coach kan de berekende doel-kcal overschrijven,
+  // waarna de macro's uit die kcal worden herberekend.
+  const [editingKcal, setEditingKcal] = useState(false)
   // Inklapbare details — default ingeklapt zodra er iets is opgeslagen,
   // zodat coach één rustige samenvatting ziet ipv alle inputs.
   const [showTdeeDetail, setShowTdeeDetail] = useState(
@@ -761,6 +764,30 @@ function MacroRulesBlock({ client, db, onClientUpdate, isMobile }) {
       target_protein: out.target_protein,
       target_carbs: out.target_carbs,
       target_fat: out.target_fat,
+    })
+  }
+
+  // Handmatige doel-kcal: coach typt zelf een kcal-doel in de "Doel kcal"-regel.
+  // We berekenen de macro's uit die kcal (eiwit/vet op gewicht, koolhydraten
+  // vullen de rest) en zetten ze in de pending-preview zodat de coach ze — net
+  // als bij de gewone berekening — kan controleren en bevestigen.
+  const applyManualKcal = (raw) => {
+    const kcal = parseInt(raw)
+    if (!Number.isFinite(kcal) || kcal <= 0) return
+    if (kcal === targetCal) return // niks veranderd
+    const m = computeMacros({ weight: effectiveWeight, tdee: kcal, surplus: 0 })
+    if (!m) {
+      alert('Kan macro\'s niet berekenen — geen gewicht bekend. Vul eerst het gewicht in bij Profiel.')
+      return
+    }
+    // Afgeleid surplus/tekort t.o.v. de bekende TDEE (puur informatief).
+    const impliedSurplus = tdeeForDoel != null ? kcal - tdeeForDoel : liveSurplus
+    setPendingMacros({
+      surplus: impliedSurplus,
+      target_calories: kcal,
+      target_protein: m.protein,
+      target_carbs: m.carbs,
+      target_fat: m.fat,
     })
   }
 
@@ -1402,8 +1429,41 @@ function MacroRulesBlock({ client, db, onClientUpdate, isMobile }) {
         )}
       </div>
 
-      {/* Berekend doel-kcal (read-only preview) */}
-      {row('Doel kcal', targetCal != null ? `${targetCal} kcal` : '—', C.gold)}
+      {/* Doel kcal — bewerkbaar: klik en typ een eigen kcal-doel, dan worden de
+          macro's daaruit berekend (verschijnen in de preview hieronder). */}
+      <div style={{
+        display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+        padding: isMobile ? '0.35rem 0.75rem' : '0.4rem 1rem',
+        borderBottom: `1px solid ${C.borderItem}`,
+      }}>
+        <span style={{ fontSize: '0.5rem', color: C.text20, textTransform: 'uppercase', letterSpacing: '0.04em', fontWeight: 700 }}>Doel kcal</span>
+        {editingKcal ? (
+          <input
+            type="number" autoFocus
+            defaultValue={targetCal ?? ''}
+            onClick={(e) => e.target.select()}
+            onBlur={(e) => { setEditingKcal(false); applyManualKcal(e.target.value) }}
+            onKeyDown={(e) => { if (e.key === 'Enter') e.target.blur() }}
+            style={{
+              width: 90, textAlign: 'right',
+              background: 'rgba(255,255,255,0.04)', border: `1px solid ${C.gold}40`,
+              borderRadius: 4, color: C.gold, fontSize: '0.7rem', fontWeight: 700,
+              padding: '0.15rem 0.35rem',
+            }}
+          />
+        ) : (
+          <span
+            onClick={() => setEditingKcal(true)}
+            title="Klik om zelf een doel-kcal in te voeren"
+            style={{
+              fontSize: isMobile ? '0.65rem' : '0.7rem', fontWeight: 700, color: C.gold,
+              cursor: 'pointer', borderBottom: `1px dotted ${C.gold}55`,
+            }}
+          >
+            {targetCal != null ? `${targetCal} kcal` : 'Typ doel'}
+          </span>
+        )}
+      </div>
 
       </>}
 
