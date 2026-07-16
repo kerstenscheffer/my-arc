@@ -20,7 +20,14 @@ import LeadDetailModalV2 from "./LeadDetailModalV2"
 // Alleen in deze kolom krijgt elke card een DM-Run knop: 1 tik → bericht op
 // klembord + Instagram-profiel open + lead als 'contacted' gemarkeerd.
 const NIEUWE_VOLGERS_SECTION_ID = '68c7837a-a779-49df-9c66-cce76fb39e39'
-const DM_RUN_MESSAGE = 'Heyy x, leuk dat je bent gaan volgen! Ben je zelf ook bezig met spieren opbouwen of vet verliezen?'
+// Standaard-DM voor de DM-Run knop. De voornaam van de lead komt op de plek
+// van "x"; zonder voornaam valt 'ie terug op een neutrale begroeting.
+function buildDMRunMessage(lead) {
+  const first = (lead?.first_name || '').trim()
+  const name = first ? first.charAt(0).toUpperCase() + first.slice(1) : ''
+  const greeting = name ? `Heyy ${name},` : 'Heyy,'
+  return `${greeting} leuk dat je bent gaan volgen! Ben je zelf ook bezig met spieren opbouwen of vet verliezen?`
+}
 
 // Synchroon kopiëren via execCommand — betrouwbaar binnen dezelfde tik, óók
 // vlak voordat we naar de Instagram-app/-tab springen (moderne clipboard-API
@@ -315,8 +322,9 @@ export default function KanbanCard({
     // 1) Bericht naar het klembord — synchroon (execCommand) zodat het staat
     // vóór we naar Instagram springen; daarnaast nog een best-effort moderne
     // clipboard-call (niet ge-await, zodat de tik-context voor stap 2 intact blijft).
-    copyToClipboardSync(DM_RUN_MESSAGE)
-    try { navigator.clipboard?.writeText(DM_RUN_MESSAGE)?.catch(() => {}) } catch {}
+    const dmMessage = buildDMRunMessage(lead)
+    copyToClipboardSync(dmMessage)
+    try { navigator.clipboard?.writeText(dmMessage)?.catch(() => {}) } catch {}
 
     // 2) Profiel openen — betrouwbaar (Instagram laat direct-in-nieuwe-chat via
     // username niet toe). App-deeplink eerst; opent de app niet binnen 800ms
@@ -333,13 +341,25 @@ export default function KanbanCard({
     }
 
     // 3) Optimistisch markeren + persisteren via het bestaande onEdit-pad
-    // (updateLead stempelt last_contacted_at bij status 'contacted').
+    // (updateLead stempelt last_contacted_at bij status 'contacted'). De DM
+    // telt óók als opvolging: followup_count +1 (+ timestamp), zodat de card
+    // zakt bij sorteren op 'weinig opvolgingen ↑'.
     setDmDone(true)
+    const prevFollowup = followupCount
+    const newFollowup = followupCount + 1
+    setFollowupCount(newFollowup)
+    const nowISO = new Date().toISOString()
     try {
-      await onEdit({ status: 'contacted', last_contacted_at: new Date().toISOString() })
+      await onEdit({
+        status: 'contacted',
+        last_contacted_at: nowISO,
+        followup_count: newFollowup,
+        last_followup_sent_at: nowISO,
+      })
     } catch (error) {
       console.error('DM-Run markeren mislukt:', error)
       setDmDone(false)
+      setFollowupCount(prevFollowup)
     } finally {
       setDmBusy(false)
     }
