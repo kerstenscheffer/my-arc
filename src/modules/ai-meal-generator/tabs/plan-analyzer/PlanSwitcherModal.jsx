@@ -5,7 +5,7 @@ import { createPortal } from 'react-dom'
 import { X, CheckCircle, Circle, Trash2, Pencil, Check, Zap, ChevronRight, Copy } from 'lucide-react'
 import TemplateLibrary from '../../../meal-templates/TemplateLibrary'
 
-export default function PlanSwitcherModal({ db, clientId, coachId, activePlanId, onSelect, onClose, isMobile, embedded = false }) {
+export default function PlanSwitcherModal({ db, clientId, coachId, activePlanId, onSelect, onRenamed, onClose, isMobile, embedded = false }) {
   const m = isMobile
   const [tab, setTab] = useState('client')
 
@@ -87,11 +87,25 @@ export default function PlanSwitcherModal({ db, clientId, coachId, activePlanId,
   const handleRenameStart = (plan) => { setRenamingId(plan.id); setRenameValue(plan.template_name || '') }
 
   const handleRenameSave = async (planId) => {
-    if (!renameValue.trim()) return
+    const next = renameValue.trim()
+    if (!next) return
     try {
-      await db.supabase.from('client_meal_plans').update({ template_name: renameValue.trim() }).eq('id', planId)
-      setPlans(prev => prev.map(p => p.id === planId ? { ...p, template_name: renameValue.trim() } : p))
-    } catch (e) { console.error('Rename error:', e) }
+      // .select() erbij zodat een update die niets raakt (geen rechten, weg
+      // plan) niet stilletjes als succes doorgaat: dan bleef de lijst de
+      // nieuwe naam tonen terwijl de DB de oude hield.
+      const { data, error } = await db.supabase
+        .from('client_meal_plans')
+        .update({ template_name: next })
+        .eq('id', planId)
+        .select('id, template_name')
+      if (error) throw error
+      if (!data?.length) throw new Error('Plan niet gevonden')
+      setPlans(prev => prev.map(p => p.id === planId ? { ...p, template_name: data[0].template_name } : p))
+      onRenamed?.(planId, data[0].template_name)
+    } catch (e) {
+      console.error('Rename error:', e)
+      alert('Naam opslaan mislukt: ' + (e.message || 'onbekende fout'))
+    }
     setRenamingId(null)
   }
 

@@ -105,8 +105,13 @@ export default function PlanLibraryModal({
 
       {/* Opslaan */}
       <div style={{ padding: m ? '0.7rem 0.8rem' : '0.85rem 1rem', borderBottom: '1px solid rgba(255,255,255,0.06)', background: 'rgba(255,215,0,0.02)', flexShrink: 0 }}>
-        <div style={{ fontSize: m ? '0.6rem' : '0.65rem', fontWeight: 800, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '0.4rem' }}>
-          Huidig plan opslaan
+        <div style={{ fontSize: m ? '0.6rem' : '0.65rem', fontWeight: 800, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '0.2rem' }}>
+          Kopie bewaren als sjabloon
+        </div>
+        {/* Expliciet: dit maakt een los, herbruikbaar sjabloon. De titel van
+            het plan zelf pas je aan in de titelbalk bovenaan de analyzer. */}
+        <div style={{ fontSize: m ? '0.55rem' : '0.6rem', fontWeight: 600, color: 'rgba(255,255,255,0.3)', marginBottom: '0.4rem', lineHeight: 1.3 }}>
+          Voor hergebruik bij andere clients — hernoemt dit plan niet.
         </div>
         <input
           value={name}
@@ -117,7 +122,7 @@ export default function PlanLibraryModal({
         {error && <div style={{ fontSize: '0.6rem', color: '#ef4444', marginBottom: '0.4rem' }}>{error}</div>}
         <button onClick={handleSave} disabled={saving} style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem', padding: '0.55rem', background: justSaved ? 'rgba(16,185,129,0.15)' : 'rgba(255,215,0,0.12)', border: `1px solid ${justSaved ? 'rgba(16,185,129,0.5)' : 'rgba(255,215,0,0.4)'}`, borderRadius: 7, color: justSaved ? '#10b981' : '#FFD700', fontSize: m ? '0.75rem' : '0.8rem', fontWeight: 800, cursor: saving ? 'default' : 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', fontFamily: 'inherit' }}>
           {saving ? <Loader size={14} style={{ animation: 'spin 1s linear infinite' }} /> : <Bookmark size={14} />}
-          {justSaved ? 'Opgeslagen ✓' : (saving ? 'Opslaan…' : 'Plan opslaan')}
+          {justSaved ? 'Sjabloon bewaard ✓' : (saving ? 'Bewaren…' : 'Bewaar als sjabloon')}
         </button>
       </div>
 

@@ -17,6 +17,7 @@ import PlanSwitcherModal from './plan-analyzer/PlanSwitcherModal'
 import TimingModal from './plan-analyzer/TimingModal'
 import BestSwapsModal from './plan-analyzer/BestSwapsModal'
 import PlanLibraryModal from './plan-analyzer/PlanLibraryModal'
+import PlanTitleBar from './plan-analyzer/PlanTitleBar'
 import ApplyDaysModal from './plan-analyzer/ApplyDaysModal'
 import { checkMealConflicts, buildConflictClientData } from './plan-analyzer/ConflictChecker'
 import { openMealPlanForPrint, openCoachingGuideForPrint } from '../mealplanhtmlgenerator'
@@ -47,6 +48,8 @@ export default function PlanAnalyzer({
   const [weekData, setWeekData] = useState(null)
   const [targets, setTargets] = useState(dailyTargets || null)
   const [planMeta, setPlanMeta] = useState(null)
+  // Zichtbare opslag-status van week-wijzigingen (swaps/edits) in de titelbalk.
+  const [weekSaveState, setWeekSaveState] = useState('idle')
   const [conceptPlans, setConceptPlans] = useState([])
   const [loadingConcepts, setLoadingConcepts] = useState(false)
   const [selectedConceptId, setSelectedConceptId] = useState(conceptPlanId || null)
@@ -347,8 +350,22 @@ export default function PlanAnalyzer({
     if (planId) {
       const ws = {}
       updated.forEach(d => { ws[d.dayId] = { ...d.meals, totals: d.totals, is_training_day: d.is_training_day } })
-      const { error } = await db.supabase.from('client_meal_plans').update({ week_structure: ws }).eq('id', planId)
-      if (error) console.error('❌ Plan-aanpassing opslaan mislukt:', error)
+      setWeekSaveState('saving')
+      // .select() erbij: een update die geen rij raakt (verkeerd id, geen
+      // rechten) geeft géén error terug — dan lijkt opslaan te lukken terwijl
+      // er niets verandert. Alleen een teruggegeven rij is echt bewijs.
+      const { data, error } = await db.supabase
+        .from('client_meal_plans')
+        .update({ week_structure: ws })
+        .eq('id', planId)
+        .select('id')
+      if (error || !data?.length) {
+        console.error('❌ Plan-aanpassing opslaan mislukt:', error || 'geen rij bijgewerkt')
+        setWeekSaveState('error')
+      } else {
+        setWeekSaveState('saved')
+        setTimeout(() => setWeekSaveState(s => (s === 'saved' ? 'idle' : s)), 2000)
+      }
     } else {
       // Nog geen opgeslagen plan (net gegenereerd). Edits leven in weekData en
       // komen zo in de PDF; opslaan gebeurt via "Opslaan"/activeren.
@@ -471,6 +488,32 @@ export default function PlanAnalyzer({
 
   // ════════════ ACTIONS ════════════
 
+  // Titel van HET PLAN DAT NU OPEN STAAT hernoemen. Schrijft naar
+  // client_meal_plans.template_name — dat is de bron die loadConceptPlan bij
+  // terugkomst weer inleest. (De bibliotheek-modal doet iets anders: die legt
+  // een los sjabloon in meal_plan_templates en laat dit plan ongemoeid.)
+  const handleRenamePlan = async (nextName) => {
+    const planId = planMeta?.id || selectedConceptId || null
+    if (!planId) throw new Error('Plan is nog niet opgeslagen')
+    const { data, error } = await db.supabase
+      .from('client_meal_plans')
+      .update({ template_name: nextName })
+      .eq('id', planId)
+      .select('id, template_name')
+    if (error) throw new Error(error.message)
+    if (!data?.length) throw new Error('Plan niet gevonden')
+    setPlanMeta(p => (p ? { ...p, name: data[0].template_name } : p))
+    // De concept-lijst en plan-switcher tonen dezelfde naam.
+    setConceptPlans(prev => prev.map(p => (p.id === planId ? { ...p, template_name: data[0].template_name } : p)))
+  }
+
+  // Rename via de plan-switcher: als het om het geopende plan gaat moet de
+  // titelbalk direct meebewegen, anders blijft daar de oude naam staan.
+  const handlePlanRenamedElsewhere = (planId, nextName) => {
+    if (planId !== (planMeta?.id || selectedConceptId)) return
+    setPlanMeta(p => (p ? { ...p, name: nextName } : p))
+  }
+
   const handleActivate = async () => {
     if (!planMeta?.id) return
     setActivating(true)
@@ -560,6 +603,7 @@ export default function PlanAnalyzer({
         {showPlanSwitcher && resolvedClientId && (
           <PlanSwitcherModal db={db} clientId={resolvedClientId} coachId={coachId} activePlanId={planMeta?.id}
             onSelect={(planId) => { setSelectedConceptId(planId); setShowPlanSwitcher(false); loadAllPlanCount(resolvedClientId) }}
+            onRenamed={handlePlanRenamedElsewhere}
             onClose={() => setShowPlanSwitcher(false)} isMobile={m} />
         )}
       </div>
@@ -795,6 +839,7 @@ export default function PlanAnalyzer({
           {dockedSection === 'plans' && resolvedClientId && (
             <PlanSwitcherModal embedded db={db} clientId={resolvedClientId} coachId={coachId} activePlanId={planMeta?.id}
               onSelect={(planId) => { setSelectedConceptId(planId); setDockedSection(null); loadAllPlanCount(resolvedClientId) }}
+              onRenamed={handlePlanRenamedElsewhere}
               onClose={() => setDockedSection(null)} isMobile={m} />
           )}
           {dockedSection === 'library' && (
@@ -862,6 +907,18 @@ export default function PlanAnalyzer({
 
       {/* ════════════ MAIN BUILDER ════════════ */}
       <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+
+        {/* Titel van het geladen plan — bewerkbaar, slaat hard op dit plan op. */}
+        {(planMeta || selectedConceptId) && (
+          <PlanTitleBar
+            name={planMeta?.name}
+            isActive={activated || planMeta?.isActive}
+            canEdit={!!(planMeta?.id || selectedConceptId)}
+            onRename={handleRenamePlan}
+            weekSaveState={weekSaveState}
+            isMobile={m}
+          />
+        )}
 
         {/* Header — compact: pijl + dagnaam + pijl, daaronder MacroHero
             (zelfde stijl als client meal pagina). De oude plan-name banner,
@@ -1109,6 +1166,7 @@ export default function PlanAnalyzer({
       {showPlanSwitcher && resolvedClientId && (
         <PlanSwitcherModal db={db} clientId={resolvedClientId} coachId={coachId} activePlanId={planMeta?.id}
           onSelect={(planId) => { setSelectedConceptId(planId); setShowPlanSwitcher(false); loadAllPlanCount(resolvedClientId) }}
+          onRenamed={handlePlanRenamedElsewhere}
           onClose={() => setShowPlanSwitcher(false)} isMobile={m} />
       )}
 
