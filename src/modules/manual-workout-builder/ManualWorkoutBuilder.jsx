@@ -120,6 +120,18 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
     setShowExerciseSelector(false)
   }
 
+  // Cardio-item toevoegen aan een dag. Rijdt mee in dezelfde exercises-array
+  // als een gewoon item, maar met type:'cardio' + eigen velden (duur/afstand/
+  // intensiteit). Coach verfijnt de waarden inline in de kaart.
+  const addCardioToDay = (dayId) => {
+    const newItem = {
+      id: Date.now(), type: 'cardio', name: 'Hardlopen',
+      duration: '20 min', distance: '', intensity: 'Matig', notes: '',
+    }
+    setWorkoutPlan(prev => ({ ...prev, days: prev.days.map(d => d.id === dayId ? { ...d, exercises: [...d.exercises, newItem] } : d) }))
+    setActiveDay(dayId)
+  }
+
   const updateExercise = (dayId, exerciseId, updates) => {
     setWorkoutPlan(prev => ({ ...prev, days: prev.days.map(d => d.id === dayId ? { ...d, exercises: d.exercises.map(ex => ex.id === exerciseId ? { ...ex, ...updates } : ex) } : d) }))
   }
@@ -133,7 +145,11 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
     workoutPlan.days.forEach((day, index) => {
       ws[`dag${index + 1}`] = {
         name: day.name, focus: day.focus, geschatteTijd: day.geschatteTijd,
-        exercises: day.exercises.map(ex => ({
+        exercises: day.exercises.map(ex => ex.type === 'cardio' ? ({
+          name: ex.name, type: 'cardio',
+          duration: ex.duration || '', distance: ex.distance || '', intensity: ex.intensity || '',
+          notes: ex.notes || ''
+        }) : ({
           name: ex.name, sets: parseInt(ex.sets) || 3, reps: ex.reps, rust: ex.rust, rpe: ex.rpe,
           equipment: ex.equipment, primairSpieren: ex.primairSpieren, notes: ex.notes || '',
           type: ex.type || 'compound', stretch: ex.stretch || false, priority: ex.priority || 1, goalPriority: ex.goalPriority || false
