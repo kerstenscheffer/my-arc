@@ -6,8 +6,13 @@
 import { Video, Trash2, ChevronUp, ChevronDown } from 'lucide-react'
 import useExerciseImage from '../hooks/useExerciseImage'
 
-// Snelkeuzes voor cardio (zelfde set als de client-side CardioLogSection).
-const CARDIO_PRESETS = ['Wandelen', 'Hardlopen', 'Fietsen', 'Zwemmen', 'Roeien', 'Crosstrainer', 'HIIT']
+// Snelkeuzes voor cardio (datalist = presets + zelf typen blijft mogelijk).
+const CARDIO_PRESETS = [
+  'Wandelen', 'Hardlopen', 'Fietsen', 'Zwemmen', 'Roeien', 'Crosstrainer', 'HIIT',
+  'Steady State Cardio', 'Spinning', 'Stairmaster', 'Skippen', 'Boksen',
+  'Wandelen op helling', 'Sprints', 'Zwemmen (baantjes)', 'Fietsen (buiten)',
+  'Hometrainer', 'Airbike', 'SkiErg', 'Roeien (interval)', 'Zone 2 Cardio',
+]
 const CARDIO_INTENSITIES = ['Rustig', 'Matig', 'Intensief']
 
 export default function BuilderExerciseCard({
