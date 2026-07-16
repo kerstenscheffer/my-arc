@@ -191,6 +191,10 @@ export default function CoachHub() {
   const [mealPanelClientId, setMealPanelClientId] = useState(null)
   const [workoutPanelClientId, setWorkoutPanelClientId] = useState(null)
 
+  // WeekGoalsBar reports whether it renders (it hides itself on a week
+  // without goals) so we only reserve top padding when it's actually there.
+  const [goalsBarVisible, setGoalsBarVisible] = useState(false)
+
   // Widget sidebar — één van { 'notifications' | 'issues' | 'ideas' | 'problems' | null }
   // tegelijk geopend, plus live counts voor de badge per knop.
   const [widgetOpen, setWidgetOpen] = useState(null)
@@ -522,10 +526,13 @@ export default function CoachHub() {
     <div style={{
       minHeight: '100vh',
       background: '#0a0a0a',
-      // Reserve space for the always-on WeekGoalsBar (fixed, top:0, ~32px
-      // + safe-area). Without this the bar floats over the header and
-      // covers the logout/switch/notification buttons.
-      paddingTop: 'calc(32px + env(safe-area-inset-top, 0px))'
+      // Reserve space for the WeekGoalsBar (fixed, top:0, ~32px + safe-area).
+      // Without this the bar floats over the header and covers the
+      // logout/switch/notification buttons. The bar hides itself when there
+      // are no goals this week, so the reservation follows its visibility.
+      paddingTop: (!clientMode && goalsBarVisible)
+        ? 'calc(32px + env(safe-area-inset-top, 0px))'
+        : 'env(safe-area-inset-top, 0px)'
     }}>
       {/* ═══ NOTIFICATIE BEL — bestuurd door WidgetSidebar (geen eigen tab meer) ═══ */}
       <CoachNotificationBell
@@ -1003,9 +1010,16 @@ export default function CoachHub() {
         />
       )}
 
-      {/* Always-on goals overlay — fixed-top strip + tap to expand.
-          Verborgen in klantmodus. */}
-      {!clientMode && <WeekGoalsBar db={db} coachId={user?.id} isMobile={isMobile} />}
+      {/* Goals overlay — fixed-top strip + tap to expand. Verbergt zichzelf
+          als er deze week geen doelen zijn; verborgen in klantmodus. */}
+      {!clientMode && (
+        <WeekGoalsBar
+          db={db}
+          coachId={user?.id}
+          isMobile={isMobile}
+          onVisibleChange={setGoalsBarVisible}
+        />
+      )}
 
       {/* Issues / ideas / klant-pijnpunten — allen bestuurd via WidgetSidebar.
           De widgets zelf renderen alleen nog hun slide-out panel; de quick-

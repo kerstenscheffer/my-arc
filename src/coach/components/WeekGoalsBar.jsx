@@ -79,7 +79,7 @@ const fetchProgress = async ({ coachId, goals, leadService }) => {
   return result
 }
 
-export default function WeekGoalsBar({ db, coachId, isMobile: propMobile }) {
+export default function WeekGoalsBar({ db, coachId, isMobile: propMobile, onVisibleChange }) {
   const isMobile = propMobile ?? (typeof window !== 'undefined' && window.innerWidth <= 768)
 
   const [service] = useState(() => new WeekGoalsService(db))
@@ -146,8 +146,15 @@ export default function WeekGoalsBar({ db, coachId, isMobile: propMobile }) {
   const totalDone = goals.filter(g => (progress[g.id] || 0) >= Number(g.target || 1)).length
   const hasGoals = goals.length > 0
 
-  // Collapsed strip — always rendered. Height kept small so it doesn't
-  // dominate the screen but the gold accent + counter pull the eye.
+  // CoachHub reserves top padding for this bar, so it has to know whether
+  // we actually render — otherwise a goal-less week leaves a 32px gap.
+  useEffect(() => { onVisibleChange?.(hasGoals) }, [hasGoals, onVisibleChange])
+
+  // No goals this week → render nothing at all.
+  if (!hasGoals) return null
+
+  // Collapsed strip. Height kept small so it doesn't dominate the screen
+  // but the gold accent + counter pull the eye.
   return (
     <div data-goalsbar="1" style={{
       position: 'fixed', top: 0, left: 0, right: 0,
@@ -164,9 +171,7 @@ export default function WeekGoalsBar({ db, coachId, isMobile: propMobile }) {
           display: 'flex', alignItems: 'center', gap: '0.5rem',
           padding: '0.35rem 0.85rem',
           minHeight: 32,
-          background: hasGoals
-            ? 'linear-gradient(180deg, rgba(255,215,0,0.18) 0%, rgba(0,0,0,0.85) 100%)'
-            : 'rgba(0,0,0,0.85)',
+          background: 'linear-gradient(180deg, rgba(255,215,0,0.18) 0%, rgba(0,0,0,0.85) 100%)',
           border: 'none',
           borderBottom: '1px solid rgba(255,215,0,0.25)',
           color: '#fff',
@@ -181,22 +186,17 @@ export default function WeekGoalsBar({ db, coachId, isMobile: propMobile }) {
         }}>
           Doelen week
         </span>
-        <span style={{
-          fontSize: '0.72rem', fontWeight: 700,
-          color: hasGoals ? '#fff' : 'rgba(255,255,255,0.35)',
-        }}>
-          {hasGoals ? `${totalDone} / ${goals.length}` : 'Nog geen doelen — open ProductivityHub'}
+        <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#fff' }}>
+          {totalDone} / {goals.length}
         </span>
         <span style={{ flex: 1 }} />
-        {hasGoals && (
-          <span style={{ color: 'rgba(255,255,255,0.5)' }}>
-            {open ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-          </span>
-        )}
+        <span style={{ color: 'rgba(255,255,255,0.5)' }}>
+          {open ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+        </span>
       </button>
 
       {/* Expanded sheet */}
-      {open && hasGoals && (
+      {open && (
         <>
           {/* Invisible click-catcher so tapping outside collapses the sheet.
               Previously this had a 55% black wash which made the sheet's

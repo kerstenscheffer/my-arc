@@ -287,7 +287,13 @@ export default function KanbanBoard({
   useLayoutEffect(() => {
     const GAP = 6
     const currentPinOffset = () => {
-      const gb = goalsBarElRef.current
+      // De doelen-balk verschijnt/verdwijnt met de doelen van de week, dus de
+      // ref kan stale zijn: opnieuw opzoeken zodra 'ie leeg of losgekoppeld is.
+      let gb = goalsBarElRef.current
+      if (!gb || !gb.isConnected) {
+        gb = document.querySelector('[data-goalsbar="1"]')
+        goalsBarElRef.current = gb
+      }
       const h = gb ? gb.getBoundingClientRect().height : 0
       return h > 0 ? Math.round(h + GAP) : (isMobile ? 8 : 12)
     }
