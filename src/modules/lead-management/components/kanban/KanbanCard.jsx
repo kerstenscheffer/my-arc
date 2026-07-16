@@ -20,7 +20,7 @@ import LeadDetailModalV2 from "./LeadDetailModalV2"
 // Alleen in deze kolom krijgt elke card een DM-Run knop: 1 tik → bericht op
 // klembord + Instagram-profiel open + lead als 'contacted' gemarkeerd.
 const NIEUWE_VOLGERS_SECTION_ID = '68c7837a-a779-49df-9c66-cce76fb39e39'
-const DM_RUN_MESSAGE = 'Hey! Zag dat je me bent gaan volgen, welkom. Mag ik vragen waar je op dit moment het meest tegenaan loopt qua voeding of training?'
+const DM_RUN_MESSAGE = 'Heyy x, leuk dat je bent gaan volgen! Ben je zelf ook bezig met spieren opbouwen of vet verliezen?'
 
 // Synchroon kopiëren via execCommand — betrouwbaar binnen dezelfde tik, óók
 // vlak voordat we naar de Instagram-app/-tab springen (moderne clipboard-API
