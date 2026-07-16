@@ -1,7 +1,8 @@
 // src/coach/tabs/ClientInfoTab.jsx - RLS FIX VERSION
 import { useState, useEffect } from 'react'
-import { User, Weight, Target, Activity, Heart, Brain, FileText, Ruler, Plus, X, Save, AlertCircle, Shield, Trash2 } from 'lucide-react'
+import { User, Weight, Target, Activity, Heart, Brain, FileText, Ruler, Plus, X, Save, AlertCircle, Shield, Trash2, ClipboardList } from 'lucide-react'
 import { signUpNewClient } from '../../lib/supabase'
+import IntakeSummaryModal from './client-info/IntakeSummaryModal'
 
 // Import sub-tabs
 import BasicInfoTab from './client-info/BasicInfoTab'
@@ -25,6 +26,7 @@ export default function ClientInfoTab({ db, isMobile }) {
   const [showDiagnostics, setShowDiagnostics] = useState(false)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [deleteLoading, setDeleteLoading] = useState(false)
+  const [showIntakeModal, setShowIntakeModal] = useState(false)
   const [newClientData, setNewClientData] = useState({
     firstName: '',
     lastName: '',
@@ -706,7 +708,43 @@ export default function ClientInfoTab({ db, isMobile }) {
               {deleteLoading ? 'Deleting...' : 'Delete'}
             </button>
           )}
-          
+
+          {/* 📋 INTAKE BEKIJKEN */}
+          {selectedClient && (
+            <button
+              onClick={() => setShowIntakeModal(true)}
+              style={{
+                flex: 1,
+                padding: isMobile ? '0.75rem 1rem' : '0.875rem 1.25rem',
+                background: 'rgba(16, 185, 129, 0.12)',
+                border: '1px solid rgba(16, 185, 129, 0.35)',
+                borderRadius: '10px',
+                color: '#10b981',
+                fontSize: isMobile ? '0.85rem' : '0.9rem',
+                fontWeight: '600',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '0.5rem',
+                minHeight: '44px',
+                touchAction: 'manipulation',
+                WebkitTapHighlightColor: 'transparent',
+                transition: 'all 0.3s ease',
+                transform: 'translateZ(0)'
+              }}
+              onTouchStart={(e) => {
+                if (isMobile) e.currentTarget.style.transform = 'scale(0.98)'
+              }}
+              onTouchEnd={(e) => {
+                if (isMobile) e.currentTarget.style.transform = 'scale(1)'
+              }}
+            >
+              <ClipboardList size={16} />
+              Intake
+            </button>
+          )}
+
           <button
             onClick={runDiagnostics}
             style={{
@@ -1210,7 +1248,17 @@ export default function ClientInfoTab({ db, isMobile }) {
           </div>
         </div>
       )}
-      
+
+      {/* 📋 INTAKE SUMMARY MODAL */}
+      {showIntakeModal && selectedClient && (
+        <IntakeSummaryModal
+          db={db}
+          client={selectedClient}
+          isMobile={isMobile}
+          onClose={() => setShowIntakeModal(false)}
+        />
+      )}
+
       <style>{`
         @keyframes fadeIn {
           from { opacity: 0; transform: translateY(10px); }
