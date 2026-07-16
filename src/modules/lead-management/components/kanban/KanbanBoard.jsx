@@ -1255,7 +1255,7 @@ export default function KanbanBoard({
   const isSaleSectionTitle = (title) => {
     const t = (title || '').toLowerCase()
     const SALE = ['sale', 'verkocht', 'klant', 'client', 'gewonnen', 'won', 'deal']
-    const NEG = ['verloren', 'lost', 'no show', 'no-show', 'noshow', 'afgehaakt', 'geannuleerd', 'refund', 'afgewezen', 'geweigerd']
+    const NEG = ['verloren', 'lost', 'no show', 'no-show', 'noshow', 'afgehaakt', 'geannuleerd', 'refund', 'afgewezen', 'geweigerd', 'call']
     return SALE.some(w => t.includes(w)) && !NEG.some(w => t.includes(w))
   }
   // Call afgewezen-sectie? → opent de reden-modal.
@@ -2116,6 +2116,7 @@ export default function KanbanBoard({
           <div style={{
             display: 'flex', alignItems: 'center', justifyContent: 'space-between',
             padding: isMobile ? '0.5rem 0.75rem' : '0.625rem 1rem',
+            paddingTop: isMobile ? 'calc(0.5rem + env(safe-area-inset-top, 0px))' : '0.625rem',
             borderBottom: '1px solid rgba(255,255,255,0.06)',
             flexShrink: 0
           }}>
