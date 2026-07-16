@@ -23,7 +23,9 @@ const NIEUWE_VOLGERS_SECTION_ID = '68c7837a-a779-49df-9c66-cce76fb39e39'
 // Standaard-DM voor de DM-Run knop. De voornaam van de lead komt op de plek
 // van "x"; zonder voornaam valt 'ie terug op een neutrale begroeting.
 function buildDMRunMessage(lead) {
-  const first = (lead?.first_name || '').trim()
+  // Alleen de voornaam: pak het eerste woord uit de naam (first_name kan de
+  // volledige Insta-naam bevatten, bv. "Sanne de Vries" → "Sanne").
+  const first = (lead?.first_name || '').trim().split(/\s+/)[0] || ''
   const name = first ? first.charAt(0).toUpperCase() + first.slice(1) : ''
   const greeting = name ? `Heyy ${name},` : 'Heyy,'
   return `${greeting} leuk dat je bent gaan volgen! Ben je zelf ook bezig met spieren opbouwen of vet verliezen?`
