@@ -336,6 +336,7 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
             onActivate={() => setActiveDay(day.id)} onUpdate={(updates) => updateDay(day.id, updates)}
             onDelete={() => deleteDay(day.id)} onDuplicate={() => duplicateDay(day.id)}
             onAddExercise={() => { setActiveDay(day.id); setShowExerciseSelector(true) }}
+            onAddCardio={() => addCardioToDay(day.id)}
             onUpdateExercise={(exerciseId, updates) => updateExercise(day.id, exerciseId, updates)}
             onDeleteExercise={(exerciseId) => deleteExercise(day.id, exerciseId)} isMobile={isMobile}
             db={db} client={selectedClient} />

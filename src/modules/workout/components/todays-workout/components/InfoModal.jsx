@@ -156,14 +156,19 @@ export default function InfoModal({ exercise, onClose, db, client, defaultTab })
           {/* DETAILS TAB */}
           {activeTab === 'details' && (
             <div style={{ padding: isMobile ? '1.25rem 1rem' : '1.75rem 1.5rem' }}>
-              {[
+              {(exercise.type === 'cardio' ? [
+                exercise.duration && { label: 'Duur', value: exercise.duration },
+                exercise.distance && { label: 'Afstand', value: exercise.distance },
+                exercise.intensity && { label: 'Intensiteit', value: exercise.intensity },
+                exercise.notes && { label: 'Notitie', value: exercise.notes },
+              ] : [
                 { label: 'Sets', value: exercise.sets },
                 { label: 'Reps', value: exercise.reps },
                 { label: 'Rust', value: exercise.rust },
                 exercise.primairSpieren && { label: 'Spiergroep', value: exercise.primairSpieren },
                 exercise.equipment && { label: 'Equipment', value: exercise.equipment },
                 exercise.rpe && { label: 'RIR', value: exercise.rpe },
-              ].filter(Boolean).map(({ label, value }) => (
+              ]).filter(Boolean).map(({ label, value }) => (
                 <div key={label} style={{ padding: isMobile ? '0.875rem 0' : '1rem 0', borderBottom: '1px solid rgba(255,255,255,0.05)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <span style={{ fontSize: isMobile ? '0.78rem' : '0.83rem', color: 'rgba(255,255,255,0.4)', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{label}</span>
                   <span style={{ fontSize: isMobile ? '0.95rem' : '1.05rem', color: '#FFD700', fontWeight: '800', textTransform: 'capitalize' }}>{value}</span>

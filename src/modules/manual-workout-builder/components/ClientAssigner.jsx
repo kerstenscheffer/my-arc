@@ -29,7 +29,14 @@ export default function ClientAssigner({ clients, workoutPlan, db, onClose, isMo
           name: day.name,
           focus: day.focus,
           geschatteTijd: day.geschatteTijd,
-          exercises: day.exercises.map(ex => ({
+          exercises: day.exercises.map(ex => ex.type === 'cardio' ? ({
+            name: ex.name,
+            type: 'cardio',
+            duration: ex.duration || '',
+            distance: ex.distance || '',
+            intensity: ex.intensity || '',
+            notes: ex.notes || ''
+          }) : ({
             name: ex.name,
             sets: parseInt(ex.sets) || 3,
             reps: ex.reps || '8-12',

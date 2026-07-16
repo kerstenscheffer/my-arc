@@ -12,6 +12,7 @@ const getFallbackImage = (exercise) => {
   const name = (exercise.name || '').toLowerCase()
   const muscles = (exercise.primairSpieren || exercise.muscleGroup || '').toLowerCase()
   const combined = `${name} ${muscles}`
+  if (exercise.type === 'cardio') return 'https://images.unsplash.com/photo-1538805060514-97d9cc17730c?w=400&h=400&fit=crop&q=80&crop=center'
   if (combined.includes('bench') || combined.includes('chest') || combined.includes('push') || combined.includes('borst') || combined.includes('fly') || combined.includes('pec')) return 'https://images.unsplash.com/photo-1598971457999-ca4ef48a9a71?w=400&h=400&fit=crop&q=80&crop=center'
   if (combined.includes('row') || combined.includes('back') || combined.includes('pull') || combined.includes('rug') || combined.includes('lat') || combined.includes('deadlift')) return 'https://images.unsplash.com/photo-1603287681836-b174ce5074c2?w=400&h=400&fit=crop&q=80&crop=center'
   if (combined.includes('squat') || combined.includes('leg') || combined.includes('lunge') || combined.includes('been') || combined.includes('quad') || combined.includes('hamstring') || combined.includes('calf') || combined.includes('kuit')) return 'https://images.unsplash.com/photo-1567598508481-65985588e295?w=400&h=400&fit=crop&q=80&crop=center'
@@ -300,21 +301,41 @@ export default function ExerciseCard({
               )}
             </div>
 
-            {/* Stats-rij — sets en reps (rust weggehaald voor rustigere look) */}
-            <div style={{ display: 'flex', gap: isMobile ? '0.55rem' : '0.7rem', overflow: 'hidden' }}>
-              {exercise.sets && (
-                <div style={{ display: 'flex', alignItems: 'baseline', gap: 2 }}>
-                  <span style={{ fontSize: isMobile ? '0.72rem' : '0.78rem', fontWeight: 800, color: 'rgba(255,255,255,0.7)' }}>{exercise.sets}</span>
-                  <span style={{ fontSize: isMobile ? '0.52rem' : '0.58rem', fontWeight: 700, color: 'rgba(255,255,255,0.3)', textTransform: 'uppercase' }}>sets</span>
-                </div>
-              )}
-              {exercise.reps && (
-                <div style={{ display: 'flex', alignItems: 'baseline', gap: 2 }}>
-                  <span style={{ fontSize: isMobile ? '0.72rem' : '0.78rem', fontWeight: 800, color: 'rgba(255,255,255,0.7)' }}>{exercise.reps}</span>
-                  <span style={{ fontSize: isMobile ? '0.52rem' : '0.58rem', fontWeight: 700, color: 'rgba(255,255,255,0.3)', textTransform: 'uppercase' }}>reps</span>
-                </div>
-              )}
-            </div>
+            {/* Stats-rij — cardio toont duur/afstand/intensiteit, anders sets/reps */}
+            {exercise.type === 'cardio' ? (
+              <div style={{ display: 'flex', gap: isMobile ? '0.55rem' : '0.7rem', overflow: 'hidden' }}>
+                {exercise.duration && (
+                  <div style={{ display: 'flex', alignItems: 'baseline', gap: 2 }}>
+                    <span style={{ fontSize: isMobile ? '0.72rem' : '0.78rem', fontWeight: 800, color: 'rgba(255,255,255,0.7)' }}>{exercise.duration}</span>
+                    <span style={{ fontSize: isMobile ? '0.52rem' : '0.58rem', fontWeight: 700, color: 'rgba(255,255,255,0.3)', textTransform: 'uppercase' }}>duur</span>
+                  </div>
+                )}
+                {exercise.distance && (
+                  <div style={{ display: 'flex', alignItems: 'baseline', gap: 2 }}>
+                    <span style={{ fontSize: isMobile ? '0.72rem' : '0.78rem', fontWeight: 800, color: 'rgba(255,255,255,0.7)' }}>{exercise.distance}</span>
+                    <span style={{ fontSize: isMobile ? '0.52rem' : '0.58rem', fontWeight: 700, color: 'rgba(255,255,255,0.3)', textTransform: 'uppercase' }}>afstand</span>
+                  </div>
+                )}
+                {exercise.intensity && (
+                  <span style={{ fontSize: isMobile ? '0.55rem' : '0.6rem', fontWeight: 800, color: '#f87171', textTransform: 'uppercase', alignSelf: 'center' }}>{exercise.intensity}</span>
+                )}
+              </div>
+            ) : (
+              <div style={{ display: 'flex', gap: isMobile ? '0.55rem' : '0.7rem', overflow: 'hidden' }}>
+                {exercise.sets && (
+                  <div style={{ display: 'flex', alignItems: 'baseline', gap: 2 }}>
+                    <span style={{ fontSize: isMobile ? '0.72rem' : '0.78rem', fontWeight: 800, color: 'rgba(255,255,255,0.7)' }}>{exercise.sets}</span>
+                    <span style={{ fontSize: isMobile ? '0.52rem' : '0.58rem', fontWeight: 700, color: 'rgba(255,255,255,0.3)', textTransform: 'uppercase' }}>sets</span>
+                  </div>
+                )}
+                {exercise.reps && (
+                  <div style={{ display: 'flex', alignItems: 'baseline', gap: 2 }}>
+                    <span style={{ fontSize: isMobile ? '0.72rem' : '0.78rem', fontWeight: 800, color: 'rgba(255,255,255,0.7)' }}>{exercise.reps}</span>
+                    <span style={{ fontSize: isMobile ? '0.52rem' : '0.58rem', fontWeight: 700, color: 'rgba(255,255,255,0.3)', textTransform: 'uppercase' }}>reps</span>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </div>
 

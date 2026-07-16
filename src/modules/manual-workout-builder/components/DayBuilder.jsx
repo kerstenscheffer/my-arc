@@ -1,12 +1,12 @@
 // src/modules/manual-workout-builder/components/DayBuilder.jsx
 import { useState } from 'react'
-import { Trash2, Copy, Plus, Edit2, ChevronDown, ChevronUp, Dumbbell, Target, Clock } from 'lucide-react'
+import { Trash2, Copy, Plus, Edit2, ChevronDown, ChevronUp, Dumbbell, Target, Clock, Heart } from 'lucide-react'
 import ExerciseVideoEditor from './ExerciseVideoEditor'
 import BuilderExerciseCard from './BuilderExerciseCard'
 
 export default function DayBuilder({
   day, dayNumber, isActive, onActivate, onUpdate, onDelete, onDuplicate,
-  onAddExercise, onUpdateExercise, onDeleteExercise, isMobile, db, client
+  onAddExercise, onAddCardio, onUpdateExercise, onDeleteExercise, isMobile, db, client
 }) {
   const [editingName, setEditingName] = useState(false)
   const [editingFocus, setEditingFocus] = useState(false)
@@ -159,15 +159,25 @@ export default function DayBuilder({
             )}
           </div>
 
-          {/* Add Exercise */}
-          <button onClick={(e) => { e.stopPropagation(); onAddExercise() }}
-            style={{ width: '100%', padding: '0.75rem', background: 'rgba(212,175,55,0.08)', border: '1px solid rgba(212,175,55,0.3)', borderRadius: '8px', color: '#FFD700', fontSize: isMobile ? '0.85rem' : '0.9rem', fontWeight: '600', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', minHeight: '44px' }}
-            onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(212,175,55,0.18)'}
-            onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(212,175,55,0.08)'}
-            onTouchStart={(e) => e.currentTarget.style.transform = 'scale(0.98)'}
-            onTouchEnd={(e) => e.currentTarget.style.transform = 'scale(1)'}>
-            <Plus size={18} />Oefening Toevoegen
-          </button>
+          {/* Add Exercise + Add Cardio */}
+          <div style={{ display: 'flex', gap: '0.5rem' }}>
+            <button onClick={(e) => { e.stopPropagation(); onAddExercise() }}
+              style={{ flex: 1, padding: '0.75rem', background: 'rgba(212,175,55,0.08)', border: '1px solid rgba(212,175,55,0.3)', borderRadius: '8px', color: '#FFD700', fontSize: isMobile ? '0.85rem' : '0.9rem', fontWeight: '600', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', minHeight: '44px' }}
+              onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(212,175,55,0.18)'}
+              onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(212,175,55,0.08)'}
+              onTouchStart={(e) => e.currentTarget.style.transform = 'scale(0.98)'}
+              onTouchEnd={(e) => e.currentTarget.style.transform = 'scale(1)'}>
+              <Plus size={18} />Oefening
+            </button>
+            <button onClick={(e) => { e.stopPropagation(); onAddCardio && onAddCardio() }}
+              style={{ flex: 1, padding: '0.75rem', background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.3)', borderRadius: '8px', color: '#f87171', fontSize: isMobile ? '0.85rem' : '0.9rem', fontWeight: '600', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', minHeight: '44px' }}
+              onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(239,68,68,0.18)'}
+              onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(239,68,68,0.08)'}
+              onTouchStart={(e) => e.currentTarget.style.transform = 'scale(0.98)'}
+              onTouchEnd={(e) => e.currentTarget.style.transform = 'scale(1)'}>
+              <Heart size={16} />Cardio
+            </button>
+          </div>
         </>
       )}
 

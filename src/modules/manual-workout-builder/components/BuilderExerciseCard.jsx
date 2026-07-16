@@ -6,6 +6,10 @@
 import { Video, Trash2, ChevronUp, ChevronDown } from 'lucide-react'
 import useExerciseImage from '../hooks/useExerciseImage'
 
+// Snelkeuzes voor cardio (zelfde set als de client-side CardioLogSection).
+const CARDIO_PRESETS = ['Wandelen', 'Hardlopen', 'Fietsen', 'Zwemmen', 'Roeien', 'Crosstrainer', 'HIIT']
+const CARDIO_INTENSITIES = ['Rustig', 'Matig', 'Intensief']
+
 export default function BuilderExerciseCard({
   exercise, index, total, isMobile, db, client, onField, onMove, onDelete, onVideo,
 }) {
@@ -63,36 +67,74 @@ export default function BuilderExerciseCard({
 
         {/* Info-kolom */}
         <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', justifyContent: 'center', padding: isMobile ? '0.4rem 0.6rem' : '0.45rem 0.8rem', gap: 6 }}>
-          {/* Naam + spiergroep-badge */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
-            <span style={{ fontSize: isMobile ? '0.9rem' : '0.95rem', fontWeight: 800, color: '#fff', lineHeight: 1.15, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', letterSpacing: '-0.015em', minWidth: 0 }}>
-              {exercise.name}
-            </span>
-            {(exercise.primairSpieren || exercise.muscle) && (
-              <span style={{ flexShrink: 0, fontSize: isMobile ? '0.52rem' : '0.55rem', fontWeight: 900, color: '#000', background: '#FFD700', padding: '2px 7px', borderRadius: 3, letterSpacing: '0.05em', textTransform: 'uppercase', whiteSpace: 'nowrap', lineHeight: 1.2 }}>
-                {exercise.primairSpieren || exercise.muscle}
-              </span>
-            )}
-          </div>
+          {exercise.type === 'cardio' ? (
+            <>
+              {/* Cardio-naam met snelkeuze-presets (datalist = presets + vrij typen) */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
+                <input list="mwb-cardio-presets" value={exercise.name ?? ''} onClick={stop}
+                  onChange={(e) => onField('name', e.target.value)} placeholder="Cardio type"
+                  style={{ flex: 1, minWidth: 0, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 6, color: '#fff', fontSize: isMobile ? '0.9rem' : '0.95rem', fontWeight: 800, padding: '3px 6px', outline: 'none' }} />
+                <datalist id="mwb-cardio-presets">
+                  {CARDIO_PRESETS.map(p => <option key={p} value={p} />)}
+                </datalist>
+                <span style={{ flexShrink: 0, fontSize: isMobile ? '0.52rem' : '0.55rem', fontWeight: 900, color: '#000', background: '#f87171', padding: '2px 7px', borderRadius: 3, letterSpacing: '0.05em', textTransform: 'uppercase', lineHeight: 1.2 }}>
+                  Cardio
+                </span>
+              </div>
 
-          {/* Bewerkbare sets / reps / rust — compact */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
-              <input type="number" min={1} max={20} value={exercise.sets ?? 3} onClick={stop}
-                onChange={(e) => onField('sets', parseInt(e.target.value) || 1)} style={statInput} />
-              <span style={statLbl}>sets</span>
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
-              <input type="text" value={exercise.reps ?? '10'} onClick={stop}
-                onChange={(e) => onField('reps', e.target.value)} style={{ ...statInput, width: 38 }} />
-              <span style={statLbl}>reps</span>
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
-              <input type="text" value={exercise.rust ?? exercise.rest ?? '90s'} onClick={stop}
-                onChange={(e) => onField('rust', e.target.value)} style={{ ...statInput, width: 40, color: 'rgba(255,255,255,0.6)' }} />
-              <span style={statLbl}>rust</span>
-            </div>
-          </div>
+              {/* Duur / afstand / intensiteit */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
+                  <input type="text" value={exercise.duration ?? ''} onClick={stop} placeholder="20 min"
+                    onChange={(e) => onField('duration', e.target.value)} style={{ ...statInput, width: 48, color: '#fff' }} />
+                  <span style={statLbl}>duur</span>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
+                  <input type="text" value={exercise.distance ?? ''} onClick={stop} placeholder="5 km"
+                    onChange={(e) => onField('distance', e.target.value)} style={{ ...statInput, width: 42, color: 'rgba(255,255,255,0.6)' }} />
+                  <span style={statLbl}>afst.</span>
+                </div>
+                <select value={exercise.intensity ?? 'Matig'} onClick={stop}
+                  onChange={(e) => onField('intensity', e.target.value)}
+                  style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 6, color: '#f87171', fontSize: '0.6rem', fontWeight: 800, padding: '3px 4px', outline: 'none', cursor: 'pointer' }}>
+                  {CARDIO_INTENSITIES.map(i => <option key={i} value={i} style={{ background: '#141414' }}>{i}</option>)}
+                </select>
+              </div>
+            </>
+          ) : (
+            <>
+              {/* Naam + spiergroep-badge */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
+                <span style={{ fontSize: isMobile ? '0.9rem' : '0.95rem', fontWeight: 800, color: '#fff', lineHeight: 1.15, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', letterSpacing: '-0.015em', minWidth: 0 }}>
+                  {exercise.name}
+                </span>
+                {(exercise.primairSpieren || exercise.muscle) && (
+                  <span style={{ flexShrink: 0, fontSize: isMobile ? '0.52rem' : '0.55rem', fontWeight: 900, color: '#000', background: '#FFD700', padding: '2px 7px', borderRadius: 3, letterSpacing: '0.05em', textTransform: 'uppercase', whiteSpace: 'nowrap', lineHeight: 1.2 }}>
+                    {exercise.primairSpieren || exercise.muscle}
+                  </span>
+                )}
+              </div>
+
+              {/* Bewerkbare sets / reps / rust — compact */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
+                  <input type="number" min={1} max={20} value={exercise.sets ?? 3} onClick={stop}
+                    onChange={(e) => onField('sets', parseInt(e.target.value) || 1)} style={statInput} />
+                  <span style={statLbl}>sets</span>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
+                  <input type="text" value={exercise.reps ?? '10'} onClick={stop}
+                    onChange={(e) => onField('reps', e.target.value)} style={{ ...statInput, width: 38 }} />
+                  <span style={statLbl}>reps</span>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
+                  <input type="text" value={exercise.rust ?? exercise.rest ?? '90s'} onClick={stop}
+                    onChange={(e) => onField('rust', e.target.value)} style={{ ...statInput, width: 40, color: 'rgba(255,255,255,0.6)' }} />
+                  <span style={statLbl}>rust</span>
+                </div>
+              </div>
+            </>
+          )}
         </div>
 
         {/* Volgorde */}
