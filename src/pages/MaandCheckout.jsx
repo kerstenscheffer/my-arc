@@ -142,7 +142,12 @@ export default function MaandCheckout() {
 
   return (
     <div style={{
-      minHeight: '100vh', background: '#000', color: '#fff',
+      // Zachte snap-scroll: glijdt naar de dichtstbijzijnde sectie zodra je in
+      // de buurt komt (proximity houdt je nergens vast — belangrijk op checkout).
+      height: isMobile ? '100dvh' : '100vh', overflowY: 'auto', WebkitOverflowScrolling: 'touch',
+      scrollSnapType: 'y proximity', scrollBehavior: 'smooth',
+      scrollPaddingTop: isMobile ? '1.5rem' : '2rem',
+      background: '#000', color: '#fff',
       fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
     }}>
       <div style={{
@@ -151,7 +156,7 @@ export default function MaandCheckout() {
       }}>
 
         {/* ══ HERO (gelijk aan /sales) ══ */}
-        <div style={{ textAlign: 'center', marginBottom: isMobile ? '1.5rem' : '1.75rem' }}>
+        <div style={{ textAlign: 'center', marginBottom: isMobile ? '1.5rem' : '1.75rem', scrollSnapAlign: 'start' }}>
           <img
             src="/ma-logo-header.png"
             alt="MA Coaching"
@@ -214,7 +219,7 @@ export default function MaandCheckout() {
           </div>
         </div>
 
-        <div style={{ marginBottom: isMobile ? '4rem' : '5.5rem' }}>
+        <div style={{ marginBottom: isMobile ? '4rem' : '5.5rem', scrollSnapAlign: 'start' }}>
           <div style={{
             textAlign: 'center', color: '#fff', fontWeight: 900,
             fontSize: isMobile ? '1.6rem' : '2rem', letterSpacing: '-0.02em',
@@ -292,7 +297,7 @@ export default function MaandCheckout() {
         </div>
 
         {/* ══ OFFER — compacte platte tekst (sales-stijl, geen card) ══ */}
-        <div style={{ textAlign: 'center', marginBottom: isMobile ? '4rem' : '5.5rem' }}>
+        <div style={{ textAlign: 'center', marginBottom: isMobile ? '4rem' : '5.5rem', scrollSnapAlign: 'start' }}>
           {/* Prijs */}
           <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'center', gap: 5 }}>
             <span style={{ fontSize: isMobile ? '2.9rem' : '3.4rem', fontWeight: 900, color: '#fff', lineHeight: 1, letterSpacing: '-0.02em' }}>€99</span>
@@ -311,6 +316,7 @@ export default function MaandCheckout() {
 
         {/* ══ CHECKOUT FORM ══ */}
         <div style={{
+          scrollSnapAlign: 'start',
           borderRadius: isMobile ? 16 : 18,
           border: '1px solid rgba(255,255,255,0.08)',
           background: 'rgba(255,255,255,0.02)',
@@ -393,7 +399,7 @@ export default function MaandCheckout() {
         </div>
 
         {/* ══ REVIEWS ══ */}
-        <div style={{ marginBottom: '1rem' }}>
+        <div style={{ marginBottom: '1rem', scrollSnapAlign: 'start' }}>
           <div style={{
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             gap: '0.5rem', marginBottom: isMobile ? '0.85rem' : '1rem',
