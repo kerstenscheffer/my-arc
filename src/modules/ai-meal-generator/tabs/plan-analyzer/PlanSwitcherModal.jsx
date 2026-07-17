@@ -2,10 +2,10 @@
 
 import React, { useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
-import { X, CheckCircle, Circle, Trash2, Pencil, Check, Zap, ChevronRight, Copy } from 'lucide-react'
+import { X, CheckCircle, Circle, Trash2, Pencil, Check, Zap, ChevronRight, Copy, Loader, AlertTriangle, Bookmark } from 'lucide-react'
 import TemplateLibrary from '../../../meal-templates/TemplateLibrary'
 
-export default function PlanSwitcherModal({ db, clientId, coachId, activePlanId, onSelect, onRenamed, onClose, isMobile, embedded = false }) {
+export default function PlanSwitcherModal({ db, clientId, coachId, activePlanId, onSelect, onRenamed, onSaveAsTemplate, weekSaveState = 'idle', onClose, isMobile, embedded = false }) {
   const m = isMobile
   const [tab, setTab] = useState('client')
 
@@ -33,7 +33,10 @@ export default function PlanSwitcherModal({ db, clientId, coachId, activePlanId,
         .select('id, template_name, daily_calories, daily_protein, daily_carbs, daily_fat, is_active, ai_generated, created_at, start_date, created_via')
         .eq('client_id', clientId)
         .order('created_at', { ascending: false })
-      setPlans(data || [])
+      // Actief plan altijd bovenaan (stabiele sort behoudt created_at-volgorde
+      // binnen de rest) → de coach ziet direct in welk plan hij werkt.
+      const sorted = (data || []).slice().sort((a, b) => (b.is_active ? 1 : 0) - (a.is_active ? 1 : 0))
+      setPlans(sorted)
     } catch (e) { console.error('PlanSwitcher load error:', e) }
     setLoadingPlans(false)
   }
@@ -235,6 +238,35 @@ export default function PlanSwitcherModal({ db, clientId, coachId, activePlanId,
           {/* CLIENT PLANS */}
           {tab === 'client' && (
             <>
+              {/* Auto-save-bevestiging: maakt zichtbaar dat élke wijziging direct
+                  in het actieve plan wordt opgeslagen (geen aparte opslaan-actie). */}
+              {(() => {
+                const active = plans.find(p => p.is_active)
+                const saveCfg = {
+                  saving: { color: 'rgba(255,255,255,0.55)', label: 'Bezig met opslaan…' },
+                  saved:  { color: '#10b981', label: 'Alle wijzigingen opgeslagen' },
+                  error:  { color: '#ef4444', label: 'Let op: laatste wijziging niet opgeslagen' },
+                  idle:   { color: '#10b981', label: 'Wijzigingen worden automatisch opgeslagen' },
+                }[weekSaveState] || { color: '#10b981', label: 'Wijzigingen worden automatisch opgeslagen' }
+                return (
+                  <div style={{ padding: m ? '0.6rem 1rem' : '0.7rem 1.25rem', borderBottom: '1px solid rgba(255,255,255,0.04)', background: 'rgba(16,185,129,0.04)' }}>
+                    <div style={{ fontSize: m ? '0.6rem' : '0.64rem', fontWeight: 800, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.2rem' }}>
+                      Je werkt nu in
+                    </div>
+                    <div style={{ fontSize: m ? '0.95rem' : '1rem', fontWeight: 800, color: '#FFD700', letterSpacing: '-0.01em', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {active ? (active.template_name || 'Naamloos plan') : 'Geen actief plan'}
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', marginTop: '0.25rem' }}>
+                      {weekSaveState === 'saving'
+                        ? <Loader size={11} color={saveCfg.color} style={{ animation: 'psmSpin 1s linear infinite' }} />
+                        : weekSaveState === 'error'
+                          ? <AlertTriangle size={11} color={saveCfg.color} />
+                          : <Check size={11} color={saveCfg.color} strokeWidth={3} />}
+                      <span style={{ fontSize: m ? '0.62rem' : '0.66rem', fontWeight: 700, color: saveCfg.color }}>{saveCfg.label}</span>
+                    </div>
+                  </div>
+                )
+              })()}
               {loadingPlans && <Placeholder text="Laden..." />}
               {!loadingPlans && plans.length === 0 && <Placeholder text="Geen plannen voor deze client" />}
               {plans.map(plan => {
@@ -367,6 +399,17 @@ export default function PlanSwitcherModal({ db, clientId, coachId, activePlanId,
 
         {/* Footer */}
         <div style={{ padding: m ? '0.5rem 1rem' : '0.5rem 1.25rem', borderTop: '1px solid rgba(255,255,255,0.04)', flexShrink: 0 }}>
+          {tab === 'client' && onSaveAsTemplate && (
+            <button onClick={onSaveAsTemplate} style={{
+              width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem',
+              padding: '0.55rem', marginBottom: '0.5rem',
+              background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '7px',
+              color: 'rgba(255,255,255,0.7)', fontSize: m ? '0.7rem' : '0.75rem', fontWeight: 700,
+              cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+            }}>
+              <Bookmark size={13} /> Dit plan bewaren als template (voor andere clients)
+            </button>
+          )}
           <div style={{ fontSize: m ? '0.62rem' : '0.66rem', color: 'rgba(255,255,255,0.4)', fontWeight: 600 }}>
             {tab === 'client' ? 'Activeer = client ziet dit plan · → = bekijk in analyzer' : 'Gebruik = kopieert als nieuw concept voor deze client'}
           </div>
@@ -375,8 +418,8 @@ export default function PlanSwitcherModal({ db, clientId, coachId, activePlanId,
     </div>
   )
 
-  if (embedded) return modal
-  return createPortal(modal, document.body)
+  if (embedded) return <>{modal}<style>{`@keyframes psmSpin { to { transform: rotate(360deg) } }`}</style></>
+  return createPortal(<>{modal}<style>{`@keyframes psmSpin { to { transform: rotate(360deg) } }`}</style></>, document.body)
 }
 
 function Placeholder({ text }) {

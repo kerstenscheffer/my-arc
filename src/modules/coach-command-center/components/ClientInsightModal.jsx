@@ -12,6 +12,7 @@ import ClientJourneyTimeline from '../../client-journey/ClientJourneyTimeline'
 import CoachingLogModal from './CoachingLogModal'
 import CoachingPeriodPanel from './CoachingPeriodPanel'
 import SendNotificationModal from '../../notifications/SendNotificationModal'
+import IntakeSummaryModal from '../../../coach/tabs/client-info/IntakeSummaryModal'
 
 const COLS = [
   { id: 'weight',  label: 'Gewicht',   color: '#FFD700' },
@@ -112,6 +113,7 @@ export default function ClientInsightModal({ isOpen, onClose, client, isMobile, 
   const [collapsed, setCollapsed] = useState(() => new Set(['data']))
   const [showLog, setShowLog] = useState(false)
   const [showNotify, setShowNotify] = useState(false)
+  const [showIntake, setShowIntake] = useState(false)
 
   const [localClient, setLocalClient] = useState(null)
   const containerRef = useRef(null)
@@ -262,6 +264,16 @@ export default function ClientInsightModal({ isOpen, onClose, client, isMobile, 
                     })}
                   </div>
                   <div style={{ flex: 1 }} />
+                  <button onClick={() => setShowIntake(true)} title="Bekijk intake" style={{
+                    display: 'flex', alignItems: 'center', gap: '0.2rem',
+                    padding: '0.25rem 0.5rem',
+                    background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)',
+                    borderRadius: '5px', color: 'rgba(255,255,255,0.4)',
+                    fontSize: '0.55rem', fontWeight: 700, cursor: 'pointer',
+                    touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', minHeight: '22px'
+                  }}>
+                    <ClipboardCheck size={10} /> Intake
+                  </button>
                   <button onClick={() => setShowLog(true)} style={{
                     display: 'flex', alignItems: 'center', gap: '0.2rem',
                     padding: '0.25rem 0.5rem',
@@ -312,6 +324,17 @@ export default function ClientInsightModal({ isOpen, onClose, client, isMobile, 
                 <span style={{ fontSize: '0.9rem', fontWeight: '800', color: '#FFD700', flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                   {effectiveClient.first_name} {effectiveClient.last_name}
                 </span>
+                <button onClick={() => setShowIntake(true)} title="Bekijk intake" style={{
+                  display: 'flex', alignItems: 'center', gap: '0.2rem',
+                  padding: '0.3rem 0.5rem',
+                  background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)',
+                  borderRadius: '6px', color: 'rgba(255,255,255,0.4)',
+                  fontSize: '0.6rem', fontWeight: 700, cursor: 'pointer',
+                  touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', minHeight: '28px',
+                  flexShrink: 0
+                }}>
+                  <ClipboardCheck size={11} /> Intake
+                </button>
                 <button onClick={() => setShowLog(true)} style={{
                   display: 'flex', alignItems: 'center', gap: '0.2rem',
                   padding: '0.3rem 0.5rem',
@@ -648,6 +671,16 @@ export default function ClientInsightModal({ isOpen, onClose, client, isMobile, 
             </div>
           )}
         </div>
+      )}
+
+      {/* ═══ INTAKE SUMMARY MODAL ═══ */}
+      {showIntake && effectiveClient && (
+        <IntakeSummaryModal
+          db={db}
+          client={effectiveClient}
+          isMobile={isMobile}
+          onClose={() => setShowIntake(false)}
+        />
       )}
 
       {/* ═══ COACHING LOG MODAL ═══ */}

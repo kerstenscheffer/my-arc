@@ -60,6 +60,7 @@ export default function PlanAnalyzer({
   const [validSchemaDagKeys, setValidSchemaDagKeys] = useState(null)
   const [viewMode, setViewMode] = useState('day')
   const [showPlanSwitcher, setShowPlanSwitcher] = useState(false)
+  const [showPlanLibrary, setShowPlanLibrary] = useState(false)
   const [showTimingModal, setShowTimingModal] = useState(false)
   const [showBalancer, setShowBalancer] = useState(false)
   const [showWeekBalancer, setShowWeekBalancer] = useState(false)
@@ -652,14 +653,13 @@ export default function PlanAnalyzer({
   // Toggle een sectie in het dock-paneel (klik zelfde knop = sluiten).
   const toggleDock = (id) => setDockedSection(d => d === id ? null : id)
   const sidebarNav = [
-    { id: 'plans',  icon: <List size={18} />,      label: 'Plannen', active: dockedSection === 'plans',  onClick: () => toggleDock('plans'),  badge: allClientPlans.length > 0 ? allClientPlans.length : null },
     { id: 'client', icon: '👤',                    label: 'Client',  active: dockedSection === 'client', onClick: () => toggleDock('client') },
     { id: 'timing', icon: <Clock size={18} />,     label: 'Tijden',  active: dockedSection === 'timing', onClick: () => toggleDock('timing') },
     { id: 'dag',    icon: <Zap size={18} />,       label: 'Dag',     active: dockedSection === 'dag',    onClick: () => toggleDock('dag') },
     { id: 'week',   icon: <Grid3X3 size={18} />,   label: 'Week',    active: viewMode === 'week',        onClick: () => setViewMode(v => v === 'week' ? 'day' : 'week') },
     { id: 'agenda', icon: <Calendar size={18} />,  label: 'Agenda',  active: dockedSection === 'agenda', onClick: () => toggleDock('agenda') },
     { id: 'swaps',  icon: <Repeat size={18} />,    label: 'Swaps',   active: dockedSection === 'swaps',  onClick: () => toggleDock('swaps') },
-    { id: 'library', icon: <Bookmark size={18} />, label: 'Opslaan', active: dockedSection === 'library', onClick: () => toggleDock('library') },
+    { id: 'library', icon: <List size={18} />, label: 'Opslaan', active: dockedSection === 'library', onClick: () => toggleDock('library'), badge: allClientPlans.length > 0 ? allClientPlans.length : null },
   ]
 
   const sidebarBottom = [
@@ -836,18 +836,13 @@ export default function PlanAnalyzer({
           {dockedSection === 'swaps' && resolvedClientId && (
             <BestSwapsModal embedded db={db} clientId={resolvedClientId} isMobile={m} onClose={() => setDockedSection(null)} />
           )}
-          {dockedSection === 'plans' && resolvedClientId && (
+          {dockedSection === 'library' && resolvedClientId && (
             <PlanSwitcherModal embedded db={db} clientId={resolvedClientId} coachId={coachId} activePlanId={planMeta?.id}
+              weekSaveState={weekSaveState}
               onSelect={(planId) => { setSelectedConceptId(planId); setDockedSection(null); loadAllPlanCount(resolvedClientId) }}
               onRenamed={handlePlanRenamedElsewhere}
+              onSaveAsTemplate={() => setShowPlanLibrary(true)}
               onClose={() => setDockedSection(null)} isMobile={m} />
-          )}
-          {dockedSection === 'library' && (
-            <PlanLibraryModal embedded db={db} coachId={coachId} isMobile={m}
-              weekData={weekData} planMeta={planMeta}
-              clientName={clientRecord?.first_name || ''}
-              onLoad={handleLoadSavedPlan}
-              onClose={() => setDockedSection(null)} />
           )}
           {dockedSection === 'agenda' && (clientRecord || resolvedClientId) && (
             <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: '#0a0a0a' }}>
@@ -1165,9 +1160,21 @@ export default function PlanAnalyzer({
 
       {showPlanSwitcher && resolvedClientId && (
         <PlanSwitcherModal db={db} clientId={resolvedClientId} coachId={coachId} activePlanId={planMeta?.id}
+          weekSaveState={weekSaveState}
           onSelect={(planId) => { setSelectedConceptId(planId); setShowPlanSwitcher(false); loadAllPlanCount(resolvedClientId) }}
           onRenamed={handlePlanRenamedElsewhere}
+          onSaveAsTemplate={() => { setShowPlanSwitcher(false); setShowPlanLibrary(true) }}
           onClose={() => setShowPlanSwitcher(false)} isMobile={m} />
+      )}
+
+      {/* Los template-opslag modal — bereikbaar via "bewaren als template" in de
+          plannen-beheerder. Bewust apart gehouden van het opslaan-in-plan-pad. */}
+      {showPlanLibrary && (
+        <PlanLibraryModal db={db} coachId={coachId} isMobile={m}
+          weekData={weekData} planMeta={planMeta}
+          clientName={clientRecord?.first_name || ''}
+          onLoad={handleLoadSavedPlan}
+          onClose={() => setShowPlanLibrary(false)} />
       )}
 
 
