@@ -1,823 +1,372 @@
 // src/pages/TwelveWeekCheckout.jsx
-import { useState, useEffect } from 'react'
-import { Utensils, Moon, TrendingUp, Target, Shield, CheckCircle, Award, Sparkles } from 'lucide-react'
+// 12-weken checkout — EENMALIG €297. Zelfde offer/design als /maand-checkout
+// (MaandCheckout), maar met een one-time betaling i.p.v. het €99/mnd-abonnement.
+//
+// Stripe: /api/create-checkout-session (one-time), plan '12-week-program'.
+
+import { useState, useEffect, useRef } from 'react'
+import { Star, Lock, Mail, User, Phone } from 'lucide-react'
+
+// Eenmalige prijs.
+const PRICE = 297
+
+// Same Stripe publishable key as the other checkouts.
+const STRIPE_PK = 'pk_live_51Px383J3V4uXn1OktbtpW48KdDUq1ELqW9nfG19weDGHZ4qDOw8wE7jxEbNkA22T18lLJX9PFG755iWZWeAOYpd300oec67m54'
+
+const REVIEWS = [
+  { name: 'Hessel', date: 'dec 2025', text: 'Kersten begreep het meteen! Na een uitgebreide 0-meting kreeg ik een plan op maat. Van 79,8 naar 74,4 in 8 weken. Als jij je aan het plan houdt geeft Kersten altijd de volle 100%!' },
+  { name: 'Me', date: 'dec 2025', text: 'Als je hulp nodig hebt met sporten raad ik Myarc echt aan. Je krijgt een goed schema om je doel te halen en je hebt wekelijkse calls.' },
+  { name: 'Indi', date: 'dec 2025', text: 'Myarc is super! Kersten helpt me iedere week met mijn maaltijden. Professioneel, persoonlijk, betrouwbaar. Ik kan Myarc aan iedereen aanraden!' },
+  { name: 'Toon', date: 'nov 2025', text: 'Super Coach, leuke gesprekken en altijd enthousiast. Heeft me goed geholpen in mijn traject. Zeker een aanrader!' },
+  { name: 'Sassus', date: 'nov 2025', text: 'Na 100 mislukte pogingen is het mij met Kersten gelukt een routine te creëren die ik kan continueren. Hij laat je jezelf verbazen over wat je kan bereiken.' },
+  { name: 'Consumer', date: 'nov 2025', text: 'Zeer professionele aanpak! Alles duidelijk en gestructureerd in een overzichtelijke app. Feedback en motivatie op de juiste momenten. Absolute aanrader!' },
+]
+
+// Transformatie-reviews (before/after) met resultaat-tekst.
+const TRANSFORMATIONS = [
+  { src: '/review-transformatie-3.png', caption: 'Van 85 naar 78,5 (en dalend)' },
+  { src: '/review-transformatie-1.png', caption: 'Van 96 naar 84' },
+  { src: '/review-transformatie-2.png', caption: 'Van 65 naar 60,2 (& veel sterker)' },
+]
+
+// De 5 pilaren met app-screenshots + korte omschrijving (info uit de sales-pagina).
+const PILLAR_PHOTOS = [
+  { screenshot: '/sales-screenshots/eten.png',    title: 'Altijd weten wat je eet', desc: 'Vaste maaltijden en vervang-opties in de app. Weten wat je kan eten voor jouw doel.' },
+  { screenshot: '/sales-screenshots/meedoen.png', title: 'Gewoon mee blijven doen', desc: 'Feestjes, uit eten en weekenden horen erbij. Ik leer je hoe.' },
+  { screenshot: '/sales-screenshots/trainen.png', title: 'In shape in 3x per week',  desc: 'Workouts efficiënt of optimaal, thuis of in de gym. Ik maak het op maat voor jouw situatie en doelen.' },
+  { screenshot: '/sales-screenshots/tracking.png', title: 'Zie dat het werkt',       desc: 'Kracht, gewicht en foto-tracking. Zichtbaar verschil in 30 dagen.' },
+  { screenshot: '/sales-screenshots/coach.png',   title: 'Coach naast je',           desc: 'Elke week een videocall en dagelijks bereikbaar in de app.' },
+]
 
 export default function TwelveWeekCheckout() {
+  const [name, setName] = useState('')
+  const [email, setEmail] = useState('')
+  const [phone, setPhone] = useState('')
   const [loading, setLoading] = useState(false)
-  const [showContent, setShowContent] = useState(false)
-  const [hoveredOffer, setHoveredOffer] = useState(null)
-  const [hoveredGuarantee, setHoveredGuarantee] = useState(null)
+  const [error, setError] = useState('')
   const isMobile = window.innerWidth <= 768
+  const scrollRef = useRef(null)
 
+  // Auto-scroll review carousel — same vibe as the other checkout pages.
   useEffect(() => {
-    setTimeout(() => setShowContent(true), 100)
+    const el = scrollRef.current
+    if (!el) return
+    let animId, pos = 0
+    const speed = 0.4
+    const scroll = () => {
+      pos += speed
+      if (pos >= el.scrollWidth / 2) pos = 0
+      el.scrollLeft = pos
+      animId = requestAnimationFrame(scroll)
+    }
+    const pause = () => cancelAnimationFrame(animId)
+    const resume = () => { animId = requestAnimationFrame(scroll) }
+    animId = requestAnimationFrame(scroll)
+    el.addEventListener('mouseenter', pause)
+    el.addEventListener('mouseleave', resume)
+    el.addEventListener('touchstart', pause, { passive: true })
+    el.addEventListener('touchend', resume)
+    return () => {
+      cancelAnimationFrame(animId)
+      el.removeEventListener('mouseenter', pause)
+      el.removeEventListener('mouseleave', resume)
+      el.removeEventListener('touchstart', pause)
+      el.removeEventListener('touchend', resume)
+    }
   }, [])
 
-  const offers = [
-    {
-      icon: Utensils,
-      title: "Easy Meal Prep Cursus",
-      description: "Van elke dag veel tijd naar geen tijd kwijt en als een koning eten",
-      value: "€397",
-      highlight: true
-    },
-    {
-      icon: Target,
-      title: "Persoonlijk Voedingssysteem", 
-      description: "Niet perfect maar persoonlijk. Kleine aanpassingen, groot verschil",
-      value: "€297"
-    },
-    {
-      icon: Award,
-      title: "De Sleutel Tot Balans",
-      description: "Gezonder leven zonder je weekend op te offeren. Ja, alcohol kan ook",
-      value: "€197"
-    },
-    {
-      icon: Moon,
-      title: "Slaap Optimalisatie Cursus",
-      description: "Haal het meest uit je slaap, ook met drukke weken",
-      value: "€197"
-    },
-    {
-      icon: TrendingUp,
-      title: "Wekelijkse Monitoring",
-      description: "Wekelijks kijk ik mee naar voortgang en passen we aan waar nodig",
-      value: "€247"
-    },
-    {
-      icon: Sparkles,
-      title: "12 Weken Begeleiding",
-      description: "5-10 kilo vetverlies, spieren behouden of opbouwen, tijd besparen",
-      value: "€497"
+  const handleCheckout = async () => {
+    if (!name || !email) {
+      setError('Vul je naam en e-mail in')
+      return
     }
-  ]
-
-  const guarantees = [
-    {
-      icon: Target,
-      badge: "GARANTIE #1",
-      title: "Haal Je Doel",
-      subtitle: "We Gaan Door Tot Je Het Haalt",
-      description: "Haal je doel niet in 12 weken? Dan gaan we door tot je doel wel behaald is."
-    },
-    {
-      icon: CheckCircle,
-      badge: "GARANTIE #2",
-      title: "14 Dagen Niet Tevreden",
-      subtitle: "= Geld Terug",
-      description: "Binnen 14 dagen niet overtuigd? Direct je geld terug, geen vragen."
-    },
-    {
-      icon: Shield,
-      badge: "GARANTIE #3",
-      title: "Consistent Gezond Leven",
-      subtitle: "Binnen 3 Maanden",
-      description: "Binnen 3 maanden leef je consistent gezond en weet je precies hoe je elk doel kan halen. Zo niet? Volledig geld terug."
-    }
-  ]
-
-  const totalValue = offers.reduce((sum, offer) => {
-    const value = parseInt(offer.value.replace('€', ''))
-    return sum + value
-  }, 0)
-
-  const actualPrice = 297
-
-  const handleCheckout = async (formData) => {
     setLoading(true)
-    
+    setError('')
     try {
-      const response = await fetch('/api/create-checkout-session', {
+      const res = await fetch('/api/create-checkout-session', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           plan: '12-week-program',
-          price: actualPrice,
-          email: formData.email,
-          name: `${formData.firstName} ${formData.lastName}`,
-          phone: formData.phone
-        })
+          price: PRICE,
+          email: email.trim(),
+          name: name.trim(),
+          phone: phone.trim(),
+        }),
       })
-
-      const { sessionId } = await response.json()
-      
-      const stripe = window.Stripe('pk_live_51Px383J3V4uXn1OktbtpW48KdDUq1ELqW9nfG19weDGHZ4qDOw8wE7jxEbNkA22T18lLJX9PFG755iWZWeAOYpd300oec67m54')
-      await stripe.redirectToCheckout({ sessionId })
-      
-    } catch (error) {
-      console.error('Payment error:', error)
-      alert('Er ging iets mis. Probeer het opnieuw.')
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Server error')
+      if (data.sessionId) {
+        const stripe = window.Stripe(STRIPE_PK)
+        await stripe.redirectToCheckout({ sessionId: data.sessionId })
+      }
+    } catch (err) {
+      console.error('Checkout error:', err)
+      setError(err.message || 'Er ging iets mis. Probeer opnieuw.')
     } finally {
       setLoading(false)
     }
   }
 
+  const doubledReviews = [...REVIEWS, ...REVIEWS]
+
   return (
     <div style={{
-      minHeight: '100vh',
-      background: '#000',
-      opacity: showContent ? 1 : 0,
-      transition: 'opacity 0.8s ease'
+      minHeight: '100vh', background: '#000', color: '#fff',
+      fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
     }}>
-      {/* Top accent gradient */}
       <div style={{
-        position: 'fixed',
-        top: 0,
-        left: 0,
-        right: 0,
-        height: '300px',
-        background: 'radial-gradient(ellipse at top, rgba(37, 99, 235, 0.15) 0%, transparent 70%)',
-        pointerEvents: 'none',
-        zIndex: 0
-      }} />
-
-      <div style={{
-        position: 'relative',
-        zIndex: 1,
-        maxWidth: '1000px',
-        margin: '0 auto',
-        padding: isMobile ? '2rem 1rem' : '4rem 2rem'
+        maxWidth: 520, margin: '0 auto',
+        padding: isMobile ? '3.5rem 1.25rem 4.5rem' : '4.5rem 2rem 5.5rem',
       }}>
-        
-        {/* Hero Header */}
-        <div style={{
-          textAlign: 'center',
-          marginBottom: isMobile ? '2rem' : '2.5rem'
-        }}>
-          <div style={{
-            display: 'inline-block',
-            padding: '0.4rem 1rem',
-            background: 'rgba(37, 99, 235, 0.15)',
-            border: '1px solid rgba(37, 99, 235, 0.3)',
-            borderRadius: '999px',
-            marginBottom: '1rem',
-            backdropFilter: 'blur(12px)'
-          }}>
-            <p style={{
-              fontSize: isMobile ? '0.7rem' : '0.75rem',
-              color: '#3b82f6',
-              fontWeight: '700',
-              letterSpacing: '0.1em',
-              textTransform: 'uppercase',
-              margin: 0
-            }}>
-              12 Weken Transformatie
-            </p>
-          </div>
-          
+
+        {/* ══ HEADER ══ */}
+        <div style={{ textAlign: 'center', marginBottom: isMobile ? '4rem' : '5.5rem' }}>
+          <img
+            src="/ma-logo-header.png"
+            alt="MA Coaching"
+            style={{ width: isMobile ? 130 : 160, height: 'auto', display: 'block', margin: `0 auto ${isMobile ? '1.25rem' : '1.5rem'}` }}
+          />
           <h1 style={{
-            fontSize: isMobile ? '1.75rem' : '2.5rem',
-            fontWeight: '800',
-            background: 'linear-gradient(135deg, #3b82f6 0%, #60a5fa 100%)',
-            WebkitBackgroundClip: 'text',
-            WebkitTextFillColor: 'transparent',
-            backgroundClip: 'text',
-            lineHeight: '1.1',
-            marginBottom: '0.75rem',
-            letterSpacing: '-0.02em'
+            fontSize: isMobile ? '1.6rem' : '2.2rem',
+            fontWeight: 900, lineHeight: 1.15, letterSpacing: '-0.02em', margin: 0, color: '#fff',
           }}>
-            Wat Je Echt Krijgt
+            De start van jouw 3 maand <span style={{ color: '#ffba09' }}>(en levenslange)</span> transformatie
           </h1>
-          
-          <p style={{
-            fontSize: isMobile ? '0.9rem' : '1rem',
-            color: 'rgba(255, 255, 255, 0.6)',
-            fontWeight: '400',
-            lineHeight: '1.4',
-            maxWidth: '600px',
-            margin: '0 auto'
-          }}>
-            Van druk naar balans. Van moeite naar moeiteloos.
-          </p>
         </div>
 
-        {/* Offers Grid */}
+        {/* ══ TRANSFORMATIE-REVIEWS (3 before/after + resultaat) ══ */}
         <div style={{
-          display: 'grid',
-          gridTemplateColumns: isMobile ? '1fr' : 'repeat(2, 1fr)',
-          gap: isMobile ? '0.75rem' : '1rem',
-          marginBottom: isMobile ? '2rem' : '2.5rem'
+          display: 'flex', gap: isMobile ? '0.45rem' : '0.75rem', justifyContent: 'center',
+          alignItems: 'flex-start', marginBottom: isMobile ? '4rem' : '5.5rem',
         }}>
-          {offers.map((offer, index) => {
-            const Icon = offer.icon
-            const isHovered = hoveredOffer === index
-            
-            return (
-              <div
-                key={index}
-                onMouseEnter={() => !isMobile && setHoveredOffer(index)}
-                onMouseLeave={() => !isMobile && setHoveredOffer(null)}
-                style={{
-                  position: 'relative',
-                  padding: isMobile ? '1rem' : '1.25rem',
-                  background: offer.highlight
-                    ? 'linear-gradient(135deg, rgba(37, 99, 235, 0.15) 0%, rgba(37, 99, 235, 0.08) 100%)'
-                    : 'linear-gradient(135deg, rgba(37, 99, 235, 0.1) 0%, rgba(23, 23, 23, 0.8) 100%)',
-                  border: `1px solid ${offer.highlight ? 'rgba(37, 99, 235, 0.35)' : 'rgba(37, 99, 235, 0.25)'}`,
-                  borderRadius: isMobile ? '12px' : '14px',
-                  backdropFilter: 'blur(12px)',
-                  boxShadow: offer.highlight
-                    ? '0 6px 20px rgba(37, 99, 235, 0.2)'
-                    : '0 4px 12px rgba(37, 99, 235, 0.12)',
-                  overflow: 'hidden',
-                  transform: isHovered ? 'translateY(-2px)' : 'translateY(0)',
-                  transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                  touchAction: 'manipulation',
-                  WebkitTapHighlightColor: 'transparent',
-                  cursor: 'default'
-                }}
-              >
-                {/* Top accent glow */}
-                {offer.highlight && (
-                  <div style={{
-                    position: 'absolute',
-                    top: 0,
-                    left: 0,
-                    right: 0,
-                    height: '2px',
-                    background: 'linear-gradient(90deg, transparent 0%, #2563eb 50%, transparent 100%)',
-                    opacity: 0.8,
-                    zIndex: 10
-                  }} />
-                )}
+          {TRANSFORMATIONS.map((t, i) => (
+            <div key={i} style={{ flex: 1, minWidth: 0, maxWidth: isMobile ? 'none' : 165, display: 'flex', flexDirection: 'column', gap: isMobile ? 6 : 8 }}>
+              <div style={{
+                width: '100%', borderRadius: isMobile ? 10 : 14, overflow: 'hidden', aspectRatio: '4 / 5',
+                boxShadow: '0 10px 26px rgba(0,0,0,0.5)', border: '1px solid rgba(255,186,9,0.2)',
+              }}>
+                <img
+                  src={t.src}
+                  alt="Transformatie — maand 1 naar maand 3"
+                  onError={(e) => { e.currentTarget.style.opacity = 0 }}
+                  style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+                />
+              </div>
+              <span style={{
+                textAlign: 'center', color: '#fff', fontWeight: 800,
+                fontSize: isMobile ? '0.78rem' : '0.92rem', lineHeight: 1.25,
+              }}>{t.caption}</span>
+            </div>
+          ))}
+        </div>
 
+        <div style={{ marginBottom: isMobile ? '4rem' : '5.5rem' }}>
+          <div style={{
+            textAlign: 'center', color: '#fff', fontWeight: 900,
+            fontSize: isMobile ? '1.6rem' : '2rem', letterSpacing: '-0.02em',
+            lineHeight: 1.1, marginBottom: isMobile ? '1.25rem' : '1.5rem',
+          }}>Wat je krijgt</div>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: isMobile ? '0.9rem' : '1.1rem' }}>
+            {PILLAR_PHOTOS.map((p, i) => (
+              <div key={i} style={{ display: 'flex', gap: isMobile ? '0.5rem' : '0.65rem', alignItems: 'center' }}>
+                {/* Screenshot — los op de pagina, geen container */}
                 <div style={{
-                  display: 'flex',
-                  alignItems: 'flex-start',
-                  gap: isMobile ? '0.75rem' : '0.875rem'
+                  flexShrink: 0, width: isMobile ? 118 : 142,
+                  borderRadius: 10, overflow: 'hidden', display: 'flex',
+                  filter: 'drop-shadow(0 8px 16px rgba(0,0,0,0.5))',
                 }}>
-                  {/* Icon */}
-                  <div style={{
-                    minWidth: isMobile ? '42px' : '46px',
-                    height: isMobile ? '42px' : '46px',
-                    borderRadius: '10px',
-                    background: 'rgba(37, 99, 235, 0.15)',
-                    border: '1px solid rgba(37, 99, 235, 0.3)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    backdropFilter: 'blur(8px)'
-                  }}>
-                    <Icon 
-                      size={isMobile ? 20 : 22} 
-                      color="#3b82f6"
-                      strokeWidth={2.5}
-                    />
-                  </div>
-
-                  {/* Content */}
-                  <div style={{ flex: 1 }}>
-                    <div style={{
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'flex-start',
-                      marginBottom: '0.375rem'
-                    }}>
-                      <h3 style={{
-                        fontSize: isMobile ? '0.95rem' : '1.05rem',
-                        fontWeight: '700',
-                        color: offer.highlight ? '#3b82f6' : '#fff',
-                        lineHeight: '1.3',
-                        margin: 0
-                      }}>
-                        {offer.title}
-                      </h3>
-                      <span style={{
-                        fontSize: isMobile ? '0.8rem' : '0.875rem',
-                        fontWeight: '800',
-                        color: '#60a5fa',
-                        marginLeft: '0.75rem',
-                        whiteSpace: 'nowrap'
-                      }}>
-                        {offer.value}
-                      </span>
-                    </div>
-                    <p style={{
-                      fontSize: isMobile ? '0.8rem' : '0.85rem',
-                      color: 'rgba(255, 255, 255, 0.6)',
-                      lineHeight: '1.4',
-                      margin: 0
-                    }}>
-                      {offer.description}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            )
-          })}
-        </div>
-
-        {/* Price Section */}
-        <div style={{
-          position: 'relative',
-          padding: isMobile ? '2rem 1.5rem' : '2.5rem 2rem',
-          background: 'linear-gradient(135deg, rgba(37, 99, 235, 0.12) 0%, rgba(23, 23, 23, 0.9) 100%)',
-          border: '2px solid rgba(37, 99, 235, 0.3)',
-          borderRadius: isMobile ? '16px' : '20px',
-          backdropFilter: 'blur(16px)',
-          boxShadow: '0 12px 40px rgba(37, 99, 235, 0.25)',
-          overflow: 'hidden',
-          marginBottom: isMobile ? '3rem' : '4rem'
-        }}>
-          {/* Top accent */}
-          <div style={{
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            right: 0,
-            height: '3px',
-            background: 'linear-gradient(90deg, transparent 0%, #2563eb 50%, transparent 100%)',
-            opacity: 0.8,
-            zIndex: 10
-          }} />
-
-          <div style={{
-            textAlign: 'center'
-          }}>
-            <p style={{
-              fontSize: isMobile ? '0.8rem' : '0.9rem',
-              color: 'rgba(255, 255, 255, 0.5)',
-              marginBottom: '0.75rem',
-              textTransform: 'uppercase',
-              letterSpacing: '0.1em',
-              fontWeight: '600'
-            }}>
-              Totale Waarde
-            </p>
-            
-            <div style={{
-              fontSize: isMobile ? '2rem' : '2.5rem',
-              fontWeight: '800',
-              color: 'rgba(255, 255, 255, 0.4)',
-              textDecoration: 'line-through',
-              marginBottom: '0.5rem'
-            }}>
-              €{totalValue}
-            </div>
-
-            <div style={{
-              marginBottom: '1rem'
-            }}>
-              <div style={{
-                fontSize: isMobile ? '3rem' : '4rem',
-                fontWeight: '900',
-                background: 'linear-gradient(135deg, #3b82f6 0%, #60a5fa 100%)',
-                WebkitBackgroundClip: 'text',
-                WebkitTextFillColor: 'transparent',
-                backgroundClip: 'text',
-                lineHeight: '1'
-              }}>
-                €{actualPrice}
-              </div>
-            </div>
-
-            <p style={{
-              fontSize: isMobile ? '0.9rem' : '1rem',
-              color: '#3b82f6',
-              fontWeight: '700',
-              margin: 0
-            }}>
-              Eenmalige investering • Start direct
-            </p>
-          </div>
-        </div>
-
-        {/* Guarantees Section */}
-        <div style={{
-          marginBottom: isMobile ? '3rem' : '4rem'
-        }}>
-          <div style={{
-            textAlign: 'center',
-            marginBottom: isMobile ? '2.5rem' : '3rem'
-          }}>
-            <h2 style={{
-              fontSize: isMobile ? '1.75rem' : '2.25rem',
-              fontWeight: '800',
-              color: '#fff',
-              marginBottom: '0.75rem'
-            }}>
-              3 IJzersterke Garanties
-            </h2>
-            <p style={{
-              fontSize: isMobile ? '1rem' : '1.125rem',
-              color: 'rgba(255, 255, 255, 0.6)',
-              margin: 0
-            }}>
-              Je kunt letterlijk niet verliezen
-            </p>
-          </div>
-
-          {/* Guarantees - Vertical on mobile */}
-          <div style={{
-            display: isMobile ? 'block' : 'grid',
-            gridTemplateColumns: isMobile ? 'none' : 'repeat(3, 1fr)',
-            gap: isMobile ? '0' : '1.25rem'
-          }}>
-            {guarantees.map((guarantee, index) => {
-              const Icon = guarantee.icon
-              const isHovered = hoveredGuarantee === index
-              
-              return (
-                <div
-                  key={index}
-                  onMouseEnter={() => !isMobile && setHoveredGuarantee(index)}
-                  onMouseLeave={() => !isMobile && setHoveredGuarantee(null)}
-                  style={{
-                    position: 'relative',
-                    padding: isMobile ? '2rem 1.5rem' : '2rem 1.75rem',
-                    background: 'linear-gradient(135deg, rgba(37, 99, 235, 0.1) 0%, rgba(23, 23, 23, 0.8) 100%)',
-                    border: `1px solid ${isHovered ? 'rgba(37, 99, 235, 0.35)' : 'rgba(37, 99, 235, 0.25)'}`,
-                    borderRadius: isMobile ? '14px' : '16px',
-                    backdropFilter: 'blur(12px)',
-                    boxShadow: isHovered
-                      ? '0 8px 24px rgba(37, 99, 235, 0.25)'
-                      : '0 4px 16px rgba(37, 99, 235, 0.15)',
-                    overflow: 'hidden',
-                    transform: isHovered ? 'translateY(-4px)' : 'translateY(0)',
-                    transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                    touchAction: 'manipulation',
-                    WebkitTapHighlightColor: 'transparent',
-                    cursor: 'default',
-                    marginBottom: isMobile ? '1.5rem' : '0',
-                    textAlign: 'center'
-                  }}
-                >
-                  {/* Top accent */}
-                  <div style={{
-                    position: 'absolute',
-                    top: 0,
-                    left: 0,
-                    right: 0,
-                    height: '2px',
-                    background: 'linear-gradient(90deg, transparent 0%, #2563eb 50%, transparent 100%)',
-                    opacity: 0.6,
-                    zIndex: 10
-                  }} />
-
-                  {/* Badge */}
-                  <div style={{
-                    display: 'inline-block',
-                    padding: '0.4rem 1rem',
-                    background: 'linear-gradient(135deg, #2563eb 0%, #3b82f6 100%)',
-                    borderRadius: '999px',
-                    fontSize: isMobile ? '0.65rem' : '0.7rem',
-                    fontWeight: '800',
-                    color: '#fff',
-                    letterSpacing: '0.08em',
-                    whiteSpace: 'nowrap',
-                    boxShadow: '0 4px 12px rgba(37, 99, 235, 0.4)',
-                    marginBottom: '1.25rem'
-                  }}>
-                    {guarantee.badge}
-                  </div>
-
-                  {/* Icon */}
-                  <div style={{
-                    width: isMobile ? '56px' : '60px',
-                    height: isMobile ? '56px' : '60px',
-                    margin: '0 auto 1.25rem',
-                    borderRadius: '14px',
-                    background: 'rgba(37, 99, 235, 0.15)',
-                    border: '1px solid rgba(37, 99, 235, 0.3)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    backdropFilter: 'blur(8px)'
-                  }}>
-                    <Icon 
-                      size={isMobile ? 28 : 30} 
-                      color="#3b82f6"
-                      strokeWidth={2.5}
-                    />
-                  </div>
-
-                  {/* Content */}
-                  <h3 style={{
-                    fontSize: isMobile ? '1.125rem' : '1.25rem',
-                    fontWeight: '800',
-                    color: '#fff',
-                    marginBottom: '0.5rem',
-                    textAlign: 'center',
-                    lineHeight: '1.2'
-                  }}>
-                    {guarantee.title}
-                  </h3>
-
-                  <p style={{
-                    fontSize: isMobile ? '0.9rem' : '1rem',
-                    fontWeight: '700',
-                    color: '#3b82f6',
-                    marginBottom: '1rem',
-                    textAlign: 'center'
-                  }}>
-                    {guarantee.subtitle}
-                  </p>
-
-                  <p style={{
-                    fontSize: isMobile ? '0.85rem' : '0.9rem',
-                    color: 'rgba(255, 255, 255, 0.6)',
-                    lineHeight: '1.6',
-                    textAlign: 'center',
-                    margin: 0
-                  }}>
-                    {guarantee.description}
-                  </p>
-                </div>
-              )
-            })}
-          </div>
-
-          {/* Bottom guarantee text */}
-          <div style={{
-            textAlign: 'center',
-            marginTop: isMobile ? '2rem' : '2.5rem',
-            padding: isMobile ? '1.5rem' : '2rem',
-            background: 'rgba(37, 99, 235, 0.06)',
-            border: '1px solid rgba(37, 99, 235, 0.2)',
-            borderRadius: isMobile ? '14px' : '16px',
-            backdropFilter: 'blur(12px)'
-          }}>
-            <p style={{
-              fontSize: isMobile ? '1.125rem' : '1.25rem',
-              color: '#fff',
-              fontWeight: '700',
-              marginBottom: '0.5rem'
-            }}>
-              Geen kleine lettertjes. Geen gedoe.
-            </p>
-            <p style={{
-              fontSize: isMobile ? '0.9rem' : '1rem',
-              color: 'rgba(255, 255, 255, 0.6)',
-              margin: 0
-            }}>
-              100% risico-vrij • Direct starten • Volledige support
-            </p>
-          </div>
-        </div>
-
-        {/* Form Section */}
-        <div style={{
-          maxWidth: '600px',
-          margin: '0 auto',
-          marginBottom: isMobile ? '2rem' : '3rem'
-        }}>
-          <div style={{
-            padding: isMobile ? '2rem 1.5rem' : '2.5rem 2rem',
-            background: 'linear-gradient(135deg, rgba(37, 99, 235, 0.08) 0%, rgba(23, 23, 23, 0.8) 100%)',
-            border: '1px solid rgba(37, 99, 235, 0.25)',
-            borderRadius: isMobile ? '16px' : '20px',
-            backdropFilter: 'blur(12px)',
-            boxShadow: '0 8px 24px rgba(37, 99, 235, 0.15)'
-          }}>
-            <h3 style={{
-              fontSize: isMobile ? '1.25rem' : '1.5rem',
-              fontWeight: '800',
-              color: '#fff',
-              textAlign: 'center',
-              marginBottom: isMobile ? '1.5rem' : '2rem'
-            }}>
-              Jouw Gegevens
-            </h3>
-
-            <form onSubmit={(e) => {
-              e.preventDefault()
-              const formData = new FormData(e.target)
-              handleCheckout({
-                firstName: formData.get('firstName'),
-                lastName: formData.get('lastName'),
-                email: formData.get('email'),
-                phone: formData.get('phone')
-              })
-            }}>
-              {/* Name Row */}
-              <div style={{
-                display: 'grid',
-                gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr',
-                gap: isMobile ? '1rem' : '1rem',
-                marginBottom: '1rem'
-              }}>
-                <div>
-                  <label style={{
-                    display: 'block',
-                    fontSize: isMobile ? '0.8rem' : '0.85rem',
-                    fontWeight: '600',
-                    color: 'rgba(255, 255, 255, 0.7)',
-                    marginBottom: '0.5rem',
-                    letterSpacing: '0.02em'
-                  }}>
-                    Voornaam
-                  </label>
-                  <input
-                    type="text"
-                    name="firstName"
-                    required
-                    style={{
-                      width: '100%',
-                      padding: isMobile ? '0.875rem' : '1rem',
-                      background: 'rgba(37, 99, 235, 0.06)',
-                      border: '1px solid rgba(37, 99, 235, 0.25)',
-                      borderRadius: isMobile ? '10px' : '12px',
-                      color: '#fff',
-                      fontSize: isMobile ? '0.9rem' : '0.95rem',
-                      outline: 'none',
-                      transition: 'all 0.3s ease',
-                      backdropFilter: 'blur(8px)',
-                      touchAction: 'manipulation',
-                      WebkitTapHighlightColor: 'transparent'
-                    }}
-                    onFocus={(e) => {
-                      e.target.style.borderColor = 'rgba(37, 99, 235, 0.4)'
-                      e.target.style.background = 'rgba(37, 99, 235, 0.1)'
-                    }}
-                    onBlur={(e) => {
-                      e.target.style.borderColor = 'rgba(37, 99, 235, 0.25)'
-                      e.target.style.background = 'rgba(37, 99, 235, 0.06)'
-                    }}
+                  <img
+                    src={p.screenshot}
+                    alt={p.title}
+                    onError={(e) => { e.currentTarget.style.opacity = 0 }}
+                    style={{ width: '100%', height: 'auto', display: 'block' }}
                   />
                 </div>
 
-                <div>
-                  <label style={{
-                    display: 'block',
-                    fontSize: isMobile ? '0.8rem' : '0.85rem',
-                    fontWeight: '600',
-                    color: 'rgba(255, 255, 255, 0.7)',
-                    marginBottom: '0.5rem',
-                    letterSpacing: '0.02em'
-                  }}>
-                    Achternaam
-                  </label>
-                  <input
-                    type="text"
-                    name="lastName"
-                    required
-                    style={{
-                      width: '100%',
-                      padding: isMobile ? '0.875rem' : '1rem',
-                      background: 'rgba(37, 99, 235, 0.06)',
-                      border: '1px solid rgba(37, 99, 235, 0.25)',
-                      borderRadius: isMobile ? '10px' : '12px',
-                      color: '#fff',
-                      fontSize: isMobile ? '0.9rem' : '0.95rem',
-                      outline: 'none',
-                      transition: 'all 0.3s ease',
-                      backdropFilter: 'blur(8px)',
-                      touchAction: 'manipulation',
-                      WebkitTapHighlightColor: 'transparent'
-                    }}
-                    onFocus={(e) => {
-                      e.target.style.borderColor = 'rgba(37, 99, 235, 0.4)'
-                      e.target.style.background = 'rgba(37, 99, 235, 0.1)'
-                    }}
-                    onBlur={(e) => {
-                      e.target.style.borderColor = 'rgba(37, 99, 235, 0.25)'
-                      e.target.style.background = 'rgba(37, 99, 235, 0.06)'
-                    }}
-                  />
+                {/* Titel + korte omschrijving (wit) */}
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{
+                    fontSize: isMobile ? '0.95rem' : '1.05rem', fontWeight: 800,
+                    color: '#fff', lineHeight: 1.2, marginBottom: 3,
+                  }}><span style={{ color: '#ffba09' }}>{i + 1}.</span> {p.title}</div>
+                  <p style={{
+                    margin: 0, fontSize: isMobile ? '0.78rem' : '0.85rem',
+                    color: 'rgba(255,255,255,0.85)', fontWeight: 500, lineHeight: 1.4,
+                  }}>{p.desc}</p>
                 </div>
               </div>
+            ))}
+          </div>
+        </div>
 
-              {/* Email */}
-              <div style={{ marginBottom: '1rem' }}>
-                <label style={{
-                  display: 'block',
-                  fontSize: isMobile ? '0.8rem' : '0.85rem',
-                  fontWeight: '600',
-                  color: 'rgba(255, 255, 255, 0.7)',
-                  marginBottom: '0.5rem',
-                  letterSpacing: '0.02em'
-                }}>
-                  Email
-                </label>
-                <input
-                  type="email"
-                  name="email"
-                  required
-                  style={{
-                    width: '100%',
-                    padding: isMobile ? '0.875rem' : '1rem',
-                    background: 'rgba(37, 99, 235, 0.06)',
-                    border: '1px solid rgba(37, 99, 235, 0.25)',
-                    borderRadius: isMobile ? '10px' : '12px',
-                    color: '#fff',
-                    fontSize: isMobile ? '0.9rem' : '0.95rem',
-                    outline: 'none',
-                    transition: 'all 0.3s ease',
-                    backdropFilter: 'blur(8px)',
-                    touchAction: 'manipulation',
-                    WebkitTapHighlightColor: 'transparent'
-                  }}
-                  onFocus={(e) => {
-                    e.target.style.borderColor = 'rgba(37, 99, 235, 0.4)'
-                    e.target.style.background = 'rgba(37, 99, 235, 0.1)'
-                  }}
-                  onBlur={(e) => {
-                    e.target.style.borderColor = 'rgba(37, 99, 235, 0.25)'
-                    e.target.style.background = 'rgba(37, 99, 235, 0.06)'
-                  }}
-                />
-              </div>
+        {/* ══ OFFER — compacte platte tekst (sales-stijl, geen card) ══ */}
+        <div style={{ textAlign: 'center', marginBottom: isMobile ? '4rem' : '5.5rem' }}>
+          {/* Prijs — eenmalig €297 */}
+          <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'center', gap: 5 }}>
+            <span style={{ fontSize: isMobile ? '2.9rem' : '3.4rem', fontWeight: 900, color: '#fff', lineHeight: 1, letterSpacing: '-0.02em' }}>€297</span>
+          </div>
+          <div style={{ fontSize: isMobile ? '0.82rem' : '0.9rem', color: 'rgba(255,255,255,0.45)', fontWeight: 600, marginTop: 8 }}>
+            Eenmalig · <span style={{ color: '#fff', fontWeight: 800 }}>het volledige 3-maanden traject</span>
+          </div>
 
-              {/* Phone */}
-              <div style={{ marginBottom: '2rem' }}>
-                <label style={{
-                  display: 'block',
-                  fontSize: isMobile ? '0.8rem' : '0.85rem',
-                  fontWeight: '600',
-                  color: 'rgba(255, 255, 255, 0.7)',
-                  marginBottom: '0.5rem',
-                  letterSpacing: '0.02em'
-                }}>
-                  Telefoonnummer
-                </label>
-                <input
-                  type="tel"
-                  name="phone"
-                  required
-                  style={{
-                    width: '100%',
-                    padding: isMobile ? '0.875rem' : '1rem',
-                    background: 'rgba(37, 99, 235, 0.06)',
-                    border: '1px solid rgba(37, 99, 235, 0.25)',
-                    borderRadius: isMobile ? '10px' : '12px',
-                    color: '#fff',
-                    fontSize: isMobile ? '0.9rem' : '0.95rem',
-                    outline: 'none',
-                    transition: 'all 0.3s ease',
-                    backdropFilter: 'blur(8px)',
-                    touchAction: 'manipulation',
-                    WebkitTapHighlightColor: 'transparent'
-                  }}
-                  onFocus={(e) => {
-                    e.target.style.borderColor = 'rgba(37, 99, 235, 0.4)'
-                    e.target.style.background = 'rgba(37, 99, 235, 0.1)'
-                  }}
-                  onBlur={(e) => {
-                    e.target.style.borderColor = 'rgba(37, 99, 235, 0.25)'
-                    e.target.style.background = 'rgba(37, 99, 235, 0.06)'
-                  }}
-                />
-              </div>
+          {/* Garantie — de belofte in goud, zoals de sales-pagina */}
+          <div style={{ fontSize: isMobile ? '1.05rem' : '1.2rem', color: '#fff', fontWeight: 700, lineHeight: 1.45, maxWidth: 470, margin: isMobile ? '1.6rem auto 0' : '2rem auto 0' }}>
+            Geen zichtbaar verschil binnen 30 dagen?{' '}
+            <span style={{ color: '#ffba09' }}>Dan krijg je je investering terug en loop je weg met 30 dagen gratis coaching.</span>
+          </div>
+        </div>
 
-              {/* Submit Button */}
-              <button
-                type="submit"
-                disabled={loading}
+        {/* ══ CHECKOUT FORM ══ */}
+        <div style={{
+          borderRadius: isMobile ? 16 : 18,
+          border: '1px solid rgba(255,255,255,0.08)',
+          background: 'rgba(255,255,255,0.02)',
+          padding: isMobile ? '1.5rem 1.25rem' : '1.75rem 1.5rem',
+          marginBottom: isMobile ? '4rem' : '5.5rem',
+        }}>
+          <div style={{
+            fontSize: isMobile ? '0.85rem' : '0.9rem',
+            fontWeight: 800, color: '#fff', marginBottom: '1rem',
+          }}>Jouw gegevens</div>
+
+          {[
+            { icon: User,  value: name,  set: setName,  placeholder: 'Je naam',                      type: 'text' },
+            { icon: Mail,  value: email, set: setEmail, placeholder: 'Je e-mailadres',               type: 'email' },
+            { icon: Phone, value: phone, set: setPhone, placeholder: 'Je telefoonnummer (optioneel)', type: 'tel' },
+          ].map((field, idx) => (
+            <div key={idx} style={{
+              display: 'flex', alignItems: 'center', gap: '0.6rem',
+              padding: isMobile ? '0.7rem 0.85rem' : '0.8rem 1rem',
+              borderRadius: 12,
+              border: '1px solid rgba(255,255,255,0.08)',
+              background: 'rgba(255,255,255,0.03)',
+              marginBottom: '0.6rem',
+            }}>
+              <field.icon size={16} color="rgba(255,186,9,0.5)" strokeWidth={2} />
+              <input
+                type={field.type}
+                placeholder={field.placeholder}
+                value={field.value}
+                onChange={e => field.set(e.target.value)}
                 style={{
-                  width: '100%',
-                  padding: isMobile ? '1.125rem' : '1.25rem',
-                  background: loading
-                    ? 'rgba(37, 99, 235, 0.1)'
-                    : 'linear-gradient(135deg, rgba(37, 99, 235, 0.25) 0%, rgba(37, 99, 235, 0.15) 100%)',
-                  border: `2px solid ${loading ? 'rgba(37, 99, 235, 0.2)' : 'rgba(37, 99, 235, 0.4)'}`,
-                  borderRadius: isMobile ? '12px' : '14px',
-                  color: loading ? 'rgba(59, 130, 246, 0.5)' : '#3b82f6',
-                  fontSize: isMobile ? '1rem' : '1.125rem',
-                  fontWeight: '800',
-                  cursor: loading ? 'not-allowed' : 'pointer',
-                  transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                  backdropFilter: 'blur(12px)',
-                  boxShadow: loading
-                    ? 'none'
-                    : '0 8px 24px rgba(37, 99, 235, 0.3)',
-                  touchAction: 'manipulation',
-                  WebkitTapHighlightColor: 'transparent',
-                  minHeight: '56px',
-                  letterSpacing: '0.02em',
-                  textTransform: 'uppercase',
-                  opacity: loading ? 0.6 : 1
+                  flex: 1, background: 'none', border: 'none', outline: 'none',
+                  color: '#fff', fontSize: isMobile ? '0.85rem' : '0.9rem',
+                  fontWeight: 500, fontFamily: 'inherit',
                 }}
-                onMouseEnter={(e) => {
-                  if (!loading && !isMobile) {
-                    e.currentTarget.style.transform = 'translateY(-2px)'
-                    e.currentTarget.style.boxShadow = '0 12px 32px rgba(37, 99, 235, 0.4)'
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  if (!loading && !isMobile) {
-                    e.currentTarget.style.transform = 'translateY(0)'
-                    e.currentTarget.style.boxShadow = '0 8px 24px rgba(37, 99, 235, 0.3)'
-                  }
-                }}
-              >
-                {loading ? 'Bezig met laden...' : 'Start Nu Voor €297'}
-              </button>
-            </form>
+              />
+            </div>
+          ))}
+
+          {error && (
+            <div style={{
+              fontSize: isMobile ? '0.75rem' : '0.8rem',
+              color: '#ef4444', fontWeight: 600,
+              marginBottom: '0.75rem', marginTop: '0.25rem',
+            }}>{error}</div>
+          )}
+
+          <button
+            onClick={handleCheckout}
+            disabled={loading}
+            style={{
+              width: '100%',
+              padding: isMobile ? '1rem' : '1.1rem',
+              borderRadius: 12, border: 'none',
+              background: loading ? 'rgba(255,186,9,0.3)' : 'linear-gradient(135deg, #ffba09, #e8a800)',
+              color: '#000',
+              fontSize: isMobile ? '0.9rem' : '0.95rem',
+              fontWeight: 900,
+              cursor: loading ? 'not-allowed' : 'pointer',
+              transition: 'all 0.3s ease',
+              marginTop: '0.5rem', minHeight: 52,
+              boxShadow: loading ? 'none' : '0 4px 20px rgba(255,186,9,0.3)',
+              touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+              letterSpacing: '0.01em',
+            }}
+          >
+            {loading ? 'Even geduld...' : 'Start Nu · €297'}
+          </button>
+
+          <div style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            gap: '0.4rem', marginTop: '0.85rem',
+          }}>
+            <Lock size={12} color="rgba(255,255,255,0.25)" />
+            <span style={{
+              fontSize: isMobile ? '0.65rem' : '0.7rem',
+              color: 'rgba(255,255,255,0.25)', fontWeight: 500,
+            }}>Veilig betalen via Stripe · SSL beveiligd</span>
           </div>
         </div>
 
-        {/* Trust signals */}
-        <div style={{
-          textAlign: 'center'
-        }}>
-          <p style={{
-            fontSize: isMobile ? '0.8rem' : '0.85rem',
-            color: 'rgba(255, 255, 255, 0.4)',
-            margin: 0
+        {/* ══ REVIEWS ══ */}
+        <div style={{ marginBottom: '1rem' }}>
+          <div style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            gap: '0.5rem', marginBottom: isMobile ? '0.85rem' : '1rem',
           }}>
-            🔒 Veilig betalen via Stripe • SSL Beveiligd
-          </p>
+            <div style={{ display: 'flex', gap: 2 }}>
+              {[1,2,3,4,5].map(i => (
+                <Star key={i} size={isMobile ? 14 : 16} fill="#ffba09" color="#ffba09" strokeWidth={0} />
+              ))}
+            </div>
+            <span style={{
+              fontSize: isMobile ? '0.7rem' : '0.75rem',
+              color: 'rgba(255,255,255,0.35)', fontWeight: 600,
+            }}>Beoordeeld op Trustpilot</span>
+          </div>
+
+          <div
+            ref={scrollRef}
+            style={{
+              display: 'flex', gap: isMobile ? '0.75rem' : '1rem',
+              overflow: 'hidden', cursor: 'grab',
+              marginLeft: isMobile ? '-1.25rem' : '-2rem',
+              marginRight: isMobile ? '-1.25rem' : '-2rem',
+              paddingLeft: isMobile ? '1.25rem' : '2rem',
+              paddingRight: isMobile ? '1.25rem' : '2rem',
+            }}
+          >
+            {doubledReviews.map((review, idx) => (
+              <div key={idx} style={{
+                minWidth: isMobile ? 240 : 280, maxWidth: isMobile ? 240 : 280,
+                padding: isMobile ? '0.85rem 1rem' : '1rem 1.15rem',
+                borderRadius: 12,
+                border: '1px solid rgba(255,255,255,0.06)',
+                background: 'rgba(255,255,255,0.02)',
+                flexShrink: 0,
+              }}>
+                <div style={{ display: 'flex', gap: 2, marginBottom: '0.5rem' }}>
+                  {[1,2,3,4,5].map(s => (
+                    <Star key={s} size={11} fill="#ffba09" color="#ffba09" strokeWidth={0} />
+                  ))}
+                </div>
+                <p style={{
+                  fontSize: isMobile ? '0.7rem' : '0.75rem',
+                  color: 'rgba(255,255,255,0.45)', fontWeight: 500,
+                  lineHeight: 1.5, marginBottom: '0.6rem',
+                  display: '-webkit-box', WebkitLineClamp: 3,
+                  WebkitBoxOrient: 'vertical', overflow: 'hidden',
+                }}>{review.text}</p>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                    <div style={{
+                      width: 24, height: 24, borderRadius: '50%',
+                      background: 'rgba(255,186,9,0.1)', border: '1px solid rgba(255,186,9,0.2)',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      fontSize: '0.6rem', fontWeight: 800, color: '#ffba09',
+                    }}>{review.name.charAt(0)}</div>
+                    <span style={{ fontSize: isMobile ? '0.65rem' : '0.7rem', fontWeight: 700, color: 'rgba(255,255,255,0.5)' }}>
+                      {review.name}
+                    </span>
+                  </div>
+                  <span style={{ fontSize: '0.55rem', color: 'rgba(255,255,255,0.2)' }}>{review.date}</span>
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
 
       </div>
