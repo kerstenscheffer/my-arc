@@ -317,6 +317,7 @@ function renderSections(sections, data) {
 export default function IntakeSummaryModal({ db, client, isMobile, onClose }) {
   const [activeTab, setActiveTab] = useState('part1')
   const [training, setTraining] = useState(null)
+  const [clientTraining, setClientTraining] = useState(null)
   const [loadingTraining, setLoadingTraining] = useState(true)
 
   useEffect(() => {
@@ -324,17 +325,28 @@ export default function IntakeSummaryModal({ db, client, isMobile, onClose }) {
     const loadTraining = async () => {
       setLoadingTraining(true)
       try {
-        const ids = [client?.auth_user_id, client?.id].filter(Boolean)
-        if (!ids.length || !db?.supabase) {
+        if (!client?.id || !db?.supabase) {
           if (!cancelled) setTraining(null)
           return
         }
-        const { data, error } = await db.supabase
+        // user_workout_preferences.user_id = auth_user_id. Het klantobject
+        // bevat auth_user_id niet altijd (bv. vanuit het Command Center), en
+        // sommige intakes schrijven de training-antwoorden alleen naar de
+        // clients-kolommen. Daarom halen we die rij hier op: voor auth_user_id
+        // én als fallback-bron voor de training-velden.
+        const { data: c } = await db.supabase
+          .from('clients')
+          .select('auth_user_id, training_experience, training_days, workout_days_per_week, preferred_training_days, training_time, training_info')
+          .eq('id', client.id).single()
+        if (!cancelled) setClientTraining(c || null)
+        const authUserId = client?.auth_user_id || c?.auth_user_id || null
+        const ids = [authUserId, client.id].filter(Boolean)
+        const { data, error } = ids.length ? await db.supabase
           .from('user_workout_preferences')
           .select('*')
           .in('user_id', ids)
           .order('workout_completed_at', { ascending: false, nullsFirst: false })
-          .limit(1)
+          .limit(1) : { data: null, error: null }
         if (error) throw error
         if (!cancelled) setTraining(data?.[0] || null)
       } catch (e) {
@@ -350,19 +362,34 @@ export default function IntakeSummaryModal({ db, client, isMobile, onClose }) {
     }
   }, [client?.id, client?.auth_user_id, db])
 
-  // training data flattened voor de renderer (split_preferences is genest)
-  const trainingData = training
+  // Fallback vanuit de clients-kolommen → op de uwp-veldnamen die de renderer
+  // gebruikt. Sommige intakes vullen alleen deze kolommen (geen uwp-rij), dan
+  // zou de Training-tab anders leeg blijven.
+  const clientFallback = clientTraining
     ? {
-        ...training,
-        _split_pref: training.split_preferences?.preferred,
-        _split_focus: training.split_preferences?.focus
+        default_experience_level: clientTraining.training_experience || undefined,
+        default_days_per_week: clientTraining.training_days ?? clientTraining.workout_days_per_week ?? undefined,
+        training_time: clientTraining.training_time || undefined,
+        other_limitations: clientTraining.training_info || undefined,
+      }
+    : {}
+
+  // Merge: uwp-waarden winnen, clients-kolommen vullen de gaten. Zo werkt de
+  // Training-tab of de data nu in user_workout_preferences of op clients staat.
+  const merged = { ...clientFallback, ...(training || {}) }
+  const hasTrainingData = Object.values(merged).some(v => v !== undefined && v !== null && v !== '')
+  const trainingData = hasTrainingData
+    ? {
+        ...merged,
+        _split_pref: training?.split_preferences?.preferred,
+        _split_focus: training?.split_preferences?.focus
       }
     : null
 
   const tabs = [
     { id: 'part1', label: 'Persoonlijk', icon: User, done: client?.intake_completed },
     { id: 'part2', label: 'Voeding', icon: Utensils, done: client?.intake_completed },
-    { id: 'part3', label: 'Training', icon: Dumbbell, done: training?.workout_completed }
+    { id: 'part3', label: 'Training', icon: Dumbbell, done: training?.workout_completed || (hasTrainingData && client?.intake_completed) }
   ]
 
   const fullName = [client?.first_name, client?.last_name].filter(Boolean).join(' ') || 'Client'
