@@ -92,6 +92,16 @@ export default function TwelveWeekCheckout() {
 
   const scrollToOffer = () => offerRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
 
+  // Elke sectie vult (min.) een heel scherm en centreert z'n inhoud verticaal,
+  // zodat je één sectie tegelijk ziet. Langere secties groeien gewoon mee.
+  const screen = {
+    minHeight: isMobile ? '100dvh' : '100vh',
+    display: 'flex', flexDirection: 'column', justifyContent: 'center',
+    scrollSnapAlign: 'start',
+    paddingTop: isMobile ? '1.5rem' : '2rem',
+    paddingBottom: isMobile ? '1.5rem' : '2rem',
+  }
+
   // Auto-scroll review carousel — same vibe as the other checkout pages.
   useEffect(() => {
     const el = scrollRef.current
@@ -167,7 +177,7 @@ export default function TwelveWeekCheckout() {
     }}>
       <div style={{
         maxWidth: 520, margin: '0 auto',
-        padding: isMobile ? '3.5rem 1.25rem 4.5rem' : '4.5rem 2rem 5.5rem',
+        padding: isMobile ? '0 1.25rem' : '0 2rem',
       }}>
 
         {/* ══ Zwevende "Investering"-knop — begeleidt naar de prijs/offer ══ */}
@@ -187,8 +197,9 @@ export default function TwelveWeekCheckout() {
           </button>
         )}
 
-        {/* ══ HERO (gelijk aan /sales) ══ */}
-        <div style={{ textAlign: 'center', marginBottom: isMobile ? '1.5rem' : '1.75rem', scrollSnapAlign: 'start' }}>
+        {/* ══ SCHERM 1: HERO ══ */}
+        <div style={screen}>
+        <div style={{ textAlign: 'center', marginBottom: isMobile ? '1.5rem' : '1.75rem' }}>
           <img
             src="/ma-logo-header.png"
             alt="MA Coaching"
@@ -235,7 +246,6 @@ export default function TwelveWeekCheckout() {
         <div style={{
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           gap: '0.5rem', marginTop: isMobile ? '1.25rem' : '1.5rem',
-          marginBottom: isMobile ? '4rem' : '5.5rem',
         }}>
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
             <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" fill={TP_GREEN}/>
@@ -251,7 +261,10 @@ export default function TwelveWeekCheckout() {
           </div>
         </div>
 
-        <div style={{ marginBottom: isMobile ? '4rem' : '5.5rem', scrollSnapAlign: 'start' }}>
+        </div>{/* /scherm 1 hero */}
+
+        {/* ══ SCHERM 2: WAT JE KRIJGT ══ */}
+        <div style={screen}>
           <div style={{
             textAlign: 'center', color: '#fff', fontWeight: 900,
             fontSize: isMobile ? '1.6rem' : '2rem', letterSpacing: '-0.02em',
@@ -328,8 +341,8 @@ export default function TwelveWeekCheckout() {
           </div>
         </div>
 
-        {/* ══ OFFER — compacte platte tekst (sales-stijl, geen card) ══ */}
-        <div ref={offerRef} style={{ textAlign: 'center', marginBottom: isMobile ? '4rem' : '5.5rem', scrollSnapAlign: 'start' }}>
+        {/* ══ SCHERM 3: OFFER ══ */}
+        <div ref={offerRef} style={{ ...screen, textAlign: 'center' }}>
           {/* Prijs — eenmalig €297 */}
           <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'center', gap: 5 }}>
             <span style={{ fontSize: isMobile ? '2.9rem' : '3.4rem', fontWeight: 900, color: '#fff', lineHeight: 1, letterSpacing: '-0.02em' }}>€297</span>
@@ -345,9 +358,9 @@ export default function TwelveWeekCheckout() {
           <div style={{ width: 56, height: 3, background: '#ffba09', borderRadius: 2, margin: isMobile ? '1.1rem auto 0' : '1.25rem auto 0' }} />
         </div>
 
-        {/* ══ CHECKOUT FORM ══ */}
+        {/* ══ SCHERM 4: FORMULIER ══ */}
+        <div style={screen}>
         <div style={{
-          scrollSnapAlign: 'start',
           borderRadius: isMobile ? 16 : 18,
           border: '1px solid rgba(255,255,255,0.08)',
           background: 'rgba(255,255,255,0.02)',
@@ -429,8 +442,10 @@ export default function TwelveWeekCheckout() {
           </div>
         </div>
 
-        {/* ══ REVIEWS ══ */}
-        <div style={{ marginBottom: '1rem', scrollSnapAlign: 'start' }}>
+        </div>{/* /scherm 4 formulier */}
+
+        {/* ══ SCHERM 5: REVIEWS ══ */}
+        <div style={screen}>
           <div style={{
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             gap: '0.5rem', marginBottom: isMobile ? '0.85rem' : '1rem',
