@@ -61,7 +61,7 @@ const PILAREN = [
       { label: 'Ik kijk mee', text: "gewicht, kracht en foto's, progressie zwart-op-wit" },
     ],
     images: ['/sales-screenshots/coach.png', '/sales-screenshots/tracking.png'],
-    quote: { text: 'Dit was voor mij het sterkste onderdeel.', author: 'klant, 3 maanden afgerond' },
+    quote: { text: 'Dit was voor mij het sterkste onderdeel.', author: 'Nitish, 3 maanden afgerond' },
   },
 ]
 
@@ -298,11 +298,11 @@ export default function TwelveWeekCheckout() {
             Eenmalig · <span style={{ color: '#fff', fontWeight: 800 }}>het volledige 3-maanden traject</span>
           </div>
 
-          {/* Garantie — de belofte in goud, zoals de sales-pagina */}
-          <div style={{ fontSize: isMobile ? '1.05rem' : '1.2rem', color: '#fff', fontWeight: 700, lineHeight: 1.45, maxWidth: 470, margin: isMobile ? '1.6rem auto 0' : '2rem auto 0' }}>
-            Geen zichtbaar verschil binnen 30 dagen?{' '}
-            <span style={{ color: '#ffba09' }}>Dan krijg je je investering terug en loop je weg met 30 dagen gratis coaching.</span>
+          {/* Garantie — bold wit, met een gouden streep eronder als accent */}
+          <div style={{ fontSize: isMobile ? '1.05rem' : '1.2rem', color: '#fff', fontWeight: 800, lineHeight: 1.45, maxWidth: 470, margin: isMobile ? '1.6rem auto 0' : '2rem auto 0' }}>
+            <span style={{ color: '#ffba09' }}>Geen zichtbaar verschil binnen 30 dagen?</span> Dan krijg je je investering terug en loop je weg met 30 dagen gratis coaching.
           </div>
+          <div style={{ width: 56, height: 3, background: '#ffba09', borderRadius: 2, margin: isMobile ? '1.1rem auto 0' : '1.25rem auto 0' }} />
         </div>
 
         {/* ══ CHECKOUT FORM ══ */}
@@ -327,11 +327,11 @@ export default function TwelveWeekCheckout() {
               display: 'flex', alignItems: 'center', gap: '0.6rem',
               padding: isMobile ? '0.7rem 0.85rem' : '0.8rem 1rem',
               borderRadius: 12,
-              border: '1px solid rgba(255,255,255,0.08)',
-              background: 'rgba(255,255,255,0.03)',
+              border: '1px solid rgba(255,255,255,0.18)',
+              background: 'rgba(255,255,255,0.05)',
               marginBottom: '0.6rem',
             }}>
-              <field.icon size={16} color="rgba(255,186,9,0.5)" strokeWidth={2} />
+              <field.icon size={16} color="rgba(255,255,255,0.55)" strokeWidth={2} />
               <input
                 type={field.type}
                 placeholder={field.placeholder}

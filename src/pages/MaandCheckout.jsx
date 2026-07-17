@@ -15,6 +15,8 @@ const STRIPE_MAAND_PRICE_ID = 'price_1SdciJJ3V4uXn1OkxOMcGNiX'
 // Same Stripe publishable key as the other checkouts.
 const STRIPE_PK = 'pk_live_51Px383J3V4uXn1OktbtpW48KdDUq1ELqW9nfG19weDGHZ4qDOw8wE7jxEbNkA22T18lLJX9PFG755iWZWeAOYpd300oec67m54'
 
+const TP_GREEN = '#00B67A'
+
 const REVIEWS = [
   { name: 'Hessel', date: 'dec 2025', text: 'Kersten begreep het meteen! Na een uitgebreide 0-meting kreeg ik een plan op maat. Van 79,8 naar 74,4 in 8 weken. Als jij je aan het plan houdt geeft Kersten altijd de volle 100%!' },
   { name: 'Me', date: 'dec 2025', text: 'Als je hulp nodig hebt met sporten raad ik Myarc echt aan. Je krijgt een goed schema om je doel te halen en je hebt wekelijkse calls.' },
@@ -26,9 +28,9 @@ const REVIEWS = [
 
 // Transformatie-reviews (before/after) met resultaat-tekst.
 const TRANSFORMATIONS = [
-  { src: '/review-transformatie-3.png', caption: 'Van 85 naar 78,5 (en dalend)' },
-  { src: '/review-transformatie-1.png', caption: 'Van 96 naar 84' },
-  { src: '/review-transformatie-2.png', caption: 'Van 65 naar 60,2 (& veel sterker)' },
+  { src: '/review-transformatie-3.png', caption: 'Saskia ging van 85 naar 78,5 en dalend.' },
+  { src: '/review-transformatie-1.png', caption: 'Kersten: van zachte buik naar sixpack.' },
+  { src: '/review-transformatie-2.png', caption: 'Nitish bouwde spier terwijl zijn vet % daalde.' },
 ]
 
 // De 3 pilaren van de sales-pagina (OfferPilarenSection): titel + subtitel +
@@ -61,7 +63,7 @@ const PILAREN = [
       { label: 'Ik kijk mee', text: "gewicht, kracht en foto's, progressie zwart-op-wit" },
     ],
     images: ['/sales-screenshots/coach.png', '/sales-screenshots/tracking.png'],
-    quote: { text: 'Dit was voor mij het sterkste onderdeel.', author: 'klant, 3 maanden afgerond' },
+    quote: { text: 'Dit was voor mij het sterkste onderdeel.', author: 'Nitish, 3 maanden afgerond' },
   },
 ]
 
@@ -148,45 +150,68 @@ export default function MaandCheckout() {
         padding: isMobile ? '3.5rem 1.25rem 4.5rem' : '4.5rem 2rem 5.5rem',
       }}>
 
-        {/* ══ HEADER ══ */}
-        <div style={{ textAlign: 'center', marginBottom: isMobile ? '4rem' : '5.5rem' }}>
+        {/* ══ HERO (gelijk aan /sales) ══ */}
+        <div style={{ textAlign: 'center', marginBottom: isMobile ? '1.5rem' : '1.75rem' }}>
           <img
             src="/ma-logo-header.png"
             alt="MA Coaching"
-            style={{ width: isMobile ? 130 : 160, height: 'auto', display: 'block', margin: `0 auto ${isMobile ? '1.25rem' : '1.5rem'}` }}
+            style={{ width: isMobile ? 104 : 132, height: 'auto', display: 'block', margin: `0 auto ${isMobile ? '1rem' : '1.25rem'}` }}
           />
           <h1 style={{
-            fontSize: isMobile ? '1.6rem' : '2.2rem',
-            fontWeight: 900, lineHeight: 1.15, letterSpacing: '-0.02em', margin: 0, color: '#fff',
+            fontSize: isMobile ? 'clamp(2rem, 7.8vw, 2.6rem)' : 'clamp(2.6rem, 4.4vw, 3.6rem)',
+            fontWeight: 900, lineHeight: 1.1, letterSpacing: '-0.02em', margin: 0, color: '#fff',
           }}>
-            De start van jouw 3 maand <span style={{ color: '#ffba09' }}>(en levenslange)</span> transformatie
+            Het in shape komen &amp; blijven systeem
           </h1>
+          <div style={{
+            fontWeight: 500, color: 'rgba(255,255,255,0.65)', lineHeight: 1.4,
+            marginTop: isMobile ? '0.5rem' : '0.65rem',
+            fontSize: isMobile ? '1.05rem' : '1.6rem',
+          }}>
+            In 3 maanden in shape met een aanpak die je daarna niet meer kwijtraakt.
+          </div>
         </div>
 
-        {/* ══ TRANSFORMATIE-REVIEWS (3 before/after + resultaat) ══ */}
+        {/* ══ 3 transformaties — onder de titel, klein (titel domineert) ══ */}
         <div style={{
-          display: 'flex', gap: isMobile ? '0.45rem' : '0.75rem', justifyContent: 'center',
-          alignItems: 'flex-start', marginBottom: isMobile ? '4rem' : '5.5rem',
+          display: 'flex', gap: isMobile ? '0.4rem' : '0.65rem', justifyContent: 'center',
+          alignItems: 'flex-start', width: isMobile ? '70%' : '100%', maxWidth: isMobile ? 'none' : 400, margin: '0 auto',
         }}>
-          {TRANSFORMATIONS.map((t, i) => (
-            <div key={i} style={{ flex: 1, minWidth: 0, maxWidth: isMobile ? 'none' : 165, display: 'flex', flexDirection: 'column', gap: isMobile ? 6 : 8 }}>
-              <div style={{
-                width: '100%', borderRadius: isMobile ? 10 : 14, overflow: 'hidden', aspectRatio: '4 / 5',
-                boxShadow: '0 10px 26px rgba(0,0,0,0.5)', border: '1px solid rgba(255,186,9,0.2)',
-              }}>
+          {TRANSFORMATIONS.map((t) => (
+            <div key={t.src} style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+              <div style={{ borderRadius: '9px', overflow: 'hidden', filter: 'drop-shadow(0 8px 18px rgba(0,0,0,0.5))' }}>
                 <img
                   src={t.src}
-                  alt="Transformatie — maand 1 naar maand 3"
+                  alt={t.caption}
                   onError={(e) => { e.currentTarget.style.opacity = 0 }}
-                  style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+                  style={{ width: '100%', height: 'auto', display: 'block' }}
                 />
               </div>
-              <span style={{
-                textAlign: 'center', color: '#fff', fontWeight: 800,
-                fontSize: isMobile ? '0.78rem' : '0.92rem', lineHeight: 1.25,
-              }}>{t.caption}</span>
+              <p style={{ margin: 0, fontSize: isMobile ? '0.5rem' : '0.62rem', fontWeight: 700, color: 'rgba(255,255,255,0.85)', lineHeight: 1.25, textAlign: 'center' }}>
+                {t.caption}
+              </p>
             </div>
           ))}
+        </div>
+
+        {/* ══ Trustpilot badge — sluit de hero af (gelijk aan /sales) ══ */}
+        <div style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          gap: '0.5rem', marginTop: isMobile ? '1.25rem' : '1.5rem',
+          marginBottom: isMobile ? '4rem' : '5.5rem',
+        }}>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+            <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" fill={TP_GREEN}/>
+          </svg>
+          <span style={{ fontSize: '0.65rem', fontWeight: 700, color: 'rgba(255,255,255,0.55)', letterSpacing: '0.04em' }}>TRUSTPILOT</span>
+          <span style={{ fontSize: '0.65rem', fontWeight: 800, color: '#fff' }}>4.8</span>
+          <div style={{ display: 'flex', gap: '2px' }}>
+            {[1,2,3,4,5].map(s => (
+              <svg key={s} width={11} height={11} viewBox="0 0 24 24" fill={TP_GREEN}>
+                <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+              </svg>
+            ))}
+          </div>
         </div>
 
         <div style={{ marginBottom: isMobile ? '4rem' : '5.5rem' }}>
@@ -277,11 +302,11 @@ export default function MaandCheckout() {
             3 maanden × €99 = <span style={{ color: '#fff', fontWeight: 800 }}>€297 totaal</span>
           </div>
 
-          {/* Garantie — de belofte in goud, zoals de sales-pagina */}
-          <div style={{ fontSize: isMobile ? '1.05rem' : '1.2rem', color: '#fff', fontWeight: 700, lineHeight: 1.45, maxWidth: 470, margin: isMobile ? '1.6rem auto 0' : '2rem auto 0' }}>
-            Geen zichtbaar verschil binnen 30 dagen?{' '}
-            <span style={{ color: '#ffba09' }}>Dan krijg je je investering terug en loop je weg met 30 dagen gratis coaching.</span>
+          {/* Garantie — bold wit, met een gouden streep eronder als accent */}
+          <div style={{ fontSize: isMobile ? '1.05rem' : '1.2rem', color: '#fff', fontWeight: 800, lineHeight: 1.45, maxWidth: 470, margin: isMobile ? '1.6rem auto 0' : '2rem auto 0' }}>
+            <span style={{ color: '#ffba09' }}>Geen zichtbaar verschil binnen 30 dagen?</span> Dan krijg je je investering terug en loop je weg met 30 dagen gratis coaching.
           </div>
+          <div style={{ width: 56, height: 3, background: '#ffba09', borderRadius: 2, margin: isMobile ? '1.1rem auto 0' : '1.25rem auto 0' }} />
         </div>
 
         {/* ══ CHECKOUT FORM ══ */}
@@ -306,11 +331,11 @@ export default function MaandCheckout() {
               display: 'flex', alignItems: 'center', gap: '0.6rem',
               padding: isMobile ? '0.7rem 0.85rem' : '0.8rem 1rem',
               borderRadius: 12,
-              border: '1px solid rgba(255,255,255,0.08)',
-              background: 'rgba(255,255,255,0.03)',
+              border: '1px solid rgba(255,255,255,0.18)',
+              background: 'rgba(255,255,255,0.05)',
               marginBottom: '0.6rem',
             }}>
-              <field.icon size={16} color="rgba(255,186,9,0.5)" strokeWidth={2} />
+              <field.icon size={16} color="rgba(255,255,255,0.55)" strokeWidth={2} />
               <input
                 type={field.type}
                 placeholder={field.placeholder}
@@ -373,15 +398,18 @@ export default function MaandCheckout() {
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             gap: '0.5rem', marginBottom: isMobile ? '0.85rem' : '1rem',
           }}>
-            <div style={{ display: 'flex', gap: 2 }}>
-              {[1,2,3,4,5].map(i => (
-                <Star key={i} size={isMobile ? 14 : 16} fill="#ffba09" color="#ffba09" strokeWidth={0} />
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+              <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" fill={TP_GREEN}/>
+            </svg>
+            <span style={{ fontSize: '0.65rem', fontWeight: 700, color: 'rgba(255,255,255,0.55)', letterSpacing: '0.04em' }}>TRUSTPILOT</span>
+            <span style={{ fontSize: '0.65rem', fontWeight: 800, color: '#fff' }}>4.8</span>
+            <div style={{ display: 'flex', gap: '2px' }}>
+              {[1,2,3,4,5].map(s => (
+                <svg key={s} width={11} height={11} viewBox="0 0 24 24" fill={TP_GREEN}>
+                  <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+                </svg>
               ))}
             </div>
-            <span style={{
-              fontSize: isMobile ? '0.7rem' : '0.75rem',
-              color: 'rgba(255,255,255,0.35)', fontWeight: 600,
-            }}>Beoordeeld op Trustpilot</span>
           </div>
 
           <div
@@ -406,7 +434,7 @@ export default function MaandCheckout() {
               }}>
                 <div style={{ display: 'flex', gap: 2, marginBottom: '0.5rem' }}>
                   {[1,2,3,4,5].map(s => (
-                    <Star key={s} size={11} fill="#ffba09" color="#ffba09" strokeWidth={0} />
+                    <Star key={s} size={11} fill={TP_GREEN} color={TP_GREEN} strokeWidth={0} />
                   ))}
                 </div>
                 <p style={{
@@ -420,9 +448,9 @@ export default function MaandCheckout() {
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                     <div style={{
                       width: 24, height: 24, borderRadius: '50%',
-                      background: 'rgba(255,186,9,0.1)', border: '1px solid rgba(255,186,9,0.2)',
+                      background: '#fff', border: `1px solid ${TP_GREEN}`,
                       display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      fontSize: '0.6rem', fontWeight: 800, color: '#ffba09',
+                      fontSize: '0.6rem', fontWeight: 800, color: TP_GREEN,
                     }}>{review.name.charAt(0)}</div>
                     <span style={{ fontSize: isMobile ? '0.65rem' : '0.7rem', fontWeight: 700, color: 'rgba(255,255,255,0.5)' }}>
                       {review.name}
