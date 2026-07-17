@@ -170,11 +170,11 @@ DatabaseService.getClientNutritionPreferences = async function(clientId) {
  * @param {object} preferences - Preference data
  * @returns {object} Saved preferences
  */
-DatabaseService.saveNutritionPreferences = async function(clientId, preferences) {
+DatabaseService.saveNutritionPreferences = async function(clientId, preferences, { completed = true } = {}) {
   try {
     // Check if preferences already exist
     const existing = await this.getClientNutritionPreferences(clientId)
-    
+
     if (existing) {
       // Update existing
       const { data, error } = await this.supabase
@@ -182,14 +182,14 @@ DatabaseService.saveNutritionPreferences = async function(clientId, preferences)
         .update({
           ...preferences,
           updated_at: new Date().toISOString(),
-          completed: true
+          completed
         })
         .eq('client_id', clientId)
         .select()
         .single()
-      
+
       if (error) throw error
-      
+
       console.log('✅ Nutrition preferences updated:', data.id)
       return data
     } else {
@@ -199,7 +199,7 @@ DatabaseService.saveNutritionPreferences = async function(clientId, preferences)
         .insert({
           client_id: clientId,
           ...preferences,
-          completed: true,
+          completed,
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString()
         })

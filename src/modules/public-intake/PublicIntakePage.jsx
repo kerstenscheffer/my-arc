@@ -172,6 +172,54 @@ function MotivationReminder({ personalData, isMobile }) {
   )
 }
 
+// ── Training-antwoorden → user_workout_preferences payload ───────────────────
+// Zet elk veld om naar het TYPE dat de kolom verwacht. Dit fixt de stille
+// upsert-fout: bv. `avoided_exercises` is een TEXT-kolom maar het formulier
+// leverde een array → de hele upsert faalde zonder error-check, waardoor alle
+// training-data verloren ging.
+function buildWorkoutPrefs(data = {}, personalData = {}) {
+  const toInt = (v) => { const n = parseInt(v, 10); return Number.isFinite(n) ? n : null }
+  const toText = (v) => {
+    if (v == null) return null
+    if (Array.isArray(v)) { const s = v.filter(Boolean).join(', '); return s || null }
+    const s = String(v).trim(); return s || null
+  }
+  const toArr = (v) => Array.isArray(v) ? v.filter(Boolean) : (v ? [v] : [])
+
+  // avoided_exercises kan een array (pills, evt. al samengevoegd) of los tekst
+  // veld zijn → altijd platslaan tot één tekst.
+  const avoidedParts = Array.isArray(data.avoided_exercises)
+    ? data.avoided_exercises
+    : [
+        ...(Array.isArray(data.avoided_exercises_pills) ? data.avoided_exercises_pills : []),
+        ...(data.avoided_exercises ? [data.avoided_exercises] : []),
+      ]
+
+  return {
+    default_experience_level: toText(data.experience_level),
+    default_days_per_week: toInt(data.days_per_week ?? personalData?.preferred_training_days?.length),
+    default_time_per_session: toInt(data.time_per_session),
+    default_equipment: toArr(data.equipment),              // text[]
+    default_primary_goal: toText(personalData?.primary_goal),
+    training_time: (data.training_time || personalData?.training_time || null) || null, // time HH:MM
+    split_preferences: { preferred: data.split_preference || null, focus: data.training_focus || null }, // jsonb
+    emphasize_stretch: data.emphasize_stretch ?? false,
+    prioritize_compounds: data.prioritize_compounds ?? false,
+    cardio_interest: toText(data.cardio_interest),
+    cardio_types: toArr(data.cardio_types),                // jsonb array
+    cardio_frequency: toInt(data.cardio_frequency),
+    cardio_duration: toInt(data.cardio_duration),
+    gym_name: toText(data.gym_name),
+    injuries: toText(data.injuries),
+    avoided_exercises: toText(avoidedParts),                // TEXT — was de crash
+    other_limitations: toText(data.other_limitations),
+    does_cardio: toText(data.does_cardio),
+    training_location: toText(data.training_location),
+    training_willingness: toText(data.training_willingness),
+    no_training_reason: toText(data.no_training_reason),
+  }
+}
+
 // ── Hoofd component ───────────────────────────────────────────────────────────
 
 export default function PublicIntakePage() {
@@ -390,66 +438,65 @@ export default function PublicIntakePage() {
     setSaving(false)
   }
 
+  // ── Training opslaan (gedeeld: autosave + afronden) ──
+  // Schrijft naar user_workout_preferences (rijke data) ÉN spiegelt de kern
+  // naar clients (waar de coach-modal 'm ook uit kan lezen). CHECKT nu de
+  // upsert-error, zodat een mislukking niet meer stil verdwijnt.
+  const persistWorkout = async (dataArg, { completed = false } = {}) => {
+    const email = personalData.email || (() => { try { return localStorage.getItem('myarc_intake_email') } catch { return null } })()
+    if (!email) return { ok: false, reason: 'NO_EMAIL' }
+    const client = await findClient(email)
+    if (!client) return { ok: false, reason: 'CLIENT_NOT_FOUND' }
+
+    const prefs = buildWorkoutPrefs(dataArg, personalData)
+    const payload = { user_id: client.auth_user_id || client.id, ...prefs }
+    if (completed) { payload.workout_completed = true; payload.workout_completed_at = new Date().toISOString() }
+
+    const { error } = await supabase
+      .from('user_workout_preferences')
+      .upsert(payload, { onConflict: 'user_id' })
+    if (error) { console.error('❌ user_workout_preferences upsert:', error); return { ok: false, reason: 'SAVE_FAILED', error } }
+
+    // Spiegel de kernvelden naar clients (fallback-bron voor de coach-modal).
+    try {
+      await updateClient(client.id, {
+        training_experience: prefs.default_experience_level,
+        workout_days_per_week: prefs.default_days_per_week,
+        training_days: prefs.default_days_per_week,
+        training_time: prefs.training_time,
+        gym_name: prefs.gym_name,
+        injuries: prefs.injuries,
+      })
+    } catch (e) { console.warn('clients spiegel-write mislukt (niet-blokkerend):', e?.message) }
+
+    return { ok: true }
+  }
+
+  // Directe autosave van fase 3: elk training-antwoord wordt meteen bewaard
+  // (debounced), niet pas bij afronden. Zo raakt niemand z'n antwoorden kwijt.
+  useEffect(() => {
+    if (phase !== 3) return
+    const email = (personalData?.email || '').trim()
+    if (!email.includes('@')) return
+    if (!Object.keys(workoutData || {}).length) return
+    const t = setTimeout(() => { persistWorkout(workoutData, { completed: false }) }, 900)
+    return () => clearTimeout(t)
+  }, [workoutData, phase])
+
   // ── Phase 3 complete ──
   const handlePhase3Complete = async (data) => {
     setWorkoutData(data)
     setSaving(true)
     setErrorType(null)
-    console.log('🏋️ handlePhase3Complete — data:', {
-      experience_level: data.experience_level,
-      days_per_week: data.days_per_week,
-      time_per_session: data.time_per_session,
-      equipment: data.equipment,
-      training_focus: data.training_focus,
-      split_preferences: data.split_preferences,
-      cardio_interest: data.cardio_interest,
-      injuries: data.injuries,
-      avoided_exercises: data.avoided_exercises,
-    })
     try {
-      const email = personalData.email || (() => { try { return localStorage.getItem('myarc_intake_email') } catch { return null } })()
-      if (!email) { setErrorType('NO_EMAIL'); setSaving(false); return }
-
-      const client = await findClient(email)
-      if (!client) { setErrorType('CLIENT_NOT_FOUND'); setSaving(false); return }
-      const { id: clientId, auth_user_id: authUserId } = client
-
-      await supabase.from('user_workout_preferences').upsert({
-        user_id: authUserId || clientId,
-        default_experience_level: data.experience_level || null,
-        default_days_per_week: data.days_per_week || null,
-        default_time_per_session: data.time_per_session || null,
-        training_time: data.training_time || personalData.training_time || null,
-        default_equipment: data.equipment || [],
-        default_primary_goal: personalData.primary_goal || null,
-        split_preferences: {
-          preferred: data.split_preference || null,
-          focus: data.training_focus || null
-        },
-        emphasize_stretch: data.emphasize_stretch ?? false,
-        prioritize_compounds: data.prioritize_compounds || false,
-        cardio_interest: data.cardio_interest || null,
-        cardio_types: data.cardio_types || [],
-        cardio_frequency: data.cardio_frequency || null,
-        cardio_duration: data.cardio_duration || null,
-        gym_name: data.gym_name || null,
-        injuries: data.injuries || null,
-        avoided_exercises: data.avoided_exercises || null,
-        other_limitations: data.other_limitations || null,
-        does_cardio: data.does_cardio || null,
-        training_location: data.training_location || null,
-        training_willingness: data.training_willingness || null,
-        no_training_reason: data.no_training_reason || null,
-        workout_completed: true, workout_completed_at: new Date().toISOString()
-      }, { onConflict: 'user_id' })
-
-      await updateClient(clientId, {
-        training_experience: data.experience_level || null,
-        workout_days_per_week: data.days_per_week || null,
-        minutes_per_session: data.time_per_session || null,
-        gym_name: data.gym_name || null, injuries: data.injuries || null
-      })
-
+      const res = await persistWorkout(data, { completed: true })
+      if (!res.ok) {
+        setErrorType(res.reason === 'NO_EMAIL' ? 'NO_EMAIL'
+          : res.reason === 'CLIENT_NOT_FOUND' ? 'CLIENT_NOT_FOUND'
+          : (res.error && detectErrorType(res.error) === 'NETWORK') ? 'NETWORK'
+          : 'SAVE_FAILED')
+        setSaving(false); return
+      }
       setPhase(4)
       try { localStorage.removeItem('myarc_intake_email') } catch {}
     } catch(e) { console.error('Save workout failed:', e); setErrorType(detectErrorType(e) === 'NETWORK' ? 'NETWORK' : 'SAVE_FAILED') }

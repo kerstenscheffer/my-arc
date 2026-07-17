@@ -142,6 +142,26 @@ export default function NutritionIntakePage() {
     } catch { setEmailError('Er ging iets mis.'); setEmailLoading(false) }
   }
 
+  // Directe autosave: elk voedings-antwoord wordt meteen bewaard (debounced),
+  // niet pas bij afronden. completed:false zodat de intake pas bij echte submit
+  // als voltooid geldt.
+  useEffect(() => {
+    if (!clientId) return
+    if (!Object.keys(flowData || {}).length) return
+    const t = setTimeout(() => {
+      try {
+        const prefs = mapToNutritionPreferences(flowData)
+        DatabaseService.saveNutritionPreferences(clientId, {
+          calorie_target: clientData?.target_calories || clientData?.tdee || null,
+          tdee: clientData?.tdee || null,
+          surplus: clientData?.surplus || 0,
+          ...prefs,
+        }, { completed: false }).catch(e => console.warn('voeding autosave mislukt (niet-blokkerend):', e?.message))
+      } catch (e) { console.warn('voeding autosave map-fout:', e?.message) }
+    }, 900)
+    return () => clearTimeout(t)
+  }, [flowData, clientId])
+
   const handleFlowNext = () => {
     console.log(`✅ [${FLOWS[activeFlow]?.id}] Flow voltooid. Data:`, flowData)
     if (activeFlow < FLOWS.length - 1) {
