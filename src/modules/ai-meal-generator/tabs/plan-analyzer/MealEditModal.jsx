@@ -197,6 +197,10 @@ export default function MealEditModal({ db, meal, slot, dayIndex, onSave, onClos
         }]).select().single()
         if (error) throw error
         updated.id = data.id; updated.meal_id = data.id
+        // Nieuwe meal moet de OUDE meal in het plan vervangen. Bewaar de oude
+        // id zodat handleUpdateMeal weet welke slot(s) 'ie moet omwisselen —
+        // anders matcht 'ie op de nieuwe id en verandert er niks in het plan.
+        updated._replacesMealId = meal.meal_id || meal.id
       }
       onSave(updated, mode); onClose()
     } catch (err) { console.error(err); setSaveError(err.message) }

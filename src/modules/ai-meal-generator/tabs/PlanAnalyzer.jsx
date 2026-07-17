@@ -447,7 +447,10 @@ export default function PlanAnalyzer({
   const handleUpdateMeal = async (dayIndex, slot, updatedMeal) => {
     if (!weekData) return
     const updated = [...weekData]
-    const matchingMealId = updatedMeal.meal_id || updatedMeal.id
+    // Bij "Kopie" heeft updatedMeal een NIEUWE id; we matchen dan op de oude
+    // (_replacesMealId) zodat de nieuwe meal de oude in het plan vervangt.
+    const { _replacesMealId, ...cleanMeal } = updatedMeal
+    const matchingMealId = _replacesMealId || cleanMeal.meal_id || cleanMeal.id
 
     // Update alle slots in de hele week die dezelfde meal_id hebben
     updated.forEach((day, di) => {
@@ -457,14 +460,14 @@ export default function PlanAnalyzer({
         if (slotMealId && slotMealId === matchingMealId) {
           updated[di] = {
             ...updated[di],
-            meals: { ...updated[di].meals, [s]: { ...m, ...updatedMeal } }
+            meals: { ...updated[di].meals, [s]: { ...m, ...cleanMeal } }
           }
           updated[di].totals = calculateTotals(updated[di].meals)
         }
       })
     })
 
-    await applyWeekUpdate(updated, `Aangepast: ${updatedMeal.name} (alle dagen)`)
+    await applyWeekUpdate(updated, `Aangepast: ${cleanMeal.name} (alle dagen)`)
   }
   const handleAutoBalance = async (dayIndex, updatedMeals) => {
     if (!weekData) return
