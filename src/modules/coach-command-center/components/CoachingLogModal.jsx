@@ -23,8 +23,13 @@ const CATEGORIES = [
   { id: 'change_log', label: 'Wijziging',  icon: History,        color: '#a855f7' },
 ]
 
-const DEFAULT_POS  = { x: Math.max(0, window.innerWidth  - 420), y: 80 }
 const DEFAULT_SIZE = { w: 400, h: 620 }
+// Gecentreerd openen zodat de modal midden in beeld verschijnt (was rechtsboven,
+// wat op sommige schermen weggevallen leek — "opent niet").
+const DEFAULT_POS  = {
+  x: Math.max(12, Math.round((window.innerWidth  - DEFAULT_SIZE.w) / 2)),
+  y: Math.max(20, Math.round((window.innerHeight - DEFAULT_SIZE.h) / 2)),
+}
 const MIN_SIZE     = { w: 320, h: 300 }
 
 function formatDate(iso) {
