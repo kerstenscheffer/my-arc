@@ -31,13 +31,38 @@ const TRANSFORMATIONS = [
   { src: '/review-transformatie-2.png', caption: 'Nitish bouwde spier terwijl zijn vet % daalde.' },
 ]
 
-// De 5 pilaren met app-screenshots + korte omschrijving (info uit de sales-pagina).
-const PILLAR_PHOTOS = [
-  { screenshot: '/sales-screenshots/eten.png',    title: 'Altijd weten wat je eet', desc: 'Vaste maaltijden en vervang-opties in de app. Weten wat je kan eten voor jouw doel.' },
-  { screenshot: '/sales-screenshots/meedoen.png', title: 'Gewoon mee blijven doen', desc: 'Feestjes, uit eten en weekenden horen erbij. Ik leer je hoe.' },
-  { screenshot: '/sales-screenshots/trainen.png', title: 'In shape in 3x per week',  desc: 'Workouts efficiënt of optimaal, thuis of in de gym. Ik maak het op maat voor jouw situatie en doelen.' },
-  { screenshot: '/sales-screenshots/tracking.png', title: 'Zie dat het werkt',       desc: 'Kracht, gewicht en foto-tracking. Zichtbaar verschil in 30 dagen.' },
-  { screenshot: '/sales-screenshots/coach.png',   title: 'Coach naast je',           desc: 'Elke week een videocall en dagelijks bereikbaar in de app.' },
+// De 3 pilaren van de sales-pagina (OfferPilarenSection): titel + subtitel +
+// bullets + app-screenshots. Pilaar 3 heeft een korte klant-quote.
+const PILAREN = [
+  {
+    title: 'Altijd Weten Wat Te Eten Systeem',
+    subtitle: 'Een aanpak die bij jou past, ook op verjaardagen, feestjes en vakanties.',
+    bullets: [
+      { label: 'Weten wat je eet', text: 'vaste structuur in de app, zonder rekenen' },
+      { label: 'Flexibel', text: 'meedoen met etentjes, een biertje of vakantie. Inbouwen, niet wegstrepen' },
+    ],
+    images: ['/sales-screenshots/eten.png', '/sales-screenshots/meedoen.png'],
+  },
+  {
+    title: 'Elke Training Telt Methode',
+    subtitle: 'Schema op maat, uitleg per oefening, feedback op jouw uitvoering.',
+    bullets: [
+      { label: 'Effectief', text: 'workouts onder een uur, thuis of in de gym' },
+      { label: 'Begeleiding', text: "uitlegvideo's + persoonlijke bijsturing" },
+    ],
+    images: ['/sales-screenshots/trainen.png'],
+  },
+  {
+    title: 'Coach In Jouw Corner',
+    subtitle: 'Ik kijk meerdere keren per week met je mee, we zien allebei dat het werkt.',
+    bullets: [
+      { label: 'Wekelijkse check-in call', text: 'toegang tot mijn agenda' },
+      { label: 'Snel bereikbaar', text: 'via de app' },
+      { label: 'Ik kijk mee', text: "gewicht, kracht en foto's, progressie zwart-op-wit" },
+    ],
+    images: ['/sales-screenshots/coach.png', '/sales-screenshots/tracking.png'],
+    quote: { text: 'Dit was voor mij het sterkste onderdeel.', author: 'klant, 3 maanden afgerond' },
+  },
 ]
 
 export default function TwelveWeekCheckout() {
@@ -193,34 +218,71 @@ export default function TwelveWeekCheckout() {
             lineHeight: 1.1, marginBottom: isMobile ? '1.25rem' : '1.5rem',
           }}>Wat je krijgt</div>
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: isMobile ? '0.9rem' : '1.1rem' }}>
-            {PILLAR_PHOTOS.map((p, i) => (
-              <div key={i} style={{ display: 'flex', gap: isMobile ? '0.5rem' : '0.65rem', alignItems: 'center' }}>
-                {/* Screenshot — los op de pagina, geen container */}
-                <div style={{
-                  flexShrink: 0, width: isMobile ? 118 : 142,
-                  borderRadius: 10, overflow: 'hidden', display: 'flex',
-                  filter: 'drop-shadow(0 8px 16px rgba(0,0,0,0.5))',
-                }}>
-                  <img
-                    src={p.screenshot}
-                    alt={p.title}
-                    onError={(e) => { e.currentTarget.style.opacity = 0 }}
-                    style={{ width: '100%', height: 'auto', display: 'block' }}
-                  />
+          <div style={{ display: 'flex', flexDirection: 'column', gap: isMobile ? '2rem' : '2.5rem' }}>
+            {PILAREN.map((p, i) => (
+              <div key={i}>
+                {/* Nummer + titel */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: isMobile ? '0.4rem' : '0.5rem' }}>
+                  <div style={{
+                    flexShrink: 0, width: isMobile ? 30 : 34, height: isMobile ? 30 : 34, borderRadius: '50%',
+                    background: 'rgba(255,255,255,0.08)', border: '1.5px solid rgba(255,255,255,0.35)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    color: '#fff', fontWeight: 900, fontSize: isMobile ? '0.9rem' : '1rem',
+                  }}>{i + 1}</div>
+                  <h3 style={{
+                    flex: 1, minWidth: 0, margin: 0,
+                    fontSize: isMobile ? '1.15rem' : '1.35rem', fontWeight: 900,
+                    color: '#fff', lineHeight: 1.15, letterSpacing: '-0.01em',
+                  }}>{p.title}</h3>
                 </div>
 
-                {/* Titel + korte omschrijving (wit) */}
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{
-                    fontSize: isMobile ? '0.95rem' : '1.05rem', fontWeight: 800,
-                    color: '#fff', lineHeight: 1.2, marginBottom: 3,
-                  }}><span style={{ color: '#ffba09' }}>{i + 1}.</span> {p.title}</div>
-                  <p style={{
-                    margin: 0, fontSize: isMobile ? '0.78rem' : '0.85rem',
-                    color: 'rgba(255,255,255,0.85)', fontWeight: 500, lineHeight: 1.4,
-                  }}>{p.desc}</p>
+                {/* Subtitel */}
+                <p style={{
+                  margin: `0 0 ${isMobile ? '0.7rem' : '0.85rem'}`,
+                  fontSize: isMobile ? '0.82rem' : '0.9rem', fontWeight: 600,
+                  color: 'rgba(255,255,255,0.65)', lineHeight: 1.4,
+                }}>{p.subtitle}</p>
+
+                {/* Beelden — 1 of 2 screenshots naast elkaar */}
+                <div style={{ display: 'flex', gap: isMobile ? '0.4rem' : '0.55rem', marginBottom: isMobile ? '0.7rem' : '0.85rem' }}>
+                  {p.images.map((src) => (
+                    <div key={src} style={{
+                      flex: 1, minWidth: 0, borderRadius: 10, overflow: 'hidden', display: 'flex',
+                      filter: 'drop-shadow(0 8px 16px rgba(0,0,0,0.5))',
+                    }}>
+                      <img
+                        src={src}
+                        alt={p.title}
+                        onError={(e) => { e.currentTarget.style.opacity = 0 }}
+                        style={{ width: '100%', height: 'auto', display: 'block' }}
+                      />
+                    </div>
+                  ))}
                 </div>
+
+                {/* Bullets */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: isMobile ? '0.4rem' : '0.5rem' }}>
+                  {p.bullets.map((b, j) => (
+                    <div key={j} style={{ display: 'flex', gap: '0.5rem', alignItems: 'flex-start' }}>
+                      <span style={{ flexShrink: 0, marginTop: isMobile ? 6 : 7, width: 5, height: 5, borderRadius: '50%', background: '#ffba09' }} />
+                      <p style={{ margin: 0, fontSize: isMobile ? '0.8rem' : '0.88rem', color: 'rgba(255,255,255,0.7)', lineHeight: 1.4, fontWeight: 500 }}>
+                        <span style={{ color: '#fff', fontWeight: 800 }}>{b.label}:</span> {b.text}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Optionele quote (pilaar 3) */}
+                {p.quote && (
+                  <div style={{ marginTop: isMobile ? '0.85rem' : '1rem', paddingLeft: '0.85rem', borderLeft: '2px solid rgba(255,255,255,0.25)' }}>
+                    <p style={{ margin: 0, fontSize: isMobile ? '0.88rem' : '0.95rem', fontStyle: 'italic', color: '#fff', fontWeight: 600, lineHeight: 1.4 }}>
+                      "{p.quote.text}"
+                    </p>
+                    <p style={{ margin: '0.3rem 0 0', fontSize: isMobile ? '0.7rem' : '0.75rem', color: 'rgba(255,255,255,0.5)', fontWeight: 600 }}>
+                      {p.quote.author}
+                    </p>
+                  </div>
+                )}
               </div>
             ))}
           </div>
