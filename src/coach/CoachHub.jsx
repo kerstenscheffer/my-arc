@@ -31,6 +31,7 @@ import SupplementsTab from '../modules/supplements/SupplementsTab'
 import CoachNotificationBell from '../modules/notifications/CoachNotificationBell'
 import PortalSwitchButton from '../components/PortalSwitchButton'
 import IssueNotesWidget from '../components/IssueNotesWidget'
+import QuickTodoModal from '../components/QuickTodoModal'
 import ContentIdeasWidget from '../components/ContentIdeasWidget'
 import ClientProblemsWidget from '../components/ClientProblemsWidget'
 import WidgetSidebar from '../components/WidgetSidebar'
@@ -52,7 +53,7 @@ import {
   Menu, X, ChevronDown, ChevronRight, Dumbbell, Target, Crown, FileText,
   Flame, Globe, Save, Zap, DollarSign, Pill, MoreHorizontal, Settings, Calendar,
   Bell, Bug, Lightbulb, AlertCircle, Image as ImageIcon, FlaskConical,
-  Eye, EyeOff
+  Eye, EyeOff, ListTodo
 } from 'lucide-react'
 
 // ============================================
@@ -198,6 +199,7 @@ export default function CoachHub() {
   // Widget sidebar — één van { 'notifications' | 'issues' | 'ideas' | 'problems' | null }
   // tegelijk geopend, plus live counts voor de badge per knop.
   const [widgetOpen, setWidgetOpen] = useState(null)
+  const [showTodoModal, setShowTodoModal] = useState(false)
   // Klantmodus: verbergt de coach-only balken (quick-link sidebar + goals-balk)
   // zodat een klant die meekijkt niet alles ziet. Onthouden in localStorage.
   const [clientMode, setClientMode] = useState(() => {
@@ -1079,6 +1081,11 @@ export default function CoachHub() {
             onClick: () => setWidgetOpen(o => o === 'notifications' ? null : 'notifications'),
           },
           {
+            id: 'todo', label: 'To-do', Icon: ListTodo, color: G.primary,
+            active: showTodoModal,
+            onClick: () => setShowTodoModal(true),
+          },
+          {
             id: 'issues', label: 'Issues', Icon: Bug, color: '#fca5a5',
             active: widgetOpen === 'issues', badge: widgetCounts.issues,
             goldBadge: issuesClaudePending,
@@ -1096,6 +1103,16 @@ export default function CoachHub() {
           },
         ]}
       />}
+
+      {showTodoModal && (
+        <QuickTodoModal
+          db={db}
+          coachId={user?.id}
+          isMobile={isMobile}
+          onOpenProductivity={() => navigateTo('productivity')}
+          onClose={() => setShowTodoModal(false)}
+        />
+      )}
 
       {mealPanelClientId && (
         <ClientContextPanel
