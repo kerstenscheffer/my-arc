@@ -3,10 +3,13 @@
 // (foto + nummerbadge + naam + spiergroep-badge + sets/reps), maar met
 // coach-bewerking: sets/reps/rust aanpasbaar, materiaal-suggestie, volgorde,
 // video koppelen en verwijderen.
+import { useState } from 'react'
 import { Video, Trash2, ChevronUp, ChevronDown } from 'lucide-react'
 import useExerciseImage from '../hooks/useExerciseImage'
 
-// Snelkeuzes voor cardio (datalist = presets + zelf typen blijft mogelijk).
+// Snelkeuzes voor cardio. We tonen ze via een eigen dropdown (niet <datalist>,
+// want die is onbetrouwbaar op iOS Safari en filtert bovendien op de al
+// ingevulde naam → dan zie je maar 1 optie). Vrij typen blijft mogelijk.
 const CARDIO_PRESETS = [
   'Wandelen', 'Hardlopen', 'Fietsen', 'Zwemmen', 'Roeien', 'Crosstrainer', 'HIIT',
   'Steady State Cardio', 'Spinning', 'Stairmaster', 'Skippen', 'Boksen',
@@ -21,6 +24,7 @@ export default function BuilderExerciseCard({
   const { imageUrl, loadingImage, hasVideo } = useExerciseImage(exercise, db, client)
   const photoSize = isMobile ? 64 : 76
   const hasVid = hasVideo || !!exercise.video_url
+  const [cardioMenuOpen, setCardioMenuOpen] = useState(false)
 
   const statInput = {
     width: 30, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)',
@@ -74,17 +78,29 @@ export default function BuilderExerciseCard({
         <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', justifyContent: 'center', padding: isMobile ? '0.4rem 0.6rem' : '0.45rem 0.8rem', gap: 6 }}>
           {exercise.type === 'cardio' ? (
             <>
-              {/* Cardio-naam met snelkeuze-presets (datalist = presets + vrij typen) */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
-                <input list="mwb-cardio-presets" value={exercise.name ?? ''} onClick={stop}
+              {/* Cardio-naam: vrij typen + knop die alle presets toont (eigen dropdown) */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0, position: 'relative' }}>
+                <input value={exercise.name ?? ''} onClick={stop}
                   onChange={(e) => onField('name', e.target.value)} placeholder="Cardio type"
                   style={{ flex: 1, minWidth: 0, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 6, color: '#fff', fontSize: isMobile ? '0.9rem' : '0.95rem', fontWeight: 800, padding: '3px 6px', outline: 'none' }} />
-                <datalist id="mwb-cardio-presets">
-                  {CARDIO_PRESETS.map(p => <option key={p} value={p} />)}
-                </datalist>
+                <button onClick={(e) => { stop(e); setCardioMenuOpen(o => !o) }} title="Kies cardio type"
+                  style={{ flexShrink: 0, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 6, color: 'rgba(255,255,255,0.7)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', width: 26, height: 26, touchAction: 'manipulation' }}>
+                  <ChevronDown size={15} style={{ transition: 'transform 0.15s', transform: cardioMenuOpen ? 'rotate(180deg)' : 'none' }} />
+                </button>
                 <span style={{ flexShrink: 0, fontSize: isMobile ? '0.52rem' : '0.55rem', fontWeight: 900, color: '#000', background: '#f87171', padding: '2px 7px', borderRadius: 3, letterSpacing: '0.05em', textTransform: 'uppercase', lineHeight: 1.2 }}>
                   Cardio
                 </span>
+
+                {cardioMenuOpen && (
+                  <div onClick={stop} style={{ position: 'absolute', top: 'calc(100% + 4px)', left: 0, right: 0, zIndex: 50, background: '#1a1a1a', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 8, boxShadow: '0 8px 24px rgba(0,0,0,0.5)', maxHeight: 200, overflowY: 'auto' }}>
+                    {CARDIO_PRESETS.map(p => (
+                      <button key={p} onClick={(e) => { stop(e); onField('name', p); setCardioMenuOpen(false) }}
+                        style={{ display: 'block', width: '100%', textAlign: 'left', padding: '0.5rem 0.7rem', background: exercise.name === p ? 'rgba(248,113,113,0.12)' : 'transparent', border: 'none', borderBottom: '1px solid rgba(255,255,255,0.05)', color: exercise.name === p ? '#f87171' : 'rgba(255,255,255,0.85)', fontSize: '0.8rem', fontWeight: 700, cursor: 'pointer', touchAction: 'manipulation' }}>
+                        {p}
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
 
               {/* Duur / afstand / intensiteit */}
