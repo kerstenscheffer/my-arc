@@ -1,6 +1,6 @@
 // src/modules/manual-workout-builder/components/DayBuilder.jsx
 import { useState } from 'react'
-import { Trash2, Copy, Plus, Edit2, ChevronDown, ChevronUp, Dumbbell, Target, Clock, Heart, BookmarkPlus } from 'lucide-react'
+import { Trash2, Copy, Plus, ChevronDown, ChevronUp, Heart, BookmarkPlus } from 'lucide-react'
 import ExerciseVideoEditor from './ExerciseVideoEditor'
 import BuilderExerciseCard from './BuilderExerciseCard'
 

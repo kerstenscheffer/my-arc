@@ -276,56 +276,35 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
   const activeSchema = clientSchemas.find(s => s.id === selectedSchemaId)
   const clientName = selectedClient ? `${selectedClient.first_name || ''} ${selectedClient.last_name || ''}`.trim() : ''
 
+  // Compacte stijl-tokens voor de header (leadsysteem-stijl, geen dikke velden).
+  const cInput = { background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, padding: '0.45rem 0.6rem', color: '#fff', fontSize: '0.82rem', minHeight: 36, outline: 'none', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }
+  const cSelect = { ...cInput, cursor: 'pointer', flex: 1, minWidth: 116 }
+  const cBtn = (accent) => ({ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '0.4rem 0.7rem', borderRadius: 8, fontSize: '0.76rem', fontWeight: 700, cursor: 'pointer', minHeight: 36, touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', background: accent ? 'rgba(255,215,0,0.12)' : 'rgba(255,255,255,0.05)', border: `1px solid ${accent ? 'rgba(255,215,0,0.3)' : 'rgba(255,255,255,0.1)'}`, color: accent ? '#FFD700' : 'rgba(255,255,255,0.8)' })
+
   return (
     <div style={{ padding: isMobile ? '1rem' : '1.5rem', maxWidth: '1400px', margin: '0 auto' }}>
-      <div style={{ background: '#141414', borderRadius: '16px', border: '1px solid rgba(255,255,255,0.08)', padding: isMobile ? '1rem' : '1.5rem', marginBottom: '1.5rem' }}>
+      <div style={{ background: '#141414', borderRadius: '14px', border: '1px solid rgba(255,255,255,0.08)', padding: isMobile ? '0.8rem' : '1rem', marginBottom: '1rem' }}>
 
-        {/* Header row */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1rem', flexWrap: 'wrap' }}>
-          <Activity size={24} color="#FFD700" />
-          <h1 style={{ fontSize: isMobile ? '1.5rem' : '2rem', fontWeight: '800', background: 'linear-gradient(135deg, #FFD700 0%, #D4AF37 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', margin: 0 }}>
-            Manual Workout Builder
-          </h1>
-
-          {/* Open the full exercise library — coach can attach videos to
-              any exercise without first dropping it into a workout day. */}
-          <button
-            onClick={() => setShowExerciseLibrary(true)}
-            title="Bibliotheek beheren · video's koppelen"
-            style={{
-              display: 'inline-flex', alignItems: 'center', gap: 5,
-              padding: '0.35rem 0.7rem',
-              background: 'rgba(255,215,0,0.12)',
-              border: '1px solid rgba(255,215,0,0.35)',
-              borderRadius: 6,
-              color: '#FFD700',
-              fontSize: '0.72rem', fontWeight: 800,
-              cursor: 'pointer', touchAction: 'manipulation',
-            }}
-          >
-            <Video size={12} /> Video's beheren
-          </button>
+        {/* Regel 1: compacte titel + client + schema · bibliotheek rechts */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.7rem', flexWrap: 'wrap' }}>
+          <Activity size={16} color="#FFD700" />
+          <span style={{ fontSize: isMobile ? '0.9rem' : '1rem', fontWeight: 800, color: '#fff', letterSpacing: '-0.01em' }}>Workout Builder</span>
           {selectedClient && (
-            <span style={{ fontSize: '0.75rem', fontWeight: '700', color: '#FFD700', background: 'rgba(255,215,0,0.1)', border: '1px solid rgba(255,215,0,0.2)', borderRadius: '6px', padding: '0.2rem 0.5rem' }}>
-              {clientName}
-            </span>
+            <span style={{ fontSize: '0.66rem', fontWeight: 700, color: '#FFD700', background: 'rgba(255,215,0,0.1)', border: '1px solid rgba(255,215,0,0.2)', borderRadius: 5, padding: '0.15rem 0.45rem' }}>{clientName}</span>
           )}
-
-          {/* Schema picker */}
           {clientSchemas.length > 1 && (
             <div style={{ position: 'relative' }}>
-              <button onClick={() => setShowSchemaPicker(!showSchemaPicker)}
-                style={{ display: 'flex', alignItems: 'center', gap: '0.375rem', padding: '0.35rem 0.75rem', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '10px', color: 'rgba(255,255,255,0.7)', fontSize: '0.75rem', fontWeight: '600', cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}>
-                {activeSchema?._label || activeSchema?.name || 'Schema kiezen'}
-                <ChevronDown size={13} style={{ transition: 'transform 0.2s', transform: showSchemaPicker ? 'rotate(180deg)' : 'rotate(0)' }} />
+              <button onClick={() => setShowSchemaPicker(!showSchemaPicker)} style={{ ...cBtn(false), fontSize: '0.72rem' }}>
+                {activeSchema?._label || activeSchema?.name || 'Schema'}
+                <ChevronDown size={12} style={{ transition: 'transform 0.2s', transform: showSchemaPicker ? 'rotate(180deg)' : 'rotate(0)' }} />
               </button>
               {showSchemaPicker && (
                 <div style={{ position: 'absolute', top: 'calc(100% + 4px)', left: 0, zIndex: 100, background: '#111', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '10px', overflow: 'hidden', minWidth: '220px', boxShadow: '0 8px 32px rgba(0,0,0,0.5)' }}>
                   {clientSchemas.map((s, i) => (
                     <button key={s.id} onClick={() => loadSchemaIntoBuilder(s)}
-                      style={{ width: '100%', padding: '0.75rem 1rem', background: selectedSchemaId === s.id ? 'rgba(255,215,0,0.08)' : 'transparent', border: 'none', borderBottom: i < clientSchemas.length - 1 ? '1px solid rgba(255,255,255,0.06)' : 'none', color: selectedSchemaId === s.id ? '#FFD700' : '#fff', fontSize: '0.78rem', fontWeight: '600', cursor: 'pointer', textAlign: 'left', touchAction: 'manipulation' }}>
+                      style={{ width: '100%', padding: '0.6rem 0.85rem', background: selectedSchemaId === s.id ? 'rgba(255,215,0,0.08)' : 'transparent', border: 'none', borderBottom: i < clientSchemas.length - 1 ? '1px solid rgba(255,255,255,0.06)' : 'none', color: selectedSchemaId === s.id ? '#FFD700' : '#fff', fontSize: '0.76rem', fontWeight: '600', cursor: 'pointer', textAlign: 'left', touchAction: 'manipulation' }}>
                       <div>{s._label || s.name}</div>
-                      <div style={{ fontSize: '0.62rem', color: 'rgba(255,255,255,0.3)', marginTop: '0.1rem' }}>
+                      <div style={{ fontSize: '0.6rem', color: 'rgba(255,255,255,0.3)', marginTop: '0.1rem' }}>
                         {s.is_client_edited ? 'Aangepast door client' : 'Origineel coachplan'}
                       </div>
                     </button>
@@ -334,59 +313,53 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
               )}
             </div>
           )}
-        </div>
-
-        {/* Inputs */}
-        <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '2fr 3fr', gap: '1rem', marginBottom: '1rem' }}>
-          <input type="text" placeholder="Workout naam... *" value={workoutPlan.name} onChange={(e) => setWorkoutPlan(prev => ({ ...prev, name: e.target.value }))} style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '10px', padding: '0.75rem', color: '#fff', fontSize: isMobile ? '0.9rem' : '1rem', minHeight: '44px', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }} />
-          <input type="text" placeholder="Beschrijving..." value={workoutPlan.description} onChange={(e) => setWorkoutPlan(prev => ({ ...prev, description: e.target.value }))} style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '10px', padding: '0.75rem', color: '#fff', fontSize: isMobile ? '0.9rem' : '1rem', minHeight: '44px', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }} />
-        </div>
-
-        <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(3, 1fr)', gap: '1rem', marginBottom: '1rem' }}>
-          <div>
-            <label style={{ display: 'block', color: 'rgba(255,255,255,0.7)', fontSize: '0.85rem', marginBottom: '0.25rem' }}>Primary Goal *</label>
-            <select value={workoutPlan.primary_goal} onChange={(e) => setWorkoutPlan(prev => ({ ...prev, primary_goal: e.target.value }))} style={{ width: '100%', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '10px', padding: '0.75rem', color: '#fff', fontSize: isMobile ? '0.9rem' : '1rem', cursor: 'pointer', minHeight: '44px' }}>
-              <option value="muscle_gain">Muscle Gain</option>
-              <option value="fat_loss">Fat Loss</option>
-              <option value="strength">Strength</option>
-              <option value="endurance">Endurance</option>
-              <option value="maintenance">Maintenance</option>
-              <option value="recomp">Body Recomposition</option>
-            </select>
-          </div>
-          <div>
-            <label style={{ display: 'block', color: 'rgba(255,255,255,0.7)', fontSize: '0.85rem', marginBottom: '0.25rem' }}>Experience Level *</label>
-            <select value={workoutPlan.experience_level} onChange={(e) => setWorkoutPlan(prev => ({ ...prev, experience_level: e.target.value }))} style={{ width: '100%', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '10px', padding: '0.75rem', color: '#fff', fontSize: isMobile ? '0.9rem' : '1rem', cursor: 'pointer', minHeight: '44px' }}>
-              <option value="beginner">Beginner</option>
-              <option value="intermediate">Intermediate</option>
-              <option value="advanced">Advanced</option>
-            </select>
-          </div>
-          <div>
-            <label style={{ display: 'block', color: 'rgba(255,255,255,0.7)', fontSize: '0.85rem', marginBottom: '0.25rem' }}>Days Per Week</label>
-            <div style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '10px', padding: '0.75rem', color: '#FFD700', fontSize: isMobile ? '0.9rem' : '1rem', minHeight: '44px', display: 'flex', alignItems: 'center', fontWeight: '600' }}>
-              {workoutPlan.days.length} dagen
-            </div>
-          </div>
-        </div>
-
-        {/* Action buttons */}
-        <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-          <button onClick={() => setShowTemplateManager(true)} style={{ padding: '0.5rem 1rem', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: '12px', color: 'rgba(255,255,255,0.8)', fontSize: isMobile ? '0.85rem' : '0.9rem', fontWeight: '600', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.5rem', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', minHeight: '44px' }}>
-            <FileText size={16} /> Templates
+          <div style={{ flex: 1 }} />
+          <button onClick={() => setShowExerciseLibrary(true)} title="Bibliotheek · video's koppelen" style={cBtn(false)}>
+            <Video size={13} /> Video's
           </button>
-          <button onClick={saveAsTemplate} disabled={saving || workoutPlan.days.length === 0 || !workoutPlan.name} style={{ padding: '0.5rem 1rem', background: 'rgba(212,175,55,0.15)', border: '1px solid rgba(212,175,55,0.35)', borderRadius: '10px', color: '#FFD700', fontSize: isMobile ? '0.85rem' : '0.9rem', fontWeight: '600', cursor: saving || !workoutPlan.name ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', gap: '0.5rem', opacity: workoutPlan.days.length === 0 || !workoutPlan.name ? 0.5 : 1, touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', minHeight: '44px' }}>
-            <Save size={16} /> {saving ? 'Opslaan...' : 'Save Template'}
-          </button>
+        </div>
 
+        {/* Regel 2: naam + beschrijving */}
+        <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.5rem', flexWrap: isMobile ? 'wrap' : 'nowrap' }}>
+          <input type="text" placeholder="Workout naam *" value={workoutPlan.name} onChange={(e) => setWorkoutPlan(prev => ({ ...prev, name: e.target.value }))} style={{ ...cInput, flex: 2, minWidth: 140 }} />
+          <input type="text" placeholder="Beschrijving (optioneel)" value={workoutPlan.description} onChange={(e) => setWorkoutPlan(prev => ({ ...prev, description: e.target.value }))} style={{ ...cInput, flex: 3, minWidth: 140 }} />
+        </div>
+
+        {/* Regel 3: doel + niveau + dagen (compact, geen losse labels) */}
+        <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.7rem', flexWrap: 'wrap' }}>
+          <select value={workoutPlan.primary_goal} onChange={(e) => setWorkoutPlan(prev => ({ ...prev, primary_goal: e.target.value }))} style={cSelect}>
+            <option value="muscle_gain">Muscle Gain</option>
+            <option value="fat_loss">Fat Loss</option>
+            <option value="strength">Strength</option>
+            <option value="endurance">Endurance</option>
+            <option value="maintenance">Maintenance</option>
+            <option value="recomp">Body Recomposition</option>
+          </select>
+          <select value={workoutPlan.experience_level} onChange={(e) => setWorkoutPlan(prev => ({ ...prev, experience_level: e.target.value }))} style={cSelect}>
+            <option value="beginner">Beginner</option>
+            <option value="intermediate">Intermediate</option>
+            <option value="advanced">Advanced</option>
+          </select>
+          <span style={{ ...cInput, display: 'flex', alignItems: 'center', color: '#FFD700', fontWeight: 700, whiteSpace: 'nowrap', flexShrink: 0 }}>
+            {workoutPlan.days.length} dagen
+          </span>
+        </div>
+
+        {/* Regel 4: acties (compact) */}
+        <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
+          <button onClick={() => setShowTemplateManager(true)} style={cBtn(false)}>
+            <FileText size={14} /> Templates
+          </button>
+          <button onClick={saveAsTemplate} disabled={saving || workoutPlan.days.length === 0 || !workoutPlan.name} style={{ ...cBtn(true), cursor: saving || !workoutPlan.name ? 'not-allowed' : 'pointer', opacity: workoutPlan.days.length === 0 || !workoutPlan.name ? 0.5 : 1 }}>
+            <Save size={14} /> {saving ? 'Opslaan…' : 'Save Template'}
+          </button>
           {selectedSchemaId && (
-            <button onClick={saveToClientSchema} disabled={saving} style={{ padding: '0.5rem 1rem', background: 'rgba(255,215,0,0.12)', border: '1px solid rgba(255,215,0,0.3)', borderRadius: '10px', color: '#FFD700', fontSize: isMobile ? '0.85rem' : '0.9rem', fontWeight: '600', cursor: saving ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', gap: '0.5rem', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', minHeight: '44px' }}>
-              <Save size={16} /> {saving ? 'Opslaan...' : 'Opslaan in client plan'}
+            <button onClick={saveToClientSchema} disabled={saving} style={{ ...cBtn(true), cursor: saving ? 'not-allowed' : 'pointer' }}>
+              <Save size={14} /> {saving ? 'Opslaan…' : 'Opslaan in client plan'}
             </button>
           )}
-
-          <button onClick={() => setShowClientAssigner(true)} disabled={workoutPlan.days.length === 0} style={{ padding: '0.5rem 1rem', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: '12px', color: 'rgba(255,255,255,0.8)', fontSize: isMobile ? '0.85rem' : '0.9rem', fontWeight: '600', cursor: workoutPlan.days.length === 0 ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', gap: '0.5rem', opacity: workoutPlan.days.length === 0 ? 0.5 : 1, touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', minHeight: '44px' }}>
-            <Users size={16} /> Assign to Clients
+          <button onClick={() => setShowClientAssigner(true)} disabled={workoutPlan.days.length === 0} style={{ ...cBtn(false), cursor: workoutPlan.days.length === 0 ? 'not-allowed' : 'pointer', opacity: workoutPlan.days.length === 0 ? 0.5 : 1 }}>
+            <Users size={14} /> Assign to Clients
           </button>
         </div>
       </div>
