@@ -75,6 +75,7 @@ export default function TwelveWeekCheckout() {
   const scrollRef = useRef(null)
   const containerRef = useRef(null)
   const offerRef = useRef(null)
+  const formRef = useRef(null)
   // Zwevende "Investering"-knop: zichtbaar tot je de offer-sectie bereikt.
   const [showInvestBtn, setShowInvestBtn] = useState(true)
 
@@ -91,6 +92,7 @@ export default function TwelveWeekCheckout() {
   }, [])
 
   const scrollToOffer = () => offerRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  const scrollToForm = () => formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
 
   // Elke sectie vult (min.) een heel scherm en centreert z'n inhoud verticaal,
   // zodat je één sectie tegelijk ziet. Langere secties groeien gewoon mee.
@@ -356,10 +358,23 @@ export default function TwelveWeekCheckout() {
             <span style={{ color: '#ffba09' }}>Geen zichtbaar verschil binnen 30 dagen?</span> Dan krijg je je investering terug en loop je weg met 30 dagen gratis coaching.
           </div>
           <div style={{ width: 56, height: 3, background: '#ffba09', borderRadius: 2, margin: isMobile ? '1.1rem auto 0' : '1.25rem auto 0' }} />
+
+          {/* Knop naar het formulier (afrekenen) */}
+          <button onClick={scrollToForm} style={{
+            alignSelf: 'center', marginTop: isMobile ? '1.85rem' : '2.25rem',
+            display: 'inline-flex', alignItems: 'center', gap: '0.4rem',
+            padding: isMobile ? '0.85rem 1.7rem' : '0.95rem 2rem', borderRadius: 999, border: 'none',
+            background: '#fff', color: '#000',
+            fontSize: isMobile ? '0.9rem' : '0.95rem', fontWeight: 900, cursor: 'pointer',
+            boxShadow: '0 4px 20px rgba(255,255,255,0.15)', letterSpacing: '0.01em',
+            touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+          }}>
+            Ik wil starten <ChevronDown size={16} strokeWidth={3} />
+          </button>
         </div>
 
         {/* ══ SCHERM 4: FORMULIER ══ */}
-        <div style={screen}>
+        <div ref={formRef} style={screen}>
         <div style={{
           borderRadius: isMobile ? 16 : 18,
           border: '1px solid rgba(255,255,255,0.08)',
@@ -442,10 +457,8 @@ export default function TwelveWeekCheckout() {
           </div>
         </div>
 
-        </div>{/* /scherm 4 formulier */}
-
-        {/* ══ SCHERM 5: REVIEWS ══ */}
-        <div style={screen}>
+        {/* ══ Reviews — samen met het formulier op dit scherm ══ */}
+        <div style={{ marginTop: isMobile ? '2.5rem' : '3rem' }}>
           <div style={{
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             gap: '0.5rem', marginBottom: isMobile ? '0.85rem' : '1rem',
@@ -514,6 +527,7 @@ export default function TwelveWeekCheckout() {
             ))}
           </div>
         </div>
+        </div>{/* /scherm 4: formulier + reviews */}
 
       </div>
     </div>
