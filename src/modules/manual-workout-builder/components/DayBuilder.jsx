@@ -38,109 +38,112 @@ export default function DayBuilder({
 
   const totalVolume = day.exercises.reduce((sum, ex) => sum + (ex.sets || 0), 0)
 
+  // Compacte icon-knop (leadsysteem-stijl) voor de dag-acties.
+  const iconBtn = {
+    width: 30, height: 30, borderRadius: 7, flexShrink: 0,
+    background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)',
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+  }
+
   return (
     <div
       onClick={onActivate}
       style={{
-        background: isActive ? 'rgba(255,215,0,0.06)' : '#141414',
+        // Actief = rustig/clean (bold wit accent), niet goud.
+        background: isActive ? 'rgba(255,255,255,0.05)' : '#141414',
         borderRadius: '16px',
-        border: `1px solid ${isActive ? 'rgba(255,215,0,0.5)' : 'rgba(255,255,255,0.08)'}`,
-        boxShadow: isActive ? '0 6px 18px rgba(255,215,0,0.18)' : 'none',
+        border: `1px solid ${isActive ? 'rgba(255,255,255,0.25)' : 'rgba(255,255,255,0.08)'}`,
+        boxShadow: 'none',
         padding: isMobile ? '1rem' : '1.25rem', cursor: 'pointer',
         transition: 'all 0.2s cubic-bezier(0.4,0,0.2,1)',
         position: 'relative', overflow: 'hidden',
         touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent'
       }}
-      onMouseEnter={(e) => { if (!isMobile) { e.currentTarget.style.transform = 'translateX(4px)'; e.currentTarget.style.borderColor = 'rgba(212,175,55,0.35)' } }}
-      onMouseLeave={(e) => { if (!isMobile) { e.currentTarget.style.transform = 'translateX(0)'; e.currentTarget.style.borderColor = isActive ? 'rgba(212,175,55,0.4)' : 'rgba(212,175,55,0.12)' } }}
+      onMouseEnter={(e) => { if (!isMobile) { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.2)' } }}
+      onMouseLeave={(e) => { if (!isMobile) { e.currentTarget.style.borderColor = isActive ? 'rgba(255,255,255,0.25)' : 'rgba(255,255,255,0.08)' } }}
     >
-      {/* Oranje accentlijn links wanneer actief — zoals de workout-cards */}
+      {/* Witte accentlijn links wanneer actief */}
       {isActive && (
-        <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: '3px', background: 'linear-gradient(180deg, #FFD700 0%, #D4AF37 100%)', boxShadow: '2px 0 8px rgba(255,215,0,0.4)' }} />
+        <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: '3px', background: '#fff' }} />
       )}
 
-      {/* Day badge */}
-      <div style={{ position: 'absolute', top: '-10px', left: '16px', background: isActive ? 'linear-gradient(135deg, #FFD700 0%, #D4AF37 100%)' : '#1e1e1e', padding: '0.25rem 0.75rem', borderRadius: '20px', fontSize: '0.75rem', fontWeight: '800', color: isActive ? '#000' : '#fff', boxShadow: '0 2px 8px rgba(0,0,0,0.3)' }}>
-        DAG {dayNumber}
-      </div>
+      {/* ═══ Header — compact, max 2 regels (leadsysteem-stijl) ═══ */}
+      <div style={{ marginBottom: collapsed ? 0 : '0.85rem' }}>
 
-      {/* Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: collapsed ? 0 : '1rem' }}>
-        <div style={{ flex: 1 }}>
+        {/* Regel 1: dagnr + naam + spiergroep · acties */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', minWidth: 0 }}>
+          {/* Dagnummer */}
+          <span style={{ flexShrink: 0, minWidth: 24, height: 24, padding: '0 6px', borderRadius: 6, background: isActive ? '#fff' : 'rgba(255,255,255,0.08)', color: isActive ? '#000' : 'rgba(255,255,255,0.65)', fontSize: '0.72rem', fontWeight: 900, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{dayNumber}</span>
 
-          {/* Name */}
+          {/* Naam — tap-to-edit */}
           {editingName ? (
-            <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', marginBottom: '0.5rem' }} onClick={(e) => e.stopPropagation()}>
-              <input type="text" value={tempName} onChange={(e) => setTempName(e.target.value)} placeholder="Bijv: PUSH A, LEGS..." autoFocus
-                style={{ flex: 1, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(212,175,55,0.4)', borderRadius: '8px', padding: '0.5rem', color: '#fff', fontSize: isMobile ? '1rem' : '1.1rem', fontWeight: '700', outline: 'none' }}
-                onKeyDown={(e) => { if (e.key === 'Enter') handleSaveName(); if (e.key === 'Escape') handleCancelName() }} />
-              <button onClick={handleSaveName} style={{ padding: '0.5rem', background: 'rgba(212,175,55,0.2)', border: '1px solid rgba(212,175,55,0.4)', borderRadius: '8px', color: '#FFD700', cursor: 'pointer', minWidth: '32px', minHeight: '32px' }}>✓</button>
-              <button onClick={handleCancelName} style={{ padding: '0.5rem', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: '8px', color: '#ef4444', cursor: 'pointer', minWidth: '32px', minHeight: '32px' }}>✕</button>
-            </div>
+            <input value={tempName} autoFocus onClick={(e) => e.stopPropagation()}
+              onChange={(e) => setTempName(e.target.value)} onBlur={handleSaveName}
+              onKeyDown={(e) => { if (e.key === 'Enter') handleSaveName(); if (e.key === 'Escape') handleCancelName() }}
+              placeholder="PUSH A, LEGS…"
+              style={{ flex: 1, minWidth: 0, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.2)', borderRadius: 6, padding: '0.3rem 0.5rem', color: '#fff', fontSize: isMobile ? '0.95rem' : '1.05rem', fontWeight: 800, outline: 'none' }} />
           ) : (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
-              <h3 style={{ fontSize: isMobile ? '1.1rem' : '1.25rem', fontWeight: '700', color: day.name ? '#fff' : 'rgba(255,255,255,0.3)', margin: 0, flex: 1 }}>
-                {day.name || 'Klik om naam in te voeren...'}
-              </h3>
-              <button onClick={(e) => { e.stopPropagation(); setEditingName(true); setTempName(day.name) }} style={{ padding: '0.25rem', background: 'transparent', border: 'none', color: 'rgba(255,255,255,0.5)', cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
-                <Edit2 size={16} />
-              </button>
-            </div>
+            <span onClick={(e) => { e.stopPropagation(); setEditingName(true); setTempName(day.name) }}
+              style={{ flex: 1, minWidth: 0, fontSize: isMobile ? '1rem' : '1.1rem', fontWeight: 800, color: day.name ? '#fff' : 'rgba(255,255,255,0.3)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', cursor: 'pointer', letterSpacing: '-0.01em' }}>
+              {day.name || 'Naam…'}
+            </span>
           )}
 
-          {/* Focus */}
+          {/* Spiergroep-pill — tap-to-edit */}
           {editingFocus ? (
-            <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', marginBottom: '0.5rem' }} onClick={(e) => e.stopPropagation()}>
-              <Target size={14} color="rgba(255,255,255,0.5)" />
-              <input type="text" value={tempFocus} onChange={(e) => setTempFocus(e.target.value)} placeholder="Bijv: chest, shoulders, triceps" autoFocus
-                style={{ flex: 1, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(212,175,55,0.4)', borderRadius: '6px', padding: '0.4rem', color: 'rgba(255,255,255,0.8)', fontSize: isMobile ? '0.8rem' : '0.85rem', outline: 'none' }}
-                onKeyDown={(e) => { if (e.key === 'Enter') handleSaveFocus(); if (e.key === 'Escape') handleCancelFocus() }} />
-              <button onClick={handleSaveFocus} style={{ padding: '0.4rem', background: 'rgba(212,175,55,0.2)', border: '1px solid rgba(212,175,55,0.4)', borderRadius: '6px', color: '#FFD700', cursor: 'pointer', minWidth: '28px', minHeight: '28px' }}>✓</button>
-              <button onClick={handleCancelFocus} style={{ padding: '0.4rem', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: '6px', color: '#ef4444', cursor: 'pointer', minWidth: '28px', minHeight: '28px' }}>✕</button>
-            </div>
+            <input value={tempFocus} autoFocus onClick={(e) => e.stopPropagation()}
+              onChange={(e) => setTempFocus(e.target.value)} onBlur={handleSaveFocus}
+              onKeyDown={(e) => { if (e.key === 'Enter') handleSaveFocus(); if (e.key === 'Escape') handleCancelFocus() }}
+              placeholder="chest, triceps…"
+              style={{ flexShrink: 1, minWidth: 0, maxWidth: 130, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.2)', borderRadius: 6, padding: '0.25rem 0.45rem', color: 'rgba(255,255,255,0.85)', fontSize: '0.7rem', fontWeight: 700, outline: 'none' }} />
           ) : (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.75rem' }}>
-              <Target size={14} color="rgba(255,255,255,0.5)" />
-              <span style={{ fontSize: isMobile ? '0.8rem' : '0.85rem', color: day.focus ? 'rgba(255,255,255,0.6)' : 'rgba(255,255,255,0.3)', flex: 1 }}>
-                {day.focus || 'Klik om spiergroepen toe te voegen...'}
-              </span>
-              <button onClick={(e) => { e.stopPropagation(); setEditingFocus(true); setTempFocus(day.focus) }} style={{ padding: '0.25rem', background: 'transparent', border: 'none', color: 'rgba(255,255,255,0.5)', cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
-                <Edit2 size={14} />
-              </button>
-            </div>
+            <span onClick={(e) => { e.stopPropagation(); setEditingFocus(true); setTempFocus(day.focus) }} title="Spiergroep"
+              style={{ flexShrink: 0, maxWidth: isMobile ? 90 : 150, fontSize: '0.6rem', fontWeight: 800, letterSpacing: '0.03em', textTransform: 'uppercase', color: day.focus ? 'rgba(255,255,255,0.7)' : 'rgba(255,255,255,0.28)', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 5, padding: '0.2rem 0.45rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', cursor: 'pointer' }}>
+              {day.focus || 'Spiergroep'}
+            </span>
           )}
 
-          {/* Stats */}
-          <div style={{ display: 'flex', gap: '1rem', fontSize: isMobile ? '0.75rem' : '0.8rem', color: 'rgba(255,255,255,0.5)' }}>
-            <span style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}><Dumbbell size={12} />{day.exercises.length} oefeningen</span>
-            <span>{totalVolume} sets</span>
-            <span style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}><Clock size={12} />{day.geschatteTijd}</span>
+          {/* Acties — compacte icon-knoppen */}
+          <div style={{ display: 'flex', gap: 3, flexShrink: 0 }}>
+            <button onClick={(e) => { e.stopPropagation(); setCollapsed(!collapsed) }} style={iconBtn}>
+              {collapsed ? <ChevronDown size={16} color="rgba(255,255,255,0.55)" /> : <ChevronUp size={16} color="rgba(255,255,255,0.55)" />}
+            </button>
+            {onSaveTemplate && (
+              <button onClick={(e) => { e.stopPropagation(); onSaveTemplate() }} title="Bewaar als dag-template" style={iconBtn}>
+                <BookmarkPlus size={15} color="#FFD700" />
+              </button>
+            )}
+            <button onClick={(e) => { e.stopPropagation(); onDuplicate() }} title="Dupliceren" style={iconBtn}>
+              <Copy size={15} color="rgba(255,255,255,0.45)" />
+            </button>
+            <button onClick={(e) => { e.stopPropagation(); if (confirm('Weet je zeker dat je deze dag wilt verwijderen?')) onDelete() }} title="Verwijderen" style={iconBtn}>
+              <Trash2 size={15} color="#ef4444" />
+            </button>
           </div>
         </div>
 
-        {/* Actions */}
-        <div style={{ display: 'flex', gap: '0.25rem', alignItems: 'center' }}>
-          <button onClick={(e) => { e.stopPropagation(); setCollapsed(!collapsed) }} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '0.5rem', display: 'flex', alignItems: 'center', justifyContent: 'center', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', minHeight: '44px', minWidth: '44px' }}>
-            {collapsed ? <ChevronDown size={20} color="rgba(255,255,255,0.5)" /> : <ChevronUp size={20} color="rgba(255,255,255,0.5)" />}
-          </button>
-          {onSaveTemplate && (
-            <button onClick={(e) => { e.stopPropagation(); onSaveTemplate() }} title="Bewaar deze dag als template" style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '0.5rem', display: 'flex', alignItems: 'center', justifyContent: 'center', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', minHeight: '44px', minWidth: '44px' }}>
-              <BookmarkPlus size={18} color="#FFD700" />
-            </button>
-          )}
-          <button onClick={(e) => { e.stopPropagation(); onDuplicate() }} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '0.5rem', display: 'flex', alignItems: 'center', justifyContent: 'center', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', minHeight: '44px', minWidth: '44px' }}>
-            <Copy size={18} color="rgba(255,255,255,0.45)" />
-          </button>
-          <button onClick={(e) => { e.stopPropagation(); if (confirm('Weet je zeker dat je deze dag wilt verwijderen?')) onDelete() }} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '0.5rem', display: 'flex', alignItems: 'center', justifyContent: 'center', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', minHeight: '44px', minWidth: '44px' }}>
-            <Trash2 size={18} color="#ef4444" />
-          </button>
-        </div>
+        {/* Regel 2: flush stat-bar (oefeningen · sets · minuten) */}
+        {!collapsed && (
+          <div style={{ display: 'flex', marginTop: '0.7rem', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 8, overflow: 'hidden' }}>
+            {[
+              { v: day.exercises.length, l: 'Oefeningen' },
+              { v: totalVolume, l: 'Sets' },
+              { v: parseInt(day.geschatteTijd) || 60, l: 'Min' },
+            ].map((s, i) => (
+              <div key={s.l} style={{ flex: 1, minWidth: 0, padding: isMobile ? '0.5rem 0.4rem' : '0.55rem 0.6rem', borderLeft: i === 0 ? 'none' : '1px solid rgba(255,255,255,0.06)', textAlign: 'center' }}>
+                <div style={{ fontSize: isMobile ? '0.95rem' : '1.1rem', fontWeight: 900, color: '#fff', lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>{s.v}</div>
+                <div style={{ fontSize: '0.5rem', fontWeight: 700, letterSpacing: '0.05em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.3)', marginTop: 3 }}>{s.l}</div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Exercises */}
       {!collapsed && (
         <>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem', marginTop: '1rem', marginBottom: '1rem', maxHeight: '460px', overflowY: 'auto', paddingRight: day.exercises.length > 4 ? '0.5rem' : 0 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem', marginTop: '1rem', marginBottom: '1rem', maxHeight: isMobile ? '400px' : '440px', overflowY: 'auto', WebkitOverflowScrolling: 'touch', paddingRight: day.exercises.length > 5 ? '0.4rem' : 0 }}>
             {day.exercises.map((exercise, index) => (
               <BuilderExerciseCard
                 key={exercise.id}
@@ -164,23 +167,19 @@ export default function DayBuilder({
             )}
           </div>
 
-          {/* Add Exercise + Add Cardio */}
+          {/* Add Exercise + Add Cardio — rustige leadsysteem-knoppen */}
           <div style={{ display: 'flex', gap: '0.5rem' }}>
             <button onClick={(e) => { e.stopPropagation(); onAddExercise() }}
-              style={{ flex: 1, padding: '0.75rem', background: 'rgba(212,175,55,0.08)', border: '1px solid rgba(212,175,55,0.3)', borderRadius: '8px', color: '#FFD700', fontSize: isMobile ? '0.85rem' : '0.9rem', fontWeight: '600', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', minHeight: '44px' }}
-              onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(212,175,55,0.18)'}
-              onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(212,175,55,0.08)'}
-              onTouchStart={(e) => e.currentTarget.style.transform = 'scale(0.98)'}
-              onTouchEnd={(e) => e.currentTarget.style.transform = 'scale(1)'}>
-              <Plus size={18} />Oefening
+              style={{ flex: 1, padding: '0.7rem', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', color: 'rgba(255,255,255,0.85)', fontSize: isMobile ? '0.82rem' : '0.88rem', fontWeight: '700', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', minHeight: '42px' }}
+              onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.08)'}
+              onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.04)'}>
+              <Plus size={16} color="#FFD700" />Oefening
             </button>
             <button onClick={(e) => { e.stopPropagation(); onAddCardio && onAddCardio() }}
-              style={{ flex: 1, padding: '0.75rem', background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.3)', borderRadius: '8px', color: '#f87171', fontSize: isMobile ? '0.85rem' : '0.9rem', fontWeight: '600', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', minHeight: '44px' }}
-              onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(239,68,68,0.18)'}
-              onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(239,68,68,0.08)'}
-              onTouchStart={(e) => e.currentTarget.style.transform = 'scale(0.98)'}
-              onTouchEnd={(e) => e.currentTarget.style.transform = 'scale(1)'}>
-              <Heart size={16} />Cardio
+              style={{ flex: 1, padding: '0.7rem', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', color: 'rgba(255,255,255,0.85)', fontSize: isMobile ? '0.82rem' : '0.88rem', fontWeight: '700', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', minHeight: '42px' }}
+              onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.08)'}
+              onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.04)'}>
+              <Heart size={15} color="#f87171" />Cardio
             </button>
           </div>
         </>

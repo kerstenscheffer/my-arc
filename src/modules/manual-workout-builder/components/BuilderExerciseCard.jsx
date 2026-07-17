@@ -22,18 +22,18 @@ export default function BuilderExerciseCard({
   exercise, index, total, isMobile, db, client, onField, onMove, onDelete, onVideo,
 }) {
   const { imageUrl, loadingImage, hasVideo } = useExerciseImage(exercise, db, client)
-  const photoSize = isMobile ? 64 : 76
+  const photoSize = isMobile ? 54 : 72
   const hasVid = hasVideo || !!exercise.video_url
   const [cardioMenuOpen, setCardioMenuOpen] = useState(false)
 
   const statInput = {
-    width: 30, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)',
+    width: 26, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)',
     borderRadius: 6, color: '#FFD700', fontSize: '0.72rem', fontWeight: 800,
     textAlign: 'center', outline: 'none', padding: '2px 1px', touchAction: 'manipulation',
     fontVariantNumeric: 'tabular-nums',
   }
-  const statLbl = { fontSize: '0.52rem', fontWeight: 700, color: 'rgba(255,255,255,0.35)', textTransform: 'uppercase', letterSpacing: '0.03em' }
-  const ctrlBtn = (color) => ({ background: 'transparent', border: 'none', cursor: 'pointer', padding: 0, color, display: 'flex', alignItems: 'center', justifyContent: 'center', minWidth: 30, minHeight: 30, touchAction: 'manipulation' })
+  const statLbl = { fontSize: '0.5rem', fontWeight: 700, color: 'rgba(255,255,255,0.35)', textTransform: 'uppercase', letterSpacing: '0.03em' }
+  const ctrlBtn = (color) => ({ background: 'transparent', border: 'none', cursor: 'pointer', padding: 0, color, display: 'flex', alignItems: 'center', justifyContent: 'center', minWidth: 26, minHeight: 28, touchAction: 'manipulation', flexShrink: 0 })
 
   const stop = (e) => e.stopPropagation()
 
@@ -41,6 +41,7 @@ export default function BuilderExerciseCard({
     <div onClick={stop} style={{
       background: '#141414', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 14,
       overflow: 'hidden', display: 'flex', flexDirection: 'column',
+      flexShrink: 0,  // niet platdrukken in de scroll-container — echt scrollen
     }}>
       {/* Gouden lijn bovenaan wanneer er een video gekoppeld is */}
       {hasVid && <div style={{ height: 2, background: 'linear-gradient(90deg, transparent, rgba(255,215,0,0.4), transparent)' }} />}
