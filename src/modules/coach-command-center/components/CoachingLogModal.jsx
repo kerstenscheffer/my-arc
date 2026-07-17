@@ -418,7 +418,22 @@ export default function CoachingLogModal({ client, db, coachId, onClose, isMobil
     </div>
   )
 
-  return createPortal(modal, document.body)
+  return createPortal(
+    <>
+      {/* Gedimde achtergrond — maakt zichtbaar dát de modal open is en sluit
+          bij klik ernaast. Net onder de modal-z-index. */}
+      <div
+        onClick={onClose}
+        style={{
+          position: 'fixed', inset: 0,
+          background: 'rgba(0,0,0,0.6)',
+          zIndex: 2147482999,
+        }}
+      />
+      {modal}
+    </>,
+    document.body
+  )
 }
 
 const iconBtnStyle = {
