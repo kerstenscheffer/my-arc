@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react'
 import DayBuilder from './components/DayBuilder'
 import ExerciseSelector from './components/ExerciseSelector'
 import TemplateManager from './components/TemplateManager'
+import DayTemplatePickerModal from './components/DayTemplatePickerModal'
 import ClientAssigner from './components/ClientAssigner'
 import { Activity, Plus, Save, Users, FileText, ChevronDown, Video } from 'lucide-react'
 import PDFExportButton from './components/PDFExportButton'
@@ -22,12 +23,14 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
   const [showClientAssigner, setShowClientAssigner] = useState(false)
   const [saving, setSaving] = useState(false)
   const [templates, setTemplates] = useState([])
+  const [dayTemplates, setDayTemplates] = useState([])
+  const [showDayPicker, setShowDayPicker] = useState(false)
   const [clientSchemas, setClientSchemas] = useState([])
   const [selectedSchemaId, setSelectedSchemaId] = useState(null)
   const [showSchemaPicker, setShowSchemaPicker] = useState(false)
   const [showExerciseLibrary, setShowExerciseLibrary] = useState(false)
 
-  useEffect(() => { loadTemplates() }, [])
+  useEffect(() => { loadTemplates(); loadDayTemplates() }, [])
 
   useEffect(() => {
     if (!selectedClient) return
@@ -81,10 +84,69 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
     } catch (e) { console.error('Error loading templates:', e) }
   }
 
-  const addDay = () => {
+  // ── Dag-templates (bv. "Push dag") — coach-scoped, herbruikbaar in elk plan ──
+  const loadDayTemplates = async () => {
+    try {
+      const user = await db.getCurrentUser()
+      if (!user) return
+      const { data, error } = await db.supabase
+        .from('workout_day_templates')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false })
+      if (error) throw error
+      setDayTemplates(data || [])
+    } catch (e) { console.error('loadDayTemplates:', e) }
+  }
+
+  const saveDayAsTemplate = async (day) => {
+    const name = (window.prompt('Naam voor deze dag-template (bv. "Push dag"):', day?.name || '') || '').trim()
+    if (!name) return
+    try {
+      const user = await db.getCurrentUser()
+      if (!user) { alert('Je moet ingelogd zijn'); return }
+      // client-only id per oefening strippen; de rest bewaren we volledig.
+      const exercises = (day.exercises || []).map(({ id, ...ex }) => ex)
+      const { error } = await db.supabase.from('workout_day_templates').insert({
+        user_id: user.id, name,
+        focus: day.focus || '',
+        geschatte_tijd: day.geschatteTijd || '60 minutes',
+        exercises,
+      })
+      if (error) throw error
+      await loadDayTemplates()
+      alert('✅ Dag-template opgeslagen!')
+    } catch (e) { alert('❌ Opslaan mislukt: ' + (e.message || e)) }
+  }
+
+  const deleteDayTemplate = async (tpl) => {
+    if (!confirm(`Dag-template "${tpl.name}" verwijderen?`)) return
+    try {
+      const { error } = await db.supabase.from('workout_day_templates').delete().eq('id', tpl.id)
+      if (error) throw error
+      setDayTemplates(prev => prev.filter(t => t.id !== tpl.id))
+    } catch (e) { alert('❌ Verwijderen mislukt: ' + (e.message || e)) }
+  }
+
+  const addEmptyDay = () => {
     const newDay = { id: Date.now(), name: '', focus: '', exercises: [], geschatteTijd: '60 minutes' }
     setWorkoutPlan(prev => ({ ...prev, days: [...prev.days, newDay], days_per_week: prev.days.length + 1 }))
     setActiveDay(newDay.id)
+    setShowDayPicker(false)
+  }
+
+  const addDayFromTemplate = (tpl) => {
+    const base = Date.now()
+    const newDay = {
+      id: base,
+      name: tpl.name || '',
+      focus: tpl.focus || '',
+      geschatteTijd: tpl.geschatte_tijd || '60 minutes',
+      exercises: (tpl.exercises || []).map((ex, i) => ({ ...ex, id: base + i + 1 + Math.random() })),
+    }
+    setWorkoutPlan(prev => ({ ...prev, days: [...prev.days, newDay], days_per_week: prev.days.length + 1 }))
+    setActiveDay(newDay.id)
+    setShowDayPicker(false)
   }
 
   const updateDay = (dayId, updates) => {
@@ -335,13 +397,14 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
           <DayBuilder key={day.id} day={day} dayNumber={index + 1} isActive={activeDay === day.id}
             onActivate={() => setActiveDay(day.id)} onUpdate={(updates) => updateDay(day.id, updates)}
             onDelete={() => deleteDay(day.id)} onDuplicate={() => duplicateDay(day.id)}
+            onSaveTemplate={() => saveDayAsTemplate(day)}
             onAddExercise={() => { setActiveDay(day.id); setShowExerciseSelector(true) }}
             onAddCardio={() => addCardioToDay(day.id)}
             onUpdateExercise={(exerciseId, updates) => updateExercise(day.id, exerciseId, updates)}
             onDeleteExercise={(exerciseId) => deleteExercise(day.id, exerciseId)} isMobile={isMobile}
             db={db} client={selectedClient} />
         ))}
-        <button onClick={addDay} style={{ background: 'rgba(212,175,55,0.07)', border: '2px dashed rgba(212,175,55,0.3)', borderRadius: '16px', padding: isMobile ? '2rem' : '3rem', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', cursor: 'pointer', minHeight: isMobile ? '150px' : '200px', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}
+        <button onClick={() => setShowDayPicker(true)} style={{ background: 'rgba(212,175,55,0.07)', border: '2px dashed rgba(212,175,55,0.3)', borderRadius: '16px', padding: isMobile ? '2rem' : '3rem', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', cursor: 'pointer', minHeight: isMobile ? '150px' : '200px', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}
           onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(212,175,55,0.15)'; e.currentTarget.style.borderColor = 'rgba(212,175,55,0.5)' }}
           onMouseLeave={(e) => { e.currentTarget.style.background = 'rgba(212,175,55,0.07)'; e.currentTarget.style.borderColor = 'rgba(212,175,55,0.3)' }}>
           <Plus size={32} color="#FFD700" />
@@ -351,6 +414,16 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
 
       {showExerciseSelector && <ExerciseSelector onSelect={addExercise} onClose={() => setShowExerciseSelector(false)} isMobile={isMobile} db={db} selectedClient={selectedClient} />}
       {showTemplateManager && <TemplateManager templates={templates} onLoad={loadTemplate} onClose={() => setShowTemplateManager(false)} isMobile={isMobile} />}
+      {showDayPicker && (
+        <DayTemplatePickerModal
+          templates={dayTemplates}
+          onPickEmpty={addEmptyDay}
+          onPickTemplate={addDayFromTemplate}
+          onDeleteTemplate={deleteDayTemplate}
+          onClose={() => setShowDayPicker(false)}
+          isMobile={isMobile}
+        />
+      )}
       {showClientAssigner && <ClientAssigner clients={clients} workoutPlan={workoutPlan} db={db} initialClient={selectedClient || null} onClose={() => setShowClientAssigner(false)} isMobile={isMobile} />}
 
       <ExerciseLibraryModal

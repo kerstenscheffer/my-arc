@@ -1,11 +1,11 @@
 // src/modules/manual-workout-builder/components/DayBuilder.jsx
 import { useState } from 'react'
-import { Trash2, Copy, Plus, Edit2, ChevronDown, ChevronUp, Dumbbell, Target, Clock, Heart } from 'lucide-react'
+import { Trash2, Copy, Plus, Edit2, ChevronDown, ChevronUp, Dumbbell, Target, Clock, Heart, BookmarkPlus } from 'lucide-react'
 import ExerciseVideoEditor from './ExerciseVideoEditor'
 import BuilderExerciseCard from './BuilderExerciseCard'
 
 export default function DayBuilder({
-  day, dayNumber, isActive, onActivate, onUpdate, onDelete, onDuplicate,
+  day, dayNumber, isActive, onActivate, onUpdate, onDelete, onDuplicate, onSaveTemplate,
   onAddExercise, onAddCardio, onUpdateExercise, onDeleteExercise, isMobile, db, client
 }) {
   const [editingName, setEditingName] = useState(false)
@@ -123,6 +123,11 @@ export default function DayBuilder({
           <button onClick={(e) => { e.stopPropagation(); setCollapsed(!collapsed) }} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '0.5rem', display: 'flex', alignItems: 'center', justifyContent: 'center', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', minHeight: '44px', minWidth: '44px' }}>
             {collapsed ? <ChevronDown size={20} color="rgba(255,255,255,0.5)" /> : <ChevronUp size={20} color="rgba(255,255,255,0.5)" />}
           </button>
+          {onSaveTemplate && (
+            <button onClick={(e) => { e.stopPropagation(); onSaveTemplate() }} title="Bewaar deze dag als template" style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '0.5rem', display: 'flex', alignItems: 'center', justifyContent: 'center', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', minHeight: '44px', minWidth: '44px' }}>
+              <BookmarkPlus size={18} color="#FFD700" />
+            </button>
+          )}
           <button onClick={(e) => { e.stopPropagation(); onDuplicate() }} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '0.5rem', display: 'flex', alignItems: 'center', justifyContent: 'center', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', minHeight: '44px', minWidth: '44px' }}>
             <Copy size={18} color="rgba(255,255,255,0.45)" />
           </button>
