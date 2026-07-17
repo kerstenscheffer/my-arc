@@ -7,7 +7,7 @@
 // Stripe: reuse van /api/create-subscription-session (no API change).
 
 import { useState, useEffect, useRef } from 'react'
-import { Star, Lock, Mail, User, Phone } from 'lucide-react'
+import { Star, Lock, Mail, User, Phone, ChevronDown } from 'lucide-react'
 
 // Stripe recurring price · €99/mnd · product prod_TaoKNtzQpYqwch
 const STRIPE_MAAND_PRICE_ID = 'price_1SdciJJ3V4uXn1OkxOMcGNiX'
@@ -75,6 +75,24 @@ export default function MaandCheckout() {
   const [error, setError] = useState('')
   const isMobile = window.innerWidth <= 768
   const scrollRef = useRef(null)
+  const containerRef = useRef(null)
+  const offerRef = useRef(null)
+  // Zwevende "Investering"-knop: zichtbaar tot je de offer-sectie bereikt.
+  const [showInvestBtn, setShowInvestBtn] = useState(true)
+
+  useEffect(() => {
+    const target = offerRef.current
+    const root = containerRef.current
+    if (!target || !root) return
+    const obs = new IntersectionObserver(
+      ([entry]) => setShowInvestBtn(!entry.isIntersecting),
+      { root, threshold: 0.15 }
+    )
+    obs.observe(target)
+    return () => obs.disconnect()
+  }, [])
+
+  const scrollToOffer = () => offerRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
 
   // Auto-scroll review carousel — same vibe as the other checkout pages.
   useEffect(() => {
@@ -141,7 +159,7 @@ export default function MaandCheckout() {
   const doubledReviews = [...REVIEWS, ...REVIEWS]
 
   return (
-    <div style={{
+    <div ref={containerRef} style={{
       // Zachte snap-scroll: glijdt naar de dichtstbijzijnde sectie zodra je in
       // de buurt komt (proximity houdt je nergens vast — belangrijk op checkout).
       height: isMobile ? '100dvh' : '100vh', overflowY: 'auto', WebkitOverflowScrolling: 'touch',
@@ -154,6 +172,23 @@ export default function MaandCheckout() {
         maxWidth: 520, margin: '0 auto',
         padding: isMobile ? '3.5rem 1.25rem 4.5rem' : '4.5rem 2rem 5.5rem',
       }}>
+
+        {/* ══ Zwevende "Investering"-knop — begeleidt naar de prijs/offer ══ */}
+        {showInvestBtn && (
+          <button onClick={scrollToOffer} style={{
+            position: 'fixed', bottom: isMobile ? 18 : 26, left: '50%', transform: 'translateX(-50%)',
+            zIndex: 50, display: 'flex', alignItems: 'center', gap: '0.4rem',
+            padding: isMobile ? '0.75rem 1.4rem' : '0.85rem 1.7rem', borderRadius: 999,
+            border: '1.5px solid rgba(255,255,255,0.85)',
+            background: 'rgba(255,255,255,0.1)', color: '#fff',
+            backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)',
+            fontSize: isMobile ? '0.85rem' : '0.92rem', fontWeight: 900, cursor: 'pointer',
+            boxShadow: '0 6px 24px rgba(0,0,0,0.35)', letterSpacing: '0.01em',
+            touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+          }}>
+            Investering hier <ChevronDown size={16} strokeWidth={3} />
+          </button>
+        )}
 
         {/* ══ HERO (gelijk aan /sales) ══ */}
         <div style={{ textAlign: 'center', marginBottom: isMobile ? '1.5rem' : '1.75rem', scrollSnapAlign: 'start' }}>
@@ -297,7 +332,7 @@ export default function MaandCheckout() {
         </div>
 
         {/* ══ OFFER — compacte platte tekst (sales-stijl, geen card) ══ */}
-        <div style={{ textAlign: 'center', marginBottom: isMobile ? '4rem' : '5.5rem', scrollSnapAlign: 'start' }}>
+        <div ref={offerRef} style={{ textAlign: 'center', marginBottom: isMobile ? '4rem' : '5.5rem', scrollSnapAlign: 'start' }}>
           {/* Prijs */}
           <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'center', gap: 5 }}>
             <span style={{ fontSize: isMobile ? '2.9rem' : '3.4rem', fontWeight: 900, color: '#fff', lineHeight: 1, letterSpacing: '-0.02em' }}>€99</span>
@@ -371,14 +406,14 @@ export default function MaandCheckout() {
               width: '100%',
               padding: isMobile ? '1rem' : '1.1rem',
               borderRadius: 12, border: 'none',
-              background: loading ? 'rgba(255,186,9,0.3)' : 'linear-gradient(135deg, #ffba09, #e8a800)',
+              background: loading ? 'rgba(255,255,255,0.4)' : '#fff',
               color: '#000',
               fontSize: isMobile ? '0.9rem' : '0.95rem',
               fontWeight: 900,
               cursor: loading ? 'not-allowed' : 'pointer',
               transition: 'all 0.3s ease',
               marginTop: '0.5rem', minHeight: 52,
-              boxShadow: loading ? 'none' : '0 4px 20px rgba(255,186,9,0.3)',
+              boxShadow: loading ? 'none' : '0 4px 20px rgba(255,255,255,0.15)',
               touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
               letterSpacing: '0.01em',
             }}
