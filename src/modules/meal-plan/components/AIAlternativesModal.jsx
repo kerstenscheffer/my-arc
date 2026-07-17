@@ -4,13 +4,14 @@
 import React, { useState, useEffect } from 'react'
 import { X, Search, Check, ArrowUp, ArrowDown, Minus, Star, Flame, Beef } from 'lucide-react'
 
-export default function AIAlternativesModal({ 
-  isOpen, 
-  onClose, 
-  currentMeal, 
+export default function AIAlternativesModal({
+  isOpen,
+  onClose,
+  currentMeal,
   onSelectMeal,
   db,
-  service
+  service,
+  client
 }) {
   const isMobile = window.innerWidth <= 768
   const [searchTerm, setSearchTerm] = useState('')
@@ -73,14 +74,22 @@ export default function AIAlternativesModal({
         .limit(200)
 
       // Door de coach gecureerde swaps voor dit slot (client_swap_options).
-      // RLS scope't automatisch op de ingelogde client; we filteren op slot.
+      // EXPLICIET op client_id filteren i.p.v. op RLS leunen: zodra meerdere
+      // clients gecureerde swaps hebben, gaf een slot-only query >1 rij →
+      // .maybeSingle() faalde stil → coach-swaps verdwenen helemaal.
       let curated = []
       try {
-        const { data: opt } = await db.supabase
-          .from('client_swap_options')
-          .select('meal_ids')
-          .eq('meal_slot', slotKey)
-          .maybeSingle()
+        const clientId = client?.id || currentMeal?.client_id || null
+        let opt = null
+        if (clientId) {
+          const { data } = await db.supabase
+            .from('client_swap_options')
+            .select('meal_ids')
+            .eq('client_id', clientId)
+            .eq('meal_slot', slotKey)
+            .maybeSingle()
+          opt = data
+        }
         const ids = opt?.meal_ids || []
         if (ids.length > 0) {
           const { data: curatedMeals } = await db.supabase.from('ai_meals').select('*').in('id', ids)

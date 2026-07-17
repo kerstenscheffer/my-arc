@@ -686,6 +686,7 @@ export default function AIMealDashboard({ client, onNavigate, db }) {
           onSelectMeal={(newMealId) => handleSwapMeal(modals.alternatives, newMealId)}
           db={db}
           service={service}
+          client={client}
         />
       )}
       
