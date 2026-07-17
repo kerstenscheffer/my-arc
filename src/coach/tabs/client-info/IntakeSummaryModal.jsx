@@ -377,7 +377,9 @@ export default function IntakeSummaryModal({ db, client, isMobile, onClose }) {
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        zIndex: 9999,
+        // Boven de CoachInsight-modal (zIndex 10000) zodat 'ie ook vanuit het
+        // Command Center vóór de insight-modal opent, niet erachter.
+        zIndex: 10600,
         padding: isMobile ? '0' : '1rem',
         animation: 'fadeIn 0.2s ease'
       }}
