@@ -242,18 +242,45 @@ export default function AIDaySchedule({
         return null
       }
       
-      for (const cfg of [
-        { key: 'breakfast', slot: 'breakfast', label: 'Ontbijt', time: 8 },
-        { key: 'lunch', slot: 'lunch', label: 'Lunch', time: 12.5 },
-        { key: 'dinner', slot: 'dinner', label: 'Diner', time: 18.5 },
-        { key: 'snack1', slot: 'snack1', label: 'Snack 1', time: 10 },
-        { key: 'snack2', slot: 'snack2', label: 'Snack 2', time: 15 }
-      ]) {
-        if (dayPlan[cfg.key]) {
-          const d = await getMealData(dayPlan[cfg.key])
-          if (d) meals.push({ ...d, slot: cfg.slot, timeSlot: cfg.label, plannedTime: cfg.time, meal_name: d.name || d.meal_name || cfg.label, meal_id: d.id || d.meal_id })
-        }
+      // Standaard label + tijd per slot. Coach kan dit overrulen met een eigen
+      // titel (display_label, bv. "Pre Workout Meal") — die wint altijd.
+      const SLOT_META = {
+        breakfast: { label: 'Ontbijt', time: 8 },
+        lunch:     { label: 'Lunch', time: 12.5 },
+        dinner:    { label: 'Diner', time: 18.5 },
+        snack1:    { label: 'Snack 1', time: 10 },
+        snack2:    { label: 'Snack 2', time: 15 },
+        snack3:    { label: 'Snack 3', time: 20.5 },
+        snack4:    { label: 'Snack 4', time: 21.5 },
       }
+      // Niet-maaltijd keys in het dag-object overslaan.
+      const NON_MEAL = new Set(['totals', 'is_training_day', 'dayId', 'scaling'])
+      const pretty = (s) => s ? s.charAt(0).toUpperCase() + s.slice(1) : 'Maaltijd'
+      const parseTime = (t) => { const mm = /(\d{1,2}):(\d{2})/.exec(t || ''); return mm ? parseInt(mm[1], 10) + parseInt(mm[2], 10) / 60 : null }
+
+      // ALLE slots in het dag-plan doorlopen (niet alleen de vaste 5), zodat
+      // snack3+/custom maaltijden óók verschijnen.
+      for (const slot of Object.keys(dayPlan)) {
+        if (NON_MEAL.has(slot) || !dayPlan[slot]) continue
+        const stored = dayPlan[slot]
+        const displayLabel = (stored && typeof stored === 'object' && stored.display_label) || null
+        const meta = SLOT_META[slot] || {}
+        const d = await getMealData(stored)
+        if (!d) continue
+        const label = displayLabel || meta.label || pretty(slot)
+        const plannedTime = parseTime(typeof stored === 'object' ? stored.timing : null) ?? meta.time ?? 12
+        meals.push({
+          ...d,
+          slot,
+          display_label: displayLabel || d.display_label || null,
+          timeSlot: label,
+          plannedTime,
+          meal_name: d.name || d.meal_name || label,
+          meal_id: d.id || d.meal_id,
+        })
+      }
+      // Op geplande tijd sorteren zodat de volgorde klopt (ook voor custom slots).
+      meals.sort((a, b) => (a.plannedTime ?? 12) - (b.plannedTime ?? 12))
       setDisplayMeals(meals)
     } catch (e) { setDisplayMeals([]) }
     finally { setLoading(false) }

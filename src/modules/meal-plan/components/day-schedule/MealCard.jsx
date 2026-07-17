@@ -19,15 +19,23 @@ const getMealImage = (meal) => {
   return foodImageFallback(meal?.name || meal?.title, meal?.slot, 200)
 }
 
-const getSlotLabel = (slot) => {
-  const labels = {
-    breakfast: 'Ontbijt',
-    lunch:     'Lunch',
-    dinner:    'Diner',
-    snack1:    'Snack 1',
-    snack2:    'Snack 2',
-  }
-  return labels[slot] || slot || 'Maaltijd'
+const SLOT_LABELS = {
+  breakfast: 'Ontbijt',
+  lunch:     'Lunch',
+  dinner:    'Diner',
+  snack1:    'Snack 1',
+  snack2:    'Snack 2',
+  snack3:    'Snack 3',
+  snack4:    'Snack 4',
+}
+// Toont de "soort maaltijd"-titel. Coach-titel (display_label, bv.
+// "Pre Workout Meal") wint; anders het standaard slot-label; anders de
+// slot-naam netjes met hoofdletter — nooit meer een kale key.
+const getMealTypeLabel = (meal) => {
+  if (meal?.display_label) return meal.display_label
+  const slot = meal?.slot
+  if (slot && SLOT_LABELS[slot]) return SLOT_LABELS[slot]
+  return slot ? slot.charAt(0).toUpperCase() + slot.slice(1) : 'Maaltijd'
 }
 
 export default function MealCard({
@@ -86,7 +94,7 @@ export default function MealCard({
             marginBottom: 4,
             opacity: 0.85,
           }}>
-            {getSlotLabel(meal.slot)}
+            {getMealTypeLabel(meal)}
           </div>
 
           <div style={{
