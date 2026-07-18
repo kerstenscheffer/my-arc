@@ -720,16 +720,10 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
         updateData.moved_to_stale_at = null
       }
 
-      if (currentItem) {
-        await this.db.supabase
-          .from('lead_section_items')
-          .update(updateData)
-          .eq('lead_id', leadId)
-      } else {
-        await this.db.supabase
-          .from('lead_section_items')
-          .insert({ lead_id: leadId, ...updateData })
-      }
+      // Upsert op lead_id → nooit een tweede rij voor dezelfde lead (issue d93267cf).
+      await this.db.supabase
+        .from('lead_section_items')
+        .upsert({ lead_id: leadId, ...updateData }, { onConflict: 'lead_id' })
 
       await this.db.supabase.from('call_leads').update({ last_touched: new Date().toISOString() }).eq('id', leadId)
 
@@ -838,22 +832,32 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
 
       const excludedSectionIds = new Set(
         sections
-          .filter(s => EXCLUDE_FROM_STALE_PATTERNS.some(pattern => 
+          .filter(s => EXCLUDE_FROM_STALE_PATTERNS.some(pattern =>
             (s.title || '').toLowerCase().includes(pattern)
           ))
           .map(s => s.id)
       )
 
-      console.log(`🛡️ Sections excluded from stale: ${excludedSectionIds.size}`,
-        sections.filter(s => excludedSectionIds.has(s.id)).map(s => s.title)
+      // v8 (issue d93267cf): WHITELIST i.p.v. blacklist. ALLEEN leads uit de
+      // actieve gesprek-secties (Gesprek insta / Gesprek Whatsapp) mogen door de
+      // stil-automation verplaatst worden. Al het andere (Call voorgesteld,
+      // Sales Call, Nieuwe volgers, Sale, No Show, Snooze, ...) blijft met rust —
+      // die verplaats je zelf. De stil-secties zelf escaleren apart (staleLeads).
+      const ALLOWED_SOURCE_PATTERNS = ['gesprek']
+      const allowedSourceIds = new Set(
+        sections
+          .filter(s => ALLOWED_SOURCE_PATTERNS.some(p => (s.title || '').toLowerCase().includes(p)))
+          .map(s => s.id)
+      )
+
+      console.log(`🛡️ Toegestane bron-secties (stil-automation): ${allowedSourceIds.size}`,
+        sections.filter(s => allowedSourceIds.has(s.id)).map(s => s.title)
       )
 
       const normalLeads = leadsWithActivity.filter(lead => {
         if (staleSectionIds.has(lead.current_section_id)) return false
-        if (excludedSectionIds.has(lead.current_section_id)) {
-          console.log(`⏭️ Skipping "${lead.first_name}" - in excluded section`)
-          return false
-        }
+        // Alleen gesprek-secties doorschuiven; alle andere kolommen met rust laten.
+        if (!allowedSourceIds.has(lead.current_section_id)) return false
         if (lead.contacted_today_date?.split('T')[0] === today) {
           console.log(`⏭️ Skipping "${lead.first_name}" - contacted today via checkbox`)
           return false
@@ -1127,23 +1131,27 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
         }
       }
       
+      // VERPLAATSEN, nooit dupliceren: upsert op lead_id (unique constraint).
+      // Zo kan één lead nooit in meerdere kolommen tegelijk belanden, ook niet
+      // als een vorige run een rare staat achterliet (issue d93267cf, FIX 2).
       const { data: existingItem } = await this.db.supabase
         .from('lead_section_items')
         .select('id, previous_section_id')
         .eq('lead_id', lead.id)
+        .limit(1)
         .maybeSingle()
-      
-      if (existingItem) {
-        const updateData = { section_id: targetSection.id, moved_at: new Date().toISOString() }
-        if (!isAlreadyStale && !existingItem.previous_section_id) {
-          Object.assign(updateData, previousSectionData)
-        }
-        await this.db.supabase.from('lead_section_items').update(updateData).eq('lead_id', lead.id)
-      } else {
-        await this.db.supabase.from('lead_section_items').insert({
-          lead_id: lead.id, section_id: targetSection.id, position: 0, ...previousSectionData
-        })
+
+      const payload = {
+        lead_id: lead.id,
+        section_id: targetSection.id,
+        moved_at: new Date().toISOString(),
+        // previous_section alleen zetten bij eerste keer stil worden.
+        ...((!isAlreadyStale && !existingItem?.previous_section_id) ? previousSectionData : {}),
+        ...(existingItem ? {} : { position: 0 }),
       }
+      await this.db.supabase
+        .from('lead_section_items')
+        .upsert(payload, { onConflict: 'lead_id' })
       
       await this.db.supabase.from('lead_movements').insert({
         lead_id: lead.id, lead_name: leadName,
