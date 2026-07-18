@@ -1314,6 +1314,7 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
         .from('lead_movements')
         .select('*')
         .gte('moved_at', today.toISOString())
+        .is('reverted_at', null)  // teruggedraaide verplaatsingen niet meetellen (issue d93267cf, FIX 3)
 
       const NO_SHOW_KEYWORDS = ['no show', 'no-show', 'noshow']
       const funnelKeywords = {
@@ -1453,7 +1454,8 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
           .is('deleted_at', null),
         this.db.supabase.from('lead_movements')
           .select('moved_at, to_section_title')
-          .gte('moved_at', startISO).lt('moved_at', endISO),
+          .gte('moved_at', startISO).lt('moved_at', endISO)
+          .is('reverted_at', null),  // teruggedraaide verplaatsingen niet dubbeltellen (issue d93267cf, FIX 3)
         this.db.supabase.from('call_leads')
           .select('last_followup_sent_at')
           .eq('coach_id', coachId)
