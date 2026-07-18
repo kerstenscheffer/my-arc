@@ -1310,11 +1310,7 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
       const today = new Date()
       today.setHours(0, 0, 0, 0)
 
-      const { data: movements } = await this.db.supabase
-        .from('lead_movements')
-        .select('*')
-        .gte('moved_at', today.toISOString())
-        .is('reverted_at', null)  // teruggedraaide verplaatsingen niet meetellen (issue d93267cf, FIX 3)
+      const movements = await this._fetchMovementsPaged(today.toISOString(), null, '*')
 
       const NO_SHOW_KEYWORDS = ['no show', 'no-show', 'noshow']
       const funnelKeywords = {
@@ -1446,16 +1442,14 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
       // Pull the underlying rows once, then bucket client-side per local
       // calendar day. Avoids N queries (one per day) and lets us re-use
       // the existing funnel-keyword logic.
-      const [{ data: leads }, { data: movements }, { data: followupLeads }] = await Promise.all([
+      const [{ data: leads }, movements, { data: followupLeads }] = await Promise.all([
         this.db.supabase.from('call_leads')
           .select('id, created_at')
           .eq('coach_id', coachId)
           .gte('created_at', startISO).lt('created_at', endISO)
           .is('deleted_at', null),
-        this.db.supabase.from('lead_movements')
-          .select('moved_at, to_section_title')
-          .gte('moved_at', startISO).lt('moved_at', endISO)
-          .is('reverted_at', null),  // teruggedraaide verplaatsingen niet dubbeltellen (issue d93267cf, FIX 3)
+        // gepagineerd → niet afgekapt op 1000 rijen bij veel movements
+        this._fetchMovementsPaged(startISO, endISO, 'moved_at, to_section_title'),
         this.db.supabase.from('call_leads')
           .select('last_followup_sent_at')
           .eq('coach_id', coachId)
@@ -1729,15 +1723,34 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
   }
 
   // Range version of getTodayFunnelStats.
+  // Haalt ALLE movements in een window op, gepagineerd. Zonder dit kapt Supabase
+  // op 1000 rijen (de nieuwste); bij veel stil-automation-verkeer (2000+/week)
+  // vielen de echte funnel-movements erbuiten -> stats toonden maar ~3. (bugfix)
+  async _fetchMovementsPaged(startISO, endISO = null, columns = '*') {
+    const pageSize = 1000
+    const rows = []
+    for (let from = 0; ; from += pageSize) {
+      let q = this.db.supabase
+        .from('lead_movements')
+        .select(columns)
+        .gte('moved_at', startISO)
+        .is('reverted_at', null)
+        .order('moved_at', { ascending: false })
+        .range(from, from + pageSize - 1)
+      if (endISO) q = q.lt('moved_at', endISO)
+      const { data, error } = await q
+      if (error) throw error
+      if (data && data.length) rows.push(...data)
+      if (!data || data.length < pageSize) break
+    }
+    return rows
+  }
+
   async getRangeFunnelStats(coachId, startISO, endISO) {
     try {
-      const { data: movements } = await this.db.supabase
-        .from('lead_movements')
-        .select('*')
-        .gte('moved_at', startISO)
-        .lt('moved_at', endISO)
-        .is('reverted_at', null)  // teruggedraaide verplaatsingen tellen niet mee
-        .order('moved_at', { ascending: false })  // nieuwste eerst → drill-down leest chronologisch
+      // Nieuwste eerst → drill-down leest chronologisch; gepagineerd zodat de
+      // 1000-rijen-cap de tellingen niet meer afknijpt.
+      const movements = await this._fetchMovementsPaged(startISO, endISO, '*')
       // ORDER MATTERS — first match wins. We check `callProposed` ahead of
       // `callScheduled` so a section titled "Call voorgesteld" lands in the
       // proposed-bucket and "Sales Call" / "Ingepland" lands in the
