@@ -14,6 +14,8 @@ export default function ScanTab({ db, onSelect, onBack, onClose, isMobile }) {
   // Manual product entry when not found
   const [notFoundBarcode, setNotFoundBarcode] = useState(null)
   const [manualProduct, setManualProduct] = useState({ name: '', brand: '', calories: '', protein: '', carbs: '', fat: '' })
+  // True when OFF found the product but had no nutritional values (different message than "not found")
+  const [offProductFoundNoMacros, setOffProductFoundNoMacros] = useState(false)
 
   const isNameSuspicious = (name) => {
     if (!name || name.length < 3) return true
@@ -116,13 +118,20 @@ export default function ScanTab({ db, onSelect, onBack, onClose, isMobile }) {
               bestName = `${bestName} (${brandClean})`
             }
 
-            if (n['energy-kcal_100g'] || n.proteins_100g) {
+            // kJ → kcal fallback: Nordic/European products often only have energy_100g (kJ)
+            const rawKcal = parseFloat(n['energy-kcal_100g'])
+            const kcal100g = !isNaN(rawKcal)
+              ? rawKcal
+              : (parseFloat(n['energy_100g']) ? Math.round(parseFloat(n['energy_100g']) / 4.184) : 0)
+
+            const hasNutrition = kcal100g || n.proteins_100g || n.carbohydrates_100g
+            if (hasNutrition) {
               product = {
                 name: bestName,
                 name_en: p.product_name_en || bestName,
                 brands: p.brands || null,
                 // Always use per 100g values — most reliable
-                calories_per_100g: parseFloat(n['energy-kcal_100g']) || 0,
+                calories_per_100g: kcal100g,
                 protein_per_100g: parseFloat(n.proteins_100g) || 0,
                 carbs_per_100g: parseFloat(n.carbohydrates_100g) || 0,
                 fat_per_100g: parseFloat(n.fat_100g) || 0,
@@ -134,6 +143,11 @@ export default function ScanTab({ db, onSelect, onBack, onClose, isMobile }) {
                 serving_size: p.serving_size || p.quantity || null,
                 barcode: barcode
               }
+              console.log('🌍 [OFF fallback] Found:', product.name, '| barcode:', barcode, '| kcal/100g:', kcal100g)
+            } else {
+              // Product found in OFF but no nutritional data — let user fill manually
+              console.log('🌍 [OFF fallback] Product found but no macros — barcode:', barcode, '|', p.product_name || '')
+              setOffProductFoundNoMacros(true)
             }
           }
         }
@@ -247,7 +261,7 @@ export default function ScanTab({ db, onSelect, onBack, onClose, isMobile }) {
           fontSize: '0.5rem', fontWeight: '700', color: 'rgba(255, 215, 0, 0.5)',
           textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '0.5rem'
         }}>
-          Product niet gevonden
+          {offProductFoundNoMacros ? 'Voedingswaarden ontbreken' : 'Product niet gevonden'}
         </div>
 
         <div style={{ fontSize: isMobile ? '0.95rem' : '1.05rem', fontWeight: '800', color: '#fff', marginBottom: '0.375rem' }}>
@@ -255,7 +269,10 @@ export default function ScanTab({ db, onSelect, onBack, onClose, isMobile }) {
         </div>
 
         <div style={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.3)', marginBottom: '1rem', lineHeight: 1.5 }}>
-          Dit product staat nog niet in onze database. Vul de gegevens in van het etiket (per 100g). Zo help je jezelf en andere gebruikers!
+          {offProductFoundNoMacros
+            ? 'Product gevonden, maar de voedingswaarden ontbreken in de internationale database. Vul ze in van het etiket (per 100g).'
+            : 'Dit product staat nog niet in onze database. Vul de gegevens in van het etiket (per 100g). Zo help je jezelf en andere gebruikers!'
+          }
         </div>
 
         {/* Barcode display */}
@@ -339,7 +356,7 @@ export default function ScanTab({ db, onSelect, onBack, onClose, isMobile }) {
             }}>
             {lookupLoading ? 'Opslaan...' : 'Opslaan & loggen'}
           </button>
-          <button onClick={() => { setNotFoundBarcode(null); setScanning(true) }}
+          <button onClick={() => { setNotFoundBarcode(null); setOffProductFoundNoMacros(false); setScanning(true) }}
             style={{
               padding: '0.75rem', background: 'transparent',
               border: '1px solid rgba(255,255,255,0.08)', borderRadius: '6px',
