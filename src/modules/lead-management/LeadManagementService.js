@@ -2309,27 +2309,35 @@ async createLeadWithSection(leadData, sectionId, coachId) {
 
   async getLeadStatsFallback(coachId, dateRange) {
     try {
-      const { data } = await this.db.supabase
+      // Use COUNT-only queries to avoid PostgREST's 1000-row default cap.
+      const base = () => this.db.supabase
         .from('call_leads')
-        .select('status, lead_source, created_at')
+        .select('*', { count: 'exact', head: true })
         .is('deleted_at', null)
 
-      const stats = {
-        total_leads: data?.length || 0,
-        new_leads: data?.filter(l => l.status === 'new').length || 0,
-        contacted_leads: data?.filter(l => l.status === 'contacted').length || 0,
-        scheduled_leads: data?.filter(l => l.status === 'scheduled').length || 0,
-        converted_leads: data?.filter(l => l.status === 'converted').length || 0,
-        conversion_rate: data?.length > 0 ? Math.round((data.filter(l => l.status === 'converted').length / data.length) * 100) : 0,
-        leads_by_source: {}
+      const [
+        { count: total },
+        { count: newCount },
+        { count: contacted },
+        { count: scheduled },
+        { count: converted },
+      ] = await Promise.all([
+        base(),
+        base().eq('status', 'new'),
+        base().eq('status', 'contacted'),
+        base().eq('status', 'scheduled'),
+        base().eq('status', 'converted'),
+      ])
+
+      return {
+        total_leads:     total     || 0,
+        new_leads:       newCount  || 0,
+        contacted_leads: contacted || 0,
+        scheduled_leads: scheduled || 0,
+        converted_leads: converted || 0,
+        conversion_rate: total > 0 ? Math.round(((converted || 0) / total) * 100) : 0,
+        leads_by_source: {},
       }
-
-      data?.forEach(lead => {
-        const source = lead.lead_source || 'unknown'
-        stats.leads_by_source[source] = (stats.leads_by_source[source] || 0) + 1
-      })
-
-      return stats
     } catch (error) {
       return { total_leads: 0, new_leads: 0, contacted_leads: 0, scheduled_leads: 0, converted_leads: 0, conversion_rate: 0, leads_by_source: {} }
     }
