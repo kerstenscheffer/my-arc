@@ -121,6 +121,13 @@ export const ATTACHMENT_CATEGORIES = [
 
 // Standaard attachment + beschikbare opties per oefening (op naam keywords)
 export const EXERCISE_ATTACHMENT_DEFAULTS = [
+  // Machine-specifieke oefeningen — VOOR generieke regels zodat machine altijd
+  // als voorgeschreven materiaal verschijnt i.p.v. dumbbell/handle/etc.
+  { keywords: ['machine lateral raise', 'machine lateral'], default: 'machine', available: ['machine'] },
+  { keywords: ['machine rear delt', 'machine rear'], default: 'machine', available: ['machine'] },
+  { keywords: ['machine fly', 'pec deck machine', 'chest fly machine', 'machine pec deck'], default: 'machine', available: ['machine'] },
+  { keywords: ['machine bicep curl', 'machine bicep', 'machine curl'], default: 'machine', available: ['machine'] },
+
   // Tricep
   { keywords: ['tricep pushdown', 'pushdown', 'tricep press'], default: 'rope', available: ['rope', 'straight_bar', 'vbar', 'double_d', 'handle'] },
   { keywords: ['tricep extension', 'overhead tricep'], default: 'rope', available: ['rope', 'double_d', 'handle'] },
