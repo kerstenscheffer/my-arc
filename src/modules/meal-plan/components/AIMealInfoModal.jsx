@@ -1,15 +1,20 @@
 // src/modules/meal-plan/components/AIMealInfoModal.jsx
 // 🎯 v2.2 - DEBUG versie met volledige logging
 import React, { useState, useEffect } from 'react'
-import { X, Info, ChefHat, Euro, Lightbulb, Clock, Package, AlertCircle, CheckCircle, Sparkles } from 'lucide-react'
+import { X, Info, ChefHat, Euro, Lightbulb, Clock, Package, AlertCircle, CheckCircle, Sparkles, Pencil } from 'lucide-react'
 import { toHumanAmount } from '../../ai-meal-generator/utils/unitConverter'
+import ClientMealEditModal from './ClientMealEditModal'
 
-export default function AIMealInfoModal({ isOpen, onClose, meal, db }) {
+export default function AIMealInfoModal({ isOpen, onClose, meal, db, service, client, planId, dayName, isToday, onSaved }) {
   const isMobile = window.innerWidth <= 768
   const [activeTab, setActiveTab] = useState('info')
   const [ingredients, setIngredients] = useState([])
   const [loading, setLoading] = useState(false)
   const [dbMealData, setDbMealData] = useState(null)
+  const [showEdit, setShowEdit] = useState(false)
+
+  // Client kan de maaltijd aanpassen zolang we weten in welk plan + slot 'ie zit.
+  const canEdit = !!(planId && meal?.slot && client?.id)
 
 
   useEffect(() => {
@@ -118,6 +123,9 @@ export default function AIMealInfoModal({ isOpen, onClose, meal, db }) {
           <div style={{ position: 'absolute', inset: 0, backgroundImage: `url(${getMealImage()})`, backgroundSize: 'cover', backgroundPosition: 'center' }} />
           <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to top, #0a0a0a 0%, rgba(0,0,0,0.3) 40%, transparent 70%)' }} />
           <button onClick={onClose} style={{ position: 'absolute', top: '0.75rem', right: '0.75rem', width: '36px', height: '36px', background: 'rgba(0,0,0,0.5)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '10px', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}><X size={18} /></button>
+          {canEdit && (
+            <button onClick={() => setShowEdit(true)} style={{ position: 'absolute', top: '0.75rem', right: '3.35rem', height: '36px', padding: '0 0.8rem', background: 'rgba(255,215,0,0.9)', border: '1px solid rgba(255,215,0,0.5)', borderRadius: '10px', color: '#0a0a0a', display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.72rem', fontWeight: 800, cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}><Pencil size={13} /> Aanpassen</button>
+          )}
           <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, padding: isMobile ? '0 1rem 0.75rem' : '0 1.5rem 1rem' }}>
             <div style={{ fontSize: isMobile ? '1.15rem' : '1.35rem', fontWeight: '800', color: '#fff', letterSpacing: '-0.02em', marginBottom: '0.4rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
               {meal.name || meal.meal_name}
@@ -154,6 +162,21 @@ export default function AIMealInfoModal({ isOpen, onClose, meal, db }) {
         </div>
       </div>
       <style>{`@keyframes infoFadeIn { from { opacity: 0; } to { opacity: 1; } } @keyframes infoSpin { to { transform: rotate(360deg); } }`}</style>
+
+      {showEdit && canEdit && (
+        <ClientMealEditModal
+          db={db}
+          service={service}
+          meal={{ ...meal, ...effectiveMeal, ingredients_list: meal?.ingredients_list }}
+          planId={planId}
+          dayName={dayName}
+          isToday={isToday}
+          clientId={client.id}
+          isMobile={isMobile}
+          onClose={() => setShowEdit(false)}
+          onSaved={() => { setShowEdit(false); onSaved?.() }}
+        />
+      )}
     </div>
   )
 }

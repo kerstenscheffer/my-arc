@@ -121,7 +121,7 @@ const dailyTotals = await this.calculateDailyTotals(clientId, todayMeals, todayP
       if (dayPlan.breakfast) {
         const swapData = swaps.breakfast
         const mealData = swapData?.was_swapped 
-          ? await this.getMealById(swapData.meal_id)
+          ? (swapData.edited_meal || await this.getMealById(swapData.meal_id))
           : await getMealData(dayPlan.breakfast)
         
         if (mealData) {
@@ -142,7 +142,7 @@ const dailyTotals = await this.calculateDailyTotals(clientId, todayMeals, todayP
       if (dayPlan.lunch) {
         const swapData = swaps.lunch
         const mealData = swapData?.was_swapped 
-          ? await this.getMealById(swapData.meal_id)
+          ? (swapData.edited_meal || await this.getMealById(swapData.meal_id))
           : await getMealData(dayPlan.lunch)
         
         if (mealData) {
@@ -163,7 +163,7 @@ const dailyTotals = await this.calculateDailyTotals(clientId, todayMeals, todayP
       if (dayPlan.dinner) {
         const swapData = swaps.dinner
         const mealData = swapData?.was_swapped 
-          ? await this.getMealById(swapData.meal_id)
+          ? (swapData.edited_meal || await this.getMealById(swapData.meal_id))
           : await getMealData(dayPlan.dinner)
         
         if (mealData) {
@@ -188,7 +188,7 @@ const dailyTotals = await this.calculateDailyTotals(clientId, todayMeals, todayP
           const swapData = swaps[slotName]
           
           const mealData = swapData?.was_swapped 
-            ? await this.getMealById(swapData.meal_id)
+            ? (swapData.edited_meal || await this.getMealById(swapData.meal_id))
             : await getMealData(snack)
           
           if (mealData) {
@@ -210,7 +210,7 @@ const dailyTotals = await this.calculateDailyTotals(clientId, todayMeals, todayP
       if (dayPlan.snack1) {
         const swapData = swaps.snack1
         const mealData = swapData?.was_swapped 
-          ? await this.getMealById(swapData.meal_id)
+          ? (swapData.edited_meal || await this.getMealById(swapData.meal_id))
           : await getMealData(dayPlan.snack1)
         
         if (mealData) {
@@ -230,7 +230,7 @@ const dailyTotals = await this.calculateDailyTotals(clientId, todayMeals, todayP
       if (dayPlan.snack2) {
         const swapData = swaps.snack2
         const mealData = swapData?.was_swapped 
-          ? await this.getMealById(swapData.meal_id)
+          ? (swapData.edited_meal || await this.getMealById(swapData.meal_id))
           : await getMealData(dayPlan.snack2)
         
         if (mealData) {
@@ -836,10 +836,42 @@ async logAIMood(clientId, moodData) {
       
       console.log('✅ Meal swapped successfully')
       return swapData
-      
+
     } catch (error) {
       console.error('Error swapping meal:', error)
       return null
+    }
+  }
+
+  // Sla een door de client BEWERKTE maaltijd alleen voor VANDAAG op (scope
+  // "eenmalig deze meal"). Het weekplan blijft ongewijzigd; de bewerkte
+  // snapshot komt in ai_meal_progress.consumed_meals[slot].edited_meal en
+  // wordt door getTodayFromWeekStructure boven het plan getoond.
+  async overrideMealForToday(clientId, slot, editedMeal) {
+    try {
+      const today = new Date().toISOString().split('T')[0]
+      let progress = await this.getAIProgress(clientId, today)
+      if (!progress.consumed_meals) progress.consumed_meals = {}
+      progress.consumed_meals[slot] = {
+        ...progress.consumed_meals[slot], // bewaar consumed/time als de meal al afgevinkt was
+        was_swapped: true,
+        edited_meal: editedMeal,
+        meal_id: editedMeal.meal_id || editedMeal.id,
+        meal_name: editedMeal.name || editedMeal.meal_name,
+        calories: Math.round(editedMeal.calories || 0),
+        protein: Math.round(editedMeal.protein || 0),
+        carbs: Math.round(editedMeal.carbs || 0),
+        fat: Math.round(editedMeal.fat || 0)
+      }
+      const { error } = await this.supabase
+        .from('ai_meal_progress')
+        .upsert({ ...progress, client_id: clientId, date: today, updated_at: new Date().toISOString() })
+      if (error) throw error
+      console.log('✅ Meal override for today saved')
+      return true
+    } catch (error) {
+      console.error('❌ overrideMealForToday failed:', error)
+      throw error
     }
   }
   // ========================================

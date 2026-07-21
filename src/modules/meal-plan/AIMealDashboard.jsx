@@ -697,6 +697,12 @@ export default function AIMealDashboard({ client, onNavigate, db }) {
           onClose={() => setModals(prev => ({ ...prev, info: null }))}
           meal={modals.info}
           db={db}
+          service={service}
+          client={client}
+          planId={dashboardData.activePlan?.id}
+          dayName={DAYS_OF_WEEK[dayKeyToIndex(selectedDay)]?.key}
+          isToday={dayKeyToIndex(selectedDay) === getTodayIndex()}
+          onSaved={() => { setModals(prev => ({ ...prev, info: null })); loadDashboardData() }}
         />
       )}
       

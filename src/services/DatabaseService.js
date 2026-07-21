@@ -11107,9 +11107,82 @@ async updateMealInWeek(planId, day, slot, mealData) {
     
     console.log('✅ Meal updated in week')
     return weekStructure
-    
+
   } catch (error) {
     console.error('❌ Update meal in week failed:', error)
+    throw error
+  }
+}
+
+/**
+ * Vervang een maaltijd OVERAL in het weekplan (elke dag + elk slot waar
+ * dezelfde meal_id voorkomt) met één nieuwe snapshot. Gebruikt door de
+ * client-meal-editor bij scope "alle dezelfde meals". Herberekent totals
+ * alleen voor de dagen die daadwerkelijk veranderden.
+ */
+async updateMealEverywhereInWeek(planId, targetMealId, mealData) {
+  try {
+    const { data: plan, error: fetchError } = await this.supabase
+      .from('client_meal_plans')
+      .select('week_structure')
+      .eq('id', planId)
+      .single()
+    if (fetchError) throw fetchError
+
+    const weekStructure = plan.week_structure || {}
+    // Niet-maaltijd-sleutels binnen een dag-object niet als slot behandelen.
+    const NON_MEAL = new Set(['totals', 'accuracy', 'targets', 'notes', 'date', 'day_totals'])
+    const mealIdOf = (v) => (typeof v === 'string' ? v : (v?.meal_id || v?.id || null))
+    let replaced = 0
+
+    Object.keys(weekStructure).forEach(day => {
+      const dayObj = weekStructure[day]
+      if (!dayObj || typeof dayObj !== 'object') return
+      let dayChanged = false
+
+      Object.keys(dayObj).forEach(slot => {
+        if (NON_MEAL.has(slot)) return
+        const val = dayObj[slot]
+        if (Array.isArray(val)) {
+          // snacks-array: per element matchen
+          dayObj[slot] = val.map(item => {
+            if (mealIdOf(item) === targetMealId) { replaced++; dayChanged = true; return { ...mealData } }
+            return item
+          })
+        } else if (mealIdOf(val) === targetMealId) {
+          dayObj[slot] = { ...mealData }
+          replaced++
+          dayChanged = true
+        }
+      })
+
+      if (dayChanged) {
+        const dayMeals = []
+        Object.keys(dayObj).forEach(slot => {
+          if (NON_MEAL.has(slot)) return
+          const val = dayObj[slot]
+          if (Array.isArray(val)) val.forEach(m => { if (m && m.calories) dayMeals.push(m) })
+          else if (val && val.calories) dayMeals.push(val)
+        })
+        dayObj.totals = {
+          kcal: dayMeals.reduce((s, m) => s + (m.calories || 0), 0),
+          protein: dayMeals.reduce((s, m) => s + (m.protein || 0), 0),
+          carbs: dayMeals.reduce((s, m) => s + (m.carbs || 0), 0),
+          fat: dayMeals.reduce((s, m) => s + (m.fat || 0), 0)
+        }
+      }
+    })
+
+    const { error: updateError } = await this.supabase
+      .from('client_meal_plans')
+      .update({ week_structure: weekStructure, updated_at: new Date().toISOString() })
+      .eq('id', planId)
+    if (updateError) throw updateError
+
+    console.log(`✅ Meal updated everywhere in week (${replaced} slots)`)
+    return { weekStructure, replaced }
+  } catch (error) {
+    console.error('❌ updateMealEverywhereInWeek failed:', error)
     throw error
   }
 }

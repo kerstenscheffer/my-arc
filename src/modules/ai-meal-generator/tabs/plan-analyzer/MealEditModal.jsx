@@ -17,7 +17,7 @@ const LABEL_GROUPS = [
   { label: 'Smaak',     color: '#a855f7', options: ['comfort_food','sweet','savory','spicy','creamy','fresh','warm','indulgent'] },
 ]
 
-export default function MealEditModal({ db, meal, slot, dayIndex, onSave, onClose, isMobile, embedded = false }) {
+export default function MealEditModal({ db, meal, slot, dayIndex, onSave, onClose, isMobile, embedded = false, clientMode = false }) {
   const m = isMobile
   const [activeTab, setActiveTab] = useState('ingredients')
   const [mealName, setMealName]         = useState(meal?.name || meal?.meal_name || '')
@@ -202,7 +202,10 @@ export default function MealEditModal({ db, meal, slot, dayIndex, onSave, onClos
         // anders matcht 'ie op de nieuwe id en verandert er niks in het plan.
         updated._replacesMealId = meal.meal_id || meal.id
       }
-      onSave(updated, mode); onClose()
+      onSave(updated, mode)
+      // Client-flow: de wrapper toont hierna de scope-keuze en sluit zelf. Bij de
+      // coach-modes sluiten we direct na opslaan zoals voorheen.
+      if (mode !== 'client') onClose()
     } catch (err) { console.error(err); setSaveError(err.message) }
     setSaving(false)
   }
@@ -338,11 +341,19 @@ export default function MealEditModal({ db, meal, slot, dayIndex, onSave, onClos
         {/* Footer */}
         <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)', flexShrink: 0, background: 'rgba(0,0,0,0.3)' }}>
           {saveError && <div style={{ fontSize: '0.55rem', color: '#ef4444', margin: m?'0.4rem 0.6rem 0':'0.4rem 0.85rem 0', padding: '0.3rem 0.5rem', background: 'rgba(239,68,68,0.08)', borderRadius: '4px' }}>{saveError}</div>}
-          <div style={{ display: 'flex' }}>
-            <button onClick={() => handleSave('plan')} disabled={saving} style={saveBtn(m,'#fff',saving,false)} title="Alleen in dit plan — niet in database"><Zap size={13}/><span>Plan</span></button>
-            <button onClick={() => handleSave('permanent')} disabled={saving||!meal.id} style={saveBtn(m,'#FFD700',saving||!meal.id,true)} title="Overschrijf permanent in database"><Save size={13}/><span>Overschrijf</span></button>
-            <button onClick={() => handleSave('copy')} disabled={saving} style={saveBtn(m,'#10b981',saving,true)} title="Sla op als nieuwe meal in database"><Copy size={13}/><span>Kopie</span></button>
-          </div>
+          {clientMode ? (
+            <div style={{ display: 'flex' }}>
+              <button onClick={() => handleSave('client')} disabled={saving} style={saveBtn(m,'#FFD700',saving,false)} title="Ga verder om te kiezen waar je dit opslaat">
+                <Save size={13}/><span>{saving ? 'Bezig...' : 'Opslaan →'}</span>
+              </button>
+            </div>
+          ) : (
+            <div style={{ display: 'flex' }}>
+              <button onClick={() => handleSave('plan')} disabled={saving} style={saveBtn(m,'#fff',saving,false)} title="Alleen in dit plan — niet in database"><Zap size={13}/><span>Plan</span></button>
+              <button onClick={() => handleSave('permanent')} disabled={saving||!meal.id} style={saveBtn(m,'#FFD700',saving||!meal.id,true)} title="Overschrijf permanent in database"><Save size={13}/><span>Overschrijf</span></button>
+              <button onClick={() => handleSave('copy')} disabled={saving} style={saveBtn(m,'#10b981',saving,true)} title="Sla op als nieuwe meal in database"><Copy size={13}/><span>Kopie</span></button>
+            </div>
+          )}
         </div>
       </div>
       <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
