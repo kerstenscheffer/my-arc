@@ -12,6 +12,23 @@ import ProductivityService from '../modules/productivity/ProductivityService'
 
 const GOLD = '#FFD700'
 
+// Prioriteiten — zelfde waarden als productivity_tasks.priority (AddTaskModal).
+const PRIOS = [
+  { key: 'low',    label: 'Laag', color: '#10b981' },
+  { key: 'medium', label: 'Med',  color: '#f59e0b' },
+  { key: 'high',   label: 'Hoog', color: '#ef4444' },
+]
+const PRIO_COLOR = { low: '#10b981', medium: '#f59e0b', high: '#ef4444' }
+const DUR_PRESETS = [15, 25, 30, 45, 60]
+// Tijd-filter-buckets op estimated_minutes.
+const DUR_FILTERS = [
+  { key: 'all',  label: 'Alle' },
+  { key: 'le15', label: '≤15m', test: (m) => m > 0 && m <= 15 },
+  { key: 'le30', label: '≤30m', test: (m) => m > 0 && m <= 30 },
+  { key: 'le60', label: '≤60m', test: (m) => m > 0 && m <= 60 },
+  { key: 'gt60', label: '60m+', test: (m) => m > 60 },
+]
+
 export default function QuickTodoModal({ db, coachId, onClose, onOpenProductivity, isMobile }) {
   const [svc] = useState(() => new ProductivityService(db.supabase))
   const [tasks, setTasks] = useState([])
@@ -22,6 +39,12 @@ export default function QuickTodoModal({ db, coachId, onClose, onOpenProductivit
   const [busy, setBusy] = useState(false)
   const [justAdded, setJustAdded] = useState(false)
   const inputRef = useRef(null)
+  // Nieuwe-to-do metadata (prioriteit + geschatte duur).
+  const [newPriority, setNewPriority] = useState('medium')
+  const [newMinutes, setNewMinutes] = useState('')
+  // Filters binnen de gekozen sectie.
+  const [prioFilter, setPrioFilter] = useState('all')  // 'all' | 'low' | 'medium' | 'high'
+  const [durFilter, setDurFilter] = useState('all')     // key uit DUR_FILTERS
 
   const load = async () => {
     try {
@@ -48,7 +71,13 @@ export default function QuickTodoModal({ db, coachId, onClose, onOpenProductivit
     if (!title || busy) return
     setBusy(true)
     try {
-      await svc.createTask(coachId, { title, sectionId: targetSectionId, needs_reflection: false })
+      await svc.createTask(coachId, {
+        title,
+        sectionId: targetSectionId,
+        needs_reflection: false,
+        priority: newPriority,
+        estimated_minutes: newMinutes ? Number(newMinutes) : undefined,
+      })
       setInput('')
       setJustAdded(true)
       setTimeout(() => setJustAdded(false), 1200)
@@ -68,12 +97,19 @@ export default function QuickTodoModal({ db, coachId, onClose, onOpenProductivit
     try { await svc.deleteTask(t.id) } catch (e) { console.error(e); load() }
   }
 
-  // Zichtbare to-do's volgens het actieve filter.
+  // Zichtbare to-do's: eerst sectie-filter, dan prio- en tijd-filter.
+  const durTest = DUR_FILTERS.find(d => d.key === durFilter)?.test
   const visible = tasks.filter(t => {
-    if (filter === 'all') return true
-    if (filter === 'inbox') return t.section_id == null
-    return t.section_id === filter
+    // Sectie
+    if (filter === 'inbox') { if (t.section_id != null) return false }
+    else if (filter !== 'all') { if (t.section_id !== filter) return false }
+    // Prioriteit
+    if (prioFilter !== 'all' && (t.priority || 'medium') !== prioFilter) return false
+    // Tijd/duur
+    if (durTest && !durTest(Number(t.estimated_minutes) || 0)) return false
+    return true
   })
+  const filtersActive = prioFilter !== 'all' || durFilter !== 'all'
 
   const countFor = (f) => tasks.filter(t => {
     if (f === 'all') return true
