@@ -2,8 +2,12 @@
 // `app_issues` Supabase table so the list is available across devices and
 // can be queried by Claude from any session ("check probleem tabellen").
 
-import { useState, useEffect } from 'react'
-import { Bug, X, Check, Trash2, Plus, BookmarkPlus, Bookmark, Pencil, MessageSquare, Send, Undo2 } from 'lucide-react'
+import { useState, useEffect, useRef } from 'react'
+import { Bug, X, Check, Trash2, Plus, BookmarkPlus, Bookmark, Pencil, MessageSquare, Send, Undo2, ImagePlus } from 'lucide-react'
+
+// Publieke bucket voor issue-screenshots. Zelfde patroon als de andere
+// coach-uploads (MealGuideManager, CardGeneratorTab).
+const SCREENSHOT_BUCKET = 'coach-photos'
 
 // Filter-modi voor de widget:
 //   open       = actieve klussen (excl. parked en done) — wat de auto-fixer pakt
@@ -50,6 +54,13 @@ export default function IssueNotesWidget({ db, coachId, open: openProp, onOpenCh
   // verlopen sessie of RLS-deny en zat je in de mist.
   const [addError, setAddError] = useState(null)
   const [addedFlash, setAddedFlash] = useState(false)
+  // Screenshots die bij een nieuwe issue worden meegestuurd (URLs). Worden
+  // meteen geüpload naar storage; bij Toevoegen gaan ze mee in `images`.
+  const [pendingImages, setPendingImages] = useState([])
+  const [uploading, setUploading] = useState(false)
+  const fileInputRef = useRef(null)
+  // Fullscreen-lightbox voor het bekijken van een screenshot.
+  const [lightbox, setLightbox] = useState(null)
 
   const load = async () => {
     if (!db?.supabase || !coachId) return
@@ -113,10 +124,47 @@ export default function IssueNotesWidget({ db, coachId, open: openProp, onOpenCh
   // browser-prompt. Eén issue tegelijk in de queue.
   const [confirmDeleteIssue, setConfirmDeleteIssue] = useState(null)
 
+  // Upload één of meer afbeeldingen naar storage en voeg de publieke URLs toe
+  // aan pendingImages. Gebruikt door de bestand-kiezer én door plakken (paste).
+  const uploadFiles = async (files) => {
+    const imgs = Array.from(files || []).filter(f => f.type?.startsWith('image/'))
+    if (imgs.length === 0) return
+    if (!coachId) { setAddError('Niet ingelogd — log opnieuw in en probeer dan opnieuw'); return }
+    setUploading(true)
+    setAddError(null)
+    try {
+      const urls = []
+      for (const file of imgs) {
+        const ext = (file.name?.split('.').pop() || 'png').toLowerCase().replace(/[^a-z0-9]/g, '') || 'png'
+        const path = `app-issues/${coachId}/${Date.now()}-${Math.random().toString(36).slice(2, 7)}.${ext}`
+        const { error } = await db.supabase.storage.from(SCREENSHOT_BUCKET).upload(path, file, { upsert: true, contentType: file.type || 'image/png' })
+        if (error) { console.error('screenshot upload failed:', error); setAddError(`Upload mislukt: ${error.message || 'onbekende fout'}`); continue }
+        const { data: u } = db.supabase.storage.from(SCREENSHOT_BUCKET).getPublicUrl(path)
+        if (u?.publicUrl) urls.push(u.publicUrl)
+      }
+      if (urls.length) setPendingImages(prev => [...prev, ...urls])
+    } finally {
+      setUploading(false)
+    }
+  }
+
+  const handlePaste = (e) => {
+    const items = e.clipboardData?.items
+    if (!items) return
+    const files = []
+    for (const it of items) {
+      if (it.type?.startsWith('image/')) { const f = it.getAsFile(); if (f) files.push(f) }
+    }
+    if (files.length) { e.preventDefault(); uploadFiles(files) }
+  }
+
+  const removePendingImage = (url) => setPendingImages(prev => prev.filter(u => u !== url))
+
   const handleAdd = async () => {
     setAddError(null)
     const t = text.trim()
-    if (!t) return
+    // Sta een screenshot-only issue toe zolang er tekst OF een beeld is.
+    if (!t && pendingImages.length === 0) return
     if (!coachId) {
       setAddError('Niet ingelogd — log opnieuw in en probeer dan opnieuw')
       return
@@ -124,7 +172,7 @@ export default function IssueNotesWidget({ db, coachId, open: openProp, onOpenCh
     setAdding(true)
     const { data, error } = await db.supabase
       .from('app_issues')
-      .insert({ coach_id: coachId, text: t })
+      .insert({ coach_id: coachId, text: t, images: pendingImages })
       .select()
       .single()
     setAdding(false)
@@ -135,6 +183,7 @@ export default function IssueNotesWidget({ db, coachId, open: openProp, onOpenCh
     }
     setIssues(prev => [data, ...prev])
     setText('')
+    setPendingImages([])
     setAddedFlash(true)
     setTimeout(() => setAddedFlash(false), 1500)
   }
@@ -421,10 +470,11 @@ export default function IssueNotesWidget({ db, coachId, open: openProp, onOpenCh
             <textarea
               value={text}
               onChange={(e) => setText(e.target.value)}
+              onPaste={handlePaste}
               onKeyDown={(e) => {
                 if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') { e.preventDefault(); handleAdd() }
               }}
-              placeholder="Wat ging er mis? (⌘+Enter om toe te voegen)"
+              placeholder="Wat ging er mis? (⌘+Enter om toe te voegen · plak of voeg een screenshot toe)"
               rows={3}
               style={{
                 width: '100%', padding: '0.55rem 0.7rem',
@@ -435,17 +485,79 @@ export default function IssueNotesWidget({ db, coachId, open: openProp, onOpenCh
                 fontFamily: 'inherit', lineHeight: 1.4,
               }}
             />
+
+            {/* Screenshot-knop + verborgen bestand-input */}
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              multiple
+              style={{ display: 'none' }}
+              onChange={(e) => { uploadFiles(e.target.files); e.target.value = '' }}
+            />
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                disabled={uploading}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: '0.35rem',
+                  padding: '0.4rem 0.6rem',
+                  background: 'rgba(255,255,255,0.04)',
+                  border: '1px solid rgba(255,255,255,0.1)',
+                  borderRadius: 8, color: 'rgba(255,255,255,0.7)',
+                  fontSize: '0.72rem', fontWeight: 700,
+                  cursor: uploading ? 'default' : 'pointer',
+                  touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+                  opacity: uploading ? 0.6 : 1,
+                }}
+              >
+                <ImagePlus size={13} />
+                {uploading ? 'Uploaden…' : 'Screenshot'}
+              </button>
+              <span style={{ fontSize: '0.6rem', color: 'rgba(255,255,255,0.25)', fontWeight: 600 }}>
+                of plak (⌘V) in het tekstveld
+              </span>
+            </div>
+
+            {/* Preview-thumbnails van de mee te sturen screenshots */}
+            {pendingImages.length > 0 && (
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem' }}>
+                {pendingImages.map((url) => (
+                  <div key={url} style={{ position: 'relative', width: 56, height: 56 }}>
+                    <img
+                      src={url} alt="screenshot"
+                      onClick={() => setLightbox(url)}
+                      style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 6, border: '1px solid rgba(255,255,255,0.12)', cursor: 'pointer' }}
+                    />
+                    <button
+                      onClick={() => removePendingImage(url)}
+                      title="Verwijderen"
+                      style={{
+                        position: 'absolute', top: -6, right: -6,
+                        width: 18, height: 18, borderRadius: '50%',
+                        background: '#ef4444', border: '2px solid #0a0a0a', color: '#fff',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        cursor: 'pointer', padding: 0,
+                      }}
+                    >
+                      <X size={9} strokeWidth={3} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+
             <button
               onClick={handleAdd}
-              disabled={adding || !text.trim()}
+              disabled={adding || (!text.trim() && pendingImages.length === 0)}
               style={{
                 padding: '0.55rem',
-                background: addedFlash ? '#10b981' : (text.trim() ? '#10b981' : 'rgba(255,255,255,0.04)'),
+                background: addedFlash ? '#10b981' : ((text.trim() || pendingImages.length > 0) ? '#10b981' : 'rgba(255,255,255,0.04)'),
                 border: 'none',
                 borderRadius: 8,
-                color: text.trim() || addedFlash ? '#fff' : 'rgba(255,255,255,0.3)',
+                color: (text.trim() || pendingImages.length > 0 || addedFlash) ? '#fff' : 'rgba(255,255,255,0.3)',
                 fontSize: '0.8rem', fontWeight: 700,
-                cursor: text.trim() ? 'pointer' : 'default',
+                cursor: (text.trim() || pendingImages.length > 0) ? 'pointer' : 'default',
                 display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.3rem',
                 opacity: adding ? 0.5 : 1,
               }}
@@ -665,6 +777,18 @@ export default function IssueNotesWidget({ db, coachId, open: openProp, onOpenCh
                         </span>
                       )}
                       {issue.text}
+                      {/* Meegestuurde screenshots */}
+                      {Array.isArray(issue.images) && issue.images.length > 0 && (
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, marginTop: 6 }}>
+                          {issue.images.map((url, ii) => (
+                            <img
+                              key={ii} src={url} alt="screenshot"
+                              onClick={(e) => { e.stopPropagation(); setLightbox(url) }}
+                              style={{ width: 48, height: 48, objectFit: 'cover', borderRadius: 5, border: '1px solid rgba(255,255,255,0.12)', cursor: 'pointer' }}
+                            />
+                          ))}
+                        </div>
+                      )}
                       <div style={{ marginTop: 4, fontSize: '0.6rem', color: 'rgba(255,255,255,0.25)', fontWeight: 600 }}>
                         {new Date(issue.created_at).toLocaleString('nl-NL', {
                           day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit',
@@ -888,6 +1012,35 @@ export default function IssueNotesWidget({ db, coachId, open: openProp, onOpenCh
               </>
             )}
           </div>
+        </div>
+      )}
+
+      {/* Lightbox — screenshot fullscreen bekijken. */}
+      {lightbox && (
+        <div
+          onClick={() => setLightbox(null)}
+          style={{
+            position: 'fixed', inset: 0,
+            background: 'rgba(0,0,0,0.92)',
+            zIndex: 2147483610,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            padding: '1rem',
+            paddingTop: 'calc(env(safe-area-inset-top) + 1rem)',
+          }}
+        >
+          <img src={lightbox} alt="screenshot" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain', borderRadius: 8 }} />
+          <button
+            onClick={() => setLightbox(null)}
+            style={{
+              position: 'absolute', top: 'calc(env(safe-area-inset-top) + 12px)', right: 12,
+              width: 40, height: 40, borderRadius: 10,
+              background: 'rgba(0,0,0,0.6)', border: '1px solid rgba(255,255,255,0.2)',
+              color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center',
+              cursor: 'pointer', touchAction: 'manipulation',
+            }}
+          >
+            <X size={18} />
+          </button>
         </div>
       )}
 
