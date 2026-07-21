@@ -145,6 +145,14 @@ export default function QuickTodoModal({ db, coachId, onClose, onOpenProductivit
     )
   }
 
+  const chipStyle = (active, color) => ({
+    display: 'inline-flex', alignItems: 'center', padding: '0.2rem 0.45rem', borderRadius: 5,
+    background: active ? `${color}22` : 'rgba(255,255,255,0.03)',
+    border: `1px solid ${active ? color + '66' : 'rgba(255,255,255,0.07)'}`,
+    color: active ? color : 'rgba(255,255,255,0.45)', fontSize: '0.56rem', fontWeight: 800,
+    cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+  })
+
   const modal = (
     <div
       onClick={(e) => { if (e.target === e.currentTarget) onClose() }}
@@ -202,6 +210,31 @@ export default function QuickTodoModal({ db, coachId, onClose, onOpenProductivit
                   <Plus size={19} />
                 </button>
               </div>
+
+              {/* Prioriteit + geschatte duur voor de nieuwe to-do */}
+              <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '0.3rem', marginTop: '0.5rem' }}>
+                {PRIOS.map(p => {
+                  const active = newPriority === p.key
+                  return (
+                    <button key={p.key} onClick={() => setNewPriority(p.key)} type="button"
+                      style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '0.25rem 0.5rem', borderRadius: 6, background: active ? `${p.color}22` : 'rgba(255,255,255,0.04)', border: `1px solid ${active ? p.color + '66' : 'rgba(255,255,255,0.08)'}`, color: active ? p.color : 'rgba(255,255,255,0.5)', fontSize: '0.6rem', fontWeight: 800, cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}>
+                      <span style={{ width: 6, height: 6, borderRadius: '50%', background: p.color }} />{p.label}
+                    </button>
+                  )
+                })}
+                <span style={{ width: 1, height: 15, background: 'rgba(255,255,255,0.08)', margin: '0 0.1rem' }} />
+                {DUR_PRESETS.map(mn => {
+                  const active = Number(newMinutes) === mn
+                  return (
+                    <button key={mn} onClick={() => setNewMinutes(active ? '' : mn)} type="button"
+                      style={{ padding: '0.25rem 0.45rem', borderRadius: 6, background: active ? 'rgba(16,185,129,0.15)' : 'rgba(255,255,255,0.04)', border: `1px solid ${active ? 'rgba(16,185,129,0.4)' : 'rgba(255,255,255,0.08)'}`, color: active ? '#10b981' : 'rgba(255,255,255,0.4)', fontSize: '0.6rem', fontWeight: 700, cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}>{mn}m</button>
+                  )
+                })}
+                <input type="number" min="1" max="480" placeholder="…m" value={newMinutes}
+                  onChange={(e) => setNewMinutes(e.target.value ? parseInt(e.target.value) : '')}
+                  style={{ width: 42, padding: '0.25rem 0.35rem', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 6, color: '#fff', fontSize: '0.6rem', outline: 'none' }} />
+              </div>
+
               <div style={{ fontSize: '0.58rem', color: 'rgba(255,255,255,0.3)', marginTop: '0.35rem', paddingLeft: '0.15rem' }}>
                 {targetSectionId
                   ? `Landt in "${sections.find(s => s.id === targetSectionId)?.title || 'sectie'}"`
@@ -209,12 +242,30 @@ export default function QuickTodoModal({ db, coachId, onClose, onOpenProductivit
               </div>
             </div>
 
+            {/* Filterbalk: prioriteit + tijd, binnen de gekozen sectie */}
+            <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '0.25rem', padding: '0 0.85rem 0.45rem' }}>
+              <span style={{ fontSize: '0.5rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'rgba(255,255,255,0.25)', marginRight: 2 }}>Filter</span>
+              <button type="button" onClick={() => setPrioFilter('all')} style={chipStyle(prioFilter === 'all', GOLD)}>Alle</button>
+              {PRIOS.map(p => (
+                <button key={p.key} type="button" onClick={() => setPrioFilter(prioFilter === p.key ? 'all' : p.key)} style={chipStyle(prioFilter === p.key, p.color)}>
+                  <span style={{ width: 6, height: 6, borderRadius: '50%', background: p.color, marginRight: 3 }} />{p.label}
+                </button>
+              ))}
+              <span style={{ width: 1, height: 13, background: 'rgba(255,255,255,0.08)', margin: '0 0.15rem' }} />
+              {DUR_FILTERS.map(d => (
+                <button key={d.key} type="button" onClick={() => setDurFilter(d.key)} style={chipStyle(durFilter === d.key, '#10b981')}>{d.label}</button>
+              ))}
+              {filtersActive && (
+                <button type="button" onClick={() => { setPrioFilter('all'); setDurFilter('all') }} style={{ ...chipStyle(false, '#fff'), color: 'rgba(255,255,255,0.4)' }}>✕ wis</button>
+              )}
+            </div>
+
             {/* Lijst */}
             <div style={{ overflowY: 'auto', WebkitOverflowScrolling: 'touch', flex: 1, padding: '0.2rem 0.5rem 0.6rem' }}>
               {loading && <div style={{ padding: '1.5rem', textAlign: 'center', color: 'rgba(255,255,255,0.3)', fontSize: '0.8rem' }}>Laden…</div>}
               {!loading && visible.length === 0 && (
                 <div style={{ padding: '1.5rem 1rem', textAlign: 'center', color: 'rgba(255,255,255,0.3)', fontSize: '0.78rem', lineHeight: 1.5 }}>
-                  Geen open to-do's hier. Typ hierboven je eerste. ✨
+                  {filtersActive ? 'Geen to-do\'s met dit filter.' : 'Geen open to-do\'s hier. Typ hierboven je eerste. ✨'}
                 </div>
               )}
               {visible.map((t) => (
@@ -224,6 +275,9 @@ export default function QuickTodoModal({ db, coachId, onClose, onOpenProductivit
                     onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.25)'; e.currentTarget.style.background = 'transparent' }}>
                     <Check size={13} color="#10b981" style={{ opacity: 0.85 }} />
                   </button>
+                  {/* Prioriteit-stip */}
+                  <span title={`Prioriteit: ${(PRIOS.find(p => p.key === (t.priority || 'medium'))?.label) || 'Med'}`}
+                    style={{ flexShrink: 0, width: 8, height: 8, borderRadius: '50%', background: PRIO_COLOR[t.priority || 'medium'] }} />
                   <span style={{ flex: 1, minWidth: 0, fontSize: '0.84rem', color: 'rgba(255,255,255,0.85)', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     {t.title}
                     {/* Toon sectie-label alleen in de "Alles"-weergave */}
@@ -233,6 +287,10 @@ export default function QuickTodoModal({ db, coachId, onClose, onOpenProductivit
                       </span>
                     )}
                   </span>
+                  {/* Geschatte duur */}
+                  {t.estimated_minutes ? (
+                    <span style={{ flexShrink: 0, fontSize: '0.58rem', fontWeight: 800, color: 'rgba(255,255,255,0.45)', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 4, padding: '0.1rem 0.3rem' }}>{t.estimated_minutes}m</span>
+                  ) : null}
                   <button onClick={() => remove(t)} title="Verwijderen" style={{ flexShrink: 0, width: 28, height: 28, borderRadius: 7, background: 'transparent', border: 'none', color: 'rgba(239,68,68,0.55)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', touchAction: 'manipulation' }}>
                     <Trash2 size={14} />
                   </button>
