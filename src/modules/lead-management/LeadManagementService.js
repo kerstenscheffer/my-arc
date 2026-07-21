@@ -1569,21 +1569,35 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
       // GEEN coach_id-filter: net als getRangeFunnelStats leunen we op RLS, zodat
       // ook de team-leads (toegevoegd door een andere coach in het team) meetellen.
       // Voorheen zag je 0 nieuwe leads als een teamgenoot ze had aangemaakt.
-      const { data: leads, error } = await this.db.supabase
+      //
+      // COUNT-only queries i.p.v. rijen ophalen: een gewone .select() capt op
+      // PostgREST's 1000-rijen-default, waardoor "Nieuwe leads" bij >1000 leads
+      // in de periode bleef hangen op 1000. head:true + count:'exact' telt op de
+      // server en kent die cap niet.
+      const base = () => this.db.supabase
         .from('call_leads')
-        .select('id, created_at, reply_count, followup_count, last_followup_sent_at, first_reply_at')
+        .select('id', { count: 'exact', head: true })
         .gte('created_at', startISO)
         .lt('created_at', endISO)
         .is('deleted_at', null)
-      if (error) throw error
-      const all = leads || []
-      const newLeads = all.length
-      // "Reacted" = the lead has a first_reply_at stamp (was clicked from
-      // 0→1 at least once). Subsequent +'s on later days bump reply_count
-      // but DON'T re-mark this metric — that would conflate response-rate
-      // with conversation-engagement.
-      const reactedLeads   = all.filter(l => !!l.first_reply_at).length
-      const followedLeads  = all.filter(l => (l.followup_count || 0) > 0).length
+
+      const [
+        { count: newCount, error: newErr },
+        // "Reacted" = de lead heeft een first_reply_at stamp (ooit van 0→1
+        // geklikt). Latere +'s op andere dagen bumpen reply_count maar
+        // her-markeren deze metric niet — anders verwar je response-rate met
+        // conversation-engagement.
+        { count: reactedCount },
+        { count: followedCount },
+      ] = await Promise.all([
+        base(),
+        base().not('first_reply_at', 'is', null),
+        base().gt('followup_count', 0),
+      ])
+      if (newErr) throw newErr
+      const newLeads       = newCount     || 0
+      const reactedLeads   = reactedCount || 0
+      const followedLeads  = followedCount || 0
       const notReactedYet  = newLeads - reactedLeads
       // Follow-ups SENT in the window (regardless of lead creation date) —
       // uses last_followup_sent_at on every lead the coach owns.
