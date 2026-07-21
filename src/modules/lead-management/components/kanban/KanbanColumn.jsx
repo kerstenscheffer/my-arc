@@ -417,8 +417,14 @@ export default function KanbanColumn({
         display: 'flex', 
         flexDirection: 'column', 
         gap: '0.75rem', 
-        minHeight: isFullscreen ? '300px' : '200px', 
-        maxHeight: isExpanded ? 'none' : (isFullscreen ? '500px' : '600px') 
+        minHeight: isFullscreen ? '300px' : '200px',
+        // Niet-fullscreen: geen hoogte-cap. In ingeklapte staat tonen we sowieso
+        // maar MAX_VISIBLE_LEADS kaarten, dus de container groeit netjes mee en
+        // de "Toon meer"-knop staat ALTIJD direct onder de laatste zichtbare
+        // lead i.p.v. onder een verborgen scroll-rand (varieerde per sectie door
+        // verschillende kaart-hoogtes). De pagina scrollt zelf wel.
+        // Fullscreen houdt wél een cap + scroll: daar is de body-scroll vergrendeld.
+        maxHeight: isFullscreen ? (isExpanded ? 'none' : '500px') : 'none'
       }}>
         {totalLeads === 0 ? (
           <div style={{ 
