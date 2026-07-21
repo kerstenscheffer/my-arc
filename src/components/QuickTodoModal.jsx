@@ -7,7 +7,7 @@
 // Coaching): filtert de lijst én bepaalt in welke sectie een nieuwe to-do landt.
 import { useState, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
-import { X, Plus, Check, Trash2, ArrowRight, ListTodo, Inbox, Layers } from 'lucide-react'
+import { X, Plus, Check, Trash2, ArrowRight, ListTodo, Inbox, Layers, Pencil } from 'lucide-react'
 import ProductivityService from '../modules/productivity/ProductivityService'
 
 const GOLD = '#FFD700'
@@ -45,6 +45,13 @@ export default function QuickTodoModal({ db, coachId, onClose, onOpenProductivit
   // Filters binnen de gekozen sectie.
   const [prioFilter, setPrioFilter] = useState('all')  // 'all' | 'low' | 'medium' | 'high'
   const [durFilter, setDurFilter] = useState('all')     // key uit DUR_FILTERS
+  // Inline bewerken van een bestaande to-do.
+  const [editingId, setEditingId] = useState(null)
+  const [editTitle, setEditTitle] = useState('')
+  const [editPriority, setEditPriority] = useState('medium')
+  const [editMinutes, setEditMinutes] = useState('')
+  const [editSection, setEditSection] = useState('')
+  const [savingEdit, setSavingEdit] = useState(false)
 
   const load = async () => {
     try {
@@ -95,6 +102,33 @@ export default function QuickTodoModal({ db, coachId, onClose, onOpenProductivit
   const remove = async (t) => {
     setTasks(prev => prev.filter(x => x.id !== t.id))
     try { await svc.deleteTask(t.id) } catch (e) { console.error(e); load() }
+  }
+
+  const startEdit = (t) => {
+    setEditingId(t.id)
+    setEditTitle(t.title || '')
+    setEditPriority(t.priority || 'medium')
+    setEditMinutes(t.estimated_minutes || '')
+    setEditSection(t.section_id || '')
+  }
+  const cancelEdit = () => { setEditingId(null); setSavingEdit(false) }
+  const saveEdit = async (t) => {
+    const title = editTitle.trim()
+    if (!title) return
+    setSavingEdit(true)
+    const updates = {
+      title,
+      priority: editPriority,
+      estimated_minutes: editMinutes ? Number(editMinutes) : null,
+      section_id: editSection || null,
+    }
+    // Optimistisch bijwerken.
+    setTasks(prev => prev.map(x => x.id === t.id ? { ...x, ...updates } : x))
+    try {
+      await svc.updateTask(t.id, updates)
+    } catch (e) { console.error('QuickTodo edit:', e); load() }
+    setSavingEdit(false)
+    setEditingId(null)
   }
 
   // Zichtbare to-do's: eerst sectie-filter, dan prio- en tijd-filter.
@@ -269,6 +303,54 @@ export default function QuickTodoModal({ db, coachId, onClose, onOpenProductivit
                 </div>
               )}
               {visible.map((t) => (
+                editingId === t.id ? (
+                  /* ── Inline edit-form ── */
+                  <div key={t.id} style={{ padding: '0.55rem 0.4rem', borderBottom: '1px solid rgba(255,255,255,0.04)', display: 'flex', flexDirection: 'column', gap: '0.45rem', background: 'rgba(255,215,0,0.03)' }}>
+                    <input
+                      value={editTitle}
+                      onChange={(e) => setEditTitle(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === 'Enter') saveEdit(t); if (e.key === 'Escape') cancelEdit() }}
+                      autoFocus
+                      style={{ width: '100%', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 8, padding: '0.45rem 0.6rem', color: '#fff', fontSize: '0.84rem', outline: 'none' }}
+                    />
+                    {/* Prioriteit + duur */}
+                    <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '0.3rem' }}>
+                      {PRIOS.map(p => {
+                        const active = editPriority === p.key
+                        return (
+                          <button key={p.key} type="button" onClick={() => setEditPriority(p.key)}
+                            style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '0.25rem 0.5rem', borderRadius: 6, background: active ? `${p.color}22` : 'rgba(255,255,255,0.04)', border: `1px solid ${active ? p.color + '66' : 'rgba(255,255,255,0.08)'}`, color: active ? p.color : 'rgba(255,255,255,0.5)', fontSize: '0.6rem', fontWeight: 800, cursor: 'pointer', touchAction: 'manipulation' }}>
+                            <span style={{ width: 6, height: 6, borderRadius: '50%', background: p.color }} />{p.label}
+                          </button>
+                        )
+                      })}
+                      <span style={{ width: 1, height: 15, background: 'rgba(255,255,255,0.08)', margin: '0 0.1rem' }} />
+                      {DUR_PRESETS.map(mn => {
+                        const active = Number(editMinutes) === mn
+                        return (
+                          <button key={mn} type="button" onClick={() => setEditMinutes(active ? '' : mn)}
+                            style={{ padding: '0.25rem 0.45rem', borderRadius: 6, background: active ? 'rgba(16,185,129,0.15)' : 'rgba(255,255,255,0.04)', border: `1px solid ${active ? 'rgba(16,185,129,0.4)' : 'rgba(255,255,255,0.08)'}`, color: active ? '#10b981' : 'rgba(255,255,255,0.4)', fontSize: '0.6rem', fontWeight: 700, cursor: 'pointer', touchAction: 'manipulation' }}>{mn}m</button>
+                        )
+                      })}
+                      <input type="number" min="1" max="480" placeholder="…m" value={editMinutes}
+                        onChange={(e) => setEditMinutes(e.target.value ? parseInt(e.target.value) : '')}
+                        style={{ width: 42, padding: '0.25rem 0.35rem', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 6, color: '#fff', fontSize: '0.6rem', outline: 'none' }} />
+                    </div>
+                    {/* Sectie + acties */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                      <select value={editSection} onChange={(e) => setEditSection(e.target.value)}
+                        style={{ flex: 1, minWidth: 0, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 6, padding: '0.35rem 0.45rem', color: '#fff', fontSize: '0.7rem', outline: 'none', cursor: 'pointer' }}>
+                        <option value="">Niet gepland (inbox)</option>
+                        {sections.map(s => <option key={s.id} value={s.id}>{s.title}</option>)}
+                      </select>
+                      <button onClick={cancelEdit} style={{ padding: '0.35rem 0.6rem', background: 'transparent', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 6, color: 'rgba(255,255,255,0.6)', fontSize: '0.7rem', fontWeight: 700, cursor: 'pointer', touchAction: 'manipulation' }}>Annuleer</button>
+                      <button onClick={() => saveEdit(t)} disabled={savingEdit || !editTitle.trim()}
+                        style={{ padding: '0.35rem 0.7rem', background: editTitle.trim() ? '#10b981' : 'rgba(255,255,255,0.06)', border: 'none', borderRadius: 6, color: editTitle.trim() ? '#fff' : 'rgba(255,255,255,0.3)', fontSize: '0.7rem', fontWeight: 800, cursor: (savingEdit || !editTitle.trim()) ? 'not-allowed' : 'pointer', touchAction: 'manipulation' }}>
+                        {savingEdit ? 'Opslaan…' : 'Opslaan'}
+                      </button>
+                    </div>
+                  </div>
+                ) : (
                 <div key={t.id} style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', padding: '0.5rem 0.4rem', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
                   <button onClick={() => complete(t)} title="Afvinken" style={{ flexShrink: 0, width: 22, height: 22, borderRadius: '50%', border: '1.5px solid rgba(255,255,255,0.25)', background: 'transparent', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', touchAction: 'manipulation' }}
                     onMouseEnter={(e) => { e.currentTarget.style.borderColor = '#10b981'; e.currentTarget.style.background = 'rgba(16,185,129,0.12)' }}
@@ -278,7 +360,7 @@ export default function QuickTodoModal({ db, coachId, onClose, onOpenProductivit
                   {/* Prioriteit-stip */}
                   <span title={`Prioriteit: ${(PRIOS.find(p => p.key === (t.priority || 'medium'))?.label) || 'Med'}`}
                     style={{ flexShrink: 0, width: 8, height: 8, borderRadius: '50%', background: PRIO_COLOR[t.priority || 'medium'] }} />
-                  <span style={{ flex: 1, minWidth: 0, fontSize: '0.84rem', color: 'rgba(255,255,255,0.85)', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  <span onClick={() => startEdit(t)} style={{ flex: 1, minWidth: 0, fontSize: '0.84rem', color: 'rgba(255,255,255,0.85)', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', cursor: 'pointer' }}>
                     {t.title}
                     {/* Toon sectie-label alleen in de "Alles"-weergave */}
                     {filter === 'all' && t.section_id && (
@@ -291,10 +373,14 @@ export default function QuickTodoModal({ db, coachId, onClose, onOpenProductivit
                   {t.estimated_minutes ? (
                     <span style={{ flexShrink: 0, fontSize: '0.58rem', fontWeight: 800, color: 'rgba(255,255,255,0.45)', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 4, padding: '0.1rem 0.3rem' }}>{t.estimated_minutes}m</span>
                   ) : null}
+                  <button onClick={() => startEdit(t)} title="Bewerken" style={{ flexShrink: 0, width: 28, height: 28, borderRadius: 7, background: 'transparent', border: 'none', color: 'rgba(255,255,255,0.3)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', touchAction: 'manipulation' }}>
+                    <Pencil size={13} />
+                  </button>
                   <button onClick={() => remove(t)} title="Verwijderen" style={{ flexShrink: 0, width: 28, height: 28, borderRadius: 7, background: 'transparent', border: 'none', color: 'rgba(239,68,68,0.55)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', touchAction: 'manipulation' }}>
                     <Trash2 size={14} />
                   </button>
                 </div>
+                )
               ))}
             </div>
           </div>
