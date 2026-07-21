@@ -401,8 +401,14 @@ export default function ProductivityKanban({
   // Resize commit for recurring tasks — show the "alleen deze of hele reeks"
   // prompt. "Alleen deze" writes an override to task_logs; "hele reeks" goes
   // through the regular updateTask path.
-  const handleRecurringResize = async ({ taskId, updates, dateISO, task }) => {
+  const handleRecurringResize = async ({ taskId, updates, dateISO, targetDate, task }) => {
     const date = dateISO || todayISO()
+    // Cross-day move? De occurrence is naar een ANDERE dag gesleept dan waar'ie
+    // stond. Het task_logs-override-model kan alleen een occurrence op z'n eigen
+    // dag qua tijd verschuiven — niet naar een andere dag verplaatsen. Daarom
+    // detachen we bij een echte verplaatsing: verberg de originele occurrence en
+    // maak een losse eenmalige task op de doeldag.
+    const isCrossDayMove = !!targetDate && targetDate !== date
     return new Promise((resolve) => {
       setRecurringPrompt({
         action: 'shorten',
@@ -413,12 +419,42 @@ export default function ProductivityKanban({
           if (!scope) { resolve(false); return }
           if (scope === 'only-this') {
             try {
-              await productivityService.overrideRecurringOnDate(taskId, coachId, date, {
-                start_time: updates.scheduled_start_time,
-                end_time: updates.scheduled_end_time,
-                minutes: updates.estimated_minutes,
-              })
-              bumpOverridesVersion()
+              if (isCrossDayMove) {
+                // 1) Verberg de originele occurrence op de brondatum.
+                await productivityService.skipRecurringOnDate(taskId, coachId, date)
+                // 2) Maak een standalone one-off op de doeldag/-datum.
+                const created = await productivityService.createTask(coachId, {
+                  title: task.title,
+                  description: task.description || null,
+                  priority: task.priority,
+                  sectionId: task.section_id || null,
+                  color: task.color,
+                  scheduled_day: updates.scheduled_day,
+                  scheduled_date: targetDate,
+                  scheduled_start_time: updates.scheduled_start_time,
+                  scheduled_end_time: updates.scheduled_end_time,
+                  estimated_minutes: updates.estimated_minutes,
+                  recurrence_active: false,
+                })
+                // 3) Direct in local state spiegelen zodat de kaart meteen op de
+                //    nieuwe dag verschijnt (de skip verbergt'm op de oude dag via
+                //    de override-refetch hieronder).
+                if (created?.scheduled_day) {
+                  setScheduledTasks(prev => {
+                    const day = created.scheduled_day
+                    const list = prev[day] || []
+                    return { ...prev, [day]: [...list, { ...created, _sectionColor: task._sectionColor }] }
+                  })
+                }
+                bumpOverridesVersion()
+              } else {
+                await productivityService.overrideRecurringOnDate(taskId, coachId, date, {
+                  start_time: updates.scheduled_start_time,
+                  end_time: updates.scheduled_end_time,
+                  minutes: updates.estimated_minutes,
+                })
+                bumpOverridesVersion()
+              }
             } catch (err) { console.error('❌ Override recurring date failed:', err) }
             resolve(true)
             return

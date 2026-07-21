@@ -417,7 +417,16 @@ export default function AgendaView({
       ...(task.recurrence_active ? {} : { scheduled_date: weekDateStrings[dayId] }),
     }
     if (task.recurrence_active && onRecurringResize) {
-      await onRecurringResize({ taskId: task.id, updates, dateISO: task._dateISO || weekDateStrings[dayId], task })
+      await onRecurringResize({
+        taskId: task.id,
+        updates,
+        // Bron-datum van de gesleepte instance (waar de occurrence nu staat)…
+        dateISO: task._dateISO || weekDateStrings[dayId],
+        // …en de kolom-datum waar'ie naartoe gesleept is. Verschillen ze, dan is
+        // het een verplaatsing naar een andere dag i.p.v. een tijd-aanpassing.
+        targetDate: weekDateStrings[dayId],
+        task,
+      })
     } else {
       await onTaskUpdate(task.id, updates)
     }
