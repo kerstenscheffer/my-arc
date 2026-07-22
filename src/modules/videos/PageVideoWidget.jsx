@@ -159,7 +159,9 @@ export default function PageVideoWidget({ client, db, pageContext = 'home', open
     setViewedIds(prev => new Set([...prev, item.id]))
     // 3) Coach-notificatie via coach_notifications (zelfde vorm als check-in/intake)
     try {
-      const coachId = client?.coach_id || client?.trainer_id
+      // RLS-policy "Clients can notify their coach" checkt op trainer_id, dus die
+      // eerst — anders wordt de insert geweigerd als coach_id afwijkt.
+      const coachId = client?.trainer_id || client?.coach_id
       if (coachId) {
         await db.supabase.from('coach_notifications').insert([{
           coach_id: coachId,
