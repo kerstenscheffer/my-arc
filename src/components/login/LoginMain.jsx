@@ -354,7 +354,7 @@ function GoldButton({ children, disabled, style, ...props }) {
   return (
     <button disabled={disabled} style={{
       width: '100%', padding: '0.9rem', minHeight: '48px',
-      background: disabled ? 'rgba(255,255,255,0.45)' : '#ffffff',
+      background: disabled ? 'rgba(255,215,0,0.45)' : '#FFD700',
       border: 'none', borderRadius: '10px',
       color: '#000', fontSize: '0.95rem', fontWeight: '800',
       cursor: disabled ? 'not-allowed' : 'pointer',
