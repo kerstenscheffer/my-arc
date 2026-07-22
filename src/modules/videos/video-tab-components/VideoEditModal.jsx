@@ -35,7 +35,8 @@ export default function VideoEditModal({
     description: video.description || '',
     video_url: video.video_url || '',
     category_id: video.category_id || null,
-    default_pages: video.default_pages || []
+    default_pages: video.default_pages || [],
+    show_in_slider: video.show_in_slider || false
   })
   const [thumbnailFile, setThumbnailFile] = useState(null)
   const [thumbnailPreview, setThumbnailPreview] = useState(video.thumbnail_url || null)
@@ -95,7 +96,8 @@ export default function VideoEditModal({
         description: formData.description.trim(),
         video_url: formData.video_url.trim(),
         category_id: formData.category_id || null,
-        default_pages: formData.default_pages
+        default_pages: formData.default_pages,
+        show_in_slider: formData.show_in_slider
       }
 
       // Handle thumbnail upload if changed
@@ -573,6 +575,31 @@ export default function VideoEditModal({
                   </button>
                 )
               })}
+            </div>
+          </div>
+
+          {/* ── IN HOME-SLIDER? ── */}
+          <div style={{
+            padding: isMobile ? '0.75rem 0.875rem' : '0.875rem 1.125rem',
+            borderBottom: '1px solid rgba(255, 255, 255, 0.04)',
+            borderLeft: formData.show_in_slider ? `3px solid ${GOLD}` : '3px solid transparent',
+            transition: 'border-left-color 0.2s ease'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: isMobile ? '0.8rem' : '0.85rem', fontWeight: '700', color: '#fff', marginBottom: '0.15rem' }}>
+                  Tonen in home-slider
+                </div>
+                <div style={{ fontSize: '0.65rem', color: 'rgba(255, 255, 255, 0.4)', lineHeight: 1.4 }}>
+                  Verschijnt in de auto-roterende slider bovenaan de home-pagina (voor alle clients).
+                </div>
+              </div>
+              <button
+                onClick={() => setFormData({ ...formData, show_in_slider: !formData.show_in_slider })}
+                style={{ width: '40px', height: '22px', background: formData.show_in_slider ? GOLD : 'rgba(255, 255, 255, 0.08)', border: 'none', borderRadius: '11px', position: 'relative', cursor: 'pointer', transition: 'background 0.2s ease', flexShrink: 0, padding: 0, touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}
+              >
+                <div style={{ position: 'absolute', top: '2px', left: formData.show_in_slider ? '20px' : '2px', width: '18px', height: '18px', background: '#fff', borderRadius: '50%', transition: 'left 0.2s ease' }} />
+              </button>
             </div>
           </div>
 

@@ -67,6 +67,7 @@ const videoService = {
         best_time_to_watch: videoData.best_time_to_watch || 'anytime',
         duration_seconds: videoData.duration_seconds || null,
         default_pages: videoData.default_pages || [],
+        show_in_slider: videoData.show_in_slider || false,
         is_active: true,
         view_count: 0,
         like_count: 0,
