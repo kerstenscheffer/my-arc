@@ -1,7 +1,7 @@
 // src/modules/videos/CoachVideoTab.jsx
 // v3.0 — Netflix categorie rijen + nieuwe filters (custom categorie + page filter)
 import React, { useState, useEffect } from 'react'
-import { Video, Plus, FolderPlus, ChevronRight, GraduationCap, Send, Pencil, Trash2 } from 'lucide-react'
+import { Video, Plus, FolderPlus, ChevronRight, ChevronDown, ChevronUp, GraduationCap, Send, Pencil, Trash2 } from 'lucide-react'
 import useIsMobile from '../../hooks/useIsMobile'
 import videoService from './VideoService'
 import CoachFileManager from './CoachFileManager'
@@ -157,8 +157,12 @@ export default function CoachVideoTab({ clients = [], db }) {
     return Array.isArray(video.default_pages) && video.default_pages.includes(selectedPage)
   }
 
+  // Video's die in een cursus zitten tonen we NIET los in het grid — ze zitten
+  // onder hun cursus-kaart (uitklapbaar). Set van alle cursus-video-ids.
+  const courseVideoIds = new Set(courses.flatMap(c => c.videoIds || []))
+
   const filteredVideos = videos.filter(v =>
-    matchesSearch(v) && matchesCategory(v) && matchesPage(v)
+    !courseVideoIds.has(v.id) && matchesSearch(v) && matchesCategory(v) && matchesPage(v)
   )
 
   // ── GROUP BY CATEGORY ──
@@ -436,6 +440,11 @@ export default function CoachVideoTab({ clients = [], db }) {
           onAssign={(c) => { setAssigningCourse(c); setShowCourseAssign(true) }}
           onEdit={(c) => { setEditingCourse(c); setShowCourseModal(true) }}
           onDelete={handleDeleteCourse}
+          onVideoAssign={(v) => { setSelectedVideo(v); setShowVisibilityModal(true) }}
+          onVideoManage={(v) => { setManagingVideo(v); setShowManageModal(true) }}
+          onVideoEdit={(v) => { setEditingVideo(v); setShowEditModal(true) }}
+          onVideoDelete={handleDeleteVideo}
+          getCategoryConfig={getCategoryConfig}
           isMobile={isMobile}
         />
       )}
@@ -630,12 +639,18 @@ export default function CoachVideoTab({ clients = [], db }) {
 // ============================================
 // COURSE ROW — cursus-kaarten met toewijzen/bewerken/verwijderen
 // ============================================
-function CourseRow({ courses, videos, onAssign, onEdit, onDelete, isMobile }) {
+function CourseRow({ courses, videos, onAssign, onEdit, onDelete, onVideoAssign, onVideoManage, onVideoEdit, onVideoDelete, getCategoryConfig, isMobile }) {
+  const [expandedId, setExpandedId] = useState(null)
   const thumbFor = (course) => {
     if (course.thumbnail_url) return course.thumbnail_url
     const first = videos.find(v => v.id === (course.videoIds || [])[0])
     return first ? videoService.getThumbnailUrl(first) : null
   }
+  const expanded = expandedId ? courses.find(c => c.id === expandedId) : null
+  const expandedVideos = expanded
+    ? (expanded.videoIds || []).map(id => videos.find(v => v.id === id)).filter(Boolean)
+    : []
+
   return (
     <div style={{ marginBottom: '1.5rem' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.625rem', padding: '0 0.25rem' }}>
@@ -646,16 +661,22 @@ function CourseRow({ courses, videos, onAssign, onEdit, onDelete, isMobile }) {
       <div className="cvt-row" style={{ display: 'flex', gap: '0.625rem', overflowX: 'auto', WebkitOverflowScrolling: 'touch', scrollbarWidth: 'none', paddingBottom: '0.25rem' }}>
         {courses.map(course => {
           const thumb = thumbFor(course)
+          const isOpen = expandedId === course.id
           return (
-            <div key={course.id} style={{ flexShrink: 0, width: isMobile ? '220px' : '260px', background: '#0a0a0a', border: `1px solid ${GOLD}33`, borderRadius: 10, overflow: 'hidden' }}>
-              <div style={{ position: 'relative', height: isMobile ? 110 : 130, background: '#000' }}>
+            <div key={course.id} style={{ flexShrink: 0, width: isMobile ? '220px' : '260px', background: '#0a0a0a', border: `1px solid ${isOpen ? GOLD : GOLD + '33'}`, borderRadius: 10, overflow: 'hidden' }}>
+              {/* Klik op de kaart = video's uitklappen */}
+              <div onClick={() => setExpandedId(isOpen ? null : course.id)} style={{ position: 'relative', height: isMobile ? 110 : 130, background: '#000', cursor: 'pointer' }}>
                 {thumb && <img src={thumb} alt={course.title} style={{ width: '100%', height: '100%', objectFit: 'cover', opacity: 0.85 }} onError={e => { e.currentTarget.style.display = 'none' }} />}
                 <div style={{ position: 'absolute', top: 8, left: 8, display: 'flex', alignItems: 'center', gap: 4, padding: '0.2rem 0.45rem', background: GOLD, borderRadius: 6, color: '#000', fontSize: '0.55rem', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
                   <GraduationCap size={11} /> Cursus · {course.videoCount}
                 </div>
+                {/* Uitklap-indicator */}
+                <div style={{ position: 'absolute', bottom: 8, right: 8, display: 'flex', alignItems: 'center', gap: 3, padding: '0.2rem 0.4rem', background: 'rgba(0,0,0,0.6)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 6, color: '#fff', fontSize: '0.5rem', fontWeight: 800, textTransform: 'uppercase' }}>
+                  {isOpen ? <><ChevronUp size={11} /> Sluit</> : <><ChevronDown size={11} /> Video's</>}
+                </div>
               </div>
               <div style={{ padding: '0.6rem 0.7rem' }}>
-                <div style={{ fontSize: '0.85rem', fontWeight: 800, color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', marginBottom: '0.5rem' }}>{course.title}</div>
+                <div onClick={() => setExpandedId(isOpen ? null : course.id)} style={{ fontSize: '0.85rem', fontWeight: 800, color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', marginBottom: '0.5rem', cursor: 'pointer' }}>{course.title}</div>
                 <div style={{ display: 'flex', gap: '0.35rem' }}>
                   <button onClick={() => onAssign(course)} style={{ flex: 2, padding: '0.45rem', background: GOLD, border: 'none', borderRadius: 6, color: '#000', fontSize: '0.62rem', fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4, textTransform: 'uppercase' }}><Send size={11} /> Toewijzen</button>
                   <button onClick={() => onEdit(course)} style={{ flex: 1, padding: '0.45rem', background: 'transparent', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 6, color: 'rgba(255,255,255,0.6)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Pencil size={12} /></button>
@@ -666,6 +687,36 @@ function CourseRow({ courses, videos, onAssign, onEdit, onDelete, isMobile }) {
           )
         })}
       </div>
+
+      {/* Uitgeklapte cursus → z'n video's eronder */}
+      {expanded && (
+        <div style={{ marginTop: '0.75rem', padding: isMobile ? '0.7rem' : '0.85rem', background: 'rgba(255,215,0,0.03)', border: `1px solid ${GOLD}22`, borderRadius: 10 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.6rem' }}>
+            <GraduationCap size={13} color={GOLD} />
+            <span style={{ fontWeight: 800, color: '#fff', fontSize: '0.72rem' }}>Video's in "{expanded.title}"</span>
+            <span style={{ color: 'rgba(255,255,255,0.3)', fontSize: '0.62rem', fontWeight: 700 }}>· {expandedVideos.length}</span>
+            <button onClick={() => setExpandedId(null)} style={{ marginLeft: 'auto', padding: '0.25rem 0.55rem', background: 'transparent', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 6, color: 'rgba(255,255,255,0.6)', fontSize: '0.6rem', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4, textTransform: 'uppercase' }}><ChevronUp size={11} /> Sluit</button>
+          </div>
+          {expandedVideos.length === 0 ? (
+            <div style={{ padding: '1rem', textAlign: 'center', color: 'rgba(255,255,255,0.3)', fontSize: '0.7rem' }}>Nog geen video's in deze cursus.</div>
+          ) : (
+            <div className="cvt-row" style={{ display: 'flex', gap: '0.625rem', overflowX: 'auto', WebkitOverflowScrolling: 'touch', scrollbarWidth: 'none', paddingBottom: '0.25rem' }}>
+              {expandedVideos.map(v => (
+                <div key={v.id} style={{ flexShrink: 0, width: isMobile ? '220px' : '260px' }}>
+                  <VideoCard
+                    video={v}
+                    categoryConfig={getCategoryConfig(v)}
+                    onAssign={() => onVideoAssign(v)}
+                    onManage={() => onVideoManage(v)}
+                    onEdit={() => onVideoEdit(v)}
+                    onDelete={() => onVideoDelete(v)}
+                  />
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
       <style>{`.cvt-row::-webkit-scrollbar { display: none; }`}</style>
     </div>
   )
