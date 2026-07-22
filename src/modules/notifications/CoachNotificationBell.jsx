@@ -1,7 +1,7 @@
 // src/modules/notifications/CoachNotificationBell.jsx
 // Simple notification bell for CoachHub - reads coach_notifications table
 import { useState, useEffect, useRef } from 'react'
-import { Bell, X, Check, ChevronRight, AlertCircle, FileText, Utensils, LifeBuoy, ClipboardCheck } from 'lucide-react'
+import { Bell, X, Check, ChevronRight, AlertCircle, FileText, Utensils, LifeBuoy, ClipboardCheck, PlayCircle } from 'lucide-react'
 
 export default function CoachNotificationBell({ db, isMobile, onNavigate, open: openProp, onOpenChange, onCountChange }) {
   const controlled = typeof openProp === 'boolean' && typeof onOpenChange === 'function'
@@ -99,6 +99,7 @@ export default function CoachNotificationBell({ db, isMobile, onNavigate, open: 
       case 'plan_ready': return <Utensils size={14} />
       case 'action_required': return <AlertCircle size={14} />
       case 'support_message': return <LifeBuoy size={14} />
+      case 'video_watched': return <PlayCircle size={14} />
       default: return <Bell size={14} />
     }
   }
@@ -110,6 +111,7 @@ export default function CoachNotificationBell({ db, isMobile, onNavigate, open: 
       case 'plan_ready': return '#10b981'
       case 'action_required': return '#f59e0b'
       case 'support_message': return '#FFD700'
+      case 'video_watched': return '#10b981'
       default: return 'rgba(255,255,255,0.5)'
     }
   }

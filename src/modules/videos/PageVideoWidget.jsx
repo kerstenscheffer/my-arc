@@ -4,7 +4,7 @@
 
 import React, { useState, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
-import { Play, X, Video, CheckCircle2, ChevronLeft, GraduationCap } from 'lucide-react'
+import { Play, X, Video, CheckCircle2, ChevronLeft, GraduationCap, Eye } from 'lucide-react'
 import videoService from './VideoService'
 import PageFilesBlock from './PageFilesBlock'
 
@@ -145,6 +145,33 @@ export default function PageVideoWidget({ client, db, pageContext = 'home', open
   // FIX: alleen locally markeren als viewed (geen reload die loop veroorzaakt)
   const handleVideoWatched = (itemId) => {
     setViewedIds(prev => new Set([...prev, itemId]))
+  }
+
+  // Client heeft de video afgekeken (auto na afloop óf via de "Video bekeken"-knop):
+  // markeer completed in de assignment én stuur de coach een notificatie.
+  const handleVideoCompleted = async (item) => {
+    if (!item) return
+    // 1) Completed markeren — alleen bij toegewezen video's (default-video's hebben geen assignment_id)
+    try {
+      if (item.assignment_id) await videoService.markAsCompleted(item.assignment_id, null)
+    } catch (e) { console.error('markAsCompleted failed:', e) }
+    // 2) Lokaal als bekeken tonen (badge-count klopt)
+    setViewedIds(prev => new Set([...prev, item.id]))
+    // 3) Coach-notificatie via coach_notifications (zelfde vorm als check-in/intake)
+    try {
+      const coachId = client?.coach_id || client?.trainer_id
+      if (coachId) {
+        await db.supabase.from('coach_notifications').insert([{
+          coach_id: coachId,
+          client_id: client.id,
+          type: 'video_watched',
+          priority: 'normal',
+          title: 'Video bekeken',
+          message: `${client.first_name || client.name || 'Een client'} heeft "${item.video?.title || 'een video'}" bekeken`,
+          read_status: false,
+        }])
+      }
+    } catch (e) { console.error('coach-notificatie video mislukt:', e) }
   }
 
   if (loading || !hasContent) return null
@@ -385,6 +412,7 @@ export default function PageVideoWidget({ client, db, pageContext = 'home', open
           item={playingItem}
           onClose={() => setPlayingItem(null)}
           onWatched={handleVideoWatched}
+          onCompleted={handleVideoCompleted}
         />
       )}
 
@@ -626,13 +654,26 @@ function VideoCard({ item, isLocallyViewed, onClick, isMobile }) {
 // FULLSCREEN PLAYER
 // FIX: onWatched callback fires maar triggert GEEN reload meer in parent
 // ============================================
-function FullscreenPlayer({ item, onClose, onWatched }) {
+function FullscreenPlayer({ item, onClose, onWatched, onCompleted }) {
+  const YT_PLAYER_ID = 'pvw-yt-player'
   const markedRef = useRef(false)
   const isMobile = window.innerWidth <= 768
 
   const video = item?.video
   const videoId = extractYouTubeId(video?.video_url)
   const isShort = isYouTubeShort(video?.video_url)
+
+  // "Bekeken"-status. Al completed bij openen → knop meteen als bevestigd tonen
+  // en geen dubbele melding sturen (ook niet als de video opnieuw eindigt).
+  const alreadyDone = item?.status === 'completed' || item?.completed
+  const [watched, setWatched] = useState(!!alreadyDone)
+  const completedRef = useRef(!!alreadyDone)
+  const markWatched = () => {
+    if (completedRef.current) return
+    completedRef.current = true
+    setWatched(true)
+    onCompleted?.(item)
+  }
 
   // Lock body scroll
   useEffect(() => {
@@ -664,6 +705,42 @@ function FullscreenPlayer({ item, onClose, onWatched }) {
     return () => window.removeEventListener('keydown', handleKey)
   }, [onClose])
 
+  // YouTube IFrame API: detecteer automatisch wanneer de video is afgelopen
+  // (onStateChange data === 0 = ended). De iframe heeft enablejsapi=1 + een id,
+  // zodat YT.Player 'm kan wrappen. Bij afloop → markWatched() (idempotent).
+  useEffect(() => {
+    if (!videoId) return
+    let player = null
+    let cancelled = false
+    let poll = null
+    const ensureYT = () => new Promise((resolve) => {
+      if (window.YT && window.YT.Player) return resolve(window.YT)
+      if (!document.getElementById('yt-iframe-api')) {
+        const tag = document.createElement('script')
+        tag.id = 'yt-iframe-api'
+        tag.src = 'https://www.youtube.com/iframe_api'
+        document.head.appendChild(tag)
+      }
+      poll = setInterval(() => {
+        if (window.YT && window.YT.Player) { clearInterval(poll); poll = null; resolve(window.YT) }
+      }, 150)
+    })
+    ensureYT().then((YT) => {
+      if (cancelled || !document.getElementById(YT_PLAYER_ID)) return
+      try {
+        player = new YT.Player(YT_PLAYER_ID, {
+          events: { onStateChange: (e) => { if (e?.data === 0) markWatched() } },
+        })
+      } catch (err) { console.warn('YT player init failed:', err?.message) }
+    })
+    return () => {
+      cancelled = true
+      if (poll) clearInterval(poll)
+      try { player && player.destroy && player.destroy() } catch { /* noop */ }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [videoId])
+
   if (!video) return null
 
   const playerStyle = isShort
@@ -679,7 +756,7 @@ function FullscreenPlayer({ item, onClose, onWatched }) {
       }
 
   const embedUrl = videoId
-    ? `https://www.youtube.com/embed/${videoId}?autoplay=1&mute=0&controls=1&rel=0&modestbranding=1&playsinline=1`
+    ? `https://www.youtube.com/embed/${videoId}?autoplay=1&mute=0&controls=1&rel=0&modestbranding=1&playsinline=1&enablejsapi=1&origin=${encodeURIComponent(window.location.origin)}`
     : null
 
   return createPortal(
@@ -764,6 +841,7 @@ function FullscreenPlayer({ item, onClose, onWatched }) {
       >
         {embedUrl ? (
           <iframe
+            id={YT_PLAYER_ID}
             src={embedUrl}
             style={{
               position: 'absolute',
@@ -852,6 +930,33 @@ function FullscreenPlayer({ item, onClose, onWatched }) {
           )}
         </div>
       )}
+
+      {/* "Video bekeken"-knop — client bevestigt (of auto na afloop) dat'ie de
+          video heeft gezien. markWatched() is idempotent, dus dubbel klikken of
+          auto+klik stuurt maar één coach-melding. */}
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{ marginTop: '1rem', display: 'flex', justifyContent: 'center', width: '100%', maxWidth: 500 }}
+      >
+        <button
+          onClick={markWatched}
+          disabled={watched}
+          style={{
+            display: 'inline-flex', alignItems: 'center', gap: '0.5rem',
+            padding: '0.65rem 1.2rem', borderRadius: 10,
+            background: watched ? 'rgba(16,185,129,0.15)' : 'linear-gradient(135deg, #FFD700, #e8a800)',
+            border: watched ? '1px solid rgba(16,185,129,0.4)' : 'none',
+            color: watched ? '#10b981' : '#000',
+            fontSize: '0.82rem', fontWeight: 800,
+            cursor: watched ? 'default' : 'pointer',
+            touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+          }}
+        >
+          {watched
+            ? <><CheckCircle2 size={16} /> Bekeken — je coach is op de hoogte</>
+            : <><Eye size={16} /> Video bekeken</>}
+        </button>
+      </div>
     </div>,
     document.body
   )
