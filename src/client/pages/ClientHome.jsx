@@ -87,17 +87,14 @@ function WelcomeSection({ client }) {
   // Traject-voortgang voor in de balk: "Week X/Y" + dunne balk.
   const startStr = client?.coaching_start_date
   const endStr = client?.subscription_end_date
-  let curWeek = null, weeksTotal = null, pct = null
+  let curWeek = null, weeksTotal = null
   if (startStr) {
     const start = new Date(startStr)
-    const elapsedDays = Math.max(0, (today.getTime() - start.getTime()) / 86400000)
-    const elapsedWeeks = Math.floor(elapsedDays / 7)
+    const elapsedWeeks = Math.floor(Math.max(0, (today.getTime() - start.getTime()) / 86400000) / 7)
     if (endStr) {
       const end = new Date(endStr)
-      const totalDays = Math.max(1, (end.getTime() - start.getTime()) / 86400000)
-      weeksTotal = Math.ceil(totalDays / 7)
+      weeksTotal = Math.ceil(Math.max(1, (end.getTime() - start.getTime()) / 86400000) / 7)
       curWeek = Math.min(weeksTotal, elapsedWeeks + 1)
-      pct = Math.min(100, Math.round((elapsedDays / totalDays) * 100))
     } else {
       curWeek = elapsedWeeks + 1
     }
@@ -116,12 +113,12 @@ function WelcomeSection({ client }) {
         padding: isMobile ? '0.85rem 1rem' : '1rem 1.5rem',
         textAlign: 'center',
       }}>
-        {/* Dag + datum-pill */}
+        {/* Dag + datum-pill + traject-week (bold wit) */}
         <div style={{
           fontSize: isMobile ? '1.2rem' : '1.35rem',
           fontWeight: 900, color: '#FFD700', letterSpacing: '-0.02em',
           lineHeight: 1.1,
-          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+          display: 'flex', alignItems: 'center', justifyContent: 'center', flexWrap: 'wrap', gap: 8,
         }}>
           {dayName}
           <span style={{
@@ -132,6 +129,11 @@ function WelcomeSection({ client }) {
           }}>
             {dateLabel}
           </span>
+          {curWeek != null && (
+            <span style={{ fontSize: isMobile ? '1rem' : '1.15rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.01em' }}>
+              week {curWeek}{weeksTotal != null && `/${weeksTotal}`}
+            </span>
+          )}
         </div>
 
         {/* Begroeting + naam */}
@@ -144,23 +146,6 @@ function WelcomeSection({ client }) {
         }}>
           {getGreeting()}, <span style={{ color: '#fff', fontWeight: 900 }}>{firstName}</span>
         </div>
-
-        {/* Traject-voortgang: Week X/Y + dunne balk */}
-        {curWeek != null && (
-          <div style={{ marginTop: 9, maxWidth: 460, marginLeft: 'auto', marginRight: 'auto' }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, fontSize: '0.6rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: weeksTotal ? 5 : 0 }}>
-              <span style={{ color: 'rgba(255,255,255,0.6)' }}>
-                Week {curWeek}{weeksTotal != null && <span style={{ color: 'rgba(255,255,255,0.3)' }}>/{weeksTotal}</span>}
-              </span>
-              {pct != null && <span style={{ color: 'rgba(255,215,0,0.75)' }}>· {pct}%</span>}
-            </div>
-            {weeksTotal != null && (
-              <div style={{ height: 4, background: 'rgba(255,255,255,0.08)', borderRadius: 999, overflow: 'hidden' }}>
-                <div style={{ width: `${pct || 0}%`, height: '100%', background: 'linear-gradient(90deg, #FFD700, #D4AF37)', borderRadius: 999, transition: 'width 0.5s ease' }} />
-              </div>
-            )}
-          </div>
-        )}
       </div>
     </div>
   )
@@ -1006,12 +991,6 @@ export default function ClientHome({ client, db, setCurrentView }) {
       <FadeOnScroll>
         <div style={{ marginTop: isMobile ? '0.5rem' : '0.75rem' }}>
           <ChallengeHomeBanner db={db} client={client} />
-        </div>
-      </FadeOnScroll>
-
-      <FadeOnScroll>
-        <div style={{ marginTop: isMobile ? '4.5rem' : '5.5rem' }}>
-          <TrajectProgress client={client} />
         </div>
       </FadeOnScroll>
 
