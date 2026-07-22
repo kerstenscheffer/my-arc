@@ -54,9 +54,9 @@ const toIsoDate = (date) => {
 // ── Budget ring ───────────────────────────────────────────────────────────
 // Vult zich naarmate hij eet (consumed/target). In het midden: het aantal
 // kcal dat hij nog over heeft. Bij overschrijding: rode rand + "-X over".
-const BudgetRing = ({ consumed, target, isMobile, showTotal = false }) => {
-  const size = isMobile ? 110 : 130
-  const stroke = isMobile ? 10 : 12
+const BudgetRing = ({ consumed, target, isMobile, showTotal = false, compact = false }) => {
+  const size = compact ? (isMobile ? 82 : 92) : (isMobile ? 110 : 130)
+  const stroke = compact ? (isMobile ? 8 : 9) : (isMobile ? 10 : 12)
   const radius = (size - stroke) / 2
   const circumference = 2 * Math.PI * radius
   const ratio = target > 0 ? Math.min(1, consumed / target) : 0
@@ -71,7 +71,7 @@ const BudgetRing = ({ consumed, target, isMobile, showTotal = false }) => {
     : (isOver ? `−${fmt(Math.abs(remaining))}` : fmt(remaining))
   const len = remainStr.length
   // Schaal mee zodat 5-cijferige getallen niet uitlopen.
-  const base = isMobile ? 1.5 : 1.7
+  const base = compact ? (isMobile ? 1.15 : 1.3) : (isMobile ? 1.5 : 1.7)
   const fontSize = len >= 5 ? base * 0.78 : len >= 4 ? base * 0.92 : base
 
   return (
@@ -141,7 +141,7 @@ const BudgetRing = ({ consumed, target, isMobile, showTotal = false }) => {
 }
 
 // ── Eiwit blok — held #2 ─────────────────────────────────────────────────
-const ProteinBlock = ({ consumed, target, isMobile }) => {
+const ProteinBlock = ({ consumed, target, isMobile, compact = false }) => {
   const remaining = (target || 0) - (consumed || 0)
   const pct = target > 0 ? Math.min(100, Math.round((consumed / target) * 100)) : 0
   const isOver = remaining < 0
@@ -161,7 +161,7 @@ const ProteinBlock = ({ consumed, target, isMobile }) => {
         marginBottom: 8,
       }}>
         <span style={{
-          fontSize: isMobile ? '1.55rem' : '1.85rem',
+          fontSize: compact ? (isMobile ? '1.2rem' : '1.35rem') : (isMobile ? '1.55rem' : '1.85rem'),
           fontWeight: 900,
           color: isOver ? '#10b981' : '#fff',
           letterSpacing: '-0.025em', lineHeight: 1,
@@ -245,7 +245,7 @@ const MacroDetailBlock = ({ label, consumed, target, isMobile }) => {
 
 // ── Carbs+Vet zwarte balk (hero-variant) ──────────────────────────────────
 // Subtiel, compact, op één regel. Toont per macro: label + "X / Y g".
-const SubtleCarbsFatBar = ({ carbs, fat, targets, isMobile }) => {
+const SubtleCarbsFatBar = ({ carbs, fat, targets, isMobile, compact = false }) => {
   const Cell = ({ label, val, target }) => (
     <div style={{
       flex: 1, minWidth: 0,
@@ -258,7 +258,7 @@ const SubtleCarbsFatBar = ({ carbs, fat, targets, isMobile }) => {
         textTransform: 'uppercase', letterSpacing: '0.08em',
       }}>{label}</span>
       <span style={{
-        fontSize: isMobile ? '0.95rem' : '1.05rem',
+        fontSize: compact ? (isMobile ? '0.82rem' : '0.9rem') : (isMobile ? '0.95rem' : '1.05rem'),
         fontWeight: 900, color: '#fff',
         letterSpacing: '-0.02em', lineHeight: 1,
       }}>
@@ -290,6 +290,7 @@ export default function MacroHero({
   selectedDate, selectedIsToday = true,
   variant = 'detail',  // 'hero' = oude stijl (kcal+eiwit groot, koolh/vet zwarte balk),
                        // 'detail' = compacte 3-blok layout (plan-analyzer).
+  compact = false,     // kleinere ring + kleinere getallen (bv. home "Planning vandaag").
   // Increment to force a cache clear + re-fetch for the current day
   // (used when a meal is logged or deleted on a past day).
   refreshKey = 0,
@@ -336,7 +337,9 @@ export default function MacroHero({
 
   return (
     <div style={{
-      padding: isMobile ? '0.7rem 0.9rem 0.85rem' : '0.85rem 1.5rem 1rem',
+      padding: compact
+        ? (isMobile ? '0.5rem 0.6rem 0.6rem' : '0.6rem 0.75rem 0.7rem')
+        : (isMobile ? '0.7rem 0.9rem 0.85rem' : '0.85rem 1.5rem 1rem'),
       maxWidth: 1400, margin: '0 auto',
     }}>
       {showShim ? (
@@ -359,11 +362,13 @@ export default function MacroHero({
               consumed={display.calories || 0}
               target={t.calories || 0}
               isMobile={isMobile}
+              compact={compact}
             />
             <ProteinBlock
               consumed={display.protein || 0}
               target={t.protein || 0}
               isMobile={isMobile}
+              compact={compact}
             />
           </div>
           <SubtleCarbsFatBar
@@ -371,6 +376,7 @@ export default function MacroHero({
             fat={display.fat || 0}
             targets={t}
             isMobile={isMobile}
+            compact={compact}
           />
         </>
       ) : (

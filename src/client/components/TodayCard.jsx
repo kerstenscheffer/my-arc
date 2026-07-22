@@ -6,7 +6,7 @@
 //   - Eerstvolgende call
 import { useState, useEffect } from 'react'
 import { Dumbbell, Play, Phone, Moon } from 'lucide-react'
-import RemainingPill from '../../modules/meal-plan/components/RemainingPill'
+import MacroHero from '../../modules/meal-plan/components/MacroHero'
 
 const GOLD = '#FFD700'
 const todayYMD = () => new Date().toISOString().split('T')[0]
