@@ -54,8 +54,12 @@ const toIsoDate = (date) => {
 // ── Budget ring ───────────────────────────────────────────────────────────
 // Vult zich naarmate hij eet (consumed/target). In het midden: het aantal
 // kcal dat hij nog over heeft. Bij overschrijding: rode rand + "-X over".
-const BudgetRing = ({ consumed, target, isMobile, showTotal = false, compact = false }) => {
-  const size = compact ? (isMobile ? 82 : 92) : (isMobile ? 110 : 130)
+const BudgetRing = ({
+  consumed, target, isMobile, showTotal = false, compact = false,
+  size: sizeOverride, unit = 'kcal', remainWord = 'over', overWord = 'te veel',
+  valueSuffix = '', overIsGood = false,
+}) => {
+  const size = sizeOverride || (compact ? (isMobile ? 82 : 92) : (isMobile ? 110 : 130))
   const stroke = compact ? (isMobile ? 8 : 9) : (isMobile ? 10 : 12)
   const radius = (size - stroke) / 2
   const circumference = 2 * Math.PI * radius
@@ -63,16 +67,16 @@ const BudgetRing = ({ consumed, target, isMobile, showTotal = false, compact = f
   const offset = circumference - ratio * circumference
   const remaining = (target || 0) - (consumed || 0)
   const isOver = remaining < 0
+  const overBad = isOver && !overIsGood   // rood alleen bij "slecht" over (kcal)
 
-  // showTotal (plan-analyzer): toon het dagtotaal in het midden i.p.v. "over".
-  // Default (client meal-pagina): toon resterend budget ("kcal over").
   const remainStr = showTotal
     ? fmt(consumed)
-    : (isOver ? `−${fmt(Math.abs(remaining))}` : fmt(remaining))
-  const len = remainStr.length
-  // Schaal mee zodat 5-cijferige getallen niet uitlopen.
+    : (isOver ? `${overIsGood ? '+' : '−'}${fmt(Math.abs(remaining))}` : fmt(remaining))
+  const len = (remainStr + valueSuffix).length
   const base = compact ? (isMobile ? 1.15 : 1.3) : (isMobile ? 1.5 : 1.7)
-  const fontSize = len >= 5 ? base * 0.78 : len >= 4 ? base * 0.92 : base
+  const scale = sizeOverride ? sizeOverride / (compact ? (isMobile ? 82 : 92) : (isMobile ? 110 : 130)) : 1
+  const fontSize = (len >= 5 ? base * 0.78 : len >= 4 ? base * 0.92 : base) * scale
+  const gradId = overIsGood ? 'bgrad' : (isOver ? 'bgradOver' : 'bgrad')
 
   return (
     <div style={{ position: 'relative', width: size, height: size, flexShrink: 0 }}>
@@ -91,7 +95,7 @@ const BudgetRing = ({ consumed, target, isMobile, showTotal = false, compact = f
         <circle cx={size / 2} cy={size / 2} r={radius}
           stroke={G.trackBg} strokeWidth={stroke} fill="none" />
         <circle cx={size / 2} cy={size / 2} r={radius}
-          stroke={isOver ? 'url(#bgradOver)' : 'url(#bgrad)'}
+          stroke={`url(#${gradId})`}
           strokeWidth={stroke} fill="none"
           strokeDasharray={circumference}
           strokeDashoffset={offset}
@@ -106,10 +110,10 @@ const BudgetRing = ({ consumed, target, isMobile, showTotal = false, compact = f
       }}>
         <div style={{
           fontSize: `${fontSize}rem`, fontWeight: 900,
-          color: isOver ? G.over : '#fff',
+          color: overBad ? G.over : (isOver && overIsGood ? '#10b981' : '#fff'),
           letterSpacing: '-0.025em', lineHeight: 1,
         }}>
-          {remainStr}
+          {remainStr}{valueSuffix && <span style={{ fontSize: '0.6em' }}>{valueSuffix}</span>}
         </div>
         <div style={{
           fontSize: isMobile ? '0.5rem' : '0.55rem',
@@ -117,9 +121,8 @@ const BudgetRing = ({ consumed, target, isMobile, showTotal = false, compact = f
           textTransform: 'uppercase', letterSpacing: '0.08em',
           marginTop: 1,
         }}>
-          {showTotal ? 'kcal totaal' : `kcal ${isOver ? 'te veel' : 'over'}`}
+          {showTotal ? `${unit} totaal` : `${unit} ${isOver ? overWord : remainWord}`}
         </div>
-        {/* "van X" onder de over-tekst — laat zien waarvan hij over is. */}
         {target > 0 && (
           <div style={{
             fontSize: isMobile ? '0.62rem' : '0.7rem',
@@ -132,7 +135,7 @@ const BudgetRing = ({ consumed, target, isMobile, showTotal = false, compact = f
             <span style={{
               fontSize: '0.7em', color: G.textFaint, fontWeight: 700,
             }}>van</span>
-            {fmt(target)}
+            {fmt(target)}{valueSuffix}
           </div>
         )}
       </div>
@@ -348,6 +351,30 @@ export default function MacroHero({
           color: G.textFaint, fontSize: '0.75rem',
         }}>
           Daggegevens laden…
+        </div>
+      ) : variant === 'rings' ? (
+        // Twee ringen naast elkaar: kcal (breder) + eiwit.
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: isMobile ? '1.1rem' : '1.6rem' }}>
+          <BudgetRing
+            consumed={display.calories || 0}
+            target={t.calories || 0}
+            isMobile={isMobile}
+            compact={compact}
+            size={compact ? (isMobile ? 108 : 122) : (isMobile ? 128 : 150)}
+            unit="kcal"
+          />
+          <BudgetRing
+            consumed={display.protein || 0}
+            target={t.protein || 0}
+            isMobile={isMobile}
+            compact={compact}
+            size={compact ? (isMobile ? 90 : 102) : (isMobile ? 110 : 128)}
+            unit="eiwit"
+            remainWord="te gaan"
+            overWord="gehaald"
+            valueSuffix="g"
+            overIsGood
+          />
         </div>
       ) : variant === 'hero' ? (
         <>

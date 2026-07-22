@@ -168,13 +168,13 @@ export default function TodayCard({ client, db, setCurrentView, isMobile }) {
         </div>
         <div
           onClick={() => setCurrentView && setCurrentView('meal')}
-          style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 16, overflow: 'hidden', cursor: 'pointer' }}
+          style={{ cursor: 'pointer' }}
         >
           {macros == null ? (
-            <div style={{ padding: '1.1rem', fontSize: '0.9rem', fontWeight: 700, color: 'rgba(255,255,255,0.3)' }}>…</div>
+            <div style={{ padding: '1.1rem', fontSize: '0.9rem', fontWeight: 700, color: 'rgba(255,255,255,0.3)', textAlign: 'center' }}>…</div>
           ) : hasTarget ? (
             <MacroHero
-              variant="hero"
+              variant="rings"
               compact
               consumed={macros.consumed}
               targets={macros.targets}
