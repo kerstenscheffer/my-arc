@@ -132,7 +132,7 @@ export default function LoginMain() {
         <form onSubmit={handleCoachVerify} style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
           <input type="password" placeholder="Toegangscode" value={coachPw}
             onChange={e => setCoachPw(e.target.value)} style={inp} autoFocus
-            onFocus={e => e.target.style.borderColor = '#FFD700'}
+            onFocus={e => e.target.style.borderColor = '#ffffff'}
             onBlur={e => e.target.style.borderColor = 'rgba(255,255,255,0.08)'} />
           <GoldButton type="submit">Verifieer</GoldButton>
         </form>
@@ -145,19 +145,13 @@ export default function LoginMain() {
     <Wrapper slide={slide}>
       <div style={{ width: '100%', maxWidth: '340px' }}>
 
-        {/* Logo */}
+        {/* Logo — nieuwe MY ARC coaching-logo */}
         <div style={{ textAlign: 'center', marginBottom: '2.25rem' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.45rem', marginBottom: '0.3rem' }}>
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#FFD700" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
-            </svg>
-            <span style={{ fontSize: '1.75rem', fontWeight: '900', color: '#FFD700', letterSpacing: '-0.01em', lineHeight: 1 }}>
-              MY ARC
-            </span>
-          </div>
-          <div style={{ fontSize: '0.5rem', fontWeight: '700', color: 'rgba(255,215,0,0.35)', letterSpacing: '0.28em', textTransform: 'uppercase' }}>
-            JOUW TRAINING PLATFORM
-          </div>
+          <img
+            src="/ma-coaching-logo.png"
+            alt="MY ARC Coaching"
+            style={{ maxWidth: '230px', width: '100%', height: 'auto', margin: '0 auto', display: 'block' }}
+          />
         </div>
 
         {/* Mode label */}
@@ -172,14 +166,14 @@ export default function LoginMain() {
         <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
           <input type="email" placeholder="Email" value={email} onChange={e => setEmail(e.target.value)}
             style={inp} autoComplete="email" autoCapitalize="none"
-            onFocus={e => e.target.style.borderColor = '#FFD700'}
+            onFocus={e => e.target.style.borderColor = '#ffffff'}
             onBlur={e => e.target.style.borderColor = 'rgba(255,255,255,0.08)'} />
 
           <div style={{ position: 'relative' }}>
             <input type={showPw ? 'text' : 'password'} placeholder="Wachtwoord" value={password}
               onChange={e => setPassword(e.target.value)} style={{ ...inp, paddingRight: '3.5rem' }}
               autoComplete="current-password"
-              onFocus={e => e.target.style.borderColor = '#FFD700'}
+              onFocus={e => e.target.style.borderColor = '#ffffff'}
               onBlur={e => e.target.style.borderColor = 'rgba(255,255,255,0.08)'} />
             <button type="button" onClick={() => setShowPw(!showPw)} style={{
               position: 'absolute', right: '1rem', top: '50%', transform: 'translateY(-50%)',
@@ -197,8 +191,8 @@ export default function LoginMain() {
             <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
               <div onClick={() => setRememberMe(!rememberMe)} style={{
                 width: '17px', height: '17px', flexShrink: 0, borderRadius: '4px',
-                background: rememberMe ? '#FFD700' : 'transparent',
-                border: `1px solid ${rememberMe ? '#FFD700' : 'rgba(255,255,255,0.18)'}`,
+                background: rememberMe ? '#ffffff' : 'transparent',
+                border: `1px solid ${rememberMe ? '#ffffff' : 'rgba(255,255,255,0.18)'}`,
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                 cursor: 'pointer', transition: 'all 0.2s',
               }}>
@@ -278,7 +272,7 @@ export default function LoginMain() {
           zIndex: 200, padding: '1.5rem',
         }}>
           <div onClick={e => e.stopPropagation()} style={{
-            background: '#0f0f0f', border: '1px solid rgba(255,215,0,0.1)',
+            background: '#0f0f0f', border: '1px solid rgba(255,255,255,0.1)',
             borderRadius: '12px', padding: '1.75rem',
             width: '100%', maxWidth: '340px',
           }}>
@@ -299,7 +293,7 @@ export default function LoginMain() {
             <form onSubmit={handleReset} style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
               <input type="email" placeholder="Email adres" value={resetEmail}
                 onChange={e => setResetEmail(e.target.value)} style={inp} autoFocus
-                onFocus={e => e.target.style.borderColor = '#FFD700'}
+                onFocus={e => e.target.style.borderColor = '#ffffff'}
                 onBlur={e => e.target.style.borderColor = 'rgba(255,255,255,0.08)'} />
               <GoldButton type="submit" disabled={resetLoading}>
                 {resetLoading ? 'Versturen...' : 'Reset sturen'}
@@ -360,7 +354,7 @@ function GoldButton({ children, disabled, style, ...props }) {
   return (
     <button disabled={disabled} style={{
       width: '100%', padding: '0.9rem', minHeight: '48px',
-      background: disabled ? 'rgba(255,215,0,0.45)' : '#FFD700',
+      background: disabled ? 'rgba(255,255,255,0.45)' : '#ffffff',
       border: 'none', borderRadius: '10px',
       color: '#000', fontSize: '0.95rem', fontWeight: '800',
       cursor: disabled ? 'not-allowed' : 'pointer',
@@ -387,7 +381,7 @@ function ErrorBox({ children }) {
 }
 
 const labelStyle = {
-  fontSize: '0.5rem', fontWeight: '700', color: 'rgba(255,215,0,0.5)',
+  fontSize: '0.5rem', fontWeight: '700', color: 'rgba(255,255,255,0.5)',
   letterSpacing: '0.25em', textTransform: 'uppercase', marginBottom: '0.35rem',
 }
 

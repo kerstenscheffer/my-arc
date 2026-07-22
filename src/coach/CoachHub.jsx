@@ -1111,6 +1111,8 @@ export default function CoachHub() {
           isMobile={isMobile}
           onOpenProductivity={() => navigateTo('productivity')}
           onClose={() => setShowTodoModal(false)}
+          onStartTask={handleStartTask}
+          activeTaskId={timerTask?.task?.id}
         />
       )}
 

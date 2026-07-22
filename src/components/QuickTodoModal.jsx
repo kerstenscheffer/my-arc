@@ -7,7 +7,7 @@
 // Coaching): filtert de lijst én bepaalt in welke sectie een nieuwe to-do landt.
 import { useState, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
-import { X, Plus, Check, Trash2, ArrowRight, ListTodo, Inbox, Layers, Pencil, GripVertical } from 'lucide-react'
+import { X, Plus, Check, Trash2, ArrowRight, ListTodo, Inbox, Layers, Pencil, GripVertical, Play } from 'lucide-react'
 import ProductivityService from '../modules/productivity/ProductivityService'
 
 const GOLD = '#FFD700'
@@ -29,7 +29,7 @@ const DUR_FILTERS = [
   { key: 'gt60', label: '60m+', test: (m) => m > 60 },
 ]
 
-export default function QuickTodoModal({ db, coachId, onClose, onOpenProductivity, isMobile }) {
+export default function QuickTodoModal({ db, coachId, onClose, onOpenProductivity, isMobile, onStartTask, activeTaskId }) {
   const [svc] = useState(() => new ProductivityService(db.supabase))
   const [tasks, setTasks] = useState([])
   const [sections, setSections] = useState([])
@@ -428,6 +428,18 @@ export default function QuickTodoModal({ db, coachId, onClose, onOpenProductivit
                   {t.estimated_minutes ? (
                     <span style={{ flexShrink: 0, fontSize: '0.58rem', fontWeight: 800, color: 'rgba(255,255,255,0.45)', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 4, padding: '0.1rem 0.3rem' }}>{t.estimated_minutes}m</span>
                   ) : null}
+                  {/* Mee bezig — start de task-timer (en sluit deze modal zodat de start-modal schoon verschijnt) */}
+                  {onStartTask && (
+                    activeTaskId === t.id ? (
+                      <span title="Bezig" style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: 3, padding: '0.15rem 0.4rem', borderRadius: 6, background: 'rgba(16,185,129,0.15)', border: '1px solid rgba(16,185,129,0.4)', color: '#10b981', fontSize: '0.52rem', fontWeight: 800, textTransform: 'uppercase' }}>
+                        <Play size={9} fill="#10b981" /> Bezig
+                      </span>
+                    ) : (
+                      <button onClick={() => { onStartTask(t); onClose && onClose() }} title="Mee bezig — start deze task" style={{ flexShrink: 0, width: 28, height: 28, borderRadius: 7, background: 'transparent', border: 'none', color: 'rgba(16,185,129,0.7)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', touchAction: 'manipulation' }}>
+                        <Play size={13} />
+                      </button>
+                    )
+                  )}
                   <button onClick={() => startEdit(t)} title="Bewerken" style={{ flexShrink: 0, width: 28, height: 28, borderRadius: 7, background: 'transparent', border: 'none', color: 'rgba(255,255,255,0.3)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', touchAction: 'manipulation' }}>
                     <Pencil size={13} />
                   </button>

@@ -323,7 +323,7 @@ export default function ClientDashboard() {
                   flexDirection: 'column',
                   alignItems: 'center',
                   gap: 3,
-                  padding: isMobile ? '0.35rem 0.2rem' : '0.45rem 0.3rem',
+                  padding: isMobile ? '0.35rem 0.05rem' : '0.45rem 0.15rem',
                   background: isActive ? `${theme.primary}14` : 'transparent',
                   border: 'none',
                   borderRadius: 14,
@@ -331,7 +331,7 @@ export default function ClientDashboard() {
                   touchAction: 'manipulation',
                   WebkitTapHighlightColor: 'transparent',
                   minHeight: 44,
-                  minWidth: 44,
+                  minWidth: 36,
                   transition: 'background 0.15s ease',
                 }}
               >

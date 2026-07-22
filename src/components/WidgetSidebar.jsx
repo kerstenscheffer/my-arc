@@ -33,7 +33,7 @@ export default function WidgetSidebar({ buttons = [], isMobile = false }) {
         border: '1px solid rgba(255,255,255,0.08)',
         borderRadius: 22,
         boxShadow: '0 18px 48px rgba(0,0,0,0.55), 0 0 0 1px rgba(255,215,0,0.04)',
-        padding: isMobile ? '0.5rem 0.3rem' : '0.6rem 0.4rem',
+        padding: isMobile ? '0.5rem 0.2rem' : '0.6rem 0.3rem',
         zIndex: 99,
         display: 'flex',
         flexDirection: 'column',
@@ -56,7 +56,7 @@ export default function WidgetSidebar({ buttons = [], isMobile = false }) {
               flexDirection: 'column',
               alignItems: 'center',
               gap: 3,
-              padding: isMobile ? '0.4rem 0.55rem' : '0.5rem 0.65rem',
+              padding: isMobile ? '0.4rem 0.3rem' : '0.5rem 0.4rem',
               background: isActive ? `${accent}1a` : 'transparent',
               border: 'none',
               borderRadius: 14,
@@ -64,7 +64,7 @@ export default function WidgetSidebar({ buttons = [], isMobile = false }) {
               touchAction: 'manipulation',
               WebkitTapHighlightColor: 'transparent',
               minHeight: 44,
-              minWidth: 44,
+              minWidth: 36,
               transition: 'background 0.15s ease',
             }}
           >
