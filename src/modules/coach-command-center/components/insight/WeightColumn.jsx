@@ -6,6 +6,7 @@
 import React from 'react'
 import { Scale, Target, Ruler, Camera, TrendingDown, Download, Maximize2 } from 'lucide-react'
 import WeightStatsGrid from '../../../weight-tracker/components/WeightStatsGrid'
+import { weightGoalColor } from '../../../weight-tracker/utils/weightGoalColor'
 
 const formatDate = (d) => { if (!d) return '-'; const dt = new Date(d); return dt.toLocaleDateString('nl-NL', { day: 'numeric', month: 'short', year: dt.getFullYear() !== new Date().getFullYear() ? 'numeric' : undefined }) }
 
