@@ -54,24 +54,27 @@ export default function TodayCard({ client, db, setCurrentView, isMobile }) {
       } catch { if (alive) setTraining({ rest: true }) }
     })()
 
-    // ── Macro's ──
+    // ── Macro's (voor MacroHero: ring + eiwit/koolh/vet) ──
     ;(async () => {
       try {
         const [{ data: t }, { data: cm }] = await Promise.all([
-          db.supabase.from('clients').select('target_calories, target_protein').eq('id', client.id).single(),
-          db.supabase.from('consumed_meals').select('calories, protein')
+          db.supabase.from('clients').select('target_calories, target_protein, target_carbs, target_fat').eq('id', client.id).single(),
+          db.supabase.from('consumed_meals').select('calories, protein, carbs, fat')
             .eq('client_id', client.id)
             .gte('consumed_at', `${day}T00:00:00`).lt('consumed_at', `${day}T23:59:59`),
         ])
-        let ck = 0, cp = 0
-        ;(cm || []).forEach(m => { ck += Number(m.calories) || 0; cp += parseFloat(m.protein) || 0 })
+        let ck = 0, cp = 0, cc = 0, cf = 0
+        ;(cm || []).forEach(m => { ck += Number(m.calories) || 0; cp += parseFloat(m.protein) || 0; cc += parseFloat(m.carbs) || 0; cf += parseFloat(m.fat) || 0 })
         if (alive) setMacros({
-          targetKcal: t?.target_calories || client.target_calories || 0,
-          targetProtein: t?.target_protein || client.target_protein || 0,
-          consumedKcal: Math.round(ck),
-          consumedProtein: Math.round(cp),
+          targets: {
+            calories: t?.target_calories || client.target_calories || 0,
+            protein: t?.target_protein || client.target_protein || 0,
+            carbs: t?.target_carbs || 0,
+            fat: t?.target_fat || 0,
+          },
+          consumed: { calories: Math.round(ck), protein: Math.round(cp), carbs: Math.round(cc), fat: Math.round(cf) },
         })
-      } catch { if (alive) setMacros({ targetKcal: 0, targetProtein: 0, consumedKcal: 0, consumedProtein: 0 }) }
+      } catch { if (alive) setMacros({ targets: { calories: 0, protein: 0, carbs: 0, fat: 0 }, consumed: { calories: 0, protein: 0, carbs: 0, fat: 0 } }) }
     })()
 
     // ── Eerstvolgende call ──
@@ -95,11 +98,7 @@ export default function TodayCard({ client, db, setCurrentView, isMobile }) {
   const isRest = training && training.rest
   const workoutImg = training && !isRest ? pickWorkoutImg(training.name) : null
 
-  // Voeding-props in de vorm die RemainingPill verwacht.
-  const hasTarget = macros && macros.targetKcal > 0
-  const remaining = macros ? { kcal: macros.targetKcal - macros.consumedKcal, protein: macros.targetProtein > 0 ? (macros.targetProtein - macros.consumedProtein) : null } : null
-  const consumed = macros ? { calories: macros.consumedKcal } : null
-  const target = macros ? { calories: macros.targetKcal, protein: macros.targetProtein } : null
+  const hasTarget = macros && macros.targets.calories > 0
 
   const callInfo = () => {
     if (nextCall === 'none' || !nextCall) return null
@@ -174,7 +173,16 @@ export default function TodayCard({ client, db, setCurrentView, isMobile }) {
           {macros == null ? (
             <div style={{ padding: '1.1rem', fontSize: '0.9rem', fontWeight: 700, color: 'rgba(255,255,255,0.3)' }}>…</div>
           ) : hasTarget ? (
-            <RemainingPill remaining={remaining} consumed={consumed} target={target} isMobile={isMobile} />
+            <MacroHero
+              variant="hero"
+              compact
+              consumed={macros.consumed}
+              targets={macros.targets}
+              db={db}
+              clientId={client.id}
+              isMobile={isMobile}
+              selectedIsToday
+            />
           ) : (
             <div style={{ padding: '1.1rem', fontSize: '0.85rem', fontWeight: 600, color: 'rgba(255,255,255,0.4)' }}>Nog geen voedingsdoel ingesteld.</div>
           )}
