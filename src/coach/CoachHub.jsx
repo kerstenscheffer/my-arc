@@ -16,7 +16,7 @@ import CoachVideoTab from '../modules/videos/CoachVideoTab'
 import CoachWorkoutAnalytics from './pages/CoachWorkoutAnalytics'
 import ManualWorkoutBuilder from '../modules/manual-workout-builder/ManualWorkoutBuilder'
 import LeadManagement from '../modules/lead-management/LeadManagement'
-import PlanWizard from '../modules/plan-wizard/PlanWizard'
+import PlanWizardHub from '../modules/plan-wizard/PlanWizardHub'
 import CoachCheckinDashboard from '../modules/client-checkin/CoachCheckinDashboard'
 import CoachOutputDashboard from '../modules/output-planning/CoachOutputDashboard'
 import ProductivityHub from '../modules/productivity/ProductivityHub'
@@ -449,7 +449,7 @@ export default function CoachHub() {
           />
         )
       case 'plan-wizard':
-        return <PlanWizard db={db} clients={clients || []} />
+        return <PlanWizardHub db={db} clients={clients || []} />
       case 'ai-meals':
         return (
           <MealPlanGenerator 
