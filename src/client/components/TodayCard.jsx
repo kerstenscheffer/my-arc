@@ -5,7 +5,7 @@
 //     eiwit te gaan vs doel
 //   - Eerstvolgende call
 import { useState, useEffect } from 'react'
-import { Dumbbell, Play, Phone, Moon, ChevronRight } from 'lucide-react'
+import { Dumbbell, Play, Phone, Moon, ChevronRight, Flame, Wheat, Egg, Droplet } from 'lucide-react'
 import MacroHero from '../../modules/meal-plan/components/MacroHero'
 import AIMealPlanService from '../../modules/meal-plan/AIMealPlanService'
 import { resolveFoodImage } from '../../modules/meal-plan/foodImageFallback'
@@ -211,6 +211,16 @@ export default function TodayCard({ client, db, setCurrentView, isMobile }) {
           )}
         </div>
 
+        {/* 4 macro-vakken met %-ring */}
+        {macros != null && hasTarget && (
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.6rem', marginTop: '0.9rem' }}>
+            <MacroBox label="Calorieën"    icon={<Flame size={13} color="#10b981" />}   color="#10b981" consumed={macros.consumed.calories} target={macros.targets.calories} unitLabel=" kcal" />
+            <MacroBox label="Koolhydraten" icon={<Wheat size={13} color="#ec4899" />}   color="#ec4899" consumed={macros.consumed.carbs}    target={macros.targets.carbs}    unitLabel="g" />
+            <MacroBox label="Eiwitten"     icon={<Egg size={13} color="#3b82f6" />}     color="#3b82f6" consumed={macros.consumed.protein}  target={macros.targets.protein}  unitLabel="g" />
+            <MacroBox label="Vetten"       icon={<Droplet size={13} color="#f59e0b" />} color="#f59e0b" consumed={macros.consumed.fat}      target={macros.targets.fat}      unitLabel="g" />
+          </div>
+        )}
+
         {/* Volgende maaltijd uit het plan */}
         {meal && (
           <button
@@ -244,6 +254,37 @@ export default function TodayCard({ client, db, setCurrentView, isMobile }) {
           <span style={{ flexShrink: 0, fontSize: '0.68rem', fontWeight: 700, color: '#c084fc' }}>{call.sub}</span>
         </button>
       )}
+    </div>
+  )
+}
+
+// Macro-vak: label + icoon, %-ring (gekleurd), "Xg over" eronder.
+function MacroBox({ label, icon, color, consumed, target, unitLabel }) {
+  const pct = target > 0 ? Math.min(100, Math.round((consumed / target) * 100)) : 0
+  const over = Math.round((target || 0) - (consumed || 0))
+  const size = 66, stroke = 6
+  const r = (size - stroke) / 2
+  const circ = 2 * Math.PI * r
+  const off = circ - (pct / 100) * circ
+  return (
+    <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 14, padding: '0.75rem 0.7rem', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem' }}>
+      <div style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <span style={{ fontSize: '0.66rem', fontWeight: 800, color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{label}</span>
+        <span style={{ flexShrink: 0, display: 'flex' }}>{icon}</span>
+      </div>
+      <div style={{ position: 'relative', width: size, height: size }}>
+        <svg width={size} height={size} style={{ transform: 'rotate(-90deg)' }}>
+          <circle cx={size / 2} cy={size / 2} r={r} stroke="rgba(255,255,255,0.08)" strokeWidth={stroke} fill="none" />
+          <circle cx={size / 2} cy={size / 2} r={r} stroke={color} strokeWidth={stroke} fill="none" strokeDasharray={circ} strokeDashoffset={off} strokeLinecap="round" style={{ transition: 'stroke-dashoffset 0.6s cubic-bezier(0.4,0,0.2,1)' }} />
+        </svg>
+        <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <span style={{ fontSize: '1rem', fontWeight: 900, color }}>{pct}<span style={{ fontSize: '0.6em' }}>%</span></span>
+        </div>
+      </div>
+      <div style={{ fontSize: '0.85rem', fontWeight: 900, color: '#fff' }}>
+        {over >= 0 ? over : `+${Math.abs(over)}`}
+        <span style={{ fontSize: '0.7em', fontWeight: 700, color: 'rgba(255,255,255,0.4)' }}>{unitLabel} {over >= 0 ? 'over' : 'te veel'}</span>
+      </div>
     </div>
   )
 }
