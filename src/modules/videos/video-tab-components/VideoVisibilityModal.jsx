@@ -22,6 +22,20 @@ const PAGE_OPTIONS = [
   { value: 'profile',      label: 'Profile',      icon: User },
 ]
 
+// Legacy pagina-sleutels -> huidige client-pagina's. 'progress' was de oude
+// naam voor de tracking-pagina; zonder deze mapping telde'ie wel mee in de
+// badge maar had geen knop (onzichtbaar geselecteerd).
+const PAGE_ALIAS = { progress: 'tracking' }
+const VALID_PAGES = new Set(PAGE_OPTIONS.map(o => o.value))
+const normalizePages = (arr) => {
+  const out = []
+  for (const p of (arr || [])) {
+    const key = PAGE_ALIAS[p] || p
+    if (VALID_PAGES.has(key) && !out.includes(key)) out.push(key)
+  }
+  return out
+}
+
 const clientName = (c, idx) =>
   (c.first_name && c.last_name) ? `${c.first_name} ${c.last_name}`
   : c.first_name || c.last_name || c.email || `Client ${idx + 1}`
@@ -32,7 +46,7 @@ export default function VideoVisibilityModal({ video, clients = [], onClose, onS
 
   const [isActive, setIsActive] = useState(video.is_active !== false)
   const [forEveryone, setForEveryone] = useState(hadDefaults)
-  const [pages, setPages] = useState(Array.isArray(video.default_pages) ? video.default_pages : [])
+  const [pages, setPages] = useState(normalizePages(video.default_pages))
   const [showInSlider, setShowInSlider] = useState(!!video.show_in_slider)
   const [selectedClients, setSelectedClients] = useState([])
   const [loading, setLoading] = useState(true)
@@ -50,7 +64,7 @@ export default function VideoVisibilityModal({ video, clients = [], onClose, onS
       // Geen standaard-instellingen maar wél toewijzingen -> personen-modus.
       if (!hadDefaults && clientIds.length > 0) {
         setForEveryone(false)
-        const pageCtx = [...new Set((rows || []).map(r => r.page_context).filter(Boolean))]
+        const pageCtx = normalizePages((rows || []).map(r => r.page_context).filter(Boolean))
         if (pageCtx.length) setPages(pageCtx)
       }
       setLoading(false)
