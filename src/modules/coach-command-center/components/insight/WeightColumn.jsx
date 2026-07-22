@@ -208,8 +208,15 @@ export default function WeightColumn({ client, weightData, circumData, photos, c
               display: 'flex', alignItems: 'center', justifyContent: 'space-between',
               marginBottom: '0.375rem',
             }}>
-              <div style={{ fontSize: '0.45rem', fontWeight: '700', color: 'rgba(255,215,0,0.35)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                Gewicht
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                <span style={{ fontSize: '0.45rem', fontWeight: '700', color: 'rgba(255,215,0,0.35)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                  Gewicht
+                </span>
+                {client.weekly_weight_goal != null && client.weekly_weight_goal !== '' && Number(client.weekly_weight_goal) !== 0 && (
+                  <span style={{ fontSize: '0.42rem', fontWeight: 800, color: 'rgba(255,255,255,0.35)', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 4, padding: '0.05rem 0.25rem', textTransform: 'uppercase', letterSpacing: '0.03em' }}>
+                    doel {Number(client.weekly_weight_goal) > 0 ? '+' : ''}{Number(client.weekly_weight_goal)}/wk
+                  </span>
+                )}
               </div>
               {/* Selectie: dag-op-dag of week-op-week */}
               <div style={{ display: 'flex', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 5, overflow: 'hidden' }}>
@@ -228,15 +235,25 @@ export default function WeightColumn({ client, weightData, circumData, photos, c
             {/* DAG-OP-DAG — alle metingen scrollbaar */}
             {weightView === 'dag' && (
               <div style={{ maxHeight: isMobile ? 220 : 280, overflowY: 'auto', WebkitOverflowScrolling: 'touch' }}>
-                {history.map((e, idx) => (
+                {history.map((e, idx) => {
+                  // history is nieuwste-eerst → vorige meting (chronologisch) = idx+1
+                  const prev = history[idx + 1]
+                  const delta = prev && Number.isFinite(e.weight) && Number.isFinite(prev.weight)
+                    ? Math.round((e.weight - prev.weight) * 10) / 10 : null
+                  const deltaColor = delta === null ? 'rgba(255,255,255,0.3)' : weightGoalColor(delta, client.weekly_weight_goal)
+                  return (
                   <div key={`${e.date}-${idx}`} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.275rem 0', borderBottom: idx < history.length - 1 ? '1px solid rgba(255,255,255,0.03)' : 'none' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
                       <span style={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.4)' }}>{formatDate(e.date)}</span>
                       {e.is_friday_weighin && <span style={{ fontSize: '0.45rem', padding: '0.05rem 0.2rem', background: 'rgba(255,215,0,0.1)', borderRadius: '3px', color: '#FFD700', fontWeight: '700' }}>VR</span>}
                     </div>
-                    <span style={{ fontSize: '0.7rem', fontWeight: '700', color: idx === 0 ? '#FFD700' : '#fff' }}>{e.weight.toFixed(1)} kg</span>
+                    <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.35rem' }}>
+                      <span style={{ fontSize: '0.7rem', fontWeight: '700', color: idx === 0 ? '#FFD700' : '#fff' }}>{e.weight.toFixed(1)} kg</span>
+                      {delta !== null && delta !== 0 && <span style={{ fontSize: '0.52rem', fontWeight: '700', color: deltaColor, minWidth: 34, textAlign: 'right' }}>{delta > 0 ? '+' : ''}{delta}</span>}
+                    </div>
                   </div>
-                ))}
+                  )
+                })}
               </div>
             )}
 
@@ -246,7 +263,7 @@ export default function WeightColumn({ client, weightData, circumData, photos, c
                 {weeklyAverages.length === 0 ? (
                   <div style={{ padding: '0.75rem 0', textAlign: 'center', color: 'rgba(255,255,255,0.2)', fontSize: '0.65rem' }}>Onvoldoende data</div>
                 ) : weeklyAverages.map((w, idx) => {
-                  const diffColor = w.diff === null ? 'rgba(255,255,255,0.3)' : w.diff < 0 ? '#10b981' : w.diff > 0 ? '#ef4444' : 'rgba(255,255,255,0.4)'
+                  const diffColor = w.diff === null ? 'rgba(255,255,255,0.3)' : weightGoalColor(w.diff, client.weekly_weight_goal)
                   return (
                     <div key={w.start} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.3rem 0', borderBottom: idx < weeklyAverages.length - 1 ? '1px solid rgba(255,255,255,0.03)' : 'none' }}>
                       <div style={{ display: 'flex', flexDirection: 'column' }}>

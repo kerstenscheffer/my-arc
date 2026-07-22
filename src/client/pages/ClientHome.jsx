@@ -20,6 +20,7 @@ import {
 } from 'lucide-react'
 import useIsMobile from '../../hooks/useIsMobile'
 import FadeOnScroll from '../../components/FadeOnScroll'
+import { weightGoalColor } from '../../modules/weight-tracker/utils/weightGoalColor'
 
 // Klein gouden section-header, identiek aan het patroon op de workout-pagina.
 function SectionLabel({ icon: Icon, label, isMobile }) {
@@ -413,6 +414,80 @@ function ProgressTowardsGoal({ client, currentWeight }) {
 }
 
 // ============================================
+// WEIGHT LOG CARD — recente weeglogs, groen/rood t.o.v. het weekdoel.
+//   De coach zet clients.weekly_weight_goal (+ = aankomen, - = afvallen).
+//   Elke meting kleurt groen als'ie de goede kant op beweegt, rood zo niet.
+// ============================================
+function WeightLogCard({ history = [], weeklyGoal }) {
+  const isMobile = useIsMobile()
+  if (!history || history.length < 2) return null
+
+  const fmt = (d) => { if (!d) return '-'; const dt = new Date(d); return dt.toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' }) }
+  const goalNum = Number(weeklyGoal)
+  const hasGoal = weeklyGoal != null && weeklyGoal !== '' && Number.isFinite(goalNum) && goalNum !== 0
+  const recent = history.slice(0, 6) // nieuwste-eerst
+
+  return (
+    <div style={{ padding: isMobile ? '0 1rem' : '0 1.5rem' }}>
+      <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: isMobile ? '0.85rem' : '1rem' }}>
+        <h2 style={{
+          fontSize: isMobile ? '1.25rem' : '1.5rem',
+          fontWeight: 900, color: '#fff', letterSpacing: '-0.025em',
+          lineHeight: 1.2, margin: 0,
+        }}>
+          Je gewicht
+        </h2>
+        {hasGoal && (
+          <span style={{ fontSize: isMobile ? '0.72rem' : '0.8rem', fontWeight: 800, color: 'rgba(255,255,255,0.5)' }}>
+            doel {goalNum > 0 ? '+' : ''}{goalNum} kg/week
+          </span>
+        )}
+      </div>
+
+      <div style={{
+        background: 'rgba(255,255,255,0.03)',
+        border: '1px solid rgba(255,255,255,0.07)',
+        borderRadius: 16,
+        overflow: 'hidden',
+      }}>
+        {recent.map((e, idx) => {
+          const prev = history[idx + 1] // chronologisch vorige meting
+          const w = Number(e.weight)
+          const pw = prev ? Number(prev.weight) : null
+          const delta = pw != null && Number.isFinite(w) && Number.isFinite(pw)
+            ? Math.round((w - pw) * 10) / 10 : null
+          const color = delta === null ? 'rgba(255,255,255,0.3)' : weightGoalColor(delta, weeklyGoal)
+          return (
+            <div key={`${e.date}-${idx}`} style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+              padding: isMobile ? '0.75rem 1rem' : '0.85rem 1.15rem',
+              borderBottom: idx < recent.length - 1 ? '1px solid rgba(255,255,255,0.05)' : 'none',
+              fontVariantNumeric: 'tabular-nums',
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                {/* Richting-stip */}
+                <span style={{ width: 8, height: 8, borderRadius: '50%', background: color, flexShrink: 0, boxShadow: delta ? `0 0 8px ${color}66` : 'none' }} />
+                <span style={{ fontSize: isMobile ? '0.85rem' : '0.92rem', fontWeight: 700, color: 'rgba(255,255,255,0.55)' }}>{fmt(e.date)}</span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.6rem' }}>
+                <span style={{ fontSize: isMobile ? '1rem' : '1.1rem', fontWeight: 900, color: idx === 0 ? '#FFD700' : '#fff', letterSpacing: '-0.02em' }}>
+                  {Number.isFinite(w) ? w.toFixed(1) : '—'} <span style={{ fontSize: '0.65rem', fontWeight: 700, opacity: 0.5 }}>kg</span>
+                </span>
+                {delta !== null && delta !== 0 && (
+                  <span style={{ fontSize: isMobile ? '0.8rem' : '0.88rem', fontWeight: 800, color, minWidth: 44, textAlign: 'right' }}>
+                    {delta > 0 ? '+' : ''}{delta}
+                  </span>
+                )}
+              </div>
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+// ============================================
 // GOAL CARD
 // ============================================
 function GoalCard({ client, currentWeight }) {
@@ -755,28 +830,32 @@ function ActionRow({ item, onToggle, isMobile, formatDate }) {
 export default function ClientHome({ client, db, setCurrentView }) {
   const [loading, setLoading] = useState(true)
   const [latestWeight, setLatestWeight] = useState(null)
+  const [weightHistory, setWeightHistory] = useState([])
   const isMobile = useIsMobile()
 
   useEffect(() => { setTimeout(() => setLoading(false), 300) }, [])
 
-  // Huidig gewicht uit logs. clients.current_weight is vaak NULL omdat we
-  // weight_challenge_logs als source-of-truth gebruiken.
+  // Gewicht-logs uit weight_challenge_logs (source-of-truth; clients.current_weight
+  // is vaak NULL). Nieuwste-eerst — [0] = huidig gewicht, de rest voor de log-kaart.
   useEffect(() => {
     if (!client?.id || !db?.supabase) return
     let cancelled = false
     ;(async () => {
       const { data, error } = await db.supabase
         .from('weight_challenge_logs')
-        .select('weight, date')
+        .select('weight, date, is_friday_weighin')
         .eq('client_id', client.id)
         .order('date', { ascending: false })
-        .limit(1)
+        .limit(60)
       if (cancelled) return
       if (error) {
-        console.error('Load latest weight failed:', error)
+        console.error('Load weight logs failed:', error)
         return
       }
-      if (data && data.length > 0) setLatestWeight(data[0].weight)
+      if (data && data.length > 0) {
+        setWeightHistory(data)
+        setLatestWeight(data[0].weight)
+      }
     })()
     return () => { cancelled = true }
   }, [client?.id, db])
@@ -817,6 +896,13 @@ export default function ClientHome({ client, db, setCurrentView }) {
       <FadeOnScroll>
         <div style={{ marginTop: isMobile ? '4rem' : '5rem' }}>
           <ProgressTowardsGoal client={client} currentWeight={latestWeight} />
+        </div>
+      </FadeOnScroll>
+
+      {/* Weeglogs — groen/rood t.o.v. het weekdoel dat de coach instelt */}
+      <FadeOnScroll>
+        <div style={{ marginTop: isMobile ? '2.5rem' : '3rem' }}>
+          <WeightLogCard history={weightHistory} weeklyGoal={client?.weekly_weight_goal} />
         </div>
       </FadeOnScroll>
 

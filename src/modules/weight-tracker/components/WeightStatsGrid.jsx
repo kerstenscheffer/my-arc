@@ -5,6 +5,7 @@
 import React, { useState, useMemo } from 'react'
 import { TrendingDown, TrendingUp, Calendar, ChevronDown, ChevronUp, Activity } from 'lucide-react'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts'
+import { weightGoalColor } from '../utils/weightGoalColor'
 
 export default function WeightStatsGrid({ stats = {}, client = {}, fridayData = {}, history = [], isMobile = false, coachingPlan = null }) {
   const [showWeekly, setShowWeekly] = useState(false)
@@ -299,7 +300,7 @@ export default function WeightStatsGrid({ stats = {}, client = {}, fridayData = 
             sub: weekChange !== null ? 'week tov week' : '—',
             val: weekChange !== null ? `${weekChange > 0 ? '+' : ''}${weekChange}` : '—',
             color: weekChange !== null
-              ? (weekChange < 0 ? '#10b981' : weekChange > 0 ? '#ef4444' : '#fff')
+              ? weightGoalColor(weekChange, client.weekly_weight_goal, '#fff')
               : 'rgba(255,255,255,0.4)',
             icon: weekChange !== null && weekChange !== 0
               ? (weekChange < 0 ? TrendingDown : TrendingUp) : null,
@@ -309,7 +310,7 @@ export default function WeightStatsGrid({ stats = {}, client = {}, fridayData = 
             sub: startDateLabel ? `vanaf ${startDateLabel}` : 'geen startmeting',
             val: totalChange !== null ? `${totalChange > 0 ? '+' : ''}${totalChange}` : '—',
             color: totalChange !== null
-              ? (totalChange < 0 ? '#10b981' : totalChange > 0 ? '#ef4444' : '#fff')
+              ? weightGoalColor(totalChange, client.weekly_weight_goal, '#fff')
               : 'rgba(255,255,255,0.4)',
             icon: totalChange !== null && totalChange !== 0
               ? (totalChange < 0 ? TrendingDown : TrendingUp) : null,
