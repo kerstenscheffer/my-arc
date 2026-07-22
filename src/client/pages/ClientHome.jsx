@@ -957,17 +957,6 @@ export default function ClientHome({ client, db, setCurrentView }) {
         <TodayCard client={client} db={db} setCurrentView={setCurrentView} isMobile={isMobile} />
       </div>
 
-      {/* Veel zwarte ruimte tussen secties — geeft de FadeOnScroll (zelfde als
-          op de workout-pagina) lucht zodat secties onderaan zichtbaar dimmen en
-          weer vol faden bij het scrollen. */}
-
-      {/* Laatste coach-bericht (notificatie) met foto. Overige notificaties
-          zitten in de floating notification-bell rechtsonder. */}
-      <FadeOnScroll>
-        <div style={{ marginTop: isMobile ? '2.5rem' : '3rem' }}>
-          <CoachNoteCard client={client} db={db} />
-        </div>
-      </FadeOnScroll>
 
       {/* Hero: progressie richting doel */}
       <FadeOnScroll>

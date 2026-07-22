@@ -5,20 +5,16 @@
 //   - Water (liters vs doel) met één tik om een glas te loggen
 //   - Eerstvolgende geplande call
 import { useState, useEffect } from 'react'
-import { Dumbbell, Flame, Droplet, Phone, Play, Plus } from 'lucide-react'
+import { Dumbbell, Flame, Phone, Play } from 'lucide-react'
 
 const GOLD = '#FFD700'
-const WATER_GOAL_L = 2.0
-const GLASS_L = 0.25
 const todayYMD = () => new Date().toISOString().split('T')[0]
 const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
 
 export default function TodayCard({ client, db, setCurrentView, isMobile }) {
   const [training, setTraining] = useState(null)   // null = nog laden; { rest:true } of { name }
   const [macros, setMacros] = useState(null)       // { kcal, protein }
-  const [water, setWater] = useState(0)            // liters
   const [nextCall, setNextCall] = useState(null)   // { scheduled_date, ... } | 'none'
-  const [savingWater, setSavingWater] = useState(false)
 
   useEffect(() => {
     if (!client?.id || !db?.supabase) return
@@ -66,14 +62,6 @@ export default function TodayCard({ client, db, setCurrentView, isMobile }) {
       } catch { if (alive) setMacros({ kcal: 0, protein: 0, hasTarget: false }) }
     })()
 
-    // ── Water ──
-    ;(async () => {
-      try {
-        const row = await db.getWaterIntake(client.id, day)
-        if (alive) setWater(row?.amount || 0)
-      } catch { /* laat 0 staan */ }
-    })()
-
     // ── Eerstvolgende call ──
     ;(async () => {
       try {
@@ -92,16 +80,6 @@ export default function TodayCard({ client, db, setCurrentView, isMobile }) {
     return () => { alive = false }
   }, [client?.id, db])
 
-  const logGlass = async () => {
-    if (savingWater) return
-    const next = Math.round((water + GLASS_L) * 100) / 100
-    setWater(next)  // optimistisch
-    setSavingWater(true)
-    try { await db.saveWaterIntake(client.id, todayYMD(), next) }
-    catch (e) { console.error('water log mislukt:', e) }
-    setSavingWater(false)
-  }
-
   const callLabel = () => {
     if (nextCall === 'none' || !nextCall) return { big: 'Geen', sub: 'call gepland' }
     const d = new Date(nextCall.scheduled_date)
@@ -110,7 +88,6 @@ export default function TodayCard({ client, db, setCurrentView, isMobile }) {
     return { big: datum, sub: dagen <= 0 ? 'vandaag' : dagen === 1 ? 'morgen' : `over ${dagen} dagen` }
   }
 
-  const glasses = Math.round(water / GLASS_L)
   const call = callLabel()
 
   return (
@@ -144,14 +121,8 @@ export default function TodayCard({ client, db, setCurrentView, isMobile }) {
           )}
         </Tile>
 
-        {/* Water */}
-        <Tile onClick={logGlass} accent="#3b82f6" icon={<Droplet size={15} color="#3b82f6" />} label="Water">
-          <Big><span style={{ color: '#3b82f6' }}>{water.toFixed(1)}</span> / {WATER_GOAL_L.toFixed(1)}L</Big>
-          <ActionPill color="#3b82f6"><Plus size={10} /> Glas ({glasses})</ActionPill>
-        </Tile>
-
-        {/* Eerstvolgende call */}
-        <Tile onClick={() => setCurrentView && setCurrentView('calls')} accent="#a855f7" icon={<Phone size={15} color="#a855f7" />} label="Volgende call">
+        {/* Eerstvolgende call — volle breedte onder de andere twee */}
+        <Tile onClick={() => setCurrentView && setCurrentView('calls')} accent="#a855f7" icon={<Phone size={15} color="#a855f7" />} label="Volgende call" style={{ gridColumn: '1 / -1' }}>
           {nextCall == null ? <Dim>…</Dim> : (
             <>
               <Big style={{ textTransform: 'capitalize' }}>{call.big}</Big>
@@ -164,7 +135,7 @@ export default function TodayCard({ client, db, setCurrentView, isMobile }) {
   )
 }
 
-function Tile({ onClick, accent, icon, label, children }) {
+function Tile({ onClick, accent, icon, label, children, style }) {
   return (
     <button
       onClick={onClick}
@@ -174,6 +145,7 @@ function Tile({ onClick, accent, icon, label, children }) {
         borderLeft: `3px solid ${accent}`, borderRadius: 14, padding: '0.85rem 0.9rem',
         display: 'flex', flexDirection: 'column', gap: '0.4rem', minHeight: 96,
         touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+        ...style,
       }}
     >
       <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
