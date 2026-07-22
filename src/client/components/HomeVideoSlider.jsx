@@ -56,7 +56,7 @@ export default function HomeVideoSlider({ client }) {
 
   const current = items[activeIdx]
   const vId = extractYouTubeId(current?.video?.video_url)
-  const thumb = vId ? getYouTubeThumbnail(vId, 'hqdefault') : null
+  const thumb = (vId ? getYouTubeThumbnail(vId, 'hqdefault') : null) || current?.video?.thumbnail_url || null
 
   const openPlayer = () => {
     setPaused(true)

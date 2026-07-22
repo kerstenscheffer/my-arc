@@ -59,6 +59,21 @@ export const getYouTubeEmbedUrl = (videoId, options = {}) => {
 }
 
 /**
+ * Bepaal het type videobron van een URL.
+ *  - youtube  → embedbaar in een iframe (youtubeId)
+ *  - zoom     → NIET embedbaar (x-frame-options: SAMEORIGIN) → extern openen
+ *  - external → onbekende http-link → extern openen
+ *  - none     → geen url
+ */
+export const getVideoSource = (url) => {
+  const youtubeId = extractYouTubeId(url)
+  if (youtubeId) return { kind: 'youtube', youtubeId, url }
+  if (url && /zoom\.us/i.test(url)) return { kind: 'zoom', url }
+  if (url) return { kind: 'external', url }
+  return { kind: 'none', url: null }
+}
+
+/**
  * Format duration seconds → "M:SS"
  */
 export const formatDuration = (seconds) => {

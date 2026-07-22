@@ -3,7 +3,7 @@
 
 import React, { useState, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
-import { X, Star } from 'lucide-react'
+import { X, Star, Play, ExternalLink } from 'lucide-react'
 import clientVideoService from './ClientVideoService'
 import { extractYouTubeId, getYouTubeEmbedUrl } from './utils/youtubeHelpers'
 
@@ -17,6 +17,9 @@ export default function VideoPlayerModal({ item, onClose }) {
   const video = item?.video
   const videoId = extractYouTubeId(video?.video_url)
   const embedUrl = videoId ? getYouTubeEmbedUrl(videoId, { autoplay: true, mute: false }) : null
+  // Niet-YouTube (bv. Zoom) → niet embedbaar, extern openen.
+  const externalUrl = (!videoId && video?.video_url) ? video.video_url : null
+  const isZoom = !!externalUrl && /zoom\.us/i.test(externalUrl)
 
   // Mark viewed on open (once)
   useEffect(() => {
@@ -154,6 +157,24 @@ export default function VideoPlayerModal({ item, onClose }) {
               allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
               allowFullScreen
             />
+          ) : externalUrl ? (
+            <div
+              onClick={() => window.open(externalUrl, '_blank', 'noopener,noreferrer')}
+              style={{
+                position: 'absolute', inset: 0, cursor: 'pointer',
+                display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '0.9rem',
+                backgroundImage: video?.thumbnail_url ? `url(${video.thumbnail_url})` : 'none',
+                backgroundSize: 'cover', backgroundPosition: 'center',
+              }}
+            >
+              <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.55)' }} />
+              <div style={{ position: 'relative', width: 60, height: 60, borderRadius: '50%', background: 'linear-gradient(135deg, #FFD700, #D4AF37)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 8px 22px rgba(255,215,0,0.5)' }}>
+                <Play size={28} color="#0a0a0a" fill="#0a0a0a" style={{ marginLeft: 3 }} />
+              </div>
+              <div style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: 6, padding: '0.5rem 0.9rem', background: 'rgba(0,0,0,0.6)', border: '1px solid rgba(255,255,255,0.2)', borderRadius: 10, color: '#fff', fontSize: '0.78rem', fontWeight: 800 }}>
+                <ExternalLink size={14} /> {isZoom ? 'Bekijk op Zoom' : 'Open video'}
+              </div>
+            </div>
           ) : (
             <div style={{
               position: 'absolute',
