@@ -11,7 +11,7 @@
 // navigatie en de tiles voegden alleen duplicaat-navigatie toe zonder content.
 
 import ChallengeHomeBanner from "../components/challenge-banner/ChallengeHomeBanner"
-import HomeVideoSlider from "../components/HomeVideoSlider"
+import TodayCard from "../components/TodayCard"
 import React, { useState, useEffect } from 'react'
 import {
   Calendar, Coffee, Sun, Moon, Target, Clock,
@@ -897,7 +897,7 @@ function ActionRow({ item, onToggle, isMobile, formatDate }) {
 // ============================================
 // MAIN CLIENT HOME
 // ============================================
-export default function ClientHome({ client, db }) {
+export default function ClientHome({ client, db, setCurrentView }) {
   const [loading, setLoading] = useState(true)
   const [latestWeight, setLatestWeight] = useState(null)
   const isMobile = useIsMobile()
@@ -952,6 +952,11 @@ export default function ClientHome({ client, db }) {
     <div style={{ minHeight: '100vh', paddingBottom: isMobile ? '9rem' : '6rem', background: '#0a0a0a' }}>
       <WelcomeSection client={client} />
 
+      {/* Vandaag-overzicht: training, macro's over, water, volgende call. */}
+      <div style={{ marginTop: isMobile ? '3.5rem' : '4.5rem' }}>
+        <TodayCard client={client} db={db} setCurrentView={setCurrentView} isMobile={isMobile} />
+      </div>
+
       {/* Veel zwarte ruimte tussen secties — geeft de FadeOnScroll (zelfde als
           op de workout-pagina) lucht zodat secties onderaan zichtbaar dimmen en
           weer vol faden bij het scrollen. */}
@@ -959,16 +964,8 @@ export default function ClientHome({ client, db }) {
       {/* Laatste coach-bericht (notificatie) met foto. Overige notificaties
           zitten in de floating notification-bell rechtsonder. */}
       <FadeOnScroll>
-        <div style={{ marginTop: isMobile ? '3.5rem' : '4.5rem' }}>
+        <div style={{ marginTop: isMobile ? '2.5rem' : '3rem' }}>
           <CoachNoteCard client={client} db={db} />
-        </div>
-      </FadeOnScroll>
-
-      {/* Auto-roterende video-slider met toegewezen coach-videos.
-          Verbergt zich automatisch wanneer er nog geen videos zijn. */}
-      <FadeOnScroll>
-        <div style={{ marginTop: isMobile ? '4rem' : '5rem' }}>
-          <HomeVideoSlider client={client} />
         </div>
       </FadeOnScroll>
 
