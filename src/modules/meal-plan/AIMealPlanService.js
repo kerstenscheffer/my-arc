@@ -812,6 +812,10 @@ async logAIMood(clientId, moodData) {
       
       progress.consumed_meals[slot] = {
         ...progress.consumed_meals[slot],
+        // Een swap overschrijft een eerdere "eenmalig vandaag"-bewerking op dit
+        // slot. Zonder dit blijft edited_meal hangen en geeft getTodayFromWeek-
+        // Structure die voorrang → de swap is dan onzichtbaar.
+        edited_meal: null,
         was_swapped: true,
         meal_id: newMealId,
         meal_name: newMeal.name || newMeal.meal_name,
