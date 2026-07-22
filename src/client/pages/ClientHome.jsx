@@ -306,108 +306,101 @@ function CoachNoteCard({ client, db }) {
 }
 
 // ============================================
-// PROGRESS TOWARDS GOAL — primaire hero op de home pagina:
-//   "Je komt van X kg, zit nu op Y kg. Doel = Z kg. Traject loopt af op DATE."
-// Toont een gouden progress-bar van start → doel met huidige positie.
+// WEEK-DOEL & GEMIDDELDEN — primaire hero op de home pagina:
+//   Bovenaan het huidige weekgemiddelde, daaronder de weekgemiddelden van
+//   afgelopen weken, elk met of het weekdoel die week gehaald is.
+//   Kleur van het verschil = richting (t.o.v. weekdoel); de badge = of de
+//   doel-grootte gehaald is (bijv. doel -0,6 → minstens 0,6 kg eraf).
 // ============================================
-function ProgressTowardsGoal({ client, currentWeight }) {
+function WeekGoalStatus({ client, history = [] }) {
   const isMobile = useIsMobile()
+  const goal = Number(client?.weekly_weight_goal)
+  const hasGoal = client?.weekly_weight_goal != null && client?.weekly_weight_goal !== '' && Number.isFinite(goal) && goal !== 0
 
-  const start   = Number(client?.start_weight) || null
-  const goal    = Number(client?.goal_weight) || null
-  const current = Number(currentWeight) || Number(client?.current_weight) || null
+  const fmt = (d) => { if (!d) return '-'; const dt = new Date(d); return dt.toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' }) }
 
-  // Niks om te tonen als de weight-data ontbreekt.
-  if (!start || !goal || !current) return null
+  // Groepeer logs per kalenderweek (maandag-start) → gemiddelde per week,
+  // nieuwste week bovenaan, met verschil t.o.v. de week ervoor.
+  const weeks = (() => {
+    if (!history || history.length === 0) return []
+    const mondayOf = (date) => { const d = new Date(date); const day = d.getDay(); const diff = day === 0 ? -6 : 1 - day; d.setDate(d.getDate() + diff); d.setHours(0, 0, 0, 0); return d.toISOString().split('T')[0] }
+    const map = {}
+    history.forEach(e => { const w = parseFloat(e.weight); if (!Number.isFinite(w)) return; const wk = mondayOf(e.date); (map[wk] = map[wk] || []).push(w) })
+    const arr = Object.keys(map).sort().map(wk => {
+      const vals = map[wk]
+      const avg = Math.round((vals.reduce((t, v) => t + v, 0) / vals.length) * 10) / 10
+      const end = new Date(wk); end.setDate(end.getDate() + 6)
+      return { start: wk, end: end.toISOString().split('T')[0], avg, count: vals.length }
+    })
+    return arr.map((w, i) => ({ ...w, diff: i > 0 ? Math.round((w.avg - arr[i - 1].avg) * 10) / 10 : null })).reverse()
+  })()
 
-  // Berekening: hoeveel % van het verschil heeft client afgelegd?
-  const totalDelta = Math.abs(goal - start) || 1
-  const doneDelta  = Math.abs(current - start)
-  const remaining  = Math.abs(current - goal).toFixed(1)
-  const pct = Math.max(0, Math.min(100, Math.round((doneDelta / totalDelta) * 100)))
-  const losingWeight = goal < start
+  if (weeks.length === 0) return null
+  const currentAvg = weeks[0].avg
 
-  // Eind-datum: subscription_end_date is leidend, anders coaching_start_date
-  // + standaard traject-lengte onbekend → laat'm weg.
-  const endStr = client?.subscription_end_date
-  let endLabel = null
-  if (endStr) {
-    const d = new Date(endStr)
-    if (!isNaN(d.getTime())) {
-      endLabel = d.toLocaleDateString('nl-NL', { day: 'numeric', month: 'long', year: 'numeric' })
-    }
+  // Doel gehaald deze week = verandering in de doel-richting én minstens de
+  // doel-grootte. null = niet te bepalen (geen doel of geen vorige week).
+  const reached = (diff) => {
+    if (diff == null || !hasGoal) return null
+    if (Math.sign(diff) !== Math.sign(goal)) return false
+    return Math.abs(diff) >= Math.abs(goal) - 0.001
   }
 
   return (
     <div style={{ padding: isMobile ? '0 1rem' : '0 1.5rem' }}>
-      {/* Heading — bold wit, geen card eromheen */}
       <h2 style={{
         fontSize: isMobile ? '1.25rem' : '1.5rem',
-        fontWeight: 900, color: '#fff',
-        letterSpacing: '-0.025em',
-        lineHeight: 1.2,
-        margin: 0,
-        marginBottom: isMobile ? '1rem' : '1.25rem',
+        fontWeight: 900, color: '#fff', letterSpacing: '-0.025em',
+        lineHeight: 1.2, margin: 0, marginBottom: isMobile ? '1rem' : '1.25rem',
       }}>
-        Jouw progressie richting doel
+        Jouw weekdoel
       </h2>
 
-      {/* Progress bar — start → doel met huidig gewicht als middenpunt-label */}
-      <div style={{ position: 'relative', marginTop: isMobile ? '0.5rem' : '0.65rem' }}>
-        <div style={{
-          height: 10, borderRadius: 5,
-          background: 'rgba(255,255,255,0.06)',
-          overflow: 'hidden',
-        }}>
-          <div style={{
-            width: `${pct}%`, height: '100%',
-            background: 'linear-gradient(90deg, #FFD700 0%, #D4AF37 100%)',
-            borderRadius: 5,
-            transition: 'width 0.4s ease',
-          }} />
+      {/* Huidig weekgemiddelde — bovenaan, prominent */}
+      <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', marginBottom: isMobile ? '1.1rem' : '1.35rem' }}>
+        <div>
+          <div style={{ fontSize: '0.68rem', fontWeight: 800, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '0.25rem' }}>Huidig gemiddelde</div>
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.2rem' }}>
+            <span style={{ fontSize: isMobile ? '2.4rem' : '2.8rem', fontWeight: 900, color: '#FFD700', letterSpacing: '-0.03em', lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>{currentAvg.toFixed(1)}</span>
+            <span style={{ fontSize: '0.9rem', fontWeight: 700, color: 'rgba(255,215,0,0.5)' }}>kg</span>
+          </div>
         </div>
-        <div style={{
-          display: 'flex', justifyContent: 'space-between', alignItems: 'baseline',
-          marginTop: 10,
-          fontVariantNumeric: 'tabular-nums',
-        }}>
-          <span style={{
-            fontSize: isMobile ? '0.95rem' : '1.05rem',
-            fontWeight: 900, color: '#fff',
-            letterSpacing: '-0.015em',
-          }}>
-            Start <span style={{ color: 'rgba(255,255,255,0.55)', fontWeight: 700 }}>{start} kg</span>
-          </span>
-          <span style={{
-            fontSize: isMobile ? '1.1rem' : '1.2rem',
-            fontWeight: 900, color: '#FFD700',
-            letterSpacing: '-0.02em',
-          }}>
-            {current} kg
-          </span>
-          <span style={{
-            fontSize: isMobile ? '0.95rem' : '1.05rem',
-            fontWeight: 900, color: '#fff',
-            letterSpacing: '-0.015em',
-          }}>
-            Doel <span style={{ color: 'rgba(255,255,255,0.55)', fontWeight: 700 }}>{goal} kg</span>
-          </span>
-        </div>
+        {hasGoal && (
+          <div style={{ textAlign: 'right' }}>
+            <div style={{ fontSize: '0.6rem', fontWeight: 800, color: 'rgba(255,255,255,0.35)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.2rem' }}>Weekdoel</div>
+            <div style={{ fontSize: isMobile ? '1rem' : '1.15rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.02em' }}>{goal > 0 ? '+' : ''}{goal} <span style={{ fontSize: '0.7rem', fontWeight: 700, color: 'rgba(255,255,255,0.4)' }}>kg/week</span></div>
+          </div>
+        )}
       </div>
 
-      {/* Nog te gaan + traject einde — minimal */}
-      <div style={{
-        marginTop: isMobile ? '0.9rem' : '1.1rem',
-        fontSize: isMobile ? '0.8rem' : '0.88rem',
-        color: 'rgba(255,255,255,0.6)',
-        fontWeight: 600, lineHeight: 1.5,
-        textAlign: 'center',
-      }}>
-        Nog <strong style={{ color: '#fff', fontWeight: 800 }}>{remaining} kg</strong>{' '}
-        te {losingWeight ? 'verliezen' : 'winnen'}
-        {endLabel && (
-          <> · traject loopt af op <strong style={{ color: '#fff', fontWeight: 800 }}>{endLabel}</strong></>
-        )}
+      {/* Weekgemiddelden onder elkaar — nieuwste bovenaan */}
+      <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 16, overflow: 'hidden' }}>
+        {weeks.map((w, idx) => {
+          const ok = reached(w.diff)
+          const diffColor = w.diff == null ? 'rgba(255,255,255,0.3)' : weightGoalColor(w.diff, goal)
+          return (
+            <div key={w.start} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: isMobile ? '0.8rem 1rem' : '0.9rem 1.15rem', borderBottom: idx < weeks.length - 1 ? '1px solid rgba(255,255,255,0.05)' : 'none', fontVariantNumeric: 'tabular-nums' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0 }}>
+                <span style={{ fontSize: isMobile ? '0.85rem' : '0.92rem', fontWeight: 800, color: idx === 0 ? '#fff' : 'rgba(255,255,255,0.7)' }}>{idx === 0 ? 'Deze week' : `${fmt(w.start)} – ${fmt(w.end)}`}</span>
+                <span style={{ fontSize: '0.62rem', fontWeight: 600, color: 'rgba(255,255,255,0.3)' }}>{idx === 0 ? `${fmt(w.start)} – ${fmt(w.end)} · ` : ''}{w.count} meting{w.count === 1 ? '' : 'en'}</span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.55rem', flexShrink: 0 }}>
+                <span style={{ fontSize: isMobile ? '1rem' : '1.1rem', fontWeight: 900, color: idx === 0 ? '#FFD700' : '#fff', letterSpacing: '-0.02em' }}>{w.avg.toFixed(1)}<span style={{ fontSize: '0.6rem', fontWeight: 700, opacity: 0.5 }}> kg</span></span>
+                {w.diff !== null && (
+                  <span style={{ fontSize: isMobile ? '0.82rem' : '0.9rem', fontWeight: 800, color: diffColor, minWidth: 40, textAlign: 'right' }}>{w.diff > 0 ? '+' : ''}{w.diff}</span>
+                )}
+                {ok !== null && w.diff !== null && (
+                  <span style={{ fontSize: '0.54rem', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.02em', padding: '0.18rem 0.4rem', borderRadius: 6, whiteSpace: 'nowrap',
+                    color: ok ? '#10b981' : 'rgba(255,255,255,0.4)',
+                    background: ok ? 'rgba(16,185,129,0.13)' : 'rgba(255,255,255,0.05)',
+                    border: `1px solid ${ok ? 'rgba(16,185,129,0.4)' : 'rgba(255,255,255,0.1)'}` }}>
+                    {ok ? '✓ gehaald' : 'niet gehaald'}
+                  </span>
+                )}
+              </div>
+            </div>
+          )
+        })}
       </div>
     </div>
   )
@@ -829,7 +822,6 @@ function ActionRow({ item, onToggle, isMobile, formatDate }) {
 // ============================================
 export default function ClientHome({ client, db, setCurrentView }) {
   const [loading, setLoading] = useState(true)
-  const [latestWeight, setLatestWeight] = useState(null)
   const [weightHistory, setWeightHistory] = useState([])
   const isMobile = useIsMobile()
 
@@ -854,7 +846,6 @@ export default function ClientHome({ client, db, setCurrentView }) {
       }
       if (data && data.length > 0) {
         setWeightHistory(data)
-        setLatestWeight(data[0].weight)
       }
     })()
     return () => { cancelled = true }
@@ -892,10 +883,10 @@ export default function ClientHome({ client, db, setCurrentView }) {
       </div>
 
 
-      {/* Hero: progressie richting doel */}
+      {/* Hero: weekdoel + weekgemiddelden */}
       <FadeOnScroll>
         <div style={{ marginTop: isMobile ? '4rem' : '5rem' }}>
-          <ProgressTowardsGoal client={client} currentWeight={latestWeight} />
+          <WeekGoalStatus client={client} history={weightHistory} />
         </div>
       </FadeOnScroll>
 
