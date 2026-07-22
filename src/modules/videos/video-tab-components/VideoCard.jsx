@@ -1,7 +1,7 @@
 // src/modules/videos/video-tab-components/VideoCard.jsx
 // v2.0 — Compact, brand styling, props ongewijzigd
 import React from 'react'
-import { Play, Eye, Users, Trash2, Edit, Globe, UserPlus } from 'lucide-react'
+import { Play, Eye, Users, Trash2, Edit, Globe } from 'lucide-react'
 import useIsMobile from '../../../hooks/useIsMobile'
 import videoService from '../VideoService'
 
@@ -11,7 +11,6 @@ export default function VideoCard({
   video,
   categoryConfig,
   onAssign,
-  onAssignPersons,
   onManage,
   onDelete,
   onEdit

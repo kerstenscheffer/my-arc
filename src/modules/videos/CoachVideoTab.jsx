@@ -474,7 +474,6 @@ export default function CoachVideoTab({ clients = [], db }) {
               color={cat.color || GOLD}
               videos={grouped[cat.id]}
               onAssign={(v) => { setSelectedVideo(v); setShowVisibilityModal(true) }}
-              onAssignPersons={(v) => { setSelectedVideo(v); setShowAssignModal(true) }}
               onManage={(v) => { setManagingVideo(v); setShowManageModal(true) }}
               onEdit={(v) => { setEditingVideo(v); setShowEditModal(true) }}
               onDelete={handleDeleteVideo}
@@ -490,7 +489,6 @@ export default function CoachVideoTab({ clients = [], db }) {
               color="rgba(255, 255, 255, 0.3)"
               videos={uncategorized}
               onAssign={(v) => { setSelectedVideo(v); setShowVisibilityModal(true) }}
-              onAssignPersons={(v) => { setSelectedVideo(v); setShowAssignModal(true) }}
               onManage={(v) => { setManagingVideo(v); setShowManageModal(true) }}
               onEdit={(v) => { setEditingVideo(v); setShowEditModal(true) }}
               onDelete={handleDeleteVideo}
@@ -559,6 +557,7 @@ export default function CoachVideoTab({ clients = [], db }) {
       {showVisibilityModal && selectedVideo && (
         <VideoVisibilityModal
           video={selectedVideo}
+          clients={localClients}
           onClose={() => { setShowVisibilityModal(false); setSelectedVideo(null) }}
           onSaved={() => { loadVideos() }}
         />
@@ -680,7 +679,6 @@ function CategoryRow({
   color,
   videos,
   onAssign,
-  onAssignPersons,
   onManage,
   onEdit,
   onDelete,
@@ -749,7 +747,6 @@ function CategoryRow({
               video={video}
               categoryConfig={getCategoryConfig(video)}
               onAssign={() => onAssign(video)}
-              onAssignPersons={() => onAssignPersons(video)}
               onManage={() => onManage(video)}
               onEdit={() => onEdit(video)}
               onDelete={() => onDelete(video)}

@@ -161,6 +161,24 @@ const videoService = {
       return { success: false, error: error.message }
     }
   },
+  // Huidige per-client toewijzingen van een video (voor de zichtbaarheid-modal:
+  // welke personen zijn nu aangevinkt).
+  getVideoAssignments: async (videoId) => {
+    try {
+      const { data, error } = await supabase.from('video_assignments').select('client_id, page_context').eq('video_id', videoId)
+      if (error) { console.error('getVideoAssignments error:', error); return [] }
+      return data || []
+    } catch { return [] }
+  },
+  // Verwijder ALLE toewijzingen van een video (voor de "vervang met deze set"-
+  // opslag in de zichtbaarheid-modal).
+  clearVideoAssignments: async (videoId) => {
+    try {
+      const { error } = await supabase.from('video_assignments').delete().eq('video_id', videoId)
+      if (error) { console.error('clearVideoAssignments error:', error); return { success: false, error: error.message } }
+      return { success: true }
+    } catch (error) { return { success: false, error: error.message } }
+  },
 
   unassignAllClients: async (videoId) => {
     try {
