@@ -6,7 +6,7 @@
 // Slaat op via videoService.updateVideo — geen per-client toewijzingen meer.
 import React, { useState } from 'react'
 import { createPortal } from 'react-dom'
-import { X, Globe, Check, PlayCircle, Home, Dumbbell, Utensils, ShoppingCart, Camera, Phone, User } from 'lucide-react'
+import { X, Globe, Check, PlayCircle, Home, Dumbbell, Utensils, ShoppingCart, Camera, Phone, User, Eye, EyeOff } from 'lucide-react'
 import useIsMobile from '../../../hooks/useIsMobile'
 import videoService from '../VideoService'
 
@@ -26,6 +26,7 @@ export default function VideoVisibilityModal({ video, onClose, onSaved }) {
   const isMobile = useIsMobile()
   const [defaultPages, setDefaultPages] = useState(Array.isArray(video.default_pages) ? video.default_pages : [])
   const [showInSlider, setShowInSlider] = useState(!!video.show_in_slider)
+  const [isActive, setIsActive] = useState(video.is_active !== false)
   const [saving, setSaving] = useState(false)
 
   const togglePage = (p) => {
@@ -38,6 +39,7 @@ export default function VideoVisibilityModal({ video, onClose, onSaved }) {
       const result = await videoService.updateVideo(video.id, {
         default_pages: defaultPages,
         show_in_slider: showInSlider,
+        is_active: isActive,
       })
       if (result?.success) {
         onSaved?.()
@@ -80,6 +82,32 @@ export default function VideoVisibilityModal({ video, onClose, onSaved }) {
         </div>
 
         <div style={{ flex: 1, overflowY: 'auto', WebkitOverflowScrolling: 'touch' }}>
+          {/* Master: video zichtbaar of volledig verborgen (is_active) */}
+          <div style={{ padding: isMobile ? '0.85rem 0.95rem' : '0.95rem 1.125rem', borderBottom: '1px solid rgba(255,255,255,0.06)', borderLeft: `3px solid ${isActive ? '#10b981' : '#ef4444'}` }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+              {isActive ? <Eye size={16} color="#10b981" /> : <EyeOff size={16} color="#ef4444" />}
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: isMobile ? '0.82rem' : '0.88rem', fontWeight: 800, color: '#fff', marginBottom: '0.15rem' }}>
+                  {isActive ? 'Video zichtbaar' : 'Video verborgen'}
+                </div>
+                <div style={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.4)', lineHeight: 1.4 }}>
+                  {isActive
+                    ? 'Zichtbaar voor clients volgens de instellingen hieronder.'
+                    : 'Verschijnt nergens — ongeacht de pagina- en slider-instellingen hieronder.'}
+                </div>
+              </div>
+              <button
+                onClick={() => setIsActive(v => !v)}
+                title={isActive ? 'Verbergen' : 'Weer zichtbaar maken'}
+                style={{ width: 40, height: 22, background: isActive ? '#10b981' : 'rgba(255,255,255,0.12)', border: 'none', borderRadius: 11, position: 'relative', cursor: 'pointer', flexShrink: 0, padding: 0, touchAction: 'manipulation' }}
+              >
+                <div style={{ position: 'absolute', top: 2, left: isActive ? 20 : 2, width: 18, height: 18, background: '#fff', borderRadius: '50%', transition: 'left 0.2s ease' }} />
+              </button>
+            </div>
+          </div>
+
+          {/* Onderstaande instellingen dimmen wanneer verborgen. */}
+          <div style={{ opacity: isActive ? 1 : 0.4, pointerEvents: isActive ? 'auto' : 'none' }}>
           {/* Standaard pagina's */}
           <div style={{ padding: isMobile ? '0.85rem 0.95rem' : '0.95rem 1.125rem', borderBottom: '1px solid rgba(255,255,255,0.04)', borderLeft: defaultPages.length > 0 ? `3px solid ${GOLD}` : '3px solid transparent' }}>
             <label style={{ ...labelStyle, display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
@@ -129,6 +157,7 @@ export default function VideoVisibilityModal({ video, onClose, onSaved }) {
                 <div style={{ position: 'absolute', top: 2, left: showInSlider ? 20 : 2, width: 18, height: 18, background: '#fff', borderRadius: '50%', transition: 'left 0.2s ease' }} />
               </button>
             </div>
+          </div>
           </div>
         </div>
 
