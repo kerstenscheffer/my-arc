@@ -86,16 +86,23 @@ function WelcomeSection({ client }) {
 
   // Traject-voortgang voor in de balk: "Week X/Y" + dunne balk.
   const startStr = client?.coaching_start_date
+  const totalWeeks = client?.coaching_total_weeks
   const endStr = client?.subscription_end_date
   let curWeek = null, weeksTotal = null
   if (startStr) {
     const start = new Date(startStr)
     const elapsedWeeks = Math.floor(Math.max(0, (today.getTime() - start.getTime()) / 86400000) / 7)
-    if (endStr) {
+    if (totalWeeks && totalWeeks > 0) {
+      // Traject-lengte staat op de client (coaching_total_weeks) — leidend.
+      weeksTotal = totalWeeks
+      curWeek = Math.min(weeksTotal, elapsedWeeks + 1)
+    } else if (endStr) {
+      // Anders afleiden uit de einddatum.
       const end = new Date(endStr)
       weeksTotal = Math.ceil(Math.max(1, (end.getTime() - start.getTime()) / 86400000) / 7)
       curWeek = Math.min(weeksTotal, elapsedWeeks + 1)
     } else {
+      // Open-ended: alleen hoeveelste week.
       curWeek = elapsedWeeks + 1
     }
   }
