@@ -68,9 +68,22 @@ export const getYouTubeEmbedUrl = (videoId, options = {}) => {
 export const getVideoSource = (url) => {
   const youtubeId = extractYouTubeId(url)
   if (youtubeId) return { kind: 'youtube', youtubeId, url }
-  if (url && /zoom\.us/i.test(url)) return { kind: 'zoom', url }
+  const zoomEmbed = getZoomEmbedUrl(url)
+  if (zoomEmbed) return { kind: 'zoom-embed', embedUrl: zoomEmbed, url }
+  if (url && /zoom\.us/i.test(url)) return { kind: 'zoom', url }  // andere zoom-link (bv. rec) → extern
   if (url) return { kind: 'external', url }
   return { kind: 'none', url: null }
+}
+
+/**
+ * Zoom Clip → embedbare iframe-URL. Zet een /clips/share/<id> om naar
+ * /clips/embed/<id> (die heeft géén x-frame-options, dus wél embedbaar).
+ * Accepteert ook een al-embed URL. Andere zoom-links → null.
+ */
+export const getZoomEmbedUrl = (url) => {
+  if (!url || typeof url !== 'string') return null
+  const m = url.match(/(https?:\/\/[^/]*zoom\.us)\/clips\/(?:share|embed)\/([A-Za-z0-9_-]+)/i)
+  return m ? `${m[1]}/clips/embed/${m[2]}` : null
 }
 
 /**

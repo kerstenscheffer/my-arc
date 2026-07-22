@@ -5,7 +5,7 @@ import React, { useState, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { X, Star, Play, ExternalLink } from 'lucide-react'
 import clientVideoService from './ClientVideoService'
-import { extractYouTubeId, getYouTubeEmbedUrl } from './utils/youtubeHelpers'
+import { extractYouTubeId, getYouTubeEmbedUrl, getZoomEmbedUrl } from './utils/youtubeHelpers'
 
 export default function VideoPlayerModal({ item, onClose }) {
   const [rating, setRating] = useState(item?.client_rating || 0)
@@ -17,8 +17,11 @@ export default function VideoPlayerModal({ item, onClose }) {
   const video = item?.video
   const videoId = extractYouTubeId(video?.video_url)
   const embedUrl = videoId ? getYouTubeEmbedUrl(videoId, { autoplay: true, mute: false }) : null
-  // Niet-YouTube (bv. Zoom) → niet embedbaar, extern openen.
-  const externalUrl = (!videoId && video?.video_url) ? video.video_url : null
+  // Zoom Clips embedden via /clips/embed/ (wél embedbaar).
+  const zoomEmbed = getZoomEmbedUrl(video?.video_url)
+  const playerEmbed = embedUrl || zoomEmbed
+  // Overige niet-embedbare links → extern openen.
+  const externalUrl = (!playerEmbed && video?.video_url) ? video.video_url : null
   const isZoom = !!externalUrl && /zoom\.us/i.test(externalUrl)
 
   // Mark viewed on open (once)
@@ -144,9 +147,9 @@ export default function VideoPlayerModal({ item, onClose }) {
           background: '#000',
           flexShrink: 0,
         }}>
-          {embedUrl ? (
+          {playerEmbed ? (
             <iframe
-              src={embedUrl}
+              src={playerEmbed}
               style={{
                 position: 'absolute',
                 inset: 0,
@@ -154,7 +157,7 @@ export default function VideoPlayerModal({ item, onClose }) {
                 height: '100%',
                 border: 'none',
               }}
-              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"
               allowFullScreen
             />
           ) : externalUrl ? (

@@ -7,6 +7,7 @@ import { createPortal } from 'react-dom'
 import { Play, X, Video, CheckCircle2, ChevronLeft, GraduationCap, Eye, ExternalLink } from 'lucide-react'
 import videoService from './VideoService'
 import PageFilesBlock from './PageFilesBlock'
+import { getZoomEmbedUrl } from './utils/youtubeHelpers'
 
 const GREEN = '#10b981'
 
@@ -760,8 +761,11 @@ function FullscreenPlayer({ item, onClose, onWatched, onCompleted }) {
   const embedUrl = videoId
     ? `https://www.youtube.com/embed/${videoId}?autoplay=1&mute=0&controls=1&rel=0&modestbranding=1&playsinline=1&enablejsapi=1&origin=${encodeURIComponent(window.location.origin)}`
     : null
-  // Niet-YouTube (bv. Zoom) → niet embedbaar, extern openen.
-  const externalUrl = (!videoId && video?.video_url) ? video.video_url : null
+  // Zoom Clips: /clips/share/ → /clips/embed/ is wél embedbaar (geen x-frame-options).
+  const zoomEmbed = getZoomEmbedUrl(video?.video_url)
+  const playerEmbed = embedUrl || zoomEmbed
+  // Overige niet-embedbare links (bv. Zoom-recordings) → extern openen.
+  const externalUrl = (!playerEmbed && video?.video_url) ? video.video_url : null
   const isZoom = !!externalUrl && /zoom\.us/i.test(externalUrl)
 
   return createPortal(
@@ -844,10 +848,10 @@ function FullscreenPlayer({ item, onClose, onWatched, onCompleted }) {
           boxShadow: '0 20px 60px rgba(0, 0, 0, 0.5)'
         }}
       >
-        {embedUrl ? (
+        {playerEmbed ? (
           <iframe
-            id={YT_PLAYER_ID}
-            src={embedUrl}
+            id={videoId ? YT_PLAYER_ID : undefined}
+            src={playerEmbed}
             style={{
               position: 'absolute',
               inset: 0,
