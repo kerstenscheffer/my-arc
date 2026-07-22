@@ -7,7 +7,7 @@
 // Coaching): filtert de lijst én bepaalt in welke sectie een nieuwe to-do landt.
 import { useState, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
-import { X, Plus, Check, Trash2, ArrowRight, ListTodo, Inbox, Layers, Pencil } from 'lucide-react'
+import { X, Plus, Check, Trash2, ArrowRight, ListTodo, Inbox, Layers, Pencil, GripVertical } from 'lucide-react'
 import ProductivityService from '../modules/productivity/ProductivityService'
 
 const GOLD = '#FFD700'
@@ -49,6 +49,9 @@ export default function QuickTodoModal({ db, coachId, onClose, onOpenProductivit
   // Toevoeg-modal: vraagt prioriteit + duur bij een nieuwe to-do.
   const [addModalOpen, setAddModalOpen] = useState(false)
   const [addSection, setAddSection] = useState('')
+  // Slepen om to-do's te herordenen (persisteert `position`).
+  const [dragId, setDragId] = useState(null)
+  const [dragOverId, setDragOverId] = useState(null)
   // Inline bewerken van een bestaande to-do.
   const [editingId, setEditingId] = useState(null)
   const [editTitle, setEditTitle] = useState('')
@@ -117,6 +120,23 @@ export default function QuickTodoModal({ db, coachId, onClose, onOpenProductivit
   const remove = async (t) => {
     setTasks(prev => prev.filter(x => x.id !== t.id))
     try { await svc.deleteTask(t.id) } catch (e) { console.error(e); load() }
+  }
+
+  // Verplaats bron-task naar de plek van doel-task en herschrijf de posities.
+  const reorder = async (sourceId, targetId) => {
+    if (!sourceId || sourceId === targetId) return
+    const arr = [...tasks]
+    const from = arr.findIndex(t => t.id === sourceId)
+    const to = arr.findIndex(t => t.id === targetId)
+    if (from === -1 || to === -1) return
+    const [moved] = arr.splice(from, 1)
+    arr.splice(to, 0, moved)
+    const withPos = arr.map((t, i) => ({ ...t, position: i }))
+    setTasks(withPos)  // optimistisch
+    const changed = withPos.filter(t => (tasks.find(o => o.id === t.id)?.position ?? -1) !== t.position)
+    try {
+      await Promise.all(changed.map(t => svc.updateTask(t.id, { position: t.position })))
+    } catch (e) { console.error('QuickTodo reorder:', e); load() }
   }
 
   const startEdit = (t) => {
@@ -377,7 +397,16 @@ export default function QuickTodoModal({ db, coachId, onClose, onOpenProductivit
                     </div>
                   </div>
                 ) : (
-                <div key={t.id} style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', padding: '0.5rem 0.4rem', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+                <div key={t.id}
+                  draggable
+                  onDragStart={(e) => { setDragId(t.id); e.dataTransfer.effectAllowed = 'move'; try { e.dataTransfer.setData('text/plain', t.id) } catch { /* noop */ } }}
+                  onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; if (dragOverId !== t.id) setDragOverId(t.id) }}
+                  onDrop={(e) => { e.preventDefault(); reorder(dragId, t.id); setDragId(null); setDragOverId(null) }}
+                  onDragEnd={() => { setDragId(null); setDragOverId(null) }}
+                  style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.5rem 0.4rem', borderBottom: '1px solid rgba(255,255,255,0.04)', borderTop: (dragOverId === t.id && dragId !== t.id) ? '2px solid rgba(255,215,0,0.6)' : '2px solid transparent', opacity: dragId === t.id ? 0.4 : 1, background: dragId === t.id ? 'rgba(255,215,0,0.04)' : 'transparent' }}>
+                  <span title="Sleep om te herordenen" style={{ flexShrink: 0, cursor: 'grab', color: 'rgba(255,255,255,0.22)', display: 'flex', alignItems: 'center' }}>
+                    <GripVertical size={14} />
+                  </span>
                   <button onClick={() => complete(t)} title="Afvinken" style={{ flexShrink: 0, width: 22, height: 22, borderRadius: '50%', border: '1.5px solid rgba(255,255,255,0.25)', background: 'transparent', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', touchAction: 'manipulation' }}
                     onMouseEnter={(e) => { e.currentTarget.style.borderColor = '#10b981'; e.currentTarget.style.background = 'rgba(16,185,129,0.12)' }}
                     onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.25)'; e.currentTarget.style.background = 'transparent' }}>
