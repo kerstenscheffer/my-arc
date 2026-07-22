@@ -2,11 +2,24 @@
 // v2.0 — Brand styling (flush/goud) + mijn categorie dropdown + category_id support
 import React, { useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
-import { Upload, X, Youtube, Camera, Image as ImageIcon, Globe, Check } from 'lucide-react'
+import { Upload, X, Youtube, Camera, Image as ImageIcon, Globe, Check, Home, Dumbbell, Utensils, ShoppingCart, Phone, User } from 'lucide-react'
 import useIsMobile from '../../../hooks/useIsMobile'
 import videoService from '../VideoService'
 
 const GOLD = '#FFD700'
+
+// Pagina's matchen ClientDashboard — zelfde set als de edit-modal. Een video
+// met een pagina in default_pages verschijnt AUTOMATISCH bij alle clients (ook
+// nieuwe) op die pagina. Dit is de enige bron van waarheid voor "standaard".
+const PAGE_OPTIONS = [
+  { value: 'home',         label: 'Home',         icon: Home },
+  { value: 'workout',      label: 'Workout',      icon: Dumbbell },
+  { value: 'meal',         label: 'Meal',         icon: Utensils },
+  { value: 'boodschappen', label: 'Boodschappen', icon: ShoppingCart },
+  { value: 'tracking',     label: 'Tracking',     icon: Camera },
+  { value: 'calls',        label: 'Calls',        icon: Phone },
+  { value: 'profile',      label: 'Profile',      icon: User },
+]
 
 export default function VideoUploadModal({ 
   onClose, 
@@ -24,13 +37,19 @@ export default function VideoUploadModal({
     tags: [],
     difficulty_level: 'beginner',
     best_time_to_watch: 'anytime',
-    is_default: false
+    default_pages: []
   })
   const [thumbnailFile, setThumbnailFile] = useState(null)
   const [thumbnailPreview, setThumbnailPreview] = useState(null)
   const [uploading, setUploading] = useState(false)
-  
+
   const isMobile = useIsMobile()
+
+  const togglePage = (pageValue) => {
+    setFormData(prev => prev.default_pages.includes(pageValue)
+      ? { ...prev, default_pages: prev.default_pages.filter(p => p !== pageValue) }
+      : { ...prev, default_pages: [...prev.default_pages, pageValue] })
+  }
 
   // Lock body scroll
   useEffect(() => {
@@ -439,69 +458,60 @@ export default function VideoUploadModal({
             />
           </div>
 
-          {/* ── STANDAARD TOGGLE ── */}
+          {/* ── STANDAARD ZICHTBAAR OP (default_pages) ── */}
           <div style={{
             padding: isMobile ? '0.75rem 0.875rem' : '0.875rem 1.125rem',
             borderBottom: '1px solid rgba(255, 255, 255, 0.04)',
-            borderLeft: formData.is_default ? `3px solid ${GOLD}` : '3px solid transparent',
+            borderLeft: formData.default_pages.length > 0 ? `3px solid ${GOLD}` : '3px solid transparent',
             transition: 'border-left-color 0.2s ease'
           }}>
-            <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.75rem'
-            }}>
-              <Globe 
-                size={16} 
-                color={formData.is_default ? GOLD : 'rgba(255, 255, 255, 0.3)'}
-              />
-              <div style={{ flex: 1 }}>
-                <div style={{
-                  fontSize: isMobile ? '0.8rem' : '0.85rem',
-                  fontWeight: '700',
-                  color: '#fff',
-                  marginBottom: '0.15rem'
-                }}>
-                  Standaard voor iedereen
-                </div>
-                <div style={{
-                  fontSize: '0.65rem',
-                  color: 'rgba(255, 255, 255, 0.4)',
-                  lineHeight: 1.4
-                }}>
-                  Automatisch zichtbaar bij alle clients
-                </div>
-              </div>
+            <label style={{ ...labelStyle, display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+              <Globe size={10} />
+              Standaard zichtbaar voor iedereen op
+              {formData.default_pages.length > 0 && (
+                <span style={{ marginLeft: '0.3rem', padding: '0.1rem 0.35rem', background: GOLD, color: '#000', borderRadius: '3px', fontSize: '0.5rem', fontWeight: '800', letterSpacing: 0 }}>
+                  {formData.default_pages.length}
+                </span>
+              )}
+            </label>
+            <div style={{ fontSize: '0.65rem', color: 'rgba(255, 255, 255, 0.4)', lineHeight: 1.4, marginBottom: '0.5rem' }}>
+              Automatisch zichtbaar bij ALLE clients (ook nieuwe) op de gekozen pagina's. Laat leeg om de video alleen los toe te wijzen.
+            </div>
 
-              {/* Toggle */}
-              <button
-                onClick={() => setFormData({ ...formData, is_default: !formData.is_default })}
-                style={{
-                  width: '40px',
-                  height: '22px',
-                  background: formData.is_default ? GOLD : 'rgba(255, 255, 255, 0.08)',
-                  border: 'none',
-                  borderRadius: '11px',
-                  position: 'relative',
-                  cursor: 'pointer',
-                  transition: 'background 0.2s ease',
-                  flexShrink: 0,
-                  padding: 0,
-                  touchAction: 'manipulation',
-                  WebkitTapHighlightColor: 'transparent'
-                }}
-              >
-                <div style={{
-                  position: 'absolute',
-                  top: '2px',
-                  left: formData.is_default ? '20px' : '2px',
-                  width: '18px',
-                  height: '18px',
-                  background: '#fff',
-                  borderRadius: '50%',
-                  transition: 'left 0.2s ease'
-                }} />
-              </button>
+            <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr 1fr' : 'repeat(3, 1fr)', gap: '0.3rem' }}>
+              {PAGE_OPTIONS.map(page => {
+                const Icon = page.icon
+                const isSelected = formData.default_pages.includes(page.value)
+                return (
+                  <button
+                    key={page.value}
+                    onClick={() => togglePage(page.value)}
+                    style={{
+                      padding: '0.55rem 0.4rem',
+                      background: isSelected ? GOLD : 'transparent',
+                      border: isSelected ? `1px solid ${GOLD}` : '1px solid rgba(255, 255, 255, 0.08)',
+                      borderRadius: '6px',
+                      color: isSelected ? '#000' : 'rgba(255, 255, 255, 0.5)',
+                      fontSize: '0.65rem',
+                      fontWeight: '800',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '0.3rem',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.03em',
+                      touchAction: 'manipulation',
+                      WebkitTapHighlightColor: 'transparent',
+                      minHeight: '40px',
+                      transition: 'all 0.15s ease'
+                    }}
+                  >
+                    <Icon size={12} />
+                    {page.label}
+                  </button>
+                )
+              })}
             </div>
           </div>
 

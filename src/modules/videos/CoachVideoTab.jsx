@@ -190,7 +190,10 @@ export default function CoachVideoTab({ clients = [], db }) {
   }
 
   const handleDeleteVideo = async (video) => {
-    const confirmMessage = video.is_default
+    // "Standaard" = default_pages heeft pagina's (de echte bron van waarheid),
+    // niet het dode is_default-veld.
+    const isDefault = Array.isArray(video.default_pages) && video.default_pages.length > 0
+    const confirmMessage = isDefault
       ? `Weet je zeker dat je "${video.title}" wilt verwijderen? Deze video is standaard zichtbaar voor alle clients!`
       : `Weet je zeker dat je "${video.title}" wilt verwijderen?`
 
