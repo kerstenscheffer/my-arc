@@ -1,19 +1,34 @@
 // src/client/components/TodayCard.jsx
-// "Vandaag"-card bovenaan de client-home. Zelf-ladend overzicht van vandaag:
-//   - Training van vandaag (schema-dag) + Start, of Rustdag
-//   - Macro's over (kcal + vooral eiwit resterend) uit consumed_meals vs target
-//   - Water (liters vs doel) met één tik om een glas te loggen
-//   - Eerstvolgende geplande call
+// "Planning vandaag" bovenaan de client-home:
+//   - Volle-breedte workout-card met foto (training van vandaag, of Rustdag)
+//   - Voeding: hergebruikt de meal-pagina styling (RemainingPill): kcal over +
+//     eiwit te gaan vs doel
+//   - Eerstvolgende call
 import { useState, useEffect } from 'react'
-import { Dumbbell, Flame, Phone, Play } from 'lucide-react'
+import { Dumbbell, Play, Phone, Moon } from 'lucide-react'
+import RemainingPill from '../../modules/meal-plan/components/RemainingPill'
 
 const GOLD = '#FFD700'
 const todayYMD = () => new Date().toISOString().split('T')[0]
 const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
 
+const WORKOUT_IMAGES = {
+  push: 'https://images.unsplash.com/photo-1532029837206-abbe2b7620e3?w=1200&h=500&fit=crop&q=85',
+  pull: 'https://images.unsplash.com/photo-1605296867424-35fc25c9212a?w=1200&h=500&fit=crop&q=85',
+  legs: 'https://images.unsplash.com/photo-1567598508481-65985588e295?w=1200&h=500&fit=crop&q=85',
+  default: 'https://images.unsplash.com/photo-1517836357463-d25dfeac3438?w=1200&h=500&fit=crop&q=85',
+}
+const pickWorkoutImg = (name) => {
+  const n = (name || '').toLowerCase()
+  if (/push|duw|borst|chest|press/.test(n)) return WORKOUT_IMAGES.push
+  if (/pull|trek|rug|back|lat/.test(n)) return WORKOUT_IMAGES.pull
+  if (/leg|been|quad|squat|hamstring|glute/.test(n)) return WORKOUT_IMAGES.legs
+  return WORKOUT_IMAGES.default
+}
+
 export default function TodayCard({ client, db, setCurrentView, isMobile }) {
-  const [training, setTraining] = useState(null)   // null = nog laden; { rest:true } of { name }
-  const [macros, setMacros] = useState(null)       // { kcal, protein }
+  const [training, setTraining] = useState(null)   // null=laden; { rest:true } | { name, focus }
+  const [macros, setMacros] = useState(null)       // { targetKcal, targetProtein, consumedKcal, consumedProtein }
   const [nextCall, setNextCall] = useState(null)   // { scheduled_date, ... } | 'none'
 
   useEffect(() => {
@@ -25,9 +40,7 @@ export default function TodayCard({ client, db, setCurrentView, isMobile }) {
     ;(async () => {
       try {
         const { data: c } = await db.supabase
-          .from('clients')
-          .select('workout_schedule, assigned_schema_id')
-          .eq('id', client.id).single()
+          .from('clients').select('workout_schedule, assigned_schema_id').eq('id', client.id).single()
         const map = c?.workout_schedule || {}
         const key = map[DAY_NAMES[new Date().getDay()]]
         let w = null
@@ -37,11 +50,11 @@ export default function TodayCard({ client, db, setCurrentView, isMobile }) {
           const ws = s?.week_structure
           if (ws) w = Array.isArray(ws) ? ws.find(d => d?.key === key || d?.id === key) : ws[key]
         }
-        if (alive) setTraining(w ? { name: w.name || w.title || w.focus || 'Training' } : { rest: true })
+        if (alive) setTraining(w ? { name: w.name || w.title || 'Training', focus: w.focus || '' } : { rest: true })
       } catch { if (alive) setTraining({ rest: true }) }
     })()
 
-    // ── Macro's over ──
+    // ── Macro's ──
     ;(async () => {
       try {
         const [{ data: t }, { data: cm }] = await Promise.all([
@@ -50,16 +63,15 @@ export default function TodayCard({ client, db, setCurrentView, isMobile }) {
             .eq('client_id', client.id)
             .gte('consumed_at', `${day}T00:00:00`).lt('consumed_at', `${day}T23:59:59`),
         ])
-        const tKcal = t?.target_calories || client.target_calories || 0
-        const tProt = t?.target_protein || client.target_protein || 0
         let ck = 0, cp = 0
         ;(cm || []).forEach(m => { ck += Number(m.calories) || 0; cp += parseFloat(m.protein) || 0 })
         if (alive) setMacros({
-          kcal: Math.max(0, Math.round(tKcal - ck)),
-          protein: Math.max(0, Math.round(tProt - cp)),
-          hasTarget: tKcal > 0 || tProt > 0,
+          targetKcal: t?.target_calories || client.target_calories || 0,
+          targetProtein: t?.target_protein || client.target_protein || 0,
+          consumedKcal: Math.round(ck),
+          consumedProtein: Math.round(cp),
         })
-      } catch { if (alive) setMacros({ kcal: 0, protein: 0, hasTarget: false }) }
+      } catch { if (alive) setMacros({ targetKcal: 0, targetProtein: 0, consumedKcal: 0, consumedProtein: 0 }) }
     })()
 
     // ── Eerstvolgende call ──
@@ -71,100 +83,118 @@ export default function TodayCard({ client, db, setCurrentView, isMobile }) {
           .eq('client_call_plans.client_id', client.id)
           .eq('status', 'scheduled')
           .gte('scheduled_date', new Date().toISOString())
-          .order('scheduled_date', { ascending: true })
-          .limit(1)
+          .order('scheduled_date', { ascending: true }).limit(1)
         if (alive) setNextCall(data?.[0] || 'none')
       } catch { if (alive) setNextCall('none') }
     })()
 
     return () => { alive = false }
-  }, [client?.id, db])
+  }, [client?.id, db]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  const callLabel = () => {
-    if (nextCall === 'none' || !nextCall) return { big: 'Geen', sub: 'call gepland' }
+  const goWorkout = () => setCurrentView && setCurrentView('workout')
+  const isRest = training && training.rest
+  const workoutImg = training && !isRest ? pickWorkoutImg(training.name) : null
+
+  // Voeding-props in de vorm die RemainingPill verwacht.
+  const hasTarget = macros && macros.targetKcal > 0
+  const remaining = macros ? { kcal: macros.targetKcal - macros.consumedKcal, protein: macros.targetProtein > 0 ? (macros.targetProtein - macros.consumedProtein) : null } : null
+  const consumed = macros ? { calories: macros.consumedKcal } : null
+  const target = macros ? { calories: macros.targetKcal, protein: macros.targetProtein } : null
+
+  const callInfo = () => {
+    if (nextCall === 'none' || !nextCall) return null
     const d = new Date(nextCall.scheduled_date)
     const dagen = Math.ceil((d - new Date()) / 86400000)
-    const datum = d.toLocaleDateString('nl-NL', { weekday: 'short', day: 'numeric', month: 'short' })
-    return { big: datum, sub: dagen <= 0 ? 'vandaag' : dagen === 1 ? 'morgen' : `over ${dagen} dagen` }
+    return {
+      datum: d.toLocaleDateString('nl-NL', { weekday: 'long', day: 'numeric', month: 'long' }),
+      sub: dagen <= 0 ? 'vandaag' : dagen === 1 ? 'morgen' : `over ${dagen} dagen`,
+    }
   }
-
-  const call = callLabel()
+  const call = callInfo()
 
   return (
     <div style={{ padding: isMobile ? '0 1rem' : '0 1.5rem' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginBottom: '0.6rem', paddingLeft: '0.15rem' }}>
-        <span style={{ fontSize: '0.6rem', fontWeight: 800, color: GOLD, textTransform: 'uppercase', letterSpacing: '0.12em' }}>Vandaag</span>
+      {/* Kop */}
+      <div style={{ fontSize: '0.62rem', fontWeight: 800, color: GOLD, textTransform: 'uppercase', letterSpacing: '0.12em', marginBottom: '0.65rem', paddingLeft: '0.15rem' }}>
+        Planning vandaag
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.6rem' }}>
-        {/* Training */}
-        <Tile onClick={() => setCurrentView && setCurrentView('workout')} accent={GOLD} icon={<Dumbbell size={15} color={GOLD} />} label="Training">
+      {/* ── Workout-card volle breedte met foto ── */}
+      <div
+        onClick={goWorkout}
+        style={{
+          position: 'relative', width: '100%', minHeight: isMobile ? 140 : 165,
+          borderRadius: 16, overflow: 'hidden', cursor: 'pointer', background: '#111',
+          border: '1px solid rgba(255,255,255,0.08)',
+          display: 'flex', flexDirection: 'column', justifyContent: 'flex-end',
+          touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+        }}
+      >
+        {workoutImg
+          ? <div style={{ position: 'absolute', inset: 0, backgroundImage: `url(${workoutImg})`, backgroundSize: 'cover', backgroundPosition: 'center' }} />
+          : <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(135deg, #1a1a1a 0%, #0f0f0f 100%)' }} />}
+        <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, rgba(0,0,0,0.15) 0%, rgba(0,0,0,0.55) 55%, rgba(0,0,0,0.88) 100%)' }} />
+
+        <div style={{ position: 'relative', padding: isMobile ? '0.9rem 1rem' : '1.1rem 1.25rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', marginBottom: '0.3rem' }}>
+            {isRest ? <Moon size={13} color="rgba(255,255,255,0.65)" /> : <Dumbbell size={13} color={GOLD} />}
+            <span style={{ fontSize: '0.56rem', fontWeight: 800, color: isRest ? 'rgba(255,255,255,0.6)' : GOLD, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+              Training vandaag
+            </span>
+          </div>
           {training == null ? (
-            <Dim>…</Dim>
-          ) : training.rest ? (
-            <Big>Rustdag</Big>
+            <div style={{ fontSize: '1.1rem', fontWeight: 800, color: 'rgba(255,255,255,0.4)' }}>…</div>
+          ) : isRest ? (
+            <div style={{ fontSize: isMobile ? '1.25rem' : '1.4rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.02em' }}>Rustdag</div>
           ) : (
-            <>
-              <Big title={training.name}>{training.name}</Big>
-              <ActionPill color={GOLD}><Play size={10} /> Start</ActionPill>
-            </>
+            <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: '0.75rem' }}>
+              <div style={{ minWidth: 0 }}>
+                <div style={{ fontSize: isMobile ? '1.25rem' : '1.45rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.02em', lineHeight: 1.1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  {training.name}
+                </div>
+                {training.focus && <div style={{ fontSize: '0.72rem', fontWeight: 600, color: 'rgba(255,255,255,0.6)', marginTop: 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{training.focus}</div>}
+              </div>
+              <div style={{ flexShrink: 0, display: 'inline-flex', alignItems: 'center', gap: 5, padding: '0.5rem 0.85rem', background: GOLD, borderRadius: 10, color: '#0a0a0a', fontSize: '0.72rem', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.03em' }}>
+                <Play size={13} fill="#0a0a0a" /> Start
+              </div>
+            </div>
           )}
-        </Tile>
-
-        {/* Macro's over */}
-        <Tile onClick={() => setCurrentView && setCurrentView('meal')} accent="#10b981" icon={<Flame size={15} color="#10b981" />} label="Nog te eten">
-          {macros == null ? <Dim>…</Dim> : !macros.hasTarget ? <Dim>Geen doel</Dim> : (
-            <>
-              <Big><span style={{ color: '#10b981' }}>{macros.protein}g</span> eiwit</Big>
-              <Sub>{macros.kcal} kcal over</Sub>
-            </>
-          )}
-        </Tile>
-
-        {/* Eerstvolgende call — volle breedte onder de andere twee */}
-        <Tile onClick={() => setCurrentView && setCurrentView('calls')} accent="#a855f7" icon={<Phone size={15} color="#a855f7" />} label="Volgende call" style={{ gridColumn: '1 / -1' }}>
-          {nextCall == null ? <Dim>…</Dim> : (
-            <>
-              <Big style={{ textTransform: 'capitalize' }}>{call.big}</Big>
-              <Sub>{call.sub}</Sub>
-            </>
-          )}
-        </Tile>
+        </div>
       </div>
+
+      {/* ── Voeding — styling overgenomen van de voeding-pagina (RemainingPill) ── */}
+      <div style={{ marginTop: '1.1rem' }}>
+        <div style={{ fontSize: '0.62rem', fontWeight: 800, color: GOLD, textTransform: 'uppercase', letterSpacing: '0.12em', marginBottom: '0.5rem', paddingLeft: '0.15rem' }}>
+          Voeding
+        </div>
+        <div
+          onClick={() => setCurrentView && setCurrentView('meal')}
+          style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 16, overflow: 'hidden', cursor: 'pointer' }}
+        >
+          {macros == null ? (
+            <div style={{ padding: '1.1rem', fontSize: '0.9rem', fontWeight: 700, color: 'rgba(255,255,255,0.3)' }}>…</div>
+          ) : hasTarget ? (
+            <RemainingPill remaining={remaining} consumed={consumed} target={target} isMobile={isMobile} />
+          ) : (
+            <div style={{ padding: '1.1rem', fontSize: '0.85rem', fontWeight: 600, color: 'rgba(255,255,255,0.4)' }}>Nog geen voedingsdoel ingesteld.</div>
+          )}
+        </div>
+      </div>
+
+      {/* ── Eerstvolgende call ── */}
+      {call && (
+        <button
+          onClick={() => setCurrentView && setCurrentView('calls')}
+          style={{ width: '100%', marginTop: '0.9rem', textAlign: 'left', cursor: 'pointer', background: 'rgba(168,85,247,0.06)', border: '1px solid rgba(168,85,247,0.25)', borderRadius: 14, padding: '0.85rem 1rem', display: 'flex', alignItems: 'center', gap: '0.7rem', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}
+        >
+          <Phone size={16} color="#a855f7" style={{ flexShrink: 0 }} />
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: '0.56rem', fontWeight: 800, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 2 }}>Volgende call</div>
+            <div style={{ fontSize: '0.88rem', fontWeight: 800, color: '#fff', textTransform: 'capitalize', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{call.datum}</div>
+          </div>
+          <span style={{ flexShrink: 0, fontSize: '0.68rem', fontWeight: 700, color: '#c084fc' }}>{call.sub}</span>
+        </button>
+      )}
     </div>
   )
 }
-
-function Tile({ onClick, accent, icon, label, children, style }) {
-  return (
-    <button
-      onClick={onClick}
-      style={{
-        textAlign: 'left', cursor: 'pointer', width: '100%',
-        background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)',
-        borderLeft: `3px solid ${accent}`, borderRadius: 14, padding: '0.85rem 0.9rem',
-        display: 'flex', flexDirection: 'column', gap: '0.4rem', minHeight: 96,
-        touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-        ...style,
-      }}
-    >
-      <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-        {icon}
-        <span style={{ fontSize: '0.58rem', fontWeight: 800, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{label}</span>
-      </div>
-      {children}
-    </button>
-  )
-}
-const Big = ({ children, title, style }) => (
-  <div title={title} style={{ fontSize: '1rem', fontWeight: 800, color: '#fff', lineHeight: 1.15, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', fontVariantNumeric: 'tabular-nums', ...style }}>{children}</div>
-)
-const Sub = ({ children }) => (
-  <div style={{ fontSize: '0.65rem', fontWeight: 600, color: 'rgba(255,255,255,0.4)' }}>{children}</div>
-)
-const Dim = ({ children }) => (
-  <div style={{ fontSize: '0.9rem', fontWeight: 700, color: 'rgba(255,255,255,0.25)' }}>{children}</div>
-)
-const ActionPill = ({ color, children }) => (
-  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, alignSelf: 'flex-start', marginTop: 'auto', padding: '0.15rem 0.45rem', background: `${color}1f`, border: `1px solid ${color}55`, borderRadius: 6, color, fontSize: '0.6rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.03em' }}>{children}</span>
-)
