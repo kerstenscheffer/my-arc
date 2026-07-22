@@ -136,11 +136,6 @@ export default function TodayCard({ client, db, setCurrentView, isMobile }) {
 
   return (
     <div style={{ padding: isMobile ? '0 1rem' : '0 1.5rem' }}>
-      {/* Kop */}
-      <div style={{ fontSize: '0.62rem', fontWeight: 800, color: GOLD, textTransform: 'uppercase', letterSpacing: '0.12em', marginBottom: '0.65rem', paddingLeft: '0.15rem' }}>
-        Planning vandaag
-      </div>
-
       {/* ── Workout-card volle breedte met foto ── */}
       <div
         onClick={goWorkout}
@@ -186,10 +181,6 @@ export default function TodayCard({ client, db, setCurrentView, isMobile }) {
 
       {/* ── Voeding — volgende maaltijd + 4 macro-vakken ── */}
       <div style={{ marginTop: '1.1rem' }}>
-        <div style={{ fontSize: '0.62rem', fontWeight: 800, color: GOLD, textTransform: 'uppercase', letterSpacing: '0.12em', marginBottom: '0.5rem', paddingLeft: '0.15rem' }}>
-          Voeding
-        </div>
-
         {/* Volgende maaltijd uit het plan */}
         {meal && (
           <button
