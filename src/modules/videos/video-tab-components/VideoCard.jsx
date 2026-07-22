@@ -236,35 +236,6 @@ export default function VideoCard({
           Zichtbaarheid
         </button>
 
-        {/* Personen — toewijzen aan specifieke clients (per-persoon) */}
-        <button
-          onClick={onAssignPersons}
-          style={{
-            flex: 1,
-            minWidth: '92px',
-            padding: '0.45rem 0.5rem',
-            background: '#0a0a0a',
-            border: `1px solid ${GOLD}`,
-            borderRadius: '6px',
-            color: GOLD,
-            fontSize: '0.6rem',
-            fontWeight: '800',
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: '0.3rem',
-            touchAction: 'manipulation',
-            WebkitTapHighlightColor: 'transparent',
-            minHeight: '32px',
-            textTransform: 'uppercase',
-            letterSpacing: '0.04em'
-          }}
-        >
-          <UserPlus size={12} />
-          Personen
-        </button>
-
         {/* Beheer (clients) */}
         <button onClick={onManage} title="Beheer toewijzingen" style={iconBtnStyle()}>
           <Users size={13} />
