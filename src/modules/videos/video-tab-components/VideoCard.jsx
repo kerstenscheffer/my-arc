@@ -1,7 +1,7 @@
 // src/modules/videos/video-tab-components/VideoCard.jsx
 // v2.0 — Compact, brand styling, props ongewijzigd
 import React from 'react'
-import { Play, Eye, Send, Users, Trash2, Edit, Globe } from 'lucide-react'
+import { Play, Eye, Users, Trash2, Edit, Globe } from 'lucide-react'
 import useIsMobile from '../../../hooks/useIsMobile'
 import videoService from '../VideoService'
 
@@ -206,7 +206,7 @@ export default function VideoCard({
         padding: '0.5rem 0.75rem 0.625rem',
         borderTop: '1px solid rgba(255, 255, 255, 0.04)'
       }}>
-        {/* Toewijzen — primary, neemt rest van breedte */}
+        {/* Zichtbaarheid — primary: standaard-pagina's + home-slider voor iedereen */}
         <button
           onClick={onAssign}
           style={{
@@ -230,8 +230,8 @@ export default function VideoCard({
             letterSpacing: '0.04em'
           }}
         >
-          <Send size={11} />
-          Toewijzen
+          <Globe size={11} />
+          Zichtbaarheid
         </button>
 
         {/* Beheer (clients) */}

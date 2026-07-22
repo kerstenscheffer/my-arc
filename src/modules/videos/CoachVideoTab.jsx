@@ -13,6 +13,7 @@ import VideoSearchFilters from './video-tab-components/VideoSearchFilters'
 import VideoCard from './video-tab-components/VideoCard'
 import VideoUploadModal from './video-tab-components/VideoUploadModal'
 import VideoAssignModal from './video-tab-components/VideoAssignModal'
+import VideoVisibilityModal from './video-tab-components/VideoVisibilityModal'
 import VideoEditModal from './video-tab-components/VideoEditModal'
 
 const GOLD = '#FFD700'
@@ -36,6 +37,7 @@ export default function CoachVideoTab({ clients = [], db }) {
 
   const [showUploadModal, setShowUploadModal] = useState(false)
   const [showAssignModal, setShowAssignModal] = useState(false)
+  const [showVisibilityModal, setShowVisibilityModal] = useState(false)
   const [selectedVideo, setSelectedVideo] = useState(null)
   const [clientsLoading, setClientsLoading] = useState(true)
   const [localClients, setLocalClients] = useState([])
@@ -471,7 +473,7 @@ export default function CoachVideoTab({ clients = [], db }) {
               title={cat.name}
               color={cat.color || GOLD}
               videos={grouped[cat.id]}
-              onAssign={(v) => { setSelectedVideo(v); setShowAssignModal(true) }}
+              onAssign={(v) => { setSelectedVideo(v); setShowVisibilityModal(true) }}
               onManage={(v) => { setManagingVideo(v); setShowManageModal(true) }}
               onEdit={(v) => { setEditingVideo(v); setShowEditModal(true) }}
               onDelete={handleDeleteVideo}
@@ -486,7 +488,7 @@ export default function CoachVideoTab({ clients = [], db }) {
               title="Zonder Categorie"
               color="rgba(255, 255, 255, 0.3)"
               videos={uncategorized}
-              onAssign={(v) => { setSelectedVideo(v); setShowAssignModal(true) }}
+              onAssign={(v) => { setSelectedVideo(v); setShowVisibilityModal(true) }}
               onManage={(v) => { setManagingVideo(v); setShowManageModal(true) }}
               onEdit={(v) => { setEditingVideo(v); setShowEditModal(true) }}
               onDelete={handleDeleteVideo}
@@ -546,6 +548,17 @@ export default function CoachVideoTab({ clients = [], db }) {
               setSelectedVideo(null)
             }
           }}
+        />
+      )}
+
+      {/* Zichtbaarheid-modal — primaire kaart-knop. Stelt standaard-pagina's +
+          home-slider in voor ALLE clients (via updateVideo), i.p.v. losse
+          per-client toewijzingen. */}
+      {showVisibilityModal && selectedVideo && (
+        <VideoVisibilityModal
+          video={selectedVideo}
+          onClose={() => { setShowVisibilityModal(false); setSelectedVideo(null) }}
+          onSaved={() => { loadVideos() }}
         />
       )}
 
