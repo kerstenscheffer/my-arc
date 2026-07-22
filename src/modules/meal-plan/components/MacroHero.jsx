@@ -353,29 +353,34 @@ export default function MacroHero({
           Daggegevens laden…
         </div>
       ) : variant === 'rings' ? (
-        // Twee ringen naast elkaar: kcal (breder) + eiwit.
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: isMobile ? '1.1rem' : '1.6rem' }}>
-          <BudgetRing
-            consumed={display.calories || 0}
-            target={t.calories || 0}
-            isMobile={isMobile}
-            compact={compact}
-            size={compact ? (isMobile ? 108 : 122) : (isMobile ? 128 : 150)}
-            unit="kcal"
-          />
-          <BudgetRing
-            consumed={display.protein || 0}
-            target={t.protein || 0}
-            isMobile={isMobile}
-            compact={compact}
-            size={compact ? (isMobile ? 90 : 102) : (isMobile ? 110 : 128)}
-            unit="eiwit"
-            remainWord="te gaan"
-            overWord="gehaald"
-            valueSuffix="g"
-            overIsGood
-          />
-        </div>
+        // Twee gelijke ringen naast elkaar: kcal + eiwit.
+        (() => {
+          const ringSize = compact ? (isMobile ? 104 : 116) : (isMobile ? 124 : 144)
+          return (
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: isMobile ? '1.4rem' : '2rem' }}>
+              <BudgetRing
+                consumed={display.calories || 0}
+                target={t.calories || 0}
+                isMobile={isMobile}
+                compact={compact}
+                size={ringSize}
+                unit="kcal"
+              />
+              <BudgetRing
+                consumed={display.protein || 0}
+                target={t.protein || 0}
+                isMobile={isMobile}
+                compact={compact}
+                size={ringSize}
+                unit="eiwit"
+                remainWord="te gaan"
+                overWord="gehaald"
+                valueSuffix="g"
+                overIsGood
+              />
+            </div>
+          )
+        })()
       ) : variant === 'hero' ? (
         <>
           {/* Hero-variant (meal-pagina): kcal-ring + groot eiwit op één rij,

@@ -5,8 +5,10 @@
 //     eiwit te gaan vs doel
 //   - Eerstvolgende call
 import { useState, useEffect } from 'react'
-import { Dumbbell, Play, Phone, Moon } from 'lucide-react'
+import { Dumbbell, Play, Phone, Moon, ChevronRight } from 'lucide-react'
 import MacroHero from '../../modules/meal-plan/components/MacroHero'
+import AIMealPlanService from '../../modules/meal-plan/AIMealPlanService'
+import { resolveFoodImage } from '../../modules/meal-plan/foodImageFallback'
 
 const GOLD = '#FFD700'
 const todayYMD = () => new Date().toISOString().split('T')[0]
@@ -28,7 +30,8 @@ const pickWorkoutImg = (name) => {
 
 export default function TodayCard({ client, db, setCurrentView, isMobile }) {
   const [training, setTraining] = useState(null)   // null=laden; { rest:true } | { name, focus }
-  const [macros, setMacros] = useState(null)       // { targetKcal, targetProtein, consumedKcal, consumedProtein }
+  const [macros, setMacros] = useState(null)       // { targets, consumed }
+  const [nextMeal, setNextMeal] = useState(null)   // maaltijd-object | 'none'
   const [nextCall, setNextCall] = useState(null)   // { scheduled_date, ... } | 'none'
 
   useEffect(() => {
@@ -77,6 +80,19 @@ export default function TodayCard({ client, db, setCurrentView, isMobile }) {
       } catch { if (alive) setMacros({ targets: { calories: 0, protein: 0, carbs: 0, fat: 0 }, consumed: { calories: 0, protein: 0, carbs: 0, fat: 0 } }) }
     })()
 
+    // ── Volgende maaltijd uit het plan ──
+    ;(async () => {
+      try {
+        const svc = new AIMealPlanService(db)
+        const plan = await svc.getActiveAIPlan(client.id)
+        if (!plan) { if (alive) setNextMeal('none'); return }
+        const progress = await svc.getAIProgress(client.id, day)
+        const meals = await svc.getTodayFromWeekStructure(plan, progress)
+        const nm = svc.calculateNextMeal(meals, progress?.consumed_meals)
+        if (alive) setNextMeal(nm || 'none')
+      } catch { if (alive) setNextMeal('none') }
+    })()
+
     // ── Eerstvolgende call ──
     ;(async () => {
       try {
@@ -110,6 +126,14 @@ export default function TodayCard({ client, db, setCurrentView, isMobile }) {
     }
   }
   const call = callInfo()
+
+  const meal = (nextMeal && nextMeal !== 'none') ? {
+    name: nextMeal.meal_name || nextMeal.name || 'Maaltijd',
+    kcal: Math.round(nextMeal.calories || 0),
+    slot: nextMeal.timeSlot || '',
+    time: (() => { const h = Math.floor(nextMeal.plannedTime || 0); const m = Math.round(((nextMeal.plannedTime || 0) - h) * 60); return `${h}:${String(m).padStart(2, '0')}` })(),
+    img: resolveFoodImage(nextMeal, { size: 160 }),
+  } : null
 
   return (
     <div style={{ padding: isMobile ? '0 1rem' : '0 1.5rem' }}>
@@ -161,15 +185,14 @@ export default function TodayCard({ client, db, setCurrentView, isMobile }) {
         </div>
       </div>
 
-      {/* ── Voeding — styling overgenomen van de voeding-pagina (RemainingPill) ── */}
+      {/* ── Voeding — 2 gelijke ringen (kcal + eiwit) + volgende maaltijd ── */}
       <div style={{ marginTop: '1.1rem' }}>
         <div style={{ fontSize: '0.62rem', fontWeight: 800, color: GOLD, textTransform: 'uppercase', letterSpacing: '0.12em', marginBottom: '0.5rem', paddingLeft: '0.15rem' }}>
           Voeding
         </div>
-        <div
-          onClick={() => setCurrentView && setCurrentView('meal')}
-          style={{ cursor: 'pointer' }}
-        >
+
+        {/* Ringen (zweven) */}
+        <div onClick={() => setCurrentView && setCurrentView('meal')} style={{ cursor: 'pointer' }}>
           {macros == null ? (
             <div style={{ padding: '1.1rem', fontSize: '0.9rem', fontWeight: 700, color: 'rgba(255,255,255,0.3)', textAlign: 'center' }}>…</div>
           ) : hasTarget ? (
@@ -184,9 +207,27 @@ export default function TodayCard({ client, db, setCurrentView, isMobile }) {
               selectedIsToday
             />
           ) : (
-            <div style={{ padding: '1.1rem', fontSize: '0.85rem', fontWeight: 600, color: 'rgba(255,255,255,0.4)' }}>Nog geen voedingsdoel ingesteld.</div>
+            <div style={{ padding: '1.1rem', fontSize: '0.85rem', fontWeight: 600, color: 'rgba(255,255,255,0.4)', textAlign: 'center' }}>Nog geen voedingsdoel ingesteld.</div>
           )}
         </div>
+
+        {/* Volgende maaltijd uit het plan */}
+        {meal && (
+          <button
+            onClick={() => setCurrentView && setCurrentView('meal')}
+            style={{ width: '100%', marginTop: '0.85rem', textAlign: 'left', cursor: 'pointer', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 14, padding: '0.6rem 0.7rem', display: 'flex', alignItems: 'center', gap: '0.7rem', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}
+          >
+            <div style={{ width: 52, height: 52, borderRadius: 10, flexShrink: 0, backgroundImage: `url(${meal.img})`, backgroundSize: 'cover', backgroundPosition: 'center', border: '1px solid rgba(255,255,255,0.08)' }} />
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: '0.55rem', fontWeight: 800, color: 'rgba(255,215,0,0.7)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 2 }}>
+                Volgende{meal.slot ? ` · ${meal.slot}` : ''}
+              </div>
+              <div style={{ fontSize: '0.9rem', fontWeight: 800, color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{meal.name}</div>
+              <div style={{ fontSize: '0.68rem', fontWeight: 600, color: 'rgba(255,255,255,0.45)' }}>{meal.time} · {meal.kcal} kcal</div>
+            </div>
+            <ChevronRight size={18} color="rgba(255,255,255,0.3)" style={{ flexShrink: 0 }} />
+          </button>
+        )}
       </div>
 
       {/* ── Eerstvolgende call ── */}
