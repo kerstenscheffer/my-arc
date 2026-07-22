@@ -9,7 +9,6 @@ import ManageAssignmentsModal from './ManageAssignmentsModal'
 import CategoryManagerModal from './CategoryManagerModal'
 import CourseManagerModal from './CourseManagerModal'
 
-import VideoStatsCards from './video-tab-components/VideoStatsCards'
 import VideoSearchFilters from './video-tab-components/VideoSearchFilters'
 import VideoCard from './video-tab-components/VideoCard'
 import VideoUploadModal from './video-tab-components/VideoUploadModal'
@@ -216,9 +215,6 @@ export default function CoachVideoTab({ clients = [], db }) {
       background: '#0a0a0a',
       minHeight: '100vh'
     }}>
-      {/* ── PDF / Bestanden manager — bovenaan zodat'ie meteen zichtbaar is. */}
-      {coachId && <CoachFileManager coachId={coachId} />}
-
       {/* ── HEADER ── */}
       <div style={{
         marginBottom: '1rem',
@@ -363,12 +359,6 @@ export default function CoachVideoTab({ clients = [], db }) {
         </div>
       </div>
 
-      {/* Stats Cards */}
-      <VideoStatsCards
-        videos={videos}
-        clientsCount={localClients.length}
-      />
-
       {/* Search + Filters */}
       <VideoSearchFilters
         searchQuery={searchQuery}
@@ -505,6 +495,13 @@ export default function CoachVideoTab({ clients = [], db }) {
               isUncategorized
             />
           )}
+        </div>
+      )}
+
+      {/* ── PDF / Bestanden manager — onderaan (video's hebben prioriteit). */}
+      {coachId && (
+        <div style={{ marginTop: '1.5rem', paddingTop: '1.25rem', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+          <CoachFileManager coachId={coachId} />
         </div>
       )}
 
