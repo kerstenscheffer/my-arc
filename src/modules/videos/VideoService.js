@@ -246,6 +246,28 @@ const videoService = {
       const uniqueDefaultVideos = defaultVideoData.filter(d => !assignedVideoIds.has(d.video_id))
       const allVideos = [...assignedVideoData, ...uniqueDefaultVideos]
 
+      // Cursus-lidmaatschap uit video_course_items: video's die in een cursus
+      // zitten krijgen course_id/course_title/course_order op context_data,
+      // zodat de widget ze onder hun cursus groepeert i.p.v. los te tonen —
+      // ongeacht of ze via default_pages of een toewijzing op de pagina komen.
+      try {
+        const vids = [...new Set(allVideos.map(v => v.video_id).filter(Boolean))]
+        if (vids.length > 0) {
+          const { data: courseItems } = await supabase
+            .from('video_course_items')
+            .select('video_id, order_index, course:video_courses(id, title)')
+            .in('video_id', vids)
+          const byVideo = new Map()
+          ;(courseItems || []).forEach(ci => {
+            if (ci.course?.id) byVideo.set(ci.video_id, { course_id: ci.course.id, course_title: ci.course.title, course_order: ci.order_index ?? 0 })
+          })
+          allVideos.forEach(v => {
+            const c = byVideo.get(v.video_id)
+            if (c) v.context_data = { ...(v.context_data || {}), ...c }
+          })
+        }
+      } catch (e) { console.warn('course grouping failed:', e?.message) }
+
       allVideos.sort((a, b) => {
         if (a.scheduled_for && !b.scheduled_for) return -1
         if (!a.scheduled_for && b.scheduled_for) return 1
