@@ -163,6 +163,27 @@ const clientVideoService = {
       return { success: false, error: error.message }
     }
   },
+
+  // Home-slider video's: coach-video's die de coach met de "in home-slider"-
+  // vlag heeft gemarkeerd (show_in_slider). Standaard voor ALLE clients van die
+  // coach — niet meer via per-client video_assignments.
+  getSliderVideos: async (coachId) => {
+    if (!coachId) return []
+    try {
+      const { data, error } = await supabase
+        .from('coach_videos')
+        .select('*')
+        .eq('coach_id', coachId)
+        .eq('is_active', true)
+        .eq('show_in_slider', true)
+        .order('created_at', { ascending: false })
+      if (error) { console.error('❌ getSliderVideos error:', error); return [] }
+      return (data || []).map(v => ({ id: v.id, video_id: v.id, video: v }))
+    } catch (error) {
+      console.error('❌ getSliderVideos failed:', error)
+      return []
+    }
+  },
 }
 
 export default clientVideoService

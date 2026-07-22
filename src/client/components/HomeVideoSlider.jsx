@@ -29,15 +29,19 @@ export default function HomeVideoSlider({ client }) {
     let cancelled = false
     ;(async () => {
       try {
-        const lib = await clientVideoService.getClientVideoLibrary(client.id)
+        // Slider toont nu de coach-video's met de "in home-slider"-vlag
+        // (show_in_slider), standaard voor alle clients — niet meer de losse
+        // per-client video_assignments.
+        const coachId = client.coach_id || client.trainer_id
+        const vids = await clientVideoService.getSliderVideos(coachId)
         if (cancelled) return
-        setItems(lib?.videos || [])
+        setItems(vids)
       } finally {
         if (!cancelled) setLoading(false)
       }
     })()
     return () => { cancelled = true }
-  }, [client?.id])
+  }, [client?.id, client?.coach_id, client?.trainer_id])
 
   // Auto-rotate timer
   useEffect(() => {
