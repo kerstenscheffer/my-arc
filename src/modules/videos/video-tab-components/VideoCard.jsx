@@ -1,16 +1,17 @@
 // src/modules/videos/video-tab-components/VideoCard.jsx
 // v2.0 — Compact, brand styling, props ongewijzigd
 import React from 'react'
-import { Play, Eye, Users, Trash2, Edit, Globe } from 'lucide-react'
+import { Play, Eye, Users, Trash2, Edit, Globe, UserPlus } from 'lucide-react'
 import useIsMobile from '../../../hooks/useIsMobile'
 import videoService from '../VideoService'
 
 const GOLD = '#FFD700'
 
 export default function VideoCard({ 
-  video, 
+  video,
   categoryConfig,
   onAssign,
+  onAssignPersons,
   onManage,
   onDelete,
   onEdit
@@ -202,6 +203,7 @@ export default function VideoCard({
       <div style={{
         display: 'flex',
         alignItems: 'center',
+        flexWrap: 'wrap',
         gap: '0.3rem',
         padding: '0.5rem 0.75rem 0.625rem',
         borderTop: '1px solid rgba(255, 255, 255, 0.04)'
@@ -226,12 +228,42 @@ export default function VideoCard({
             touchAction: 'manipulation',
             WebkitTapHighlightColor: 'transparent',
             minHeight: '32px',
+            minWidth: '92px',
             textTransform: 'uppercase',
             letterSpacing: '0.04em'
           }}
         >
           <Globe size={11} />
           Zichtbaarheid
+        </button>
+
+        {/* Personen — toewijzen aan specifieke clients (per-persoon) */}
+        <button
+          onClick={onAssignPersons}
+          style={{
+            flex: 1,
+            minWidth: '92px',
+            padding: '0.45rem 0.5rem',
+            background: '#0a0a0a',
+            border: `1px solid ${GOLD}`,
+            borderRadius: '6px',
+            color: GOLD,
+            fontSize: '0.6rem',
+            fontWeight: '800',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '0.3rem',
+            touchAction: 'manipulation',
+            WebkitTapHighlightColor: 'transparent',
+            minHeight: '32px',
+            textTransform: 'uppercase',
+            letterSpacing: '0.04em'
+          }}
+        >
+          <UserPlus size={12} />
+          Personen
         </button>
 
         {/* Beheer (clients) */}
