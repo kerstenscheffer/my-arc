@@ -29,7 +29,7 @@ const STEPS = [
     title: 'Na salescall',
     label: 'COACH',
     message: {
-      text: 'Hey [naam], super om je gesproken te hebben! Ik kijk er naar uit om samen aan [doel] te werken. We gaan zorgen dat je daar komt. 💪',
+      text: 'Hey [naam], super om je gesproken te hebben! Ik kijk er naar uit om samen aan [doel] te werken. We gaan zorgen dat je daar komt. 💪\n\nBekijk deze korte video even, dan weet je precies hoe we van start gaan:\nhttps://youtu.be/vDMftzhsPHI',
       manualVars: ['doel']
     }
   },
@@ -38,7 +38,19 @@ const STEPS = [
     title: 'Checkout sturen',
     label: 'COACH',
     message: {
-      text: 'Om alles rond te maken stuur ik je even de betaallink. Zodra dat geregeld is kunnen we gaan knallen! 💪\nhttps://www.myarcfitness.com/checkout',
+      // Coach kiest tussen maandelijks abonnement of 12-weken in één keer.
+      variants: [
+        {
+          id: 'monthly',
+          label: 'Maandelijks',
+          text: 'Om alles rond te maken stuur ik je even de betaallink voor het maandelijkse abonnement. Zodra dat geregeld is kunnen we gaan knallen! 💪\nhttps://www.myarcfitness.com/monthly-checkout'
+        },
+        {
+          id: 'onetime',
+          label: 'In één keer (12 wk)',
+          text: 'Om alles rond te maken stuur ik je even de betaallink voor het 12-weken traject (in één keer). Zodra dat geregeld is kunnen we gaan knallen! 💪\nhttps://www.myarcfitness.com/12-week-checkout'
+        }
+      ],
       manualVars: []
     }
   },
@@ -135,6 +147,8 @@ export default function OnboardingSOPFlow({ db, selectedClient, onStartSetup, on
   const [saving, setSaving] = useState(false)
   const [copied, setCopied] = useState(null)
   const [expandedWarning, setExpandedWarning] = useState(null)
+  // Per-stap gekozen bericht-variant (bv. checkout maandelijks vs 12-weken).
+  const [variantChoice, setVariantChoice] = useState({})
 
   // Sync client change
   useEffect(() => {
@@ -369,17 +383,57 @@ export default function OnboardingSOPFlow({ db, selectedClient, onStartSetup, on
                     </div>
                   )}
 
-                  {/* Main message */}
-                  {step.message && (
-                    <MsgBlock
-                      text={step.message.text}
-                      msgId={`msg-${step.id}`}
-                      resolve={resolve}
-                      copied={copied}
-                      onCopy={copy}
-                      isMobile={isMobile}
-                    />
-                  )}
+                  {/* Main message — met variant-keuze (bv. checkout maandelijks/12-wk) */}
+                  {step.message && (() => {
+                    const msg = step.message
+                    if (msg.variants?.length) {
+                      const chosenId = variantChoice[step.id] || msg.variants[0].id
+                      const active = msg.variants.find(v => v.id === chosenId) || msg.variants[0]
+                      return (
+                        <>
+                          <div style={{ display: 'flex', gap: '0.35rem', marginBottom: '0.5rem' }}>
+                            {msg.variants.map(v => {
+                              const sel = v.id === active.id
+                              return (
+                                <button
+                                  key={v.id}
+                                  onClick={() => setVariantChoice(p => ({ ...p, [step.id]: v.id }))}
+                                  style={{
+                                    flex: 1, padding: '0.35rem 0.5rem', borderRadius: '5px',
+                                    background: sel ? `${GOLD}18` : 'rgba(255,255,255,0.03)',
+                                    border: `1px solid ${sel ? GOLD + '55' : BORDER}`,
+                                    color: sel ? GOLD : MUTED, fontSize: '0.58rem', fontWeight: 800,
+                                    cursor: 'pointer', touchAction: 'manipulation',
+                                    WebkitTapHighlightColor: 'transparent', minHeight: '30px'
+                                  }}
+                                >
+                                  {v.label}
+                                </button>
+                              )
+                            })}
+                          </div>
+                          <MsgBlock
+                            text={active.text}
+                            msgId={`msg-${step.id}`}
+                            resolve={resolve}
+                            copied={copied}
+                            onCopy={copy}
+                            isMobile={isMobile}
+                          />
+                        </>
+                      )
+                    }
+                    return (
+                      <MsgBlock
+                        text={msg.text}
+                        msgId={`msg-${step.id}`}
+                        resolve={resolve}
+                        copied={copied}
+                        onCopy={copy}
+                        isMobile={isMobile}
+                      />
+                    )
+                  })()}
 
                   {/* Warning berichten (stap 2) */}
                   {step.warnings?.map((w, i) => (
