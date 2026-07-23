@@ -178,10 +178,11 @@ export default function WeightDashboard({ client, db }) {
       />
       
       {/* Timeline */}
-      <Timeline 
+      <Timeline
         history={history}
         isMobile={isMobile}
         theme={THEME}
+        weeklyGoal={client?.weekly_weight_goal}
       />
       
       {/* Floating Action Button */}

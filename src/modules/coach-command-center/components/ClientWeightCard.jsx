@@ -11,6 +11,7 @@ import {
 } from 'lucide-react'
 import ClientInsightModal from './ClientInsightModal'
 import CoachingLogModal from './CoachingLogModal'
+import { weightGoalColor } from '../../weight-tracker/utils/weightGoalColor'
 
 const GOAL_LABELS = {
   afvallen: 'Afvallen', fat_loss: 'Afvallen', weight_loss: 'Afvallen',
@@ -137,12 +138,12 @@ export default function ClientWeightCard({ client, isMobile, onToggleStatus, sho
     {
       label: 'Verschil',
       val: weekDiff !== null ? `${weekDiff > 0 ? '+' : ''}${weekDiff}` : '—',
-      color: weekDiff !== null ? (weekDiff < 0 ? '#10b981' : weekDiff > 0 ? '#ef4444' : '#fff') : 'rgba(255,255,255,0.4)',
+      color: weekDiff !== null ? weightGoalColor(weekDiff, client.weekly_weight_goal) : 'rgba(255,255,255,0.4)',
     },
     {
       label: 'Sinds start',
       val: totalChange !== null ? `${totalChange > 0 ? '+' : ''}${totalChange}` : '—',
-      color: totalChange !== null ? (totalChange < 0 ? '#10b981' : totalChange > 0 ? '#ef4444' : '#fff') : 'rgba(255,255,255,0.4)',
+      color: totalChange !== null ? weightGoalColor(totalChange, client.weekly_weight_goal) : 'rgba(255,255,255,0.4)',
     },
   ]
 
@@ -258,8 +259,8 @@ export default function ClientWeightCard({ client, isMobile, onToggleStatus, sho
               {[
                 { label: 'Deze week (Ma-Zo)',   sub: thisWeek.count > 0 ? `${thisWeek.count} meting${thisWeek.count === 1 ? '' : 'en'} · ${fmtWeekRange(thisWeek.monday, thisWeek.sunday)}` : `geen metingen · ${fmtWeekRange(thisWeek.monday, thisWeek.sunday)}`, val: curAvg ?? '—', color: '#FFD700' },
                 { label: 'Vorige week (Ma-Zo)', sub: lastWeek.count > 0 ? `${lastWeek.count} meting${lastWeek.count === 1 ? '' : 'en'} · ${fmtWeekRange(lastWeek.monday, lastWeek.sunday)}` : `geen metingen · ${fmtWeekRange(lastWeek.monday, lastWeek.sunday)}`, val: prevAvg ?? '—', color: '#fff' },
-                { label: 'vs Vorige week', sub: weekDiff !== null ? 'verschil tussen weekgemiddelden' : 'geen vergelijking', val: weekDiff !== null ? `${weekDiff > 0 ? '+' : ''}${weekDiff}` : '—', color: weekDiff !== null ? (weekDiff < 0 ? '#10b981' : weekDiff > 0 ? '#ef4444' : '#fff') : 'rgba(255,255,255,0.4)' },
-                { label: 'Sinds start', sub: startDateLabel ? `eerste meting · ${startDateLabel}` : 'geen startmeting', val: totalChange !== null ? `${totalChange > 0 ? '+' : ''}${totalChange}` : '—', color: totalChange !== null ? (totalChange < 0 ? '#10b981' : totalChange > 0 ? '#ef4444' : '#fff') : 'rgba(255,255,255,0.4)' },
+                { label: 'vs Vorige week', sub: weekDiff !== null ? 'verschil tussen weekgemiddelden' : 'geen vergelijking', val: weekDiff !== null ? `${weekDiff > 0 ? '+' : ''}${weekDiff}` : '—', color: weekDiff !== null ? weightGoalColor(weekDiff, client.weekly_weight_goal) : 'rgba(255,255,255,0.4)' },
+                { label: 'Sinds start', sub: startDateLabel ? `eerste meting · ${startDateLabel}` : 'geen startmeting', val: totalChange !== null ? `${totalChange > 0 ? '+' : ''}${totalChange}` : '—', color: totalChange !== null ? weightGoalColor(totalChange, client.weekly_weight_goal) : 'rgba(255,255,255,0.4)' },
               ].map((s, i) => (
                 <div key={i} style={{ padding: '0.5rem 0.6rem', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: 8, display: 'flex', flexDirection: 'column', gap: 3 }}>
                   <div style={{ fontSize: '0.62rem', fontWeight: 700, color: 'rgba(255,255,255,0.55)' }}>{s.label}</div>

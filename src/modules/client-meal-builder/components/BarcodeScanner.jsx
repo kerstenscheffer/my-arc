@@ -175,7 +175,7 @@ export default function BarcodeScanner({ onScan, onClose, onSwitchToSearch }) {
       opacity: visible ? 1 : 0, transition: 'opacity 0.3s ease'
     }}>
 
-      {/* ═══ TOP BAR ═══ */}
+      {/* ═══ TOP BAR ═══ — close button only, torch moved to camera overlay */}
       <div style={{
         position: 'absolute', top: 0, left: 0, right: 0,
         padding: isMobile ? '0.875rem 1rem' : '1.25rem 1.5rem',
@@ -202,21 +202,8 @@ export default function BarcodeScanner({ onScan, onClose, onSwitchToSearch }) {
           Voeding loggen
         </div>
 
-        {!manualMode ? (
-          <button onClick={toggleTorch} aria-label="Flits" style={{
-            width: '38px', height: '38px', borderRadius: '8px',
-            background: torchEnabled ? G.primarySoft : 'rgba(255,255,255,0.06)',
-            border: torchEnabled ? `1px solid ${G.primaryBorder}` : '1px solid rgba(255,255,255,0.1)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            cursor: 'pointer', touchAction: 'manipulation'
-          }}>
-            {torchEnabled
-              ? <Zap size={17} color={G.primary} fill={G.primary} />
-              : <ZapOff size={17} color="rgba(255,255,255,0.5)" />}
-          </button>
-        ) : (
-          <div style={{ width: '38px', height: '38px' }} />
-        )}
+        {/* Placeholder to keep title centered */}
+        <div style={{ width: '38px', height: '38px' }} />
       </div>
 
       {/* ═══ CAMERA VIEW ═══ */}
@@ -294,6 +281,26 @@ export default function BarcodeScanner({ onScan, onClose, onSwitchToSearch }) {
           }}>
             {helperText()}
           </div>
+
+          {/* Torch/flash button — floats bottom-right of camera view, clearly separated from close (top-left) */}
+          {!manualMode && (
+            <button onClick={toggleTorch} aria-label="Flits" style={{
+              position: 'absolute',
+              bottom: isMobile ? '130px' : '155px',
+              right: isMobile ? '1.25rem' : '1.5rem',
+              width: '44px', height: '44px', borderRadius: '50%',
+              background: torchEnabled ? G.primarySoft : 'rgba(0,0,0,0.55)',
+              border: torchEnabled ? `1.5px solid ${G.primaryBorder}` : '1.5px solid rgba(255,255,255,0.18)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              cursor: 'pointer', touchAction: 'manipulation',
+              backdropFilter: 'blur(8px)',
+              zIndex: 11,
+            }}>
+              {torchEnabled
+                ? <Zap size={20} color={G.primary} fill={G.primary} />
+                : <ZapOff size={20} color="rgba(255,255,255,0.6)" />}
+            </button>
+          )}
 
           {/* Timeout retry buttons — anchored above the bottom pill */}
           {status === 'timeout' && (

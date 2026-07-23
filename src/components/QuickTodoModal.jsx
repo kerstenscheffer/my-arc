@@ -403,49 +403,91 @@ export default function QuickTodoModal({ db, coachId, onClose, onOpenProductivit
                   onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; if (dragOverId !== t.id) setDragOverId(t.id) }}
                   onDrop={(e) => { e.preventDefault(); reorder(dragId, t.id); setDragId(null); setDragOverId(null) }}
                   onDragEnd={() => { setDragId(null); setDragOverId(null) }}
-                  style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.5rem 0.4rem', borderBottom: '1px solid rgba(255,255,255,0.04)', borderTop: (dragOverId === t.id && dragId !== t.id) ? '2px solid rgba(255,215,0,0.6)' : '2px solid transparent', opacity: dragId === t.id ? 0.4 : 1, background: dragId === t.id ? 'rgba(255,215,0,0.04)' : 'transparent' }}>
-                  <span title="Sleep om te herordenen" style={{ flexShrink: 0, cursor: 'grab', color: 'rgba(255,255,255,0.22)', display: 'flex', alignItems: 'center' }}>
+                  style={{ display: 'flex', alignItems: isMobile ? 'flex-start' : 'center', gap: '0.4rem', padding: '0.5rem 0.4rem', borderBottom: '1px solid rgba(255,255,255,0.04)', borderTop: (dragOverId === t.id && dragId !== t.id) ? '2px solid rgba(255,215,0,0.6)' : '2px solid transparent', opacity: dragId === t.id ? 0.4 : 1, background: dragId === t.id ? 'rgba(255,215,0,0.04)' : 'transparent' }}>
+                  <span title="Sleep om te herordenen" style={{ flexShrink: 0, cursor: 'grab', color: 'rgba(255,255,255,0.22)', display: 'flex', alignItems: 'center', paddingTop: isMobile ? '2px' : 0 }}>
                     <GripVertical size={14} />
                   </span>
-                  <button onClick={() => complete(t)} title="Afvinken" style={{ flexShrink: 0, width: 22, height: 22, borderRadius: '50%', border: '1.5px solid rgba(255,255,255,0.25)', background: 'transparent', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', touchAction: 'manipulation' }}
+                  <button onClick={() => complete(t)} title="Afvinken" style={{ flexShrink: 0, width: 22, height: 22, borderRadius: '50%', border: '1.5px solid rgba(255,255,255,0.25)', background: 'transparent', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', touchAction: 'manipulation', marginTop: isMobile ? '1px' : 0 }}
                     onMouseEnter={(e) => { e.currentTarget.style.borderColor = '#10b981'; e.currentTarget.style.background = 'rgba(16,185,129,0.12)' }}
                     onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.25)'; e.currentTarget.style.background = 'transparent' }}>
                     <Check size={13} color="#10b981" style={{ opacity: 0.85 }} />
                   </button>
-                  {/* Prioriteit-stip */}
-                  <span title={`Prioriteit: ${(PRIOS.find(p => p.key === (t.priority || 'medium'))?.label) || 'Med'}`}
-                    style={{ flexShrink: 0, width: 8, height: 8, borderRadius: '50%', background: PRIO_COLOR[t.priority || 'medium'] }} />
-                  <span onClick={() => startEdit(t)} style={{ flex: 1, minWidth: 0, fontSize: '0.84rem', color: 'rgba(255,255,255,0.85)', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', cursor: 'pointer' }}>
-                    {t.title}
-                    {/* Toon sectie-label alleen in de "Alles"-weergave */}
-                    {filter === 'all' && t.section_id && (
-                      <span style={{ marginLeft: 6, fontSize: '0.55rem', fontWeight: 700, color: 'rgba(255,215,0,0.6)', textTransform: 'uppercase', letterSpacing: '0.03em' }}>
-                        {sections.find(s => s.id === t.section_id)?.title || ''}
+
+                  {/* Op mobile: 2 rijen (titel / knoppen). Op desktop: alles op 1 rij. */}
+                  {isMobile ? (
+                    <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                      {/* Rij 1: prioriteit-stip + titel */}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', minWidth: 0 }}>
+                        <span title={`Prioriteit: ${(PRIOS.find(p => p.key === (t.priority || 'medium'))?.label) || 'Med'}`}
+                          style={{ flexShrink: 0, width: 7, height: 7, borderRadius: '50%', background: PRIO_COLOR[t.priority || 'medium'] }} />
+                        <span onClick={() => startEdit(t)} style={{ flex: 1, minWidth: 0, fontSize: '0.84rem', color: 'rgba(255,255,255,0.9)', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', cursor: 'pointer', lineHeight: 1.3 }}>
+                          {t.title}
+                          {filter === 'all' && t.section_id && (
+                            <span style={{ marginLeft: 6, fontSize: '0.55rem', fontWeight: 700, color: 'rgba(255,215,0,0.6)', textTransform: 'uppercase', letterSpacing: '0.03em' }}>
+                              {sections.find(s => s.id === t.section_id)?.title || ''}
+                            </span>
+                          )}
+                        </span>
+                      </div>
+                      {/* Rij 2: duur + actieknoppen */}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                        {t.estimated_minutes ? (
+                          <span style={{ fontSize: '0.58rem', fontWeight: 800, color: 'rgba(255,255,255,0.4)', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 4, padding: '0.1rem 0.3rem' }}>{t.estimated_minutes}m</span>
+                        ) : null}
+                        {onStartTask && (
+                          activeTaskId === t.id ? (
+                            <span title="Bezig" style={{ display: 'flex', alignItems: 'center', gap: 3, padding: '0.15rem 0.4rem', borderRadius: 6, background: 'rgba(16,185,129,0.15)', border: '1px solid rgba(16,185,129,0.4)', color: '#10b981', fontSize: '0.52rem', fontWeight: 800, textTransform: 'uppercase' }}>
+                              <Play size={9} fill="#10b981" /> Bezig
+                            </span>
+                          ) : (
+                            <button onClick={() => { onStartTask(t); onClose && onClose() }} title="Start" style={{ width: 28, height: 28, borderRadius: 7, background: 'transparent', border: 'none', color: 'rgba(16,185,129,0.7)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', touchAction: 'manipulation', flexShrink: 0 }}>
+                              <Play size={13} />
+                            </button>
+                          )
+                        )}
+                        <button onClick={() => startEdit(t)} title="Bewerken" style={{ width: 28, height: 28, borderRadius: 7, background: 'transparent', border: 'none', color: 'rgba(255,255,255,0.35)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', touchAction: 'manipulation', flexShrink: 0 }}>
+                          <Pencil size={13} />
+                        </button>
+                        <button onClick={() => remove(t)} title="Verwijderen" style={{ width: 28, height: 28, borderRadius: 7, background: 'transparent', border: 'none', color: 'rgba(239,68,68,0.55)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', touchAction: 'manipulation', flexShrink: 0 }}>
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <>
+                      {/* Prioriteit-stip */}
+                      <span title={`Prioriteit: ${(PRIOS.find(p => p.key === (t.priority || 'medium'))?.label) || 'Med'}`}
+                        style={{ flexShrink: 0, width: 8, height: 8, borderRadius: '50%', background: PRIO_COLOR[t.priority || 'medium'] }} />
+                      <span onClick={() => startEdit(t)} style={{ flex: 1, minWidth: 0, fontSize: '0.84rem', color: 'rgba(255,255,255,0.85)', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', cursor: 'pointer' }}>
+                        {t.title}
+                        {filter === 'all' && t.section_id && (
+                          <span style={{ marginLeft: 6, fontSize: '0.55rem', fontWeight: 700, color: 'rgba(255,215,0,0.6)', textTransform: 'uppercase', letterSpacing: '0.03em' }}>
+                            {sections.find(s => s.id === t.section_id)?.title || ''}
+                          </span>
+                        )}
                       </span>
-                    )}
-                  </span>
-                  {/* Geschatte duur */}
-                  {t.estimated_minutes ? (
-                    <span style={{ flexShrink: 0, fontSize: '0.58rem', fontWeight: 800, color: 'rgba(255,255,255,0.45)', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 4, padding: '0.1rem 0.3rem' }}>{t.estimated_minutes}m</span>
-                  ) : null}
-                  {/* Mee bezig — start de task-timer (en sluit deze modal zodat de start-modal schoon verschijnt) */}
-                  {onStartTask && (
-                    activeTaskId === t.id ? (
-                      <span title="Bezig" style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: 3, padding: '0.15rem 0.4rem', borderRadius: 6, background: 'rgba(16,185,129,0.15)', border: '1px solid rgba(16,185,129,0.4)', color: '#10b981', fontSize: '0.52rem', fontWeight: 800, textTransform: 'uppercase' }}>
-                        <Play size={9} fill="#10b981" /> Bezig
-                      </span>
-                    ) : (
-                      <button onClick={() => { onStartTask(t); onClose && onClose() }} title="Mee bezig — start deze task" style={{ flexShrink: 0, width: 28, height: 28, borderRadius: 7, background: 'transparent', border: 'none', color: 'rgba(16,185,129,0.7)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', touchAction: 'manipulation' }}>
-                        <Play size={13} />
+                      {t.estimated_minutes ? (
+                        <span style={{ flexShrink: 0, fontSize: '0.58rem', fontWeight: 800, color: 'rgba(255,255,255,0.45)', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 4, padding: '0.1rem 0.3rem' }}>{t.estimated_minutes}m</span>
+                      ) : null}
+                      {onStartTask && (
+                        activeTaskId === t.id ? (
+                          <span title="Bezig" style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: 3, padding: '0.15rem 0.4rem', borderRadius: 6, background: 'rgba(16,185,129,0.15)', border: '1px solid rgba(16,185,129,0.4)', color: '#10b981', fontSize: '0.52rem', fontWeight: 800, textTransform: 'uppercase' }}>
+                            <Play size={9} fill="#10b981" /> Bezig
+                          </span>
+                        ) : (
+                          <button onClick={() => { onStartTask(t); onClose && onClose() }} title="Mee bezig — start deze task" style={{ flexShrink: 0, width: 28, height: 28, borderRadius: 7, background: 'transparent', border: 'none', color: 'rgba(16,185,129,0.7)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', touchAction: 'manipulation' }}>
+                            <Play size={13} />
+                          </button>
+                        )
+                      )}
+                      <button onClick={() => startEdit(t)} title="Bewerken" style={{ flexShrink: 0, width: 28, height: 28, borderRadius: 7, background: 'transparent', border: 'none', color: 'rgba(255,255,255,0.3)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', touchAction: 'manipulation' }}>
+                        <Pencil size={13} />
                       </button>
-                    )
+                      <button onClick={() => remove(t)} title="Verwijderen" style={{ flexShrink: 0, width: 28, height: 28, borderRadius: 7, background: 'transparent', border: 'none', color: 'rgba(239,68,68,0.55)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', touchAction: 'manipulation' }}>
+                        <Trash2 size={14} />
+                      </button>
+                    </>
                   )}
-                  <button onClick={() => startEdit(t)} title="Bewerken" style={{ flexShrink: 0, width: 28, height: 28, borderRadius: 7, background: 'transparent', border: 'none', color: 'rgba(255,255,255,0.3)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', touchAction: 'manipulation' }}>
-                    <Pencil size={13} />
-                  </button>
-                  <button onClick={() => remove(t)} title="Verwijderen" style={{ flexShrink: 0, width: 28, height: 28, borderRadius: 7, background: 'transparent', border: 'none', color: 'rgba(239,68,68,0.55)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', touchAction: 'manipulation' }}>
-                    <Trash2 size={14} />
-                  </button>
                 </div>
                 )
               ))}
