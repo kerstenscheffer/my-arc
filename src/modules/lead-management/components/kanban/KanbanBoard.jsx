@@ -1165,6 +1165,14 @@ export default function KanbanBoard({
           ? lead.previous_section_id
           : (findInstagramConversationSection()?.id || null)
       }
+      // Nieuwe volgers → een +1 reactie betekent dat het gesprek begint: verplaats
+      // de kaart direct naar "Gesprek insta" (in dezelfde actie).
+      const isNieuweVolgersReply = updates.reply_count !== undefined
+        && updates.reply_count > (lead.reply_count || 0)
+        && currentSectionId === NIEUWE_VOLGERS_SECTION_ID
+      if (!restoreTarget && isNieuweVolgersReply) {
+        restoreTarget = findInstagramConversationSection()?.id || null
+      }
       // Nieuwe regel: elke reactie (+1) reset de opvolg-teller direct naar 0 —
       // ook in de board-state, anders synct de card 'm terug naar de oude waarde.
       const replyReset = updates.reply_count !== undefined ? { followup_count: 0, last_followup_sent_at: null } : {}

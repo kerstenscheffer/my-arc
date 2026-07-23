@@ -11,6 +11,7 @@
 // Dag/Week-tabs zijn weggehaald — week-gem zit nu in MealDaySummaryModal.
 
 import React, { useEffect, useState } from 'react'
+import MacroBoxes from '../../../client/components/MacroBoxes'
 
 const G = {
   primary:   '#FFD700',
@@ -337,6 +338,15 @@ export default function MacroHero({
     : (dayCache[dateKey] || { calories: 0, protein: 0, carbs: 0, fat: 0 })
   const t = targets || {}
   const showShim = !selectedIsToday && dayCache[dateKey] === undefined && dayLoading
+
+  // 'boxes' = de 4 macro-vakken (zelfde als client-home), dag-bewust via `display`.
+  if (variant === 'boxes') {
+    return (
+      <div style={{ padding: isMobile ? '0 0.9rem 0.6rem' : '0 1.5rem 0.7rem', maxWidth: 1400, margin: '0 auto', opacity: showShim ? 0.5 : 1, transition: 'opacity 0.2s ease' }}>
+        <MacroBoxes consumed={display} targets={t} />
+      </div>
+    )
+  }
 
   return (
     <div style={{

@@ -569,7 +569,7 @@ export default function AIMealDashboard({ client, onNavigate, db }) {
             selectedDate={selectedDate}
             selectedIsToday={selectedIsToday}
             isMobile={isMobile}
-            variant="hero"
+            variant="boxes"
             refreshKey={pastDayRefreshKey}
           />
         )
