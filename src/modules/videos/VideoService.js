@@ -590,6 +590,46 @@ const videoService = {
     }
   },
 
+  // Huidige "standaard voor iedereen"-zichtbaarheid van een cursus afleiden uit
+  // z'n video's: de unie van alle default_pages + of één video in de slider staat.
+  // Zo kan de cursus-zichtbaarheid-modal de juiste beginstaat tonen.
+  getCourseVisibility: async (courseId) => {
+    try {
+      const { data: items } = await supabase.from('video_course_items').select('video_id').eq('course_id', courseId)
+      const ids = (items || []).map(i => i.video_id)
+      if (!ids.length) return { pages: [], showInSlider: false }
+      const { data: vids } = await supabase.from('coach_videos').select('default_pages, show_in_slider').in('id', ids)
+      const pageSet = new Set()
+      let slider = false
+      ;(vids || []).forEach(v => { (v.default_pages || []).forEach(p => pageSet.add(p)); if (v.show_in_slider) slider = true })
+      return { pages: [...pageSet], showInSlider: slider }
+    } catch (e) {
+      console.error('getCourseVisibility failed:', e)
+      return { pages: [], showInSlider: false }
+    }
+  },
+
+  // Zet in ÉÉN actie de standaard-zichtbaarheid van een hele cursus: alle
+  // video's van de cursus krijgen dezelfde default_pages + slider-vlag. De
+  // client-kant groepeert ze al automatisch onder één cursus-kaart per pagina
+  // (getVideosForPage stempelt context_data.course_id via video_course_items).
+  setCourseVisibility: async (courseId, { pages = [], showInSlider = false }) => {
+    try {
+      const { data: items, error } = await supabase.from('video_course_items').select('video_id').eq('course_id', courseId)
+      if (error) return { success: false, error: error.message }
+      const ids = (items || []).map(i => i.video_id)
+      if (!ids.length) return { success: false, error: 'Deze cursus heeft nog geen video’s' }
+      const { error: upErr } = await supabase.from('coach_videos')
+        .update({ is_active: true, default_pages: pages, show_in_slider: showInSlider, updated_at: new Date().toISOString() })
+        .in('id', ids)
+      if (upErr) { console.error('setCourseVisibility update error:', upErr); return { success: false, error: upErr.message } }
+      return { success: true, count: ids.length }
+    } catch (e) {
+      console.error('setCourseVisibility failed:', e)
+      return { success: false, error: e.message }
+    }
+  },
+
   extractYouTubeId: (url) => {
     if (!url) return null
     const patterns = [

@@ -1,7 +1,7 @@
 // src/modules/videos/CoachVideoTab.jsx
 // v3.0 — Netflix categorie rijen + nieuwe filters (custom categorie + page filter)
 import React, { useState, useEffect } from 'react'
-import { Video, Plus, FolderPlus, ChevronRight, ChevronDown, ChevronUp, GraduationCap, Send, Pencil, Trash2 } from 'lucide-react'
+import { Video, Plus, FolderPlus, ChevronRight, ChevronDown, ChevronUp, GraduationCap, Send, Pencil, Trash2, Globe } from 'lucide-react'
 import useIsMobile from '../../hooks/useIsMobile'
 import videoService from './VideoService'
 import CoachFileManager from './CoachFileManager'
@@ -14,6 +14,7 @@ import VideoCard from './video-tab-components/VideoCard'
 import VideoUploadModal from './video-tab-components/VideoUploadModal'
 import VideoAssignModal from './video-tab-components/VideoAssignModal'
 import VideoVisibilityModal from './video-tab-components/VideoVisibilityModal'
+import CourseVisibilityModal from './video-tab-components/CourseVisibilityModal'
 import VideoEditModal from './video-tab-components/VideoEditModal'
 
 const GOLD = '#FFD700'
@@ -57,6 +58,8 @@ export default function CoachVideoTab({ clients = [], db }) {
   const [editingCourse, setEditingCourse] = useState(null)
   const [showCourseAssign, setShowCourseAssign] = useState(false)
   const [assigningCourse, setAssigningCourse] = useState(null)
+  const [showCourseVisibility, setShowCourseVisibility] = useState(false)
+  const [visibilityCourse, setVisibilityCourse] = useState(null)
 
   const isMobile = useIsMobile()
 
@@ -438,6 +441,7 @@ export default function CoachVideoTab({ clients = [], db }) {
           courses={courses}
           videos={videos}
           onAssign={(c) => { setAssigningCourse(c); setShowCourseAssign(true) }}
+          onVisibility={(c) => { setVisibilityCourse(c); setShowCourseVisibility(true) }}
           onEdit={(c) => { setEditingCourse(c); setShowCourseModal(true) }}
           onDelete={handleDeleteCourse}
           onVideoAssign={(v) => { setSelectedVideo(v); setShowVisibilityModal(true) }}
@@ -632,6 +636,15 @@ export default function CoachVideoTab({ clients = [], db }) {
           }}
         />
       )}
+
+      {/* ── CURSUS zichtbaarheid (standaard voor iedereen: pagina's + slider) ── */}
+      {showCourseVisibility && visibilityCourse && (
+        <CourseVisibilityModal
+          course={visibilityCourse}
+          onClose={() => { setShowCourseVisibility(false); setVisibilityCourse(null) }}
+          onSaved={() => loadCourses()}
+        />
+      )}
     </div>
   )
 }
@@ -639,7 +652,7 @@ export default function CoachVideoTab({ clients = [], db }) {
 // ============================================
 // COURSE ROW — cursus-kaarten met toewijzen/bewerken/verwijderen
 // ============================================
-function CourseRow({ courses, videos, onAssign, onEdit, onDelete, onVideoAssign, onVideoManage, onVideoEdit, onVideoDelete, getCategoryConfig, isMobile }) {
+function CourseRow({ courses, videos, onAssign, onVisibility, onEdit, onDelete, onVideoAssign, onVideoManage, onVideoEdit, onVideoDelete, getCategoryConfig, isMobile }) {
   const [expandedId, setExpandedId] = useState(null)
   const thumbFor = (course) => {
     if (course.thumbnail_url) return course.thumbnail_url
@@ -682,6 +695,8 @@ function CourseRow({ courses, videos, onAssign, onEdit, onDelete, onVideoAssign,
                   <button onClick={() => onEdit(course)} style={{ flex: 1, padding: '0.45rem', background: 'transparent', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 6, color: 'rgba(255,255,255,0.6)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Pencil size={12} /></button>
                   <button onClick={() => onDelete(course)} style={{ flex: 1, padding: '0.45rem', background: 'transparent', border: '1px solid rgba(239,68,68,0.2)', borderRadius: 6, color: 'rgba(239,68,68,0.6)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Trash2 size={12} /></button>
                 </div>
+                {/* Cursus in één keer standaard zichtbaar maken (pagina's + slider) */}
+                <button onClick={() => onVisibility(course)} style={{ marginTop: '0.35rem', width: '100%', padding: '0.45rem', background: 'rgba(255,215,0,0.1)', border: `1px solid ${GOLD}44`, borderRadius: 6, color: GOLD, fontSize: '0.62rem', fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4, textTransform: 'uppercase', letterSpacing: '0.03em' }}><Globe size={11} /> Zichtbaarheid</button>
               </div>
             </div>
           )
