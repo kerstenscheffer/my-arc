@@ -221,6 +221,25 @@ export default function AgendaView({
     return DAYS.find(d => d.id === tid)?.id || 'monday'
   })
 
+  const handleMobilePrevDay = () => {
+    const idx = DAYS.findIndex(d => d.id === mobileDay)
+    if (idx > 0) {
+      setMobileDay(DAYS[idx - 1].id)
+    } else {
+      setWeekAnchor(prev => { const d = new Date(prev); d.setDate(d.getDate() - 7); return d })
+      setMobileDay(DAYS[DAYS.length - 1].id)
+    }
+  }
+  const handleMobileNextDay = () => {
+    const idx = DAYS.findIndex(d => d.id === mobileDay)
+    if (idx < DAYS.length - 1) {
+      setMobileDay(DAYS[idx + 1].id)
+    } else {
+      setWeekAnchor(prev => { const d = new Date(prev); d.setDate(d.getDate() + 7); return d })
+      setMobileDay(DAYS[0].id)
+    }
+  }
+
   // Section color lookup — only used when section.color is missing on a task.
   const sectionColorById = useMemo(() => {
     const map = {}
@@ -767,22 +786,21 @@ export default function AgendaView({
           style={{
             position: 'absolute',
             left: 0, right: 0, bottom: 0,
-            height: '10px',
+            height: isMobile ? '18px' : '10px',
             cursor: 'ns-resize',
             background: 'transparent',
-            // Visual hint on hover (active or hover)
             display: 'flex', alignItems: 'flex-end', justifyContent: 'center',
-            paddingBottom: '2px',
+            paddingBottom: '3px',
             touchAction: 'none',
           }}
           onMouseEnter={(e) => { e.currentTarget.style.background = `linear-gradient(to bottom, transparent, ${color}40)` }}
           onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent' }}
         >
           <div style={{
-            width: '20px', height: '2px',
+            width: isMobile ? '28px' : '20px', height: '3px',
             background: isResizingThis ? color : `${color}80`,
             borderRadius: '2px',
-            opacity: isResizingThis ? 1 : 0.5,
+            opacity: isMobile ? 0.8 : (isResizingThis ? 1 : 0.5),
           }} />
         </div>
       </div>
@@ -824,10 +842,93 @@ export default function AgendaView({
       background: '#0a0a0a',
       minHeight: '600px',
     }}>
-      {/* ── Header: week-nav + week-number ─────────────────────────────────── */}
-      <div style={{
+      {/* ── Mobile compact day header (replaces separate week-nav + day tabs) ── */}
+      {isMobile && (
+        <div style={{
+          display: 'flex', alignItems: 'center',
+          padding: '0.5rem 0.75rem',
+          borderBottom: '1px solid rgba(255,255,255,0.06)',
+          gap: '0.4rem',
+        }}>
+          <button onClick={handleMobilePrevDay} style={navBtnStyle} aria-label="Vorige dag">
+            <ChevronLeft size={16} />
+          </button>
+          <div style={{ flex: 1, textAlign: 'center', minWidth: 0 }}>
+            <div style={{ fontSize: '0.9rem', fontWeight: '800', color: mobileDay === todayDayId && isCurrentWeek ? '#10b981' : '#fff', lineHeight: 1.2 }}>
+              {DAYS.find(d => d.id === mobileDay)?.label}
+              {mobileDay === todayDayId && isCurrentWeek && (
+                <span style={{ fontSize: '0.6rem', color: '#10b981', marginLeft: '0.4rem', fontWeight: '700' }}>· vandaag</span>
+              )}
+            </div>
+            <div style={{ fontSize: '0.62rem', color: 'rgba(255,255,255,0.4)', fontWeight: '600', marginTop: '1px' }}>
+              {weekDates[mobileDay] ? weekDates[mobileDay].toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' }) : ''}
+              {' · '}Week {weekNumber}
+              {!isCurrentWeek && (
+                <button onClick={() => { setWeekAnchor(getMondayOfWeek(new Date())); setMobileDay(getTodayDayId()) }}
+                  style={{ marginLeft: '0.35rem', background: 'none', border: 'none', color: '#10b981', fontSize: '0.62rem', fontWeight: '700', cursor: 'pointer', padding: 0, touchAction: 'manipulation' }}>
+                  → Vandaag
+                </button>
+              )}
+            </div>
+          </div>
+          <button onClick={handleMobileNextDay} style={navBtnStyle} aria-label="Volgende dag">
+            <ChevronRight size={16} />
+          </button>
+          <div
+            onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move' }}
+            onDrop={onSidebarDrop}
+          >
+            <FloatingPanel
+              icon={Inbox}
+              label="Niet gepland"
+              badge={unscheduledTasks.length}
+              accent="#10b981"
+              iconColor="rgba(255,255,255,0.6)"
+              isMobile={isMobile}
+              align="right"
+              panelWidth={260}
+            >
+              <div style={{ padding: '0.5rem', display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                {unscheduledTasks.length === 0 && (
+                  <div style={{ padding: '1.2rem 0.5rem', textAlign: 'center', color: 'rgba(255,255,255,0.25)', fontSize: '0.7rem', fontWeight: 500, lineHeight: 1.4 }}>
+                    Geen losse taken. Tik een taak aan om in te plannen.
+                  </div>
+                )}
+                {unscheduledTasks.map(task => {
+                  const color = task.color || sectionColorById[task.section_id] || '#10b981'
+                  const isArmed = armedTask?.id === task.id
+                  return (
+                    <div key={task.id}
+                      onClick={() => setArmedTask(prev => prev?.id === task.id ? null : task)}
+                      style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', padding: '0.5rem 0.6rem', background: isArmed ? 'rgba(255,215,0,0.14)' : 'rgba(255,255,255,0.04)', border: isArmed ? '1px solid #FFD700' : '1px solid rgba(255,255,255,0.07)', borderLeft: `3px solid ${color}`, borderRadius: 6, cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{task.title}</div>
+                        <div style={{ fontSize: '0.55rem', color: isArmed ? '#FFD700' : 'rgba(255,255,255,0.35)', fontWeight: 600, marginTop: 2 }}>
+                          {isArmed ? 'Tik op tijdslot →' : (task.estimated_minutes ? `${task.estimated_minutes} min` : 'Tik om in te plannen')}
+                        </div>
+                      </div>
+                      <button onClick={(e) => { e.stopPropagation(); onTaskClick && onTaskClick(task) }}
+                        style={{ flexShrink: 0, width: 24, height: 24, borderRadius: 6, background: 'rgba(255,255,255,0.06)', border: 'none', color: 'rgba(255,255,255,0.5)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', touchAction: 'manipulation' }}>
+                        <Pencil size={11} />
+                      </button>
+                    </div>
+                  )
+                })}
+              </div>
+            </FloatingPanel>
+          </div>
+          <button onClick={() => setEditingBlock({})}
+            style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '28px', height: '28px', background: 'rgba(255,215,0,0.12)', border: '1px solid rgba(255,215,0,0.3)', borderRadius: 6, color: '#FFD700', cursor: 'pointer', touchAction: 'manipulation', flexShrink: 0 }}
+            title="Nieuw vast blok">
+            <Plus size={12} strokeWidth={3} />
+          </button>
+        </div>
+      )}
+
+      {/* ── Header: week-nav + week-number (desktop only) ──────────────────── */}
+      {!isMobile && <div style={{
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        padding: isMobile ? '0.5rem 0.75rem' : '0.625rem 1rem',
+        padding: '0.625rem 1rem',
         borderBottom: '1px solid rgba(255,255,255,0.06)',
         gap: '0.5rem',
       }}>
@@ -966,7 +1067,7 @@ export default function AgendaView({
             <Plus size={11} strokeWidth={3} /> Blok
           </button>
         </div>
-      </div>
+      </div>}
 
       {/* Conflict toast */}
       {conflictHint && (
@@ -1001,42 +1102,6 @@ export default function AgendaView({
         </div>
       )}
 
-      {/* Mobile day-picker tabs */}
-      {isMobile && (
-        <div style={{
-          display: 'flex', borderBottom: '1px solid rgba(255,255,255,0.06)',
-          overflowX: 'auto',
-        }}>
-          {DAYS.map(d => {
-            const active = d.id === mobileDay
-            const isToday = d.id === todayDayId && isCurrentWeek
-            const dateNum = weekDates[d.id] ? weekDates[d.id].getDate() : ''
-            return (
-              <button
-                key={d.id}
-                onClick={() => setMobileDay(d.id)}
-                style={{
-                  flex: 1, minWidth: '52px',
-                  padding: '0.5rem 0.25rem',
-                  background: active ? 'rgba(16,185,129,0.08)' : 'transparent',
-                  border: 'none',
-                  borderBottom: active ? '2px solid #10b981' : '2px solid transparent',
-                  color: active ? '#10b981' : isToday ? '#fff' : 'rgba(255,255,255,0.4)',
-                  fontSize: '0.7rem',
-                  fontWeight: active || isToday ? '800' : '600',
-                  cursor: 'pointer',
-                  touchAction: 'manipulation',
-                  WebkitTapHighlightColor: 'transparent',
-                  display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1,
-                }}
-              >
-                <span>{d.short}</span>
-                <span style={{ fontSize: '0.55rem', fontWeight: 600, opacity: 0.65 }}>{dateNum}</span>
-              </button>
-            )
-          })}
-        </div>
-      )}
 
       {/* ── Body: grid + sidebar ───────────────────────────────────────────── */}
       <div style={{ display: 'flex', flex: 1, minHeight: 0 }}>
@@ -1049,20 +1114,20 @@ export default function AgendaView({
           padding: isMobile ? '0.5rem 0.5rem 0.5rem 3rem' : '0.75rem 0.5rem 0.75rem 3.5rem',
           position: 'relative',
           ...(isMobile && {
-            height: 'calc(100vh - 220px)',
-            maxHeight: 'calc(100vh - 220px)',
+            height: 'calc(100vh - 160px)',
+            maxHeight: 'calc(100vh - 160px)',
             WebkitOverflowScrolling: 'touch',
             overscrollBehavior: 'contain',
             touchAction: 'pan-y pan-x',
           }),
         }}>
-          {/* Day headers (drop = append to end) */}
-          <div style={{
+          {/* Day headers (drop = append to end) — desktop only; mobile compact header shows day */}
+          {!isMobile && <div style={{
             display: 'grid',
             gridTemplateColumns: `repeat(${visibleDays.length}, 1fr)`,
             gap: '4px',
             marginBottom: '0.5rem',
-            minWidth: isMobile ? 'auto' : `${visibleDays.length * 90}px`,
+            minWidth: `${visibleDays.length * 90}px`,
           }}>
             {visibleDays.map(day => {
               const isToday = day.id === todayDayId && isCurrentWeek
@@ -1096,7 +1161,7 @@ export default function AgendaView({
                 </div>
               )
             })}
-          </div>
+          </div>}
 
           {/* Time-grid cells */}
           <div style={{
