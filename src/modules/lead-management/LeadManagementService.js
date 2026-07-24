@@ -2076,18 +2076,57 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
 
   // Draai één funnel-verplaatsing terug vanuit de stats-drill-down. We zetten
   // een soft-stempel (reverted_at) zodat de movement uit de tellingen verdwijnt
-  // maar de rij bewaard blijft (omkeerbaar). De lead zelf blijft staan waar 'ie
-  // staat op het bord — dit raakt alleen de statistiek.
-  // Geef revert=false mee om het terugdraaien ongedaan te maken.
+  // maar de rij bewaard blijft (omkeerbaar). Bij terugdraaien wordt de lead OOK
+  // fysiek teruggezet naar de sectie waar 'ie vandaan kwam (from_section_id) —
+  // maar alleen als 'ie sindsdien niet ergens anders heen is verplaatst. Het bord
+  // ververst vanzelf via de realtime-subscription op lead_section_items.
+  // Geef revert=false mee om het terugdraaien ongedaan te maken (alleen stats).
   async revertMovement(movementId, revert = true) {
     try {
       if (!movementId) return { success: false, error: 'geen movement-id' }
+
+      // Movement ophalen — nodig om de lead terug te kunnen plaatsen.
+      const { data: mov } = await this.db.supabase
+        .from('lead_movements')
+        .select('lead_id, from_section_id, from_section_title, to_section_id, to_section_title')
+        .eq('id', movementId)
+        .maybeSingle()
+
+      // Soft-stempel voor de statistiek.
       const { error } = await this.db.supabase
         .from('lead_movements')
         .update({ reverted_at: revert ? new Date().toISOString() : null })
         .eq('id', movementId)
       if (error) throw error
-      return { success: true, reverted: revert }
+
+      // Kaart fysiek terugzetten naar de vorige sectie (alleen bij terugdraaien).
+      let movedBack = false
+      if (revert && mov?.lead_id && mov?.from_section_id) {
+        const { data: cur } = await this.db.supabase
+          .from('lead_section_items')
+          .select('section_id')
+          .eq('lead_id', mov.lead_id)
+          .maybeSingle()
+        // Alleen terugzetten als 'ie nog in de doelsectie van deze move staat.
+        if (cur && cur.section_id === mov.to_section_id) {
+          const { error: moveErr } = await this.db.supabase
+            .from('lead_section_items')
+            .update({
+              section_id: mov.from_section_id,
+              position: 0,
+              moved_at: new Date().toISOString(),
+              previous_section_id: mov.to_section_id,
+              previous_section_title: mov.to_section_title || null,
+              previous_section_color: null,
+              moved_to_stale_at: null,
+            })
+            .eq('lead_id', mov.lead_id)
+          if (moveErr) console.warn('Revert: kaart terugzetten mislukt:', moveErr.message)
+          else movedBack = true
+        }
+      }
+
+      return { success: true, reverted: revert, movedBack }
     } catch (error) {
       console.error('❌ Revert movement failed:', error)
       return { success: false, error: error.message }
