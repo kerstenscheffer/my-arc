@@ -12,6 +12,7 @@
 
 import ChallengeHomeBanner from "../components/challenge-banner/ChallengeHomeBanner"
 import TodayCard from "../components/TodayCard"
+import HomeVideoSlider from "../components/HomeVideoSlider"
 import React, { useState, useEffect } from 'react'
 import {
   Calendar, Coffee, Sun, Moon, Target, Clock,
@@ -881,6 +882,13 @@ export default function ClientHome({ client, db, setCurrentView }) {
       <div style={{ marginTop: isMobile ? '3.5rem' : '4.5rem' }}>
         <TodayCard client={client} db={db} setCurrentView={setCurrentView} isMobile={isMobile} />
       </div>
+
+      {/* Video-slider (coach-video's met show_in_slider) */}
+      <FadeOnScroll>
+        <div style={{ marginTop: isMobile ? '2.5rem' : '3rem' }}>
+          <HomeVideoSlider client={client} />
+        </div>
+      </FadeOnScroll>
 
 
       {/* Hero: weekdoel + weekgemiddelden */}
