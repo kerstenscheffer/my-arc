@@ -43,12 +43,12 @@ const STEPS = [
         {
           id: 'monthly',
           label: 'Maandelijks',
-          text: 'Om alles rond te maken stuur ik je even de betaallink voor het maandelijkse abonnement. Zodra dat geregeld is kunnen we gaan knallen! 💪\nhttps://www.myarcfitness.com/monthly-checkout'
+          text: 'Om alles rond te maken kun je hier de investering voor het maandelijkse traject doen. Nadat dit gelukt is kom je op de intake pagina waar een video op je wacht over hoe je deze in kan vullen. Als je hem hebt ingevuld krijg ik een melding en ga ik direct voor je aan de slag om jouw plan binnen 1-3 dagen klaar te zetten.\nhttps://www.myarcfitness.com/monthly-checkout'
         },
         {
           id: 'onetime',
           label: 'In één keer (12 wk)',
-          text: 'Om alles rond te maken stuur ik je even de betaallink voor het 12-weken traject (in één keer). Zodra dat geregeld is kunnen we gaan knallen! 💪\nhttps://www.myarcfitness.com/12-week-checkout'
+          text: 'Om alles rond te maken kun je hier de investering voor het 12-weken traject doen. Nadat dit gelukt is kom je op de intake pagina waar een video op je wacht over hoe je deze in kan vullen. Als je hem hebt ingevuld krijg ik een melding en ga ik direct voor je aan de slag om jouw plan binnen 1-3 dagen klaar te zetten.\nhttps://www.myarcfitness.com/12-week-checkout'
         }
       ],
       manualVars: []
