@@ -10,6 +10,7 @@ import KanbanCard from './KanbanCard'
 import AddLeadModal from './AddLeadModal'
 import SaleValueModal from './SaleValueModal'
 import RejectionReasonModal from './RejectionReasonModal'
+import SaleLostReasonModal from './SaleLostReasonModal'
 import RapidAddLeadsModal from './RapidAddLeadsModal'
 import SectionModal from './SectionModal'
 import PeriodStatsBar from '../PeriodStatsBar'
@@ -80,6 +81,7 @@ export default function KanbanBoard({
   // Sale-modal: opent na een move naar een sale-sectie om de omzet in te voeren.
   const [saleModalLead, setSaleModalLead] = useState(null)
   const [rejectionLead, setRejectionLead] = useState(null)
+  const [saleLostLead, setSaleLostLead] = useState(null)
   // Bovenste stats-balk in/uitklapbaar (mobiel standaard dicht = rustiger).
   const [showStats, setShowStats] = useState(!isMobile)
   // boardFilter shape: {
@@ -966,6 +968,8 @@ export default function KanbanBoard({
         if (isSaleSectionTitle(targetSection.title)) setSaleModalLead({ id: draggedLead.id, name: leadFullName(draggedLead) })
         // Call afgewezen-sectie → open de reden-modal.
         if (isRejectedSectionTitle(targetSection.title)) setRejectionLead({ id: draggedLead.id, name: leadFullName(draggedLead) })
+        // Sale verloren-sectie → open de objectie-modal.
+        if (isSaleLostSectionTitle(targetSection.title)) setSaleLostLead({ id: draggedLead.id, name: leadFullName(draggedLead) })
         // Auto-open the magnet picker when this drop landed in the
         // Lead-magnets section. Strip the dragged-lead's transient
         // currentSectionId before handing it to the modal.
@@ -1277,6 +1281,12 @@ export default function KanbanBoard({
     const t = (title || '').toLowerCase()
     return ['afgewezen', 'geweigerd', 'rejected'].some(w => t.includes(w))
   }
+  // Sale verloren-sectie? → opent de objectie-modal. (verloren/lost, maar niet
+  // "afgewezen" — dat is de aparte call-afgewezen-flow.)
+  const isSaleLostSectionTitle = (title) => {
+    const t = (title || '').toLowerCase()
+    return (t.includes('verloren') || t.includes('lost')) && !t.includes('afgewezen')
+  }
   const leadFullName = (l) => `${l?.first_name || ''} ${l?.last_name || ''}`.trim() || (l?.instagram_handle ? `@${l.instagram_handle}` : 'deze lead')
 
   const handleMoveLeadToSection = async (lead, fromSectionId, targetSectionId) => {
@@ -1296,6 +1306,8 @@ export default function KanbanBoard({
       if (tgt && isSaleSectionTitle(tgt.title)) setSaleModalLead({ id: lead.id, name: leadFullName(lead) })
       // Call afgewezen → open de reden-modal.
       if (tgt && isRejectedSectionTitle(tgt.title)) setRejectionLead({ id: lead.id, name: leadFullName(lead) })
+      // Sale verloren → open de objectie-modal.
+      if (tgt && isSaleLostSectionTitle(tgt.title)) setSaleLostLead({ id: lead.id, name: leadFullName(lead) })
       // Call voorgesteld → open de bericht-modal (zelfde gedrag als drag-drop,
       // dat op mobiel via de dropdown niet gebeurde).
       const tt = (tgt?.title || '').toLowerCase()
@@ -2266,6 +2278,23 @@ export default function KanbanBoard({
             setRejectionLead(null)
             if (lead?.id) {
               try { await leadService.setMovementRejectionReason(lead.id, reason) } catch (e) { console.error('Afwijzingsreden opslaan mislukt:', e) }
+              setStatsRefreshKey(k => k + 1)
+            }
+          }}
+        />
+      )}
+
+      {/* Sale verloren → objectie-reden opvragen; landt op de laatste movement-rij. */}
+      {saleLostLead && (
+        <SaleLostReasonModal
+          isMobile={isMobile}
+          leadName={saleLostLead.name}
+          onClose={() => setSaleLostLead(null)}
+          onSave={async (reason) => {
+            const lead = saleLostLead
+            setSaleLostLead(null)
+            if (lead?.id) {
+              try { await leadService.setMovementRejectionReason(lead.id, reason) } catch (e) { console.error('Objectie opslaan mislukt:', e) }
               setStatsRefreshKey(k => k + 1)
             }
           }}

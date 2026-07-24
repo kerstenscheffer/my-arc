@@ -1778,6 +1778,9 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
       // Call afgewezen — negatief eindpunt op de call-fase. Apart geteld (met een
       // reden-breakdown), net als no-show.
       const REJECTED_KEYWORDS = ['afgewezen', 'geweigerd', 'call afgewezen', 'rejected']
+      // Sale verloren — negatief eindpunt ná de call (objectie-breakdown). Apart
+      // geteld, en VÓÓR de NEGATIVE_FUNNEL_WORDS-skip (die 'verloren'/'lost' bevat).
+      const SALE_LOST_KEYWORDS = ['verloren', 'lost']
       const funnelKeywords = {
         replied:       ['replied', 'gereageerd', 'reactie', 'response', 'antwoord'],
         conversation:  ['gesprek', 'conversation', 'kwalificatie', 'qualified', 'interesse'],
@@ -1793,6 +1796,7 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
         sale:          { count: 0, leads: [], omzet: 0 },
         noShow:        { count: 0, leads: [] },
         callRejected:  { count: 0, leads: [], reasons: {} },
+        saleLost:      { count: 0, leads: [], reasons: {} },
       }
       // Funnel-rang van een sectietitel (zelfde first-match-volgorde als de
       // funnelKeywords hieronder). Gebruikt om TERUGWAARTSE verplaatsingen niet
@@ -1812,6 +1816,7 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
       const seen = {
         replied: new Set(), conversation: new Set(), callProposed: new Set(),
         callScheduled: new Set(), sale: new Set(), noShow: new Set(), callRejected: new Set(),
+        saleLost: new Set(),
       }
 
       // "Door wie" — resolve coach_id → naam voor de drill-down per stat. De
@@ -1867,6 +1872,15 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
           funnel.callRejected.leads.push({ ...leadInfo, reason })
           return
         }
+        if (SALE_LOST_KEYWORDS.some(kw => toSection.includes(kw))) {
+          if (leadId && seen.saleLost.has(leadId)) return
+          if (leadId) seen.saleLost.add(leadId)
+          const reason = (mov.rejection_reason || '').trim() || 'Onbekend'
+          funnel.saleLost.reasons[reason] = (funnel.saleLost.reasons[reason] || 0) + 1
+          funnel.saleLost.count++
+          funnel.saleLost.leads.push({ ...leadInfo, reason })
+          return
+        }
         if (NEGATIVE_FUNNEL_WORDS.some(w => toSection.includes(w))) return
         for (const [stage, keywords] of Object.entries(funnelKeywords)) {
           if (keywords.some(kw => toSection.includes(kw))) {
@@ -1891,6 +1905,7 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
         callProposed: { count: 0, leads: [] }, callScheduled: { count: 0, leads: [] },
         sale: { count: 0, leads: [], omzet: 0 }, noShow: { count: 0, leads: [] },
         callRejected: { count: 0, leads: [], reasons: {} },
+        saleLost: { count: 0, leads: [], reasons: {} },
       }
     }
   }

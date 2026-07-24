@@ -9,7 +9,7 @@ import {
   X, ChevronLeft, ChevronRight, ChevronDown, Calendar, Zap, TrendingUp,
   MessageCircle, Users, Phone, Trophy, Activity, BarChart3, PhoneCall,
   Send, FileText, Percent, UserX, Eye, Download, LineChart as LineChartIcon,
-  RotateCcw, Target, Save, UserPlus, CalendarCheck, Euro, PhoneOff,
+  RotateCcw, Target, Save, UserPlus, CalendarCheck, Euro, PhoneOff, XCircle,
 } from 'lucide-react'
 import { exportStatsPDF } from '../utils/exportStatsPDF'
 import GrowthChart from './GrowthChart'
@@ -347,7 +347,7 @@ export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, 
   const noShowRate = totalCalls > 0 ? Math.round((totalNoShows / totalCalls) * 100) : null
   const closeRate = shownCalls > 0 ? Math.round((totalSales / shownCalls) * 100) : null
   const pct1 = (v) => (v == null ? '—' : `${v}%`)
-  const STAGE_ACCENT = { callProposed: '#a855f7', callScheduled: '#06b6d4', sale: '#10b981', noShow: '#f97316', callRejected: '#f97316' }
+  const STAGE_ACCENT = { callProposed: '#a855f7', callScheduled: '#06b6d4', sale: '#10b981', noShow: '#f97316', callRejected: '#f97316', saleLost: '#ef4444' }
   const countItems = [
     { label: 'Nieuwe leads', value: newLeadsInPeriod,          Icon: UserPlus,      color: '#3b82f6' },
     { label: 'Follow-ups',   value: activity?.followUps ?? 0,  Icon: Send,          color: '#f59e0b' },
@@ -358,6 +358,7 @@ export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, 
     { label: 'Omzet',        value: '€' + Math.round(funnel?.sale?.omzet || 0).toLocaleString('nl-NL'), Icon: Euro, color: '#22c55e' },
     { label: 'No-shows',     value: totalNoShows,              Icon: UserX,         color: '#ef4444', stage: 'noShow' },
     { label: 'Afgewezen',    value: funnel?.callRejected?.count ?? 0, Icon: PhoneOff, color: '#f97316', stage: 'callRejected' },
+    { label: 'Sale verloren', value: funnel?.saleLost?.count ?? 0, Icon: XCircle, color: '#ef4444', stage: 'saleLost' },
   ]
   const pctItems = [
     { label: 'Response',      value: pct1(responseRate),        Icon: MessageCircle, color: '#3b82f6' },
@@ -563,7 +564,7 @@ export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, 
                 <DrillPanel
                   leads={funnel?.[drillStage]?.leads}
                   accent={STAGE_ACCENT[drillStage]}
-                  reasons={drillStage === 'callRejected' ? funnel?.callRejected?.reasons : null}
+                  reasons={drillStage === 'callRejected' ? funnel?.callRejected?.reasons : drillStage === 'saleLost' ? funnel?.saleLost?.reasons : null}
                   onRevert={handleRevertMovement} revertingId={revertingId}
                   onDelete={handleDeleteMovement} deletingId={deletingId}
                 />
