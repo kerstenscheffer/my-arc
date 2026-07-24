@@ -1,7 +1,7 @@
 // src/client/pages/ClientProfile.jsx
 import { useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
-import { User, Phone, Mail, MapPin, Settings, Bell, Globe, Shield, LogOut, Edit, Save, X, Camera, Target, ChevronRight, Trash2, AlertTriangle } from 'lucide-react'
+import { User, MapPin, Settings, Globe, Shield, LogOut, Edit, Save, X, Target, ChevronRight, Trash2, AlertTriangle, Weight } from 'lucide-react'
 import DatabaseService from '../../services/DatabaseService'
 import PortalSwitchButton from '../../components/PortalSwitchButton'
 const db = DatabaseService
@@ -28,6 +28,9 @@ export default function ClientProfile({ client, user, onClientUpdate }) {
     age: client?.age || '',
     height: client?.height || '',
     location: client?.location || '',
+    gender: client?.gender || '',
+    date_of_birth: client?.date_of_birth || '',
+    current_weight: client?.current_weight || '',
   })
 
   useEffect(() => {
@@ -40,6 +43,9 @@ export default function ClientProfile({ client, user, onClientUpdate }) {
         age: client.age || '',
         height: client.height || '',
         location: client.location || '',
+        gender: client.gender || '',
+        date_of_birth: client.date_of_birth || '',
+        current_weight: client.current_weight || '',
       })
     }
   }, [client])
@@ -61,6 +67,9 @@ export default function ClientProfile({ client, user, onClientUpdate }) {
         age: formData.age ? parseInt(formData.age) : null,
         height: formData.height ? parseInt(formData.height) : null,
         location: formData.location,
+        gender: formData.gender || null,
+        date_of_birth: formData.date_of_birth || null,
+        current_weight: formData.current_weight ? parseFloat(formData.current_weight) : null,
         updated_at: new Date().toISOString()
       }).eq('id', client.id).select().single()
       console.log('✅ Result:', data)
@@ -94,6 +103,31 @@ export default function ClientProfile({ client, user, onClientUpdate }) {
       setDeleting(false)
     }
   }
+
+  const selectField = (label, value, key, options) => (
+    <div>
+      <label style={{ display: 'block', fontSize: '0.7rem', fontWeight: '700', color: 'rgba(255,255,255,0.3)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '0.4rem' }}>{label}</label>
+      <select
+        value={value}
+        onChange={(e) => setFormData({...formData, [key]: e.target.value})}
+        disabled={!isEditing}
+        style={{ width: '100%', padding: '0.7rem 0.875rem', background: isEditing ? 'rgba(255,255,255,0.04)' : 'transparent', border: `1px solid ${isEditing ? GOLD_BORDER_ACTIVE : GOLD_BORDER}`, borderRadius: '6px', color: value ? '#fff' : 'rgba(255,255,255,0.3)', fontSize: '0.875rem', fontWeight: '500', outline: 'none', boxSizing: 'border-box', appearance: isEditing ? 'auto' : 'none', WebkitAppearance: isEditing ? 'auto' : 'none' }}
+      >
+        <option value="">— niet ingesteld —</option>
+        {options.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+      </select>
+    </div>
+  )
+
+  const readonlyField = (label, displayValue, note) => (
+    <div>
+      <label style={{ display: 'block', fontSize: '0.7rem', fontWeight: '700', color: 'rgba(255,255,255,0.3)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '0.4rem' }}>{label}</label>
+      <div style={{ padding: '0.7rem 0.875rem', border: `1px solid ${GOLD_BORDER}`, borderRadius: '6px', fontSize: '0.875rem', fontWeight: '500', color: displayValue ? 'rgba(255,255,255,0.5)' : 'rgba(255,255,255,0.2)' }}>
+        {displayValue || '—'}
+      </div>
+      {note && <div style={{ fontSize: '0.62rem', color: 'rgba(255,255,255,0.25)', marginTop: '0.25rem' }}>{note}</div>}
+    </div>
+  )
 
   const field = (label, value, key, type = 'text', disabled = false) => (
     <div>
@@ -288,6 +322,22 @@ export default function ClientProfile({ client, user, onClientUpdate }) {
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
               {field('Leeftijd', formData.age, 'age', 'number')}
               {field('Lengte (cm)', formData.height, 'height', 'number')}
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+              {selectField('Geslacht', formData.gender, 'gender', [
+                { value: 'man', label: 'Man' },
+                { value: 'vrouw', label: 'Vrouw' },
+                { value: 'anders', label: 'Anders / niet ingevuld' },
+              ])}
+              {field('Geboortedatum', formData.date_of_birth, 'date_of_birth', 'date')}
+            </div>
+            <div style={{ height: '1px', background: 'rgba(255,255,255,0.06)', margin: '0.25rem 0' }} />
+            <div style={{ fontSize: '0.7rem', fontWeight: '700', color: 'rgba(255,255,255,0.25)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '-0.25rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+              <Weight size={12} /> Gewicht
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+              {field('Huidig gewicht (kg)', formData.current_weight, 'current_weight', 'number')}
+              {readonlyField('Streefgewicht (kg)', client?.goal_weight || client?.target_weight || '', 'Ingesteld door je coach')}
             </div>
           </div>
         )}
