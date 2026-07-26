@@ -172,14 +172,16 @@ export default function PlanSwitcherModal({ db, clientId, coachId, activePlanId,
         ai_generated: false,
         start_date: new Date().toISOString().split('T')[0]
       }
-      const { error } = await db.supabase.from('client_meal_plans').insert([newPlan])
+      const { data, error } = await db.supabase.from('client_meal_plans').insert([newPlan]).select('id').single()
       if (error) throw error
       await loadPlans()
       setCopiedId(template.id)
-      // Meteen naar de Client-tab: daar staat de kopie mét een "Activeer"-knop,
-      // zodat je 'm direct actief kunt maken. Modal blijft open.
-      setTab('client')
-      setTimeout(() => setCopiedId(null), 1500)
+      // Laad de kopie direct in de analyzer (onSelect zet selectedConceptId +
+      // sluit de modal). De zijbalk toont daarna een "Activeer"-knop.
+      setTimeout(() => {
+        setCopiedId(null)
+        if (onSelect && data?.id) onSelect(data.id)
+      }, 900)
     } catch (e) { console.error('Copy template error:', e) }
     setCopyingId(null)
   }
