@@ -17,7 +17,6 @@ import PlanSwitcherModal from './plan-analyzer/PlanSwitcherModal'
 import TimingModal from './plan-analyzer/TimingModal'
 import BestSwapsModal from './plan-analyzer/BestSwapsModal'
 import PlanLibraryModal from './plan-analyzer/PlanLibraryModal'
-import CrossClientPlanModal from './plan-analyzer/CrossClientPlanModal'
 import PlanTitleBar from './plan-analyzer/PlanTitleBar'
 import ApplyDaysModal from './plan-analyzer/ApplyDaysModal'
 import { checkMealConflicts, buildConflictClientData } from './plan-analyzer/ConflictChecker'
@@ -62,7 +61,6 @@ export default function PlanAnalyzer({
   const [viewMode, setViewMode] = useState('day')
   const [showPlanSwitcher, setShowPlanSwitcher] = useState(false)
   const [showPlanLibrary, setShowPlanLibrary] = useState(false)
-  const [showCrossClient, setShowCrossClient] = useState(false)
   const [showTimingModal, setShowTimingModal] = useState(false)
   const [showBalancer, setShowBalancer] = useState(false)
   const [showWeekBalancer, setShowWeekBalancer] = useState(false)
@@ -475,33 +473,6 @@ export default function PlanAnalyzer({
     setDockedSection(null)
   }
 
-  // Kopieer een plan van een ANDERE klant naar de huidige klant: maakt ALTIJD
-  // een nieuw client_meal_plans-plan aan (overschrijft nooit een bestaand plan).
-  const handleCopyPlanFromClient = async (ws, name) => {
-    if (!ws || !resolvedClientId) return
-    const days = await hydrateWeekStructure(ws)
-    if (!days) return
-    const wsToSave = {}
-    days.forEach(d => { wsToSave[d.dayId] = { ...d.meals, totals: d.totals, is_training_day: d.is_training_day } })
-    setWeekSaveState('saving')
-    try {
-      const { data, error } = await db.supabase
-        .from('client_meal_plans')
-        .insert([{ client_id: resolvedClientId, coach_id: coachId || clientRecord?.coach_id || null, template_name: name ? `${name} (kopie)` : 'Gekopieerd plan', week_structure: wsToSave, created_via: 'client_copy', is_active: false }])
-        .select('id').single()
-      if (error || !data?.id) throw (error || new Error('geen id teruggegeven'))
-      setSelectedConceptId(data.id)
-      loadAllPlanCount(resolvedClientId)
-      setWeekData(days); pushHistory(days, `Plan gekopieerd: ${name || 'plan'}`)
-      setAgendaRefreshKey(k => k + 1)
-      setWeekSaveState('saved'); setTimeout(() => setWeekSaveState(s => (s === 'saved' ? 'idle' : s)), 2000)
-    } catch (e) {
-      console.error('❌ Plan kopiëren van andere klant mislukt:', e)
-      setWeekSaveState('error')
-    }
-    setShowCrossClient(false)
-    setDockedSection(null)
-  }
   const handleUpdateMeal = async (dayIndex, slot, updatedMeal) => {
     if (!weekData) return
     const updated = [...weekData]
@@ -658,12 +629,6 @@ export default function PlanAnalyzer({
             <Bookmark size={14} /> Opgeslagen sjabloon laden
           </button>
         )}
-        {/* Kopieer een bestaand plan van een andere klant naar deze klant. */}
-        {resolvedClientId && (
-          <button onClick={() => setShowCrossClient(true)} style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem', padding: '0.625rem 1rem', marginBottom: '1rem', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: '6px', cursor: 'pointer', color: 'rgba(255,255,255,0.75)', fontSize: '0.65rem', fontWeight: 700, touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}>
-            <Copy size={14} /> Plan van andere klant kopiëren
-          </button>
-        )}
         {loadingConcepts && <div style={{ textAlign: 'center', padding: '2rem', color: 'rgba(255,255,255,0.2)', fontSize: '0.65rem' }}>Laden...</div>}
         {conceptPlans.map(plan => (
           <button key={plan.id} onClick={() => setSelectedConceptId(plan.id)} style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '0.6rem', padding: m ? '0.625rem 0.75rem' : '0.75rem 1rem', background: 'rgba(255,255,255,0.02)', border: 'none', borderBottom: '1px solid rgba(255,255,255,0.04)', cursor: 'pointer', textAlign: 'left', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}>
@@ -687,11 +652,6 @@ export default function PlanAnalyzer({
             clientName={clientRecord?.first_name || ''}
             onLoad={handleLoadSavedPlan}
             onClose={() => setShowPlanLibrary(false)} />
-        )}
-        {showCrossClient && resolvedClientId && (
-          <CrossClientPlanModal db={db} coachId={coachId || clientRecord?.coach_id}
-            currentClientId={resolvedClientId} onCopy={handleCopyPlanFromClient}
-            onClose={() => setShowCrossClient(false)} isMobile={m} />
         )}
       </div>
     )
@@ -749,7 +709,6 @@ export default function PlanAnalyzer({
   ]
 
   const sidebarBottom = [
-    { id: 'copyclient', icon: <Copy size={16} />, label: 'Kopie', onClick: () => setShowCrossClient(true), color: '#FFD700' },
     { id: 'pdf',     icon: loadingPdf ? <Loader size={16} style={{ animation: 'spin 1s linear infinite' }} /> : <Download size={16} />, label: 'PDF',    onClick: handlePDF,                                                     color: '#FFD700' },
     { id: 'guide',   icon: <FileText size={16} />,    label: 'Guide',  onClick: () => openCoachingGuideForPrint(clientRecord?.first_name || 'Client'), color: '#6366f1' },
     { id: 'wa',      icon: <MessageSquare size={16} />, label: 'WA',   onClick: handleWhatsApp,  color: '#10b981' },
@@ -1262,11 +1221,6 @@ export default function PlanAnalyzer({
           clientName={clientRecord?.first_name || ''}
           onLoad={handleLoadSavedPlan}
           onClose={() => setShowPlanLibrary(false)} />
-      )}
-      {showCrossClient && resolvedClientId && (
-        <CrossClientPlanModal db={db} coachId={coachId || clientRecord?.coach_id}
-          currentClientId={resolvedClientId} onCopy={handleCopyPlanFromClient}
-          onClose={() => setShowCrossClient(false)} isMobile={m} />
       )}
 
 

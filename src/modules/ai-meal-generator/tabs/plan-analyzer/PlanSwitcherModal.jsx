@@ -44,21 +44,20 @@ export default function PlanSwitcherModal({ db, clientId, coachId, activePlanId,
   const loadTemplates = async () => {
     setLoadingTemplates(true)
     try {
-      // Gebruik coach_id filter zoals TemplateLibrary.getTemplates() dat doet
+      // Toon ALLE opgeslagen plannen/sjablonen — inclusief de full_week-plannen
+      // die je vanuit de analyzer bewaart als "Dit plan bewaren als template".
+      // (Die werden voorheen weggefilterd, waardoor je ze bij een andere klant
+      // niet terugzag.) Coach-filter is null-inclusief omdat oudere sjablonen
+      // met coach_id = null zijn opgeslagen.
       let query = db.supabase
         .from('meal_plan_templates')
-        .select('id, name, emoji, description, daily_calories, daily_protein, daily_carbs, daily_fat, base_macros, week_structure, created_at, meals_per_day')
-        .or('plan_type.is.null,plan_type.neq.full_week')
+        .select('id, name, emoji, description, plan_type, daily_calories, daily_protein, daily_carbs, daily_fat, base_macros, week_structure, created_at, meals_per_day')
         .order('created_at', { ascending: false })
-
-      if (coachId) {
-        query = query.eq('coach_id', coachId)
-      }
+      if (coachId) query = query.or(`coach_id.is.null,coach_id.eq.${coachId}`)
 
       const { data, error } = await query
       if (error) throw error
       setTemplates(data || [])
-      console.log(`✅ Loaded ${data?.length || 0} templates for coach ${coachId}`)
     } catch (e) {
       console.error('Templates load error:', e)
     }
@@ -112,45 +111,52 @@ export default function PlanSwitcherModal({ db, clientId, coachId, activePlanId,
     setRenamingId(null)
   }
 
+  const DAY_KEYS = ['ma', 'di', 'wo', 'do', 'vr', 'za', 'zo']
+  const isFullWeekStructure = (ws) => ws && typeof ws === 'object' && DAY_KEYS.some(k => k in ws)
+
   const handleCopyTemplate = async (template) => {
     setCopyingId(template.id)
     try {
       // Macros uit base_macros of directe kolommen
       const macros = template.base_macros || {}
 
-      // Expand setA/setB → per-dag, mét volledige meal-objecten (anders
-      // verschijnen er geen namen in de agenda omdat templates alleen
-      // meal_id-referenties bevatten). Trainingsdagen uit workout_schedule
-      // van de client.
-      const lib = new TemplateLibrary(db.supabase)
-      const mealIds = lib.extractMealIds(template.week_structure)
-      const meals = await lib.loadMealsByIds(mealIds)
+      let expandedWeek
+      if (template.plan_type === 'full_week' || isFullWeekStructure(template.week_structure)) {
+        // Full-week-plan: al per-dag mét volledige meal-objecten opgeslagen →
+        // direct kopiëren (de analyzer hydrateert 'm verder bij het laden).
+        expandedWeek = template.week_structure
+      } else {
+        // Oud setA/setB-template → expand naar per-dag, mét volledige meal-objecten
+        // (anders geen namen in de agenda). Trainingsdagen uit de client.
+        const lib = new TemplateLibrary(db.supabase)
+        const mealIds = lib.extractMealIds(template.week_structure)
+        const meals = await lib.loadMealsByIds(mealIds)
 
-      const { data: clientData } = await db.supabase
-        .from('clients')
-        .select('workout_schedule, training_time, preferred_training_days, assigned_schema_id')
-        .eq('id', clientId)
-        .single()
-
-      let validDagKeys = null
-      if (clientData?.assigned_schema_id) {
-        const { data: schema } = await db.supabase
-          .from('workout_schemas')
-          .select('week_structure')
-          .eq('id', clientData.assigned_schema_id)
+        const { data: clientData } = await db.supabase
+          .from('clients')
+          .select('workout_schedule, training_time, preferred_training_days, assigned_schema_id')
+          .eq('id', clientId)
           .single()
-        if (schema?.week_structure && typeof schema.week_structure === 'object') {
-          validDagKeys = new Set(Object.keys(schema.week_structure))
-        }
-      }
-      const clientTrainingDays = lib.resolveClientTrainingDays(clientData, validDagKeys)
-      const trainingTime = clientData?.training_time || null
 
-      // scaleFactor = 1 → kopie van de template-macros, geen herschaling
-      // naar client-targets (dat doet Activate-flow later).
-      const expandedWeek = lib.buildScaledWeek(
-        template.week_structure, meals, 1, clientTrainingDays, trainingTime
-      )
+        let validDagKeys = null
+        if (clientData?.assigned_schema_id) {
+          const { data: schema } = await db.supabase
+            .from('workout_schemas')
+            .select('week_structure')
+            .eq('id', clientData.assigned_schema_id)
+            .single()
+          if (schema?.week_structure && typeof schema.week_structure === 'object') {
+            validDagKeys = new Set(Object.keys(schema.week_structure))
+          }
+        }
+        const clientTrainingDays = lib.resolveClientTrainingDays(clientData, validDagKeys)
+        const trainingTime = clientData?.training_time || null
+
+        // scaleFactor = 1 → kopie van de template-macros, geen herschaling.
+        expandedWeek = lib.buildScaledWeek(
+          template.week_structure, meals, 1, clientTrainingDays, trainingTime
+        )
+      }
 
       const newPlan = {
         client_id: clientId,
@@ -166,15 +172,14 @@ export default function PlanSwitcherModal({ db, clientId, coachId, activePlanId,
         ai_generated: false,
         start_date: new Date().toISOString().split('T')[0]
       }
-      const { data, error } = await db.supabase.from('client_meal_plans').insert([newPlan]).select().single()
+      const { error } = await db.supabase.from('client_meal_plans').insert([newPlan])
       if (error) throw error
       await loadPlans()
       setCopiedId(template.id)
-      setTimeout(() => {
-        setCopiedId(null)
-        setTab('client')
-        if (onSelect) onSelect(data.id)
-      }, 1200)
+      // Meteen naar de Client-tab: daar staat de kopie mét een "Activeer"-knop,
+      // zodat je 'm direct actief kunt maken. Modal blijft open.
+      setTab('client')
+      setTimeout(() => setCopiedId(null), 1500)
     } catch (e) { console.error('Copy template error:', e) }
     setCopyingId(null)
   }
@@ -349,8 +354,7 @@ export default function PlanSwitcherModal({ db, clientId, coachId, activePlanId,
           {tab === 'templates' && (
             <>
               {loadingTemplates && <Placeholder text="Templates laden..." />}
-              {!loadingTemplates && !coachId && <Placeholder text="Geen coach ID beschikbaar — templates kunnen niet geladen worden" />}
-              {!loadingTemplates && coachId && templates.length === 0 && <Placeholder text="Geen templates gevonden" />}
+              {!loadingTemplates && templates.length === 0 && <Placeholder text="Nog geen opgeslagen plannen — bewaar er eerst een via 'Dit plan bewaren als template'." />}
               {templates.map(tmpl => {
                 const isCopying = copyingId === tmpl.id
                 const isCopied = copiedId === tmpl.id
