@@ -71,6 +71,72 @@ const isEmpty = (v) =>
   (Array.isArray(v) && v.length === 0) ||
   (typeof v === 'object' && !Array.isArray(v) && Object.keys(v).length === 0)
 
+// ---- voedingsintake (nutrition_preferences) --------------------------------
+
+const N = {
+  guidance: { strict: 'Strak schema', flexible: 'Flexibel', free: 'Vrij / losjes' },
+  budget: { '30-40': '€30–40 p/w', '40-60': '€40–60 p/w', '60-80': '€60–80 p/w', '80+': '€80+ p/w' },
+  cooking: { graag: 'Kookt graag', neutraal: 'Neutraal', niet_graag: 'Kookt niet graag' },
+  diet: { geen: 'Geen', vegetarisch: 'Vegetarisch', veganistisch: 'Veganistisch', halal: 'Halal', pescotarisch: 'Pescotarisch' },
+  supps: { ja_graag: 'Ja, graag', basics: 'Alleen de basics', liever_niet: 'Liever niet', nee: 'Nee' },
+  cheat: { nooit: 'Nooit', '1x_week': '1x per week', weekend: 'In het weekend', als_nodig: 'Als nodig' },
+  social: { zelden: 'Zelden', '1x_week': '1x per week', vaker: 'Vaker' },
+  jbn: { ja: 'Ja', beetje: 'Een beetje', nee: 'Nee' },
+  jsn: { ja: 'Ja', soms: 'Soms', nee: 'Nee' },
+  jn: { ja: 'Ja', nee: 'Nee' },
+}
+
+// Vat het gekozen eetpatroon per maaltijd samen tot één leesbare regel
+// (sub-items + zelf-getypte items + vrije tekst).
+const mealSummary = (w, meal) => {
+  if (!w || typeof w !== 'object') return undefined
+  const asArr = (x) => Array.isArray(x) ? x : (x && typeof x === 'object' ? Object.values(x) : [])
+  const parts = [
+    ...asArr(w[`${meal}_subs`]),
+    ...asArr(w[`${meal}_custom`]).flat(),
+    ...asArr(w[`${meal}_text`]),
+  ].map((s) => humanize(String(s || '').replace(/_/g, ' ').trim())).filter(Boolean)
+  const uniq = [...new Set(parts)]
+  return uniq.length ? uniq.join(', ') : undefined
+}
+
+// nutrition_preferences (geneste JSONB) → platte keys voor de renderer.
+// Alleen niet-lege waarden, zodat ze de clients-kolommen niet per ongeluk wissen.
+function flattenNp(np) {
+  if (!np) return {}
+  const out = {}
+  const put = (k, v) => { if (!isEmpty(v)) out[k] = v }
+  const gl = np.guidance_level || {}, lc = np.life_context || {}, al = np.allergens || {}
+  const ms = np.meal_schedule || {}, pi = np.practical_info || {}
+  const sp = np.supplement_preferences || {}, cm = np.cheat_meals || {}, w = np.wishes || {}
+  put('intake_guidance_level', gl.guidance_level)
+  put('intake_num_meals', ms.num_meals)
+  put('intake_weekly_budget', lc.weekly_budget)
+  put('intake_cooking_preference', lc.cooking_preference)
+  put('intake_diet_preference', al.diet_preference)
+  put('intake_allergens_full', al.selected_allergens)
+  put('intake_allergens_limited', al.intolerances)
+  put('intake_allergens_custom', al.custom_allergens)
+  put('intake_niet_lekker', w.niet_lekker)
+  put('intake_niet_lekker_overig', w.niet_lekker_overig)
+  put('intake_absoluut_niet', w.absoluut_niet)
+  put('intake_wat_werkte', w.wat_werkte)
+  put('intake_wat_werkte_toelichting', w.wat_werkte_toelichting)
+  put('intake_macros_kennis', pi.macros_kennis)
+  put('intake_calorieen_geteld', pi.calorieen_geteld)
+  put('intake_plan_gevolgd', pi.plan_gevolgd)
+  put('intake_supps', sp.openness)
+  put('intake_cheat', cm.frequency)
+  put('intake_sociaal', cm.social_frequency)
+  put('intake_ontbijt', mealSummary(w, 'ontbijt'))
+  put('intake_lunch', mealSummary(w, 'lunch'))
+  put('intake_diner', mealSummary(w, 'diner'))
+  put('tdee', np.tdee)
+  put('target_calories', np.calorie_target)
+  put('intake_surplus', np.surplus)
+  return out
+}
+
 // ---- veld-definities per deel ---------------------------------------------
 
 const PART1_SECTIONS = [
@@ -143,6 +209,53 @@ const PART1_SECTIONS = [
 
 const PART2_SECTIONS = [
   {
+    title: 'Begeleiding & praktisch',
+    fields: [
+      { key: 'intake_guidance_level', label: 'Begeleidingsstijl', fmt: fmtMap(N.guidance) },
+      { key: 'intake_num_meals', label: 'Maaltijden per dag', fmt: fmtNum() },
+      { key: 'intake_weekly_budget', label: 'Weekbudget boodschappen', fmt: fmtMap(N.budget) },
+      { key: 'intake_cooking_preference', label: 'Kookvoorkeur', fmt: fmtMap(N.cooking) }
+    ]
+  },
+  {
+    title: 'Kennis & ervaring',
+    fields: [
+      { key: 'intake_macros_kennis', label: "Kent macro's", fmt: fmtMap(N.jbn) },
+      { key: 'intake_calorieen_geteld', label: 'Ooit calorieën geteld', fmt: fmtMap(N.jsn) },
+      { key: 'intake_plan_gevolgd', label: 'Eerder voedingsplan gevolgd', fmt: fmtMap(N.jn) }
+    ]
+  },
+  {
+    title: 'Restricties & allergieën',
+    fields: [
+      { key: 'intake_diet_preference', label: 'Dieet', fmt: fmtMap(N.diet) },
+      { key: 'intake_allergens_full', label: 'Volledig vermijden', fmt: fmtArr() },
+      { key: 'intake_allergens_limited', label: 'Beperkt (intolerantie)', fmt: fmtArr() },
+      { key: 'intake_allergens_custom', label: 'Overige allergieën' },
+      { key: 'intake_niet_lekker', label: 'Vindt niet lekker', fmt: fmtArr() },
+      { key: 'intake_niet_lekker_overig', label: 'Niet lekker — overig' },
+      { key: 'intake_absoluut_niet', label: 'Absoluut niet', fmt: fmtArr() }
+    ]
+  },
+  {
+    title: 'Eetpatroon',
+    fields: [
+      { key: 'intake_ontbijt', label: 'Ontbijt' },
+      { key: 'intake_lunch', label: 'Lunch' },
+      { key: 'intake_diner', label: 'Diner' },
+      { key: 'intake_wat_werkte', label: 'Eerder een goede periode', fmt: fmtMap(N.jbn) },
+      { key: 'intake_wat_werkte_toelichting', label: 'Toelichting' }
+    ]
+  },
+  {
+    title: 'Supplementen & sociaal',
+    fields: [
+      { key: 'intake_supps', label: 'Supplementen', fmt: fmtMap(N.supps) },
+      { key: 'intake_cheat', label: 'Cheat meals', fmt: fmtMap(N.cheat) },
+      { key: 'intake_sociaal', label: 'Buiten de deur eten', fmt: fmtMap(N.social) }
+    ]
+  },
+  {
     title: 'Voedingsvoorkeuren',
     fields: [
       { key: 'meals_per_day', label: 'Maaltijden per dag' },
@@ -158,6 +271,7 @@ const PART2_SECTIONS = [
     fields: [
       { key: 'tdee', label: 'TDEE', fmt: fmtNum('kcal') },
       { key: 'target_calories', label: 'Streefcalorieën', fmt: fmtNum('kcal') },
+      { key: 'intake_surplus', label: 'Surplus / tekort', fmt: fmtNum('kcal') },
       { key: 'target_protein', label: 'Eiwit', fmt: fmtNum('g') },
       { key: 'target_carbs', label: 'Koolhydraten', fmt: fmtNum('g') },
       { key: 'target_fat', label: 'Vetten', fmt: fmtNum('g') }
@@ -319,6 +433,8 @@ export default function IntakeSummaryModal({ db, client, isMobile, onClose }) {
   const [training, setTraining] = useState(null)
   const [clientTraining, setClientTraining] = useState(null)
   const [loadingTraining, setLoadingTraining] = useState(true)
+  const [np, setNp] = useState(null)
+  const [loadingNp, setLoadingNp] = useState(true)
 
   useEffect(() => {
     let cancelled = false
@@ -362,6 +478,33 @@ export default function IntakeSummaryModal({ db, client, isMobile, onClose }) {
     }
   }, [client?.id, client?.auth_user_id, db])
 
+  // Rijke voedingsintake uit nutrition_preferences (de /nutritionintake-form).
+  // De Voeding-tab toonde voorheen alleen wat verouderde clients-kolommen; deze
+  // rij bevat de volledige antwoorden (geneste JSONB).
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      setLoadingNp(true)
+      try {
+        if (!client?.id || !db?.supabase) { if (!cancelled) setNp(null); return }
+        const { data } = await db.supabase
+          .from('nutrition_preferences')
+          .select('*')
+          .eq('client_id', client.id)
+          .order('updated_at', { ascending: false })
+          .limit(1)
+          .maybeSingle()
+        if (!cancelled) setNp(data || null)
+      } catch (e) {
+        console.error('[IntakeSummaryModal] nutrition_preferences load failed:', e)
+        if (!cancelled) setNp(null)
+      } finally {
+        if (!cancelled) setLoadingNp(false)
+      }
+    })()
+    return () => { cancelled = true }
+  }, [client?.id, db])
+
   // Fallback vanuit de clients-kolommen → op de uwp-veldnamen die de renderer
   // gebruikt. Sommige intakes vullen alleen deze kolommen (geen uwp-rij), dan
   // zou de Training-tab anders leeg blijven.
@@ -388,7 +531,7 @@ export default function IntakeSummaryModal({ db, client, isMobile, onClose }) {
 
   const tabs = [
     { id: 'part1', label: 'Persoonlijk', icon: User, done: client?.intake_completed },
-    { id: 'part2', label: 'Voeding', icon: Utensils, done: client?.intake_completed },
+    { id: 'part2', label: 'Voeding', icon: Utensils, done: np?.completed || client?.intake_completed },
     { id: 'part3', label: 'Training', icon: Dumbbell, done: training?.workout_completed || (hasTrainingData && client?.intake_completed) }
   ]
 
@@ -515,7 +658,24 @@ export default function IntakeSummaryModal({ db, client, isMobile, onClose }) {
           }}
         >
           {activeTab === 'part1' && renderSections(PART1_SECTIONS, client)}
-          {activeTab === 'part2' && renderSections(PART2_SECTIONS, client)}
+          {activeTab === 'part2' &&
+            (loadingNp ? (
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '0.5rem',
+                  padding: '2rem',
+                  color: 'rgba(255,255,255,0.5)',
+                  fontSize: '0.9rem'
+                }}
+              >
+                <Clock size={16} /> Voeding laden…
+              </div>
+            ) : (
+              renderSections(PART2_SECTIONS, { ...client, ...flattenNp(np) })
+            ))}
           {activeTab === 'part3' &&
             (loadingTraining ? (
               <div
