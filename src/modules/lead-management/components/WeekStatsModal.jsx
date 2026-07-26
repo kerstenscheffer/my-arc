@@ -342,7 +342,11 @@ export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, 
 
   // Twee strakke stat-rijen (aantallen + percentages), in de stijl van de
   // stats-bar — geen vakjes meer.
-  const shownCalls = Math.max(0, totalCalls - totalNoShows)
+  // happenedCalls = calls whose scheduled date has already passed (or no date set).
+  // Gebruik dit als noemer voor de close rate zodat nog-niet-gehouden calls de
+  // close rate niet naar beneden trekken.
+  const happenedCalls = funnel?.callScheduled?.happenedCount ?? totalCalls
+  const shownCalls = Math.max(0, happenedCalls - totalNoShows)
   const proposedToScheduled = totalCallProposed > 0 ? Math.round((totalCalls / totalCallProposed) * 100) : null
   const noShowRate = totalCalls > 0 ? Math.round((totalNoShows / totalCalls) * 100) : null
   const closeRate = shownCalls > 0 ? Math.round((totalSales / shownCalls) * 100) : null
@@ -459,7 +463,8 @@ export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, 
                     : `Week ${isoWeek(mondayOf(anchorDate))} · ${fmtRange(mondayOf(anchorDate))}`
                 const periodSubtitle = `${start.toLocaleDateString('nl-NL', { day: 'numeric', month: 'short', year: 'numeric' })} → ${new Date(end - 1).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short', year: 'numeric' })}`
                 const noShowRate = totalCalls > 0 ? Math.round((totalNoShows / totalCalls) * 100) : null
-                const shownCalls = Math.max(0, totalCalls - totalNoShows)
+                const happenedCallsPdf = funnel?.callScheduled?.happenedCount ?? totalCalls
+                const shownCalls = Math.max(0, happenedCallsPdf - totalNoShows)
                 const proposedToScheduled = totalCallProposed > 0 ? Math.round((totalCalls / totalCallProposed) * 100) : null
                 const closeRate = shownCalls > 0 ? Math.round((totalSales / shownCalls) * 100) : null
                 const omzetVal = Math.round(funnel?.sale?.omzet || 0)

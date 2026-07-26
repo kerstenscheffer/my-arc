@@ -662,7 +662,7 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
   // MOVEMENT TRACKING - WITH LEAD NAMES + STALE DETECTION
   // ============================================================================
 
-  async moveLeadToSection(leadId, targetSectionId, targetPosition = 0, coachId = null) {
+  async moveLeadToSection(leadId, targetSectionId, targetPosition = 0, coachId = null, callDate = null) {
     try {
       if (targetSectionId === 'unassigned') {
         return await this.removeLeadFromSection(leadId, coachId)
@@ -729,7 +729,7 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
 
       await this.logMovement({
         leadId, leadName, fromSectionId, fromSectionTitle,
-        toSectionId: targetSectionId, toSectionTitle, coachId
+        toSectionId: targetSectionId, toSectionTitle, coachId, callDate
       })
 
       return { success: true, leadName, fromSection: fromSectionTitle, toSection: toSectionTitle }
@@ -776,7 +776,7 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
     }
   }
 
-  async logMovement({ leadId, leadName, fromSectionId, fromSectionTitle, toSectionId, toSectionTitle, coachId, outcomeType = null }) {
+  async logMovement({ leadId, leadName, fromSectionId, fromSectionTitle, toSectionId, toSectionTitle, coachId, outcomeType = null, callDate = null }) {
     try {
       const { error } = await this.db.supabase
         .from('lead_movements')
@@ -784,7 +784,8 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
           lead_id: leadId, lead_name: leadName || null,
           from_section_id: fromSectionId, from_section_title: fromSectionTitle,
           to_section_id: toSectionId, to_section_title: toSectionTitle,
-          coach_id: coachId, moved_at: new Date().toISOString(), outcome_type: outcomeType
+          coach_id: coachId, moved_at: new Date().toISOString(), outcome_type: outcomeType,
+          call_date: callDate || null,
         })
 
       if (error) throw error
@@ -1792,7 +1793,7 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
         replied:       { count: 0, leads: [] },
         conversation:  { count: 0, leads: [] },
         callProposed:  { count: 0, leads: [] },
-        callScheduled: { count: 0, leads: [] },
+        callScheduled: { count: 0, happenedCount: 0, leads: [] },
         sale:          { count: 0, leads: [], omzet: 0 },
         noShow:        { count: 0, leads: [] },
         callRejected:  { count: 0, leads: [], reasons: {} },
@@ -1893,6 +1894,12 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
             if (leadId) seen[stage].add(leadId)
             funnel[stage].count++
             funnel[stage].leads.push(leadInfo)
+            if (stage === 'callScheduled') {
+              const todayStr = new Date().toISOString().split('T')[0]
+              if (!mov.call_date || mov.call_date <= todayStr) {
+                funnel.callScheduled.happenedCount++
+              }
+            }
             break
           }
         }
