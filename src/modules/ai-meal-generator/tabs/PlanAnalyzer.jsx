@@ -441,7 +441,35 @@ export default function PlanAnalyzer({
     if (!ws) return
     const days = await hydrateWeekStructure(ws)
     if (!days) return
+    const planId = planMeta?.id || selectedConceptId || null
+    // Geen open plan maar wél een client (bv. een sjabloon toepassen op een verse
+    // klant zoals Lisa) → maak direct een nieuw client_meal_plans-plan aan, zodat
+    // het geladen sjabloon ook écht opslaat (persistWeekData no-opt zonder plan-id).
+    if (!planId && resolvedClientId) {
+      const wsToSave = {}
+      days.forEach(d => { wsToSave[d.dayId] = { ...d.meals, totals: d.totals, is_training_day: d.is_training_day } })
+      setWeekSaveState('saving')
+      try {
+        const { data, error } = await db.supabase
+          .from('client_meal_plans')
+          .insert([{ client_id: resolvedClientId, coach_id: coachId || null, template_name: name || 'Geladen sjabloon', week_structure: wsToSave, created_via: 'template_copy', is_active: false }])
+          .select('id').single()
+        if (error || !data?.id) throw (error || new Error('geen id teruggegeven'))
+        setSelectedConceptId(data.id)
+        loadAllPlanCount(resolvedClientId)
+        setWeekData(days); pushHistory(days, `Plan geladen: ${name || 'sjabloon'}`)
+        setAgendaRefreshKey(k => k + 1)
+        setWeekSaveState('saved'); setTimeout(() => setWeekSaveState(s => (s === 'saved' ? 'idle' : s)), 2000)
+      } catch (e) {
+        console.error('❌ Sjabloon toepassen op client mislukt:', e)
+        setWeekSaveState('error')
+      }
+      setShowPlanLibrary(false)
+      setDockedSection(null)
+      return
+    }
     await applyWeekUpdate(days, `Plan geladen: ${name || 'opgeslagen plan'}`)
+    setShowPlanLibrary(false)
     setDockedSection(null)
   }
   const handleUpdateMeal = async (dayIndex, slot, updatedMeal) => {
@@ -589,8 +617,15 @@ export default function PlanAnalyzer({
           </div>
         </div>
         {resolvedClientId && allClientPlans.length > 0 && (
-          <button onClick={() => setShowPlanSwitcher(true)} style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem', padding: '0.625rem 1rem', marginBottom: '1rem', background: 'rgba(255,215,0,0.05)', border: '1px solid rgba(255,215,0,0.15)', borderRadius: '6px', cursor: 'pointer', color: '#FFD700', fontSize: '0.65rem', fontWeight: 700, touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}>
+          <button onClick={() => setShowPlanSwitcher(true)} style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem', padding: '0.625rem 1rem', marginBottom: '0.6rem', background: 'rgba(255,215,0,0.05)', border: '1px solid rgba(255,215,0,0.15)', borderRadius: '6px', cursor: 'pointer', color: '#FFD700', fontSize: '0.65rem', fontWeight: 700, touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}>
             <List size={14} /> Alle plannen bekijken ({allClientPlans.length})
+          </button>
+        )}
+        {/* Altijd bereikbaar: een opgeslagen sjabloon (full_week) laden — ook voor
+            een verse klant zonder eigen plan (maakt dan een nieuw plan aan). */}
+        {resolvedClientId && (
+          <button onClick={() => setShowPlanLibrary(true)} style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem', padding: '0.625rem 1rem', marginBottom: '1rem', background: 'rgba(255,215,0,0.1)', border: '1px solid rgba(255,215,0,0.3)', borderRadius: '6px', cursor: 'pointer', color: '#FFD700', fontSize: '0.65rem', fontWeight: 800, touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}>
+            <Bookmark size={14} /> Opgeslagen sjabloon laden
           </button>
         )}
         {loadingConcepts && <div style={{ textAlign: 'center', padding: '2rem', color: 'rgba(255,255,255,0.2)', fontSize: '0.65rem' }}>Laden...</div>}
@@ -609,6 +644,13 @@ export default function PlanAnalyzer({
             onSelect={(planId) => { setSelectedConceptId(planId); setShowPlanSwitcher(false); loadAllPlanCount(resolvedClientId) }}
             onRenamed={handlePlanRenamedElsewhere}
             onClose={() => setShowPlanSwitcher(false)} isMobile={m} />
+        )}
+        {showPlanLibrary && (
+          <PlanLibraryModal db={db} coachId={coachId} isMobile={m}
+            weekData={weekData} planMeta={planMeta}
+            clientName={clientRecord?.first_name || ''}
+            onLoad={handleLoadSavedPlan}
+            onClose={() => setShowPlanLibrary(false)} />
         )}
       </div>
     )
