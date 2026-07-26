@@ -2,7 +2,7 @@
 // v2.0 — Gold/black CoachHub styling, no extra wrapper, full width
 
 import { useState, useEffect } from 'react'
-import { Users, Utensils, Zap, BarChart3, Save, AlertCircle, Check, Heart, Ban, Loader } from 'lucide-react'
+import { Users, BarChart3, AlertCircle, Check } from 'lucide-react'
 
 import ClientSelector from './tabs/ClientSelector'
 import MealSelector from './tabs/MealSelector'
@@ -19,19 +19,21 @@ const G = {
   text: 'rgba(255, 215, 0, 0.6)'
 }
 
+// Alleen nog Client (om een klant te kiezen) + Analyzer. De oude bouw-tabs
+// (Maaltijden/Bouwen/Opslaan) zijn uit de UI gehaald; hun code blijft als
+// switch-case staan zodat er niks breekt. `idx` = de case-index in de switch.
 const TABS = [
-  { id: 'client',  label: 'Client',     icon: Users },
-  { id: 'meals',   label: 'Maaltijden', icon: Utensils },
-  { id: 'build',   label: 'Bouwen',     icon: Zap },
-  { id: 'analyze', label: 'Analyzer',   icon: BarChart3 },
-  { id: 'actions', label: 'Opslaan',    icon: Save }
+  { id: 'client',  idx: 0, label: 'Client',   icon: Users },
+  { id: 'analyze', idx: 3, label: 'Analyzer', icon: BarChart3 }
 ]
 
-export default function MealPlanGenerator({ db, clients = [], conceptPlanId, selectedClient: propSelectedClient, onClientSelect }) {
+export default function MealPlanGenerator({ db, clients = [], conceptPlanId, selectedClient: propSelectedClient }) {
   const isMobile = window.innerWidth <= 768
   const m = isMobile
 
-  const [activeTab, setActiveTab] = useState(() => conceptPlanId ? 3 : 0)
+  // Open direct op de Analyzer als er een client of concept-plan is; anders de
+  // client-kiezer.
+  const [activeTab, setActiveTab] = useState(() => (conceptPlanId || propSelectedClient) ? 3 : 0)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
   const [success, setSuccess] = useState(null)
@@ -47,7 +49,7 @@ export default function MealPlanGenerator({ db, clients = [], conceptPlanId, sel
   const [mealPreferences, setMealPreferences] = useState({ avoidRepeats: true, optimizeShopping: true, budgetTier: 'moderate' })
 
   const [generatedPlan, setGeneratedPlan] = useState(null)
-  const [analyzedData, setAnalyzedData] = useState(null)
+  const [analyzedData] = useState(null)
   const [planModifications, setPlanModifications] = useState({})
 
   const [resolvedClientId, setResolvedClientId] = useState(propSelectedClient?.id || null)
@@ -58,6 +60,7 @@ export default function MealPlanGenerator({ db, clients = [], conceptPlanId, sel
     if (propSelectedClient) {
       setSelectedClient(propSelectedClient)
       setResolvedClientId(propSelectedClient.id)
+      setActiveTab(3) // meteen naar de Analyzer
     }
   }, [propSelectedClient])
 
@@ -217,15 +220,15 @@ export default function MealPlanGenerator({ db, clients = [], conceptPlanId, sel
         zIndex: 50,
         overflowX: 'auto', WebkitOverflowScrolling: 'touch'
       }}>
-        {TABS.map((tab, index) => {
+        {TABS.map((tab) => {
           const Icon = tab.icon
-          const isActive = index === activeTab
-          const isCompleted = generatedPlan && index < 3
-          const isDisabled = !selectedClient && !conceptPlanId && index > 0
+          const isActive = tab.idx === activeTab
+          const isCompleted = generatedPlan && tab.idx < 3
+          const isDisabled = tab.idx === 3 && !selectedClient && !conceptPlanId && !resolvedClientId
           return (
             <button
               key={tab.id}
-              onClick={() => !isDisabled && setActiveTab(index)}
+              onClick={() => !isDisabled && setActiveTab(tab.idx)}
               disabled={isDisabled}
               style={{
                 flex: 1, minWidth: m ? '58px' : '80px',
@@ -283,62 +286,6 @@ export default function MealPlanGenerator({ db, clients = [], conceptPlanId, sel
       {/* ═══ TAB CONTENT ═══ */}
       <div style={{ minHeight: '60vh' }}>
         {renderTabContent()}
-      </div>
-
-      {/* ═══ NAVIGATIE BOTTOM BAR ═══ */}
-      <div style={{
-        display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-        padding: m ? '0.5rem 0.75rem' : '0.625rem 1rem',
-        borderTop: '1px solid rgba(255,255,255,0.04)',
-        gap: '0.5rem', background: '#0a0a0a'
-      }}>
-        <button
-          onClick={() => setActiveTab(Math.max(0, activeTab - 1))}
-          disabled={activeTab === 0}
-          style={{
-            padding: m ? '0.4rem 0.875rem' : '0.5rem 1.25rem',
-            background: 'transparent',
-            border: `1px solid ${activeTab === 0 ? 'rgba(255,255,255,0.04)' : 'rgba(255,255,255,0.08)'}`,
-            borderRadius: '6px',
-            color: activeTab === 0 ? 'rgba(255,255,255,0.12)' : 'rgba(255,255,255,0.4)',
-            fontSize: m ? '0.65rem' : '0.7rem', fontWeight: 600,
-            cursor: activeTab === 0 ? 'default' : 'pointer',
-            minHeight: '32px', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent'
-          }}
-        >← Vorige</button>
-
-        {/* Ingredient status pills — compact */}
-        <div style={{ display: 'flex', gap: '0.2rem', flex: 1, justifyContent: 'center', flexWrap: 'wrap' }}>
-          {selectedIngredients.length > 0 && (
-            <span style={{ display: 'flex', alignItems: 'center', gap: '0.15rem', padding: '0.15rem 0.4rem', background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.15)', borderRadius: '3px', fontSize: '0.45rem', color: '#10b981', fontWeight: 700 }}>
-              <Heart size={8} fill="#10b981" />{selectedIngredients.length}
-            </span>
-          )}
-          {excludedIngredients.length > 0 && (
-            <span style={{ display: 'flex', alignItems: 'center', gap: '0.15rem', padding: '0.15rem 0.4rem', background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.15)', borderRadius: '3px', fontSize: '0.45rem', color: '#ef4444', fontWeight: 700 }}>
-              <Ban size={8} />{excludedIngredients.length}
-            </span>
-          )}
-          {forcedMealsConfig.length > 0 && (
-            <span style={{ display: 'flex', alignItems: 'center', gap: '0.15rem', padding: '0.15rem 0.4rem', background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.15)', borderRadius: '3px', fontSize: '0.45rem', color: '#f59e0b', fontWeight: 700 }}>
-              <Zap size={8} />{forcedMealsConfig.length}
-            </span>
-          )}
-        </div>
-
-        <button
-          onClick={() => setActiveTab(Math.min(TABS.length - 1, activeTab + 1))}
-          disabled={!selectedClient && !conceptPlanId && activeTab === 0}
-          style={{
-            padding: m ? '0.4rem 0.875rem' : '0.5rem 1.25rem',
-            background: G.bg, border: `1px solid ${G.border}`,
-            borderRadius: '6px', color: G.primary,
-            fontSize: m ? '0.65rem' : '0.7rem', fontWeight: 700,
-            cursor: (!selectedClient && !conceptPlanId && activeTab === 0) ? 'default' : 'pointer',
-            opacity: (!selectedClient && !conceptPlanId && activeTab === 0) ? 0.35 : 1,
-            minHeight: '32px', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent'
-          }}
-        >Volgende →</button>
       </div>
 
       <style>{`@keyframes mgSpin { to { transform: rotate(360deg); } }`}</style>

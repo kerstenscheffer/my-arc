@@ -4,7 +4,7 @@
 // v1.2 — ClientDocumentsSection toegevoegd
 
 import React, { useState } from 'react'
-import { UtensilsCrossed, ExternalLink, ChevronRight, ArrowLeft, Zap } from 'lucide-react'
+import { UtensilsCrossed, ExternalLink, ChevronRight, ArrowLeft, Zap, BarChart3 } from 'lucide-react'
 import GeneratePlanModal from './GeneratePlanModal'
 import ClientDocumentsSection from './ClientDocumentsSection'
 
@@ -141,21 +141,25 @@ export default function MealsColumn({ client, mealData, isMobile, onNavigatePlan
                   <Zap size={10} /> Genereer
                 </button>
               )}
-              <button
-                onClick={() => { onNavigatePlan(client.id, mealData.plan?.id || null); onClose() }}
-                style={{
-                  padding: isMobile ? '0.3rem 0.5rem' : '0.35rem 0.625rem',
-                  background: 'rgba(255,215,0,0.08)',
-                  border: '1px solid rgba(255,215,0,0.2)',
-                  borderRadius: '6px', color: '#FFD700',
-                  fontSize: '0.6rem', fontWeight: '700',
-                  cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.2rem',
-                  touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', minHeight: '28px'
-                }}
-              >
-                <ExternalLink size={10} /> {mealData.plan ? 'Bekijk' : 'Nieuw'}
-              </button>
             </div>
+          </div>
+        )}
+
+        {/* Directe knop naar de Plan Analyzer van deze klant */}
+        {onNavigatePlan && (
+          <div style={{ padding: isMobile ? '0.5rem 0.75rem' : '0.625rem 1rem', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+            <button
+              onClick={() => { onNavigatePlan(client.id, mealData.plan?.id || null); onClose() }}
+              style={{
+                width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem',
+                padding: isMobile ? '0.5rem' : '0.6rem',
+                background: 'rgba(255,215,0,0.12)', border: '1px solid rgba(255,215,0,0.35)',
+                borderRadius: '8px', color: '#FFD700', fontSize: isMobile ? '0.68rem' : '0.72rem', fontWeight: 800,
+                cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', minHeight: '34px'
+              }}
+            >
+              <BarChart3 size={13} /> Plan Analyzer
+            </button>
           </div>
         )}
 
