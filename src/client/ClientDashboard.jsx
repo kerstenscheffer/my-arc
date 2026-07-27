@@ -122,7 +122,16 @@ export default function ClientDashboard() {
       const authUser = await db.getCurrentUser()
       if (!authUser?.email) { setError('Geen gebruiker gevonden'); setLoading(false); return }
       setUser(authUser)
-      const clientData = await db.getClientByEmail(authUser.email)
+
+      const previewClientId = localStorage.getItem('coachPreviewClientId')
+      let clientData
+      if (previewClientId) {
+        localStorage.removeItem('coachPreviewClientId')
+        clientData = await db.getClient(previewClientId)
+      } else {
+        clientData = await db.getClientByEmail(authUser.email)
+      }
+
       if (!clientData) { setError('Client account niet gevonden voor: ' + authUser.email); setLoading(false); return }
       setClient(clientData)
       if (clientData.assigned_schema_id) {

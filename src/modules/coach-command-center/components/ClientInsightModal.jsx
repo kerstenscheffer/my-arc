@@ -2,7 +2,7 @@
 // ClientInsightModal.jsx - v8.3
 // + onOpenMealPanel prop toegevoegd voor Meal Plan SOP widget
 import React, { useState, useRef, useCallback } from 'react'
-import { X, Scale, Dumbbell, UtensilsCrossed, ChevronLeft, ChevronRight, ChevronDown, TrendingUp, User, BookOpen, ClipboardCheck, Bell, Download } from 'lucide-react'
+import { X, Scale, Dumbbell, UtensilsCrossed, ChevronLeft, ChevronRight, ChevronDown, TrendingUp, User, BookOpen, ClipboardCheck, Bell, Download, ExternalLink } from 'lucide-react'
 import WeightColumn from './insight/WeightColumn'
 import WorkoutColumn from './insight/WorkoutColumn'
 import MealsColumn from './insight/MealsColumn'
@@ -98,7 +98,7 @@ function groupPhotosByMonthAndDay(photos) {
   return months
 }
 
-export default function ClientInsightModal({ isOpen, onClose, client, isMobile, onNavigatePlan, onNavigateWorkout, db, coachId, onOpenMealPanel, onOpenWorkoutPanel }) {
+export default function ClientInsightModal({ isOpen, onClose, client, isMobile, onNavigatePlan, onNavigateWorkout, db, coachId, onOpenMealPanel, onOpenWorkoutPanel, onSwitchToClientView }) {
   const [selectedPhotoIndex, setSelectedPhotoIndex] = useState(0)
   const [photoZoom, setPhotoZoom] = useState(false)
   const [showGallery, setShowGallery] = useState(false)  // volledig foto-overzicht (grid)
@@ -295,6 +295,18 @@ export default function ClientInsightModal({ isOpen, onClose, client, isMobile, 
                   }}>
                     <Bell size={10} strokeWidth={2.6} /> Notif
                   </button>
+                  {onSwitchToClientView && (
+                    <button onClick={() => { onClose(); onSwitchToClientView(effectiveClient) }} title="Bekijk als client" style={{
+                      display: 'flex', alignItems: 'center', gap: '0.2rem',
+                      padding: '0.25rem 0.5rem',
+                      background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.15)',
+                      borderRadius: '5px', color: 'rgba(255,255,255,0.6)',
+                      fontSize: '0.55rem', fontWeight: 700, cursor: 'pointer',
+                      touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', minHeight: '22px',
+                    }}>
+                      <ExternalLink size={10} /> Client
+                    </button>
+                  )}
                   <button onClick={onClose} style={{
                     width: '26px', height: '26px', borderRadius: '6px',
                     background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)',
@@ -358,6 +370,19 @@ export default function ClientInsightModal({ isOpen, onClose, client, isMobile, 
                 }}>
                   <Bell size={11} strokeWidth={2.6} /> Notif
                 </button>
+                {onSwitchToClientView && (
+                  <button onClick={() => { onClose(); onSwitchToClientView(effectiveClient) }} title="Bekijk als client" style={{
+                    display: 'flex', alignItems: 'center', gap: '0.2rem',
+                    padding: '0.3rem 0.5rem',
+                    background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.15)',
+                    borderRadius: '6px', color: 'rgba(255,255,255,0.6)',
+                    fontSize: '0.6rem', fontWeight: 700, cursor: 'pointer',
+                    touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', minHeight: '28px',
+                    flexShrink: 0,
+                  }}>
+                    <ExternalLink size={11} /> Client
+                  </button>
+                )}
                 <button onClick={onClose} style={{
                   width: '40px', height: '40px', borderRadius: '8px', flexShrink: 0,
                   background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.3)',

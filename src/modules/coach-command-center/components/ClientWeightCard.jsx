@@ -329,6 +329,11 @@ export default function ClientWeightCard({ client, isMobile, onToggleStatus, sho
           coachId={coachId}
           onOpenMealPanel={onOpenMealPanel}
           onOpenWorkoutPanel={onOpenWorkoutPanel}
+          onSwitchToClientView={(c) => {
+            localStorage.setItem('coachPreviewClientId', c.id)
+            localStorage.setItem('isClientMode', 'true')
+            window.location.href = '/'
+          }}
         />,
         document.body
       )}
