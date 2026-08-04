@@ -123,8 +123,8 @@ function App() {
     return <SalesScrollPage />
   }
 
-  // Sales call booking page
-  if (currentPath === '/sales') {
+  // Programma-pagina (voorheen /sales — alias blijft werken voor oude links)
+  if (currentPath === '/programma' || currentPath === '/sales') {
     return <SalesCallPage />
   }
 
