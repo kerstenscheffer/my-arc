@@ -332,7 +332,15 @@ export default function ClientWeightCard({ client, isMobile, onToggleStatus, sho
           onSwitchToClientView={(c) => {
             localStorage.setItem('coachPreviewClientId', c.id)
             localStorage.setItem('isClientMode', 'true')
-            window.location.href = '/'
+            // CoachHub gebruikt hash-tabs (bv. /#command). Alleen href='/' zetten
+            // verandert dan enkel de hash → geen volledige reload → App leest
+            // isClientMode niet opnieuw. Forceer daarom een echte reload.
+            if (window.location.pathname !== '/') {
+              window.location.href = '/'
+            } else {
+              window.location.hash = ''
+              window.location.reload()
+            }
           }}
         />,
         document.body
