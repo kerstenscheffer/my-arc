@@ -2073,7 +2073,7 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
   //   - totalBooked:   totale geboekte contractwaarde (alle sales)
   //   - months:        cashflow-projectie per maand (vooruitbetaald = alles in de
   //                    sale-maand; maandelijks = totaal/looptijd, gespreid)
-  async getRevenueProjection(coachId, monthsAhead = 12) {
+  async getRevenueProjection(coachId, monthsAhead = 12, monthsBehind = 5) {
     try {
       const { data } = await this.db.supabase
         .from('lead_movements')
@@ -2119,15 +2119,17 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
 
       const totalBooked = sales.reduce((a, s) => a + s.total, 0)
 
-      // Projectie: deze maand t/m monthsAhead vooruit.
+      // Reeks: monthsBehind terug (gerealiseerd) t/m monthsAhead vooruit (projectie).
       const months = []
-      for (let i = 0; i < monthsAhead; i++) {
+      for (let i = -monthsBehind; i < monthsAhead; i++) {
         const d = startOfMonth(now, i)
         const k = monthKey(d)
         months.push({
           key: k,
           label: d.toLocaleDateString('nl-NL', { month: 'short', year: 'numeric' }),
           amount: Math.round(cash[k] || 0),
+          isPast: i < 0,
+          isCurrent: i === 0,
         })
       }
 

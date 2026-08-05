@@ -854,18 +854,29 @@ export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, 
                         </div>
                       ))}
                     </div>
-                    <div style={{ fontSize: '0.7rem', fontWeight: 800, letterSpacing: '0.05em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.4)', marginBottom: 8 }}>Cashflow komende 12 maanden</div>
-                    {revenue.months.map(m => (
-                      <div key={m.key} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '0.3rem 0' }}>
-                        <div style={{ width: 66, fontSize: '0.72rem', color: 'rgba(255,255,255,0.6)', textTransform: 'capitalize' }}>{m.label}</div>
-                        <div style={{ flex: 1, height: 8, background: 'rgba(255,255,255,0.05)', borderRadius: 4, overflow: 'hidden' }}>
-                          <div style={{ width: `${Math.round((m.amount / maxAmount) * 100)}%`, height: '100%', background: '#22c55e', borderRadius: 4 }} />
-                        </div>
-                        <div style={{ width: 66, textAlign: 'right', fontSize: '0.75rem', fontWeight: 800, color: m.amount > 0 ? '#fff' : 'rgba(255,255,255,0.3)' }}>{eur(m.amount)}</div>
-                      </div>
-                    ))}
+                    <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 8 }}>
+                      <div style={{ fontSize: '0.7rem', fontWeight: 800, letterSpacing: '0.05em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.4)' }}>Omzet per maand</div>
+                      <div style={{ fontSize: '0.55rem', color: 'rgba(255,255,255,0.3)' }}>← scroll voor meer →</div>
+                    </div>
+                    {/* Horizontaal scrollbare balk-chart: afgelopen (vol) + komende
+                        (lichter, projectie) maanden. Start links = afgelopen maanden. */}
+                    <div style={{ display: 'flex', gap: 6, overflowX: 'auto', WebkitOverflowScrolling: 'touch', paddingBottom: 6 }}>
+                      {revenue.months.map(m => {
+                        const h = Math.max(3, Math.round((m.amount / maxAmount) * 72))
+                        const barColor = (m.isPast || m.isCurrent) ? '#22c55e' : 'rgba(34,197,94,0.4)'
+                        return (
+                          <div key={m.key} style={{ flexShrink: 0, width: 50, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
+                            <div style={{ fontSize: '0.5rem', fontWeight: 800, color: m.amount > 0 ? '#fff' : 'rgba(255,255,255,0.22)', whiteSpace: 'nowrap' }}>{m.amount > 0 ? eur(m.amount) : '—'}</div>
+                            <div style={{ height: 76, width: '100%', display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
+                              <div style={{ width: 20, height: h, background: barColor, borderRadius: 4, transition: 'height 0.3s ease' }} />
+                            </div>
+                            <div style={{ fontSize: '0.55rem', fontWeight: m.isCurrent ? 900 : 600, color: m.isCurrent ? '#FFD700' : 'rgba(255,255,255,0.5)', textTransform: 'capitalize', whiteSpace: 'nowrap' }}>{m.label.replace(/ 20/, " '")}</div>
+                          </div>
+                        )
+                      })}
+                    </div>
                     <div style={{ marginTop: '0.8rem', fontSize: '0.66rem', color: 'rgba(255,255,255,0.35)', lineHeight: 1.5 }}>
-                      Vooruitbetaald = volledige bedrag in de sale-maand. Maandelijks = totaal ÷ looptijd, gespreid over de maanden.
+                      Vol groen = gerealiseerd (afgelopen + deze maand) · lichter = projectie. Vooruitbetaald telt in de sale-maand; maandelijks = totaal ÷ looptijd, gespreid.
                     </div>
                   </>
                 )
