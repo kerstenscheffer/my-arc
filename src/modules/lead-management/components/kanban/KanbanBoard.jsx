@@ -90,6 +90,7 @@ export default function KanbanBoard({
   const [callTimeInput, setCallTimeInput] = useState('')
   // Openstaande calls (datum+tijd voorbij, nog niet afgehandeld) — pop-up bij openen.
   const [dueCalls, setDueCalls] = useState([])
+  const [showDueCalls, setShowDueCalls] = useState(false)
   // Bovenste stats-balk in/uitklapbaar (mobiel standaard dicht = rustiger).
   const [showStats, setShowStats] = useState(!isMobile)
   // boardFilter shape: {
@@ -847,7 +848,9 @@ export default function KanbanBoard({
       // → drijft de pop-up.
       try {
         const schedIds = board.filter(s => s.id !== 'unassigned' && isScheduledSectionTitle(s.title)).map(s => s.id)
-        setDueCalls(schedIds.length ? await leadService.getDueScheduledCalls(schedIds) : [])
+        const due = schedIds.length ? await leadService.getDueScheduledCalls(schedIds) : []
+        setDueCalls(due)
+        if (isInitialLoad && due.length) setShowDueCalls(true) // auto-open bij openen bord
       } catch (e) { console.warn('due calls load failed:', e?.message) }
     } catch (error) { console.error('❌ Load kanban failed:', error) }
     finally { setLoading(false) }
@@ -1313,6 +1316,15 @@ export default function KanbanBoard({
     }
   }
 
+  // Openstaande-calls pop-up handmatig openen (ververst de lijst eerst).
+  const openDueCalls = async () => {
+    try {
+      const schedIds = sections.filter(s => s.id !== 'unassigned' && isScheduledSectionTitle(s.title)).map(s => s.id)
+      setDueCalls(schedIds.length ? await leadService.getDueScheduledCalls(schedIds) : [])
+    } catch (e) { console.warn('due calls open failed:', e?.message) }
+    setShowDueCalls(true)
+  }
+
   // Afhandeling van een openstaande call vanuit de pop-up (2-staps).
   //   sale / saleLost  → call gevoerd (call_happened=true) + verplaats naar de
   //                      sale- resp. sale-verloren-sectie (opent bedrag-/objectie-modal).
@@ -1713,6 +1725,24 @@ export default function KanbanBoard({
               )}
             </div>
 
+
+            {/* Openstaande calls — opent de afhandel-pop-up (2-staps). */}
+            <button
+              onClick={openDueCalls}
+              title="Openstaande calls afhandelen"
+              style={{
+                position: 'relative',
+                width: 30, height: 30, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                background: 'rgba(255,215,0,0.14)', border: '1px solid rgba(255,215,0,0.4)',
+                borderRadius: 8, color: '#FFD700',
+                cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+              }}
+            >
+              <Phone size={16} />
+              {dueCalls.length > 0 && (
+                <span style={{ position: 'absolute', top: -5, right: -5, minWidth: 15, height: 15, background: '#ef4444', color: '#fff', borderRadius: 8, padding: '0 3px', fontSize: '0.55rem', fontWeight: 900, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{dueCalls.length}</span>
+              )}
+            </button>
 
             {/* Hot-leads toggle (icon-only). Hot en warm sluiten elkaar uit. */}
             <button
@@ -2377,12 +2407,15 @@ export default function KanbanBoard({
       )}
 
       {/* Openstaande calls — pop-up met 2-staps afhandeling (gevoerd → sale/
-          sale verloren · niet gevoerd → no show/verplaatst). */}
-      <DueCallsModal
-        dueCalls={dueCalls}
-        onOutcome={handleDueCallOutcome}
-        onClose={() => setDueCalls([])}
-      />
+          sale verloren · niet gevoerd → no show/verplaatst). Opent automatisch
+          bij openen bord en handmatig via de call-knop boven de zoekbalk. */}
+      {showDueCalls && (
+        <DueCallsModal
+          dueCalls={dueCalls}
+          onOutcome={handleDueCallOutcome}
+          onClose={() => setShowDueCalls(false)}
+        />
+      )}
 
       <style>{`
         @keyframes kbSpin { to { transform: rotate(360deg); } }

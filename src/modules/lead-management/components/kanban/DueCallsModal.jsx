@@ -73,20 +73,26 @@ function DueCallItem({ dc, onOutcome }) {
 }
 
 export default function DueCallsModal({ dueCalls, onOutcome, onClose }) {
-  if (!dueCalls || dueCalls.length === 0) return null
+  const list = dueCalls || []
   return createPortal(
     <div style={{ position: 'fixed', inset: 0, zIndex: 100000, background: 'rgba(0,0,0,0.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
       <div style={{ background: '#0d0d0d', border: '1px solid rgba(6,182,212,0.35)', borderRadius: 14, width: '100%', maxWidth: 420, maxHeight: '85vh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '0.9rem 1rem', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
           <CalendarClock size={16} color="#06b6d4" />
           <div style={{ flex: 1 }}>
-            <div style={{ fontWeight: 800, color: '#fff' }}>Openstaande call{dueCalls.length > 1 ? 's' : ''}</div>
-            <div style={{ fontSize: '0.62rem', color: 'rgba(255,255,255,0.4)' }}>Hoe ging de call? · {dueCalls.length} open</div>
+            <div style={{ fontWeight: 800, color: '#fff' }}>Openstaande call{list.length === 1 ? '' : 's'}</div>
+            <div style={{ fontSize: '0.62rem', color: 'rgba(255,255,255,0.4)' }}>Hoe ging de call? · {list.length} open</div>
           </div>
           <button onClick={onClose} title="Later" style={{ background: 'transparent', border: 'none', color: 'rgba(255,255,255,0.5)', cursor: 'pointer', padding: 4 }}><X size={18} /></button>
         </div>
         <div style={{ flex: 1, overflowY: 'auto', WebkitOverflowScrolling: 'touch' }}>
-          {dueCalls.map(dc => <DueCallItem key={dc.movementId} dc={dc} onOutcome={onOutcome} />)}
+          {list.length === 0 ? (
+            <div style={{ padding: '2.5rem 1rem', textAlign: 'center', color: 'rgba(255,255,255,0.45)', fontSize: '0.85rem' }}>
+              🎉 Geen openstaande calls — alles is afgehandeld.
+            </div>
+          ) : (
+            list.map(dc => <DueCallItem key={dc.movementId} dc={dc} onOutcome={onOutcome} />)
+          )}
         </div>
       </div>
     </div>,
