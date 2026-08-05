@@ -5,7 +5,7 @@
 // de stats voor die periode laadt. Data uit dezelfde range-methodes als de
 // week-analytics modal (getRangeFunnelStats + getRangeReactionStats).
 import { useState, useEffect } from 'react'
-import { ChevronDown, BarChart3, TrendingUp, UserPlus, Send, MessageCircle, Phone, CalendarCheck, Trophy, UserX, Euro, PhoneOff, XCircle } from 'lucide-react'
+import { ChevronDown, BarChart3, TrendingUp, UserPlus, Send, MessageCircle, Phone, CalendarCheck, Trophy, UserX, Euro, PhoneOff, XCircle, PhoneCall } from 'lucide-react'
 import WeekStatsModal from './WeekStatsModal'
 import GrowthChart from './GrowthChart'
 import { kpiTargetFor, kpiColor, fmtTarget } from '../kpiConfig'
@@ -76,7 +76,7 @@ export default function PeriodStatsBar({ leadService, coachId, isMobile, refresh
   const [open, setOpen] = useState(false)
   const [showWeek, setShowWeek] = useState(false)
   const [loading, setLoading] = useState(true)
-  const [s, setS] = useState({ nieuw: 0, follow: 0, reacties: 0, voorgesteld: 0, ingepland: 0, sales: 0, omzet: 0, noshow: 0, afgewezen: 0, saleVerloren: 0 })
+  const [s, setS] = useState({ nieuw: 0, follow: 0, reacties: 0, voorgesteld: 0, ingepland: 0, callGevoerd: 0, sales: 0, omzet: 0, noshow: 0, afgewezen: 0, saleVerloren: 0 })
   const [timeSeries, setTimeSeries] = useState([])
   const [chartOpen, setChartOpen] = useState(false)
   // KPI-doelen (per coach) + een key om ze te herladen na opslaan in de modal.
@@ -112,6 +112,7 @@ export default function PeriodStatsBar({ leadService, coachId, isMobile, refresh
           reacties: react?.reactionEventsInWindow || react?.reactionsInWindow || 0,
           voorgesteld: funnel?.callProposed?.count || 0,
           ingepland: funnel?.callScheduled?.count || 0,
+          callGevoerd: funnel?.callHeld?.count || 0,
           sales: funnel?.sale?.count || 0,
           omzet: funnel?.sale?.omzet || 0,
           noshow: funnel?.noShow?.count || 0,
@@ -140,6 +141,7 @@ export default function PeriodStatsBar({ leadService, coachId, isMobile, refresh
     { key: 'reacties',    label: 'Reacties',         value: s.reacties,    num: s.reacties,  Icon: MessageCircle, color: '#10b981' },
     { key: 'voorgesteld', label: 'Call voorgesteld', value: s.voorgesteld, num: s.voorgesteld, Icon: Phone,       color: '#a855f7' },
     { key: 'ingepland',   label: 'Call ingepland',   value: s.ingepland,   num: s.ingepland, Icon: CalendarCheck, color: '#06b6d4' },
+    { key: 'callGevoerd', label: 'Call gevoerd',     value: s.callGevoerd, num: s.callGevoerd, Icon: PhoneCall,   color: '#10b981' },
     { key: 'sales',       label: 'Sales',            value: s.sales,       num: s.sales,     Icon: Trophy,        color: GOLD },
     { key: 'omzet',       label: 'Omzet',            value: '€' + Math.round(s.omzet || 0).toLocaleString('nl-NL'), num: s.omzet, Icon: Euro, color: '#22c55e' },
     { key: 'noshow',      label: 'No-shows',         value: s.noshow,      num: s.noshow,    Icon: UserX,         color: '#ef4444' },

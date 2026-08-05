@@ -11,6 +11,7 @@ import AddLeadModal from './AddLeadModal'
 import SaleValueModal from './SaleValueModal'
 import RejectionReasonModal from './RejectionReasonModal'
 import SaleLostReasonModal from './SaleLostReasonModal'
+import DueCallsModal from './DueCallsModal'
 import RapidAddLeadsModal from './RapidAddLeadsModal'
 import SectionModal from './SectionModal'
 import PeriodStatsBar from '../PeriodStatsBar'
@@ -86,6 +87,9 @@ export default function KanbanBoard({
   // zodat de exacte calldatum wordt opgeslagen — close rate telt de call pas mee NA die datum.
   const [pendingScheduledMove, setPendingScheduledMove] = useState(null)
   const [callDateInput, setCallDateInput] = useState('')
+  const [callTimeInput, setCallTimeInput] = useState('')
+  // Openstaande calls (datum+tijd voorbij, nog niet afgehandeld) — pop-up bij openen.
+  const [dueCalls, setDueCalls] = useState([])
   // Bovenste stats-balk in/uitklapbaar (mobiel standaard dicht = rustiger).
   const [showStats, setShowStats] = useState(!isMobile)
   // boardFilter shape: {
@@ -842,6 +846,12 @@ export default function KanbanBoard({
         if (unassigned) reordered.push(unassigned)
         setSections(reordered)
       }
+      // Openstaande calls (ingepland, datum+tijd voorbij, nog niet afgehandeld)
+      // → drijft de pop-up.
+      try {
+        const schedIds = board.filter(s => s.id !== 'unassigned' && isScheduledSectionTitle(s.title)).map(s => s.id)
+        setDueCalls(schedIds.length ? await leadService.getDueScheduledCalls(schedIds) : [])
+      } catch (e) { console.warn('due calls load failed:', e?.message) }
     } catch (error) { console.error('❌ Load kanban failed:', error) }
     finally { setLoading(false) }
   }
@@ -960,6 +970,7 @@ export default function KanbanBoard({
       if (isScheduledSectionTitle(targetSection.title)) {
         setPendingScheduledMove({ lead: draggedLead, fromSectionId: draggedLead.currentSectionId, targetSection })
         setCallDateInput(new Date().toISOString().split('T')[0])
+        setCallTimeInput(new Date().toTimeString().slice(0, 5))
         setDraggedLead(null)
         return
       }
@@ -1306,12 +1317,12 @@ export default function KanbanBoard({
       && !NEG.some(w => t.includes(w))
   }
 
-  const completePendingMove = async (callDate) => {
+  const completePendingMove = async (callDate, callTime) => {
     if (!pendingScheduledMove) return
     const { lead, fromSectionId, targetSection } = pendingScheduledMove
     setPendingScheduledMove(null)
     try {
-      await leadService.moveLeadToSection(lead.id, targetSection.id, 0, coachId, callDate || null)
+      await leadService.moveLeadToSection(lead.id, targetSection.id, 0, coachId, callDate || null, callTime || null)
       setSections(prev => prev.map(section => {
         if (section.id === fromSectionId) return { ...section, leads: (section.leads || []).filter(l => l.id !== lead.id) }
         if (section.id === targetSection.id) return { ...section, leads: [lead, ...(section.leads || []).filter(l => l.id !== lead.id)] }
@@ -1327,12 +1338,42 @@ export default function KanbanBoard({
     }
   }
 
+  // Afhandeling van een openstaande call vanuit de pop-up (2-staps).
+  //   sale / saleLost  → call gevoerd (call_happened=true) + verplaats naar de
+  //                      sale- resp. sale-verloren-sectie (opent bedrag-/objectie-modal).
+  //   noShow           → niet gevoerd + verplaats naar no-show-sectie.
+  //   reschedule       → niet gevoerd + nieuwe ingeplande call (datum/tijd).
+  const handleDueCallOutcome = async (dc, kind, extra = {}) => {
+    setDueCalls(prev => prev.filter(d => d.movementId !== dc.movementId))
+    const lead = (sections.find(s => s.id === dc.sectionId)?.leads || []).find(l => l.id === dc.leadId)
+      || { id: dc.leadId, first_name: dc.leadName || '' }
+    try {
+      if (kind === 'reschedule') {
+        await leadService.rescheduleScheduledCall(dc.movementId, {
+          leadId: dc.leadId, leadName: dc.leadName, sectionId: dc.sectionId, sectionTitle: dc.sectionTitle,
+          callDate: extra.callDate || null, callTime: extra.callTime || null, coachId,
+        })
+        return
+      }
+      const happened = (kind === 'sale' || kind === 'saleLost')
+      await leadService.resolveScheduledCall(dc.movementId, happened)
+      let target = null
+      if (kind === 'sale') target = sections.find(s => s.id !== 'unassigned' && isSaleSectionTitle(s.title))
+      else if (kind === 'saleLost') target = sections.find(s => s.id !== 'unassigned' && isSaleLostSectionTitle(s.title))
+      else if (kind === 'noShow') target = sections.find(s => s.id !== 'unassigned' && /no.?show/i.test(s.title || ''))
+      if (target) await handleMoveLeadToSection(lead, dc.sectionId, target.id)
+      else console.warn('Geen doel-sectie gevonden voor uitkomst:', kind)
+      setStatsRefreshKey(k => k + 1)
+    } catch (e) { console.error('due call outcome failed:', e) }
+  }
+
   const handleMoveLeadToSection = async (lead, fromSectionId, targetSectionId) => {
     if (!targetSectionId || targetSectionId === fromSectionId) return
     const targetSectionObj = sections.find(s => s.id === targetSectionId)
     if (targetSectionObj && isScheduledSectionTitle(targetSectionObj.title)) {
       setPendingScheduledMove({ lead, fromSectionId, targetSection: targetSectionObj })
       setCallDateInput(new Date().toISOString().split('T')[0])
+      setCallTimeInput(new Date().toTimeString().slice(0, 5))
       return
     }
     try {
@@ -2387,32 +2428,40 @@ export default function KanbanBoard({
 
       {pendingScheduledMove && createPortal(
         <div
-          onClick={() => completePendingMove(null)}
+          onClick={() => completePendingMove(null, null)}
           style={{ position: 'fixed', inset: 0, zIndex: 99999, background: 'rgba(0,0,0,0.72)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
         >
           <div
             onClick={(e) => e.stopPropagation()}
-            style={{ background: '#111', border: '1px solid rgba(255,215,0,0.3)', borderRadius: 14, padding: 24, width: 290, color: '#fff', boxShadow: '0 16px 48px rgba(0,0,0,0.6)' }}
+            style={{ background: '#111', border: '1px solid rgba(255,215,0,0.3)', borderRadius: 14, padding: 24, width: 300, color: '#fff', boxShadow: '0 16px 48px rgba(0,0,0,0.6)' }}
           >
             <div style={{ fontWeight: 800, fontSize: '1rem', marginBottom: 8 }}>Wanneer is de call?</div>
             <div style={{ fontSize: '0.8rem', color: 'rgba(255,255,255,0.5)', marginBottom: 16 }}>
               {leadFullName(pendingScheduledMove.lead)}
             </div>
-            <input
-              type="date"
-              value={callDateInput}
-              onChange={(e) => setCallDateInput(e.target.value)}
-              style={{ width: '100%', padding: '8px 10px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.15)', background: '#1a1a1a', color: '#fff', fontSize: '0.9rem', marginBottom: 16, boxSizing: 'border-box' }}
-            />
+            <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
+              <input
+                type="date"
+                value={callDateInput}
+                onChange={(e) => setCallDateInput(e.target.value)}
+                style={{ flex: 2, padding: '8px 10px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.15)', background: '#1a1a1a', color: '#fff', fontSize: '0.9rem', boxSizing: 'border-box' }}
+              />
+              <input
+                type="time"
+                value={callTimeInput}
+                onChange={(e) => setCallTimeInput(e.target.value)}
+                style={{ flex: 1, padding: '8px 8px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.15)', background: '#1a1a1a', color: '#fff', fontSize: '0.9rem', boxSizing: 'border-box' }}
+              />
+            </div>
             <div style={{ display: 'flex', gap: 8 }}>
               <button
-                onClick={() => completePendingMove(callDateInput || null)}
+                onClick={() => completePendingMove(callDateInput || null, callTimeInput || null)}
                 style={{ flex: 1, padding: '9px 0', borderRadius: 8, border: 'none', background: '#FFD700', color: '#000', fontWeight: 700, fontSize: '0.88rem', cursor: 'pointer' }}
               >
                 Bevestig
               </button>
               <button
-                onClick={() => completePendingMove(null)}
+                onClick={() => completePendingMove(null, null)}
                 style={{ flex: 1, padding: '9px 0', borderRadius: 8, border: '1px solid rgba(255,255,255,0.15)', background: 'transparent', color: 'rgba(255,255,255,0.6)', fontSize: '0.88rem', cursor: 'pointer' }}
               >
                 Overslaan
@@ -2422,6 +2471,14 @@ export default function KanbanBoard({
         </div>,
         document.body
       )}
+
+      {/* Openstaande calls — pop-up met 2-staps afhandeling (gevoerd → sale/
+          sale verloren · niet gevoerd → no show/verplaatst). */}
+      <DueCallsModal
+        dueCalls={dueCalls}
+        onOutcome={handleDueCallOutcome}
+        onClose={() => setDueCalls([])}
+      />
 
       <style>{`
         @keyframes kbSpin { to { transform: rotate(360deg); } }

@@ -662,7 +662,7 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
   // MOVEMENT TRACKING - WITH LEAD NAMES + STALE DETECTION
   // ============================================================================
 
-  async moveLeadToSection(leadId, targetSectionId, targetPosition = 0, coachId = null, callDate = null) {
+  async moveLeadToSection(leadId, targetSectionId, targetPosition = 0, coachId = null, callDate = null, callTime = null) {
     try {
       if (targetSectionId === 'unassigned') {
         return await this.removeLeadFromSection(leadId, coachId)
@@ -727,12 +727,12 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
 
       await this.db.supabase.from('call_leads').update({ last_touched: new Date().toISOString() }).eq('id', leadId)
 
-      await this.logMovement({
+      const movementId = await this.logMovement({
         leadId, leadName, fromSectionId, fromSectionTitle,
-        toSectionId: targetSectionId, toSectionTitle, coachId, callDate
+        toSectionId: targetSectionId, toSectionTitle, coachId, callDate, callTime
       })
 
-      return { success: true, leadName, fromSection: fromSectionTitle, toSection: toSectionTitle }
+      return { success: true, leadName, fromSection: fromSectionTitle, toSection: toSectionTitle, movementId }
     } catch (error) {
       console.error('❌ Move lead to section failed:', error)
       throw error
@@ -776,9 +776,9 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
     }
   }
 
-  async logMovement({ leadId, leadName, fromSectionId, fromSectionTitle, toSectionId, toSectionTitle, coachId, outcomeType = null, callDate = null }) {
+  async logMovement({ leadId, leadName, fromSectionId, fromSectionTitle, toSectionId, toSectionTitle, coachId, outcomeType = null, callDate = null, callTime = null }) {
     try {
-      const { error } = await this.db.supabase
+      const { data, error } = await this.db.supabase
         .from('lead_movements')
         .insert({
           lead_id: leadId, lead_name: leadName || null,
@@ -786,11 +786,90 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
           to_section_id: toSectionId, to_section_title: toSectionTitle,
           coach_id: coachId, moved_at: new Date().toISOString(), outcome_type: outcomeType,
           call_date: callDate || null,
+          call_time: callTime || null,
         })
+        .select('id')
+        .single()
 
       if (error) throw error
+      return data?.id || null
     } catch (error) {
       console.error('❌ Log movement failed:', error)
+      return null
+    }
+  }
+
+  // ── INGEPLANDE CALLS ────────────────────────────────────────────────
+  // Openstaande calls: leads waarvan de laatste ingepland-movement een call_date
+  // heeft, nog niet is afgehandeld (call_happened = null), de lead nog in die
+  // ingepland-sectie staat, én de call-datum+tijd voorbij is.
+  async getDueScheduledCalls(scheduledSectionIds = []) {
+    try {
+      if (!scheduledSectionIds || scheduledSectionIds.length === 0) return []
+      const { data: movs, error } = await this.db.supabase
+        .from('lead_movements')
+        .select('id, lead_id, lead_name, to_section_id, to_section_title, call_date, call_time, moved_at')
+        .in('to_section_id', scheduledSectionIds)
+        .not('call_date', 'is', null)
+        .is('call_happened', null)
+        .is('reverted_at', null)
+        .order('moved_at', { ascending: false })
+      if (error) throw error
+      if (!movs || movs.length === 0) return []
+
+      // Per lead alleen de meest recente ingepland-movement.
+      const latestByLead = new Map()
+      for (const mv of movs) { if (!latestByLead.has(mv.lead_id)) latestByLead.set(mv.lead_id, mv) }
+
+      // Alleen leads die NU nog in die ingepland-sectie staan.
+      const leadIds = [...latestByLead.keys()]
+      const { data: items } = await this.db.supabase
+        .from('lead_section_items').select('lead_id, section_id').in('lead_id', leadIds)
+      const currentSection = new Map((items || []).map(it => [it.lead_id, it.section_id]))
+
+      const now = new Date()
+      const due = []
+      for (const [leadId, mv] of latestByLead) {
+        if (currentSection.get(leadId) !== mv.to_section_id) continue
+        const dt = new Date(`${mv.call_date}T${mv.call_time || '23:59'}:00`)
+        if (isNaN(dt.getTime()) || dt > now) continue
+        due.push({ movementId: mv.id, leadId, leadName: mv.lead_name, sectionId: mv.to_section_id, sectionTitle: mv.to_section_title, callDate: mv.call_date, callTime: mv.call_time })
+      }
+      due.sort((a, b) => `${a.callDate}${a.callTime || ''}`.localeCompare(`${b.callDate}${b.callTime || ''}`))
+      return due
+    } catch (e) {
+      console.error('getDueScheduledCalls failed:', e)
+      return []
+    }
+  }
+
+  // Markeer een ingeplande call als wel/niet gevoerd (drijft de "Call gevoerd"-stat).
+  async resolveScheduledCall(movementId, happened) {
+    try {
+      if (!movementId) return { success: false }
+      const { error } = await this.db.supabase
+        .from('lead_movements').update({ call_happened: !!happened }).eq('id', movementId)
+      if (error) throw error
+      return { success: true }
+    } catch (e) {
+      console.error('resolveScheduledCall failed:', e)
+      return { success: false, error: e.message }
+    }
+  }
+
+  // Verplaats een call: sluit de oude af (niet gevoerd) en leg een nieuwe
+  // ingeplande call vast in dezelfde sectie met nieuwe datum/tijd.
+  async rescheduleScheduledCall(oldMovementId, { leadId, leadName, sectionId, sectionTitle, callDate, callTime, coachId }) {
+    try {
+      if (oldMovementId) await this.resolveScheduledCall(oldMovementId, false)
+      const movementId = await this.logMovement({
+        leadId, leadName, fromSectionId: sectionId, fromSectionTitle: sectionTitle,
+        toSectionId: sectionId, toSectionTitle: sectionTitle, coachId, callDate, callTime,
+      })
+      return { success: true, movementId }
+    } catch (e) {
+      console.error('rescheduleScheduledCall failed:', e)
+      return { success: false }
     }
   }
 
@@ -1794,6 +1873,7 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
         conversation:  { count: 0, leads: [] },
         callProposed:  { count: 0, leads: [] },
         callScheduled: { count: 0, happenedCount: 0, leads: [] },
+        callHeld:      { count: 0, leads: [] },
         sale:          { count: 0, leads: [], omzet: 0 },
         noShow:        { count: 0, leads: [] },
         callRejected:  { count: 0, leads: [], reasons: {} },
@@ -1904,12 +1984,37 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
           }
         }
       })
+
+      // Call gevoerd — ingeplande calls die als "gevoerd" (Sale/Sale verloren)
+      // zijn afgehandeld, geteld op de CALL-datum (niet moved_at) binnen de periode.
+      try {
+        const startDate = (startISO || '').split('T')[0]
+        const endDate = (endISO || '').split('T')[0]
+        if (startDate && endDate) {
+          const { data: heldRows } = await this.db.supabase
+            .from('lead_movements')
+            .select('lead_id, lead_name, call_date')
+            .eq('call_happened', true)
+            .is('reverted_at', null)
+            .gte('call_date', startDate).lte('call_date', endDate)
+          const heldSeen = new Set()
+          ;(heldRows || []).forEach(r => {
+            if (r.lead_id && !heldSeen.has(r.lead_id)) {
+              heldSeen.add(r.lead_id)
+              funnel.callHeld.count++
+              funnel.callHeld.leads.push({ leadId: r.lead_id, name: r.lead_name || 'Unknown', at: r.call_date })
+            }
+          })
+        }
+      } catch (e) { console.warn('callHeld count failed:', e?.message) }
+
       return funnel
     } catch (error) {
       console.error('❌ Get range funnel stats failed:', error)
       return {
         replied: { count: 0, leads: [] }, conversation: { count: 0, leads: [] },
         callProposed: { count: 0, leads: [] }, callScheduled: { count: 0, leads: [] },
+        callHeld: { count: 0, leads: [] },
         sale: { count: 0, leads: [], omzet: 0 }, noShow: { count: 0, leads: [] },
         callRejected: { count: 0, leads: [], reasons: {} },
         saleLost: { count: 0, leads: [], reasons: {} },
