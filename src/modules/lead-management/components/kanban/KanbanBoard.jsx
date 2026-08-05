@@ -5,7 +5,7 @@
 
 import { useState, useEffect, useLayoutEffect, useCallback, useRef } from 'react'
 import { createPortal } from 'react-dom'
-import { Plus, Settings, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, GripVertical, Save, RotateCcw, Users, Instagram, Search, X, ArrowUp, ArrowUpDown, Clock, Maximize2, Minimize2, CheckCircle, Send, Zap, Flame, Thermometer, Phone, SlidersHorizontal, Bell, BarChart3 } from 'lucide-react'
+import { Plus, Settings, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, GripVertical, Save, RotateCcw, Users, Instagram, Search, X, ArrowUp, ArrowUpDown, Clock, Maximize2, Minimize2, CheckCircle, Send, Zap, Flame, Thermometer, Phone, SlidersHorizontal, BarChart3 } from 'lucide-react'
 import KanbanCard from './KanbanCard'
 import AddLeadModal from './AddLeadModal'
 import SaleValueModal from './SaleValueModal'
@@ -337,9 +337,6 @@ export default function KanbanBoard({
   }, [barHeight, loading, sections.length, statsRefreshKey, isMobile])
   const [staleCheckDone, setStaleCheckDone] = useState(false)
   // Urgente opvolg-melding: hot/call-voorgesteld leads die >24u stil zijn.
-  const [urgentLeads, setUrgentLeads] = useState([])
-  const [showUrgent, setShowUrgent] = useState(false)
-  const [urgentDone, setUrgentDone] = useState(false)
   const [staleCheckResult, setStaleCheckResult] = useState(null)
   const [snoozeSection, setSnoozeSection] = useState(null)
   // "Follow up stil"-sectie: leads die 3 dagen stil staan en al 1x opgevolgd
@@ -871,28 +868,6 @@ export default function KanbanBoard({
     if (!loading && !staleCheckDone) run()
   }, [leadService, coachId, loading, staleCheckDone])
 
-  // URGENTE OPVOLG-MELDING — draait één keer, ná de stale-check (zodat de
-  // secties actueel zijn). Toont een pop-up met hot/call-voorgesteld leads
-  // die al >24u stil liggen.
-  useEffect(() => {
-    const run = async () => {
-      if (!leadService || !coachId || urgentDone || loading || !staleCheckDone) return
-      if (typeof leadService.getUrgentFollowups !== 'function') { setUrgentDone(true); return }
-      try {
-        const list = await leadService.getUrgentFollowups(coachId)
-        setUrgentDone(true)
-        if (list && list.length) { setUrgentLeads(list); setShowUrgent(true) }
-      } catch (error) { console.error('❌ Urgent followups failed:', error); setUrgentDone(true) }
-    }
-    run()
-  }, [leadService, coachId, loading, staleCheckDone, urgentDone])
-
-  // Handmatig openen via de knop boven de zoekbalk — haalt de lijst vers op.
-  const openUrgentModal = async () => {
-    setShowUrgent(true)
-    if (typeof leadService?.getUrgentFollowups !== 'function') return
-    try { setUrgentLeads(await leadService.getUrgentFollowups(coachId) || []) } catch (e) { console.error(e) }
-  }
 
   // ========================================
   // HANDLERS — ALL PRESERVED 1:1
@@ -1738,23 +1713,6 @@ export default function KanbanBoard({
               )}
             </div>
 
-            {/* Opvolg-melding openen — pop-up met hot/call-voorgesteld leads */}
-            <button
-              onClick={openUrgentModal}
-              title="Toon leads die opvolging nodig hebben"
-              style={{
-                position: 'relative',
-                width: 30, height: 30, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                background: 'rgba(255,215,0,0.14)', border: '1px solid rgba(255,215,0,0.4)',
-                borderRadius: 8, color: '#FFD700',
-                cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-              }}
-            >
-              <Bell size={16} />
-              {urgentLeads.length > 0 && (
-                <span style={{ position: 'absolute', top: -5, right: -5, minWidth: 15, height: 15, background: '#ef4444', color: '#fff', borderRadius: 8, padding: '0 3px', fontSize: '0.55rem', fontWeight: 900, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{urgentLeads.length}</span>
-              )}
-            </button>
 
             {/* Hot-leads toggle (icon-only). Hot en warm sluiten elkaar uit. */}
             <button
@@ -2145,60 +2103,6 @@ export default function KanbanBoard({
       )}
 
       {/* ═══ URGENTE OPVOLG-MELDING ═══ */}
-      {showUrgent && createPortal(
-        <div
-          onClick={() => setShowUrgent(false)}
-          style={{ position: 'fixed', inset: 0, zIndex: 2147483500, background: 'rgba(0,0,0,0.8)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: isMobile ? 'flex-end' : 'center', justifyContent: 'center', padding: isMobile ? 0 : '1.5rem' }}
-        >
-          <div
-            onClick={(e) => e.stopPropagation()}
-            style={{ width: isMobile ? '100%' : '100%', maxWidth: isMobile ? '100%' : 440, maxHeight: isMobile ? '85vh' : '80vh', background: '#141414', border: '1px solid rgba(255,215,0,0.25)', borderRadius: isMobile ? '16px 16px 0 0' : 16, display: 'flex', flexDirection: 'column', overflow: 'hidden', boxShadow: '0 10px 24px rgba(255,215,0,0.15), 0 8px 30px rgba(0,0,0,0.6)' }}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '1rem 1.1rem', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
-              <Clock size={18} color="#FFD700" />
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 15, fontWeight: 800, color: '#fff', letterSpacing: '-0.01em' }}>
-                  {urgentLeads.length > 0 ? `Opvolgen — ${urgentLeads.length} ${urgentLeads.length === 1 ? 'lead' : 'leads'}` : 'Opvolgen'}
-                </div>
-                <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)' }}>Hot of call-voorgesteld · &gt;24u stil</div>
-              </div>
-              <button onClick={() => setShowUrgent(false)} aria-label="Sluiten" style={{ width: 44, height: 44, flexShrink: 0, borderRadius: 10, background: 'transparent', border: '1px solid rgba(255,255,255,0.1)', color: 'rgba(255,255,255,0.6)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><X size={18} /></button>
-            </div>
-
-            <div style={{ flex: 1, overflowY: 'auto', padding: '0.5rem' }}>
-              {urgentLeads.length === 0 && (
-                <div style={{ padding: '2rem 1rem', textAlign: 'center', color: 'rgba(255,255,255,0.5)', fontSize: 14 }}>
-                  🎉 Niks te doen — geen hot of call-voorgesteld leads die nu opvolging nodig hebben.
-                </div>
-              )}
-              {urgentLeads.map(l => {
-                const isHot = l.reason === 'hot'
-                return (
-                  <button
-                    key={l.id}
-                    onClick={() => { setShowUrgent(false); scrollToLead(l.id, l.sectionId) }}
-                    style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '0.7rem 0.75rem', minHeight: 56, background: 'transparent', borderTop: 'none', borderRight: 'none', borderLeft: 'none', borderBottom: '1px solid rgba(255,255,255,0.05)', cursor: 'pointer', textAlign: 'left' }}
-                  >
-                    <span style={{ width: 30, height: 30, flexShrink: 0, borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', background: isHot ? 'rgba(239,68,68,0.15)' : 'rgba(255,215,0,0.15)', border: `1px solid ${isHot ? 'rgba(239,68,68,0.4)' : 'rgba(255,215,0,0.4)'}` }}>
-                      {isHot ? <Flame size={15} color="#f87171" /> : <Phone size={15} color="#FFD700" />}
-                    </span>
-                    <span style={{ flex: 1, minWidth: 0 }}>
-                      <span style={{ display: 'block', fontSize: 14, fontWeight: 700, color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{l.name}</span>
-                      <span style={{ display: 'block', fontSize: 11, color: 'rgba(255,255,255,0.45)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{l.sectionTitle || '—'}</span>
-                    </span>
-                    <span style={{ flexShrink: 0, fontSize: 11, fontWeight: 800, color: isHot ? '#f87171' : '#FFD700' }}>{l.hoursSilent}u stil</span>
-                  </button>
-                )
-              })}
-            </div>
-
-            <div style={{ padding: '0.75rem 1.1rem', borderTop: '1px solid rgba(255,255,255,0.08)' }}>
-              <button onClick={() => setShowUrgent(false)} style={{ width: '100%', minHeight: 48, borderRadius: 12, background: '#FFD700', color: '#000', border: 'none', fontSize: 15, fontWeight: 800, cursor: 'pointer', boxShadow: '0 6px 18px rgba(255,215,0,0.22)' }}>Aan de slag</button>
-            </div>
-          </div>
-        </div>,
-        document.body
-      )}
 
       {/* ═══ SCROLL TO TOP — compact ═══ */}
       {showScrollTop && createPortal(
