@@ -51,5 +51,9 @@
 	<string>MY ARC gebruikt je foto-bibliotheek om profielfoto's en voortgangsfoto's te kiezen.</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>
 	<string>MY ARC slaat voortgangsfoto's op in je foto-bibliotheek.</string>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>remote-notification</string>
+	</array>
 </dict>
 </plist>

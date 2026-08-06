@@ -54,6 +54,7 @@ import DatabaseService from './services/DatabaseService'
 import { LanguageProvider } from './contexts/LanguageContext'
 import PWAInstaller from './components/PWAInstaller'
 import UpdateModal from './components/UpdateModal'
+import pushNotificationService from './services/PushNotificationService'
 
 const db = DatabaseService
 
@@ -78,6 +79,10 @@ function App() {
   useEffect(() => {
     localStorage.setItem('isClientMode', isClientMode)
   }, [isClientMode])
+
+  useEffect(() => {
+    if (user?.id) pushNotificationService.init(user.id)
+  }, [user])
 
   const checkUser = async () => {
     try {
