@@ -2053,7 +2053,7 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
 
   // Zet de order-waarde (omzet) op de meest recente movement van een lead —
   // aangeroepen wanneer een lead naar een sale-sectie is verplaatst.
-  async setMovementOrderValue(leadId, orderValue, paymentType = null, durationMonths = null) {
+  async setMovementOrderValue(leadId, orderValue, paymentType = null, durationMonths = null, partnerSharePct = undefined) {
     try {
       const { data: rows } = await this.db.supabase
         .from('lead_movements').select('id')
@@ -2066,6 +2066,11 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
       // cashflow kunnen berekenen (wanneer komt hoeveel binnen).
       if (paymentType !== undefined) patch.payment_type = paymentType
       if (durationMonths !== undefined) patch.duration_months = durationMonths
+      // Partner-aandeel (percentage). null/leeg = geen split.
+      if (partnerSharePct !== undefined) {
+        const pct = partnerSharePct === null || partnerSharePct === '' ? null : Number(partnerSharePct)
+        patch.partner_share_pct = (pct != null && !isNaN(pct)) ? pct : null
+      }
       const { error } = await this.db.supabase
         .from('lead_movements').update(patch).eq('id', movId)
       return { error }
@@ -2166,6 +2171,132 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
     } catch (error) {
       console.error('❌ getRevenueProjection failed:', error)
       return { mrr: 0, activeMonthly: 0, totalBooked: 0, months: [], saleCount: 0 }
+    }
+  }
+
+  // ── PARTNER-UITBETALING ─────────────────────────────────────────────────
+  // Berekent per maand wat er aan de partner (bv. Marcel) toekomt: van elke
+  // sale met een partner_share_pct wordt dat % van de maand-cashflow genomen
+  // (vooruitbetaald = alles in de sale-maand; maandelijks = per termijn gespreid,
+  // exact zoals getRevenueProjection de omzet spreidt). Vervolgens trekken we af
+  // wat er al is uitbetaald (partner_payouts.amount_paid) → openstaand per maand.
+  async getPartnerPayouts(coachId, monthsBehind = 5, monthsAhead = 6) {
+    try {
+      if (!coachId) return { months: [], totalOutstanding: 0 }
+      const [{ data: saleRows }, { data: paidRows }] = await Promise.all([
+        this.db.supabase
+          .from('lead_movements')
+          .select('order_value, payment_type, duration_months, moved_at, partner_share_pct')
+          .not('order_value', 'is', null)
+          .not('partner_share_pct', 'is', null)
+          .is('reverted_at', null),
+        this.db.supabase
+          .from('partner_payouts')
+          .select('period, amount_paid, paid_at')
+          .eq('coach_id', coachId),
+      ])
+
+      const sales = (saleRows || []).map(r => ({
+        total: Number(r.order_value) || 0,
+        type: r.payment_type || 'prepaid',
+        months: Math.max(1, Number(r.duration_months) || 1),
+        pct: Number(r.partner_share_pct) || 0,
+        date: new Date(r.moved_at),
+      })).filter(s => s.total > 0 && s.pct > 0 && !isNaN(s.date?.getTime?.()))
+
+      const monthKey = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+      const startOfMonth = (d, add = 0) => new Date(d.getFullYear(), d.getMonth() + add, 1)
+
+      // Partner-aandeel per maand opbouwen (zelfde spreiding als de omzet).
+      const owed = {}
+      sales.forEach(s => {
+        const share = s.pct / 100
+        if (s.type === 'monthly' && s.months > 1) {
+          const per = (s.total / s.months) * share
+          for (let i = 0; i < s.months; i++) {
+            const k = monthKey(startOfMonth(s.date, i))
+            owed[k] = (owed[k] || 0) + per
+          }
+        } else {
+          const k = monthKey(s.date)
+          owed[k] = (owed[k] || 0) + s.total * share
+        }
+      })
+
+      // Al uitbetaald per maand.
+      const paid = {}
+      const paidAt = {}
+      ;(paidRows || []).forEach(r => {
+        const d = new Date(r.period)
+        const k = monthKey(d)
+        paid[k] = (paid[k] || 0) + (Number(r.amount_paid) || 0)
+        paidAt[k] = r.paid_at
+      })
+
+      const now = new Date()
+      const months = []
+      let totalOutstanding = 0
+      for (let i = -monthsBehind; i < monthsAhead; i++) {
+        const d = startOfMonth(now, i)
+        const k = monthKey(d)
+        const owedM = Math.round((owed[k] || 0) * 100) / 100
+        const paidM = Math.round((paid[k] || 0) * 100) / 100
+        const outstanding = Math.round((owedM - paidM) * 100) / 100
+        // Alleen maanden met iets te verdelen tonen (owed > 0 of al betaald).
+        if (owedM <= 0 && paidM <= 0) continue
+        if (i <= 0) totalOutstanding += Math.max(0, outstanding)
+        months.push({
+          key: k,
+          label: d.toLocaleDateString('nl-NL', { month: 'long', year: 'numeric' }),
+          owed: owedM,
+          paid: paidM,
+          outstanding,
+          settled: outstanding <= 0.005 && owedM > 0,
+          paidAt: paidAt[k] || null,
+          isPast: i < 0,
+          isCurrent: i === 0,
+        })
+      }
+      return { months, totalOutstanding: Math.round(totalOutstanding * 100) / 100 }
+    } catch (error) {
+      console.error('❌ getPartnerPayouts failed:', error)
+      return { months: [], totalOutstanding: 0 }
+    }
+  }
+
+  // Markeer een maand als (volledig) uitbetaald: zet amount_paid op het bedrag
+  // dat op dat moment openstaat (owedNow), zodat de maand op €0 openstaand komt.
+  // Komt er later nog een sale in die maand bij, dan wordt owed > paid en
+  // verschijnt alleen dat nieuwe stukje opnieuw als openstaand.
+  async settlePartnerMonth(coachId, periodKey, owedNow) {
+    try {
+      if (!coachId || !periodKey) return { error: 'coach/periode ontbreekt' }
+      const period = `${periodKey}-01` // YYYY-MM → YYYY-MM-01
+      const { error } = await this.db.supabase
+        .from('partner_payouts')
+        .upsert(
+          { coach_id: coachId, period, amount_paid: Number(owedNow) || 0, paid_at: new Date().toISOString() },
+          { onConflict: 'coach_id,period' }
+        )
+      return { error }
+    } catch (error) {
+      console.error('❌ settlePartnerMonth failed:', error)
+      return { error }
+    }
+  }
+
+  // Draai een uitbetaling terug (maand weer als openstaand tonen).
+  async unsettlePartnerMonth(coachId, periodKey) {
+    try {
+      if (!coachId || !periodKey) return { error: 'coach/periode ontbreekt' }
+      const period = `${periodKey}-01`
+      const { error } = await this.db.supabase
+        .from('partner_payouts')
+        .delete().eq('coach_id', coachId).eq('period', period)
+      return { error }
+    } catch (error) {
+      console.error('❌ unsettlePartnerMonth failed:', error)
+      return { error }
     }
   }
 

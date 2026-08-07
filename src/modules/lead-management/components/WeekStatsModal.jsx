@@ -9,7 +9,7 @@ import {
   X, ChevronLeft, ChevronRight, ChevronDown, Calendar, Zap, TrendingUp,
   MessageCircle, Users, Phone, Trophy, Activity, BarChart3, PhoneCall,
   Send, FileText, Percent, UserX, Eye, Download, LineChart as LineChartIcon,
-  RotateCcw, Target, Save, UserPlus, CalendarCheck, Euro, PhoneOff, XCircle,
+  RotateCcw, Target, Save, UserPlus, CalendarCheck, Euro, PhoneOff, XCircle, Check,
 } from 'lucide-react'
 import { exportStatsPDF } from '../utils/exportStatsPDF'
 import GrowthChart from './GrowthChart'
@@ -99,6 +99,12 @@ export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, 
   const [showRevenue, setShowRevenue] = useState(false)
   const [revenue, setRevenue] = useState(null)
   const [revLoading, setRevLoading] = useState(false)
+  // Partner-uitbetaling (bv. Marcel): per maand wat er open staat + betaald-knop.
+  const [payouts, setPayouts] = useState(null)
+  const [payoutBusy, setPayoutBusy] = useState(null) // period-key die nu update
+  const partnerName = (() => {
+    try { return localStorage.getItem('lead_partner_name') || 'Marcel' } catch { return 'Marcel' }
+  })()
   // Welke funnel-stap staat open in de drill-down (voor terugdraaien/verwijderen).
   const [drillStage, setDrillStage] = useState(null)
 
@@ -132,17 +138,45 @@ export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, 
     setKpiDraft(prev => ({ ...prev, [key]: { ...(prev[key] || {}), [period]: clean } }))
   }
 
+  const loadPayouts = async () => {
+    try {
+      if (!leadService?.getPartnerPayouts) return
+      const p = await leadService.getPartnerPayouts(coachId, 5, 6)
+      setPayouts(p)
+    } catch (e) {
+      console.error('Partner-uitbetaling laden mislukt:', e)
+      setPayouts(null)
+    }
+  }
+
   const openRevenuePanel = async () => {
     setShowRevenue(true)
     setRevLoading(true)
     try {
-      const r = await leadService.getRevenueProjection(coachId, 12)
+      const [r] = await Promise.all([
+        leadService.getRevenueProjection(coachId, 12),
+        loadPayouts(),
+      ])
       setRevenue(r)
     } catch (e) {
       console.error('Revenue laden mislukt:', e)
       setRevenue(null)
     } finally {
       setRevLoading(false)
+    }
+  }
+
+  const settleMonth = async (m) => {
+    if (!m || payoutBusy) return
+    setPayoutBusy(m.key)
+    try {
+      if (m.settled) await leadService.unsettlePartnerMonth(coachId, m.key)
+      else await leadService.settlePartnerMonth(coachId, m.key, m.owed)
+      await loadPayouts()
+    } catch (e) {
+      console.error('Uitbetaling bijwerken mislukt:', e)
+    } finally {
+      setPayoutBusy(null)
     }
   }
 
@@ -878,6 +912,76 @@ export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, 
                     <div style={{ marginTop: '0.8rem', fontSize: '0.66rem', color: 'rgba(255,255,255,0.35)', lineHeight: 1.5 }}>
                       Vol groen = gerealiseerd (afgelopen + deze maand) · lichter = projectie. Vooruitbetaald telt in de sale-maand; maandelijks = totaal ÷ looptijd, gespreid.
                     </div>
+
+                    {/* ── Uit te betalen aan de partner (bv. Marcel) ── */}
+                    {(() => {
+                      const pos = payouts?.months || []
+                      const settleable = pos.filter(m => m.isPast || m.isCurrent).slice().reverse()
+                      const upcoming = pos.filter(m => !m.isPast && !m.isCurrent && m.owed > 0)
+                      const totalOut = payouts?.totalOutstanding || 0
+                      const cap = (s) => s.charAt(0).toUpperCase() + s.slice(1)
+                      const fmtDate = (iso) => { try { return new Date(iso).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' }) } catch { return '' } }
+                      return (
+                        <div style={{ marginTop: '1.4rem', borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: '1rem' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: '0.9rem' }}>
+                            <Users size={15} color="#FFD700" />
+                            <div style={{ flex: 1, fontSize: '0.8rem', fontWeight: 800, color: '#fff' }}>Uit te betalen aan {partnerName}</div>
+                            <div style={{ fontSize: '0.72rem', fontWeight: 900, color: totalOut > 0 ? '#FFD700' : '#22c55e', background: totalOut > 0 ? 'rgba(255,215,0,0.12)' : 'rgba(34,197,94,0.12)', border: `1px solid ${totalOut > 0 ? 'rgba(255,215,0,0.3)' : 'rgba(34,197,94,0.3)'}`, borderRadius: 8, padding: '3px 8px' }}>
+                              {totalOut > 0 ? `${eur(totalOut)} open` : 'Alles betaald ✓'}
+                            </div>
+                          </div>
+
+                          {settleable.length === 0 && upcoming.length === 0 ? (
+                            <div style={{ fontSize: '0.72rem', color: 'rgba(255,255,255,0.4)', lineHeight: 1.5 }}>
+                              Nog geen sales met een aandeel voor {partnerName}. Vul bij een sale het veld “Aandeel {partnerName}” in.
+                            </div>
+                          ) : (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                              {settleable.map(m => {
+                                const busy = payoutBusy === m.key
+                                return (
+                                  <div key={m.key} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '0.6rem 0.75rem', borderRadius: 10, background: 'rgba(255,255,255,0.03)', border: `1px solid ${m.settled ? 'rgba(34,197,94,0.25)' : m.outstanding > 0 ? 'rgba(255,215,0,0.22)' : 'rgba(255,255,255,0.08)'}` }}>
+                                    <div style={{ flex: 1, minWidth: 0 }}>
+                                      <div style={{ fontSize: '0.8rem', fontWeight: 800, color: '#fff', textTransform: 'capitalize' }}>
+                                        {cap(m.label)} {m.isCurrent && <span style={{ fontSize: '0.58rem', color: '#FFD700', fontWeight: 700 }}>· deze maand</span>}
+                                      </div>
+                                      <div style={{ fontSize: '0.64rem', color: 'rgba(255,255,255,0.4)', marginTop: 2 }}>
+                                        {m.settled
+                                          ? `Betaald${m.paidAt ? ' op ' + fmtDate(m.paidAt) : ''} · aandeel ${eur(m.owed)}`
+                                          : `Aandeel ${eur(m.owed)}${m.paid > 0 ? ` · ${eur(m.paid)} betaald` : ''}`}
+                                      </div>
+                                    </div>
+                                    {m.settled ? (
+                                      <button onClick={() => settleMonth(m)} disabled={busy} title="Betaling terugdraaien"
+                                        style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: 5, padding: '0.4rem 0.7rem', borderRadius: 8, background: 'rgba(34,197,94,0.14)', border: '1px solid rgba(34,197,94,0.4)', color: '#22c55e', fontWeight: 800, fontSize: '0.72rem', cursor: busy ? 'default' : 'pointer', opacity: busy ? 0.5 : 1 }}>
+                                        <Check size={13} /> Betaald
+                                      </button>
+                                    ) : (
+                                      <div style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
+                                        <div style={{ fontSize: '0.9rem', fontWeight: 900, color: '#FFD700' }}>{eur(m.outstanding)}</div>
+                                        <button onClick={() => settleMonth(m)} disabled={busy}
+                                          style={{ padding: '0.4rem 0.75rem', borderRadius: 8, border: 'none', background: 'linear-gradient(135deg,#FFD700,#D4AF37)', color: '#000', fontWeight: 900, fontSize: '0.72rem', cursor: busy ? 'default' : 'pointer', opacity: busy ? 0.5 : 1 }}>
+                                          {busy ? '…' : 'Betaald'}
+                                        </button>
+                                      </div>
+                                    )}
+                                  </div>
+                                )
+                              })}
+                              {upcoming.length > 0 && (
+                                <div style={{ marginTop: 6, fontSize: '0.64rem', color: 'rgba(255,255,255,0.4)', lineHeight: 1.6 }}>
+                                  <span style={{ fontWeight: 700, color: 'rgba(255,255,255,0.5)' }}>Komende termijnen:</span>{' '}
+                                  {upcoming.map(m => `${cap(m.label.replace(/ 20\d\d/, ''))} ${eur(m.owed)}`).join(' · ')}
+                                </div>
+                              )}
+                            </div>
+                          )}
+                          <div style={{ marginTop: '0.7rem', fontSize: '0.62rem', color: 'rgba(255,255,255,0.3)', lineHeight: 1.5 }}>
+                            Tip: maak op de 25e het openstaande bedrag over en klik dan “Betaald”. Komt er daarna nog een sale in die maand bij, dan verschijnt alleen dat nieuwe stukje weer als openstaand.
+                          </div>
+                        </div>
+                      )
+                    })()}
                   </>
                 )
               })()}

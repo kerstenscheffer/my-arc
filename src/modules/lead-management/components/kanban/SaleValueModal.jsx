@@ -5,12 +5,18 @@
 // guard tegen mobiele click-through (zelfde patroon als AddLeadModal).
 import { useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
-import { X, Euro, Wallet, CalendarClock } from 'lucide-react'
+import { X, Euro, Wallet, CalendarClock, Users } from 'lucide-react'
 
-export default function SaleValueModal({ isMobile, leadName, onSave, onClose }) {
+// Naam van de vaste partner (later aanpasbaar via localStorage).
+const PARTNER_NAME = (() => {
+  try { return localStorage.getItem('lead_partner_name') || 'Marcel' } catch { return 'Marcel' }
+})()
+
+export default function SaleValueModal({ isMobile, leadName, partnerName = PARTNER_NAME, onSave, onClose }) {
   const [value, setValue] = useState('')
   const [paymentType, setPaymentType] = useState('prepaid') // 'prepaid' | 'monthly'
   const [months, setMonths] = useState('12')
+  const [partnerPct, setPartnerPct] = useState('50') // aandeel partner, standaard 50%
   const [armed, setArmed] = useState(false)
   useEffect(() => { const t = setTimeout(() => setArmed(true), 300); return () => clearTimeout(t) }, [])
 
@@ -18,11 +24,13 @@ export default function SaleValueModal({ isMobile, leadName, onSave, onClose }) 
   const monthsNum = Math.max(1, parseInt(months, 10) || 0)
   const perMonth = (!isNaN(totalNum) && paymentType === 'monthly' && monthsNum > 0)
     ? totalNum / monthsNum : null
+  const pctNum = Math.min(100, Math.max(0, parseFloat(String(partnerPct).replace(',', '.')) || 0))
+  const partnerTotal = (!isNaN(totalNum) && pctNum > 0) ? totalNum * (pctNum / 100) : null
 
   const submit = () => {
     const val = isNaN(totalNum) ? null : totalNum
     const dur = paymentType === 'monthly' ? Math.max(1, parseInt(months, 10) || 12) : 1
-    onSave({ value: val, paymentType, durationMonths: dur })
+    onSave({ value: val, paymentType, durationMonths: dur, partnerSharePct: pctNum > 0 ? pctNum : null })
   }
 
   const pill = (active) => ({
@@ -89,6 +97,30 @@ export default function SaleValueModal({ isMobile, leadName, onSave, onClose }) 
                 <div style={{ marginTop: 8, fontSize: '0.8rem', fontWeight: 700, color: '#22c55e' }}>
                   = €{perMonth.toLocaleString('nl-NL', { maximumFractionDigits: 2 })} per maand × {monthsNum}
                 </div>
+              )}
+            </div>
+          )}
+
+          {/* Partner-aandeel */}
+          <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.8rem', fontWeight: 600, color: 'rgba(255,255,255,0.6)', marginBottom: 8 }}>
+            <Users size={14} color="#FFD700" /> Aandeel {partnerName}
+          </label>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '0.7rem 1rem', borderRadius: 12, border: '1px solid rgba(255,215,0,0.3)', background: 'rgba(255,255,255,0.03)', marginBottom: partnerTotal != null ? '0.5rem' : '1.1rem' }}>
+            <input
+              type="number" inputMode="decimal" value={partnerPct}
+              onChange={e => setPartnerPct(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter') submit() }}
+              style={{ width: 70, background: 'none', border: 'none', outline: 'none', color: '#fff', fontSize: '1.05rem', fontWeight: 800, fontFamily: 'inherit' }}
+            />
+            <span style={{ fontSize: '0.95rem', fontWeight: 800, color: 'rgba(255,255,255,0.5)' }}>%</span>
+          </div>
+          {partnerTotal != null && (
+            <div style={{ marginBottom: '1.1rem', fontSize: '0.8rem', fontWeight: 700, color: '#FFD700' }}>
+              = €{partnerTotal.toLocaleString('nl-NL', { maximumFractionDigits: 2 })} voor {partnerName}
+              {paymentType === 'monthly' && monthsNum > 1 && perMonth != null && (
+                <span style={{ color: 'rgba(255,255,255,0.5)', fontWeight: 600 }}>
+                  {' '}(€{(perMonth * (pctNum / 100)).toLocaleString('nl-NL', { maximumFractionDigits: 2 })}/mnd × {monthsNum})
+                </span>
               )}
             </div>
           )}
