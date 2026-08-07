@@ -50,7 +50,7 @@ export default function GarantiePrijsSection({ isMobile }) {
             { m: '6 maanden', p: '€547' },
             { m: '3 maanden', p: '€297' },
           ].map((tier) => (
-            <div key={tier.m} style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: '1rem' }}>
+            <div key={tier.m} style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'center', gap: isMobile ? '0.6rem' : '0.85rem' }}>
               <span style={{ fontSize: isMobile ? '1rem' : '1.2rem', fontWeight: '700', color: 'rgba(255,255,255,0.85)' }}>
                 {tier.m}
               </span>
