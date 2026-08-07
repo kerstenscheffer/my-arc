@@ -44,7 +44,7 @@ export default function GarantiePrijsSection({ isMobile }) {
         <div style={{ textAlign: 'center', marginBottom: isMobile ? '0.9rem' : '1.1rem' }}>
           <span style={{ fontSize: isMobile ? '0.6rem' : '0.65rem', fontWeight: '800', letterSpacing: '0.15em', color: 'rgba(255,255,255,0.5)' }}>DE INVESTERING</span>
         </div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: isMobile ? '0.7rem' : '0.9rem', marginBottom: isMobile ? '1.5rem' : '1.75rem' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: isMobile ? '0.3rem' : '0.4rem', marginBottom: isMobile ? '1.5rem' : '1.75rem' }}>
           {[
             { m: '12 maanden', p: '€997' },
             { m: '6 maanden', p: '€547' },
@@ -54,18 +54,11 @@ export default function GarantiePrijsSection({ isMobile }) {
               <span style={{ fontSize: isMobile ? '1rem' : '1.2rem', fontWeight: '700', color: 'rgba(255,255,255,0.85)' }}>
                 {tier.m}
               </span>
-              <span style={{ fontSize: isMobile ? '2rem' : '2.6rem', fontWeight: '900', color: GOLD, lineHeight: 1, letterSpacing: '-0.02em' }}>
+              <span style={{ fontSize: isMobile ? '2rem' : '2.6rem', fontWeight: '900', color: '#fff', lineHeight: 1, letterSpacing: '-0.02em' }}>
                 {tier.p}
               </span>
             </div>
           ))}
-        </div>
-
-        {/* ═══ Case study-regel ═══ */}
-        <div style={{ textAlign: 'center', marginBottom: isMobile ? '1rem' : '1.25rem' }}>
-          <p style={{ margin: 0, fontSize: isMobile ? '0.85rem' : '0.95rem', fontStyle: 'italic', color: 'rgba(255,255,255,0.6)', fontWeight: '500', lineHeight: 1.4 }}>
-            Hessel: van 79,8 naar 74,4 kg in 8 weken.
-          </p>
         </div>
 
         {/* ═══ Trustpilot — kleine social proof ═══ */}
