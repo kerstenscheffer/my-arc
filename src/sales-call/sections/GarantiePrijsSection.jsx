@@ -40,29 +40,23 @@ export default function GarantiePrijsSection({ isMobile }) {
           ))}
         </div>
 
-        {/* ═══ De investering — 3 trajecten (3 mnd populairst) ═══ */}
+        {/* ═══ De investering — 3 trajecten, simpel onder elkaar (geen vakjes) ═══ */}
         <div style={{ textAlign: 'center', marginBottom: isMobile ? '0.9rem' : '1.1rem' }}>
           <span style={{ fontSize: isMobile ? '0.6rem' : '0.65rem', fontWeight: '800', letterSpacing: '0.15em', color: 'rgba(255,255,255,0.5)' }}>DE INVESTERING</span>
         </div>
-        <div style={{ display: 'flex', gap: isMobile ? '0.5rem' : '0.75rem', marginBottom: isMobile ? '1.25rem' : '1.5rem', alignItems: 'stretch' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: isMobile ? '0.7rem' : '0.9rem', marginBottom: isMobile ? '1.5rem' : '1.75rem' }}>
           {[
-            { m: '12 maanden', p: '€997', highlight: false },
-            { m: '3 maanden', p: '€297', highlight: true },
-            { m: '6 maanden', p: '€547', highlight: false },
+            { m: '12 maanden', p: '€997' },
+            { m: '6 maanden', p: '€547' },
+            { m: '3 maanden', p: '€297' },
           ].map((tier) => (
-            <div key={tier.m} style={{
-              flex: 1, minWidth: 0, textAlign: 'center',
-              padding: isMobile ? '1rem 0.4rem' : '1.35rem 0.6rem',
-              borderRadius: '14px',
-              background: tier.highlight ? 'rgba(255,186,9,0.10)' : 'rgba(255,255,255,0.03)',
-              border: `1.5px solid ${tier.highlight ? GOLD + '99' : 'rgba(255,255,255,0.1)'}`,
-            }}>
-              <div style={{ fontSize: isMobile ? '0.62rem' : '0.72rem', fontWeight: '700', color: 'rgba(255,255,255,0.6)', marginBottom: isMobile ? '0.4rem' : '0.55rem', whiteSpace: 'nowrap' }}>
+            <div key={tier.m} style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: '1rem' }}>
+              <span style={{ fontSize: isMobile ? '1rem' : '1.2rem', fontWeight: '700', color: 'rgba(255,255,255,0.85)' }}>
                 {tier.m}
-              </div>
-              <div style={{ fontSize: isMobile ? '1.75rem' : '2.6rem', fontWeight: '900', color: tier.highlight ? GOLD : '#fff', lineHeight: 1, letterSpacing: '-0.02em' }}>
+              </span>
+              <span style={{ fontSize: isMobile ? '2rem' : '2.6rem', fontWeight: '900', color: GOLD, lineHeight: 1, letterSpacing: '-0.02em' }}>
                 {tier.p}
-              </div>
+              </span>
             </div>
           ))}
         </div>
