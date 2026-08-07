@@ -5,7 +5,7 @@
 
 import { useState, useEffect, useLayoutEffect, useCallback, useRef } from 'react'
 import { createPortal } from 'react-dom'
-import { Plus, Settings, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, GripVertical, Save, RotateCcw, Users, Instagram, Search, X, ArrowUp, ArrowUpDown, Clock, Maximize2, Minimize2, CheckCircle, Send, Zap, Flame, Thermometer, Phone, SlidersHorizontal, BarChart3 } from 'lucide-react'
+import { Plus, Settings, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, GripVertical, Save, RotateCcw, Users, Instagram, Search, X, ArrowUp, ArrowUpDown, Clock, Maximize2, Minimize2, CheckCircle, Send, Zap, Flame, Phone, SlidersHorizontal, BarChart3 } from 'lucide-react'
 import KanbanCard from './KanbanCard'
 import AddLeadModal from './AddLeadModal'
 import SaleValueModal from './SaleValueModal'
@@ -128,21 +128,18 @@ export default function KanbanBoard({
       document.removeEventListener('touchstart', onDown)
     }
   }, [showBoardFilter])
-  // Globale "hot leads" toggle — overschrijft de per-sectie temperatuur-
-  // filter zodat de coach in één klik hot leads ALLE secties kan zien.
-  const [globalHotOnly, setGlobalHotOnly] = useState(false)
-  // Globale "warm leads" toggle — zelfde idee als hot, maar op warm.
-  const [globalWarmOnly, setGlobalWarmOnly] = useState(false)
-  // Globale "calls voorgesteld" toggle — toont alleen leads waar de coach
-  // al een call_proposal-bericht heeft gestuurd (via lead_notes).
-  const [globalCallProposedOnly, setGlobalCallProposedOnly] = useState(false)
+  // Globale "prioriteit" toggle — één knop die de coach in één klik ALLE
+  // actie-leads laat zien over alle secties heen: hot OF warm OF een lead
+  // waar al een call is voorgesteld. (Verving de drie losse knoppen hot/warm/
+  // call-voorgesteld.)
+  const [globalPriorityOnly, setGlobalPriorityOnly] = useState(false)
   const [callProposedLeadIds, setCallProposedLeadIds] = useState(() => new Set())
 
   // Eenmalig lijst van leads met een call-proposal note ophalen. Reload
   // gebeurt elke keer dat we de toggle aanzetten — zo blijft de set vers
   // ook als de coach intussen nieuwe proposals heeft gestuurd.
   useEffect(() => {
-    if (!globalCallProposedOnly || !coachId || !leadService?.db?.supabase) return
+    if (!globalPriorityOnly || !coachId || !leadService?.db?.supabase) return
     let cancelled = false
     leadService.db.supabase
       .from('lead_notes')
@@ -156,25 +153,23 @@ export default function KanbanBoard({
         setCallProposedLeadIds(new Set((data || []).map(r => r.lead_id)))
       })
     return () => { cancelled = true }
-  }, [globalCallProposedOnly, coachId, leadService])
+  }, [globalPriorityOnly, coachId, leadService])
 
   const sectionPassesFilter = (lead, filter, section = null) => {
-    // Globale hot-only override — als actief, alleen hot leads tonen,
-    // ongeacht de per-sectie temperatuur-filter.
-    if (globalHotOnly && lead.lead_temperature !== 'hot') return false
-    // Globale warm-only override — zelfde als hot, maar op warm.
-    if (globalWarmOnly && lead.lead_temperature !== 'warm') return false
-    // Globale call-proposed override — toon leads die een call voorgesteld
-    // hebben gekregen. Dat is: ze staan NU in de "Call voorgesteld"-sectie,
-    // óf ze zijn vanuit die sectie naar "stil" geschoven (previous_section),
-    // óf er is een tracked call_proposal-note voor verstuurd. (Eerder keken we
-    // alleen naar de note, waardoor handmatig verplaatste leads wegvielen.)
-    if (globalCallProposedOnly) {
+    // Globale prioriteit-override — één gate die hot, warm én call-voorgesteld
+    // combineert: de lead passeert als hij hot OF warm is, OF een call
+    // voorgesteld heeft gekregen. Call-voorgesteld = staat NU in de "Call
+    // voorgesteld"-sectie, óf is daarvandaan naar "stil" geschoven
+    // (previous_section), óf er is een tracked call_proposal-note voor verstuurd.
+    if (globalPriorityOnly) {
+      const temp = lead.lead_temperature
+      const isHotWarm = temp === 'hot' || temp === 'warm'
       const proposedRe = /voorgesteld|voorstel/i
-      const inProposedSection = proposedRe.test(section?.title || '')
-      const cameFromProposed = proposedRe.test(lead.previous_section_title || '')
-      const hasProposalNote = callProposedLeadIds.has(lead.id)
-      if (!(inProposedSection || cameFromProposed || hasProposalNote)) return false
+      const isProposed =
+        proposedRe.test(section?.title || '') ||
+        proposedRe.test(lead.previous_section_title || '') ||
+        callProposedLeadIds.has(lead.id)
+      if (!isHotWarm && !isProposed) return false
     }
 
     // Type-filter — een lead heeft EITHER een lead_magnet OR een
@@ -189,8 +184,8 @@ export default function KanbanBoard({
       if (!matches) return false
     }
     // Temperatuur-filter — null/empty count als 'none'. Geskipt als
-    // globalHotOnly al actief is.
-    if (!globalHotOnly && !globalWarmOnly && filter.temps.size > 0) {
+    // de globale prioriteit-toggle al actief is.
+    if (!globalPriorityOnly && filter.temps.size > 0) {
       const t = lead.lead_temperature || 'none'
       if (!filter.temps.has(t)) return false
     }
@@ -1744,49 +1739,20 @@ export default function KanbanBoard({
               )}
             </button>
 
-            {/* Hot-leads toggle (icon-only). Hot en warm sluiten elkaar uit. */}
+            {/* Prioriteit-toggle (icon-only) — één knop die hot, warm én
+                call-voorgesteld combineert. Toont in één klik alle actie-leads. */}
             <button
-              onClick={() => setGlobalHotOnly(v => { const nv = !v; if (nv) setGlobalWarmOnly(false); return nv })}
-              title={globalHotOnly ? 'Toon alle leads weer' : 'Toon alleen hot leads (overal)'}
+              onClick={() => setGlobalPriorityOnly(v => !v)}
+              title={globalPriorityOnly ? 'Toon alle leads weer' : 'Toon alleen actie-leads (hot, warm of call voorgesteld)'}
               style={{
                 width: 30, height: 30, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                background: globalHotOnly ? 'rgba(239,68,68,0.18)' : 'rgba(255,255,255,0.04)',
-                border: `1px solid ${globalHotOnly ? 'rgba(239,68,68,0.5)' : 'rgba(255,255,255,0.08)'}`,
-                borderRadius: 8, color: globalHotOnly ? '#f87171' : 'rgba(255,255,255,0.5)',
+                background: globalPriorityOnly ? 'rgba(239,68,68,0.18)' : 'rgba(255,255,255,0.04)',
+                border: `1px solid ${globalPriorityOnly ? 'rgba(239,68,68,0.5)' : 'rgba(255,255,255,0.08)'}`,
+                borderRadius: 8, color: globalPriorityOnly ? '#f87171' : 'rgba(255,255,255,0.5)',
                 cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
               }}
             >
               <Flame size={16} />
-            </button>
-
-            {/* Warm-leads toggle (icon-only). Warm en hot sluiten elkaar uit. */}
-            <button
-              onClick={() => setGlobalWarmOnly(v => { const nv = !v; if (nv) setGlobalHotOnly(false); return nv })}
-              title={globalWarmOnly ? 'Toon alle leads weer' : 'Toon alleen warm leads (overal)'}
-              style={{
-                width: 30, height: 30, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                background: globalWarmOnly ? 'rgba(245,158,11,0.18)' : 'rgba(255,255,255,0.04)',
-                border: `1px solid ${globalWarmOnly ? 'rgba(245,158,11,0.5)' : 'rgba(255,255,255,0.08)'}`,
-                borderRadius: 8, color: globalWarmOnly ? '#fbbf24' : 'rgba(255,255,255,0.5)',
-                cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-              }}
-            >
-              <Thermometer size={16} />
-            </button>
-
-            {/* Call-voorgesteld toggle (icon-only) */}
-            <button
-              onClick={() => setGlobalCallProposedOnly(v => !v)}
-              title={globalCallProposedOnly ? 'Toon alle leads weer' : 'Toon alleen leads waar al een call voorgesteld is'}
-              style={{
-                width: 30, height: 30, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                background: globalCallProposedOnly ? 'rgba(212,175,55,0.18)' : 'rgba(255,255,255,0.04)',
-                border: `1px solid ${globalCallProposedOnly ? 'rgba(212,175,55,0.5)' : 'rgba(255,255,255,0.08)'}`,
-                borderRadius: 8, color: globalCallProposedOnly ? '#D4AF37' : 'rgba(255,255,255,0.5)',
-                cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-              }}
-            >
-              <Phone size={16} />
             </button>
 
             {/* Overkoepelende filter voor het HELE bord — Type, Temperatuur,
