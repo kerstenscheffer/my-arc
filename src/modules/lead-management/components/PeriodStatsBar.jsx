@@ -82,16 +82,6 @@ export default function PeriodStatsBar({ leadService, coachId, isMobile, refresh
   // KPI-doelen (per coach) + een key om ze te herladen na opslaan in de modal.
   const [targets, setTargets] = useState({})
   const [targetsKey, setTargetsKey] = useState(0)
-  // Alleen owner/solo ziet omzet; teamleden (bv. Marcel) niet. Default false
-  // zodat het omzet-bedrag niet even flikkert voor een teamlid.
-  const [canSeeRevenue, setCanSeeRevenue] = useState(false)
-
-  useEffect(() => {
-    if (!leadService?.getMyTeamRole) return
-    let alive = true
-    leadService.getMyTeamRole().then(role => { if (alive) setCanSeeRevenue(role !== 'member') })
-    return () => { alive = false }
-  }, [leadService])
 
   useEffect(() => {
     if (!leadService || !coachId) return
@@ -153,7 +143,7 @@ export default function PeriodStatsBar({ leadService, coachId, isMobile, refresh
     { key: 'ingepland',   label: 'Call ingepland',   value: s.ingepland,   num: s.ingepland, Icon: CalendarCheck, color: '#06b6d4' },
     { key: 'callGevoerd', label: 'Call gevoerd',     value: s.callGevoerd, num: s.callGevoerd, Icon: PhoneCall,   color: '#10b981' },
     { key: 'sales',       label: 'Sales',            value: s.sales,       num: s.sales,     Icon: Trophy,        color: GOLD },
-    ...(canSeeRevenue ? [{ key: 'omzet', label: 'Omzet', value: '€' + Math.round(s.omzet || 0).toLocaleString('nl-NL'), num: s.omzet, Icon: Euro, color: '#22c55e' }] : []),
+    { key: 'omzet',       label: 'Omzet',            value: '€' + Math.round(s.omzet || 0).toLocaleString('nl-NL'), num: s.omzet, Icon: Euro, color: '#22c55e' },
     { key: 'noshow',      label: 'No-shows',         value: s.noshow,      num: s.noshow,    Icon: UserX,         color: '#ef4444' },
     { key: 'afgewezen',   label: 'Call afgewezen',   value: s.afgewezen,   num: s.afgewezen, Icon: PhoneOff,      color: '#f97316' },
     { key: 'saleVerloren', label: 'Sale verloren',   value: s.saleVerloren, num: s.saleVerloren, Icon: XCircle,     color: '#ef4444' },

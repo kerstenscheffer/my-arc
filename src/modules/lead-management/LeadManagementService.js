@@ -2203,10 +2203,11 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
           .not('order_value', 'is', null)
           .not('partner_share_pct', 'is', null)
           .is('reverted_at', null),
+        // Geen coach-filter: RLS geeft je eigen rijen + die van teamgenoten
+        // (de owner zet de betaal-status; teamleden lezen 'm mee).
         this.db.supabase
           .from('partner_payouts')
-          .select('period, amount_paid, paid_at')
-          .eq('coach_id', coachId),
+          .select('period, amount_paid, paid_at'),
       ])
 
       const sales = (saleRows || []).map(r => ({

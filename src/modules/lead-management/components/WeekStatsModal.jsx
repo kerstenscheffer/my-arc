@@ -96,10 +96,10 @@ export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, 
   const [kpiDraft, setKpiDraft] = useState({})
   const [kpiSaving, setKpiSaving] = useState(false)
   // Revenue/cashflow-paneel.
-  // Alleen de team-owner (of een solo-coach) mag omzet/uitbetaling zien.
-  // Teamleden (bv. Marcel) niet — die zouden anders de totale omzet + marge zien.
-  // Default false zodat een teamlid de knop niet even ziet flikkeren.
-  const [canSeeRevenue, setCanSeeRevenue] = useState(false)
+  // Iedereen (owner + teamleden) ziet omzet. De payout-tab is wél kijker-
+  // afhankelijk: de owner ziet "Marcel ontvangt / jij houdt" + Betaald-knoppen,
+  // een teamlid (Marcel) ziet "jij ontvangt" + alleen-lezen status.
+  const [isOwner, setIsOwner] = useState(true)
   const [showRevenue, setShowRevenue] = useState(false)
   const [revTab, setRevTab] = useState('omzet') // 'omzet' | 'payout'
   const [revenue, setRevenue] = useState(null)
@@ -124,11 +124,11 @@ export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, 
     return () => { alive = false }
   }, [isOpen, coachId, leadService])
 
-  // Team-rol laden: alleen owner/solo mag omzet + uitbetaling zien.
+  // Team-rol laden: bepaalt of de payout-tab de owner-weergave toont.
   useEffect(() => {
     if (!isOpen || !leadService?.getMyTeamRole) return
     let alive = true
-    leadService.getMyTeamRole().then(role => { if (alive) setCanSeeRevenue(role !== 'member') })
+    leadService.getMyTeamRole().then(role => { if (alive) setIsOwner(role !== 'member') })
     return () => { alive = false }
   }, [isOpen, leadService])
 
@@ -163,7 +163,6 @@ export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, 
   }
 
   const openRevenuePanel = async () => {
-    if (!canSeeRevenue) return // alleen owner/solo
     setShowRevenue(true)
     setRevTab('omzet')
     setRevLoading(true)
@@ -408,8 +407,7 @@ export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, 
     { label: 'Ingepland',    value: totalCalls,                Icon: CalendarCheck, color: '#06b6d4', stage: 'callScheduled' },
     { label: 'Call gevoerd', value: funnel?.callHeld?.count ?? 0, Icon: Phone,      color: '#10b981' },
     { label: 'Sales',        value: totalSales,                Icon: Trophy,        color: '#FFD700', stage: 'sale' },
-    // Omzet alleen voor de owner/solo — teamleden zien het bedrag niet.
-    ...(canSeeRevenue ? [{ label: 'Omzet', value: '€' + Math.round(funnel?.sale?.omzet || 0).toLocaleString('nl-NL'), Icon: Euro, color: '#22c55e' }] : []),
+    { label: 'Omzet',        value: '€' + Math.round(funnel?.sale?.omzet || 0).toLocaleString('nl-NL'), Icon: Euro, color: '#22c55e' },
     { label: 'No-shows',     value: totalNoShows,              Icon: UserX,         color: '#ef4444', stage: 'noShow' },
     { label: 'Afgewezen',    value: funnel?.callRejected?.count ?? 0, Icon: PhoneOff, color: '#f97316', stage: 'callRejected' },
     { label: 'Sale verloren', value: funnel?.saleLost?.count ?? 0, Icon: XCircle, color: '#ef4444', stage: 'saleLost' },
@@ -476,19 +474,17 @@ export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, 
             })}
           </div>
           <div style={{ flex: 1, minWidth: 8 }} />
-          {canSeeRevenue && (
-            <button
-              onClick={openRevenuePanel}
-              title="Terugkerende omzet & cashflow"
-              style={{
-                width: 36, height: 36, flexShrink: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10,
-                color: '#22c55e', cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-              }}
-            >
-              <TrendingUp size={16} />
-            </button>
-          )}
+          <button
+            onClick={openRevenuePanel}
+            title="Terugkerende omzet & cashflow"
+            style={{
+              width: 36, height: 36, flexShrink: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+              background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10,
+              color: '#22c55e', cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+            }}
+          >
+            <TrendingUp size={16} />
+          </button>
           <button
             onClick={openKpiPanel}
             disabled={loading}
@@ -526,7 +522,7 @@ export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, 
                   periodLabel, periodSubtitle,
                   generatedAt: new Date().toLocaleString('nl-NL', { dateStyle: 'short', timeStyle: 'short' }),
                   activity, funnel, reactionStats, sourceBreakdown,
-                  revenueVisible: canSeeRevenue, // teamleden krijgen geen omzet in de PDF
+                  revenueVisible: true, // omzet mag in de PDF (ook voor teamleden)
                   ratios: {
                     responseRate, chaseShare, showRate, noShowRate,
                     proposedToScheduled, closeRate, amountPerCall,
@@ -970,10 +966,18 @@ export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, 
                 const youKeepNow = Math.max(0, curRev - partnerNow)
                 // Totaal dat de partner dit jaar toekomt (alle getoonde maanden).
                 const partnerTotalAll = pos.reduce((a, m) => a + (m.owed || 0), 0)
-                const summary = [
+                // Kijker-afhankelijk: de owner ziet "Marcel ontvangt / jij houdt"
+                // + kan afvinken; een teamlid (Marcel) ziet "jij ontvangt" +
+                // alleen-lezen status.
+                const blockName = isOwner ? partnerName : 'Jij'
+                const summary = isOwner ? [
                   { label: `${partnerName} ontvangt`, sub: 'deze maand', value: eur(partnerNow), color: '#FFD700' },
                   { label: 'Jij houdt', sub: 'deze maand', value: eur(youKeepNow), color: '#22c55e' },
                   { label: 'Over te maken', sub: 'nu openstaand', value: eur(totalOut), color: totalOut > 0 ? '#f59e0b' : '#22c55e' },
+                ] : [
+                  { label: 'Jij ontvangt', sub: 'deze maand', value: eur(partnerNow), color: '#FFD700' },
+                  { label: 'Omzet', sub: 'deze maand', value: eur(curRev), color: '#22c55e' },
+                  { label: 'Nog te ontvangen', sub: 'openstaand', value: eur(totalOut), color: totalOut > 0 ? '#f59e0b' : '#22c55e' },
                 ]
                 return (
                   <>
@@ -994,18 +998,20 @@ export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, 
                       <div style={{ width: 26, height: 26, borderRadius: '50%', background: 'rgba(255,215,0,0.15)', border: '1px solid rgba(255,215,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                         <Users size={13} color="#FFD700" />
                       </div>
-                      <div style={{ flex: 1, fontSize: '0.85rem', fontWeight: 800, color: '#fff' }}>{partnerName}</div>
+                      <div style={{ flex: 1, fontSize: '0.85rem', fontWeight: 800, color: '#fff' }}>{blockName}</div>
                       <div style={{ fontSize: '0.6rem', color: 'rgba(255,255,255,0.4)', textAlign: 'right' }}>
                         totaal aandeel<br /><span style={{ color: '#FFD700', fontWeight: 800, fontSize: '0.72rem' }}>{eur(partnerTotalAll)}</span>
                       </div>
                       <div style={{ fontSize: '0.72rem', fontWeight: 900, color: totalOut > 0 ? '#FFD700' : '#22c55e', background: totalOut > 0 ? 'rgba(255,215,0,0.12)' : 'rgba(34,197,94,0.12)', border: `1px solid ${totalOut > 0 ? 'rgba(255,215,0,0.3)' : 'rgba(34,197,94,0.3)'}`, borderRadius: 8, padding: '3px 8px' }}>
-                        {totalOut > 0 ? `${eur(totalOut)} open` : 'Betaald ✓'}
+                        {totalOut > 0 ? `${eur(totalOut)} ${isOwner ? 'open' : 'te ontvangen'}` : (isOwner ? 'Betaald ✓' : 'Ontvangen ✓')}
                       </div>
                     </div>
 
                     {settleable.length === 0 && upcoming.length === 0 ? (
                       <div style={{ padding: '1.5rem 0.5rem', fontSize: '0.78rem', color: 'rgba(255,255,255,0.4)', lineHeight: 1.5, textAlign: 'center' }}>
-                        Nog geen sales met een aandeel voor {partnerName}. Vul bij een sale het veld “Aandeel {partnerName}” in.
+                        {isOwner
+                          ? <>Nog geen sales met een aandeel voor {partnerName}. Vul bij een sale het veld “Aandeel {partnerName}” in.</>
+                          : <>Je hebt nog geen aandeel op een sale gekregen.</>}
                       </div>
                     ) : (
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
@@ -1019,13 +1025,28 @@ export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, 
                                   {cap(m.label)} {m.isCurrent && <span style={{ fontSize: '0.58rem', color: '#FFD700', fontWeight: 700 }}>· deze maand</span>}
                                 </div>
                                 <div style={{ fontSize: '0.64rem', color: 'rgba(255,255,255,0.4)', marginTop: 2 }}>
-                                  {partnerName} {eur(m.owed)} · jij {eur(youKeepM)}
+                                  {isOwner
+                                    ? `${partnerName} ${eur(m.owed)} · jij ${eur(youKeepM)}`
+                                    : `Jouw aandeel ${eur(m.owed)}`}
                                   {m.settled
-                                    ? ` · betaald${m.paidAt ? ' ' + fmtDate(m.paidAt) : ''}`
-                                    : m.paid > 0 ? ` · ${eur(m.paid)} betaald` : ''}
+                                    ? ` · ${isOwner ? 'betaald' : 'ontvangen'}${m.paidAt ? ' ' + fmtDate(m.paidAt) : ''}`
+                                    : m.paid > 0 ? ` · ${eur(m.paid)} ${isOwner ? 'betaald' : 'ontvangen'}` : ''}
                                 </div>
                               </div>
-                              {m.settled ? (
+                              {/* Owner kan af-/aanvinken; een teamlid ziet alleen de status. */}
+                              {!isOwner ? (
+                                <div style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
+                                  {m.settled ? (
+                                    <span style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '0.4rem 0.7rem', borderRadius: 8, background: 'rgba(34,197,94,0.14)', border: '1px solid rgba(34,197,94,0.4)', color: '#22c55e', fontWeight: 800, fontSize: '0.72rem' }}>
+                                      <Check size={13} /> Ontvangen
+                                    </span>
+                                  ) : (
+                                    <span style={{ padding: '0.4rem 0.7rem', borderRadius: 8, background: 'rgba(255,215,0,0.12)', border: '1px solid rgba(255,215,0,0.3)', color: '#FFD700', fontWeight: 900, fontSize: '0.72rem' }}>
+                                      {eur(m.outstanding)} openstaand
+                                    </span>
+                                  )}
+                                </div>
+                              ) : m.settled ? (
                                 <button onClick={() => settleMonth(m)} disabled={busy} title="Betaling terugdraaien"
                                   style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: 5, padding: '0.4rem 0.7rem', borderRadius: 8, background: 'rgba(34,197,94,0.14)', border: '1px solid rgba(34,197,94,0.4)', color: '#22c55e', fontWeight: 800, fontSize: '0.72rem', cursor: busy ? 'default' : 'pointer', opacity: busy ? 0.5 : 1 }}>
                                   <Check size={13} /> Betaald
@@ -1051,7 +1072,9 @@ export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, 
                       </div>
                     )}
                     <div style={{ marginTop: '0.9rem', fontSize: '0.62rem', color: 'rgba(255,255,255,0.3)', lineHeight: 1.5 }}>
-                      Tip: maak op de 25e het openstaande bedrag over en klik dan “Betaald”. Komt er daarna nog een sale in die maand bij, dan verschijnt alleen dat nieuwe stukje weer als openstaand.
+                      {isOwner
+                        ? 'Tip: maak op de 25e het openstaande bedrag over en klik dan “Betaald”. Komt er daarna nog een sale in die maand bij, dan verschijnt alleen dat nieuwe stukje weer als openstaand.'
+                        : 'Je coach maakt je aandeel over (meestal rond de 25e) en vinkt de maand dan af. “Openstaand” = nog niet overgemaakt.'}
                     </div>
                   </>
                 )
