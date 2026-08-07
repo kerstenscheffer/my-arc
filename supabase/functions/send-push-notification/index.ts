@@ -5,6 +5,9 @@
 //   APNS_KEY_ID     — 10-char key ID shown in Apple Developer portal
 //   APNS_TEAM_ID    — 10-char Team ID from Apple Developer account
 //   APNS_BUNDLE_ID  — "com.myarcfitness.app"
+//   PUSH_HOOK_SECRET — gedeeld geheim; de DB-trigger stuurt dit mee in de
+//                      x-push-secret header. Als deze env-var gezet is, worden
+//                      requests zonder het juiste geheim geweigerd (401).
 //   SUPABASE_URL    — auto-injected
 //   SUPABASE_SERVICE_ROLE_KEY — auto-injected
 
@@ -13,7 +16,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const CORS = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-push-secret",
 };
 
 // Build APNs JWT — valid for 1 hour
@@ -103,6 +106,16 @@ serve(async (req) => {
     return new Response("ok", { headers: CORS });
   }
 
+  // Shared-secret guard: als PUSH_HOOK_SECRET gezet is, moet de caller 'm
+  // meesturen (x-push-secret). Zo kan alleen onze DB-trigger pushes triggeren.
+  const hookSecret = Deno.env.get("PUSH_HOOK_SECRET");
+  if (hookSecret && req.headers.get("x-push-secret") !== hookSecret) {
+    return new Response(JSON.stringify({ error: "unauthorized" }), {
+      status: 401,
+      headers: { ...CORS, "content-type": "application/json" },
+    });
+  }
+
   try {
     const { client_id, user_id, title, body, data } = await req.json();
 
@@ -118,15 +131,16 @@ serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
     );
 
-    // Resolve user_id from client_id if needed
+    // Resolve user_id from client_id if needed (device_push_tokens.user_id =
+    // de auth-uid; op clients heet die kolom auth_user_id).
     let resolvedUserId = user_id;
     if (!resolvedUserId && client_id) {
       const { data: client } = await supabaseAdmin
         .from("clients")
-        .select("user_id")
+        .select("auth_user_id")
         .eq("id", client_id)
         .single();
-      resolvedUserId = client?.user_id;
+      resolvedUserId = client?.auth_user_id;
     }
 
     if (!resolvedUserId) {
