@@ -308,10 +308,13 @@ export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, 
   const totalCalls = funnel?.callScheduled?.count || 0
   const totalSales = funnel?.sale?.count || 0
   const totalNoShows = funnel?.noShow?.count || 0
-  // Show rate = how many scheduled calls actually showed up
-  // (scheduled - no shows) / scheduled.
-  const showRate = totalCalls > 0
-    ? Math.round(((totalCalls - totalNoShows) / totalCalls) * 100)
+  // Show-up en no-show worden berekend over AFGEHANDELDE calls (gevoerd + no-show),
+  // niet over ingeplande — een no-show hoort vaak bij een call die in een vorige
+  // maand werd ingepland, wat anders >100% of negatieve rates gaf.
+  const callsHeld = funnel?.callHeld?.count || 0
+  const handledCalls = callsHeld + totalNoShows
+  const showRate = handledCalls > 0
+    ? Math.round((callsHeld / handledCalls) * 100)
     : null
 
   // Reactie-stats — uses the lead-card counters as the source of truth:
@@ -342,12 +345,9 @@ export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, 
 
   // Twee strakke stat-rijen (aantallen + percentages), in de stijl van de
   // stats-bar — geen vakjes meer.
-  // Close rate wordt berekend vanaf GEVOERDE calls (Sale + Sale verloren), niet
-  // vanaf ingeplande — een ingeplande call die nog niet plaatsvond of een no-show
-  // telt niet mee in de noemer.
-  const callsHeld = funnel?.callHeld?.count ?? 0
+  // Close rate = sales / gevoerde calls (Sale + Sale verloren), niet ingeplande.
   const proposedToScheduled = totalCallProposed > 0 ? Math.round((totalCalls / totalCallProposed) * 100) : null
-  const noShowRate = totalCalls > 0 ? Math.round((totalNoShows / totalCalls) * 100) : null
+  const noShowRate = handledCalls > 0 ? Math.round((totalNoShows / handledCalls) * 100) : null
   const closeRate = callsHeld > 0 ? Math.round((totalSales / callsHeld) * 100) : null
   const pct1 = (v) => (v == null ? '—' : `${v}%`)
   const STAGE_ACCENT = { callProposed: '#a855f7', callScheduled: '#06b6d4', sale: '#10b981', noShow: '#f97316', callRejected: '#f97316', saleLost: '#ef4444' }
@@ -462,8 +462,9 @@ export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, 
                     ? anchorDate.toLocaleDateString('nl-NL', { month: 'long', year: 'numeric' })
                     : `Week ${isoWeek(mondayOf(anchorDate))} · ${fmtRange(mondayOf(anchorDate))}`
                 const periodSubtitle = `${start.toLocaleDateString('nl-NL', { day: 'numeric', month: 'short', year: 'numeric' })} → ${new Date(end - 1).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short', year: 'numeric' })}`
-                const noShowRate = totalCalls > 0 ? Math.round((totalNoShows / totalCalls) * 100) : null
                 const callsHeldPdf = funnel?.callHeld?.count ?? 0
+                const handledCallsPdf = callsHeldPdf + totalNoShows
+                const noShowRate = handledCallsPdf > 0 ? Math.round((totalNoShows / handledCallsPdf) * 100) : null
                 const proposedToScheduled = totalCallProposed > 0 ? Math.round((totalCalls / totalCallProposed) * 100) : null
                 // Close rate vanaf gevoerde calls (Sale + Sale verloren).
                 const closeRate = callsHeldPdf > 0 ? Math.round((totalSales / callsHeldPdf) * 100) : null
@@ -480,8 +481,8 @@ export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, 
                     reactedLeads,
                     responseFraction: `${reactedLeads} / ${newLeadsInPeriod}`,
                     chaseFraction:    `${followedLeads} / ${newLeadsInPeriod}`,
-                    showFraction:     totalCalls > 0 ? `${totalCalls - totalNoShows} / ${totalCalls}` : '—',
-                    noShowFraction:   totalCalls > 0 ? `${totalNoShows} / ${totalCalls}` : '—',
+                    showFraction:     handledCallsPdf > 0 ? `${callsHeldPdf} / ${handledCallsPdf}` : '—',
+                    noShowFraction:   handledCallsPdf > 0 ? `${totalNoShows} / ${handledCallsPdf}` : '—',
                     proposedFraction: totalCallProposed > 0 ? `${totalCalls} / ${totalCallProposed}` : '—',
                     closeFraction:    callsHeldPdf > 0 ? `${totalSales} / ${callsHeldPdf}` : '—',
                     amountPerCallFraction: totalCalls > 0 ? `€${omzetVal.toLocaleString('nl-NL')} / ${totalCalls}` : '—',
