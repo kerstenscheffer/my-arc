@@ -431,6 +431,23 @@ export default function PublicIntakePage() {
         }
       }
 
+      // Coach een melding sturen dat de intake is ingevuld. Via de anon-veilige
+      // RPC (leidt de coach server-side af uit de client) — dezelfde route als de
+      // voedingsintake, want deze pagina draait publiek/anon. Niet-blokkerend.
+      try {
+        await supabase.rpc('create_intake_notification', {
+          p_client_id: clientId,
+          p_type: 'intake_completed',
+          p_priority: 'high',
+          p_title: `${data.first_name || existingClient.first_name || 'Een client'} heeft de intake ingevuld`,
+          p_message: 'De onboarding-intake is volledig ingevuld en klaar om te bekijken.',
+          p_action_type: 'review_intake',
+          p_action_data: { client_id: clientId },
+        })
+      } catch (notifyErr) {
+        console.warn('⚠️ Coach-notificatie voor intake mislukt (intake zelf is opgeslagen):', notifyErr)
+      }
+
       console.log('✅ Opgeslagen! Naar phase 2...')
       setIntakeId(clientId)
       setPhase(2)
