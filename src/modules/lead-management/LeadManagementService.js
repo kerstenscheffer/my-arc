@@ -1854,7 +1854,6 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
       // skip so we can count no-shows even though "no show" is in the
       // NEGATIVE_FUNNEL_WORDS exclusion list (used to keep them out of the
       // positive stages like `sale` / `callScheduled`).
-      const NO_SHOW_KEYWORDS = ['no show', 'no-show', 'noshow']
       // Call afgewezen — negatief eindpunt op de call-fase. Apart geteld (met een
       // reden-breakdown), net als no-show.
       const REJECTED_KEYWORDS = ['afgewezen', 'geweigerd', 'call afgewezen', 'rejected']
@@ -1896,7 +1895,7 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
       // heen-en-weer geschuif of dubbele movements de teller niet opblazen.
       const seen = {
         replied: new Set(), conversation: new Set(), callProposed: new Set(),
-        callScheduled: new Set(), sale: new Set(), noShow: new Set(), callRejected: new Set(),
+        callScheduled: new Set(), sale: new Set(), callRejected: new Set(),
         saleLost: new Set(),
       }
 
@@ -1937,13 +1936,10 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
           at: mov.moved_at,
           by: coachLabel(mov.coach_id),
         }
-        if (NO_SHOW_KEYWORDS.some(kw => toSection.includes(kw))) {
-          if (leadId && seen.noShow.has(leadId)) return
-          if (leadId) seen.noShow.add(leadId)
-          funnel.noShow.count++
-          funnel.noShow.leads.push(leadInfo)
-          return
-        }
+        // No-show wordt NIET meer hier (op moved_at) geteld, maar verderop op
+        // call_date — zie het noShow-blok na de loop. No-Show-secties vallen door
+        // naar de NEGATIVE_FUNNEL_WORDS-skip zodat ze niet in positieve stappen
+        // belanden.
         if (REJECTED_KEYWORDS.some(kw => toSection.includes(kw))) {
           if (leadId && seen.callRejected.has(leadId)) return
           if (leadId) seen.callRejected.add(leadId)
@@ -2007,6 +2003,39 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
           })
         }
       } catch (e) { console.warn('callHeld count failed:', e?.message) }
+
+      // No-show — ingeplande calls die niet-gevoerd waren, geteld op de CALL-datum
+      // (net als callHeld), NIET op moved_at. Zo vervuilt het opruimen van oude
+      // no-show-kaarten op het bord de week-stats niet meer. Per lead kijken we naar
+      // de LAATSTE ingeplande call: een verplaatsing (reschedule) zet de oude call op
+      // call_happened=false maar legt een nieuwe call vast — alleen als de láátste
+      // ingeplande call niet-gevoerd is, telt de lead als no-show.
+      try {
+        const startDate = (startISO || '').split('T')[0]
+        const endDate = (endISO || '').split('T')[0]
+        if (startDate && endDate) {
+          const { data: schedRows } = await this.db.supabase
+            .from('lead_movements')
+            .select('lead_id, lead_name, call_date, call_happened, moved_at')
+            .not('call_date', 'is', null)
+            .is('reverted_at', null)
+          const latestByLead = new Map()
+          ;(schedRows || []).forEach(r => {
+            if (!r.lead_id) return
+            const prev = latestByLead.get(r.lead_id)
+            if (!prev || r.call_date > prev.call_date ||
+                (r.call_date === prev.call_date && r.moved_at > prev.moved_at)) {
+              latestByLead.set(r.lead_id, r)
+            }
+          })
+          latestByLead.forEach(r => {
+            if (r.call_happened === false && r.call_date >= startDate && r.call_date <= endDate) {
+              funnel.noShow.count++
+              funnel.noShow.leads.push({ leadId: r.lead_id, name: r.lead_name || 'Unknown', at: r.call_date, to: 'No Show' })
+            }
+          })
+        }
+      } catch (e) { console.warn('noShow count failed:', e?.message) }
 
       return funnel
     } catch (error) {
