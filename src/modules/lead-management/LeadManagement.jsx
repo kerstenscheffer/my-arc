@@ -14,7 +14,6 @@ import KanbanBoard from './components/kanban/KanbanBoard'
 import OutreachAnalytics from './components/analytics/OutreachAnalytics'
 import CampaignTracker from './components/CampaignTracker'
 import campaignTrackingService from './CampaignTrackingService'
-import DMBibleModal from './components/DMBibleModal'
 import LeadAnalyticsDashboard from '../lead-analytics/LeadAnalyticsDashboard'
 import IntakeTab from './components/IntakeTab'
 import LeadMoreMenu from './components/LeadMoreMenu'
@@ -479,7 +478,6 @@ export default function LeadManagement({ db, isMobile, coachId, user }) {
         )}
       </div>
 
-      <DMBibleModal isMobile={isMobile} db={db} coachId={coachId} />
       {showSOP && <SOPModal isMobile={isMobile} onClose={() => setShowSOP(false)} />}
 
       <style>{`

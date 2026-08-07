@@ -4,7 +4,7 @@
 
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { createPortal } from 'react-dom'
-import { Flame, X, Copy, Check, GripHorizontal, Trash2, Plus, Eraser, Pencil, EyeOff, Eye, FolderPlus } from 'lucide-react'
+import { Flame, X, Copy, Check, GripHorizontal, Trash2, Plus, Eraser, Pencil, EyeOff, Eye, FolderPlus, MessageSquare } from 'lucide-react'
 
 // GOLD THEME
 const GOLD = {
@@ -327,7 +327,7 @@ const iconBtn = (color) => ({
   color, cursor: 'pointer', touchAction: 'manipulation',
 })
 
-export default function DMBibleModal({ isMobile = false, db = null, coachId = null }) {
+export default function DMBibleModal({ isMobile = false, db = null, coachId = null, triggerVariant = 'fab' }) {
   const [isOpen, setIsOpen] = useState(false)
   const [activeCategory, setActiveCategory] = useState('eerste-dikker')
   const [copiedIndex, setCopiedIndex] = useState(null)
@@ -676,9 +676,27 @@ export default function DMBibleModal({ isMobile = false, db = null, coachId = nu
     }
   }, [isDragging, onDragMove, onDragEnd])
 
-  // ===== FLOATING BUTTON — portal'd to body so a parent's `transform:
-  // translateZ(0)` (used elsewhere for compositing) doesn't turn this from
-  // viewport-fixed into container-fixed and scroll the FAB off screen.
+  // ===== TRIGGER — twee varianten:
+  //  'inline' → compacte toolbar-knop (naast de zoekbalk op de leads-pagina),
+  //             gewoon in de flow gerenderd (geen portal/fixed).
+  //  'fab'    → zwevende ronde knop rechtsonder, portal'd to body zodat een
+  //             parent's `transform: translateZ(0)` (compositing) 'm niet van
+  //             viewport-fixed naar container-fixed verandert en wegscrollt.
+  const inlineTrigger = !isOpen ? (
+    <button
+      onClick={() => setIsOpen(true)}
+      title="DM Copy Center"
+      style={{
+        width: 30, height: 30, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
+        background: 'rgba(212,175,55,0.14)', border: '1px solid rgba(212,175,55,0.4)',
+        borderRadius: 8, color: GOLD.primary,
+        cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+      }}
+    >
+      <MessageSquare size={16} />
+    </button>
+  ) : null
+
   const fab = !isOpen ? createPortal(
     <button
       onClick={() => setIsOpen(true)}
@@ -711,7 +729,9 @@ export default function DMBibleModal({ isMobile = false, db = null, coachId = nu
     document.body,
   ) : null
 
-  if (!isOpen) return fab
+  const trigger = triggerVariant === 'inline' ? inlineTrigger : fab
+
+  if (!isOpen) return trigger
 
   if (!pos) return fab // wait for initial position calc
 

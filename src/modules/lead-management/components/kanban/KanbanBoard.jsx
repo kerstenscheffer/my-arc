@@ -23,6 +23,7 @@ import LeadDetailModalV2 from './LeadDetailModalV2'
 import OutreachLoggerModal from '../OutreachLoggerModal'
 import LeadSourceModal from './LeadSourceModal'
 import CallProposalModal from './CallProposalModal'
+import DMBibleModal from '../DMBibleModal'
 
 const SNOOZE_SECTION_PATTERNS = ['later follow', 'later opvolg', 'follow up', 'followup', 'snooze', 'parkeer']
 
@@ -1720,6 +1721,9 @@ export default function KanbanBoard({
               )}
             </div>
 
+            {/* DM Copy Center — inline trigger naast de zoekbalk (verving de
+                zwevende FAB rechtsonder). */}
+            <DMBibleModal triggerVariant="inline" isMobile={isMobile} db={db} coachId={coachId} />
 
             {/* Openstaande calls — opent de afhandel-pop-up (2-staps). */}
             <button
