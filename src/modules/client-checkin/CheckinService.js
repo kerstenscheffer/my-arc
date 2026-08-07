@@ -135,32 +135,10 @@ export default class CheckinService {
       if (error) throw error
       console.log('✅ Check-in created:', data.id)
 
-      // Coach een melding sturen dat de check-in binnen is (CoachNotificationBell
-      // leest coach_notifications). Alleen bij een echte submit, niet bij concept.
-      // Non-blocking: faalt dit, dan blijft de check-in zelf gewoon opgeslagen.
-      if (insertData.status === 'submitted' && baseData.coach_id) {
-        try {
-          let clientName = ''
-          if (baseData.client_id) {
-            const { data: c } = await this.supabase
-              .from('clients').select('first_name, last_name').eq('id', baseData.client_id).maybeSingle()
-            if (c) clientName = `${c.first_name || ''} ${c.last_name || ''}`.trim()
-          }
-          await this.supabase.from('coach_notifications').insert([{
-            coach_id: baseData.coach_id,
-            client_id: baseData.client_id || null,
-            type: 'checkin_completed',
-            priority: 'normal',
-            title: 'Check-in ingevuld',
-            message: clientName
-              ? `${clientName} heeft de wekelijkse check-in ingevuld`
-              : 'Een client heeft de wekelijkse check-in ingevuld',
-            read_status: false,
-          }])
-        } catch (notifyErr) {
-          console.error('⚠️ Coach-notificatie voor check-in mislukt (check-in zelf is opgeslagen):', notifyErr)
-        }
-      }
+      // De coach-melding "Check-in ingevuld" wordt server-side aangemaakt door
+      // de DB-trigger trg_notify_coach_on_checkin op client_checkins (bij élke
+      // overgang naar status='submitted'). Betrouwbaarder dan een client-side
+      // insert die van het codepad/de build afhing — daarom hier niet meer.
 
       return data
     } catch (error) {
