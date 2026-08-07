@@ -86,7 +86,7 @@ export default function OfferPilarenSection({ isMobile }) {
         {/* Pilaar-cards — verticale lijst, om en om links/rechts op desktop */}
         <div style={{
           display: 'flex', flexDirection: 'column',
-          gap: isMobile ? '1rem' : '1.05rem',
+          gap: isMobile ? '3rem' : '4rem',
           maxWidth: 940, margin: '0 auto'
         }}>
           {PILAREN.map((p, i) => (

@@ -40,14 +40,31 @@ export default function GarantiePrijsSection({ isMobile }) {
           ))}
         </div>
 
-        {/* ═══ Prijs — veruit het grootste element van dit scherm ═══ */}
-        <div style={{ textAlign: 'center', marginBottom: isMobile ? '1.25rem' : '1.5rem' }}>
-          <div style={{ fontSize: isMobile ? '4.2rem' : '6.2rem', fontWeight: '900', color: GOLD, lineHeight: 1, letterSpacing: '-0.03em' }}>
-            €297
-          </div>
-          <div style={{ marginTop: isMobile ? '0.7rem' : '0.95rem', fontSize: isMobile ? '0.95rem' : '1.15rem', fontWeight: '700', color: '#fff', lineHeight: 1.3 }}>
-            3 maanden, het volledige traject
-          </div>
+        {/* ═══ De investering — 3 trajecten (3 mnd populairst) ═══ */}
+        <div style={{ textAlign: 'center', marginBottom: isMobile ? '0.9rem' : '1.1rem' }}>
+          <span style={{ fontSize: isMobile ? '0.6rem' : '0.65rem', fontWeight: '800', letterSpacing: '0.15em', color: 'rgba(255,255,255,0.5)' }}>DE INVESTERING</span>
+        </div>
+        <div style={{ display: 'flex', gap: isMobile ? '0.5rem' : '0.75rem', marginBottom: isMobile ? '1.25rem' : '1.5rem', alignItems: 'stretch' }}>
+          {[
+            { m: '12 maanden', p: '€997', highlight: false },
+            { m: '3 maanden', p: '€297', highlight: true },
+            { m: '6 maanden', p: '€547', highlight: false },
+          ].map((tier) => (
+            <div key={tier.m} style={{
+              flex: 1, minWidth: 0, textAlign: 'center',
+              padding: isMobile ? '1rem 0.4rem' : '1.35rem 0.6rem',
+              borderRadius: '14px',
+              background: tier.highlight ? 'rgba(255,186,9,0.10)' : 'rgba(255,255,255,0.03)',
+              border: `1.5px solid ${tier.highlight ? GOLD + '99' : 'rgba(255,255,255,0.1)'}`,
+            }}>
+              <div style={{ fontSize: isMobile ? '0.62rem' : '0.72rem', fontWeight: '700', color: 'rgba(255,255,255,0.6)', marginBottom: isMobile ? '0.4rem' : '0.55rem', whiteSpace: 'nowrap' }}>
+                {tier.m}
+              </div>
+              <div style={{ fontSize: isMobile ? '1.75rem' : '2.6rem', fontWeight: '900', color: tier.highlight ? GOLD : '#fff', lineHeight: 1, letterSpacing: '-0.02em' }}>
+                {tier.p}
+              </div>
+            </div>
+          ))}
         </div>
 
         {/* ═══ Case study-regel ═══ */}

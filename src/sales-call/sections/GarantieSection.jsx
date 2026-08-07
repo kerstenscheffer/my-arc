@@ -35,9 +35,9 @@ export default function GarantieSection({ isMobile }) {
           lineHeight: 1.4,
           letterSpacing: '-0.01em',
         }}>
-          Geen zichtbaar verschil binnen 30 dagen?{' '}
+          Risico vrij starten: Geen zichtbaar verschil in 30 dagen?{' '}
           <span style={{ color: GOLD }}>
-            Dan krijg je je investering terug en loop je weg met 30 dagen gratis coaching.
+            Krijg je volledige investering terug.
           </span>
         </p>
       </div>

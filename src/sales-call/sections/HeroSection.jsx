@@ -110,7 +110,7 @@ export default function HeroSection({ isMobile }) {
           marginTop: isMobile ? '0.5rem' : '0.65rem',
           fontSize: isMobile ? '1.05rem' : '1.6rem',
         }}>
-          In 3 maanden in shape met een aanpak die je daarna niet meer kwijtraakt.
+          In shape komen met een aanpak die je levenslang kan aanhouden.
         </div>
       </div>
 
