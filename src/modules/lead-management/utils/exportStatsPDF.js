@@ -128,6 +128,7 @@ export async function exportStatsPDF(payload) {
   const {
     periodLabel, periodSubtitle, coachName, generatedAt,
     activity, reactionStats, ratios, funnel, sourceBreakdown,
+    revenueVisible = true, // owner/solo → true; teamlid → false (geen omzet)
   } = payload
 
   const doc = new jsPDF({ unit: 'pt', format: 'a4' })
@@ -218,7 +219,7 @@ export async function exportStatsPDF(payload) {
     { label: 'Call voorgesteld', value: funnel?.callProposed?.count || 0,    hex: '#a855f7', rgb: [168, 85, 247],  node: ICON_NODES.phone },
     { label: 'Call ingepland',   value: funnel?.callScheduled?.count || 0,   hex: '#06b6d4', rgb: [6, 182, 212],   node: ICON_NODES.calendarCheck },
     { label: 'Sales',            value: funnel?.sale?.count || 0,            hex: '#FFD700', rgb: [255, 215, 0],   node: ICON_NODES.trophy },
-    { label: 'Omzet',            value: '€' + omzet.toLocaleString('nl-NL'), hex: '#22c55e', rgb: [34, 197, 94], node: ICON_NODES.euro },
+    ...(revenueVisible ? [{ label: 'Omzet', value: '€' + omzet.toLocaleString('nl-NL'), hex: '#22c55e', rgb: [34, 197, 94], node: ICON_NODES.euro }] : []),
     { label: 'No-shows',         value: funnel?.noShow?.count || 0,          hex: '#ef4444', rgb: [239, 68, 68],   node: ICON_NODES.userX },
     { label: 'Call afgewezen',   value: funnel?.callRejected?.count || 0,    hex: '#f97316', rgb: [249, 115, 22],  node: ICON_NODES.phoneOff },
   ]
@@ -284,7 +285,7 @@ export async function exportStatsPDF(payload) {
         ['Show-up rate',           fmtPct(ratios.showRate),            ratios.showFraction || '—',     'Ingeplande calls die ook echt komen opdagen'],
         ['No-show rate',           fmtPct(ratios.noShowRate),          ratios.noShowFraction || '—',   'Calls die niet komen opdagen — hoe lager, hoe beter'],
         ['Close rate',             fmtPct(ratios.closeRate),           ratios.closeFraction || '—',    'Gehouden calls die sluiten in een sale (sales / getoond)'],
-        ['Bedrag per sales call',  eurFmt(ratios.amountPerCall),       ratios.amountPerCallFraction || '—', 'Wat een ingeplande call gemiddeld oplevert (omzet / calls)'],
+        ...(revenueVisible ? [['Bedrag per sales call',  eurFmt(ratios.amountPerCall),       ratios.amountPerCallFraction || '—', 'Wat een ingeplande call gemiddeld oplevert (omzet / calls)']] : []),
         ['Opvolg rate',            fmtPct(ratios.chaseShare),          ratios.chaseFraction || '—',    'Aandeel leads dat een follow-up nodig had'],
       ],
       headStyles: { fillColor: GREEN, textColor: BLACK, fontStyle: 'bold' },

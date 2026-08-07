@@ -2174,6 +2174,19 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
     }
   }
 
+  // Rol van de ingelogde coach in z'n team: 'owner' | 'member' | null (solo).
+  // Bepaalt wie de omzet/uitbetaal-cijfers mag zien (alleen owner/solo).
+  async getMyTeamRole() {
+    try {
+      const { data, error } = await this.db.supabase.rpc('my_team_role')
+      if (error) throw error
+      return data || null
+    } catch (e) {
+      console.warn('getMyTeamRole failed:', e?.message)
+      return null
+    }
+  }
+
   // ── PARTNER-UITBETALING ─────────────────────────────────────────────────
   // Berekent per maand wat er aan de partner (bv. Marcel) toekomt: van elke
   // sale met een partner_share_pct wordt dat % van de maand-cashflow genomen

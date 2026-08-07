@@ -96,6 +96,10 @@ export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, 
   const [kpiDraft, setKpiDraft] = useState({})
   const [kpiSaving, setKpiSaving] = useState(false)
   // Revenue/cashflow-paneel.
+  // Alleen de team-owner (of een solo-coach) mag omzet/uitbetaling zien.
+  // Teamleden (bv. Marcel) niet — die zouden anders de totale omzet + marge zien.
+  // Default false zodat een teamlid de knop niet even ziet flikkeren.
+  const [canSeeRevenue, setCanSeeRevenue] = useState(false)
   const [showRevenue, setShowRevenue] = useState(false)
   const [revTab, setRevTab] = useState('omzet') // 'omzet' | 'payout'
   const [revenue, setRevenue] = useState(null)
@@ -119,6 +123,14 @@ export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, 
     leadService.getKpiTargets(coachId).then(m => { if (alive) setKpiTargets(m || {}) })
     return () => { alive = false }
   }, [isOpen, coachId, leadService])
+
+  // Team-rol laden: alleen owner/solo mag omzet + uitbetaling zien.
+  useEffect(() => {
+    if (!isOpen || !leadService?.getMyTeamRole) return
+    let alive = true
+    leadService.getMyTeamRole().then(role => { if (alive) setCanSeeRevenue(role !== 'member') })
+    return () => { alive = false }
+  }, [isOpen, leadService])
 
   const openKpiPanel = () => {
     const draft = {}
@@ -151,6 +163,7 @@ export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, 
   }
 
   const openRevenuePanel = async () => {
+    if (!canSeeRevenue) return // alleen owner/solo
     setShowRevenue(true)
     setRevTab('omzet')
     setRevLoading(true)
@@ -395,7 +408,8 @@ export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, 
     { label: 'Ingepland',    value: totalCalls,                Icon: CalendarCheck, color: '#06b6d4', stage: 'callScheduled' },
     { label: 'Call gevoerd', value: funnel?.callHeld?.count ?? 0, Icon: Phone,      color: '#10b981' },
     { label: 'Sales',        value: totalSales,                Icon: Trophy,        color: '#FFD700', stage: 'sale' },
-    { label: 'Omzet',        value: '€' + Math.round(funnel?.sale?.omzet || 0).toLocaleString('nl-NL'), Icon: Euro, color: '#22c55e' },
+    // Omzet alleen voor de owner/solo — teamleden zien het bedrag niet.
+    ...(canSeeRevenue ? [{ label: 'Omzet', value: '€' + Math.round(funnel?.sale?.omzet || 0).toLocaleString('nl-NL'), Icon: Euro, color: '#22c55e' }] : []),
     { label: 'No-shows',     value: totalNoShows,              Icon: UserX,         color: '#ef4444', stage: 'noShow' },
     { label: 'Afgewezen',    value: funnel?.callRejected?.count ?? 0, Icon: PhoneOff, color: '#f97316', stage: 'callRejected' },
     { label: 'Sale verloren', value: funnel?.saleLost?.count ?? 0, Icon: XCircle, color: '#ef4444', stage: 'saleLost' },
@@ -462,17 +476,19 @@ export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, 
             })}
           </div>
           <div style={{ flex: 1, minWidth: 8 }} />
-          <button
-            onClick={openRevenuePanel}
-            title="Terugkerende omzet & cashflow"
-            style={{
-              width: 36, height: 36, flexShrink: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-              background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10,
-              color: '#22c55e', cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-            }}
-          >
-            <TrendingUp size={16} />
-          </button>
+          {canSeeRevenue && (
+            <button
+              onClick={openRevenuePanel}
+              title="Terugkerende omzet & cashflow"
+              style={{
+                width: 36, height: 36, flexShrink: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10,
+                color: '#22c55e', cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+              }}
+            >
+              <TrendingUp size={16} />
+            </button>
+          )}
           <button
             onClick={openKpiPanel}
             disabled={loading}
@@ -510,6 +526,7 @@ export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, 
                   periodLabel, periodSubtitle,
                   generatedAt: new Date().toLocaleString('nl-NL', { dateStyle: 'short', timeStyle: 'short' }),
                   activity, funnel, reactionStats, sourceBreakdown,
+                  revenueVisible: canSeeRevenue, // teamleden krijgen geen omzet in de PDF
                   ratios: {
                     responseRate, chaseShare, showRate, noShowRate,
                     proposedToScheduled, closeRate, amountPerCall,
