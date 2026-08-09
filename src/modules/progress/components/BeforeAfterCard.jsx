@@ -65,7 +65,19 @@ export default function BeforeAfterCard({ client, db, isMobile, bare = false, fa
           .order('photo_date', { ascending: true })
         const all = (data || []).filter(p => p.photo_url)
         const front = all.filter(isFront)
-        const use = front.length >= 2 ? front : all
+        let use
+        if (front.length >= 2) {
+          use = front
+        } else {
+          // Group by angle, pick first group with 2+ photos — never mix angles
+          const groups = {}
+          for (const p of all) {
+            const a = (p.metadata?.subtype || p.photo_type || 'overig').toLowerCase()
+            ;(groups[a] = groups[a] || []).push(p)
+          }
+          const withTwo = Object.values(groups).find(g => g.length >= 2)
+          use = withTwo || []
+        }
         if (use.length < 2) { if (!cancelled) setStatus('empty'); return }
         if (!cancelled) setPair({ first: use[0], last: use[use.length - 1] })
       } catch (e) { console.error('BeforeAfter laden mislukt:', e); if (!cancelled) setStatus('error') }

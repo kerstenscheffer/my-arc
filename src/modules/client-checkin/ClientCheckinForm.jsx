@@ -434,7 +434,8 @@ export default function ClientCheckinForm({ db, client, onSubmitted, onClose }) 
         </div>
         <p style={{
           fontSize: isMobile ? '0.8rem' : '0.85rem',
-          color: 'rgba(255, 255, 255, 0.5)',
+          color: 'rgba(255, 255, 255, 0.85)',
+          fontWeight: '600',
           margin: 0,
         }}>
           {section.description}
@@ -457,8 +458,8 @@ export default function ClientCheckinForm({ db, client, onSubmitted, onClose }) 
               alignItems: 'center',
               gap: '0.4rem',
               fontSize: isMobile ? '0.75rem' : '0.8rem',
-              color: 'rgba(255, 255, 255, 0.55)',
-              fontWeight: '600',
+              color: '#fff',
+              fontWeight: '800',
               marginBottom: '0.45rem',
               letterSpacing: '0.01em',
             }}>

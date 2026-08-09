@@ -7,6 +7,7 @@ const GOLD = '#ffba09'
 
 const PILAREN = [
   {
+    category: 'Voeding',
     title: 'Altijd Weten Wat Te Eten Systeem',
     subtitle: 'Een aanpak die bij jou past — ook op verjaardagen, feestjes en vakanties.',
     bullets: [
@@ -16,6 +17,7 @@ const PILAREN = [
     images: ['/sales-screenshots/eten.png', '/sales-screenshots/meedoen.png'],
   },
   {
+    category: 'Training',
     title: 'Elke Training Telt Methode',
     subtitle: 'Schema op maat, uitleg per oefening, feedback op jouw uitvoering.',
     bullets: [
@@ -25,6 +27,7 @@ const PILAREN = [
     images: ['/sales-screenshots/trainen.png'],
   },
   {
+    category: 'Begeleiding',
     title: 'Coach In Jouw Corner',
     subtitle: 'Ik kijk meerdere keren per week met je mee — we zien allebei dat het werkt.',
     bullets: [
@@ -123,16 +126,21 @@ export default function OfferPilarenSection({ isMobile }) {
                 <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? '0.65rem' : '0.75rem', marginBottom: isMobile ? '0.4rem' : '0.5rem' }}>
                   <div style={{
                     flexShrink: 0, width: isMobile ? 34 : 42, height: isMobile ? 34 : 42, borderRadius: '50%',
-                    background: 'rgba(255,186,9,0.14)', border: `1.5px solid ${GOLD}66`,
+                    background: 'rgba(255,255,255,0.1)', border: '1.5px solid rgba(255,255,255,0.55)',
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    color: GOLD, fontWeight: '900', fontSize: isMobile ? '1.05rem' : '1.35rem',
+                    color: '#fff', fontWeight: '900', fontSize: isMobile ? '1.05rem' : '1.35rem',
                   }}>{i + 1}</div>
                   <h3 style={{
                     flex: 1, minWidth: 0,
-                    fontSize: isMobile ? '1.5rem' : '2.1rem',
+                    fontSize: isMobile ? '1.25rem' : '1.85rem',
                     fontWeight: '900', color: '#fff', margin: 0,
-                    lineHeight: 1.1, letterSpacing: '-0.02em',
-                  }}>{p.title}</h3>
+                    lineHeight: 1.15, letterSpacing: '-0.02em',
+                  }}>
+                    <span style={{ display: 'block', fontSize: isMobile ? '0.7rem' : '0.8rem', fontWeight: '700', color: GOLD, letterSpacing: '0.04em', marginBottom: '0.2rem' }}>
+                      PILAAR {i + 1}: {p.category.toUpperCase()}
+                    </span>
+                    {p.title}
+                  </h3>
                 </div>
 
                 {/* Subkop — kleiner, ondergeschikt aan de pilaarnaam */}
