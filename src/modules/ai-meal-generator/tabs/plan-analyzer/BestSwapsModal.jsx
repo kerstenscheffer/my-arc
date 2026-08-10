@@ -90,8 +90,11 @@ export default function BestSwapsModal({ clientId, db, isMobile, onClose, embedd
   const handleSave = async () => {
     setSaving(true); setSavedMsg('')
     try {
-      const { data: auth } = await db.supabase.auth.getUser()
-      const coachId = auth?.user?.id
+      // getSession() leest de coach-id lokaal uit de opgeslagen sessie (geen
+      // netwerk-call), i.p.v. getUser() dat de token online valideert en kon
+      // falen met "Failed to fetch".
+      const { data: { session } } = await db.supabase.auth.getSession()
+      const coachId = session?.user?.id
       const rows = SLOTS.map(s => ({
         coach_id: coachId,
         client_id: clientId,
