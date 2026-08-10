@@ -452,7 +452,7 @@ export default function PlanAnalyzer({
       try {
         const { data, error } = await db.supabase
           .from('client_meal_plans')
-          .insert([{ client_id: resolvedClientId, coach_id: coachId || null, template_name: name || 'Geladen sjabloon', week_structure: wsToSave, created_via: 'template_copy', is_active: false }])
+          .insert([{ client_id: resolvedClientId, template_name: name || 'Geladen sjabloon', week_structure: wsToSave, created_via: 'template_copy', is_active: false }])
           .select('id').single()
         if (error || !data?.id) throw (error || new Error('geen id teruggegeven'))
         setSelectedConceptId(data.id)
