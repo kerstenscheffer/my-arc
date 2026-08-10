@@ -19,11 +19,17 @@ export default function ExerciseHistory({ exerciseName, previousLog, loading, cl
     if (!client?.id || !db || !exerciseName) return
     setLoadingHistory(true)
     try {
-      const { data, error } = await db.supabase
+      // Match op ALLE woorden van de naam (AND van ilike's) i.p.v. exact-match,
+      // zodat naam-varianten samenvallen ("Pec Deck Machine" ↔ "Machine Pec Deck").
+      const tokens = (exerciseName || '').toLowerCase()
+        .replace(/[^a-z0-9]+/g, ' ').trim().split(/\s+/).filter(w => w.length >= 2)
+      let q = db.supabase
         .from('workout_progress')
-        .select(`sets, created_at, workout_sessions!inner(client_id)`)
+        .select(`sets, created_at, exercise_name, workout_sessions!inner(client_id)`)
         .eq('workout_sessions.client_id', client.id)
-        .eq('exercise_name', exerciseName)
+      if (tokens.length) tokens.forEach(t => { q = q.ilike('exercise_name', `%${t}%`) })
+      else q = q.eq('exercise_name', exerciseName)
+      const { data, error } = await q
         .order('created_at', { ascending: false })
         .limit(20)
       if (error) throw error

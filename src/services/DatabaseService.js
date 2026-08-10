@@ -9240,22 +9240,23 @@ async updateLeadStatus(leadId, status, notes = null) {
  */
 async getPreviousExerciseLog(clientId, exerciseName) {
   try {
-    const { data, error } = await this.supabase
+    // Match op ALLE woorden van de naam (AND van ilike's) i.p.v. exact-match,
+    // zodat naam-varianten samenvallen: "Pec Deck Machine" vindt óók logs onder
+    // "Machine Pec Deck" (woordvolgorde/hoofdletters/spaties maken niet meer uit).
+    const tokens = (exerciseName || '').toLowerCase()
+      .replace(/[^a-z0-9]+/g, ' ').trim().split(/\s+/).filter(w => w.length >= 2)
+    let q = this.supabase
       .from('workout_progress')
-      .select(`
-        sets,
-        created_at,
-        workout_sessions!inner(client_id)
-      `)
+      .select('sets, created_at, exercise_name, workout_sessions!inner(client_id)')
       .eq('workout_sessions.client_id', clientId)
-      .eq('exercise_name', exerciseName)
+    if (tokens.length) tokens.forEach(t => { q = q.ilike('exercise_name', `%${t}%`) })
+    else q = q.eq('exercise_name', exerciseName)
+    const { data, error } = await q
       .order('created_at', { ascending: false })
       .limit(1)
-      .single()
-    
+      .maybeSingle()
+
     if (error) throw error
-    
-    console.log('✅ Previous log loaded:', exerciseName)
     return data
   } catch (error) {
     console.log('ℹ️ No previous log found for:', exerciseName)
