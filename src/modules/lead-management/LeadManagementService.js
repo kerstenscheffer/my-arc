@@ -1872,6 +1872,7 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
         conversation:  { count: 0, leads: [] },
         callProposed:  { count: 0, leads: [] },
         callScheduled: { count: 0, happenedCount: 0, leads: [] },
+        callBooked:    { count: 0, leads: [] },
         callHeld:      { count: 0, leads: [] },
         sale:          { count: 0, leads: [], omzet: 0 },
         noShow:        { count: 0, leads: [] },
@@ -2029,13 +2030,21 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
             }
           })
           latestByLead.forEach(r => {
-            if (r.call_happened === false && r.call_date >= startDate && r.call_date <= endDate) {
+            const inPeriod = r.call_date >= startDate && r.call_date <= endDate
+            // Calls geboekt = alle calls die op hun INGEPLANDE datum in de
+            // periode vallen (gevoerd, no-show óf nog open) — per lead de
+            // laatste ingeplande call, zodat verzette calls niet dubbel tellen.
+            if (inPeriod) {
+              funnel.callBooked.count++
+              funnel.callBooked.leads.push({ leadId: r.lead_id, name: r.lead_name || 'Unknown', at: r.call_date })
+            }
+            if (r.call_happened === false && inPeriod) {
               funnel.noShow.count++
               funnel.noShow.leads.push({ leadId: r.lead_id, name: r.lead_name || 'Unknown', at: r.call_date, to: 'No Show' })
             }
           })
         }
-      } catch (e) { console.warn('noShow count failed:', e?.message) }
+      } catch (e) { console.warn('noShow/booked count failed:', e?.message) }
 
       return funnel
     } catch (error) {
@@ -2043,6 +2052,7 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
       return {
         replied: { count: 0, leads: [] }, conversation: { count: 0, leads: [] },
         callProposed: { count: 0, leads: [] }, callScheduled: { count: 0, leads: [] },
+        callBooked: { count: 0, leads: [] },
         callHeld: { count: 0, leads: [] },
         sale: { count: 0, leads: [], omzet: 0 }, noShow: { count: 0, leads: [] },
         callRejected: { count: 0, leads: [], reasons: {} },
