@@ -181,7 +181,7 @@ const generateWeekOverviewPage = (enrichedPlan) => {
       const timing = (typeof m.timing === 'string' && m.timing.length <= 5 && m.timing.includes(':')) ? m.timing : null
       return `
         <div class="wday-meal">
-          <div class="wday-meal-slot">${SLOT_CONFIG[slot].icon} ${SLOT_CONFIG[slot].label}${timing ? ` · ${timing}` : ''}</div>
+          <div class="wday-meal-slot">${SLOT_CONFIG[slot].icon} ${(m.display_label || SLOT_CONFIG[slot].label).toUpperCase()}${timing ? ` · ${timing}` : ''}</div>
           <div class="wday-meal-name">${name.length > 22 ? name.slice(0, 22) + '…' : name}</div>
           <div class="wday-meal-kcal">${kcal}</div>
         </div>
@@ -258,7 +258,7 @@ const generateDayPage = (day, dayData, dayIndex, pageNum) => {
       <div class="meal-card">
         <div class="meal-photo" style="background-image:url('${photo}');">
           <div class="meal-photo-ov">
-            <span class="meal-slot-tag">${cfg.icon} ${cfg.label}</span>
+            <span class="meal-slot-tag">${cfg.icon} ${(m.display_label || cfg.label).toUpperCase()}</span>
             <span class="meal-time-tag">${timing || '—'}</span>
           </div>
         </div>
@@ -489,6 +489,7 @@ const SWAP_SLOT_CONFIG = {
   lunch:       { label: 'LUNCH',          icon: '🍱' },
   dinner:      { label: 'DINER',          icon: '🍽️' },
   snack:       { label: 'SNACKS',         icon: '🥤' },
+  avondsnack:  { label: 'AVONDSNACK',     icon: '🌙' },
   pre_workout: { label: 'PRE-WORKOUT',    icon: '⚡' },
 }
 

@@ -15,6 +15,7 @@ const SLOTS = [
   { key: 'lunch',       label: 'Lunch',           timing: 'lunch',       max: 3 },
   { key: 'dinner',      label: 'Diner',           timing: 'dinner',      max: 3 },
   { key: 'snack',       label: 'Snacks',          timing: 'snack',       max: 3 },
+  { key: 'avondsnack',  label: 'Avondsnack',      timing: 'snack',       max: 3 },
   { key: 'pre_workout', label: 'Pre-Workout',     timing: 'pre_workout', max: 3 },
 ]
 
@@ -22,7 +23,7 @@ const mealLabel = (m) => m.internal_name || m.name || 'Maaltijd'
 
 export default function BestSwapsModal({ clientId, db, isMobile, onClose, embedded = false }) {
   const [activeSlot, setActiveSlot] = useState('breakfast')
-  const [selected, setSelected] = useState({ breakfast: [], lunch: [], dinner: [], snack: [], pre_workout: [] })
+  const [selected, setSelected] = useState({ breakfast: [], lunch: [], dinner: [], snack: [], avondsnack: [], pre_workout: [] })
   const [candidates, setCandidates] = useState([])
   const [search, setSearch] = useState('')
   const [loading, setLoading] = useState(true)
@@ -47,7 +48,7 @@ export default function BestSwapsModal({ clientId, db, isMobile, onClose, embedd
           mealsById = Object.fromEntries((meals || []).map(m => [m.id, m]))
         }
         if (!alive) return
-        const next = { breakfast: [], lunch: [], dinner: [], snack: [], pre_workout: [] }
+        const next = { breakfast: [], lunch: [], dinner: [], snack: [], avondsnack: [], pre_workout: [] }
         for (const r of (rows || [])) {
           if (next[r.meal_slot] !== undefined) next[r.meal_slot] = (r.meal_ids || []).map(id => mealsById[id]).filter(Boolean)
         }
