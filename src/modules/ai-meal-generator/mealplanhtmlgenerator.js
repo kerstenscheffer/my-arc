@@ -138,6 +138,8 @@ const generateCoverPage = (clientName, weekRange, stats, opts = {}) => {
   const heading = opts.heading || 'WEEK<br>PLAN'
   const subtitle = opts.subtitle || `${weekRange} — Jouw persoonlijke voedingsplan op maat. Alles is berekend. Volg het plan.`
   const suf = opts.statSuffix != null ? opts.statSuffix : '/dag'
+  // Kleinere kop bij een eigen titel / dagnaam (die vaak langer is dan "WEEK PLAN").
+  const headingStyle = opts.headingSize ? ` style="font-size:${opts.headingSize};letter-spacing:-2px;line-height:0.95;"` : ''
   return `
   <div class="page">
     <div class="cover">
@@ -152,7 +154,7 @@ const generateCoverPage = (clientName, weekRange, stats, opts = {}) => {
         </div>
       </div>
       <div class="cover-main">
-        <h1 class="brutal-title">
+        <h1 class="brutal-title"${headingStyle}>
           <span class="red">${clientName.toUpperCase()}</span><br>
           ${heading}
         </h1>
@@ -594,7 +596,12 @@ export const generateMealPlanHTML = (enrichedPlan, clientName = 'Client', weekRa
     statSuffix = ''
   }
   if (title) coverHeading = title.toUpperCase()
-  const coverOpts = { heading: coverHeading, statSuffix }
+  // Kop kleiner + schalend met de lengte; "WEEK PLAN" behoudt z'n grote formaat.
+  const isDefaultHeading = coverHeading === 'WEEK<br>PLAN'
+  const headingLen = Math.max(clientName.length, coverHeading.replace(/<br>/g, ' ').length)
+  const headingSize = isDefaultHeading ? null
+    : headingLen > 22 ? '42px' : headingLen > 14 ? '54px' : headingLen > 9 ? '72px' : '96px'
+  const coverOpts = { heading: coverHeading, statSuffix, headingSize }
 
   return `
 <!DOCTYPE html>
