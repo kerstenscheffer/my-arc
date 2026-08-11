@@ -699,15 +699,6 @@ export default function PlanAnalyzer({
             onRenamed={handlePlanRenamedElsewhere}
             onClose={() => setShowPlanSwitcher(false)} isMobile={m} />
         )}
-        {pdfModal && (
-          <PdfSettingsModal
-            hasSwaps={!!pdfModal.swapOptions}
-            defaultTitle={planMeta?.name || ''}
-            onGenerate={runPdfExport}
-            onClose={() => setPdfModal(null)}
-            isMobile={m}
-          />
-        )}
         {showPlanLibrary && (
           <PlanLibraryModal db={db} coachId={coachId} isMobile={m}
             weekData={weekData} planMeta={planMeta}
@@ -1283,6 +1274,17 @@ export default function PlanAnalyzer({
           clientName={clientRecord?.first_name || ''}
           onLoad={handleLoadSavedPlan}
           onClose={() => setShowPlanLibrary(false)} />
+      )}
+
+      {/* PDF-instellingen vóór genereren (scope/dag/swaps/titel) */}
+      {pdfModal && (
+        <PdfSettingsModal
+          hasSwaps={!!pdfModal.swapOptions}
+          defaultTitle={planMeta?.name || ''}
+          onGenerate={runPdfExport}
+          onClose={() => setPdfModal(null)}
+          isMobile={m}
+        />
       )}
 
 
