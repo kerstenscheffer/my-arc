@@ -594,7 +594,36 @@ export default function PlanAnalyzer({
       const clientName = clientRecord?.first_name || 'Client'
       const today = new Date(); const nextWeek = new Date(today.getTime() + 7 * 24 * 60 * 60 * 1000)
       const weekRange = `${today.toLocaleDateString('nl-NL')} - ${nextWeek.toLocaleDateString('nl-NL')}`
-      await openMealPlanForPrint(plan, clientName, weekRange)
+
+      // Laad voorgeschreven swaps voor deze client (als beschikbaar).
+      let swapOptions = null
+      if (resolvedClientId && db?.supabase) {
+        try {
+          const { data: swapRows } = await db.supabase
+            .from('client_swap_options')
+            .select('meal_slot, meal_ids')
+            .eq('client_id', resolvedClientId)
+          if (swapRows && swapRows.length > 0) {
+            const allIds = [...new Set(swapRows.flatMap(r => r.meal_ids || []))]
+            let mealsById = {}
+            if (allIds.length > 0) {
+              const { data: meals } = await db.supabase
+                .from('ai_meals')
+                .select('id, name, internal_name, calories, protein, carbs, fat')
+                .in('id', allIds)
+              mealsById = Object.fromEntries((meals || []).map(m => [m.id, m]))
+            }
+            swapOptions = {}
+            swapRows.forEach(r => {
+              const resolved = (r.meal_ids || []).map(id => mealsById[id]).filter(Boolean)
+              if (resolved.length > 0) swapOptions[r.meal_slot] = resolved
+            })
+            if (Object.keys(swapOptions).length === 0) swapOptions = null
+          }
+        } catch (e) { console.warn('Swaps laden voor PDF mislukt:', e) }
+      }
+
+      await openMealPlanForPrint(plan, clientName, weekRange, swapOptions)
     } catch (err) { console.error('❌ PDF-export fout:', err); alert('PDF maken mislukt: ' + (err?.message || 'onbekende fout')) }
     setLoadingPdf(false)
   }

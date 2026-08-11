@@ -602,27 +602,31 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
   async getKanbanBoard(coachId) {
     try {
       console.log('🔍 [KANBAN] getKanbanBoard called for coachId:', coachId)
-      const sections = await this.getSections(coachId)
+
+      // Drie onafhankelijke queries parallel uitvoeren i.p.v. sequentieel.
+      // Voorheen: sections → sectionItems → allLeads (3 round trips achter elkaar).
+      // Nu: alle drie tegelijk → load time ~ langzaamste van de drie queries.
+      const [sections, sectionItems, allLeads] = await Promise.all([
+        this.getSections(coachId),
+        // BELANGRIJK: gepagineerd ophalen. PostgREST geeft standaard max. 1000
+        // rijen per query terug. Met >1000 leads/koppelingen viel een deel van de
+        // section-links weg → die leads belandden onterecht in "Niet toegewezen".
+        this._fetchAllRows(() => this.db.supabase
+          .from('lead_section_items')
+          .select('lead_id, section_id, position, previous_section_id, previous_section_title, previous_section_color, moved_to_stale_at')),
+        this._fetchAllRows(() => this.db.supabase
+          .from('call_leads')
+          .select(`
+            *,
+            source_lead_magnet:lead_magnets!call_leads_source_lead_magnet_id_fkey(id, name),
+            outreach_campaign:outreach_campaigns!call_leads_outreach_campaign_id_fkey(id, name, variant_tag)
+          `)
+          // Geen coach_id filter — RLS bepaalt de toegang (team-membership of eigen leads).
+          .is('deleted_at', null)
+          .order('created_at', { ascending: false }))
+      ])
       console.log('🔍 [KANBAN] sections loaded:', sections?.length, sections?.map(s => s.title))
-
-      // BELANGRIJK: gepagineerd ophalen. PostgREST geeft standaard max. 1000
-      // rijen per query terug. Met >1000 leads/koppelingen viel een deel van de
-      // section-links weg → die leads belandden onterecht in "Niet toegewezen".
-      const sectionItems = await this._fetchAllRows(() => this.db.supabase
-        .from('lead_section_items')
-        .select('lead_id, section_id, position, previous_section_id, previous_section_title, previous_section_color, moved_to_stale_at'))
       console.log('🔍 [KANBAN] section_items:', sectionItems?.length)
-
-      const allLeads = await this._fetchAllRows(() => this.db.supabase
-        .from('call_leads')
-        .select(`
-          *,
-          source_lead_magnet:lead_magnets!call_leads_source_lead_magnet_id_fkey(id, name),
-          outreach_campaign:outreach_campaigns!call_leads_outreach_campaign_id_fkey(id, name, variant_tag)
-        `)
-        // Geen coach_id filter — RLS bepaalt de toegang (team-membership of eigen leads).
-        .is('deleted_at', null)
-        .order('created_at', { ascending: false }))
       console.log('🔍 [KANBAN] call_leads result:', allLeads?.length)
 
       const leadMap = new Map((allLeads || []).map(lead => [lead.id, lead]))

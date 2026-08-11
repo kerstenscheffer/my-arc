@@ -484,7 +484,64 @@ const generateCoachingPages = () => `
     </div>
   </div>
 `
-export const generateMealPlanHTML = (enrichedPlan, clientName = 'Client', weekRange = 'Week Plan') => {
+// ── Swaps Page ────────────────────────────────────────────────────────────────
+const SWAP_SLOT_CONFIG = {
+  breakfast:   { label: 'ONTBIJT',       icon: '🌅' },
+  lunch:       { label: 'LUNCH',          icon: '🍱' },
+  dinner:      { label: 'DINER',          icon: '🍽️' },
+  snack:       { label: 'SNACKS',         icon: '🥤' },
+  pre_workout: { label: 'PRE-WORKOUT',    icon: '⚡' },
+}
+
+const generateSwapsPage = (swapOptions) => {
+  const slots = Object.entries(SWAP_SLOT_CONFIG)
+    .map(([key, cfg]) => ({ key, ...cfg, meals: swapOptions[key] || [] }))
+    .filter(s => s.meals.length > 0)
+
+  if (slots.length === 0) return ''
+
+  const slotHtml = slots.map((slot, i) => {
+    const mealRows = slot.meals.map(m => `
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid rgba(0,0,0,0.08);font-size:12px;">
+        <span style="font-weight:600;color:#111;">${m.name || m.internal_name || '—'}</span>
+        <span style="font-size:11px;font-weight:700;letter-spacing:-0.5px;color:#666;white-space:nowrap;margin-left:8px;">${m.calories ? m.calories + ' kcal' : ''} · ${m.protein ? Math.round(m.protein) + 'e' : ''}</span>
+      </div>`).join('')
+
+    const isLastCol = i === slots.length - 1
+    return `
+      <div style="padding:20px 24px;border-right:${isLastCol ? 'none' : '3px solid #000'};overflow:hidden;">
+        <div style="font-size:9px;font-weight:700;letter-spacing:3px;text-transform:uppercase;color:#666;margin-bottom:12px;padding-bottom:10px;border-bottom:2px solid #000;">
+          ${slot.icon} ${slot.label}
+        </div>
+        ${mealRows || '<span style="font-size:11px;color:#999;">Geen opties ingesteld</span>'}
+      </div>`
+  }).join('')
+
+  const cols = Math.min(slots.length, 3)
+  return `
+  <div class="page">
+    <div class="day-pg">
+      <div class="day-hdr">
+        <div class="dhc"><span class="day-num" style="font-size:22px;">SWAP</span></div>
+        <div class="dhc"><span class="day-name-brutal">MAALTIJD SWAPS — JOUW OPTIES</span></div>
+        <div class="dhc"><span class="pg-num">S</span></div>
+      </div>
+      <div class="training-bar" style="background:#f0f0f0;">
+        <span class="train-lbl">WISSEL FLEXIBEL BINNEN DEZE OPTIES — MACRO'S BLIJVEN OP DOEL</span>
+      </div>
+      <div style="flex:1;display:grid;grid-template-columns:repeat(${cols},1fr);overflow:hidden;">
+        ${slotHtml}
+      </div>
+      <div class="brutal-footer">
+        <div class="bfc">MY ARC</div>
+        <div class="bfc">Weekplan</div>
+        <div class="bfc">Swaps</div>
+      </div>
+    </div>
+  </div>`
+}
+
+export const generateMealPlanHTML = (enrichedPlan, clientName = 'Client', weekRange = 'Week Plan', swapOptions = null) => {
   const stats = enrichedPlan.weeklyStats || { avgCalories: 0, avgProtein: 0, avgCarbs: 0, avgFat: 0 }
   const days  = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday']
   const ws    = enrichedPlan.week_structure_enriched || {}
@@ -494,6 +551,8 @@ export const generateMealPlanHTML = (enrichedPlan, clientName = 'Client', weekRa
     if (!dayData) return ''
     return generateDayPage(day, dayData, i, i + 3)
   }).join('')
+
+  const swapsPage = swapOptions ? generateSwapsPage(swapOptions) : ''
 
   return `
 <!DOCTYPE html>
@@ -512,6 +571,7 @@ export const generateMealPlanHTML = (enrichedPlan, clientName = 'Client', weekRa
   ${generateCoverPage(clientName, weekRange, stats)}
   ${generateWeekOverviewPage(enrichedPlan)}
   ${dayPages}
+  ${swapsPage}
   <script>lucide.createIcons();</script>
 </body>
 </html>
@@ -595,7 +655,7 @@ const openHTMLForPrint = (html, loadingText = 'PDF MAKEN...') => {
   if (document.body.contains(loadingDiv)) document.body.removeChild(loadingDiv)
 }
 
-export const openMealPlanForPrint = async (mealPlan, clientName, weekRange) => {
+export const openMealPlanForPrint = async (mealPlan, clientName, weekRange, swapOptions = null) => {
   const MealPlanPDFService = (await import('./MealPlanPDFService')).default
   const pdfService = new MealPlanPDFService()
 
@@ -607,7 +667,7 @@ export const openMealPlanForPrint = async (mealPlan, clientName, weekRange) => {
   try {
     const enrichedPlan = await pdfService.enrichMealPlanData(mealPlan)
     enrichedPlan.weeklyStats = pdfService.calculateWeeklyStats(enrichedPlan)
-    const html = generateMealPlanHTML(enrichedPlan, clientName, weekRange)
+    const html = generateMealPlanHTML(enrichedPlan, clientName, weekRange, swapOptions)
     if (document.body.contains(loadingDiv)) document.body.removeChild(loadingDiv)
     openHTMLForPrint(html)
   } catch (err) {
