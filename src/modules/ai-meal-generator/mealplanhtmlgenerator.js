@@ -162,7 +162,7 @@ const generateCoverPage = (clientName, weekRange, stats, opts = {}) => {
         </div>
         <div class="cover-top-r">
           <div class="lbl">Coaching</div>
-          <div class="lbl" style="margin-top:auto;">Door Kersten van den Berg</div>
+          <div class="lbl" style="margin-top:auto;">Door Kersten Scheffer</div>
         </div>
       </div>
       <div class="cover-main">
@@ -665,7 +665,7 @@ export const generateCoachingGuideHTML = (clientName = 'Client') => {
         </div>
         <div class="cover-top-r">
           <div class="lbl">Voeding & Lifestyle</div>
-          <div class="lbl" style="margin-top:auto;">Door Kersten van den Berg</div>
+          <div class="lbl" style="margin-top:auto;">Door Kersten Scheffer</div>
         </div>
       </div>
       <div class="cover-main">
