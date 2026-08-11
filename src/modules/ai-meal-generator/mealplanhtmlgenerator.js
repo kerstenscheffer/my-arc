@@ -133,7 +133,12 @@ const generateStyles = () => `
 `
 
 // ── Cover Page ───────────────────────────────────────────────────────────────
-const generateCoverPage = (clientName, weekRange, stats, customTitle = null) => `
+const generateCoverPage = (clientName, weekRange, stats, opts = {}) => {
+  // opts: { heading (HTML voor de grote kop-tweede-regel), subtitle, statSuffix }
+  const heading = opts.heading || 'WEEK<br>PLAN'
+  const subtitle = opts.subtitle || `${weekRange} — Jouw persoonlijke voedingsplan op maat. Alles is berekend. Volg het plan.`
+  const suf = opts.statSuffix != null ? opts.statSuffix : '/dag'
+  return `
   <div class="page">
     <div class="cover">
       <div class="cover-top">
@@ -149,20 +154,20 @@ const generateCoverPage = (clientName, weekRange, stats, customTitle = null) => 
       <div class="cover-main">
         <h1 class="brutal-title">
           <span class="red">${clientName.toUpperCase()}</span><br>
-          WEEK<br>
-          PLAN
+          ${heading}
         </h1>
-        <p class="cover-sub">${customTitle ? customTitle : `${weekRange} — Jouw persoonlijke voedingsplan op maat. Alles is berekend. Volg het plan.`}</p>
+        <p class="cover-sub">${subtitle}</p>
       </div>
       <div class="cover-bottom">
-        <div class="cover-stat"><div class="cs-lbl">Kcal/dag</div><div class="cs-val">${stats.avgCalories}</div></div>
-        <div class="cover-stat"><div class="cs-lbl">Eiwit/dag</div><div class="cs-val">${stats.avgProtein}g</div></div>
-        <div class="cover-stat"><div class="cs-lbl">Koolh/dag</div><div class="cs-val">${stats.avgCarbs}g</div></div>
-        <div class="cover-stat"><div class="cs-lbl">Vet/dag</div><div class="cs-val">${stats.avgFat}g</div></div>
+        <div class="cover-stat"><div class="cs-lbl">Kcal${suf}</div><div class="cs-val">${stats.avgCalories}</div></div>
+        <div class="cover-stat"><div class="cs-lbl">Eiwit${suf}</div><div class="cs-val">${stats.avgProtein}g</div></div>
+        <div class="cover-stat"><div class="cs-lbl">Koolh${suf}</div><div class="cs-val">${stats.avgCarbs}g</div></div>
+        <div class="cover-stat"><div class="cs-lbl">Vet${suf}</div><div class="cs-val">${stats.avgFat}g</div></div>
       </div>
     </div>
   </div>
 `
+}
 
 // ── Week Overview Page ────────────────────────────────────────────────────────
 const generateWeekOverviewPage = (enrichedPlan) => {
@@ -572,6 +577,25 @@ export const generateMealPlanHTML = (enrichedPlan, clientName = 'Client', weekRa
   const swapsPage = swapOptions ? generateSwapsPage(swapOptions) : ''
   const docTitle = title || `${clientName} — MY ARC Weekplan`
 
+  // Cover-opties. Bij één dag: toon de macro's van díe dag (niet het weekgemiddelde)
+  // en gebruik de dagnaam als kop-standaard. Een eigen titel vervangt de grote kop.
+  const DAY_NL = { monday: 'Maandag', tuesday: 'Dinsdag', wednesday: 'Woensdag', thursday: 'Donderdag', friday: 'Vrijdag', saturday: 'Zaterdag', sunday: 'Zondag' }
+  const singleDay = Array.isArray(dayFilter) && dayFilter.length === 1
+  let coverStats = stats
+  let coverHeading = 'WEEK<br>PLAN'
+  let statSuffix = '/dag'
+  if (singleDay) {
+    const dk = dayFilter[0]
+    const dd = ws[dk] || {}
+    let c = 0, p = 0, cb = 0, f = 0
+    SLOT_KEYS.forEach(s => { const mm = dd[s]; if (mm) { c += mm.calories || 0; p += mm.protein || 0; cb += mm.carbs || 0; f += mm.fat || 0 } })
+    coverStats = { avgCalories: Math.round(c), avgProtein: Math.round(p), avgCarbs: Math.round(cb), avgFat: Math.round(f) }
+    coverHeading = (DAY_NL[dk] || 'DAG').toUpperCase()
+    statSuffix = ''
+  }
+  if (title) coverHeading = title.toUpperCase()
+  const coverOpts = { heading: coverHeading, statSuffix }
+
   return `
 <!DOCTYPE html>
 <html lang="nl">
@@ -586,7 +610,7 @@ export const generateMealPlanHTML = (enrichedPlan, clientName = 'Client', weekRa
 </head>
 <body>
   <button class="print-btn" onclick="window.print()">Download PDF</button>
-  ${includeCover ? generateCoverPage(clientName, weekRange, stats, title) : ''}
+  ${includeCover ? generateCoverPage(clientName, weekRange, coverStats, coverOpts) : ''}
   ${includeWeekOverview ? generateWeekOverviewPage(enrichedPlan) : ''}
   ${dayPages}
   ${swapsPage}
