@@ -57,7 +57,9 @@ export default function MealEditModal({ db, meal, slot, dayIndex, onSave, onClos
         if (!item?.ingredient_id || !UUID_REGEX.test(item.ingredient_id)) return null
         const d = dbRows[item.ingredient_id]; if (!d) return null
         const amount = item.amount || d.default_portion_gram || 100
-        return { ingredient_id: item.ingredient_id, name: d.name, amount, unit: item.unit || 'gram', cal: d.calories_per_100g, prot: d.protein_per_100g, carbs: d.carbs_per_100g, fat: d.fat_per_100g, min: d.min_portion_gram || 0, max: Infinity, scalable: d.scalable !== false }
+        // Geen min_portion_gram-ondergrens bij handmatig bewerken — de coach mag
+        // vrij omlaag (0 = ondergrens). Voorheen zat je vast op bv. 100g.
+        return { ingredient_id: item.ingredient_id, name: d.name, amount, unit: item.unit || 'gram', cal: d.calories_per_100g, prot: d.protein_per_100g, carbs: d.carbs_per_100g, fat: d.fat_per_100g, min: 0, max: Infinity, scalable: d.scalable !== false }
       }).filter(Boolean)
       setIngredients(built)
 
@@ -148,7 +150,7 @@ export default function MealEditModal({ db, meal, slot, dayIndex, onSave, onClos
 
   const addIngredient = (row) => {
     if (ingredients.some(i => i.ingredient_id === row.id)) return
-    setIngredients(prev => [...prev, { ingredient_id: row.id, name: row.name, amount: row.default_portion_gram||100, unit: 'gram', cal: row.calories_per_100g, prot: row.protein_per_100g, carbs: row.carbs_per_100g, fat: row.fat_per_100g, min: row.min_portion_gram||0, max: Infinity, scalable: row.scalable!==false }])
+    setIngredients(prev => [...prev, { ingredient_id: row.id, name: row.name, amount: row.default_portion_gram||100, unit: 'gram', cal: row.calories_per_100g, prot: row.protein_per_100g, carbs: row.carbs_per_100g, fat: row.fat_per_100g, min: 0, max: Infinity, scalable: row.scalable!==false }])
     setDbCache(prev => ({ ...prev, [row.id]: row }))
     setSearchQuery(''); setSearchResults([]); setShowSearch(false)
   }
