@@ -48,6 +48,13 @@ const generateStyles = () => `
   .cover-stat:last-child { border-right: none; }
   .cs-lbl { font-size: 9px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; color: var(--gray); margin-bottom: 8px; }
   .cs-val { font-size: 34px; font-weight: 900; letter-spacing: -2px; }
+  /* Cover met achtergrondfoto: donkere overlay + witte tekst (rood accent blijft). */
+  .cover.photo { background-size: cover; background-position: center; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .cover.photo .cover-top, .cover.photo .cover-top-l,
+  .cover.photo .cover-bottom, .cover.photo .cover-stat { border-color: rgba(255,255,255,0.22) !important; }
+  .cover.photo .lbl { color: rgba(255,255,255,0.72); }
+  .cover.photo .yr, .cover.photo .brutal-title, .cover.photo .cs-val { color: #fff; }
+  .cover.photo .cover-sub, .cover.photo .cs-lbl { color: rgba(255,255,255,0.80); }
 
   /* ── DAY PAGE ── */
   .day-pg { height: 297mm; display: grid; grid-template-rows: auto auto auto 1fr auto; }
@@ -140,9 +147,14 @@ const generateCoverPage = (clientName, weekRange, stats, opts = {}) => {
   const suf = opts.statSuffix != null ? opts.statSuffix : '/dag'
   // Kleinere kop bij een eigen titel / dagnaam (die vaak langer is dan "WEEK PLAN").
   const headingStyle = opts.headingSize ? ` style="font-size:${opts.headingSize};letter-spacing:-2px;line-height:0.95;"` : ''
+  // Achtergrondfoto (absolute URL zodat 'ie ook in het print-venster laadt). Donkere
+  // overlay eroverheen zodat de tekst leesbaar blijft. Leeg = witte cover.
+  const coverImg = opts.coverImage !== undefined ? opts.coverImage : 'https://www.myarcfitness.com/intro-meal.jpg'
+  const coverClass = coverImg ? 'cover photo' : 'cover'
+  const coverBg = coverImg ? ` style="background-image: linear-gradient(rgba(8,8,10,0.5), rgba(8,8,10,0.74)), url('${coverImg}');"` : ''
   return `
   <div class="page">
-    <div class="cover">
+    <div class="${coverClass}"${coverBg}>
       <div class="cover-top">
         <div class="cover-top-l">
           <div class="lbl">MY ARC — Voedingsplan</div>
