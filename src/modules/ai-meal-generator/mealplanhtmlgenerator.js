@@ -133,7 +133,7 @@ const generateStyles = () => `
 `
 
 // ── Cover Page ───────────────────────────────────────────────────────────────
-const generateCoverPage = (clientName, weekRange, stats) => `
+const generateCoverPage = (clientName, weekRange, stats, customTitle = null) => `
   <div class="page">
     <div class="cover">
       <div class="cover-top">
@@ -152,7 +152,7 @@ const generateCoverPage = (clientName, weekRange, stats) => `
           WEEK<br>
           PLAN
         </h1>
-        <p class="cover-sub">${weekRange} — Jouw persoonlijke voedingsplan op maat. Alles is berekend. Volg het plan.</p>
+        <p class="cover-sub">${customTitle ? customTitle : `${weekRange} — Jouw persoonlijke voedingsplan op maat. Alles is berekend. Volg het plan.`}</p>
       </div>
       <div class="cover-bottom">
         <div class="cover-stat"><div class="cs-lbl">Kcal/dag</div><div class="cs-val">${stats.avgCalories}</div></div>
@@ -243,15 +243,14 @@ const generateDayPage = (day, dayData, dayIndex, pageNum) => {
     const kcal = m.calories || 0
     const photo = m.image_url || 'https://images.unsplash.com/photo-1512058564366-18510be2db19?w=400&h=200&fit=crop'
 
-    // Ingrediënten — max 5
-    const ings = (m.ingredients || []).slice(0, 5)
+    // Ingrediënten — allemaal tonen (geen afkapping)
+    const ings = (m.ingredients || [])
     const ingHtml = ings.length > 0
       ? `<div class="ing-list">${ings.map(i => `
           <div class="ing-row">
             <span class="ing-name">${i.name || '—'}</span>
             <span class="ing-amt">${Math.round(i.amount_scaled || i.amount || 0)}${i.unit || 'g'}</span>
           </div>`).join('')}
-          ${m.ingredients?.length > 5 ? `<div style="font-size:9px;color:var(--gray);margin-top:2px;">+${m.ingredients.length - 5} meer</div>` : ''}
         </div>`
       : ''
 
@@ -541,25 +540,43 @@ const generateSwapsPage = (swapOptions) => {
   </div>`
 }
 
-export const generateMealPlanHTML = (enrichedPlan, clientName = 'Client', weekRange = 'Week Plan', swapOptions = null) => {
+export const generateMealPlanHTML = (enrichedPlan, clientName = 'Client', weekRange = 'Week Plan', opts = {}) => {
+  // opts: { title, days (array van day-keys, null = alle), includeCover,
+  //         includeWeekOverview, swapOptions }. Backward-compatibel: als opts
+  //        per ongeluk een oude swapOptions-map is, pakken we die op.
+  const {
+    title = null,
+    days: dayFilter = null,
+    includeCover = true,
+    includeWeekOverview = true,
+    swapOptions = null,
+  } = (opts && (opts.title !== undefined || opts.days !== undefined || opts.swapOptions !== undefined ||
+                opts.includeCover !== undefined || opts.includeWeekOverview !== undefined))
+        ? opts
+        : { swapOptions: opts || null }
+
   const stats = enrichedPlan.weeklyStats || { avgCalories: 0, avgProtein: 0, avgCarbs: 0, avgFat: 0 }
-  const days  = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday']
+  const allDays = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday']
   const ws    = enrichedPlan.week_structure_enriched || {}
 
-  const dayPages = days.map((day, i) => {
+  // dayFilter null = alle dagen; [] = geen dag-pagina's (bv. 'alleen weekschema').
+  const daysToRender = Array.isArray(dayFilter) ? allDays.filter(d => dayFilter.includes(d)) : allDays
+  const dayPages = daysToRender.map((day) => {
     const dayData = ws[day]
     if (!dayData) return ''
+    const i = allDays.indexOf(day)
     return generateDayPage(day, dayData, i, i + 3)
   }).join('')
 
   const swapsPage = swapOptions ? generateSwapsPage(swapOptions) : ''
+  const docTitle = title || `${clientName} — MY ARC Weekplan`
 
   return `
 <!DOCTYPE html>
 <html lang="nl">
 <head>
   <meta charset="UTF-8">
-  <title>${clientName} — MY ARC Weekplan</title>
+  <title>${docTitle}</title>
   <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -568,8 +585,8 @@ export const generateMealPlanHTML = (enrichedPlan, clientName = 'Client', weekRa
 </head>
 <body>
   <button class="print-btn" onclick="window.print()">Download PDF</button>
-  ${generateCoverPage(clientName, weekRange, stats)}
-  ${generateWeekOverviewPage(enrichedPlan)}
+  ${includeCover ? generateCoverPage(clientName, weekRange, stats, title) : ''}
+  ${includeWeekOverview ? generateWeekOverviewPage(enrichedPlan) : ''}
   ${dayPages}
   ${swapsPage}
   <script>lucide.createIcons();</script>
@@ -655,7 +672,7 @@ const openHTMLForPrint = (html, loadingText = 'PDF MAKEN...') => {
   if (document.body.contains(loadingDiv)) document.body.removeChild(loadingDiv)
 }
 
-export const openMealPlanForPrint = async (mealPlan, clientName, weekRange, swapOptions = null) => {
+export const openMealPlanForPrint = async (mealPlan, clientName, weekRange, opts = {}) => {
   const MealPlanPDFService = (await import('./MealPlanPDFService')).default
   const pdfService = new MealPlanPDFService()
 
@@ -667,7 +684,7 @@ export const openMealPlanForPrint = async (mealPlan, clientName, weekRange, swap
   try {
     const enrichedPlan = await pdfService.enrichMealPlanData(mealPlan)
     enrichedPlan.weeklyStats = pdfService.calculateWeeklyStats(enrichedPlan)
-    const html = generateMealPlanHTML(enrichedPlan, clientName, weekRange, swapOptions)
+    const html = generateMealPlanHTML(enrichedPlan, clientName, weekRange, opts)
     if (document.body.contains(loadingDiv)) document.body.removeChild(loadingDiv)
     openHTMLForPrint(html)
   } catch (err) {

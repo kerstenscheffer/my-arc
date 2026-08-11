@@ -14,6 +14,7 @@ import WeekOverview from './plan-analyzer/WeekOverview'
 import ClientAgendaView from '../../client-agenda/ClientAgendaView'
 import MacroHero from '../../meal-plan/components/MacroHero'
 import PlanSwitcherModal from './plan-analyzer/PlanSwitcherModal'
+import PdfSettingsModal from './plan-analyzer/PdfSettingsModal'
 import TimingModal from './plan-analyzer/TimingModal'
 import BestSwapsModal from './plan-analyzer/BestSwapsModal'
 import PlanLibraryModal from './plan-analyzer/PlanLibraryModal'
@@ -98,6 +99,8 @@ export default function PlanAnalyzer({
   const [activating, setActivating] = useState(false)
   const [activated, setActivated] = useState(false)
   const [loadingPdf, setLoadingPdf] = useState(false)
+  // Instellingen-scherm vóór PDF-generatie (scope/dag/swaps/titel).
+  const [pdfModal, setPdfModal] = useState(null)
 
   const m = isMobile
 
@@ -623,7 +626,28 @@ export default function PlanAnalyzer({
         } catch (e) { console.warn('Swaps laden voor PDF mislukt:', e) }
       }
 
-      await openMealPlanForPrint(plan, clientName, weekRange, swapOptions)
+      // Open het instellingen-scherm; de echte generatie gebeurt in runPdfExport
+      // zodra de coach kiest wat er in de PDF moet (scope/dag/swaps/titel).
+      setPdfModal({ plan, clientName, weekRange, swapOptions })
+    } catch (err) { console.error('❌ PDF-export fout:', err); alert('PDF maken mislukt: ' + (err?.message || 'onbekende fout')) }
+    setLoadingPdf(false)
+  }
+
+  // Genereert de PDF met de gekozen instellingen uit PdfSettingsModal.
+  const runPdfExport = async (ui) => {
+    if (!pdfModal) return
+    const { plan, clientName, weekRange, swapOptions } = pdfModal
+    setPdfModal(null)
+    setLoadingPdf(true)
+    try {
+      const genOpts = {
+        title: (ui.title || '').trim() || null,
+        swapOptions: ui.includeSwaps ? swapOptions : null,
+      }
+      if (ui.scope === 'day') { genOpts.days = ui.day ? [ui.day] : null; genOpts.includeWeekOverview = false }
+      else if (ui.scope === 'weekschema') { genOpts.days = []; genOpts.includeWeekOverview = true }
+      else { genOpts.days = null; genOpts.includeWeekOverview = true } // hele week
+      await openMealPlanForPrint(plan, clientName, weekRange, genOpts)
     } catch (err) { console.error('❌ PDF-export fout:', err); alert('PDF maken mislukt: ' + (err?.message || 'onbekende fout')) }
     setLoadingPdf(false)
   }
@@ -674,6 +698,15 @@ export default function PlanAnalyzer({
             onSelect={(planId) => { setSelectedConceptId(planId); setShowPlanSwitcher(false); loadAllPlanCount(resolvedClientId) }}
             onRenamed={handlePlanRenamedElsewhere}
             onClose={() => setShowPlanSwitcher(false)} isMobile={m} />
+        )}
+        {pdfModal && (
+          <PdfSettingsModal
+            hasSwaps={!!pdfModal.swapOptions}
+            defaultTitle={planMeta?.name || ''}
+            onGenerate={runPdfExport}
+            onClose={() => setPdfModal(null)}
+            isMobile={m}
+          />
         )}
         {showPlanLibrary && (
           <PlanLibraryModal db={db} coachId={coachId} isMobile={m}
