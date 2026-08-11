@@ -107,7 +107,19 @@ const STEPS = [
     title: 'Inloggegevens + app sturen',
     label: 'COACH',
     message: {
-      text: 'Top [naam], hier is de link naar de app. (laat me weten als je geen App Store hebt).\n\nLink naar de app: https://apps.apple.com/us/app/my-arc/id6764539959\n\nJe inloggegevens:\nEmail: [email]\nWachtwoord: [wachtwoord]\n\nZodra je ingelogd bent staat er een video op je te wachten over hoe de app werkt en hoe je alles eruit kan halen om je doelen te halen.\n\nVeel succes en laat het weten als je er niet uitkomt! 🏆',
+      // Coach kiest: App Store (nieuwe app) of Geen App Store (web/PWA-versie).
+      variants: [
+        {
+          id: 'appstore',
+          label: 'App Store',
+          text: 'Top [naam], hier is de link naar de app. (laat me weten als je geen App Store hebt).\n\nLink naar de app: https://apps.apple.com/us/app/my-arc/id6764539959\n\nJe inloggegevens:\nEmail: [email]\nWachtwoord: [wachtwoord]\n\nZodra je ingelogd bent staat er een video op je te wachten over hoe de app werkt en hoe je alles eruit kan halen om je doelen te halen.\n\nVeel succes en laat het weten als je er niet uitkomt! 🏆'
+        },
+        {
+          id: 'web',
+          label: 'Geen App Store',
+          text: 'Top [naam], hier is de link naar de app. Je hoeft hem maar een keer te "downloaden" en dan staat hij op je startscherm net als alle andere apps.\n\n📱 Bekijk deze korte video hoe je de app installeert:\nhttps://youtube.com/shorts/Xb_4M8lYpOk\n\nJe inloggegevens:\nEmail: [email]\nWachtwoord: [wachtwoord]\n\nHier de link: https://myarcfitness.com/login\n\nAls je het niet begrijpt, trek aan de bel en ik help je erdoorheen. 💪'
+        }
+      ],
       manualVars: ['wachtwoord']
     }
   }
