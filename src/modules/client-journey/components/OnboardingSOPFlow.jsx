@@ -43,12 +43,12 @@ const STEPS = [
         {
           id: 'monthly',
           label: 'Maandelijks',
-          text: 'Om alles rond te maken kun je hier de investering voor het maandelijkse traject doen. Nadat dit gelukt is kom je op de intake pagina waar een video op je wacht over hoe je deze in kan vullen. Als je hem hebt ingevuld krijg ik een melding en ga ik direct voor je aan de slag om jouw plan binnen 1-3 dagen klaar te zetten.\nhttps://www.myarcfitness.com/monthly-checkout'
+          text: 'Om alles rond te maken kun je hier de investering voor het maandelijkse traject doen. Nadat dit gelukt is kom je op de intake pagina waar een video op je wacht over hoe je deze in kan vullen. Als je hem hebt ingevuld krijg ik een melding en ga ik direct voor je aan de slag om jouw plan binnen 2-4 dagen klaar te zetten. Ik kijk er naar uit je naar je doel toe te brengen!\nhttps://www.myarcfitness.com/maand-checkout'
         },
         {
           id: 'onetime',
           label: 'In één keer (12 wk)',
-          text: 'Om alles rond te maken kun je hier de investering voor het 12-weken traject doen. Nadat dit gelukt is kom je op de intake pagina waar een video op je wacht over hoe je deze in kan vullen. Als je hem hebt ingevuld krijg ik een melding en ga ik direct voor je aan de slag om jouw plan binnen 1-3 dagen klaar te zetten.\nhttps://www.myarcfitness.com/12-week-checkout'
+          text: 'Om alles rond te maken kun je hier de investering voor het 12-weken traject doen. Nadat dit gelukt is kom je op de intake pagina waar een video op je wacht over hoe je deze in kan vullen. Als je hem hebt ingevuld krijg ik een melding en ga ik direct voor je aan de slag om jouw plan binnen 2-4 dagen klaar te zetten. Ik kijk er naar uit je naar je doel toe te brengen!\nhttps://www.myarcfitness.com/12-week-checkout'
         }
       ],
       manualVars: []
@@ -107,7 +107,7 @@ const STEPS = [
     title: 'Inloggegevens + app sturen',
     label: 'COACH',
     message: {
-      text: 'Top [naam], hier is de link naar de app. Je hoeft hem maar een keer te "downloaden" en dan staat hij op je startscherm net als alle andere apps.\n\n📱 Bekijk deze korte video hoe je de app installeert:\nhttps://youtube.com/shorts/Xb_4M8lYpOk\n\nJe inloggegevens:\nEmail: [email]\nWachtwoord: [wachtwoord]\n\nHier de link: https://myarcfitness.com/login\n\nAls je het niet begrijpt, trek aan de bel en ik help je erdoorheen. 💪',
+      text: 'Top [naam], hier is de link naar de app. (laat me weten als je geen App Store hebt).\n\nLink naar de app: https://apps.apple.com/us/app/my-arc/id6764539959\n\nJe inloggegevens:\nEmail: [email]\nWachtwoord: [wachtwoord]\n\nZodra je ingelogd bent staat er een video op je te wachten over hoe de app werkt en hoe je alles eruit kan halen om je doelen te halen.\n\nVeel succes en laat het weten als je er niet uitkomt! 🏆',
       manualVars: ['wachtwoord']
     }
   }
