@@ -2244,6 +2244,8 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
         proposedAt: r.proposed_at,
         reached: r.reached === true,
         currentSection: r.current_section || 'Niet toegewezen',
+        subject: r.subject || null,
+        content: r.content || '',
       }))
       const reached = items.filter(i => i.reached).length
       return {
