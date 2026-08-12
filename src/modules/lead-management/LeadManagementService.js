@@ -2231,6 +2231,33 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
     }
   }
 
+  // Rapport van alle 'call voorgesteld'-berichten + of ze geslaagd zijn (lead
+  // bereikte de Sales Call-fase of verder ná het voorstel). Via RPC (server-side).
+  async getCallProposalsReport(coachId) {
+    try {
+      if (!coachId) return { total: 0, reached: 0, pct: null, items: [] }
+      const { data, error } = await this.db.supabase.rpc('get_call_proposals_report', { p_coach: coachId })
+      if (error) throw error
+      const items = (data || []).map(r => ({
+        leadId: r.lead_id,
+        name: r.lead_name || 'Onbekend',
+        proposedAt: r.proposed_at,
+        reached: r.reached === true,
+        currentSection: r.current_section || 'Niet toegewezen',
+      }))
+      const reached = items.filter(i => i.reached).length
+      return {
+        total: items.length,
+        reached,
+        pct: items.length ? Math.round((reached / items.length) * 100) : null,
+        items,
+      }
+    } catch (e) {
+      console.warn('getCallProposalsReport failed:', e?.message)
+      return { total: 0, reached: 0, pct: null, items: [] }
+    }
+  }
+
   // Rol van de ingelogde coach in z'n team: 'owner' | 'member' | null (solo).
   // Bepaalt wie de omzet/uitbetaal-cijfers mag zien (alleen owner/solo).
   async getMyTeamRole() {

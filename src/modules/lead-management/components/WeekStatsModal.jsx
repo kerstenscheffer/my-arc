@@ -110,6 +110,16 @@ export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, 
   const partnerName = (() => {
     try { return localStorage.getItem('lead_partner_name') || 'Marcel' } catch { return 'Marcel' }
   })()
+  // Call-voorstellen rapport (welke 'call voorgesteld'-berichten + geslaagd).
+  const [showProposals, setShowProposals] = useState(false)
+  const [proposals, setProposals] = useState(null)
+  const [propLoading, setPropLoading] = useState(false)
+  const openProposalsPanel = async () => {
+    setShowProposals(true); setPropLoading(true)
+    try { setProposals(await leadService.getCallProposalsReport(coachId)) }
+    catch (e) { console.error('Call-voorstellen laden mislukt:', e); setProposals(null) }
+    finally { setPropLoading(false) }
+  }
   // Welke funnel-stap staat open in de drill-down (voor terugdraaien/verwijderen).
   const [drillStage, setDrillStage] = useState(null)
 
