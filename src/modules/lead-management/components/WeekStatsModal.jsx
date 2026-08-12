@@ -9,7 +9,7 @@ import {
   X, ChevronLeft, ChevronRight, ChevronDown, Calendar, Zap, TrendingUp,
   MessageCircle, Users, Phone, Trophy, Activity, BarChart3, PhoneCall,
   Send, FileText, Percent, UserX, Eye, Download, LineChart as LineChartIcon,
-  RotateCcw, Target, Save, UserPlus, CalendarCheck, Euro, PhoneOff, XCircle, Check,
+  RotateCcw, Target, Save, UserPlus, CalendarCheck, Euro, PhoneOff, XCircle, Check, Ban,
 } from 'lucide-react'
 import { exportStatsPDF } from '../utils/exportStatsPDF'
 import GrowthChart from './GrowthChart'
@@ -398,7 +398,7 @@ export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, 
   const noShowRate = handledCalls > 0 ? Math.round((totalNoShows / handledCalls) * 100) : null
   const closeRate = callsHeld > 0 ? Math.round((totalSales / callsHeld) * 100) : null
   const pct1 = (v) => (v == null ? '—' : `${v}%`)
-  const STAGE_ACCENT = { callProposed: '#a855f7', callScheduled: '#06b6d4', sale: '#10b981', noShow: '#f97316', callRejected: '#f97316', saleLost: '#ef4444' }
+  const STAGE_ACCENT = { callProposed: '#a855f7', callScheduled: '#06b6d4', sale: '#10b981', noShow: '#f97316', callRejected: '#f97316', saleLost: '#ef4444', notSuitable: '#64748b' }
   const countItems = [
     { label: 'Nieuwe leads', value: newLeadsInPeriod,          Icon: UserPlus,      color: '#3b82f6' },
     { label: 'Follow-ups',   value: activity?.followUps ?? 0,  Icon: Send,          color: '#f59e0b' },
@@ -412,6 +412,7 @@ export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, 
     { label: 'No-shows',     value: totalNoShows,              Icon: UserX,         color: '#ef4444', stage: 'noShow' },
     { label: 'Afgewezen',    value: funnel?.callRejected?.count ?? 0, Icon: PhoneOff, color: '#f97316', stage: 'callRejected' },
     { label: 'Sale verloren', value: funnel?.saleLost?.count ?? 0, Icon: XCircle, color: '#ef4444', stage: 'saleLost' },
+    { label: 'Niet geschikt', value: funnel?.notSuitable?.count ?? 0, Icon: Ban, color: '#64748b', stage: 'notSuitable' },
   ]
   const pctItems = [
     { label: 'Response',      value: pct1(responseRate),        Icon: MessageCircle, color: '#3b82f6' },

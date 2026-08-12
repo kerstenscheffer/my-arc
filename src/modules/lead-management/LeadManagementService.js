@@ -1895,6 +1895,9 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
       // Sale verloren — negatief eindpunt ná de call (objectie-breakdown). Apart
       // geteld, en VÓÓR de NEGATIVE_FUNNEL_WORDS-skip (die 'verloren'/'lost' bevat).
       const SALE_LOST_KEYWORDS = ['verloren', 'lost']
+      // Niet geschikt — lead die geen goede fit is (coach diskwalificeert). Eigen
+      // eindpunt + stat, apart geteld op moved_at.
+      const NOT_SUITABLE_KEYWORDS = ['niet geschikt', 'ongeschikt', 'niet passend']
       const funnelKeywords = {
         replied:       ['replied', 'gereageerd', 'reactie', 'response', 'antwoord'],
         conversation:  ['gesprek', 'conversation', 'kwalificatie', 'qualified', 'interesse'],
@@ -1913,6 +1916,7 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
         noShow:        { count: 0, leads: [] },
         callRejected:  { count: 0, leads: [], reasons: {} },
         saleLost:      { count: 0, leads: [], reasons: {} },
+        notSuitable:   { count: 0, leads: [] },
       }
       // Funnel-rang van een sectietitel (zelfde first-match-volgorde als de
       // funnelKeywords hieronder). Gebruikt om TERUGWAARTSE verplaatsingen niet
@@ -1932,7 +1936,7 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
       const seen = {
         replied: new Set(), conversation: new Set(), callProposed: new Set(),
         callScheduled: new Set(), sale: new Set(), callRejected: new Set(),
-        saleLost: new Set(),
+        saleLost: new Set(), notSuitable: new Set(),
       }
 
       // "Door wie" — resolve coach_id → naam voor de drill-down per stat. De
@@ -1992,6 +1996,13 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
           funnel.saleLost.reasons[reason] = (funnel.saleLost.reasons[reason] || 0) + 1
           funnel.saleLost.count++
           funnel.saleLost.leads.push({ ...leadInfo, reason })
+          return
+        }
+        if (NOT_SUITABLE_KEYWORDS.some(kw => toSection.includes(kw))) {
+          if (leadId && seen.notSuitable.has(leadId)) return
+          if (leadId) seen.notSuitable.add(leadId)
+          funnel.notSuitable.count++
+          funnel.notSuitable.leads.push(leadInfo)
           return
         }
         if (NEGATIVE_FUNNEL_WORDS.some(w => toSection.includes(w))) return
@@ -2092,6 +2103,7 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
         sale: { count: 0, leads: [], omzet: 0 }, noShow: { count: 0, leads: [] },
         callRejected: { count: 0, leads: [], reasons: {} },
         saleLost: { count: 0, leads: [], reasons: {} },
+        notSuitable: { count: 0, leads: [] },
       }
     }
   }
