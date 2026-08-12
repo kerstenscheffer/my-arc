@@ -487,6 +487,17 @@ export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, 
           </div>
           <div style={{ flex: 1, minWidth: 8 }} />
           <button
+            onClick={openProposalsPanel}
+            title="Call-voorstellen — verstuurd & geslaagd"
+            style={{
+              width: 36, height: 36, flexShrink: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+              background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10,
+              color: '#a855f7', cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+            }}
+          >
+            <PhoneCall size={16} />
+          </button>
+          <button
             onClick={openRevenuePanel}
             title="Terugkerende omzet & cashflow"
             style={{
@@ -1087,6 +1098,74 @@ export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, 
                       {isOwner
                         ? 'Tip: maak op de 25e het openstaande bedrag over en klik dan “Betaald”. Komt er daarna nog een sale in die maand bij, dan verschijnt alleen dat nieuwe stukje weer als openstaand.'
                         : 'Je coach maakt je aandeel over (meestal rond de 25e) en vinkt de maand dan af. “Openstaand” = nog niet overgemaakt.'}
+                    </div>
+                  </>
+                )
+              })()}
+            </div>
+          </div>
+        </div>
+      )}
+      {showProposals && (
+        <div
+          onClick={() => setShowProposals(false)}
+          style={{ position: 'fixed', inset: 0, zIndex: 2147483560, background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(6px)', display: 'flex', alignItems: isMobile ? 'flex-end' : 'center', justifyContent: 'center', padding: isMobile ? 0 : '1.5rem' }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{ width: '100%', maxWidth: 560, maxHeight: isMobile ? '92vh' : '85vh', display: 'flex', flexDirection: 'column', background: '#111', border: '1px solid rgba(168,85,247,0.28)', borderRadius: isMobile ? '16px 16px 0 0' : 16, overflow: 'hidden' }}
+          >
+            <div style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: 8, padding: isMobile ? 'calc(0.7rem + env(safe-area-inset-top)) 0.9rem 0.7rem' : '0.9rem 1rem', borderBottom: '1px solid rgba(255,255,255,0.08)', background: 'rgba(0,0,0,0.5)' }}>
+              <PhoneCall size={17} color="#a855f7" />
+              <div style={{ flex: 1, color: '#fff', fontWeight: 800, fontSize: '0.95rem' }}>Call-voorstellen</div>
+              <button onClick={() => setShowProposals(false)} title="Sluiten" style={iconBtn}><X size={16} /></button>
+            </div>
+            <div style={{ flex: 1, overflowY: 'auto', padding: '1rem' }}>
+              {propLoading ? (
+                <div style={{ padding: '2rem', textAlign: 'center', color: 'rgba(255,255,255,0.5)' }}>Laden…</div>
+              ) : (!proposals || proposals.total === 0) ? (
+                <div style={{ padding: '2rem 1rem', textAlign: 'center', color: 'rgba(255,255,255,0.4)', fontSize: '0.85rem', lineHeight: 1.5 }}>
+                  Nog geen call-voorstellen verstuurd. Zodra je een call voorstelt aan een lead, verschijnen ze hier — met of ze een call boekten.
+                </div>
+              ) : (() => {
+                const fmt = (iso) => { try { return new Date(iso).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short', year: '2-digit' }) } catch { return '' } }
+                const cards = [
+                  { label: 'Verstuurd', value: proposals.total, color: '#a855f7' },
+                  { label: 'Geslaagd', value: proposals.reached, color: '#22c55e', hint: 'call geboekt' },
+                  { label: 'Slaagkans', value: proposals.pct != null ? `${proposals.pct}%` : '—', color: '#FFD700' },
+                ]
+                return (
+                  <>
+                    <div style={{ display: 'flex', gap: 8, marginBottom: '1.1rem' }}>
+                      {cards.map(c => (
+                        <div key={c.label} style={{ flex: 1, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 12, padding: '0.7rem 0.5rem', textAlign: 'center' }}>
+                          <div style={{ fontSize: isMobile ? '1.1rem' : '1.3rem', fontWeight: 900, color: c.color, lineHeight: 1.1 }}>{c.value}</div>
+                          <div style={{ fontSize: '0.58rem', fontWeight: 800, letterSpacing: '0.03em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.45)', marginTop: 4 }}>{c.label}</div>
+                          {c.hint && <div style={{ fontSize: '0.56rem', color: 'rgba(255,255,255,0.3)', marginTop: 2 }}>{c.hint}</div>}
+                        </div>
+                      ))}
+                    </div>
+                    <div style={{ fontSize: '0.66rem', fontWeight: 800, letterSpacing: '0.05em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.4)', marginBottom: 8 }}>Alle voorstellen</div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                      {proposals.items.map((p, i) => (
+                        <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '0.6rem 0.75rem', borderRadius: 10, background: 'rgba(255,255,255,0.03)', border: `1px solid ${p.reached ? 'rgba(34,197,94,0.25)' : 'rgba(255,255,255,0.08)'}` }}>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ fontSize: '0.82rem', fontWeight: 800, color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.name}</div>
+                            <div style={{ fontSize: '0.62rem', color: 'rgba(255,255,255,0.4)', marginTop: 2 }}>
+                              Voorgesteld {fmt(p.proposedAt)} · nu: {p.currentSection}
+                            </div>
+                          </div>
+                          <span style={{ flexShrink: 0, display: 'inline-flex', alignItems: 'center', gap: 4, padding: '0.28rem 0.55rem', borderRadius: 8, fontSize: '0.64rem', fontWeight: 800,
+                            background: p.reached ? 'rgba(34,197,94,0.14)' : 'rgba(255,255,255,0.05)',
+                            border: `1px solid ${p.reached ? 'rgba(34,197,94,0.4)' : 'rgba(255,255,255,0.1)'}`,
+                            color: p.reached ? '#22c55e' : 'rgba(255,255,255,0.45)' }}>
+                            {p.reached ? <><Check size={12} /> Geslaagd</> : 'Nog niet'}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                    <div style={{ marginTop: '0.8rem', fontSize: '0.62rem', color: 'rgba(255,255,255,0.3)', lineHeight: 1.5 }}>
+                      "Geslaagd" = de lead bereikte de Sales Call-fase (of verder) ná jouw voorstel.
                     </div>
                   </>
                 )
