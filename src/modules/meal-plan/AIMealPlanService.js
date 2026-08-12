@@ -116,134 +116,108 @@ const dailyTotals = await this.calculateDailyTotals(clientId, todayMeals, todayP
       
       const swaps = todayProgress?.consumed_meals || {}
       const meals = []
-      
+
+      // Haalt de coach-ingestelde klok-tijd en display-label op uit een slot-ref.
+      // Slot-refs in week_structure kunnen een volledig meal-object zijn (met .calories)
+      // of een referentie-object (met .meal_id). In beide gevallen zitten timing en
+      // display_label op het slot-niveau en worden ze hier bewaard voordat getMealData
+      // ze overschrijft met data uit de ai_meals tabel.
+      const getSlotMeta = (slotRef) => ({
+        timing: typeof slotRef === 'object' && slotRef !== null ? (slotRef.timing || null) : null,
+        display_label: typeof slotRef === 'object' && slotRef !== null ? (slotRef.display_label || null) : null,
+      })
+
+      // Bouwt een meal-push-object met slot-metadata (timing + display_label) die
+      // altijd wint van wat er eventueel in mealData zit.
+      const buildMealEntry = (mealData, slotRef, slot, defaultTimeSlot, defaultPlannedTime, swapKey) => {
+        const { timing, display_label } = getSlotMeta(slotRef)
+        return {
+          ...mealData,
+          slot,
+          display_label: display_label || mealData.display_label || null,
+          timing: timing || (typeof mealData.timing === 'string' ? mealData.timing : null) || null,
+          timeSlot: display_label || defaultTimeSlot,
+          plannedTime: timing || defaultPlannedTime,
+          isConsumed: swaps[swapKey]?.consumed || false,
+          consumedAt: swaps[swapKey]?.time || null,
+          meal_name: mealData.name || mealData.meal_name,
+          meal_id: mealData.id || mealData.meal_id,
+        }
+      }
+
       // Process breakfast
       if (dayPlan.breakfast) {
         const swapData = swaps.breakfast
-        const mealData = swapData?.was_swapped 
+        const mealData = swapData?.was_swapped
           ? (swapData.edited_meal || await this.getMealById(swapData.meal_id))
           : await getMealData(dayPlan.breakfast)
-        
+
         if (mealData) {
-          meals.push({
-            ...mealData,
-            slot: 'breakfast',
-            timeSlot: this.formatSlotName('breakfast'),
-            plannedTime: this.getPlannedTime('breakfast'),
-            isConsumed: swaps.breakfast?.consumed || false,
-            consumedAt: swaps.breakfast?.time || null,
-            meal_name: mealData.name || mealData.meal_name,
-            meal_id: mealData.id || mealData.meal_id
-          })
+          meals.push(buildMealEntry(mealData, dayPlan.breakfast, 'breakfast', this.formatSlotName('breakfast'), this.getPlannedTime('breakfast'), 'breakfast'))
         }
       }
-      
+
       // Process lunch
       if (dayPlan.lunch) {
         const swapData = swaps.lunch
-        const mealData = swapData?.was_swapped 
+        const mealData = swapData?.was_swapped
           ? (swapData.edited_meal || await this.getMealById(swapData.meal_id))
           : await getMealData(dayPlan.lunch)
-        
+
         if (mealData) {
-          meals.push({
-            ...mealData,
-            slot: 'lunch',
-            timeSlot: this.formatSlotName('lunch'),
-            plannedTime: this.getPlannedTime('lunch'),
-            isConsumed: swaps.lunch?.consumed || false,
-            consumedAt: swaps.lunch?.time || null,
-            meal_name: mealData.name || mealData.meal_name,
-            meal_id: mealData.id || mealData.meal_id
-          })
+          meals.push(buildMealEntry(mealData, dayPlan.lunch, 'lunch', this.formatSlotName('lunch'), this.getPlannedTime('lunch'), 'lunch'))
         }
       }
-      
+
       // Process dinner
       if (dayPlan.dinner) {
         const swapData = swaps.dinner
-        const mealData = swapData?.was_swapped 
+        const mealData = swapData?.was_swapped
           ? (swapData.edited_meal || await this.getMealById(swapData.meal_id))
           : await getMealData(dayPlan.dinner)
-        
+
         if (mealData) {
-          meals.push({
-            ...mealData,
-            slot: 'dinner',
-            timeSlot: this.formatSlotName('dinner'),
-            plannedTime: this.getPlannedTime('dinner'),
-            isConsumed: swaps.dinner?.consumed || false,
-            consumedAt: swaps.dinner?.time || null,
-            meal_name: mealData.name || mealData.meal_name,
-            meal_id: mealData.id || mealData.meal_id
-          })
+          meals.push(buildMealEntry(mealData, dayPlan.dinner, 'dinner', this.formatSlotName('dinner'), this.getPlannedTime('dinner'), 'dinner'))
         }
       }
-      
+
       // Process snacks array
       if (dayPlan.snacks && Array.isArray(dayPlan.snacks)) {
         for (let idx = 0; idx < dayPlan.snacks.length; idx++) {
           const snack = dayPlan.snacks[idx]
           const slotName = `snack${idx + 1}`
           const swapData = swaps[slotName]
-          
-          const mealData = swapData?.was_swapped 
+
+          const mealData = swapData?.was_swapped
             ? (swapData.edited_meal || await this.getMealById(swapData.meal_id))
             : await getMealData(snack)
-          
+
           if (mealData) {
-            meals.push({
-              ...mealData,
-              slot: slotName,
-              timeSlot: `Snack ${idx + 1}`,
-              plannedTime: this.getPlannedTime(slotName),
-              isConsumed: swaps[slotName]?.consumed || false,
-              consumedAt: swaps[slotName]?.time || null,
-              meal_name: mealData.name || mealData.meal_name,
-              meal_id: mealData.id || mealData.meal_id
-            })
+            meals.push(buildMealEntry(mealData, snack, slotName, `Snack ${idx + 1}`, this.getPlannedTime(slotName), slotName))
           }
         }
       }
-      
+
       // Check direct snack properties
       if (dayPlan.snack1) {
         const swapData = swaps.snack1
-        const mealData = swapData?.was_swapped 
+        const mealData = swapData?.was_swapped
           ? (swapData.edited_meal || await this.getMealById(swapData.meal_id))
           : await getMealData(dayPlan.snack1)
-        
+
         if (mealData) {
-          meals.push({
-            ...mealData,
-            slot: 'snack1',
-            timeSlot: this.formatSlotName('snack1'),
-            plannedTime: this.getPlannedTime('snack1'),
-            isConsumed: swaps.snack1?.consumed || false,
-            consumedAt: swaps.snack1?.time || null,
-            meal_name: mealData.name || mealData.meal_name,
-            meal_id: mealData.id || mealData.meal_id
-          })
+          meals.push(buildMealEntry(mealData, dayPlan.snack1, 'snack1', this.formatSlotName('snack1'), this.getPlannedTime('snack1'), 'snack1'))
         }
       }
-      
+
       if (dayPlan.snack2) {
         const swapData = swaps.snack2
-        const mealData = swapData?.was_swapped 
+        const mealData = swapData?.was_swapped
           ? (swapData.edited_meal || await this.getMealById(swapData.meal_id))
           : await getMealData(dayPlan.snack2)
-        
+
         if (mealData) {
-          meals.push({
-            ...mealData,
-            slot: 'snack2',
-            timeSlot: this.formatSlotName('snack2'),
-            plannedTime: this.getPlannedTime('snack2'),
-            isConsumed: swaps.snack2?.consumed || false,
-            consumedAt: swaps.snack2?.time || null,
-            meal_name: mealData.name || mealData.meal_name,
-            meal_id: mealData.id || mealData.meal_id
-          })
+          meals.push(buildMealEntry(mealData, dayPlan.snack2, 'snack2', this.formatSlotName('snack2'), this.getPlannedTime('snack2'), 'snack2'))
         }
       }
       

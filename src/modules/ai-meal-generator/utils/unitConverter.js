@@ -103,12 +103,18 @@ const UNIT_RULES = [
   },
 ]
 
+// Korte keywords (≤2 tekens) die via includes() te veel false positives geven
+// (bv. 'ei' matcht ook 'sojaeiwit', 'seitan', 'caseine'). Voor deze keywords
+// wordt een word-boundary regex gebruikt.
+const BOUNDARY_KEYWORDS = new Set(['ei', 'egg'])
+
 /**
  * Geeft een human-readable hoeveelheid terug
  * bijv. "12 kakelverse scharreleieren L, 1 ster (Jumbo)" 150g → "3 eieren (150g)"
  * bijv. "eieren (Albert Heijn)" 55g → "1 ei (55g)"
  *
  * Matching: INCLUDES check op lowercase — herkent merknamen, varianten etc.
+ * Uitzondering: korte keywords in BOUNDARY_KEYWORDS gebruiken word-boundary regex.
  */
 export function toHumanAmount(name, grams) {
   if (!name || !grams || grams <= 0) return `${Math.round(grams)}g`
@@ -116,7 +122,11 @@ export function toHumanAmount(name, grams) {
   const nameLower = name.toLowerCase()
 
   const rule = UNIT_RULES.find(r =>
-    r.keywords.some(keyword => nameLower.includes(keyword))
+    r.keywords.some(keyword =>
+      BOUNDARY_KEYWORDS.has(keyword)
+        ? new RegExp(`\\b${keyword}\\b`).test(nameLower)
+        : nameLower.includes(keyword)
+    )
   )
 
   if (!rule) return `${Math.round(grams)}g`

@@ -85,16 +85,31 @@ export default function MealCard({
           padding: isMobile ? '0.45rem 0.7rem 0.4rem' : '0.55rem 0.95rem 0.5rem',
         }}>
           <div style={{
-            fontSize: isMobile ? '0.55rem' : '0.6rem',
-            fontWeight: 800,
-            color: GOLD,
-            textTransform: 'uppercase',
-            letterSpacing: '0.1em',
-            lineHeight: 1,
+            display: 'flex', alignItems: 'center', gap: 6,
             marginBottom: 4,
-            opacity: 0.85,
           }}>
-            {getMealTypeLabel(meal)}
+            <div style={{
+              fontSize: isMobile ? '0.55rem' : '0.6rem',
+              fontWeight: 800,
+              color: GOLD,
+              textTransform: 'uppercase',
+              letterSpacing: '0.1em',
+              lineHeight: 1,
+              opacity: 0.85,
+            }}>
+              {getMealTypeLabel(meal)}
+            </div>
+            {meal.timing && typeof meal.timing === 'string' && /^\d{1,2}:\d{2}/.test(meal.timing) && (
+              <div style={{
+                fontSize: isMobile ? '0.52rem' : '0.56rem',
+                fontWeight: 700,
+                color: 'rgba(255,255,255,0.35)',
+                letterSpacing: '0.03em',
+                lineHeight: 1,
+              }}>
+                {meal.timing}
+              </div>
+            )}
           </div>
 
           <div style={{
