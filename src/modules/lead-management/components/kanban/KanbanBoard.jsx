@@ -1632,13 +1632,14 @@ export default function KanbanBoard({
   // ========================================
   // LOADING
   // ========================================
-  if (loading) {
-    return (
-      <div style={{ minHeight: '400px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <div style={{ width: '40px', height: '40px', border: '2px solid rgba(255,255,255,0.06)', borderTopColor: '#10b981', borderRadius: '50%', animation: 'kbSpin 0.8s linear infinite' }} />
-      </div>
-    )
-  }
+  // Board-loader: alleen het board-gebied toont een spinner tijdens het laden,
+  // zodat de bovenbalk (stats + zoekbalk) DIRECT zichtbaar is en je meteen kunt
+  // zoeken — i.p.v. de hele pagina achter één spinner te verbergen.
+  const boardLoader = (
+    <div style={{ minHeight: '300px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <div style={{ width: '36px', height: '36px', border: '2px solid rgba(255,255,255,0.06)', borderTopColor: '#10b981', borderRadius: '50%', animation: 'kbSpin 0.8s linear infinite' }} />
+    </div>
+  )
 
   const showSaveBar = hasUnsavedChanges()
 
@@ -2079,7 +2080,7 @@ export default function KanbanBoard({
           )}
 
 
-          {renderKanbanColumns(false)}
+          {loading ? boardLoader : renderKanbanColumns(false)}
 
           {showAddLead && <AddLeadModal isMobile={isMobile} onClose={() => { setShowAddLead(false); setSelectedSectionForLead(null) }} onSubmit={handleAddLead} />}
           {showRapidAdd && (
@@ -2188,7 +2189,7 @@ export default function KanbanBoard({
                     <Plus size={10} /> Sectie
                   </button>
                 </div>
-                {renderKanbanColumns(true)}
+                {loading ? boardLoader : renderKanbanColumns(true)}
               </>
             )}
           </div>
