@@ -588,13 +588,32 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
 
   // Haalt ALLE rijen op ondanks de PostgREST 1000-rijen limiet, door te
   // pagineren met .range(). `build` moet telkens een VERSE query teruggeven.
-  async _fetchAllRows(build, pageSize = 1000) {
-    let out = []
-    for (let from = 0; ; from += pageSize) {
-      const { data, error } = await build().range(from, from + pageSize - 1)
-      if (error) { console.error('❌ _fetchAllRows error:', error.message); break }
-      out = out.concat(data || [])
-      if (!data || data.length < pageSize) break
+  // Haalt alle rijen op (PostgREST kapt op 1000/req). Voorheen: sequentiële
+  // pagina's → bij 4000+ leads waren dat 5 round-trips achter elkaar (traag).
+  // Nu: eerste pagina apart (kleine tabellen = 1 request), grotere sets in
+  // PARALLELLE batches → veel minder wachttijd op netwerk-latency.
+  async _fetchAllRows(build, pageSize = 1000, parallel = 6) {
+    const first = await build().range(0, pageSize - 1)
+    if (first.error) { console.error('❌ _fetchAllRows error:', first.error.message); return [] }
+    let out = first.data || []
+    if (out.length < pageSize) return out // alles paste in 1 request
+
+    let base = pageSize
+    while (true) {
+      const reqs = []
+      for (let i = 0; i < parallel; i++) {
+        const from = base + i * pageSize
+        reqs.push(build().range(from, from + pageSize - 1))
+      }
+      const results = await Promise.all(reqs)
+      let full = 0
+      for (const { data, error } of results) {
+        if (error) { console.error('❌ _fetchAllRows error:', error.message); return out }
+        out = out.concat(data || [])
+        if ((data?.length || 0) === pageSize) full++
+      }
+      if (full < parallel) break // laatste batch bevatte een niet-volle pagina → klaar
+      base += parallel * pageSize
     }
     return out
   }
@@ -616,8 +635,20 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
           .select('lead_id, section_id, position, previous_section_id, previous_section_title, previous_section_color, moved_to_stale_at')),
         this._fetchAllRows(() => this.db.supabase
           .from('call_leads')
+          // Slanke selectie i.p.v. `select *`: alleen de kolommen die de kaart +
+          // bord-logica gebruiken. De zware jsonb-kolommen (dm_node_history,
+          // sales_call_notes) en ongebruikte vrije-tekstvelden vielen weg → veel
+          // kleinere payload voor 4000+ leads. De detail-modal haalt de volledige
+          // lead apart op, dus niks gaat verloren.
           .select(`
-            *,
+            id, first_name, last_name, email, phone, status, lead_source,
+            created_at, last_contacted_at, last_touched, contacted_today_date,
+            last_followup_sent_at, last_dm_interaction, current_dm_node,
+            coach_id, team_id, deleted_at, notes, reply_count, first_reply_at,
+            is_snoozed, campaign_id, followup_count, lead_temperature,
+            lead_magnets_shared, outreach_campaign_id, source_lead_magnet_id,
+            previous_section_color, previous_section_id, previous_section_title,
+            qual_goal_checked, qual_pain_checked, qual_urgency_checked, qual_open_checked,
             source_lead_magnet:lead_magnets!call_leads_source_lead_magnet_id_fkey(id, name),
             outreach_campaign:outreach_campaigns!call_leads_outreach_campaign_id_fkey(id, name, variant_tag)
           `)
