@@ -6,6 +6,22 @@ import './styles/ai-generator.css'
 import './ui/tokens.css'   // design-contract tokens (goud), additief — laadt op elke pagina
 import App from './App.jsx'
 
+// ── Service-worker kill-switch ──────────────────────────────────────────────
+// De oude PWA-service-worker (public/service-worker.js) veroorzaakte spontane
+// hard-refreshes: hij checkte elke 5 min op updates → stuurde NEW_VERSION_AVAILABLE
+// → update-prompt → reload, én cachete HTML/JS-chunks (na een deploy = stale/
+// mismatch). Registratie stond al uit, maar browsers die 'm ooit registreerden
+// draaien 'm nog. Hier verwijderen we elke bestaande SW + z'n caches zodat de app
+// voortaan altijd vers van het netwerk laadt. (No-op zodra er niks meer staat.)
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.getRegistrations()
+    .then(regs => regs.forEach(reg => reg.unregister()))
+    .catch(() => {})
+  if (window.caches?.keys) {
+    caches.keys().then(keys => keys.forEach(k => caches.delete(k))).catch(() => {})
+  }
+}
+
 // Mount application
 const container = document.getElementById('root');
 const root = createRoot(container);

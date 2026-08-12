@@ -2,12 +2,16 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 
-export default defineConfig({
+// command === 'build' → productie: strip alle console.* + debugger (scheelt
+// overhead van logs die grote objecten serialiseren in hot paths en houdt de
+// prod-console schoon). In dev (`vite`) blijven de logs staan om te debuggen.
+export default defineConfig(({ command }) => ({
   plugins: [
     react({
       jsxRuntime: 'automatic' // Automatic JSX Transform - no React import needed
     })
   ],
+  esbuild: command === 'build' ? { drop: ['console', 'debugger'] } : {},
   build: {
     minify: 'esbuild',
     sourcemap: false,
@@ -22,4 +26,4 @@ export default defineConfig({
     port: 5173,
     host: true
   }
-})
+}))
