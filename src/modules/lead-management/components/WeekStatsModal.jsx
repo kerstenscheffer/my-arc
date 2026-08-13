@@ -6,7 +6,7 @@
 import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import {
-  X, ChevronLeft, ChevronRight, ChevronDown, Calendar, Zap, TrendingUp,
+  X, ChevronLeft, ChevronRight, ChevronDown, Calendar, Zap, TrendingUp, Info,
   MessageCircle, Users, Phone, Trophy, Activity, BarChart3, PhoneCall,
   Send, FileText, Percent, UserX, Eye, Download, LineChart as LineChartIcon,
   RotateCcw, Target, Save, UserPlus, CalendarCheck, Euro, PhoneOff, XCircle, Check, Ban,
@@ -402,38 +402,29 @@ export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, 
   const closeRate = callsHeld > 0 ? Math.round((totalSales / callsHeld) * 100) : null
   const pct1 = (v) => (v == null ? '—' : `${v}%`)
   const STAGE_ACCENT = { callProposed: '#a855f7', callScheduled: '#06b6d4', sale: '#10b981', noShow: '#f97316', callRejected: '#f97316', saleLost: '#ef4444', notSuitable: '#64748b' }
+  const frac = (a, b) => `${a} van ${b}`
   const countItems = [
-    { label: 'Nieuwe leads', value: newLeadsInPeriod,          Icon: UserPlus,      color: '#3b82f6' },
-    { label: 'Follow-ups',   value: activity?.followUps ?? 0,  Icon: Send,          color: '#f59e0b' },
-    { label: 'Reacties',     value: kpiValues.reacties,        Icon: MessageCircle, color: '#10b981' },
-    { label: 'Voorgesteld',  value: totalCallProposed,         Icon: PhoneCall,     color: '#a855f7', stage: 'callProposed' },
-    { label: 'Ingepland',    value: totalCalls,                Icon: CalendarCheck, color: '#06b6d4', stage: 'callScheduled' },
-    { label: 'Calls geboekt', value: funnel?.callBooked?.count ?? 0, Icon: Calendar, color: '#6366f1' },
-    { label: 'Call gevoerd', value: funnel?.callHeld?.count ?? 0, Icon: Phone,      color: '#10b981' },
-    { label: 'Sales',        value: totalSales,                Icon: Trophy,        color: '#FFD700', stage: 'sale' },
-    { label: 'Omzet',        value: '€' + Math.round(funnel?.sale?.omzet || 0).toLocaleString('nl-NL'), Icon: Euro, color: '#22c55e' },
-    { label: 'No-shows',     value: totalNoShows,              Icon: UserX,         color: '#ef4444', stage: 'noShow' },
-    { label: 'Afgewezen',    value: funnel?.callRejected?.count ?? 0, Icon: PhoneOff, color: '#f97316', stage: 'callRejected' },
-    { label: 'Sale verloren', value: funnel?.saleLost?.count ?? 0, Icon: XCircle, color: '#ef4444', stage: 'saleLost' },
-    { label: 'Niet geschikt', value: funnel?.notSuitable?.count ?? 0, Icon: Ban, color: '#64748b', stage: 'notSuitable' },
+    { label: 'Nieuwe leads', value: newLeadsInPeriod,          Icon: UserPlus,      color: '#3b82f6', info: 'Nieuwe leads die in deze periode zijn binnengekomen (op aanmaakdatum).' },
+    { label: 'Follow-ups',   value: activity?.followUps ?? 0,  Icon: Send,          color: '#f59e0b', info: 'Aantal opvolg-berichten dat je hebt gestuurd in deze periode.' },
+    { label: 'Reacties',     value: kpiValues.reacties,        Icon: MessageCircle, color: '#10b981', info: 'Aantal keer dat een lead reageerde (elke reactie-klik telt).' },
+    { label: 'Voorgesteld',  value: totalCallProposed,         Icon: PhoneCall,     color: '#a855f7', stage: 'callProposed', info: 'Leads die je een call hebt voorgesteld (naar de "Call voorgesteld"-kolom verplaatst). Klik voor de lijst.' },
+    { label: 'Ingepland',    value: totalCalls,                Icon: CalendarCheck, color: '#06b6d4', stage: 'callScheduled', info: 'Leads die je naar "Sales Call" verplaatste in deze periode. Klik voor de lijst.' },
+    { label: 'Calls geboekt', value: funnel?.callBooked?.count ?? 0, Icon: Calendar, color: '#6366f1', info: 'Calls waarvan de geplande datum in deze periode valt — ongeacht of ze gevoerd zijn, no-show of nog open.' },
+    { label: 'Call gevoerd', value: funnel?.callHeld?.count ?? 0, Icon: Phone,      color: '#10b981', info: 'Ingeplande calls die je écht hebt gevoerd (afgehandeld als sale of sale verloren), geteld op de call-datum.' },
+    { label: 'Sales',        value: totalSales,                Icon: Trophy,        color: '#FFD700', stage: 'sale', info: 'Gewonnen deals (naar een "Sale"-kolom verplaatst). Klik voor de lijst.' },
+    { label: 'Omzet',        value: '€' + Math.round(funnel?.sale?.omzet || 0).toLocaleString('nl-NL'), Icon: Euro, color: '#22c55e', info: 'Totale orderwaarde van de sales in deze periode.' },
+    { label: 'No-shows',     value: totalNoShows,              Icon: UserX,         color: '#ef4444', stage: 'noShow', info: 'Ingeplande calls waarbij de lead niet kwam opdagen, geteld op de call-datum. Klik voor de lijst.' },
+    { label: 'Afgewezen',    value: funnel?.callRejected?.count ?? 0, Icon: PhoneOff, color: '#f97316', stage: 'callRejected', info: 'Leads die het call-voorstel afwezen (naar "Call afgewezen"). Klik voor de reden-verdeling.' },
+    { label: 'Sale verloren', value: funnel?.saleLost?.count ?? 0, Icon: XCircle, color: '#ef4444', stage: 'saleLost', info: 'Gevoerde calls die niet in een sale eindigden. Klik voor de objectie-verdeling.' },
+    { label: 'Niet geschikt', value: funnel?.notSuitable?.count ?? 0, Icon: Ban, color: '#64748b', stage: 'notSuitable', info: 'Leads die je als geen goede fit hebt gemarkeerd (naar "Niet geschikt"). Klik voor de lijst.' },
   ]
   const pctItems = [
-    { label: 'Response',      value: pct1(responseRate),        Icon: MessageCircle, color: '#3b82f6' },
-    { label: 'Opvolg',        value: pct1(chaseShare),          Icon: Send,          color: '#f59e0b' },
-    { label: 'Voorstel→call', value: pct1(proposedToScheduled), Icon: PhoneCall,     color: '#a855f7' },
-    { label: 'Show-up',       value: pct1(showRate),            Icon: CalendarCheck, color: '#06b6d4' },
-    { label: 'No-show',       value: pct1(noShowRate),          Icon: UserX,         color: '#ef4444' },
-    { label: 'Close rate',    value: pct1(closeRate),           Icon: Trophy,        color: '#22c55e' },
-  ]
-
-  // Conversie VANAF de eerste reactie — hoeveel % van de gereageerde leads elke
-  // volgende fase haalt. Noemer = unieke gereageerde leads in de periode.
-  const fromReaction = (n) => reactedLeads > 0 ? Math.round((n / reactedLeads) * 100) : null
-  const reactionItems = [
-    { label: '→ Voorgesteld', value: pct1(fromReaction(totalCallProposed)),        Icon: PhoneCall,     color: '#a855f7' },
-    { label: '→ Ingepland',   value: pct1(fromReaction(totalCalls)),               Icon: CalendarCheck, color: '#06b6d4' },
-    { label: '→ Gevoerd',     value: pct1(fromReaction(callsHeld)),                Icon: Phone,         color: '#10b981' },
-    { label: '→ Sale',        value: pct1(fromReaction(totalSales)),               Icon: Trophy,        color: '#22c55e' },
+    { label: 'Response',      value: pct1(responseRate),        Icon: MessageCircle, color: '#3b82f6', sub: frac(reactedLeads, newLeadsInPeriod),   info: 'Van de nieuwe leads deze periode, hoeveel % er reageerde.' },
+    { label: 'Opvolg',        value: pct1(chaseShare),          Icon: Send,          color: '#f59e0b', sub: frac(followedLeads, newLeadsInPeriod),   info: 'Van de nieuwe leads, hoeveel % je moest opvolgen (follow-up nodig had).' },
+    { label: 'Voorstel→call', value: pct1(proposedToScheduled), Icon: PhoneCall,     color: '#a855f7', sub: frac(totalCalls, totalCallProposed),    info: 'Van de leads aan wie je een call voorstelde, hoeveel % ook echt een call inplande.' },
+    { label: 'Show-up',       value: pct1(showRate),            Icon: CalendarCheck, color: '#06b6d4', sub: frac(callsHeld, handledCalls),          info: 'Van de afgehandelde calls (gevoerd + no-show), hoeveel % kwam opdagen.' },
+    { label: 'No-show',       value: pct1(noShowRate),          Icon: UserX,         color: '#ef4444', sub: frac(totalNoShows, handledCalls),       info: 'Van de afgehandelde calls, hoeveel % niet kwam opdagen.' },
+    { label: 'Close rate',    value: pct1(closeRate),           Icon: Trophy,        color: '#22c55e', sub: frac(totalSales, callsHeld),            info: 'Van de gevoerde calls, hoeveel % je sloot als sale.' },
   ]
 
   const modal = (
@@ -643,11 +634,6 @@ export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, 
               {/* Percentages — tweede strakke rij. */}
               <SectionTitle icon={<Percent size={13} color={GOLD} />} title="Percentages" />
               <StatFlow items={pctItems} activeStage={null} onToggle={() => {}} />
-
-              {/* Conversie vanaf de eerste reactie — % van gereageerde leads dat
-                  elke volgende fase haalt (reactie → voorgesteld → ... → sale). */}
-              <SectionTitle icon={<MessageCircle size={13} color="#10b981" />} title="Vanaf eerste reactie" />
-              <StatFlow items={reactionItems} activeStage={null} onToggle={() => {}} />
 
               {/* Call-voorstellen — laad alle verstuurde berichten + welke geslaagd. */}
               <button
@@ -1480,23 +1466,54 @@ function StagePill({ label, value, color }) {
 // Compacte stat-rij in de stijl van de stats-bar: gekleurd icoon + bold wit
 // getal + klein label. Items met een `stage` zijn klikbaar → drill-down eronder.
 function StatFlow({ items, activeStage, onToggle }) {
+  // Welke stat z'n uitleg-box getoond wordt (klik op het ⓘ-icoon).
+  const [openInfo, setOpenInfo] = useState(null)
+  const active = openInfo != null ? items.find(x => x.label === openInfo) : null
   return (
-    <div style={{ display: 'flex', alignItems: 'flex-start', gap: 18, overflowX: 'auto', WebkitOverflowScrolling: 'touch', padding: '2px 0 8px' }}>
-      {items.map(it => {
-        const clickable = !!it.stage
-        const on = clickable && activeStage === it.stage
-        return (
-          <div key={it.label} onClick={clickable ? () => onToggle(it.stage) : undefined} title={it.label}
-            style={{ display: 'flex', flexDirection: 'column', gap: 3, flexShrink: 0, cursor: clickable ? 'pointer' : 'default' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-              <it.Icon size={16} color={it.color} strokeWidth={2.4} style={{ flexShrink: 0 }} />
-              <span style={{ fontSize: '1.15rem', fontWeight: 900, color: '#fff', fontVariantNumeric: 'tabular-nums', lineHeight: 1 }}>{it.value}</span>
-              {clickable && <ChevronDown size={12} color={on ? '#FFD700' : 'rgba(255,255,255,0.35)'} style={{ transform: on ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s ease' }} />}
+    <div>
+      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 18, overflowX: 'auto', WebkitOverflowScrolling: 'touch', padding: '2px 0 8px' }}>
+        {items.map(it => {
+          const clickable = !!it.stage
+          const on = clickable && activeStage === it.stage
+          const infoOn = openInfo === it.label
+          return (
+            <div key={it.label} style={{ display: 'flex', flexDirection: 'column', gap: 3, flexShrink: 0 }}>
+              <div onClick={clickable ? () => onToggle(it.stage) : undefined} title={it.label}
+                style={{ display: 'flex', alignItems: 'center', gap: 5, cursor: clickable ? 'pointer' : 'default' }}>
+                <it.Icon size={16} color={it.color} strokeWidth={2.4} style={{ flexShrink: 0 }} />
+                <span style={{ fontSize: '1.15rem', fontWeight: 900, color: '#fff', fontVariantNumeric: 'tabular-nums', lineHeight: 1 }}>{it.value}</span>
+                {clickable && <ChevronDown size={12} color={on ? '#FFD700' : 'rgba(255,255,255,0.35)'} style={{ transform: on ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s ease' }} />}
+              </div>
+              {/* Titel + ⓘ-uitlegknop. */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
+                <span style={{ fontSize: '0.56rem', fontWeight: 800, letterSpacing: '0.04em', textTransform: 'uppercase', color: on ? '#FFD700' : 'rgba(255,255,255,0.4)', whiteSpace: 'nowrap' }}>{it.label}</span>
+                {it.info && (
+                  <button
+                    onClick={(e) => { e.stopPropagation(); setOpenInfo(p => p === it.label ? null : it.label) }}
+                    title="Wat betekent dit?"
+                    style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', padding: 0, width: 13, height: 13, borderRadius: '50%', background: 'none', border: 'none', cursor: 'pointer', color: infoOn ? '#FFD700' : 'rgba(255,255,255,0.3)', flexShrink: 0 }}
+                  >
+                    <Info size={11} />
+                  </button>
+                )}
+              </div>
+              {/* Echte breuk onder een percentage (bv. "45 van 310"). */}
+              {it.sub && <span style={{ fontSize: '0.5rem', fontWeight: 700, color: 'rgba(255,255,255,0.28)', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>{it.sub}</span>}
             </div>
-            <span style={{ fontSize: '0.56rem', fontWeight: 800, letterSpacing: '0.04em', textTransform: 'uppercase', color: on ? '#FFD700' : 'rgba(255,255,255,0.4)', whiteSpace: 'nowrap' }}>{it.label}</span>
+          )
+        })}
+      </div>
+      {/* Uitleg-box — verschijnt onder de rij bij klik op ⓘ. */}
+      {active && (
+        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 7, margin: '0 0 0.7rem', padding: '0.5rem 0.65rem', background: `${active.color}12`, border: `1px solid ${active.color}33`, borderRadius: 8 }}>
+          <Info size={13} color={active.color} style={{ flexShrink: 0, marginTop: 1 }} />
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: '0.66rem', fontWeight: 800, color: '#fff', marginBottom: 1 }}>{active.label}{active.sub ? ` · ${active.sub}` : ''}</div>
+            <div style={{ fontSize: '0.66rem', color: 'rgba(255,255,255,0.6)', lineHeight: 1.45 }}>{active.info}</div>
           </div>
-        )
-      })}
+          <button onClick={() => setOpenInfo(null)} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.4)', cursor: 'pointer', padding: 2, flexShrink: 0 }}><X size={12} /></button>
+        </div>
+      )}
     </div>
   )
 }
