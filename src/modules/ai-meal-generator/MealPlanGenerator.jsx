@@ -31,9 +31,8 @@ export default function MealPlanGenerator({ db, clients = [], conceptPlanId, sel
   const isMobile = window.innerWidth <= 768
   const m = isMobile
 
-  // Open direct op de Analyzer als er een client of concept-plan is; anders de
-  // client-kiezer.
-  const [activeTab, setActiveTab] = useState(() => (conceptPlanId || propSelectedClient) ? 3 : 0)
+  // Altijd direct op de Analyzer openen — client kies je via de inline picker in de tab-balk.
+  const [activeTab, setActiveTab] = useState(3)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
   const [success, setSuccess] = useState(null)
@@ -208,9 +207,7 @@ export default function MealPlanGenerator({ db, clients = [], conceptPlanId, sel
   return (
     <div style={{ minHeight: '100vh', background: '#0a0a0a' }}>
 
-      {/* ═══ TAB BAR — sticky onder de WeekGoalsBar (32px) ═══
-          Vroeger zat hier `+ 88px / 101px` voor de oude CoachHub-header.
-          Header is nu weg → tab-bar plakt direct onder de WeekGoalsBar. */}
+      {/* ═══ TAB BAR + INLINE CLIENT PICKER — sticky ═══ */}
       <div style={{
         display: 'flex', alignItems: 'stretch',
         borderBottom: `1px solid ${G.border}`,
@@ -218,41 +215,78 @@ export default function MealPlanGenerator({ db, clients = [], conceptPlanId, sel
         position: 'sticky',
         top: 'calc(env(safe-area-inset-top, 0px) + 32px)',
         zIndex: 50,
-        overflowX: 'auto', WebkitOverflowScrolling: 'touch'
       }}>
-        {TABS.map((tab) => {
-          const Icon = tab.icon
-          const isActive = tab.idx === activeTab
-          const isCompleted = generatedPlan && tab.idx < 3
-          const isDisabled = tab.idx === 3 && !selectedClient && !conceptPlanId && !resolvedClientId
-          return (
-            <button
-              key={tab.id}
-              onClick={() => !isDisabled && setActiveTab(tab.idx)}
-              disabled={isDisabled}
-              style={{
-                flex: 1, minWidth: m ? '58px' : '80px',
-                padding: m ? '0.6rem 0.2rem' : '0.75rem 0',
-                background: 'transparent', border: 'none',
-                borderBottom: isActive ? `2px solid ${G.primary}` : '2px solid transparent',
-                color: isActive ? G.primary : isCompleted ? '#10b981' : isDisabled ? 'rgba(255,255,255,0.12)' : 'rgba(255,255,255,0.35)',
-                fontSize: m ? '0.58rem' : '0.7rem', fontWeight: isActive ? 700 : 500,
-                cursor: isDisabled ? 'default' : 'pointer',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                gap: m ? '0.15rem' : '0.3rem',
-                flexDirection: m ? 'column' : 'row',
-                opacity: isDisabled ? 0.35 : 1,
-                touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-                transition: 'all 0.15s ease', whiteSpace: 'nowrap',
-                letterSpacing: '-0.01em'
-              }}
-            >
-              <Icon size={m ? 12 : 14} />
-              {tab.label}
-              {isCompleted && !isActive && <Check size={9} color="#10b981" />}
-            </button>
-          )
-        })}
+        {/* Tabs */}
+        <div style={{ display: 'flex', overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
+          {TABS.map((tab) => {
+            const Icon = tab.icon
+            const isActive = tab.idx === activeTab
+            const isCompleted = generatedPlan && tab.idx < 3
+            return (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.idx)}
+                style={{
+                  minWidth: m ? '58px' : '80px',
+                  padding: m ? '0.6rem 0.2rem' : '0.75rem 0',
+                  background: 'transparent', border: 'none',
+                  borderBottom: isActive ? `2px solid ${G.primary}` : '2px solid transparent',
+                  color: isActive ? G.primary : isCompleted ? '#10b981' : 'rgba(255,255,255,0.35)',
+                  fontSize: m ? '0.58rem' : '0.7rem', fontWeight: isActive ? 700 : 500,
+                  cursor: 'pointer',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  gap: m ? '0.15rem' : '0.3rem',
+                  flexDirection: m ? 'column' : 'row',
+                  touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+                  transition: 'all 0.15s ease', whiteSpace: 'nowrap',
+                  letterSpacing: '-0.01em'
+                }}
+              >
+                <Icon size={m ? 12 : 14} />
+                {tab.label}
+                {isCompleted && !isActive && <Check size={9} color="#10b981" />}
+              </button>
+            )
+          })}
+        </div>
+
+        {/* Inline client picker — kies direct hier, geen aparte Client-tab nodig */}
+        <div style={{
+          marginLeft: 'auto',
+          display: 'flex', alignItems: 'center', gap: '0.3rem',
+          padding: m ? '0 0.5rem' : '0 0.75rem',
+          borderLeft: `1px solid ${G.border}`,
+          flexShrink: 0,
+        }}>
+          <Users size={11} color={G.text} style={{ flexShrink: 0 }} />
+          <select
+            value={selectedClient?.id || ''}
+            onChange={e => {
+              const client = (clients || []).find(c => c.id === e.target.value) || null
+              setSelectedClient(client)
+            }}
+            style={{
+              background: 'transparent',
+              border: 'none',
+              color: selectedClient ? G.primary : 'rgba(255,255,255,0.3)',
+              fontSize: m ? '0.62rem' : '0.68rem',
+              fontWeight: 600,
+              cursor: 'pointer',
+              outline: 'none',
+              maxWidth: m ? '100px' : '160px',
+            }}
+          >
+            <option value="" style={{ background: '#1a1a1a', color: '#ccc' }}>Kies client…</option>
+            {(clients || [])
+              .slice()
+              .sort((a, b) => `${a.first_name} ${a.last_name}`.localeCompare(`${b.first_name} ${b.last_name}`))
+              .map(c => (
+                <option key={c.id} value={c.id} style={{ background: '#1a1a1a', color: '#fff' }}>
+                  {c.first_name} {c.last_name}
+                </option>
+              ))}
+          </select>
+        </div>
       </div>
 
       {/* ═══ STATUS MESSAGES ═══ */}
