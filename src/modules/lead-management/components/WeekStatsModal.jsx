@@ -426,6 +426,16 @@ export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, 
     { label: 'Close rate',    value: pct1(closeRate),           Icon: Trophy,        color: '#22c55e' },
   ]
 
+  // Conversie VANAF de eerste reactie — hoeveel % van de gereageerde leads elke
+  // volgende fase haalt. Noemer = unieke gereageerde leads in de periode.
+  const fromReaction = (n) => reactedLeads > 0 ? Math.round((n / reactedLeads) * 100) : null
+  const reactionItems = [
+    { label: '→ Voorgesteld', value: pct1(fromReaction(totalCallProposed)),        Icon: PhoneCall,     color: '#a855f7' },
+    { label: '→ Ingepland',   value: pct1(fromReaction(totalCalls)),               Icon: CalendarCheck, color: '#06b6d4' },
+    { label: '→ Gevoerd',     value: pct1(fromReaction(callsHeld)),                Icon: Phone,         color: '#10b981' },
+    { label: '→ Sale',        value: pct1(fromReaction(totalSales)),               Icon: Trophy,        color: '#22c55e' },
+  ]
+
   const modal = (
     <div
       onClick={onClose}
@@ -633,6 +643,11 @@ export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, 
               {/* Percentages — tweede strakke rij. */}
               <SectionTitle icon={<Percent size={13} color={GOLD} />} title="Percentages" />
               <StatFlow items={pctItems} activeStage={null} onToggle={() => {}} />
+
+              {/* Conversie vanaf de eerste reactie — % van gereageerde leads dat
+                  elke volgende fase haalt (reactie → voorgesteld → ... → sale). */}
+              <SectionTitle icon={<MessageCircle size={13} color="#10b981" />} title="Vanaf eerste reactie" />
+              <StatFlow items={reactionItems} activeStage={null} onToggle={() => {}} />
 
               {/* Call-voorstellen — laad alle verstuurde berichten + welke geslaagd. */}
               <button
