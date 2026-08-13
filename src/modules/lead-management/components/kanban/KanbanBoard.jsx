@@ -5,7 +5,7 @@
 
 import { useState, useEffect, useLayoutEffect, useCallback, useRef } from 'react'
 import { createPortal } from 'react-dom'
-import { Plus, Settings, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, GripVertical, Save, RotateCcw, Users, Instagram, Search, X, ArrowUp, ArrowUpDown, Clock, Maximize2, Minimize2, CheckCircle, Send, Zap, Flame, Phone, PhoneCall, SlidersHorizontal, BarChart3 } from 'lucide-react'
+import { Plus, Settings, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, GripVertical, Save, RotateCcw, Users, Instagram, Search, X, ArrowUp, ArrowUpDown, Clock, Maximize2, Minimize2, CheckCircle, Send, Zap, Flame, Phone, SlidersHorizontal, BarChart3 } from 'lucide-react'
 import KanbanCard from './KanbanCard'
 import AddLeadModal from './AddLeadModal'
 import SaleValueModal from './SaleValueModal'
@@ -24,7 +24,6 @@ import OutreachLoggerModal from '../OutreachLoggerModal'
 import LeadSourceModal from './LeadSourceModal'
 import CallProposalModal from './CallProposalModal'
 import DMBibleModal from '../DMBibleModal'
-import CallProposalsModal from '../CallProposalsModal'
 
 const SNOOZE_SECTION_PATTERNS = ['later follow', 'later opvolg', 'follow up', 'followup', 'snooze', 'parkeer']
 
@@ -135,8 +134,6 @@ export default function KanbanBoard({
   // waar al een call is voorgesteld. (Verving de drie losse knoppen hot/warm/
   // call-voorgesteld.)
   const [globalPriorityOnly, setGlobalPriorityOnly] = useState(false)
-  // Call-voorstellen rapport (verstuurde berichten + welke geslaagd zijn).
-  const [showCallProposals, setShowCallProposals] = useState(false)
   const [callProposedLeadIds, setCallProposedLeadIds] = useState(() => new Set())
 
   // Eenmalig lijst van leads met een call-proposal note ophalen. Reload
@@ -1763,20 +1760,6 @@ export default function KanbanBoard({
               <Flame size={16} />
             </button>
 
-            {/* Call-voorstellen — rapport van verstuurde berichten + geslaagd. */}
-            <button
-              onClick={() => setShowCallProposals(true)}
-              title="Call-voorstellen — verstuurd, geslaagd & berichten hergebruiken"
-              style={{
-                width: 30, height: 30, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                background: 'rgba(168,85,247,0.12)', border: '1px solid rgba(168,85,247,0.4)',
-                borderRadius: 8, color: '#a855f7',
-                cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-              }}
-            >
-              <PhoneCall size={16} />
-            </button>
-
             {/* Overkoepelende filter voor het HELE bord — Type, Temperatuur,
                 Opvolg-aantal en Sortering, in alle secties tegelijk. */}
             {(() => {
@@ -2402,15 +2385,6 @@ export default function KanbanBoard({
           dueCalls={dueCalls}
           onOutcome={handleDueCallOutcome}
           onClose={() => setShowDueCalls(false)}
-        />
-      )}
-
-      {showCallProposals && (
-        <CallProposalsModal
-          leadService={leadService}
-          coachId={coachId}
-          isMobile={isMobile}
-          onClose={() => setShowCallProposals(false)}
         />
       )}
 

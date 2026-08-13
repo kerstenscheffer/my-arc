@@ -12,6 +12,7 @@ import {
   RotateCcw, Target, Save, UserPlus, CalendarCheck, Euro, PhoneOff, XCircle, Check, Ban,
 } from 'lucide-react'
 import { exportStatsPDF } from '../utils/exportStatsPDF'
+import CallProposalsModal from './CallProposalsModal'
 import GrowthChart from './GrowthChart'
 import { KPI_STATS, kpiTargetFor, kpiColor, fmtTarget } from '../kpiConfig'
 
@@ -110,6 +111,8 @@ export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, 
   const partnerName = (() => {
     try { return localStorage.getItem('lead_partner_name') || 'Marcel' } catch { return 'Marcel' }
   })()
+  // Call-voorstellen rapport (verstuurde berichten + welke geslaagd zijn).
+  const [showCallProposals, setShowCallProposals] = useState(false)
   // Welke funnel-stap staat open in de drill-down (voor terugdraaien/verwijderen).
   const [drillStage, setDrillStage] = useState(null)
 
@@ -631,6 +634,27 @@ export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, 
               <SectionTitle icon={<Percent size={13} color={GOLD} />} title="Percentages" />
               <StatFlow items={pctItems} activeStage={null} onToggle={() => {}} />
 
+              {/* Call-voorstellen — laad alle verstuurde berichten + welke geslaagd. */}
+              <button
+                onClick={() => setShowCallProposals(true)}
+                style={{
+                  width: '100%', display: 'flex', alignItems: 'center', gap: 10,
+                  margin: '0.9rem 0 0.2rem', padding: '0.7rem 0.85rem', borderRadius: 11,
+                  background: 'rgba(168,85,247,0.10)', border: '1px solid rgba(168,85,247,0.4)',
+                  color: '#a855f7', cursor: 'pointer', fontFamily: 'inherit',
+                  touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+                }}
+              >
+                <PhoneCall size={16} style={{ flexShrink: 0 }} />
+                <div style={{ flex: 1, textAlign: 'left', minWidth: 0 }}>
+                  <div style={{ fontSize: '0.82rem', fontWeight: 800, color: '#fff' }}>Call-voorstel berichten</div>
+                  <div style={{ fontSize: '0.64rem', color: 'rgba(255,255,255,0.5)', marginTop: 1 }}>
+                    Bekijk verstuurde berichten, welke geslaagd zijn & hergebruik ze
+                  </div>
+                </div>
+                <ChevronRight size={16} style={{ flexShrink: 0, opacity: 0.6 }} />
+              </button>
+
               {/* Growth chart — input vs output over time. Window is wider
                   than the period (min 30 days) so coach sees trends. */}
               {timeSeries && timeSeries.length > 0 && (
@@ -1084,6 +1108,14 @@ export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, 
             </div>
           </div>
         </div>
+      )}
+      {showCallProposals && (
+        <CallProposalsModal
+          leadService={leadService}
+          coachId={coachId}
+          isMobile={isMobile}
+          onClose={() => setShowCallProposals(false)}
+        />
       )}
       {pdfPreview && (
         <div
