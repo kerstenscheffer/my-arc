@@ -1,7 +1,7 @@
 // src/modules/meal-plan/components/food-log/MyMealsTab.jsx
 // 🎯 v3.0 - Uses parent buildingMeal state to survive tab switches
 import React, { useState, useEffect } from 'react'
-import { Plus, Trash2, Check, ArrowLeft, ChevronRight, Camera, Image as ImageIcon, X, Calculator } from 'lucide-react'
+import { Plus, Trash2, Check, ArrowLeft, ChevronRight, ChevronDown, Camera, Image as ImageIcon, X, Calculator } from 'lucide-react'
 import MealPrepCalculator from '../MealPrepCalculator'
 
 const MEAL_MOMENTS = [
@@ -11,10 +11,22 @@ const MEAL_MOMENTS = [
   { id: 'snack', label: 'Tussendoortjes' }
 ]
 
+// Vaste secties waarin de klant z'n eigen maaltijden indeelt. Vast door ons
+// bepaald; `moment` is het bijhorende log-moment, `emoji` de card-icoon-fallback.
+const SECTIONS = [
+  { id: 'ontbijt',     label: 'Mijn ontbijt',     moment: 'breakfast', emoji: '🌅', color: '#f59e0b' },
+  { id: 'lunch',       label: 'Mijn lunch',       moment: 'lunch',     emoji: '🥗', color: '#10b981' },
+  { id: 'pre_workout', label: 'Mijn pre-workout', moment: 'snack',     emoji: '⚡', color: '#3b82f6' },
+  { id: 'snacks',      label: 'Mijn snacks',      moment: 'snack',     emoji: '🍎', color: '#ec4899' },
+  { id: 'diner',       label: 'Mijn diner',       moment: 'dinner',    emoji: '🍽️', color: '#8b5cf6' },
+]
+const SECTION_MOMENT = Object.fromEntries(SECTIONS.map(s => [s.id, s.moment]))
+
 export default function MyMealsTab({ client, db, onLog, onRequestAddIngredient, buildingMeal, setBuildingMeal, isMobile }) {
   const [myMeals, setMyMeals] = useState([])
   const [loading, setLoading] = useState(true)
   const [showPrep, setShowPrep] = useState(false)
+  const [openSection, setOpenSection] = useState(null) // welke sectie is uitgeklapt
 
   useEffect(() => {
     if (client?.id) loadMyMeals()
