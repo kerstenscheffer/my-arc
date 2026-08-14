@@ -53,21 +53,33 @@ export default function MyMealsTab({ client, db, onLog, onRequestAddIngredient, 
       calories: meal.calories || 0, protein: parseFloat(meal.protein) || 0,
       carbs: parseFloat(meal.carbs) || 0, fat: parseFloat(meal.fat) || 0,
       ingredients: meal.ingredients_list || [], source: 'my_meals',
-      meal_type: 'snack', per100g: false,
+      meal_type: SECTION_MOMENT[meal.section] || 'snack', per100g: false,
       image_url: meal.image_url || null
     })
   }
 
-  const handleCreateNew = () => {
+  // Nieuwe maaltijd — optioneel voor een vaste sectie (dan onthoudt 'ie de sectie
+  // + het bijbehorende log-moment).
+  const handleCreateNew = (sectionId = null) => {
     setBuildingMeal({
       id: null, name: '', ingredients_list: [],
-      calories: 0, protein: 0, carbs: 0, fat: 0
+      calories: 0, protein: 0, carbs: 0, fat: 0,
+      section: sectionId, _moment: sectionId ? SECTION_MOMENT[sectionId] : null,
     })
   }
 
   const handleOpenMeal = (meal) => {
     setBuildingMeal({ ...meal, ingredients_list: meal.ingredients_list || [] })
   }
+
+  // Maaltijden gegroepeerd per sectie (null/onbekend → 'overige').
+  const mealsBySection = {}
+  SECTIONS.forEach(s => { mealsBySection[s.id] = [] })
+  mealsBySection.overige = []
+  myMeals.forEach(m => {
+    const sid = mealsBySection[m.section] !== undefined ? m.section : 'overige'
+    mealsBySection[sid].push(m)
+  })
 
   // ═══ DETAIL VIEW (building/editing a meal) ═══
   if (buildingMeal) {
@@ -136,84 +148,137 @@ export default function MyMealsTab({ client, db, onLog, onRequestAddIngredient, 
         />
       )}
 
-      {myMeals.length === 0 ? (
-        <div style={{ padding: '3rem 1rem', textAlign: 'center' }}>
-          <div style={{ fontSize: '0.85rem', fontWeight: '700', color: 'rgba(255,255,255,0.3)', marginBottom: '0.5rem' }}>
-            Nog geen opgeslagen maaltijden
-          </div>
-          <div style={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.15)' }}>
-            Stel je eerste maaltijd samen
-          </div>
-        </div>
-      ) : (
-        myMeals.map((meal, idx) => (
-          <div key={meal.id} style={{
-            display: 'flex', alignItems: 'center',
-            borderBottom: idx < myMeals.length - 1 ? '1px solid rgba(255,255,255,0.04)' : 'none'
-          }}>
-            <button
-              onClick={() => handleOpenMeal(meal)}
-              style={{
-                flex: 1, minWidth: 0, display: 'flex', alignItems: 'center',
-                padding: isMobile ? '0.75rem 1rem' : '0.875rem 1.25rem',
-                background: 'transparent', border: 'none', cursor: 'pointer',
-                textAlign: 'left', touchAction: 'manipulation', minHeight: '64px', gap: '0.75rem'
-              }}
-            >
-              {/* Thumbnail (image or apple placeholder) */}
-              {meal.image_url ? (
-                <div style={{
-                  width: '48px', height: '48px', borderRadius: '10px', flexShrink: 0,
-                  background: `url(${meal.image_url}) center/cover, #fff`,
-                  border: '1px solid rgba(255,255,255,0.08)'
-                }} />
-              ) : (
-                <div style={{
-                  width: '48px', height: '48px', borderRadius: '10px', flexShrink: 0,
-                  background: 'rgba(255, 215, 0, 0.06)',
-                  border: '1px solid rgba(255, 215, 0, 0.15)',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  color: 'rgba(255, 215, 0, 0.5)'
-                }}>
-                  <ImageIcon size={20} strokeWidth={1.8} />
+      {/* ── Vaste secties: elke sectie een card (foto/emoji + titel), links een
+             uitklap-pijl om de meals te zien, rechts een "+" om een meal voor
+             deze sectie aan te maken. Meals zonder sectie vallen in "Overige". ── */}
+      {SECTIONS.concat(
+        mealsBySection.overige.length
+          ? [{ id: 'overige', label: 'Overige', moment: 'snack', emoji: '📦', color: 'rgba(255,255,255,0.4)' }]
+          : []
+      ).map(sec => {
+        const meals = mealsBySection[sec.id] || []
+        const open = openSection === sec.id
+        const thumb = meals.find(m => m.image_url)?.image_url || null
+        return (
+          <div key={sec.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+            {/* Sectie-card */}
+            <div style={{ display: 'flex', alignItems: 'center' }}>
+              <button
+                onClick={() => setOpenSection(open ? null : sec.id)}
+                style={{
+                  flex: 1, minWidth: 0, display: 'flex', alignItems: 'center',
+                  padding: isMobile ? '0.75rem 1rem' : '0.875rem 1.25rem',
+                  background: open ? 'rgba(255,255,255,0.02)' : 'transparent', border: 'none', cursor: 'pointer',
+                  textAlign: 'left', touchAction: 'manipulation', minHeight: '64px', gap: '0.75rem'
+                }}
+              >
+                {/* Uitklap-pijl links */}
+                <ChevronDown size={16} color="rgba(255,255,255,0.4)"
+                  style={{ flexShrink: 0, transform: open ? 'rotate(0deg)' : 'rotate(-90deg)', transition: 'transform 0.2s ease' }} />
+                {/* Thumbnail: eerste meal-foto in de sectie, anders emoji */}
+                {thumb ? (
+                  <div style={{ width: '48px', height: '48px', borderRadius: '10px', flexShrink: 0, background: `url(${thumb}) center/cover, #fff`, border: '1px solid rgba(255,255,255,0.08)' }} />
+                ) : (
+                  <div style={{ width: '48px', height: '48px', borderRadius: '10px', flexShrink: 0, background: `${sec.color}14`, border: `1px solid ${sec.color}33`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.3rem' }}>
+                    {sec.emoji}
+                  </div>
+                )}
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: isMobile ? '0.9rem' : '0.95rem', fontWeight: '800', color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                    {sec.label}
+                  </div>
+                  <div style={{ fontSize: '0.6rem', color: 'rgba(255,255,255,0.35)', marginTop: '0.2rem' }}>
+                    {meals.length} maaltijd{meals.length !== 1 ? 'en' : ''}
+                  </div>
                 </div>
+              </button>
+              {/* "+" rechts — nieuwe meal voor deze sectie */}
+              {sec.id !== 'overige' && (
+                <button
+                  onClick={(e) => { e.stopPropagation(); handleCreateNew(sec.id) }}
+                  aria-label={`Maaltijd toevoegen aan ${sec.label}`}
+                  style={{
+                    width: '48px', minHeight: '56px', flexShrink: 0,
+                    background: 'transparent', border: 'none',
+                    borderLeft: '1px solid rgba(255,255,255,0.04)',
+                    color: '#FFD700', cursor: 'pointer',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    touchAction: 'manipulation'
+                  }}
+                >
+                  <Plus size={18} strokeWidth={2.5} />
+                </button>
               )}
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{
-                  fontSize: isMobile ? '0.85rem' : '0.9rem', fontWeight: '700', color: '#fff',
-                  whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'
-                }}>
-                  {meal.name}
+            </div>
+
+            {/* Uitgeklapte meals van deze sectie */}
+            {open && (
+              meals.length === 0 ? (
+                <div style={{ padding: '1rem 1.25rem 1.25rem calc(1.25rem + 16px + 0.75rem)', fontSize: '0.7rem', color: 'rgba(255,255,255,0.3)' }}>
+                  Nog geen maaltijden hier — tik op <Plus size={11} style={{ display: 'inline', verticalAlign: 'middle' }} /> om er een aan te maken.
                 </div>
-                <div style={{ display: 'flex', gap: '0.375rem', marginTop: '0.2rem' }}>
-                  <span style={{ fontSize: '0.6rem', color: 'rgba(255,255,255,0.35)' }}>
-                    <span style={{ fontWeight: '800', color: 'rgba(255,255,255,0.5)' }}>{meal.calories || 0}</span> kcal
-                  </span>
-                  {meal.ingredients_list && Array.isArray(meal.ingredients_list) && (
-                    <span style={{ fontSize: '0.55rem', color: 'rgba(255,255,255,0.2)' }}>
-                      • {meal.ingredients_list.length} item{meal.ingredients_list.length !== 1 ? 's' : ''}
-                    </span>
-                  )}
-                </div>
-              </div>
-              <ChevronRight size={14} color="rgba(255,255,255,0.15)" />
-            </button>
-            <button
-              onClick={(e) => { e.stopPropagation(); handleQuickLog(meal) }}
-              style={{
-                width: '48px', minHeight: '56px', flexShrink: 0,
-                background: 'transparent', border: 'none',
-                borderLeft: '1px solid rgba(255,255,255,0.04)',
-                color: '#FFD700', cursor: 'pointer',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                touchAction: 'manipulation'
-              }}
-            >
-              <Plus size={16} strokeWidth={2.5} />
-            </button>
+              ) : (
+                meals.map((meal, idx) => (
+                  <div key={meal.id} style={{
+                    display: 'flex', alignItems: 'center',
+                    background: 'rgba(255,255,255,0.015)',
+                    borderTop: idx === 0 ? '1px solid rgba(255,255,255,0.03)' : 'none',
+                    borderBottom: idx < meals.length - 1 ? '1px solid rgba(255,255,255,0.03)' : 'none'
+                  }}>
+                    <button
+                      onClick={() => handleOpenMeal(meal)}
+                      style={{
+                        flex: 1, minWidth: 0, display: 'flex', alignItems: 'center',
+                        padding: isMobile ? '0.65rem 1rem 0.65rem 2.5rem' : '0.75rem 1.25rem 0.75rem 3rem',
+                        background: 'transparent', border: 'none', cursor: 'pointer',
+                        textAlign: 'left', touchAction: 'manipulation', minHeight: '56px', gap: '0.75rem'
+                      }}
+                    >
+                      {meal.image_url ? (
+                        <div style={{ width: '40px', height: '40px', borderRadius: '9px', flexShrink: 0, background: `url(${meal.image_url}) center/cover, #fff`, border: '1px solid rgba(255,255,255,0.08)' }} />
+                      ) : (
+                        <div style={{ width: '40px', height: '40px', borderRadius: '9px', flexShrink: 0, background: 'rgba(255, 215, 0, 0.06)', border: '1px solid rgba(255, 215, 0, 0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'rgba(255, 215, 0, 0.5)' }}>
+                          <ImageIcon size={18} strokeWidth={1.8} />
+                        </div>
+                      )}
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: isMobile ? '0.82rem' : '0.88rem', fontWeight: '700', color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                          {meal.name}
+                        </div>
+                        <div style={{ display: 'flex', gap: '0.375rem', marginTop: '0.15rem' }}>
+                          <span style={{ fontSize: '0.6rem', color: 'rgba(255,255,255,0.35)' }}>
+                            <span style={{ fontWeight: '800', color: 'rgba(255,255,255,0.5)' }}>{meal.calories || 0}</span> kcal
+                          </span>
+                          {Array.isArray(meal.ingredients_list) && (
+                            <span style={{ fontSize: '0.55rem', color: 'rgba(255,255,255,0.2)' }}>
+                              • {meal.ingredients_list.length} item{meal.ingredients_list.length !== 1 ? 's' : ''}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      <ChevronRight size={14} color="rgba(255,255,255,0.15)" />
+                    </button>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); handleQuickLog(meal) }}
+                      aria-label="Loggen"
+                      style={{
+                        width: '48px', minHeight: '52px', flexShrink: 0,
+                        background: 'transparent', border: 'none',
+                        borderLeft: '1px solid rgba(255,255,255,0.04)',
+                        color: '#FFD700', cursor: 'pointer',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        touchAction: 'manipulation'
+                      }}
+                    >
+                      <Plus size={16} strokeWidth={2.5} />
+                    </button>
+                  </div>
+                ))
+              )
+            )}
           </div>
-        ))
-      )}
+        )
+      })}
     </div>
   )
 }
@@ -225,7 +290,8 @@ export default function MyMealsTab({ client, db, onLog, onRequestAddIngredient, 
 function MealDetailView({ meal, setMeal, client, db, isMobile, onBack, onRequestAddIngredient, onLog }) {
   const [saving, setSaving] = useState(false)
   const [showMealDropdown, setShowMealDropdown] = useState(false)
-  const [mealMoment, setMealMoment] = useState('breakfast')
+  // Log-moment: standaard uit de gekozen sectie (bv. pre-workout → snack).
+  const [mealMoment, setMealMoment] = useState(meal._moment || SECTION_MOMENT[meal.section] || 'breakfast')
   // Photo state — `photoFile` is a File from the picker (upload pending),
   // `photoPreview` is what's shown in the UI (object URL or saved image_url).
   const [photoFile, setPhotoFile] = useState(null)
@@ -299,6 +365,7 @@ function MealDetailView({ meal, setMeal, client, db, isMobile, onBack, onRequest
         carbs: Math.round(totals.carbs), fat: Math.round(totals.fat),
         ingredients_list: meal.ingredients_list, is_active: true,
         image_url: imageUrl,
+        section: meal.section || null,
         updated_at: new Date().toISOString()
       }
       if (meal.id) {
@@ -326,6 +393,7 @@ function MealDetailView({ meal, setMeal, client, db, isMobile, onBack, onRequest
         carbs: Math.round(totals.carbs), fat: Math.round(totals.fat),
         ingredients_list: meal.ingredients_list, is_active: true,
         image_url: imageUrl,
+        section: meal.section || null,
         updated_at: new Date().toISOString()
       }
       if (meal.id) {
