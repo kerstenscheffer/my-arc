@@ -2236,20 +2236,21 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
   // percentages; 'unknown' = nog niet ingevuld.
   async getGenderBreakdown(coachId) {
     try {
-      const { data, error } = await this.db.supabase
-        .from('call_leads')
-        .select('gender')
-        .is('deleted_at', null)
-      if (error) throw error
-      let male = 0, female = 0, unknown = 0
-      ;(data || []).forEach(r => {
-        if (r.gender === 'male') male++
-        else if (r.gender === 'female') female++
-        else unknown++
-      })
+      // Tellen via head-count queries i.p.v. rijen ophalen — anders kapt de
+      // 1000-rijen-cap van PostgREST de telling af (bij 4000+ leads zag de app
+      // maar een fractie van de ingevulde geslachten).
+      const base = () => this.db.supabase.from('call_leads').select('*', { count: 'exact', head: true }).is('deleted_at', null)
+      const [totalRes, maleRes, femaleRes] = await Promise.all([
+        base(),
+        base().eq('gender', 'male'),
+        base().eq('gender', 'female'),
+      ])
+      const total = totalRes.count || 0
+      const male = maleRes.count || 0
+      const female = femaleRes.count || 0
       const known = male + female
       return {
-        male, female, unknown, total: (data || []).length, known,
+        male, female, unknown: Math.max(0, total - known), total, known,
         malePct: known ? Math.round((male / known) * 100) : null,
         femalePct: known ? Math.round((female / known) * 100) : null,
       }
