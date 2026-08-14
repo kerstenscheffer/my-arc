@@ -113,6 +113,14 @@ export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, 
   })()
   // Call-voorstellen rapport (verstuurde berichten + welke geslaagd zijn).
   const [showCallProposals, setShowCallProposals] = useState(false)
+  // Man/vrouw-verdeling over alle leads (niet periode-gebonden).
+  const [gender, setGender] = useState(null)
+  useEffect(() => {
+    if (!isOpen || !coachId || !leadService?.getGenderBreakdown) return
+    let alive = true
+    leadService.getGenderBreakdown(coachId).then(g => { if (alive) setGender(g) })
+    return () => { alive = false }
+  }, [isOpen, coachId, leadService])
   // Welke funnel-stap staat open in de drill-down (voor terugdraaien/verwijderen).
   const [drillStage, setDrillStage] = useState(null)
 
@@ -634,6 +642,14 @@ export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, 
               {/* Percentages — tweede strakke rij. */}
               <SectionTitle icon={<Percent size={13} color={GOLD} />} title="Percentages" />
               <StatFlow items={pctItems} activeStage={null} onToggle={() => {}} />
+
+              {/* Man/vrouw-verdeling — ring over alle leads (niet periode-gebonden). */}
+              {gender && gender.known > 0 && (
+                <>
+                  <SectionTitle icon={<Users size={13} color="#ec4899" />} title="Man / Vrouw (alle leads)" />
+                  <GenderRing gender={gender} />
+                </>
+              )}
 
               {/* Call-voorstellen — laad alle verstuurde berichten + welke geslaagd. */}
               <button
@@ -1465,6 +1481,44 @@ function StagePill({ label, value, color }) {
 
 // Compacte stat-rij in de stijl van de stats-bar: gekleurd icoon + bold wit
 // getal + klein label. Items met een `stage` zijn klikbaar → drill-down eronder.
+// Man/vrouw-verhouding als SVG-donut + legenda.
+function GenderRing({ gender }) {
+  const { male, female, malePct, femalePct, unknown } = gender
+  const known = male + female
+  const R = 34, C = 2 * Math.PI * R
+  const maleFrac = known ? male / known : 0
+  const maleLen = C * maleFrac
+  const MALE = '#3b82f6', FEMALE = '#ec4899'
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 18, padding: '2px 0 10px' }}>
+      <svg width="86" height="86" viewBox="0 0 86 86" style={{ flexShrink: 0, transform: 'rotate(-90deg)' }}>
+        <circle cx="43" cy="43" r={R} fill="none" stroke={FEMALE} strokeWidth="11" />
+        <circle cx="43" cy="43" r={R} fill="none" stroke={MALE} strokeWidth="11"
+          strokeDasharray={`${maleLen} ${C - maleLen}`} strokeLinecap="butt" />
+      </svg>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+          <span style={{ width: 9, height: 9, borderRadius: 3, background: MALE, flexShrink: 0 }} />
+          <span style={{ fontSize: '0.8rem', fontWeight: 800, color: '#fff' }}>Man</span>
+          <span style={{ fontSize: '0.8rem', fontWeight: 900, color: MALE, fontVariantNumeric: 'tabular-nums' }}>{malePct}%</span>
+          <span style={{ fontSize: '0.62rem', fontWeight: 600, color: 'rgba(255,255,255,0.4)' }}>({male})</span>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+          <span style={{ width: 9, height: 9, borderRadius: 3, background: FEMALE, flexShrink: 0 }} />
+          <span style={{ fontSize: '0.8rem', fontWeight: 800, color: '#fff' }}>Vrouw</span>
+          <span style={{ fontSize: '0.8rem', fontWeight: 900, color: FEMALE, fontVariantNumeric: 'tabular-nums' }}>{femalePct}%</span>
+          <span style={{ fontSize: '0.62rem', fontWeight: 600, color: 'rgba(255,255,255,0.4)' }}>({female})</span>
+        </div>
+        {unknown > 0 && (
+          <div style={{ fontSize: '0.6rem', fontWeight: 600, color: 'rgba(255,255,255,0.3)' }}>
+            {unknown} nog niet ingevuld
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
 function StatFlow({ items, activeStage, onToggle }) {
   // Welke stat z'n uitleg-box getoond wordt (klik op het ⓘ-icoon).
   const [openInfo, setOpenInfo] = useState(null)

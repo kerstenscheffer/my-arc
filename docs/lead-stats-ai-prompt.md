@@ -13,6 +13,10 @@ Een lead doorloopt een kanban-bord (secties/kolommen). Elke verplaatsing tussen 
 
 **`call_leads`** — de leads zelf (1 rij per lead)
 - `id`, `first_name`, `last_name`, `email`, `phone`, `lead_source`, `lead_temperature` ('hot'|'warm'|null)
+- `gender` — geslacht van de lead. Canonieke waarden: **`'male'`** | **`'female'`** | **NULL** (nog niet ingevuld). Zo lees/schrijf je 't:
+  - Verdeling: `SELECT gender, count(*) FROM call_leads WHERE deleted_at IS NULL GROUP BY gender;`
+  - Instellen op een lead: `UPDATE call_leads SET gender='male' WHERE id=<lead_id>;` (of via de app: `updateLead(leadId, { gender: 'male' })`).
+  - Op een lead-card meegeven: het veld heet `gender` op het lead-object; toon 'male' als "Man", 'female' als "Vrouw", NULL = onbekend.
 - `coach_id`, `team_id` (alle leads van MY ARC delen één team)
 - `created_at` (wanneer de lead binnenkwam), `deleted_at` (NIET NULL = verwijderd, altijd uitsluiten)
 - `reply_count`, `followup_count`

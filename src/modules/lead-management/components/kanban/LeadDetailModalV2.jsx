@@ -99,6 +99,7 @@ export default function LeadDetailModalV2({
     lead_source:     lead?.lead_source     || '',
     lead_temperature: lead?.lead_temperature || '',
     outreach_campaign_id: lead?.outreach_campaign_id || '',
+    gender:          lead?.gender           || null,
   })
 
   const [qual, setQual] = useState({
@@ -645,6 +646,36 @@ function InfoTab({ info, persistInfo, savingField, campaigns = [] }) {
                 }}
               >
                 <Flame size={11} />
+                {opt.label}
+              </button>
+            )
+          })}
+        </div>
+      </div>
+
+      <div>
+        <FieldLabel>Geslacht</FieldLabel>
+        <div style={{ display: 'flex', gap: '0.4rem' }}>
+          {[
+            { key: 'male',   label: 'Man',   color: '#3b82f6' },
+            { key: 'female', label: 'Vrouw', color: '#ec4899' },
+          ].map(opt => {
+            const active = info.gender === opt.key
+            return (
+              <button
+                key={opt.key}
+                onClick={() => persistInfo({ gender: active ? null : opt.key })}
+                style={{
+                  flex: 1, padding: '0.5rem 0.6rem',
+                  background: active ? `${opt.color}22` : 'rgba(255,255,255,0.03)',
+                  border: `1px solid ${active ? opt.color + '66' : 'rgba(255,255,255,0.07)'}`,
+                  borderRadius: '6px',
+                  color: active ? opt.color : 'rgba(255,255,255,0.55)',
+                  fontSize: '0.72rem', fontWeight: active ? '800' : '600',
+                  cursor: 'pointer', minHeight: '36px',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                }}
+              >
                 {opt.label}
               </button>
             )

@@ -648,7 +648,7 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
             is_snoozed, campaign_id, followup_count, lead_temperature,
             lead_magnets_shared, outreach_campaign_id, source_lead_magnet_id,
             previous_section_color, previous_section_id, previous_section_title,
-            qual_goal_checked, qual_pain_checked, qual_urgency_checked, qual_open_checked,
+            qual_goal_checked, qual_pain_checked, qual_urgency_checked, qual_open_checked, gender,
             source_lead_magnet:lead_magnets!call_leads_source_lead_magnet_id_fkey(id, name),
             outreach_campaign:outreach_campaigns!call_leads_outreach_campaign_id_fkey(id, name, variant_tag)
           `)
@@ -2228,6 +2228,34 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
     } catch (error) {
       console.error('❌ getRevenueProjection failed:', error)
       return { mrr: 0, activeMonthly: 0, totalBooked: 0, months: [], saleCount: 0 }
+    }
+  }
+
+  // Man/vrouw-verdeling over alle (niet-verwijderde) leads. Geslacht is een
+  // eigenschap van de lead, dus niet periode-gebonden. Retourneert aantallen +
+  // percentages; 'unknown' = nog niet ingevuld.
+  async getGenderBreakdown(coachId) {
+    try {
+      const { data, error } = await this.db.supabase
+        .from('call_leads')
+        .select('gender')
+        .is('deleted_at', null)
+      if (error) throw error
+      let male = 0, female = 0, unknown = 0
+      ;(data || []).forEach(r => {
+        if (r.gender === 'male') male++
+        else if (r.gender === 'female') female++
+        else unknown++
+      })
+      const known = male + female
+      return {
+        male, female, unknown, total: (data || []).length, known,
+        malePct: known ? Math.round((male / known) * 100) : null,
+        femalePct: known ? Math.round((female / known) * 100) : null,
+      }
+    } catch (e) {
+      console.warn('getGenderBreakdown failed:', e?.message)
+      return { male: 0, female: 0, unknown: 0, total: 0, known: 0, malePct: null, femalePct: null }
     }
   }
 
