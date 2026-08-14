@@ -1,7 +1,7 @@
 // src/modules/meal-plan/components/food-log/MyMealsTab.jsx
 // 🎯 v3.0 - Uses parent buildingMeal state to survive tab switches
 import React, { useState, useEffect } from 'react'
-import { Plus, Trash2, Check, ArrowLeft, ChevronRight, ChevronDown, Camera, Image as ImageIcon, X, Calculator } from 'lucide-react'
+import { Plus, Trash2, Check, ArrowLeft, ChevronRight, ChevronDown, Camera, Image as ImageIcon, X, Calculator, Sunrise, Salad, Zap, Apple, Utensils, Package } from 'lucide-react'
 import MealPrepCalculator from '../MealPrepCalculator'
 
 const MEAL_MOMENTS = [
@@ -14,11 +14,11 @@ const MEAL_MOMENTS = [
 // Vaste secties waarin de klant z'n eigen maaltijden indeelt. Vast door ons
 // bepaald; `moment` is het bijhorende log-moment, `emoji` de card-icoon-fallback.
 const SECTIONS = [
-  { id: 'ontbijt',     label: 'Mijn ontbijt',     moment: 'breakfast', emoji: '🌅', color: '#f59e0b' },
-  { id: 'lunch',       label: 'Mijn lunch',       moment: 'lunch',     emoji: '🥗', color: '#10b981' },
-  { id: 'pre_workout', label: 'Mijn pre-workout', moment: 'snack',     emoji: '⚡', color: '#3b82f6' },
-  { id: 'snacks',      label: 'Mijn snacks',      moment: 'snack',     emoji: '🍎', color: '#ec4899' },
-  { id: 'diner',       label: 'Mijn diner',       moment: 'dinner',    emoji: '🍽️', color: '#8b5cf6' },
+  { id: 'ontbijt',     label: 'Mijn ontbijt',     moment: 'breakfast', Icon: Sunrise,  color: '#f59e0b' },
+  { id: 'lunch',       label: 'Mijn lunch',       moment: 'lunch',     Icon: Salad,    color: '#10b981' },
+  { id: 'pre_workout', label: 'Mijn pre-workout', moment: 'snack',     Icon: Zap,      color: '#3b82f6' },
+  { id: 'snacks',      label: 'Mijn snacks',      moment: 'snack',     Icon: Apple,    color: '#ec4899' },
+  { id: 'diner',       label: 'Mijn diner',       moment: 'dinner',    Icon: Utensils, color: '#8b5cf6' },
 ]
 const SECTION_MOMENT = Object.fromEntries(SECTIONS.map(s => [s.id, s.moment]))
 
@@ -153,7 +153,7 @@ export default function MyMealsTab({ client, db, onLog, onRequestAddIngredient, 
              deze sectie aan te maken. Meals zonder sectie vallen in "Overige". ── */}
       {SECTIONS.concat(
         mealsBySection.overige.length
-          ? [{ id: 'overige', label: 'Overige', moment: 'snack', emoji: '📦', color: 'rgba(255,255,255,0.4)' }]
+          ? [{ id: 'overige', label: 'Overige', moment: 'snack', Icon: Package, color: 'rgba(255,255,255,0.4)' }]
           : []
       ).map(sec => {
         const meals = mealsBySection[sec.id] || []
@@ -179,8 +179,8 @@ export default function MyMealsTab({ client, db, onLog, onRequestAddIngredient, 
                 {thumb ? (
                   <div style={{ width: '48px', height: '48px', borderRadius: '10px', flexShrink: 0, background: `url(${thumb}) center/cover, #fff`, border: '1px solid rgba(255,255,255,0.08)' }} />
                 ) : (
-                  <div style={{ width: '48px', height: '48px', borderRadius: '10px', flexShrink: 0, background: `${sec.color}14`, border: `1px solid ${sec.color}33`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.3rem' }}>
-                    {sec.emoji}
+                  <div style={{ width: '48px', height: '48px', borderRadius: '10px', flexShrink: 0, background: `${sec.color}14`, border: `1px solid ${sec.color}33`, display: 'flex', alignItems: 'center', justifyContent: 'center', color: sec.color }}>
+                    <sec.Icon size={22} strokeWidth={2} />
                   </div>
                 )}
                 <div style={{ flex: 1, minWidth: 0 }}>
