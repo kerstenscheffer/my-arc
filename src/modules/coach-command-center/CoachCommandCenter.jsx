@@ -52,7 +52,9 @@ export default function CoachCommandCenter({ db, onSelectClient, setActiveTab, o
       if (user) setCoachId(user.id)
 
       // ── Stap 1: klanten op (snelste query) → lijst tonen ──
-      const clients = await db.getAllClients()
+      // Demo-persoon (voor voorbeeldplannen in de Analyzer) niet in het
+      // coaching-overzicht tonen — het is geen echte klant.
+      const clients = (await db.getAllClients()).filter(c => c.email !== 'demo@myarcfitness.internal')
       const clientIds = clients.map(c => c.id)
 
       const emptyClientShape = (client) => ({

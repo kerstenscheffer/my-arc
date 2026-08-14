@@ -27,6 +27,9 @@ const TABS = [
   { id: 'analyze', idx: 3, label: 'Analyzer', icon: BarChart3 }
 ]
 
+// Vaste demo-client (voor voorbeeldplannen). Herkend op dit e-mailadres.
+const DEMO_EMAIL = 'demo@myarcfitness.internal'
+
 export default function MealPlanGenerator({ db, clients = [], conceptPlanId, selectedClient: propSelectedClient }) {
   const isMobile = window.innerWidth <= 768
   const m = isMobile
@@ -277,7 +280,14 @@ export default function MealPlanGenerator({ db, clients = [], conceptPlanId, sel
             }}
           >
             <option value="" style={{ background: '#1a1a1a', color: '#ccc' }}>Kies client…</option>
+            {/* Demo-persoon vastgepind bovenaan — voor voorbeeldplannen. */}
+            {(clients || []).filter(c => c.email === DEMO_EMAIL).map(demo => (
+              <option key={demo.id} value={demo.id} style={{ background: '#1a1a1a', color: '#FFD700' }}>
+                🧪 Demo persoon
+              </option>
+            ))}
             {(clients || [])
+              .filter(c => c.email !== DEMO_EMAIL)
               .slice()
               .sort((a, b) => `${a.first_name} ${a.last_name}`.localeCompare(`${b.first_name} ${b.last_name}`))
               .map(c => (
