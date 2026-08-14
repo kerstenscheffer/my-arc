@@ -169,7 +169,7 @@ export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, 
   const loadPayouts = async () => {
     try {
       if (!leadService?.getPartnerPayouts) return
-      const p = await leadService.getPartnerPayouts(coachId, 5, 6)
+      const p = await leadService.getPartnerPayouts(coachId, 5, 6, fixedCosts)
       setPayouts(p)
     } catch (e) {
       console.error('Partner-uitbetaling laden mislukt:', e)
