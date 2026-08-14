@@ -111,6 +111,10 @@ export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, 
   const partnerName = (() => {
     try { return localStorage.getItem('lead_partner_name') || 'Marcel' } catch { return 'Marcel' }
   })()
+  // Vaste lasten die eerst van de omzet af gaan vóór de verdeling (instelbaar).
+  const fixedCosts = (() => {
+    try { const v = Number(localStorage.getItem('lead_fixed_costs')); return Number.isFinite(v) && v > 0 ? v : 250 } catch { return 250 }
+  })()
   // Call-voorstellen rapport (verstuurde berichten + welke geslaagd zijn).
   const [showCallProposals, setShowCallProposals] = useState(false)
   // Man/vrouw-verdeling over alle leads (niet periode-gebonden).
@@ -1001,12 +1005,14 @@ export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, 
                 const settleable = pos.filter(m => m.isPast || m.isCurrent).slice().reverse()
                 const upcoming = pos.filter(m => !m.isPast && !m.isCurrent && m.owed > 0)
                 const totalOut = payouts?.totalOutstanding || 0
-                // Omzet per maand → om "jij houdt" (omzet − partner-aandeel) te tonen.
-                const revByKey = Object.fromEntries((revenue?.months || []).map(m => [m.key, m.amount]))
+                const fixedCosts = payouts?.fixedCosts || 0
+                // "Jij houdt" = (omzet − vaste lasten) − partner-aandeel. We gebruiken
+                // de netto-omzet die per maand al is uitgerekend in de service.
                 const cur = pos.find(m => m.isCurrent)
-                const curRev = cur ? (revByKey[cur.key] || 0) : 0
+                const curRev = cur ? (cur.revenue || 0) : 0
+                const curNet = cur ? (cur.netRevenue || 0) : 0
                 const partnerNow = cur ? cur.owed : 0
-                const youKeepNow = Math.max(0, curRev - partnerNow)
+                const youKeepNow = Math.max(0, curNet - partnerNow)
                 // Totaal dat de partner dit jaar toekomt (alle getoonde maanden).
                 const partnerTotalAll = pos.reduce((a, m) => a + (m.owed || 0), 0)
                 // Kijker-afhankelijk: de owner ziet "Marcel ontvangt / jij houdt"
@@ -1024,6 +1030,14 @@ export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, 
                 ]
                 return (
                   <>
+                    {/* Vaste lasten-uitleg: eerst eraf, dan verdelen. */}
+                    {isOwner && fixedCosts > 0 && (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: '0.8rem', padding: '0.55rem 0.75rem', borderRadius: 10, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)' }}>
+                        <span style={{ fontSize: '0.66rem', color: 'rgba(255,255,255,0.55)' }}>
+                          Deze maand: omzet <b style={{ color: '#fff' }}>{eur(curRev)}</b> − vaste lasten <b style={{ color: '#ef4444' }}>{eur(fixedCosts)}</b> = <b style={{ color: '#22c55e' }}>{eur(curNet)}</b> te verdelen
+                        </span>
+                      </div>
+                    )}
                     {/* Samenvatting deze maand: wie krijgt wat */}
                     <div style={{ display: 'flex', gap: 8, marginBottom: '1.1rem' }}>
                       {summary.map(c => (
@@ -1060,7 +1074,7 @@ export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, 
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                         {settleable.map(m => {
                           const busy = payoutBusy === m.key
-                          const youKeepM = Math.max(0, (revByKey[m.key] || 0) - (m.owed || 0))
+                          const youKeepM = Math.max(0, (m.netRevenue || 0) - (m.owed || 0))
                           return (
                             <div key={m.key} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '0.6rem 0.75rem', borderRadius: 10, background: 'rgba(255,255,255,0.03)', border: `1px solid ${m.settled ? 'rgba(34,197,94,0.25)' : m.outstanding > 0 ? 'rgba(255,215,0,0.22)' : 'rgba(255,255,255,0.08)'}` }}>
                               <div style={{ flex: 1, minWidth: 0 }}>

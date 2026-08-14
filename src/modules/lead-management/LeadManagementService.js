@@ -2308,9 +2308,10 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
   // (vooruitbetaald = alles in de sale-maand; maandelijks = per termijn gespreid,
   // exact zoals getRevenueProjection de omzet spreidt). Vervolgens trekken we af
   // wat er al is uitbetaald (partner_payouts.amount_paid) → openstaand per maand.
-  async getPartnerPayouts(coachId, monthsBehind = 5, monthsAhead = 6) {
+  async getPartnerPayouts(coachId, monthsBehind = 5, monthsAhead = 6, fixedCosts = 250) {
     try {
       if (!coachId) return { months: [], totalOutstanding: 0 }
+      const FIXED = Math.max(0, Number(fixedCosts) || 0)
       const [{ data: saleRows }, { data: paidRows }] = await Promise.all([
         this.db.supabase
           .from('lead_movements')
@@ -2336,20 +2337,36 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
       const monthKey = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
       const startOfMonth = (d, add = 0) => new Date(d.getFullYear(), d.getMonth() + add, 1)
 
-      // Partner-aandeel per maand opbouwen (zelfde spreiding als de omzet).
-      const owed = {}
+      // Per maand: BRUTO omzet (van de split-sales) én het bruto partner-aandeel
+      // opbouwen (zelfde spreiding als de omzet). De vaste lasten trekken we
+      // hierna per maand van de omzet af vóór de split.
+      const owedGross = {}
+      const revenue = {}
       sales.forEach(s => {
         const share = s.pct / 100
         if (s.type === 'monthly' && s.months > 1) {
-          const per = (s.total / s.months) * share
+          const perRev = s.total / s.months
           for (let i = 0; i < s.months; i++) {
             const k = monthKey(startOfMonth(s.date, i))
-            owed[k] = (owed[k] || 0) + per
+            revenue[k] = (revenue[k] || 0) + perRev
+            owedGross[k] = (owedGross[k] || 0) + perRev * share
           }
         } else {
           const k = monthKey(s.date)
-          owed[k] = (owed[k] || 0) + s.total * share
+          revenue[k] = (revenue[k] || 0) + s.total
+          owedGross[k] = (owedGross[k] || 0) + s.total * share
         }
+      })
+
+      // Vaste lasten er eerst af, DAN verdelen: het partner-aandeel wordt
+      // berekend over (omzet − vaste lasten). Bij meerdere %-en schaalt elk
+      // aandeel evenredig mee (netto-factor = (omzet−lasten)/omzet).
+      const owed = {}
+      Object.keys(revenue).forEach(k => {
+        const rev = revenue[k]
+        const net = Math.max(0, rev - FIXED)
+        const factor = rev > 0 ? net / rev : 0
+        owed[k] = (owedGross[k] || 0) * factor
       })
 
       // Al uitbetaald per maand.
@@ -2374,6 +2391,7 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
         // Alleen maanden met iets te verdelen tonen (owed > 0 of al betaald).
         if (owedM <= 0 && paidM <= 0) continue
         if (i <= 0) totalOutstanding += Math.max(0, outstanding)
+        const revM = Math.round((revenue[k] || 0) * 100) / 100
         months.push({
           key: k,
           label: d.toLocaleDateString('nl-NL', { month: 'long', year: 'numeric' }),
@@ -2382,11 +2400,14 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
           outstanding,
           settled: outstanding <= 0.005 && owedM > 0,
           paidAt: paidAt[k] || null,
+          revenue: revM,                                       // bruto omzet die maand
+          fixedCosts: revM > 0 ? Math.min(FIXED, revM) : 0,    // afgetrokken vaste lasten
+          netRevenue: Math.max(0, Math.round((revM - FIXED) * 100) / 100), // te verdelen
           isPast: i < 0,
           isCurrent: i === 0,
         })
       }
-      return { months, totalOutstanding: Math.round(totalOutstanding * 100) / 100 }
+      return { months, totalOutstanding: Math.round(totalOutstanding * 100) / 100, fixedCosts: FIXED }
     } catch (error) {
       console.error('❌ getPartnerPayouts failed:', error)
       return { months: [], totalOutstanding: 0 }
