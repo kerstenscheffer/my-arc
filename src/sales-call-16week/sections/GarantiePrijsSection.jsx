@@ -6,7 +6,6 @@ const TP_GREEN = '#00B67A'
 
 // Dezelfde 3 transformaties als in de hero, maar compact (rij van drie).
 const TRANSFORMS = [
-  { src: '/review-transformatie-3.png', caption: 'Van 85 naar 78,5 kg' },
   { src: '/review-transformatie-1.png', caption: 'Zachte buik → sixpack' },
   { src: '/review-transformatie-2.png', caption: 'Spier op, vet omlaag' },
 ]
