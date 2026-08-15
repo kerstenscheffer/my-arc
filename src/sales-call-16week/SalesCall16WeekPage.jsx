@@ -4,11 +4,10 @@
 import { useEffect, useRef, useState } from 'react'
 import HeroSection from './sections/HeroSection'
 import OfferPilarenSection from './sections/OfferPilarenSection'
-import GarantieSection from './sections/GarantieSection'
 import GarantiePrijsSection from './sections/GarantiePrijsSection'
 
 const GOLD = '#ffba09'
-const SECTION_COUNT = 4
+const SECTION_COUNT = 3
 
 export default function SalesCall16WeekPage() {
   const containerRef = useRef(null)
@@ -88,7 +87,6 @@ export default function SalesCall16WeekPage() {
       >
         <HeroSection isMobile={isMobile} />
         <OfferPilarenSection isMobile={isMobile} />
-        <GarantieSection isMobile={isMobile} />
         <GarantiePrijsSection isMobile={isMobile} />
       </div>
 

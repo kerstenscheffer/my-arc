@@ -82,7 +82,7 @@ export default function OfferPilarenSection({ isMobile }) {
             fontWeight: '900', color: '#fff', margin: 0, lineHeight: 1.15,
             padding: isMobile ? '0 0.25rem' : 0,
           }}>
-            Het In Shape Komen &amp; Blijven Systeem
+            MY ARC-Methode — Strakker en sterker, passend bij jouw leven
           </h2>
         </div>
 

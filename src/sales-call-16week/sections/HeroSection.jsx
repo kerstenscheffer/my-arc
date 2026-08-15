@@ -101,7 +101,7 @@ export default function HeroSection({ isMobile }) {
           color: '#fff',
           fontSize: isMobile ? 'clamp(2rem, 7.8vw, 2.6rem)' : 'clamp(2.6rem, 4.4vw, 3.6rem)',
         }}>
-          Het in shape komen &amp; blijven systeem
+          In 16 weken strakker &amp; sterker naast je 9-tot-5
         </h1>
         <div style={{
           fontWeight: '500',
@@ -110,7 +110,7 @@ export default function HeroSection({ isMobile }) {
           marginTop: isMobile ? '0.5rem' : '0.65rem',
           fontSize: isMobile ? '1.05rem' : '1.6rem',
         }}>
-          In shape komen met een aanpak die je levenslang kan aanhouden.
+          Zonder gek dieet of uren in de gym en met dat biertje en etentje er gewoon in.
         </div>
       </div>
 

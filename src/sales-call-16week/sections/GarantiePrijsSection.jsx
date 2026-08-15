@@ -44,11 +44,9 @@ export default function GarantiePrijsSection({ isMobile }) {
         <div style={{ textAlign: 'center', marginBottom: isMobile ? '0.9rem' : '1.1rem' }}>
           <span style={{ fontSize: isMobile ? '0.6rem' : '0.65rem', fontWeight: '800', letterSpacing: '0.15em', color: 'rgba(255,255,255,0.5)' }}>DE INVESTERING</span>
         </div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: isMobile ? '0.3rem' : '0.4rem', marginBottom: isMobile ? '1.5rem' : '1.75rem' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: isMobile ? '0.3rem' : '0.4rem', marginBottom: isMobile ? '1.25rem' : '1.5rem' }}>
           {[
-            { m: '12 maanden', p: '€997' },
-            { m: '6 maanden', p: '€547' },
-            { m: '3 maanden', p: '€297' },
+            { m: '16 weken', p: '€1000' },
           ].map((tier) => (
             <div key={tier.m} style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'center', gap: isMobile ? '0.6rem' : '0.85rem' }}>
               <span style={{ fontSize: isMobile ? '1rem' : '1.2rem', fontWeight: '700', color: 'rgba(255,255,255,0.85)' }}>
@@ -60,6 +58,17 @@ export default function GarantiePrijsSection({ isMobile }) {
             </div>
           ))}
         </div>
+
+        {/* ═══ Garantie — verplaatst vanuit de losse garantie-sectie ═══ */}
+        <p style={{
+          margin: `0 auto ${isMobile ? '1.5rem' : '1.75rem'}`,
+          maxWidth: '480px', textAlign: 'center',
+          fontSize: isMobile ? '0.9rem' : '1.05rem',
+          fontWeight: '700', color: '#fff', lineHeight: 1.4, letterSpacing: '-0.01em',
+        }}>
+          Risico vrij starten: Geen zichtbaar verschil in 30 dagen?{' '}
+          <span style={{ color: GOLD }}>Krijg je volledige investering terug.</span>
+        </p>
 
         {/* ═══ Trustpilot — kleine social proof ═══ */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}>
