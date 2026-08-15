@@ -8,7 +8,7 @@ const GOLD = '#ffba09'
 const PILAREN = [
   {
     category: 'Voeding',
-    title: 'Altijd Weten Wat Te Eten Systeem',
+    title: 'Weet Wat Je Eet Systeem',
     subtitle: 'Een aanpak die bij jou past — ook op verjaardagen, feestjes en vakanties.',
     bullets: [
       { label: 'Weten wat je eet', text: 'vaste structuur in de app, zonder rekenen' },
