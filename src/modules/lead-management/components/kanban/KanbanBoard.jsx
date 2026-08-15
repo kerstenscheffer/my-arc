@@ -103,7 +103,7 @@ export default function KanbanBoard({
   // Eén overkoepelende filter voor het HELE bord (i.p.v. per sectie). Dezelfde
   // dimensies (type, temperatuur, opvolg-aantal, sortering) gelden nu in alle
   // secties tegelijk.
-  const [boardFilter, setBoardFilter] = useState({ sort: 'default', types: new Set(), temps: new Set(), followups: new Set() })
+  const [boardFilter, setBoardFilter] = useState({ sort: 'default', types: new Set(), temps: new Set(), followups: new Set(), genders: new Set() })
   const [showBoardFilter, setShowBoardFilter] = useState(false)
   const boardFilterRef = useRef(null)
 
@@ -113,7 +113,7 @@ export default function KanbanBoard({
     return { ...cur, [key]: next }
   })
   const setBoardSort = (sort) => setBoardFilter(cur => ({ ...cur, sort }))
-  const resetBoardFilter = () => setBoardFilter({ sort: 'default', types: new Set(), temps: new Set(), followups: new Set() })
+  const resetBoardFilter = () => setBoardFilter({ sort: 'default', types: new Set(), temps: new Set(), followups: new Set(), genders: new Set() })
 
   // Sluit de globale filter-dropdown bij een klik/touch buiten (document-niveau,
   // betrouwbaar ook binnen transform-ouders zoals de kanban-kolommen).
@@ -194,6 +194,11 @@ export default function KanbanBoard({
     // opvolg-berichten. Leeg = alle aantallen toegestaan.
     if (filter.followups && filter.followups.size > 0) {
       if (!filter.followups.has(Number(lead.followup_count) || 0)) return false
+    }
+    // Geslacht-filter — man/vrouw. Leeg = alle. Leads zonder ingevuld geslacht
+    // vallen buiten de selectie zodra je op man of vrouw filtert.
+    if (filter.genders && filter.genders.size > 0) {
+      if (!filter.genders.has(lead.gender)) return false
     }
     return true
   }
@@ -1764,8 +1769,8 @@ export default function KanbanBoard({
                 Opvolg-aantal en Sortering, in alle secties tegelijk. */}
             {(() => {
               const counts = [...new Set(sections.flatMap(s => (s.leads || []).map(l => Number(l.followup_count) || 0)))].sort((a, b) => a - b)
-              const hasFilter = boardFilter.sort !== 'default' || boardFilter.types.size > 0 || boardFilter.temps.size > 0 || boardFilter.followups.size > 0
-              const filterCount = boardFilter.types.size + boardFilter.temps.size + boardFilter.followups.size + (boardFilter.sort !== 'default' ? 1 : 0)
+              const hasFilter = boardFilter.sort !== 'default' || boardFilter.types.size > 0 || boardFilter.temps.size > 0 || boardFilter.followups.size > 0 || boardFilter.genders.size > 0
+              const filterCount = boardFilter.types.size + boardFilter.temps.size + boardFilter.followups.size + boardFilter.genders.size + (boardFilter.sort !== 'default' ? 1 : 0)
               const GOLD = '#FFD700'
               return (
                 <div style={{ position: 'relative', flexShrink: 0 }} ref={boardFilterRef}>
@@ -1816,6 +1821,20 @@ export default function KanbanBoard({
                           return (
                             <label key={opt.id} style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', padding: '0.3rem 0.1rem', cursor: 'pointer', color: active ? GOLD : 'rgba(255,255,255,0.65)', fontSize: '0.72rem', fontWeight: active ? 700 : 500 }}>
                               <input type="checkbox" checked={active} onChange={() => toggleBoardSet('temps', opt.id)} style={{ accentColor: GOLD, width: 14, height: 14 }} />
+                              {opt.label}
+                            </label>
+                          )
+                        })}
+                      </div>
+
+                      {/* Geslacht-filter */}
+                      <div style={{ padding: '0.5rem 0.65rem 0.4rem', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                        <div style={{ fontSize: '0.5rem', fontWeight: 800, color: 'rgba(255,255,255,0.35)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '0.3rem' }}>Geslacht</div>
+                        {[{ id: 'male', label: 'Man' }, { id: 'female', label: 'Vrouw' }].map(opt => {
+                          const active = boardFilter.genders.has(opt.id)
+                          return (
+                            <label key={opt.id} style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', padding: '0.3rem 0.1rem', cursor: 'pointer', color: active ? GOLD : 'rgba(255,255,255,0.65)', fontSize: '0.72rem', fontWeight: active ? 700 : 500 }}>
+                              <input type="checkbox" checked={active} onChange={() => toggleBoardSet('genders', opt.id)} style={{ accentColor: GOLD, width: 14, height: 14 }} />
                               {opt.label}
                             </label>
                           )
