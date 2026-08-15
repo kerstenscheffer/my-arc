@@ -34,6 +34,7 @@ const PILAREN = [
       { label: 'Wekelijkse check-in call', text: 'toegang tot mijn agenda' },
       { label: 'Snel bereikbaar', text: 'via de app' },
       { label: 'Ik kijk mee', text: "gewicht, kracht en foto's — progressie zwart-op-wit" },
+      { label: 'Accountability', text: 'je hoeft het niet alleen te doen — ik hou je scherp en op koers' },
     ],
     images: ['/sales-screenshots/coach.png', '/sales-screenshots/tracking.png'],
     quote: { text: 'Dit was voor mij het sterkste onderdeel.', author: 'klant, 3 maanden afgerond' },
