@@ -1,7 +1,7 @@
-// src/sales-call/sections/OfferPilarenSection.jsx
-// Donkere offer-sectie voor /sales — 3 pilaren (was 5 losse systemen).
-// Gedeelde PILLARS uit PillarenSection.jsx laten we met rust (PhotoFan +
-// /start funnel + BackInShapePage hangen eraan); deze data is lokaal.
+// src/sales-call-16week/sections/OfferPilarenSection.jsx
+// Offer-pijler — ÉÉN pijler per volledig scherm (focus per pijler). De page
+// rendert 'm 3× via de `index`-prop. Data lokaal; styling gelijk aan het
+// origineel, alleen nu gecentreerd en groter voor focus.
 
 const GOLD = '#ffba09'
 
@@ -40,16 +40,23 @@ const PILAREN = [
   },
 ]
 
-export default function OfferPilarenSection({ isMobile }) {
+export const PILAAR_COUNT = PILAREN.length
+
+export default function OfferPilarenSection({ isMobile, index = 0 }) {
+  const p = PILAREN[index] || PILAREN[0]
+  // Om en om links/rechts op desktop voor ritme tussen de schermen.
+  const imgFirst = index % 2 === 0
+
   return (
     <section style={{
       scrollSnapAlign: 'start',
       minHeight: '100dvh',
       background: '#0a0a0a',
       display: 'flex',
+      flexDirection: 'column',
       alignItems: 'center',
       justifyContent: 'center',
-      padding: isMobile ? '4rem 1rem' : '5.5rem 2rem',
+      padding: isMobile ? '4rem 1.25rem' : '5.5rem 2rem',
       position: 'relative',
       overflow: 'hidden'
     }}>
@@ -70,116 +77,101 @@ export default function OfferPilarenSection({ isMobile }) {
         background: `linear-gradient(90deg, transparent, ${GOLD}30, transparent)`
       }} />
 
-      <div style={{ maxWidth: '1000px', width: '100%', position: 'relative', zIndex: 2 }}>
-        {/* Header */}
-        <div style={{ textAlign: 'center', marginBottom: isMobile ? '1.25rem' : '1.75rem' }}>
+      <div style={{ maxWidth: '960px', width: '100%', position: 'relative', zIndex: 2 }}>
+        {/* Kleine methode-eyebrow — continuïteit tussen de 3 pijler-schermen */}
+        <div style={{ textAlign: 'center', marginBottom: isMobile ? '1.5rem' : '2.25rem' }}>
           <span style={{
             fontSize: isMobile ? '0.55rem' : '0.58rem', fontWeight: '800', letterSpacing: '0.15em',
-            color: 'rgba(255,255,255,0.5)', display: 'inline-block', marginBottom: '0.65rem'
-          }}>HET SYSTEEM</span>
-          <h2 style={{
-            fontSize: isMobile ? 'clamp(1.6rem, 7.5vw, 2.1rem)' : '2.9rem',
-            fontWeight: '900', color: '#fff', margin: 0, lineHeight: 1.15,
-            padding: isMobile ? '0 0.25rem' : 0,
-          }}>
-            MY ARC-Methode — Strakker en sterker, passend bij jouw leven
-          </h2>
+            color: 'rgba(255,255,255,0.5)',
+          }}>MY ARC-METHODE · {index + 1}/{PILAAR_COUNT}</span>
         </div>
 
-        {/* Pilaar-cards — verticale lijst, om en om links/rechts op desktop */}
+        {/* Pijler — beeld + tekst, gecentreerd en groot */}
         <div style={{
-          display: 'flex', flexDirection: 'column',
-          gap: isMobile ? '3rem' : '4rem',
-          maxWidth: 940, margin: '0 auto'
+          display: 'flex',
+          flexDirection: isMobile ? 'column' : (imgFirst ? 'row-reverse' : 'row'),
+          alignItems: 'center',
+          gap: isMobile ? '1.75rem' : '3rem',
         }}>
-          {PILAREN.map((p, i) => (
-            <div key={i} style={{
-              borderRadius: '16px',
-              display: 'flex',
-              flexDirection: isMobile ? 'column' : (i % 2 === 0 ? 'row-reverse' : 'row'),
-              alignItems: 'center',
-            }}>
-              {/* Beeld-kolom — max 40% van de breedte; bewust ondergeschikt aan de titel */}
+          {/* Beeld-kolom */}
+          <div style={{
+            flex: isMobile ? 'none' : '0 0 42%',
+            maxWidth: isMobile ? '72%' : '42%',
+            width: isMobile ? '72%' : undefined,
+            margin: isMobile ? '0 auto' : undefined,
+            display: 'flex',
+            gap: isMobile ? '0.5rem' : '0.65rem',
+            alignItems: 'center', justifyContent: 'center',
+          }}>
+            {p.images.map((src) => (
+              <div key={src} style={{ flex: 1, minWidth: 0, borderRadius: '14px', overflow: 'hidden', filter: 'drop-shadow(0 12px 26px rgba(0,0,0,0.55))' }}>
+                <img
+                  src={src}
+                  alt={p.title}
+                  onError={(e) => { e.currentTarget.style.opacity = 0 }}
+                  style={{ width: '100%', height: 'auto', display: 'block', objectFit: 'cover' }}
+                />
+              </div>
+            ))}
+          </div>
+
+          {/* Tekst-kolom */}
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? '0.75rem' : '0.9rem', marginBottom: isMobile ? '0.6rem' : '0.75rem' }}>
               <div style={{
-                flex: isMobile ? 'none' : '0 0 40%',
-                maxWidth: isMobile ? '60%' : '40%',
-                width: isMobile ? '60%' : undefined,
-                margin: isMobile ? '0 auto' : undefined,
-                display: 'flex',
-                gap: isMobile ? '0.4rem' : '0.55rem',
-                alignItems: 'center', justifyContent: 'center',
+                flexShrink: 0, width: isMobile ? 42 : 56, height: isMobile ? 42 : 56, borderRadius: '50%',
+                background: 'rgba(255,255,255,0.1)', border: '1.5px solid rgba(255,255,255,0.55)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                color: '#fff', fontWeight: '900', fontSize: isMobile ? '1.3rem' : '1.7rem',
+              }}>{index + 1}</div>
+              <h3 style={{
+                flex: 1, minWidth: 0,
+                fontSize: isMobile ? '1.55rem' : '2.35rem',
+                fontWeight: '900', color: '#fff', margin: 0,
+                lineHeight: 1.12, letterSpacing: '-0.02em',
               }}>
-                {p.images.map((src) => (
-                  <div key={src} style={{ flex: 1, minWidth: 0, borderRadius: '12px', overflow: 'hidden', filter: 'drop-shadow(0 10px 22px rgba(0,0,0,0.55))' }}>
-                    <img
-                      src={src}
-                      alt={p.title}
-                      onError={(e) => { e.currentTarget.style.opacity = 0 }}
-                      style={{ width: '100%', height: 'auto', display: 'block', objectFit: 'cover' }}
-                    />
-                  </div>
-                ))}
-              </div>
-
-              {/* Tekst-kolom */}
-              <div style={{ flex: 1, minWidth: 0, padding: isMobile ? '0.6rem 0.5rem 0' : '0.5rem 1.35rem' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? '0.65rem' : '0.75rem', marginBottom: isMobile ? '0.4rem' : '0.5rem' }}>
-                  <div style={{
-                    flexShrink: 0, width: isMobile ? 34 : 42, height: isMobile ? 34 : 42, borderRadius: '50%',
-                    background: 'rgba(255,255,255,0.1)', border: '1.5px solid rgba(255,255,255,0.55)',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    color: '#fff', fontWeight: '900', fontSize: isMobile ? '1.05rem' : '1.35rem',
-                  }}>{i + 1}</div>
-                  <h3 style={{
-                    flex: 1, minWidth: 0,
-                    fontSize: isMobile ? '1.25rem' : '1.85rem',
-                    fontWeight: '900', color: '#fff', margin: 0,
-                    lineHeight: 1.15, letterSpacing: '-0.02em',
-                  }}>
-                    <span style={{ display: 'block', fontSize: isMobile ? '0.7rem' : '0.8rem', fontWeight: '700', color: GOLD, letterSpacing: '0.04em', marginBottom: '0.2rem' }}>
-                      PILAAR {i + 1}: {p.category.toUpperCase()}
-                    </span>
-                    {p.title}
-                  </h3>
-                </div>
-
-                {/* Subkop — kleiner, ondergeschikt aan de pilaarnaam */}
-                <p style={{
-                  margin: `0 0 ${isMobile ? '0.5rem' : '0.6rem'}`,
-                  fontSize: isMobile ? '0.82rem' : '0.9rem',
-                  fontWeight: '600', color: 'rgba(255,255,255,0.65)', lineHeight: 1.4,
-                }}>{p.subtitle}</p>
-
-                {/* Bullets (max 3) — bewust klein */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: isMobile ? '0.4rem' : '0.5rem' }}>
-                  {p.bullets.map((b, j) => (
-                    <div key={j} style={{ display: 'flex', gap: '0.5rem', alignItems: 'flex-start' }}>
-                      <span style={{ flexShrink: 0, marginTop: isMobile ? 5 : 6, width: 5, height: 5, borderRadius: '50%', background: 'rgba(255,255,255,0.45)' }} />
-                      <p style={{ margin: 0, fontSize: isMobile ? '0.76rem' : '0.84rem', color: 'rgba(255,255,255,0.65)', lineHeight: 1.4, fontWeight: '500' }}>
-                        <span style={{ color: '#fff', fontWeight: '800' }}>{b.label}:</span> {b.text}
-                      </p>
-                    </div>
-                  ))}
-                </div>
-
-                {/* Optionele quote (pilaar 3) */}
-                {p.quote && (
-                  <div style={{
-                    marginTop: isMobile ? '0.9rem' : '1.1rem',
-                    paddingLeft: '0.85rem',
-                    borderLeft: '2px solid rgba(255,255,255,0.25)',
-                  }}>
-                    <p style={{ margin: 0, fontSize: isMobile ? '0.9rem' : '1rem', fontStyle: 'italic', color: '#fff', fontWeight: '600', lineHeight: 1.4 }}>
-                      "{p.quote.text}"
-                    </p>
-                    <p style={{ margin: '0.3rem 0 0', fontSize: isMobile ? '0.72rem' : '0.78rem', color: 'rgba(255,255,255,0.5)', fontWeight: '600' }}>
-                      — {p.quote.author}
-                    </p>
-                  </div>
-                )}
-              </div>
+                <span style={{ display: 'block', fontSize: isMobile ? '0.75rem' : '0.9rem', fontWeight: '700', color: GOLD, letterSpacing: '0.04em', marginBottom: '0.25rem' }}>
+                  PIJLER {index + 1}: {p.category.toUpperCase()}
+                </span>
+                {p.title}
+              </h3>
             </div>
-          ))}
+
+            {/* Subkop */}
+            <p style={{
+              margin: `0 0 ${isMobile ? '0.85rem' : '1.1rem'}`,
+              fontSize: isMobile ? '0.95rem' : '1.1rem',
+              fontWeight: '600', color: 'rgba(255,255,255,0.7)', lineHeight: 1.45,
+            }}>{p.subtitle}</p>
+
+            {/* Bullets */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: isMobile ? '0.55rem' : '0.65rem' }}>
+              {p.bullets.map((b, j) => (
+                <div key={j} style={{ display: 'flex', gap: '0.6rem', alignItems: 'flex-start' }}>
+                  <span style={{ flexShrink: 0, marginTop: isMobile ? 7 : 8, width: 6, height: 6, borderRadius: '50%', background: GOLD }} />
+                  <p style={{ margin: 0, fontSize: isMobile ? '0.9rem' : '1rem', color: 'rgba(255,255,255,0.7)', lineHeight: 1.45, fontWeight: '500' }}>
+                    <span style={{ color: '#fff', fontWeight: '800' }}>{b.label}:</span> {b.text}
+                  </p>
+                </div>
+              ))}
+            </div>
+
+            {/* Optionele quote (pijler 3) */}
+            {p.quote && (
+              <div style={{
+                marginTop: isMobile ? '1.1rem' : '1.4rem',
+                paddingLeft: '0.95rem',
+                borderLeft: '2px solid rgba(255,255,255,0.25)',
+              }}>
+                <p style={{ margin: 0, fontSize: isMobile ? '1rem' : '1.15rem', fontStyle: 'italic', color: '#fff', fontWeight: '600', lineHeight: 1.4 }}>
+                  "{p.quote.text}"
+                </p>
+                <p style={{ margin: '0.35rem 0 0', fontSize: isMobile ? '0.78rem' : '0.85rem', color: 'rgba(255,255,255,0.5)', fontWeight: '600' }}>
+                  — {p.quote.author}
+                </p>
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </section>

@@ -7,7 +7,8 @@ import OfferPilarenSection from './sections/OfferPilarenSection'
 import GarantiePrijsSection from './sections/GarantiePrijsSection'
 
 const GOLD = '#ffba09'
-const SECTION_COUNT = 3
+// Hero + 3 pijler-schermen (elk eigen focus) + prijs = 5.
+const SECTION_COUNT = 5
 
 export default function SalesCall16WeekPage() {
   const containerRef = useRef(null)
@@ -86,7 +87,9 @@ export default function SalesCall16WeekPage() {
         }}
       >
         <HeroSection isMobile={isMobile} />
-        <OfferPilarenSection isMobile={isMobile} />
+        <OfferPilarenSection isMobile={isMobile} index={0} />
+        <OfferPilarenSection isMobile={isMobile} index={1} />
+        <OfferPilarenSection isMobile={isMobile} index={2} />
         <GarantiePrijsSection isMobile={isMobile} />
       </div>
 
