@@ -100,7 +100,7 @@ export default function HeroSection({ isMobile }) {
           color: '#fff',
           fontSize: isMobile ? 'clamp(2rem, 7.8vw, 2.6rem)' : 'clamp(2.6rem, 4.4vw, 3.6rem)',
         }}>
-          In 16 weken strakker &amp; sterker naast je 9-tot-5
+          In 16 weken strakker en sterker,<br />met de MY ARC methode.
         </h1>
         <div style={{
           fontWeight: '500',
