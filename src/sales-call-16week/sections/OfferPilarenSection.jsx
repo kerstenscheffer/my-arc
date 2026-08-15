@@ -117,25 +117,16 @@ export default function OfferPilarenSection({ isMobile, index = 0 }) {
 
           {/* Tekst-kolom */}
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? '0.75rem' : '0.9rem', marginBottom: isMobile ? '0.6rem' : '0.75rem' }}>
-              <div style={{
-                flexShrink: 0, width: isMobile ? 42 : 56, height: isMobile ? 42 : 56, borderRadius: '50%',
-                background: 'rgba(255,255,255,0.1)', border: '1.5px solid rgba(255,255,255,0.55)',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                color: '#fff', fontWeight: '900', fontSize: isMobile ? '1.3rem' : '1.7rem',
-              }}>{index + 1}</div>
-              <h3 style={{
-                flex: 1, minWidth: 0,
-                fontSize: isMobile ? '1.55rem' : '2.35rem',
-                fontWeight: '900', color: '#fff', margin: 0,
-                lineHeight: 1.12, letterSpacing: '-0.02em',
-              }}>
-                <span style={{ display: 'block', fontSize: isMobile ? '0.75rem' : '0.9rem', fontWeight: '700', color: GOLD, letterSpacing: '0.04em', marginBottom: '0.25rem' }}>
-                  PIJLER {index + 1}: {p.category.toUpperCase()}
-                </span>
-                {p.title}
-              </h3>
-            </div>
+            <h3 style={{
+              fontSize: isMobile ? '1.55rem' : '2.35rem',
+              fontWeight: '900', color: '#fff', margin: `0 0 ${isMobile ? '0.6rem' : '0.75rem'}`,
+              lineHeight: 1.12, letterSpacing: '-0.02em',
+            }}>
+              <span style={{ display: 'block', fontSize: isMobile ? '0.75rem' : '0.9rem', fontWeight: '900', color: '#fff', letterSpacing: '0.04em', marginBottom: '0.25rem' }}>
+                PIJLER {index + 1}: {p.category.toUpperCase()}
+              </span>
+              {p.title}
+            </h3>
 
             {/* Subkop */}
             <p style={{
