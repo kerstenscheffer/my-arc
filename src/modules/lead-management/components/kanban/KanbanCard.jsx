@@ -28,7 +28,7 @@ function buildDMRunMessage(lead) {
   const first = (lead?.first_name || '').trim().split(/\s+/)[0] || ''
   const name = first ? first.charAt(0).toUpperCase() + first.slice(1) : ''
   const greeting = name ? `Heyy ${name},` : 'Heyy,'
-  return `${greeting} leuk dat je bent gaan volgen! Ben je zelf ook bezig met spieren opbouwen of vet verliezen?`
+  return `${greeting} bedankt voor het volgen! Ben je zelf ook bezig met een fitness journey of vind je de content gewoon interessant?`
 }
 
 // Synchroon kopiëren via execCommand — betrouwbaar binnen dezelfde tik, óók
