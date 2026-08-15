@@ -10,7 +10,6 @@ import CoachVideoFeedback from '../video-feedback/CoachVideoFeedback'
 import AddClientModal from './components/AddClientModal'
 
 export default function CoachCommandCenter({ db, onSelectClient, setActiveTab, onNavigatePlan, onNavigateWorkout, onOpenMealPanel, onOpenWorkoutPanel }) {
-  console.log('🏋️ CoachCommandCenter render — onOpenMealPanel:', typeof onOpenMealPanel, '— onOpenWorkoutPanel:', typeof onOpenWorkoutPanel)
   const isMobile = window.innerWidth <= 768
   const [loading, setLoading] = useState(true)
   const [clientsWithData, setClientsWithData] = useState([])

@@ -120,7 +120,6 @@ async createLead(leadData) {
 
   async getLeads(coachId, filters = {}) {
     try {
-      console.log('🔍 [GETLEADS] called for coachId:', coachId, 'filters:', filters)
       let query = this.db.supabase
         .from('call_leads')
         .select(`
@@ -140,7 +139,6 @@ async createLead(leadData) {
       if (filters.limit) query = query.limit(filters.limit)
 
       const { data, error } = await query
-      console.log('🔍 [GETLEADS] result count:', data?.length, 'error:', error?.message)
       if (error) throw error
       return data || []
     } catch (error) {
@@ -620,8 +618,6 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
 
   async getKanbanBoard(coachId) {
     try {
-      console.log('🔍 [KANBAN] getKanbanBoard called for coachId:', coachId)
-
       // Drie onafhankelijke queries parallel uitvoeren i.p.v. sequentieel.
       // Voorheen: sections → sectionItems → allLeads (3 round trips achter elkaar).
       // Nu: alle drie tegelijk → load time ~ langzaamste van de drie queries.
@@ -656,10 +652,6 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
           .is('deleted_at', null)
           .order('created_at', { ascending: false }))
       ])
-      console.log('🔍 [KANBAN] sections loaded:', sections?.length, sections?.map(s => s.title))
-      console.log('🔍 [KANBAN] section_items:', sectionItems?.length)
-      console.log('🔍 [KANBAN] call_leads result:', allLeads?.length)
-
       const leadMap = new Map((allLeads || []).map(lead => [lead.id, lead]))
       const assignedLeadIds = new Set((sectionItems || []).map(item => item.lead_id))
 
