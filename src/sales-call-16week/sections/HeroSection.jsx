@@ -102,15 +102,6 @@ export default function HeroSection({ isMobile }) {
         }}>
           In 16 weken strakker en sterker,<br />met de MY ARC methode.
         </h1>
-        <div style={{
-          fontWeight: '500',
-          color: 'rgba(255,255,255,0.65)',
-          lineHeight: 1.4,
-          marginTop: isMobile ? '0.5rem' : '0.65rem',
-          fontSize: isMobile ? '1.05rem' : '1.6rem',
-        }}>
-          Zonder gek dieet of uren in de gym en met dat biertje en etentje er gewoon in.
-        </div>
       </div>
 
       {/* ═══ 3 transformaties — onder de titel, bewust klein (titel domineert) ═══ */}
