@@ -65,7 +65,7 @@ export default function GarantiePrijsSection({ isMobile }) {
           fontSize: isMobile ? '0.9rem' : '1.05rem',
           fontWeight: '700', color: '#fff', lineHeight: 1.4, letterSpacing: '-0.01em',
         }}>
-          Resultaat garantie: Geen zichtbaar verschil in 30 dagen?{' '}
+          Resultaat garantie: Geen transformatie waar je enorm trots op bent?{' '}
           <span style={{ color: GOLD }}>Krijg je volledige investering terug.</span>
         </p>
 
