@@ -6,7 +6,7 @@ const TP_GREEN = '#00B67A'
 // 3 echte transformaties — in de hero onder de titel.
 const TRANSFORMS = [
   { src: '/review-transformatie-1.png', caption: 'Kersten: van zachte buik naar sixpack.' },
-  { src: '/review-transformatie-2.png', caption: 'Nitish bouwde spier terwijl zijn vet % daalde.' },
+  { src: '/review-transformatie-2-16week.png', caption: 'Nitish bouwde spier terwijl zijn vet % daalde.' },
 ]
 
 const REVIEWS = [
