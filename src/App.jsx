@@ -35,6 +35,7 @@ import ResultPage from './lead-magnet/ResultPage'
 import SevenSecretsFunnel from './lead-magnet/7secretsfunnel/7SecretsFunnel'
 import GiveawayPage from './lead-magnet/7secretsfunnel/GiveawayPage'
 import SalesCallPage from './sales-call/SalesCallPage'
+import SalesCall16WeekPage from './sales-call-16week/SalesCall16WeekPage'
 import BackInShapePage from './sales-call/BackInShapePage'
 import VSLLandingPage from './sales-call-vsl/VSLLandingPage'
 import SalesCallVSLPage from './sales-call-vsl/SalesCallVSLPage'
@@ -131,6 +132,11 @@ function App() {
   // Programma-pagina (voorheen /sales — alias blijft werken voor oude links)
   if (currentPath === '/programma' || currentPath === '/sales') {
     return <SalesCallPage />
+  }
+
+  // 16-weken offer — kopie van /programma met eigen copy.
+  if (currentPath === '/16week') {
+    return <SalesCall16WeekPage />
   }
 
   // Sales-pagina-kopie met gratis strategiegesprek-CTA i.p.v. prijzen
