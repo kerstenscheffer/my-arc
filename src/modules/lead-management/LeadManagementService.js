@@ -149,8 +149,6 @@ async createLead(leadData) {
 
 async updateLead(leadId, updates, coachId = null) {
   try {
-    console.log('📝 UPDATE LEAD:', leadId, 'Updates:', Object.keys(updates))
-
     if (updates.status === 'contacted' && !updates.last_contacted_at) {
       updates.last_contacted_at = new Date().toISOString()
     }
@@ -220,12 +218,7 @@ async updateLead(leadId, updates, coachId = null) {
     )
     
     if (shouldRestore && coachId) {
-      console.log('🔄 Triggering restore check...')
       const restoreResult = await this.restoreFromStaleIfNeeded(leadId, coachId)
-
-      if (restoreResult.restored) {
-        console.log('✅ Lead restored to:', restoreResult.restoredTo?.title)
-      }
 
       // Reactie (+1) op een lead die uit de "Follow up stil"-sectie wordt
       // teruggezet: de lead heeft gereageerd, dus de opvolg-teller (= hoe vaak
@@ -906,8 +899,6 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
 
   async checkAndMoveStaleLeads(coachId) {
     try {
-      console.log('🔍 ========== STALE CHECK START ==========')
-      
       const sections = await this.getSections(coachId)
       const staleSections = this.identifyStaleSections(sections)
       
@@ -957,35 +948,25 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
           .map(s => s.id)
       )
 
-      console.log(`🛡️ Toegestane bron-secties (stil-automation): ${allowedSourceIds.size}`,
-        sections.filter(s => allowedSourceIds.has(s.id)).map(s => s.title)
-      )
-
       const normalLeads = leadsWithActivity.filter(lead => {
         if (staleSectionIds.has(lead.current_section_id)) return false
         // Alleen gesprek-secties doorschuiven; alle andere kolommen met rust laten.
         if (!allowedSourceIds.has(lead.current_section_id)) return false
-        if (lead.contacted_today_date?.split('T')[0] === today) {
-          console.log(`⏭️ Skipping "${lead.first_name}" - contacted today via checkbox`)
-          return false
-        }
+        if (lead.contacted_today_date?.split('T')[0] === today) return false
         return true
       })
 
-      const staleLeads = leadsWithActivity.filter(lead => 
+      const staleLeads = leadsWithActivity.filter(lead =>
         staleSectionIds.has(lead.current_section_id)
       )
-
-      console.log(`📊 Normal: ${normalLeads.length}, Stale: ${staleLeads.length}, Excluded: ${excludedSectionIds.size} sections`)
 
       let movedCount = 0
       const now = new Date()
 
       // Process NORMAL leads
       for (const lead of normalLeads) {
-        const leadName = `${lead.first_name || ''} ${lead.last_name || ''}`.trim() || 'Unknown'
         const lastActivity = lead.last_activity ? new Date(lead.last_activity) : null
-        
+
         let daysSinceActivity
         if (!lastActivity) {
           const created = new Date(lead.created_at)
@@ -993,7 +974,7 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
         } else {
           daysSinceActivity = Math.floor((now - lastActivity) / (1000 * 60 * 60 * 24))
         }
-        
+
         if (daysSinceActivity >= 1) {
           const targetDays = daysSinceActivity >= 3 ? 3 : daysSinceActivity >= 2 ? 2 : 1
           // 3+ dagen stil én al opgevolgd → naar "Follow up stil" i.p.v.
@@ -1004,22 +985,17 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
 
           if (targetSection) {
             if (lead.current_section_id === targetSection.id) continue
-            
             const moveResult = await this.moveToStaleSection(lead, targetSection, coachId, false)
-            if (moveResult) {
-              movedCount++
-              console.log(`  ✅ MOVED "${leadName}" to "${targetSection.title}"`)
-            }
+            if (moveResult) movedCount++
           }
         }
       }
-      
+
       // Process STALE leads for escalation
       for (const lead of staleLeads) {
-        const leadName = `${lead.first_name || ''} ${lead.last_name || ''}`.trim() || 'Unknown'
         const lastActivity = lead.last_activity ? new Date(lead.last_activity) : new Date(lead.created_at)
         const daysSinceActivity = Math.floor((now - lastActivity) / (1000 * 60 * 60 * 24))
-        
+
         const targetDays = daysSinceActivity >= 3 ? 3 : daysSinceActivity >= 2 ? 2 : 1
 
         // Al-opgevolgde leads die 3+ dagen stil staan → naar "Follow up stil"
@@ -1028,7 +1004,7 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
         if (targetDays >= 3 && (lead.followup_count || 0) >= 1 && staleSections.followupStil
             && lead.current_section_id !== staleSections.followupStil.id) {
           const moveResult = await this.moveToStaleSection(lead, staleSections.followupStil, coachId, true)
-          if (moveResult) { movedCount++; console.log(`  ✅ → Follow up stil "${leadName}"`) }
+          if (moveResult) movedCount++
           continue
         }
 
@@ -1036,7 +1012,7 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
 
         if (!targetSection) continue
         if (lead.current_section_id === targetSection.id) continue
-        
+
         let currentStaleLevel = 0
         for (const [level, section] of Object.entries(staleSections)) {
           if (section.id === lead.current_section_id) {
@@ -1044,17 +1020,12 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
             break
           }
         }
-        
+
         if (targetDays > currentStaleLevel) {
           const moveResult = await this.moveToStaleSection(lead, targetSection, coachId, true)
-          if (moveResult) {
-            movedCount++
-            console.log(`  ✅ ESCALATED "${leadName}" to "${targetSection.title}"`)
-          }
+          if (moveResult) movedCount++
         }
       }
-      
-      console.log(`✅ Stale check: ${movedCount} verplaatst, ${normalLeads.length + staleLeads.length} gecheckt`)
       
       return { 
         moved: movedCount, 
@@ -1101,39 +1072,39 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
 
   async getLeadsWithLastActivity(coachId) {
     try {
-      // BELANGRIJK: alles gepagineerd ophalen. PostgREST kapt elke query af op
-      // 1000 rijen. Met >1000 leads/movements viel de stil-zet-check stil: een
-      // deel van de leads werd nooit opgehaald en "laatste activiteit" klopte
-      // niet meer (movements > 1000). Daarom nu overal via _fetchAllRows().
-      const leads = await this._fetchAllRows(() => this.db.supabase
-        .from('call_leads')
-        .select('id, first_name, last_name, created_at, last_touched, contacted_today_date, followup_count, lead_temperature')
-        // Geen coach_id filter — RLS bepaalt de toegang (team-membership of eigen leads).
-        .is('deleted_at', null))
+      // De stale-check kijkt alleen naar activiteit in de afgelopen 1-3 dagen.
+      // Movements en notes ouder dan 7 dagen zijn nooit relevant voor stale-detectie;
+      // leads zonder recente movement/note vallen terug op last_touched (al in call_leads).
+      // Vier queries parallel i.p.v. sequentieel → veel kortere wachttijd.
+      const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
 
-      const sectionItems = await this._fetchAllRows(() => this.db.supabase
-        .from('lead_section_items')
-        .select('lead_id, section_id, previous_section_id, previous_section_title, previous_section_color'))
+      const [leads, sectionItems, movements, notes] = await Promise.all([
+        this._fetchAllRows(() => this.db.supabase
+          .from('call_leads')
+          .select('id, first_name, last_name, created_at, last_touched, contacted_today_date, followup_count, lead_temperature')
+          .is('deleted_at', null)),
+        this._fetchAllRows(() => this.db.supabase
+          .from('lead_section_items')
+          .select('lead_id, section_id, previous_section_id, previous_section_title, previous_section_color')),
+        this._fetchAllRows(() => this.db.supabase
+          .from('lead_movements')
+          .select('lead_id, moved_at')
+          .gte('moved_at', sevenDaysAgo)
+          .order('moved_at', { ascending: false })),
+        this._fetchAllRows(() => this.db.supabase
+          .from('lead_notes')
+          .select('lead_id, created_at')
+          .is('deleted_at', null)
+          .gte('created_at', sevenDaysAgo)
+          .order('created_at', { ascending: false })),
+      ])
 
       const sectionMap = new Map((sectionItems || []).map(item => [item.lead_id, item]))
-
-      // Gesorteerd op moved_at desc; over alle pagina's blijft de volgorde
-      // behouden, dus de eerste keer dat we een lead_id zien = de laatste move.
-      const movements = await this._fetchAllRows(() => this.db.supabase
-        .from('lead_movements')
-        .select('lead_id, moved_at')
-        .order('moved_at', { ascending: false }))
 
       const latestMovement = new Map()
       ;(movements || []).forEach(m => {
         if (!latestMovement.has(m.lead_id)) latestMovement.set(m.lead_id, m.moved_at)
       })
-
-      const notes = await this._fetchAllRows(() => this.db.supabase
-        .from('lead_notes')
-        .select('lead_id, created_at')
-        .is('deleted_at', null)
-        .order('created_at', { ascending: false }))
 
       const latestNote = new Map()
       ;(notes || []).forEach(n => {
