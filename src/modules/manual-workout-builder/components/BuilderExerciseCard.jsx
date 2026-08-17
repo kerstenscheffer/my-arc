@@ -14,7 +14,18 @@ const CARDIO_PRESETS = [
   'Hometrainer', 'Airbike', 'SkiErg', 'Roeien (interval)', 'Zone 2 Cardio',
 ]
 const CARDIO_INTENSITIES = ['Rustig', 'Matig', 'Intensief']
-const EQUIPMENT_QUICK = ['Bodyweight', 'Dumbbell', 'Kettlebell', 'Band', 'Barbell']
+// Volledige apparaten-lijst voor de dropdown — vrije tekst blijft ook mogelijk
+// (bv. "Kettlebell 16 kg"). Gegroepeerd van vrij → machines.
+const EQUIPMENT_OPTIONS = [
+  'Bodyweight', 'Dumbbell', 'Barbell', 'Kettlebell', 'EZ-bar', 'Trap bar',
+  'Weerstandsband', 'Kabel', 'Smith machine', 'Machine (algemeen)',
+  'Leg press', 'Hack squat', 'Leg extension', 'Leg curl', 'Calf raise machine',
+  'Chest press machine', 'Pec deck', 'Shoulder press machine',
+  'Lat pulldown', 'Seated row', 'Assisted pull-up machine',
+  'Hip thrust machine', 'Glute kickback machine', 'Preacher curl',
+  'Pull-up bar', 'Dip station', 'Halterbank', 'Gewichtsschijf', 'Medicine ball',
+  'TRX / suspension', 'Verzwaringsvest',
+]
 
 export default function BuilderExerciseCard({
   exercise, index, total, isMobile, db, client, onField, onMove, onDelete, onVideo,
@@ -183,19 +194,14 @@ function ExerciseEditModal({ exercise, isCardio, isMobile, hasVid, onField, onVi
 
               <div>
                 <label style={label}>Apparaat / uitvoering</label>
-                <input value={exercise.equipment ?? ''} onChange={(e) => onField('equipment', e.target.value)} placeholder='Bv. "Kettlebell 16 kg"' style={input} />
-                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 8 }}>
-                  {EQUIPMENT_QUICK.map(opt => {
-                    const active = (exercise.equipment || '').toLowerCase() === opt.toLowerCase()
-                    return (
-                      <button key={opt} onClick={() => onField('equipment', opt)}
-                        style={{ padding: '0.35rem 0.65rem', borderRadius: 7, cursor: 'pointer', fontSize: '0.7rem', fontWeight: 800,
-                          background: active ? 'rgba(255,215,0,0.16)' : 'rgba(255,255,255,0.04)',
-                          border: `1px solid ${active ? 'rgba(255,215,0,0.4)' : 'rgba(255,255,255,0.1)'}`,
-                          color: active ? '#FFD700' : 'rgba(255,255,255,0.55)' }}>{opt}</button>
-                    )
-                  })}
-                </div>
+                {/* Dropdown met alle apparaten/machines — kies er een; het veld
+                    eronder blijft vrij te typen voor specifieks (bv. gewicht). */}
+                <select value="" onChange={(e) => { if (e.target.value) onField('equipment', e.target.value) }}
+                  style={{ ...input, cursor: 'pointer', appearance: 'auto', color: 'rgba(255,255,255,0.85)' }}>
+                  <option value="" style={{ background: '#1a1a1a' }}>Kies apparaat / machine…</option>
+                  {EQUIPMENT_OPTIONS.map(o => <option key={o} value={o} style={{ background: '#1a1a1a' }}>{o}</option>)}
+                </select>
+                <input value={exercise.equipment ?? ''} onChange={(e) => onField('equipment', e.target.value)} placeholder='Gekozen apparaat — of typ vrij, bv. "Smith machine" / "Kettlebell 16 kg"' style={{ ...input, marginTop: 8 }} />
               </div>
 
               <div><label style={label}>Notitie</label>
