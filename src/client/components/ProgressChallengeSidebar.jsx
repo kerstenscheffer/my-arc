@@ -37,7 +37,7 @@ export default function ProgressChallengeSidebar({ client, db, challengeData, we
         .eq('client_id', client.id)
         .eq('is_active', true)
         .eq('challenge_type', '8week')
-        .single()
+        .maybeSingle()
 
       if (challengeError || !challenge) {
         setShowBadge(false)
@@ -50,7 +50,7 @@ export default function ProgressChallengeSidebar({ client, db, challengeData, we
         .select('*')
         .eq('assignment_id', challenge.id)
         .eq('is_primary', true)
-        .single()
+        .maybeSingle()
 
       // Use current weight from props
       const currentWeight = weightStats?.current || client?.current_weight || 0
@@ -69,7 +69,7 @@ export default function ProgressChallengeSidebar({ client, db, challengeData, we
           .gte('date', challenge.start_date)
           .order('date', { ascending: true })
           .limit(1)
-          .single()
+          .maybeSingle()
         
         startWeight = initialWeight?.weight || currentWeight
         
@@ -119,7 +119,7 @@ export default function ProgressChallengeSidebar({ client, db, challengeData, we
         .select('*')
         .eq('client_id', client.id)
         .eq('date', today)
-        .single()
+        .maybeSingle()
 
       setProgressData({
         currentWeight,

@@ -85,7 +85,7 @@ export default function ChallengeHomeBanner({ db, client }) {
         .select('*')
         .eq('client_id', client.id)
         .eq('is_active', true)
-        .single()
+        .maybeSingle()
       
       console.log('📦 Challenge query result:', { challenge, error })
       
@@ -105,7 +105,7 @@ export default function ChallengeHomeBanner({ db, client }) {
           .select('*')
           .eq('assignment_id', challenge.id)
           .eq('is_primary', true)
-          .single()
+          .maybeSingle()
         
         console.log('📦 Goal query result:', goal)
         
@@ -120,7 +120,7 @@ export default function ChallengeHomeBanner({ db, client }) {
               .eq('client_id', client.id)
               .order('date', { ascending: false })
               .limit(1)
-              .single()
+              .maybeSingle()
             
             console.log('📦 Latest weight:', latestWeight)
             

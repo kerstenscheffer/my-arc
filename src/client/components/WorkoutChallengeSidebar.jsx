@@ -36,7 +36,7 @@ export default function WorkoutChallengeSidebar({ client, db }) {
         .eq('client_id', client.id)
         .eq('is_active', true)
         .eq('challenge_type', '8week')
-        .single()
+        .maybeSingle()
 
       if (error || !challenge) {
         setShowBadge(false)
