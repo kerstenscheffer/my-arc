@@ -176,9 +176,18 @@ export default function WeekSchedule({
           <button
             onClick={onSwitchPlan}
             aria-label="Wissel van plan"
-            style={{ flexShrink: 0, width: isMobile ? 34 : 38, height: isMobile ? 34 : 38, borderRadius: 10, background: 'rgba(255,215,0,0.12)', border: '1px solid rgba(255,215,0,0.4)', color: '#FFD700', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}
+            style={{
+              flexShrink: 0, width: isMobile ? 42 : 48, height: isMobile ? 42 : 48,
+              borderRadius: '50%',
+              background: 'linear-gradient(135deg, #FFD700 0%, #D4AF37 100%)',
+              border: 'none',
+              boxShadow: '0 6px 16px rgba(255,215,0,0.35), 0 2px 6px rgba(0,0,0,0.4)',
+              color: '#0a0a0a',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+            }}
           >
-            <RefreshCw size={isMobile ? 16 : 18} strokeWidth={2.4} />
+            <RefreshCw size={isMobile ? 20 : 24} strokeWidth={2.6} />
           </button>
         )}
       </div>
