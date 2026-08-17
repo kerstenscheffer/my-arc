@@ -157,8 +157,7 @@ export function TemplateManager({ templates, onLoad, onClose, isMobile, db, onCh
   )
 }
 
-// src/modules/manual-workout-builder/components/ClientAssigner.jsx
-import { useState } from 'react'
+// src/modules/manual-workout-builder/components/ClientAssigner.jsx (LEGACY/dead — actieve versie staat in ClientAssigner.jsx)
 import { Users, Check } from 'lucide-react'
 
 export function ClientAssigner({ clients, workoutPlan, db, onClose, isMobile }) {
