@@ -369,7 +369,7 @@ export default function ClientPlanEditor({ schema, client, db, weekSchedule: ini
                         </div>
 
                         {/* Foto */}
-                        <div style={{ width: '36px', height: '36px', borderRadius: '4px', flexShrink: 0, backgroundImage: `url(${exercise.image_url || getFallbackImage(exercise.name)})`, backgroundSize: 'cover', backgroundPosition: 'center', opacity: 0.65 }} />
+                        <div style={{ width: '36px', height: '36px', borderRadius: '4px', flexShrink: 0, backgroundImage: `url(${exercise.image_url || getFallbackImage(exercise.name)})`, backgroundSize: 'cover', backgroundPosition: 'center', opacity: 1 }} />
 
                         {/* Info + inputs */}
                         <div style={{ flex: 1, minWidth: 0 }}>
@@ -426,7 +426,7 @@ export default function ClientPlanEditor({ schema, client, db, weekSchedule: ini
                             style={{ display: 'flex', alignItems: 'center', gap: '0.625rem', padding: '0.45rem 0.25rem', borderBottom: '1px solid rgba(255,255,255,0.04)', cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}
                             onTouchStart={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.03)'}
                             onTouchEnd={(e) => e.currentTarget.style.background = 'transparent'}>
-                            <div style={{ width: '30px', height: '30px', borderRadius: '3px', backgroundImage: `url(${ex.image_url || getFallbackImage(ex.name)})`, backgroundSize: 'cover', backgroundPosition: 'center', flexShrink: 0, opacity: 0.65 }} />
+                            <div style={{ width: '30px', height: '30px', borderRadius: '3px', backgroundImage: `url(${ex.image_url || getFallbackImage(ex.name)})`, backgroundSize: 'cover', backgroundPosition: 'center', flexShrink: 0, opacity: 1 }} />
                             <div style={{ flex: 1, minWidth: 0 }}>
                               <div style={{ fontSize: isMobile ? '0.78rem' : '0.82rem', fontWeight: '700', color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                                 {ex.name}

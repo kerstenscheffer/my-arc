@@ -47,7 +47,7 @@ export default function AttachmentSelector({ suggested, value, onChange, isMobil
           {current ? (
             <>
               {/* Foto */}
-              <div style={{ width: '40px', height: '40px', borderRadius: '6px', backgroundImage: `url(${current.img})`, backgroundSize: 'cover', backgroundPosition: 'center', flexShrink: 0, opacity: 0.75 }} />
+              <div style={{ width: '40px', height: '40px', borderRadius: '6px', backgroundImage: `url(${current.img})`, backgroundSize: 'cover', backgroundPosition: 'center', flexShrink: 0, opacity: 1 }} />
               {/* Naam */}
               <div style={{ flex: 1, textAlign: 'left' }}>
                 <div style={{ fontSize: isMobile ? '0.85rem' : '0.9rem', fontWeight: '700', color: '#fff' }}>{current.nl}</div>

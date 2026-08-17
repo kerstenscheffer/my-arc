@@ -431,7 +431,7 @@ function ExerciseRow({ exercise, imageUrl, onSelect, onSelectPermanent, swapping
         style={{ display: 'flex', alignItems: 'stretch', cursor: swapping ? 'not-allowed' : 'pointer', opacity: swapping ? 0.5 : 1, transition: 'background 0.15s ease', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', background: showActions ? 'rgba(255,215,0,0.03)' : 'transparent' }}
       >
         <div style={{ width: imageSize, minHeight: imageSize, flexShrink: 0, position: 'relative', overflow: 'hidden' }}>
-          <div style={{ position: 'absolute', inset: 0, backgroundImage: `url(${imageUrl})`, backgroundSize: 'cover', backgroundPosition: 'center', opacity: 0.75 }} />
+          <div style={{ position: 'absolute', inset: 0, backgroundImage: `url(${imageUrl})`, backgroundSize: 'cover', backgroundPosition: 'center', opacity: 1 }} />
           <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(135deg, rgba(0,0,0,0.3) 0%, rgba(0,0,0,0.1) 100%)' }} />
         </div>
 

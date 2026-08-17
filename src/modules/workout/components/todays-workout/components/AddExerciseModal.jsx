@@ -194,7 +194,7 @@ export default function AddExerciseModal({ onClose, onSave, client, db, schema, 
 
                     {/* Thumbnail */}
                     <div style={{ width: isMobile ? '52px' : '60px', minHeight: isMobile ? '52px' : '60px', flexShrink: 0, position: 'relative', overflow: 'hidden' }}>
-                      <div style={{ position: 'absolute', inset: 0, backgroundImage: `url(${exerciseImages[ex.name] || ex.image_url || getFallbackImage(ex)})`, backgroundSize: 'cover', backgroundPosition: 'center', opacity: 0.7 }} />
+                      <div style={{ position: 'absolute', inset: 0, backgroundImage: `url(${exerciseImages[ex.name] || ex.image_url || getFallbackImage(ex)})`, backgroundSize: 'cover', backgroundPosition: 'center', opacity: 1 }} />
                       <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(135deg, rgba(0,0,0,0.3) 0%, rgba(0,0,0,0.1) 100%)' }} />
                     </div>
 

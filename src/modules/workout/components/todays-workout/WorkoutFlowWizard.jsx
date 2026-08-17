@@ -241,9 +241,9 @@ export default function WorkoutFlowWizard({ exercises, client, db, onComplete, o
       {/* FOTO */}
       <div style={{ flex: '0 0 auto', height: isMobile ? '220px' : '280px', position: 'relative', overflow: 'hidden' }}>
         {imageUrl && (
-          <div style={{ position: 'absolute', inset: 0, backgroundImage: `url(${imageUrl})`, backgroundSize: 'cover', backgroundPosition: 'center', opacity: 0.6 }} />
+          <div style={{ position: 'absolute', inset: 0, backgroundImage: `url(${imageUrl})`, backgroundSize: 'cover', backgroundPosition: 'center', opacity: 1 }} />
         )}
-        <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to bottom, rgba(10,10,10,0.1) 0%, rgba(10,10,10,0.7) 80%, #0a0a0a 100%)' }} />
+        <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to bottom, rgba(10,10,10,0) 0%, rgba(10,10,10,0.25) 75%, rgba(10,10,10,0.9) 100%)' }} />
 
         {/* Sets indicator over foto */}
         <div style={{ position: 'absolute', bottom: isMobile ? '1rem' : '1.25rem', left: isMobile ? '1rem' : '1.25rem', right: isMobile ? '1rem' : '1.25rem', display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between' }}>

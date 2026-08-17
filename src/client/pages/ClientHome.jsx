@@ -891,17 +891,11 @@ export default function ClientHome({ client, db, setCurrentView }) {
       </FadeOnScroll>
 
 
-      {/* Hero: weekdoel + weekgemiddelden */}
+      {/* Hero: weekdoel + weekgemiddelden. (2e gewicht-kaart WeightLogCard
+          verwijderd — stond dubbel op home; detail staat op de tracking-pagina.) */}
       <FadeOnScroll>
         <div style={{ marginTop: isMobile ? '4rem' : '5rem' }}>
           <WeekGoalStatus client={client} history={weightHistory} />
-        </div>
-      </FadeOnScroll>
-
-      {/* Weeglogs — groen/rood t.o.v. het weekdoel dat de coach instelt */}
-      <FadeOnScroll>
-        <div style={{ marginTop: isMobile ? '2.5rem' : '3rem' }}>
-          <WeightLogCard history={weightHistory} weeklyGoal={client?.weekly_weight_goal} />
         </div>
       </FadeOnScroll>
 
