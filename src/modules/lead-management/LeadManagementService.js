@@ -2541,14 +2541,16 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
   // a call sectie (call_proposed or call_scheduled).
   async getRangeLeadSources(coachId, startISO, endISO) {
     try {
-      // Pull leads created in the window
-      const { data: leads } = await this.db.supabase
+      // Pull leads created in the window. Gepagineerd (i.p.v. de 1000-rijen-cap
+      // van PostgREST) — anders miste de bron-breakdown bij >1000 nieuwe leads
+      // het grootste deel (bv. de "geen bron"-groep alleen al >1900/maand). Geen
+      // coach_id-filter → RLS neemt ook team-leads mee, net als de andere stats.
+      const leads = await this._fetchAllRows(() => this.db.supabase
         .from('call_leads')
         .select('id, created_at, outreach_campaign_id, source_lead_magnet_id, followup_count, reply_count, first_reply_at')
-        .eq('coach_id', coachId)
         .gte('created_at', startISO)
         .lt('created_at', endISO)
-        .is('deleted_at', null)
+        .is('deleted_at', null))
 
       const leadIds = (leads || []).map(l => l.id)
 
@@ -2566,12 +2568,19 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
       const perLeadStages = new Map()
       const reachedCall = new Set()
       if (leadIds.length > 0) {
-        const { data: moves } = await this.db.supabase
-          .from('lead_movements')
-          .select('lead_id, to_section_title, moved_at')
-          .in('lead_id', leadIds)
-          .gte('moved_at', startISO)
-          .lt('moved_at', endISO)
+        // Chunk de .in()-query — met duizenden lead-ids wordt de URL anders te
+        // lang. Per batch de movements in het venster ophalen.
+        const moves = []
+        for (let i = 0; i < leadIds.length; i += 300) {
+          const chunk = leadIds.slice(i, i + 300)
+          const { data } = await this.db.supabase
+            .from('lead_movements')
+            .select('lead_id, to_section_title, moved_at')
+            .in('lead_id', chunk)
+            .gte('moved_at', startISO)
+            .lt('moved_at', endISO)
+          if (data) moves.push(...data)
+        }
         ;(moves || []).forEach(m => {
           const t = (m.to_section_title || '').toLowerCase()
           if (NEGATIVE_FUNNEL_WORDS.some(w => t.includes(w))) return

@@ -20,6 +20,9 @@ import LeadDetailModalV2 from "./LeadDetailModalV2"
 // Alleen in deze kolom krijgt elke card een DM-Run knop: 1 tik → bericht op
 // klembord + Instagram-profiel open + lead als 'contacted' gemarkeerd.
 const NIEUWE_VOLGERS_SECTION_ID = '68c7837a-a779-49df-9c66-cce76fb39e39'
+// Outreach-campagne waaraan we een nieuwe volger koppelen zodra je 'm DM't,
+// zodat z'n reactie-% zichtbaar wordt in de bron-breakdown van de stats-modal.
+const NIEUWE_VOLGERS_CAMPAIGN_ID = 'f0cda767-9a17-4925-8cae-7e68d75d57a5'
 // Standaard-DM voor de DM-Run knop. De voornaam van de lead komt op de plek
 // van "x"; zonder voornaam valt 'ie terug op een neutrale begroeting.
 function buildDMRunMessage(lead) {
@@ -357,6 +360,12 @@ export default function KanbanCard({
         last_contacted_at: nowISO,
         followup_count: newFollowup,
         last_followup_sent_at: nowISO,
+        // Nieuwe volger die je nu ge-DM't hebt → koppel aan de "Nieuwe volgers"-
+        // campagne, MAAR alleen als de lead nog geen bron heeft (magnet/campagne
+        // niet overschrijven). Zo verschijnt-ie met reactie-% in de bron-breakdown.
+        ...(!lead.outreach_campaign_id && !lead.source_lead_magnet_id
+          ? { outreach_campaign_id: NIEUWE_VOLGERS_CAMPAIGN_ID }
+          : {}),
       })
     } catch (error) {
       console.error('DM-Run markeren mislukt:', error)
