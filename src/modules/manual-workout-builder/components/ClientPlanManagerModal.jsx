@@ -3,11 +3,11 @@
 // plannen → activeer/verwijder, of wijs een extra plan toe vanuit je templates.
 import { useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
-import { X, Search, ChevronLeft, ChevronRight, Check, Plus, Trash2, Dumbbell, Star } from 'lucide-react'
+import { X, Search, ChevronLeft, ChevronRight, Plus, Trash2, Dumbbell, Star, Pencil } from 'lucide-react'
 
 const GOLD = '#FFD700'
 
-export default function ClientPlanManagerModal({ clients = [], templates = [], db, isMobile = false, onClose }) {
+export default function ClientPlanManagerModal({ clients = [], templates = [], db, isMobile = false, onClose, onEditInBuilder }) {
   const [sel, setSel] = useState(null)          // gekozen klant
   const [query, setQuery] = useState('')
   const [data, setData] = useState(null)        // { plans, activeId }
@@ -121,7 +121,7 @@ export default function ClientPlanManagerModal({ clients = [], templates = [], d
               <>
                 <SectionLabel>Actief plan</SectionLabel>
                 {active ? (
-                  <PlanRow p={active} isActive busy={busy} onRemove={() => remove(active.id)} isMobile={isMobile} />
+                  <PlanRow p={active} isActive busy={busy} onRemove={() => remove(active.id)} onEdit={onEditInBuilder ? () => onEditInBuilder(active) : null} isMobile={isMobile} />
                 ) : (
                   <div style={{ padding: '0.85rem', borderRadius: 10, background: 'rgba(255,255,255,0.03)', border: '1px dashed rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.4)', fontSize: '0.78rem', marginBottom: '1rem' }}>Nog geen actief plan.</div>
                 )}
@@ -130,7 +130,7 @@ export default function ClientPlanManagerModal({ clients = [], templates = [], d
                 {reserve.length === 0 ? (
                   <div style={{ padding: '0.7rem 0', color: 'rgba(255,255,255,0.35)', fontSize: '0.75rem' }}>Geen reserve-plannen.</div>
                 ) : reserve.map(p => (
-                  <PlanRow key={p.id} p={p} busy={busy} onActivate={() => activate(p.id)} onRemove={() => remove(p.id)} isMobile={isMobile} />
+                  <PlanRow key={p.id} p={p} busy={busy} onActivate={() => activate(p.id)} onRemove={() => remove(p.id)} onEdit={onEditInBuilder ? () => onEditInBuilder(p) : null} isMobile={isMobile} />
                 ))}
 
                 <button onClick={() => setPicking(true)}
@@ -151,10 +151,10 @@ function SectionLabel({ children }) {
   return <div style={{ fontSize: '0.6rem', fontWeight: 800, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.4)', margin: '0.4rem 0 0.5rem' }}>{children}</div>
 }
 
-function PlanRow({ p, isActive, busy, onActivate, onRemove, isMobile }) {
+function PlanRow({ p, isActive, busy, onActivate, onRemove, onEdit, isMobile }) {
   const days = p.days_per_week || Object.keys(p.week_structure || {}).length
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '0.7rem 0.8rem', marginBottom: 8, borderRadius: 11, background: 'rgba(255,255,255,0.03)', border: `1px solid ${isActive ? 'rgba(255,215,0,0.45)' : 'rgba(255,255,255,0.08)'}` }}>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '0.7rem 0.8rem', marginBottom: 8, borderRadius: 11, background: 'rgba(255,255,255,0.03)', border: `1px solid ${isActive ? 'rgba(255,215,0,0.45)' : 'rgba(255,255,255,0.08)'}` }}>
       {isActive && <Star size={15} color={GOLD} fill={GOLD} style={{ flexShrink: 0 }} />}
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ fontSize: '0.85rem', fontWeight: 800, color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.name || 'Plan'}</div>
@@ -164,6 +164,12 @@ function PlanRow({ p, isActive, busy, onActivate, onRemove, isMobile }) {
         <button onClick={onActivate} disabled={busy === p.id}
           style={{ flexShrink: 0, padding: '0.4rem 0.7rem', borderRadius: 8, fontSize: '0.66rem', fontWeight: 800, color: '#000', background: GOLD, border: 'none', cursor: busy === p.id ? 'default' : 'pointer', opacity: busy === p.id ? 0.6 : 1 }}>
           {busy === p.id ? '…' : 'Activeer'}
+        </button>
+      )}
+      {onEdit && (
+        <button onClick={onEdit} title="Bekijk/bewerk in builder"
+          style={{ flexShrink: 0, width: 30, height: 30, borderRadius: 8, background: 'rgba(255,215,0,0.12)', border: '1px solid rgba(255,215,0,0.35)', color: GOLD, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <Pencil size={13} />
         </button>
       )}
       <button onClick={onRemove} disabled={busy === p.id} title="Verwijder plan"
