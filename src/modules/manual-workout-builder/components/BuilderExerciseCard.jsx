@@ -4,7 +4,7 @@
 // coach-bewerking: sets/reps/rust aanpasbaar, materiaal-suggestie, volgorde,
 // video koppelen en verwijderen.
 import { useState } from 'react'
-import { Video, Trash2, ChevronUp, ChevronDown } from 'lucide-react'
+import { Video, Trash2, ChevronUp, ChevronDown, Dumbbell } from 'lucide-react'
 import useExerciseImage from '../hooks/useExerciseImage'
 
 // Snelkeuzes voor cardio. We tonen ze via een eigen dropdown (niet <datalist>,
@@ -154,6 +154,30 @@ export default function BuilderExerciseCard({
                     onChange={(e) => onField('rust', e.target.value)} style={{ ...statInput, width: 40, color: 'rgba(255,255,255,0.6)' }} />
                   <span style={statLbl}>rust</span>
                 </div>
+              </div>
+
+              {/* Apparaat / uitvoering — vrij in te typen (bv. "Kettlebell 16 kg")
+                  met snelkeuzes. Opgeslagen in het equipment-veld → de klant ziet 't. */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginTop: 6, flexWrap: 'wrap' }}>
+                <Dumbbell size={12} color="rgba(255,255,255,0.35)" style={{ flexShrink: 0 }} />
+                <input
+                  type="text" value={exercise.equipment ?? ''} onClick={stop}
+                  onChange={(e) => onField('equipment', e.target.value)}
+                  placeholder="Apparaat / bodyweight…"
+                  style={{ flex: '1 1 110px', minWidth: 84, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 6, color: 'rgba(255,255,255,0.85)', fontSize: '0.68rem', fontWeight: 600, outline: 'none', padding: '3px 7px', touchAction: 'manipulation' }}
+                />
+                {['Bodyweight', 'Dumbbell', 'Kettlebell', 'Band', 'Barbell'].map(opt => {
+                  const active = (exercise.equipment || '').toLowerCase() === opt.toLowerCase()
+                  return (
+                    <button key={opt} onClick={(e) => { stop(e); onField('equipment', opt) }}
+                      style={{ flexShrink: 0, padding: '2px 7px', borderRadius: 6, cursor: 'pointer', fontSize: '0.56rem', fontWeight: 800,
+                        background: active ? 'rgba(255,215,0,0.16)' : 'rgba(255,255,255,0.04)',
+                        border: `1px solid ${active ? 'rgba(255,215,0,0.4)' : 'rgba(255,255,255,0.08)'}`,
+                        color: active ? '#FFD700' : 'rgba(255,255,255,0.5)', touchAction: 'manipulation' }}>
+                      {opt}
+                    </button>
+                  )
+                })}
               </div>
             </>
           )}
