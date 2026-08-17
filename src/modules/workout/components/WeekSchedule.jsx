@@ -1,6 +1,6 @@
 // src/modules/workout/components/WeekSchedule.jsx
 import useIsMobile from '../../../hooks/useIsMobile'
-import { AlertCircle } from 'lucide-react'
+import { AlertCircle, RefreshCw } from 'lucide-react'
 import { useState, useEffect } from 'react'
 import WeekGrid from './week-schedule/WeekGrid'
 import ActionButtons from './week-schedule/ActionButtons'
@@ -8,7 +8,7 @@ import ActionButtons from './week-schedule/ActionButtons'
 export default function WeekSchedule({
   weekSchedule, schema, swapMode, selectedWorkout,
   completedWorkouts = [], todayIndex, onDayClick,
-  clientId, db, workoutService, onScheduleUpdate,
+  clientId, db, workoutService, onScheduleUpdate, onSwitchPlan,
 }) {
   const isMobile = useIsMobile()
   const [localSwapMode, setLocalSwapMode] = useState(false)
@@ -164,16 +164,23 @@ export default function WeekSchedule({
         </div>
       )}
 
-      {/* Sectie-titel — groot dik wit boven het week-grid */}
+      {/* Sectie-titel: actief trainingsplan + wissel-knop */}
       <div style={{
         padding: isMobile ? '0.5rem 1rem 0.875rem' : '0.5rem 1.25rem 1rem',
-        fontSize: isMobile ? '1.15rem' : '1.3rem',
-        fontWeight: 900,
-        color: '#fff',
-        letterSpacing: '-0.02em',
-        lineHeight: 1.15,
+        display: 'flex', alignItems: 'center', gap: 10,
       }}>
-        Jouw week planning
+        <div style={{ flex: 1, minWidth: 0, fontSize: isMobile ? '1.15rem' : '1.3rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.02em', lineHeight: 1.15, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+          Jouw trainingsplan: <span style={{ color: '#FFD700' }}>{schema?.name || 'Plan'}</span>
+        </div>
+        {onSwitchPlan && (
+          <button
+            onClick={onSwitchPlan}
+            aria-label="Wissel van plan"
+            style={{ flexShrink: 0, width: isMobile ? 34 : 38, height: isMobile ? 34 : 38, borderRadius: 10, background: 'rgba(255,215,0,0.12)', border: '1px solid rgba(255,215,0,0.4)', color: '#FFD700', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}
+          >
+            <RefreshCw size={isMobile ? 16 : 18} strokeWidth={2.4} />
+          </button>
+        )}
       </div>
 
       {/* WeekGrid */}

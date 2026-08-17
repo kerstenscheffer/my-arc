@@ -151,27 +151,6 @@ export default function WorkoutPlan({ client, schema, db, onFocusChange }) {
         />
       )}
 
-      {/* ── Actief trainingsplan + wissel-knop ── */}
-      {!workoutOpen && (localSchema?.name) && (
-        <div style={{
-          position: 'sticky', top: 0, zIndex: 51,
-          background: 'rgba(10,10,10,0.95)', backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)',
-          paddingTop: 'env(safe-area-inset-top, 0)', borderBottom: '1px solid rgba(255,255,255,0.05)',
-        }}>
-          <div style={{ maxWidth: 1400, margin: '0 auto', padding: isMobile ? '0.5rem 1.25rem' : '0.55rem 2.5rem', display: 'flex', alignItems: 'center', gap: 10 }}>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: '0.55rem', fontWeight: 800, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.4)' }}>Actief trainingsplan</div>
-              <div style={{ fontSize: isMobile ? '0.85rem' : '0.95rem', fontWeight: 800, color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', marginTop: 1 }}>{localSchema.name}</div>
-            </div>
-            <button
-              onClick={() => setShowPlanSwitch(true)}
-              style={{ flexShrink: 0, display: 'inline-flex', alignItems: 'center', gap: 5, padding: isMobile ? '0.4rem 0.7rem' : '0.45rem 0.8rem', borderRadius: 9, background: 'rgba(255,215,0,0.12)', border: '1px solid rgba(255,215,0,0.4)', color: '#FFD700', fontSize: '0.72rem', fontWeight: 800, cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}
-            >
-              <RefreshCw size={13} /> Wissel
-            </button>
-          </div>
-        </div>
-      )}
 
       {/* Jouw week planning — direct onder de plan-balk. */}
       {!workoutOpen && <FadeOnScroll><div id="week-schedule" style={{ marginTop: isMobile ? '0.75rem' : '1rem' }}>
@@ -191,6 +170,7 @@ export default function WorkoutPlan({ client, schema, db, onFocusChange }) {
             setScheduleReloadKey(prev => prev + 1)
           }}
           onOpenWizard={() => setShowWizard(true)}
+          onSwitchPlan={() => setShowPlanSwitch(true)}
         />
       </div></FadeOnScroll>}
 
