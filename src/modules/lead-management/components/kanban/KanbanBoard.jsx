@@ -5,7 +5,7 @@
 
 import { useState, useEffect, useLayoutEffect, useCallback, useRef } from 'react'
 import { createPortal } from 'react-dom'
-import { Plus, Settings, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, GripVertical, Save, RotateCcw, Users, Instagram, Search, X, ArrowUp, ArrowUpDown, Clock, Maximize2, Minimize2, CheckCircle, Send, Zap, Flame, Phone, SlidersHorizontal, BarChart3 } from 'lucide-react'
+import { Plus, Settings, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, GripVertical, Save, RotateCcw, Users, Instagram, Search, X, ArrowUp, ArrowUpDown, Clock, Maximize2, Minimize2, CheckCircle, Send, Zap, Flame, Phone, SlidersHorizontal, BarChart3, Megaphone } from 'lucide-react'
 import KanbanCard from './KanbanCard'
 import AddLeadModal from './AddLeadModal'
 import SaleValueModal from './SaleValueModal'
@@ -24,6 +24,7 @@ import OutreachLoggerModal from '../OutreachLoggerModal'
 import LeadSourceModal from './LeadSourceModal'
 import CallProposalModal from './CallProposalModal'
 import DMBibleModal from '../DMBibleModal'
+import StartCampaignModal from '../StartCampaignModal'
 
 const SNOOZE_SECTION_PATTERNS = ['later follow', 'later opvolg', 'follow up', 'followup', 'snooze', 'parkeer']
 
@@ -135,6 +136,10 @@ export default function KanbanBoard({
   // call-voorgesteld.)
   const [globalPriorityOnly, setGlobalPriorityOnly] = useState(false)
   const [callProposedLeadIds, setCallProposedLeadIds] = useState(() => new Set())
+  // Lopende outreach-campagne (DM-run) — als gezet krijgt elke card een
+  // campagne-DM-knop. Los van de auto-attributie-`activeCampaign`-prop hierboven.
+  const [runCampaign, setRunCampaign] = useState(null)
+  const [showCampaignModal, setShowCampaignModal] = useState(false)
 
   // Eenmalig lijst van leads met een call-proposal note ophalen. Reload
   // gebeurt elke keer dat we de toggle aanzetten — zo blijft de set vers
@@ -1438,6 +1443,7 @@ export default function KanbanBoard({
           onSalesCallClick={(lead) => setSalesCallLead(lead)}
           coachId={coachId} db={db} onRefresh={loadBoard}
           onMagnetAttached={handleMagnetAttachedForLead}
+          activeCampaign={runCampaign}
         />
       </div>
     )
@@ -1763,6 +1769,22 @@ export default function KanbanBoard({
               }}
             >
               <Flame size={16} />
+            </button>
+
+            {/* Start campagne — kies een outreach-campagne; daarna krijgt elke
+                card een campagne-DM-knop. Paars = actief. */}
+            <button
+              onClick={() => runCampaign ? setRunCampaign(null) : setShowCampaignModal(true)}
+              title={runCampaign ? `Campagne "${runCampaign.name}" stoppen` : 'Start een outreach-campagne'}
+              style={{
+                width: 30, height: 30, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                background: runCampaign ? 'rgba(168,85,247,0.2)' : 'rgba(168,85,247,0.1)',
+                border: `1px solid ${runCampaign ? 'rgba(168,85,247,0.6)' : 'rgba(168,85,247,0.35)'}`,
+                borderRadius: 8, color: '#a855f7',
+                cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+              }}
+            >
+              <Megaphone size={16} />
             </button>
 
             {/* Overkoepelende filter voor het HELE bord — Type, Temperatuur,
@@ -2405,6 +2427,39 @@ export default function KanbanBoard({
           onOutcome={handleDueCallOutcome}
           onClose={() => setShowDueCalls(false)}
         />
+      )}
+
+      {showCampaignModal && (
+        <StartCampaignModal
+          leadService={leadService}
+          coachId={coachId}
+          isMobile={isMobile}
+          onSelect={(c) => { setRunCampaign(c); setShowCampaignModal(false) }}
+          onClose={() => setShowCampaignModal(false)}
+        />
+      )}
+
+      {/* Balk onderin als er een campagne actief is. */}
+      {runCampaign && (
+        <div style={{
+          position: 'fixed', left: '50%', bottom: isMobile ? '76px' : '18px', transform: 'translateX(-50%)',
+          zIndex: 2147483000, display: 'flex', alignItems: 'center', gap: 10,
+          background: 'rgba(168,85,247,0.16)', border: '1px solid rgba(168,85,247,0.5)',
+          backdropFilter: 'blur(10px)', borderRadius: 12, padding: '0.5rem 0.6rem 0.5rem 0.85rem',
+          boxShadow: '0 8px 24px rgba(0,0,0,0.5)', maxWidth: 'calc(100vw - 24px)',
+        }}>
+          <Megaphone size={15} color="#a855f7" style={{ flexShrink: 0 }} />
+          <div style={{ minWidth: 0 }}>
+            <div style={{ fontSize: '0.7rem', fontWeight: 800, color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>Campagne actief: {runCampaign.name}</div>
+            <div style={{ fontSize: '0.58rem', color: 'rgba(255,255,255,0.5)' }}>Tik de paarse DM-knop op een card</div>
+          </div>
+          <button
+            onClick={() => setRunCampaign(null)}
+            style={{ flexShrink: 0, display: 'inline-flex', alignItems: 'center', gap: 4, padding: '0.35rem 0.6rem', borderRadius: 8, background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.15)', color: '#fff', fontSize: '0.62rem', fontWeight: 800, cursor: 'pointer' }}
+          >
+            <X size={12} /> Stop
+          </button>
+        </div>
       )}
 
       <style>{`

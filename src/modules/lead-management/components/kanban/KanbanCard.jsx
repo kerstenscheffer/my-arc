@@ -94,6 +94,7 @@ export default function KanbanCard({
   sectionTitle = '',
   onSalesCallClick,
   onMagnetAttached,
+  activeCampaign = null,
 }) {
   const [showReturnDropdown, setShowReturnDropdown] = useState(false)
   const [showMoveDropdown, setShowMoveDropdown] = useState(false)
@@ -129,6 +130,10 @@ export default function KanbanCard({
   // waarheid = lead.last_contacted_at; lokaal voor optimistische feedback.
   const [dmDone, setDmDone] = useState(!!lead.last_contacted_at)
   const [dmBusy, setDmBusy] = useState(false)
+  // Campagne-DM status (per card, per actieve campagne). Lokaal — reset zodra
+  // een andere campagne wordt gestart.
+  const [campaignDmDone, setCampaignDmDone] = useState(false)
+  useEffect(() => { setCampaignDmDone(false) }, [activeCampaign?.id])
 
   useEffect(() => {
     setReplyCount(lead.reply_count || 0)
@@ -370,6 +375,53 @@ export default function KanbanCard({
     } catch (error) {
       console.error('DM-Run markeren mislukt:', error)
       setDmDone(false)
+      setFollowupCount(prevFollowup)
+    } finally {
+      setDmBusy(false)
+    }
+  }
+
+  // Campagne-DM: zelfde mechaniek als de Nieuwe volgers-knop, maar met het
+  // bericht + de attributie van de ACTIEVE campagne. Kopieert het campagne-
+  // bericht (met voornaam ingevuld), opent het IG-profiel, +1 follow-up, en
+  // koppelt de lead aan de campagne zodat de reacties in de bron-breakdown komen.
+  const handleCampaignDM = async (e) => {
+    e.stopPropagation()
+    if (!activeCampaign || campaignDmDone || dmBusy) return
+    setDmBusy(true)
+
+    const first = (lead?.first_name || '').trim().split(/\s+/)[0] || ''
+    const name = first ? first.charAt(0).toUpperCase() + first.slice(1) : 'maat'
+    const msg = (activeCampaign.message_text || '')
+      .replace(/\[naam\]|\[first_name\]|\{first_name\}|\{naam\}/gi, name)
+    copyToClipboardSync(msg)
+    try { navigator.clipboard?.writeText(msg)?.catch(() => {}) } catch {}
+
+    const handle = (lead.first_name || '').trim().toLowerCase()
+    if (handle) {
+      const web = `https://www.instagram.com/${handle}`
+      const timer = setTimeout(() => { window.open(web, '_blank') }, 800)
+      const cancel = () => { clearTimeout(timer); document.removeEventListener('visibilitychange', cancel) }
+      document.addEventListener('visibilitychange', cancel)
+      window.location.href = `instagram://user?username=${handle}`
+    }
+
+    setCampaignDmDone(true)
+    const prevFollowup = followupCount
+    const newFollowup = followupCount + 1
+    setFollowupCount(newFollowup)
+    const nowISO = new Date().toISOString()
+    try {
+      await onEdit({
+        status: 'contacted',
+        last_contacted_at: nowISO,
+        followup_count: newFollowup,
+        last_followup_sent_at: nowISO,
+        outreach_campaign_id: activeCampaign.id,
+      })
+    } catch (error) {
+      console.error('Campagne-DM markeren mislukt:', error)
+      setCampaignDmDone(false)
       setFollowupCount(prevFollowup)
     } finally {
       setDmBusy(false)
@@ -711,6 +763,32 @@ export default function KanbanCard({
               }}
             >
               {dmDone ? <><CheckCircle size={12} /> Gedaan</> : <><Send size={12} /> DM</>}
+            </button>
+          )}
+
+          {/* Campagne-DM knop — verschijnt op ELKE card zodra er een campagne
+              actief is (behalve in Nieuwe volgers, die heeft z'n eigen knop).
+              Paars = campagne-actie. */}
+          {activeCampaign && !isNieuweVolgers && (
+            <button
+              data-no-click
+              onClick={campaignDmDone ? (e) => e.stopPropagation() : handleCampaignDM}
+              disabled={campaignDmDone || dmBusy}
+              title={campaignDmDone ? 'Campagne-DM verstuurd' : `Campagne-bericht kopiëren + profiel openen (${activeCampaign.name})`}
+              style={{
+                flexShrink: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 4,
+                minHeight: 28, padding: isMobile ? '0 0.7rem' : '0 0.6rem',
+                background: campaignDmDone ? 'rgba(16,185,129,0.14)' : 'rgba(168,85,247,0.16)',
+                border: `1px solid ${campaignDmDone ? 'rgba(16,185,129,0.4)' : 'rgba(168,85,247,0.45)'}`,
+                borderRadius: 8,
+                color: campaignDmDone ? '#10b981' : '#a855f7',
+                fontSize: isMobile ? '0.62rem' : '0.6rem', fontWeight: 800, letterSpacing: '0.04em',
+                cursor: campaignDmDone ? 'default' : 'pointer',
+                opacity: dmBusy ? 0.6 : 1,
+                touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+              }}
+            >
+              {campaignDmDone ? <><CheckCircle size={12} /> Gedaan</> : <><Send size={12} /> DM</>}
             </button>
           )}
 
