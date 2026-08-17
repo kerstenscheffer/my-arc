@@ -357,9 +357,6 @@ export default function KanbanCard({
         last_contacted_at: nowISO,
         followup_count: newFollowup,
         last_followup_sent_at: nowISO,
-        // Eerste outreach-DM naar een nieuwe volger — één keer stempelen zodat
-        // het een dedupe-veilige metric is in de stats-modal.
-        ...(lead.first_dm_sent_at ? {} : { first_dm_sent_at: nowISO }),
       })
     } catch (error) {
       console.error('DM-Run markeren mislukt:', error)

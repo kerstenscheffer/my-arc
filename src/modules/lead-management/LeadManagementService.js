@@ -1709,25 +1709,16 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
         reactionEventsInWindow = (rxEvents || []).reduce((s, e) => s + (Number(e.delta) || 0), 0)
         if (reactionEventsInWindow < 0) reactionEventsInWindow = 0
       } catch (e) { console.warn('reaction events read failed:', e?.message) }
-      // Nieuwe-volger-DM's verstuurd in het venster (DM-knop → first_dm_sent_at).
-      // Dedupe-veilig: één stempel per lead.
-      const { count: dmSentInWindow } = await this.db.supabase
-        .from('call_leads')
-        .select('id', { count: 'exact', head: true })
-        .gte('first_dm_sent_at', startISO)
-        .lt('first_dm_sent_at', endISO)
-        .is('deleted_at', null)
       return {
         newLeads,
         reactedLeads, notReactedYet, followedLeads,
         followupsInWindow: followupsInWindow || 0,
         reactionsInWindow: reactionsInWindow || 0,
         reactionEventsInWindow,
-        dmSentInWindow: dmSentInWindow || 0,
       }
     } catch (e) {
       console.error('❌ Get range reaction stats failed:', e)
-      return { newLeads: 0, reactedLeads: 0, notReactedYet: 0, followedLeads: 0, followupsInWindow: 0, reactionsInWindow: 0, reactionEventsInWindow: 0, dmSentInWindow: 0 }
+      return { newLeads: 0, reactedLeads: 0, notReactedYet: 0, followedLeads: 0, followupsInWindow: 0, reactionsInWindow: 0, reactionEventsInWindow: 0 }
     }
   }
 
