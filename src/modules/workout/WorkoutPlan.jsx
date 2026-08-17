@@ -173,80 +173,26 @@ export default function WorkoutPlan({ client, schema, db, onFocusChange }) {
         </div>
       )}
 
-      {/* ── Dag-nav header — verbergen tijdens focus-mode ── */}
-      {!workoutOpen && <div style={{
-        position: 'sticky', top: 0, zIndex: 50,
-        background: 'rgba(10,10,10,0.92)',
-        backdropFilter: 'blur(16px)',
-        WebkitBackdropFilter: 'blur(16px)',
-        paddingTop: 'env(safe-area-inset-top, 0)',
-      }}>
-        <div style={{
-          maxWidth: 1400, margin: '0 auto',
-          padding: isMobile ? '0.65rem 1.5rem' : '0.8rem 2.5rem',
-          display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10,
-        }}>
-          <button
-            onClick={() => setSelectedDayIdx(i => Math.max(0, i - 1))}
-            disabled={selectedDayIdx === 0}
-            aria-label="Vorige dag"
-            style={{
-              width: isMobile ? 32 : 36, height: isMobile ? 32 : 36,
-              background: 'transparent', border: 'none',
-              color: selectedDayIdx === 0 ? 'rgba(255,255,255,0.18)' : '#fff',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              cursor: selectedDayIdx === 0 ? 'not-allowed' : 'pointer',
-              touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', flexShrink: 0,
-            }}
-          >
-            <ChevronLeft size={isMobile ? 22 : 24} strokeWidth={2.4} />
-          </button>
-
-          <div style={{ flex: 1, textAlign: 'center', minWidth: 0 }}>
-            <div style={{
-              fontSize: isMobile ? '1.15rem' : '1.3rem',
-              fontWeight: 900, color: '#FFD700', letterSpacing: '-0.02em',
-              lineHeight: 1.1,
-              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-              whiteSpace: 'nowrap',
-            }}>
-              {selectedDayName}
-              {relativeLabel && (
-                <span style={{
-                  fontSize: '0.65rem', fontWeight: 800,
-                  color: 'rgba(0,0,0,0.85)', background: '#FFD700',
-                  padding: '2px 7px', borderRadius: 4,
-                  letterSpacing: '0.04em', textTransform: 'uppercase',
-                }}>{relativeLabel}</span>
-              )}
-            </div>
-            <div style={{
-              fontSize: isMobile ? '0.75rem' : '0.82rem',
-              fontWeight: 700, marginTop: 3,
-              color: isTrainingDay ? '#FFD700' : 'rgba(255,255,255,0.5)',
-              letterSpacing: '0.04em', textTransform: 'uppercase',
-            }}>
-              {isTrainingDay ? 'Trainingsdag' : 'Rustdag'} · {dateLabel}
-            </div>
-          </div>
-
-          <button
-            onClick={() => setSelectedDayIdx(i => Math.min(6, i + 1))}
-            disabled={selectedDayIdx === 6}
-            aria-label="Volgende dag"
-            style={{
-              width: isMobile ? 32 : 36, height: isMobile ? 32 : 36,
-              background: 'transparent', border: 'none',
-              color: selectedDayIdx === 6 ? 'rgba(255,255,255,0.18)' : '#fff',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              cursor: selectedDayIdx === 6 ? 'not-allowed' : 'pointer',
-              touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', flexShrink: 0,
-            }}
-          >
-            <ChevronRight size={isMobile ? 22 : 24} strokeWidth={2.4} />
-          </button>
-        </div>
-      </div>}
+      {/* Jouw week planning — direct onder de plan-balk. */}
+      {!workoutOpen && <FadeOnScroll><div id="week-schedule" style={{ marginTop: isMobile ? '0.75rem' : '1rem' }}>
+        <WeekSchedule
+          weekSchedule={weekSchedule}
+          schema={localSchema}
+          swapMode={swapMode}
+          selectedWorkout={selectedWorkout}
+          completedWorkouts={completedWorkouts}
+          todayIndex={todayIndex}
+          onDayClick={handleDayClick}
+          clientId={client?.id}
+          db={db}
+          workoutService={workoutService}
+          onScheduleUpdate={(newSchedule) => {
+            setWeekSchedule(newSchedule)
+            setScheduleReloadKey(prev => prev + 1)
+          }}
+          onOpenWizard={() => setShowWizard(true)}
+        />
+      </div></FadeOnScroll>}
 
       <div id="todays-workout-anchor">
         <TodaysWorkoutMain
@@ -348,26 +294,6 @@ export default function WorkoutPlan({ client, schema, db, onFocusChange }) {
         </FadeOnScroll>
       )}
 
-      {!workoutOpen && <FadeOnScroll><div id="week-schedule" style={{ marginTop: isMobile ? '2.5rem' : '3rem' }}>
-        <WeekSchedule
-        weekSchedule={weekSchedule}
-        schema={localSchema}
-        swapMode={swapMode}
-        selectedWorkout={selectedWorkout}
-        completedWorkouts={completedWorkouts}
-        todayIndex={todayIndex}
-        onDayClick={handleDayClick}
-        clientId={client?.id}
-        db={db}
-        workoutService={workoutService}
-        onScheduleUpdate={(newSchedule) => {
-          setWeekSchedule(newSchedule)
-          // ✅ Trigger TodaysWorkoutMain reload na elke schedule wijziging
-          setScheduleReloadKey(prev => prev + 1)
-        }}
-        onOpenWizard={() => setShowWizard(true)}
-      />
-      </div></FadeOnScroll>}
 
       {!workoutOpen && <FadeOnScroll>
         <CardioLogSection client={client} db={db} isMobile={isMobile} />
