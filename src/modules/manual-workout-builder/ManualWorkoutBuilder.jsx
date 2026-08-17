@@ -6,7 +6,7 @@ import TemplateManager from './components/TemplateManager'
 import DayTemplatePickerModal from './components/DayTemplatePickerModal'
 import ClientAssigner from './components/ClientAssigner'
 import ClientPlanManagerModal from './components/ClientPlanManagerModal'
-import { Activity, Plus, Save, Users, FileText, ChevronDown, Video } from 'lucide-react'
+import { Activity, Plus, Save, Users, FileText, ChevronDown, Video, Trash2 } from 'lucide-react'
 import PDFExportButton from './components/PDFExportButton'
 import ExerciseLibraryModal from './components/ExerciseLibraryModal'
 
@@ -262,6 +262,19 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
     finally { setSaving(false) }
   }
 
+  // Leegmaken: reset het hele plan naar leeg om vers te beginnen. Met bevestiging.
+  const clearPlan = () => {
+    if (workoutPlan.days.length === 0 && !workoutPlan.name) return
+    if (!confirm('Hele plan leegmaken? Alle dagen en oefeningen worden gewist.')) return
+    setWorkoutPlan({
+      name: '', description: '', primary_goal: 'muscle_gain',
+      experience_level: 'intermediate', split_type: 'custom',
+      days_per_week: 0, equipment: [], days: []
+    })
+    setSelectedSchemaId(null)
+    setActiveDay(null)
+  }
+
   const loadTemplate = (template) => {
     const days = []
     if (template.week_structure) {
@@ -351,6 +364,10 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
         <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
           <button onClick={() => setShowTemplateManager(true)} style={cBtn(false)}>
             <FileText size={14} /> Templates
+          </button>
+          <button onClick={clearPlan} disabled={workoutPlan.days.length === 0 && !workoutPlan.name}
+            style={{ ...cBtn(false), color: '#ef4444', border: '1px solid rgba(239,68,68,0.3)', background: 'rgba(239,68,68,0.08)', opacity: (workoutPlan.days.length === 0 && !workoutPlan.name) ? 0.4 : 1, cursor: (workoutPlan.days.length === 0 && !workoutPlan.name) ? 'not-allowed' : 'pointer' }}>
+            <Trash2 size={14} /> Leegmaken
           </button>
           <button onClick={saveAsTemplate} disabled={saving || workoutPlan.days.length === 0 || !workoutPlan.name} style={{ ...cBtn(true), cursor: saving || !workoutPlan.name ? 'not-allowed' : 'pointer', opacity: workoutPlan.days.length === 0 || !workoutPlan.name ? 0.5 : 1 }}>
             <Save size={14} /> {saving ? 'Opslaan…' : 'Save Template'}
