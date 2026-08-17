@@ -1207,18 +1207,32 @@ async getClientSchemas(clientId) {
         const { data: c } = await supabase.from('clients').select('assigned_schema_id').eq('id', clientId).single()
         if (c?.assigned_schema_id !== schemaId) return { success: false, error: 'Plan hoort niet bij deze klant' }
       }
-      // Reset de week-schedule bij een plan-wissel: de oude mapping (weekdag →
-      // dagX) kan minder/andere dagen bevatten dan het nieuwe plan, waardoor er
-      // workouts "verdwenen". null → de client-app her-default naar alle dagen
-      // van het nieuwe plan.
+      // Bij een plan-wissel een VERSE default-week-schedule uit het nieuwe plan
+      // opslaan (niet null!). De oude mapping kan naar dag-keys van het vorige
+      // plan wijzen. TodaysWorkoutMain leest clients.workout_schedule direct, dus
+      // die moet gevuld zijn — anders toont een dag "geen workout ingepland".
+      const { data: sc } = await supabase.from('workout_schemas').select('week_structure').eq('id', schemaId).single()
+      const schedule = this._defaultScheduleFromStructure(sc?.week_structure)
       const { error } = await supabase
-        .from('clients').update({ assigned_schema_id: schemaId, workout_schedule: null, updated_at: new Date().toISOString() }).eq('id', clientId)
+        .from('clients').update({ assigned_schema_id: schemaId, workout_schedule: schedule, updated_at: new Date().toISOString() }).eq('id', clientId)
       if (error) throw error
       return { success: true }
     } catch (e) {
       console.error('❌ setActiveWorkoutPlan failed:', e)
       return { success: false, error: e.message }
     }
+  }
+
+  // Default week-schedule uit een plan-structuur: verdeel de trainingsdagen over
+  // Ma/Wo/Vr/Zo/Di/Do/Za (zelfde volgorde als de client-app's default). Geeft de
+  // mapping { 'Monday': 'dag1', ... } terug (hoofdletter-weekdag = schema-formaat).
+  _defaultScheduleFromStructure(weekStructure) {
+    const days = (weekStructure && typeof weekStructure === 'object') ? Object.keys(weekStructure) : []
+    if (!days.length) return null
+    const slots = ['Monday', 'Wednesday', 'Friday', 'Sunday', 'Tuesday', 'Thursday', 'Saturday']
+    const schedule = {}
+    days.forEach((d, i) => { if (slots[i]) schedule[slots[i]] = d })
+    return schedule
   }
 
   // Wijs een template (is_template=true) toe aan een klant: maak een nieuwe
@@ -1248,9 +1262,9 @@ async getClientSchemas(clientId) {
       if (error) throw error
       const shouldActivate = makeActive || !c?.assigned_schema_id
       if (shouldActivate) {
-        // Reset week-schedule zodat het nieuwe plan al z'n dagen toont (zie
-        // setActiveWorkoutPlan).
-        await supabase.from('clients').update({ assigned_schema_id: schema.id, workout_schedule: null, updated_at: now }).eq('id', clientId)
+        // Verse default-schedule uit het nieuwe plan (zie setActiveWorkoutPlan).
+        const schedule = this._defaultScheduleFromStructure(tpl.week_structure)
+        await supabase.from('clients').update({ assigned_schema_id: schema.id, workout_schedule: schedule, updated_at: now }).eq('id', clientId)
       }
       return { success: true, schema, activated: shouldActivate }
     } catch (e) {
