@@ -5,21 +5,25 @@ import { Users, Check, AlertCircle } from 'lucide-react'
 export default function ClientAssigner({ clients, workoutPlan, db, onClose, isMobile, initialClient }) {
   const [selectedClients, setSelectedClients] = useState(initialClient ? [initialClient.id] : [])
   const [assigning, setAssigning] = useState(false)
-  
+  // 'selected' = alleen aangevinkte klanten (actief). 'all' = iedereen, in hun
+  // bibliotheek (niet auto-actief, behalve klanten die nog géén plan hebben).
+  const [mode, setMode] = useState('selected')
+
   const toggleClient = (clientId) => {
-    setSelectedClients(prev => 
+    setSelectedClients(prev =>
       prev.includes(clientId)
         ? prev.filter(id => id !== clientId)
         : [...prev, clientId]
     )
   }
-  
+
   const assignToClients = async () => {
-    if (selectedClients.length === 0) {
-      alert('Selecteer minimaal één client')
+    const targetClients = mode === 'all' ? clients.map(c => c.id) : selectedClients
+    if (targetClients.length === 0) {
+      alert(mode === 'all' ? 'Geen klanten gevonden' : 'Selecteer minimaal één client')
       return
     }
-    
+
     setAssigning(true)
     
     try {
@@ -74,27 +78,34 @@ export default function ClientAssigner({ clients, workoutPlan, db, onClose, isMo
         updated_at: new Date().toISOString()
       }
 
-      // Per klant een EIGEN schema-instance (met client_id), zodat elke klant een
-      // eigen plan-bibliotheek opbouwt. Het nieuwe plan wordt hun actieve plan;
-      // eerdere plannen blijven bewaard en zijn wisselbaar op hun workout-pagina.
-      for (const clientId of selectedClients) {
-        const clientName = (clients.find(c => c.id === clientId)
-          ? `${clients.find(c => c.id === clientId).first_name || ''} ${clients.find(c => c.id === clientId).last_name || ''}`.trim()
-          : null)
+      // Per klant een EIGEN schema-instance (met client_id) → elke klant bouwt een
+      // eigen plan-bibliotheek op. Actief zetten: 'selected' = altijd (dat is de
+      // normale toewijs-flow); 'all' (iedereen) = alleen in de bibliotheek, behalve
+      // klanten die nog géén actief plan hebben (die krijgen 't wél actief).
+      let activated = 0
+      for (const clientId of targetClients) {
+        const clientObj = clients.find(c => c.id === clientId)
+        const clientName = clientObj ? `${clientObj.first_name || ''} ${clientObj.last_name || ''}`.trim() : null
         const { data: schema, error: schemaError } = await db.supabase
           .from('workout_schemas')
           .insert({ ...baseSchema, client_id: clientId, client_name: clientName })
           .select().single()
         if (schemaError) throw new Error(`Schema error: ${schemaError.message}`)
 
-        const { error: assignError } = await db.supabase
-          .from('clients')
-          .update({ assigned_schema_id: schema.id, updated_at: new Date().toISOString() })
-          .eq('id', clientId)
-        if (assignError) throw new Error(`Toewijzen mislukt: ${assignError.message}`)
+        const makeActive = mode === 'selected' || !clientObj?.assigned_schema_id
+        if (makeActive) {
+          const { error: assignError } = await db.supabase
+            .from('clients')
+            .update({ assigned_schema_id: schema.id, updated_at: new Date().toISOString() })
+            .eq('id', clientId)
+          if (assignError) throw new Error(`Toewijzen mislukt: ${assignError.message}`)
+          activated++
+        }
       }
 
-      alert(`✅ Workout toegewezen aan ${selectedClients.length} client(s)!`)
+      alert(mode === 'all'
+        ? `✅ Plan in de bibliotheek van ${targetClients.length} klant(en) gezet${activated ? ` — ${activated} kreeg 't meteen als actief plan (had er nog geen)` : ''}.`
+        : `✅ Workout toegewezen aan ${targetClients.length} client(s)!`)
       onClose()
       
     } catch (error) {
@@ -125,9 +136,32 @@ export default function ClientAssigner({ clients, workoutPlan, db, onClose, isMo
           <button onClick={onClose} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'rgba(255, 255, 255, 0.5)', fontSize: '1.5rem', padding: '0.5rem', display: 'flex', alignItems: 'center', justifyContent: 'center', minWidth: '44px', minHeight: '44px', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}>×</button>
         </div>
         
-        {/* Client List */}
+        {/* Doelgroep-toggle: geselecteerde klanten vs iedereen */}
+        <div style={{ padding: isMobile ? '0.85rem 1rem 0' : '1rem 1.5rem 0', display: 'flex', gap: '0.5rem' }}>
+          {[
+            { id: 'selected', label: 'Alleen aan geselecteerde' },
+            { id: 'all', label: `Iedereen (${clients.length})` },
+          ].map(opt => {
+            const active = mode === opt.id
+            return (
+              <button key={opt.id} onClick={() => setMode(opt.id)}
+                style={{ flex: 1, padding: '0.6rem', borderRadius: '10px', cursor: 'pointer', fontSize: isMobile ? '0.75rem' : '0.8rem', fontWeight: 800,
+                  background: active ? 'rgba(16,185,129,0.14)' : 'rgba(255,255,255,0.03)',
+                  border: `1px solid ${active ? 'rgba(16,185,129,0.5)' : 'rgba(255,255,255,0.1)'}`,
+                  color: active ? '#10b981' : 'rgba(255,255,255,0.55)' }}>{opt.label}</button>
+            )
+          })}
+        </div>
+        {mode === 'all' && (
+          <div style={{ padding: isMobile ? '0.6rem 1rem 0' : '0.7rem 1.5rem 0', fontSize: '0.72rem', color: 'rgba(255,255,255,0.5)', lineHeight: 1.5 }}>
+            Dit plan komt in de bibliotheek van <b style={{ color: '#fff' }}>alle {clients.length} klanten</b> — ze kunnen het inzien en zelf activeren via de Wissel-knop. Klanten zónder actief plan krijgen 't meteen actief.
+          </div>
+        )}
+
+        {/* Client List — alleen bij 'geselecteerde' */}
+        {mode === 'selected' && (
         <div style={{ flex: 1, overflow: 'auto', padding: isMobile ? '1rem' : '1.5rem' }}>
-          
+
           {clientsWithoutWorkout.length > 0 && (
             <>
               <div style={{ fontSize: '0.85rem', color: 'rgba(255, 255, 255, 0.5)', marginBottom: '0.75rem', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
@@ -176,15 +210,21 @@ export default function ClientAssigner({ clients, workoutPlan, db, onClose, isMo
             </>
           )}
         </div>
-        
+        )}
+
         {/* Footer */}
         <div style={{ padding: isMobile ? '1rem' : '1.5rem', borderTop: '1px solid rgba(255, 255, 255, 0.1)', display: 'flex', gap: '0.75rem' }}>
           <button onClick={onClose} style={{ flex: 1, padding: '0.75rem', background: 'rgba(255, 255, 255, 0.05)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '10px', color: 'rgba(255, 255, 255, 0.7)', fontSize: isMobile ? '0.9rem' : '1rem', fontWeight: '600', cursor: 'pointer', minHeight: '44px', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}>
             Cancel
           </button>
-          <button onClick={assignToClients} disabled={assigning || selectedClients.length === 0} style={{ flex: 1, padding: '0.75rem', background: assigning ? 'rgba(255, 255, 255, 0.1)' : selectedClients.length === 0 ? 'rgba(255, 255, 255, 0.05)' : 'linear-gradient(135deg, #10b981 0%, #059669 100%)', border: 'none', borderRadius: '10px', color: '#fff', fontSize: isMobile ? '0.9rem' : '1rem', fontWeight: '600', cursor: assigning || selectedClients.length === 0 ? 'not-allowed' : 'pointer', opacity: selectedClients.length === 0 ? 0.5 : 1, minHeight: '44px', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}>
-            {assigning ? 'Toewijzen...' : `Assign to ${selectedClients.length} Client(s)`}
-          </button>
+          {(() => {
+            const disabled = assigning || (mode === 'selected' && selectedClients.length === 0)
+            return (
+              <button onClick={assignToClients} disabled={disabled} style={{ flex: 1, padding: '0.75rem', background: assigning ? 'rgba(255, 255, 255, 0.1)' : disabled ? 'rgba(255, 255, 255, 0.05)' : 'linear-gradient(135deg, #10b981 0%, #059669 100%)', border: 'none', borderRadius: '10px', color: '#fff', fontSize: isMobile ? '0.9rem' : '1rem', fontWeight: '600', cursor: disabled ? 'not-allowed' : 'pointer', opacity: disabled ? 0.5 : 1, minHeight: '44px', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}>
+                {assigning ? 'Toewijzen...' : (mode === 'all' ? `Toewijzen aan alle ${clients.length}` : `Assign to ${selectedClients.length} Client(s)`)}
+              </button>
+            )
+          })()}
         </div>
         
         {selectedClients.some(id => clientsWithWorkout.find(c => c.id === id)) && (
