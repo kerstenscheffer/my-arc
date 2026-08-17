@@ -1217,6 +1217,63 @@ async getClientSchemas(clientId) {
     }
   }
 
+  // Wijs een template (is_template=true) toe aan een klant: maak een nieuwe
+  // client-instance (kopie van week_structure) met client_id. Optioneel meteen
+  // actief; anders belandt 'ie in de bibliotheek (wél actief als de klant nog
+  // geen actief plan had). original_schema_id verwijst naar de bron-template.
+  async assignTemplateToClient(templateId, clientId, makeActive = false) {
+    try {
+      const { data: tpl, error: tErr } = await supabase
+        .from('workout_schemas').select('*').eq('id', templateId).single()
+      if (tErr || !tpl) throw new Error('Template niet gevonden')
+      const { data: c } = await supabase
+        .from('clients').select('first_name, last_name, assigned_schema_id').eq('id', clientId).single()
+      const cname = c ? `${c.first_name || ''} ${c.last_name || ''}`.trim() : null
+      const now = new Date().toISOString()
+      const insert = {
+        name: tpl.name, description: tpl.description || '',
+        user_id: tpl.user_id, client_id: clientId, client_name: cname,
+        primary_goal: tpl.primary_goal, specific_goal: tpl.specific_goal,
+        experience_level: tpl.experience_level, days_per_week: tpl.days_per_week,
+        time_per_session: tpl.time_per_session, split_type: tpl.split_type, split_name: tpl.split_name,
+        week_structure: tpl.week_structure, equipment: tpl.equipment,
+        is_ai_generated: false, is_template: false, is_public: false,
+        original_schema_id: templateId, created_at: now, updated_at: now,
+      }
+      const { data: schema, error } = await supabase.from('workout_schemas').insert(insert).select().single()
+      if (error) throw error
+      const shouldActivate = makeActive || !c?.assigned_schema_id
+      if (shouldActivate) {
+        await supabase.from('clients').update({ assigned_schema_id: schema.id, updated_at: now }).eq('id', clientId)
+      }
+      return { success: true, schema, activated: shouldActivate }
+    } catch (e) {
+      console.error('❌ assignTemplateToClient failed:', e)
+      return { success: false, error: e.message }
+    }
+  }
+
+  // Verwijder een toegewezen plan van een klant. Was het actief, dan valt de
+  // klant terug op een ander (meest recent) plan of op geen plan.
+  async removeClientPlan(clientId, schemaId) {
+    try {
+      const { data: c } = await supabase.from('clients').select('assigned_schema_id').eq('id', clientId).single()
+      await supabase.from('workout_schemas').delete().eq('id', schemaId).eq('client_id', clientId)
+      if (c?.assigned_schema_id === schemaId) {
+        const { data: rest } = await supabase
+          .from('workout_schemas').select('id').eq('client_id', clientId).neq('is_template', true)
+          .order('created_at', { ascending: false }).limit(1)
+        await supabase.from('clients')
+          .update({ assigned_schema_id: rest?.[0]?.id || null, updated_at: new Date().toISOString() })
+          .eq('id', clientId)
+      }
+      return { success: true }
+    } catch (e) {
+      console.error('❌ removeClientPlan failed:', e)
+      return { success: false, error: e.message }
+    }
+  }
+
 
 
   // FIX: Use workout_plans table (exists!) or assigned_schema_id

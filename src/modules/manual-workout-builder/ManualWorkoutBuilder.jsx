@@ -5,6 +5,7 @@ import ExerciseSelector from './components/ExerciseSelector'
 import TemplateManager from './components/TemplateManager'
 import DayTemplatePickerModal from './components/DayTemplatePickerModal'
 import ClientAssigner from './components/ClientAssigner'
+import ClientPlanManagerModal from './components/ClientPlanManagerModal'
 import { Activity, Plus, Save, Users, FileText, ChevronDown, Video } from 'lucide-react'
 import PDFExportButton from './components/PDFExportButton'
 import ExerciseLibraryModal from './components/ExerciseLibraryModal'
@@ -21,6 +22,7 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
   const [showExerciseSelector, setShowExerciseSelector] = useState(false)
   const [showTemplateManager, setShowTemplateManager] = useState(false)
   const [showClientAssigner, setShowClientAssigner] = useState(false)
+  const [showPlanManager, setShowPlanManager] = useState(false)
   const [saving, setSaving] = useState(false)
   const [templates, setTemplates] = useState([])
   const [dayTemplates, setDayTemplates] = useState([])
@@ -359,7 +361,10 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
             </button>
           )}
           <button onClick={() => setShowClientAssigner(true)} disabled={workoutPlan.days.length === 0} style={{ ...cBtn(false), cursor: workoutPlan.days.length === 0 ? 'not-allowed' : 'pointer', opacity: workoutPlan.days.length === 0 ? 0.5 : 1 }}>
-            <Users size={14} /> Assign to Clients
+            <Users size={14} /> Huidig plan toewijzen
+          </button>
+          <button onClick={() => setShowPlanManager(true)} style={cBtn(true)}>
+            <Users size={14} /> Plannen toewijzen
           </button>
         </div>
       </div>
@@ -398,6 +403,7 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
         />
       )}
       {showClientAssigner && <ClientAssigner clients={clients} workoutPlan={workoutPlan} db={db} initialClient={selectedClient || null} onClose={() => setShowClientAssigner(false)} isMobile={isMobile} />}
+      {showPlanManager && <ClientPlanManagerModal clients={clients} templates={templates} db={db} isMobile={isMobile} onClose={() => setShowPlanManager(false)} />}
 
       <ExerciseLibraryModal
         isOpen={showExerciseLibrary}
