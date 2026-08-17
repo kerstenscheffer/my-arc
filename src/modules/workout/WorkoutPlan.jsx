@@ -177,8 +177,8 @@ export default function WorkoutPlan({ client, schema, db, onFocusChange }) {
       {/* Grote titel boven de today's-workout foto, met veel zwarte ruimte erboven. */}
       {!workoutOpen && (
         <div style={{ padding: isMobile ? '6rem 1rem 1.25rem' : '9rem 2rem 1.75rem', textAlign: 'center' }}>
-          <div style={{ fontSize: isMobile ? '2.5rem' : '4rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.03em', lineHeight: 1.02 }}>
-            Vandaags<br />workout
+          <div style={{ fontSize: isMobile ? '1.7rem' : '2.6rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.03em', lineHeight: 1.05, whiteSpace: 'nowrap' }}>
+            Vandaags workout
           </div>
         </div>
       )}
