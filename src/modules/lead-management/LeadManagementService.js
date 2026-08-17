@@ -3045,35 +3045,37 @@ async createLeadWithSection(leadData, sectionId, coachId) {
       if (!isInStale) return { restored: false }
       if (!sectionItem.previous_section_id) return { restored: false }
       
-      const { data: previousSection } = await this.db.supabase
-        .from('lead_sections')
-        .select('id, title, color')
-        .eq('id', sectionItem.previous_section_id)
-        .single()
-      
+      const [{ data: previousSection }, { data: lead }] = await Promise.all([
+        this.db.supabase
+          .from('lead_sections')
+          .select('id, title, color')
+          .eq('id', sectionItem.previous_section_id)
+          .single(),
+        this.db.supabase
+          .from('call_leads')
+          .select('first_name, last_name')
+          .eq('id', leadId)
+          .single()
+      ])
+
       if (!previousSection) return { restored: false }
-      
-      const { data: lead } = await this.db.supabase
-        .from('call_leads')
-        .select('first_name, last_name')
-        .eq('id', leadId)
-        .single()
-      
+
       const leadName = `${lead?.first_name || ''} ${lead?.last_name || ''}`.trim() || 'Unknown'
-      
-      await this.db.supabase.from('lead_section_items').update({
-        section_id: sectionItem.previous_section_id,
-        previous_section_id: null, previous_section_title: null,
-        previous_section_color: null, moved_to_stale_at: null, position: 0
-      }).eq('id', sectionItem.id)
-      
-      await this.db.supabase.from('lead_movements').insert({
-        lead_id: leadId, from_section_id: sectionItem.section_id,
-        to_section_id: sectionItem.previous_section_id,
-        coach_id: coachId, moved_at: new Date().toISOString(),
-        lead_name: leadName, outcome_type: 'restored_from_stale'
-      })
-      
+
+      await Promise.all([
+        this.db.supabase.from('lead_section_items').update({
+          section_id: sectionItem.previous_section_id,
+          previous_section_id: null, previous_section_title: null,
+          previous_section_color: null, moved_to_stale_at: null, position: 0
+        }).eq('id', sectionItem.id),
+        this.db.supabase.from('lead_movements').insert({
+          lead_id: leadId, from_section_id: sectionItem.section_id,
+          to_section_id: sectionItem.previous_section_id,
+          coach_id: coachId, moved_at: new Date().toISOString(),
+          lead_name: leadName, outcome_type: 'restored_from_stale'
+        })
+      ])
+
       return {
         restored: true,
         restoredTo: { id: previousSection.id, title: previousSection.title, color: previousSection.color },

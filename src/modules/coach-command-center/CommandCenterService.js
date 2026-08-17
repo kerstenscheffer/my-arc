@@ -157,11 +157,14 @@ export default class CommandCenterService {
       sessions.forEach(s => { sessionMap[s.id] = { client_id: s.client_id, date: s.workout_date } })
       let allProgress = []
       const batchSize = 200
+      const batches = []
       for (let i = 0; i < sessions.length; i += batchSize) {
-        const batch = sessions.slice(i, i + batchSize).map(s => s.id)
-        const { data: progress } = await this.supabase.from('workout_progress').select('session_id, exercise_name, sets, notes, attachment_used').in('session_id', batch)
-        if (progress) allProgress = allProgress.concat(progress)
+        batches.push(sessions.slice(i, i + batchSize).map(s => s.id))
       }
+      const batchResults = await Promise.all(batches.map(batch =>
+        this.supabase.from('workout_progress').select('session_id, exercise_name, sets, notes, attachment_used').in('session_id', batch)
+      ))
+      batchResults.forEach(({ data: progress }) => { if (progress) allProgress = allProgress.concat(progress) })
       const progressByClient = {}
       clientIds.forEach(id => { progressByClient[id] = {} })
       allProgress.forEach(entry => {
