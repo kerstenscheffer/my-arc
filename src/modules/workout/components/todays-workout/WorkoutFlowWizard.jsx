@@ -1,6 +1,6 @@
 // src/modules/workout/components/todays-workout/WorkoutFlowWizard.jsx
 import { useState, useEffect, useRef } from 'react'
-import { X, ChevronRight, ChevronLeft, Check, Timer, Play, Pause, SkipForward } from 'lucide-react'
+import { X, ChevronRight, ChevronLeft, Check, Timer, Play, Pause, SkipForward, Dumbbell } from 'lucide-react'
 import { createPortal } from 'react-dom'
 import ExerciseService from '../../../../services/ExerciseService'
 
@@ -254,6 +254,11 @@ export default function WorkoutFlowWizard({ exercises, client, db, onComplete, o
             <div style={{ fontSize: isMobile ? '1.4rem' : '1.7rem', fontWeight: '800', color: '#fff', letterSpacing: '-0.03em', lineHeight: 1 }}>
               {exercise?.name}
             </div>
+            {exercise?.equipment && (
+              <div style={{ display: 'inline-flex', alignItems: 'center', gap: 4, marginTop: '0.4rem', fontSize: isMobile ? '0.68rem' : '0.72rem', fontWeight: 700, color: 'rgba(255,215,0,0.85)' }}>
+                <Dumbbell size={12} /> {exercise.equipment}
+              </div>
+            )}
           </div>
           <div style={{ textAlign: 'right' }}>
             <div style={{ fontSize: isMobile ? '0.6rem' : '0.65rem', color: 'rgba(255,255,255,0.3)', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '0.2rem' }}>Reps</div>
