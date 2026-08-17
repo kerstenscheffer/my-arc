@@ -877,6 +877,24 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
     }
   }
 
+  // Ingeplande call geannuleerd (lead heeft afgezegd). call_happened=false zodat
+  // 'ie van de due-lijst af is, + outcome_type='cancelled' zodat de no-show-stat
+  // 'm NIET meetelt (afzeggen ≠ niet komen opdagen).
+  async cancelScheduledCall(movementId) {
+    try {
+      if (!movementId) return { success: false }
+      const { error } = await this.db.supabase
+        .from('lead_movements')
+        .update({ call_happened: false, outcome_type: 'cancelled' })
+        .eq('id', movementId)
+      if (error) throw error
+      return { success: true }
+    } catch (e) {
+      console.error('cancelScheduledCall failed:', e)
+      return { success: false, error: e.message }
+    }
+  }
+
   // Verplaats een call: sluit de oude af (niet gevoerd) en leg een nieuwe
   // ingeplande call vast in dezelfde sectie met nieuwe datum/tijd.
   async rescheduleScheduledCall(oldMovementId, { leadId, leadName, sectionId, sectionTitle, callDate, callTime, coachId }) {
@@ -2026,7 +2044,7 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
         if (startDate && endDate) {
           const { data: schedRows } = await this.db.supabase
             .from('lead_movements')
-            .select('lead_id, lead_name, call_date, call_happened, moved_at')
+            .select('lead_id, lead_name, call_date, call_happened, moved_at, outcome_type')
             .not('call_date', 'is', null)
             .is('reverted_at', null)
           const latestByLead = new Map()
@@ -2047,7 +2065,9 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
               funnel.callBooked.count++
               funnel.callBooked.leads.push({ leadId: r.lead_id, name: r.lead_name || 'Unknown', at: r.call_date })
             }
-            if (r.call_happened === false && inPeriod) {
+            // Afgezegde calls (outcome_type='cancelled') tellen NIET als no-show —
+            // de lead heeft netjes afgezegd, niet "niet komen opdagen".
+            if (r.call_happened === false && r.outcome_type !== 'cancelled' && inPeriod) {
               funnel.noShow.count++
               funnel.noShow.leads.push({ leadId: r.lead_id, name: r.lead_name || 'Unknown', at: r.call_date, to: 'No Show' })
             }

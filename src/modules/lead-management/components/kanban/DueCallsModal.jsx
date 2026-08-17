@@ -6,7 +6,7 @@
 // Elke keuze bubbelt via onOutcome(dc, kind, extra) naar de KanbanBoard.
 import { useState } from 'react'
 import { createPortal } from 'react-dom'
-import { X, Phone, Check, XCircle, Trophy, CalendarClock, UserX } from 'lucide-react'
+import { X, Phone, Check, XCircle, Trophy, CalendarClock, UserX, CalendarX } from 'lucide-react'
 
 const inp = (flex) => ({ flex, padding: '8px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.15)', background: '#1a1a1a', color: '#fff', fontSize: '0.85rem', boxSizing: 'border-box' })
 const chip = (color) => ({ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '0.6rem', borderRadius: 9, border: `1px solid ${color}55`, background: `${color}18`, color, fontWeight: 800, fontSize: '0.8rem', cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' })
@@ -51,8 +51,9 @@ function DueCallItem({ dc, onOutcome }) {
       )}
 
       {step === 'n' && !reschedule && (
-        <div style={{ display: 'flex', gap: 8 }}>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           <button style={chip('#f97316')} onClick={() => onOutcome(dc, 'noShow')}><UserX size={14} /> No show</button>
+          <button style={chip('#a855f7')} onClick={() => onOutcome(dc, 'afgezegd')}><CalendarX size={14} /> Afgezegd</button>
           <button style={chip('#06b6d4')} onClick={() => setReschedule(true)}><CalendarClock size={14} /> Verplaatst</button>
         </div>
       )}
