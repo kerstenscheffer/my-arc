@@ -1,7 +1,34 @@
 // src/modules/manual-workout-builder/components/TemplateManager.jsx
-import { FileText, Clock } from 'lucide-react'
+import { useState } from 'react'
+import { FileText, Clock, Archive, ArchiveRestore, Trash2 } from 'lucide-react'
 
-export function TemplateManager({ templates, onLoad, onClose, isMobile }) {
+export function TemplateManager({ templates, onLoad, onClose, isMobile, db, onChange }) {
+  const [showArchived, setShowArchived] = useState(false)
+  const [busy, setBusy] = useState(null)
+
+  const setArchived = async (tpl, archived, e) => {
+    e.stopPropagation()
+    if (busy) return
+    setBusy(tpl.id)
+    try {
+      await db.supabase.from('workout_schemas').update({ is_archived: archived, updated_at: new Date().toISOString() }).eq('id', tpl.id)
+      onChange && await onChange()
+    } catch (err) { console.error(err); alert('Archiveren mislukt.') } finally { setBusy(null) }
+  }
+  const remove = async (tpl, e) => {
+    e.stopPropagation()
+    if (busy) return
+    if (!confirm(`Template "${tpl.name}" definitief verwijderen?`)) return
+    setBusy(tpl.id)
+    try {
+      await db.supabase.from('workout_schemas').delete().eq('id', tpl.id).eq('is_template', true)
+      onChange && await onChange()
+    } catch (err) { console.error(err); alert('Verwijderen mislukt.') } finally { setBusy(null) }
+  }
+
+  const list = (templates || []).filter(t => showArchived ? t.is_archived : !t.is_archived)
+  const archivedCount = (templates || []).filter(t => t.is_archived).length
+
   return (
     <div style={{
       position: 'fixed',
@@ -40,20 +67,22 @@ export function TemplateManager({ templates, onLoad, onClose, isMobile }) {
             color: '#fff',
             margin: 0
           }}>
-            Workout Templates
+            {showArchived ? 'Gearchiveerd' : 'Workout Templates'}
           </h2>
-          <button
-            onClick={onClose}
-            style={{
-              background: 'transparent',
-              border: 'none',
-              cursor: 'pointer',
-              color: 'rgba(255, 255, 255, 0.5)',
-              fontSize: '1.5rem'
-            }}
-          >
-            ×
-          </button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <button
+              onClick={() => setShowArchived(v => !v)}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '0.35rem 0.6rem', borderRadius: 8, background: showArchived ? 'rgba(255,215,0,0.14)' : 'rgba(255,255,255,0.05)', border: `1px solid ${showArchived ? 'rgba(255,215,0,0.4)' : 'rgba(255,255,255,0.12)'}`, color: showArchived ? '#FFD700' : 'rgba(255,255,255,0.6)', fontSize: '0.68rem', fontWeight: 800, cursor: 'pointer' }}
+            >
+              <Archive size={13} /> {showArchived ? 'Actief' : `Archief${archivedCount ? ` (${archivedCount})` : ''}`}
+            </button>
+            <button
+              onClick={onClose}
+              style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'rgba(255, 255, 255, 0.5)', fontSize: '1.5rem' }}
+            >
+              ×
+            </button>
+          </div>
         </div>
         
         <div style={{
@@ -61,13 +90,13 @@ export function TemplateManager({ templates, onLoad, onClose, isMobile }) {
           overflow: 'auto',
           padding: isMobile ? '1rem' : '1.5rem'
         }}>
-          {templates.length === 0 ? (
+          {list.length === 0 ? (
             <div style={{
               textAlign: 'center',
               color: 'rgba(255, 255, 255, 0.5)',
               padding: '3rem'
             }}>
-              Nog geen templates opgeslagen
+              {showArchived ? 'Geen gearchiveerde templates' : 'Nog geen templates opgeslagen'}
             </div>
           ) : (
             <div style={{
@@ -75,62 +104,50 @@ export function TemplateManager({ templates, onLoad, onClose, isMobile }) {
               flexDirection: 'column',
               gap: '0.75rem'
             }}>
-              {templates.map(template => (
-                <button
-                  key={template.id}
-                  onClick={() => onLoad(template)}
-                  style={{
-                    background: 'rgba(255, 255, 255, 0.03)',
-                    border: '1px solid rgba(255, 255, 255, 0.1)',
-                    borderRadius: '12px',
-                    padding: isMobile ? '0.75rem' : '1rem',
-                    cursor: 'pointer',
-                    textAlign: 'left',
-                    transition: 'all 0.3s ease'
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.background = 'rgba(139, 92, 246, 0.1)'
-                    e.currentTarget.style.borderColor = 'rgba(139, 92, 246, 0.3)'
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.background = 'rgba(255, 255, 255, 0.03)'
-                    e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.1)'
-                  }}
-                >
-                  <div style={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'flex-start'
-                  }}>
-                    <div>
-                      <h4 style={{
-                        color: '#fff',
-                        fontSize: isMobile ? '0.9rem' : '1rem',
-                        fontWeight: '600',
-                        margin: '0 0 0.25rem 0'
-                      }}>
+              {list.map(template => (
+                <div key={template.id} style={{
+                  display: 'flex', alignItems: 'stretch',
+                  background: 'rgba(255, 255, 255, 0.03)',
+                  border: '1px solid rgba(255, 255, 255, 0.1)',
+                  borderRadius: '12px', overflow: 'hidden',
+                }}>
+                  {/* Klikbaar naam-gebied → laadt de template in de builder */}
+                  <button
+                    onClick={() => onLoad(template)}
+                    style={{
+                      flex: 1, minWidth: 0, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '0.75rem',
+                      background: 'transparent', border: 'none', cursor: 'pointer', textAlign: 'left',
+                      padding: isMobile ? '0.75rem' : '1rem',
+                    }}
+                  >
+                    <div style={{ minWidth: 0 }}>
+                      <h4 style={{ color: '#fff', fontSize: isMobile ? '0.9rem' : '1rem', fontWeight: '600', margin: '0 0 0.25rem 0', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                         {template.name}
                       </h4>
-                      <p style={{
-                        color: 'rgba(255, 255, 255, 0.5)',
-                        fontSize: isMobile ? '0.8rem' : '0.85rem',
-                        margin: 0
-                      }}>
+                      <p style={{ color: 'rgba(255, 255, 255, 0.5)', fontSize: isMobile ? '0.8rem' : '0.85rem', margin: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                         {template.description || 'Geen beschrijving'}
                       </p>
                     </div>
-                    <div style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '0.5rem',
-                      color: 'rgba(255, 255, 255, 0.4)',
-                      fontSize: isMobile ? '0.75rem' : '0.8rem'
-                    }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'rgba(255, 255, 255, 0.4)', fontSize: isMobile ? '0.75rem' : '0.8rem', flexShrink: 0 }}>
                       <Clock size={14} />
                       {template.days_per_week} dagen
                     </div>
+                  </button>
+
+                  {/* Archiveer/herstel + verwijder */}
+                  <div style={{ display: 'flex', flexDirection: 'column', flexShrink: 0, borderLeft: '1px solid rgba(255,255,255,0.06)' }}>
+                    <button onClick={(e) => setArchived(template, !template.is_archived, e)} disabled={busy === template.id}
+                      title={template.is_archived ? 'Terug uit archief' : 'Archiveren'}
+                      style={{ flex: 1, width: 42, background: 'transparent', border: 'none', borderBottom: '1px solid rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.55)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: busy === template.id ? 0.4 : 1 }}>
+                      {template.is_archived ? <ArchiveRestore size={16} /> : <Archive size={16} />}
+                    </button>
+                    <button onClick={(e) => remove(template, e)} disabled={busy === template.id}
+                      title="Definitief verwijderen"
+                      style={{ flex: 1, width: 42, background: 'transparent', border: 'none', color: '#ef4444', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: busy === template.id ? 0.4 : 1 }}>
+                      <Trash2 size={15} />
+                    </button>
                   </div>
-                </button>
+                </div>
               ))}
             </div>
           )}

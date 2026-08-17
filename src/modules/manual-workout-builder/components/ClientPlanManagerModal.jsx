@@ -98,9 +98,9 @@ export default function ClientPlanManagerModal({ clients = [], templates = [], d
               <span style={{ fontSize: '0.8rem', fontWeight: 800, color: '#fff' }}>Kies een template</span>
             </div>
             <div style={{ flex: 1, overflowY: 'auto', padding: '0.7rem' }}>
-              {templates.length === 0 ? (
+              {templates.filter(t => !t.is_archived).length === 0 ? (
                 <div style={{ padding: '2rem 1rem', textAlign: 'center', color: 'rgba(255,255,255,0.4)', fontSize: '0.82rem', lineHeight: 1.5 }}>Nog geen templates. Sla in de builder eerst een plan op als template.</div>
-              ) : templates.map(t => (
+              ) : templates.filter(t => !t.is_archived).map(t => (
                 <button key={t.id} onClick={() => assignTemplate(t)} disabled={busy === t.id}
                   style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '0.7rem 0.8rem', marginBottom: 6, borderRadius: 10, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', cursor: 'pointer', textAlign: 'left', opacity: busy === t.id ? 0.5 : 1 }}>
                   <div style={{ flex: 1, minWidth: 0 }}>

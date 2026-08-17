@@ -391,7 +391,7 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
       </div>
 
       {showExerciseSelector && <ExerciseSelector onSelect={addExercise} onClose={() => setShowExerciseSelector(false)} isMobile={isMobile} db={db} selectedClient={selectedClient} />}
-      {showTemplateManager && <TemplateManager templates={templates} onLoad={loadTemplate} onClose={() => setShowTemplateManager(false)} isMobile={isMobile} />}
+      {showTemplateManager && <TemplateManager templates={templates} onLoad={loadTemplate} onClose={() => setShowTemplateManager(false)} isMobile={isMobile} db={db} onChange={loadTemplates} />}
       {showDayPicker && (
         <DayTemplatePickerModal
           templates={dayTemplates}
