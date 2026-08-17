@@ -3,24 +3,44 @@
 // een campagne-DM-knop die het campagne-bericht kopieert + het profiel opent.
 import { useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
-import { X, Megaphone, Send, Check } from 'lucide-react'
+import { X, Megaphone, Send, Check, Plus } from 'lucide-react'
 
 export default function StartCampaignModal({ leadService, coachId, isMobile = false, onSelect, onClose }) {
   const [loading, setLoading] = useState(true)
   const [campaigns, setCampaigns] = useState([])
+  const [creating, setCreating] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [form, setForm] = useState({ name: '', platform: 'instagram', messageText: '' })
 
-  useEffect(() => {
-    let alive = true
-    ;(async () => {
-      setLoading(true)
-      try {
-        const data = await leadService.getCampaigns(coachId)
-        if (alive) setCampaigns((data || []).filter(c => c.status !== 'archived'))
-      } catch (e) { console.error('Campagnes laden mislukt:', e); if (alive) setCampaigns([]) }
-      finally { if (alive) setLoading(false) }
-    })()
-    return () => { alive = false }
-  }, [leadService, coachId])
+  const load = async () => {
+    setLoading(true)
+    try {
+      const data = await leadService.getCampaigns(coachId)
+      setCampaigns((data || []).filter(c => c.status !== 'archived'))
+    } catch (e) { console.error('Campagnes laden mislukt:', e); setCampaigns([]) }
+    finally { setLoading(false) }
+  }
+  useEffect(() => { let alive = true; if (alive) load(); return () => { alive = false } }, [leadService, coachId])
+
+  const handleCreate = async () => {
+    if (!form.name.trim() || !form.messageText.trim() || saving) return
+    setSaving(true)
+    try {
+      const { data, error } = await leadService.db.supabase
+        .from('outreach_campaigns')
+        .insert({
+          coach_id: coachId, name: form.name.trim(), platform: form.platform,
+          message_text: form.messageText.trim(), status: 'active',
+        })
+        .select().single()
+      if (error) throw error
+      setCreating(false)
+      setForm({ name: '', platform: 'instagram', messageText: '' })
+      await load()
+      if (data) onSelect(data) // meteen starten met de nieuwe campagne
+    } catch (e) { console.error('Campagne aanmaken mislukt:', e); alert('Aanmaken mislukt.') }
+    finally { setSaving(false) }
+  }
 
   return createPortal(
     <div
@@ -41,6 +61,45 @@ export default function StartCampaignModal({ leadService, coachId, isMobile = fa
         </div>
 
         <div style={{ flex: 1, overflowY: 'auto', padding: '0.85rem' }}>
+          {/* Nieuwe campagne — inline maak-formulier */}
+          {creating ? (
+            <div style={{ padding: '0.85rem', borderRadius: 12, background: 'rgba(168,85,247,0.06)', border: '1px solid rgba(168,85,247,0.28)', marginBottom: '0.85rem', display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
+              <div style={{ fontSize: '0.8rem', fontWeight: 800, color: '#fff' }}>Nieuwe campagne</div>
+              <input
+                value={form.name}
+                onChange={(e) => setForm(f => ({ ...f, name: e.target.value }))}
+                placeholder="Naam (bv. Lidl gids)"
+                style={{ width: '100%', padding: '0.55rem 0.65rem', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 8, color: '#fff', fontSize: '0.82rem', outline: 'none' }}
+              />
+              <input
+                value={form.platform}
+                onChange={(e) => setForm(f => ({ ...f, platform: e.target.value }))}
+                placeholder="Platform (bv. instagram)"
+                style={{ width: '100%', padding: '0.55rem 0.65rem', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 8, color: '#fff', fontSize: '0.82rem', outline: 'none' }}
+              />
+              <textarea
+                value={form.messageText}
+                onChange={(e) => setForm(f => ({ ...f, messageText: e.target.value }))}
+                placeholder="Bericht… gebruik [naam] voor de voornaam"
+                rows={4}
+                style={{ width: '100%', padding: '0.55rem 0.65rem', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 8, color: '#fff', fontSize: '0.82rem', outline: 'none', resize: 'vertical', fontFamily: 'inherit', lineHeight: 1.4 }}
+              />
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button onClick={() => { setCreating(false); setForm({ name: '', platform: 'instagram', messageText: '' }) }}
+                  style={{ flex: 1, padding: '0.55rem', borderRadius: 9, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.6)', fontSize: '0.75rem', fontWeight: 700, cursor: 'pointer' }}>Annuleer</button>
+                <button onClick={handleCreate} disabled={!form.name.trim() || !form.messageText.trim() || saving}
+                  style={{ flex: 1, padding: '0.55rem', borderRadius: 9, background: 'rgba(168,85,247,0.2)', border: '1px solid rgba(168,85,247,0.5)', color: '#a855f7', fontSize: '0.75rem', fontWeight: 800, cursor: (!form.name.trim() || !form.messageText.trim() || saving) ? 'not-allowed' : 'pointer', opacity: (!form.name.trim() || !form.messageText.trim() || saving) ? 0.5 : 1 }}>
+                  {saving ? 'Opslaan…' : 'Aanmaken & starten'}
+                </button>
+              </div>
+            </div>
+          ) : (
+            <button onClick={() => setCreating(true)}
+              style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '0.6rem', marginBottom: '0.85rem', borderRadius: 10, background: 'rgba(168,85,247,0.1)', border: '1px dashed rgba(168,85,247,0.45)', color: '#a855f7', fontSize: '0.78rem', fontWeight: 800, cursor: 'pointer' }}>
+              <Plus size={15} /> Nieuwe campagne
+            </button>
+          )}
+
           {loading ? (
             <div style={{ padding: '2rem', textAlign: 'center', color: 'rgba(255,255,255,0.5)' }}>Laden…</div>
           ) : campaigns.length === 0 ? (
