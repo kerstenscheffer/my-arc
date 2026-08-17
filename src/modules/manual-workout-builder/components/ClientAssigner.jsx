@@ -55,8 +55,8 @@ export default function ClientAssigner({ clients, workoutPlan, db, onClose, isMo
       
       const user = await db.getCurrentUser()
       if (!user) { alert('Je moet ingelogd zijn'); return }
-      
-      const schemaData = {
+
+      const baseSchema = {
         name: workoutPlan.name || 'Custom Workout',
         description: workoutPlan.description || '',
         user_id: user.id,
@@ -73,26 +73,27 @@ export default function ClientAssigner({ clients, workoutPlan, db, onClose, isMo
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
       }
-      
-      const { data: schema, error: schemaError } = await db.supabase
-        .from('workout_schemas')
-        .insert(schemaData)
-        .select()
-        .single()
-      
-      if (schemaError) throw new Error(`Schema error: ${schemaError.message}`)
-      
-      const updatePromises = selectedClients.map(clientId => 
-        db.supabase
+
+      // Per klant een EIGEN schema-instance (met client_id), zodat elke klant een
+      // eigen plan-bibliotheek opbouwt. Het nieuwe plan wordt hun actieve plan;
+      // eerdere plannen blijven bewaard en zijn wisselbaar op hun workout-pagina.
+      for (const clientId of selectedClients) {
+        const clientName = (clients.find(c => c.id === clientId)
+          ? `${clients.find(c => c.id === clientId).first_name || ''} ${clients.find(c => c.id === clientId).last_name || ''}`.trim()
+          : null)
+        const { data: schema, error: schemaError } = await db.supabase
+          .from('workout_schemas')
+          .insert({ ...baseSchema, client_id: clientId, client_name: clientName })
+          .select().single()
+        if (schemaError) throw new Error(`Schema error: ${schemaError.message}`)
+
+        const { error: assignError } = await db.supabase
           .from('clients')
           .update({ assigned_schema_id: schema.id, updated_at: new Date().toISOString() })
           .eq('id', clientId)
-      )
-      
-      const results = await Promise.all(updatePromises)
-      const errors = results.filter(r => r.error)
-      if (errors.length > 0) throw new Error(`Failed to assign to ${errors.length} client(s)`)
-      
+        if (assignError) throw new Error(`Toewijzen mislukt: ${assignError.message}`)
+      }
+
       alert(`✅ Workout toegewezen aan ${selectedClients.length} client(s)!`)
       onClose()
       
@@ -154,7 +155,7 @@ export default function ClientAssigner({ clients, workoutPlan, db, onClose, isMo
           {clientsWithWorkout.length > 0 && (
             <>
               <div style={{ fontSize: '0.85rem', color: 'rgba(249, 115, 22, 0.8)', marginBottom: '0.75rem', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <AlertCircle size={14} /> Hebben al een workout ({clientsWithWorkout.length})
+                <AlertCircle size={14} /> Hebben al een workout ({clientsWithWorkout.length}) — dit wordt hun nieuwe actieve plan
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                 {clientsWithWorkout.map(client => (
@@ -164,7 +165,7 @@ export default function ClientAssigner({ clients, workoutPlan, db, onClose, isMo
                     </div>
                     <div style={{ flex: 1, textAlign: 'left' }}>
                       <h4 style={{ color: '#fff', fontSize: isMobile ? '0.9rem' : '1rem', fontWeight: '600', margin: 0 }}>{client.first_name} {client.last_name}</h4>
-                      <p style={{ color: 'rgba(249, 115, 22, 0.8)', fontSize: isMobile ? '0.7rem' : '0.75rem', margin: 0 }}>⚠️ Wordt overschreven</p>
+                      <p style={{ color: 'rgba(249, 115, 22, 0.8)', fontSize: isMobile ? '0.7rem' : '0.75rem', margin: 0 }}>Nieuw plan wordt actief · oude blijft bewaard</p>
                     </div>
                     {initialClient?.id === client.id && (
                       <span style={{ fontSize: '0.55rem', fontWeight: '700', color: '#FFD700', background: 'rgba(255,215,0,0.1)', border: '1px solid rgba(255,215,0,0.2)', borderRadius: '4px', padding: '0.1rem 0.35rem' }}>GESELECTEERD</span>
@@ -189,7 +190,7 @@ export default function ClientAssigner({ clients, workoutPlan, db, onClose, isMo
         {selectedClients.some(id => clientsWithWorkout.find(c => c.id === id)) && (
           <div style={{ padding: '0.75rem 1.5rem', background: 'rgba(249, 115, 22, 0.1)', borderTop: '1px solid rgba(249, 115, 22, 0.2)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
             <AlertCircle size={16} color="#f97316" />
-            <span style={{ color: 'rgba(249, 115, 22, 0.9)', fontSize: isMobile ? '0.75rem' : '0.8rem' }}>Let op: Bestaande workouts worden overschreven</span>
+            <span style={{ color: 'rgba(249, 115, 22, 0.9)', fontSize: isMobile ? '0.75rem' : '0.8rem' }}>Het nieuwe plan wordt actief; bestaande plannen blijven bewaard en zijn wisselbaar door de klant</span>
           </div>
         )}
       </div>

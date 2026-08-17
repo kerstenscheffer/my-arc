@@ -1166,6 +1166,57 @@ async getClientSchemas(clientId) {
   }
 }
 
+  // Alle workout-plannen die aan een klant zijn TOEGEWEZEN (client_id), met een
+  // markering welke het actieve is (clients.assigned_schema_id). Voedt de plan-
+  // wissel op de client-workout-pagina.
+  async getClientWorkoutPlans(clientId) {
+    try {
+      const { data: client } = await supabase
+        .from('clients').select('assigned_schema_id').eq('id', clientId).single()
+      const activeId = client?.assigned_schema_id || null
+      const { data: plans, error } = await supabase
+        .from('workout_schemas')
+        .select('id, name, description, primary_goal, days_per_week, week_structure, is_client_edited, created_at, updated_at')
+        .eq('client_id', clientId)
+        .neq('is_template', true)
+        .order('created_at', { ascending: false })
+      if (error) throw error
+      let list = (plans || []).map(p => ({ ...p, isActive: p.id === activeId }))
+      // Fallback: als het actieve plan (nog) geen client_id heeft (oud/backfill),
+      // alsnog meenemen zodat de header/lijst 'm toont.
+      if (activeId && !list.some(p => p.id === activeId)) {
+        const { data: act } = await supabase.from('workout_schemas')
+          .select('id, name, description, primary_goal, days_per_week, week_structure, is_client_edited, created_at, updated_at')
+          .eq('id', activeId).single()
+        if (act) list = [{ ...act, isActive: true }, ...list]
+      }
+      return { plans: list, activeId }
+    } catch (e) {
+      console.error('❌ getClientWorkoutPlans failed:', e)
+      return { plans: [], activeId: null }
+    }
+  }
+
+  // Actief plan wisselen — alleen als het schema aan deze klant toebehoort
+  // (of al het actieve is). Zet clients.assigned_schema_id.
+  async setActiveWorkoutPlan(clientId, schemaId) {
+    try {
+      const { data: owns } = await supabase
+        .from('workout_schemas').select('id').eq('id', schemaId).eq('client_id', clientId).maybeSingle()
+      if (!owns) {
+        const { data: c } = await supabase.from('clients').select('assigned_schema_id').eq('id', clientId).single()
+        if (c?.assigned_schema_id !== schemaId) return { success: false, error: 'Plan hoort niet bij deze klant' }
+      }
+      const { error } = await supabase
+        .from('clients').update({ assigned_schema_id: schemaId, updated_at: new Date().toISOString() }).eq('id', clientId)
+      if (error) throw error
+      return { success: true }
+    } catch (e) {
+      console.error('❌ setActiveWorkoutPlan failed:', e)
+      return { success: false, error: e.message }
+    }
+  }
+
 
 
   // FIX: Use workout_plans table (exists!) or assigned_schema_id
