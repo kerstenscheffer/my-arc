@@ -401,11 +401,12 @@ export default class ShoppingService {
   calculateCost(amount, pricePerUnit, unit, unitType) {
     if (!pricePerUnit) return 0
     const price = parseFloat(pricePerUnit)
-    
-    if (unit === 'gram' && unitType === 'kg') {
-      return (amount / 1000) * price
-    }
-    if (unit === 'ml' && unitType === 'liter') {
+
+    // Prijs per kg/liter, hoeveelheid staat in gram/ml → deel door 1000.
+    // (Voorheen keek dit ook naar `unit`; bij olie stond de hoeveelheid in gram
+    //  i.p.v. ml, waardoor de liter-conversie werd overgeslagen en de prijs
+    //  1000× te hoog werd — bv. €1200 voor olijfolie.)
+    if (unitType === 'kg' || unitType === 'liter') {
       return (amount / 1000) * price
     }
     if (unitType === 'piece' || unitType === 'stuks') {
