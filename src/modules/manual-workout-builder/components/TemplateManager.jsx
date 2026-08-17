@@ -1,19 +1,24 @@
 // src/modules/manual-workout-builder/components/TemplateManager.jsx
 import { useState } from 'react'
 import { FileText, Clock, Archive, ArchiveRestore, Trash2 } from 'lucide-react'
+import dbService from '../../../services/DatabaseService'
 
 export function TemplateManager({ templates, onLoad, onClose, isMobile, db, onChange }) {
   const [showArchived, setShowArchived] = useState(false)
   const [busy, setBusy] = useState(null)
+  // Gebruik de meegegeven db, val terug op de singleton (robuust tegen een
+  // ontbrekende prop in oudere bundles).
+  const sb = (db && db.supabase) || dbService.supabase
 
   const setArchived = async (tpl, archived, e) => {
     e.stopPropagation()
     if (busy) return
     setBusy(tpl.id)
     try {
-      await db.supabase.from('workout_schemas').update({ is_archived: archived, updated_at: new Date().toISOString() }).eq('id', tpl.id)
+      const { error } = await sb.from('workout_schemas').update({ is_archived: archived }).eq('id', tpl.id)
+      if (error) throw error
       onChange && await onChange()
-    } catch (err) { console.error(err); alert('Archiveren mislukt.') } finally { setBusy(null) }
+    } catch (err) { console.error(err); alert('Archiveren mislukt: ' + (err?.message || err)) } finally { setBusy(null) }
   }
   const remove = async (tpl, e) => {
     e.stopPropagation()
@@ -21,9 +26,10 @@ export function TemplateManager({ templates, onLoad, onClose, isMobile, db, onCh
     if (!confirm(`Template "${tpl.name}" definitief verwijderen?`)) return
     setBusy(tpl.id)
     try {
-      await db.supabase.from('workout_schemas').delete().eq('id', tpl.id).eq('is_template', true)
+      const { error } = await sb.from('workout_schemas').delete().eq('id', tpl.id).eq('is_template', true)
+      if (error) throw error
       onChange && await onChange()
-    } catch (err) { console.error(err); alert('Verwijderen mislukt.') } finally { setBusy(null) }
+    } catch (err) { console.error(err); alert('Verwijderen mislukt: ' + (err?.message || err)) } finally { setBusy(null) }
   }
 
   const list = (templates || []).filter(t => showArchived ? t.is_archived : !t.is_archived)
