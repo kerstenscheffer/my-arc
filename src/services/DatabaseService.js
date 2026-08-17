@@ -1207,8 +1207,12 @@ async getClientSchemas(clientId) {
         const { data: c } = await supabase.from('clients').select('assigned_schema_id').eq('id', clientId).single()
         if (c?.assigned_schema_id !== schemaId) return { success: false, error: 'Plan hoort niet bij deze klant' }
       }
+      // Reset de week-schedule bij een plan-wissel: de oude mapping (weekdag →
+      // dagX) kan minder/andere dagen bevatten dan het nieuwe plan, waardoor er
+      // workouts "verdwenen". null → de client-app her-default naar alle dagen
+      // van het nieuwe plan.
       const { error } = await supabase
-        .from('clients').update({ assigned_schema_id: schemaId, updated_at: new Date().toISOString() }).eq('id', clientId)
+        .from('clients').update({ assigned_schema_id: schemaId, workout_schedule: null, updated_at: new Date().toISOString() }).eq('id', clientId)
       if (error) throw error
       return { success: true }
     } catch (e) {
@@ -1244,7 +1248,9 @@ async getClientSchemas(clientId) {
       if (error) throw error
       const shouldActivate = makeActive || !c?.assigned_schema_id
       if (shouldActivate) {
-        await supabase.from('clients').update({ assigned_schema_id: schema.id, updated_at: now }).eq('id', clientId)
+        // Reset week-schedule zodat het nieuwe plan al z'n dagen toont (zie
+        // setActiveWorkoutPlan).
+        await supabase.from('clients').update({ assigned_schema_id: schema.id, workout_schedule: null, updated_at: now }).eq('id', clientId)
       }
       return { success: true, schema, activated: shouldActivate }
     } catch (e) {
