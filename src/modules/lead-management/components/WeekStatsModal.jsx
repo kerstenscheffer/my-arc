@@ -416,6 +416,7 @@ export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, 
   const STAGE_ACCENT = { callProposed: '#a855f7', callScheduled: '#06b6d4', sale: '#10b981', noShow: '#f97316', callRejected: '#f97316', saleLost: '#ef4444', notSuitable: '#64748b' }
   const frac = (a, b) => `${a} van ${b}`
   const countItems = [
+    { label: 'Volgers ge-DM’d', value: reactionStats?.dmSentInWindow ?? 0, Icon: Send, color: '#06b6d4', info: 'Nieuwe volgers die je met de DM-knop een eerste bericht stuurde (dedupe: 1 per lead, geteld op verzenddatum).' },
     { label: 'Nieuwe leads', value: newLeadsInPeriod,          Icon: UserPlus,      color: '#3b82f6', info: 'Nieuwe leads die in deze periode zijn binnengekomen (op aanmaakdatum).' },
     { label: 'Follow-ups',   value: activity?.followUps ?? 0,  Icon: Send,          color: '#f59e0b', info: 'Aantal opvolg-berichten dat je hebt gestuurd in deze periode.' },
     { label: 'Reacties',     value: kpiValues.reacties,        Icon: MessageCircle, color: '#10b981', info: 'Aantal keer dat een lead reageerde (elke reactie-klik telt).' },
