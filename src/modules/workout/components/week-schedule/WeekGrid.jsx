@@ -20,9 +20,10 @@ export default function WeekGrid({
   return (
     <div style={{
       display: 'grid',
-      gridTemplateColumns: 'repeat(7, 1fr)',
+      gridTemplateColumns: 'repeat(7, minmax(0, 1fr))',
       gap: isMobile ? '0.25rem' : '0.375rem',
       marginBottom: isMobile ? '0.5rem' : '0.625rem',
+      minWidth: 0, width: '100%',
     }}>
       {weekDays.map((day, index) => {
         const assignedWorkout = tempSchedule[day]

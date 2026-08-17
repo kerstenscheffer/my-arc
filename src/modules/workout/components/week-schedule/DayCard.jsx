@@ -79,6 +79,7 @@ export default function DayCard({
   // afmeting hebben — onafhankelijk van titel-lengte of voltooid-status.
   const sharedCardStyle = {
     position: 'relative',
+    width: '100%', minWidth: 0,   // niet meegroeien met lange titels
     paddingTop: topPadding,
     paddingBottom: bottomPadding,
     paddingLeft: 0,
@@ -160,7 +161,7 @@ export default function DayCard({
   ) : null
 
   return (
-    <div style={{ position: 'relative' }}>
+    <div style={{ position: 'relative', minWidth: 0 }}>
       {hasContent ? (
         <div
           onClick={handleClick}
