@@ -37,11 +37,11 @@ const TRANSFORMATIONS = [
 // bullets + app-screenshots. Pilaar 3 heeft een korte klant-quote.
 const PILAREN = [
   {
-    title: 'Altijd Weten Wat Te Eten Systeem',
-    subtitle: 'Een aanpak die bij jou past, ook op verjaardagen, feestjes en vakanties.',
+    title: 'Weet Wat Je Eet Systeem',
+    subtitle: 'Een aanpak die bij jou past — ook op verjaardagen, feestjes en vakanties.',
     bullets: [
       { label: 'Weten wat je eet', text: 'vaste structuur in de app, zonder rekenen' },
-      { label: 'Flexibel', text: 'meedoen met etentjes, een biertje of vakantie. Inbouwen, niet wegstrepen' },
+      { label: 'Flexibel', text: 'meedoen met etentjes, een biertje, vakantie — inbouwen, niet wegstrepen' },
     ],
     images: ['/sales-screenshots/eten.png', '/sales-screenshots/meedoen.png'],
   },
@@ -56,11 +56,12 @@ const PILAREN = [
   },
   {
     title: 'Coach In Jouw Corner',
-    subtitle: 'Ik kijk meerdere keren per week met je mee, we zien allebei dat het werkt.',
+    subtitle: 'Ik kijk meerdere keren per week met je mee — we zien allebei dat het werkt.',
     bullets: [
       { label: 'Wekelijkse check-in call', text: 'toegang tot mijn agenda' },
       { label: 'Snel bereikbaar', text: 'via de app' },
-      { label: 'Ik kijk mee', text: "gewicht, kracht en foto's, progressie zwart-op-wit" },
+      { label: 'Ik kijk mee', text: "gewicht, kracht en foto's — progressie zwart-op-wit" },
+      { label: 'Accountability', text: 'je hoeft het niet alleen te doen — ik hou je scherp en op koers' },
     ],
     images: ['/sales-screenshots/coach.png', '/sales-screenshots/tracking.png'],
     quote: { text: 'Dit was voor mij het sterkste onderdeel.', author: 'Nitish, 3 maanden afgerond' },
@@ -214,15 +215,8 @@ export default function MaandCheckout() {
             fontSize: isMobile ? 'clamp(2rem, 7.8vw, 2.6rem)' : 'clamp(2.6rem, 4.4vw, 3.6rem)',
             fontWeight: 900, lineHeight: 1.1, letterSpacing: '-0.02em', margin: 0, color: '#fff',
           }}>
-            Het in shape komen &amp; blijven systeem
+            In 3 maanden in shape komen,<br />met de MY ARC methode.
           </h1>
-          <div style={{
-            fontWeight: 500, color: 'rgba(255,255,255,0.65)', lineHeight: 1.4,
-            marginTop: isMobile ? '0.5rem' : '0.65rem',
-            fontSize: isMobile ? '1.05rem' : '1.6rem',
-          }}>
-            In 3 maanden in shape met een aanpak die je daarna niet meer kwijtraakt.
-          </div>
         </div>
 
         {/* ══ 3 transformaties — onder de titel, klein (titel domineert) ══ */}
