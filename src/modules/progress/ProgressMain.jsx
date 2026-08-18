@@ -321,6 +321,13 @@ export default function ProgressMain({ db, client }) {
         />
       )}
 
+      {/* ═══ ZONE 2b: GEWICHT-STATS — direct onder het logmoment ═══ */}
+      {!photosOpen && (
+        <div style={{ marginTop: isMobile ? '1rem' : '1.25rem' }}>
+          <WeightStatsGrid stats={weightStats} client={client} fridayData={fridayData} history={weightHistory} isMobile={isMobile} />
+        </div>
+      )}
+
       {/* ═══ ZONE 3: FOTO-KNOP — TodaysWorkoutCard-stijl: foto-banner bovenaan,
             info-rij eronder, gouden cirkel-chevron rechts ═══ */}
       {!photosOpen && (() => {
@@ -421,11 +428,10 @@ export default function ProgressMain({ db, client }) {
       })()}
 
       {/* ═══ ZONE 4: GEWICHT-CONTENT — alleen wanneer foto-dropdown gesloten ═══
-            Volgorde: stat-bar bovenaan (zwevend), daaronder de historie. */}
+            Volgorde: histograaf bovenaan, daarna omtrekken. */}
       {!photosOpen && (
         <div style={{ marginTop: isMobile ? '4.25rem' : '5.25rem' }}>
-          <WeightStatsGrid stats={weightStats} client={client} fridayData={fridayData} history={weightHistory} isMobile={isMobile} />
-          <div style={{ marginTop: isMobile ? '4rem' : '5rem' }}>
+          <div>
             <WeightHistory history={weightHistory} isMobile={isMobile} maxItems={200} />
           </div>
           <div style={{

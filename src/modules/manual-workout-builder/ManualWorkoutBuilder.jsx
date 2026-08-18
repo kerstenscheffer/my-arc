@@ -6,7 +6,7 @@ import TemplateManager from './components/TemplateManager'
 import DayTemplatePickerModal from './components/DayTemplatePickerModal'
 import ClientAssigner from './components/ClientAssigner'
 import ClientPlanManagerModal from './components/ClientPlanManagerModal'
-import { Activity, Plus, Save, Users, FileText, ChevronDown, Video, Trash2 } from 'lucide-react'
+import { Activity, Plus, Save, Users, FileText, ChevronDown, Video, Trash2, Search, X, Calendar } from 'lucide-react'
 import PDFExportButton from './components/PDFExportButton'
 import ExerciseLibraryModal from './components/ExerciseLibraryModal'
 
@@ -31,27 +31,59 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
   const [selectedSchemaId, setSelectedSchemaId] = useState(null)
   const [showSchemaPicker, setShowSchemaPicker] = useState(false)
   const [showExerciseLibrary, setShowExerciseLibrary] = useState(false)
+  const [localClient, setLocalClient] = useState(null)
+  const [showClientPicker, setShowClientPicker] = useState(false)
+  const [clientSearch, setClientSearch] = useState('')
+  const [trainingInfo, setTrainingInfo] = useState(null)
+
+  const effectiveClient = localClient || selectedClient
 
   useEffect(() => { loadTemplates(); loadDayTemplates() }, [])
 
   useEffect(() => {
     if (!selectedClient) return
-    loadClientSchemas()
+    loadClientSchemas(selectedClient)
   }, [selectedClient?.id])
 
-  const loadClientSchemas = async () => {
+  const loadClientSchemas = async (client, openAssigner = true) => {
+    if (!client) return
     try {
-      const schemas = await db.getClientSchemas(selectedClient.id)
+      const schemas = await db.getClientSchemas(client.id)
       setClientSchemas(schemas || [])
       if (schemas?.length > 0) loadSchemaIntoBuilder(schemas[0])
     } catch (e) {
       console.error('❌ getClientSchemas failed, falling back:', e)
       try {
-        const schema = await db.getClientSchema(selectedClient.id)
+        const schema = await db.getClientSchema(client.id)
         if (schema) loadSchemaIntoBuilder(schema)
       } catch {}
     }
-    setShowClientAssigner(true)
+    if (openAssigner) setShowClientAssigner(true)
+  }
+
+  const loadTrainingInfo = async (clientId) => {
+    try {
+      const { data: cd } = await db.supabase.from('clients')
+        .select('preferred_training_days, primary_goal, work_schedule, first_name, last_name')
+        .eq('id', clientId).single()
+      let intakeDays = []
+      try {
+        const { data: np } = await db.supabase.from('nutrition_preferences')
+          .select('training').eq('client_id', clientId).order('updated_at', { ascending: false }).limit(1)
+        intakeDays = np?.[0]?.training?.training_days || []
+      } catch {}
+      setTrainingInfo({ ...cd, intakeDays })
+    } catch (e) {
+      console.error('loadTrainingInfo:', e)
+    }
+  }
+
+  const handleSelectLocalClient = async (client) => {
+    setLocalClient(client)
+    setShowClientPicker(false)
+    setClientSearch('')
+    await loadClientSchemas(client, false)
+    await loadTrainingInfo(client.id)
   }
 
   const loadSchemaIntoBuilder = (schema) => {
@@ -289,7 +321,14 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
   }
 
   const activeSchema = clientSchemas.find(s => s.id === selectedSchemaId)
-  const clientName = selectedClient ? `${selectedClient.first_name || ''} ${selectedClient.last_name || ''}`.trim() : ''
+  const clientName = effectiveClient ? `${effectiveClient.first_name || ''} ${effectiveClient.last_name || ''}`.trim() : ''
+
+  const DAY_ABBR = { maandag: 'Ma', dinsdag: 'Di', woensdag: 'Wo', donderdag: 'Do', vrijdag: 'Vr', zaterdag: 'Za', zondag: 'Zo' }
+  const GOAL_LABELS = { afvallen: 'Afvallen', fat_loss: 'Afvallen', weight_loss: 'Afvallen', spieren: 'Spieropbouw', muscle_gain: 'Spieropbouw', recomp: 'Recomp', body_recomposition: 'Recomp', fitness: 'Fitter worden', general_fitness: 'Fitter worden' }
+  const filteredClients = (clients || []).filter(c => {
+    const name = `${c.first_name || ''} ${c.last_name || ''}`.toLowerCase()
+    return name.includes(clientSearch.toLowerCase())
+  })
 
   // Compacte stijl-tokens voor de header (leadsysteem-stijl, geen dikke velden).
   const cInput = { background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, padding: '0.45rem 0.6rem', color: '#fff', fontSize: '0.82rem', minHeight: 36, outline: 'none', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }
@@ -304,9 +343,33 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.7rem', flexWrap: 'wrap' }}>
           <Activity size={16} color="#FFD700" />
           <span style={{ fontSize: isMobile ? '0.9rem' : '1rem', fontWeight: 800, color: '#fff', letterSpacing: '-0.01em' }}>Workout Builder</span>
-          {selectedClient && (
+          {effectiveClient && (
             <span style={{ fontSize: '0.66rem', fontWeight: 700, color: '#FFD700', background: 'rgba(255,215,0,0.1)', border: '1px solid rgba(255,215,0,0.2)', borderRadius: 5, padding: '0.15rem 0.45rem' }}>{clientName}</span>
           )}
+          {/* Klant-loader — selecteer klant inline */}
+          <div style={{ position: 'relative' }}>
+            <button onClick={() => setShowClientPicker(!showClientPicker)} style={{ ...cBtn(false), fontSize: '0.72rem' }}>
+              <Users size={12} /> {effectiveClient ? 'Wissel klant' : 'Klant laden'}
+            </button>
+            {showClientPicker && (
+              <div style={{ position: 'absolute', top: 'calc(100% + 4px)', left: 0, zIndex: 200, background: '#111', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '10px', overflow: 'hidden', minWidth: '240px', maxHeight: '320px', boxShadow: '0 8px 32px rgba(0,0,0,0.6)', display: 'flex', flexDirection: 'column' }}>
+                <div style={{ padding: '0.5rem', borderBottom: '1px solid rgba(255,255,255,0.07)', display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <Search size={12} color="rgba(255,255,255,0.4)" />
+                  <input autoFocus value={clientSearch} onChange={e => setClientSearch(e.target.value)} placeholder="Zoek klant…" style={{ background: 'none', border: 'none', outline: 'none', color: '#fff', fontSize: '0.78rem', flex: 1 }} />
+                  {clientSearch && <button onClick={() => setClientSearch('')} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, color: 'rgba(255,255,255,0.4)' }}><X size={12} /></button>}
+                </div>
+                <div style={{ overflowY: 'auto', flex: 1 }}>
+                  {filteredClients.length === 0 && <div style={{ padding: '0.6rem 0.85rem', color: 'rgba(255,255,255,0.3)', fontSize: '0.72rem' }}>Geen klanten gevonden</div>}
+                  {filteredClients.map((c, i) => (
+                    <button key={c.id} onClick={() => handleSelectLocalClient(c)}
+                      style={{ width: '100%', padding: '0.55rem 0.85rem', background: effectiveClient?.id === c.id ? 'rgba(255,215,0,0.08)' : 'transparent', border: 'none', borderBottom: i < filteredClients.length - 1 ? '1px solid rgba(255,255,255,0.05)' : 'none', color: effectiveClient?.id === c.id ? '#FFD700' : '#fff', fontSize: '0.76rem', fontWeight: 600, cursor: 'pointer', textAlign: 'left', touchAction: 'manipulation' }}>
+                      {c.first_name} {c.last_name}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
           {clientSchemas.length > 1 && (
             <div style={{ position: 'relative' }}>
               <button onClick={() => setShowSchemaPicker(!showSchemaPicker)} style={{ ...cBtn(false), fontSize: '0.72rem' }}>
@@ -333,6 +396,32 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
             <Video size={13} /> Video's
           </button>
         </div>
+
+        {/* Training-info strip — intake data van geselecteerde klant */}
+        {trainingInfo && (
+          <div style={{ marginBottom: '0.65rem', padding: '0.5rem 0.65rem', background: 'rgba(255,215,0,0.04)', border: '1px solid rgba(255,215,0,0.15)', borderRadius: 8, display: 'flex', flexWrap: 'wrap', gap: '0.75rem', alignItems: 'center' }}>
+            <Calendar size={12} color="#FFD700" style={{ flexShrink: 0 }} />
+            {trainingInfo.preferred_training_days?.length > 0 && (
+              <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', alignItems: 'center' }}>
+                <span style={{ fontSize: '0.6rem', fontWeight: 700, color: 'rgba(255,215,0,0.6)', textTransform: 'uppercase', letterSpacing: '0.06em', marginRight: 2 }}>Voorkeur</span>
+                {trainingInfo.preferred_training_days.map(d => (
+                  <span key={d} style={{ fontSize: '0.65rem', fontWeight: 800, color: '#FFD700', background: 'rgba(255,215,0,0.1)', borderRadius: 4, padding: '0.1rem 0.35rem' }}>{DAY_ABBR[d] || d}</span>
+                ))}
+              </div>
+            )}
+            {trainingInfo.intakeDays?.length > 0 && (
+              <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', alignItems: 'center' }}>
+                <span style={{ fontSize: '0.6rem', fontWeight: 700, color: 'rgba(255,255,255,0.35)', textTransform: 'uppercase', letterSpacing: '0.06em', marginRight: 2 }}>Intake</span>
+                {trainingInfo.intakeDays.map(d => (
+                  <span key={d} style={{ fontSize: '0.65rem', fontWeight: 800, color: 'rgba(255,255,255,0.7)', background: 'rgba(255,255,255,0.07)', borderRadius: 4, padding: '0.1rem 0.35rem' }}>{DAY_ABBR[d] || d}</span>
+                ))}
+              </div>
+            )}
+            {trainingInfo.primary_goal && (
+              <span style={{ fontSize: '0.6rem', fontWeight: 700, color: 'rgba(255,255,255,0.4)', marginLeft: 'auto' }}>{GOAL_LABELS[trainingInfo.primary_goal] || trainingInfo.primary_goal}</span>
+            )}
+          </div>
+        )}
 
         {/* Regel 2: naam + beschrijving */}
         <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.5rem', flexWrap: isMobile ? 'wrap' : 'nowrap' }}>
@@ -397,7 +486,7 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
             onAddCardio={() => addCardioToDay(day.id)}
             onUpdateExercise={(exerciseId, updates) => updateExercise(day.id, exerciseId, updates)}
             onDeleteExercise={(exerciseId) => deleteExercise(day.id, exerciseId)} isMobile={isMobile}
-            db={db} client={selectedClient} />
+            db={db} client={effectiveClient} />
         ))}
         <button onClick={() => setShowDayPicker(true)} style={{ background: 'rgba(212,175,55,0.07)', border: '2px dashed rgba(212,175,55,0.3)', borderRadius: '16px', padding: isMobile ? '2rem' : '3rem', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', cursor: 'pointer', minHeight: isMobile ? '150px' : '200px', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}
           onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(212,175,55,0.15)'; e.currentTarget.style.borderColor = 'rgba(212,175,55,0.5)' }}
@@ -407,7 +496,7 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
         </button>
       </div>
 
-      {showExerciseSelector && <ExerciseSelector onSelect={addExercise} onClose={() => setShowExerciseSelector(false)} isMobile={isMobile} db={db} selectedClient={selectedClient} />}
+      {showExerciseSelector && <ExerciseSelector onSelect={addExercise} onClose={() => setShowExerciseSelector(false)} isMobile={isMobile} db={db} selectedClient={effectiveClient} />}
       {showTemplateManager && <TemplateManager templates={templates} onLoad={loadTemplate} onClose={() => setShowTemplateManager(false)} isMobile={isMobile} db={db} onChange={loadTemplates} />}
       {showDayPicker && (
         <DayTemplatePickerModal
@@ -419,7 +508,7 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
           isMobile={isMobile}
         />
       )}
-      {showClientAssigner && <ClientAssigner clients={clients} workoutPlan={workoutPlan} db={db} initialClient={selectedClient || null} onClose={() => setShowClientAssigner(false)} isMobile={isMobile} />}
+      {showClientAssigner && <ClientAssigner clients={clients} workoutPlan={workoutPlan} db={db} initialClient={effectiveClient || null} onClose={() => setShowClientAssigner(false)} isMobile={isMobile} />}
       {showPlanManager && <ClientPlanManagerModal clients={clients} templates={templates} db={db} isMobile={isMobile} onClose={() => setShowPlanManager(false)} onEditInBuilder={(schema) => { loadSchemaIntoBuilder(schema); setShowPlanManager(false) }} />}
 
       <ExerciseLibraryModal
