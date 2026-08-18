@@ -743,7 +743,7 @@ export default function KanbanCard({
 
           {/* DM-Run knop — alleen in de "Nieuwe volgers"-kolom. Goud = nog te
               doen, groen "Gedaan" = al gecontacteerd (niet meer klikbaar). */}
-          {isNieuweVolgers && (
+          {isNieuweVolgers && !activeCampaign && (
             <button
               data-no-click
               onClick={dmDone ? (e) => e.stopPropagation() : handleDMRun}
@@ -769,7 +769,7 @@ export default function KanbanCard({
           {/* Campagne-DM knop — verschijnt op ELKE card zodra er een campagne
               actief is (behalve in Nieuwe volgers, die heeft z'n eigen knop).
               Paars = campagne-actie. */}
-          {activeCampaign && !isNieuweVolgers && (
+          {activeCampaign && (
             <button
               data-no-click
               onClick={campaignDmDone ? (e) => e.stopPropagation() : handleCampaignDM}
