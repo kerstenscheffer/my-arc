@@ -108,9 +108,24 @@ export default function CampaignCard({
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                 <Target size={14} style={{ color: 'rgba(255, 255, 255, 0.5)' }} />
                 <span style={{ fontSize: '0.85rem', color: 'rgba(255, 255, 255, 0.7)' }}>
-                  {totalResponses} responses
+                  {totalResponses} responses (handmatig)
                 </span>
               </div>
+            </div>
+
+            {/* Live data — automatisch uit de leads die aan deze campagne
+                gekoppeld zijn (via de campagne-DM-knop op het bord). */}
+            <div style={{ display: 'flex', gap: isMobile ? '0.5rem' : '0.6rem', marginTop: '0.85rem' }}>
+              {[
+                { label: 'Leads', value: campaign.auto_leads ?? 0, color: '#a855f7' },
+                { label: 'Reacties', value: campaign.auto_replied ?? 0, color: '#10b981' },
+                { label: 'Reactie-%', value: `${campaign.auto_rate ?? 0}%`, color: '#FFD700' },
+              ].map(s => (
+                <div key={s.label} style={{ flex: 1, minWidth: 60, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 10, padding: '0.55rem 0.5rem', textAlign: 'center' }}>
+                  <div style={{ fontSize: isMobile ? '1.05rem' : '1.2rem', fontWeight: 900, color: s.color, lineHeight: 1.05 }}>{s.value}</div>
+                  <div style={{ fontSize: '0.5rem', fontWeight: 800, letterSpacing: '0.04em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.4)', marginTop: 3 }}>{s.label}</div>
+                </div>
+              ))}
             </div>
           </div>
 

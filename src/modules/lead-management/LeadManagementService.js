@@ -2901,7 +2901,27 @@ async createLeadWithSection(leadData, sectionId, coachId) {
         .limit(limit)
 
       if (error) throw error
-      return data || []
+      const campaigns = data || []
+
+      // Automatische cijfers per campagne: hoeveel leads zijn eraan gekoppeld
+      // (outreach_campaign_id) en hoeveel daarvan reageerden (first_reply_at).
+      // Head-count queries → geen 1000-rijen-cap. Dit is de LIVE campagne-data.
+      await Promise.all(campaigns.map(async (c) => {
+        try {
+          const base = () => this.db.supabase
+            .from('call_leads').select('id', { count: 'exact', head: true })
+            .eq('outreach_campaign_id', c.id).is('deleted_at', null)
+          const [{ count: leads }, { count: replied }] = await Promise.all([
+            base(),
+            base().not('first_reply_at', 'is', null),
+          ])
+          c.auto_leads = leads || 0
+          c.auto_replied = replied || 0
+          c.auto_rate = leads > 0 ? Math.round((replied / leads) * 1000) / 10 : 0
+        } catch { c.auto_leads = 0; c.auto_replied = 0; c.auto_rate = 0 }
+      }))
+
+      return campaigns
     } catch (error) {
       console.error('❌ Get campaigns failed:', error)
       return []
