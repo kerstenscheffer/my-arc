@@ -2,13 +2,13 @@
 // Builds a styled multi-section PDF from the WeekStatsModal data.
 // Uses jsPDF + jspdf-autotable (same toolchain as PDFExportService).
 //
-// Sections:
+// Sections (spiegelt de stats-modal: Stats + Campagnes, GEEN grafiek/calls/
+// bron/verplaatsingen):
 //   1. Header (title, period label, generated-on stamp)
-//   2. Activity (nieuwe leads, follow-ups, verplaatsingen)
-//   3. Reactie (gereageerd, niet gereageerd, opvolg)
-//   4. Conversie ratio's (response, opvolg-share, call, sale, close)
-//   5. Funnel (per stage)
-//   6. Source-breakdown (per campaign + per magnet) — includes message preview
+//   2. Overzicht — totalen (Aantallen, dezelfde headline-cards als de modal)
+//   3. Kerncijfers — percentages (response, call, sale, close…)
+//   4. Campagnes — aantallen (per campagne, ná campagne-bericht)
+//   5. Campagnes — percentages (per campagne)
 //
 // Keep this dumb: no Supabase calls, no React. Caller passes a `payload`
 // object with everything already computed.
@@ -127,7 +127,7 @@ function svgToPngDataUrl(svg, sizePx = 128) {
 export async function exportStatsPDF(payload) {
   const {
     periodLabel, periodSubtitle, coachName, generatedAt,
-    activity, reactionStats, ratios, funnel, sourceBreakdown,
+    activity, reactionStats, ratios, funnel, campaignBreakdown,
     revenueVisible = true, // owner/solo → true; teamlid → false (geen omzet)
   } = payload
 
@@ -299,98 +299,68 @@ export async function exportStatsPDF(payload) {
     y = doc.lastAutoTable.finalY + 16
   }
 
-  // ─── CALL AFGEWEZEN — REDENEN ──────────────────────────────────────────────
-  if (funnel?.callRejected?.count > 0 && funnel.callRejected.reasons) {
-    const reasonRows = Object.entries(funnel.callRejected.reasons).sort((a, b) => b[1] - a[1])
-    if (reasonRows.length > 0) {
-      section('Call afgewezen — redenen',
-        'Waarom prospects de call afwezen. Stuur op de meest voorkomende reden.')
-      autoTable(doc, darkTable({
-        startY: y,
-        head: [['Reden', 'Aantal']],
-        body: reasonRows.map(([r, n]) => [r, String(n)]),
-        headStyles: { fillColor: [249, 115, 22], textColor: BLACK, fontStyle: 'bold' },
-        columnStyles: { 1: { halign: 'right', fontStyle: 'bold', cellWidth: 60, textColor: WHITE } },
-      }))
-      y = doc.lastAutoTable.finalY + 16
-    }
-  }
-
-  // ─── SOURCE BREAKDOWN ──────────────────────────────────────────────────────
-  if (sourceBreakdown) {
-    const allSources = [
-      ...(sourceBreakdown.campaigns || []).map(c => ({ ...c, type: 'Campagne' })),
-      ...(sourceBreakdown.magnets || []).map(m => ({ ...m, type: 'Lead magnet' })),
-    ]
-    if (allSources.length > 0) {
-      section('Bron-breakdown',
-        'Per campagne en lead-magnet: hoeveel leads en hun response-, call- en sale-percentage. Zo zie je welke bron het beste presteert.')
-      const rows = allSources.map(s => {
-        // Match the on-screen labels: "Call ingepl." uses scheduled only.
-        const scheduledCalls = s.stages?.callScheduled || 0
-        const responseRate = s.total > 0 ? Math.round(((s.repliedLeads || 0) / s.total) * 100) : null
-        const callRate     = s.total > 0 ? Math.round((scheduledCalls / s.total) * 100) : null
-        const saleRate     = s.total > 0 ? Math.round(((s.stages?.sale || 0) / s.total) * 100) : null
+  // ─── CAMPAGNES (all-time, ná campagne-bericht) ─────────────────────────────
+  // Zelfde blok als "Campagnes open" in de stats-modal: per campagne de
+  // Aantallen + Percentages. Grafiek/calls/bron/verplaatsingen staan bewust
+  // NIET in de PDF — alleen Stats (boven) + Campagnes.
+  if (campaignBreakdown && (campaignBreakdown.campaigns || []).length > 0) {
+    const camps = campaignBreakdown.campaigns
+    section('Campagnes — aantallen',
+      `Per campagne alle getagde leads en wat er ná het campagne-bericht gebeurde. ${campaignBreakdown.totalLeads || 0} leads getagd (alle tijd).`)
+    autoTable(doc, darkTable({
+      startY: y,
+      head: [['Campagne', 'Getagd', 'Reacties', 'Voorgesteld', 'Ingepland', 'Sale', 'Opvolg']],
+      body: camps.map(c => {
+        const s = c.stages || {}
         return [
-          s.type,
-          s.name || '—',
-          String(s.total || 0),
-          String(s.repliedLeads || 0),
-          String(scheduledCalls),
-          String(s.stages?.sale || 0),
-          fmtPct(responseRate),
-          fmtPct(callRate),
-          fmtPct(saleRate),
+          c.name || '—',
+          String(c.total || 0),
+          String(s.replied || 0),
+          String(s.callProposed || 0),
+          String(s.callScheduled || 0),
+          String(s.sale || 0),
+          String(c.followupCount || 0),
         ]
-      })
-      autoTable(doc, darkTable({
-        startY: y,
-        head: [['Type', 'Naam', 'Leads', 'Reactie', 'Ingepl.', 'Sales', 'Resp%', 'Call ingepl.%', 'Sale%']],
-        body: rows,
-        styles: { textColor: WHITE, fillColor: ROW, lineColor: LINE, lineWidth: 0.5, fontSize: 8, cellPadding: 5, valign: 'middle' },
-        headStyles: { fillColor: GOLD, textColor: BLACK, fontStyle: 'bold' },
-        columnStyles: {
-          0: { cellWidth: 50, textColor: GRAY },
-          1: { cellWidth: 110 },
-          2: { halign: 'right' },
-          3: { halign: 'right' },
-          4: { halign: 'right' },
-          5: { halign: 'right' },
-          6: { halign: 'right', fontStyle: 'bold' },
-          7: { halign: 'right', fontStyle: 'bold' },
-          8: { halign: 'right', fontStyle: 'bold' },
-        },
-      }))
-      y = doc.lastAutoTable.finalY + 14
+      }),
+      headStyles: { fillColor: PURPLE, textColor: WHITE, fontStyle: 'bold' },
+      columnStyles: {
+        0: { cellWidth: 150 },
+        1: { halign: 'right', fontStyle: 'bold' },
+        2: { halign: 'right' },
+        3: { halign: 'right' },
+        4: { halign: 'right' },
+        5: { halign: 'right' },
+        6: { halign: 'right', textColor: GRAY },
+      },
+    }))
+    y = doc.lastAutoTable.finalY + 16
 
-      // Add per-campaign message-text appendix on a fresh page if any.
-      const campaignsWithMsg = (sourceBreakdown.campaigns || []).filter(c => c.messageText)
-      if (campaignsWithMsg.length > 0) {
-        newPage()
-        section('Outreach-berichten',
-          'De letterlijke outreach-tekst per campagne.')
-        for (const c of campaignsWithMsg) {
-          if (y > 720) newPage()
-          doc.setFontSize(10)
-          doc.setTextColor(...GOLD)
-          doc.setFont('helvetica', 'bold')
-          doc.text(c.name, margin, y)
-          y += 12
-          if (c.platform || c.purpose) {
-            doc.setFontSize(8)
-            doc.setTextColor(...GRAY)
-            doc.text(`${c.platform || ''}${c.platform && c.purpose ? ' · ' : ''}${c.purpose || ''}`, margin, y)
-            y += 10
-          }
-          doc.setFontSize(9)
-          doc.setTextColor(...WHITE)
-          doc.setFont('helvetica', 'normal')
-          const lines = doc.splitTextToSize(c.messageText, pageW - 2 * margin)
-          doc.text(lines, margin, y)
-          y += lines.length * 11 + 14
-        }
-      }
-    }
+    section('Campagnes — percentages',
+      'De verhoudingen per campagne: reactie-%, voorstel-%, en de doorstroom naar call en sale.')
+    const pc = (a, b) => (b > 0 ? `${Math.round((a / b) * 100)}%` : '—')
+    autoTable(doc, darkTable({
+      startY: y,
+      head: [['Campagne', 'Reactie', 'Voorstel', 'Voorstel→call', 'Close']],
+      body: camps.map(c => {
+        const s = c.stages || {}
+        return [
+          c.name || '—',
+          pc(s.replied || 0, c.total || 0),
+          pc(s.callProposed || 0, c.total || 0),
+          pc(s.callScheduled || 0, s.callProposed || 0),
+          pc(s.sale || 0, s.callScheduled || 0),
+        ]
+      }),
+      headStyles: { fillColor: PURPLE, textColor: WHITE, fontStyle: 'bold' },
+      columnStyles: {
+        0: { cellWidth: 150 },
+        1: { halign: 'right', fontStyle: 'bold' },
+        2: { halign: 'right', fontStyle: 'bold' },
+        3: { halign: 'right', fontStyle: 'bold' },
+        4: { halign: 'right', fontStyle: 'bold' },
+      },
+    }))
+    y = doc.lastAutoTable.finalY + 14
   }
 
   // ─── FOOTER on every page ──────────────────────────────────────────────────

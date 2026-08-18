@@ -558,7 +558,7 @@ export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, 
                 const res = await exportStatsPDF({
                   periodLabel, periodSubtitle,
                   generatedAt: new Date().toLocaleString('nl-NL', { dateStyle: 'short', timeStyle: 'short' }),
-                  activity, funnel, reactionStats, sourceBreakdown,
+                  activity, funnel, reactionStats, campaignBreakdown,
                   revenueVisible: true, // omzet mag in de PDF (ook voor teamleden)
                   ratios: {
                     responseRate, chaseShare, showRate, noShowRate,
