@@ -2729,17 +2729,43 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
     try {
       // Alle campagne-getagde leads (geen datum-venster). Gepagineerd i.v.m. de
       // 1000-rijen-cap. Geen coach_id-filter → RLS neemt team-leads mee.
+      // campaign_message_sent_at = stabiele tijd van het campagne-bericht
+      // (handleCampaignDM stempelt dit; wordt NIET gereset bij een reactie, i.t.t.
+      // last_followup_sent_at) → onze betrouwbare "na-campagne"-anker.
       const leads = await this._fetchAllRows(() => this.db.supabase
         .from('call_leads')
-        .select('id, outreach_campaign_id, followup_count, first_reply_at')
+        .select('id, outreach_campaign_id, followup_count, campaign_message_sent_at')
         .not('outreach_campaign_id', 'is', null)
         .is('deleted_at', null))
 
       const leadIds = (leads || []).map(l => l.id)
       if (leadIds.length === 0) return { campaigns: [], totalLeads: 0 }
 
-      // Stage-detectie op ALLE movements van deze leads (geen tijdvenster) —
-      // "heeft deze lead ooit voorgesteld/ingepland/sale bereikt?".
+      // Anker per lead: het moment van het campagne-bericht. Reacties/funnel-
+      // stappen tellen ALLEEN als ze ná dit moment gebeurden — anders vervuilen
+      // oude reacties (van vóór de campagne) de cijfers.
+      const anchor = new Map((leads || []).map(l => [l.id, l.campaign_message_sent_at ? new Date(l.campaign_message_sent_at).getTime() : null]))
+
+      // 1) REACTIES ná campagne — uit lead_reaction_events (elke +1 op de reactie-
+      //    teller wordt daar met timestamp gelogd). Zo tellen we alléén reacties
+      //    ná het campagne-bericht, niet historische reacties op oude berichten.
+      const repliedAfter = new Set()
+      for (let i = 0; i < leadIds.length; i += 300) {
+        const chunk = leadIds.slice(i, i + 300)
+        const { data } = await this.db.supabase
+          .from('lead_reaction_events')
+          .select('lead_id, delta, created_at')
+          .in('lead_id', chunk)
+          .gt('delta', 0)
+        ;(data || []).forEach(ev => {
+          const a = anchor.get(ev.lead_id)
+          if (!a || !ev.created_at) return
+          if (new Date(ev.created_at).getTime() >= a) repliedAfter.add(ev.lead_id)
+        })
+      }
+
+      // 2) DIEPERE FUNNEL ná campagne — uit lead_movements (voorgesteld/ingepland/
+      //    sale-secties) met moved_at ná het campagne-bericht.
       const stageKeywords = [
         { key: 'callProposed',  words: ['voorgesteld', 'voorstel'] },
         { key: 'callScheduled', words: ['sales call', 'ingepland', 'scheduled', 'booking', 'afspraak', 'meeting'] },
@@ -2751,9 +2777,13 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
         const chunk = leadIds.slice(i, i + 300)
         const { data } = await this.db.supabase
           .from('lead_movements')
-          .select('lead_id, to_section_title')
+          .select('lead_id, to_section_title, moved_at')
           .in('lead_id', chunk)
         ;(data || []).forEach(m => {
+          const a = anchor.get(m.lead_id)
+          // Geen anker (geen campagne-bericht-stempel) → niks telt als na-campagne.
+          if (!a) return
+          if (!m.moved_at || new Date(m.moved_at).getTime() < a) return
           const t = (m.to_section_title || '').toLowerCase()
           if (NEGATIVE_FUNNEL_WORDS.some(w => t.includes(w))) return
           for (const stage of stageKeywords) {
@@ -2778,7 +2808,7 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
       ;(leads || []).forEach(l => {
         const st = perLeadStages.get(l.id) || { callProposed: 0, callScheduled: 0, sale: 0 }
         const fc = l.followup_count || 0
-        const repliedOne = l.first_reply_at ? 1 : 0
+        const repliedOne = repliedAfter.has(l.id) ? 1 : 0
         const c = campMap.get(l.outreach_campaign_id)
         const entry = campStats.get(l.outreach_campaign_id) || {
           id: l.outreach_campaign_id,
@@ -2788,7 +2818,7 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
           purpose: c?.purpose || null,
           total: 0, reached: 0, followupCount: 0,
           repliedLeads: 0, followedLeads: 0,
-          // stages.replied = eerste-reactie-stempel (canonieke "gereageerd"-meting)
+          // stages tellen alleen na-campagne-activiteit (movements ná het bericht)
           stages: { replied: 0, callProposed: 0, callScheduled: 0, sale: 0 },
         }
         entry.total += 1

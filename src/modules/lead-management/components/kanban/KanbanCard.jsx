@@ -369,7 +369,7 @@ export default function KanbanCard({
         // campagne, MAAR alleen als de lead nog geen bron heeft (magnet/campagne
         // niet overschrijven). Zo verschijnt-ie met reactie-% in de bron-breakdown.
         ...(!lead.outreach_campaign_id && !lead.source_lead_magnet_id
-          ? { outreach_campaign_id: NIEUWE_VOLGERS_CAMPAIGN_ID }
+          ? { outreach_campaign_id: NIEUWE_VOLGERS_CAMPAIGN_ID, campaign_message_sent_at: nowISO }
           : {}),
       })
     } catch (error) {
@@ -418,6 +418,8 @@ export default function KanbanCard({
         followup_count: newFollowup,
         last_followup_sent_at: nowISO,
         outreach_campaign_id: activeCampaign.id,
+        // Stabiel anker voor "reacties ná dit campagne-bericht" (reset niet bij reactie).
+        campaign_message_sent_at: nowISO,
       })
     } catch (error) {
       console.error('Campagne-DM markeren mislukt:', error)
