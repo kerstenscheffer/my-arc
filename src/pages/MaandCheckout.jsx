@@ -28,9 +28,8 @@ const REVIEWS = [
 
 // Transformatie-reviews (before/after) met resultaat-tekst.
 const TRANSFORMATIONS = [
-  { src: '/review-transformatie-3.png', caption: 'Saskia ging van 85 naar 78,5 en dalend.' },
   { src: '/review-transformatie-1.png', caption: 'Kersten: van zachte buik naar sixpack.' },
-  { src: '/review-transformatie-2.png', caption: 'Nitish bouwde spier terwijl zijn vet % daalde.' },
+  { src: '/review-transformatie-2-16week.png', caption: 'Nitish bouwde spier terwijl zijn vet % daalde.' },
 ]
 
 // De 3 pilaren van de sales-pagina (OfferPilarenSection): titel + subtitel +
@@ -215,7 +214,7 @@ export default function MaandCheckout() {
             fontSize: isMobile ? 'clamp(2rem, 7.8vw, 2.6rem)' : 'clamp(2.6rem, 4.4vw, 3.6rem)',
             fontWeight: 900, lineHeight: 1.1, letterSpacing: '-0.02em', margin: 0, color: '#fff',
           }}>
-            In 3 maanden in shape komen,<br />met de MY ARC methode.
+            In 16 weken in shape komen,<br />met de MY ARC methode.
           </h1>
         </div>
 
@@ -348,12 +347,12 @@ export default function MaandCheckout() {
             <span style={{ fontSize: isMobile ? '1rem' : '1.2rem', color: 'rgba(255,255,255,0.4)', fontWeight: 700 }}>/mnd</span>
           </div>
           <div style={{ fontSize: isMobile ? '0.82rem' : '0.9rem', color: 'rgba(255,255,255,0.45)', fontWeight: 600, marginTop: 8 }}>
-            3 maanden × €99 = <span style={{ color: '#fff', fontWeight: 800 }}>€297 totaal</span>
+            Het 16-weken traject · 3 × €99 = <span style={{ color: '#fff', fontWeight: 800 }}>€297 totaal</span>
           </div>
 
           {/* Garantie — bold wit, met een gouden streep eronder als accent */}
           <div style={{ fontSize: isMobile ? '1.05rem' : '1.2rem', color: '#fff', fontWeight: 800, lineHeight: 1.45, maxWidth: 470, margin: isMobile ? '1.6rem auto 0' : '2rem auto 0' }}>
-            <span style={{ color: '#ffba09' }}>Geen zichtbaar verschil binnen 30 dagen?</span> Dan krijg je je investering terug en loop je weg met 30 dagen gratis coaching.
+            Geen succesvolle transformatie? <span style={{ color: '#ffba09' }}>Krijg je investering terug.</span>
           </div>
           <div style={{ width: 56, height: 3, background: '#ffba09', borderRadius: 2, margin: isMobile ? '1.1rem auto 0' : '1.25rem auto 0' }} />
 
