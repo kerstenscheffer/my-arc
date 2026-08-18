@@ -80,6 +80,9 @@ export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, 
   const [activity, setActivity] = useState(null)
   const [funnel, setFunnel] = useState(null)
   const [sourceBreakdown, setSourceBreakdown] = useState(null)
+  // All-time campagne-breakdown (los van de periode) — campagnes op bestaande
+  // volgers vallen buiten de nieuwe-leads-bron-breakdown, dus apart geladen.
+  const [campaignBreakdown, setCampaignBreakdown] = useState(null)
   const [reactionStats, setReactionStats] = useState(null)
   const [timeSeries, setTimeSeries] = useState([])
   const [callProposals, setCallProposals] = useState([])
@@ -330,6 +333,18 @@ export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, 
     return () => { cancelled = true }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, leadService, coachId, periodMode, +start, +end, reloadKey])
+
+  // Campagne-breakdown is all-time → alleen laden bij openen / reload, niet bij
+  // periode-navigatie (scheelt onnodige queries).
+  useEffect(() => {
+    if (!isOpen || !leadService || !coachId) return
+    if (!leadService.getCampaignBreakdown) return
+    let cancelled = false
+    leadService.getCampaignBreakdown(coachId)
+      .then(cb => { if (!cancelled) setCampaignBreakdown(cb) })
+      .catch(() => { if (!cancelled) setCampaignBreakdown(null) })
+    return () => { cancelled = true }
+  }, [isOpen, leadService, coachId, reloadKey])
 
   if (!isOpen) return null
 
@@ -749,6 +764,20 @@ export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, 
                           {p.content}
                         </div>
                       </div>
+                    ))}
+                  </div>
+                </>
+              )}
+
+              {/* Campagnes — all-time, ongeacht de periode. Toont campagnes die
+                  bestaande volgers aanschrijven (die vallen buiten de nieuwe-
+                  leads-breakdown hieronder). */}
+              {campaignBreakdown && campaignBreakdown.campaigns.length > 0 && (
+                <>
+                  <SectionTitle icon={<Send size={13} color="#a855f7" />} title={`Campagnes · ${campaignBreakdown.totalLeads} getagd (alle tijd)`} />
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+                    {campaignBreakdown.campaigns.map(c => (
+                      <SourceRow key={c.id} icon={<Send size={12} color="#a855f7" />} label={c.name} total={c.total} reached={c.reached} stages={c.stages} followupCount={c.followupCount} repliedLeads={c.repliedLeads} followedLeads={c.followedLeads} messageText={c.messageText} platform={c.platform} purpose={c.purpose} accent="#a855f7" />
                     ))}
                   </div>
                 </>

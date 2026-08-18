@@ -2720,6 +2720,99 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
     }
   }
 
+  // All-time breakdown per outreach-campagne — ONGEACHT wanneer de lead is
+  // aangemaakt. Bedoeld voor campagnes die bestaande volgers aanschrijven
+  // (die leads zijn niet "nieuw in de periode", dus de bron-breakdown mist ze).
+  // Groepeert ALLE campagne-getagde leads op campagne, met dezelfde funnel-
+  // stages als getRangeLeadSources zodat de UI SourceRow kan hergebruiken.
+  async getCampaignBreakdown(coachId) {
+    try {
+      // Alle campagne-getagde leads (geen datum-venster). Gepagineerd i.v.m. de
+      // 1000-rijen-cap. Geen coach_id-filter → RLS neemt team-leads mee.
+      const leads = await this._fetchAllRows(() => this.db.supabase
+        .from('call_leads')
+        .select('id, outreach_campaign_id, followup_count, first_reply_at')
+        .not('outreach_campaign_id', 'is', null)
+        .is('deleted_at', null))
+
+      const leadIds = (leads || []).map(l => l.id)
+      if (leadIds.length === 0) return { campaigns: [], totalLeads: 0 }
+
+      // Stage-detectie op ALLE movements van deze leads (geen tijdvenster) —
+      // "heeft deze lead ooit voorgesteld/ingepland/sale bereikt?".
+      const stageKeywords = [
+        { key: 'callProposed',  words: ['voorgesteld', 'voorstel'] },
+        { key: 'callScheduled', words: ['sales call', 'ingepland', 'scheduled', 'booking', 'afspraak', 'meeting'] },
+        { key: 'sale',          words: ['sale', 'verkocht', 'klant', 'client', 'gewonnen', 'won', 'deal'] },
+      ]
+      const perLeadStages = new Map()
+      const reachedCall = new Set()
+      for (let i = 0; i < leadIds.length; i += 300) {
+        const chunk = leadIds.slice(i, i + 300)
+        const { data } = await this.db.supabase
+          .from('lead_movements')
+          .select('lead_id, to_section_title')
+          .in('lead_id', chunk)
+        ;(data || []).forEach(m => {
+          const t = (m.to_section_title || '').toLowerCase()
+          if (NEGATIVE_FUNNEL_WORDS.some(w => t.includes(w))) return
+          for (const stage of stageKeywords) {
+            if (stage.words.some(k => t.includes(k))) {
+              const entry = perLeadStages.get(m.lead_id) || { callProposed: 0, callScheduled: 0, sale: 0 }
+              entry[stage.key] = 1
+              perLeadStages.set(m.lead_id, entry)
+              if (stage.key === 'callProposed' || stage.key === 'callScheduled') reachedCall.add(m.lead_id)
+              break
+            }
+          }
+        })
+      }
+
+      const campIds = [...new Set((leads || []).map(l => l.outreach_campaign_id).filter(Boolean))]
+      const { data: camps } = campIds.length
+        ? await this.db.supabase.from('outreach_campaigns').select('id, name, variant_tag, message_text, platform, purpose').in('id', campIds)
+        : { data: [] }
+      const campMap = new Map((camps || []).map(c => [c.id, c]))
+
+      const campStats = new Map()
+      ;(leads || []).forEach(l => {
+        const st = perLeadStages.get(l.id) || { callProposed: 0, callScheduled: 0, sale: 0 }
+        const fc = l.followup_count || 0
+        const repliedOne = l.first_reply_at ? 1 : 0
+        const c = campMap.get(l.outreach_campaign_id)
+        const entry = campStats.get(l.outreach_campaign_id) || {
+          id: l.outreach_campaign_id,
+          name: c ? `${c.name}${c.variant_tag ? ` · ${c.variant_tag}` : ''}` : 'Onbekende campagne',
+          messageText: c?.message_text || null,
+          platform: c?.platform || null,
+          purpose: c?.purpose || null,
+          total: 0, reached: 0, followupCount: 0,
+          repliedLeads: 0, followedLeads: 0,
+          // stages.replied = eerste-reactie-stempel (canonieke "gereageerd"-meting)
+          stages: { replied: 0, callProposed: 0, callScheduled: 0, sale: 0 },
+        }
+        entry.total += 1
+        entry.reached += reachedCall.has(l.id) ? 1 : 0
+        entry.followupCount += fc
+        entry.repliedLeads  += repliedOne
+        entry.followedLeads += fc > 0 ? 1 : 0
+        entry.stages.replied       += repliedOne
+        entry.stages.callProposed  += st.callProposed
+        entry.stages.callScheduled += st.callScheduled
+        entry.stages.sale          += st.sale
+        campStats.set(l.outreach_campaign_id, entry)
+      })
+
+      return {
+        campaigns: [...campStats.values()].sort((a, b) => b.total - a.total),
+        totalLeads: (leads || []).length,
+      }
+    } catch (error) {
+      console.error('❌ Get campaign breakdown failed:', error)
+      return { campaigns: [], totalLeads: 0 }
+    }
+  }
+
   async getActivityHistory(coachId, days = 7) {
     try {
       const cutoffDate = new Date()
