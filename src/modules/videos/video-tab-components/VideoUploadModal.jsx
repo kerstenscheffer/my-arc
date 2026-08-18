@@ -21,12 +21,13 @@ const PAGE_OPTIONS = [
   { value: 'profile',      label: 'Profile',      icon: User },
 ]
 
-export default function VideoUploadModal({ 
-  onClose, 
-  onSave, 
-  categories = [], 
+export default function VideoUploadModal({
+  onClose,
+  onSave,
+  categories = [],
   customCategories = [],
-  db 
+  clients = [],
+  db
 }) {
   const [formData, setFormData] = useState({
     title: '',
@@ -43,6 +44,22 @@ export default function VideoUploadModal({
   const [thumbnailFile, setThumbnailFile] = useState(null)
   const [thumbnailPreview, setThumbnailPreview] = useState(null)
   const [uploading, setUploading] = useState(false)
+
+  // Voor wie is deze video? 'everyone' = standaard zichtbaar voor alle clients
+  // (via default_pages/slider). 'specific' = alleen losse toewijzing aan gekozen
+  // klant(en) op één pagina.
+  const [audience, setAudience] = useState('everyone')
+  const [selectedClientIds, setSelectedClientIds] = useState([])
+  const [clientSearch, setClientSearch] = useState('')
+  const [assignPage, setAssignPage] = useState('home')
+
+  const toggleClient = (id) => {
+    setSelectedClientIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id])
+  }
+  const clientName = (c) => `${c.first_name || ''} ${c.last_name || ''}`.trim() || c.email || 'Klant'
+  const filteredClients = (clients || []).filter(c =>
+    !clientSearch.trim() || clientName(c).toLowerCase().includes(clientSearch.toLowerCase())
+  )
 
   const isMobile = useIsMobile()
 
@@ -74,6 +91,10 @@ export default function VideoUploadModal({
       alert('Vul minimaal een titel en video URL in')
       return
     }
+    if (audience === 'specific' && selectedClientIds.length === 0) {
+      alert('Kies minimaal één klant, of kies "Iedereen".')
+      return
+    }
 
     setUploading(true)
     try {
@@ -82,7 +103,7 @@ export default function VideoUploadModal({
       if (thumbnailFile) {
         const user = await db.getCurrentUser()
         const uploadResult = await videoService.uploadThumbnail(thumbnailFile, user.id)
-        
+
         if (uploadResult.success) {
           thumbnailUrl = uploadResult.thumbnailUrl
         } else {
@@ -90,9 +111,17 @@ export default function VideoUploadModal({
         }
       }
 
+      const specific = audience === 'specific'
       await onSave({
         ...formData,
-        thumbnail_url: thumbnailUrl
+        // Specifieke toewijzing → niet standaard voor iedereen tonen.
+        default_pages: specific ? [] : formData.default_pages,
+        show_in_slider: specific ? false : formData.show_in_slider,
+        thumbnail_url: thumbnailUrl,
+        // Doorgegeven aan CoachVideoTab om ná createVideo toe te wijzen.
+        _audience: audience,
+        _clientIds: specific ? selectedClientIds : [],
+        _assignPage: assignPage,
       })
     } catch (error) {
       console.error('Error creating video:', error)
@@ -459,6 +488,135 @@ export default function VideoUploadModal({
             />
           </div>
 
+          {/* ── VOOR WIE? — Iedereen vs specifieke klant(en) ── */}
+          <div style={{
+            padding: isMobile ? '0.75rem 0.875rem' : '0.875rem 1.125rem',
+            borderBottom: '1px solid rgba(255, 255, 255, 0.04)'
+          }}>
+            <label style={labelStyle}>Voor wie is deze video?</label>
+            <div style={{ display: 'flex', gap: '0.4rem' }}>
+              {[
+                { key: 'everyone', label: 'Iedereen', Icon: Globe, sub: 'Alle clients' },
+                { key: 'specific', label: 'Specifieke klant', Icon: User, sub: 'Kies wie' },
+              ].map(opt => {
+                const on = audience === opt.key
+                return (
+                  <button
+                    key={opt.key}
+                    onClick={() => setAudience(opt.key)}
+                    style={{
+                      flex: 1, padding: '0.6rem 0.5rem',
+                      background: on ? GOLD : 'transparent',
+                      border: `1px solid ${on ? GOLD : 'rgba(255,255,255,0.1)'}`,
+                      borderRadius: '8px', cursor: 'pointer',
+                      color: on ? '#000' : 'rgba(255,255,255,0.55)',
+                      display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.2rem',
+                      touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+                    }}
+                  >
+                    <opt.Icon size={15} />
+                    <span style={{ fontSize: '0.72rem', fontWeight: 800 }}>{opt.label}</span>
+                    <span style={{ fontSize: '0.55rem', fontWeight: 600, opacity: 0.7 }}>{opt.sub}</span>
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+
+          {/* ── SPECIFIEKE KLANT(EN) — picker + pagina ── */}
+          {audience === 'specific' && (
+            <div style={{
+              padding: isMobile ? '0.75rem 0.875rem' : '0.875rem 1.125rem',
+              borderBottom: '1px solid rgba(255, 255, 255, 0.04)',
+              borderLeft: `3px solid ${GOLD}`,
+            }}>
+              <label style={{ ...labelStyle, display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                <User size={10} />
+                Kies klant(en)
+                {selectedClientIds.length > 0 && (
+                  <span style={{ marginLeft: '0.3rem', padding: '0.1rem 0.35rem', background: GOLD, color: '#000', borderRadius: '3px', fontSize: '0.5rem', fontWeight: 800, letterSpacing: 0 }}>
+                    {selectedClientIds.length}
+                  </span>
+                )}
+              </label>
+
+              <input
+                type="text"
+                value={clientSearch}
+                onChange={(e) => setClientSearch(e.target.value)}
+                placeholder="Zoek klant…"
+                style={{ ...inputStyle, marginBottom: '0.4rem' }}
+              />
+
+              <div style={{
+                maxHeight: '168px', overflowY: 'auto', WebkitOverflowScrolling: 'touch',
+                border: '1px solid rgba(255,255,255,0.06)', borderRadius: '8px', background: '#000',
+              }}>
+                {filteredClients.length === 0 ? (
+                  <div style={{ padding: '1rem', textAlign: 'center', fontSize: '0.72rem', color: 'rgba(255,255,255,0.35)' }}>
+                    Geen klanten gevonden.
+                  </div>
+                ) : filteredClients.map(c => {
+                  const on = selectedClientIds.includes(c.id)
+                  return (
+                    <button
+                      key={c.id}
+                      onClick={() => toggleClient(c.id)}
+                      style={{
+                        width: '100%', display: 'flex', alignItems: 'center', gap: '0.5rem',
+                        padding: '0.5rem 0.65rem', background: on ? 'rgba(255,215,0,0.1)' : 'transparent',
+                        border: 'none', borderBottom: '1px solid rgba(255,255,255,0.04)',
+                        cursor: 'pointer', textAlign: 'left',
+                        touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+                      }}
+                    >
+                      <span style={{
+                        width: 16, height: 16, flexShrink: 0, borderRadius: '4px',
+                        border: `1px solid ${on ? GOLD : 'rgba(255,255,255,0.2)'}`,
+                        background: on ? GOLD : 'transparent',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      }}>
+                        {on && <Check size={11} strokeWidth={3} color="#000" />}
+                      </span>
+                      <span style={{ flex: 1, minWidth: 0, fontSize: '0.8rem', fontWeight: 700, color: on ? '#fff' : 'rgba(255,255,255,0.7)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {clientName(c)}
+                      </span>
+                    </button>
+                  )
+                })}
+              </div>
+
+              {/* Op welke pagina verschijnt de video bij deze klant(en)? */}
+              <label style={{ ...labelStyle, marginTop: '0.6rem' }}>Verschijnt op pagina</label>
+              <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr 1fr' : 'repeat(3, 1fr)', gap: '0.3rem' }}>
+                {PAGE_OPTIONS.map(page => {
+                  const Icon = page.icon
+                  const on = assignPage === page.value
+                  return (
+                    <button
+                      key={page.value}
+                      onClick={() => setAssignPage(page.value)}
+                      style={{
+                        padding: '0.5rem 0.4rem',
+                        background: on ? GOLD : 'transparent',
+                        border: on ? `1px solid ${GOLD}` : '1px solid rgba(255,255,255,0.08)',
+                        borderRadius: '6px', color: on ? '#000' : 'rgba(255,255,255,0.5)',
+                        fontSize: '0.65rem', fontWeight: 800, cursor: 'pointer',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.3rem',
+                        textTransform: 'uppercase', letterSpacing: '0.03em', minHeight: '38px',
+                        touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+                      }}
+                    >
+                      <Icon size={12} />
+                      {page.label}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+          )}
+
+          {audience === 'everyone' && (<>
           {/* ── STANDAARD ZICHTBAAR OP (default_pages) ── */}
           <div style={{
             padding: isMobile ? '0.75rem 0.875rem' : '0.875rem 1.125rem',
@@ -540,6 +698,7 @@ export default function VideoUploadModal({
               </button>
             </div>
           </div>
+          </>)}
 
           {/* Filler to ensure action buttons aren't flush against last field */}
           <div style={{ height: '0.5rem' }} />

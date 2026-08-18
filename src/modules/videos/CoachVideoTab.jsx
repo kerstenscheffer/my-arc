@@ -526,15 +526,29 @@ export default function CoachVideoTab({ clients = [], db }) {
           onClose={() => setShowUploadModal(false)}
           onSave={async (videoData) => {
             const user = await db.getCurrentUser()
+            // _audience/_clientIds/_assignPage zijn UI-only velden; createVideo
+            // negeert onbekende velden, maar we halen ze er netjes uit.
+            const { _audience, _clientIds = [], _assignPage = 'home', ...videoFields } = videoData
             const result = await videoService.createVideo({
-              ...videoData,
+              ...videoFields,
               coach_id: user.id
             })
             if (result.success) {
+              // Specifieke klant(en) → direct toewijzen aan de nieuwe video.
+              if (_audience === 'specific' && _clientIds.length > 0 && result.data?.id) {
+                const assignRes = await videoService.assignVideo(result.data.id, _clientIds, {
+                  type: 'manual',
+                  pageContext: _assignPage,
+                })
+                if (!assignRes.success) {
+                  alert(`Video aangemaakt, maar toewijzen mislukte: ${assignRes.error}`)
+                }
+              }
               await loadVideos()
               setShowUploadModal(false)
             }
           }}
+          clients={localClients}
           customCategories={customCategories}
           db={db}
         />
