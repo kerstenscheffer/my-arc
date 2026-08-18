@@ -130,6 +130,10 @@ export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, 
   }, [isOpen, coachId, leadService])
   // Welke funnel-stap staat open in de drill-down (voor terugdraaien/verwijderen).
   const [drillStage, setDrillStage] = useState(null)
+  // Welke onderste secties (grafiek/calls/campagnes/bron/verplaatsingen) open
+  // staan — bediend via de vierkante tab-vakjes op één rij.
+  const [openTabs, setOpenTabs] = useState({})
+  const toggleTab = (k) => setOpenTabs(p => ({ ...p, [k]: !p[k] }))
 
   // Preview-blob-URL opruimen wanneer 'ie sluit of de modal ontmount.
   useEffect(() => () => { if (pdfPreview?.url) URL.revokeObjectURL(pdfPreview.url) }, [pdfPreview])
