@@ -695,14 +695,43 @@ export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, 
                 <ChevronRight size={16} style={{ flexShrink: 0, opacity: 0.6 }} />
               </button>
 
-              {/* Growth chart — input vs output over time. Window is wider
-                  than the period (min 30 days) so coach sees trends. */}
-              {timeSeries && timeSeries.length > 0 && (
-                <CollapsibleSection
-                  icon={<LineChartIcon size={13} color={GOLD} />}
-                  title={`Groei (${timeSeries.length}-daagse trend)`}
-                  accent={GOLD}
-                >
+              {/* ─── Vierkante tab-vakjes op één rij — klik opent de sectie eronder ─── */}
+              {(() => {
+                const tabs = [
+                  { key: 'grafiek',        label: 'Grafiek',     Icon: LineChartIcon, show: timeSeries && timeSeries.length > 0 },
+                  { key: 'calls',          label: 'Calls',       Icon: PhoneCall,     show: callProposals && callProposals.length > 0 },
+                  { key: 'campagnes',      label: 'Campagnes',   Icon: Send,          show: campaignBreakdown && campaignBreakdown.campaigns.length > 0 },
+                  { key: 'bron',           label: 'Bron',        Icon: FileText,      show: sourceBreakdown && (sourceBreakdown.campaigns.length > 0 || sourceBreakdown.magnets.length > 0 || sourceBreakdown.noSource.total > 0) },
+                  { key: 'verplaatsingen', label: 'Verplaats.',  Icon: Calendar,      show: activity.movementsList && activity.movementsList.length > 0 },
+                ].filter(t => t.show)
+                if (!tabs.length) return null
+                return (
+                  <div style={{ display: 'flex', gap: isMobile ? 6 : 8, margin: '0.9rem 0 0.5rem' }}>
+                    {tabs.map(t => {
+                      const on = !!openTabs[t.key]
+                      return (
+                        <button key={t.key} onClick={() => toggleTab(t.key)}
+                          style={{
+                            flex: '1 1 0', minWidth: 0, aspectRatio: '1 / 1', maxWidth: isMobile ? 'none' : 108,
+                            display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 6,
+                            background: on ? 'rgba(255,215,0,0.12)' : 'rgba(255,255,255,0.03)',
+                            border: `1px solid ${on ? 'rgba(255,215,0,0.5)' : 'rgba(255,255,255,0.08)'}`,
+                            borderRadius: 12, cursor: 'pointer', fontFamily: 'inherit',
+                            touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+                          }}>
+                          <t.Icon size={isMobile ? 18 : 21} color={on ? GOLD : 'rgba(255,255,255,0.55)'} strokeWidth={2.2} />
+                          <span style={{ fontSize: isMobile ? '0.5rem' : '0.58rem', fontWeight: 800, letterSpacing: '0.02em', textTransform: 'uppercase', textAlign: 'center', lineHeight: 1.1, color: on ? GOLD : 'rgba(255,255,255,0.6)' }}>{t.label}</span>
+                        </button>
+                      )
+                    })}
+                  </div>
+                )
+              })()}
+
+              {/* Grafiek */}
+              {openTabs.grafiek && timeSeries && timeSeries.length > 0 && (
+                <>
+                  <SectionTitle icon={<LineChartIcon size={13} color={GOLD} />} title={`Groei (${timeSeries.length}-daagse trend)`} />
                   <div style={{
                     padding: '0.75rem 0.85rem 0.5rem',
                     background: 'rgba(255,255,255,0.02)',
@@ -712,16 +741,13 @@ export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, 
                   }}>
                     <GrowthChart data={timeSeries} isMobile={isMobile} />
                   </div>
-                </CollapsibleSection>
+                </>
               )}
 
               {/* Call-voorstellen — exact wat ik gestuurd heb + uitkomst */}
-              {callProposals && callProposals.length > 0 && (
-                <CollapsibleSection
-                  icon={<PhoneCall size={13} color={GOLD} />}
-                  title={`Call-voorstellen (${callProposals.length})`}
-                  accent={GOLD}
-                >
+              {openTabs.calls && callProposals && callProposals.length > 0 && (
+                <>
+                  <SectionTitle icon={<PhoneCall size={13} color={GOLD} />} title={`Call-voorstellen (${callProposals.length})`} />
                   <div style={{
                     display: 'flex', flexDirection: 'column', gap: 5,
                     marginBottom: '0.85rem',
@@ -770,25 +796,26 @@ export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, 
                       </div>
                     ))}
                   </div>
-                </CollapsibleSection>
+                </>
               )}
 
-              {/* Campagnes — all-time, ongeacht de periode. Toont campagnes die
-                  bestaande volgers aanschrijven (die vallen buiten de nieuwe-
-                  leads-breakdown hieronder). */}
-              {campaignBreakdown && campaignBreakdown.campaigns.length > 0 && (
-                <CollapsibleSection icon={<Send size={13} color="#a855f7" />} title={`Campagnes · ${campaignBreakdown.totalLeads} getagd (alle tijd)`} accent="#a855f7">
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+              {/* Campagnes — all-time, ongeacht de periode. Per campagne de
+                  Aantallen + Percentages in de top-modal-stijl (StatFlow). */}
+              {openTabs.campagnes && campaignBreakdown && campaignBreakdown.campaigns.length > 0 && (
+                <>
+                  <SectionTitle icon={<Send size={13} color="#a855f7" />} title={`Campagnes · ${campaignBreakdown.totalLeads} getagd (alle tijd)`} />
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginBottom: '0.85rem' }}>
                     {campaignBreakdown.campaigns.map(c => (
-                      <SourceRow key={c.id} icon={<Send size={12} color="#a855f7" />} label={c.name} total={c.total} reached={c.reached} stages={c.stages} followupCount={c.followupCount} repliedLeads={c.repliedLeads} followedLeads={c.followedLeads} messageText={c.messageText} platform={c.platform} purpose={c.purpose} accent="#a855f7" />
+                      <CampaignStatCard key={c.id} campaign={c} isMobile={isMobile} />
                     ))}
                   </div>
-                </CollapsibleSection>
+                </>
               )}
 
               {/* Source breakdown — which campaigns / magnets brought leads in */}
-              {sourceBreakdown && (sourceBreakdown.campaigns.length > 0 || sourceBreakdown.magnets.length > 0 || sourceBreakdown.noSource.total > 0) && (
-                <CollapsibleSection icon={<Send size={13} color={GOLD} />} title={`Bron-breakdown · ${sourceBreakdown.totalLeads} nieuwe leads`} accent={GOLD}>
+              {openTabs.bron && sourceBreakdown && (sourceBreakdown.campaigns.length > 0 || sourceBreakdown.magnets.length > 0 || sourceBreakdown.noSource.total > 0) && (
+                <>
+                  <SectionTitle icon={<Send size={13} color={GOLD} />} title={`Bron-breakdown · ${sourceBreakdown.totalLeads} nieuwe leads`} />
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
                     {sourceBreakdown.campaigns.map(c => (
                       <SourceRow key={c.id} icon={<Send size={12} color={GOLD} />} label={c.name} total={c.total} reached={c.reached} stages={c.stages} followupCount={c.followupCount} repliedLeads={c.repliedLeads} followedLeads={c.followedLeads} messageText={c.messageText} platform={c.platform} purpose={c.purpose} />
@@ -800,12 +827,13 @@ export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, 
                       <SourceRow icon={<X size={12} color="rgba(255,255,255,0.4)" />} label="Geen bron toegewezen" total={sourceBreakdown.noSource.total} reached={sourceBreakdown.noSource.reached} stages={sourceBreakdown.noSource.stages} followupCount={sourceBreakdown.noSource.followupCount} repliedLeads={sourceBreakdown.noSource.repliedLeads} followedLeads={sourceBreakdown.noSource.followedLeads} accent="rgba(255,255,255,0.4)" muted />
                     )}
                   </div>
-                </CollapsibleSection>
+                </>
               )}
 
               {/* Recent movements list */}
-              {activity.movementsList && activity.movementsList.length > 0 && (
-                <CollapsibleSection icon={<Calendar size={13} color={GOLD} />} title={`Verplaatsingen (${activity.movementsList.length})`} accent={GOLD}>
+              {openTabs.verplaatsingen && activity.movementsList && activity.movementsList.length > 0 && (
+                <>
+                  <SectionTitle icon={<Calendar size={13} color={GOLD} />} title={`Verplaatsingen (${activity.movementsList.length})`} />
                   <div style={{
                     border: '1px solid rgba(255,255,255,0.05)',
                     borderRadius: 8, overflow: 'hidden',
@@ -838,7 +866,7 @@ export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, 
                       </div>
                     )}
                   </div>
-                </CollapsibleSection>
+                </>
               )}
 
               {!isCurrentPeriod && (
@@ -1588,6 +1616,53 @@ function GenderRing({ gender }) {
           </div>
         )}
       </div>
+    </div>
+  )
+}
+
+// Per-campagne stat-kaart: naam + total, met daaronder de Aantallen- en
+// Percentages-rijen in exact dezelfde StatFlow-stijl als bovenin de modal.
+// Alle cijfers zijn "ná campagne-bericht" (uit getCampaignBreakdown).
+function CampaignStatCard({ campaign: c, isMobile }) {
+  const [showMsg, setShowMsg] = useState(false)
+  const s = c.stages || { replied: 0, callProposed: 0, callScheduled: 0, sale: 0 }
+  const p = (a, b) => (b > 0 ? `${Math.round((a / b) * 100)}%` : '—')
+  const frac = (a, b) => `${a} van ${b}`
+  const countItems = [
+    { label: 'Getagd',      value: c.total,          Icon: UserPlus,      color: '#a855f7' },
+    { label: 'Reacties',    value: s.replied,        Icon: MessageCircle, color: '#10b981' },
+    { label: 'Voorgesteld', value: s.callProposed,   Icon: PhoneCall,     color: '#a855f7' },
+    { label: 'Ingepland',   value: s.callScheduled,  Icon: CalendarCheck, color: '#06b6d4' },
+    { label: 'Sale',        value: s.sale,           Icon: Trophy,        color: '#FFD700' },
+    { label: 'Opvolg',      value: c.followupCount,  Icon: Send,          color: '#f59e0b' },
+  ]
+  const pctItems = [
+    { label: 'Reactie',       value: p(s.replied, c.total),          Icon: MessageCircle, color: '#10b981', sub: frac(s.replied, c.total) },
+    { label: 'Voorstel',      value: p(s.callProposed, c.total),     Icon: PhoneCall,     color: '#a855f7', sub: frac(s.callProposed, c.total) },
+    { label: 'Voorstel→call', value: p(s.callScheduled, s.callProposed), Icon: CalendarCheck, color: '#06b6d4', sub: frac(s.callScheduled, s.callProposed) },
+    { label: 'Close rate',    value: p(s.sale, s.callScheduled),     Icon: Trophy,        color: '#22c55e', sub: frac(s.sale, s.callScheduled) },
+  ]
+  return (
+    <div style={{ padding: '0.7rem 0.75rem', background: 'rgba(168,85,247,0.05)', border: '1px solid rgba(168,85,247,0.22)', borderRadius: 10 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+        <Send size={13} color="#a855f7" style={{ flexShrink: 0 }} />
+        <span style={{ flex: 1, minWidth: 0, fontSize: '0.85rem', fontWeight: 800, color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.name}</span>
+        {c.messageText && (
+          <button onClick={() => setShowMsg(v => !v)}
+            style={{ flexShrink: 0, display: 'inline-flex', alignItems: 'center', gap: 4, padding: '2px 8px', borderRadius: 999, background: 'rgba(168,85,247,0.12)', border: '1px solid rgba(168,85,247,0.35)', color: '#c084fc', fontSize: '0.58rem', fontWeight: 800, cursor: 'pointer', touchAction: 'manipulation' }}>
+            <MessageCircle size={10} /> Bericht
+          </button>
+        )}
+      </div>
+      <div style={{ fontSize: '0.54rem', fontWeight: 800, letterSpacing: '0.05em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.35)', margin: '4px 0 2px' }}>Aantallen</div>
+      <StatFlow items={countItems} activeStage={null} onToggle={() => {}} />
+      <div style={{ fontSize: '0.54rem', fontWeight: 800, letterSpacing: '0.05em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.35)', margin: '2px 0' }}>Percentages</div>
+      <StatFlow items={pctItems} activeStage={null} onToggle={() => {}} />
+      {showMsg && c.messageText && (
+        <div style={{ marginTop: 6, background: 'rgba(0,0,0,0.35)', border: '1px solid rgba(168,85,247,0.2)', borderRadius: 6, padding: '0.55rem 0.7rem', fontSize: '0.75rem', color: 'rgba(255,255,255,0.85)', whiteSpace: 'pre-wrap', lineHeight: 1.4 }}>
+          {c.messageText}
+        </div>
+      )}
     </div>
   )
 }
