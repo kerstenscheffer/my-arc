@@ -694,11 +694,11 @@ export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, 
               {/* Growth chart — input vs output over time. Window is wider
                   than the period (min 30 days) so coach sees trends. */}
               {timeSeries && timeSeries.length > 0 && (
-                <>
-                  <SectionTitle
-                    icon={<LineChartIcon size={13} color={GOLD} />}
-                    title={`Groei (${timeSeries.length}-daagse trend)`}
-                  />
+                <CollapsibleSection
+                  icon={<LineChartIcon size={13} color={GOLD} />}
+                  title={`Groei (${timeSeries.length}-daagse trend)`}
+                  accent={GOLD}
+                >
                   <div style={{
                     padding: '0.75rem 0.85rem 0.5rem',
                     background: 'rgba(255,255,255,0.02)',
@@ -708,16 +708,16 @@ export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, 
                   }}>
                     <GrowthChart data={timeSeries} isMobile={isMobile} />
                   </div>
-                </>
+                </CollapsibleSection>
               )}
 
               {/* Call-voorstellen — exact wat ik gestuurd heb + uitkomst */}
               {callProposals && callProposals.length > 0 && (
-                <>
-                  <SectionTitle
-                    icon={<PhoneCall size={13} color={GOLD} />}
-                    title={`Call-voorstellen (${callProposals.length})`}
-                  />
+                <CollapsibleSection
+                  icon={<PhoneCall size={13} color={GOLD} />}
+                  title={`Call-voorstellen (${callProposals.length})`}
+                  accent={GOLD}
+                >
                   <div style={{
                     display: 'flex', flexDirection: 'column', gap: 5,
                     marginBottom: '0.85rem',
@@ -766,27 +766,25 @@ export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, 
                       </div>
                     ))}
                   </div>
-                </>
+                </CollapsibleSection>
               )}
 
               {/* Campagnes — all-time, ongeacht de periode. Toont campagnes die
                   bestaande volgers aanschrijven (die vallen buiten de nieuwe-
                   leads-breakdown hieronder). */}
               {campaignBreakdown && campaignBreakdown.campaigns.length > 0 && (
-                <>
-                  <SectionTitle icon={<Send size={13} color="#a855f7" />} title={`Campagnes · ${campaignBreakdown.totalLeads} getagd (alle tijd)`} />
+                <CollapsibleSection icon={<Send size={13} color="#a855f7" />} title={`Campagnes · ${campaignBreakdown.totalLeads} getagd (alle tijd)`} accent="#a855f7">
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
                     {campaignBreakdown.campaigns.map(c => (
                       <SourceRow key={c.id} icon={<Send size={12} color="#a855f7" />} label={c.name} total={c.total} reached={c.reached} stages={c.stages} followupCount={c.followupCount} repliedLeads={c.repliedLeads} followedLeads={c.followedLeads} messageText={c.messageText} platform={c.platform} purpose={c.purpose} accent="#a855f7" />
                     ))}
                   </div>
-                </>
+                </CollapsibleSection>
               )}
 
               {/* Source breakdown — which campaigns / magnets brought leads in */}
               {sourceBreakdown && (sourceBreakdown.campaigns.length > 0 || sourceBreakdown.magnets.length > 0 || sourceBreakdown.noSource.total > 0) && (
-                <>
-                  <SectionTitle icon={<Send size={13} color={GOLD} />} title={`Bron-breakdown · ${sourceBreakdown.totalLeads} nieuwe leads`} />
+                <CollapsibleSection icon={<Send size={13} color={GOLD} />} title={`Bron-breakdown · ${sourceBreakdown.totalLeads} nieuwe leads`} accent={GOLD}>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
                     {sourceBreakdown.campaigns.map(c => (
                       <SourceRow key={c.id} icon={<Send size={12} color={GOLD} />} label={c.name} total={c.total} reached={c.reached} stages={c.stages} followupCount={c.followupCount} repliedLeads={c.repliedLeads} followedLeads={c.followedLeads} messageText={c.messageText} platform={c.platform} purpose={c.purpose} />
@@ -798,13 +796,12 @@ export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, 
                       <SourceRow icon={<X size={12} color="rgba(255,255,255,0.4)" />} label="Geen bron toegewezen" total={sourceBreakdown.noSource.total} reached={sourceBreakdown.noSource.reached} stages={sourceBreakdown.noSource.stages} followupCount={sourceBreakdown.noSource.followupCount} repliedLeads={sourceBreakdown.noSource.repliedLeads} followedLeads={sourceBreakdown.noSource.followedLeads} accent="rgba(255,255,255,0.4)" muted />
                     )}
                   </div>
-                </>
+                </CollapsibleSection>
               )}
 
               {/* Recent movements list */}
               {activity.movementsList && activity.movementsList.length > 0 && (
-                <>
-                  <SectionTitle icon={<Calendar size={13} color={GOLD} />} title={`Verplaatsingen (${activity.movementsList.length})`} />
+                <CollapsibleSection icon={<Calendar size={13} color={GOLD} />} title={`Verplaatsingen (${activity.movementsList.length})`} accent={GOLD}>
                   <div style={{
                     border: '1px solid rgba(255,255,255,0.05)',
                     borderRadius: 8, overflow: 'hidden',
@@ -837,7 +834,7 @@ export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, 
                       </div>
                     )}
                   </div>
-                </>
+                </CollapsibleSection>
               )}
 
               {!isCurrentPeriod && (
@@ -1257,6 +1254,35 @@ function SectionTitle({ icon, title }) {
     }}>
       {icon} {title}
     </div>
+  )
+}
+
+// Inklapbare sectie — kop is een knop, inhoud verschijnt pas na klik.
+// Default dicht zodat de stats-modal rustig oogt en de coach zelf kiest
+// wat 'ie openklapt (grafiek, campagnes, bron-breakdown, verplaatsingen…).
+function CollapsibleSection({ icon, title, accent = 'rgba(255,255,255,0.55)', defaultOpen = false, children }) {
+  const [open, setOpen] = useState(defaultOpen)
+  return (
+    <>
+      <button
+        onClick={() => setOpen(v => !v)}
+        style={{
+          width: '100%', display: 'flex', alignItems: 'center', gap: '0.45rem',
+          margin: '0.6rem 0 0.35rem', padding: '0.65rem 0.75rem',
+          background: open ? 'rgba(255,255,255,0.045)' : 'rgba(255,255,255,0.025)',
+          border: '1px solid rgba(255,255,255,0.07)', borderRadius: 9,
+          cursor: 'pointer', fontFamily: 'inherit',
+          fontSize: '0.7rem', fontWeight: 800,
+          letterSpacing: '0.06em', textTransform: 'uppercase',
+          touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+        }}
+      >
+        <span style={{ display: 'flex', alignItems: 'center', flexShrink: 0 }}>{icon}</span>
+        <span style={{ flex: 1, textAlign: 'left', color: open ? '#fff' : 'rgba(255,255,255,0.6)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{title}</span>
+        <ChevronDown size={15} color={accent} style={{ flexShrink: 0, transform: open ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s' }} />
+      </button>
+      {open && children}
+    </>
   )
 }
 
