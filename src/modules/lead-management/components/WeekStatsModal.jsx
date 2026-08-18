@@ -546,33 +546,15 @@ export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, 
                   : periodMode === 'month'
                     ? anchorDate.toLocaleDateString('nl-NL', { month: 'long', year: 'numeric' })
                     : `Week ${isoWeek(mondayOf(anchorDate))} · ${fmtRange(mondayOf(anchorDate))}`
-                const periodSubtitle = `${start.toLocaleDateString('nl-NL', { day: 'numeric', month: 'short', year: 'numeric' })} → ${new Date(end - 1).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short', year: 'numeric' })}`
-                const callsHeldPdf = funnel?.callHeld?.count ?? 0
-                const handledCallsPdf = callsHeldPdf + totalNoShows
-                const noShowRate = handledCallsPdf > 0 ? Math.round((totalNoShows / handledCallsPdf) * 100) : null
-                const proposedToScheduled = totalCallProposed > 0 ? Math.round((totalCalls / totalCallProposed) * 100) : null
-                // Close rate vanaf gevoerde calls (Sale + Sale verloren).
-                const closeRate = callsHeldPdf > 0 ? Math.round((totalSales / callsHeldPdf) * 100) : null
-                const omzetVal = Math.round(funnel?.sale?.omzet || 0)
-                const amountPerCall = totalCalls > 0 ? Math.round(omzetVal / totalCalls) : null
+                // De PDF gebruikt EXACT dezelfde item-arrays als de modal, zodat
+                // getallen 1-op-1 kloppen en de simpele inline-stijl matcht.
                 const res = await exportStatsPDF({
-                  periodLabel, periodSubtitle,
+                  periodLabel,
                   generatedAt: new Date().toLocaleString('nl-NL', { dateStyle: 'short', timeStyle: 'short' }),
-                  activity, funnel, reactionStats, campaignBreakdown,
-                  revenueVisible: true, // omzet mag in de PDF (ook voor teamleden)
-                  ratios: {
-                    responseRate, chaseShare, showRate, noShowRate,
-                    proposedToScheduled, closeRate, amountPerCall,
-                    newLeads:         newLeadsInPeriod,
-                    reactedLeads,
-                    responseFraction: `${reactedLeads} / ${newLeadsInPeriod}`,
-                    chaseFraction:    `${followedLeads} / ${newLeadsInPeriod}`,
-                    showFraction:     handledCallsPdf > 0 ? `${callsHeldPdf} / ${handledCallsPdf}` : '—',
-                    noShowFraction:   handledCallsPdf > 0 ? `${totalNoShows} / ${handledCallsPdf}` : '—',
-                    proposedFraction: totalCallProposed > 0 ? `${totalCalls} / ${totalCallProposed}` : '—',
-                    closeFraction:    callsHeldPdf > 0 ? `${totalSales} / ${callsHeldPdf}` : '—',
-                    amountPerCallFraction: totalCalls > 0 ? `€${omzetVal.toLocaleString('nl-NL')} / ${totalCalls}` : '—',
-                  },
+                  countItems: countItems.map(i => ({ label: i.label, value: i.value, color: i.color })),
+                  pctItems: pctItems.map(i => ({ label: i.label, value: i.value, color: i.color, sub: i.sub })),
+                  gender,
+                  campaignBreakdown,
                 })
                 if (res?.url) setPdfPreview({ url: res.url, filename: res.filename })
               } catch (e) {
