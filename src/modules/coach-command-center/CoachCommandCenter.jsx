@@ -79,6 +79,7 @@ export default function CoachCommandCenter({ db, onSelectClient, setActiveTab, o
         db.supabase
           .from('client_coaching_logs')
           .select('id, client_id, status, note, created_at')
+          .in('client_id', clientIds)
           .order('created_at', { ascending: false })
           .then(r => {
             const byClient = {}
