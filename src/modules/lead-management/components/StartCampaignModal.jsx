@@ -3,7 +3,7 @@
 // een campagne-DM-knop die het campagne-bericht kopieert + het profiel opent.
 import { useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
-import { X, Megaphone, Send, Check, Plus, Pencil } from 'lucide-react'
+import { X, Megaphone, Send, Check, Plus, Pencil, Trash2 } from 'lucide-react'
 
 export default function StartCampaignModal({ leadService, coachId, isMobile = false, onSelect, onClose }) {
   const [loading, setLoading] = useState(true)
@@ -20,6 +20,36 @@ export default function StartCampaignModal({ leadService, coachId, isMobile = fa
     setEditingId(c.id)
     setEditForm({ name: c.name || '', messageText: c.message_text || '' })
   }
+  const [deletingId, setDeletingId] = useState(null)
+  const handleDelete = async (c) => {
+    if (deletingId) return
+    // Leads met deze campagne-tag: hun tag valt weg (ON DELETE SET NULL), de
+    // leads zelf blijven. Metrics/sends van de campagne worden mee verwijderd.
+    let leadCount = 0
+    try {
+      const { count } = await leadService.db.supabase
+        .from('call_leads')
+        .select('id', { count: 'exact', head: true })
+        .eq('outreach_campaign_id', c.id)
+        .is('deleted_at', null)
+      leadCount = count || 0
+    } catch {}
+    const msg = leadCount > 0
+      ? `Campagne "${c.name}" verwijderen?\n\n${leadCount} lead(s) verliezen hun campagne-tag (de leads zelf blijven bestaan). Dit kan niet ongedaan worden.`
+      : `Campagne "${c.name}" verwijderen? Dit kan niet ongedaan worden.`
+    if (!confirm(msg)) return
+    setDeletingId(c.id)
+    try {
+      const { error } = await leadService.db.supabase
+        .from('outreach_campaigns')
+        .delete()
+        .eq('id', c.id)
+      if (error) throw error
+      await load()
+    } catch (e) { console.error('Campagne verwijderen mislukt:', e); alert('Verwijderen mislukt.') }
+    finally { setDeletingId(null) }
+  }
+
   const handleUpdate = async () => {
     if (!editForm.name.trim() || !editForm.messageText.trim() || editSaving) return
     setEditSaving(true)
@@ -188,6 +218,11 @@ export default function StartCampaignModal({ leadService, coachId, isMobile = fa
                       <button onClick={() => startEdit(c)} title="Bericht bewerken"
                         style={{ flexShrink: 0, width: 30, height: 30, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', borderRadius: 8, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.6)', cursor: 'pointer' }}>
                         <Pencil size={13} />
+                      </button>
+                      {/* Verwijder-knop */}
+                      <button onClick={() => handleDelete(c)} disabled={deletingId === c.id} title="Campagne verwijderen"
+                        style={{ flexShrink: 0, width: 30, height: 30, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', borderRadius: 8, background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.3)', color: '#ef4444', cursor: deletingId === c.id ? 'wait' : 'pointer', opacity: deletingId === c.id ? 0.5 : 1 }}>
+                        <Trash2 size={13} />
                       </button>
                       {/* Start-knop */}
                       <button onClick={() => !noMsg && onSelect(c)} disabled={noMsg}
