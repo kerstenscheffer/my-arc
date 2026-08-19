@@ -53,7 +53,7 @@ import {
   Menu, X, ChevronDown, ChevronRight, Dumbbell, Target, Crown, FileText,
   Flame, Globe, Save, Zap, DollarSign, Pill, MoreHorizontal, Settings, Calendar,
   Bell, Bug, Lightbulb, AlertCircle, Image as ImageIcon, FlaskConical,
-  Eye, EyeOff, ListTodo
+  Eye, EyeOff, ListTodo, ArrowLeft
 } from 'lucide-react'
 
 // ============================================
@@ -171,6 +171,7 @@ const setHashTab = (id) => {
 // ============================================
 export default function CoachHub() {
   const [activeTab, setActiveTab] = useState(getHashTab)
+  const [navStack, setNavStack] = useState([]) // tab-geschiedenis voor de terug-knop
   const [moreOpen, setMoreOpen] = useState(false)
   const [loading, setLoading] = useState(false)
   const [selectedClient, setSelectedClient] = useState(null)
@@ -351,8 +352,20 @@ export default function CoachHub() {
   // NAVIGATION
   // ============================================
   const navigateTo = (id) => {
+    // Onthoud waar we vandaan kwamen zodat de terug-knop netjes terugkeert
+    // (blijft binnen CoachHub, verlaat de app niet).
+    if (id !== activeTab) setNavStack(s => [...s, activeTab])
     setHashTab(id)
     setActiveTab(id)
+    setMoreOpen(false)
+  }
+
+  const goBack = () => {
+    if (navStack.length === 0) return
+    const prev = navStack[navStack.length - 1]
+    setNavStack(s => s.slice(0, -1))
+    setHashTab(prev)
+    setActiveTab(prev)
     setMoreOpen(false)
   }
 
@@ -763,6 +776,36 @@ export default function CoachHub() {
       </header>
 
       {/* ═══ MAIN CONTENT ═══ */}
+      {/* ═══ TERUG-KNOP ═══ */}
+      {/* Zweeft linksboven; keert terug naar de vorige tab. Alleen zichtbaar als
+          er iets is om naar terug te gaan (en niet in klantmodus). */}
+      {!clientMode && navStack.length > 0 && (
+        <button
+          onClick={goBack}
+          title="Terug"
+          style={{
+            position: 'fixed',
+            top: 'calc(env(safe-area-inset-top, 0px) + 12px)',
+            left: 12,
+            zIndex: 120,
+            display: 'flex', alignItems: 'center', gap: 6,
+            padding: isMobile ? '0.5rem 0.7rem' : '0.55rem 0.85rem',
+            height: 40,
+            background: 'rgba(10,10,10,0.88)',
+            backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)',
+            border: `1px solid ${G.primary}44`,
+            borderRadius: 999,
+            color: G.primary,
+            fontSize: isMobile ? '0.72rem' : '0.78rem', fontWeight: 800,
+            cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+            boxShadow: '0 8px 24px rgba(0,0,0,0.5)',
+          }}
+        >
+          <ArrowLeft size={16} strokeWidth={2.6} />
+          Terug
+        </button>
+      )}
+
       <main style={{
         minHeight: 'calc(100vh - 100px)',
         // Ruimte onderaan voor de floating bottom-nav (zelfde pattern als
