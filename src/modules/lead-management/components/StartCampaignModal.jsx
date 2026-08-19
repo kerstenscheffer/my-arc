@@ -3,7 +3,7 @@
 // een campagne-DM-knop die het campagne-bericht kopieert + het profiel opent.
 import { useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
-import { X, Megaphone, Send, Check, Plus } from 'lucide-react'
+import { X, Megaphone, Send, Check, Plus, Pencil } from 'lucide-react'
 
 export default function StartCampaignModal({ leadService, coachId, isMobile = false, onSelect, onClose }) {
   const [loading, setLoading] = useState(true)
@@ -11,6 +11,29 @@ export default function StartCampaignModal({ leadService, coachId, isMobile = fa
   const [creating, setCreating] = useState(false)
   const [saving, setSaving] = useState(false)
   const [form, setForm] = useState({ name: '', platform: 'instagram', messageText: '' })
+  // Inline bewerken van een bestaande campagne (naam + bericht).
+  const [editingId, setEditingId] = useState(null)
+  const [editForm, setEditForm] = useState({ name: '', messageText: '' })
+  const [editSaving, setEditSaving] = useState(false)
+
+  const startEdit = (c) => {
+    setEditingId(c.id)
+    setEditForm({ name: c.name || '', messageText: c.message_text || '' })
+  }
+  const handleUpdate = async () => {
+    if (!editForm.name.trim() || !editForm.messageText.trim() || editSaving) return
+    setEditSaving(true)
+    try {
+      const { error } = await leadService.db.supabase
+        .from('outreach_campaigns')
+        .update({ name: editForm.name.trim(), message_text: editForm.messageText.trim() })
+        .eq('id', editingId)
+      if (error) throw error
+      setEditingId(null)
+      await load()
+    } catch (e) { console.error('Campagne bijwerken mislukt:', e); alert('Bijwerken mislukt.') }
+    finally { setEditSaving(false) }
+  }
 
   const load = async () => {
     setLoading(true)
@@ -80,7 +103,7 @@ export default function StartCampaignModal({ leadService, coachId, isMobile = fa
               <textarea
                 value={form.messageText}
                 onChange={(e) => setForm(f => ({ ...f, messageText: e.target.value }))}
-                placeholder="Bericht… gebruik [naam] voor de voornaam"
+                placeholder="Bericht… gebruik {{ name }} voor de naam"
                 rows={4}
                 style={{ width: '100%', padding: '0.55rem 0.65rem', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 8, color: '#fff', fontSize: '0.82rem', outline: 'none', resize: 'vertical', fontFamily: 'inherit', lineHeight: 1.4 }}
               />
@@ -110,16 +133,46 @@ export default function StartCampaignModal({ leadService, coachId, isMobile = fa
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               {campaigns.map(c => {
                 const noMsg = !c.message_text
+                const isEditing = editingId === c.id
+
+                // ─── BEWERK-MODUS ───
+                if (isEditing) {
+                  return (
+                    <div key={c.id} style={{ padding: '0.75rem 0.85rem', borderRadius: 11, background: 'rgba(168,85,247,0.06)', border: '1px solid rgba(168,85,247,0.3)', display: 'flex', flexDirection: 'column', gap: '0.55rem' }}>
+                      <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#a855f7' }}>Campagne bewerken</div>
+                      <input
+                        value={editForm.name}
+                        onChange={(e) => setEditForm(f => ({ ...f, name: e.target.value }))}
+                        placeholder="Naam"
+                        style={{ width: '100%', padding: '0.5rem 0.6rem', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 8, color: '#fff', fontSize: '0.82rem', outline: 'none' }}
+                      />
+                      <textarea
+                        value={editForm.messageText}
+                        onChange={(e) => setEditForm(f => ({ ...f, messageText: e.target.value }))}
+                        placeholder="Bericht… gebruik {{ name }} voor de naam"
+                        rows={5}
+                        style={{ width: '100%', padding: '0.5rem 0.6rem', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 8, color: '#fff', fontSize: '0.82rem', outline: 'none', resize: 'vertical', fontFamily: 'inherit', lineHeight: 1.4 }}
+                      />
+                      <div style={{ display: 'flex', gap: 8 }}>
+                        <button onClick={() => setEditingId(null)}
+                          style={{ flex: 1, padding: '0.55rem', borderRadius: 9, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.6)', fontSize: '0.75rem', fontWeight: 700, cursor: 'pointer' }}>Annuleer</button>
+                        <button onClick={handleUpdate} disabled={!editForm.name.trim() || !editForm.messageText.trim() || editSaving}
+                          style={{ flex: 1, padding: '0.55rem', borderRadius: 9, background: 'rgba(168,85,247,0.2)', border: '1px solid rgba(168,85,247,0.5)', color: '#a855f7', fontSize: '0.75rem', fontWeight: 800, cursor: (!editForm.name.trim() || !editForm.messageText.trim() || editSaving) ? 'not-allowed' : 'pointer', opacity: (!editForm.name.trim() || !editForm.messageText.trim() || editSaving) ? 0.5 : 1 }}>
+                          {editSaving ? 'Opslaan…' : 'Opslaan'}
+                        </button>
+                      </div>
+                    </div>
+                  )
+                }
+
+                // ─── NORMALE WEERGAVE ───
                 return (
-                  <button
+                  <div
                     key={c.id}
-                    onClick={() => !noMsg && onSelect(c)}
-                    disabled={noMsg}
-                    title={noMsg ? 'Deze campagne heeft geen bericht-tekst' : `Start ${c.name}`}
                     style={{
-                      textAlign: 'left', width: '100%', padding: '0.75rem 0.85rem', borderRadius: 11,
+                      width: '100%', padding: '0.75rem 0.85rem', borderRadius: 11,
                       background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)',
-                      cursor: noMsg ? 'not-allowed' : 'pointer', opacity: noMsg ? 0.5 : 1, fontFamily: 'inherit',
+                      opacity: noMsg ? 0.7 : 1,
                     }}
                   >
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: c.message_text ? '0.5rem' : 0 }}>
@@ -131,22 +184,32 @@ export default function StartCampaignModal({ leadService, coachId, isMobile = fa
                           {c.platform || 'instagram'}{c.purpose ? ` · ${c.purpose}` : ''}
                         </div>
                       </div>
-                      {!noMsg && <span style={{ flexShrink: 0, display: 'inline-flex', alignItems: 'center', gap: 4, padding: '0.28rem 0.6rem', borderRadius: 8, fontSize: '0.62rem', fontWeight: 800, background: 'rgba(168,85,247,0.14)', border: '1px solid rgba(168,85,247,0.4)', color: '#a855f7' }}><Send size={11} /> Start</span>}
+                      {/* Bewerk-knop */}
+                      <button onClick={() => startEdit(c)} title="Bericht bewerken"
+                        style={{ flexShrink: 0, width: 30, height: 30, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', borderRadius: 8, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.6)', cursor: 'pointer' }}>
+                        <Pencil size={13} />
+                      </button>
+                      {/* Start-knop */}
+                      <button onClick={() => !noMsg && onSelect(c)} disabled={noMsg}
+                        title={noMsg ? 'Deze campagne heeft geen bericht-tekst' : `Start ${c.name}`}
+                        style={{ flexShrink: 0, display: 'inline-flex', alignItems: 'center', gap: 4, padding: '0.32rem 0.65rem', borderRadius: 8, fontSize: '0.62rem', fontWeight: 800, background: 'rgba(168,85,247,0.14)', border: '1px solid rgba(168,85,247,0.4)', color: '#a855f7', cursor: noMsg ? 'not-allowed' : 'pointer', opacity: noMsg ? 0.5 : 1 }}>
+                        <Send size={11} /> Start
+                      </button>
                     </div>
                     {c.message_text && (
                       <div style={{ fontSize: '0.72rem', color: 'rgba(255,255,255,0.6)', lineHeight: 1.45, whiteSpace: 'pre-wrap', wordBreak: 'break-word', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 8, padding: '0.5rem 0.6rem' }}>
                         {c.message_text}
                       </div>
                     )}
-                    {noMsg && <div style={{ fontSize: '0.62rem', color: 'rgba(239,68,68,0.7)', fontWeight: 700 }}>Geen bericht-tekst — voeg er een toe in de Analytics-tab.</div>}
-                  </button>
+                    {noMsg && <div style={{ fontSize: '0.62rem', color: 'rgba(239,68,68,0.7)', fontWeight: 700, marginTop: 4 }}>Geen bericht-tekst — klik op het potlood om er een toe te voegen.</div>}
+                  </div>
                 )
               })}
             </div>
           )}
           <div style={{ marginTop: '0.85rem', fontSize: '0.62rem', color: 'rgba(255,255,255,0.3)', lineHeight: 1.5, display: 'flex', alignItems: 'flex-start', gap: 6 }}>
             <Check size={12} style={{ flexShrink: 0, marginTop: 2 }} />
-            Gebruik <b style={{ color: 'rgba(255,255,255,0.55)' }}>[naam]</b> in je bericht — dat wordt automatisch de voornaam van de lead.
+            Gebruik <b style={{ color: 'rgba(255,255,255,0.55)' }}>{'{{ name }}'}</b> in je bericht — dat wordt automatisch de naam/handle van de lead. ([naam] en {'{first_name}'} werken ook.)
           </div>
         </div>
       </div>

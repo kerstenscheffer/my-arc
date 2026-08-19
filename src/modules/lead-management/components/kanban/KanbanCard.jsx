@@ -392,8 +392,10 @@ export default function KanbanCard({
 
     const first = (lead?.first_name || '').trim().split(/\s+/)[0] || ''
     const name = first ? first.charAt(0).toUpperCase() + first.slice(1) : 'maat'
+    // Placeholders → voornaam/handle van de lead. Ondersteunt [naam], {naam},
+    // {first_name} én de {{ name }}-stijl (met/zonder spaties).
     const msg = (activeCampaign.message_text || '')
-      .replace(/\[naam\]|\[first_name\]|\{first_name\}|\{naam\}/gi, name)
+      .replace(/\{\{\s*(name|naam|first_name)\s*\}\}|\[naam\]|\[first_name\]|\{first_name\}|\{naam\}/gi, name)
     copyToClipboardSync(msg)
     try { navigator.clipboard?.writeText(msg)?.catch(() => {}) } catch {}
 
