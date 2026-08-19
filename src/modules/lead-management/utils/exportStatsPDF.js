@@ -224,10 +224,11 @@ export async function exportStatsPDF(payload) {
   }
 
   const sectionLabel = (text) => {
-    ensure(24)
-    doc.setFont('helvetica', 'bold'); doc.setFontSize(8.5); doc.setTextColor(...GRAY)
-    doc.text(text.toUpperCase(), margin, y)
-    y += 14
+    ensure(30)
+    y += 4
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(14); doc.setTextColor(...WHITE)
+    doc.text(text, margin, y + 4)
+    y += 20
   }
 
   // ─── HEADER ───
@@ -279,8 +280,8 @@ export async function exportStatsPDF(payload) {
     for (const c of campCards) {
       ensure(90)
       // Naam
-      doc.setFont('helvetica', 'bold'); doc.setFontSize(10); doc.setTextColor(...WHITE)
-      doc.text(c.name, margin, y); y += 14
+      doc.setFont('helvetica', 'bold'); doc.setFontSize(12); doc.setTextColor(...WHITE)
+      doc.text(c.name, margin, y); y += 15
       // Aantallen
       doc.setFont('helvetica', 'bold'); doc.setFontSize(6); doc.setTextColor(...DIM)
       doc.text('AANTALLEN', margin, y); y += 9
