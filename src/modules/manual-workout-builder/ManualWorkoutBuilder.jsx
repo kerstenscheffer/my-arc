@@ -1,5 +1,7 @@
 // src/modules/manual-workout-builder/ManualWorkoutBuilder.jsx
 import { useState, useEffect } from 'react'
+import useHistoryState from './hooks/useHistoryState'
+import { Undo2, Redo2 } from 'lucide-react'
 import DayBuilder from './components/DayBuilder'
 import ExerciseSelector from './components/ExerciseSelector'
 import TemplateManager from './components/TemplateManager'
@@ -13,7 +15,7 @@ import ExerciseLibraryModal from './components/ExerciseLibraryModal'
 export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
   const isMobile = window.innerWidth <= 768
 
-  const [workoutPlan, setWorkoutPlan] = useState({
+  const [workoutPlan, setWorkoutPlan, history] = useHistoryState({
     name: '', description: '', primary_goal: 'muscle_gain',
     experience_level: 'intermediate', split_type: 'custom',
     days_per_week: 0, equipment: [], days: []
@@ -39,6 +41,21 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
   const effectiveClient = localClient || selectedClient
 
   useEffect(() => { loadTemplates(); loadDayTemplates() }, [])
+
+  // Toetsenbord: Cmd/Ctrl+Z = ongedaan maken, Cmd/Ctrl+Shift+Z = opnieuw.
+  // Niet actief terwijl je in een tekstveld typt (dan hoort Z gewoon een Z).
+  useEffect(() => {
+    const onKey = (e) => {
+      if ((e.metaKey || e.ctrlKey) && (e.key === 'z' || e.key === 'Z')) {
+        const tag = (e.target?.tagName || '').toLowerCase()
+        if (tag === 'input' || tag === 'textarea' || e.target?.isContentEditable) return
+        e.preventDefault()
+        if (e.shiftKey) history.redo(); else history.undo()
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [history.undo, history.redo])
 
   useEffect(() => {
     if (!selectedClient) return
@@ -97,7 +114,7 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
         geschatteTijd: day.geschatteTijd || '60 minutes',
         exercises: (day.exercises || []).map((ex, i) => ({ ...ex, id: Date.now() + index + i + Math.random() }))
       }))
-    setWorkoutPlan({
+    history.reset({
       name: schema.name || '', description: schema.description || '',
       primary_goal: schema.primary_goal || 'muscle_gain',
       experience_level: schema.experience_level || 'intermediate',
@@ -316,7 +333,7 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
           days.push({ id: Date.now() + index, name: day.name || `DAG ${index + 1}`, focus: day.focus || '', geschatteTijd: day.geschatteTijd || '60 minutes', exercises: (day.exercises || []).map((ex, i) => ({ ...ex, id: Date.now() + index + i + Math.random() })) })
         })
     }
-    setWorkoutPlan({ name: template.name + ' (Copy)', description: template.description || '', primary_goal: template.primary_goal || 'muscle_gain', experience_level: template.experience_level || 'intermediate', split_type: template.split_type || 'custom', days_per_week: days.length, equipment: template.equipment || [], days })
+    history.reset({ name: template.name + ' (Copy)', description: template.description || '', primary_goal: template.primary_goal || 'muscle_gain', experience_level: template.experience_level || 'intermediate', split_type: template.split_type || 'custom', days_per_week: days.length, equipment: template.equipment || [], days })
     setShowTemplateManager(false)
   }
 
@@ -451,6 +468,15 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
 
         {/* Regel 4: acties (compact) */}
         <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
+          {/* Ongedaan maken / opnieuw — draait wijzigingen in het plan terug. */}
+          <button onClick={history.undo} disabled={!history.canUndo} title="Ongedaan maken"
+            style={{ ...cBtn(false), padding: '0 0.6rem', opacity: history.canUndo ? 1 : 0.35, cursor: history.canUndo ? 'pointer' : 'not-allowed' }}>
+            <Undo2 size={15} />
+          </button>
+          <button onClick={history.redo} disabled={!history.canRedo} title="Opnieuw"
+            style={{ ...cBtn(false), padding: '0 0.6rem', opacity: history.canRedo ? 1 : 0.35, cursor: history.canRedo ? 'pointer' : 'not-allowed' }}>
+            <Redo2 size={15} />
+          </button>
           <button onClick={() => setShowTemplateManager(true)} style={cBtn(false)}>
             <FileText size={14} /> Templates
           </button>
