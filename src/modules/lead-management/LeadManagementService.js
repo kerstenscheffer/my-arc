@@ -1883,6 +1883,18 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
 
   async getRangeFunnelStats(coachId, startISO, endISO) {
     try {
+      // Datum-buckets (call gevoerd / no-show / calls geboekt) vergelijken op
+      // call_date, een KALENDERDATUM. De ISO-string is UTC, dus .split('T')[0]
+      // geeft voor een coach ten oosten van UTC de VORIGE dag (lokaal middernacht
+      // = 22:00 UTC de dag ervoor) → "vandaag" pakte dan gisteren mee. Daarom
+      // de LOKALE kalenderdatum van het moment gebruiken.
+      const localDateStr = (iso) => {
+        if (!iso) return ''
+        const d = new Date(iso)
+        if (isNaN(d.getTime())) return String(iso).split('T')[0]
+        const p = (n) => String(n).padStart(2, '0')
+        return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`
+      }
       // Nieuwste eerst → drill-down leest chronologisch; gepagineerd zodat de
       // 1000-rijen-cap de tellingen niet meer afknijpt.
       const movements = await this._fetchMovementsPaged(startISO, endISO, '*')
@@ -2037,8 +2049,8 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
       // Call gevoerd — ingeplande calls die als "gevoerd" (Sale/Sale verloren)
       // zijn afgehandeld, geteld op de CALL-datum (niet moved_at) binnen de periode.
       try {
-        const startDate = (startISO || '').split('T')[0]
-        const endDate = (endISO || '').split('T')[0]
+        const startDate = localDateStr(startISO)
+        const endDate = localDateStr(endISO)
         if (startDate && endDate) {
           const { data: heldRows } = await this.db.supabase
             .from('lead_movements')
@@ -2064,8 +2076,8 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
       // call_happened=false maar legt een nieuwe call vast — alleen als de láátste
       // ingeplande call niet-gevoerd is, telt de lead als no-show.
       try {
-        const startDate = (startISO || '').split('T')[0]
-        const endDate = (endISO || '').split('T')[0]
+        const startDate = localDateStr(startISO)
+        const endDate = localDateStr(endISO)
         if (startDate && endDate) {
           const { data: schedRows } = await this.db.supabase
             .from('lead_movements')
