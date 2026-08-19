@@ -497,6 +497,31 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
   // KANBAN BOARD METHODS
   // ============================================================================
 
+  // Idempotente aanmaak voor systeem-secties (Snooze, Follow up stil). Checkt
+  // EERST in de DB of er al een sectie met deze titel bestaat voor deze coach —
+  // pas als die er niet is wordt er aangemaakt. Zo voorkomen we duplicaten door
+  // races of een hapering in het laden (de auto-create in de kanban vuurde
+  // anders zodra de sectie niet in de zojuist geladen lijst zat).
+  async ensureSystemSection(coachId, sectionData) {
+    try {
+      const title = sectionData.title
+      // Bestaat 'ie al (case-insensitive) voor deze coach? Dan die teruggeven.
+      const { data: existing } = await this.db.supabase
+        .from('lead_sections')
+        .select('*')
+        .eq('coach_id', coachId)
+        .ilike('title', title)
+        .order('created_at', { ascending: true })
+        .limit(1)
+        .maybeSingle()
+      if (existing) return existing
+      return await this.createSection(coachId, sectionData)
+    } catch (error) {
+      console.error('❌ ensureSystemSection failed:', error)
+      throw error
+    }
+  }
+
   async createSection(coachId, sectionData) {
     try {
       // Nieuwe secties krijgen de team_id van de coach (eerste lidmaatschap).

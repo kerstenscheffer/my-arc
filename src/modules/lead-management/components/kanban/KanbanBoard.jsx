@@ -519,7 +519,7 @@ export default function KanbanBoard({
     snoozeAutoCreatedRef.current = true
     ;(async () => {
       try {
-        const ns = await leadService.createSection(coachId, {
+        const ns = await leadService.ensureSystemSection(coachId, {
           title: '💤 Snooze',
           color: '#64748b',
           position: sections.filter(s => s.id !== 'unassigned').length,
@@ -552,7 +552,7 @@ export default function KanbanBoard({
     followupStilAutoCreatedRef.current = true
     ;(async () => {
       try {
-        const ns = await leadService.createSection(coachId, {
+        const ns = await leadService.ensureSystemSection(coachId, {
           title: '📵 Follow up stil',
           color: '#f97316',
           position: sections.filter(s => s.id !== 'unassigned').length,
