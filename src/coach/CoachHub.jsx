@@ -22,6 +22,7 @@ import CoachOutputDashboard from '../modules/output-planning/CoachOutputDashboar
 import ProductivityHub from '../modules/productivity/ProductivityHub'
 import { FunnelDashboard } from '../modules/qualification-funnel'
 import SpotsManager from '../modules/spots/SpotsManager'
+import NotificationHub from '../modules/notifications/NotificationHub'
 import TemplateManager from '../modules/meal-templates/TemplateManager'
 import IngredientPhotoManager from '../modules/ingredient-photos/IngredientPhotoManager'
 import MealGuideManager from '../modules/meal-plan/MealGuideManager'
@@ -130,6 +131,7 @@ const MORE_CATEGORIES = [
   {
     label: 'Systeem',
     items: [
+      { id: 'notifications-hub', label: 'Meldingen', icon: Bell },
       { id: 'spots', label: 'Spots Manager', icon: Settings },
       { id: 'lab', label: 'Lab', icon: FlaskConical }
     ]
@@ -505,6 +507,8 @@ export default function CoachHub() {
         return <ResultsHub db={db} clients={clients || []} />
       case 'faq':
         return <CoachFAQManager db={db} />
+      case 'notifications-hub':
+        return <NotificationHub db={db} />
       case 'spots':
         return <SpotsManager db={db} compact={false} />
       case 'lab':
