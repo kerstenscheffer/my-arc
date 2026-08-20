@@ -475,12 +475,17 @@ export default function KanbanBoard({
 
   const handleLeadInsert = (newLead) => {
     const targetSectionId = newLead.section_id || 'unassigned'
+    // Een move = DELETE oude section_item + INSERT nieuwe. Het DELETE-realtime-
+    // event bevat standaard alleen de primary key (geen lead_id), dus dat wordt
+    // hierboven genegeerd → zonder deze globale dedup bleef de kaart óók in de
+    // oude kolom staan (lead in twee secties tegelijk). Daarom: verwijder de
+    // lead eerst uit ELKE andere sectie, dan toevoegen aan de doelsectie.
     setSections(prev => prev.map(section => {
+      const without = (section.leads || []).filter(l => l.id !== newLead.id)
       if (section.id === targetSectionId) {
-        const exists = (section.leads || []).some(l => l.id === newLead.id)
-        if (!exists) return { ...section, leads: [newLead, ...(section.leads || [])] }
+        return { ...section, leads: [newLead, ...without] }
       }
-      return section
+      return { ...section, leads: without }
     }))
     setHighlightedLeadId(newLead.id)
     setTimeout(() => setHighlightedLeadId(null), 3000)
