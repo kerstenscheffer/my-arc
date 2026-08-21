@@ -1,22 +1,24 @@
-// src/pages/SixteenWeekCheckout.jsx
-// Checkout op /16-week-checkout — EENMALIG €497, 16 weken / 4 maanden traject.
-// Duplicaat van TwelveWeekCheckout.jsx (zelfde opmaak/copy), andere prijs.
+// src/pages/SixteenWeekMonthlyCheckout.jsx
+// Checkout op /16-week-monthly-checkout — €125 PER MAAND, 16 weken /
+// 4 maanden traject. Duplicaat van SixteenWeekCheckout.jsx (zelfde opmaak en
+// copy), maar een doorlopend maandabonnement i.p.v. één betaling.
 //
 // Opmaak + copy zijn overgenomen van /16week (src/sales-call-16week/):
 // full-screen snap-secties op #0a0a0a, hero → 3 losse pijler-schermen → offer
 // → formulier, met nav-dots rechts.
 //
-// Stripe: /api/create-checkout-session (one-time), plan '16-week-program'.
+// Stripe: /api/create-subscription-session (subscription), zelfde endpoint als
+// MaandCheckout.
 
 import { useState, useEffect, useRef } from 'react'
 import { Star, Lock, Mail, User, Phone, ChevronDown } from 'lucide-react'
 
-// Eenmalige prijs.
-const PRICE = 497
+// Maandbedrag zoals het op de pagina staat.
+const PRICE = 125
 
-// Stripe Price ID van dit traject — de checkout rekent hiermee af, niet met
-// PRICE hierboven (die is alleen nog de weergegeven prijs op de pagina).
-const STRIPE_PRICE_ID = 'price_1U6oNiJ3V4uXn1Okl1DG5TDD'
+// Stripe Price ID van dit abonnement — de checkout rekent hiermee af, niet met
+// PRICE hierboven (die is alleen de weergegeven prijs op de pagina).
+const STRIPE_PRICE_ID = 'price_1U6oR6J3V4uXn1Ok29IM1ks0'
 
 // Same Stripe publishable key as the other checkouts.
 const STRIPE_PK = 'pk_live_51Px383J3V4uXn1OktbtpW48KdDUq1ELqW9nfG19weDGHZ4qDOw8wE7jxEbNkA22T18lLJX9PFG755iWZWeAOYpd300oec67m54'
@@ -208,7 +210,7 @@ function PijlerSection({ isMobile, index }) {
   )
 }
 
-export default function SixteenWeekCheckout() {
+export default function SixteenWeekMonthlyCheckout() {
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [phone, setPhone] = useState('')
@@ -311,16 +313,16 @@ export default function SixteenWeekCheckout() {
     setLoading(true)
     setError('')
     try {
-      const res = await fetch('/api/create-checkout-session', {
+      const res = await fetch('/api/create-subscription-session', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          plan: '16-week-program',
-          price: PRICE,
-          ...(STRIPE_PRICE_ID ? { priceId: STRIPE_PRICE_ID } : {}),
+          priceId: STRIPE_PRICE_ID,
+          plan: '16-weken-maandelijks',
           email: email.trim(),
           name: name.trim(),
           phone: phone.trim(),
+          duration: '4-months',
         }),
       })
       const data = await res.json()
@@ -414,12 +416,13 @@ export default function SixteenWeekCheckout() {
         {/* ══ SCHERM 5: OFFER — ongewijzigd ══ */}
         <section ref={offerRef} style={{ ...screen, textAlign: 'center' }}>
           <div style={{ maxWidth: 520, width: '100%' }}>
-            {/* Prijs — eenmalig €497 */}
+            {/* Prijs — €125 per maand */}
             <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'center', gap: 5 }}>
-              <span style={{ fontSize: isMobile ? '2.9rem' : '3.4rem', fontWeight: 900, color: '#fff', lineHeight: 1, letterSpacing: '-0.02em' }}>€497</span>
+              <span style={{ fontSize: isMobile ? '2.9rem' : '3.4rem', fontWeight: 900, color: '#fff', lineHeight: 1, letterSpacing: '-0.02em' }}>€{PRICE}</span>
+              <span style={{ fontSize: isMobile ? '1.1rem' : '1.3rem', fontWeight: 800, color: 'rgba(255,255,255,0.55)', lineHeight: 1 }}>/mnd</span>
             </div>
             <div style={{ fontSize: isMobile ? '0.82rem' : '0.9rem', color: 'rgba(255,255,255,0.45)', fontWeight: 600, marginTop: 8 }}>
-              Eenmalig · <span style={{ color: '#fff', fontWeight: 800 }}>4 maanden traject</span>
+              Per maand · <span style={{ color: '#fff', fontWeight: 800 }}>4 maanden traject</span>
             </div>
 
             {/* Garantie — zelfde regel en opmaak als /16week */}
@@ -518,7 +521,7 @@ export default function SixteenWeekCheckout() {
                   letterSpacing: '0.01em', fontFamily: 'inherit',
                 }}
               >
-                {loading ? 'Even geduld...' : 'Start Nu · €497'}
+                {loading ? 'Even geduld...' : `Start Nu · €${PRICE}/mnd`}
               </button>
 
               <div style={{

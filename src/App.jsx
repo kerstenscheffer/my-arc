@@ -24,6 +24,7 @@ import BackInShapeMonthlyCheckout from './pages/BackInShapeMonthlyCheckout'
 import EightWeekCheckout from './pages/EightWeekCheckout'
 import TwelveWeekCheckout from './pages/TwelveWeekCheckout'
 import SixteenWeekCheckout from './pages/SixteenWeekCheckout'
+import SixteenWeekMonthlyCheckout from './pages/SixteenWeekMonthlyCheckout'
 import MonthlySubscriptionCheckout from './pages/MonthlySubscriptionCheckout'
 import MaandCheckout from './pages/MaandCheckout'
 import SixMonthSubscriptionCheckout from './pages/SixMonthSubscriptionCheckout'
@@ -189,6 +190,11 @@ function App() {
   // met of zonder streepje werkt.
   if (currentPath === '/16-week-checkout' || currentPath === '/16week-checkout') {
     return <SixteenWeekCheckout />
+  }
+
+  // 16-weken checkout, maandelijks — €125/mnd abonnement.
+  if (currentPath === '/16-week-monthly-checkout' || currentPath === '/16week-monthly-checkout') {
+    return <SixteenWeekMonthlyCheckout />
   }
 
   if (currentPath === '/monthly-checkout') {
