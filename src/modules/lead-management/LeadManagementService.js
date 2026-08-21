@@ -713,27 +713,15 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
         return await this.removeLeadFromSection(leadId, coachId)
       }
 
-      const { data: leadData } = await this.db.supabase
-        .from('call_leads')
-        .select('first_name, last_name')
-        .eq('id', leadId)
-        .single()
+      const [{ data: leadData }, { data: currentItem }, { data: targetSection }] = await Promise.all([
+        this.db.supabase.from('call_leads').select('first_name, last_name').eq('id', leadId).single(),
+        this.db.supabase.from('lead_section_items').select('section_id, previous_section_id, previous_section_title, previous_section_color, lead_sections:section_id(id, title, color)').eq('lead_id', leadId).maybeSingle(),
+        this.db.supabase.from('lead_sections').select('id, title, color').eq('id', targetSectionId).single(),
+      ])
 
-      const leadName = leadData 
+      const leadName = leadData
         ? `${leadData.first_name || ''} ${leadData.last_name || ''}`.trim() || 'Unknown'
         : 'Unknown'
-
-      const { data: currentItem } = await this.db.supabase
-        .from('lead_section_items')
-        .select('section_id, previous_section_id, previous_section_title, previous_section_color, lead_sections:section_id(id, title, color)')
-        .eq('lead_id', leadId)
-        .maybeSingle()
-
-      const { data: targetSection } = await this.db.supabase
-        .from('lead_sections')
-        .select('id, title, color')
-        .eq('id', targetSectionId)
-        .single()
 
       const fromSectionId = currentItem?.section_id || null
       const fromSectionTitle = currentItem?.lead_sections?.title || 'Niet toegewezen'
@@ -765,12 +753,11 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
         updateData.moved_to_stale_at = null
       }
 
-      // Upsert op lead_id → nooit een tweede rij voor dezelfde lead (issue d93267cf).
-      await this.db.supabase
-        .from('lead_section_items')
-        .upsert({ lead_id: leadId, ...updateData }, { onConflict: 'lead_id' })
-
-      await this.db.supabase.from('call_leads').update({ last_touched: new Date().toISOString() }).eq('id', leadId)
+      // Upsert + last_touched update zijn onafhankelijk → parallel.
+      await Promise.all([
+        this.db.supabase.from('lead_section_items').upsert({ lead_id: leadId, ...updateData }, { onConflict: 'lead_id' }),
+        this.db.supabase.from('call_leads').update({ last_touched: new Date().toISOString() }).eq('id', leadId),
+      ])
 
       const movementId = await this.logMovement({
         leadId, leadName, fromSectionId, fromSectionTitle,
@@ -786,21 +773,14 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
 
   async removeLeadFromSection(leadId, coachId = null) {
     try {
-      const { data: leadData } = await this.db.supabase
-        .from('call_leads')
-        .select('first_name, last_name')
-        .eq('id', leadId)
-        .single()
+      const [{ data: leadData }, { data: currentItem }] = await Promise.all([
+        this.db.supabase.from('call_leads').select('first_name, last_name').eq('id', leadId).single(),
+        this.db.supabase.from('lead_section_items').select('section_id, lead_sections:section_id(id, title)').eq('lead_id', leadId).maybeSingle(),
+      ])
 
-      const leadName = leadData 
+      const leadName = leadData
         ? `${leadData.first_name || ''} ${leadData.last_name || ''}`.trim() || 'Unknown'
         : 'Unknown'
-
-      const { data: currentItem } = await this.db.supabase
-        .from('lead_section_items')
-        .select('section_id, lead_sections:section_id(id, title)')
-        .eq('lead_id', leadId)
-        .maybeSingle()
 
       if (currentItem) {
         await this.logMovement({
@@ -811,8 +791,10 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
         })
       }
 
-      await this.db.supabase.from('lead_section_items').delete().eq('lead_id', leadId)
-      await this.db.supabase.from('call_leads').update({ last_touched: new Date().toISOString() }).eq('id', leadId)
+      await Promise.all([
+        this.db.supabase.from('lead_section_items').delete().eq('lead_id', leadId),
+        this.db.supabase.from('call_leads').update({ last_touched: new Date().toISOString() }).eq('id', leadId),
+      ])
 
       return true
     } catch (error) {
