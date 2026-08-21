@@ -1,5 +1,5 @@
 // src/pages/TwelveWeekCheckout.jsx
-// 12-weken checkout — EENMALIG €297.
+// Checkout op /12-week-checkout — EENMALIG €297, 16 weken / 4 maanden traject.
 //
 // Opmaak + copy zijn overgenomen van /16week (src/sales-call-16week/):
 // full-screen snap-secties op #0a0a0a, hero → 3 losse pijler-schermen → offer
@@ -374,7 +374,7 @@ export default function TwelveWeekCheckout() {
               letterSpacing: '-0.02em', color: '#fff',
               fontSize: isMobile ? 'clamp(2rem, 7.8vw, 2.6rem)' : 'clamp(2.6rem, 4.4vw, 3.6rem)',
             }}>
-              In 12 weken in shape komen,<br />met de MY ARC methode.
+              In 16 weken in shape komen,<br />met de MY ARC methode.
             </h1>
           </div>
 
@@ -415,14 +415,19 @@ export default function TwelveWeekCheckout() {
               <span style={{ fontSize: isMobile ? '2.9rem' : '3.4rem', fontWeight: 900, color: '#fff', lineHeight: 1, letterSpacing: '-0.02em' }}>€297</span>
             </div>
             <div style={{ fontSize: isMobile ? '0.82rem' : '0.9rem', color: 'rgba(255,255,255,0.45)', fontWeight: 600, marginTop: 8 }}>
-              Eenmalig · <span style={{ color: '#fff', fontWeight: 800 }}>het volledige 3-maanden traject</span>
+              Eenmalig · <span style={{ color: '#fff', fontWeight: 800 }}>4 maanden traject</span>
             </div>
 
-            {/* Garantie — bold wit, met een gouden streep eronder als accent */}
-            <div style={{ fontSize: isMobile ? '1.05rem' : '1.2rem', color: '#fff', fontWeight: 800, lineHeight: 1.45, maxWidth: 470, margin: isMobile ? '1.6rem auto 0' : '2rem auto 0' }}>
-              <span style={{ color: GOLD }}>Geen zichtbaar verschil binnen 30 dagen?</span> Dan krijg je je investering terug en loop je weg met 30 dagen gratis coaching.
-            </div>
-            <div style={{ width: 56, height: 3, background: GOLD, borderRadius: 2, margin: isMobile ? '1.1rem auto 0' : '1.25rem auto 0' }} />
+            {/* Garantie — zelfde regel en opmaak als /16week */}
+            <p style={{
+              margin: isMobile ? '1.5rem auto 0' : '1.75rem auto 0',
+              maxWidth: 480, textAlign: 'center',
+              fontSize: isMobile ? '0.9rem' : '1.05rem',
+              fontWeight: 700, color: '#fff', lineHeight: 1.4, letterSpacing: '-0.01em',
+            }}>
+              Geen succesvolle transformatie?{' '}
+              <span style={{ color: GOLD }}>Krijg je investering terug.</span>
+            </p>
 
             {/* Knop naar het formulier (afrekenen) */}
             <button onClick={scrollToForm} style={{
