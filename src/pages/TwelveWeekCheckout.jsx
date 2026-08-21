@@ -35,7 +35,6 @@ const REVIEWS = [
 
 // Transformatie-reviews (before/after) met resultaat-tekst.
 const TRANSFORMATIONS = [
-  { src: '/review-transformatie-3.png', caption: 'Saskia ging van 85 naar 78,5 en dalend.' },
   { src: '/review-transformatie-1.png', caption: 'Kersten: van zachte buik naar sixpack.' },
   { src: '/review-transformatie-2.png', caption: 'Nitish bouwde spier terwijl zijn vet % daalde.' },
 ]
@@ -379,7 +378,7 @@ export default function TwelveWeekCheckout() {
           </div>
 
           {/* Transformaties — onder de titel, bewust klein (titel domineert) */}
-          <div style={{ width: isMobile ? '78%' : '100%', maxWidth: isMobile ? '100%' : 560, margin: '0 auto' }}>
+          <div style={{ width: isMobile ? '70%' : '100%', maxWidth: isMobile ? '100%' : 532, margin: '0 auto' }}>
             <div style={{ display: 'flex', gap: isMobile ? '0.4rem' : '0.65rem' }}>
               {TRANSFORMATIONS.map((t) => (
                 <div key={t.src} style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
