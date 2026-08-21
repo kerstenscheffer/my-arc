@@ -23,6 +23,7 @@ import BackInShapeCheckout from './pages/BackInShapeCheckout'
 import BackInShapeMonthlyCheckout from './pages/BackInShapeMonthlyCheckout'
 import EightWeekCheckout from './pages/EightWeekCheckout'
 import TwelveWeekCheckout from './pages/TwelveWeekCheckout'
+import SixteenWeekCheckout from './pages/SixteenWeekCheckout'
 import MonthlySubscriptionCheckout from './pages/MonthlySubscriptionCheckout'
 import MaandCheckout from './pages/MaandCheckout'
 import SixMonthSubscriptionCheckout from './pages/SixMonthSubscriptionCheckout'
@@ -182,6 +183,12 @@ function App() {
 
   if (currentPath === '/12-week-checkout') {
     return <TwelveWeekCheckout />
+  }
+
+  // 16-weken checkout — €497. Beide schrijfwijzen, zodat een gedeelde link
+  // met of zonder streepje werkt.
+  if (currentPath === '/16-week-checkout' || currentPath === '/16week-checkout') {
+    return <SixteenWeekCheckout />
   }
 
   if (currentPath === '/monthly-checkout') {
