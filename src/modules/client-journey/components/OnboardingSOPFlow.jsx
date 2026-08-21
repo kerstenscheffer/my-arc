@@ -1,7 +1,7 @@
 // src/modules/client-journey/components/OnboardingSOPFlow.jsx
 import React, { useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
-import { Check, Copy, ChevronRight, ChevronDown, AlertTriangle, X, ExternalLink } from 'lucide-react'
+import { Check, Copy, ChevronRight, ChevronDown, AlertTriangle, X, ExternalLink, Pencil, RotateCcw } from 'lucide-react'
 import IntakeCallPanel from './calls/IntakeCallPanel'
 
 function getWAUrl(client) {
@@ -23,6 +23,10 @@ const MUTED = 'rgba(255,255,255,0.45)'
 const DIM = 'rgba(255,255,255,0.2)'
 
 // ─── SOP DEFINITIE ───────────────────────────────────────────────
+// Dit zijn de STANDAARD-teksten. De coach kan elk bericht in de UI aanpassen;
+// die aanpassingen komen in public.coach_onboarding_sop (jsonb `messages`,
+// key -> { text, label }) en overschrijven wat hieronder staat. "Herstel
+// standaard" gooit de override weg en de tekst hier komt weer terug.
 const STEPS = [
   {
     id: 0,
@@ -161,6 +165,58 @@ export default function OnboardingSOPFlow({ db, selectedClient, onStartSetup, on
   const [expandedWarning, setExpandedWarning] = useState(null)
   // Per-stap gekozen bericht-variant (bv. checkout maandelijks vs 12-weken).
   const [variantChoice, setVariantChoice] = useState({})
+
+  // ── Bewerkbare berichten ──
+  // `overrides` is een map key -> { text?, label? }. Alles wat er niet in staat
+  // valt terug op de standaardtekst uit STEPS hierboven.
+  const [overrides, setOverrides] = useState({})
+  const [coachId, setCoachId] = useState(null)
+
+  useEffect(() => {
+    if (!db?.supabase) return
+    let cancelled = false
+    ;(async () => {
+      try {
+        const user = await db.getCurrentUser?.()
+        if (!user?.id || cancelled) return
+        setCoachId(user.id)
+        const { data } = await db.supabase
+          .from('coach_onboarding_sop')
+          .select('messages')
+          .eq('coach_id', user.id)
+          .maybeSingle()
+        if (!cancelled && data?.messages) setOverrides(data.messages)
+      } catch (e) { console.error('SOP berichten laden:', e) }
+    })()
+    return () => { cancelled = true }
+  }, [db])
+
+  const persistOverrides = async (next) => {
+    setOverrides(next)
+    if (!db?.supabase || !coachId) return
+    setSaving(true)
+    try {
+      await db.supabase
+        .from('coach_onboarding_sop')
+        .upsert(
+          { coach_id: coachId, messages: next, updated_at: new Date().toISOString() },
+          { onConflict: 'coach_id' }
+        )
+    } catch (e) { console.error('SOP bericht opslaan:', e) }
+    setSaving(false)
+  }
+
+  const saveOverride = (key, patch) =>
+    persistOverrides({ ...overrides, [key]: { ...(overrides[key] || {}), ...patch } })
+
+  const resetOverride = (key) => {
+    const next = { ...overrides }
+    delete next[key]
+    persistOverrides(next)
+  }
+
+  const textFor = (key, fallback) => overrides[key]?.text ?? fallback
+  const labelFor = (key, fallback) => overrides[key]?.label ?? fallback
 
   // Sync client change
   useEffect(() => {
@@ -401,6 +457,7 @@ export default function OnboardingSOPFlow({ db, selectedClient, onStartSetup, on
                     if (msg.variants?.length) {
                       const chosenId = variantChoice[step.id] || msg.variants[0].id
                       const active = msg.variants.find(v => v.id === chosenId) || msg.variants[0]
+                      const activeKey = `step-${step.id}:${active.id}`
                       return (
                         <>
                           <div style={{ display: 'flex', gap: '0.35rem', marginBottom: '0.5rem' }}>
@@ -419,30 +476,40 @@ export default function OnboardingSOPFlow({ db, selectedClient, onStartSetup, on
                                     WebkitTapHighlightColor: 'transparent', minHeight: '30px'
                                   }}
                                 >
-                                  {v.label}
+                                  {labelFor(`step-${step.id}:${v.id}`, v.label)}
                                 </button>
                               )
                             })}
                           </div>
                           <MsgBlock
-                            text={active.text}
+                            key={activeKey}
+                            text={textFor(activeKey, active.text)}
+                            label={labelFor(activeKey, active.label)}
                             msgId={`msg-${step.id}`}
                             resolve={resolve}
                             copied={copied}
                             onCopy={copy}
                             isMobile={isMobile}
+                            edited={!!overrides[activeKey]}
+                            onSave={(patch) => saveOverride(activeKey, patch)}
+                            onReset={() => resetOverride(activeKey)}
                           />
                         </>
                       )
                     }
+                    const key = `step-${step.id}`
                     return (
                       <MsgBlock
-                        text={msg.text}
+                        key={key}
+                        text={textFor(key, msg.text)}
                         msgId={`msg-${step.id}`}
                         resolve={resolve}
                         copied={copied}
                         onCopy={copy}
                         isMobile={isMobile}
+                        edited={!!overrides[key]}
+                        onSave={(patch) => saveOverride(key, patch)}
+                        onReset={() => resetOverride(key)}
                       />
                     )
                   })()}
@@ -500,13 +567,17 @@ export default function OnboardingSOPFlow({ db, selectedClient, onStartSetup, on
                             </div>
                           )}
                           <MsgBlock
-                            text={w.text}
+                            key={`step-${step.id}:warn-${i}`}
+                            text={textFor(`step-${step.id}:warn-${i}`, w.text)}
                             msgId={`warn-${step.id}-${i}`}
                             resolve={resolve}
                             copied={copied}
                             onCopy={copy}
                             isMobile={isMobile}
                             accent={RED}
+                            edited={!!overrides[`step-${step.id}:warn-${i}`]}
+                            onSave={(patch) => saveOverride(`step-${step.id}:warn-${i}`, patch)}
+                            onReset={() => resetOverride(`step-${step.id}:warn-${i}`)}
                           />
                         </div>
                       )}
