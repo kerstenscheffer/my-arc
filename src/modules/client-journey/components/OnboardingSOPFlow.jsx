@@ -800,9 +800,110 @@ export default function OnboardingSOPFlow({ db, selectedClient, onStartSetup, on
 }
 
 // ─── MESSAGE BLOCK ───────────────────────────────────────────────
-function MsgBlock({ text, msgId, resolve, copied, onCopy, isMobile, accent }) {
+// Toont het bericht met var-substitutie. Met het potlood klapt hij open in een
+// bewerkmodus: daar staat de RUWE tekst (dus mét [naam]/[doel]-placeholders),
+// zodat die bij het kopiëren nog ingevuld blijven worden.
+function MsgBlock({ text, label, msgId, resolve, copied, onCopy, isMobile, accent, edited, onSave, onReset }) {
   const borderColor = accent ? `${accent}20` : BORDER
   const bg = accent ? `${accent}05` : 'rgba(255,255,255,0.02)'
+
+  const [editing, setEditing] = useState(false)
+  const [draftText, setDraftText] = useState(text)
+  const [draftLabel, setDraftLabel] = useState(label || '')
+
+  const startEdit = () => {
+    setDraftText(text)
+    setDraftLabel(label || '')
+    setEditing(true)
+  }
+
+  const commit = () => {
+    const patch = { text: draftText }
+    if (label !== undefined) patch.label = draftLabel
+    onSave?.(patch)
+    setEditing(false)
+  }
+
+  const inputStyle = {
+    width: '100%', boxSizing: 'border-box',
+    background: 'rgba(255,255,255,0.04)',
+    border: `1px solid ${BORDER}`, borderRadius: '5px',
+    color: TEXT, fontFamily: 'inherit', outline: 'none',
+  }
+
+  const smallBtn = (extra) => ({
+    padding: '0.35rem 0.6rem', borderRadius: '5px',
+    fontSize: '0.55rem', fontWeight: 800, cursor: 'pointer',
+    touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+    minHeight: '30px', display: 'flex', alignItems: 'center', gap: '0.25rem',
+    ...extra,
+  })
+
+  if (editing) {
+    return (
+      <div style={{
+        background: bg, border: `1px solid ${GOLD}35`,
+        borderRadius: '6px', padding: '0.6rem 0.75rem'
+      }}>
+        {label !== undefined && (
+          <>
+            <label style={{
+              display: 'block', fontSize: '0.38rem', color: DIM,
+              textTransform: 'uppercase', letterSpacing: '0.08em',
+              fontWeight: 700, marginBottom: '0.2rem'
+            }}>Knop-label</label>
+            <input
+              value={draftLabel}
+              onChange={e => setDraftLabel(e.target.value)}
+              style={{ ...inputStyle, padding: '0.35rem 0.55rem', fontSize: '0.72rem', marginBottom: '0.5rem' }}
+            />
+          </>
+        )}
+
+        <label style={{
+          display: 'block', fontSize: '0.38rem', color: DIM,
+          textTransform: 'uppercase', letterSpacing: '0.08em',
+          fontWeight: 700, marginBottom: '0.2rem'
+        }}>Bericht</label>
+        <textarea
+          value={draftText}
+          onChange={e => setDraftText(e.target.value)}
+          rows={Math.min(20, Math.max(6, draftText.split('\n').length + 2))}
+          style={{
+            ...inputStyle, padding: '0.5rem 0.6rem',
+            fontSize: isMobile ? '0.7rem' : '0.73rem', lineHeight: 1.65,
+            resize: 'vertical',
+          }}
+        />
+
+        <p style={{ fontSize: '0.42rem', color: DIM, margin: '0.35rem 0 0.5rem', lineHeight: 1.5 }}>
+          Placeholders blijven werken: [naam], [email], [doel], [wachtwoord].
+        </p>
+
+        <div style={{ display: 'flex', gap: '0.35rem', flexWrap: 'wrap' }}>
+          <button onClick={commit} style={smallBtn({
+            background: `${GREEN}15`, border: `1px solid ${GREEN}35`, color: GREEN, flex: 1, justifyContent: 'center'
+          })}>
+            <Check size={10} strokeWidth={3} /> Opslaan
+          </button>
+          <button onClick={() => setEditing(false)} style={smallBtn({
+            background: 'transparent', border: '1px solid rgba(255,255,255,0.1)', color: MUTED
+          })}>
+            Annuleren
+          </button>
+          {edited && (
+            <button
+              onClick={() => { onReset?.(); setEditing(false) }}
+              style={smallBtn({ background: 'rgba(255,255,255,0.03)', border: `1px solid ${BORDER}`, color: MUTED })}
+              title="Zet de standaardtekst terug"
+            >
+              <RotateCcw size={10} /> Standaard
+            </button>
+          )}
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div style={{
@@ -817,23 +918,56 @@ function MsgBlock({ text, msgId, resolve, copied, onCopy, isMobile, accent }) {
       }}>
         {resolve(text)}
       </p>
-      <button
-        onClick={() => onCopy(text, msgId)}
-        style={{
-          position: 'absolute', top: '0.5rem', right: '0.5rem',
-          width: '26px', height: '26px', borderRadius: '5px',
-          background: copied === msgId ? `${GREEN}15` : 'rgba(255,255,255,0.04)',
-          border: `1px solid ${copied === msgId ? GREEN + '35' : BORDER}`,
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          cursor: 'pointer', touchAction: 'manipulation',
-          WebkitTapHighlightColor: 'transparent', transition: 'all 0.15s ease'
-        }}
-      >
-        {copied === msgId
-          ? <Check size={11} color={GREEN} strokeWidth={2.5} />
-          : <Copy size={11} color={MUTED} />
-        }
-      </button>
+
+      {edited && (
+        <span style={{
+          display: 'inline-block', marginTop: '0.4rem',
+          fontSize: '0.38rem', fontWeight: 800, letterSpacing: '0.07em',
+          color: GOLD, opacity: 0.7
+        }}>
+          AANGEPAST
+        </span>
+      )}
+
+      <div style={{
+        position: 'absolute', top: '0.5rem', right: '0.5rem',
+        display: 'flex', flexDirection: 'column', gap: '0.25rem'
+      }}>
+        <button
+          onClick={() => onCopy(text, msgId)}
+          style={{
+            width: '26px', height: '26px', borderRadius: '5px',
+            background: copied === msgId ? `${GREEN}15` : 'rgba(255,255,255,0.04)',
+            border: `1px solid ${copied === msgId ? GREEN + '35' : BORDER}`,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            cursor: 'pointer', touchAction: 'manipulation',
+            WebkitTapHighlightColor: 'transparent', transition: 'all 0.15s ease'
+          }}
+          title="Kopieer bericht"
+        >
+          {copied === msgId
+            ? <Check size={11} color={GREEN} strokeWidth={2.5} />
+            : <Copy size={11} color={MUTED} />
+          }
+        </button>
+
+        {onSave && (
+          <button
+            onClick={startEdit}
+            style={{
+              width: '26px', height: '26px', borderRadius: '5px',
+              background: 'rgba(255,255,255,0.04)',
+              border: `1px solid ${edited ? GOLD + '35' : BORDER}`,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              cursor: 'pointer', touchAction: 'manipulation',
+              WebkitTapHighlightColor: 'transparent', transition: 'all 0.15s ease'
+            }}
+            title="Bericht aanpassen"
+          >
+            <Pencil size={10} color={edited ? GOLD : MUTED} />
+          </button>
+        )}
+      </div>
     </div>
   )
 }
