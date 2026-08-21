@@ -1,11 +1,11 @@
 // src/modules/manual-workout-builder/components/ExerciseSelector.jsx
 import { useState, useEffect } from 'react'
-import { X, Search, Dumbbell, User, Plus } from 'lucide-react'
+import { X, Search, Dumbbell, User, Plus, Trash2 } from 'lucide-react'
 import EXERCISE_DATABASE from '../../workout/constants/exerciseDatabase'
 import CustomExerciseModal from '../../workout/components/todays-workout/components/CustomExerciseModal'
 
 export default function ExerciseSelector({ onSelect, onClose, isMobile, db, selectedClient }) {
-  const [tab, setTab] = useState('database') // 'database' | 'client'
+  const [tab, setTab] = useState('database') // 'database' | 'client' | 'coach'
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedMuscle, setSelectedMuscle] = useState('all')
   const [selectedEquipment, setSelectedEquipment] = useState('all')
@@ -14,11 +14,16 @@ export default function ExerciseSelector({ onSelect, onClose, isMobile, db, sele
   const [clientExercises, setClientExercises] = useState([])
   const [loadingClient, setLoadingClient] = useState(false)
   const [showCustomModal, setShowCustomModal] = useState(false)
+  const [coachExercises, setCoachExercises] = useState([])
+  const [loadingCoach, setLoadingCoach] = useState(false)
+  const [showAddForm, setShowAddForm] = useState(false)
+  const [newEx, setNewEx] = useState({ name: '', muscle_group: '', equipment: '', notes: '' })
 
   useEffect(() => { loadExercises() }, [selectedMuscle, selectedEquipment, selectedDifficulty, searchTerm])
 
   useEffect(() => {
     if (tab === 'client' && db) loadClientExercises()
+    if (tab === 'coach' && db) loadCoachExercises()
   }, [tab])
 
   const loadExercises = () => {
@@ -63,6 +68,43 @@ export default function ExerciseSelector({ onSelect, onClose, isMobile, db, sele
       })))
     } catch (e) { console.error('Failed to load client exercises:', e) }
     finally { setLoadingClient(false) }
+  }
+
+  const loadCoachExercises = async () => {
+    setLoadingCoach(true)
+    try {
+      const { data, error } = await db.supabase
+        .from('custom_exercises')
+        .select('id, name, muscle_group, equipment, notes')
+        .is('client_id', null)
+        .order('name')
+      if (error) throw error
+      setCoachExercises(data || [])
+    } catch (e) { console.error('Failed to load coach exercises:', e) }
+    finally { setLoadingCoach(false) }
+  }
+
+  const addCoachExercise = async () => {
+    if (!newEx.name.trim() || !newEx.muscle_group.trim()) return
+    try {
+      const { data, error } = await db.supabase
+        .from('custom_exercises')
+        .insert({ name: newEx.name.trim(), muscle_group: newEx.muscle_group.trim(), equipment: newEx.equipment.trim() || null, notes: newEx.notes.trim() || null, client_id: null })
+        .select().single()
+      if (error) throw error
+      setCoachExercises(prev => [...prev, data].sort((a, b) => a.name.localeCompare(b.name)))
+      setNewEx({ name: '', muscle_group: '', equipment: '', notes: '' })
+      setShowAddForm(false)
+    } catch (e) { console.error('Failed to add coach exercise:', e); alert('Opslaan mislukt') }
+  }
+
+  const deleteCoachExercise = async (id) => {
+    if (!window.confirm('Oefening verwijderen uit coach database?')) return
+    try {
+      const { error } = await db.supabase.from('custom_exercises').delete().eq('id', id).is('client_id', null)
+      if (error) throw error
+      setCoachExercises(prev => prev.filter(e => e.id !== id))
+    } catch (e) { console.error('Failed to delete coach exercise:', e); alert('Verwijderen mislukt') }
   }
 
   const handleSelectClient = (ex) => {
@@ -121,8 +163,14 @@ export default function ExerciseSelector({ onSelect, onClose, isMobile, db, sele
           </button>
           {db && (
             <button onClick={() => setTab('client')} style={{ flex: 1, padding: '0.625rem', background: 'transparent', border: 'none', borderBottom: tab === 'client' ? '2px solid #FFD700' : '2px solid transparent', color: tab === 'client' ? '#FFD700' : 'rgba(255,255,255,0.35)', fontSize: '0.72rem', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.04em', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.3rem', touchAction: 'manipulation' }}>
-              <User size={12} strokeWidth={2.5} />Client oefeningen
+              <User size={12} strokeWidth={2.5} />Client
               {clientExercises.length > 0 && <span style={{ fontSize: '0.58rem', background: 'rgba(255,215,0,0.15)', color: '#FFD700', padding: '0.1rem 0.3rem', borderRadius: '3px', fontWeight: '800' }}>{clientExercises.length}</span>}
+            </button>
+          )}
+          {db && (
+            <button onClick={() => setTab('coach')} style={{ flex: 1, padding: '0.625rem', background: 'transparent', border: 'none', borderBottom: tab === 'coach' ? '2px solid #FFD700' : '2px solid transparent', color: tab === 'coach' ? '#FFD700' : 'rgba(255,255,255,0.35)', fontSize: '0.72rem', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.04em', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.3rem', touchAction: 'manipulation' }}>
+              <Dumbbell size={12} strokeWidth={2.5} />Coach DB
+              {coachExercises.length > 0 && <span style={{ fontSize: '0.58rem', background: 'rgba(255,215,0,0.15)', color: '#FFD700', padding: '0.1rem 0.3rem', borderRadius: '3px', fontWeight: '800' }}>{coachExercises.length}</span>}
             </button>
           )}
         </div>
@@ -214,13 +262,73 @@ export default function ExerciseSelector({ onSelect, onClose, isMobile, db, sele
               )}
             </>
           )}
+          {/* COACH DB TAB */}
+          {tab === 'coach' && (
+            <>
+              {loadingCoach ? (
+                <div style={{ display: 'flex', justifyContent: 'center', padding: '3rem' }}>
+                  <div style={{ width: '28px', height: '28px', border: '2px solid rgba(255,215,0,0.15)', borderTopColor: '#FFD700', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
+                </div>
+              ) : (
+                <>
+                  {coachExercises.filter(ex => !searchTerm || ex.name.toLowerCase().includes(searchTerm.toLowerCase())).map(ex => (
+                    <div key={ex.id} style={{ display: 'flex', alignItems: 'center', padding: isMobile ? '0.625rem 1rem' : '0.75rem 1.25rem', borderBottom: '1px solid rgba(255,255,255,0.04)', gap: '0.75rem' }}>
+                      <div onClick={() => onSelect({ name: ex.name, sets: 3, reps: '10', rest: '90s', primairSpieren: ex.muscle_group || '', equipment: ex.equipment || '', type: 'custom', _isCustom: true })}
+                        style={{ flex: 1, minWidth: 0, cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}
+                        onMouseEnter={e => { if (window.innerWidth > 768) e.currentTarget.style.background = 'rgba(255,255,255,0.03)' }}
+                        onMouseLeave={e => { if (window.innerWidth > 768) e.currentTarget.style.background = 'transparent' }}>
+                        <div style={{ fontSize: isMobile ? '0.82rem' : '0.87rem', fontWeight: '700', color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{ex.name}</div>
+                        <div style={{ fontSize: '0.62rem', color: 'rgba(255,255,255,0.3)', fontWeight: '600', marginTop: '0.1rem', textTransform: 'capitalize' }}>
+                          {ex.muscle_group}{ex.equipment ? ` · ${ex.equipment}` : ''}
+                        </div>
+                      </div>
+                      <button onClick={() => deleteCoachExercise(ex.id)} style={{ width: '28px', height: '28px', background: 'transparent', border: '1px solid rgba(239,68,68,0.2)', borderRadius: '6px', color: 'rgba(239,68,68,0.5)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, touchAction: 'manipulation' }}>
+                        <Trash2 size={12} strokeWidth={2.5} />
+                      </button>
+                    </div>
+                  ))}
+                  {coachExercises.length === 0 && !showAddForm && (
+                    <div style={{ textAlign: 'center', padding: '2rem 2rem 1rem', color: 'rgba(255,255,255,0.25)', fontSize: '0.82rem', fontWeight: '600', fontStyle: 'italic' }}>
+                      Nog geen coach-oefeningen — voeg ze toe hieronder
+                    </div>
+                  )}
+                </>
+              )}
+            </>
+          )}
         </div>
+
+        {/* COACH DB — Oefening toevoegen footer */}
+        {tab === 'coach' && db && (
+          <div style={{ padding: isMobile ? '0.75rem 1rem' : '0.875rem 1.25rem', borderTop: '1px solid rgba(255,255,255,0.06)', flexShrink: 0 }}>
+            {showAddForm ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                <input value={newEx.name} onChange={e => setNewEx(p => ({ ...p, name: e.target.value }))} placeholder="Naam oefening *" style={{ padding: '0.4rem 0.625rem', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '6px', color: '#fff', fontSize: '0.8rem', outline: 'none' }} />
+                <input value={newEx.muscle_group} onChange={e => setNewEx(p => ({ ...p, muscle_group: e.target.value }))} placeholder="Spiergroep * (bv. borst, rug, benen)" style={{ padding: '0.4rem 0.625rem', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '6px', color: '#fff', fontSize: '0.8rem', outline: 'none' }} />
+                <input value={newEx.equipment} onChange={e => setNewEx(p => ({ ...p, equipment: e.target.value }))} placeholder="Materiaal (optioneel)" list="coach-equipment-list" style={{ padding: '0.4rem 0.625rem', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '6px', color: '#fff', fontSize: '0.8rem', outline: 'none' }} />
+                <datalist id="coach-equipment-list">
+                  {['Bodyweight','Dumbbell','Barbell','Kettlebell','EZ-bar','Weerstandsband','Kabel','Smith machine','Machine (algemeen)','Pull-up bar','Dip station','Halterbank'].map(o => <option key={o} value={o} />)}
+                  {[...new Set(coachExercises.map(e => e.equipment).filter(Boolean))].map(o => <option key={'ce-' + o} value={o} />)}
+                </datalist>
+                <div style={{ display: 'flex', gap: '0.5rem' }}>
+                  <button onClick={addCoachExercise} disabled={!newEx.name.trim() || !newEx.muscle_group.trim()} style={{ flex: 1, padding: '0.4rem', background: 'rgba(255,215,0,0.12)', border: '1px solid rgba(255,215,0,0.25)', borderRadius: '6px', color: '#FFD700', fontSize: '0.72rem', fontWeight: '700', cursor: 'pointer', touchAction: 'manipulation' }}>Opslaan</button>
+                  <button onClick={() => { setShowAddForm(false); setNewEx({ name: '', muscle_group: '', equipment: '', notes: '' }) }} style={{ flex: 1, padding: '0.4rem', background: 'transparent', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '6px', color: 'rgba(255,255,255,0.35)', fontSize: '0.72rem', fontWeight: '700', cursor: 'pointer', touchAction: 'manipulation' }}>Annuleren</button>
+                </div>
+              </div>
+            ) : (
+              <button onClick={() => setShowAddForm(true)} style={{ width: '100%', padding: '0.5rem', background: 'transparent', border: '1px dashed rgba(255,215,0,0.2)', borderRadius: '7px', color: 'rgba(255,215,0,0.5)', fontSize: isMobile ? '0.68rem' : '0.72rem', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.04em', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.375rem', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}>
+                <Plus size={12} strokeWidth={2.5} />Oefening toevoegen aan Coach DB
+              </button>
+            )}
+          </div>
+        )}
+
       </div>
 
       <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
 
-      {/* Eigen oefening aanmaken */}
-      {db && selectedClient && (
+      {/* Eigen oefening aanmaken (client tab only) */}
+      {db && selectedClient && tab !== 'coach' && (
         <div style={{ padding: isMobile ? '0.625rem 1rem' : '0.75rem 1.25rem', borderTop: '1px solid rgba(255,255,255,0.06)', flexShrink: 0 }}>
           <button onClick={() => setShowCustomModal(true)}
             style={{ width: '100%', padding: '0.5rem', background: 'transparent', border: '1px dashed rgba(255,215,0,0.2)', borderRadius: '7px', color: 'rgba(255,215,0,0.5)', fontSize: isMobile ? '0.68rem' : '0.72rem', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.04em', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.375rem', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}>
