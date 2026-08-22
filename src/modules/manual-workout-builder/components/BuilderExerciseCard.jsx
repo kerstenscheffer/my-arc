@@ -2,10 +2,13 @@
 // Compacte oefening-kaart in de builder: foto + naam + read-only stats +
 // één "Bewerken"-knop. Alle bewerking (sets/reps/rust/RIR/apparaat/notitie,
 // of cardio-velden) gebeurt in een groter modal — zo blijft de pagina rustig.
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { Video, Trash2, ChevronUp, ChevronDown, Dumbbell, Pencil, X } from 'lucide-react'
 import useExerciseImage from '../hooks/useExerciseImage'
+
+// Module-level cache — one DB query per session, shared across all exercise cards
+const _equipCache = { data: null, promise: null }
 
 const CARDIO_PRESETS = [
   'Wandelen', 'Hardlopen', 'Fietsen', 'Zwemmen', 'Roeien', 'Crosstrainer', 'HIIT',
@@ -35,6 +38,21 @@ export default function BuilderExerciseCard({
   const hasVid = hasVideo || !!exercise.video_url
   const isCardio = exercise.type === 'cardio'
   const [editing, setEditing] = useState(false)
+  const [coachEquip, setCoachEquip] = useState(_equipCache.data ?? [])
+
+  useEffect(() => {
+    if (_equipCache.data) { setCoachEquip(_equipCache.data); return }
+    if (!_equipCache.promise) {
+      _equipCache.promise = db.supabase
+        .from('custom_exercises').select('equipment').is('client_id', null)
+        .then(({ data }) => {
+          const opts = [...new Set((data ?? []).map(r => r.equipment).filter(Boolean))]
+          _equipCache.data = opts
+          return opts
+        })
+    }
+    _equipCache.promise.then(opts => setCoachEquip(opts))
+  }, [db])
 
   const stop = (e) => e.stopPropagation()
   const ctrlBtn = (color, bg = 'transparent', border = 'none') => ({
@@ -201,7 +219,10 @@ function ExerciseEditModal({ exercise, isCardio, isMobile, hasVid, onField, onVi
                   <option value="" style={{ background: '#1a1a1a' }}>Kies apparaat / machine…</option>
                   {EQUIPMENT_OPTIONS.map(o => <option key={o} value={o} style={{ background: '#1a1a1a' }}>{o}</option>)}
                 </select>
-                <input value={exercise.equipment ?? ''} onChange={(e) => onField('equipment', e.target.value)} placeholder='Gekozen apparaat — of typ vrij, bv. "Smith machine" / "Kettlebell 16 kg"' style={{ ...input, marginTop: 8 }} />
+                <datalist id="bec-equipment-list">
+                  {[...new Set([...EQUIPMENT_OPTIONS, ...coachEquip])].map(o => <option key={o} value={o} />)}
+                </datalist>
+                <input value={exercise.equipment ?? ''} onChange={(e) => onField('equipment', e.target.value)} placeholder='Gekozen apparaat — of typ vrij, bv. "Smith machine" / "Kettlebell 16 kg"' list="bec-equipment-list" style={{ ...input, marginTop: 8 }} />
               </div>
 
               <div><label style={label}>Notitie</label>
