@@ -24,41 +24,36 @@ class NowActionsService {
   // Main method to detect all actions
   async detectAllActions(clients, enabledDetectors = {}) {
     if (!clients || clients.length === 0) return []
-    
-    console.log('🔍 Detecting actions for', clients.length, 'clients...')
-    console.log('Active detectors:', this.detectors.map(d => d.constructor.name))
-    
+
     // Filter detectors based on settings
     const activeDetectors = this.detectors.filter(detector => {
       const detectorName = detector.constructor.name.toLowerCase().replace('detector', '')
       return enabledDetectors[detectorName] !== false
     })
-    
-    const allActions = []
-    
+
     // Check for snoozed actions
     const snoozedIds = await this.getSnoozedActionIds()
-    
-    // Run all detectors for each client
-    for (const client of clients) {
-      for (const detector of activeDetectors) {
-        try {
-          const actions = await detector.detect(client)
-          if (actions) {
-            // Ensure actions is array
-            const actionArray = Array.isArray(actions) ? actions : [actions]
-            // Filter out snoozed actions
-            const activeActions = actionArray.filter(a => !snoozedIds.includes(a.id))
-            allActions.push(...activeActions)
-          }
-        } catch (error) {
+
+    // Run all (client, detector) pairs in parallel instead of sequentially
+    const pairs = clients.flatMap(client =>
+      activeDetectors.map(detector => ({ client, detector }))
+    )
+    const results = await Promise.all(
+      pairs.map(({ client, detector }) =>
+        detector.detect(client).catch(error => {
           console.error(`Detector ${detector.constructor.name} failed for ${client.first_name}:`, error)
-        }
-      }
-    }
-    
-    console.log(`✅ Found ${allActions.length} total actions`)
-    
+          return null
+        })
+      )
+    )
+
+    const allActions = []
+    results.forEach(actions => {
+      if (!actions) return
+      const actionArray = Array.isArray(actions) ? actions : [actions]
+      actionArray.forEach(a => { if (!snoozedIds.includes(a.id)) allActions.push(a) })
+    })
+
     // Sort by priority and time
     return this.sortActions(allActions)
   }
