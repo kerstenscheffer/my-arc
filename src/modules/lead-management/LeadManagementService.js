@@ -924,16 +924,16 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
 
   async checkAndMoveStaleLeads(coachId) {
     try {
-      const sections = await this.getSections(coachId)
+      const [sections, leadsWithActivity] = await Promise.all([
+        this.getSections(coachId),
+        this.getLeadsWithLastActivity(coachId),
+      ])
       const staleSections = this.identifyStaleSections(sections)
-      
+
       const staleSectionCount = Object.keys(staleSections).length
       if (staleSectionCount === 0) {
-        console.log('⚠️ Geen "Stil" secties gevonden!')
         return { moved: 0, checked: 0, error: 'No stale sections found' }
       }
-      
-      const leadsWithActivity = await this.getLeadsWithLastActivity(coachId)
       
       // ================================================================
       // v7.1: EXPANDED EXCLUSIONS — snooze + sale + ghost sections
