@@ -1214,36 +1214,40 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
   async moveToStaleSection(lead, targetSection, coachId, isAlreadyStale = false) {
     try {
       const leadName = `${lead.first_name || ''} ${lead.last_name || ''}`.trim() || 'Unknown'
-      
+
+      // Movement insert is fully independent of the reads — fire immediately
+      const movInsertPromise = this.db.supabase.from('lead_movements').insert({
+        lead_id: lead.id, lead_name: leadName,
+        from_section_id: lead.current_section_id,
+        from_section_title: isAlreadyStale ? 'Stale Sectie' : (lead.current_section_title || 'Niet toegewezen'),
+        to_section_id: targetSection.id, to_section_title: targetSection.title,
+        coach_id: coachId, moved_at: new Date().toISOString(), outcome_type: 'auto_stale'
+      })
+
+      // Parallel reads: currentSection (conditional) + existingItem
+      const [currentSectionResult, existingItemResult] = await Promise.all([
+        (!isAlreadyStale && lead.current_section_id)
+          ? this.db.supabase.from('lead_sections').select('id, title, color').eq('id', lead.current_section_id).single()
+          : Promise.resolve({ data: null }),
+        this.db.supabase.from('lead_section_items').select('id, previous_section_id').eq('lead_id', lead.id).limit(1).maybeSingle()
+      ])
+
+      const currentSection = currentSectionResult.data
+      const existingItem = existingItemResult.data
+
       let previousSectionData = {}
-      
-      if (!isAlreadyStale && lead.current_section_id) {
-        const { data: currentSection } = await this.db.supabase
-          .from('lead_sections')
-          .select('id, title, color')
-          .eq('id', lead.current_section_id)
-          .single()
-        
-        if (currentSection) {
-          previousSectionData = {
-            previous_section_id: currentSection.id,
-            previous_section_title: currentSection.title,
-            previous_section_color: currentSection.color,
-            moved_to_stale_at: new Date().toISOString()
-          }
+      if (currentSection) {
+        previousSectionData = {
+          previous_section_id: currentSection.id,
+          previous_section_title: currentSection.title,
+          previous_section_color: currentSection.color,
+          moved_to_stale_at: new Date().toISOString()
         }
       }
-      
+
       // VERPLAATSEN, nooit dupliceren: upsert op lead_id (unique constraint).
       // Zo kan één lead nooit in meerdere kolommen tegelijk belanden, ook niet
       // als een vorige run een rare staat achterliet (issue d93267cf, FIX 2).
-      const { data: existingItem } = await this.db.supabase
-        .from('lead_section_items')
-        .select('id, previous_section_id')
-        .eq('lead_id', lead.id)
-        .limit(1)
-        .maybeSingle()
-
       const payload = {
         lead_id: lead.id,
         section_id: targetSection.id,
@@ -1252,18 +1256,11 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
         ...((!isAlreadyStale && !existingItem?.previous_section_id) ? previousSectionData : {}),
         ...(existingItem ? {} : { position: 0 }),
       }
-      await this.db.supabase
-        .from('lead_section_items')
-        .upsert(payload, { onConflict: 'lead_id' })
-      
-      await this.db.supabase.from('lead_movements').insert({
-        lead_id: lead.id, lead_name: leadName,
-        from_section_id: lead.current_section_id,
-        from_section_title: isAlreadyStale ? 'Stale Sectie' : (lead.current_section_title || 'Niet toegewezen'),
-        to_section_id: targetSection.id, to_section_title: targetSection.title,
-        coach_id: coachId, moved_at: new Date().toISOString(), outcome_type: 'auto_stale'
-      })
-      
+      await Promise.all([
+        this.db.supabase.from('lead_section_items').upsert(payload, { onConflict: 'lead_id' }),
+        movInsertPromise
+      ])
+
       return true
     } catch (error) {
       console.error('❌ Move to stale section failed:', error)
