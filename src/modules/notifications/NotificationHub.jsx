@@ -8,7 +8,9 @@ import { createPortal } from 'react-dom'
 import {
   Bell, BellRing, Smartphone, Server, Check, X, AlertCircle, Send,
   Zap, RefreshCw, ClipboardCheck, MessageCircle, FileText, CheckCircle2,
+  Users, CalendarClock,
 } from 'lucide-react'
+import ScheduledNotifications from './ScheduledNotifications'
 
 const GOLD = '#FFD700'
 const GREEN = '#10b981'
@@ -86,6 +88,7 @@ export default function NotificationHub({ db }) {
   }
 
   const hasToken = (status?.my_device_tokens || 0) > 0
+  const clientTokens = status?.client_device_tokens || 0
   const serverReady = !!status?.apns_configured && !!status?.trigger_active
   // Volledig werkend = server klaar + minstens één toestel gekoppeld.
   const fullyWorking = serverReady && hasToken
@@ -150,6 +153,18 @@ export default function NotificationHub({ db }) {
           title="iPhone gekoppeld"
           okText={`${status?.my_device_tokens} toestel(len) geregistreerd`}
           failText="Nog geen toestel — zie stappen hieronder" />
+        <StatusRow ok={!!status?.client_trigger_active} Icon={Bell}
+          title="Push naar klanten"
+          okText="Elke klant-melding stuurt ook een push"
+          failText="Trigger op klant-meldingen ontbreekt" />
+        <StatusRow ok={!!status?.scheduler_active} Icon={CalendarClock}
+          title="Planner voor automatische meldingen"
+          okText="Draait elk kwartier"
+          failText="Cron-job staat uit" />
+        <StatusRow ok={clientTokens > 0} Icon={Users}
+          title="Klanten met een gekoppeld toestel"
+          okText={`${clientTokens} van ${status?.my_clients ?? 0} actieve klanten`}
+          failText={`0 van ${status?.my_clients ?? 0} actieve klanten — zij zien meldingen alleen in de app`} />
       </div>
 
       {/* ─── Zo koppel je je iPhone (alleen als nog geen token) ─── */}
@@ -189,8 +204,11 @@ export default function NotificationHub({ db }) {
         {testResult === 'err' && <span style={{ fontSize: '0.72rem', color: RED, fontWeight: 700, width: '100%' }}>Versturen mislukt.</span>}
       </div>
 
+      {/* ─── Automatische meldingen naar klanten ─── */}
+      <ScheduledNotifications db={db} coachId={userId} isMobile={isMobile} />
+
       {/* ─── Welke gebeurtenissen ─── */}
-      <SectionTitle>Wanneer krijg je een melding?</SectionTitle>
+      <SectionTitle>Wanneer krijg jíj een melding?</SectionTitle>
       <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 8, marginBottom: '1.3rem' }}>
         {EVENT_TYPES.map(ev => (
           <div key={ev.type} style={{ padding: '0.75rem 0.85rem', borderRadius: 11, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)', display: 'flex', gap: 10, alignItems: 'flex-start' }}>

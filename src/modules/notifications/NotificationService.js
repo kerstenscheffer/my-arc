@@ -9,17 +9,29 @@ class NotificationService {
   // Get active notifications for client
   async getActiveNotifications(clientId, pageContext = 'all') {
     try {
+      // Geplande reminders krijgen een show_from/show_until-venster mee. Zonder
+      // dat filter blijft elke dagelijkse herinnering voor altijd in de widget
+      // staan en stapelen ze op tot de klant ze stuk voor stuk wegklikt.
+      // De kolommen zijn `timestamp without time zone` en bevatten UTC (default
+      // now() op de server), dus vergelijken we met een ISO-string zonder Z.
+      // show_from heeft een default en is nooit null → gewone lte. show_until is
+      // null bij handmatige meldingen → die moeten blijven staan, vandaar de or.
+      const nowIso = new Date().toISOString().replace('Z', '');
       let query = this.supabase
         .from('notifications')
         .select('*')
         .eq('client_id', clientId)
         .eq('status', 'active')
+        .lte('show_from', nowIso)
+        .or(`show_until.is.null,show_until.gte.${nowIso}`)
         .order('priority', { ascending: false })
         .order('created_at', { ascending: false });
 
-      // Filter by page context
+      // Filter by page context. Bewust .in() en geen tweede .or(): PostgREST
+      // krijgt hierboven al een or= voor show_until mee, en twee or-parameters
+      // in dezelfde query is niet betrouwbaar te combineren.
       if (pageContext !== 'all') {
-        query = query.or(`page_context.eq.${pageContext},page_context.eq.all`);
+        query = query.in('page_context', [pageContext, 'all']);
       }
 
       const { data, error } = await query;
