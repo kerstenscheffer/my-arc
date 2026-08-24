@@ -11,6 +11,7 @@ import {
   Plus, X, Trash2, Clock, Users, Scale, UtensilsCrossed, Dumbbell,
   Bell, Eye, Loader2, AlertCircle, ClipboardCheck, Camera,
 } from 'lucide-react'
+import RecipientsModal from './RecipientsModal'
 
 const GOLD = '#FFD700'
 const GREEN = '#10b981'
@@ -101,6 +102,8 @@ export default function ScheduledNotifications({ db, coachId, isMobile }) {
   const [editing, setEditing] = useState(null)   // regel-object of null
   const [busyId, setBusyId] = useState(null)
   const [error, setError] = useState(null)
+  // Welke regel staat open in "naar wie is dit gegaan?" — null = dicht.
+  const [showFor, setShowFor] = useState(null)
 
   const load = useCallback(async () => {
     if (!coachId) return
@@ -239,6 +242,10 @@ export default function ScheduledNotifications({ db, coachId, isMobile }) {
                   </span>
                 </div>
               </button>
+              <button onClick={() => setShowFor(r)} title="Naar wie is dit gestuurd?"
+                style={{ flexShrink: 0, width: 28, height: 28, borderRadius: 7, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: 'rgba(255,255,255,0.5)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <Users size={13} />
+              </button>
               <button onClick={() => toggleActive(r)} disabled={busyId === r.id} title={r.is_active ? 'Uitzetten' : 'Aanzetten'}
                 style={{ flexShrink: 0, width: 44, height: 24, borderRadius: 12, border: 'none', cursor: busyId === r.id ? 'wait' : 'pointer', padding: 2, background: r.is_active ? GREEN : 'rgba(255,255,255,0.14)', transition: 'background 0.15s', position: 'relative' }}>
                 <span style={{ display: 'block', width: 20, height: 20, borderRadius: '50%', background: '#fff', transform: `translateX(${r.is_active ? 20 : 0}px)`, transition: 'transform 0.15s' }} />
@@ -255,6 +262,11 @@ export default function ScheduledNotifications({ db, coachId, isMobile }) {
       {editing && (
         <RuleEditor db={db} isMobile={isMobile} rule={editing}
           onClose={() => setEditing(null)} onSave={saveRule} />
+      )}
+
+      {showFor && (
+        <RecipientsModal db={db} title={showFor.name} scheduleId={showFor.id}
+          isMobile={isMobile} onClose={() => setShowFor(null)} />
       )}
     </>
   )

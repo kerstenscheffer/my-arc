@@ -8,8 +8,9 @@
 // uitstaat, dus de schakelaar werkt ongeacht wie de melding probeert te maken.
 import { useState, useEffect, useCallback } from 'react'
 import {
-  ClipboardCheck, CheckCircle2, Dumbbell, Video, MessageCircle, AlertCircle,
+  ClipboardCheck, CheckCircle2, Dumbbell, Video, MessageCircle, AlertCircle, Users,
 } from 'lucide-react'
+import RecipientsModal from './RecipientsModal'
 
 const GREEN = '#10b981'
 const RED = '#ef4444'
@@ -29,6 +30,8 @@ export default function FixedNotifications({ db, coachId }) {
   const [loading, setLoading] = useState(true)
   const [busyKey, setBusyKey] = useState(null)
   const [error, setError] = useState(null)
+  // Welke melding staat open in "naar wie is dit gegaan?" — null = dicht.
+  const [showFor, setShowFor] = useState(null)
 
   const load = useCallback(async () => {
     if (!coachId) return
@@ -107,6 +110,10 @@ export default function FixedNotifications({ db, coachId }) {
                 </div>
                 <div style={{ fontSize: '0.68rem', color: 'rgba(255,255,255,0.42)', lineHeight: 1.4 }}>{f.desc}</div>
               </div>
+              <button onClick={() => setShowFor(f)} title="Naar wie is dit gestuurd?"
+                style={{ flexShrink: 0, width: 28, height: 28, borderRadius: 7, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: 'rgba(255,255,255,0.5)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <Users size={13} />
+              </button>
               <button onClick={() => toggle(f.key)} disabled={busyKey === f.key} title={on ? 'Uitzetten' : 'Aanzetten'}
                 style={{ flexShrink: 0, width: 44, height: 24, borderRadius: 12, border: 'none', cursor: busyKey === f.key ? 'wait' : 'pointer', padding: 2, background: on ? GREEN : 'rgba(255,255,255,0.14)', transition: 'background 0.15s' }}>
                 <span style={{ display: 'block', width: 20, height: 20, borderRadius: '50%', background: '#fff', transform: `translateX(${on ? 20 : 0}px)`, transition: 'transform 0.15s' }} />
@@ -115,6 +122,12 @@ export default function FixedNotifications({ db, coachId }) {
           )
         })}
       </div>
+
+      {showFor && (
+        <RecipientsModal db={db} title={showFor.label} fixedKey={showFor.key}
+          isMobile={typeof window !== 'undefined' && window.innerWidth <= 768}
+          onClose={() => setShowFor(null)} />
+      )}
     </>
   )
 }

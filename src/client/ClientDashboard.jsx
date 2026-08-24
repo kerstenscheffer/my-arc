@@ -364,8 +364,13 @@ export default function ClientDashboard() {
         </div>
       </nav>}
 
+      {/* currentPage="all" — de widget is het meldingen-centrum en toont ALLES.
+          Stond hier `currentView`, waardoor een melding alleen zichtbaar was als
+          de klant toevallig op de bijbehorende pagina stond; meldingen met een
+          context die geen enkele view heeft (bv. 'progress', 'quick_message')
+          waren zelfs nooit te zien. page_context blijft als metadata bestaan. */}
       <NotificationWidget
-        db={db} clientId={client?.id} currentPage={currentView}
+        db={db} clientId={client?.id} currentPage="all"
         open={widgetOpen === 'notifications'}
         onOpenChange={(o) => setWidgetOpen(o ? 'notifications' : null)}
         onCountChange={setCount('notifications')}
