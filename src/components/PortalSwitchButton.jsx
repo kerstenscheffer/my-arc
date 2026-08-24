@@ -38,6 +38,11 @@ export default function PortalSwitchButton({
         throw new Error(result?.error || 'Inloggen mislukt — controleer je gegevens')
       }
       localStorage.setItem('isClientMode', target === 'client' ? 'true' : 'false')
+      // Expliciete keuze vastleggen. Accounts die tegelijk coach én klant zijn
+      // (één auth-account, beide rollen) worden bij het opstarten op 'coach'
+      // gezet tenzij deze sleutel iets anders zegt — zie get_my_portal_role in
+      // App.jsx. Zonder dit kon zo'n account na een wissel niet terug.
+      localStorage.setItem('portalChoice', target === 'client' ? 'client' : 'coach')
       window.location.href = '/'
     } catch (err) {
       setError(err.message || 'Wissel mislukt')

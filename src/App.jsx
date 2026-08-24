@@ -98,21 +98,51 @@ function App() {
       const currentUser = await db.getCurrentUser()
       setUser(currentUser)
 
-      // Rol-check op de server, niet op localStorage. `isClientMode` is maar
-      // een vlag in localStorage en zei dus feitelijk niets: wie 'm op false
-      // kreeg, kreeg CoachHub. Heeft dit account een eigen clients-rij, dan
-      // is het een klant en dwingen we client-modus af — wat er ook in
-      // localStorage staat.
+      // Rol-check op de server, niet op localStorage — die vlag zegt niets:
+      // de inlog op `/` zet 'm sowieso op true, ongeacht wie je bent.
+      //
+      // Dit was eerder één check: "heeft dit auth-account een clients-rij? →
+      // klant". Voor een account dat BEIDE is ging dat mis. Coach Horstink is
+      // teamlid én heeft een oude (inactieve) clients-rij op zijn naam, dus
+      // 'klant' won altijd en hij kon nooit meer bij CoachHub. De wissel-knop
+      // hielp niet: die logt in op een ánder account, en hij heeft er één.
+      //
+      // get_my_portal_role() weegt beide kanten:
+      //   'coach'  → coach-portaal afdwingen
+      //   'client' → client-portaal afdwingen
+      //   'both'   → de expliciete keuze van de wissel-knop volgen (default coach)
       if (currentUser?.id) {
-        const { data: clientRow } = await db.supabase
-          .from('clients')
-          .select('id')
-          .eq('auth_user_id', currentUser.id)
-          .limit(1)
-          .maybeSingle()
-        if (clientRow) {
-          setIsClientMode(true)
-          localStorage.setItem('isClientMode', 'true')
+        let role = null
+        try {
+          const { data, error } = await db.supabase.rpc('get_my_portal_role')
+          if (!error) role = data
+        } catch (e) {
+          console.warn('Portal-rol ophalen mislukt:', e?.message)
+        }
+
+        if (role === 'client' || role === 'coach' || role === 'both') {
+          // Alleen bij 'both' mag de opgeslagen keuze meespelen. Bewust een
+          // aparte sleutel en niet `isClientMode`: die staat bij dubbelrol-
+          // accounts al op 'true' door de oude bug, en zou ze dus opnieuw
+          // vastzetten in het client-portaal.
+          const choice = (() => {
+            try { return localStorage.getItem('portalChoice') } catch { return null }
+          })()
+          const asClient = role === 'client' || (role === 'both' && choice === 'client')
+          setIsClientMode(asClient)
+          localStorage.setItem('isClientMode', asClient ? 'true' : 'false')
+        } else {
+          // RPC niet beschikbaar (oude DB) of 'none' → oude gedrag als vangnet.
+          const { data: clientRow } = await db.supabase
+            .from('clients')
+            .select('id')
+            .eq('auth_user_id', currentUser.id)
+            .limit(1)
+            .maybeSingle()
+          if (clientRow) {
+            setIsClientMode(true)
+            localStorage.setItem('isClientMode', 'true')
+          }
         }
       }
     } catch (error) {
@@ -123,6 +153,7 @@ function App() {
 
   const handleLogout = () => {
     localStorage.removeItem('isClientMode')
+    localStorage.removeItem('portalChoice')
     setIsClientMode(false)
   }
 
