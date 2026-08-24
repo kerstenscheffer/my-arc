@@ -661,59 +661,47 @@ export default function KanbanBoard({
     setShowSearchResults(true)
   }
 
-  // When local results come back empty for a non-trivial query, do an
-  // async server-side lookup. PostgREST ilike with * wildcards (not %)
-  // because % gets URL-mangled in OR-filters.
+  // Server-side zoeken — PRIMAIR, niet als vangnet.
+  //
+  // Het bord kan er seconden over doen om te laden, en het lokale zoeken werkt
+  // alleen over `sections`. Zolang die leeg is leverde typen dus niets op.
+  // Deze zoekopdracht draait onafhankelijk van het bord, via een geïndexeerde
+  // RPC (~25 ms), zodat je meteen kunt typen.
+  //
+  // `sections` staat BEWUST niet in de dependencies: die verandert zodra het
+  // bord binnen is, en dat herstartte de debounce en wiste net gevonden
+  // resultaten. De sectie-info komt nu uit de RPC zelf, dus we hebben `sections`
+  // hier niet nodig.
   useEffect(() => {
     const q = (searchQuery || '').trim()
-    // Need at least 2 chars + coach context + zero local hits.
-    if (!coachId || q.length < 2 || searchResults.length > 0) {
+    if (!coachId || !leadService || q.length < 2) {
       setDbCheckResults([])
       setDbCheckLoading(false)
       return
     }
     let cancelled = false
     setDbCheckLoading(true)
-    const localLeadIds = new Set(sections.flatMap(s => (s.leads || []).map(l => l.id)))
-    const handleClean = q.replace(/^@+/, '')
     const timer = setTimeout(async () => {
       try {
-        const { data, error } = await leadService.db.supabase
-          .from('call_leads')
-          .select('id, first_name, last_name, email, phone, lead_source, notes, coach_id')
-          .eq('coach_id', coachId)
-          .is('deleted_at', null)
-          .or(`first_name.ilike.*${handleClean}*,last_name.ilike.*${handleClean}*,email.ilike.*${handleClean}*,notes.ilike.*${handleClean}*`)
-          .limit(8)
-        if (cancelled) return
-        if (error) { console.warn('Server-side lead search failed:', error); setDbCheckResults([]); setDbCheckLoading(false); return }
-        // Drop hits that are already in the local board (no need to dupe-warn).
-        const novel = (data || []).filter(l => !localLeadIds.has(l.id))
-        // Annotate with current section info via lead_section_items lookup.
-        if (novel.length === 0) { setDbCheckResults([]); setDbCheckLoading(false); return }
-        const novelIds = novel.map(l => l.id)
-        const { data: items } = await leadService.db.supabase
-          .from('lead_section_items')
-          .select('lead_id, section_id')
-          .in('lead_id', novelIds)
-        if (cancelled) return
-        const sectionMap = {}
-        sections.forEach(s => { sectionMap[s.id] = s })
-        const annotated = novel.map(l => {
-          const item = (items || []).find(i => i.lead_id === l.id)
-          const sec = item ? sectionMap[item.section_id] : null
-          return { ...l, sectionId: sec?.id || null, sectionTitle: sec?.title || 'Niet toegewezen', sectionColor: sec?.color || '#6b7280' }
-        })
-        setDbCheckResults(annotated)
+        const found = await leadService.searchLeads(q, 10)
+        if (!cancelled) setDbCheckResults(found)
       } catch (err) {
-        console.error('DB dupe-check error:', err)
+        console.error('Lead search failed:', err)
         if (!cancelled) setDbCheckResults([])
       } finally {
         if (!cancelled) setDbCheckLoading(false)
       }
-    }, 300) // debounce so we don't query on every keystroke
+    }, 150) // kort genoeg om mee te typen, lang genoeg om niet elke toets te vuren
     return () => { cancelled = true; clearTimeout(timer) }
-  }, [searchQuery, searchResults.length, coachId, leadService, sections])
+  }, [searchQuery, coachId, leadService])
+
+  // Wat de zoekbalk toont: lokale treffers zodra het bord geladen is, anders
+  // (of als het bord niks heeft) de server-treffers. Ze hebben dezelfde vorm —
+  // id + sectionId/sectionTitle/sectionColor — dus dezelfde render en dezelfde
+  // klik-actie werken voor allebei.
+  const displayedSearchResults = searchResults.length > 0
+    ? searchResults
+    : dbCheckResults.filter(r => r.sectionId)
 
   // Called when a magnet is *added* to a lead via the modal. Auto-moves the
   // lead into the "Lead magnets" section if it isn't already there. No-op
@@ -783,7 +771,23 @@ export default function KanbanBoard({
     }
   }
 
+  // Klik je een zoekresultaat aan terwijl het bord nog laadt, dan bestaat de
+  // kaart nog niet in de DOM en valt de scroll in het niets. Onthouden en
+  // opnieuw proberen zodra het bord er is.
+  const pendingScrollRef = useRef(null)
+  useEffect(() => {
+    if (loading || !pendingScrollRef.current) return
+    const pending = pendingScrollRef.current
+    pendingScrollRef.current = null
+    scrollToLead(pending.leadId, pending.sectionId)
+    // scrollToLead is stabiel binnen deze render-scope; opnemen in de deps zou
+    // 'm bij elke render opnieuw laten vuren.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading])
+
   const scrollToLead = (leadId, sectionId) => {
+    // Bord nog niet binnen? Bewaar de sprong voor straks.
+    if (loading) pendingScrollRef.current = { leadId, sectionId }
     // Op mobiel is alleen de actieve stage in de DOM — schakel eerst naar de
     // sectie van deze lead, anders bestaat de kaart niet en kan 'ie er niet
     // naartoe scrollen.
@@ -1745,7 +1749,7 @@ export default function KanbanBoard({
               order: isMobile ? 2 : 0, ...(isMobile ? { flexBasis: '100%' } : {}),
               padding: isMobile ? '0.4rem 0.6rem' : '0.35rem 0.625rem',
               background: 'rgba(255,255,255,0.03)',
-              border: showSearchResults && searchResults.length > 0 ? '1px solid rgba(16,185,129,0.3)' : '1px solid rgba(255,255,255,0.06)',
+              border: showSearchResults && displayedSearchResults.length > 0 ? '1px solid rgba(16,185,129,0.3)' : '1px solid rgba(255,255,255,0.06)',
               borderRadius: '6px', transition: 'all 0.2s ease', minHeight: '30px'
             }}>
               <Search size={12} color={searchQuery ? '#10b981' : 'rgba(255,255,255,0.2)'} style={{ flexShrink: 0 }} />
@@ -1999,13 +2003,13 @@ export default function KanbanBoard({
                 de sectie-slider (order:4) omlaag i.p.v. eroverheen. */}
             {showSearchResults && (
               <div style={{ order: 3, flexBasis: '100%', width: '100%', marginTop: -2, position: 'relative', zIndex: 1000 }}>
-              {searchResults.length > 0 ? (
+              {displayedSearchResults.length > 0 ? (
                 <div style={{ width: '100%' }}>
                   <div style={{ background: '#111', border: '1px solid rgba(16,185,129,0.2)', borderRadius: '8px', overflowX: 'hidden', boxShadow: '0 8px 24px rgba(0,0,0,0.5)', maxHeight: '60vh', overflowY: 'auto' }}>
                     <div style={{ padding: '0.5rem 0.85rem', borderBottom: '1px solid rgba(255,255,255,0.06)', fontSize: '0.62rem', fontWeight: '800', color: '#10b981', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-                      {searchResults.length} RESULTATEN
+                      {displayedSearchResults.length} RESULTATEN
                     </div>
-                    {searchResults.map(lead => (
+                    {displayedSearchResults.map(lead => (
                       <button key={lead.id} onClick={() => scrollToLead(lead.id, lead.sectionId)} style={{ width: '100%', padding: '0.75rem 0.85rem', background: 'transparent', borderTop: 'none', borderRight: 'none', borderLeft: 'none', borderBottom: '1px solid rgba(255,255,255,0.05)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem', textAlign: 'left', minHeight: 52 }} onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(16,185,129,0.06)'} onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}>
                         <div style={{ flex: 1, minWidth: 0 }}>
                           <div style={{ color: '#fff', fontWeight: '800', fontSize: '0.95rem', letterSpacing: '-0.01em' }}>{lead.first_name} {lead.last_name}</div>

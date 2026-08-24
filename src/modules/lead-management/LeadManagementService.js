@@ -634,6 +634,31 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
     return out
   }
 
+  // Zoeken op naam/e-mail/notitie, server-side en geïndexeerd (trigram).
+  // Geeft per treffer meteen de sectie mee, dus één round trip i.p.v. twee.
+  // Bewust GEEN coach_id-filter: RLS bepaalt de zichtbaarheid, net als bij het
+  // bord. De oude client-side variant filterde wél op coach_id en vond daardoor
+  // team-leads en leads zonder coach niet, terwijl het bord ze wel toont.
+  async searchLeads(query, limit = 10) {
+    const q = (query || '').trim()
+    if (!q) return []
+    try {
+      const { data, error } = await this.db.supabase
+        .rpc('search_leads', { p_query: q, p_limit: limit })
+      if (error) throw error
+      // Naar de vorm die het bord al gebruikt voor zoekresultaten.
+      return (data || []).map(l => ({
+        ...l,
+        sectionId: l.section_id || null,
+        sectionTitle: l.section_title || 'Niet toegewezen',
+        sectionColor: l.section_color || '#6b7280',
+      }))
+    } catch (error) {
+      console.error('❌ Lead search failed:', error)
+      return []
+    }
+  }
+
   // Licht bord: één RPC die per sectie het TOTAAL-aantal geeft + alleen de
   // eerste `perSection` leads. Vervangt het binnenhalen van de complete
   // call_leads-tabel (~6.4 MB bij 6.2k leads) door ~210 kB, en 15+ HTTP-requests
