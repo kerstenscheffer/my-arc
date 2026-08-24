@@ -2319,11 +2319,11 @@ export default function KanbanBoard({
           isMobile={isMobile}
           leadName={saleModalLead.name}
           onClose={() => setSaleModalLead(null)}
-          onSave={async ({ value, paymentType, durationMonths, partnerSharePct }) => {
+          onSave={async ({ value, paymentType, durationMonths, partnerSharePct, reservation }) => {
             const lead = saleModalLead
             setSaleModalLead(null)
             if (value != null && lead?.id) {
-              try { await leadService.setMovementOrderValue(lead.id, value, paymentType, durationMonths, partnerSharePct) } catch (e) { console.error('Omzet opslaan mislukt:', e) }
+              try { await leadService.setMovementOrderValue(lead.id, value, paymentType, durationMonths, partnerSharePct, reservation) } catch (e) { console.error('Omzet opslaan mislukt:', e) }
               setStatsRefreshKey(k => k + 1)
             }
           }}

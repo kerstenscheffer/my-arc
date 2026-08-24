@@ -2218,7 +2218,9 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
 
   // Zet de order-waarde (omzet) op de meest recente movement van een lead —
   // aangeroepen wanneer een lead naar een sale-sectie is verplaatst.
-  async setMovementOrderValue(leadId, orderValue, paymentType = null, durationMonths = null, partnerSharePct = undefined) {
+  // `reservation` is optioneel: { isReservation, amount, dueDate }. Zonder dat
+  // veld verandert er niets aan het bestaande gedrag.
+  async setMovementOrderValue(leadId, orderValue, paymentType = null, durationMonths = null, partnerSharePct = undefined, reservation = undefined) {
     try {
       const { data: rows } = await this.db.supabase
         .from('lead_movements').select('id')
@@ -2236,11 +2238,51 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
         const pct = partnerSharePct === null || partnerSharePct === '' ? null : Number(partnerSharePct)
         patch.partner_share_pct = (pct != null && !isNaN(pct)) ? pct : null
       }
+      // Reservering: order_value blijft de VOLLEDIGE waarde en telt gewoon mee
+      // in de omzet. Dit legt alleen vast wat er nu binnen is en wanneer de rest
+      // komt, zodat je het kunt opvolgen.
+      if (reservation !== undefined) {
+        if (reservation && reservation.isReservation) {
+          const bedrag = Number(reservation.amount)
+          patch.is_reservation = true
+          patch.reservation_amount = (!isNaN(bedrag) && bedrag > 0) ? bedrag : 50
+          patch.payment_due_date = reservation.dueDate || null
+        } else {
+          patch.is_reservation = false
+          patch.reservation_amount = null
+          patch.payment_due_date = null
+        }
+      }
       const { error } = await this.db.supabase
         .from('lead_movements').update(patch).eq('id', movId)
       return { error }
     } catch (error) {
       console.error('❌ setMovementOrderValue failed:', error)
+      return { error }
+    }
+  }
+
+  // Openstaande reserveringen: sales waar het restbedrag nog moet komen.
+  async getOpenReservations(coachId = null) {
+    try {
+      const { data, error } = await this.db.supabase
+        .rpc('get_open_reservations', { p_coach_id: coachId })
+      if (error) throw error
+      return data || []
+    } catch (error) {
+      console.error('❌ getOpenReservations failed:', error)
+      return []
+    }
+  }
+
+  // Restbedrag binnen → reservering afvinken.
+  async markReservationPaid(movementId) {
+    try {
+      const { error } = await this.db.supabase
+        .from('lead_movements').update({ payment_received: true }).eq('id', movementId)
+      return { error }
+    } catch (error) {
+      console.error('❌ markReservationPaid failed:', error)
       return { error }
     }
   }

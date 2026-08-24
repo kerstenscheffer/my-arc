@@ -5,7 +5,7 @@
 // guard tegen mobiele click-through (zelfde patroon als AddLeadModal).
 import { useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
-import { X, Euro, Wallet, CalendarClock, Users } from 'lucide-react'
+import { X, Euro, Wallet, CalendarClock, Users, BookmarkCheck } from 'lucide-react'
 
 // Naam van de vaste partner (later aanpasbaar via localStorage).
 const PARTNER_NAME = (() => {
@@ -17,6 +17,12 @@ export default function SaleValueModal({ isMobile, leadName, partnerName = PARTN
   const [paymentType, setPaymentType] = useState('prepaid') // 'prepaid' | 'monthly'
   const [months, setMonths] = useState('12')
   const [partnerPct, setPartnerPct] = useState('50') // aandeel partner, standaard 50%
+  // Reservering: lead legt nu een bedrag neer, rest volgt op een afgesproken
+  // datum. De orderwaarde hierboven blijft het VOLLEDIGE bedrag en telt gewoon
+  // mee in de omzet — dit is opvolg-administratie.
+  const [isReservation, setIsReservation] = useState(false)
+  const [reservationAmount, setReservationAmount] = useState('50')
+  const [dueDate, setDueDate] = useState('')
   const [armed, setArmed] = useState(false)
   useEffect(() => { const t = setTimeout(() => setArmed(true), 300); return () => clearTimeout(t) }, [])
 
@@ -27,10 +33,21 @@ export default function SaleValueModal({ isMobile, leadName, partnerName = PARTN
   const pctNum = Math.min(100, Math.max(0, parseFloat(String(partnerPct).replace(',', '.')) || 0))
   const partnerTotal = (!isNaN(totalNum) && pctNum > 0) ? totalNum * (pctNum / 100) : null
 
+  const resNum = parseFloat(String(reservationAmount).replace(',', '.'))
+  const restBedrag = (!isNaN(totalNum) && !isNaN(resNum)) ? totalNum - resNum : null
+
   const submit = () => {
     const val = isNaN(totalNum) ? null : totalNum
     const dur = paymentType === 'monthly' ? Math.max(1, parseInt(months, 10) || 12) : 1
-    onSave({ value: val, paymentType, durationMonths: dur, partnerSharePct: pctNum > 0 ? pctNum : null })
+    onSave({
+      value: val, paymentType, durationMonths: dur,
+      partnerSharePct: pctNum > 0 ? pctNum : null,
+      reservation: {
+        isReservation,
+        amount: isNaN(resNum) ? 50 : resNum,
+        dueDate: dueDate || null,
+      },
+    })
   }
 
   const pill = (active) => ({
@@ -98,6 +115,46 @@ export default function SaleValueModal({ isMobile, leadName, partnerName = PARTN
                   = €{perMonth.toLocaleString('nl-NL', { maximumFractionDigits: 2 })} per maand × {monthsNum}
                 </div>
               )}
+            </div>
+          )}
+
+          {/* Reservering — lead betaalt nu een deel, rest op een afgesproken datum. */}
+          <div onClick={() => setIsReservation(v => !v)} style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '0.7rem 0.85rem', borderRadius: 12, cursor: 'pointer', marginBottom: isReservation ? '0.7rem' : '1.1rem', background: isReservation ? 'rgba(255,215,0,0.08)' : 'rgba(255,255,255,0.03)', border: `1px solid ${isReservation ? 'rgba(255,215,0,0.4)' : 'rgba(255,255,255,0.1)'}` }}>
+            <BookmarkCheck size={16} color={isReservation ? '#FFD700' : 'rgba(255,255,255,0.4)'} />
+            <span style={{ flex: 1, fontSize: '0.85rem', fontWeight: 700, color: isReservation ? '#FFD700' : 'rgba(255,255,255,0.6)' }}>
+              Reservering gedaan
+            </span>
+            <span style={{ width: 40, height: 22, borderRadius: 11, padding: 2, background: isReservation ? '#FFD700' : 'rgba(255,255,255,0.15)', flexShrink: 0 }}>
+              <span style={{ display: 'block', width: 18, height: 18, borderRadius: '50%', background: '#fff', transform: `translateX(${isReservation ? 18 : 0}px)`, transition: 'transform 0.15s' }} />
+            </span>
+          </div>
+
+          {isReservation && (
+            <div style={{ padding: '0.85rem', borderRadius: 12, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,215,0,0.2)', marginBottom: '1.1rem' }}>
+              <div style={{ display: 'flex', gap: 10 }}>
+                <div style={{ flex: 1 }}>
+                  <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 600, color: 'rgba(255,255,255,0.55)', marginBottom: 5 }}>Nu betaald</label>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '0.5rem 0.6rem', borderRadius: 9, border: '1px solid rgba(255,255,255,0.12)', background: 'rgba(255,255,255,0.03)' }}>
+                    <Euro size={14} color="#FFD700" />
+                    <input type="number" inputMode="decimal" value={reservationAmount}
+                      onChange={e => setReservationAmount(e.target.value)}
+                      style={{ width: '100%', background: 'none', border: 'none', outline: 'none', color: '#fff', fontSize: '0.95rem', fontWeight: 800, fontFamily: 'inherit' }} />
+                  </div>
+                </div>
+                <div style={{ flex: 1.3 }}>
+                  <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 600, color: 'rgba(255,255,255,0.55)', marginBottom: 5 }}>Rest betaald op</label>
+                  <input type="date" value={dueDate} onChange={e => setDueDate(e.target.value)}
+                    style={{ width: '100%', boxSizing: 'border-box', padding: '0.5rem 0.6rem', borderRadius: 9, border: '1px solid rgba(255,255,255,0.12)', background: 'rgba(255,255,255,0.03)', color: '#fff', fontSize: '0.85rem', fontWeight: 700, fontFamily: 'inherit', outline: 'none' }} />
+                </div>
+              </div>
+              {restBedrag != null && restBedrag > 0 && (
+                <div style={{ marginTop: 8, fontSize: '0.78rem', fontWeight: 700, color: '#22c55e' }}>
+                  Nog te ontvangen: €{restBedrag.toLocaleString('nl-NL', { maximumFractionDigits: 2 })}
+                </div>
+              )}
+              <div style={{ marginTop: 6, fontSize: '0.7rem', color: 'rgba(255,255,255,0.4)', lineHeight: 1.4 }}>
+                De volledige orderwaarde telt gewoon mee in je omzet van vandaag.
+              </div>
             </div>
           )}
 
