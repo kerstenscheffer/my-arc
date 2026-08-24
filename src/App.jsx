@@ -76,6 +76,12 @@ function App() {
   const [isClientMode, setIsClientMode] = useState(storedMode)
 
   useEffect(() => {
+    // Opruimen van het oude portal-switch-lek: die knop bewaarde e-mail +
+    // wachtwoord van het andere account in localStorage. De metadata-kant is
+    // in de database al leeggemaakt, maar devices die de creds ooit hebben
+    // opgehaald hebben ze nog lokaal staan. Dit wist ze bij de eerstvolgende
+    // keer dat de app opent.
+    try { localStorage.removeItem('portalSwitchCreds') } catch { /* private mode */ }
     checkUser()
   }, [])
 
@@ -91,6 +97,24 @@ function App() {
     try {
       const currentUser = await db.getCurrentUser()
       setUser(currentUser)
+
+      // Rol-check op de server, niet op localStorage. `isClientMode` is maar
+      // een vlag in localStorage en zei dus feitelijk niets: wie 'm op false
+      // kreeg, kreeg CoachHub. Heeft dit account een eigen clients-rij, dan
+      // is het een klant en dwingen we client-modus af — wat er ook in
+      // localStorage staat.
+      if (currentUser?.id) {
+        const { data: clientRow } = await db.supabase
+          .from('clients')
+          .select('id')
+          .eq('auth_user_id', currentUser.id)
+          .limit(1)
+          .maybeSingle()
+        if (clientRow) {
+          setIsClientMode(true)
+          localStorage.setItem('isClientMode', 'true')
+        }
+      }
     } catch (error) {
       console.log('Not authenticated')
     }

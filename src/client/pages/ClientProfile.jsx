@@ -3,7 +3,6 @@ import { useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { User, MapPin, Settings, Globe, Shield, LogOut, Edit, Save, X, Target, ChevronRight, Trash2, AlertTriangle, Weight } from 'lucide-react'
 import DatabaseService from '../../services/DatabaseService'
-import PortalSwitchButton from '../../components/PortalSwitchButton'
 const db = DatabaseService
 
 const GOLD = '#FFD700'
@@ -476,17 +475,9 @@ export default function ClientProfile({ client, user, onClientUpdate }) {
         )}
       </div>
 
-      {/* Portal switch (coach <-> client) — gemigreerd uit de header
-          die we hebben weggehaald. Hier hoort 'ie als dichter bij
-          "account-acties" naast logout. */}
-      <div style={{ marginBottom: '0.6rem' }}>
-        <PortalSwitchButton target="coach" db={db} style={{
-          width: '100%',
-          padding: '0.875rem',
-          fontSize: '0.875rem',
-          fontWeight: 600,
-        }} />
-      </div>
+      {/* GEEN portal-switch aan de client-kant. Die knop heeft hier gestaan en
+          gaf elke klant een route naar de coach-hub (zie PortalSwitchButton).
+          Wisselen tussen coach en client hoort alleen thuis in CoachHub. */}
 
       {/* Logout */}
       <button onClick={handleLogout} style={{

@@ -1,40 +1,19 @@
-// Quick switch between coach- and client-portal. Stores credentials of the
-// OTHER account in BOTH localStorage (snel, offline) en Supabase
-// user_metadata (cross-device sync). Eerste klik op desktop slaat 'em op
-// → mobiel pakt 'm automatisch op na inloggen op hetzelfde account.
+// Wisselen tussen het coach- en het client-portaal.
+//
+// LET OP — hier heeft een lek gezeten. Deze knop bewaarde de inloggegevens van
+// het andere account (inclusief wachtwoord, in platte tekst) in localStorage
+// én in Supabase `user_metadata`. Omdat user_metadata leesbaar is voor de
+// eigenaar van dat account, kon elke klant op wiens account die creds ooit
+// waren weggeschreven het coach-wachtwoord uitlezen én met één tik als de
+// coach inloggen. Er wordt daarom NIETS meer opgeslagen: elke wissel vraagt
+// opnieuw om inloggegevens. De autoComplete-velden zorgen dat de
+// wachtwoordmanager van het device het invulwerk doet.
+//
+// Deze knop hoort alleen in CoachHub. Zet 'm nooit in de client-UI.
 
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Repeat, X } from 'lucide-react'
-
-const STORAGE_KEY = 'portalSwitchCreds'
-
-const readLocal = () => {
-  try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}') }
-  catch { return {} }
-}
-const writeLocal = (next) => {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(next))
-}
-
-// Cross-device sync via Supabase user_metadata. Alleen leesbaar / schrijfbaar
-// voor de eigenaar van het account (auth.user). Inhoud van het ANDERE
-// account z'n credentials staat opgeslagen op het HUIDIGE account z'n
-// metadata — dus alleen toegankelijk als je als die user inlogt.
-const readRemote = async (db) => {
-  try {
-    const { data, error } = await db.supabase.auth.getUser()
-    if (error || !data?.user) return null
-    return data.user.user_metadata?.portal_switch_creds || null
-  } catch { return null }
-}
-const writeRemote = async (db, store) => {
-  try {
-    await db.supabase.auth.updateUser({ data: { portal_switch_creds: store } })
-  } catch (e) {
-    console.warn('writeRemote portalSwitch failed:', e)
-  }
-}
 
 export default function PortalSwitchButton({
   target,        // 'coach' | 'client'
@@ -49,35 +28,6 @@ export default function PortalSwitchButton({
   const [password, setPassword] = useState('')
 
   const label = target === 'coach' ? 'Wissel naar coach' : 'Wissel naar client'
-
-  // Bij mount: tweerichtings-sync tussen localStorage en user_metadata.
-  // - Remote heeft creds, local niet → kopieer naar local (mobiel pickt
-  //   ze op zonder re-entry).
-  // - Local heeft creds, remote niet → push naar remote (eenmalige
-  //   backfill voor accounts die de switch eerder al opgezet hadden vóór
-  //   deze cross-device-sync er was).
-  // Bij conflict: lokale waarde wint, want die is per definitie recenter
-  // ingevoerd door de gebruiker.
-  useEffect(() => {
-    let cancelled = false
-    const hydrate = async () => {
-      const remote = await readRemote(db)
-      if (cancelled) return
-      const local = readLocal()
-      const merged = { ...(remote || {}), ...local } // local wint bij conflict
-      const localStr = JSON.stringify(local)
-      const mergedStr = JSON.stringify(merged)
-      const remoteStr = JSON.stringify(remote || {})
-      // Local outdated → update.
-      if (mergedStr !== localStr) writeLocal(merged)
-      // Remote outdated of leeg → push (eenmalige backfill mogelijk).
-      if (mergedStr !== remoteStr && Object.keys(merged).length > 0) {
-        writeRemote(db, merged).catch(() => {})
-      }
-    }
-    hydrate()
-    return () => { cancelled = true }
-  }, [db])
 
   const performSwitch = async (creds) => {
     setBusy(true); setError(null)
@@ -95,38 +45,15 @@ export default function PortalSwitchButton({
     }
   }
 
-  const handleClick = async () => {
-    let store = readLocal()
-    let saved = store[target]
-    // Als lokaal niets staat, vraag remote nog één keer expliciet (race-vrij
-    // ten opzichte van de hydrate-useEffect).
-    if (!saved?.email || !saved?.password) {
-      const remote = await readRemote(db)
-      if (remote?.[target]?.email && remote[target]?.password) {
-        store = { ...remote, ...store }
-        writeLocal(store)
-        saved = store[target]
-      }
-    }
-    if (saved?.email && saved?.password) {
-      performSwitch(saved)
-    } else {
-      setEmail(''); setPassword(''); setError(null); setShowPrompt(true)
-    }
+  const handleClick = () => {
+    setEmail(''); setPassword(''); setError(null); setShowPrompt(true)
   }
 
-  const handleSavePrompt = async (e) => {
+  const handleSubmitPrompt = async (e) => {
     e?.preventDefault()
     if (!email.trim() || !password) { setError('Vul email en wachtwoord in'); return }
-    const creds = { email: email.trim(), password }
-    const store = readLocal()
-    const nextStore = { ...store, [target]: creds }
-    writeLocal(nextStore)
-    // Schrijf óók naar user_metadata zodat andere devices van dezelfde user
-    // de creds direct hebben na inloggen.
-    writeRemote(db, nextStore).catch(() => {})
     setShowPrompt(false)
-    await performSwitch(creds)
+    await performSwitch({ email: email.trim(), password })
   }
 
   return (
@@ -167,7 +94,7 @@ export default function PortalSwitchButton({
           }}
         >
           <form
-            onSubmit={handleSavePrompt}
+            onSubmit={handleSubmitPrompt}
             style={{
               width: '100%', maxWidth: 380,
               background: '#0a0a0a',
@@ -178,7 +105,7 @@ export default function PortalSwitchButton({
           >
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <h3 style={{ margin: 0, color: '#fff', fontSize: '1rem', fontWeight: 800 }}>
-                {target === 'coach' ? 'Coach-login opslaan' : 'Client-login opslaan'}
+                {target === 'coach' ? 'Inloggen als coach' : 'Inloggen als client'}
               </h3>
               <button type="button" onClick={() => setShowPrompt(false)}
                 style={{
@@ -190,8 +117,8 @@ export default function PortalSwitchButton({
               </button>
             </div>
             <p style={{ margin: 0, color: 'rgba(255,255,255,0.5)', fontSize: '0.75rem', lineHeight: 1.4 }}>
-              Eenmalig opslaan op dit apparaat. Daarna één klik om te wisselen.
-              Slaat op in localStorage — alleen op jouw device.
+              Je gegevens worden niet opgeslagen — laat je wachtwoordmanager
+              ze invullen.
             </p>
             <input
               type="email"
@@ -218,7 +145,7 @@ export default function PortalSwitchButton({
                 borderRadius: 8, color: '#fff', fontWeight: 700, fontSize: '0.85rem',
                 cursor: busy ? 'wait' : 'pointer', opacity: busy ? 0.6 : 1,
               }}>
-              {busy ? 'Wisselen…' : 'Opslaan & wissel'}
+              {busy ? 'Wisselen…' : 'Wissel'}
             </button>
           </form>
         </div>,
