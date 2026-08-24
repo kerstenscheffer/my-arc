@@ -93,7 +93,7 @@ const ICON_NODES = {
 // Modal-labels → icon-key (de modal stuurt alleen label/value/color mee).
 const LABEL_ICON = {
   'Nieuwe leads': 'userPlus', 'Follow-ups': 'send', 'Reacties': 'messageCircle',
-  'Voorgesteld': 'phone', 'Ingepland': 'calendarCheck', 'Calls geboekt': 'calendar',
+  'Voorgesteld': 'phone', 'Ingepland': 'calendarCheck', 'Calls gepland': 'calendar',
   'Call gevoerd': 'phone', 'Sales': 'trophy', 'Omzet': 'euro', 'No-shows': 'userX',
   'Afgewezen': 'phoneOff', 'Sale verloren': 'xCircle', 'Niet geschikt': 'ban',
   'Response': 'messageCircle', 'Opvolg': 'send', 'Voorstel→call': 'phone',

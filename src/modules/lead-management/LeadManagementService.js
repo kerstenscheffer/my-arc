@@ -2058,11 +2058,42 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
         const startDate = localDateStr(startISO)
         const endDate = localDateStr(endISO)
         if (startDate && endDate) {
-          const { data: schedRows } = await this.db.supabase
-            .from('lead_movements')
-            .select('lead_id, lead_name, call_date, call_happened, moved_at, outcome_type')
-            .not('call_date', 'is', null)
-            .is('reverted_at', null)
+          // Gepagineerd: zonder .range() knijpt PostgREST dit op 1000 rijen af en
+          // verdwijnen ingeplande calls stilletjes uit de telling zodra de
+          // call-historie voorbij dat aantal groeit.
+          const schedRows = []
+          for (let from = 0; ; from += 1000) {
+            const { data, error } = await this.db.supabase
+              .from('lead_movements')
+              .select('lead_id, lead_name, call_date, call_happened, moved_at, outcome_type')
+              .not('call_date', 'is', null)
+              .is('reverted_at', null)
+              .order('call_date', { ascending: false })
+              .range(from, from + 999)
+            if (error) throw error
+            if (data && data.length) schedRows.push(...data)
+            if (!data || data.length < 1000) break
+          }
+
+          // Calls geboekt = ELKE ingeplande call waarvan de call-datum in de
+          // periode valt (gevoerd, no-show óf nog open). Bewust NÍET via
+          // latestByLead hieronder: dat houdt per lead alleen de allerlaatste
+          // call over, waardoor een call die in deze week stond maar daarna
+          // opnieuw werd ingepland volledig uit de week-telling verdween (week 30
+          // toonde zo 1 i.p.v. 4). Dedupen op lead + call-datum, zodat twee
+          // movements voor dezelfde afspraak niet dubbel tellen maar een echt
+          // tweede moment op een andere datum wél.
+          const bookedSeen = new Set()
+          ;(schedRows || []).forEach(r => {
+            if (!r.lead_id || !r.call_date) return
+            if (r.call_date < startDate || r.call_date > endDate) return
+            const key = `${r.lead_id}|${r.call_date}`
+            if (bookedSeen.has(key)) return
+            bookedSeen.add(key)
+            funnel.callBooked.count++
+            funnel.callBooked.leads.push({ leadId: r.lead_id, name: r.lead_name || 'Unknown', at: r.call_date })
+          })
+
           const latestByLead = new Map()
           ;(schedRows || []).forEach(r => {
             if (!r.lead_id) return
@@ -2074,13 +2105,6 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
           })
           latestByLead.forEach(r => {
             const inPeriod = r.call_date >= startDate && r.call_date <= endDate
-            // Calls geboekt = alle calls die op hun INGEPLANDE datum in de
-            // periode vallen (gevoerd, no-show óf nog open) — per lead de
-            // laatste ingeplande call, zodat verzette calls niet dubbel tellen.
-            if (inPeriod) {
-              funnel.callBooked.count++
-              funnel.callBooked.leads.push({ leadId: r.lead_id, name: r.lead_name || 'Unknown', at: r.call_date })
-            }
             // Afgezegde calls (outcome_type='cancelled') tellen NIET als no-show —
             // de lead heeft netjes afgezegd, niet "niet komen opdagen".
             if (r.call_happened === false && r.outcome_type !== 'cancelled' && inPeriod) {
