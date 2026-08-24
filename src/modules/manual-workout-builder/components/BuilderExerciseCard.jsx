@@ -145,6 +145,7 @@ export default function BuilderExerciseCard({
         <ExerciseEditModal
           exercise={exercise} isCardio={isCardio} isMobile={isMobile}
           hasVid={hasVid} onField={onField} onVideo={onVideo}
+          coachEquip={coachEquip}
           onClose={() => setEditing(false)}
         />
       )}
@@ -155,7 +156,12 @@ export default function BuilderExerciseCard({
 }
 
 // ── Bewerk-modal ────────────────────────────────────────────────────────────
-function ExerciseEditModal({ exercise, isCardio, isMobile, hasVid, onField, onVideo, onClose }) {
+// coachEquip = de zelf toegevoegde apparaten uit custom_exercises. Die state
+// leeft in BuilderExerciseCard en moet hier expliciet naar binnen: de datalist
+// hieronder gebruikte 'm, maar hij stond niet in scope → ReferenceError zodra
+// je een oefening opende. Default op [] zodat de datalist ook werkt voordat de
+// lijst geladen is.
+function ExerciseEditModal({ exercise, isCardio, isMobile, hasVid, onField, onVideo, onClose, coachEquip = [] }) {
   const [cardioMenu, setCardioMenu] = useState(false)
   const label = { fontSize: '0.6rem', fontWeight: 800, letterSpacing: '0.05em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.4)', marginBottom: 5, display: 'block' }
   const input = { width: '100%', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 8, color: '#fff', fontSize: '0.85rem', fontWeight: 600, padding: '0.55rem 0.7rem', outline: 'none', fontFamily: 'inherit' }
