@@ -1874,6 +1874,19 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
         const p = (n) => String(n).padStart(2, '0')
         return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`
       }
+      // LAATSTE kalenderdag van de periode. Alle callers geven een EXCLUSIEVE
+      // eind-grens door (maandag+7, dag+1, 1e van de volgende maand) — die
+      // rechtstreeks door localDateStr halen gaf de maandag ná de week, waardoor
+      // calls op die maandag nog in de vorige week meetelden (week 34 toonde 7
+      // i.p.v. 5: de twee calls van 24 aug lekten erin). Eén milliseconde eraf
+      // geeft de laatste dag die écht in de periode zit, en werkt ook voor de
+      // callers die een inclusief eind meesturen (…T23:59:59 of "nu").
+      const lastDateStr = (iso) => {
+        if (!iso) return ''
+        const t = Date.parse(iso)
+        if (isNaN(t)) return localDateStr(iso)
+        return localDateStr(new Date(t - 1))
+      }
       // Nieuwste eerst → drill-down leest chronologisch; gepagineerd zodat de
       // 1000-rijen-cap de tellingen niet meer afknijpt.
       const movements = await this._fetchMovementsPaged(startISO, endISO, '*')
@@ -2029,7 +2042,7 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
       // zijn afgehandeld, geteld op de CALL-datum (niet moved_at) binnen de periode.
       try {
         const startDate = localDateStr(startISO)
-        const endDate = localDateStr(endISO)
+        const endDate = lastDateStr(endISO)
         if (startDate && endDate) {
           const { data: heldRows } = await this.db.supabase
             .from('lead_movements')
@@ -2056,7 +2069,7 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
       // ingeplande call niet-gevoerd is, telt de lead als no-show.
       try {
         const startDate = localDateStr(startISO)
-        const endDate = localDateStr(endISO)
+        const endDate = lastDateStr(endISO)
         if (startDate && endDate) {
           // Gepagineerd: zonder .range() knijpt PostgREST dit op 1000 rijen af en
           // verdwijnen ingeplande calls stilletjes uit de telling zodra de
