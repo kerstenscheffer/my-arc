@@ -73,7 +73,9 @@ export default function NotificationHub({ db }) {
     try {
       const { error } = await db.supabase.from('coach_notifications').insert({
         coach_id: userId,
-        type: 'test',
+        // 'test' bestaat niet in de valid_type-constraint op coach_notifications
+        // — die insert faalde stil, dus de testknop deed niets.
+        type: 'announcement',
         priority: 'normal',
         title: '🔔 Testmelding',
         message: 'Als het goed is zie je deze melding in je bel — en op je iPhone zodra die gekoppeld is.',
