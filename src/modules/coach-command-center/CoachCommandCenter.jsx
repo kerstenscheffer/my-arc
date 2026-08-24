@@ -139,6 +139,19 @@ export default function CoachCommandCenter({ db, onSelectClient, setActiveTab, o
     } catch (error) { console.error('❌ Toggle failed:', error); alert('Kon status niet wijzigen') }
   }
 
+  // Klant is definitief verwijderd → kaart uit de lijst en de tellers bijwerken.
+  const handleClientDeleted = (clientId) => {
+    const weg = clientsWithData.find(c => c.id === clientId)
+    setClientsWithData(prev => prev.filter(c => c.id !== clientId))
+    if (weg) {
+      setStats(prev => ({
+        ...prev,
+        active:   weg.status === 'active'   ? Math.max(0, prev.active - 1)   : prev.active,
+        inactive: weg.status === 'inactive' ? Math.max(0, prev.inactive - 1) : prev.inactive,
+      }))
+    }
+  }
+
   const filteredClients = clientsWithData.filter(client => {
     if (statusFilter !== 'all' && client.status !== statusFilter) return false
     if (searchQuery && !`${client.first_name} ${client.last_name}`.toLowerCase().includes(searchQuery.toLowerCase())) return false
@@ -277,6 +290,7 @@ export default function CoachCommandCenter({ db, onSelectClient, setActiveTab, o
                 client={client}
                 isMobile={isMobile}
                 onToggleStatus={handleToggleStatus}
+                onDeleted={handleClientDeleted}
                 showStatusToggle={true}
                 onOpenJourney={() => setJourneyClient(client)}
                 onNavigatePlan={onNavigatePlan}

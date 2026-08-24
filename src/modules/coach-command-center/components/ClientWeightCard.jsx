@@ -6,9 +6,10 @@ import React, { useState } from 'react'
 import { createPortal } from 'react-dom'
 import {
   TrendingDown, TrendingUp,
-  MessageCircle, Power, MoreHorizontal,
+  MessageCircle, Power, MoreHorizontal, Trash2,
   BarChart3, BookOpen, Pause
 } from 'lucide-react'
+import DeleteClientModal from './DeleteClientModal'
 import ClientInsightModal from './ClientInsightModal'
 import CoachingLogModal from './CoachingLogModal'
 import { weightGoalColor } from '../../weight-tracker/utils/weightGoalColor'
@@ -20,10 +21,11 @@ const GOAL_LABELS = {
   fitness: 'Fitter worden', general_fitness: 'Fitter worden',
 }
 
-export default function ClientWeightCard({ client, isMobile, onToggleStatus, showStatusToggle = false, onNavigatePlan, onNavigateWorkout, db, coachId, onOpenMealPanel, onOpenWorkoutPanel }) {
+export default function ClientWeightCard({ client, isMobile, onToggleStatus, onDeleted, showStatusToggle = false, onNavigatePlan, onNavigateWorkout, db, coachId, onOpenMealPanel, onOpenWorkoutPanel }) {
   const [showInsight, setShowInsight]   = useState(false)
   const [showLog, setShowLog]           = useState(false)
   const [showMenu, setShowMenu]         = useState(false)
+  const [showDelete, setShowDelete]     = useState(false)
   const [toggling, setToggling]         = useState(false)
   const [statsExpanded, setStatsExpanded] = useState(false)
 
@@ -310,6 +312,10 @@ export default function ClientWeightCard({ client, isMobile, onToggleStatus, sho
                     <Power size={15} /> {isInactive ? 'Activeer' : 'Deactiveer'}
                   </button>
                 )}
+                {/* Onomkeerbaar — de bevestiging zit in DeleteClientModal. */}
+                <button onClick={() => { setShowDelete(true); setShowMenu(false) }} style={{ width: '100%', padding: '0.6rem 0.85rem', background: 'transparent', border: 'none', borderTop: '1px solid rgba(255,255,255,0.06)', color: '#ef4444', fontSize: '0.78rem', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.45rem', textAlign: 'left', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}>
+                  <Trash2 size={15} /> Verwijderen
+                </button>
               </div>
             </>
           )}
@@ -317,6 +323,12 @@ export default function ClientWeightCard({ client, isMobile, onToggleStatus, sho
       </div>
 
       {/* ── MODALS ── */}
+      {showDelete && (
+        <DeleteClientModal db={db} client={client} isMobile={isMobile}
+          onClose={() => setShowDelete(false)}
+          onDeleted={(id) => { setShowDelete(false); onDeleted?.(id) }} />
+      )}
+
       {showInsight && createPortal(
         <ClientInsightModal
           isOpen={showInsight}
