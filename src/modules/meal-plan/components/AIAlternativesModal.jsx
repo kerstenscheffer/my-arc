@@ -73,24 +73,21 @@ export default function AIAlternativesModal({
         .select('*')
         .limit(200)
 
-      // Door de coach gecureerde swaps voor dit slot (client_swap_options).
-      // EXPLICIET op client_id filteren i.p.v. op RLS leunen: zodra meerdere
-      // clients gecureerde swaps hebben, gaf een slot-only query >1 rij →
-      // .maybeSingle() faalde stil → coach-swaps verdwenen helemaal.
+      // Door de coach gecureerde swaps voor dit slot.
+      // Via get_effective_swap_options i.p.v. rechtstreeks client_swap_options:
+      // die RPC past de laag eronder toe — heeft de coach niets voor DEZE klant
+      // ingesteld, dan gelden zijn standaard-swaps (coach_swap_defaults). Zo
+      // hoeft de fallback niet apart in deze modal, de PDF-export én de
+      // coach-modal geïmplementeerd te staan.
       let curated = []
       try {
         const clientId = client?.id || currentMeal?.client_id || null
-        let opt = null
+        let ids = []
         if (clientId) {
           const { data } = await db.supabase
-            .from('client_swap_options')
-            .select('meal_ids')
-            .eq('client_id', clientId)
-            .eq('meal_slot', slotKey)
-            .maybeSingle()
-          opt = data
+            .rpc('get_effective_swap_options', { p_client_id: clientId })
+          ids = data?.[slotKey]?.meal_ids || []
         }
-        const ids = opt?.meal_ids || []
         if (ids.length > 0) {
           const { data: curatedMeals } = await db.supabase.from('ai_meals').select('*').in('id', ids)
           // Behoud de volgorde waarin de coach ze koos.

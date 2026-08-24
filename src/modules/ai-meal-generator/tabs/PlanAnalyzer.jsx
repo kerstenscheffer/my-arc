@@ -598,16 +598,17 @@ export default function PlanAnalyzer({
       const today = new Date(); const nextWeek = new Date(today.getTime() + 7 * 24 * 60 * 60 * 1000)
       const weekRange = `${today.toLocaleDateString('nl-NL')} - ${nextWeek.toLocaleDateString('nl-NL')}`
 
-      // Laad voorgeschreven swaps voor deze client (als beschikbaar).
+      // Laad de swaps die voor deze client écht gelden. Via de RPC, zodat de
+      // PDF dezelfde uitkomst toont als de client in zijn app ziet: eigen
+      // curatie waar die er is, anders de standaard-swaps van de coach.
       let swapOptions = null
       if (resolvedClientId && db?.supabase) {
         try {
-          const { data: swapRows } = await db.supabase
-            .from('client_swap_options')
-            .select('meal_slot, meal_ids')
-            .eq('client_id', resolvedClientId)
-          if (swapRows && swapRows.length > 0) {
-            const allIds = [...new Set(swapRows.flatMap(r => r.meal_ids || []))]
+          const { data: effective } = await db.supabase
+            .rpc('get_effective_swap_options', { p_client_id: resolvedClientId })
+          const entries = Object.entries(effective || {})
+          if (entries.length > 0) {
+            const allIds = [...new Set(entries.flatMap(([, v]) => v?.meal_ids || []))]
             let mealsById = {}
             if (allIds.length > 0) {
               const { data: meals } = await db.supabase
@@ -617,9 +618,9 @@ export default function PlanAnalyzer({
               mealsById = Object.fromEntries((meals || []).map(m => [m.id, m]))
             }
             swapOptions = {}
-            swapRows.forEach(r => {
-              const resolved = (r.meal_ids || []).map(id => mealsById[id]).filter(Boolean)
-              if (resolved.length > 0) swapOptions[r.meal_slot] = resolved
+            entries.forEach(([slot, v]) => {
+              const resolved = (v?.meal_ids || []).map(id => mealsById[id]).filter(Boolean)
+              if (resolved.length > 0) swapOptions[slot] = resolved
             })
             if (Object.keys(swapOptions).length === 0) swapOptions = null
           }
@@ -932,8 +933,10 @@ export default function PlanAnalyzer({
             <AutoBalancer embedded dayData={currentDay} targets={targets} dayIndex={activeDay}
               onApply={handleAutoBalance} onClose={() => setDockedSection(null)} isMobile={m} />
           )}
-          {dockedSection === 'swaps' && resolvedClientId && (
-            <BestSwapsModal embedded db={db} clientId={resolvedClientId} isMobile={m} onClose={() => setDockedSection(null)} />
+          {/* Ook zonder geselecteerde klant te openen: dan staat 'ie in
+              standaard-modus, zodat je je vaste swaps kunt zetten. */}
+          {dockedSection === 'swaps' && (
+            <BestSwapsModal embedded db={db} clientId={resolvedClientId || null} isMobile={m} onClose={() => setDockedSection(null)} />
           )}
           {dockedSection === 'library' && resolvedClientId && (
             <PlanSwitcherModal embedded db={db} clientId={resolvedClientId} coachId={coachId} activePlanId={planMeta?.id}
