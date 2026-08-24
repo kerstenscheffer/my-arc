@@ -867,20 +867,34 @@ export default function KanbanBoard({
     finally { setLoading(false) }
   }
 
-  // STALE CHECK — PRESERVED 1:1
+  // STALE CHECK — dagelijkse opruiming, hoogstens 1× per dag.
+  //
+  // Dit is huishoudwerk ("leads die X dagen stil zijn naar de stil-sectie"), geen
+  // weergave-logica: de uitkomst verandert alleen als er een DAG voorbij is. Het
+  // draaide echter bij ELKE board-open, en `getLeadsWithLastActivity` haalt de
+  // volledige call_leads- én lead_section_items-tabel op — precies wat
+  // getKanbanBoard net al deed. Dat verdubbelde elke board-open, en bij een
+  // treffer kwam er via loadBoard() nog een derde ronde overheen.
+  // Nu: één keer per kalenderdag per coach, onthouden in localStorage.
+  const staleCheckKey = coachId ? `staleCheck:${coachId}` : null
   useEffect(() => {
     const run = async () => {
       if (!leadService || !coachId || staleCheckDone || loading) return
       if (typeof leadService.checkAndMoveStaleLeads !== 'function') { setStaleCheckDone(true); return }
+      const today = new Date().toISOString().slice(0, 10)
+      let lastRun = null
+      try { lastRun = localStorage.getItem(staleCheckKey) } catch { /* private mode */ }
+      if (lastRun === today) { setStaleCheckDone(true); return }
       try {
         const result = await leadService.checkAndMoveStaleLeads(coachId)
+        try { localStorage.setItem(staleCheckKey, today) } catch { /* private mode */ }
         setStaleCheckResult(result)
         setStaleCheckDone(true)
         if (result && result.moved > 0) { await loadBoard(true); await loadActivityData() }
       } catch (error) { console.error('❌ Stale check failed:', error); setStaleCheckDone(true) }
     }
     if (!loading && !staleCheckDone) run()
-  }, [leadService, coachId, loading, staleCheckDone])
+  }, [leadService, coachId, loading, staleCheckDone, staleCheckKey])
 
 
   // ========================================

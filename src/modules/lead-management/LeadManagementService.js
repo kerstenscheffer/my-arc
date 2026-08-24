@@ -634,6 +634,53 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
     return out
   }
 
+  // Licht bord: één RPC die per sectie het TOTAAL-aantal geeft + alleen de
+  // eerste `perSection` leads. Vervangt het binnenhalen van de complete
+  // call_leads-tabel (~6.4 MB bij 6.2k leads) door ~210 kB, en 15+ HTTP-requests
+  // door 1. De teller per sectie komt uit de database, dus "+N meer" blijft
+  // kloppen zonder dat de rest geladen is.
+  //
+  // Let op: `section.leads` is hier BEWUST onvolledig. Alles wat over álle leads
+  // moet redeneren (client-side filteren/zoeken over het hele bord) hoort via
+  // getSectionLeads() bij te laden of server-side te gebeuren.
+  async getKanbanBoardLight(coachId, perSection = 10) {
+    try {
+      const { data, error } = await this.db.supabase
+        .rpc('get_kanban_board_light', { p_per_section: perSection })
+      if (error) throw error
+      const sections = (data?.sections || []).map(s => ({
+        id: s.id, title: s.title, color: s.color, position: s.position,
+        leads: s.leads || [],
+        leadCount: s.lead_count || 0,
+        // Zolang dit false is heeft de sectie meer leads dan er geladen zijn.
+        leadsComplete: (s.leads || []).length >= (s.lead_count || 0),
+      }))
+      const un = data?.unassigned || { lead_count: 0, leads: [] }
+      sections.push({
+        id: 'unassigned', title: 'Niet toegewezen', color: '#6b7280', position: 9999,
+        leads: un.leads || [], leadCount: un.lead_count || 0,
+        leadsComplete: (un.leads || []).length >= (un.lead_count || 0),
+      })
+      return sections
+    } catch (error) {
+      console.error('❌ Get kanban board (light) failed:', error)
+      return []
+    }
+  }
+
+  // Volgende hap leads van één sectie — voor "toon meer" zonder het bord te herladen.
+  async getSectionLeads(sectionId, offset = 0, limit = 50) {
+    try {
+      const { data, error } = await this.db.supabase
+        .rpc('get_section_leads', { p_section_id: sectionId, p_offset: offset, p_limit: limit })
+      if (error) throw error
+      return data || []
+    } catch (error) {
+      console.error('❌ Get section leads failed:', error)
+      return []
+    }
+  }
+
   async getKanbanBoard(coachId) {
     try {
       // Drie onafhankelijke queries parallel uitvoeren i.p.v. sequentieel.
