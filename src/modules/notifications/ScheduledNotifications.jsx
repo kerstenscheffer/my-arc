@@ -9,7 +9,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { createPortal } from 'react-dom'
 import {
   Plus, X, Trash2, Clock, Users, Scale, UtensilsCrossed, Dumbbell,
-  Bell, Eye, Loader2, AlertCircle,
+  Bell, Eye, Loader2, AlertCircle, ClipboardCheck, Camera,
 } from 'lucide-react'
 
 const GOLD = '#FFD700'
@@ -33,6 +33,16 @@ const CHECK_TYPES = [
     value: 'workout_not_logged', label: 'Niet getraind', Icon: Dumbbell, color: '#a855f7',
     desc: 'Stuurt naar klanten zonder afgeronde workout in de gekozen periode.',
     defaults: { name: 'Trainings-herinnering', title: 'Tijd om te trainen', message: 'Hoi {naam}, we missen je in de gym. Vandaag weer een sessie pakken?', page_context: 'workout' },
+  },
+  {
+    value: 'checkin_not_done', label: 'Check-in niet gedaan', Icon: ClipboardCheck, color: '#06b6d4',
+    desc: 'Stuurt naar klanten zonder check-in in de gekozen periode.',
+    defaults: { name: 'Check-in herinnering', title: 'Tijd voor je check-in', message: 'Heyy het is tijd om je check-in in te vullen!', page_context: 'all' },
+  },
+  {
+    value: 'photo_not_uploaded', label: 'Geen progressiefoto', Icon: Camera, color: '#ec4899',
+    desc: 'Stuurt naar klanten die in de gekozen periode geen foto uploadden.',
+    defaults: { name: 'Progressiefoto', title: 'Tijd voor een nieuwe foto', message: 'Heyy, upload even een nieuwe progressiefoto — dan zien we je vooruitgang terug!', page_context: 'tracking' },
   },
   {
     value: 'always', label: 'Altijd sturen', Icon: Bell, color: AMBER,
@@ -63,6 +73,7 @@ const PAGE_CONTEXTS = [
 const emptyRule = () => ({
   ...checkMeta('weight_not_logged').defaults,
   check_type: 'weight_not_logged',
+  target: 'client',
   check_days: 1,
   run_at: '19:00',
   days_of_week: [1, 2, 3, 4, 5, 6, 7],
@@ -165,6 +176,7 @@ export default function ScheduledNotifications({ db, coachId, isMobile }) {
       page_context: draft.page_context || 'all',
       priority: draft.priority || 'normal',
       audience: draft.audience || 'active',
+      target: draft.target || 'client',
       cooldown_hours: Number(draft.cooldown_hours) || 20,
     }
     if (draft.id) {
@@ -221,6 +233,7 @@ export default function ScheduledNotifications({ db, coachId, isMobile }) {
                 <div style={{ fontSize: '0.68rem', color: 'rgba(255,255,255,0.42)', display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 1 }}>
                   <span><Clock size={9} style={{ verticalAlign: -1 }} /> {String(r.run_at).slice(0, 5)}{allDays ? '' : ' · ' + (r.days_of_week || []).map(d => DAYS[d - 1]?.l).join('')}</span>
                   <span><Users size={9} style={{ verticalAlign: -1 }} /> {AUDIENCES.find(a => a.value === r.audience)?.label || r.audience}</span>
+                  {r.target === 'coach' && <span style={{ color: GOLD, fontWeight: 800 }}>→ naar jou</span>}
                   <span style={{ color: 'rgba(255,255,255,0.28)' }}>
                     {counts[r.id] ? `${counts[r.id]}× verstuurd` : fmtLastRun(r.last_run_at)}
                   </span>
@@ -340,11 +353,30 @@ function RuleEditor({ db, isMobile, rule, onClose, onSave }) {
           </Field>
         )}
 
+        <Field label="Wie krijgt de melding?">
+          <div style={{ display: 'flex', gap: 6 }}>
+            {[
+              { key: 'client', label: 'De klant' },
+              { key: 'coach',  label: 'Ik (coach)' },
+            ].map(t => {
+              const on = (draft.target || 'client') === t.key
+              return (
+                <button key={t.key} onClick={() => set('target', t.key)} style={{
+                  flex: 1, padding: '0.5rem', borderRadius: 9, cursor: 'pointer',
+                  background: on ? 'rgba(255,215,0,0.14)' : 'rgba(255,255,255,0.03)',
+                  border: `1px solid ${on ? GOLD + '66' : 'rgba(255,255,255,0.08)'}`,
+                  color: on ? GOLD : 'rgba(255,255,255,0.55)', fontSize: '0.74rem', fontWeight: 800,
+                }}>{t.label}</button>
+              )
+            })}
+          </div>
+        </Field>
+
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
           <Field label="Tijdstip">
             <Input type="time" value={String(draft.run_at).slice(0, 5)} onChange={v => set('run_at', v)} />
           </Field>
-          <Field label="Doelgroep">
+          <Field label="Over welke klanten">
             <Select value={draft.audience} onChange={v => set('audience', v)} options={AUDIENCES} />
           </Field>
         </div>
@@ -376,7 +408,7 @@ function RuleEditor({ db, isMobile, rule, onClose, onSave }) {
           <Field label="Opent in de app">
             <Select value={draft.page_context} onChange={v => set('page_context', v)} options={PAGE_CONTEXTS} />
           </Field>
-          <Field label="Min. uren ertussen">
+          <Field label="Min. uren ertussen" hint="Bepaalt ook het ritme: 312 op alleen maandag = elke 2 weken.">
             <Input type="number" min={1} max={720} value={draft.cooldown_hours} onChange={v => set('cooldown_hours', v)} />
           </Field>
         </div>

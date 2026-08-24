@@ -12,6 +12,7 @@ import {
   BellRing, Smartphone, Check, Send, RefreshCw, Bell, ChevronDown, ChevronRight,
 } from 'lucide-react'
 import ScheduledNotifications from './ScheduledNotifications'
+import FixedNotifications from './FixedNotifications'
 
 const GOLD = '#FFD700'
 const GREEN = '#10b981'
@@ -140,7 +141,10 @@ export default function NotificationHub({ db }) {
         </div>
       </div>
 
-      {/* ─── De regels die je zelf beheert ─── */}
+      {/* ─── Vaste meldingen: alleen aan/uit ─── */}
+      <FixedNotifications db={db} coachId={userId} />
+
+      {/* ─── Regels die je zelf instelt (tijdstip, drempel, tekst) ─── */}
       <ScheduledNotifications db={db} coachId={userId} isMobile={isMobile} />
 
       {/* ─── Recente meldingen — inklapbaar, standaard dicht ─── */}
