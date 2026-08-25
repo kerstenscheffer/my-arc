@@ -11,13 +11,21 @@ import { foodImageFallback } from '../../foodImageFallback'
 
 const MOMENTS = [
   { id: 'breakfast', label: 'Ontbijt' },
-  { id: 'lunch', label: 'Middageten' },
-  { id: 'dinner', label: 'Avondeten' },
+  { id: 'lunch', label: 'Lunch' },
+  { id: 'dinner', label: 'Diner' },
   { id: 'snack', label: 'Tussendoortjes' }
 ]
 
-// Map plan slot names to moments
-const slotToMoment = (slot) => {
+// Map plan slot names to moments.
+// display_label (set by coach in plan-analyzer) is checked first so a meal
+// explicitly labelled 'Diner' groups into the Diner section even when its
+// underlying slot key is 'lunch'.
+const slotToMoment = (slot, displayLabel) => {
+  const dl = (displayLabel || '').toLowerCase()
+  if (dl === 'ontbijt' || dl.includes('breakfast')) return 'breakfast'
+  if (dl === 'lunch' || dl.includes('middag')) return 'lunch'
+  if (dl === 'diner' || dl.includes('dinner') || dl.includes('avond')) return 'dinner'
+  if (dl === 'snack' || dl.includes('tussendoor')) return 'snack'
   const s = (slot || '').toLowerCase()
   if (s.includes('breakfast') || s.includes('ontbijt')) return 'breakfast'
   if (s.includes('lunch') || s.includes('middag')) return 'lunch'
@@ -207,7 +215,7 @@ export default function MealTimelineMobile({
   MOMENTS.forEach(m => { grouped[m.id] = { planMeals: [], loggedMeals: [] } })
 
   meals.forEach(meal => {
-    const moment = slotToMoment(meal.slot)
+    const moment = slotToMoment(meal.slot, meal.display_label)
     if (grouped[moment]) grouped[moment].planMeals.push(meal)
   })
 
