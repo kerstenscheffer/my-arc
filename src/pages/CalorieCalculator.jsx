@@ -64,9 +64,13 @@ export default function CalorieCalculator() {
     padding: isMobile ? '1.5rem 1rem 3rem' : '2.5rem 1rem 4rem',
   }
 
-  const Logo = () => (
+  const Logo = ({ vol }) => (
     <img src="/ma-logo-header.png" alt="MY ARC"
-      style={{ display: 'block', margin: '0 auto', width: isMobile ? 88 : 110, height: 'auto', opacity: 0.6 }} />
+      style={{
+        display: 'block', margin: '0 auto',
+        width: vol ? (isMobile ? 104 : 132) : (isMobile ? 88 : 110),
+        height: 'auto', opacity: vol ? 1 : 0.6,
+      }} />
   )
 
   // ── Startscherm ──────────────────────────────────────────────────────────
@@ -74,26 +78,24 @@ export default function CalorieCalculator() {
     return (
       <div style={wrap}>
         <div style={{ maxWidth: 480, margin: '0 auto' }}>
-          <Logo />
+          <Logo vol />
+          {/* Titel en ondertitel samengevoegd tot één regel — korter leest beter
+              op een telefoon dan een kop met een alinea eronder. */}
           <h1 style={{
-            margin: isMobile ? '2rem 0 0' : '2.5rem 0 0', textAlign: 'center', color: '#fff',
-            fontWeight: 900, fontSize: isMobile ? '2rem' : '2.5rem', lineHeight: 1.1, letterSpacing: '-0.03em',
+            margin: isMobile ? '2rem 0 1.8rem' : '2.5rem 0 2rem', textAlign: 'center', color: '#fff',
+            fontWeight: 900, fontSize: isMobile ? '2.1rem' : '2.6rem', lineHeight: 1.1, letterSpacing: '-0.03em',
           }}>
-            Calorie calculator<br />voor mannen
+            Jouw caloriedoel<br />in {TOTAAL} vragen
           </h1>
-          <p style={{
-            margin: '1rem 0 1.8rem', textAlign: 'center', fontWeight: 500,
-            fontSize: isMobile ? '1rem' : '1.05rem', lineHeight: 1.55, color: 'rgba(255,255,255,0.75)',
-          }}>
-            {TOTAAL} korte vragen. Daarna weet je precies wat je moet eten,
-            hoeveel je per week verliest en hoe lang je erover doet.
-          </p>
 
           <Voorbeeld isMobile={isMobile} />
 
+          {/* Startscherm is bewust zwart-wit: alleen het logo, de titel, het
+              papieren voorbeeld en deze knop. Goud komt pas terug in de
+              vraagschermen, waar het de voortgang en je keuzes markeert. */}
           <button onClick={() => setStap(0)} style={{
             width: '100%', marginTop: '1.5rem', padding: '1.1rem',
-            borderRadius: 14, border: 'none', background: GOLD, color: '#000',
+            borderRadius: 14, border: 'none', background: '#fff', color: '#000',
             fontSize: '1.05rem', fontWeight: 900, cursor: 'pointer', fontFamily: 'inherit',
             touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
           }}>
@@ -316,12 +318,15 @@ function Voorbeeld({ isMobile }) {
   )
   return (
     <div>
-      <div style={{ fontSize: '0.8rem', fontWeight: 700, color: 'rgba(255,255,255,0.5)', textAlign: 'center', marginBottom: 8 }}>
-        Dit krijg je aan het eind
+      <div style={{
+        fontSize: isMobile ? '1.25rem' : '1.4rem', fontWeight: 900, color: '#fff',
+        textAlign: 'center', marginBottom: 12, letterSpacing: '-0.02em',
+      }}>
+        Dit krijg je
       </div>
       <div style={{
         background: '#faf9f5', borderRadius: 12,
-        padding: isMobile ? '0.9rem 1rem' : '1.1rem 1.2rem', opacity: 0.75,
+        padding: isMobile ? '0.9rem 1rem' : '1.1rem 1.2rem',
       }}>
         <div style={{ fontSize: '0.95rem', fontWeight: 900, color: '#111', borderBottom: '2px solid #111', paddingBottom: 6, marginBottom: 6 }}>
           Mijn caloriedoel
