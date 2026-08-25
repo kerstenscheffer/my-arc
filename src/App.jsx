@@ -23,6 +23,7 @@ import BackInShapeCheckout from './pages/BackInShapeCheckout'
 import BackInShapeMonthlyCheckout from './pages/BackInShapeMonthlyCheckout'
 import EightWeekCheckout from './pages/EightWeekCheckout'
 import TwelveWeekCheckout from './pages/TwelveWeekCheckout'
+import CalorieCalculator from './pages/CalorieCalculator'
 import SixteenWeekCheckout from './pages/SixteenWeekCheckout'
 import SixteenWeekMonthlyCheckout from './pages/SixteenWeekMonthlyCheckout'
 import MonthlySubscriptionCheckout from './pages/MonthlySubscriptionCheckout'
@@ -189,6 +190,12 @@ function App() {
   // Programma-pagina (voorheen /sales — alias blijft werken voor oude links)
   if (currentPath === '/programma' || currentPath === '/sales') {
     return <SalesCallPage />
+  }
+
+  // Calorie-calculator voor mannen — losse tool onder de 16-weken-video.
+  // Beide schrijfwijzen, zodat een gedeelde link met of zonder streepje werkt.
+  if (currentPath === '/calorie-calculator' || currentPath === '/caloriecalculator') {
+    return <CalorieCalculator />
   }
 
   // 16-weken offer — kopie van /programma met eigen copy.
