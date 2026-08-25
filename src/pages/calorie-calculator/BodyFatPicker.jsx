@@ -38,7 +38,9 @@ export default function BodyFatPicker({ waarde, waarde2, onChange, accent = '#FF
 
   return (
     <>
-      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(3, 1fr)' : 'repeat(5, 1fr)', gap: '0.3rem' }}>
+      {/* Altijd 5 naast elkaar — ook op telefoon. Smallere gap zodat er per
+          foto genoeg breedte overblijft. */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: isMobile ? 4 : 6 }}>
         {BF_OPTIES.map((opt, i) => {
           const gekozen = waarde === opt.value || waarde2 === opt.value
           const hint = i === 0 && leeg
@@ -58,14 +60,19 @@ export default function BodyFatPicker({ waarde, waarde2, onChange, accent = '#FF
                   filter: gekozen ? 'none' : 'brightness(0.55)',
                 }} />
               <div style={{
-                position: 'absolute', bottom: 0, left: 0, right: 0, padding: '0.3rem 0.25rem',
-                background: gekozen ? `${accent}e0` : 'rgba(0,0,0,0.72)',
+                position: 'absolute', bottom: 0, left: 0, right: 0,
+                padding: isMobile ? '0.25rem 0.1rem' : '0.3rem 0.25rem',
+                background: gekozen ? `${accent}e6` : 'rgba(0,0,0,0.78)',
               }}>
-                <div style={{ fontSize: isMobile ? '0.55rem' : '0.6rem', fontWeight: 800, color: gekozen ? '#000' : '#fff', textAlign: 'center' }}>{opt.label}</div>
-                <div style={{ fontSize: '0.45rem', color: gekozen ? 'rgba(0,0,0,0.65)' : 'rgba(255,255,255,0.45)', textAlign: 'center', lineHeight: 1.3, marginTop: '0.1rem' }}>{opt.sub}</div>
+                <div style={{ fontSize: isMobile ? '0.62rem' : '0.68rem', fontWeight: 900, color: gekozen ? '#000' : '#fff', textAlign: 'center', whiteSpace: 'nowrap' }}>{opt.label}</div>
+                {/* Subtekst alleen op desktop — bij 5 kolommen op een telefoon
+                    zou dat onleesbaar klein worden. */}
+                {!isMobile && (
+                  <div style={{ fontSize: '0.52rem', fontWeight: 600, color: gekozen ? 'rgba(0,0,0,0.7)' : 'rgba(255,255,255,0.6)', textAlign: 'center', lineHeight: 1.3, marginTop: '0.1rem' }}>{opt.sub}</div>
+                )}
               </div>
               {gekozen && (
-                <div style={{ position: 'absolute', top: '0.3rem', right: '0.3rem', width: 16, height: 16, borderRadius: '50%', background: accent, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <div style={{ position: 'absolute', top: '0.3rem', right: '0.3rem', width: isMobile ? 14 : 16, height: isMobile ? 14 : 16, borderRadius: '50%', background: accent, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                   <span style={{ fontSize: '0.5rem', fontWeight: 800, color: '#000' }}>
                     {tussenin ? (waarde === opt.value ? '1' : '2') : '✓'}
                   </span>
@@ -81,7 +88,7 @@ export default function BodyFatPicker({ waarde, waarde2, onChange, accent = '#FF
         })}
       </div>
       {tussenin && (
-        <div style={{ fontSize: '0.68rem', color: `${accent}aa`, fontWeight: 600, textAlign: 'center', marginTop: 8 }}>
+        <div style={{ fontSize: '0.8rem', color: accent, fontWeight: 700, textAlign: 'center', marginTop: 10 }}>
           Tussenin — we rekenen met ~{bfWaarde(waarde, waarde2)}%
         </div>
       )}
