@@ -88,6 +88,33 @@ export default function CalorieCalculator() {
             Jouw caloriedoel<br />in {TOTAAL} vragen
           </h1>
 
+          {/* Kersten in een rondje met zijn boodschap ernaast — persoonlijke
+              introductie vóór het voorbeeld. objectPosition op 38% zodat het
+              gezicht én de romp in de cirkel vallen; bij 50% zou de kop eraf
+              gesneden worden (staande foto, 360×638). */}
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: isMobile ? 14 : 18,
+            marginBottom: isMobile ? '1.8rem' : '2rem',
+          }}>
+            <img src="/kersten-rond.jpg" alt="Kersten"
+              style={{
+                flexShrink: 0,
+                width: isMobile ? 96 : 118, height: isMobile ? 96 : 118,
+                borderRadius: '50%', objectFit: 'cover', objectPosition: '50% 38%',
+                border: '2px solid rgba(255,255,255,0.9)',
+                boxShadow: '0 6px 18px rgba(0,0,0,0.5)',
+              }} />
+            <p style={{
+              margin: 0, flex: 1, minWidth: 0,
+              fontSize: isMobile ? '0.88rem' : '0.95rem', lineHeight: 1.5,
+              fontWeight: 600, color: '#fff',
+            }}>
+              Dit is hoe ik voor mezelf en mijn klanten macro&apos;s bereken om enorme
+              resultaten mee neer te zetten. Vul de vragen in, download jouw macro&apos;s
+              en pas het voor jezelf toe.
+            </p>
+          </div>
+
           <Voorbeeld isMobile={isMobile} />
 
           {/* Startscherm is bewust zwart-wit: alleen het logo, de titel, het
