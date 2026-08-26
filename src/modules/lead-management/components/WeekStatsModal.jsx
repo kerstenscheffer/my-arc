@@ -51,6 +51,10 @@ const isoWeek = (date) => {
   return Math.ceil((((d - yearStart) / 86400000) + 1) / 7)
 }
 
+// Percentage tonen, of "—" als er geen noemer is. Bewust op module-niveau:
+// SourceRow staat buiten de hoofdcomponent en kan niet bij de pct1 daarbinnen.
+const toonPct = (v) => (v == null ? '—' : `${v}%`)
+
 const sameMonday = (a, b) => mondayOf(a).getTime() === mondayOf(b).getTime()
 const sameDay = (a, b) => {
   const x = new Date(a), y = new Date(b)
@@ -1392,17 +1396,20 @@ function SourceRow({ icon, label, total, reached, stages, followupCount = 0, rep
         />
       </div>
 
-      {/* Row 2: stage breakdown — 5 small pills (4 stages + followup) */}
-      <div style={{
-        display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)',
-        gap: '0.35rem',
-      }}>
-        <StagePill label="Reactie"  value={s.replied}       color="#3b82f6" />
-        <StagePill label="Voorgest." value={s.callProposed}  color="#ef4444" />
-        <StagePill label="Ingepl."   value={s.callScheduled} color="#FFD700" />
-        <StagePill label="Sale"     value={s.sale}          color="#10b981" />
-        <StagePill label={`Opvolg · ø${avgFollow}`} value={followupCount} color="#FFD700" />
-      </div>
+      {/* Row 2: dezelfde stat-stijl als de rij bovenaan de modal (StatFlow),
+          zodat je niet hoeft om te schakelen tussen twee manieren van lezen.
+          Icoon + kleur per stap komen 1-op-1 overeen met `countItems` daar. */}
+      <StatFlow
+        items={[
+          { label: 'Reacties',    value: s.replied || 0,       Icon: MessageCircle, color: '#10b981' },
+          { label: 'Voorgesteld', value: s.callProposed || 0,  Icon: PhoneCall,     color: '#a855f7' },
+          { label: 'Ingepland',   value: s.callScheduled || 0, Icon: CalendarCheck, color: '#06b6d4' },
+          { label: 'Sales',       value: s.sale || 0,          Icon: Trophy,        color: '#FFD700' },
+          { label: 'Follow-ups',  value: followupCount,        Icon: Send,          color: '#f59e0b', sub: `ø${avgFollow} per lead` },
+        ]}
+        activeStage={null}
+        onToggle={() => {}}
+      />
 
       {/* Expanded: per-source % metrics + the actual outreach message that
           this source used. Same definitions as the top Conversie ratio's
@@ -1414,22 +1421,18 @@ function SourceRow({ icon, label, total, reached, stages, followupCount = 0, rep
           borderTop: '1px dashed rgba(255,255,255,0.08)',
           display: 'flex', flexDirection: 'column', gap: '0.5rem',
         }}>
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))',
-            gap: '0.35rem',
-          }}>
-            <MiniRatio label="Response rate" value={responseRate}
-              sub={`${repliedLeads} / ${total}`} accent="#3b82f6" />
-            <MiniRatio label="Opvolg rate" value={chaseShare}
-              sub={`${followedLeads} / ${total}`} accent="#D4AF37" />
-            <MiniRatio label="Calls voorgesteld" value={s.callProposed || 0}
-              sub="aantal" accent="#ef4444" rawValue />
-            <MiniRatio label="Calls ingepland" value={scheduledCalls}
-              sub="aantal" accent="#D4AF37" rawValue />
-            <MiniRatio label="Sales gemaakt" value={s.sale || 0}
-              sub="aantal" accent="#10b981" rawValue />
-          </div>
+          {/* Ook de percentages in dezelfde stijl als de "Percentages"-rij
+              bovenaan — zelfde iconen, zelfde breuk eronder. */}
+          <StatFlow
+            items={[
+              { label: 'Response',  value: toonPct(responseRate), Icon: MessageCircle, color: '#10b981', sub: `${repliedLeads} van ${total}` },
+              { label: 'Opvolg',    value: toonPct(chaseShare),   Icon: Send,          color: '#f59e0b', sub: `${followedLeads} van ${total}` },
+              { label: 'Voorstel→call', value: toonPct(pct(scheduledCalls, s.callProposed || 0)), Icon: PhoneCall, color: '#a855f7', sub: `${scheduledCalls} van ${s.callProposed || 0}` },
+              { label: 'Close rate',    value: toonPct(pct(s.sale || 0, scheduledCalls)),        Icon: Trophy,    color: '#22c55e', sub: `${s.sale || 0} van ${scheduledCalls}` },
+            ]}
+            activeStage={null}
+            onToggle={() => {}}
+          />
 
           {/* Outreach-message preview (campaigns) of magnet-description.
               Pure read-only inside the metrics modal — handy for the "wat
@@ -1491,80 +1494,6 @@ function SourceRow({ icon, label, total, reached, stages, followupCount = 0, rep
   )
 }
 
-function MiniRatio({ label, value, sub, accent, rawValue = false }) {
-  const hasValue = value !== null && value !== undefined
-  return (
-    <div style={{
-      padding: '0.35rem 0.45rem',
-      background: 'rgba(255,255,255,0.02)',
-      border: '1px solid rgba(255,255,255,0.05)',
-      borderRadius: 5,
-    }}>
-      <div style={{ display: 'flex', alignItems: 'baseline', gap: 4 }}>
-        <span style={{
-          fontSize: '0.85rem', fontWeight: 900,
-          color: hasValue ? accent : 'rgba(255,255,255,0.25)',
-          fontFamily: 'monospace', lineHeight: 1,
-        }}>
-          {hasValue ? (rawValue ? `${value}` : `${value}%`) : '—'}
-        </span>
-        <span style={{
-          fontSize: '0.55rem', fontWeight: 700,
-          color: 'rgba(255,255,255,0.5)',
-          letterSpacing: '0.04em', textTransform: 'uppercase',
-        }}>{label}</span>
-      </div>
-      <div style={{
-        marginTop: 3,
-        height: 2, background: 'rgba(255,255,255,0.06)', borderRadius: 1,
-      }}>
-        <div style={{
-          width: `${hasValue && !rawValue ? Math.min(100, value) : 0}%`,
-          height: '100%', background: accent,
-        }} />
-      </div>
-      {sub && (
-        <div style={{ marginTop: 2, fontSize: '0.55rem', color: 'rgba(255,255,255,0.4)' }}>
-          {sub}
-        </div>
-      )}
-    </div>
-  )
-}
-
-function StagePill({ label, value, color }) {
-  const active = value > 0
-  return (
-    <div style={{
-      display: 'flex', flexDirection: 'column', alignItems: 'center',
-      padding: '0.3rem 0.2rem',
-      borderRadius: 5,
-      background: active ? `${color}1f` : 'rgba(255,255,255,0.02)',
-      border: `1px solid ${active ? `${color}55` : 'rgba(255,255,255,0.04)'}`,
-    }}>
-      <div style={{
-        fontSize: '0.85rem', fontWeight: 900,
-        color: active ? color : 'rgba(255,255,255,0.25)',
-        fontFamily: 'monospace', lineHeight: 1,
-      }}>
-        {value}
-      </div>
-      <div style={{
-        fontSize: '0.48rem', fontWeight: 800,
-        color: active ? color : 'rgba(255,255,255,0.3)',
-        opacity: active ? 0.85 : 1,
-        letterSpacing: '0.04em', textTransform: 'uppercase',
-        marginTop: 2,
-      }}>
-        {label}
-      </div>
-    </div>
-  )
-}
-
-// Compacte stat-rij in de stijl van de stats-bar: gekleurd icoon + bold wit
-// getal + klein label. Items met een `stage` zijn klikbaar → drill-down eronder.
-// Man/vrouw-verhouding als SVG-donut + legenda.
 function GenderRing({ gender }) {
   const { male, female, malePct, femalePct, unknown } = gender
   const known = male + female
