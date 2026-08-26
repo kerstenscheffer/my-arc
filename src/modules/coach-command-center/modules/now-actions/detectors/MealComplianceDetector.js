@@ -13,29 +13,30 @@ export default class MealComplianceDetector {
     const isMobile = window.innerWidth <= 768
     
     try {
-      // Get today's meal progress
-      const { data: mealProgress } = await this.supabase
-        .from('ai_meal_progress')
-        .select('*')
-        .eq('client_id', client.id)
-        .eq('date', today)
-        .maybeSingle()
-      
-      // Get active meal plan
-      const { data: mealPlan } = await this.supabase
-        .from('client_meal_plans')
-        .select('daily_calories, daily_protein, is_active')
-        .eq('client_id', client.id)
-        .eq('is_active', true)
-        .maybeSingle()
-      
-      // Get water intake
-      const { data: waterData } = await this.supabase
-        .from('water_tracking')
-        .select('amount_liters, target_liters')
-        .eq('client_id', client.id)
-        .eq('date', today)
-        .maybeSingle()
+      const [
+        { data: mealProgress },
+        { data: mealPlan },
+        { data: waterData }
+      ] = await Promise.all([
+        this.supabase
+          .from('ai_meal_progress')
+          .select('*')
+          .eq('client_id', client.id)
+          .eq('date', today)
+          .maybeSingle(),
+        this.supabase
+          .from('client_meal_plans')
+          .select('daily_calories, daily_protein, is_active')
+          .eq('client_id', client.id)
+          .eq('is_active', true)
+          .maybeSingle(),
+        this.supabase
+          .from('water_tracking')
+          .select('amount_liters, target_liters')
+          .eq('client_id', client.id)
+          .eq('date', today)
+          .maybeSingle()
+      ])
       
       // 1. CHECK: No meals tracked at all today
       if (!mealProgress || !mealProgress.consumed_meals || Object.keys(mealProgress.consumed_meals).length === 0) {

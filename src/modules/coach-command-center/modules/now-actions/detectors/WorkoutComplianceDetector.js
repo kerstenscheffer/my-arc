@@ -17,37 +17,33 @@ class WorkoutComplianceDetector {
       // Get last 7 days of workout data
       const sevenDaysAgo = new Date()
       sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7)
-      
-      // Check workout_completion table
-      const { data: completions } = await this.supabase
-        .from('workout_completion')
-        .select('*')
-        .eq('client_id', client.id)
-        .gte('workout_date', sevenDaysAgo.toISOString().split('T')[0])
-        .order('workout_date', { ascending: false })
-      
-      // Check today's workout
-      const { data: todayWorkout } = await this.supabase
-        .from('workout_completion')
-        .select('*')
-        .eq('client_id', client.id)
-        .eq('workout_date', todayStr)
-        .maybeSingle()
-      
-      // Get workout sessions for more detail
-      const { data: sessions } = await this.supabase
-        .from('workout_sessions')
-        .select('*')
-        .eq('client_id', client.id)
-        .gte('workout_date', sevenDaysAgo.toISOString().split('T')[0])
-        .order('workout_date', { ascending: false })
-      
-      // Get client's workout schema to know expected days
-      const { data: workoutPlan } = await this.supabase
-        .from('client_workouts')
-        .select('*')
-        .eq('client_id', client.id)
-        .maybeSingle()
+      const sevenDaysAgoStr = sevenDaysAgo.toISOString().split('T')[0]
+
+      const [
+        { data: completions },
+        { data: sessions },
+        { data: workoutPlan }
+      ] = await Promise.all([
+        this.supabase
+          .from('workout_completion')
+          .select('*')
+          .eq('client_id', client.id)
+          .gte('workout_date', sevenDaysAgoStr)
+          .order('workout_date', { ascending: false }),
+        this.supabase
+          .from('workout_sessions')
+          .select('*')
+          .eq('client_id', client.id)
+          .gte('workout_date', sevenDaysAgoStr)
+          .order('workout_date', { ascending: false }),
+        this.supabase
+          .from('client_workouts')
+          .select('*')
+          .eq('client_id', client.id)
+          .maybeSingle()
+      ])
+
+      const todayWorkout = completions?.find(c => c.workout_date === todayStr) || null
       
       // 1. CHECK: Today's workout not done (after typical workout time)
       if (!todayWorkout || !todayWorkout.completed) {
