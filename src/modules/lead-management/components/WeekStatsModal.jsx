@@ -1050,6 +1050,10 @@ export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, 
                 const upcoming = pos.filter(m => !m.isPast && !m.isCurrent && m.owed > 0)
                 const totalOut = payouts?.totalOutstanding || 0
                 const fixedCosts = payouts?.fixedCosts || 0
+                // Sales die ná een afgeronde uitbetaling binnenkwamen en dus in
+                // de volgende maand meelopen. Zonder deze regel lijkt zo'n maand
+                // onverklaarbaar hoog.
+                const verschoven = payouts?.verschoven || []
                 // "Jij houdt" = (omzet − vaste lasten) − partner-aandeel. We gebruiken
                 // de netto-omzet die per maand al is uitgerekend in de service.
                 const cur = pos.find(m => m.isCurrent)
@@ -1072,6 +1076,25 @@ export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, 
                   { label: 'Omzet', sub: 'deze maand', value: eur(curRev), color: '#22c55e' },
                   { label: 'Nog te ontvangen', sub: 'openstaand', value: eur(totalOut), color: totalOut > 0 ? '#f59e0b' : '#22c55e' },
                 ]
+                const verschovenRegel = verschoven.length > 0 ? (
+                  <div style={{
+                    display: 'flex', gap: 7, alignItems: 'flex-start',
+                    padding: '0.55rem 0.7rem', borderRadius: 8, marginBottom: '0.6rem',
+                    background: 'rgba(255,215,0,0.07)', border: `1px solid ${GOLD}33`,
+                  }}>
+                    <Info size={13} color={GOLD} style={{ flexShrink: 0, marginTop: 1 }} />
+                    <div style={{ flex: 1, minWidth: 0, fontSize: '0.68rem', color: 'rgba(255,255,255,0.75)', lineHeight: 1.45 }}>
+                      {verschoven.map((v, i) => (
+                        <div key={i}>
+                          <strong style={{ color: '#fff' }}>{eur(v.bedrag)}</strong>
+                          {v.naam ? ` (${v.naam})` : ''} kwam binnen ná de uitbetaling van {v.van} —
+                          telt mee in {v.naar}.
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ) : null
+
                 return (
                   <>
                     {/* Vaste lasten-uitleg: eerst eraf, dan verdelen. */}
@@ -1082,6 +1105,8 @@ export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, 
                         </span>
                       </div>
                     )}
+                    {verschovenRegel}
+
                     {/* Samenvatting deze maand: wie krijgt wat */}
                     <div style={{ display: 'flex', gap: 8, marginBottom: '1.1rem' }}>
                       {summary.map(c => (

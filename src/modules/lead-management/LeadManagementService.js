@@ -2491,36 +2491,20 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
       // Per maand: BRUTO omzet (van de split-sales) én het bruto partner-aandeel
       // opbouwen (zelfde spreiding als de omzet). De vaste lasten trekken we
       // hierna per maand van de omzet af vóór de split.
-      const owedGross = {}
       const revenue = {}
       sales.forEach(s => {
-        const share = s.pct / 100
         if (s.type === 'monthly' && s.months > 1) {
           const perRev = s.total / s.months
           for (let i = 0; i < s.months; i++) {
-            const k = monthKey(startOfMonth(s.date, i))
-            revenue[k] = (revenue[k] || 0) + perRev
-            owedGross[k] = (owedGross[k] || 0) + perRev * share
+            revenue[monthKey(startOfMonth(s.date, i))] = (revenue[monthKey(startOfMonth(s.date, i))] || 0) + perRev
           }
         } else {
-          const k = monthKey(s.date)
-          revenue[k] = (revenue[k] || 0) + s.total
-          owedGross[k] = (owedGross[k] || 0) + s.total * share
+          revenue[monthKey(s.date)] = (revenue[monthKey(s.date)] || 0) + s.total
         }
       })
 
-      // Vaste lasten er eerst af, DAN verdelen: het partner-aandeel wordt
-      // berekend over (omzet − vaste lasten). Bij meerdere %-en schaalt elk
-      // aandeel evenredig mee (netto-factor = (omzet−lasten)/omzet).
-      const owed = {}
-      Object.keys(revenue).forEach(k => {
-        const rev = revenue[k]
-        const net = Math.max(0, rev - FIXED)
-        const factor = rev > 0 ? net / rev : 0
-        owed[k] = (owedGross[k] || 0) * factor
-      })
-
-      // Al uitbetaald per maand.
+      // Al uitbetaald per maand. Eerst ophalen, want de betaaldatum bepaalt
+      // hieronder of een late sale nog in die maand valt of doorschuift.
       const paid = {}
       const paidAt = {}
       ;(paidRows || []).forEach(r => {
@@ -2528,6 +2512,63 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
         const k = monthKey(d)
         paid[k] = (paid[k] || 0) + (Number(r.amount_paid) || 0)
         paidAt[k] = r.paid_at
+      })
+
+      // Vaste lasten er eerst af, DAN verdelen: het partner-aandeel wordt
+      // berekend over (omzet − vaste lasten). Bij meerdere %-en schaalt elk
+      // aandeel evenredig mee (netto-factor = (omzet−lasten)/omzet).
+
+      // Een maand die al is afgerekend is dicht: alles wat ERNA binnenkwam hoort
+      // bij de volgende uitbetaling, niet als achterstand op een maand die je al
+      // hebt betaald. Voorbeeld: augustus afgerekend om 11:41, om 16:36 komt er
+      // nog een sale binnen → dat bedrag telt vanaf september.
+      // De omzet-rapportage schuift NIET mee; die blijft in de maand van de sale.
+      const volgendeMaand = (k) => {
+        const [j, m] = k.split('-').map(Number)
+        return monthKey(new Date(j, m, 1))   // m is 1-based → new Date(j, m) = maand erna
+      }
+      const doelMaand = (k, saleDatum) => {
+        let key = k
+        // Maximaal 24 stappen — puur een noodrem tegen een oneindige lus.
+        for (let i = 0; i < 24; i++) {
+          const betaald = paidAt[key] ? new Date(paidAt[key]) : null
+          if (!betaald || saleDatum <= betaald) return key
+          key = volgendeMaand(key)
+        }
+        return key
+      }
+
+      // Alle omzet-porties per maand, op volgorde van binnenkomst.
+      const porties = {}
+      sales.forEach(s => {
+        const share = s.pct / 100
+        const delen = (s.type === 'monthly' && s.months > 1)
+          ? Array.from({ length: s.months }, (_, i) => ({ k: monthKey(startOfMonth(s.date, i)), omzet: s.total / s.months }))
+          : [{ k: monthKey(s.date), omzet: s.total }]
+        delen.forEach(({ k, omzet }) => {
+          ;(porties[k] = porties[k] || []).push({ omzet, share, datum: s.date, naam: s.naam })
+        })
+      })
+
+      // De vaste lasten zijn een bedrag dat je ÉÉN keer per maand betaalt, niet
+      // een percentage over elke sale. Ze worden daarom opgesoupeerd door wat er
+      // als eerste binnenkomt. Deed je dat evenredig over de hele maand, dan
+      // zou een sale ná de uitbetaling alsnog een deel van al betaalde lasten
+      // meekrijgen — en klopte het bedrag dat je al overmaakte niet meer.
+      const owed = {}
+      const verschoven = []   // wat er is doorgeschoven, voor uitleg in de UI
+      Object.keys(porties).forEach(k => {
+        const rij = porties[k].slice().sort((a, b) => a.datum - b.datum)
+        let restLasten = FIXED
+        rij.forEach(p => {
+          const aftrek = Math.min(restLasten, p.omzet)
+          restLasten -= aftrek
+          const netto = (p.omzet - aftrek) * p.share
+          if (netto <= 0) return
+          const naar = doelMaand(k, p.datum)
+          owed[naar] = (owed[naar] || 0) + netto
+          if (naar !== k) verschoven.push({ van: k, naar, bedrag: Math.round(netto * 100) / 100, naam: p.naam })
+        })
       })
 
       const now = new Date()
@@ -2558,7 +2599,7 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
           isCurrent: i === 0,
         })
       }
-      return { months, totalOutstanding: Math.round(totalOutstanding * 100) / 100, fixedCosts: FIXED }
+      return { months, totalOutstanding: Math.round(totalOutstanding * 100) / 100, fixedCosts: FIXED, verschoven }
     } catch (error) {
       console.error('❌ getPartnerPayouts failed:', error)
       return { months: [], totalOutstanding: 0 }
