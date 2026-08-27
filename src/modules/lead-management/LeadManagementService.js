@@ -2574,7 +2574,7 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
         // Aanbetaling komt nu binnen.
         if (heeftRest && s.reservering > 0) {
           const k = monthKey(s.date)
-          ;(porties[k] = porties[k] || []).push({ omzet: s.reservering, share, datum: s.date, naam: s.naam })
+          ;(porties[k] = porties[k] || []).push({ omzet: s.reservering, share, datum: s.date, naam: s.naam, soort: 'Reservering' })
         }
         if (restBedrag <= 0) return
 
@@ -2585,11 +2585,12 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
               // Datum van díe termijn — bepaalt of 'ie nog vóór een afgeronde
               // uitbetaling viel.
               datum: new Date(restStart.getFullYear(), restStart.getMonth() + i, restStart.getDate()),
+              soort: `Termijn ${i + 1} van ${s.months}`,
             }))
-          : [{ k: monthKey(restStart), omzet: restBedrag, datum: restStart }]
+          : [{ k: monthKey(restStart), omzet: restBedrag, datum: restStart, soort: heeftRest ? 'Restbetaling' : 'Vooruitbetaald' }]
 
-        delen.forEach(({ k, omzet, datum }) => {
-          ;(porties[k] = porties[k] || []).push({ omzet, share, datum, naam: s.naam })
+        delen.forEach(({ k, omzet, datum, soort }) => {
+          ;(porties[k] = porties[k] || []).push({ omzet, share, datum, naam: s.naam, soort })
         })
       })
 
@@ -2651,6 +2652,17 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
           settled: outstanding <= 0.005 && owedM > 0,
           paidAt: paidAt[k] || null,
           revenue: revM,                                       // ONTVANGEN omzet die maand
+          // De losse posten waaruit `revenue` is opgebouwd — voedt de uitklap
+          // onder "Ontvangen deze maand".
+          ontvangsten: (porties[k] || [])
+            .slice()
+            .sort((a, b) => a.datum - b.datum)
+            .map(p => ({
+              naam: p.naam || 'Onbekend',
+              bedrag: Math.round(p.omzet * 100) / 100,
+              soort: p.soort || null,
+              datum: p.datum instanceof Date ? p.datum.toISOString().slice(0, 10) : null,
+            })),
           orderRevenue: Math.round((orderOmzet[k] || 0) * 100) / 100, // omzet uit orders die maand
           fixedCosts: revM > 0 ? Math.min(FIXED, revM) : 0,    // afgetrokken vaste lasten
           netRevenue: Math.max(0, Math.round((revM - FIXED) * 100) / 100), // te verdelen

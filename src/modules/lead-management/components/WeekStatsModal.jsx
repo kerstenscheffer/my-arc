@@ -115,6 +115,8 @@ export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, 
   // Partner-uitbetaling (bv. Marcel): per maand wat er open staat + betaald-knop.
   const [payouts, setPayouts] = useState(null)
   const [payoutBusy, setPayoutBusy] = useState(null) // period-key die nu update
+  // Staat de lijst met losse ontvangsten van deze maand open?
+  const [ontvangstenOpen, setOntvangstenOpen] = useState(false)
   const partnerName = (() => {
     try { return localStorage.getItem('lead_partner_name') || 'Marcel' } catch { return 'Marcel' }
   })()
@@ -1047,7 +1049,9 @@ export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, 
                 const fmtDate = (iso) => { try { return new Date(iso).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' }) } catch { return '' } }
                 const pos = payouts?.months || []
                 const settleable = pos.filter(m => m.isPast || m.isCurrent).slice().reverse()
-                const upcoming = pos.filter(m => !m.isPast && !m.isCurrent && m.owed > 0)
+                // De eerstvolgende twee maanden — verwachting, want dat geld moet
+                // nog binnenkomen. Wel met knop: soms betaal je vooruit.
+                const upcoming = pos.filter(m => !m.isPast && !m.isCurrent && m.owed > 0).slice(0, 2)
                 const totalOut = payouts?.totalOutstanding || 0
                 const fixedCosts = payouts?.fixedCosts || 0
                 // Sales die ná een afgeronde uitbetaling binnenkwamen en dus in
@@ -1066,29 +1070,6 @@ export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, 
                 // rekenen, dan telde het doorgeschoven deel als jouw winst.
                 const partnerNow = cur ? (cur.earned ?? cur.owed) : 0
                 const youKeepNow = Math.max(0, curNet - partnerNow)
-                // Wat er volgende maand naar de partner gaat — inclusief alles
-                // wat vanuit deze maand is doorgeschoven.
-                const nextIdx = pos.findIndex(m => m.isCurrent)
-                const next = nextIdx >= 0 ? pos[nextIdx + 1] : null
-                const partnerNext = next ? (next.owed || 0) : 0
-                const nextLabel = next ? cap(next.label.split(' ')[0]) : 'volgende maand'
-                // Totaal dat de partner dit jaar toekomt (alle getoonde maanden).
-                const partnerTotalAll = pos.reduce((a, m) => a + (m.owed || 0), 0)
-                // Kijker-afhankelijk: de owner ziet "Marcel ontvangt / jij houdt"
-                // + kan afvinken; een teamlid (Marcel) ziet "jij ontvangt" +
-                // alleen-lezen status.
-                const blockName = isOwner ? partnerName : 'Jij'
-                const summary = isOwner ? [
-                  { label: `${partnerName} verdient`, sub: 'deze maand', value: eur(partnerNow), color: '#FFD700' },
-                  { label: 'Jij houdt', sub: 'deze maand', value: eur(youKeepNow), color: '#22c55e' },
-                  { label: 'Over te maken', sub: 'nu openstaand', value: eur(totalOut), color: totalOut > 0 ? '#f59e0b' : '#22c55e' },
-                  { label: `Naar ${partnerName}`, sub: nextLabel, value: eur(partnerNext), color: '#06b6d4' },
-                ] : [
-                  { label: 'Jij verdient', sub: 'deze maand', value: eur(partnerNow), color: '#FFD700' },
-                  { label: 'Ontvangen', sub: 'deze maand', value: eur(curRev), color: '#22c55e' },
-                  { label: 'Nog te ontvangen', sub: 'openstaand', value: eur(totalOut), color: totalOut > 0 ? '#f59e0b' : '#22c55e' },
-                  { label: 'Jij ontvangt', sub: nextLabel, value: eur(partnerNext), color: '#06b6d4' },
-                ]
                 const verschovenRegel = verschoven.length > 0 ? (
                   <div style={{
                     display: 'flex', gap: 7, alignItems: 'flex-start',
@@ -1108,132 +1089,130 @@ export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, 
                   </div>
                 ) : null
 
+                // Kale typografie: geen vakken, geen accentkleuren. Hiërarchie
+                // via formaat en dikte, scheiding via haarlijnen.
+                const rij = { display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 12, padding: '0.6rem 0' }
+                const lijn = { borderTop: '1px solid rgba(255,255,255,0.1)' }
+                const kopje = { fontSize: '0.95rem', fontWeight: 900, color: '#fff', margin: '1.5rem 0 0.2rem' }
+                const knop = (leeg) => ({
+                  flexShrink: 0, padding: '0.5rem 0.9rem', borderRadius: 9,
+                  border: leeg ? '1px solid rgba(255,255,255,0.3)' : 'none',
+                  background: leeg ? 'transparent' : '#fff', color: leeg ? '#fff' : '#000',
+                  fontWeight: 900, fontSize: '0.82rem', fontFamily: 'inherit', cursor: 'pointer',
+                })
+
+                const MaandRij = ({ m, verwacht }) => {
+                  const busy = payoutBusy === m.key
+                  const youKeepM = Math.max(0, (m.netRevenue || 0) - (m.earned ?? m.owed ?? 0))
+                  return (
+                    <div style={{ ...rij, ...lijn, alignItems: 'center' }}>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: '0.95rem', fontWeight: 900, color: '#fff', textTransform: 'capitalize' }}>
+                          {cap(m.label)}
+                          {m.isCurrent && <span style={{ fontWeight: 700, color: 'rgba(255,255,255,0.5)' }}> · deze maand</span>}
+                          {verwacht && <span style={{ fontWeight: 700, color: 'rgba(255,255,255,0.5)' }}> · verwacht</span>}
+                        </div>
+                        <div style={{ fontSize: '0.85rem', fontWeight: 600, color: 'rgba(255,255,255,0.65)', marginTop: 2 }}>
+                          {isOwner ? `${partnerName} ${eur(m.owed)} · jij ${eur(youKeepM)}` : `Jouw aandeel ${eur(m.owed)}`}
+                          {m.settled && ` · betaald${m.paidAt ? ' ' + fmtDate(m.paidAt) : ''}`}
+                        </div>
+                      </div>
+                      {!isOwner ? (
+                        <div style={{ flexShrink: 0, fontSize: '1rem', fontWeight: 900, color: '#fff' }}>
+                          {m.settled ? 'Ontvangen' : eur(m.outstanding)}
+                        </div>
+                      ) : (
+                        <div style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: 10 }}>
+                          {!m.settled && <span style={{ fontSize: '1.05rem', fontWeight: 900, color: '#fff' }}>{eur(m.outstanding)}</span>}
+                          <button onClick={() => settleMonth(m)} disabled={busy} style={{ ...knop(m.settled || verwacht), opacity: busy ? 0.5 : 1 }}>
+                            {busy ? '…' : m.settled ? 'Betaald ✓' : 'Betaald'}
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  )
+                }
+
                 return (
                   <>
-                    {/* Vaste lasten-uitleg: eerst eraf, dan verdelen. */}
-                    {/* Twee verschillende omzetten, en het verschil bepaalt wanneer
-                        de partner betaald wordt. Verkocht = de order. Ontvangen =
-                        wat er die maand daadwerkelijk binnenkwam (aanbetalingen en
-                        termijnen). Alleen over het ONTVANGEN deel wordt verdeeld. */}
-                    {isOwner && (
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: '0.8rem', padding: '0.65rem 0.75rem', borderRadius: 10, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.7rem' }}>
-                          <span style={{ color: 'rgba(255,255,255,0.5)' }}>Verkocht deze maand (orders)</span>
-                          <b style={{ color: 'rgba(255,255,255,0.75)' }}>{eur(curOrders)}</b>
-                        </div>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.7rem' }}>
-                          <span style={{ color: '#fff', fontWeight: 700 }}>Ontvangen deze maand</span>
-                          <b style={{ color: '#fff' }}>{eur(curRev)}</b>
-                        </div>
-                        {fixedCosts > 0 && (
-                          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.7rem', paddingTop: 5, borderTop: '1px dashed rgba(255,255,255,0.1)' }}>
-                            <span style={{ color: 'rgba(255,255,255,0.5)' }}>− vaste lasten {eur(fixedCosts)} = te verdelen</span>
-                            <b style={{ color: '#22c55e' }}>{eur(curNet)}</b>
-                          </div>
-                        )}
-                        <div style={{ fontSize: '0.62rem', color: 'rgba(255,255,255,0.35)', lineHeight: 1.4 }}>
-                          Er wordt verdeeld over wat er binnenkomt, niet over wat er verkocht is —
-                          een reservering telt pas mee zodra de rest betaald wordt.
-                        </div>
-                      </div>
-                    )}
                     {verschovenRegel}
 
-                    {/* Samenvatting deze maand: wie krijgt wat */}
-                    <div style={{ display: 'flex', gap: 8, marginBottom: '1.1rem', flexWrap: 'wrap' }}>
-                      {summary.map(c => (
-                        <div key={c.label} style={{ flex: '1 1 44%', minWidth: 0, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 12, padding: '0.7rem 0.5rem', textAlign: 'center' }}>
-                          <div style={{ fontSize: isMobile ? '1rem' : '1.15rem', fontWeight: 900, color: c.color, lineHeight: 1.1 }}>{c.value}</div>
-                          <div style={{ fontSize: '0.58rem', fontWeight: 800, letterSpacing: '0.03em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.45)', marginTop: 4 }}>{c.label}</div>
-                          <div style={{ fontSize: '0.54rem', color: 'rgba(255,255,255,0.3)', marginTop: 2 }}>{c.sub}</div>
+                    {isOwner && (
+                      <>
+                        <div style={rij}>
+                          <span style={{ fontSize: '0.95rem', fontWeight: 700, color: 'rgba(255,255,255,0.7)' }}>Verkocht deze maand</span>
+                          <span style={{ fontSize: '1rem', fontWeight: 800, color: 'rgba(255,255,255,0.7)' }}>{eur(curOrders)}</span>
                         </div>
-                      ))}
-                    </div>
 
-                    {/* Per partner (nu: Marcel). Extra medewerkers verschijnen hier
-                        later als eigen blok zodra ze een aandeel op een sale hebben. */}
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: '0.7rem' }}>
-                      <div style={{ width: 26, height: 26, borderRadius: '50%', background: 'rgba(255,215,0,0.15)', border: '1px solid rgba(255,215,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                        <Users size={13} color="#FFD700" />
-                      </div>
-                      <div style={{ flex: 1, fontSize: '0.85rem', fontWeight: 800, color: '#fff' }}>{blockName}</div>
-                      <div style={{ fontSize: '0.6rem', color: 'rgba(255,255,255,0.4)', textAlign: 'right' }}>
-                        totaal aandeel<br /><span style={{ color: '#FFD700', fontWeight: 800, fontSize: '0.72rem' }}>{eur(partnerTotalAll)}</span>
-                      </div>
-                      <div style={{ fontSize: '0.72rem', fontWeight: 900, color: totalOut > 0 ? '#FFD700' : '#22c55e', background: totalOut > 0 ? 'rgba(255,215,0,0.12)' : 'rgba(34,197,94,0.12)', border: `1px solid ${totalOut > 0 ? 'rgba(255,215,0,0.3)' : 'rgba(34,197,94,0.3)'}`, borderRadius: 8, padding: '3px 8px' }}>
-                        {totalOut > 0 ? `${eur(totalOut)} ${isOwner ? 'open' : 'te ontvangen'}` : (isOwner ? 'Betaald ✓' : 'Ontvangen ✓')}
-                      </div>
-                    </div>
+                        <button onClick={() => setOntvangstenOpen(o => !o)}
+                          style={{ ...rij, ...lijn, width: '100%', background: 'none', border: 'none', borderTop: '1px solid rgba(255,255,255,0.1)', cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left' }}>
+                          <span style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: '1rem', fontWeight: 900, color: '#fff' }}>
+                            <ChevronDown size={14} style={{ transform: ontvangstenOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s' }} />
+                            Ontvangen deze maand
+                          </span>
+                          <span style={{ fontSize: '1.15rem', fontWeight: 900, color: '#fff' }}>{eur(curRev)}</span>
+                        </button>
 
-                    {settleable.length === 0 && upcoming.length === 0 ? (
-                      <div style={{ padding: '1.5rem 0.5rem', fontSize: '0.78rem', color: 'rgba(255,255,255,0.4)', lineHeight: 1.5, textAlign: 'center' }}>
-                        {isOwner
-                          ? <>Nog geen sales met een aandeel voor {partnerName}. Vul bij een sale het veld “Aandeel {partnerName}” in.</>
-                          : <>Je hebt nog geen aandeel op een sale gekregen.</>}
-                      </div>
-                    ) : (
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                        {settleable.map(m => {
-                          const busy = payoutBusy === m.key
-                          const youKeepM = Math.max(0, (m.netRevenue || 0) - (m.owed || 0))
-                          return (
-                            <div key={m.key} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '0.6rem 0.75rem', borderRadius: 10, background: 'rgba(255,255,255,0.03)', border: `1px solid ${m.settled ? 'rgba(34,197,94,0.25)' : m.outstanding > 0 ? 'rgba(255,215,0,0.22)' : 'rgba(255,255,255,0.08)'}` }}>
-                              <div style={{ flex: 1, minWidth: 0 }}>
-                                <div style={{ fontSize: '0.8rem', fontWeight: 800, color: '#fff', textTransform: 'capitalize' }}>
-                                  {cap(m.label)} {m.isCurrent && <span style={{ fontSize: '0.58rem', color: '#FFD700', fontWeight: 700 }}>· deze maand</span>}
-                                </div>
-                                <div style={{ fontSize: '0.64rem', color: 'rgba(255,255,255,0.4)', marginTop: 2 }}>
-                                  {isOwner
-                                    ? `${partnerName} ${eur(m.owed)} · jij ${eur(youKeepM)}`
-                                    : `Jouw aandeel ${eur(m.owed)}`}
-                                  {m.settled
-                                    ? ` · ${isOwner ? 'betaald' : 'ontvangen'}${m.paidAt ? ' ' + fmtDate(m.paidAt) : ''}`
-                                    : m.paid > 0 ? ` · ${eur(m.paid)} ${isOwner ? 'betaald' : 'ontvangen'}` : ''}
-                                </div>
+                        {ontvangstenOpen && (
+                          <div style={{ padding: '0 0 0.5rem 1.2rem' }}>
+                            {(cur?.ontvangsten || []).length === 0 ? (
+                              <div style={{ fontSize: '0.85rem', color: 'rgba(255,255,255,0.5)', padding: '0.3rem 0' }}>Niets binnengekomen deze maand.</div>
+                            ) : cur.ontvangsten.map((o, i) => (
+                              <div key={i} style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 10, padding: '0.3rem 0' }}>
+                                <span style={{ flex: 1, minWidth: 0, fontSize: '0.88rem', fontWeight: 600, color: 'rgba(255,255,255,0.8)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                  {o.naam}{o.soort && <span style={{ color: 'rgba(255,255,255,0.45)' }}> · {o.soort}</span>}
+                                </span>
+                                <b style={{ flexShrink: 0, fontSize: '0.9rem', color: '#fff', fontVariantNumeric: 'tabular-nums' }}>{eur(o.bedrag)}</b>
                               </div>
-                              {/* Owner kan af-/aanvinken; een teamlid ziet alleen de status. */}
-                              {!isOwner ? (
-                                <div style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
-                                  {m.settled ? (
-                                    <span style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '0.4rem 0.7rem', borderRadius: 8, background: 'rgba(34,197,94,0.14)', border: '1px solid rgba(34,197,94,0.4)', color: '#22c55e', fontWeight: 800, fontSize: '0.72rem' }}>
-                                      <Check size={13} /> Ontvangen
-                                    </span>
-                                  ) : (
-                                    <span style={{ padding: '0.4rem 0.7rem', borderRadius: 8, background: 'rgba(255,215,0,0.12)', border: '1px solid rgba(255,215,0,0.3)', color: '#FFD700', fontWeight: 900, fontSize: '0.72rem' }}>
-                                      {eur(m.outstanding)} openstaand
-                                    </span>
-                                  )}
-                                </div>
-                              ) : m.settled ? (
-                                <button onClick={() => settleMonth(m)} disabled={busy} title="Betaling terugdraaien"
-                                  style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: 5, padding: '0.4rem 0.7rem', borderRadius: 8, background: 'rgba(34,197,94,0.14)', border: '1px solid rgba(34,197,94,0.4)', color: '#22c55e', fontWeight: 800, fontSize: '0.72rem', cursor: busy ? 'default' : 'pointer', opacity: busy ? 0.5 : 1 }}>
-                                  <Check size={13} /> Betaald
-                                </button>
-                              ) : (
-                                <div style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
-                                  <div style={{ fontSize: '0.9rem', fontWeight: 900, color: '#FFD700' }}>{eur(m.outstanding)}</div>
-                                  <button onClick={() => settleMonth(m)} disabled={busy}
-                                    style={{ padding: '0.4rem 0.75rem', borderRadius: 8, border: 'none', background: 'linear-gradient(135deg,#FFD700,#D4AF37)', color: '#000', fontWeight: 900, fontSize: '0.72rem', cursor: busy ? 'default' : 'pointer', opacity: busy ? 0.5 : 1 }}>
-                                    {busy ? '…' : 'Betaald'}
-                                  </button>
-                                </div>
-                              )}
-                            </div>
-                          )
-                        })}
-                        {upcoming.length > 0 && (
-                          <div style={{ marginTop: 6, fontSize: '0.64rem', color: 'rgba(255,255,255,0.4)', lineHeight: 1.6 }}>
-                            <span style={{ fontWeight: 700, color: 'rgba(255,255,255,0.5)' }}>Komende termijnen:</span>{' '}
-                            {upcoming.map(m => `${cap(m.label.replace(/ 20\d\d/, ''))} ${eur(m.owed)}`).join(' · ')}
+                            ))}
                           </div>
                         )}
-                      </div>
+
+                        {fixedCosts > 0 && (
+                          <div style={{ ...rij, ...lijn }}>
+                            <span style={{ fontSize: '0.9rem', fontWeight: 600, color: 'rgba(255,255,255,0.65)' }}>Min vaste lasten {eur(fixedCosts)}</span>
+                            <span style={{ fontSize: '1rem', fontWeight: 900, color: '#fff' }}>{eur(curNet)}</span>
+                          </div>
+                        )}
+
+                        <div style={kopje}>Deze maand</div>
+                        <div style={{ ...rij, ...lijn }}>
+                          <span style={{ fontSize: '0.95rem', fontWeight: 700, color: 'rgba(255,255,255,0.7)' }}>{partnerName} verdient</span>
+                          <span style={{ fontSize: '1.1rem', fontWeight: 900, color: '#fff' }}>{eur(partnerNow)}</span>
+                        </div>
+                        <div style={{ ...rij, ...lijn }}>
+                          <span style={{ fontSize: '0.95rem', fontWeight: 700, color: 'rgba(255,255,255,0.7)' }}>Jij houdt</span>
+                          <span style={{ fontSize: '1.1rem', fontWeight: 900, color: '#fff' }}>{eur(youKeepNow)}</span>
+                        </div>
+                        <div style={{ ...rij, ...lijn }}>
+                          <span style={{ fontSize: '0.95rem', fontWeight: 700, color: 'rgba(255,255,255,0.7)' }}>Nog over te maken</span>
+                          <span style={{ fontSize: '1.1rem', fontWeight: 900, color: '#fff' }}>{eur(totalOut)}</span>
+                        </div>
+                      </>
                     )}
-                    <div style={{ marginTop: '0.9rem', fontSize: '0.62rem', color: 'rgba(255,255,255,0.3)', lineHeight: 1.5 }}>
-                      {isOwner
-                        ? 'Tip: maak op de 25e het openstaande bedrag over en klik dan “Betaald”. Komt er daarna nog een sale in die maand bij, dan verschijnt alleen dat nieuwe stukje weer als openstaand.'
-                        : 'Je coach maakt je aandeel over (meestal rond de 25e) en vinkt de maand dan af. “Openstaand” = nog niet overgemaakt.'}
-                    </div>
+
+                    {!isOwner && (
+                      <>
+                        <div style={rij}>
+                          <span style={{ fontSize: '0.95rem', fontWeight: 700, color: 'rgba(255,255,255,0.7)' }}>Jij verdient deze maand</span>
+                          <span style={{ fontSize: '1.1rem', fontWeight: 900, color: '#fff' }}>{eur(partnerNow)}</span>
+                        </div>
+                        <div style={{ ...rij, ...lijn }}>
+                          <span style={{ fontSize: '0.95rem', fontWeight: 700, color: 'rgba(255,255,255,0.7)' }}>Nog te ontvangen</span>
+                          <span style={{ fontSize: '1.1rem', fontWeight: 900, color: '#fff' }}>{eur(totalOut)}</span>
+                        </div>
+                      </>
+                    )}
+
+                    <div style={kopje}>Per maand</div>
+                    {settleable.length === 0 && upcoming.length === 0 ? (
+                      <div style={{ ...rij, ...lijn, fontSize: '0.9rem', color: 'rgba(255,255,255,0.5)' }}>Nog niets te verdelen.</div>
+                    ) : (
+                      <>
+                        {settleable.map(m => <MaandRij key={m.key} m={m} />)}
+                        {upcoming.map(m => <MaandRij key={m.key} m={m} verwacht />)}
+                      </>
+                    )}
                   </>
                 )
               })()}
