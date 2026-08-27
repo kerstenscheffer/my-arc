@@ -2318,7 +2318,7 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
     try {
       const { data } = await this.db.supabase
         .from('lead_movements')
-        .select('order_value, payment_type, duration_months, moved_at')
+        .select('order_value, payment_type, duration_months, moved_at, is_reservation, reservation_amount, payment_due_date')
         .not('order_value', 'is', null)
         .is('reverted_at', null)
       const sales = (data || []).map(r => ({
@@ -2326,6 +2326,13 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
         type: r.payment_type || 'prepaid',
         months: Math.max(1, Number(r.duration_months) || 1),
         date: new Date(r.moved_at),
+        // Reservering: nu komt alleen het aanbetaalde bedrag binnen, de rest op
+        // de afgesproken datum. Dit tabblad is een CASHFLOW-overzicht, dus dan
+        // hoort het restbedrag in de maand van die datum te staan — niet in de
+        // maand van de sale. (De "Omzet"-stat in de weekstats blijft wél op de
+        // sale-datum tellen; dat is bewust, zie SaleValueModal.)
+        reservering: r.is_reservation ? Math.max(0, Number(r.reservation_amount) || 0) : 0,
+        restDatum: (r.is_reservation && r.payment_due_date) ? new Date(r.payment_due_date) : null,
       })).filter(s => s.total > 0 && !isNaN(s.date?.getTime?.()))
 
       const monthKey = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
@@ -2334,15 +2341,28 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
       // Cashflow per maand opbouwen.
       const cash = {}
       sales.forEach(s => {
+        // Bij een reservering valt de aanbetaling nu, en start de rest pas op de
+        // afgesproken betaaldatum. Zonder geldige datum valt alles terug op het
+        // oude gedrag (alles op de sale-datum).
+        const heeftRest = s.restDatum && !isNaN(s.restDatum.getTime())
+        const restBedrag = heeftRest ? Math.max(0, s.total - s.reservering) : s.total
+        const restStart = heeftRest ? s.restDatum : s.date
+
+        if (heeftRest && s.reservering > 0) {
+          const k = monthKey(s.date)
+          cash[k] = (cash[k] || 0) + s.reservering
+        }
+        if (restBedrag <= 0) return
+
         if (s.type === 'monthly' && s.months > 1) {
-          const per = s.total / s.months
+          const per = restBedrag / s.months
           for (let i = 0; i < s.months; i++) {
-            const k = monthKey(startOfMonth(s.date, i))
+            const k = monthKey(startOfMonth(restStart, i))
             cash[k] = (cash[k] || 0) + per
           }
         } else {
-          const k = monthKey(s.date)
-          cash[k] = (cash[k] || 0) + s.total
+          const k = monthKey(restStart)
+          cash[k] = (cash[k] || 0) + restBedrag
         }
       })
 
