@@ -5,23 +5,18 @@ class CallDetector {
   }
 
   async detect(client) {
-    const actions = []
-    
     try {
-      // 1. Check voor toekomstige geplande calls
-      const upcomingCall = await this.detectUpcomingCall(client)
-      if (upcomingCall) actions.push(upcomingCall)
-      
-      // 2. Check voor ongeplande calls
-      const unscheduledCall = await this.detectUnscheduledCall(client)
-      if (unscheduledCall) actions.push(unscheduledCall)
-      
-      // 3. Check voor pending call requests
-      const pendingRequests = await this.detectPendingRequests(client)
-      if (pendingRequests && pendingRequests.length > 0) {
-        actions.push(...pendingRequests)
-      }
-      
+      const [upcomingCall, unscheduledCall, pendingRequests] = await Promise.all([
+        this.detectUpcomingCall(client),
+        this.detectUnscheduledCall(client),
+        this.detectPendingRequests(client),
+      ])
+
+      const actions = [
+        ...(upcomingCall ? [upcomingCall] : []),
+        ...(unscheduledCall ? [unscheduledCall] : []),
+        ...(pendingRequests || []),
+      ]
       return actions.length > 0 ? actions : null
     } catch (error) {
       console.error('Call detection failed for', client.first_name, ':', error)

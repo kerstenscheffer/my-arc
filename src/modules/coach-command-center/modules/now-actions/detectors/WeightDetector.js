@@ -5,26 +5,18 @@ class WeightDetector {
   }
 
   async detect(client) {
-    const actions = []
-    
     try {
-      // Skip als client geen weight goals heeft
       if (!client.target_weight && !client.current_weight) {
         return null
       }
-      
-      // 1. Check laatste weging
-      const lastWeighIn = await this.detectLastWeighIn(client)
-      if (lastWeighIn) actions.push(lastWeighIn)
-      
-      // 2. Check weight trend als er data is
-      const trendAlert = await this.detectWeightTrend(client)
-      if (trendAlert) actions.push(trendAlert)
-      
-      // 3. Check progress naar goal
-      const goalProgress = await this.detectGoalProgress(client)
-      if (goalProgress) actions.push(goalProgress)
-      
+
+      const [lastWeighIn, trendAlert, goalProgress] = await Promise.all([
+        this.detectLastWeighIn(client),
+        this.detectWeightTrend(client),
+        this.detectGoalProgress(client),
+      ])
+
+      const actions = [lastWeighIn, trendAlert, goalProgress].filter(Boolean)
       return actions.length > 0 ? actions : null
     } catch (error) {
       console.error('Weight detection failed for', client.first_name, ':', error)

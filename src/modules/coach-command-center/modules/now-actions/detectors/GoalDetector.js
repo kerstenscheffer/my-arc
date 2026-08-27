@@ -5,34 +5,24 @@ class GoalDetector {
   }
 
   async detect(client) {
-    const actions = []
-    
     try {
-      // 1. Check of client goals heeft
+      // Early exit: geen actieve goals → geen verdere checks
       const noGoalsAction = await this.detectNoGoals(client)
       if (noGoalsAction) {
-        actions.push(noGoalsAction)
-        return actions // Als geen goals, stop hier
+        return [noGoalsAction]
       }
-      
-      // 2. Check voor goals met deadline issues
-      const deadlineActions = await this.detectDeadlineIssues(client)
-      if (deadlineActions && deadlineActions.length > 0) {
-        actions.push(...deadlineActions)
-      }
-      
-      // 3. Check voor goals zonder recente progress
-      const inactiveGoals = await this.detectInactiveGoals(client)
-      if (inactiveGoals && inactiveGoals.length > 0) {
-        actions.push(...inactiveGoals)
-      }
-      
-      // 4. Check voor goals achter op schema
-      const behindSchedule = await this.detectGoalsBehindSchedule(client)
-      if (behindSchedule && behindSchedule.length > 0) {
-        actions.push(...behindSchedule)
-      }
-      
+
+      const [deadlineActions, inactiveGoals, behindSchedule] = await Promise.all([
+        this.detectDeadlineIssues(client),
+        this.detectInactiveGoals(client),
+        this.detectGoalsBehindSchedule(client),
+      ])
+
+      const actions = [
+        ...(deadlineActions || []),
+        ...(inactiveGoals || []),
+        ...(behindSchedule || []),
+      ]
       return actions.length > 0 ? actions : null
     } catch (error) {
       console.error('Goal detection failed for', client.first_name, ':', error)
@@ -177,23 +167,32 @@ class GoalDetector {
         `)
         .eq('client_id', client.id)
         .eq('status', 'active')
-      
+
       if (!goals || goals.length === 0) return null
-      
+
+      const goalIds = goals.map(g => g.id)
+
+      // Batch-fetch meest recente progress per goal (één query i.p.v. N)
+      const { data: allProgress } = await this.db.supabase
+        .from('goal_progress')
+        .select('goal_id, date')
+        .in('goal_id', goalIds)
+        .order('date', { ascending: false })
+
+      // Maak map: goal_id → meest recente date
+      const latestDateByGoal = {}
+      for (const entry of (allProgress || [])) {
+        if (!latestDateByGoal[entry.goal_id]) {
+          latestDateByGoal[entry.goal_id] = entry.date
+        }
+      }
+
       const inactiveActions = []
-      
+
       for (const goal of goals) {
-        // Check laatste progress entry
-        const { data: lastProgress } = await this.db.supabase
-          .from('goal_progress')
-          .select('date')
-          .eq('goal_id', goal.id)
-          .order('date', { ascending: false })
-          .limit(1)
-          .single()
-        
-        const daysSinceProgress = lastProgress 
-          ? this.getDaysSince(lastProgress.date)
+        const lastDate = latestDateByGoal[goal.id] || null
+        const daysSinceProgress = lastDate
+          ? this.getDaysSince(lastDate)
           : 999
         
         // Voor checkbox goals (dagelijkse tracking)
