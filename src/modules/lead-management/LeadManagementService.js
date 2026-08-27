@@ -2510,6 +2510,18 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
       const monthKey = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
       const startOfMonth = (d, add = 0) => new Date(d.getFullYear(), d.getMonth() + add, 1)
 
+      // De uitbetaalperiode loopt van de 26e t/m de 25e, want op de 25e maak je
+      // het bedrag over. Komt er daarna nog geld binnen, dan hoort dat bij de
+      // VOLGENDE ronde — anders zou je een periode moeten heropenen die je net
+      // hebt afgesloten. Vaste knip; staat los van het moment waarop je
+      // daadwerkelijk op "Betaald" klikt (die regel zit in doelMaand).
+      const UITBETAALDAG = 25
+      const periodeKey = (d) => (
+        d.getDate() > UITBETAALDAG
+          ? monthKey(new Date(d.getFullYear(), d.getMonth() + 1, 1))
+          : monthKey(d)
+      )
+
       // Per maand: BRUTO omzet (van de split-sales) én het bruto partner-aandeel
       // opbouwen (zelfde spreiding als de omzet). De vaste lasten trekken we
       // hierna per maand van de omzet af vóór de split.
@@ -2567,27 +2579,27 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
         const restBedrag = heeftRest ? Math.max(0, s.total - s.reservering) : s.total
         const restStart = heeftRest ? s.restDatum : s.date
 
-        // Order-omzet: volledig in de maand van de sale (zo staat 'ie ook in de
-        // weekstats).
-        orderOmzet[monthKey(s.date)] = (orderOmzet[monthKey(s.date)] || 0) + s.total
+        // Order-omzet in dezelfde periode-indeling (26e t/m 25e), zodat
+        // "verkocht" en "ontvangen" over hetzelfde venster gaan.
+        orderOmzet[periodeKey(s.date)] = (orderOmzet[periodeKey(s.date)] || 0) + s.total
 
         // Aanbetaling komt nu binnen.
         if (heeftRest && s.reservering > 0) {
-          const k = monthKey(s.date)
+          const k = periodeKey(s.date)
           ;(porties[k] = porties[k] || []).push({ omzet: s.reservering, share, datum: s.date, naam: s.naam, soort: 'Reservering' })
         }
         if (restBedrag <= 0) return
 
         const delen = (s.type === 'monthly' && s.months > 1)
           ? Array.from({ length: s.months }, (_, i) => ({
-              k: monthKey(startOfMonth(restStart, i)),
+              k: periodeKey(new Date(restStart.getFullYear(), restStart.getMonth() + i, restStart.getDate())),
               omzet: restBedrag / s.months,
               // Datum van díe termijn — bepaalt of 'ie nog vóór een afgeronde
               // uitbetaling viel.
               datum: new Date(restStart.getFullYear(), restStart.getMonth() + i, restStart.getDate()),
               soort: `Termijn ${i + 1} van ${s.months}`,
             }))
-          : [{ k: monthKey(restStart), omzet: restBedrag, datum: restStart, soort: heeftRest ? 'Restbetaling' : 'Vooruitbetaald' }]
+          : [{ k: periodeKey(restStart), omzet: restBedrag, datum: restStart, soort: heeftRest ? 'Restbetaling' : 'Vooruitbetaald' }]
 
         delen.forEach(({ k, omzet, datum, soort }) => {
           ;(porties[k] = porties[k] || []).push({ omzet, share, datum, naam: s.naam, soort })
@@ -2605,14 +2617,30 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
       // Bij een sale ná een afgeronde uitbetaling lopen die uiteen: verdiend in
       // augustus, uit te betalen in september. "Jij houdt" moet op `earned`
       // rekenen — anders lijkt het doorgeschoven bedrag jouw winst.
-      // Ontvangen omzet per maand = de som van de porties die die maand binnenkomen.
+      // Elke portie krijgt hier zijn DEFINITIEVE periode: eerst de vaste knip op
+      // de 25e (zit al in periodeKey), daarna de afvink-regel. Komt geld binnen
+      // nadat je die periode hebt afgerekend, dan hoort het er in z'n geheel
+      // niet meer bij — niet alleen de uitbetaling, ook de omzet zelf. Anders
+      // zie je "te verdelen" oplopen in een periode die je al hebt afgesloten.
+      const verschoven = []   // wat er is doorgeschoven, voor uitleg in de UI
+      const definitief = {}
+      Object.keys(porties).forEach(k => {
+        porties[k].forEach(p => {
+          const naar = doelMaand(k, p.datum)
+          ;(definitief[naar] = definitief[naar] || []).push(p)
+          if (naar !== k) verschoven.push({ van: k, naar, bedrag: Math.round(p.omzet * 100) / 100, naam: p.naam })
+        })
+      })
+      Object.keys(porties).forEach(k => { delete porties[k] })
+      Object.keys(definitief).forEach(k => { porties[k] = definitief[k] })
+
+      // Ontvangen omzet per periode = de som van de porties die er nu in vallen.
       Object.keys(porties).forEach(k => {
         revenue[k] = porties[k].reduce((a, p) => a + p.omzet, 0)
       })
 
       const owed = {}
       const earned = {}
-      const verschoven = []   // wat er is doorgeschoven, voor uitleg in de UI
       Object.keys(porties).forEach(k => {
         const rij = porties[k].slice().sort((a, b) => a.datum - b.datum)
         let restLasten = FIXED
@@ -2621,10 +2649,10 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
           restLasten -= aftrek
           const netto = (p.omzet - aftrek) * p.share
           if (netto <= 0) return
+          // Omzet én uitbetaling zitten nu in dezelfde periode, dus deze twee
+          // lopen niet meer uiteen.
           earned[k] = (earned[k] || 0) + netto
-          const naar = doelMaand(k, p.datum)
-          owed[naar] = (owed[naar] || 0) + netto
-          if (naar !== k) verschoven.push({ van: k, naar, bedrag: Math.round(netto * 100) / 100, naam: p.naam })
+          owed[k] = (owed[k] || 0) + netto
         })
       })
 

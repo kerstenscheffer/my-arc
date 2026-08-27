@@ -1139,8 +1139,13 @@ export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, 
 
                     {isOwner && (
                       <>
+                        {/* Periode loopt van de 26e t/m de 25e — zonder dit label
+                            lijkt "deze maand" een kalendermaand. */}
+                        <div style={{ fontSize: '0.85rem', fontWeight: 700, color: 'rgba(255,255,255,0.55)', marginBottom: 2 }}>
+                          Periode 26e t/m 25e
+                        </div>
                         <div style={rij}>
-                          <span style={{ fontSize: '0.95rem', fontWeight: 700, color: 'rgba(255,255,255,0.7)' }}>Verkocht deze maand</span>
+                          <span style={{ fontSize: '0.95rem', fontWeight: 700, color: 'rgba(255,255,255,0.7)' }}>Verkocht deze periode</span>
                           <span style={{ fontSize: '1rem', fontWeight: 800, color: 'rgba(255,255,255,0.7)' }}>{eur(curOrders)}</span>
                         </div>
 
@@ -1175,7 +1180,7 @@ export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, 
                           </div>
                         )}
 
-                        <div style={kopje}>Deze maand</div>
+                        <div style={kopje}>Deze periode</div>
                         <div style={{ ...rij, ...lijn }}>
                           <span style={{ fontSize: '0.95rem', fontWeight: 700, color: 'rgba(255,255,255,0.7)' }}>{partnerName} verdient</span>
                           <span style={{ fontSize: '1.1rem', fontWeight: 900, color: '#fff' }}>{eur(partnerNow)}</span>
