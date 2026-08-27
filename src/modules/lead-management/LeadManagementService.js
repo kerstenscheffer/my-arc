@@ -2465,7 +2465,7 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
       const [{ data: saleRows }, { data: paidRows }] = await Promise.all([
         this.db.supabase
           .from('lead_movements')
-          .select('order_value, payment_type, duration_months, moved_at, partner_share_pct')
+          .select('order_value, payment_type, duration_months, moved_at, partner_share_pct, lead_name')
           .not('order_value', 'is', null)
           .not('partner_share_pct', 'is', null)
           .is('reverted_at', null),
@@ -2482,6 +2482,7 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
         months: Math.max(1, Number(r.duration_months) || 1),
         pct: Number(r.partner_share_pct) || 0,
         date: new Date(r.moved_at),
+        naam: r.lead_name || null,
       })).filter(s => s.total > 0 && s.pct > 0 && !isNaN(s.date?.getTime?.()))
 
       const monthKey = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
