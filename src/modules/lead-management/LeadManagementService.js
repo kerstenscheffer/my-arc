@@ -2485,7 +2485,7 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
       const [{ data: saleRows }, { data: paidRows }] = await Promise.all([
         this.db.supabase
           .from('lead_movements')
-          .select('order_value, payment_type, duration_months, moved_at, partner_share_pct, lead_name')
+          .select('order_value, payment_type, duration_months, moved_at, partner_share_pct, lead_name, is_reservation, reservation_amount, payment_due_date')
           .not('order_value', 'is', null)
           .not('partner_share_pct', 'is', null)
           .is('reverted_at', null),
@@ -2503,6 +2503,8 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
         pct: Number(r.partner_share_pct) || 0,
         date: new Date(r.moved_at),
         naam: r.lead_name || null,
+        reservering: r.is_reservation ? Math.max(0, Number(r.reservation_amount) || 0) : 0,
+        restDatum: (r.is_reservation && r.payment_due_date) ? new Date(r.payment_due_date) : null,
       })).filter(s => s.total > 0 && s.pct > 0 && !isNaN(s.date?.getTime?.()))
 
       const monthKey = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
@@ -2511,17 +2513,8 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
       // Per maand: BRUTO omzet (van de split-sales) én het bruto partner-aandeel
       // opbouwen (zelfde spreiding als de omzet). De vaste lasten trekken we
       // hierna per maand van de omzet af vóór de split.
+      // Placeholder; wordt hieronder gevuld uit `porties` (ontvangen omzet).
       const revenue = {}
-      sales.forEach(s => {
-        if (s.type === 'monthly' && s.months > 1) {
-          const perRev = s.total / s.months
-          for (let i = 0; i < s.months; i++) {
-            revenue[monthKey(startOfMonth(s.date, i))] = (revenue[monthKey(startOfMonth(s.date, i))] || 0) + perRev
-          }
-        } else {
-          revenue[monthKey(s.date)] = (revenue[monthKey(s.date)] || 0) + s.total
-        }
-      })
 
       // Al uitbetaald per maand. Eerst ophalen, want de betaaldatum bepaalt
       // hieronder of een late sale nog in die maand valt of doorschuift.
@@ -2559,14 +2552,44 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
       }
 
       // Alle omzet-porties per maand, op volgorde van binnenkomst.
+      // KERN: de partner wordt betaald over geld dat BINNENKOMT, niet over een
+      // order die nog voldaan moet worden. Een reservering van €50 op een order
+      // van €497 levert deze maand €50 op; de €447 telt pas in de maand van de
+      // afgesproken betaaldatum. Zelfde spreiding als get_payment_schedule.
+      //
+      // `orderOmzet` blijft apart bijgehouden voor de weergave "omzet uit orders"
+      // — dat is een ander getal en de UI toont ze naast elkaar.
       const porties = {}
+      const orderOmzet = {}
       sales.forEach(s => {
         const share = s.pct / 100
+        const heeftRest = s.restDatum && !isNaN(s.restDatum.getTime())
+        const restBedrag = heeftRest ? Math.max(0, s.total - s.reservering) : s.total
+        const restStart = heeftRest ? s.restDatum : s.date
+
+        // Order-omzet: volledig in de maand van de sale (zo staat 'ie ook in de
+        // weekstats).
+        orderOmzet[monthKey(s.date)] = (orderOmzet[monthKey(s.date)] || 0) + s.total
+
+        // Aanbetaling komt nu binnen.
+        if (heeftRest && s.reservering > 0) {
+          const k = monthKey(s.date)
+          ;(porties[k] = porties[k] || []).push({ omzet: s.reservering, share, datum: s.date, naam: s.naam })
+        }
+        if (restBedrag <= 0) return
+
         const delen = (s.type === 'monthly' && s.months > 1)
-          ? Array.from({ length: s.months }, (_, i) => ({ k: monthKey(startOfMonth(s.date, i)), omzet: s.total / s.months }))
-          : [{ k: monthKey(s.date), omzet: s.total }]
-        delen.forEach(({ k, omzet }) => {
-          ;(porties[k] = porties[k] || []).push({ omzet, share, datum: s.date, naam: s.naam })
+          ? Array.from({ length: s.months }, (_, i) => ({
+              k: monthKey(startOfMonth(restStart, i)),
+              omzet: restBedrag / s.months,
+              // Datum van díe termijn — bepaalt of 'ie nog vóór een afgeronde
+              // uitbetaling viel.
+              datum: new Date(restStart.getFullYear(), restStart.getMonth() + i, restStart.getDate()),
+            }))
+          : [{ k: monthKey(restStart), omzet: restBedrag, datum: restStart }]
+
+        delen.forEach(({ k, omzet, datum }) => {
+          ;(porties[k] = porties[k] || []).push({ omzet, share, datum, naam: s.naam })
         })
       })
 
@@ -2575,7 +2598,19 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
       // als eerste binnenkomt. Deed je dat evenredig over de hele maand, dan
       // zou een sale ná de uitbetaling alsnog een deel van al betaalde lasten
       // meekrijgen — en klopte het bedrag dat je al overmaakte niet meer.
+      // Twee verschillende getallen, en ze moeten uit elkaar gehouden worden:
+      //   earned = het aandeel dat de partner VERDIENT aan de omzet van die maand
+      //   owed   = wat er in die maand UITBETAALD moet worden
+      // Bij een sale ná een afgeronde uitbetaling lopen die uiteen: verdiend in
+      // augustus, uit te betalen in september. "Jij houdt" moet op `earned`
+      // rekenen — anders lijkt het doorgeschoven bedrag jouw winst.
+      // Ontvangen omzet per maand = de som van de porties die die maand binnenkomen.
+      Object.keys(porties).forEach(k => {
+        revenue[k] = porties[k].reduce((a, p) => a + p.omzet, 0)
+      })
+
       const owed = {}
+      const earned = {}
       const verschoven = []   // wat er is doorgeschoven, voor uitleg in de UI
       Object.keys(porties).forEach(k => {
         const rij = porties[k].slice().sort((a, b) => a.datum - b.datum)
@@ -2585,6 +2620,7 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
           restLasten -= aftrek
           const netto = (p.omzet - aftrek) * p.share
           if (netto <= 0) return
+          earned[k] = (earned[k] || 0) + netto
           const naar = doelMaand(k, p.datum)
           owed[naar] = (owed[naar] || 0) + netto
           if (naar !== k) verschoven.push({ van: k, naar, bedrag: Math.round(netto * 100) / 100, naam: p.naam })
@@ -2601,18 +2637,21 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
         const paidM = Math.round((paid[k] || 0) * 100) / 100
         const outstanding = Math.round((owedM - paidM) * 100) / 100
         // Alleen maanden met iets te verdelen tonen (owed > 0 of al betaald).
-        if (owedM <= 0 && paidM <= 0) continue
+        if (owedM <= 0 && paidM <= 0 && (earned[k] || 0) <= 0) continue
         if (i <= 0) totalOutstanding += Math.max(0, outstanding)
         const revM = Math.round((revenue[k] || 0) * 100) / 100
         months.push({
           key: k,
           label: d.toLocaleDateString('nl-NL', { month: 'long', year: 'numeric' }),
           owed: owedM,
+          // Verdiend aan de omzet van DEZE maand — los van wanneer het betaald wordt.
+          earned: Math.round((earned[k] || 0) * 100) / 100,
           paid: paidM,
           outstanding,
           settled: outstanding <= 0.005 && owedM > 0,
           paidAt: paidAt[k] || null,
-          revenue: revM,                                       // bruto omzet die maand
+          revenue: revM,                                       // ONTVANGEN omzet die maand
+          orderRevenue: Math.round((orderOmzet[k] || 0) * 100) / 100, // omzet uit orders die maand
           fixedCosts: revM > 0 ? Math.min(FIXED, revM) : 0,    // afgetrokken vaste lasten
           netRevenue: Math.max(0, Math.round((revM - FIXED) * 100) / 100), // te verdelen
           isPast: i < 0,

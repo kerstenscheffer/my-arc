@@ -1057,10 +1057,21 @@ export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, 
                 // "Jij houdt" = (omzet − vaste lasten) − partner-aandeel. We gebruiken
                 // de netto-omzet die per maand al is uitgerekend in de service.
                 const cur = pos.find(m => m.isCurrent)
-                const curRev = cur ? (cur.revenue || 0) : 0
+                const curRev = cur ? (cur.revenue || 0) : 0        // ontvangen deze maand
+                const curOrders = cur ? (cur.orderRevenue || 0) : 0 // verkocht deze maand
                 const curNet = cur ? (cur.netRevenue || 0) : 0
-                const partnerNow = cur ? cur.owed : 0
+                // VERDIEND deze maand, niet "uit te betalen deze maand". Bij een
+                // sale ná een afgeronde uitbetaling schuift de uitbetaling door
+                // naar volgende maand; zou "Jij houdt" op dat lagere bedrag
+                // rekenen, dan telde het doorgeschoven deel als jouw winst.
+                const partnerNow = cur ? (cur.earned ?? cur.owed) : 0
                 const youKeepNow = Math.max(0, curNet - partnerNow)
+                // Wat er volgende maand naar de partner gaat — inclusief alles
+                // wat vanuit deze maand is doorgeschoven.
+                const nextIdx = pos.findIndex(m => m.isCurrent)
+                const next = nextIdx >= 0 ? pos[nextIdx + 1] : null
+                const partnerNext = next ? (next.owed || 0) : 0
+                const nextLabel = next ? cap(next.label.split(' ')[0]) : 'volgende maand'
                 // Totaal dat de partner dit jaar toekomt (alle getoonde maanden).
                 const partnerTotalAll = pos.reduce((a, m) => a + (m.owed || 0), 0)
                 // Kijker-afhankelijk: de owner ziet "Marcel ontvangt / jij houdt"
@@ -1068,13 +1079,15 @@ export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, 
                 // alleen-lezen status.
                 const blockName = isOwner ? partnerName : 'Jij'
                 const summary = isOwner ? [
-                  { label: `${partnerName} ontvangt`, sub: 'deze maand', value: eur(partnerNow), color: '#FFD700' },
+                  { label: `${partnerName} verdient`, sub: 'deze maand', value: eur(partnerNow), color: '#FFD700' },
                   { label: 'Jij houdt', sub: 'deze maand', value: eur(youKeepNow), color: '#22c55e' },
                   { label: 'Over te maken', sub: 'nu openstaand', value: eur(totalOut), color: totalOut > 0 ? '#f59e0b' : '#22c55e' },
+                  { label: `Naar ${partnerName}`, sub: nextLabel, value: eur(partnerNext), color: '#06b6d4' },
                 ] : [
-                  { label: 'Jij ontvangt', sub: 'deze maand', value: eur(partnerNow), color: '#FFD700' },
-                  { label: 'Omzet', sub: 'deze maand', value: eur(curRev), color: '#22c55e' },
+                  { label: 'Jij verdient', sub: 'deze maand', value: eur(partnerNow), color: '#FFD700' },
+                  { label: 'Ontvangen', sub: 'deze maand', value: eur(curRev), color: '#22c55e' },
                   { label: 'Nog te ontvangen', sub: 'openstaand', value: eur(totalOut), color: totalOut > 0 ? '#f59e0b' : '#22c55e' },
+                  { label: 'Jij ontvangt', sub: nextLabel, value: eur(partnerNext), color: '#06b6d4' },
                 ]
                 const verschovenRegel = verschoven.length > 0 ? (
                   <div style={{
@@ -1098,19 +1111,38 @@ export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, 
                 return (
                   <>
                     {/* Vaste lasten-uitleg: eerst eraf, dan verdelen. */}
-                    {isOwner && fixedCosts > 0 && (
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: '0.8rem', padding: '0.55rem 0.75rem', borderRadius: 10, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)' }}>
-                        <span style={{ fontSize: '0.66rem', color: 'rgba(255,255,255,0.55)' }}>
-                          Deze maand: omzet <b style={{ color: '#fff' }}>{eur(curRev)}</b> − vaste lasten <b style={{ color: '#ef4444' }}>{eur(fixedCosts)}</b> = <b style={{ color: '#22c55e' }}>{eur(curNet)}</b> te verdelen
-                        </span>
+                    {/* Twee verschillende omzetten, en het verschil bepaalt wanneer
+                        de partner betaald wordt. Verkocht = de order. Ontvangen =
+                        wat er die maand daadwerkelijk binnenkwam (aanbetalingen en
+                        termijnen). Alleen over het ONTVANGEN deel wordt verdeeld. */}
+                    {isOwner && (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: '0.8rem', padding: '0.65rem 0.75rem', borderRadius: 10, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.7rem' }}>
+                          <span style={{ color: 'rgba(255,255,255,0.5)' }}>Verkocht deze maand (orders)</span>
+                          <b style={{ color: 'rgba(255,255,255,0.75)' }}>{eur(curOrders)}</b>
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.7rem' }}>
+                          <span style={{ color: '#fff', fontWeight: 700 }}>Ontvangen deze maand</span>
+                          <b style={{ color: '#fff' }}>{eur(curRev)}</b>
+                        </div>
+                        {fixedCosts > 0 && (
+                          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.7rem', paddingTop: 5, borderTop: '1px dashed rgba(255,255,255,0.1)' }}>
+                            <span style={{ color: 'rgba(255,255,255,0.5)' }}>− vaste lasten {eur(fixedCosts)} = te verdelen</span>
+                            <b style={{ color: '#22c55e' }}>{eur(curNet)}</b>
+                          </div>
+                        )}
+                        <div style={{ fontSize: '0.62rem', color: 'rgba(255,255,255,0.35)', lineHeight: 1.4 }}>
+                          Er wordt verdeeld over wat er binnenkomt, niet over wat er verkocht is —
+                          een reservering telt pas mee zodra de rest betaald wordt.
+                        </div>
                       </div>
                     )}
                     {verschovenRegel}
 
                     {/* Samenvatting deze maand: wie krijgt wat */}
-                    <div style={{ display: 'flex', gap: 8, marginBottom: '1.1rem' }}>
+                    <div style={{ display: 'flex', gap: 8, marginBottom: '1.1rem', flexWrap: 'wrap' }}>
                       {summary.map(c => (
-                        <div key={c.label} style={{ flex: 1, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 12, padding: '0.7rem 0.5rem', textAlign: 'center' }}>
+                        <div key={c.label} style={{ flex: '1 1 44%', minWidth: 0, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 12, padding: '0.7rem 0.5rem', textAlign: 'center' }}>
                           <div style={{ fontSize: isMobile ? '1rem' : '1.15rem', fontWeight: 900, color: c.color, lineHeight: 1.1 }}>{c.value}</div>
                           <div style={{ fontSize: '0.58rem', fontWeight: 800, letterSpacing: '0.03em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.45)', marginTop: 4 }}>{c.label}</div>
                           <div style={{ fontSize: '0.54rem', color: 'rgba(255,255,255,0.3)', marginTop: 2 }}>{c.sub}</div>
