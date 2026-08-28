@@ -1057,10 +1057,10 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
         staleSectionIds.has(lead.current_section_id)
       )
 
-      let movedCount = 0
       const now = new Date()
+      const pendingMoves = []
 
-      // Process NORMAL leads
+      // Process NORMAL leads — collect all moves, then run in parallel
       for (const lead of normalLeads) {
         const lastActivity = lead.last_activity ? new Date(lead.last_activity) : null
 
@@ -1080,15 +1080,13 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
             ? staleSections.followupStil
             : staleSections[targetDays]
 
-          if (targetSection) {
-            if (lead.current_section_id === targetSection.id) continue
-            const moveResult = await this.moveToStaleSection(lead, targetSection, coachId, false)
-            if (moveResult) movedCount++
+          if (targetSection && lead.current_section_id !== targetSection.id) {
+            pendingMoves.push(this.moveToStaleSection(lead, targetSection, coachId, false))
           }
         }
       }
 
-      // Process STALE leads for escalation
+      // Process STALE leads for escalation — collect all moves, then run in parallel
       for (const lead of staleLeads) {
         const lastActivity = lead.last_activity ? new Date(lead.last_activity) : new Date(lead.created_at)
         const daysSinceActivity = Math.floor((now - lastActivity) / (1000 * 60 * 60 * 24))
@@ -1100,8 +1098,7 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
         // escalatie, anders blokkeert de "zelfde sectie"-check de verplaatsing.
         if (targetDays >= 3 && (lead.followup_count || 0) >= 1 && staleSections.followupStil
             && lead.current_section_id !== staleSections.followupStil.id) {
-          const moveResult = await this.moveToStaleSection(lead, staleSections.followupStil, coachId, true)
-          if (moveResult) movedCount++
+          pendingMoves.push(this.moveToStaleSection(lead, staleSections.followupStil, coachId, true))
           continue
         }
 
@@ -1119,13 +1116,15 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
         }
 
         if (targetDays > currentStaleLevel) {
-          const moveResult = await this.moveToStaleSection(lead, targetSection, coachId, true)
-          if (moveResult) movedCount++
+          pendingMoves.push(this.moveToStaleSection(lead, targetSection, coachId, true))
         }
       }
-      
-      return { 
-        moved: movedCount, 
+
+      const moveResults = await Promise.all(pendingMoves)
+      const movedCount = moveResults.filter(Boolean).length
+
+      return {
+        moved: movedCount,
         checked: normalLeads.length + staleLeads.length,
         staleSectionsFound: staleSectionCount
       }

@@ -276,17 +276,12 @@ export default class CheckinService {
       if (clientsError) throw clientsError
       if (!clients || clients.length === 0) return []
 
-      const clientsWithoutCheckin = []
+      // Parallelliseer: 1 query per client tegelijk i.p.v. sequentieel
+      const hasCheckinFlags = await Promise.all(
+        clients.map(client => this.hasCheckinSinceLastFriday(client.id))
+      )
 
-      for (const client of clients) {
-        // Vrijdag-cyclus: consistent met de client-form/banner/popup.
-        const hasCheckin = await this.hasCheckinSinceLastFriday(client.id)
-        if (!hasCheckin) {
-          clientsWithoutCheckin.push(client)
-        }
-      }
-
-      return clientsWithoutCheckin
+      return clients.filter((_, i) => !hasCheckinFlags[i])
     } catch (error) {
       console.error('❌ Get clients without check-in failed:', error)
       return []
