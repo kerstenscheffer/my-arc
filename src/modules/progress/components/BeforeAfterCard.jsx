@@ -42,12 +42,25 @@ function drawCover(ctx, img, dx, dy, dw, dh) {
   ctx.drawImage(img, sx, sy, sw, sh, dx, dy, dw, dh)
 }
 
-const isFront = (p) => {
-  const s = (p.metadata?.subtype || p.photo_type || '').toLowerCase()
-  return s === 'front' || s === 'voor' || s.includes('front') || s.includes('voor')
+// De tabel bevat 'front', 'side', 'back', 'pump' en incidenteel Nederlandse
+// varianten ('voor', 'zij'). Eén matcher voor alle hoeken.
+const HOEK_WOORDEN = {
+  front: ['front', 'voor'],
+  side:  ['side', 'zij'],
+  back:  ['back', 'achter', 'rug'],
 }
+const hoekVan = (p) => (p.metadata?.subtype || p.photo_type || '').toLowerCase()
+const isHoek = (p, hoek) => {
+  const s = hoekVan(p)
+  return (HOEK_WOORDEN[hoek] || []).some(w => s === w || s.includes(w))
+}
+const isFront = (p) => isHoek(p, 'front')
 
-export default function BeforeAfterCard({ client, db, isMobile, bare = false, fallbackUrl = null }) {
+// `hoek` dwingt één specifieke opname-hoek af ('front' | 'side' | 'back') in
+// plaats van "voorkant, anders de eerste groep met twee foto's". `fotos` laat
+// de aanroeper een al opgehaalde lijst meegeven, zodat drie kaarten naast
+// elkaar niet drie keer dezelfde query doen.
+export default function BeforeAfterCard({ client, db, isMobile, bare = false, fallbackUrl = null, hoek = null, fotos = null, bijschrift = null }) {
   const canvasRef = useRef(null)
   const [status, setStatus] = useState('loading') // loading | ready | empty | error
   const [pair, setPair] = useState(null)
@@ -55,15 +68,31 @@ export default function BeforeAfterCard({ client, db, isMobile, bare = false, fa
   useEffect(() => {
     let cancelled = false
     ;(async () => {
-      if (!client?.id || !db?.supabase) return
+      if (!fotos && (!client?.id || !db?.supabase)) return
       setStatus('loading')
       try {
-        const { data } = await db.supabase
-          .from('ch8_progress_photos')
-          .select('id, photo_url, photo_type, photo_date, metadata')
-          .eq('client_id', client.id)
-          .order('photo_date', { ascending: true })
-        const all = (data || []).filter(p => p.photo_url)
+        let data = fotos
+        if (!data) {
+          const res = await db.supabase
+            .from('ch8_progress_photos')
+            .select('id, photo_url, photo_type, photo_date, metadata')
+            .eq('client_id', client.id)
+            .order('photo_date', { ascending: true })
+          data = res.data
+        }
+        const all = (data || [])
+          .filter(p => p.photo_url)
+          .sort((a, b) => new Date(a.photo_date) - new Date(b.photo_date))
+
+        // Vaste hoek: alleen die hoek, geen terugval op een andere. Anders zou
+        // de 'Achter'-kolom stiekem voorkant-foto's kunnen tonen.
+        if (hoek) {
+          const eigen = all.filter(p => isHoek(p, hoek))
+          if (eigen.length < 2) { if (!cancelled) setStatus('empty'); return }
+          if (!cancelled) setPair({ first: eigen[0], last: eigen[eigen.length - 1] })
+          return
+        }
+
         const front = all.filter(isFront)
         let use
         if (front.length >= 2) {
@@ -83,7 +112,7 @@ export default function BeforeAfterCard({ client, db, isMobile, bare = false, fa
       } catch (e) { console.error('BeforeAfter laden mislukt:', e); if (!cancelled) setStatus('error') }
     })()
     return () => { cancelled = true }
-  }, [client?.id, db])
+  }, [client?.id, db, hoek, fotos])
 
   useEffect(() => {
     if (!pair) return
@@ -146,7 +175,7 @@ export default function BeforeAfterCard({ client, db, isMobile, bare = false, fa
           <img src={OVERLAY_SRC} alt="" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', pointerEvents: 'none' }} />
           {status === 'empty' && (
             <div style={{ position: 'absolute', top: 10, left: 10, right: 10, textAlign: 'center', fontSize: 12, fontWeight: 700, color: 'rgba(255,255,255,0.85)', textShadow: '0 1px 3px rgba(0,0,0,0.8)' }}>
-              Nog geen before/after — upload 2 voorkant-foto's
+              {hoek ? 'Nog geen 2 foto\'s' : "Nog geen before/after — upload 2 voorkant-foto's"}
             </div>
           )}
         </>
@@ -159,9 +188,16 @@ export default function BeforeAfterCard({ client, db, isMobile, bare = false, fa
       )}
 
       {status === 'ready' && (
-        <button onClick={download} title="Download" style={{ position: 'absolute', top: 8, right: 8, width: 38, height: 38, borderRadius: 10, background: '#FFD700', color: '#000', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 12px rgba(0,0,0,0.4)', touchAction: 'manipulation' }}>
+        <button onClick={download} title="Download" style={{ position: 'absolute', top: 8, right: 8, width: 38, height: 38, borderRadius: 10, background: '#fff', color: '#000', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 12px rgba(0,0,0,0.4)', touchAction: 'manipulation' }}>
           <Download size={16} />
         </button>
+      )}
+      {bijschrift && (
+        <div style={{
+          position: 'absolute', top: 6, left: 8, zIndex: 2,
+          fontSize: '0.78rem', fontWeight: 900, color: '#fff',
+          textShadow: '0 1px 4px rgba(0,0,0,0.9)', pointerEvents: 'none',
+        }}>{bijschrift}</div>
       )}
       <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
     </div>
@@ -170,7 +206,7 @@ export default function BeforeAfterCard({ client, db, isMobile, bare = false, fa
   if (bare) return canvasArea
 
   return (
-    <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,215,0,0.2)', borderRadius: 16, padding: isMobile ? 12 : 16, marginBottom: 16 }}>
+    <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 16, padding: isMobile ? 12 : 16, marginBottom: 16 }}>
       <div style={{ fontSize: 15, fontWeight: 800, color: '#fff', marginBottom: 12 }}>Jouw transformatie</div>
       {canvasArea}
     </div>

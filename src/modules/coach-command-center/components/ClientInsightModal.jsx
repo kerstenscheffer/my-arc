@@ -142,8 +142,6 @@ export default function ClientInsightModal({ isOpen, onClose, client, isMobile, 
       <WeightColumn
         client={effectiveClient} weightData={weightData} circumData={circumData}
         photos={photos} coachingPlan={effectiveClient.coachingPlan} isMobile={klein}
-        onPhotoClick={(idx) => { setSelectedPhotoIndex(idx); setPhotoZoom(true) }}
-        onDownloadPhoto={(idx) => downloadPhoto(photos[idx], idx)}
         onOpenGallery={() => setShowGallery(true)}
       />
     )

@@ -241,9 +241,10 @@ function BodyFatTargetCalculator({ client, db, onClientUpdate, isMobile }) {
   const [currentBfDraft, setCurrentBfDraft] = useState(null)
   const [targetBfDraft, setTargetBfDraft] = useState(null)
   const [busy, setBusy] = useState(false)
-  const [expanded, setExpanded] = useState(
-    !Number.isFinite(parseFloat(client?.target_body_fat))
-  )
+  // Standaard dicht. Stond open zodra er nog geen doel-BF% bekend was, maar
+  // dat is bij de meeste klanten zo — dan is dit het eerste dat je ziet in een
+  // tab waar je meestal voor de macro's komt.
+  const [expanded, setExpanded] = useState(false)
 
   React.useEffect(() => {
     if (!db?.supabase || !client?.id) return
@@ -901,43 +902,42 @@ function MacroRulesBlock({ client, db, onClientUpdate, isMobile }) {
   // Dit is fors leesbaarder dan alles op één smalle regel proppen.
   const factorCard = ({ label, checked, onCheck, detail, kcalText, kcalColor, dimmed, disabled, missingHint }) => (
     <div style={{
-      padding: isMobile ? '0.45rem 0.75rem 0.55rem' : '0.55rem 1rem 0.65rem',
+      padding: isMobile ? '0.5rem 0.75rem' : '0.55rem 1rem',
       borderTop: `1px solid ${C.borderItem}`,
-      opacity: disabled ? 0.55 : 1,
+      opacity: disabled ? 0.5 : 1,
     }}>
-      <div style={{
-        display: 'flex', alignItems: 'center', gap: 8,
-      }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
         <input
           type="checkbox" checked={checked} disabled={disabled}
           onChange={(e) => onCheck(e.target.checked)}
           style={{
-            width: 14, height: 14, accentColor: C.gold,
+            width: 15, height: 15, accentColor: '#fff',
             cursor: disabled ? 'not-allowed' : 'pointer', flexShrink: 0,
           }}
         />
         <span style={{
-          flex: 1,
-          fontSize: '0.75rem', color: '#fff',
-          fontWeight: 700, letterSpacing: '-0.005em',
+          flex: 1, minWidth: 0,
+          fontSize: '0.85rem', color: '#fff',
+          fontWeight: 900, letterSpacing: '-0.01em',
         }}>
           {label}
         </span>
         <span style={{
-          fontSize: '0.8rem', fontWeight: 800,
-          color: dimmed ? C.text25 : (kcalColor || C.gold),
+          fontSize: '0.92rem', fontWeight: 900,
+          color: dimmed ? 'rgba(255,255,255,0.35)' : (kcalColor || '#fff'),
+          letterSpacing: '-0.01em', whiteSpace: 'nowrap',
         }}>
           {kcalText}
         </span>
       </div>
       {(detail || missingHint) && (
         <div style={{
-          marginTop: 5, marginLeft: 22,
-          display: 'flex', alignItems: 'center', gap: 6,
-          fontSize: '0.72rem', color: C.text50,
+          marginTop: 6, marginLeft: 25,
+          display: 'flex', alignItems: 'center', gap: 7, flexWrap: 'wrap',
+          fontSize: '0.78rem', fontWeight: 700, color: 'rgba(255,255,255,0.6)',
         }}>
           {missingHint ? (
-            <span style={{ color: '#f59e0b', fontStyle: 'italic' }}>{missingHint}</span>
+            <span style={{ color: '#f59e0b' }}>{missingHint}</span>
           ) : detail}
         </div>
       )}
@@ -951,12 +951,12 @@ function MacroRulesBlock({ client, db, onClientUpdate, isMobile }) {
       onChange={(e) => onChange(e.target.value)}
       style={{
         background: 'rgba(255,255,255,0.06)',
-        border: `1px solid ${C.gold}40`,
-        borderRadius: 5, color: '#fff',
-        fontSize: '0.72rem', fontWeight: 700,
-        padding: '0.18rem 0.3rem',
+        border: '1px solid rgba(255,255,255,0.15)',
+        borderRadius: 6, color: '#fff',
+        fontSize: '0.78rem', fontWeight: 800, fontFamily: 'inherit',
+        padding: '0.2rem 0.35rem',
         cursor: 'pointer',
-        maxWidth: 130,
+        maxWidth: 150,
       }}
     >
       {options.map(opt => (
@@ -979,14 +979,14 @@ function MacroRulesBlock({ client, db, onClientUpdate, isMobile }) {
         style={{
           width: w, textAlign: 'right',
           background: 'rgba(255,255,255,0.06)',
-          border: `1px solid ${C.gold}40`,
-          borderRadius: 5, color: '#fff',
-          fontSize: '0.72rem', fontWeight: 700,
-          padding: '0.2rem 0.4rem',
+          border: '1px solid rgba(255,255,255,0.15)',
+          borderRadius: 6, color: '#fff',
+          fontSize: '0.8rem', fontWeight: 800, fontFamily: 'inherit',
+          padding: '0.22rem 0.4rem',
         }}
       />
       {suffix && (
-        <span style={{ fontSize: '0.72rem', color: C.text50, fontWeight: 600 }}>
+        <span style={{ fontSize: '0.78rem', color: 'rgba(255,255,255,0.6)', fontWeight: 700 }}>
           {suffix}
         </span>
       )}
@@ -1017,57 +1017,30 @@ function MacroRulesBlock({ client, db, onClientUpdate, isMobile }) {
           width: '100%',
           padding: isMobile ? '0.55rem 0.75rem' : '0.65rem 1rem',
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-          background: 'rgba(255,255,255,0.06)',
+          background: 'none',
           border: 'none', cursor: 'pointer',
-          color: 'inherit',
+          color: 'inherit', fontFamily: 'inherit',
         }}
       >
-        <span style={{ fontSize: isMobile ? '0.64rem' : '0.68rem', color: C.gold, letterSpacing: '-0.01em', fontWeight: 900 }}>
-          Onderhoud · modus {goal}
+        <span style={{ fontSize: '0.95rem', color: '#fff', letterSpacing: '-0.02em', fontWeight: 900 }}>
+          Onderhoud <span style={{ color: 'rgba(255,255,255,0.45)' }}>· {goal}</span>
         </span>
         <span style={{
           display: 'flex', alignItems: 'baseline', gap: 8,
         }}>
           {!showTdeeDetail && (
             <span style={{
-              fontSize: '0.95rem', fontWeight: 900, color: C.gold,
+              fontSize: '1.05rem', fontWeight: 900, color: '#fff',
               letterSpacing: '-0.02em',
             }}>
               {savedTdee != null ? `${savedTdee} kcal` : '—'}
             </span>
           )}
-          <span style={{ fontSize: '0.72rem', color: C.text50, fontWeight: 700, letterSpacing: '0.05em' }}>
+          <span style={{ fontSize: '0.78rem', color: 'rgba(255,255,255,0.5)', fontWeight: 800 }}>
             {showTdeeDetail ? 'Inklappen ▴' : 'Bewerken ▾'}
           </span>
         </span>
       </button>
-
-      {showTdeeDetail && (
-        <div style={{
-          padding: isMobile ? '0 0.75rem 0.4rem' : '0 1rem 0.45rem',
-          display: 'flex', alignItems: 'center', justifyContent: 'flex-end',
-          background: 'rgba(255,255,255,0.04)',
-        }}>
-          <button
-            onClick={handleSaveTdee}
-            disabled={busy != null}
-            style={{
-              display: 'flex', alignItems: 'center', gap: 4,
-              padding: '0.35rem 0.7rem',
-              background: 'rgba(255,255,255,0.14)',
-              border: `1px solid rgba(255,255,255,0.4)`,
-              borderRadius: 5,
-              color: C.gold,
-              fontSize: '0.72rem', fontWeight: 800,
-              cursor: busy ? 'wait' : 'pointer', minHeight: 28,
-              letterSpacing: '0.04em',
-            }}
-          >
-            <RefreshCw size={11} />
-            {busy === 'tdee' ? 'Bezig…' : 'Bereken & opslaan TDEE'}
-          </button>
-        </div>
-      )}
 
       {showTdeeDetail && <>
 
@@ -1106,29 +1079,20 @@ function MacroRulesBlock({ client, db, onClientUpdate, isMobile }) {
           detail: (
             <>
               {inlineInput(trainingDays, (v) => setTrainingDays(parseInt(v) || 0), 'd/wk', 38)}
-              <span style={{ color: C.text25 }}>×</span>
+              <span style={{ color: 'rgba(255,255,255,0.3)' }}>×</span>
               {inlineInput(kcalPerSession, (v) => setKcalPerSession(parseInt(v) || 0), 'kcal/sessie', 52)}
               {hasPlan && (
                 synced ? (
-                  <span style={{
-                    fontSize: '0.72rem', color: C.green, fontWeight: 700,
-                    background: 'rgba(16,185,129,0.1)',
-                    border: '1px solid rgba(16,185,129,0.25)',
-                    padding: '1px 5px', borderRadius: 4,
-                    letterSpacing: '-0.01em',
-                  }}>
+                  <span style={{ fontSize: '0.78rem', color: C.green, fontWeight: 800 }}>
                     uit plan
                   </span>
                 ) : (
                   <button
                     onClick={() => setTrainingDays(planTrainingDays)}
                     style={{
-                      fontSize: '0.72rem', color: C.amber, fontWeight: 700,
-                      background: 'rgba(245,158,11,0.08)',
-                      border: '1px solid rgba(245,158,11,0.3)',
-                      padding: '1px 5px', borderRadius: 4,
-                      letterSpacing: '-0.01em',
-                      cursor: 'pointer',
+                      fontSize: '0.78rem', color: C.amber, fontWeight: 800,
+                      background: 'none', border: 'none', padding: 0,
+                      fontFamily: 'inherit', cursor: 'pointer',
                     }}
                     title={`Plan staat op ${planTrainingDays} d/wk — klik om te syncen`}
                   >
@@ -1232,7 +1196,7 @@ function MacroRulesBlock({ client, db, onClientUpdate, isMobile }) {
                   {/* Onderste regel: min + sessies, ruimere inputs */}
                   <div style={{
                     display: 'flex', alignItems: 'center', gap: 8,
-                    fontSize: '0.75rem', color: C.text50, fontWeight: 600,
+                    fontSize: '0.78rem', color: 'rgba(255,255,255,0.6)', fontWeight: 700,
                   }}>
                     <input
                       type="number" value={min}
@@ -1241,13 +1205,13 @@ function MacroRulesBlock({ client, db, onClientUpdate, isMobile }) {
                       style={{
                         width: 52, textAlign: 'center',
                         background: 'rgba(255,255,255,0.06)',
-                        border: `1px solid ${C.gold}30`, borderRadius: 5,
+                        border: '1px solid rgba(255,255,255,0.15)', borderRadius: 6,
                         color: '#fff', fontSize: '0.85rem', fontWeight: 800,
                         padding: '0.3rem 0.4rem',
                       }}
                     />
                     <span>min/sessie</span>
-                    <span style={{ color: C.text25 }}>×</span>
+                    <span style={{ color: 'rgba(255,255,255,0.3)' }}>×</span>
                     <input
                       type="number" value={sessions}
                       onChange={(e) => update({ sessions: parseInt(e.target.value) || 0 })}
@@ -1255,7 +1219,7 @@ function MacroRulesBlock({ client, db, onClientUpdate, isMobile }) {
                       style={{
                         width: 44, textAlign: 'center',
                         background: 'rgba(255,255,255,0.06)',
-                        border: `1px solid ${C.gold}30`, borderRadius: 5,
+                        border: '1px solid rgba(255,255,255,0.15)', borderRadius: 6,
                         color: '#fff', fontSize: '0.85rem', fontWeight: 800,
                         padding: '0.3rem 0.4rem',
                       }}
@@ -1275,16 +1239,13 @@ function MacroRulesBlock({ client, db, onClientUpdate, isMobile }) {
             if (!includeCardio) setIncludeCardio(true)
           }}
           style={{
-            marginTop: 7, marginLeft: 22,
-            display: 'flex', alignItems: 'center', gap: 4,
-            padding: '0.3rem 0.55rem',
-            background: 'rgba(16,185,129,0.08)',
-            border: `1px dashed rgba(16,185,129,0.35)`,
-            borderRadius: 6,
-            color: C.green,
-            fontSize: '0.72rem', fontWeight: 700,
+            marginTop: 8, marginLeft: 25,
+            display: 'flex', alignItems: 'center', gap: 5,
+            padding: 0,
+            background: 'none', border: 'none',
+            color: '#fff', fontFamily: 'inherit',
+            fontSize: '0.82rem', fontWeight: 900,
             cursor: 'pointer', minHeight: 26,
-            letterSpacing: '0.02em',
           }}
         >
           <Plus size={11} strokeWidth={3} />
@@ -1294,10 +1255,10 @@ function MacroRulesBlock({ client, db, onClientUpdate, isMobile }) {
         {/* Totaal preview onder de lijst */}
         {includeCardio && cardioKcalPerWeek > 0 && (
           <div style={{
-            marginTop: 7, marginLeft: 22,
-            fontSize: '0.72rem', color: C.text25,
+            marginTop: 7, marginLeft: 25,
+            fontSize: '0.78rem', fontWeight: 700, color: 'rgba(255,255,255,0.6)',
           }}>
-            Totaal: {cardioKcalPerWeek} kcal/wk · ÷ 7 = {cardioExtra} kcal/dag
+            {cardioKcalPerWeek} kcal/wk · ÷ 7 = {cardioExtra} kcal/dag
           </div>
         )}
       </div>
@@ -1311,9 +1272,9 @@ function MacroRulesBlock({ client, db, onClientUpdate, isMobile }) {
         detail: logEstimate ? (
           <>
             <span>{logEstimate.days}d data</span>
-            <span style={{ color: C.text25 }}>·</span>
+            <span style={{ color: 'rgba(255,255,255,0.3)' }}>·</span>
             <span>Ø {logEstimate.avgKcal} kcal/d</span>
-            <span style={{ color: C.text25 }}>·</span>
+            <span style={{ color: 'rgba(255,255,255,0.3)' }}>·</span>
             <span>Δ {logEstimate.deltaKg > 0 ? '+' : ''}{logEstimate.deltaKg} kg</span>
           </>
         ) : null,
@@ -1333,7 +1294,7 @@ function MacroRulesBlock({ client, db, onClientUpdate, isMobile }) {
         detail: (
           <>
             {inlineInput(manualTdee, (v) => setManualTdee(parseInt(v) || 0), 'kcal', 70)}
-            <span style={{ color: C.amber, fontStyle: 'italic' }}>
+            <span style={{ color: includeManual ? C.amber : 'rgba(255,255,255,0.5)', fontWeight: 700 }}>
               {includeManual ? 'wint van alles' : 'gebruik als je TDEE al kent'}
             </span>
           </>
@@ -1351,14 +1312,14 @@ function MacroRulesBlock({ client, db, onClientUpdate, isMobile }) {
         display: 'flex', alignItems: 'baseline', justifyContent: 'space-between',
       }}>
         <span style={{
-          fontSize: '0.72rem', color: C.gold, fontWeight: 800,
+          fontSize: '0.88rem', color: '#fff', fontWeight: 900,
           letterSpacing: '-0.01em',
         }}>
           Berekende TDEE
         </span>
         <span style={{
-          fontSize: isMobile ? '1rem' : '1.15rem', fontWeight: 900,
-          color: computedTdee != null ? C.gold : C.text25,
+          fontSize: isMobile ? '1.15rem' : '1.3rem', fontWeight: 900,
+          color: computedTdee != null ? '#fff' : 'rgba(255,255,255,0.35)',
           letterSpacing: '-0.02em',
         }}>
           {computedTdee != null ? `${computedTdee} kcal` : '—'}
@@ -1367,18 +1328,41 @@ function MacroRulesBlock({ client, db, onClientUpdate, isMobile }) {
       {savedTdee != null && (
         <div style={{
           padding: isMobile ? '0.3rem 0.75rem 0.5rem' : '0.35rem 1rem 0.55rem',
-          fontSize: '0.72rem', color: C.text50,
+          fontSize: '0.78rem', fontWeight: 700,
           display: 'flex', alignItems: 'center', gap: 6,
         }}>
-          <span style={{ color: C.text25 }}>Opgeslagen:</span>
-          <span style={{ color: C.text, fontWeight: 700 }}>{savedTdee} kcal</span>
+          <span style={{ color: 'rgba(255,255,255,0.5)' }}>Opgeslagen:</span>
+          <span style={{ color: '#fff', fontWeight: 900 }}>{savedTdee} kcal</span>
           {savedTdee !== computedTdee && computedTdee != null && (
-            <span style={{ color: C.amber, fontStyle: 'italic', marginLeft: 'auto' }}>
-              ≠ berekend
+            <span style={{ color: C.amber, fontWeight: 800, marginLeft: 'auto' }}>
+              wijkt af van berekend
             </span>
           )}
         </div>
       )}
+
+      {/* Bereken & opslaan hoort ónder de instellingen: je stelt eerst de
+          factoren in en bevestigt dan. Stond boven de lijst, dus je moest
+          terug omhoog scrollen om je eigen invoer op te slaan. */}
+      <div style={{ padding: isMobile ? '0.5rem 0.75rem 0.7rem' : '0.6rem 1rem 0.8rem' }}>
+        <button
+          onClick={handleSaveTdee}
+          disabled={busy != null}
+          style={{
+            width: '100%',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+            padding: '0.55rem 0.9rem',
+            background: '#fff', border: 'none', borderRadius: 8,
+            color: '#0a0a0a',
+            fontSize: '0.85rem', fontWeight: 900, fontFamily: 'inherit',
+            cursor: busy ? 'wait' : 'pointer', minHeight: 38,
+            opacity: busy != null ? 0.6 : 1,
+          }}
+        >
+          <RefreshCw size={14} strokeWidth={2.6} />
+          {busy === 'tdee' ? 'Bezig…' : 'Bereken & opslaan onderhoud'}
+        </button>
+      </div>
 
       </>}
 
@@ -1391,12 +1375,12 @@ function MacroRulesBlock({ client, db, onClientUpdate, isMobile }) {
           width: '100%',
           padding: isMobile ? '0.55rem 0.75rem' : '0.65rem 1rem',
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-          background: 'rgba(255,255,255,0.06)',
+          background: 'none',
           border: 'none', borderTop: `1px solid ${C.border}`,
-          cursor: 'pointer', color: 'inherit',
+          cursor: 'pointer', color: 'inherit', fontFamily: 'inherit',
         }}
       >
-        <span style={{ fontSize: isMobile ? '0.64rem' : '0.68rem', color: C.gold, letterSpacing: '-0.01em', fontWeight: 900 }}>
+        <span style={{ fontSize: '0.95rem', color: '#fff', letterSpacing: '-0.02em', fontWeight: 900 }}>
           Macro's
         </span>
         <span style={{
@@ -2036,6 +2020,9 @@ function MacroEditor({ initKcal, initProtein, initCarbs, initFat, isMobile, onRe
 // ════════════════════════════════════
 export default function ClientDataColumn({ client, db, isMobile, onClientUpdate }) {
   const [activeSection, setActiveSection] = useState('profiel')
+  // Tijdlijn, urgentie, motivatie en obstakels komen uit de intake en worden
+  // hier zelden aangepast; ze stonden wel permanent onder de macro's.
+  const [meerDoelVelden, setMeerDoelVelden] = useState(false)
   const [editingMacros, setEditingMacros] = useState(false)
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
@@ -2142,15 +2129,31 @@ export default function ClientDataColumn({ client, db, isMobile, onClientUpdate 
             en projectie naar het traject-einde. Voorheen apart in 'macros'. */}
         <MacroRulesBlock client={client} db={db} onClientUpdate={onClientUpdate} isMobile={isMobile} />
 
-        {/* Overige doel-velden, verder naar onderen — minder vaak nodig. */}
+        {/* Deze twee voeden de rekenaars hierboven, dus die blijven staan.
+            Heette "Wk afval", wat voor een bulker nergens op slaat; het teken
+            hoeft niet te kloppen, de richting komt uit het primaire doel. */}
         <E label="Doel vet %"   value={client.target_body_fat} field="target_body_fat" type="number" suffix="%" />
-        <E label="Tijdlijn"     value={client.goal_timeline}  field="goal_timeline" />
-        <E label="Urgentie"     value={client.goal_urgency}   field="goal_urgency" options={['low', 'moderate', 'high', 'extreme']} />
-        {/* Heette "Wk afval", wat voor een bulker nergens op slaat. Het teken
-            hoeft hier niet te kloppen: de richting komt uit het primaire doel. */}
         <E label="Weekdoel"     value={client.weekly_weight_goal} field="weekly_weight_goal" type="number" suffix=" kg/wk" />
-        <E label="Motivatie"    value={client.motivation}     field="motivation" />
-        <E label="Obstakels"    value={client.biggest_obstacle} field="biggest_obstacle" />
+
+        <button
+          onClick={() => setMeerDoelVelden(v => !v)}
+          style={{
+            width: '100%', padding: isMobile ? '0.55rem 0.85rem' : '0.6rem 1rem',
+            display: 'flex', alignItems: 'center', gap: 6,
+            background: 'none', border: 'none', borderBottom: `1px solid ${C.borderItem}`,
+            color: '#fff', fontFamily: 'inherit',
+            fontSize: '0.82rem', fontWeight: 900, cursor: 'pointer', textAlign: 'left',
+            touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+          }}>
+          {meerDoelVelden ? 'Minder velden ▴' : 'Meer velden ▾'}
+        </button>
+
+        {meerDoelVelden && (<>
+          <E label="Tijdlijn"     value={client.goal_timeline}  field="goal_timeline" />
+          <E label="Urgentie"     value={client.goal_urgency}   field="goal_urgency" options={['low', 'moderate', 'high', 'extreme']} />
+          <E label="Motivatie"    value={client.motivation}     field="motivation" />
+          <E label="Obstakels"    value={client.biggest_obstacle} field="biggest_obstacle" />
+        </>)}
       </>)
 
       case 'levensstijl': return (<>

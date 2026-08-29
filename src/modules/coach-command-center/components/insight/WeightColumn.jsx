@@ -1,16 +1,17 @@
 // ============================================
 // 📁 FILE: src/modules/coach-command-center/components/insight/WeightColumn.jsx
-// Gewicht + Plan vs Werkelijkheid chart + Metingen + Foto's
-// Props: { client, weightData, circumData, photos, coachingPlan, isMobile, onPhotoClick }
+// Gewicht + statistiekbalk + Metingen + before/after per hoek
+// Props: { client, weightData, circumData, photos, coachingPlan, isMobile, onOpenGallery }
 // ============================================
 import React from 'react'
 import { Scale, Target, Ruler, Camera, Download, Maximize2, ChevronDown, ChevronUp } from 'lucide-react'
 import WeightStatsGrid from '../../../weight-tracker/components/WeightStatsGrid'
+import BeforeAfterCard from '../../../progress/components/BeforeAfterCard'
 import { weightGoalColor } from '../../../weight-tracker/utils/weightGoalColor'
 
 const formatDate = (d) => { if (!d) return '-'; const dt = new Date(d); return dt.toLocaleDateString('nl-NL', { day: 'numeric', month: 'short', year: dt.getFullYear() !== new Date().getFullYear() ? 'numeric' : undefined }) }
 
-export default function WeightColumn({ client, weightData, circumData, photos, coachingPlan, isMobile, onPhotoClick, onDownloadPhoto, onOpenGallery }) {
+export default function WeightColumn({ client, weightData, circumData, photos, coachingPlan, isMobile, onOpenGallery }) {
   const history = weightData?.history || []
   // 'dag' = dag-op-dag logs · 'week' = week-op-week gemiddelden + verschil
   const [weightView, setWeightView] = React.useState('dag')
@@ -218,26 +219,37 @@ export default function WeightColumn({ client, weightData, circumData, photos, c
                 )}
               </div>
             </div>
-            <div style={{ display: 'flex', gap: '0.3rem', overflowX: 'auto', WebkitOverflowScrolling: 'touch', paddingBottom: '0.25rem' }}>
-              {photos.slice(0, 6).map((p, idx) => (
-                <div key={p.id} style={{ position: 'relative', width: '52px', height: '52px', borderRadius: '6px', overflow: 'hidden', border: '1px solid rgba(255,255,255,0.06)', flexShrink: 0 }}>
-                  <img src={p.photo_url} alt="" onClick={() => onPhotoClick(idx)} style={{ width: '100%', height: '100%', objectFit: 'cover', cursor: 'pointer', display: 'block' }} />
-                  {/* Download-knopje op de foto-kaart */}
-                  {onDownloadPhoto && (
-                    <button
-                      onClick={(e) => { e.stopPropagation(); onDownloadPhoto(idx) }}
-                      title="Download foto"
-                      style={{ position: 'absolute', bottom: 2, right: 2, width: 20, height: 20, borderRadius: 5, background: 'rgba(0,0,0,0.65)', border: '1px solid rgba(255,255,255,0.5)', color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0, touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}
-                    >
-                      <Download size={11} />
-                    </button>
-                  )}
-                </div>
+            {/* Drie hoeken naast elkaar, elk eerste foto tegen laatste met de
+                MA-overlay — hetzelfde beeld als op de trackingpagina. Stond
+                eerder als strip miniaturen van 52 bij 52 pixels; daar zie je
+                geen verschil op. */}
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(3, 1fr)',
+              gap: isMobile ? '0.3rem' : '0.5rem',
+              // Zonder bovengrens rekken ze mee met het paneel: met één sectie
+              // open werd elk vak ruim 400px. Dit is een preview, geen galerij.
+              maxWidth: isMobile ? '100%' : 520,
+            }}>
+              {[
+                { hoek: 'front', label: 'Voor' },
+                { hoek: 'side',  label: 'Zij' },
+                { hoek: 'back',  label: 'Achter' },
+              ].map(v => (
+                <BeforeAfterCard
+                  key={v.hoek}
+                  client={client}
+                  isMobile={isMobile}
+                  bare
+                  hoek={v.hoek}
+                  bijschrift={v.label}
+                  fotos={photos}
+                />
               ))}
-              {photos.length > 6 && (
-                <div onClick={() => onPhotoClick(6)} style={{ width: '52px', height: '52px', borderRadius: '6px', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.72rem', fontWeight: 700, color: 'rgba(255,255,255,0.8)', flexShrink: 0, cursor: 'pointer' }}>+{photos.length - 6}</div>
-              )}
             </div>
+
+            {/* De losse miniaturen blijven bereikbaar via Overzicht hierboven;
+                een aparte strip eronder zou dezelfde foto's dubbel tonen. */}
           </div>
         )}
         {!history.length && !circumData?.latest && photos.length === 0 && (
