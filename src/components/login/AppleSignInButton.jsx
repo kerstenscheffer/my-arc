@@ -32,7 +32,7 @@ const sha256Hex = async (str) => {
     .join('')
 }
 
-export default function AppleSignInButton({ isClientMode = true, onError }) {
+export default function AppleSignInButton({ onError }) {
   const [loading, setLoading] = useState(false)
 
   // Hide on web — feature only works inside the native iOS app
@@ -63,9 +63,9 @@ export default function AppleSignInButton({ isClientMode = true, onError }) {
       })
       if (error) throw error
 
-      // Match the email flow exactly: persist mode, redirect to root.
-      // The root route refetches the user and routes to ClientDashboard / CoachHub.
-      localStorage.setItem('isClientMode', isClientMode ? 'true' : 'false')
+      // Net als bij de e-mail-inlog: geen portaalvlag zetten. De root-route
+      // haalt de gebruiker opnieuw op en bepaalt via get_my_portal_role() of
+      // dit ClientDashboard of CoachHub wordt.
       window.location.href = '/'
     } catch (err) {
       // User cancelled the Apple sheet → silent

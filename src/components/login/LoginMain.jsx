@@ -7,7 +7,6 @@ import AppleSignInButton from './AppleSignInButton'
 
 const db = DatabaseService
 const passwordReset = PasswordResetService
-const COACH_ACCESS_PASSWORD = 'MYARC2025'
 
 const SLIDES = [
   'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?w=800&q=80',
@@ -27,8 +26,14 @@ export default function LoginMain() {
     return () => clearInterval(timer.current)
   }, [])
 
-  // mode: 'client' (default) | 'coach-verify' | 'coach'
-  const [mode, setMode] = useState('client')
+  // Er is één inlogscherm voor iedereen. Waar je terechtkomt bepaalt de
+  // server na het inloggen: App.jsx roept get_my_portal_role() aan en zet
+  // `isClientMode` op basis daarvan. Het loginscherm hoeft dat niet te weten.
+  //
+  // Er stond hier een tussenstap: knop "Coach toegang" → toegangscode
+  // MYARC2025 → pas dán een coach-inlogformulier. Die code beschermde niets:
+  // hij stond in de frontend-bundel en zette alleen een vlag die App.jsx bij
+  // de eerstvolgende laadbeurt tóch overschreef met het serverantwoord.
 
   // form
   const [email, setEmail] = useState('')
@@ -37,9 +42,6 @@ export default function LoginMain() {
   const [showPw, setShowPw] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
-
-  // coach verify
-  const [coachPw, setCoachPw] = useState('')
 
   // reset
   const [showReset, setShowReset] = useState(false)
@@ -67,7 +69,8 @@ export default function LoginMain() {
     try {
       const result = await db.signIn(email, password)
       if (result?.user) {
-        localStorage.setItem('isClientMode', (mode === 'client').toString())
+        // Bewust geen `isClientMode` meer zetten: dat zette iedereen op
+        // 'klant' en werd daarna alsnog door de rolcheck overschreven.
         if (rememberMe) localStorage.setItem('rememberEmail', email)
         else localStorage.removeItem('rememberEmail')
         window.location.href = '/'
@@ -78,16 +81,6 @@ export default function LoginMain() {
       setError(err.message || 'Er ging iets mis')
     }
     setLoading(false)
-  }
-
-  // ── coach verify ──────────────────────────────────────────────────────────
-  const handleCoachVerify = (e) => {
-    e?.preventDefault()
-    if (coachPw === COACH_ACCESS_PASSWORD) {
-      setCoachPw(''); setError(null); setMode('coach')
-    } else {
-      setError('Onjuiste toegangscode')
-    }
   }
 
   // ── reset ─────────────────────────────────────────────────────────────────
@@ -117,30 +110,7 @@ export default function LoginMain() {
     transition: 'border-color 0.2s',
   }
 
-  // ── COACH VERIFY SCREEN ───────────────────────────────────────────────────
-  if (mode === 'coach-verify') return (
-    <Wrapper slide={slide}>
-      <div style={{ width: '100%', maxWidth: '340px' }}>
-        <button onClick={() => { setMode('client'); setError(null); setCoachPw('') }}
-          style={backBtn}>← Terug</button>
-
-        <div style={labelStyle}>COACH TOEGANG</div>
-        <h1 style={headingStyle}>Verificatie</h1>
-
-        {error && <ErrorBox>{error}</ErrorBox>}
-
-        <form onSubmit={handleCoachVerify} style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-          <input type="password" placeholder="Toegangscode" value={coachPw}
-            onChange={e => setCoachPw(e.target.value)} style={inp} autoFocus
-            onFocus={e => e.target.style.borderColor = '#ffffff'}
-            onBlur={e => e.target.style.borderColor = 'rgba(255,255,255,0.08)'} />
-          <GoldButton type="submit">Verifieer</GoldButton>
-        </form>
-      </div>
-    </Wrapper>
-  )
-
-  // ── MAIN LOGIN (client + coach after verify) ──────────────────────────────
+  // ── INLOGSCHERM — één voor coach én klant ────────────────────────────────
   return (
     <Wrapper slide={slide}>
       <div style={{ width: '100%', maxWidth: '340px' }}>
@@ -154,10 +124,7 @@ export default function LoginMain() {
           />
         </div>
 
-        {/* Mode label */}
-        <div style={labelStyle}>
-          {mode === 'coach' ? 'COACH PORTAL' : 'INLOGGEN'}
-        </div>
+        <div style={labelStyle}>INLOGGEN</div>
         <h1 style={{ ...headingStyle, marginBottom: '1.75rem' }}>Welkom terug</h1>
 
         {error && <ErrorBox>{error}</ErrorBox>}
@@ -228,40 +195,10 @@ export default function LoginMain() {
               </span>
               <div style={{ flex: 1, height: '1px', background: 'rgba(255,255,255,0.06)' }} />
             </div>
-            <AppleSignInButton
-              isClientMode={mode === 'client'}
-              onError={(msg) => setError(msg)}
-            />
+            <AppleSignInButton onError={(msg) => setError(msg)} />
           </div>
         )}
 
-        {/* Coach link — alleen zichtbaar op client mode, klein onderaan */}
-        {mode === 'client' && (
-          <div style={{ textAlign: 'center', marginTop: '2.5rem' }}>
-            <button onClick={() => { setMode('coach-verify'); setError(null) }} style={{
-              background: 'none', border: 'none',
-              color: 'rgba(255,255,255,0.18)',
-              fontSize: '0.68rem', fontWeight: '600',
-              letterSpacing: '0.08em', textTransform: 'uppercase',
-              cursor: 'pointer', padding: '0.5rem 1rem', minHeight: '44px',
-              touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-            }}>
-              Coach toegang
-            </button>
-          </div>
-        )}
-
-        {mode === 'coach' && (
-          <div style={{ textAlign: 'center', marginTop: '1.5rem' }}>
-            <button onClick={() => { setMode('client'); setError(null) }} style={{
-              background: 'none', border: 'none', color: 'rgba(255,255,255,0.2)',
-              fontSize: '0.72rem', cursor: 'pointer', padding: '0.5rem',
-              touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-            }}>
-              ← Terug naar client login
-            </button>
-          </div>
-        )}
       </div>
 
       {/* Password Reset Modal */}
@@ -388,11 +325,4 @@ const labelStyle = {
 const headingStyle = {
   fontSize: '1.75rem', fontWeight: '900', color: '#fff',
   margin: 0, letterSpacing: '-0.02em', lineHeight: 1.1,
-}
-
-const backBtn = {
-  background: 'none', border: 'none', color: 'rgba(255,255,255,0.3)',
-  fontSize: '0.78rem', cursor: 'pointer', padding: '0 0 1.75rem',
-  touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-  display: 'flex', alignItems: 'center', gap: '0.3rem',
 }

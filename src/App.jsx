@@ -140,10 +140,12 @@ function App() {
             .eq('auth_user_id', currentUser.id)
             .limit(1)
             .maybeSingle()
-          if (clientRow) {
-            setIsClientMode(true)
-            localStorage.setItem('isClientMode', 'true')
-          }
+          // Expliciet beide kanten zetten. Bleef dit op de opgeslagen waarde
+          // staan, dan kon een vers coach-account met een oude 'true' in
+          // localStorage alsnog in het klantportaal belanden.
+          const alsKlant = !!clientRow
+          setIsClientMode(alsKlant)
+          localStorage.setItem('isClientMode', alsKlant ? 'true' : 'false')
         }
       }
     } catch (error) {
@@ -439,11 +441,11 @@ function App() {
       // Not logged in → Show client login
       return (
         <LanguageProvider>
-          <Login onLogin={() => {
-            setIsClientMode(true)
-            localStorage.setItem('isClientMode', 'true')
-            checkUser()
-          }} />
+          {/* Geen onLogin-callback: LoginMain herlaadt na het inloggen de
+              pagina, waarna checkUser() hierboven de rol bij de server
+              opvraagt. Hier een portaalvlag zetten deed niets behalve
+              verwarren — hij werd meteen weer overschreven. */}
+          <Login />
           <PWAInstaller />
           <UpdateModal db={db} />
         </LanguageProvider>
@@ -488,11 +490,7 @@ function App() {
   if (!user) {
     return (
       <LanguageProvider>
-        <Login onLogin={() => {
-          setIsClientMode(false)
-          localStorage.setItem('isClientMode', 'false')
-          checkUser()
-        }} />
+        <Login />
         <PWAInstaller />
         <UpdateModal db={db} />
       </LanguageProvider>
