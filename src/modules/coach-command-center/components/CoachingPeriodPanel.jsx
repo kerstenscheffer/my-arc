@@ -196,92 +196,74 @@ export default function CoachingPeriodPanel({ client, coachId, isMobile, onClien
     return (
       <div style={panelShell()}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.55rem' }}>
-          <Clock size={13} color="#FFD700" />
-          <span style={{ fontSize: '0.72rem', fontWeight: '800', color: '#FFD700', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+          <Clock size={15} color="#fff" />
+          <span style={{ fontSize: '0.9rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.01em' }}>
             {editing ? 'Coaching-periode aanpassen' : 'Coaching-periode instellen'}
           </span>
         </div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
-          {/* Rij 1: startdatum + weken */}
-          <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'flex-end' }}>
-            <div style={{ flex: '0 0 160px' }}>
-              <FieldLabel>Startdatum</FieldLabel>
-              <input
-                type="date" value={draftStart}
-                onChange={(e) => setDraftStart(e.target.value)}
-                style={inputStyle}
-              />
-            </div>
-            <div style={{ flex: 1, minWidth: '160px' }}>
-              <FieldLabel>Hoeveel weken gekocht?</FieldLabel>
-              <div style={{ display: 'flex', gap: '0.3rem', alignItems: 'center', flexWrap: 'wrap' }}>
-                {DURATION_PRESETS.map(w => {
-                  const active = parseInt(draftWeeks, 10) === w
-                  return (
-                    <button
-                      key={w} onClick={() => setDraftWeeks(w)}
-                      style={{
-                        padding: '0.35rem 0.55rem',
-                        background: active ? 'rgba(255,215,0,0.15)' : 'rgba(255,255,255,0.04)',
-                        border: `1px solid ${active ? 'rgba(255,215,0,0.4)' : 'rgba(255,255,255,0.08)'}`,
-                        borderRadius: '5px',
-                        color: active ? '#FFD700' : 'rgba(255,255,255,0.55)',
-                        fontSize: '0.7rem', fontWeight: '800',
-                        cursor: 'pointer', minHeight: '30px',
-                      }}
-                    >{w}w</button>
-                  )
-                })}
-                <input
-                  type="number" min="1" max="104" value={draftWeeks}
-                  onChange={(e) => setDraftWeeks(e.target.value)}
-                  style={{ ...inputStyle, width: '70px', textAlign: 'center', padding: '0.35rem 0.5rem', fontSize: '0.78rem' }}
-                />
-              </div>
-            </div>
-          </div>
+        {/* Alles op één rij zolang het past: datum, weken, betaalwijze en de
+            knop. Stond eerder in drie rijen onder elkaar met een label boven
+            elk veld — dat maakte een simpel formuliertje drie keer zo hoog. */}
+        <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '0.5rem' }}>
 
-          {/* Rij 2: betaalmethode */}
-          <div>
-            <FieldLabel>Hoe heeft hij betaald?</FieldLabel>
-            <div style={{ display: 'flex', gap: '0.3rem', flexWrap: 'wrap' }}>
-              {PAYMENT_OPTIONS.map(opt => {
-                const active = draftPayment === opt.id
-                return (
-                  <button
-                    key={opt.id}
-                    onClick={() => setDraftPayment(active ? '' : opt.id)}
-                    style={{
-                      padding: '0.4rem 0.7rem',
-                      background: active ? `${opt.color}1f` : 'rgba(255,255,255,0.04)',
-                      border: `1px solid ${active ? `${opt.color}66` : 'rgba(255,255,255,0.08)'}`,
-                      borderRadius: '6px',
-                      color: active ? opt.color : 'rgba(255,255,255,0.55)',
-                      fontSize: '0.72rem', fontWeight: active ? '900' : '700',
-                      cursor: 'pointer', minHeight: '32px',
-                    }}
-                  >
-                    {opt.label}
-                  </button>
-                )
-              })}
-            </div>
-          </div>
+          <input
+            type="date" value={draftStart}
+            onChange={(e) => setDraftStart(e.target.value)}
+            title="Startdatum"
+            style={{ ...inputStyle, width: 'auto', flex: '0 0 150px', height: 34, padding: '0 0.55rem' }}
+          />
 
-          {/* Rij 3: knoppen */}
-          <div style={{ display: 'flex', gap: '0.4rem', justifyContent: 'flex-end' }}>
-            {editing && (
-              <button onClick={() => setEditing(false)} style={secondaryBtnStyle}>Annuleer</button>
-            )}
-            <button
-              onClick={saveSetup}
-              disabled={busy || !draftStart || !draftWeeks}
-              style={primaryBtnStyle(busy || !draftStart || !draftWeeks)}
-            >
-              <Check size={13} strokeWidth={2.8} />
-              {busy ? 'Opslaan…' : (editing ? 'Wijziging opslaan' : 'Start coaching')}
-            </button>
-          </div>
+          {/* Weken als dropdown i.p.v. zes losse knoppen plus een invoerveld.
+              Zeven elementen voor één keuze is te veel voor wat het is. */}
+          <select
+            value={DURATION_PRESETS.includes(parseInt(draftWeeks, 10)) ? String(draftWeeks) : 'anders'}
+            onChange={(e) => {
+              if (e.target.value === 'anders') {
+                // Vraag alleen om een getal wanneer het echt afwijkt.
+                const eigen = window.prompt('Hoeveel weken?', draftWeeks || '')
+                const n = parseInt(eigen, 10)
+                if (!isNaN(n) && n >= 1 && n <= 104) setDraftWeeks(n)
+              } else {
+                setDraftWeeks(parseInt(e.target.value, 10))
+              }
+            }}
+            title="Hoeveel weken gekocht?"
+            style={{ ...inputStyle, width: 'auto', flex: '0 0 120px', height: 34, padding: '0 0.5rem', fontWeight: 800, cursor: 'pointer' }}
+          >
+            {DURATION_PRESETS.map(w => (
+              <option key={w} value={String(w)} style={{ background: '#0a0a0a' }}>{w} weken</option>
+            ))}
+            <option value="anders" style={{ background: '#0a0a0a' }}>
+              {DURATION_PRESETS.includes(parseInt(draftWeeks, 10)) ? 'Anders…' : `${draftWeeks} weken`}
+            </option>
+          </select>
+
+          {/* Betaalwijze als dropdown i.p.v. een rij losse knoppen. */}
+          <select
+            value={draftPayment}
+            onChange={(e) => setDraftPayment(e.target.value)}
+            title="Hoe heeft hij betaald?"
+            style={{ ...inputStyle, width: 'auto', flex: '1 1 130px', minWidth: 120, height: 34, padding: '0 0.5rem', fontWeight: 800, cursor: 'pointer' }}
+          >
+            <option value="" style={{ background: '#0a0a0a' }}>Betaalwijze…</option>
+            {PAYMENT_OPTIONS.map(opt => (
+              <option key={opt.id} value={opt.id} style={{ background: '#0a0a0a' }}>{opt.label}</option>
+            ))}
+          </select>
+
+          <div style={{ flex: 1, minWidth: 0 }} />
+
+          {editing && (
+            <button onClick={() => setEditing(false)} style={{ ...secondaryBtnStyle, height: 34, minHeight: 34 }}>Annuleer</button>
+          )}
+          <button
+            onClick={saveSetup}
+            disabled={busy || !draftStart || !draftWeeks}
+            style={{ ...primaryBtnStyle(busy || !draftStart || !draftWeeks), height: 34, minHeight: 34 }}
+          >
+            <Check size={13} strokeWidth={2.8} />
+            {busy ? 'Opslaan…' : (editing ? 'Opslaan' : 'Start')}
+          </button>
         </div>
       </div>
     )
@@ -492,24 +474,25 @@ export default function CoachingPeriodPanel({ client, coachId, isMobile, onClien
 
 // ────────────────────────────────────────────────────────────────────────────
 function panelShell(status) {
-  const tint = status === 'paused' ? '#f59e0b' : status === 'ended' ? '#6b7280' : '#FFD700'
+  // Alleen een accentstreep links; de gouden gradient en gouden rand eromheen
+  // maakten dit blok zwaarder dan de inhoud rechtvaardigt.
+  const tint = status === 'paused' ? '#f59e0b' : status === 'ended' ? '#6b7280' : '#fff'
   return {
-    padding: '0.55rem 0.75rem',
-    background: `linear-gradient(135deg, ${tint}0d 0%, transparent 100%)`,
-    border: `1px solid ${tint}33`,
+    padding: '0.7rem 0.9rem',
+    background: 'rgba(255,255,255,0.03)',
+    border: '1px solid rgba(255,255,255,0.08)',
     borderLeft: `3px solid ${tint}`,
-    borderRadius: '8px',
-    margin: '0.5rem 1rem',
+    borderRadius: '10px',
+    margin: '0.6rem 1rem',
   }
 }
 
 function FieldLabel({ children }) {
   return (
     <div style={{
-      fontSize: '0.55rem', fontWeight: '800',
-      color: 'rgba(255,255,255,0.45)',
-      textTransform: 'uppercase', letterSpacing: '0.06em',
-      marginBottom: '0.25rem',
+      fontSize: '0.72rem', fontWeight: 800,
+      color: 'rgba(255,255,255,0.6)',
+      marginBottom: '0.3rem',
     }}>{children}</div>
   )
 }
@@ -526,10 +509,10 @@ const inputStyle = {
 
 const primaryBtnStyle = (disabled) => ({
   padding: '0.5rem 0.9rem',
-  background: disabled ? 'rgba(255,215,0,0.15)' : '#FFD700',
-  border: 'none', borderRadius: '7px',
-  color: disabled ? 'rgba(255,215,0,0.4)' : '#000',
-  fontSize: '0.8rem', fontWeight: '900',
+  background: disabled ? 'rgba(255,255,255,0.12)' : '#fff',
+  border: 'none', borderRadius: '9px',
+  color: disabled ? 'rgba(255,255,255,0.35)' : '#000',
+  fontSize: '0.82rem', fontWeight: 900,
   cursor: disabled ? 'not-allowed' : 'pointer',
   display: 'flex', alignItems: 'center', gap: '0.3rem',
   minHeight: '36px',
@@ -538,10 +521,10 @@ const primaryBtnStyle = (disabled) => ({
 const secondaryBtnStyle = {
   padding: '0.45rem 0.8rem',
   background: 'transparent',
-  border: '1px solid rgba(255,255,255,0.12)',
-  borderRadius: '7px',
-  color: 'rgba(255,255,255,0.55)',
-  fontSize: '0.75rem', fontWeight: '700',
+  border: '1px solid rgba(255,255,255,0.18)',
+  borderRadius: '9px',
+  color: '#fff',
+  fontSize: '0.78rem', fontWeight: 800,
   cursor: 'pointer', minHeight: '34px',
 }
 

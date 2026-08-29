@@ -189,7 +189,7 @@ export default function ClientWeightCard({ client, isMobile, onToggleStatus, onD
         padding: isMobile ? '0.6rem 0.85rem 0.5rem' : '0.7rem 1rem 0.55rem',
         gap: isMobile ? '0.5rem' : '0.625rem',
       }}>
-        <div style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'baseline', gap: '0.4rem' }}>
+        <div style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'baseline', gap: '0.4rem', overflow: 'hidden' }}>
           <h3 style={{ fontSize: isMobile ? '1rem' : '1.1rem', fontWeight: 800, color: isInactive ? '#6b7280' : '#fff', margin: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', flexShrink: 1, letterSpacing: '-0.01em' }}>
             {client.first_name} {client.last_name}
           </h3>
@@ -226,10 +226,13 @@ export default function ClientWeightCard({ client, isMobile, onToggleStatus, onD
       {/* ── ROW 2 — kerncijfers links, acties rechts, op één regel ── */}
       {/* Alleen Verschil en Sinds start: deze week / vorige week staan in de
           uitklap en het huidige gewicht staat al op de regel hierboven. */}
+      {/* Wrapt op smalle schermen: twee cijfers plus drie knoppen passen niet
+          altijd op 375px. Past het wél, dan blijft het één regel. */}
       <div style={{
-        display: 'flex', alignItems: 'center',
+        display: 'flex', alignItems: 'center', flexWrap: 'wrap',
+        rowGap: '0.45rem',
         padding: isMobile ? '0 0.85rem 0.6rem' : '0 1rem 0.65rem',
-        gap: isMobile ? '0.75rem' : '1rem',
+        gap: isMobile ? '0.7rem' : '1rem',
       }}>
         {!isInactive && !statsExpanded && (
           <button onClick={() => setStatsExpanded(true)}

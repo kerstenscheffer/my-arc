@@ -24,10 +24,11 @@ export default function CoachCommandCenter({ db, onSelectClient, setActiveTab, o
   // Dropdown-stijl: dik wit, geen accentkleur. Vervangt de gekleurde
   // filterpillen die eerder een eigen rij innamen.
   const selectStijl = {
-    flexShrink: 0, height: 36, padding: '0 0.6rem', borderRadius: 10,
+    flex: isMobile ? '1 1 0' : '0 0 auto', minWidth: 0,
+    height: 36, padding: '0 0.5rem', borderRadius: 10,
     background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)',
     color: '#fff', fontSize: '0.85rem', fontWeight: 800, fontFamily: 'inherit',
-    cursor: 'pointer', outline: 'none', maxWidth: 170,
+    cursor: 'pointer', outline: 'none', maxWidth: isMobile ? 'none' : 170,
   }
   const optieStijl = { background: '#0a0a0a', color: '#fff' }
 
@@ -226,7 +227,11 @@ export default function CoachCommandCenter({ db, onSelectClient, setActiveTab, o
         borderBottom: '1px solid rgba(255,255,255,0.06)',
         background: 'rgba(10,10,10,0.92)',
         backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)',
-        display: 'flex', alignItems: 'center', gap: isMobile ? '0.5rem' : '0.75rem'
+        // Op een telefoon past dit niet op één regel: twee dropdowns plus een
+        // zoekveld plus twee knoppen lopen ruim over 375px heen. Daarom
+        // wrappen; de zoekbalk krijgt dan de volle tweede regel.
+        display: 'flex', alignItems: 'center', flexWrap: isMobile ? 'wrap' : 'nowrap',
+        gap: isMobile ? '0.5rem' : '0.75rem',
       }}>
         {/* Eén regel: filters links, zoek + camera + nieuwe klant rechts.
             Geen titel, geen gekleurde chips, geen bolletjes — de statusfilters
@@ -255,12 +260,14 @@ export default function CoachCommandCenter({ db, onSelectClient, setActiveTab, o
           </select>
         )}
 
-        <div style={{ flex: 1, minWidth: 8 }} />
+        {!isMobile && <div style={{ flex: 1, minWidth: 8 }} />}
+        {/* Regelafbreking op telefoon: zoeken + knoppen op een eigen rij. */}
+        {isMobile && <div style={{ flexBasis: '100%', height: 0 }} />}
 
         {/* Zoeken staat nu inline; dat scheelt een klik en een aparte rij. */}
         <div style={{
-          display: 'flex', alignItems: 'center', gap: 6, flexShrink: 1, minWidth: 0,
-          maxWidth: isMobile ? 150 : 260,
+          display: 'flex', alignItems: 'center', gap: 6, minWidth: 0,
+          flex: isMobile ? '1 1 0' : '0 1 260px',
           padding: '0 0.6rem', height: 36, borderRadius: 10,
           background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)',
         }}>

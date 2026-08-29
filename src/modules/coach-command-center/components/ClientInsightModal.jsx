@@ -27,6 +27,18 @@ const COLS = [
 // kreeg dan elke render een nieuw functie-type en mounted de hele subtree
 // (incl. ClientDataColumn-state als activeSection) opnieuw. Daardoor
 // "sprong" de Gegevens-kolom terug naar de Profiel-tab na elke save.
+// Kopknop: kaal icoon, geen vak eromheen. Vier omkaderde knoppen met tekst
+// namen de halve kopregel in; als icoon met tooltip is het even duidelijk en
+// veel rustiger. Raakvlak blijft 32px zodat het op een telefoon te tikken is.
+const kopKnop = (primair = false) => ({
+  display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+  width: 32, height: 32, padding: 0,
+  background: 'none', border: 'none',
+  color: primair ? '#fff' : 'rgba(255,255,255,0.55)',
+  cursor: 'pointer', flexShrink: 0,
+  touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+})
+
 function ColWrapper({ id, children, isLast, collapsed, onToggle }) {
   const col = COLS.find(c => c.id === id)
   const isCollapsed = collapsed.has(id)
@@ -103,7 +115,6 @@ export default function ClientInsightModal({ isOpen, onClose, client, isMobile, 
   const [photoZoom, setPhotoZoom] = useState(false)
   const [showGallery, setShowGallery] = useState(false)  // volledig foto-overzicht (grid)
   const [mobileTab, setMobileTab] = useState('weight')
-  const [showHeader, setShowHeader] = useState(false)
   // Default-collapse 'data' so the new 5-column layout stays comfortable.
   // Coach can re-expand it via the "Secties"-toggles in the hover header.
   const [collapsed, setCollapsed] = useState(() => new Set(['data']))
@@ -198,21 +209,19 @@ export default function ClientInsightModal({ isOpen, onClose, client, isMobile, 
           paddingTop: 'env(safe-area-inset-top, 0px)',
         }}>
 
-          {/* ═══ DESKTOP HOVER HEADER ═══ */}
+          {/* ═══ DESKTOP HEADER — altijd zichtbaar ═══ */}
+          {/* Zat verstopt achter een 6px hover-strip bovenaan: je moest weten
+              dát 'ie er was. Nu gewoon een vaste balk in de flow. */}
           {!isMobile && (
             <div
-              onMouseEnter={() => setShowHeader(true)}
-              onMouseLeave={() => setShowHeader(false)}
               style={{
-                position: 'absolute', top: 0, left: 0, right: 0,
-                height: showHeader ? 'auto' : '6px',
-                background: showHeader ? 'rgba(10,10,10,0.98)' : 'transparent',
-                borderBottom: showHeader ? '1px solid rgba(255,255,255,0.08)' : 'none',
-                zIndex: 15, overflow: 'hidden', transition: 'all 0.2s ease'
+                flexShrink: 0,
+                background: 'rgba(10,10,10,0.98)',
+                borderBottom: '1px solid rgba(255,255,255,0.08)',
+                zIndex: 15,
               }}
             >
-              {showHeader && (
-                <div style={{ padding: '0.5rem 1rem', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+              <div style={{ padding: '0.5rem 1rem', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
                   <span style={{ fontSize: '0.9rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.02em', flexShrink: 0 }}>
                     {effectiveClient.first_name} {effectiveClient.last_name}
                   </span>
@@ -243,66 +252,25 @@ export default function ClientInsightModal({ isOpen, onClose, client, isMobile, 
                     })}
                   </div>
                   <div style={{ flex: 1 }} />
-                  <button onClick={() => setShowIntake(true)} title="Bekijk intake" style={{
-                    display: 'flex', alignItems: 'center', gap: '0.2rem',
-                    padding: '0.25rem 0.5rem',
-                    background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)',
-                    borderRadius: '5px', color: 'rgba(255,255,255,0.4)',
-                    fontSize: '0.55rem', fontWeight: 700, cursor: 'pointer',
-                    touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', minHeight: '22px'
-                  }}>
-                    <ClipboardCheck size={10} /> Intake
+                  <button onClick={() => setShowIntake(true)} title="Bekijk intake" style={kopKnop()}>
+                    <ClipboardCheck size={17} />
                   </button>
-                  <button onClick={() => setShowLog(true)} style={{
-                    display: 'flex', alignItems: 'center', gap: '0.2rem',
-                    padding: '0.25rem 0.5rem',
-                    background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)',
-                    borderRadius: '5px', color: 'rgba(255,255,255,0.4)',
-                    fontSize: '0.55rem', fontWeight: 700, cursor: 'pointer',
-                    touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', minHeight: '22px'
-                  }}>
-                    <BookOpen size={10} /> Log
+                  <button onClick={() => setShowLog(true)} title="Logboek" style={kopKnop()}>
+                    <BookOpen size={17} />
                   </button>
-                  <button onClick={() => setShowNotify(true)} title="Stuur notificatie" style={{
-                    display: 'flex', alignItems: 'center', gap: '0.2rem',
-                    padding: '0.25rem 0.5rem',
-                    background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.14)',
-                    borderRadius: '5px', color: '#fff',
-                    fontSize: '0.55rem', fontWeight: 800, cursor: 'pointer',
-                    touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', minHeight: '22px',
-                    textTransform: 'uppercase', letterSpacing: '0.04em',
-                  }}>
-                    <Bell size={10} strokeWidth={2.6} /> Notif
+                  <button onClick={() => setShowNotify(true)} title="Stuur notificatie" style={kopKnop(true)}>
+                    <Bell size={17} strokeWidth={2.4} />
                   </button>
                   {onSwitchToClientView && (
-                    <button onClick={() => { onClose(); onSwitchToClientView(effectiveClient) }} title="Bekijk als client" style={{
-                      display: 'flex', alignItems: 'center', gap: '0.2rem',
-                      padding: '0.25rem 0.5rem',
-                      background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.15)',
-                      borderRadius: '5px', color: 'rgba(255,255,255,0.6)',
-                      fontSize: '0.55rem', fontWeight: 700, cursor: 'pointer',
-                      touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', minHeight: '22px',
-                    }}>
-                      <ExternalLink size={10} /> Client
+                    <button onClick={() => { onClose(); onSwitchToClientView(effectiveClient) }} title="Bekijk als client" style={kopKnop()}>
+                      <ExternalLink size={17} />
                     </button>
                   )}
-                  <button onClick={onClose} style={{
-                    width: '26px', height: '26px', borderRadius: '6px',
-                    background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)',
-                    color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-                  }}>
-                    <X size={13} />
+                  <button onClick={onClose} title="Sluiten" style={kopKnop()}>
+                    <X size={17} />
                   </button>
-                </div>
-              )}
+              </div>
             </div>
-          )}
-
-          {!isMobile && !showHeader && (
-            <div onMouseEnter={() => setShowHeader(true)} style={{
-              position: 'absolute', top: 0, right: 0, width: '80px', height: '32px', zIndex: 16
-            }} />
           )}
 
           {/* ═══ MOBILE HEADER ═══ */}
@@ -326,50 +294,19 @@ export default function ClientInsightModal({ isOpen, onClose, client, isMobile, 
                 }}>
                   <ClipboardCheck size={11} /> Intake
                 </button>
-                <button onClick={() => setShowLog(true)} style={{
-                  display: 'flex', alignItems: 'center', gap: '0.2rem',
-                  padding: '0.3rem 0.5rem',
-                  background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)',
-                  borderRadius: '6px', color: 'rgba(255,255,255,0.4)',
-                  fontSize: '0.6rem', fontWeight: 700, cursor: 'pointer',
-                  touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', minHeight: '28px',
-                  flexShrink: 0
-                }}>
-                  <BookOpen size={11} /> Log
+                <button onClick={() => setShowLog(true)} title="Logboek" style={{ ...kopKnop(), width: 36, height: 36 }}>
+                  <BookOpen size={17} />
                 </button>
-                <button onClick={() => setShowNotify(true)} title="Stuur notificatie" style={{
-                  display: 'flex', alignItems: 'center', gap: '0.2rem',
-                  padding: '0.3rem 0.55rem',
-                  background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.14)',
-                  borderRadius: '6px', color: '#fff',
-                  fontSize: '0.6rem', fontWeight: 800, cursor: 'pointer',
-                  touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', minHeight: '28px',
-                  flexShrink: 0,
-                  textTransform: 'uppercase', letterSpacing: '0.04em',
-                }}>
-                  <Bell size={11} strokeWidth={2.6} /> Notif
+                <button onClick={() => setShowNotify(true)} title="Stuur notificatie" style={{ ...kopKnop(true), width: 36, height: 36 }}>
+                  <Bell size={17} strokeWidth={2.4} />
                 </button>
                 {onSwitchToClientView && (
-                  <button onClick={() => { onClose(); onSwitchToClientView(effectiveClient) }} title="Bekijk als client" style={{
-                    display: 'flex', alignItems: 'center', gap: '0.2rem',
-                    padding: '0.3rem 0.5rem',
-                    background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.15)',
-                    borderRadius: '6px', color: 'rgba(255,255,255,0.6)',
-                    fontSize: '0.6rem', fontWeight: 700, cursor: 'pointer',
-                    touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', minHeight: '28px',
-                    flexShrink: 0,
-                  }}>
-                    <ExternalLink size={11} /> Client
+                  <button onClick={() => { onClose(); onSwitchToClientView(effectiveClient) }} title="Bekijk als client" style={{ ...kopKnop(), width: 36, height: 36 }}>
+                    <ExternalLink size={17} />
                   </button>
                 )}
-                <button onClick={onClose} style={{
-                  width: '40px', height: '40px', borderRadius: '8px', flexShrink: 0,
-                  background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.3)',
-                  color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-                  minHeight: '40px', minWidth: '40px',
-                }}>
-                  <X size={18} strokeWidth={2.5} />
+                <button onClick={onClose} title="Sluiten" style={{ ...kopKnop(), width: 40, height: 40 }}>
+                  <X size={19} strokeWidth={2.4} />
                 </button>
               </div>
               <div style={{
