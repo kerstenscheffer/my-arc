@@ -240,7 +240,7 @@ export default function WeightColumn({ client, weightData, circumData, photos, c
                   const prev = history[idx + 1]
                   const delta = prev && Number.isFinite(e.weight) && Number.isFinite(prev.weight)
                     ? Math.round((e.weight - prev.weight) * 10) / 10 : null
-                  const deltaColor = delta === null ? 'rgba(255,255,255,0.3)' : weightGoalColor(delta, client.weekly_weight_goal)
+                  const deltaColor = delta === null ? 'rgba(255,255,255,0.3)' : weightGoalColor(delta, client)
                   return (
                   <div key={`${e.date}-${idx}`} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.275rem 0', borderBottom: idx < history.length - 1 ? '1px solid rgba(255,255,255,0.03)' : 'none' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
@@ -263,7 +263,7 @@ export default function WeightColumn({ client, weightData, circumData, photos, c
                 {weeklyAverages.length === 0 ? (
                   <div style={{ padding: '0.75rem 0', textAlign: 'center', color: 'rgba(255,255,255,0.2)', fontSize: '0.65rem' }}>Onvoldoende data</div>
                 ) : weeklyAverages.map((w, idx) => {
-                  const diffColor = w.diff === null ? 'rgba(255,255,255,0.3)' : weightGoalColor(w.diff, client.weekly_weight_goal)
+                  const diffColor = w.diff === null ? 'rgba(255,255,255,0.3)' : weightGoalColor(w.diff, client)
                   return (
                     <div key={w.start} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.3rem 0', borderBottom: idx < weeklyAverages.length - 1 ? '1px solid rgba(255,255,255,0.03)' : 'none' }}>
                       <div style={{ display: 'flex', flexDirection: 'column' }}>

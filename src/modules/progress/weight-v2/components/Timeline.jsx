@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react'
 import { BarChart3, LineChart, Clock, ChevronDown } from 'lucide-react'
 import { weightGoalColor, weightGoalStatus } from '../../../../weight-tracker/utils/weightGoalColor'
 
-export default function Timeline({ history, isMobile, theme, weeklyGoal }) {
+export default function Timeline({ history, isMobile, theme, doel }) {
   const [viewType, setViewType] = useState('timeline')
   const [expanded, setExpanded] = useState(!isMobile)
   const svgRef = useRef(null)
@@ -84,7 +84,7 @@ export default function Timeline({ history, isMobile, theme, weeklyGoal }) {
                   width: isToday ? '12px' : '8px',
                   height: isToday ? '12px' : '8px',
                   borderRadius: '50%',
-                  background: isToday ? theme.primary : change !== 0 ? weightGoalColor(change, weeklyGoal) : 'rgba(255,255,255,0.3)',
+                  background: isToday ? theme.primary : change !== 0 ? weightGoalColor(change, doel) : 'rgba(255,255,255,0.3)',
                   boxShadow: isToday ? `0 0 12px ${theme.primary}66` : 'none'
                 }} />
                 {index < displayData.length - 1 && (
@@ -164,10 +164,10 @@ export default function Timeline({ history, isMobile, theme, weeklyGoal }) {
               {change !== 0 && (
                 <div style={{
                   padding: isMobile ? '0.25rem 0.5rem' : '0.375rem 0.625rem',
-                  background: `${weightGoalColor(change, weeklyGoal)}22`,
+                  background: `${weightGoalColor(change, doel)}22`,
                   borderRadius: '8px',
                   fontSize: isMobile ? '0.75rem' : '0.8rem',
-                  color: weightGoalColor(change, weeklyGoal),
+                  color: weightGoalColor(change, doel),
                   fontWeight: '600',
                   display: 'flex',
                   alignItems: 'center',

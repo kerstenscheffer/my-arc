@@ -20,7 +20,7 @@ const platteKnop = {
   display: 'inline-flex', alignItems: 'center', gap: '0.3rem',
   background: 'none', border: 'none', padding: 0,
   color: '#fff', fontSize: '0.78rem', fontWeight: 800, fontFamily: 'inherit',
-  cursor: 'pointer', whiteSpace: 'nowrap',
+  cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0,
   touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
 }
 
@@ -147,12 +147,12 @@ export default function ClientWeightCard({ client, isMobile, onToggleStatus, onD
     {
       label: 'Verschil',
       val: weekDiff !== null ? `${weekDiff > 0 ? '+' : ''}${weekDiff}` : '—',
-      color: weekDiff !== null ? weightGoalColor(weekDiff, client.weekly_weight_goal) : 'rgba(255,255,255,0.4)',
+      color: weekDiff !== null ? weightGoalColor(weekDiff, client) : 'rgba(255,255,255,0.4)',
     },
     {
       label: 'Sinds start',
       val: totalChange !== null ? `${totalChange > 0 ? '+' : ''}${totalChange}` : '—',
-      color: totalChange !== null ? weightGoalColor(totalChange, client.weekly_weight_goal) : 'rgba(255,255,255,0.4)',
+      color: totalChange !== null ? weightGoalColor(totalChange, client) : 'rgba(255,255,255,0.4)',
     },
   ]
 
@@ -253,8 +253,15 @@ export default function ClientWeightCard({ client, isMobile, onToggleStatus, onD
           </button>
         )}
 
-        <div style={{ flex: 1, minWidth: 4 }} />
-
+        {/* De drie acties zijn één blok. Los van elkaar waren het drie
+            flex-items, en dan brak op een smalle kaart alleen de ⋯ af naar
+            een eigen regel — een lege derde regel voor één knopje. Nu gaan
+            ze samen naar de volgende regel of blijven ze samen staan. */}
+        <div style={{
+          display: 'flex', alignItems: 'center', flexShrink: 0,
+          marginLeft: 'auto',
+          gap: isMobile ? '0.7rem' : '1rem',
+        }}>
         <button onClick={() => setShowLog(true)} style={platteKnop}>
           <BookOpen size={13} /> Log
         </button>
@@ -287,6 +294,7 @@ export default function ClientWeightCard({ client, isMobile, onToggleStatus, onD
             </>
           )}
         </div>
+        </div>
       </div>
 
       {/* Uitgeklapte weekcijfers — klik erop om weer in te klappen. */}
@@ -303,8 +311,8 @@ export default function ClientWeightCard({ client, isMobile, onToggleStatus, onD
                 {[
                   { label: 'Deze week (Ma-Zo)',   sub: thisWeek.count > 0 ? `${thisWeek.count} meting${thisWeek.count === 1 ? '' : 'en'} · ${fmtWeekRange(thisWeek.monday, thisWeek.sunday)}` : `geen metingen · ${fmtWeekRange(thisWeek.monday, thisWeek.sunday)}`, val: curAvg ?? '—', color: '#fff' },
                   { label: 'Vorige week (Ma-Zo)', sub: lastWeek.count > 0 ? `${lastWeek.count} meting${lastWeek.count === 1 ? '' : 'en'} · ${fmtWeekRange(lastWeek.monday, lastWeek.sunday)}` : `geen metingen · ${fmtWeekRange(lastWeek.monday, lastWeek.sunday)}`, val: prevAvg ?? '—', color: '#fff' },
-                  { label: 'vs Vorige week', sub: weekDiff !== null ? 'verschil tussen weekgemiddelden' : 'geen vergelijking', val: weekDiff !== null ? `${weekDiff > 0 ? '+' : ''}${weekDiff}` : '—', color: weekDiff !== null ? weightGoalColor(weekDiff, client.weekly_weight_goal) : 'rgba(255,255,255,0.4)' },
-                  { label: 'Sinds start', sub: startDateLabel ? `eerste meting · ${startDateLabel}` : 'geen startmeting', val: totalChange !== null ? `${totalChange > 0 ? '+' : ''}${totalChange}` : '—', color: totalChange !== null ? weightGoalColor(totalChange, client.weekly_weight_goal) : 'rgba(255,255,255,0.4)' },
+                  { label: 'vs Vorige week', sub: weekDiff !== null ? 'verschil tussen weekgemiddelden' : 'geen vergelijking', val: weekDiff !== null ? `${weekDiff > 0 ? '+' : ''}${weekDiff}` : '—', color: weekDiff !== null ? weightGoalColor(weekDiff, client) : 'rgba(255,255,255,0.4)' },
+                  { label: 'Sinds start', sub: startDateLabel ? `eerste meting · ${startDateLabel}` : 'geen startmeting', val: totalChange !== null ? `${totalChange > 0 ? '+' : ''}${totalChange}` : '—', color: totalChange !== null ? weightGoalColor(totalChange, client) : 'rgba(255,255,255,0.4)' },
                 ].map((s, i) => (
                   <div key={i} style={{ padding: '0.5rem 0.6rem', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: 8, display: 'flex', flexDirection: 'column', gap: 3 }}>
                     <div style={{ fontSize: '0.7rem', fontWeight: 800, color: '#fff' }}>{s.label}</div>

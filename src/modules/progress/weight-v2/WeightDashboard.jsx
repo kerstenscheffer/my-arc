@@ -182,7 +182,7 @@ export default function WeightDashboard({ client, db }) {
         history={history}
         isMobile={isMobile}
         theme={THEME}
-        weeklyGoal={client?.weekly_weight_goal}
+        doel={client}
       />
       
       {/* Floating Action Button */}

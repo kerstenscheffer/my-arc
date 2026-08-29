@@ -7,6 +7,7 @@
 import React, { useState, useRef } from 'react'
 import { User, Save, Edit3, Check, X, Plus, Minus, Flame, RefreshCw } from 'lucide-react'
 import { applyMacroRules, computeMacros, calcTDEE, calcBMR, surplusRuleFor, normalizeGoal, DEFAULT_ACTIVITY } from '../../../macros/macroRules'
+import { goalDirection, WEIGHT_GREEN, WEIGHT_RED } from '../../../weight-tracker/utils/weightGoalColor'
 import ClientActionsManager from './ClientActionsManager'
 import { logClientChanges, pickTrackedFields } from '../../utils/clientChangeLogger'
 
@@ -66,14 +67,89 @@ const SECTION_META = {
 }
 
 // ── Editable Row ──
+// Primair doel bepaalt welke kant het gewicht op moet, en dus welke kleur een
+// verandering krijgt op de client-card, in het gewicht-paneel en bij de klant
+// zelf. Dat stond eerder als kale dropdown met de ruwe databasewaarden
+// ('cut', 'health', 'performance') zonder dat ergens bleek wat het deed —
+// terwijl een bulker met +0,1 kg daardoor rood bleef staan. Nu een vaste
+// dropdown met de gevolgen eronder.
+const DOEL_OPTIES = [
+  { value: 'cut',      label: 'Afvallen (cut)' },
+  { value: 'bulk',     label: 'Aankomen (bulk)' },
+  { value: 'recomp',   label: 'Recomp' },
+  { value: 'maintain', label: 'Onderhoud' },
+]
+
+function DoelRegel({ client, isMobile, onSave }) {
+  const [saving, setSaving] = useState(false)
+  // De tabel kent historisch fat_loss/muscle_gain/general_fitness naast
+  // cut/bulk. Toon de genormaliseerde variant, maar alleen als er echt iets
+  // staat — anders zou een lege klant "Onderhoud" lijken.
+  const huidig = client?.primary_goal ? normalizeGoal(client.primary_goal) : ''
+  const richting = goalDirection(client?.primary_goal, client?.weekly_weight_goal)
+
+  const uitleg =
+    richting === 1  ? { tekst: 'Aankomen telt als vooruitgang', kleur: WEIGHT_GREEN }
+    : richting === -1 ? { tekst: 'Afvallen telt als vooruitgang', kleur: WEIGHT_GREEN }
+    : richting === 0  ? { tekst: 'Geen richting — gewicht blijft neutraal gekleurd', kleur: C.text50 }
+    : { tekst: 'Geen doel gekozen — afvallen telt nu als vooruitgang', kleur: WEIGHT_RED }
+
+  const kies = async (v) => {
+    setSaving(true)
+    await onSave('primary_goal', v === '' ? null : v)
+    setSaving(false)
+  }
+
+  return (
+    <div style={{
+      padding: isMobile ? '0.6rem 0.85rem' : '0.65rem 1rem',
+      borderBottom: `1px solid ${C.borderItem}`,
+      display: 'flex', flexDirection: 'column', gap: '0.4rem',
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+        <span style={{ fontSize: isMobile ? '0.62rem' : '0.66rem', color: C.text50, textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 800, flexShrink: 0 }}>
+          Primair doel
+        </span>
+        <select
+          value={huidig}
+          disabled={saving}
+          onChange={(e) => kies(e.target.value)}
+          style={{
+            flex: 1, minWidth: 0, height: 34, padding: '0 0.5rem',
+            background: 'rgba(255,255,255,0.05)',
+            border: '1px solid rgba(255,255,255,0.12)', borderRadius: 6,
+            color: '#fff', fontSize: isMobile ? '0.88rem' : '0.92rem',
+            fontWeight: 800, fontFamily: 'inherit', outline: 'none',
+            cursor: saving ? 'wait' : 'pointer',
+          }}
+        >
+          <option value="" style={{ background: '#111' }}>Niet gekozen</option>
+          {DOEL_OPTIES.map(o => (
+            <option key={o.value} value={o.value} style={{ background: '#111' }}>{o.label}</option>
+          ))}
+        </select>
+      </div>
+      <span style={{ fontSize: '0.72rem', fontWeight: 700, color: uitleg.kleur }}>
+        {uitleg.tekst}
+      </span>
+    </div>
+  )
+}
+
 function EditableRow({ label, value, field, type = 'text', options, suffix, isMobile, onSave }) {
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState('')
   const [saving, setSaving] = useState(false)
-  const display = value === null || value === undefined || value === '' ? null : String(value)
+  // options mag strings bevatten of {value,label}-paren; met paren slaan we de
+  // canonieke waarde op maar tonen we Nederlandse tekst.
+  const opties = (options || []).map(o => (typeof o === 'string' ? { value: o, label: o } : o))
+  const leeg = value === null || value === undefined || value === ''
+  const gekozen = opties.find(o => o.value === String(value))
+  const display = leeg ? null : (gekozen ? gekozen.label : String(value))
+  const rauw = leeg ? '' : String(value)
 
   const startEdit = () => {
-    setDraft(display || '')
+    setDraft(rauw)
     setEditing(true)
   }
 
@@ -101,7 +177,7 @@ function EditableRow({ label, value, field, type = 'text', options, suffix, isMo
             fontSize: isMobile ? '0.82rem' : '0.88rem', outline: 'none', fontFamily: 'inherit'
           }}>
             <option value="" style={{ background: '#111' }}>—</option>
-            {options.map(o => <option key={o} value={o} style={{ background: '#111' }}>{o}</option>)}
+            {opties.map(o => <option key={o.value} value={o.value} style={{ background: '#111' }}>{o.label}</option>)}
           </select>
         ) : (
           <input
@@ -2053,7 +2129,7 @@ export default function ClientDataColumn({ client, db, isMobile, onClientUpdate 
       case 'doelen': return (<>
         {/* Primair doel staat bovenaan zodat het MacroRulesBlock-paneel
             er meteen op kan reageren (de modus stuurt de regels). */}
-        <E label="Primair doel" value={client.primary_goal}   field="primary_goal" options={['cut', 'bulk', 'maintain', 'recomp', 'health', 'performance']} />
+        <DoelRegel client={client} isMobile={isMobile} onSave={handleFieldSave} />
         <E label="Doelgewicht"  value={client.target_weight ? parseFloat(client.target_weight).toFixed(1) : null} field="target_weight" type="number" suffix=" kg" />
         <E label="Deadline"     value={client.goal_deadline ? client.goal_deadline.split('T')[0] : null} field="goal_deadline" />
 
@@ -2070,7 +2146,9 @@ export default function ClientDataColumn({ client, db, isMobile, onClientUpdate 
         <E label="Doel vet %"   value={client.target_body_fat} field="target_body_fat" type="number" suffix="%" />
         <E label="Tijdlijn"     value={client.goal_timeline}  field="goal_timeline" />
         <E label="Urgentie"     value={client.goal_urgency}   field="goal_urgency" options={['low', 'moderate', 'high', 'extreme']} />
-        <E label="Wk afval"     value={client.weekly_weight_goal} field="weekly_weight_goal" type="number" suffix=" kg/wk" />
+        {/* Heette "Wk afval", wat voor een bulker nergens op slaat. Het teken
+            hoeft hier niet te kloppen: de richting komt uit het primaire doel. */}
+        <E label="Weekdoel"     value={client.weekly_weight_goal} field="weekly_weight_goal" type="number" suffix=" kg/wk" />
         <E label="Motivatie"    value={client.motivation}     field="motivation" />
         <E label="Obstakels"    value={client.biggest_obstacle} field="biggest_obstacle" />
       </>)

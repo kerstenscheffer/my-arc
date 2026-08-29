@@ -378,7 +378,7 @@ function WeekGoalStatus({ client, history = [] }) {
       <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 16, overflow: 'hidden' }}>
         {weeks.map((w, idx) => {
           const ok = reached(w.diff)
-          const diffColor = w.diff == null ? 'rgba(255,255,255,0.3)' : weightGoalColor(w.diff, goal)
+          const diffColor = w.diff == null ? 'rgba(255,255,255,0.3)' : weightGoalColor(w.diff, client)
           return (
             <div key={w.start} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: isMobile ? '0.8rem 1rem' : '0.9rem 1.15rem', borderBottom: idx < weeks.length - 1 ? '1px solid rgba(255,255,255,0.05)' : 'none', fontVariantNumeric: 'tabular-nums' }}>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0 }}>

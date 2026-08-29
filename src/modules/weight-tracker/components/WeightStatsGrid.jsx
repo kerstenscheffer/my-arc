@@ -300,7 +300,7 @@ export default function WeightStatsGrid({ stats = {}, client = {}, fridayData = 
             sub: weekChange !== null ? 'week tov week' : '—',
             val: weekChange !== null ? `${weekChange > 0 ? '+' : ''}${weekChange}` : '—',
             color: weekChange !== null
-              ? weightGoalColor(weekChange, client.weekly_weight_goal, '#fff')
+              ? weightGoalColor(weekChange, client, '#fff')
               : 'rgba(255,255,255,0.4)',
             icon: weekChange !== null && weekChange !== 0
               ? (weekChange < 0 ? TrendingDown : TrendingUp) : null,
@@ -310,7 +310,7 @@ export default function WeightStatsGrid({ stats = {}, client = {}, fridayData = 
             sub: startDateLabel ? `vanaf ${startDateLabel}` : 'geen startmeting',
             val: totalChange !== null ? `${totalChange > 0 ? '+' : ''}${totalChange}` : '—',
             color: totalChange !== null
-              ? weightGoalColor(totalChange, client.weekly_weight_goal, '#fff')
+              ? weightGoalColor(totalChange, client, '#fff')
               : 'rgba(255,255,255,0.4)',
             icon: totalChange !== null && totalChange !== 0
               ? (totalChange < 0 ? TrendingDown : TrendingUp) : null,
