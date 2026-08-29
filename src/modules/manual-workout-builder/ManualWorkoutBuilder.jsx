@@ -8,7 +8,7 @@ import TemplateManager from './components/TemplateManager'
 import DayTemplatePickerModal from './components/DayTemplatePickerModal'
 import ClientAssigner from './components/ClientAssigner'
 import ClientPlanManagerModal from './components/ClientPlanManagerModal'
-import { Activity, Plus, Save, Users, FileText, ChevronDown, Video, Trash2, Search, X, Calendar } from 'lucide-react'
+import { Plus, Save, Users, FileText, ChevronDown, Video, Trash2, Search, X, Calendar } from 'lucide-react'
 import PDFExportButton from './components/PDFExportButton'
 import ExerciseLibraryModal from './components/ExerciseLibraryModal'
 
@@ -35,7 +35,6 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
   const [showDayPicker, setShowDayPicker] = useState(false)
   const [clientSchemas, setClientSchemas] = useState([])
   const [selectedSchemaId, setSelectedSchemaId] = useState(null)
-  const [showSchemaPicker, setShowSchemaPicker] = useState(false)
   const [showExerciseLibrary, setShowExerciseLibrary] = useState(false)
   const [localClient, setLocalClient] = useState(null)
   const [showClientPicker, setShowClientPicker] = useState(false)
@@ -127,7 +126,6 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
       _schemaId: schema.id
     })
     setSelectedSchemaId(schema.id)
-    setShowSchemaPicker(false)
   }
 
   const loadTemplates = async () => {
@@ -341,7 +339,6 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
     setShowTemplateManager(false)
   }
 
-  const activeSchema = clientSchemas.find(s => s.id === selectedSchemaId)
   const clientName = effectiveClient ? `${effectiveClient.first_name || ''} ${effectiveClient.last_name || ''}`.trim() : ''
 
   const DAY_ABBR = { maandag: 'Ma', dinsdag: 'Di', woensdag: 'Wo', donderdag: 'Do', vrijdag: 'Vr', zaterdag: 'Za', zondag: 'Zo' }
@@ -360,7 +357,6 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
   // Compacte stijl-tokens voor de header (leadsysteem-stijl, geen dikke velden).
   const cInput = { background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, padding: '0.45rem 0.6rem', color: '#fff', fontSize: '0.82rem', minHeight: 36, outline: 'none', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }
   const cSelect = { ...cInput, cursor: 'pointer', flex: 1, minWidth: 116 }
-  const cBtn = (accent) => ({ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '0.4rem 0.7rem', borderRadius: 8, fontSize: '0.76rem', fontWeight: 700, cursor: 'pointer', minHeight: 36, touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', background: accent ? 'rgba(255,215,0,0.12)' : 'rgba(255,255,255,0.05)', border: `1px solid ${accent ? 'rgba(255,215,0,0.3)' : 'rgba(255,255,255,0.1)'}`, color: accent ? '#FFD700' : 'rgba(255,255,255,0.8)' })
 
   // Zijpaneel-knop: plat, volle breedte, geen vakje eromheen.
   const zijKnop = (extra = {}) => ({
