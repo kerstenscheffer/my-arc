@@ -21,6 +21,10 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
     days_per_week: 0, equipment: [], days: []
   })
   const [activeDay, setActiveDay] = useState(null)
+  // Het rechterpaneel toont één dag tegelijk, dus er moet er altijd één
+  // gekozen zijn. Valt de selectie weg (dag verwijderd, ander plan geladen),
+  // dan pakken we de eerste.
+  const [instellingenOpen, setInstellingenOpen] = useState(false)
   const [showExerciseSelector, setShowExerciseSelector] = useState(false)
   const [showTemplateManager, setShowTemplateManager] = useState(false)
   const [showClientAssigner, setShowClientAssigner] = useState(false)
@@ -347,39 +351,80 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
     return name.includes(clientSearch.toLowerCase())
   })
 
+  useEffect(() => {
+    const dagen = workoutPlan.days || []
+    if (!dagen.length) { if (activeDay !== null) setActiveDay(null); return }
+    if (!dagen.some(d => d.id === activeDay)) setActiveDay(dagen[0].id)
+  }, [workoutPlan.days, activeDay])
+
   // Compacte stijl-tokens voor de header (leadsysteem-stijl, geen dikke velden).
   const cInput = { background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, padding: '0.45rem 0.6rem', color: '#fff', fontSize: '0.82rem', minHeight: 36, outline: 'none', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }
   const cSelect = { ...cInput, cursor: 'pointer', flex: 1, minWidth: 116 }
   const cBtn = (accent) => ({ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '0.4rem 0.7rem', borderRadius: 8, fontSize: '0.76rem', fontWeight: 700, cursor: 'pointer', minHeight: 36, touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', background: accent ? 'rgba(255,215,0,0.12)' : 'rgba(255,255,255,0.05)', border: `1px solid ${accent ? 'rgba(255,215,0,0.3)' : 'rgba(255,255,255,0.1)'}`, color: accent ? '#FFD700' : 'rgba(255,255,255,0.8)' })
 
-  return (
-    <div style={{ padding: isMobile ? '1rem' : '1.5rem', maxWidth: '1400px', margin: '0 auto' }}>
-      <div style={{ background: '#141414', borderRadius: '14px', border: '1px solid rgba(255,255,255,0.08)', padding: isMobile ? '0.8rem' : '1rem', marginBottom: '1rem' }}>
+  // Zijpaneel-knop: plat, volle breedte, geen vakje eromheen.
+  const zijKnop = (extra = {}) => ({
+    display: 'flex', alignItems: 'center', gap: 7,
+    width: '100%', padding: '0.45rem 0',
+    background: 'none', border: 'none', fontFamily: 'inherit',
+    fontSize: '0.82rem', fontWeight: 800, color: 'rgba(255,255,255,0.75)',
+    cursor: 'pointer', textAlign: 'left',
+    touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+    ...extra,
+  })
 
-        {/* Regel 1: compacte titel + client + schema · bibliotheek rechts */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.7rem', flexWrap: 'wrap' }}>
-          <Activity size={16} color="#FFD700" />
-          <span style={{ fontSize: isMobile ? '0.9rem' : '1rem', fontWeight: 800, color: '#fff', letterSpacing: '-0.01em' }}>Workout Builder</span>
-          {effectiveClient && (
-            <span style={{ fontSize: '0.66rem', fontWeight: 700, color: '#FFD700', background: 'rgba(255,215,0,0.1)', border: '1px solid rgba(255,215,0,0.2)', borderRadius: 5, padding: '0.15rem 0.45rem' }}>{clientName}</span>
-          )}
-          {/* Klant-loader — selecteer klant inline */}
+  const actieveDag = workoutPlan.days.find(d => d.id === activeDay) || null
+  const actieveIndex = workoutPlan.days.findIndex(d => d.id === activeDay)
+
+  return (
+    /* ══ 3/7-indeling — links sturen, rechts werken ══════════════════════
+       Was één brede kopkaart met vier regels velden en tien knoppen op een
+       rij, met daaronder een raster van dagkaarten van 350px. Bij zes dagen
+       stond je te scrollen tussen even brede kolommen zonder te weten waar je
+       was. Nu links het plan en de dagenlijst, rechts de dag waar je aan
+       werkt over de volle breedte — zelfde patroon als de Plan Analyzer en
+       het inzichtscherm. */
+    <div style={{
+      display: 'flex', flexDirection: isMobile ? 'column' : 'row',
+      alignItems: 'stretch',
+      height: isMobile ? 'auto' : 'calc(100vh - 120px)',
+      overflow: 'hidden',
+    }}>
+
+      {/* ══════════════ LINKS (3) ══════════════ */}
+      <div style={{
+        flex: isMobile ? 'none' : '3 1 0',
+        minWidth: 0,
+        maxWidth: isMobile ? '100%' : 420,
+        borderRight: isMobile ? 'none' : '1px solid rgba(255,255,255,0.08)',
+        borderBottom: isMobile ? '1px solid rgba(255,255,255,0.08)' : 'none',
+        overflowY: 'auto', WebkitOverflowScrolling: 'touch',
+        padding: isMobile ? '0.75rem' : '1rem',
+        display: 'flex', flexDirection: 'column', gap: '0.85rem',
+      }}>
+
+        {/* Klant + schema */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+          <span style={{ fontSize: '1rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.02em' }}>
+            {clientName || 'Workout Builder'}
+          </span>
+          <div style={{ flex: 1 }} />
           <div style={{ position: 'relative' }}>
-            <button onClick={() => setShowClientPicker(!showClientPicker)} style={{ ...cBtn(false), fontSize: '0.72rem' }}>
-              <Users size={12} /> {effectiveClient ? 'Wissel klant' : 'Klant laden'}
+            <button onClick={() => setShowClientPicker(!showClientPicker)} style={zijKnop({ width: 'auto', padding: 0, fontSize: '0.78rem', color: '#fff' })}>
+              <Users size={13} /> {effectiveClient ? 'Wissel' : 'Klant laden'}
             </button>
             {showClientPicker && (
-              <div style={{ position: 'absolute', top: 'calc(100% + 4px)', left: 0, zIndex: 200, background: '#111', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '10px', overflow: 'hidden', minWidth: '240px', maxHeight: '320px', boxShadow: '0 8px 32px rgba(0,0,0,0.6)', display: 'flex', flexDirection: 'column' }}>
+              <div style={{ position: 'absolute', top: 'calc(100% + 6px)', right: 0, zIndex: 200, background: '#111', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 10, overflow: 'hidden', minWidth: 240, maxHeight: 320, boxShadow: '0 8px 32px rgba(0,0,0,0.6)', display: 'flex', flexDirection: 'column' }}>
                 <div style={{ padding: '0.5rem', borderBottom: '1px solid rgba(255,255,255,0.07)', display: 'flex', alignItems: 'center', gap: 6 }}>
                   <Search size={12} color="rgba(255,255,255,0.4)" />
-                  <input autoFocus value={clientSearch} onChange={e => setClientSearch(e.target.value)} placeholder="Zoek klant…" style={{ background: 'none', border: 'none', outline: 'none', color: '#fff', fontSize: '0.78rem', flex: 1 }} />
+                  <input autoFocus value={clientSearch} onChange={e => setClientSearch(e.target.value)} placeholder="Zoek klant…" style={{ background: 'none', border: 'none', outline: 'none', color: '#fff', fontSize: '0.8rem', flex: 1, fontFamily: 'inherit' }} />
                   {clientSearch && <button onClick={() => setClientSearch('')} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, color: 'rgba(255,255,255,0.4)' }}><X size={12} /></button>}
                 </div>
                 <div style={{ overflowY: 'auto', flex: 1 }}>
-                  {filteredClients.length === 0 && <div style={{ padding: '0.6rem 0.85rem', color: 'rgba(255,255,255,0.3)', fontSize: '0.72rem' }}>Geen klanten gevonden</div>}
+                  {filteredClients.length === 0 && <div style={{ padding: '0.6rem 0.85rem', color: 'rgba(255,255,255,0.4)', fontSize: '0.78rem' }}>Geen klanten gevonden</div>}
                   {filteredClients.map((c, i) => (
                     <button key={c.id} onClick={() => handleSelectLocalClient(c)}
-                      style={{ width: '100%', padding: '0.55rem 0.85rem', background: effectiveClient?.id === c.id ? 'rgba(255,215,0,0.08)' : 'transparent', border: 'none', borderBottom: i < filteredClients.length - 1 ? '1px solid rgba(255,255,255,0.05)' : 'none', color: effectiveClient?.id === c.id ? '#FFD700' : '#fff', fontSize: '0.76rem', fontWeight: 600, cursor: 'pointer', textAlign: 'left', touchAction: 'manipulation' }}>
+                      style={{ width: '100%', padding: '0.55rem 0.85rem', background: 'transparent', border: 'none', borderBottom: i < filteredClients.length - 1 ? '1px solid rgba(255,255,255,0.05)' : 'none', color: '#fff', fontSize: '0.8rem', fontWeight: effectiveClient?.id === c.id ? 900 : 600, cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit', touchAction: 'manipulation' }}>
                       {c.first_name} {c.last_name}
                     </button>
                   ))}
@@ -387,140 +432,189 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
               </div>
             )}
           </div>
-          {clientSchemas.length > 1 && (
-            <div style={{ position: 'relative' }}>
-              <button onClick={() => setShowSchemaPicker(!showSchemaPicker)} style={{ ...cBtn(false), fontSize: '0.72rem' }}>
-                {activeSchema?._label || activeSchema?.name || 'Schema'}
-                <ChevronDown size={12} style={{ transition: 'transform 0.2s', transform: showSchemaPicker ? 'rotate(180deg)' : 'rotate(0)' }} />
-              </button>
-              {showSchemaPicker && (
-                <div style={{ position: 'absolute', top: 'calc(100% + 4px)', left: 0, zIndex: 100, background: '#111', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '10px', overflow: 'hidden', minWidth: '220px', boxShadow: '0 8px 32px rgba(0,0,0,0.5)' }}>
-                  {clientSchemas.map((s, i) => (
-                    <button key={s.id} onClick={() => loadSchemaIntoBuilder(s)}
-                      style={{ width: '100%', padding: '0.6rem 0.85rem', background: selectedSchemaId === s.id ? 'rgba(255,215,0,0.08)' : 'transparent', border: 'none', borderBottom: i < clientSchemas.length - 1 ? '1px solid rgba(255,255,255,0.06)' : 'none', color: selectedSchemaId === s.id ? '#FFD700' : '#fff', fontSize: '0.76rem', fontWeight: '600', cursor: 'pointer', textAlign: 'left', touchAction: 'manipulation' }}>
-                      <div>{s._label || s.name}</div>
-                      <div style={{ fontSize: '0.6rem', color: 'rgba(255,255,255,0.3)', marginTop: '0.1rem' }}>
-                        {s.is_client_edited ? 'Aangepast door client' : 'Origineel coachplan'}
-                      </div>
-                    </button>
-                  ))}
+        </div>
+
+        {clientSchemas.length > 1 && (
+          <select value={selectedSchemaId || ''} onChange={(e) => {
+            const s = clientSchemas.find(x => x.id === e.target.value)
+            if (s) loadSchemaIntoBuilder(s)
+          }} style={cSelect}>
+            {clientSchemas.map(s => (
+              <option key={s.id} value={s.id} style={{ background: '#0a0a0a' }}>
+                {s._label || s.name}{s.is_client_edited ? ' · door client aangepast' : ''}
+              </option>
+            ))}
+          </select>
+        )}
+
+        {/* ── Dagen — dit is de navigatie ─────────────────────────────── */}
+        <div>
+          <div style={{ fontSize: '0.72rem', fontWeight: 900, color: 'rgba(255,255,255,0.45)', marginBottom: 6 }}>
+            {workoutPlan.days.length} {workoutPlan.days.length === 1 ? 'dag' : 'dagen'}
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+            {workoutPlan.days.map((day, index) => {
+              const aan = day.id === activeDay
+              const aantal = (day.exercises || []).length
+              return (
+                <button key={day.id} onClick={() => setActiveDay(day.id)}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 8,
+                    width: '100%', padding: '0.5rem 0.6rem', borderRadius: 8,
+                    background: aan ? 'rgba(255,255,255,0.1)' : 'transparent',
+                    border: `1px solid ${aan ? 'rgba(255,255,255,0.2)' : 'transparent'}`,
+                    color: '#fff', fontFamily: 'inherit', cursor: 'pointer', textAlign: 'left',
+                    touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+                  }}>
+                  <span style={{
+                    flexShrink: 0, minWidth: 22, height: 22, borderRadius: 6,
+                    background: aan ? '#fff' : 'rgba(255,255,255,0.08)',
+                    color: aan ? '#000' : 'rgba(255,255,255,0.6)',
+                    fontSize: '0.72rem', fontWeight: 900,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  }}>{index + 1}</span>
+                  <span style={{ flex: 1, minWidth: 0, fontSize: '0.85rem', fontWeight: aan ? 900 : 700, letterSpacing: '-0.01em', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {day.name || `Dag ${index + 1}`}
+                  </span>
+                  <span style={{ flexShrink: 0, fontSize: '0.75rem', fontWeight: 700, color: 'rgba(255,255,255,0.4)' }}>
+                    {aantal}
+                  </span>
+                </button>
+              )
+            })}
+            <button onClick={() => setShowDayPicker(true)} style={zijKnop({ padding: '0.5rem 0.6rem', color: '#fff', fontWeight: 900 })}>
+              <Plus size={14} strokeWidth={2.8} /> Nieuwe dag
+            </button>
+          </div>
+        </div>
+
+        {/* ── Planinstellingen — dichtgeklapt; je stelt ze één keer in ─── */}
+        <div style={{ borderTop: '1px solid rgba(255,255,255,0.07)', paddingTop: '0.6rem' }}>
+          <button onClick={() => setInstellingenOpen(v => !v)} style={zijKnop({ color: '#fff', fontWeight: 900 })}>
+            <ChevronDown size={14} style={{ transform: instellingenOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s' }} />
+            Planinstellingen
+          </button>
+          {instellingenOpen && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.45rem', marginTop: '0.4rem' }}>
+              <input type="text" placeholder="Workout naam *" value={workoutPlan.name}
+                onChange={(e) => setWorkoutPlan(prev => ({ ...prev, name: e.target.value }))} style={cInput} />
+              <input type="text" placeholder="Beschrijving" value={workoutPlan.description}
+                onChange={(e) => setWorkoutPlan(prev => ({ ...prev, description: e.target.value }))} style={cInput} />
+              <select value={workoutPlan.primary_goal} onChange={(e) => setWorkoutPlan(prev => ({ ...prev, primary_goal: e.target.value }))} style={{ ...cSelect, flex: 'none' }}>
+                <option value="muscle_gain">Muscle Gain</option>
+                <option value="fat_loss">Fat Loss</option>
+                <option value="strength">Strength</option>
+                <option value="endurance">Endurance</option>
+                <option value="maintenance">Maintenance</option>
+                <option value="recomp">Body Recomposition</option>
+              </select>
+              <select value={workoutPlan.experience_level} onChange={(e) => setWorkoutPlan(prev => ({ ...prev, experience_level: e.target.value }))} style={{ ...cSelect, flex: 'none' }}>
+                <option value="beginner">Beginner</option>
+                <option value="intermediate">Intermediate</option>
+                <option value="advanced">Advanced</option>
+              </select>
+
+              {/* Intake-voorkeuren van de klant — alleen relevant bij het opzetten. */}
+              {trainingInfo && (
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, alignItems: 'center', fontSize: '0.75rem', fontWeight: 700, color: 'rgba(255,255,255,0.55)' }}>
+                  <Calendar size={12} style={{ flexShrink: 0 }} />
+                  {trainingInfo.preferred_training_days?.length > 0 && (
+                    <>Voorkeur: {trainingInfo.preferred_training_days.map(d => DAY_ABBR[d] || d).join(' ')}</>
+                  )}
+                  {trainingInfo.intakeDays?.length > 0 && (
+                    <span style={{ color: 'rgba(255,255,255,0.4)' }}>· intake {trainingInfo.intakeDays.map(d => DAY_ABBR[d] || d).join(' ')}</span>
+                  )}
                 </div>
               )}
             </div>
           )}
-          <div style={{ flex: 1 }} />
-          <button onClick={() => setShowExerciseLibrary(true)} title="Bibliotheek · video's koppelen" style={cBtn(false)}>
-            <Video size={13} /> Video's
-          </button>
         </div>
 
-        {/* Training-info strip — intake data van geselecteerde klant */}
-        {trainingInfo && (
-          <div style={{ marginBottom: '0.65rem', padding: '0.5rem 0.65rem', background: 'rgba(255,215,0,0.04)', border: '1px solid rgba(255,215,0,0.15)', borderRadius: 8, display: 'flex', flexWrap: 'wrap', gap: '0.75rem', alignItems: 'center' }}>
-            <Calendar size={12} color="#FFD700" style={{ flexShrink: 0 }} />
-            {trainingInfo.preferred_training_days?.length > 0 && (
-              <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', alignItems: 'center' }}>
-                <span style={{ fontSize: '0.6rem', fontWeight: 700, color: 'rgba(255,215,0,0.6)', textTransform: 'uppercase', letterSpacing: '0.06em', marginRight: 2 }}>Voorkeur</span>
-                {trainingInfo.preferred_training_days.map(d => (
-                  <span key={d} style={{ fontSize: '0.65rem', fontWeight: 800, color: '#FFD700', background: 'rgba(255,215,0,0.1)', borderRadius: 4, padding: '0.1rem 0.35rem' }}>{DAY_ABBR[d] || d}</span>
-                ))}
-              </div>
-            )}
-            {trainingInfo.intakeDays?.length > 0 && (
-              <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', alignItems: 'center' }}>
-                <span style={{ fontSize: '0.6rem', fontWeight: 700, color: 'rgba(255,255,255,0.35)', textTransform: 'uppercase', letterSpacing: '0.06em', marginRight: 2 }}>Intake</span>
-                {trainingInfo.intakeDays.map(d => (
-                  <span key={d} style={{ fontSize: '0.65rem', fontWeight: 800, color: 'rgba(255,255,255,0.7)', background: 'rgba(255,255,255,0.07)', borderRadius: 4, padding: '0.1rem 0.35rem' }}>{DAY_ABBR[d] || d}</span>
-                ))}
-              </div>
-            )}
-            {trainingInfo.primary_goal && (
-              <span style={{ fontSize: '0.6rem', fontWeight: 700, color: 'rgba(255,255,255,0.4)', marginLeft: 'auto' }}>{GOAL_LABELS[trainingInfo.primary_goal] || trainingInfo.primary_goal}</span>
-            )}
-          </div>
-        )}
-
-        {/* Regel 2: naam + beschrijving */}
-        <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.5rem', flexWrap: isMobile ? 'wrap' : 'nowrap' }}>
-          <input type="text" placeholder="Workout naam *" value={workoutPlan.name} onChange={(e) => setWorkoutPlan(prev => ({ ...prev, name: e.target.value }))} style={{ ...cInput, flex: 2, minWidth: 140 }} />
-          <input type="text" placeholder="Beschrijving (optioneel)" value={workoutPlan.description} onChange={(e) => setWorkoutPlan(prev => ({ ...prev, description: e.target.value }))} style={{ ...cInput, flex: 3, minWidth: 140 }} />
-        </div>
-
-        {/* Regel 3: doel + niveau + dagen (compact, geen losse labels) */}
-        <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.7rem', flexWrap: 'wrap' }}>
-          <select value={workoutPlan.primary_goal} onChange={(e) => setWorkoutPlan(prev => ({ ...prev, primary_goal: e.target.value }))} style={cSelect}>
-            <option value="muscle_gain">Muscle Gain</option>
-            <option value="fat_loss">Fat Loss</option>
-            <option value="strength">Strength</option>
-            <option value="endurance">Endurance</option>
-            <option value="maintenance">Maintenance</option>
-            <option value="recomp">Body Recomposition</option>
-          </select>
-          <select value={workoutPlan.experience_level} onChange={(e) => setWorkoutPlan(prev => ({ ...prev, experience_level: e.target.value }))} style={cSelect}>
-            <option value="beginner">Beginner</option>
-            <option value="intermediate">Intermediate</option>
-            <option value="advanced">Advanced</option>
-          </select>
-          <span style={{ ...cInput, display: 'flex', alignItems: 'center', color: '#FFD700', fontWeight: 700, whiteSpace: 'nowrap', flexShrink: 0 }}>
-            {workoutPlan.days.length} dagen
-          </span>
-        </div>
-
-        {/* Regel 4: acties (compact) */}
-        <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
-          {/* Ongedaan maken / opnieuw — draait wijzigingen in het plan terug. */}
-          <button onClick={history.undo} disabled={!history.canUndo} title="Ongedaan maken"
-            style={{ ...cBtn(false), padding: '0 0.6rem', opacity: history.canUndo ? 1 : 0.35, cursor: history.canUndo ? 'pointer' : 'not-allowed' }}>
-            <Undo2 size={15} />
-          </button>
-          <button onClick={history.redo} disabled={!history.canRedo} title="Opnieuw"
-            style={{ ...cBtn(false), padding: '0 0.6rem', opacity: history.canRedo ? 1 : 0.35, cursor: history.canRedo ? 'pointer' : 'not-allowed' }}>
-            <Redo2 size={15} />
-          </button>
-          <button onClick={() => setShowTemplateManager(true)} style={cBtn(false)}>
-            <FileText size={14} /> Templates
-          </button>
-          <button onClick={clearPlan} disabled={workoutPlan.days.length === 0 && !workoutPlan.name}
-            style={{ ...cBtn(false), color: '#ef4444', border: '1px solid rgba(239,68,68,0.3)', background: 'rgba(239,68,68,0.08)', opacity: (workoutPlan.days.length === 0 && !workoutPlan.name) ? 0.4 : 1, cursor: (workoutPlan.days.length === 0 && !workoutPlan.name) ? 'not-allowed' : 'pointer' }}>
-            <Trash2 size={14} /> Leegmaken
-          </button>
-          <button onClick={saveAsTemplate} disabled={saving || workoutPlan.days.length === 0 || !workoutPlan.name} style={{ ...cBtn(true), cursor: saving || !workoutPlan.name ? 'not-allowed' : 'pointer', opacity: workoutPlan.days.length === 0 || !workoutPlan.name ? 0.5 : 1 }}>
-            <Save size={14} /> {saving ? 'Opslaan…' : 'Save Template'}
-          </button>
-          {selectedSchemaId && (
-            <button onClick={saveToClientSchema} disabled={saving} style={{ ...cBtn(true), cursor: saving ? 'not-allowed' : 'pointer' }}>
-              <Save size={14} /> {saving ? 'Opslaan…' : 'Opslaan in client plan'}
-            </button>
-          )}
-          <button onClick={() => setShowClientAssigner(true)} disabled={workoutPlan.days.length === 0} style={{ ...cBtn(false), cursor: workoutPlan.days.length === 0 ? 'not-allowed' : 'pointer', opacity: workoutPlan.days.length === 0 ? 0.5 : 1 }}>
-            <Users size={14} /> Huidig plan toewijzen
-          </button>
-          <button onClick={() => setShowPlanManager(true)} style={cBtn(true)}>
+        {/* ── Acties — onder elkaar i.p.v. tien knoppen op een rij ─────── */}
+        <div style={{ borderTop: '1px solid rgba(255,255,255,0.07)', paddingTop: '0.6rem', display: 'flex', flexDirection: 'column', gap: 1 }}>
+          <button onClick={() => setShowPlanManager(true)} style={zijKnop({ color: '#fff', fontWeight: 900 })}>
             <Users size={14} /> Plannen toewijzen
           </button>
+          <button onClick={() => setShowClientAssigner(true)} disabled={workoutPlan.days.length === 0}
+            style={zijKnop({ opacity: workoutPlan.days.length === 0 ? 0.35 : 1, cursor: workoutPlan.days.length === 0 ? 'not-allowed' : 'pointer' })}>
+            <Users size={14} /> Huidig plan toewijzen
+          </button>
+          <button onClick={() => setShowTemplateManager(true)} style={zijKnop()}>
+            <FileText size={14} /> Templates
+          </button>
+          <button onClick={() => setShowExerciseLibrary(true)} style={zijKnop()}>
+            <Video size={14} /> Video's
+          </button>
+          <button onClick={clearPlan} disabled={workoutPlan.days.length === 0 && !workoutPlan.name}
+            style={zijKnop({ color: '#ef4444', opacity: (workoutPlan.days.length === 0 && !workoutPlan.name) ? 0.35 : 1 })}>
+            <Trash2 size={14} /> Leegmaken
+          </button>
+
+          <div style={{ display: 'flex', gap: 6, marginTop: '0.5rem' }}>
+            <button onClick={history.undo} disabled={!history.canUndo} title="Ongedaan maken"
+              style={{ ...zijKnop({ width: 'auto', padding: '0.4rem 0.55rem' }), opacity: history.canUndo ? 1 : 0.3 }}>
+              <Undo2 size={15} />
+            </button>
+            <button onClick={history.redo} disabled={!history.canRedo} title="Opnieuw"
+              style={{ ...zijKnop({ width: 'auto', padding: '0.4rem 0.55rem' }), opacity: history.canRedo ? 1 : 0.3 }}>
+              <Redo2 size={15} />
+            </button>
+          </div>
+
+          {/* Eén primaire actie onderaan. */}
+          <button onClick={selectedSchemaId ? saveToClientSchema : saveAsTemplate}
+            disabled={saving || workoutPlan.days.length === 0 || (!selectedSchemaId && !workoutPlan.name)}
+            style={{
+              marginTop: '0.5rem', width: '100%',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+              padding: '0.6rem', borderRadius: 8, border: 'none',
+              background: '#fff', color: '#0a0a0a',
+              fontSize: '0.85rem', fontWeight: 900, fontFamily: 'inherit',
+              cursor: saving ? 'wait' : 'pointer',
+              opacity: (workoutPlan.days.length === 0 || (!selectedSchemaId && !workoutPlan.name)) ? 0.45 : 1,
+              touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+            }}>
+            <Save size={15} strokeWidth={2.6} />
+            {saving ? 'Opslaan…' : selectedSchemaId ? 'Opslaan in client plan' : 'Opslaan als template'}
+          </button>
         </div>
       </div>
 
-      {/* Days Grid */}
-      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fill, minmax(350px, 1fr))', gap: '1rem', marginBottom: '1.5rem' }}>
-        {workoutPlan.days.map((day, index) => (
-          <DayBuilder key={day.id} day={day} dayNumber={index + 1} isActive={activeDay === day.id}
-            onActivate={() => setActiveDay(day.id)} onUpdate={(updates) => updateDay(day.id, updates)}
-            onDelete={() => deleteDay(day.id)} onDuplicate={() => duplicateDay(day.id)}
-            onSaveTemplate={() => saveDayAsTemplate(day)}
-            onAddExercise={() => { setActiveDay(day.id); setShowExerciseSelector(true) }}
-            onAddCardio={() => addCardioToDay(day.id)}
-            onUpdateExercise={(exerciseId, updates) => updateExercise(day.id, exerciseId, updates)}
-            onDeleteExercise={(exerciseId) => deleteExercise(day.id, exerciseId)} isMobile={isMobile}
-            db={db} client={effectiveClient} />
-        ))}
-        <button onClick={() => setShowDayPicker(true)} style={{ background: 'rgba(212,175,55,0.07)', border: '2px dashed rgba(212,175,55,0.3)', borderRadius: '16px', padding: isMobile ? '2rem' : '3rem', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', cursor: 'pointer', minHeight: isMobile ? '150px' : '200px', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}
-          onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(212,175,55,0.15)'; e.currentTarget.style.borderColor = 'rgba(212,175,55,0.5)' }}
-          onMouseLeave={(e) => { e.currentTarget.style.background = 'rgba(212,175,55,0.07)'; e.currentTarget.style.borderColor = 'rgba(212,175,55,0.3)' }}>
-          <Plus size={32} color="#FFD700" />
-          <span style={{ color: '#FFD700', fontSize: isMobile ? '0.9rem' : '1rem', fontWeight: '600' }}>Nieuwe Dag Toevoegen</span>
-        </button>
+      {/* ══════════════ RECHTS (7) ══════════════ */}
+      <div style={{
+        flex: isMobile ? 'none' : '7 1 0',
+        minWidth: 0,
+        overflowY: 'auto', WebkitOverflowScrolling: 'touch',
+        padding: isMobile ? '0.75rem' : '1rem',
+      }}>
+        {actieveDag ? (
+          <DayBuilder
+            key={actieveDag.id} day={actieveDag} dayNumber={actieveIndex + 1} isActive
+            onActivate={() => setActiveDay(actieveDag.id)}
+            onUpdate={(updates) => updateDay(actieveDag.id, updates)}
+            onDelete={() => deleteDay(actieveDag.id)}
+            onDuplicate={() => duplicateDay(actieveDag.id)}
+            onSaveTemplate={() => saveDayAsTemplate(actieveDag)}
+            onAddExercise={() => { setActiveDay(actieveDag.id); setShowExerciseSelector(true) }}
+            onAddCardio={() => addCardioToDay(actieveDag.id)}
+            onUpdateExercise={(exerciseId, updates) => updateExercise(actieveDag.id, exerciseId, updates)}
+            onDeleteExercise={(exerciseId) => deleteExercise(actieveDag.id, exerciseId)}
+            isMobile={isMobile} db={db} client={effectiveClient}
+          />
+        ) : (
+          <div style={{ padding: '3rem 1rem', textAlign: 'center' }}>
+            <div style={{ fontSize: '1rem', fontWeight: 900, color: '#fff', marginBottom: '0.5rem' }}>Nog geen dagen</div>
+            <button onClick={() => setShowDayPicker(true)} style={{
+              display: 'inline-flex', alignItems: 'center', gap: 6, padding: '0.6rem 1rem',
+              borderRadius: 8, border: 'none', background: '#fff', color: '#0a0a0a',
+              fontSize: '0.85rem', fontWeight: 900, fontFamily: 'inherit', cursor: 'pointer',
+            }}>
+              <Plus size={15} strokeWidth={2.8} /> Eerste dag toevoegen
+            </button>
+          </div>
+        )}
       </div>
+
 
       {showExerciseSelector && <ExerciseSelector onSelect={addExercise} onClose={() => setShowExerciseSelector(false)} isMobile={isMobile} db={db} selectedClient={effectiveClient} />}
       {showTemplateManager && <TemplateManager templates={templates} onLoad={loadTemplate} onClose={() => setShowTemplateManager(false)} isMobile={isMobile} db={db} onChange={loadTemplates} />}
