@@ -336,97 +336,106 @@ export default function AgendaView({
     )
   }, [allTasks])
 
-  // Ongeplande taken gegroepeerd per sectie — zelfde indeling als de
-  // todo-modal (DayDetailView): secties onder elkaar, elk inklapbaar met een
-  // gekleurde kop en de taken eronder. Vervangt de horizontale tabs; die
-  // dwongen je steeds één sectie tegelijk te bekijken.
-  const [dichtgeklapt, setDichtgeklapt] = useState({})
+  // Sectie-rail links, taken rechts — zelfde indeling als QuickTodoModal.
+  // Eerder stonden de secties boven elkaar mét hun taken erin; dan moet je
+  // scrollen langs secties die je niet zoekt.
+  const [railFilter, setRailFilter] = useState('all')
 
-  const ongeplandPerSectie = useMemo(() => {
-    const groepen = (sections || [])
-      .filter(sec => sec.id !== 'unassigned')
-      .map(sec => ({
-        id: sec.id,
-        title: sec.title,
-        color: sec.color || '#10b981',
-        tasks: unscheduledTasks.filter(t => t.section_id === sec.id),
-      }))
-      .filter(g => g.tasks.length > 0)
-
-    // Taken zonder sectie onderaan, zodat ze niet tussen je echte kolommen
-    // verdwijnen.
-    const losse = unscheduledTasks.filter(t => !t.section_id)
-    if (losse.length > 0) groepen.push({ id: 'geen', title: 'Overig', color: '#10b981', tasks: losse })
-    return groepen
+  const railItems = useMemo(() => {
+    const telling = {}
+    unscheduledTasks.forEach(t => { const k = t.section_id || 'geen'; telling[k] = (telling[k] || 0) + 1 })
+    return [
+      { id: 'all', title: 'Alles', color: '#FFD700', aantal: unscheduledTasks.length },
+      ...(sections || [])
+        .filter(sec => sec.id !== 'unassigned' && telling[sec.id])
+        .map(sec => ({ id: sec.id, title: sec.title, color: sec.color || '#10b981', aantal: telling[sec.id] })),
+      ...(telling.geen ? [{ id: 'geen', title: 'Overig', color: 'rgba(255,255,255,0.6)', aantal: telling.geen }] : []),
+    ]
   }, [unscheduledTasks, sections])
 
-  // Gedeelde lijst voor beide "Niet gepland"-panelen, zodat ze niet uit elkaar
-  // kunnen lopen. `sleepbaar` staat alleen aan in het paneel dat drag-and-drop
-  // ondersteunt; het andere werkt via aantikken (armedTask).
-  const OngeplandeLijst = ({ sleepbaar = false, legeTekst }) => (
-    <div style={{ padding: '0.5rem', display: 'flex', flexDirection: 'column', gap: '0.45rem' }}>
-      {ongeplandPerSectie.length === 0 && (
-        <div style={{ padding: '1.2rem 0.5rem', textAlign: 'center', color: 'rgba(255,255,255,0.25)', fontSize: '0.7rem', fontWeight: 500, lineHeight: 1.4 }}>
-          {legeTekst}
-        </div>
-      )}
-      {ongeplandPerSectie.map(sec => {
-        const open = !dichtgeklapt[sec.id]
-        return (
-          <div key={sec.id} style={{ background: '#0a0a0a', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 8, overflow: 'hidden' }}>
-            <button
-              onClick={() => setDichtgeklapt(prev => ({ ...prev, [sec.id]: open }))}
-              style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '0.4rem', padding: '0.4rem 0.6rem', background: 'transparent', border: 'none', borderBottom: open ? `1px solid ${sec.color}20` : 'none', cursor: 'pointer', fontFamily: 'inherit', touchAction: 'manipulation' }}>
-              <span style={{ width: 6, height: 6, borderRadius: '50%', background: sec.color, flexShrink: 0 }} />
-              <span style={{ flex: 1, textAlign: 'left', fontSize: '0.7rem', fontWeight: 800, color: sec.color }}>{sec.title}</span>
-              <span style={{ fontSize: '0.6rem', fontWeight: 800, color: sec.color, opacity: 0.6 }}>{sec.tasks.length}</span>
-              {open ? <ChevronUp size={11} color="rgba(255,255,255,0.3)" /> : <ChevronDown size={11} color="rgba(255,255,255,0.3)" />}
-            </button>
+  const zichtbareTaken = useMemo(() => {
+    if (railFilter === 'all') return unscheduledTasks
+    if (railFilter === 'geen') return unscheduledTasks.filter(t => !t.section_id)
+    return unscheduledTasks.filter(t => t.section_id === railFilter)
+  }, [unscheduledTasks, railFilter])
 
-            {open && (
-              <div style={{ padding: '0.35rem', display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
-                {sec.tasks.map(task => {
-                  const color = task.color || sec.color
-                  const isArmed = armedTask?.id === task.id
-                  return (
-                    <div
-                      key={task.id}
-                      draggable={sleepbaar}
-                      onDragStart={sleepbaar ? (e) => onTaskDragStart(e, task, 'sidebar') : undefined}
-                      onDragEnd={sleepbaar ? onTaskDragEnd : undefined}
-                      onClick={() => setArmedTask(prev => prev?.id === task.id ? null : task)}
-                      style={{
-                        display: 'flex', alignItems: 'center', gap: '0.4rem',
-                        padding: '0.45rem 0.55rem',
-                        background: isArmed ? 'rgba(255,215,0,0.14)' : 'rgba(255,255,255,0.03)',
-                        border: isArmed ? '1px solid #FFD700' : '1px solid rgba(255,255,255,0.05)',
-                        borderLeft: `3px solid ${color}`,
-                        borderRadius: 6,
-                        cursor: sleepbaar ? 'grab' : 'pointer',
-                        touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-                      }}
-                    >
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#fff', lineHeight: 1.25, wordBreak: 'break-word' }}>
-                          {task.title}
-                        </div>
-                        <div style={{ fontSize: '0.55rem', color: isArmed ? '#FFD700' : 'rgba(255,255,255,0.35)', fontWeight: 600, marginTop: 2 }}>
-                          {isArmed ? 'Tik op een dag/tijd →' : (task.estimated_minutes ? `${task.estimated_minutes} min` : 'Tik om in te plannen')}
-                        </div>
-                      </div>
-                      <button onClick={(e) => { e.stopPropagation(); onTaskClick && onTaskClick(task) }}
-                        title="Bewerk taak"
-                        style={{ flexShrink: 0, width: 24, height: 24, borderRadius: 6, background: 'rgba(255,255,255,0.06)', border: 'none', color: 'rgba(255,255,255,0.5)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', touchAction: 'manipulation' }}>
-                        <Pencil size={11} />
-                      </button>
-                    </div>
-                  )
-                })}
-              </div>
-            )}
+  // Gekozen sectie leeggeraakt → terug naar Alles, anders staar je naar niets.
+  useEffect(() => {
+    if (railFilter !== 'all' && !railItems.some(r => r.id === railFilter)) setRailFilter('all')
+  }, [railItems, railFilter])
+
+  // Gedeeld door beide "Niet gepland"-panelen zodat ze niet uit elkaar lopen.
+  // `sleepbaar` staat alleen aan in het paneel dat drag-and-drop ondersteunt.
+  const OngeplandeLijst = ({ sleepbaar = false, legeTekst }) => (
+    <div style={{ display: 'flex', minHeight: 0 }}>
+      {/* Sectie-rail */}
+      <div style={{ width: isMobile ? 96 : 128, flexShrink: 0, borderRight: '1px solid rgba(255,255,255,0.06)', padding: '0.5rem 0.4rem', overflowY: 'auto' }}>
+        <div style={{ fontSize: '0.5rem', fontWeight: 800, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.3)', padding: '0 0.3rem 0.35rem' }}>Secties</div>
+        {railItems.map(item => {
+          const aan = railFilter === item.id
+          return (
+            <button key={item.id} onClick={() => setRailFilter(item.id)} title={item.title}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 5, width: '100%',
+                padding: '0.4rem 0.45rem', borderRadius: 7, marginBottom: 2,
+                background: aan ? 'rgba(255,215,0,0.12)' : 'transparent',
+                border: `1px solid ${aan ? 'rgba(255,215,0,0.35)' : 'transparent'}`,
+                cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit',
+                touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+              }}>
+              <span style={{ flexShrink: 0, width: 7, height: 7, borderRadius: '50%', background: item.color }} />
+              <span style={{ flex: 1, minWidth: 0, fontSize: '0.68rem', fontWeight: aan ? 800 : 600, color: aan ? '#FFD700' : 'rgba(255,255,255,0.7)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.title}</span>
+              <span style={{ flexShrink: 0, fontSize: '0.56rem', fontWeight: 800, color: aan ? '#FFD700' : 'rgba(255,255,255,0.35)' }}>{item.aantal}</span>
+            </button>
+          )
+        })}
+      </div>
+
+      {/* Taken */}
+      <div style={{ flex: 1, minWidth: 0, padding: '0.5rem', display: 'flex', flexDirection: 'column', gap: '0.35rem', overflowY: 'auto' }}>
+        {zichtbareTaken.length === 0 && (
+          <div style={{ padding: '1.2rem 0.5rem', textAlign: 'center', color: 'rgba(255,255,255,0.25)', fontSize: '0.7rem', fontWeight: 500, lineHeight: 1.4 }}>
+            {railFilter === 'all' ? legeTekst : 'Geen losse taken in deze sectie.'}
           </div>
-        )
-      })}
+        )}
+        {zichtbareTaken.map(task => {
+          const color = task.color || sectionColorById[task.section_id] || '#10b981'
+          const isArmed = armedTask?.id === task.id
+          return (
+            <div
+              key={task.id}
+              draggable={sleepbaar}
+              onDragStart={sleepbaar ? (e) => onTaskDragStart(e, task, 'sidebar') : undefined}
+              onDragEnd={sleepbaar ? onTaskDragEnd : undefined}
+              onClick={() => setArmedTask(prev => prev?.id === task.id ? null : task)}
+              style={{
+                display: 'flex', alignItems: 'center', gap: '0.4rem',
+                padding: '0.45rem 0.55rem',
+                background: isArmed ? 'rgba(255,215,0,0.14)' : 'rgba(255,255,255,0.03)',
+                border: isArmed ? '1px solid #FFD700' : '1px solid rgba(255,255,255,0.05)',
+                borderLeft: `3px solid ${color}`,
+                borderRadius: 6,
+                cursor: sleepbaar ? 'grab' : 'pointer',
+                touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+              }}
+            >
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#fff', lineHeight: 1.25, wordBreak: 'break-word' }}>
+                  {task.title}
+                </div>
+                <div style={{ fontSize: '0.55rem', color: isArmed ? '#FFD700' : 'rgba(255,255,255,0.35)', fontWeight: 600, marginTop: 2 }}>
+                  {isArmed ? 'Tik op een dag/tijd →' : (task.estimated_minutes ? `${task.estimated_minutes} min` : 'Tik om in te plannen')}
+                </div>
+              </div>
+              <button onClick={(e) => { e.stopPropagation(); onTaskClick && onTaskClick(task) }}
+                title="Bewerk taak"
+                style={{ flexShrink: 0, width: 24, height: 24, borderRadius: 6, background: 'rgba(255,255,255,0.06)', border: 'none', color: 'rgba(255,255,255,0.5)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', touchAction: 'manipulation' }}>
+                <Pencil size={11} />
+              </button>
+            </div>
+          )
+        })}
+      </div>
     </div>
   )
 
@@ -980,7 +989,7 @@ export default function AgendaView({
               iconColor="rgba(255,255,255,0.6)"
               isMobile={isMobile}
               align="right"
-              panelWidth={isMobile ? 260 : 380}
+              panelWidth={isMobile ? 320 : 480}
             >
               <OngeplandeLijst legeTekst="Geen losse taken. Tik een taak aan om in te plannen." />
             </FloatingPanel>
@@ -1050,7 +1059,7 @@ export default function AgendaView({
               iconColor="rgba(255,255,255,0.6)"
               isMobile={isMobile}
               align="right"
-              panelWidth={isMobile ? 260 : 380}
+              panelWidth={isMobile ? 320 : 480}
             >
               <div
                 onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move' }}
