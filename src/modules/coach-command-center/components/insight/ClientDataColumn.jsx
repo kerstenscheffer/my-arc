@@ -906,7 +906,11 @@ function MacroRulesBlock({ client, db, onClientUpdate, isMobile }) {
       borderTop: `1px solid ${C.borderItem}`,
       opacity: disabled ? 0.5 : 1,
     }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+      {/* Alles op één regel: vinkje, naam, instelling, uitkomst. De instelling
+          stond eerder als tweede regel eronder ingesprongen — dat is een halve
+          extra regel per factor, vijf keer. Op telefoon zakt de instelling
+          alsnog naar een eigen regel, want daar past het niet naast elkaar. */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
         <input
           type="checkbox" checked={checked} disabled={disabled}
           onChange={(e) => onCheck(e.target.checked)}
@@ -916,13 +920,30 @@ function MacroRulesBlock({ client, db, onClientUpdate, isMobile }) {
           }}
         />
         <span style={{
-          flex: 1, minWidth: 0,
+          flexShrink: 0,
           fontSize: '0.85rem', color: '#fff',
           fontWeight: 900, letterSpacing: '-0.01em',
         }}>
           {label}
         </span>
+
+        {(detail || missingHint) && (
+          <span style={{
+            order: isMobile ? 4 : 0,
+            flex: isMobile ? '1 1 100%' : '1 1 auto',
+            minWidth: 0,
+            marginLeft: isMobile ? 25 : 0,
+            display: 'flex', alignItems: 'center', gap: 7, flexWrap: 'wrap',
+            fontSize: '0.78rem', fontWeight: 700, color: 'rgba(255,255,255,0.6)',
+          }}>
+            {missingHint ? (
+              <span style={{ color: '#f59e0b' }}>{missingHint}</span>
+            ) : detail}
+          </span>
+        )}
+
         <span style={{
+          marginLeft: 'auto', flexShrink: 0,
           fontSize: '0.92rem', fontWeight: 900,
           color: dimmed ? 'rgba(255,255,255,0.35)' : (kcalColor || '#fff'),
           letterSpacing: '-0.01em', whiteSpace: 'nowrap',
@@ -930,17 +951,6 @@ function MacroRulesBlock({ client, db, onClientUpdate, isMobile }) {
           {kcalText}
         </span>
       </div>
-      {(detail || missingHint) && (
-        <div style={{
-          marginTop: 6, marginLeft: 25,
-          display: 'flex', alignItems: 'center', gap: 7, flexWrap: 'wrap',
-          fontSize: '0.78rem', fontWeight: 700, color: 'rgba(255,255,255,0.6)',
-        }}>
-          {missingHint ? (
-            <span style={{ color: '#f59e0b' }}>{missingHint}</span>
-          ) : detail}
-        </div>
-      )}
     </div>
   )
 
@@ -1012,7 +1022,14 @@ function MacroRulesBlock({ client, db, onClientUpdate, isMobile }) {
           Inklapbare header: dichtgeklapt zie je alleen de opgeslagen TDEE
           + modus, open zie je alle factoren + Bereken-knop. */}
       <button
-        onClick={() => setShowTdeeDetail(v => !v)}
+        onClick={() => {
+          // Onderhoud en macro's zijn twee stappen van dezelfde handeling.
+          // Ga je onderhoud bewerken, dan hoort het tekort er direct onder te
+          // staan in plaats van achter een tweede uitklap.
+          const open = !showTdeeDetail
+          setShowTdeeDetail(open)
+          if (open) setShowMacroDetail(true)
+        }}
         style={{
           width: '100%',
           padding: isMobile ? '0.55rem 0.75rem' : '0.65rem 1rem',
@@ -1110,22 +1127,22 @@ function MacroRulesBlock({ client, db, onClientUpdate, isMobile }) {
 
       {/* Cardio — lijst van activiteiten, elk met type/min/sessies */}
       <div style={{
-        padding: isMobile ? '0.45rem 0.75rem 0.55rem' : '0.55rem 1rem 0.65rem',
+        padding: isMobile ? '0.5rem 0.75rem' : '0.55rem 1rem',
         borderTop: `1px solid ${C.borderItem}`,
         opacity: !includeCardio ? 0.6 : 1,
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <input
             type="checkbox" checked={includeCardio}
             onChange={(e) => setIncludeCardio(e.target.checked)}
-            style={{ width: 14, height: 14, accentColor: C.gold, cursor: 'pointer', flexShrink: 0 }}
+            style={{ width: 15, height: 15, accentColor: '#fff', cursor: 'pointer', flexShrink: 0 }}
           />
-          <span style={{ flex: 1, fontSize: '0.75rem', color: '#fff', fontWeight: 700 }}>
+          <span style={{ flex: 1, fontSize: '0.85rem', color: '#fff', fontWeight: 900, letterSpacing: '-0.01em' }}>
             Cardio
           </span>
           <span style={{
             fontSize: '0.8rem', fontWeight: 800,
-            color: includeCardio ? C.green : C.text25,
+            color: includeCardio ? C.green : 'rgba(255,255,255,0.35)',
           }}>
             {includeCardio ? `+${cardioExtra} kcal` : '—'}
           </span>
@@ -1133,7 +1150,7 @@ function MacroRulesBlock({ client, db, onClientUpdate, isMobile }) {
 
         {/* Activiteiten-lijst */}
         {cardioActivities.length > 0 && (
-          <div style={{ marginTop: 7, marginLeft: 22, display: 'flex', flexDirection: 'column', gap: 5 }}>
+          <div style={{ marginTop: 6, marginLeft: 25, display: 'flex', flexDirection: 'column', gap: 6 }}>
             {cardioActivities.map((act, idx) => {
               const cfg = CARDIO_TYPES[act.type] || CARDIO_TYPES.running
               const min = parseInt(act.min) || 0
@@ -1146,86 +1163,54 @@ function MacroRulesBlock({ client, db, onClientUpdate, isMobile }) {
                 setCardioActivities(arr => arr.filter((_, i) => i !== idx))
               }
               return (
+                /* Type, duur, frequentie, uitkomst en verwijderen op één regel.
+                   Zat als kaartje met rand in twee regels — vijf keer zoveel
+                   hoogte als de informatie rechtvaardigt. */
                 <div key={idx} style={{
-                  padding: '0.5rem 0.6rem',
-                  background: 'rgba(255,255,255,0.03)',
-                  border: `1px solid ${C.borderItem}`,
-                  borderRadius: 8,
+                  display: 'flex', alignItems: 'center', gap: 7, flexWrap: 'wrap',
+                  fontSize: '0.78rem', fontWeight: 700, color: 'rgba(255,255,255,0.6)',
                 }}>
-                  {/* Bovenste regel: type-keuze + delete + kcal */}
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
-                    <select
-                      value={act.type}
-                      onChange={(e) => update({ type: e.target.value })}
-                      style={{
-                        background: 'rgba(255,255,255,0.05)',
-                        border: `1px solid ${C.gold}30`,
-                        borderRadius: 5,
-                        color: '#fff', fontWeight: 700,
-                        fontSize: '0.78rem',
-                        cursor: 'pointer', flex: 1, minWidth: 0,
-                        padding: '0.35rem 0.5rem',
-                      }}
-                    >
-                      {Object.entries(CARDIO_TYPES).map(([value, { label }]) => (
-                        <option key={value} value={value} style={{ background: '#0a0a0a' }}>{label}</option>
-                      ))}
-                    </select>
-                    <span style={{
-                      fontSize: '0.75rem', color: C.green, fontWeight: 800,
-                      minWidth: 64, textAlign: 'right',
-                    }}>
-                      {kcalPerWeek} kcal
-                    </span>
-                    <button
-                      onClick={remove}
-                      style={{
-                        width: 22, height: 22, padding: 0,
-                        background: 'rgba(255,255,255,0.04)',
-                        border: `1px solid ${C.borderItem}`,
-                        borderRadius: 4,
-                        color: C.text50, cursor: 'pointer',
-                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        flexShrink: 0,
-                      }}
-                      title="Verwijderen"
-                    >
-                      <X size={13} />
-                    </button>
-                  </div>
-                  {/* Onderste regel: min + sessies, ruimere inputs */}
-                  <div style={{
-                    display: 'flex', alignItems: 'center', gap: 8,
-                    fontSize: '0.78rem', color: 'rgba(255,255,255,0.6)', fontWeight: 700,
+                  <select
+                    value={act.type}
+                    onChange={(e) => update({ type: e.target.value })}
+                    style={{
+                      background: 'rgba(255,255,255,0.06)',
+                      border: '1px solid rgba(255,255,255,0.15)',
+                      borderRadius: 6,
+                      color: '#fff', fontWeight: 800, fontFamily: 'inherit',
+                      fontSize: '0.78rem',
+                      cursor: 'pointer', minWidth: 0, maxWidth: 130,
+                      padding: '0.22rem 0.35rem',
+                    }}
+                  >
+                    {Object.entries(CARDIO_TYPES).map(([value, { label }]) => (
+                      <option key={value} value={value} style={{ background: '#0a0a0a' }}>{label}</option>
+                    ))}
+                  </select>
+
+                  {inlineInput(min, (v) => update({ min: parseInt(v) || 0 }), 'min', 46)}
+                  <span style={{ color: 'rgba(255,255,255,0.3)' }}>×</span>
+                  {inlineInput(sessions, (v) => update({ sessions: parseInt(v) || 0 }), '/wk', 40)}
+
+                  <span style={{
+                    marginLeft: 'auto', flexShrink: 0,
+                    fontSize: '0.82rem', color: C.green, fontWeight: 900,
+                    whiteSpace: 'nowrap',
                   }}>
-                    <input
-                      type="number" value={min}
-                      onChange={(e) => update({ min: parseInt(e.target.value) || 0 })}
-                      onClick={(e) => e.target.select()}
-                      style={{
-                        width: 52, textAlign: 'center',
-                        background: 'rgba(255,255,255,0.06)',
-                        border: '1px solid rgba(255,255,255,0.15)', borderRadius: 6,
-                        color: '#fff', fontSize: '0.85rem', fontWeight: 800,
-                        padding: '0.3rem 0.4rem',
-                      }}
-                    />
-                    <span>min/sessie</span>
-                    <span style={{ color: 'rgba(255,255,255,0.3)' }}>×</span>
-                    <input
-                      type="number" value={sessions}
-                      onChange={(e) => update({ sessions: parseInt(e.target.value) || 0 })}
-                      onClick={(e) => e.target.select()}
-                      style={{
-                        width: 44, textAlign: 'center',
-                        background: 'rgba(255,255,255,0.06)',
-                        border: '1px solid rgba(255,255,255,0.15)', borderRadius: 6,
-                        color: '#fff', fontSize: '0.85rem', fontWeight: 800,
-                        padding: '0.3rem 0.4rem',
-                      }}
-                    />
-                    <span>/wk</span>
-                  </div>
+                    {kcalPerWeek} kcal
+                  </span>
+                  <button
+                    onClick={remove}
+                    title="Verwijder"
+                    style={{
+                      flexShrink: 0, width: 22, height: 22, padding: 0,
+                      display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                      background: 'none', border: 'none',
+                      color: 'rgba(255,255,255,0.4)', cursor: 'pointer',
+                    }}
+                  >
+                    <X size={13} />
+                  </button>
                 </div>
               )
             })}
@@ -1407,45 +1392,18 @@ function MacroRulesBlock({ client, db, onClientUpdate, isMobile }) {
         </span>
       </button>
 
-      {showMacroDetail && (
-        <div style={{
-          padding: isMobile ? '0 0.75rem 0.4rem' : '0 1rem 0.45rem',
-          display: 'flex', alignItems: 'center', justifyContent: 'flex-end',
-          background: 'rgba(255,255,255,0.04)',
-        }}>
-          <button
-            onClick={handleComputeMacros}
-            disabled={busy != null}
-            style={{
-              display: 'flex', alignItems: 'center', gap: 4,
-              padding: '0.35rem 0.7rem',
-              background: 'rgba(255,255,255,0.14)',
-              border: `1px solid rgba(255,255,255,0.4)`,
-              borderRadius: 5,
-              color: C.gold,
-              fontSize: '0.72rem', fontWeight: 800,
-              cursor: busy ? 'wait' : 'pointer', minHeight: 28,
-              letterSpacing: '0.04em',
-            }}
-          >
-            <RefreshCw size={11} />
-            {busy === 'macros' ? 'Bezig…' : 'Bereken voorbeeld'}
-          </button>
-        </div>
-      )}
-
       {showMacroDetail && <>
 
       {/* Surplus / Deficit — editable binnen het regel-bereik */}
       <div style={{
         display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-        padding: isMobile ? '0.35rem 0.75rem' : '0.4rem 1rem',
+        padding: isMobile ? '0.5rem 0.75rem' : '0.55rem 1rem',
         borderTop: `1px solid ${C.borderItem}`,
       }}>
-        <span style={{ fontSize: '0.72rem', color: C.text20, letterSpacing: '-0.01em', fontWeight: 700 }}>
+        <span style={{ fontSize: '0.85rem', color: '#fff', letterSpacing: '-0.01em', fontWeight: 900 }}>
           Tekort / surplus
-          <span style={{ marginLeft: 4, color: C.text15, textTransform: 'none', letterSpacing: 0 }}>
-            (aanbevolen {rule.min === rule.max ? '0' : `${rule.min} t/m ${rule.max}`})
+          <span style={{ marginLeft: 6, color: 'rgba(255,255,255,0.45)', fontWeight: 700, fontSize: '0.78rem' }}>
+            aanbevolen {rule.min === rule.max ? '0' : `${rule.min} t/m ${rule.max}`}
           </span>
         </span>
         {editingS ? (
@@ -1466,24 +1424,24 @@ function MacroRulesBlock({ client, db, onClientUpdate, isMobile }) {
             }}
             onKeyDown={(e) => { if (e.key === 'Enter') e.target.blur() }}
             style={{
-              width: 80, textAlign: 'right',
-              background: 'rgba(255,255,255,0.04)', border: `1px solid ${C.gold}40`,
-              borderRadius: 4, color: C.text, fontSize: '0.75rem', fontWeight: 700,
-              padding: '0.15rem 0.35rem',
+              width: 90, textAlign: 'right',
+              background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.15)',
+              borderRadius: 6, color: '#fff', fontSize: '0.9rem', fontWeight: 900,
+              fontFamily: 'inherit', padding: '0.2rem 0.4rem',
             }}
           />
         ) : (
           <span
             onClick={() => setEditingS(true)}
             style={{
-              fontSize: isMobile ? '0.65rem' : '0.7rem', fontWeight: 700,
-              color: liveSurplus < 0 ? C.red : liveSurplus > 0 ? C.green : C.text50,
+              fontSize: '0.95rem', fontWeight: 900,
+              color: liveSurplus < 0 ? C.red : liveSurplus > 0 ? C.green : 'rgba(255,255,255,0.5)',
               cursor: 'pointer',
             }}
           >
             {liveSurplus > 0 ? '+' : ''}{liveSurplus} kcal
             {client?.surplus == null && (
-              <span style={{ marginLeft: 4, fontSize: '0.72rem', color: C.text25, fontWeight: 600 }}>niet ingesteld</span>
+              <span style={{ marginLeft: 5, fontSize: '0.78rem', color: 'rgba(255,255,255,0.5)', fontWeight: 700 }}>niet ingesteld</span>
             )}
           </span>
         )}
@@ -1493,10 +1451,10 @@ function MacroRulesBlock({ client, db, onClientUpdate, isMobile }) {
           macro's daaruit berekend (verschijnen in de preview hieronder). */}
       <div style={{
         display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-        padding: isMobile ? '0.35rem 0.75rem' : '0.4rem 1rem',
+        padding: isMobile ? '0.5rem 0.75rem' : '0.55rem 1rem',
         borderBottom: `1px solid ${C.borderItem}`,
       }}>
-        <span style={{ fontSize: '0.72rem', color: C.text20, letterSpacing: '-0.01em', fontWeight: 700 }}>Doel kcal</span>
+        <span style={{ fontSize: '0.85rem', color: '#fff', letterSpacing: '-0.01em', fontWeight: 900 }}>Doel kcal</span>
         {editingKcal ? (
           <input
             type="number" autoFocus
@@ -1505,10 +1463,10 @@ function MacroRulesBlock({ client, db, onClientUpdate, isMobile }) {
             onBlur={(e) => { setEditingKcal(false); applyManualKcal(e.target.value) }}
             onKeyDown={(e) => { if (e.key === 'Enter') e.target.blur() }}
             style={{
-              width: 90, textAlign: 'right',
-              background: 'rgba(255,255,255,0.04)', border: `1px solid ${C.gold}40`,
-              borderRadius: 4, color: C.gold, fontSize: '0.75rem', fontWeight: 700,
-              padding: '0.15rem 0.35rem',
+              width: 100, textAlign: 'right',
+              background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.15)',
+              borderRadius: 6, color: '#fff', fontSize: '0.9rem', fontWeight: 900,
+              fontFamily: 'inherit', padding: '0.2rem 0.4rem',
             }}
           />
         ) : (
@@ -1516,13 +1474,36 @@ function MacroRulesBlock({ client, db, onClientUpdate, isMobile }) {
             onClick={() => setEditingKcal(true)}
             title="Klik om zelf een doel-kcal in te voeren"
             style={{
-              fontSize: isMobile ? '0.65rem' : '0.7rem', fontWeight: 700, color: C.gold,
-              cursor: 'pointer', borderBottom: `1px dotted ${C.gold}55`,
+              fontSize: '0.95rem', fontWeight: 900, color: '#fff',
+              cursor: 'pointer',
             }}
           >
             {targetCal != null ? `${targetCal} kcal` : 'Typ doel'}
           </span>
         )}
+      </div>
+
+      {/* Zelfde volgorde als bij onderhoud: eerst instellen, dan pas de knop.
+          Stond boven het tekort-veld, dus je stelde iets in en moest terug
+          omhoog om het te laten doorrekenen. */}
+      <div style={{ padding: isMobile ? '0.5rem 0.75rem 0.7rem' : '0.6rem 1rem 0.8rem' }}>
+        <button
+          onClick={handleComputeMacros}
+          disabled={busy != null}
+          style={{
+            width: '100%',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+            padding: '0.55rem 0.9rem',
+            background: '#fff', border: 'none', borderRadius: 8,
+            color: '#0a0a0a',
+            fontSize: '0.85rem', fontWeight: 900, fontFamily: 'inherit',
+            cursor: busy ? 'wait' : 'pointer', minHeight: 38,
+            opacity: busy != null ? 0.6 : 1,
+          }}
+        >
+          <RefreshCw size={14} strokeWidth={2.6} />
+          {busy === 'macros' ? 'Bezig…' : "Bereken macro's"}
+        </button>
       </div>
 
       </>}
