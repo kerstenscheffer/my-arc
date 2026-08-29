@@ -46,12 +46,12 @@ const CARDIO_TYPES = {
 }
 
 const C = {
-  gold: '#FFD700', green: '#10b981', red: '#ef4444', amber: '#f59e0b',
+  gold: '#fff', green: '#10b981', red: '#ef4444', amber: '#f59e0b',
   orange: '#f97316', purple: '#a855f7',
   text: '#fff', text50: 'rgba(255,255,255,0.5)', text25: 'rgba(255,255,255,0.25)',
   text20: 'rgba(255,255,255,0.2)', text15: 'rgba(255,255,255,0.15)',
   border: 'rgba(255,255,255,0.06)', borderSub: 'rgba(255,255,255,0.04)', borderItem: 'rgba(255,255,255,0.03)',
-  goldBg10: 'rgba(255,215,0,0.08)',
+  goldBg10: 'rgba(255,255,255,0.08)',
 }
 
 // 'macros' is samengevoegd met 'doelen' — alles wat met richting +
@@ -107,7 +107,7 @@ function DoelRegel({ client, isMobile, onSave }) {
       display: 'flex', flexDirection: 'column', gap: '0.4rem',
     }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-        <span style={{ fontSize: isMobile ? '0.62rem' : '0.66rem', color: C.text50, textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 800, flexShrink: 0 }}>
+        <span style={{ fontSize: isMobile ? '0.62rem' : '0.66rem', color: C.text50, letterSpacing: '-0.01em', fontWeight: 800, flexShrink: 0 }}>
           Primair doel
         </span>
         <select
@@ -129,7 +129,7 @@ function DoelRegel({ client, isMobile, onSave }) {
           ))}
         </select>
       </div>
-      <span style={{ fontSize: '0.72rem', fontWeight: 700, color: uitleg.kleur }}>
+      <span style={{ fontSize: '0.75rem', fontWeight: 700, color: uitleg.kleur }}>
         {uitleg.tekst}
       </span>
     </div>
@@ -169,7 +169,7 @@ function EditableRow({ label, value, field, type = 'text', options, suffix, isMo
   if (editing) {
     return (
       <div style={{ padding: isMobile ? '0.5rem 0.85rem' : '0.55rem 1rem', borderBottom: `1px solid ${C.borderItem}`, display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-        <span style={{ fontSize: isMobile ? '0.62rem' : '0.66rem', color: C.text50, textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: '800', flexShrink: 0, minWidth: isMobile ? '60px' : '70px' }}>{label}</span>
+        <span style={{ fontSize: isMobile ? '0.62rem' : '0.66rem', color: C.text50, letterSpacing: '-0.01em', fontWeight: '800', flexShrink: 0, minWidth: isMobile ? '60px' : '70px' }}>{label}</span>
         {options ? (
           <select value={draft} onChange={e => setDraft(e.target.value)} autoFocus style={{
             flex: 1, padding: '0.25rem 0.3rem', background: 'rgba(255,255,255,0.06)',
@@ -210,9 +210,9 @@ function EditableRow({ label, value, field, type = 'text', options, suffix, isMo
       cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
       transition: 'background 0.1s ease', gap: '0.75rem',
     }}
-    onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,215,0,0.03)'}
+    onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.03)'}
     onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
-      <span style={{ fontSize: isMobile ? '0.62rem' : '0.66rem', color: C.text50, textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: '800', flexShrink: 0 }}>{label}</span>
+      <span style={{ fontSize: isMobile ? '0.62rem' : '0.66rem', color: C.text50, letterSpacing: '-0.01em', fontWeight: '800', flexShrink: 0 }}>{label}</span>
       <span style={{ fontSize: isMobile ? '0.92rem' : '1rem', fontWeight: '800', color: display ? C.text : C.text15, textAlign: 'right', wordBreak: 'break-word', letterSpacing: '-0.01em' }}>
         {display ? `${display}${suffix || ''}` : '—'}
       </span>
@@ -321,7 +321,7 @@ function BodyFatTargetCalculator({ client, db, onClientUpdate, isMobile }) {
   // Inklap-header
   return (
     <div style={{
-      background: 'rgba(255,215,0,0.03)',
+      background: 'rgba(255,255,255,0.03)',
       borderTop: `1px solid ${C.border}`,
       borderBottom: `1px solid ${C.border}`,
       marginBottom: 2,
@@ -332,13 +332,13 @@ function BodyFatTargetCalculator({ client, db, onClientUpdate, isMobile }) {
           width: '100%',
           padding: isMobile ? '0.55rem 0.75rem' : '0.65rem 1rem',
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-          background: 'rgba(255,215,0,0.05)',
+          background: 'rgba(255,255,255,0.05)',
           border: 'none', cursor: 'pointer', color: 'inherit',
         }}
       >
         <span style={{
           fontSize: isMobile ? '0.64rem' : '0.68rem', color: C.gold, fontWeight: 900,
-          textTransform: 'uppercase', letterSpacing: '0.06em',
+          letterSpacing: '-0.01em',
         }}>
           Streefgewicht uit bodyfat
         </span>
@@ -351,7 +351,7 @@ function BodyFatTargetCalculator({ client, db, onClientUpdate, isMobile }) {
               {targetWeightRounded} kg
             </span>
           )}
-          <span style={{ fontSize: '0.55rem', color: C.text50, fontWeight: 700, letterSpacing: '0.05em' }}>
+          <span style={{ fontSize: '0.72rem', color: C.text50, fontWeight: 700, letterSpacing: '0.05em' }}>
             {expanded ? 'Inklappen ▴' : 'Bewerken ▾'}
           </span>
         </span>
@@ -366,7 +366,7 @@ function BodyFatTargetCalculator({ client, db, onClientUpdate, isMobile }) {
             borderBottom: `1px solid ${C.borderItem}`,
             marginBottom: 6,
           }}>
-            <span style={{ fontSize: '0.55rem', color: C.text25, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+            <span style={{ fontSize: '0.72rem', color: C.text25, fontWeight: 700, letterSpacing: '-0.01em' }}>
               Huidig gewicht
             </span>
             <span style={{ fontSize: '0.78rem', fontWeight: 700, color: '#fff' }}>
@@ -391,7 +391,7 @@ function BodyFatTargetCalculator({ client, db, onClientUpdate, isMobile }) {
           {/* Hint als intake een range gaf (tussen 2 kaarten) */}
           {hasIntakeRange && currentBfDraft == null && (
             <div style={{
-              fontSize: '0.5rem', color: C.text25, fontStyle: 'italic',
+              fontSize: '0.72rem', color: C.text25, fontStyle: 'italic',
               padding: '0.2rem 0 0.35rem', letterSpacing: '0.02em',
             }}>
               uit intake: tussen {Math.min(intakeBf1, intakeBf2)}% en {Math.max(intakeBf1, intakeBf2)}% → ~{intakeAvgBf}%
@@ -416,20 +416,20 @@ function BodyFatTargetCalculator({ client, db, onClientUpdate, isMobile }) {
           <div style={{
             marginTop: 8,
             padding: '0.55rem 0.65rem',
-            background: 'rgba(255,215,0,0.06)',
-            border: '1px solid rgba(255,215,0,0.2)',
+            background: 'rgba(255,255,255,0.06)',
+            border: '1px solid rgba(255,255,255,0.2)',
             borderRadius: 8,
           }}>
             <div style={{
-              fontSize: '0.5rem', fontWeight: 800, color: C.gold,
-              textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 5,
+              fontSize: '0.72rem', fontWeight: 800, color: C.gold,
+              letterSpacing: '-0.01em', marginBottom: 5,
             }}>
               Berekend
             </div>
 
             <div style={{
               display: 'flex', justifyContent: 'space-between', alignItems: 'baseline',
-              fontSize: '0.62rem', color: C.text50, fontWeight: 600,
+              fontSize: '0.72rem', color: C.text50, fontWeight: 600,
               marginBottom: 4,
             }}>
               <span>Vetvrije massa</span>
@@ -443,8 +443,8 @@ function BodyFatTargetCalculator({ client, db, onClientUpdate, isMobile }) {
               marginTop: 2, marginBottom: 8,
             }}>
               <span style={{
-                fontSize: '0.55rem', color: C.gold, fontWeight: 800,
-                textTransform: 'uppercase', letterSpacing: '0.05em',
+                fontSize: '0.72rem', color: C.gold, fontWeight: 800,
+                letterSpacing: '-0.01em',
               }}>
                 Streefgewicht
               </span>
@@ -467,9 +467,9 @@ function BodyFatTargetCalculator({ client, db, onClientUpdate, isMobile }) {
                   : 'rgba(255,255,255,0.04)',
                 border: 'none', borderRadius: 6,
                 color: targetWeightRounded != null ? '#fff' : C.text25,
-                fontSize: '0.62rem', fontWeight: 800,
+                fontSize: '0.72rem', fontWeight: 800,
                 cursor: busy || targetWeightRounded == null ? 'default' : 'pointer',
-                textTransform: 'uppercase', letterSpacing: '0.04em',
+                letterSpacing: '-0.01em',
                 display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5,
               }}
             >
@@ -485,7 +485,7 @@ function BodyFatTargetCalculator({ client, db, onClientUpdate, isMobile }) {
           </div>
 
           <div style={{
-            marginTop: 7, fontSize: '0.52rem',
+            marginTop: 7, fontSize: '0.72rem',
             color: C.text25, fontStyle: 'italic', lineHeight: 1.45,
           }}>
             Aanname: vetvrije massa blijft gelijk (geldt bij eiwit 2g/kg + krachttraining).
@@ -506,8 +506,8 @@ function BfRow({ label, value, onChange, onBlur, color, isMobile }) {
       borderBottom: `1px solid ${C.borderItem}`,
     }}>
       <span style={{
-        fontSize: '0.55rem', color: C.text25, fontWeight: 700,
-        textTransform: 'uppercase', letterSpacing: '0.05em',
+        fontSize: '0.72rem', color: C.text25, fontWeight: 700,
+        letterSpacing: '-0.01em',
       }}>
         {label}
       </span>
@@ -527,7 +527,7 @@ function BfRow({ label, value, onChange, onBlur, color, isMobile }) {
             padding: '0.22rem 0.4rem',
           }}
         />
-        <span style={{ fontSize: '0.65rem', color: C.text50, fontWeight: 700 }}>%</span>
+        <span style={{ fontSize: '0.72rem', color: C.text50, fontWeight: 700 }}>%</span>
       </div>
     </div>
   )
@@ -890,7 +890,7 @@ function MacroRulesBlock({ client, db, onClientUpdate, isMobile }) {
       padding: isMobile ? '0.35rem 0.75rem' : '0.4rem 1rem',
       borderBottom: `1px solid ${C.borderItem}`,
     }}>
-      <span style={{ fontSize: '0.5rem', color: C.text20, textTransform: 'uppercase', letterSpacing: '0.04em', fontWeight: 700 }}>{label}</span>
+      <span style={{ fontSize: '0.72rem', color: C.text20, letterSpacing: '-0.01em', fontWeight: 700 }}>{label}</span>
       <span style={{ fontSize: isMobile ? '0.65rem' : '0.7rem', fontWeight: 700, color }}>{val}</span>
     </div>
   )
@@ -918,7 +918,7 @@ function MacroRulesBlock({ client, db, onClientUpdate, isMobile }) {
         />
         <span style={{
           flex: 1,
-          fontSize: '0.7rem', color: '#fff',
+          fontSize: '0.75rem', color: '#fff',
           fontWeight: 700, letterSpacing: '-0.005em',
         }}>
           {label}
@@ -934,7 +934,7 @@ function MacroRulesBlock({ client, db, onClientUpdate, isMobile }) {
         <div style={{
           marginTop: 5, marginLeft: 22,
           display: 'flex', alignItems: 'center', gap: 6,
-          fontSize: '0.6rem', color: C.text50,
+          fontSize: '0.72rem', color: C.text50,
         }}>
           {missingHint ? (
             <span style={{ color: '#f59e0b', fontStyle: 'italic' }}>{missingHint}</span>
@@ -953,7 +953,7 @@ function MacroRulesBlock({ client, db, onClientUpdate, isMobile }) {
         background: 'rgba(255,255,255,0.06)',
         border: `1px solid ${C.gold}40`,
         borderRadius: 5, color: '#fff',
-        fontSize: '0.6rem', fontWeight: 700,
+        fontSize: '0.72rem', fontWeight: 700,
         padding: '0.18rem 0.3rem',
         cursor: 'pointer',
         maxWidth: 130,
@@ -981,12 +981,12 @@ function MacroRulesBlock({ client, db, onClientUpdate, isMobile }) {
           background: 'rgba(255,255,255,0.06)',
           border: `1px solid ${C.gold}40`,
           borderRadius: 5, color: '#fff',
-          fontSize: '0.68rem', fontWeight: 700,
+          fontSize: '0.72rem', fontWeight: 700,
           padding: '0.2rem 0.4rem',
         }}
       />
       {suffix && (
-        <span style={{ fontSize: '0.58rem', color: C.text50, fontWeight: 600 }}>
+        <span style={{ fontSize: '0.72rem', color: C.text50, fontWeight: 600 }}>
           {suffix}
         </span>
       )}
@@ -1003,7 +1003,7 @@ function MacroRulesBlock({ client, db, onClientUpdate, isMobile }) {
 
   return (
     <div style={{
-      background: 'rgba(255,215,0,0.025)',
+      background: 'rgba(255,255,255,0.025)',
       borderTop: `1px solid ${C.border}`,
       borderBottom: `1px solid ${C.border}`,
       marginBottom: 2,
@@ -1017,12 +1017,12 @@ function MacroRulesBlock({ client, db, onClientUpdate, isMobile }) {
           width: '100%',
           padding: isMobile ? '0.55rem 0.75rem' : '0.65rem 1rem',
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-          background: 'rgba(255,215,0,0.06)',
+          background: 'rgba(255,255,255,0.06)',
           border: 'none', cursor: 'pointer',
           color: 'inherit',
         }}
       >
-        <span style={{ fontSize: isMobile ? '0.64rem' : '0.68rem', color: C.gold, textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 900 }}>
+        <span style={{ fontSize: isMobile ? '0.64rem' : '0.68rem', color: C.gold, letterSpacing: '-0.01em', fontWeight: 900 }}>
           Onderhoud · modus {goal}
         </span>
         <span style={{
@@ -1036,7 +1036,7 @@ function MacroRulesBlock({ client, db, onClientUpdate, isMobile }) {
               {savedTdee != null ? `${savedTdee} kcal` : '—'}
             </span>
           )}
-          <span style={{ fontSize: '0.55rem', color: C.text50, fontWeight: 700, letterSpacing: '0.05em' }}>
+          <span style={{ fontSize: '0.72rem', color: C.text50, fontWeight: 700, letterSpacing: '0.05em' }}>
             {showTdeeDetail ? 'Inklappen ▴' : 'Bewerken ▾'}
           </span>
         </span>
@@ -1046,7 +1046,7 @@ function MacroRulesBlock({ client, db, onClientUpdate, isMobile }) {
         <div style={{
           padding: isMobile ? '0 0.75rem 0.4rem' : '0 1rem 0.45rem',
           display: 'flex', alignItems: 'center', justifyContent: 'flex-end',
-          background: 'rgba(255,215,0,0.04)',
+          background: 'rgba(255,255,255,0.04)',
         }}>
           <button
             onClick={handleSaveTdee}
@@ -1054,13 +1054,13 @@ function MacroRulesBlock({ client, db, onClientUpdate, isMobile }) {
             style={{
               display: 'flex', alignItems: 'center', gap: 4,
               padding: '0.35rem 0.7rem',
-              background: 'rgba(255,215,0,0.14)',
-              border: `1px solid rgba(255,215,0,0.4)`,
+              background: 'rgba(255,255,255,0.14)',
+              border: `1px solid rgba(255,255,255,0.4)`,
               borderRadius: 5,
               color: C.gold,
-              fontSize: '0.6rem', fontWeight: 800,
+              fontSize: '0.72rem', fontWeight: 800,
               cursor: busy ? 'wait' : 'pointer', minHeight: 28,
-              letterSpacing: '0.04em', textTransform: 'uppercase',
+              letterSpacing: '0.04em',
             }}
           >
             <RefreshCw size={11} />
@@ -1111,11 +1111,11 @@ function MacroRulesBlock({ client, db, onClientUpdate, isMobile }) {
               {hasPlan && (
                 synced ? (
                   <span style={{
-                    fontSize: '0.5rem', color: C.green, fontWeight: 700,
+                    fontSize: '0.72rem', color: C.green, fontWeight: 700,
                     background: 'rgba(16,185,129,0.1)',
                     border: '1px solid rgba(16,185,129,0.25)',
                     padding: '1px 5px', borderRadius: 4,
-                    textTransform: 'uppercase', letterSpacing: '0.04em',
+                    letterSpacing: '-0.01em',
                   }}>
                     uit plan
                   </span>
@@ -1123,11 +1123,11 @@ function MacroRulesBlock({ client, db, onClientUpdate, isMobile }) {
                   <button
                     onClick={() => setTrainingDays(planTrainingDays)}
                     style={{
-                      fontSize: '0.5rem', color: C.amber, fontWeight: 700,
+                      fontSize: '0.72rem', color: C.amber, fontWeight: 700,
                       background: 'rgba(245,158,11,0.08)',
                       border: '1px solid rgba(245,158,11,0.3)',
                       padding: '1px 5px', borderRadius: 4,
-                      textTransform: 'uppercase', letterSpacing: '0.04em',
+                      letterSpacing: '-0.01em',
                       cursor: 'pointer',
                     }}
                     title={`Plan staat op ${planTrainingDays} d/wk — klik om te syncen`}
@@ -1156,7 +1156,7 @@ function MacroRulesBlock({ client, db, onClientUpdate, isMobile }) {
             onChange={(e) => setIncludeCardio(e.target.checked)}
             style={{ width: 14, height: 14, accentColor: C.gold, cursor: 'pointer', flexShrink: 0 }}
           />
-          <span style={{ flex: 1, fontSize: '0.7rem', color: '#fff', fontWeight: 700 }}>
+          <span style={{ flex: 1, fontSize: '0.75rem', color: '#fff', fontWeight: 700 }}>
             Cardio
           </span>
           <span style={{
@@ -1208,7 +1208,7 @@ function MacroRulesBlock({ client, db, onClientUpdate, isMobile }) {
                       ))}
                     </select>
                     <span style={{
-                      fontSize: '0.72rem', color: C.green, fontWeight: 800,
+                      fontSize: '0.75rem', color: C.green, fontWeight: 800,
                       minWidth: 64, textAlign: 'right',
                     }}>
                       {kcalPerWeek} kcal
@@ -1232,7 +1232,7 @@ function MacroRulesBlock({ client, db, onClientUpdate, isMobile }) {
                   {/* Onderste regel: min + sessies, ruimere inputs */}
                   <div style={{
                     display: 'flex', alignItems: 'center', gap: 8,
-                    fontSize: '0.7rem', color: C.text50, fontWeight: 600,
+                    fontSize: '0.75rem', color: C.text50, fontWeight: 600,
                   }}>
                     <input
                       type="number" value={min}
@@ -1282,7 +1282,7 @@ function MacroRulesBlock({ client, db, onClientUpdate, isMobile }) {
             border: `1px dashed rgba(16,185,129,0.35)`,
             borderRadius: 6,
             color: C.green,
-            fontSize: '0.6rem', fontWeight: 700,
+            fontSize: '0.72rem', fontWeight: 700,
             cursor: 'pointer', minHeight: 26,
             letterSpacing: '0.02em',
           }}
@@ -1295,7 +1295,7 @@ function MacroRulesBlock({ client, db, onClientUpdate, isMobile }) {
         {includeCardio && cardioKcalPerWeek > 0 && (
           <div style={{
             marginTop: 7, marginLeft: 22,
-            fontSize: '0.55rem', color: C.text25,
+            fontSize: '0.72rem', color: C.text25,
           }}>
             Totaal: {cardioKcalPerWeek} kcal/wk · ÷ 7 = {cardioExtra} kcal/dag
           </div>
@@ -1347,12 +1347,12 @@ function MacroRulesBlock({ client, db, onClientUpdate, isMobile }) {
       <div style={{
         padding: isMobile ? '0.6rem 0.75rem 0.65rem' : '0.7rem 1rem 0.75rem',
         borderTop: `1px solid ${C.border}`,
-        background: 'rgba(255,215,0,0.06)',
+        background: 'rgba(255,255,255,0.06)',
         display: 'flex', alignItems: 'baseline', justifyContent: 'space-between',
       }}>
         <span style={{
-          fontSize: '0.55rem', color: C.gold, fontWeight: 800,
-          textTransform: 'uppercase', letterSpacing: '0.06em',
+          fontSize: '0.72rem', color: C.gold, fontWeight: 800,
+          letterSpacing: '-0.01em',
         }}>
           Berekende TDEE
         </span>
@@ -1367,7 +1367,7 @@ function MacroRulesBlock({ client, db, onClientUpdate, isMobile }) {
       {savedTdee != null && (
         <div style={{
           padding: isMobile ? '0.3rem 0.75rem 0.5rem' : '0.35rem 1rem 0.55rem',
-          fontSize: '0.55rem', color: C.text50,
+          fontSize: '0.72rem', color: C.text50,
           display: 'flex', alignItems: 'center', gap: 6,
         }}>
           <span style={{ color: C.text25 }}>Opgeslagen:</span>
@@ -1391,12 +1391,12 @@ function MacroRulesBlock({ client, db, onClientUpdate, isMobile }) {
           width: '100%',
           padding: isMobile ? '0.55rem 0.75rem' : '0.65rem 1rem',
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-          background: 'rgba(255,215,0,0.06)',
+          background: 'rgba(255,255,255,0.06)',
           border: 'none', borderTop: `1px solid ${C.border}`,
           cursor: 'pointer', color: 'inherit',
         }}
       >
-        <span style={{ fontSize: isMobile ? '0.64rem' : '0.68rem', color: C.gold, textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 900 }}>
+        <span style={{ fontSize: isMobile ? '0.64rem' : '0.68rem', color: C.gold, letterSpacing: '-0.01em', fontWeight: 900 }}>
           Macro's
         </span>
         <span style={{
@@ -1405,19 +1405,19 @@ function MacroRulesBlock({ client, db, onClientUpdate, isMobile }) {
         }}>
           {!showMacroDetail && (
             <span style={{
-              fontSize: '0.62rem', color: C.text50, fontWeight: 700,
+              fontSize: '0.72rem', color: C.text50, fontWeight: 700,
               display: 'flex', gap: 6, alignItems: 'baseline',
             }}>
               <span style={{ color: C.gold, fontWeight: 900, fontSize: '0.95rem' }}>
                 {client?.target_calories ? `${client.target_calories}` : '—'}
               </span>
-              <span style={{ color: C.gold, fontWeight: 700, fontSize: '0.55rem' }}>kcal</span>
+              <span style={{ color: C.gold, fontWeight: 700, fontSize: '0.72rem' }}>kcal</span>
               {client?.target_protein != null && <span style={{ color: C.orange }}>{Math.round(client.target_protein)}E</span>}
               {client?.target_carbs   != null && <span style={{ color: C.green }}>{Math.round(client.target_carbs)}K</span>}
               {client?.target_fat     != null && <span style={{ color: C.amber }}>{Math.round(client.target_fat)}V</span>}
             </span>
           )}
-          <span style={{ fontSize: '0.55rem', color: C.text50, fontWeight: 700, letterSpacing: '0.05em' }}>
+          <span style={{ fontSize: '0.72rem', color: C.text50, fontWeight: 700, letterSpacing: '0.05em' }}>
             {showMacroDetail ? 'Inklappen ▴' : 'Bewerken ▾'}
           </span>
         </span>
@@ -1427,7 +1427,7 @@ function MacroRulesBlock({ client, db, onClientUpdate, isMobile }) {
         <div style={{
           padding: isMobile ? '0 0.75rem 0.4rem' : '0 1rem 0.45rem',
           display: 'flex', alignItems: 'center', justifyContent: 'flex-end',
-          background: 'rgba(255,215,0,0.04)',
+          background: 'rgba(255,255,255,0.04)',
         }}>
           <button
             onClick={handleComputeMacros}
@@ -1435,13 +1435,13 @@ function MacroRulesBlock({ client, db, onClientUpdate, isMobile }) {
             style={{
               display: 'flex', alignItems: 'center', gap: 4,
               padding: '0.35rem 0.7rem',
-              background: 'rgba(255,215,0,0.14)',
-              border: `1px solid rgba(255,215,0,0.4)`,
+              background: 'rgba(255,255,255,0.14)',
+              border: `1px solid rgba(255,255,255,0.4)`,
               borderRadius: 5,
               color: C.gold,
-              fontSize: '0.6rem', fontWeight: 800,
+              fontSize: '0.72rem', fontWeight: 800,
               cursor: busy ? 'wait' : 'pointer', minHeight: 28,
-              letterSpacing: '0.04em', textTransform: 'uppercase',
+              letterSpacing: '0.04em',
             }}
           >
             <RefreshCw size={11} />
@@ -1458,7 +1458,7 @@ function MacroRulesBlock({ client, db, onClientUpdate, isMobile }) {
         padding: isMobile ? '0.35rem 0.75rem' : '0.4rem 1rem',
         borderTop: `1px solid ${C.borderItem}`,
       }}>
-        <span style={{ fontSize: '0.5rem', color: C.text20, textTransform: 'uppercase', letterSpacing: '0.04em', fontWeight: 700 }}>
+        <span style={{ fontSize: '0.72rem', color: C.text20, letterSpacing: '-0.01em', fontWeight: 700 }}>
           Tekort / surplus
           <span style={{ marginLeft: 4, color: C.text15, textTransform: 'none', letterSpacing: 0 }}>
             (aanbevolen {rule.min === rule.max ? '0' : `${rule.min} t/m ${rule.max}`})
@@ -1484,7 +1484,7 @@ function MacroRulesBlock({ client, db, onClientUpdate, isMobile }) {
             style={{
               width: 80, textAlign: 'right',
               background: 'rgba(255,255,255,0.04)', border: `1px solid ${C.gold}40`,
-              borderRadius: 4, color: C.text, fontSize: '0.7rem', fontWeight: 700,
+              borderRadius: 4, color: C.text, fontSize: '0.75rem', fontWeight: 700,
               padding: '0.15rem 0.35rem',
             }}
           />
@@ -1499,7 +1499,7 @@ function MacroRulesBlock({ client, db, onClientUpdate, isMobile }) {
           >
             {liveSurplus > 0 ? '+' : ''}{liveSurplus} kcal
             {client?.surplus == null && (
-              <span style={{ marginLeft: 4, fontSize: '0.5rem', color: C.text25, fontWeight: 600 }}>niet ingesteld</span>
+              <span style={{ marginLeft: 4, fontSize: '0.72rem', color: C.text25, fontWeight: 600 }}>niet ingesteld</span>
             )}
           </span>
         )}
@@ -1512,7 +1512,7 @@ function MacroRulesBlock({ client, db, onClientUpdate, isMobile }) {
         padding: isMobile ? '0.35rem 0.75rem' : '0.4rem 1rem',
         borderBottom: `1px solid ${C.borderItem}`,
       }}>
-        <span style={{ fontSize: '0.5rem', color: C.text20, textTransform: 'uppercase', letterSpacing: '0.04em', fontWeight: 700 }}>Doel kcal</span>
+        <span style={{ fontSize: '0.72rem', color: C.text20, letterSpacing: '-0.01em', fontWeight: 700 }}>Doel kcal</span>
         {editingKcal ? (
           <input
             type="number" autoFocus
@@ -1523,7 +1523,7 @@ function MacroRulesBlock({ client, db, onClientUpdate, isMobile }) {
             style={{
               width: 90, textAlign: 'right',
               background: 'rgba(255,255,255,0.04)', border: `1px solid ${C.gold}40`,
-              borderRadius: 4, color: C.gold, fontSize: '0.7rem', fontWeight: 700,
+              borderRadius: 4, color: C.gold, fontSize: '0.75rem', fontWeight: 700,
               padding: '0.15rem 0.35rem',
             }}
           />
@@ -1560,11 +1560,11 @@ function MacroRulesBlock({ client, db, onClientUpdate, isMobile }) {
           <div style={{
             padding: isMobile ? '0.65rem 0.75rem 0.7rem' : '0.75rem 1rem 0.8rem',
             borderTop: `1px solid ${C.border}`,
-            background: 'rgba(255,215,0,0.07)',
+            background: 'rgba(255,255,255,0.07)',
           }}>
             <div style={{
-              fontSize: '0.5rem', color: C.gold, fontWeight: 800,
-              textTransform: 'uppercase', letterSpacing: '0.06em',
+              fontSize: '0.72rem', color: C.gold, fontWeight: 800,
+              letterSpacing: '-0.01em',
               marginBottom: 8,
             }}>
               ▸ Voorbeeld — klik op een waarde om aan te passen
@@ -1587,11 +1587,11 @@ function MacroRulesBlock({ client, db, onClientUpdate, isMobile }) {
                     borderRadius: 7, textAlign: 'center',
                   }}>
                     <div style={{
-                      fontSize: '0.45rem', color: C.text25, fontWeight: 700,
-                      textTransform: 'uppercase', letterSpacing: '0.05em',
+                      fontSize: '0.72rem', color: C.text25, fontWeight: 700,
+                      letterSpacing: '-0.01em',
                     }}>{m.label}</div>
                     <div style={{
-                      fontSize: '0.5rem', color: C.text25, fontWeight: 600,
+                      fontSize: '0.72rem', color: C.text25, fontWeight: 600,
                       marginTop: 2, textDecoration: 'line-through',
                       height: 11,
                     }}>
@@ -1615,7 +1615,7 @@ function MacroRulesBlock({ client, db, onClientUpdate, isMobile }) {
                     />
                     {delta != null && delta !== 0 && (
                       <div style={{
-                        fontSize: '0.48rem',
+                        fontSize: '0.72rem',
                         color: delta > 0 ? C.green : C.red,
                         fontWeight: 700, marginTop: 2,
                       }}>
@@ -1634,7 +1634,7 @@ function MacroRulesBlock({ client, db, onClientUpdate, isMobile }) {
               border: `1px solid ${kcalMatch ? 'rgba(16,185,129,0.25)' : 'rgba(245,158,11,0.3)'}`,
               borderRadius: 6,
               marginBottom: 10,
-              fontSize: '0.55rem',
+              fontSize: '0.72rem',
               color: kcalMatch ? C.green : C.amber,
               fontWeight: 700,
               display: 'flex', alignItems: 'center', gap: 6,
@@ -1657,9 +1657,9 @@ function MacroRulesBlock({ client, db, onClientUpdate, isMobile }) {
                   border: `1px solid ${C.border}`,
                   borderRadius: 6,
                   color: C.text50,
-                  fontSize: '0.6rem', fontWeight: 700,
+                  fontSize: '0.72rem', fontWeight: 700,
                   cursor: busy ? 'wait' : 'pointer',
-                  textTransform: 'uppercase', letterSpacing: '0.04em',
+                  letterSpacing: '-0.01em',
                 }}
               >
                 Annuleren
@@ -1670,13 +1670,13 @@ function MacroRulesBlock({ client, db, onClientUpdate, isMobile }) {
                 style={{
                   flex: 2,
                   padding: '0.45rem',
-                  background: 'linear-gradient(135deg, #FFD700 0%, #D4AF37 100%)',
+                  background: 'linear-gradient(135deg, #fff 0%, #D4AF37 100%)',
                   border: 'none',
                   borderRadius: 6,
                   color: '#000',
-                  fontSize: '0.62rem', fontWeight: 800,
+                  fontSize: '0.72rem', fontWeight: 800,
                   cursor: busy ? 'wait' : 'pointer',
-                  textTransform: 'uppercase', letterSpacing: '0.04em',
+                  letterSpacing: '-0.01em',
                   display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4,
                 }}
               >
@@ -1692,12 +1692,12 @@ function MacroRulesBlock({ client, db, onClientUpdate, isMobile }) {
       <div style={{
         margin: isMobile ? '0.5rem 0.75rem 0.4rem' : '0.6rem 1rem 0.45rem',
         padding: isMobile ? '0.75rem 0.85rem' : '0.85rem 1rem',
-        background: 'rgba(255,215,0,0.04)',
-        border: '1px solid rgba(255,215,0,0.2)',
+        background: 'rgba(255,255,255,0.04)',
+        border: '1px solid rgba(255,255,255,0.2)',
         borderRadius: 14,
       }}>
         <div style={{
-          fontSize: isMobile ? '0.7rem' : '0.75rem', color: C.gold, textTransform: 'uppercase',
+          fontSize: isMobile ? '0.7rem' : '0.75rem', color: C.gold,
           letterSpacing: '0.06em', fontWeight: 900, marginBottom: 10,
         }}>
           🎯 Doelen & Macro's
@@ -1717,7 +1717,7 @@ function MacroRulesBlock({ client, db, onClientUpdate, isMobile }) {
             }}>
               <div style={{
                 fontSize: isMobile ? '0.62rem' : '0.66rem', color: 'rgba(255,255,255,0.65)', fontWeight: 800,
-                textTransform: 'uppercase', letterSpacing: '0.05em',
+                letterSpacing: '-0.01em',
               }}>{m.label}</div>
               <div style={{
                 fontSize: isMobile ? '1.35rem' : '1.5rem',
@@ -1798,7 +1798,7 @@ function ProjectionPanel({ client, currentWeight, liveSurplus, isMobile }) {
       background: 'rgba(255,255,255,0.015)',
     }}>
       <div style={{
-        fontSize: '0.5rem', color: C.gold, textTransform: 'uppercase',
+        fontSize: '0.72rem', color: C.gold,
         letterSpacing: '0.06em', fontWeight: 800, marginBottom: 8,
       }}>
         Projectie eind traject
@@ -1825,7 +1825,7 @@ function ProjectionPanel({ client, currentWeight, liveSurplus, isMobile }) {
 
       {!hasAll ? (
         <div style={{
-          fontSize: '0.6rem', color: C.text25, fontStyle: 'italic',
+          fontSize: '0.72rem', color: C.text25, fontStyle: 'italic',
           padding: '0.4rem 0',
         }}>
           Vul gewicht, doelgewicht en deadline om de projectie te zien.
@@ -1840,8 +1840,8 @@ function ProjectionPanel({ client, currentWeight, liveSurplus, isMobile }) {
             marginBottom: 6,
           }}>
             <div style={{
-              fontSize: '0.5rem', color: C.text25, fontWeight: 700,
-              textTransform: 'uppercase', letterSpacing: '0.05em',
+              fontSize: '0.72rem', color: C.text25, fontWeight: 700,
+              letterSpacing: '-0.01em',
               marginBottom: 3,
             }}>
               Met huidig tekort ({liveSurplus > 0 ? '+' : ''}{liveSurplus} kcal)
@@ -1854,14 +1854,14 @@ function ProjectionPanel({ client, currentWeight, liveSurplus, isMobile }) {
                 {projectedEndW} kg
               </span>
               <span style={{
-                fontSize: '0.6rem', color: C.text50, fontWeight: 600,
+                fontSize: '0.72rem', color: C.text50, fontWeight: 600,
               }}>
                 eind {fmtDate(deadline)}
               </span>
               {deltaToGoal != null && deltaToGoal !== 0 && (
                 <span style={{
                   marginLeft: 'auto',
-                  fontSize: '0.62rem', fontWeight: 700, color: trackColor,
+                  fontSize: '0.72rem', fontWeight: 700, color: trackColor,
                 }}>
                   {deltaToGoal > 0 ? `${deltaToGoal} kg boven doel` : `${Math.abs(deltaToGoal)} kg onder doel`}
                 </span>
@@ -1869,7 +1869,7 @@ function ProjectionPanel({ client, currentWeight, liveSurplus, isMobile }) {
               {deltaToGoal === 0 && (
                 <span style={{
                   marginLeft: 'auto',
-                  fontSize: '0.62rem', fontWeight: 800, color: C.green,
+                  fontSize: '0.72rem', fontWeight: 800, color: C.green,
                 }}>op doel</span>
               )}
             </div>
@@ -1884,14 +1884,14 @@ function ProjectionPanel({ client, currentWeight, liveSurplus, isMobile }) {
               display: 'flex', alignItems: 'baseline', gap: 6,
             }}>
               <span style={{
-                fontSize: '0.5rem', color: C.text25, fontWeight: 700,
-                textTransform: 'uppercase', letterSpacing: '0.05em',
+                fontSize: '0.72rem', color: C.text25, fontWeight: 700,
+                letterSpacing: '-0.01em',
               }}>
                 Voor exact doel
               </span>
               <span style={{
                 marginLeft: 'auto',
-                fontSize: '0.72rem', fontWeight: 800,
+                fontSize: '0.75rem', fontWeight: 800,
                 color: neededSurplus < 0 ? C.red : neededSurplus > 0 ? C.green : C.text,
               }}>
                 {neededSurplus > 0 ? '+' : ''}{neededSurplus} kcal/dag
@@ -1909,7 +1909,7 @@ const ReadRow = ({ label, value, isMobile }) => {
   if (value === null || value === undefined || value === '' || value === '-') return null
   return (
     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', padding: isMobile ? '0.35rem 0.75rem' : '0.4rem 1rem', borderBottom: `1px solid ${C.borderItem}` }}>
-      <span style={{ fontSize: '0.5rem', color: C.text20, textTransform: 'uppercase', letterSpacing: '0.04em', fontWeight: '700', flexShrink: 0, marginRight: '0.5rem' }}>{label}</span>
+      <span style={{ fontSize: '0.72rem', color: C.text20, letterSpacing: '-0.01em', fontWeight: '700', flexShrink: 0, marginRight: '0.5rem' }}>{label}</span>
       <span style={{ fontSize: isMobile ? '0.65rem' : '0.7rem', fontWeight: '600', color: C.text, textAlign: 'right', wordBreak: 'break-word' }}>{value}</span>
     </div>
   )
@@ -1923,7 +1923,7 @@ const ToggleRow = ({ label, value, defaultValue = true, onChange, isMobile, hint
   return (
     <div style={{ padding: isMobile ? '0.45rem 0.75rem' : '0.5rem 1rem', borderBottom: `1px solid ${C.borderItem}` }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.5rem' }}>
-        <span style={{ fontSize: '0.5rem', color: C.text20, textTransform: 'uppercase', letterSpacing: '0.04em', fontWeight: '700' }}>{label}</span>
+        <span style={{ fontSize: '0.72rem', color: C.text20, letterSpacing: '-0.01em', fontWeight: '700' }}>{label}</span>
         <button
           onClick={() => onChange?.(!current)}
           style={{
@@ -1944,7 +1944,7 @@ const ToggleRow = ({ label, value, defaultValue = true, onChange, isMobile, hint
         </button>
       </div>
       {hint && (
-        <div style={{ marginTop: 3, fontSize: '0.52rem', color: C.text25, fontStyle: 'italic', lineHeight: 1.4 }}>{hint}</div>
+        <div style={{ marginTop: 3, fontSize: '0.72rem', color: C.text25, fontStyle: 'italic', lineHeight: 1.4 }}>{hint}</div>
       )}
     </div>
   )
@@ -1984,13 +1984,13 @@ function MacroEditor({ initKcal, initProtein, initCarbs, initFat, isMobile, onRe
     return (
       <div style={{ padding: isMobile ? '0.5rem 0.75rem' : '0.625rem 1rem', borderBottom: `1px solid ${C.borderSub}` }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginBottom: '0.35rem' }}>
-          <span style={{ fontSize: '0.4rem', fontWeight: 700, color: C.text20, textTransform: 'uppercase', letterSpacing: '0.06em', width: unit === 'kcal' ? '4rem' : '3.5rem', flexShrink: 0 }}>{label}</span>
+          <span style={{ fontSize: '0.72rem', fontWeight: 700, color: C.text20, letterSpacing: '-0.01em', width: unit === 'kcal' ? '4rem' : '3.5rem', flexShrink: 0 }}>{label}</span>
           <div style={{ flex: 1 }} />
           {isAuto ? (
             <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.2rem' }}>
               <span style={{ fontSize: isMobile ? '1rem' : '1.15rem', fontWeight: 800, color, lineHeight: 1 }}>{value}</span>
-              <span style={{ fontSize: '0.4rem', color: C.text25 }}>{unit}</span>
-              <span style={{ fontSize: '0.35rem', color: C.text15, marginLeft: '0.15rem' }}>AUTO</span>
+              <span style={{ fontSize: '0.72rem', color: C.text25 }}>{unit}</span>
+              <span style={{ fontSize: '0.72rem', color: C.text15, marginLeft: '0.15rem' }}>AUTO</span>
             </div>
           ) : (
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
@@ -2000,13 +2000,13 @@ function MacroEditor({ initKcal, initProtein, initCarbs, initFat, isMobile, onRe
               ) : (
                 <div onClick={() => { setTyping(true); setDraft(String(value)) }} style={{ minWidth: unit === 'kcal' ? '52px' : '40px', textAlign: 'center', cursor: 'text', padding: '0.1rem 0.2rem', borderRadius: '4px', border: '1px solid transparent', transition: 'border 0.15s' }} onMouseEnter={e => e.currentTarget.style.border = `1px solid ${color}30`} onMouseLeave={e => e.currentTarget.style.border = '1px solid transparent'}>
                   <span style={{ fontSize: isMobile ? '1rem' : '1.15rem', fontWeight: 800, color, lineHeight: 1 }}>{value}</span>
-                  <span style={{ fontSize: '0.4rem', color: C.text25, marginLeft: '0.1rem' }}>{unit}</span>
+                  <span style={{ fontSize: '0.72rem', color: C.text25, marginLeft: '0.1rem' }}>{unit}</span>
                 </div>
               )}
               <button onClick={() => setValue(clamp(value + step))} style={{ width: isMobile ? '28px' : '30px', height: isMobile ? '28px' : '30px', borderRadius: '6px', background: 'rgba(255,255,255,0.04)', border: `1px solid ${C.border}`, color: C.text50, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', flexShrink: 0 }}><Plus size={10} /></button>
             </div>
           )}
-          {!isAuto && kcalPer > 0 && <span style={{ fontSize: '0.4rem', color: C.text15, width: '2.5rem', textAlign: 'right', flexShrink: 0 }}>{Math.round(macroKcal)} kcal</span>}
+          {!isAuto && kcalPer > 0 && <span style={{ fontSize: '0.72rem', color: C.text15, width: '2.5rem', textAlign: 'right', flexShrink: 0 }}>{Math.round(macroKcal)} kcal</span>}
         </div>
         <div onTouchStart={!isAuto ? onBarTouchStart : undefined} onTouchMove={!isAuto ? onBarTouchMove : undefined} onTouchEnd={!isAuto ? onBarTouchEnd : undefined} onMouseDown={!isAuto ? onBarMouseDown : undefined} style={{ height: '6px', background: 'rgba(0,0,0,0.5)', borderRadius: '3px', overflow: 'hidden', cursor: isAuto ? 'default' : 'ew-resize', touchAction: isAuto ? 'auto' : 'none', userSelect: 'none' }}>
           <div style={{ height: '100%', width: `${barPct}%`, background: color, borderRadius: '3px', opacity: isAuto ? 0.5 : 1, transition: swipeStartX.current !== null ? 'none' : 'width 0.15s ease' }} />
@@ -2022,10 +2022,10 @@ function MacroEditor({ initKcal, initProtein, initCarbs, initFat, isMobile, onRe
       <SwipeInput label="Vet" value={fat} setValue={setFat} min={20} max={200} step={2} kcalPer={9} color={C.gold} />
       <SwipeInput label="Koolhydr." value={carbs} setValue={() => {}} min={0} max={600} step={5} kcalPer={4} color={C.gold} isAuto />
       <div style={{ padding: isMobile ? '0.35rem 0.75rem' : '0.4rem 1rem', borderBottom: `1px solid ${C.borderSub}`, display: 'flex', alignItems: 'center', gap: '0.5rem', background: Math.abs(kcalDiff) > 50 ? 'rgba(239,68,68,0.08)' : 'rgba(16,185,129,0.06)' }}>
-        <span style={{ fontSize: '0.4rem', color: C.text20, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Totaal</span>
+        <span style={{ fontSize: '0.72rem', color: C.text20, letterSpacing: '-0.01em' }}>Totaal</span>
         <div style={{ flex: 1 }} />
-        <span style={{ fontSize: '0.6rem', fontWeight: 800, color: Math.abs(kcalDiff) > 50 ? C.red : C.green }}>{totalKcal} kcal</span>
-        {Math.abs(kcalDiff) > 0 && <span style={{ fontSize: '0.4rem', color: Math.abs(kcalDiff) > 50 ? C.red : C.text25, fontWeight: 700 }}>{kcalDiff > 0 ? '+' : ''}{kcalDiff} vs target</span>}
+        <span style={{ fontSize: '0.72rem', fontWeight: 800, color: Math.abs(kcalDiff) > 50 ? C.red : C.green }}>{totalKcal} kcal</span>
+        {Math.abs(kcalDiff) > 0 && <span style={{ fontSize: '0.72rem', color: Math.abs(kcalDiff) > 50 ? C.red : C.text25, fontWeight: 700 }}>{kcalDiff > 0 ? '+' : ''}{kcalDiff} vs target</span>}
       </div>
     </div>
   )
@@ -2163,7 +2163,7 @@ export default function ClientDataColumn({ client, db, isMobile, onClientUpdate 
         <ReadRow isMobile={isMobile} label="Verwachting" value={client.coaching_expectations} />
         {Object.keys(wp).length > 0 && <>
           <div style={{ padding: isMobile ? '0.35rem 0.75rem' : '0.4rem 1rem', borderBottom: `1px solid ${C.borderSub}`, borderTop: `1px solid ${C.borderSub}`, marginTop: '0.25rem' }}>
-            <span style={{ fontSize: '0.42rem', fontWeight: 700, color: 'rgba(249,115,22,0.4)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Training Voorkeuren</span>
+            <span style={{ fontSize: '0.72rem', fontWeight: 700, color: 'rgba(249,115,22,0.4)', letterSpacing: '-0.01em' }}>Training Voorkeuren</span>
           </div>
           <ReadRow isMobile={isMobile} label="Niveau"      value={wp.default_experience_level} />
           <ReadRow isMobile={isMobile} label="Dagen/wk"    value={wp.default_days_per_week} />
@@ -2220,7 +2220,7 @@ export default function ClientDataColumn({ client, db, isMobile, onClientUpdate 
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
       <div style={{ padding: isMobile ? '0.625rem 0.75rem' : '0.75rem 1rem', borderBottom: `1px solid ${C.border}`, display: 'flex', alignItems: 'center', gap: '0.4rem', flexShrink: 0 }}>
         <User size={16} color={activeMeta.color} />
-        <span style={{ fontSize: isMobile ? '0.82rem' : '0.9rem', fontWeight: 900, color: activeMeta.color, textTransform: 'uppercase', letterSpacing: '0.04em' }}>{activeMeta.label}</span>
+        <span style={{ fontSize: isMobile ? '0.82rem' : '0.9rem', fontWeight: 900, color: activeMeta.color, letterSpacing: '-0.01em' }}>{activeMeta.label}</span>
       </div>
 
       <div style={{ display: 'flex', overflowX: 'auto', flexShrink: 0, borderBottom: `1px solid ${C.border}`, scrollbarWidth: 'none', msOverflowStyle: 'none' }}>

@@ -12,7 +12,7 @@ import {
 import CheckinService from '../../../client-checkin/CheckinService'
 
 const G = {
-  primary:    '#FFD700',
+  primary:    '#fff',
   secondary:  '#D4AF37',
   bg:         'rgba(255, 215, 0, 0.06)',
   bgStrong:   'rgba(255, 215, 0, 0.12)',
@@ -109,11 +109,11 @@ function CheckinCard({ checkin, isMobile }) {
             </span>
             {reviewed && (
               <span style={{
-                fontSize: '0.45rem', fontWeight: 800,
+                fontSize: '0.72rem', fontWeight: 800,
                 color: G.good, padding: '0.1rem 0.3rem',
                 background: 'rgba(16,185,129,0.1)',
                 border: '1px solid rgba(16,185,129,0.25)',
-                borderRadius: '3px', textTransform: 'uppercase', letterSpacing: '0.06em',
+                borderRadius: '3px', letterSpacing: '-0.01em',
               }}>
                 ✓ Gelezen
               </span>
@@ -121,7 +121,7 @@ function CheckinCard({ checkin, isMobile }) {
           </div>
           <div style={{
             display: 'flex', gap: '0.4rem', alignItems: 'center',
-            fontSize: '0.55rem', color: G.textFaint, fontWeight: 600,
+            fontSize: '0.72rem', color: G.textFaint, fontWeight: 600,
           }}>
             {SECTIONS.map(s => {
               const v = checkin[s.scoreField]
@@ -215,10 +215,10 @@ const ScorePill = ({ children, label, value }) => (
     borderRadius: '6px',
   }}>
     {children}
-    <span style={{ fontSize: '0.55rem', fontWeight: 700, color: G.textDim, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+    <span style={{ fontSize: '0.72rem', fontWeight: 700, color: G.textDim, letterSpacing: '-0.01em' }}>
       {label}
     </span>
-    <span style={{ fontSize: '0.7rem', fontWeight: 900, color: scoreColor(value) }}>
+    <span style={{ fontSize: '0.75rem', fontWeight: 900, color: scoreColor(value) }}>
       {value}
     </span>
   </div>
@@ -234,15 +234,15 @@ const NoteBlock = ({ children, label, text, accent }) => (
   }}>
     <div style={{
       display: 'flex', alignItems: 'center', gap: '0.3rem',
-      fontSize: '0.5rem', fontWeight: 800, color: accent,
-      textTransform: 'uppercase', letterSpacing: '0.06em',
+      fontSize: '0.72rem', fontWeight: 800, color: accent,
+      letterSpacing: '-0.01em',
       marginBottom: '0.2rem',
     }}>
       {children}
       {label}
     </div>
     <div style={{
-      fontSize: '0.7rem', color: 'rgba(255,255,255,0.75)',
+      fontSize: '0.75rem', color: 'rgba(255,255,255,0.75)',
       lineHeight: 1.4, whiteSpace: 'pre-wrap', wordBreak: 'break-word',
     }}>
       {text}
@@ -263,15 +263,15 @@ const SectionBlock = ({ section, score, notes, extras }) => (
     }}>
       <section.Icon size={12} color={G.primary} />
       <span style={{
-        fontSize: '0.6rem', fontWeight: 800, color: G.primary,
-        textTransform: 'uppercase', letterSpacing: '0.05em',
+        fontSize: '0.72rem', fontWeight: 800, color: G.primary,
+        letterSpacing: '-0.01em',
         flex: 1,
       }}>
         {section.label}
       </span>
       {score && (
         <span style={{
-          fontSize: '0.7rem', fontWeight: 900,
+          fontSize: '0.75rem', fontWeight: 900,
           color: scoreColor(score),
         }}>
           {score}/10
@@ -281,7 +281,7 @@ const SectionBlock = ({ section, score, notes, extras }) => (
     {extras.length > 0 && (
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.3rem 0.5rem', marginBottom: notes ? '0.25rem' : 0 }}>
         {extras.map((e, i) => (
-          <div key={i} style={{ fontSize: '0.55rem', color: 'rgba(255,255,255,0.55)' }}>
+          <div key={i} style={{ fontSize: '0.72rem', color: 'rgba(255,255,255,0.55)' }}>
             <span style={{ color: G.textFaint }}>{e.label}:</span>{' '}
             <span style={{ fontWeight: 700, color: 'rgba(255,255,255,0.85)' }}>{e.val}</span>
           </div>
@@ -290,7 +290,7 @@ const SectionBlock = ({ section, score, notes, extras }) => (
     )}
     {notes && (
       <div style={{
-        fontSize: '0.65rem', color: 'rgba(255,255,255,0.6)',
+        fontSize: '0.72rem', color: 'rgba(255,255,255,0.6)',
         lineHeight: 1.4, whiteSpace: 'pre-wrap', wordBreak: 'break-word',
         fontStyle: 'italic',
       }}>
@@ -330,14 +330,14 @@ export default function CheckinsColumn({ client, db, isMobile }) {
       }}>
         <ClipboardCheck size={14} color={G.primary} />
         <span style={{
-          fontSize: '0.7rem', fontWeight: 700, color: G.primary,
-          textTransform: 'uppercase', letterSpacing: '0.05em', flex: 1,
+          fontSize: '0.75rem', fontWeight: 700, color: G.primary,
+          letterSpacing: '-0.01em', flex: 1,
         }}>
           Check-ins
         </span>
         {checkins && checkins.length > 0 && (
           <span style={{
-            fontSize: '0.55rem', fontWeight: 700,
+            fontSize: '0.72rem', fontWeight: 700,
             padding: '0.15rem 0.4rem',
             background: G.bg, border: `1px solid ${G.border}`,
             borderRadius: '4px', color: G.primary,
@@ -355,11 +355,11 @@ export default function CheckinsColumn({ client, db, isMobile }) {
           </div>
         ) : !checkins || checkins.length === 0 ? (
           <div style={{ padding: '2rem 1rem', textAlign: 'center' }}>
-            <ClipboardCheck size={28} color="rgba(255,215,0,0.18)" style={{ marginBottom: '0.5rem' }} />
-            <div style={{ fontSize: '0.78rem', fontWeight: 600, color: 'rgba(255,255,255,0.4)' }}>
+            <ClipboardCheck size={28} color="rgba(255,255,255,0.18)" style={{ marginBottom: '0.5rem' }} />
+            <div style={{ fontSize: '0.78rem', fontWeight: 600, color: 'rgba(255,255,255,0.55)' }}>
               Nog geen check-ins
             </div>
-            <div style={{ fontSize: '0.6rem', color: G.textFaint, marginTop: '0.3rem' }}>
+            <div style={{ fontSize: '0.72rem', color: G.textFaint, marginTop: '0.3rem' }}>
               Client heeft de wekelijkse vragenlijst nog niet ingevuld.
             </div>
           </div>

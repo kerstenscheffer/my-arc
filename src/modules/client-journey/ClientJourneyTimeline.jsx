@@ -215,10 +215,10 @@ export default function ClientJourneyTimeline({ db, clients, selectedClient, onS
             <span style={{ fontSize: isMobile ? '0.75rem' : '0.8rem', fontWeight: 800, color: G.text }}>
               {selectedWeek === 0 ? 'Onboarding' : `W${selectedWeek}`}
               {selectedWeek === currentWeek && (
-                <span style={{ marginLeft: '0.2rem', fontSize: '0.35rem', padding: '0.04rem 0.2rem', borderRadius: '3px', background: `${G.gold}20`, color: G.gold, fontWeight: 700, verticalAlign: 'middle' }}>NU</span>
+                <span style={{ marginLeft: '0.2rem', fontSize: '0.72rem', padding: '0.04rem 0.2rem', borderRadius: '3px', background: `${G.gold}20`, color: G.gold, fontWeight: 700, verticalAlign: 'middle' }}>NU</span>
               )}
             </span>
-            <div style={{ fontSize: '0.35rem', color: G.textMuted, lineHeight: 1.2 }}>
+            <div style={{ fontSize: '0.72rem', color: G.textMuted, lineHeight: 1.2 }}>
               {selectedPhase?.name || ''}{journey.coaching_plan ? ` · ${journey.coaching_plan.deficit_level} · Lv${journey.coaching_plan.coaching_level}` : ''}
             </div>
           </div>
@@ -228,7 +228,7 @@ export default function ClientJourneyTimeline({ db, clients, selectedClient, onS
         {/* Right: actions count + add button */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
           {weekActions.length > 0 && (
-            <span style={{ fontSize: '0.45rem', color: G.textMuted, display: 'flex', alignItems: 'center', gap: '0.1rem' }}>
+            <span style={{ fontSize: '0.72rem', color: G.textMuted, display: 'flex', alignItems: 'center', gap: '0.1rem' }}>
               <CheckCircle size={8} color={weekActions.every(a => a.status === 'completed') ? G.green : G.textDim} />
               {weekActions.filter(a => a.status === 'completed').length}/{weekActions.length}
             </span>
@@ -236,7 +236,7 @@ export default function ClientJourneyTimeline({ db, clients, selectedClient, onS
           <button onClick={() => { setEditingAction({ week_number: selectedWeek, day_number: selectedDay || 0 }); setShowAddAction(true) }} style={{
             padding: '0.15rem 0.35rem', borderRadius: '4px',
             background: 'transparent', border: `1px solid ${G.gold}20`,
-            color: G.gold, fontSize: '0.4rem', fontWeight: 700,
+            color: G.gold, fontSize: '0.72rem', fontWeight: 700,
             cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.1rem',
             touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', minHeight: '22px'
           }}>
@@ -337,7 +337,7 @@ function CategoryModal({ category, column, weekNumber, totalWeeks, zoomLevel, se
             </div>
             <div>
               <h3 style={{ color: '#fff', fontSize: isMobile ? '1rem' : '1.1rem', fontWeight: '700', margin: 0 }}>{config.label}</h3>
-              <p style={{ color: config.color, fontSize: '0.6rem', fontWeight: '600', margin: '0.1rem 0 0', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+              <p style={{ color: config.color, fontSize: '0.72rem', fontWeight: '600', margin: '0.1rem 0 0', letterSpacing: '-0.01em' }}>
                 {column != null && column <= 6 ? `${DAY_LABELS[column]} — Week ${weekNumber}` : `Week ${weekNumber}`}
               </p>
             </div>

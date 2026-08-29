@@ -5,7 +5,7 @@
 import { useState, useEffect } from 'react'
 import { Plus, Trash2, Check } from 'lucide-react'
 
-const GOLD = '#FFD700'
+const GOLD = '#fff'
 const GREEN = '#10b981'
 
 const SOURCE_LABEL = { coach: 'Coach', call: 'Call', whatsapp: 'WhatsApp', checkin: 'Check-in' }
@@ -75,7 +75,7 @@ export default function ClientActionsManager({ client, db, isMobile }) {
 
   return (
     <div style={{ padding: isMobile ? '0.75rem 0.85rem' : '0.85rem 1rem' }}>
-      <p style={{ fontSize: '0.68rem', color: 'rgba(255,255,255,0.45)', margin: '0 0 0.7rem', fontWeight: 500, lineHeight: 1.4 }}>
+      <p style={{ fontSize: '0.72rem', color: 'rgba(255,255,255,0.55)', margin: '0 0 0.7rem', fontWeight: 500, lineHeight: 1.4 }}>
         Acties die {client.first_name} op de home-pagina ziet. Voeg toe wat je afspreekt; de client kan ze afvinken.
       </p>
 
@@ -92,7 +92,7 @@ export default function ClientActionsManager({ client, db, isMobile }) {
           <input type="date" style={{ ...inputStyle, flex: 1, colorScheme: 'dark' }} value={due} onChange={e => setDue(e.target.value)} />
           <button onClick={add} disabled={saving || !text.trim()} style={{
             flexShrink: 0, padding: isMobile ? '0.55rem 0.9rem' : '0.6rem 1.1rem', borderRadius: 8, border: 'none',
-            background: (saving || !text.trim()) ? 'rgba(255,215,0,0.35)' : 'linear-gradient(135deg,#FFD700,#D4AF37)',
+            background: (saving || !text.trim()) ? 'rgba(255,255,255,0.25)' : '#fff',
             color: '#0a0a0a', fontSize: '0.82rem', fontWeight: 900, cursor: saving ? 'default' : 'pointer',
             display: 'flex', alignItems: 'center', gap: '0.3rem',
           }}><Plus size={14} /> {saving ? '…' : 'Toevoegen'}</button>
@@ -101,9 +101,9 @@ export default function ClientActionsManager({ client, db, isMobile }) {
 
       {/* Lijst */}
       {loading ? (
-        <div style={{ textAlign: 'center', padding: '1.5rem', color: 'rgba(255,255,255,0.3)', fontSize: '0.8rem' }}>Laden…</div>
+        <div style={{ textAlign: 'center', padding: '1.5rem', color: 'rgba(255,255,255,0.5)', fontSize: '0.8rem' }}>Laden…</div>
       ) : items.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: '1.5rem', color: 'rgba(255,255,255,0.3)', fontSize: '0.8rem' }}>Nog geen acties voor deze client.</div>
+        <div style={{ textAlign: 'center', padding: '1.5rem', color: 'rgba(255,255,255,0.5)', fontSize: '0.8rem' }}>Nog geen acties voor deze client.</div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
           {items.map(item => {
@@ -118,11 +118,11 @@ export default function ClientActionsManager({ client, db, isMobile }) {
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontSize: isMobile ? '0.82rem' : '0.85rem', fontWeight: 600, color: '#fff', lineHeight: 1.3, textDecoration: done ? 'line-through' : 'none' }}>{item.text}</div>
                   <div style={{ display: 'flex', gap: '0.5rem', marginTop: 2 }}>
-                    <span style={{ fontSize: '0.6rem', fontWeight: 700, color: 'rgba(255,215,0,0.6)' }}>{SOURCE_LABEL[item.source] || item.source}</span>
-                    {item.due_date && <span style={{ fontSize: '0.6rem', fontWeight: 600, color: 'rgba(255,255,255,0.4)' }}>· deadline {fmtDate(item.due_date)}</span>}
+                    <span style={{ fontSize: '0.72rem', fontWeight: 700, color: 'rgba(255,255,255,0.6)' }}>{SOURCE_LABEL[item.source] || item.source}</span>
+                    {item.due_date && <span style={{ fontSize: '0.72rem', fontWeight: 600, color: 'rgba(255,255,255,0.55)' }}>· deadline {fmtDate(item.due_date)}</span>}
                   </div>
                 </div>
-                <button onClick={() => remove(item.id)} aria-label="Verwijderen" style={{ flexShrink: 0, width: 26, height: 26, borderRadius: 7, background: 'transparent', border: 'none', color: 'rgba(255,255,255,0.35)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Trash2 size={13} /></button>
+                <button onClick={() => remove(item.id)} aria-label="Verwijderen" style={{ flexShrink: 0, width: 26, height: 26, borderRadius: 7, background: 'transparent', border: 'none', color: 'rgba(255,255,255,0.55)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Trash2 size={13} /></button>
               </div>
             )
           })}

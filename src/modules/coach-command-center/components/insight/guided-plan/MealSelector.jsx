@@ -74,10 +74,10 @@ export default function MealSelector({ db, slotType, selectedMeals = [], onToggl
             }}>
               <Check size={10} color="#10b981" />
               <span style={{ flex: 1, fontSize: m ? '0.65rem' : '0.7rem', fontWeight: 700, color: '#fff' }}>{meal.name}</span>
-              <span style={{ fontSize: '0.5rem', color: 'rgba(255,255,255,0.3)' }}>{meal.calories} kcal</span>
+              <span style={{ fontSize: '0.72rem', color: 'rgba(255,255,255,0.5)' }}>{meal.calories} kcal</span>
               <button onClick={() => onToggle(meal)} style={{
                 background: 'transparent', border: 'none', cursor: 'pointer',
-                color: 'rgba(255,255,255,0.3)', padding: '0.1rem',
+                color: 'rgba(255,255,255,0.5)', padding: '0.1rem',
                 display: 'flex', alignItems: 'center',
                 touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent'
               }}><X size={10} /></button>
@@ -109,7 +109,7 @@ export default function MealSelector({ db, slotType, selectedMeals = [], onToggl
                 fontFamily: 'inherit'
               }}
             />
-            {loading && <div style={{ width: '10px', height: '10px', borderRadius: '50%', border: '1.5px solid rgba(255,255,255,0.1)', borderTopColor: '#FFD700', animation: 'spin 0.8s linear infinite' }} />}
+            {loading && <div style={{ width: '10px', height: '10px', borderRadius: '50%', border: '1.5px solid rgba(255,255,255,0.1)', borderTopColor: '#fff', animation: 'spin 0.8s linear infinite' }} />}
           </div>
 
           {/* Resultaten */}
@@ -134,13 +134,13 @@ export default function MealSelector({ db, slotType, selectedMeals = [], onToggl
                   <div style={{ fontSize: m ? '0.65rem' : '0.7rem', fontWeight: 600, color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{meal.name}</div>
                 </div>
                 <div style={{ display: 'flex', gap: '0.3rem', flexShrink: 0, alignItems: 'center' }}>
-                  <span style={{ fontSize: '0.5rem', fontWeight: 800, color: '#FFD700' }}>{meal.calories}</span>
-                  <span style={{ fontSize: '0.45rem', color: '#10b981' }}>{Math.round(meal.protein)}E</span>
+                  <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#fff' }}>{meal.calories}</span>
+                  <span style={{ fontSize: '0.72rem', color: '#10b981' }}>{Math.round(meal.protein)}E</span>
                 </div>
               </button>
             ))}
             {results.filter(r => !isSelected(r)).length === 0 && !loading && (
-              <div style={{ padding: '0.75rem', textAlign: 'center', fontSize: '0.55rem', color: 'rgba(255,255,255,0.2)' }}>
+              <div style={{ padding: '0.75rem', textAlign: 'center', fontSize: '0.72rem', color: 'rgba(255,255,255,0.45)' }}>
                 {query ? 'Geen resultaten' : 'Geen maaltijden gevonden'}
               </div>
             )}

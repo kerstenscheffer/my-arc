@@ -374,28 +374,28 @@ export default function GuidedPlanFlow({ client, db, coachId, onClose, onSuccess
 
     if (isSettings) return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-        <StepHeader title="Instellingen" sub="Basis configuratie voor het plan" color="#FFD700" />
+        <StepHeader title="Instellingen" sub="Basis configuratie voor het plan" color="#fff" />
         <div style={{ display: 'flex', gap: '0.5rem' }}>
           {[
-            { label: 'KCAL', val: client?.target_calories || '?', color: '#FFD700' },
+            { label: 'KCAL', val: client?.target_calories || '?', color: '#fff' },
             { label: 'EIWIT', val: `${client?.target_protein || '?'}g`, color: '#10b981' },
-            { label: 'DOEL', val: client?.primary_goal || '-', color: 'rgba(255,255,255,0.4)' },
+            { label: 'DOEL', val: client?.primary_goal || '-', color: 'rgba(255,255,255,0.55)' },
           ].map((s, i) => (
             <div key={i} style={{ flex: 1, padding: '0.5rem', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '6px', textAlign: 'center' }}>
-              <div style={{ fontSize: '0.4rem', fontWeight: 700, color: 'rgba(255,255,255,0.2)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '0.2rem' }}>{s.label}</div>
+              <div style={{ fontSize: '0.72rem', fontWeight: 700, color: 'rgba(255,255,255,0.45)', letterSpacing: '-0.01em', marginBottom: '0.2rem' }}>{s.label}</div>
               <div style={{ fontSize: '0.8rem', fontWeight: 800, color: s.color }}>{s.val}</div>
             </div>
           ))}
         </div>
         <div>
-          <div style={{ fontSize: '0.45rem', fontWeight: 700, color: 'rgba(255,255,255,0.3)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '0.35rem' }}>MAALTIJDEN PER DAG</div>
+          <div style={{ fontSize: '0.72rem', fontWeight: 700, color: 'rgba(255,255,255,0.5)', letterSpacing: '-0.01em', marginBottom: '0.35rem' }}>MAALTIJDEN PER DAG</div>
           <div style={{ display: 'flex', gap: '0.25rem' }}>
             {[3, 4, 5, 6].map(n => (
               <button key={n} onClick={() => setMealsPerDay(n)} style={{
                 flex: 1, padding: '0.5rem 0',
-                background: mealsPerDay === n ? 'rgba(255,215,0,0.08)' : 'rgba(255,255,255,0.02)',
-                border: `1px solid ${mealsPerDay === n ? 'rgba(255,215,0,0.3)' : 'rgba(255,255,255,0.06)'}`,
-                borderRadius: '4px', color: mealsPerDay === n ? '#FFD700' : 'rgba(255,255,255,0.3)',
+                background: mealsPerDay === n ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.02)',
+                border: `1px solid ${mealsPerDay === n ? 'rgba(255,255,255,0.3)' : 'rgba(255,255,255,0.06)'}`,
+                borderRadius: '4px', color: mealsPerDay === n ? '#fff' : 'rgba(255,255,255,0.3)',
                 fontSize: '0.8rem', fontWeight: 800,
                 cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', minHeight: '40px',
                 fontFamily: 'inherit'
@@ -405,8 +405,8 @@ export default function GuidedPlanFlow({ client, db, coachId, onClose, onSuccess
         </div>
         {intake && (
           <div style={{ padding: '0.5rem 0.625rem', background: 'rgba(16,185,129,0.04)', border: '1px solid rgba(16,185,129,0.12)', borderRadius: '6px' }}>
-            <div style={{ fontSize: '0.45rem', fontWeight: 700, color: '#10b981', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '0.2rem' }}>INTAKE DATA GEVONDEN</div>
-            <div style={{ fontSize: '0.55rem', color: 'rgba(255,255,255,0.3)' }}>
+            <div style={{ fontSize: '0.72rem', fontWeight: 700, color: '#10b981', letterSpacing: '-0.01em', marginBottom: '0.2rem' }}>INTAKE DATA GEVONDEN</div>
+            <div style={{ fontSize: '0.72rem', color: 'rgba(255,255,255,0.5)' }}>
               Voorkeuren, allergieën en trainingstijden worden meegenomen.
             </div>
           </div>
@@ -428,23 +428,23 @@ export default function GuidedPlanFlow({ client, db, coachId, onClose, onSuccess
               <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: '0.35rem', padding: '0.35rem 0.5rem', background: 'rgba(99,102,241,0.06)', border: '1px solid rgba(99,102,241,0.15)', borderRadius: '4px' }}>
                 <span style={{ fontSize: '0.75rem' }}>🌙</span>
                 <div>
-                  <div style={{ fontSize: '0.38rem', fontWeight: 700, color: 'rgba(255,255,255,0.2)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>SLAPEN</div>
-                  <div style={{ fontSize: '0.65rem', fontWeight: 800, color: '#6366f1' }}>{sleepBlock.start}</div>
+                  <div style={{ fontSize: '0.72rem', fontWeight: 700, color: 'rgba(255,255,255,0.45)', letterSpacing: '-0.01em' }}>SLAPEN</div>
+                  <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#6366f1' }}>{sleepBlock.start}</div>
                 </div>
               </div>
               <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: '0.35rem', padding: '0.35rem 0.5rem', background: 'rgba(251,191,36,0.06)', border: '1px solid rgba(251,191,36,0.15)', borderRadius: '4px' }}>
                 <span style={{ fontSize: '0.75rem' }}>☀️</span>
                 <div>
-                  <div style={{ fontSize: '0.38rem', fontWeight: 700, color: 'rgba(255,255,255,0.2)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>WAKKER</div>
-                  <div style={{ fontSize: '0.65rem', fontWeight: 800, color: '#fbbf24' }}>{sleepBlock.end}</div>
+                  <div style={{ fontSize: '0.72rem', fontWeight: 700, color: 'rgba(255,255,255,0.45)', letterSpacing: '-0.01em' }}>WAKKER</div>
+                  <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#fbbf24' }}>{sleepBlock.end}</div>
                 </div>
               </div>
               {trainingDays.length > 0 && (
-                <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: '0.35rem', padding: '0.35rem 0.5rem', background: 'rgba(255,215,0,0.06)', border: '1px solid rgba(255,215,0,0.15)', borderRadius: '4px' }}>
+                <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: '0.35rem', padding: '0.35rem 0.5rem', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: '4px' }}>
                   <span style={{ fontSize: '0.75rem' }}>💪</span>
                   <div>
-                    <div style={{ fontSize: '0.38rem', fontWeight: 700, color: 'rgba(255,255,255,0.2)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>TRAINING</div>
-                    <div style={{ fontSize: '0.65rem', fontWeight: 800, color: '#FFD700' }}>{timingOverride.preworkout ? `${timingOverride.preworkout}+` : trainingDays.length + 'x/week'}</div>
+                    <div style={{ fontSize: '0.72rem', fontWeight: 700, color: 'rgba(255,255,255,0.45)', letterSpacing: '-0.01em' }}>TRAINING</div>
+                    <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#fff' }}>{timingOverride.preworkout ? `${timingOverride.preworkout}+` : trainingDays.length + 'x/week'}</div>
                   </div>
                 </div>
               )}
@@ -455,7 +455,7 @@ export default function GuidedPlanFlow({ client, db, coachId, onClose, onSuccess
           <WeekCalendarComp schedule={weekSchedule} isMobile={m} highlightDays={trainingDays} />
         ) : (
           <div style={{ padding: '1rem', textAlign: 'center', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '6px' }}>
-            <div style={{ fontSize: '0.6rem', color: 'rgba(255,255,255,0.2)' }}>
+            <div style={{ fontSize: '0.72rem', color: 'rgba(255,255,255,0.45)' }}>
               {weekSchedule === null ? 'Weekschema laden...' : 'Geen weekschema beschikbaar — client heeft de weekbuilder nog niet ingevuld'}
             </div>
           </div>
@@ -463,7 +463,7 @@ export default function GuidedPlanFlow({ client, db, coachId, onClose, onSuccess
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', marginBottom: '0.5rem' }}>
             <Clock size={12} color="#6366f1" />
-            <span style={{ fontSize: '0.45rem', fontWeight: 700, color: 'rgba(255,255,255,0.3)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+            <span style={{ fontSize: '0.72rem', fontWeight: 700, color: 'rgba(255,255,255,0.5)', letterSpacing: '-0.01em' }}>
               MAALTIJDTIJDEN INSTELLEN
             </span>
           </div>
@@ -482,7 +482,7 @@ export default function GuidedPlanFlow({ client, db, coachId, onClose, onSuccess
                 borderLeft: `2px solid ${info.color}`,
                 borderRadius: '0 4px 4px 0'
               }}>
-                <span style={{ fontSize: '0.7rem', lineHeight: 1 }}>{info.icon}</span>
+                <span style={{ fontSize: '0.75rem', lineHeight: 1 }}>{info.icon}</span>
                 <span style={{ flex: 1, fontSize: m ? '0.6rem' : '0.65rem', fontWeight: 600, color: 'rgba(255,255,255,0.6)' }}>{info.label}</span>
                 <input
                   type="time"
@@ -527,15 +527,15 @@ export default function GuidedPlanFlow({ client, db, coachId, onClose, onSuccess
 
           {isPreWorkout && (
             <div style={{ padding: '0.5rem 0.625rem', background: 'rgba(249,115,22,0.05)', border: '1px solid rgba(249,115,22,0.15)', borderRadius: '6px' }}>
-              <div style={{ fontSize: '0.45rem', fontWeight: 700, color: '#f97316', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '0.2rem' }}>PRE-WORKOUT RICHTLIJNEN</div>
-              <div style={{ fontSize: '0.55rem', color: 'rgba(255,255,255,0.35)', lineHeight: 1.5 }}>
+              <div style={{ fontSize: '0.72rem', fontWeight: 700, color: '#f97316', letterSpacing: '-0.01em', marginBottom: '0.2rem' }}>PRE-WORKOUT RICHTLIJNEN</div>
+              <div style={{ fontSize: '0.72rem', color: 'rgba(255,255,255,0.55)', lineHeight: 1.5 }}>
                 Snelle koolhydraten — rijstwafels, honing, banaan, dadels. Weinig vet (&lt;5g). Ideaal 30-60 min voor training.
               </div>
             </div>
           )}
 
           <div>
-            <div style={{ fontSize: '0.45rem', fontWeight: 700, color: 'rgba(255,255,255,0.3)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '0.35rem' }}>ELKE DAG HETZELFDE?</div>
+            <div style={{ fontSize: '0.72rem', fontWeight: 700, color: 'rgba(255,255,255,0.5)', letterSpacing: '-0.01em', marginBottom: '0.35rem' }}>ELKE DAG HETZELFDE?</div>
             <div style={{ display: 'flex', gap: '0.25rem' }}>
               {[
                 { val: 'fixed', label: 'Ja, vast', sub: 'Elke dag dezelfde maaltijd' },
@@ -549,8 +549,8 @@ export default function GuidedPlanFlow({ client, db, coachId, onClose, onSuccess
                   borderRadius: '6px', cursor: 'pointer',
                   touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', fontFamily: 'inherit'
                 }}>
-                  <div style={{ fontSize: '0.6rem', fontWeight: 800, color: c.mode === opt.val ? color : 'rgba(255,255,255,0.4)', marginBottom: '0.1rem' }}>{opt.label}</div>
-                  <div style={{ fontSize: '0.42rem', color: 'rgba(255,255,255,0.2)', lineHeight: 1.3 }}>{opt.sub}</div>
+                  <div style={{ fontSize: '0.72rem', fontWeight: 800, color: c.mode === opt.val ? color : 'rgba(255,255,255,0.4)', marginBottom: '0.1rem' }}>{opt.label}</div>
+                  <div style={{ fontSize: '0.72rem', color: 'rgba(255,255,255,0.45)', lineHeight: 1.3 }}>{opt.sub}</div>
                 </button>
               ))}
             </div>
@@ -558,7 +558,7 @@ export default function GuidedPlanFlow({ client, db, coachId, onClose, onSuccess
 
           {c.mode === 'varied' && (
             <div>
-              <div style={{ fontSize: '0.45rem', fontWeight: 700, color: 'rgba(255,255,255,0.3)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '0.35rem' }}>HOEVEEL VARIATIES?</div>
+              <div style={{ fontSize: '0.72rem', fontWeight: 700, color: 'rgba(255,255,255,0.5)', letterSpacing: '-0.01em', marginBottom: '0.35rem' }}>HOEVEEL VARIATIES?</div>
               <div style={{ display: 'flex', gap: '0.25rem', flexWrap: 'wrap' }}>
                 {VARIATION_OPTIONS.map(opt => (
                   <button key={opt.value} onClick={() => updateConfig(slot, { variation: opt.value, meals: [] })} style={{
@@ -568,8 +568,8 @@ export default function GuidedPlanFlow({ client, db, coachId, onClose, onSuccess
                     borderRadius: '6px', cursor: 'pointer', textAlign: 'left',
                     touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', fontFamily: 'inherit'
                   }}>
-                    <div style={{ fontSize: '0.6rem', fontWeight: 800, color: c.variation === opt.value ? color : 'rgba(255,255,255,0.4)' }}>{opt.label}</div>
-                    <div style={{ fontSize: '0.42rem', color: 'rgba(255,255,255,0.2)' }}>{opt.sub}</div>
+                    <div style={{ fontSize: '0.72rem', fontWeight: 800, color: c.variation === opt.value ? color : 'rgba(255,255,255,0.4)' }}>{opt.label}</div>
+                    <div style={{ fontSize: '0.72rem', color: 'rgba(255,255,255,0.45)' }}>{opt.sub}</div>
                   </button>
                 ))}
               </div>
@@ -578,7 +578,7 @@ export default function GuidedPlanFlow({ client, db, coachId, onClose, onSuccess
 
           {(c.mode === 'fixed' || (c.mode === 'varied' && c.variation > 0)) && (
             <div>
-              <div style={{ fontSize: '0.45rem', fontWeight: 700, color: 'rgba(255,255,255,0.3)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '0.35rem' }}>
+              <div style={{ fontSize: '0.72rem', fontWeight: 700, color: 'rgba(255,255,255,0.5)', letterSpacing: '-0.01em', marginBottom: '0.35rem' }}>
                 {c.mode === 'fixed' ? 'KIES MAALTIJD' : `KIES ${c.variation} MAALTIJDEN (${c.meals.length}/${c.variation})`}
               </div>
               <MealSelector
@@ -599,12 +599,12 @@ export default function GuidedPlanFlow({ client, db, coachId, onClose, onSuccess
       if (generating) return (
         <div style={{ padding: '1rem 0' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1rem' }}>
-            <Loader size={16} color="#FFD700" style={{ animation: 'spin 1s linear infinite' }} />
-            <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#FFD700' }}>Plan wordt gegenereerd...</span>
+            <Loader size={16} color="#fff" style={{ animation: 'spin 1s linear infinite' }} />
+            <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#fff' }}>Plan wordt gegenereerd...</span>
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem' }}>
             {log.map((line, i) => (
-              <div key={i} style={{ fontSize: '0.55rem', color: 'rgba(255,255,255,0.4)', fontFamily: 'monospace' }}>{line}</div>
+              <div key={i} style={{ fontSize: '0.72rem', color: 'rgba(255,255,255,0.55)', fontFamily: 'monospace' }}>{line}</div>
             ))}
           </div>
         </div>
@@ -616,7 +616,7 @@ export default function GuidedPlanFlow({ client, db, coachId, onClose, onSuccess
             <Check size={18} color="#10b981" />
             <span style={{ fontSize: '0.8rem', fontWeight: 800, color: '#10b981' }}>Plan gegenereerd!</span>
           </div>
-          <div style={{ fontSize: '0.55rem', color: 'rgba(255,255,255,0.3)', lineHeight: 1.5 }}>
+          <div style={{ fontSize: '0.72rem', color: 'rgba(255,255,255,0.5)', lineHeight: 1.5 }}>
             Het concept plan staat klaar in de Analyzer.
           </div>
         </div>
@@ -626,10 +626,10 @@ export default function GuidedPlanFlow({ client, db, coachId, onClose, onSuccess
         <div style={{ padding: '0.5rem 0' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginBottom: '0.5rem' }}>
             <AlertCircle size={14} color="#ef4444" />
-            <span style={{ fontSize: '0.65rem', fontWeight: 700, color: '#ef4444' }}>Fout bij genereren</span>
+            <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#ef4444' }}>Fout bij genereren</span>
           </div>
-          <div style={{ fontSize: '0.55rem', color: 'rgba(239,68,68,0.7)', marginBottom: '0.75rem' }}>{error}</div>
-          <button onClick={handleGenerate} style={{ padding: '0.5rem 0.75rem', background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: '6px', color: '#ef4444', fontSize: '0.65rem', fontWeight: 700, cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', fontFamily: 'inherit' }}>
+          <div style={{ fontSize: '0.72rem', color: 'rgba(239,68,68,0.7)', marginBottom: '0.75rem' }}>{error}</div>
+          <button onClick={handleGenerate} style={{ padding: '0.5rem 0.75rem', background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: '6px', color: '#ef4444', fontSize: '0.72rem', fontWeight: 700, cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', fontFamily: 'inherit' }}>
             Opnieuw proberen
           </button>
         </div>
@@ -637,14 +637,14 @@ export default function GuidedPlanFlow({ client, db, coachId, onClose, onSuccess
 
       return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-          <StepHeader title="Klaar om te genereren" color="#FFD700"
+          <StepHeader title="Klaar om te genereren" color="#fff"
             sub={`Plan voor ${client.first_name} — ${mealsPerDay} maaltijden/dag`}
           />
           <div style={{ display: 'flex', gap: '0.2rem', flexWrap: 'wrap', marginBottom: '0.25rem' }}>
             {Object.entries(SLOT_LABELS).map(([slot, info]) => (
               <div key={slot} style={{ display: 'flex', alignItems: 'center', gap: '0.2rem', padding: '0.2rem 0.4rem', background: `${info.color}08`, border: `1px solid ${info.color}25`, borderRadius: '4px' }}>
-                <span style={{ fontSize: '0.55rem' }}>{info.icon}</span>
-                <span style={{ fontSize: '0.45rem', fontWeight: 800, color: info.color }}>{timingOverride[slot] || DEFAULT_TIMES[slot]}</span>
+                <span style={{ fontSize: '0.72rem' }}>{info.icon}</span>
+                <span style={{ fontSize: '0.72rem', fontWeight: 800, color: info.color }}>{timingOverride[slot] || DEFAULT_TIMES[slot]}</span>
               </div>
             ))}
           </div>
@@ -661,8 +661,8 @@ export default function GuidedPlanFlow({ client, db, coachId, onClose, onSuccess
               <div key={slot} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.4rem 0.625rem', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '6px' }}>
                 <div style={{ width: '3px', height: '24px', borderRadius: '2px', background: color, flexShrink: 0 }} />
                 <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: '0.55rem', fontWeight: 700, color: '#fff' }}>{label}</div>
-                  <div style={{ fontSize: '0.45rem', color: 'rgba(255,255,255,0.3)' }}>
+                  <div style={{ fontSize: '0.72rem', fontWeight: 700, color: '#fff' }}>{label}</div>
+                  <div style={{ fontSize: '0.72rem', color: 'rgba(255,255,255,0.5)' }}>
                     {modeLabel}{c.meals.length > 0 && ` — ${c.meals.map(m => m.name).join(', ')}`}
                   </div>
                 </div>
@@ -680,15 +680,15 @@ export default function GuidedPlanFlow({ client, db, coachId, onClose, onSuccess
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
       <div style={{ height: '2px', background: 'rgba(255,255,255,0.06)', flexShrink: 0 }}>
-        <div style={{ height: '100%', width: `${progressPct}%`, background: '#FFD700', transition: 'width 0.3s ease' }} />
+        <div style={{ height: '100%', width: `${progressPct}%`, background: '#fff', transition: 'width 0.3s ease' }} />
       </div>
       <div style={{ display: 'flex', padding: m ? '0.4rem 0.75rem' : '0.5rem 1rem', gap: '0.15rem', flexShrink: 0, borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
         {STEPS.map((s, i) => (
-          <div key={s.id} style={{ flex: 1, height: '3px', borderRadius: '2px', background: i <= step ? (s.color || '#FFD700') : 'rgba(255,255,255,0.08)', transition: 'background 0.2s ease' }} />
+          <div key={s.id} style={{ flex: 1, height: '3px', borderRadius: '2px', background: i <= step ? (s.color || '#fff') : 'rgba(255,255,255,0.08)', transition: 'background 0.2s ease' }} />
         ))}
       </div>
       <div style={{ padding: m ? '0.3rem 0.75rem' : '0.35rem 1rem', flexShrink: 0, borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
-        <span style={{ fontSize: '0.42rem', fontWeight: 700, color: currentStep.color || 'rgba(255,255,255,0.2)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+        <span style={{ fontSize: '0.72rem', fontWeight: 700, color: currentStep.color || 'rgba(255,255,255,0.2)', letterSpacing: '0.08em' }}>
           Stap {step + 1}/{STEPS.length} — {currentStep.label}
         </span>
       </div>
@@ -700,7 +700,7 @@ export default function GuidedPlanFlow({ client, db, coachId, onClose, onSuccess
           <button onClick={() => setStep(s => s - 1)} style={{
             padding: '0.5rem 0.75rem', background: 'rgba(255,255,255,0.04)',
             border: '1px solid rgba(255,255,255,0.08)', borderRadius: '6px',
-            color: 'rgba(255,255,255,0.4)', fontSize: '0.65rem', fontWeight: 700,
+            color: 'rgba(255,255,255,0.55)', fontSize: '0.72rem', fontWeight: 700,
             cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.2rem',
             touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', minHeight: '40px', fontFamily: 'inherit'
           }}>
@@ -713,11 +713,11 @@ export default function GuidedPlanFlow({ client, db, coachId, onClose, onSuccess
             disabled={!canNext()}
             style={{
               flex: 1, padding: '0.5rem',
-              background: canNext() ? (isReview ? '#FFD700' : 'rgba(255,215,0,0.08)') : 'rgba(255,255,255,0.03)',
-              border: `1px solid ${canNext() ? (isReview ? 'transparent' : 'rgba(255,215,0,0.25)') : 'rgba(255,255,255,0.06)'}`,
+              background: canNext() ? (isReview ? '#fff' : 'rgba(255,255,255,0.08)') : 'rgba(255,255,255,0.03)',
+              border: `1px solid ${canNext() ? (isReview ? 'transparent' : 'rgba(255,255,255,0.25)') : 'rgba(255,255,255,0.06)'}`,
               borderRadius: '6px',
-              color: canNext() ? (isReview ? '#000' : '#FFD700') : 'rgba(255,255,255,0.2)',
-              fontSize: '0.7rem', fontWeight: 800,
+              color: canNext() ? (isReview ? '#000' : '#fff') : 'rgba(255,255,255,0.2)',
+              fontSize: '0.75rem', fontWeight: 800,
               cursor: canNext() ? 'pointer' : 'not-allowed',
               display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.3rem',
               touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', minHeight: '40px',
@@ -729,10 +729,10 @@ export default function GuidedPlanFlow({ client, db, coachId, onClose, onSuccess
         )}
         {done && (
           <div style={{ display: 'flex', gap: '0.5rem', flex: 1 }}>
-            <button onClick={onClose} style={{ flex: 1, padding: '0.5rem', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '6px', color: 'rgba(255,255,255,0.4)', fontSize: '0.65rem', fontWeight: 700, cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', minHeight: '40px', fontFamily: 'inherit' }}>
+            <button onClick={onClose} style={{ flex: 1, padding: '0.5rem', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '6px', color: 'rgba(255,255,255,0.55)', fontSize: '0.72rem', fontWeight: 700, cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', minHeight: '40px', fontFamily: 'inherit' }}>
               Sluiten
             </button>
-            <button onClick={() => { onClose(); if (onSuccess) onSuccess(planId) }} style={{ flex: 2, padding: '0.5rem', background: '#10b981', border: 'none', borderRadius: '6px', color: '#fff', fontSize: '0.7rem', fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.3rem', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', minHeight: '40px', fontFamily: 'inherit' }}>
+            <button onClick={() => { onClose(); if (onSuccess) onSuccess(planId) }} style={{ flex: 2, padding: '0.5rem', background: '#10b981', border: 'none', borderRadius: '6px', color: '#fff', fontSize: '0.75rem', fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.3rem', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', minHeight: '40px', fontFamily: 'inherit' }}>
               <Zap size={13} /> Bekijk in Analyzer
             </button>
           </div>
@@ -747,7 +747,7 @@ function StepHeader({ title, sub, color }) {
   return (
     <div style={{ marginBottom: '0.25rem' }}>
       <div style={{ fontSize: '0.9rem', fontWeight: 800, color: color || '#fff', marginBottom: '0.15rem' }}>{title}</div>
-      {sub && <div style={{ fontSize: '0.55rem', color: 'rgba(255,255,255,0.3)', lineHeight: 1.4 }}>{sub}</div>}
+      {sub && <div style={{ fontSize: '0.72rem', color: 'rgba(255,255,255,0.5)', lineHeight: 1.4 }}>{sub}</div>}
     </div>
   )
 }

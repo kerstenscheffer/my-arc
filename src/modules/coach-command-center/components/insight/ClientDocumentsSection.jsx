@@ -102,7 +102,7 @@ export default function ClientDocumentsSection({ db, clientId, coachId, isMobile
             display: 'flex', alignItems: 'center', gap: '0.2rem',
             padding: '0.3rem 0.6rem', background: 'rgba(16,185,129,0.1)',
             border: '1px solid rgba(16,185,129,0.25)', borderRadius: '5px',
-            color: '#10b981', fontSize: '0.55rem', fontWeight: 700, textDecoration: 'none'
+            color: '#10b981', fontSize: '0.72rem', fontWeight: 700, textDecoration: 'none'
           }}>
             <ExternalLink size={11} /> Openen
           </a>
@@ -135,11 +135,11 @@ export default function ClientDocumentsSection({ db, clientId, coachId, isMobile
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
           <FileText size={12} color="#10b981" />
-          <span style={{ fontSize: m ? '0.55rem' : '0.6rem', fontWeight: 700, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+          <span style={{ fontSize: m ? '0.55rem' : '0.6rem', fontWeight: 700, color: 'rgba(255,255,255,0.55)', letterSpacing: '-0.01em' }}>
             Documenten
           </span>
           {documents.length > 0 && (
-            <span style={{ fontSize: '0.38rem', fontWeight: 800, background: 'rgba(16,185,129,0.1)', color: '#10b981', padding: '0.05rem 0.25rem', borderRadius: '3px' }}>
+            <span style={{ fontSize: '0.72rem', fontWeight: 800, background: 'rgba(16,185,129,0.1)', color: '#10b981', padding: '0.05rem 0.25rem', borderRadius: '3px' }}>
               {documents.length}
             </span>
           )}
@@ -157,7 +157,7 @@ export default function ClientDocumentsSection({ db, clientId, coachId, isMobile
                 background: uploading ? 'rgba(255,255,255,0.03)' : 'rgba(16,185,129,0.08)',
                 border: `1px solid ${uploading ? 'rgba(255,255,255,0.06)' : 'rgba(16,185,129,0.25)'}`,
                 borderRadius: '4px', color: uploading ? 'rgba(255,255,255,0.2)' : '#10b981',
-                fontSize: '0.48rem', fontWeight: 700, cursor: uploading ? 'not-allowed' : 'pointer',
+                fontSize: '0.72rem', fontWeight: 700, cursor: uploading ? 'not-allowed' : 'pointer',
                 touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', minHeight: '24px'
               }}
             >
@@ -173,9 +173,9 @@ export default function ClientDocumentsSection({ db, clientId, coachId, isMobile
 
       {/* Document lijst */}
       {loading ? (
-        <div style={{ padding: '0.75rem', textAlign: 'center', fontSize: '0.55rem', color: 'rgba(255,255,255,0.2)' }}>Laden...</div>
+        <div style={{ padding: '0.75rem', textAlign: 'center', fontSize: '0.72rem', color: 'rgba(255,255,255,0.45)' }}>Laden...</div>
       ) : documents.length === 0 ? (
-        <div style={{ padding: '0.75rem', textAlign: 'center', fontSize: '0.55rem', color: 'rgba(255,255,255,0.15)' }}>
+        <div style={{ padding: '0.75rem', textAlign: 'center', fontSize: '0.72rem', color: 'rgba(255,255,255,0.45)' }}>
           {isClientView ? 'Geen documenten beschikbaar' : 'Nog geen documenten geüpload'}
         </div>
       ) : (
@@ -192,7 +192,7 @@ export default function ClientDocumentsSection({ db, clientId, coachId, isMobile
                 <div style={{ fontSize: m ? '0.62rem' : '0.68rem', fontWeight: 600, color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                   {doc.name}
                 </div>
-                <div style={{ fontSize: '0.38rem', color: 'rgba(255,255,255,0.2)', marginTop: '1px' }}>
+                <div style={{ fontSize: '0.72rem', color: 'rgba(255,255,255,0.45)', marginTop: '1px' }}>
                   {formatDate(doc.created_at)}
                 </div>
               </div>
@@ -205,7 +205,7 @@ export default function ClientDocumentsSection({ db, clientId, coachId, isMobile
                   style={{
                     padding: '0.2rem 0.4rem', background: 'rgba(16,185,129,0.08)',
                     border: '1px solid rgba(16,185,129,0.2)', borderRadius: '4px',
-                    color: '#10b981', fontSize: '0.45rem', fontWeight: 700, cursor: 'pointer',
+                    color: '#10b981', fontSize: '0.72rem', fontWeight: 700, cursor: 'pointer',
                     touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', minHeight: '24px'
                   }}
                 >

@@ -119,7 +119,7 @@ const CustomTooltip = ({ active, payload, label }) => {
       border: '1px solid rgba(255,255,255,0.1)',
       borderRadius: '8px',
       padding: '0.5rem 0.625rem',
-      fontSize: '0.65rem',
+      fontSize: '0.72rem',
       maxWidth: '240px',
       boxShadow: '0 8px 24px rgba(0,0,0,0.5)'
     }}>
@@ -248,7 +248,7 @@ const CustomLegend = ({
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                   width: '16px', height: '16px',
                   background: 'transparent', border: 'none', padding: 0,
-                  color: 'rgba(255,255,255,0.4)', cursor: 'pointer',
+                  color: 'rgba(255,255,255,0.55)', cursor: 'pointer',
                   touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', flexShrink: 0,
                 }}
               >
@@ -266,12 +266,12 @@ const CustomLegend = ({
                 flex: 1, minWidth: 0,
                 fontSize: '0.78rem', fontWeight: 800,
                 color: isGroupHidden ? 'rgba(255,255,255,0.35)' : '#fff',
-                textTransform: 'uppercase', letterSpacing: '0.06em',
+                letterSpacing: '-0.01em',
               }}>
                 {groupLabel}
                 <span style={{
-                  marginLeft: '0.5rem', fontWeight: 600, fontSize: '0.68rem',
-                  color: 'rgba(255,255,255,0.45)', textTransform: 'none',
+                  marginLeft: '0.5rem', fontWeight: 600, fontSize: '0.72rem',
+                  color: 'rgba(255,255,255,0.55)', textTransform: 'none',
                 }}>
                   ({exercises.length})
                 </span>
@@ -324,7 +324,7 @@ const CustomLegend = ({
                   }} />
                   <span style={{
                     flex: 1, minWidth: 0,
-                    fontSize: '0.72rem', fontWeight: 600,
+                    fontSize: '0.75rem', fontWeight: 600,
                     color: isHidden ? 'rgba(255,255,255,0.3)' : 'rgba(255,255,255,0.92)',
                     textDecoration: isHidden ? 'line-through' : 'none',
                     whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
@@ -339,8 +339,8 @@ const CustomLegend = ({
                     isMobile={isMobile}
                   />
                   <span style={{
-                    fontSize: '0.72rem', fontWeight: 800,
-                    color: isHidden ? 'rgba(255,255,255,0.25)' : '#FFD700',
+                    fontSize: '0.75rem', fontWeight: 800,
+                    color: isHidden ? 'rgba(255,255,255,0.25)' : '#fff',
                     minWidth: 44, textAlign: 'right', flexShrink: 0,
                     fontVariantNumeric: 'tabular-nums',
                   }}>
@@ -478,7 +478,7 @@ export default function WorkoutOverviewChart({
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             width: 36, height: 36,
             background: 'transparent', border: 'none',
-            color: '#FFD700', cursor: 'pointer', padding: 0,
+            color: '#fff', cursor: 'pointer', padding: 0,
             touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
             flexShrink: 0,
           }}
@@ -486,7 +486,7 @@ export default function WorkoutOverviewChart({
           <ArrowLeft size={18} strokeWidth={2.4} />
         </button>
       )}
-      <BarChart3 size={isMobile ? 20 : 22} color="#FFD700" strokeWidth={2.2} style={{ flexShrink: 0 }} />
+      <BarChart3 size={isMobile ? 20 : 22} color="#fff" strokeWidth={2.2} style={{ flexShrink: 0 }} />
       <span style={{
         fontSize: isMobile ? '1.1rem' : '1.25rem',
         fontWeight: 900, color: '#fff',
@@ -502,9 +502,9 @@ export default function WorkoutOverviewChart({
         style={{
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           width: 38, height: 38,
-          background: 'rgba(255,215,0,0.1)',
-          border: '1px solid rgba(255,215,0,0.3)',
-          borderRadius: 10, color: '#FFD700',
+          background: 'rgba(255,255,255,0.1)',
+          border: '1px solid rgba(255,255,255,0.3)',
+          borderRadius: 10, color: '#fff',
           cursor: 'pointer', touchAction: 'manipulation',
           WebkitTapHighlightColor: 'transparent', flexShrink: 0,
         }}
@@ -532,14 +532,14 @@ export default function WorkoutOverviewChart({
               flex: 1,
               minHeight: 40,
               padding: isMobile ? '0.55rem 0' : '0.6rem 0',
-              background: active ? 'rgba(255,215,0,0.1)' : 'transparent',
+              background: active ? 'rgba(255,255,255,0.1)' : 'transparent',
               border: 'none',
-              borderBottom: active ? '2px solid #FFD700' : '2px solid transparent',
-              color: active ? '#FFD700' : 'rgba(255,255,255,0.55)',
+              borderBottom: active ? '2px solid #fff' : '2px solid transparent',
+              color: active ? '#fff' : 'rgba(255,255,255,0.55)',
               fontSize: isMobile ? '0.72rem' : '0.78rem',
               fontWeight: active ? 800 : 600,
               letterSpacing: '0.04em',
-              textTransform: 'uppercase',
+
               cursor: fetching ? 'wait' : 'pointer',
               touchAction: 'manipulation',
               WebkitTapHighlightColor: 'transparent',
@@ -576,7 +576,7 @@ export default function WorkoutOverviewChart({
               minHeight: 40,
               padding: isMobile ? '0.55rem 0.5rem' : '0.65rem 0.75rem',
               background: active
-                ? 'linear-gradient(135deg, #FFD700 0%, #D4AF37 100%)'
+                ? '#fff'
                 : 'rgba(255,255,255,0.04)',
               border: `1px solid ${active ? 'transparent' : 'rgba(255,255,255,0.08)'}`,
               borderRadius: 10,
@@ -584,11 +584,11 @@ export default function WorkoutOverviewChart({
               fontSize: isMobile ? '0.72rem' : '0.78rem',
               fontWeight: active ? 900 : 700,
               letterSpacing: '0.03em',
-              textTransform: 'uppercase',
+
               cursor: 'pointer',
               touchAction: 'manipulation',
               WebkitTapHighlightColor: 'transparent',
-              boxShadow: active ? '0 4px 12px rgba(255,215,0,0.25)' : 'none',
+              boxShadow: 'none',
               transition: 'all 0.15s ease',
             }}
           >
@@ -946,7 +946,7 @@ export default function WorkoutOverviewChart({
       {isLoading ? (
         <StateBlock>
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem' }}>
-            <Loader size={20} style={{ animation: 'spinChart 0.8s linear infinite' }} color="#FFD700" />
+            <Loader size={20} style={{ animation: 'spinChart 0.8s linear infinite' }} color="#fff" />
             <span>Laden...</span>
           </div>
         </StateBlock>

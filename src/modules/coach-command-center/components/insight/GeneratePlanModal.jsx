@@ -38,7 +38,7 @@ export default function GeneratePlanModal({ client, db, coachId, onClose, onSucc
           <button onClick={onClose} style={{
             width: '28px', height: '28px', borderRadius: '6px',
             background: 'transparent', border: '1px solid rgba(255,255,255,0.08)',
-            color: 'rgba(255,255,255,0.3)', cursor: 'pointer',
+            color: 'rgba(255,255,255,0.5)', cursor: 'pointer',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent'
           }}><X size={14} /></button>
