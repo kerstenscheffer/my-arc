@@ -248,6 +248,16 @@ export default function ClientInsightModal({ isOpen, onClose, client, isMobile, 
             </div>
           )}
 
+          {/* ═══ LOOPTIJD — vast onder de kopregel, volle breedte ═══ */}
+          {!isMobile && (
+            <CoachingPeriodPanel
+              client={effectiveClient}
+              coachId={coachId}
+              isMobile={false}
+              onClientUpdate={handleClientUpdate}
+            />
+          )}
+
           {/* ═══ MOBILE HEADER ═══ */}
           {isMobile && (
             <>
@@ -280,6 +290,13 @@ export default function ClientInsightModal({ isOpen, onClose, client, isMobile, 
                   <X size={19} strokeWidth={2.4} />
                 </button>
               </div>
+              {/* ═══ LOOPTIJD — direct onder de kop, boven de tabs ═══ */}
+              <CoachingPeriodPanel
+                client={effectiveClient}
+                coachId={coachId}
+                isMobile={isMobile}
+                onClientUpdate={handleClientUpdate}
+              />
               <div style={{
                 display: 'flex', borderBottom: '1px solid rgba(255,255,255,0.06)',
                 flexShrink: 0, overflowX: 'auto', scrollbarWidth: 'none'
@@ -306,13 +323,6 @@ export default function ClientInsightModal({ isOpen, onClose, client, isMobile, 
             </>
           )}
 
-          {/* ═══ COACHING-PERIODE STRIP — boven alle data zichtbaar ═══ */}
-          <CoachingPeriodPanel
-            client={effectiveClient}
-            coachId={coachId}
-            isMobile={isMobile}
-            onClientUpdate={handleClientUpdate}
-          />
 
           {/* ═══ DESKTOP CONTENT — rail links, gekozen secties rechts ═══ */}
           {/* De rail is een aan/uit-keuze, geen radioknop: elke sectie die je

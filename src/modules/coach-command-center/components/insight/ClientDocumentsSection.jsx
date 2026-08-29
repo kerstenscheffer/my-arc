@@ -173,9 +173,9 @@ export default function ClientDocumentsSection({ db, clientId, coachId, isMobile
 
       {/* Document lijst */}
       {loading ? (
-        <div style={{ padding: '0.75rem', textAlign: 'center', fontSize: '0.72rem', color: 'rgba(255,255,255,0.45)' }}>Laden...</div>
+        <div style={{ padding: '0.75rem', textAlign: 'center', fontSize: '0.72rem', color: 'rgba(255,255,255,0.55)' }}>Laden...</div>
       ) : documents.length === 0 ? (
-        <div style={{ padding: '0.75rem', textAlign: 'center', fontSize: '0.72rem', color: 'rgba(255,255,255,0.45)' }}>
+        <div style={{ padding: '0.75rem', textAlign: 'center', fontSize: '0.72rem', color: 'rgba(255,255,255,0.55)' }}>
           {isClientView ? 'Geen documenten beschikbaar' : 'Nog geen documenten geüpload'}
         </div>
       ) : (
@@ -192,7 +192,7 @@ export default function ClientDocumentsSection({ db, clientId, coachId, isMobile
                 <div style={{ fontSize: m ? '0.62rem' : '0.68rem', fontWeight: 600, color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                   {doc.name}
                 </div>
-                <div style={{ fontSize: '0.72rem', color: 'rgba(255,255,255,0.45)', marginTop: '1px' }}>
+                <div style={{ fontSize: '0.72rem', color: 'rgba(255,255,255,0.55)', marginTop: '1px' }}>
                   {formatDate(doc.created_at)}
                 </div>
               </div>

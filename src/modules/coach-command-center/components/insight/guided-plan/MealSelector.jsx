@@ -140,7 +140,7 @@ export default function MealSelector({ db, slotType, selectedMeals = [], onToggl
               </button>
             ))}
             {results.filter(r => !isSelected(r)).length === 0 && !loading && (
-              <div style={{ padding: '0.75rem', textAlign: 'center', fontSize: '0.72rem', color: 'rgba(255,255,255,0.45)' }}>
+              <div style={{ padding: '0.75rem', textAlign: 'center', fontSize: '0.72rem', color: 'rgba(255,255,255,0.55)' }}>
                 {query ? 'Geen resultaten' : 'Geen maaltijden gevonden'}
               </div>
             )}

@@ -1990,7 +1990,7 @@ function MacroEditor({ initKcal, initProtein, initCarbs, initFat, isMobile, onRe
             <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.2rem' }}>
               <span style={{ fontSize: isMobile ? '1rem' : '1.15rem', fontWeight: 800, color, lineHeight: 1 }}>{value}</span>
               <span style={{ fontSize: '0.72rem', color: C.text25 }}>{unit}</span>
-              <span style={{ fontSize: '0.72rem', color: C.text15, marginLeft: '0.15rem' }}>AUTO</span>
+              <span style={{ fontSize: '0.72rem', color: C.text15, marginLeft: '0.15rem' }}>Auto</span>
             </div>
           ) : (
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>

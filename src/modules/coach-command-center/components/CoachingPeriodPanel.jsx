@@ -284,148 +284,96 @@ export default function CoachingPeriodPanel({ client, coachId, isMobile, onClien
     <>
       <div style={panelShell(status, isMobile)}>
 
-        {/* Op telefoon stond dit als één flexrij met wrap: de statuspil, een
-            voortgangsbalk met minWidth 180 en rechts een kolom datums in
-            0,55rem grijs plus vier knoppen. Dat brak op willekeurige plekken
-            af. Nu drie vaste regels — status + weken, balk, datums + acties —
-            en leesbare tekstgroottes. */}
+        {/* Eén compacte regel: status en betaalwijze links, voortgang in het
+            midden, acties rechts. Stond eerder als losse blokken met een
+            gekleurde pil, een omkaderde badge en vier omrande knopjes — vijf
+            vakjes voor informatie die op één regel past. */}
         <div style={{
-          display: 'flex',
-          flexDirection: isMobile ? 'column' : 'row',
-          alignItems: isMobile ? 'stretch' : 'center',
+          display: 'flex', alignItems: 'center',
           gap: isMobile ? '0.5rem' : '0.75rem',
+          flexWrap: isMobile ? 'wrap' : 'nowrap',
         }}>
 
-          {/* Regel 1 op telefoon: status links, weken rechts. */}
-          <div style={isMobile
-            ? { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem' }
-            : { display: 'contents' }}>
-
-            <div style={{
-              display: 'inline-flex', alignItems: 'center', gap: '0.3rem',
-              padding: '0.25rem 0.55rem',
-              background: `${sm.color}1a`, border: `1px solid ${sm.color}55`,
-              borderRadius: '999px',
-              color: sm.color,
-              fontSize: '0.62rem', fontWeight: '800',
-              textTransform: 'uppercase', letterSpacing: '0.06em',
-              flexShrink: 0,
-            }}>
-              <StatusIcon size={10} strokeWidth={2.8} />
+          {/* Status + betaalwijze aan elkaar: een stip draagt de kleur, de
+              tekst blijft dik wit. */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexShrink: 0 }}>
+            <span style={{ width: 7, height: 7, borderRadius: '50%', background: sm.color, flexShrink: 0 }} />
+            <span style={{ fontSize: '0.82rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.01em', whiteSpace: 'nowrap' }}>
               {sm.label}
-            </div>
-
-            {isMobile && (
-              <span style={{ fontSize: '0.9rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.01em', whiteSpace: 'nowrap' }}>
-                {period.weeksDone} <span style={{ color: 'rgba(255,255,255,0.4)', fontWeight: 700, fontSize: '0.72rem' }}>/ {period.weeksTotal} weken</span>
-              </span>
-            )}
-          </div>
-
-          {/* Voortgang: op telefoon alleen de balk (het cijfer staat hierboven). */}
-          <div style={{ flex: 1, minWidth: isMobile ? 0 : '180px' }}>
-            {!isMobile && (
-              <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: '0.5rem', marginBottom: '0.25rem' }}>
-                <span style={{ fontSize: '0.85rem', fontWeight: '900', color: '#fff', letterSpacing: '-0.01em' }}>
-                  {period.weeksDone} <span style={{ color: 'rgba(255,255,255,0.35)', fontWeight: '600', fontSize: '0.7rem' }}>/ {period.weeksTotal}</span> <span style={{ color: 'rgba(255,255,255,0.45)', fontWeight: '700', fontSize: '0.65rem' }}>weken</span>
-                </span>
-                <span style={{ fontSize: '0.62rem', fontWeight: '700', color: overdue ? '#ef4444' : 'rgba(255,255,255,0.45)' }}>
-                  {overdue
-                    ? 'Periode voorbij'
-                    : status === 'paused'
-                      ? `Pauze loopt (${period.weeksRemaining}w rest)`
-                      : `nog ~${period.weeksRemaining} weken`}
-                </span>
-              </div>
-            )}
-            <div style={{ height: isMobile ? '8px' : '6px', background: 'rgba(255,255,255,0.05)', borderRadius: '999px', overflow: 'hidden' }}>
-              <div style={{
-                width: `${period.pct}%`, height: '100%',
-                background: `linear-gradient(90deg, ${barColor}aa 0%, ${barColor} 100%)`,
-                transition: 'width 0.4s ease',
-              }} />
-            </div>
-            {isMobile && (
-              <div style={{ marginTop: '0.35rem', fontSize: '0.72rem', fontWeight: 700, color: overdue ? '#ef4444' : 'rgba(255,255,255,0.55)' }}>
-                {overdue
-                  ? 'Periode voorbij'
-                  : status === 'paused'
-                    ? `Pauze loopt · ${period.weeksRemaining}w rest`
-                    : `nog ~${period.weeksRemaining} weken`}
-                <span style={{ color: 'rgba(255,255,255,0.3)' }}> · {formatDate(period.startDate)} → {formatDate(period.endDate)}</span>
-              </div>
-            )}
-          </div>
-
-          {/* Datums + betaalwijze + acties. Op telefoon één regel onderaan. */}
-          <div style={{
-            display: 'flex', alignItems: 'center', gap: '0.4rem',
-            flexShrink: 0, flexWrap: 'wrap',
-            justifyContent: isMobile ? 'flex-end' : undefined,
-          }}>
-            {!isMobile && (
-              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', fontSize: '0.62rem', color: 'rgba(255,255,255,0.45)', fontWeight: '600' }}>
-                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.2rem' }}>
-                  <Calendar size={9} /> Start: {formatDate(period.startDate)}
-                </span>
-                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.2rem' }}>
-                  <Hourglass size={9} /> Eind: {formatDate(period.endDate)}
-                </span>
-              </div>
-            )}
+            </span>
             {client.payment_plan && paymentMeta(client.payment_plan) && (
-              <span style={{
-                display: 'inline-flex', alignItems: 'center',
-                padding: '0.2rem 0.5rem',
-                background: `${paymentMeta(client.payment_plan).color}18`,
-                border: `1px solid ${paymentMeta(client.payment_plan).color}45`,
-                borderRadius: '999px',
-                color: paymentMeta(client.payment_plan).color,
-                fontSize: '0.6rem', fontWeight: '900',
-                textTransform: 'uppercase', letterSpacing: '0.05em',
-                marginRight: isMobile ? 'auto' : 0,
-              }}>
-                {paymentMeta(client.payment_plan).short}
+              <>
+                <span style={{ color: 'rgba(255,255,255,0.25)', fontWeight: 700 }}>·</span>
+                <span style={{ fontSize: '0.82rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.01em', whiteSpace: 'nowrap' }}>
+                  {paymentMeta(client.payment_plan).short}
+                </span>
+              </>
+            )}
+          </div>
+
+          {/* Weken + balk. De balk pakt de resterende ruimte. */}
+          <span style={{ fontSize: '0.82rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.01em', whiteSpace: 'nowrap', flexShrink: 0 }}>
+            {period.weeksDone}<span style={{ color: 'rgba(255,255,255,0.4)' }}>/{period.weeksTotal}</span> wk
+          </span>
+
+          <div style={{
+            flex: 1, minWidth: isMobile ? '100%' : 60,
+            order: isMobile ? 3 : 0,
+            height: 6, background: 'rgba(255,255,255,0.08)',
+            borderRadius: 999, overflow: 'hidden',
+          }}>
+            <div style={{ width: `${period.pct}%`, height: '100%', background: barColor, transition: 'width 0.4s ease' }} />
+          </div>
+
+          <span style={{ fontSize: '0.78rem', fontWeight: 800, color: overdue ? '#ef4444' : 'rgba(255,255,255,0.55)', whiteSpace: 'nowrap', flexShrink: 0 }}>
+            {overdue
+              ? 'Periode voorbij'
+              : status === 'paused'
+                ? `pauze · ${period.weeksRemaining}w rest`
+                : `nog ${period.weeksRemaining}w`}
+            {!isMobile && (
+              <span style={{ color: 'rgba(255,255,255,0.3)', fontWeight: 700 }}>
+                {' · '}{formatDate(period.startDate)} → {formatDate(period.endDate)}
               </span>
             )}
+          </span>
+
+          {/* Kale icoonknoppen, geen vakjes. */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.15rem', flexShrink: 0, marginLeft: 'auto' }}>
             {status === 'active' && (
-              <button onClick={() => setShowPauseModal(true)} disabled={busy} style={actionBtnStyle('#f59e0b')}>
-                <Pause size={11} /> Pauzeer
+              <button onClick={() => setShowPauseModal(true)} disabled={busy} title="Pauzeer coaching" style={ikoonKnop('#f59e0b')}>
+                <Pause size={15} />
               </button>
             )}
             {status === 'paused' && (
-              <button onClick={resume} disabled={busy} style={actionBtnStyle('#10b981')}>
-                <Play size={11} /> Hervat
+              <button onClick={resume} disabled={busy} title="Hervat coaching" style={ikoonKnop('#10b981')}>
+                <Play size={15} />
               </button>
             )}
             {status !== 'ended' && (
-              <button onClick={endCoaching} disabled={busy} style={actionBtnStyle('#ef4444', true)}>
-                <Square size={11} />
+              <button onClick={endCoaching} disabled={busy} title="Beëindig coaching" style={ikoonKnop('#ef4444')}>
+                <Square size={14} />
               </button>
             )}
             {status === 'ended' && (
-              <button onClick={reopenCoaching} disabled={busy} style={actionBtnStyle('#10b981')}>
-                <Play size={11} /> Heropen
+              <button onClick={reopenCoaching} disabled={busy} title="Heropen coaching" style={ikoonKnop('#10b981')}>
+                <Play size={15} />
               </button>
             )}
-            <button onClick={() => setEditing(true)} style={actionBtnStyle('rgba(255,255,255,0.5)', true)} title="Periode aanpassen">
-              <Settings size={11} />
+            <button onClick={() => setEditing(true)} title="Periode aanpassen" style={ikoonKnop()}>
+              <Settings size={15} />
             </button>
           </div>
         </div>
         {/* Pauze-reden banner */}
         {status === 'paused' && client.coaching_pause_reason && (
           <div style={{
-            marginTop: '0.5rem',
-            padding: '0.4rem 0.6rem',
-            background: 'rgba(245,158,11,0.08)',
-            border: '1px solid rgba(245,158,11,0.22)',
-            borderRadius: '6px',
-            fontSize: '0.7rem', color: 'rgba(255,255,255,0.7)',
+            marginTop: '0.35rem',
             display: 'flex', alignItems: 'center', gap: '0.4rem',
+            fontSize: '0.78rem', fontWeight: 700, color: 'rgba(255,255,255,0.6)',
           }}>
-            <AlertCircle size={11} color="#f59e0b" />
-            <span style={{ color: '#f59e0b', fontWeight: '800', textTransform: 'uppercase', fontSize: '0.55rem', letterSpacing: '0.06em' }}>Reden:</span>
+            <AlertCircle size={13} color="#f59e0b" style={{ flexShrink: 0 }} />
+            <span style={{ color: '#fff', fontWeight: 900 }}>Reden:</span>
             <span>{client.coaching_pause_reason}</span>
           </div>
         )}
@@ -515,29 +463,18 @@ export default function CoachingPeriodPanel({ client, coachId, isMobile, onClien
 
 // ────────────────────────────────────────────────────────────────────────────
 function panelShell(status, isMobile) {
-  // Alleen een accentstreep links; de gouden gradient en gouden rand eromheen
-  // maakten dit blok zwaarder dan de inhoud rechtvaardigt.
+  // Vast tegen de bovenkant en over de volle breedte, op desktop net zo goed
+  // als op telefoon. Zat eerder als los kaartje met 1rem marge rondom en
+  // afgeronde hoeken midden in de flow — dat las als een zwevend blok in
+  // plaats van als de balk die het is.
   const tint = status === 'paused' ? '#f59e0b' : status === 'ended' ? '#6b7280' : '#fff'
-  if (isMobile) {
-    // Volle breedte op telefoon: de marge van 1rem links en rechts kostte
-    // 32px van een scherm dat er maar 360 heeft, en juist hier staan de
-    // invoervelden die de ruimte nodig hebben.
-    return {
-      padding: '0.7rem 0.75rem',
-      background: 'rgba(255,255,255,0.03)',
-      borderTop: '1px solid rgba(255,255,255,0.08)',
-      borderBottom: '1px solid rgba(255,255,255,0.08)',
-      borderLeft: `3px solid ${tint}`,
-      margin: '0 0 0.5rem',
-    }
-  }
   return {
-    padding: '0.7rem 0.9rem',
+    flexShrink: 0,
+    padding: isMobile ? '0.5rem 0.75rem' : '0.5rem 1rem',
     background: 'rgba(255,255,255,0.03)',
-    border: '1px solid rgba(255,255,255,0.08)',
+    borderBottom: '1px solid rgba(255,255,255,0.08)',
     borderLeft: `3px solid ${tint}`,
-    borderRadius: '10px',
-    margin: '0.6rem 1rem',
+    margin: 0,
   }
 }
 
@@ -582,15 +519,12 @@ const secondaryBtnStyle = {
   cursor: 'pointer', minHeight: '34px',
 }
 
-const actionBtnStyle = (color, iconOnly) => ({
-  padding: iconOnly ? '0.35rem 0.45rem' : '0.35rem 0.6rem',
-  background: `${color}15`,
-  border: `1px solid ${color}40`,
-  borderRadius: '6px',
-  color,
-  fontSize: '0.62rem', fontWeight: '800',
-  cursor: 'pointer',
-  display: 'flex', alignItems: 'center', gap: '0.25rem',
-  minHeight: '28px',
-  whiteSpace: 'nowrap',
+// Kaal icoon, geen vak. De kleur zit in het icoon zelf; een rand en een
+// getinte achtergrond eromheen maakten van vier acties vier blokjes.
+const ikoonKnop = (color = 'rgba(255,255,255,0.55)') => ({
+  width: 30, height: 30, padding: 0,
+  display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+  background: 'none', border: 'none', borderRadius: 6,
+  color, cursor: 'pointer', flexShrink: 0,
+  touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
 })

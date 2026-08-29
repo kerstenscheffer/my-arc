@@ -7,7 +7,11 @@ import { TrendingDown, TrendingUp, Calendar, ChevronDown, ChevronUp, Activity } 
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts'
 import { weightGoalColor } from '../utils/weightGoalColor'
 
-export default function WeightStatsGrid({ stats = {}, client = {}, fridayData = {}, history = [], isMobile = false, coachingPlan = null }) {
+// `volleBreedte` + `toonHuidig` worden alleen door het coach-inzichtpaneel
+// gebruikt: daar is dit de bovenste balk van de sectie en hoort hij tegen de
+// randen te staan, met het huidige gewicht als eerste cel. Op de klantpagina
+// blijft het een zwevend kaartje binnen de bestaande opmaak.
+export default function WeightStatsGrid({ stats = {}, client = {}, fridayData = {}, history = [], isMobile = false, coachingPlan = null, volleBreedte = false, toonHuidig = false }) {
   const [showWeekly, setShowWeekly] = useState(false)
   const sortedHistory = [...history].sort((a, b) => new Date(a.date) - new Date(b.date))
 
@@ -262,12 +266,30 @@ export default function WeightStatsGrid({ stats = {}, client = {}, fridayData = 
     )
   }
   
+  // Laatste meting voor de Huidig-cel.
+  const laatsteMeting = history && history.length
+    ? [...history].sort((a, b) => new Date(b.date) - new Date(a.date))[0]
+    : null
+  const laatsteGewicht = laatsteMeting && Number.isFinite(parseFloat(laatsteMeting.weight))
+    ? Math.round(parseFloat(laatsteMeting.weight) * 10) / 10 : null
+  const laatsteDatum = laatsteMeting?.date
+    ? new Date(laatsteMeting.date).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })
+    : null
+
   return (
     <div>
       {/* ═══ 4-COLUMN STAT BAR — Deze week | Vorige week | Verschil | Sinds start
             Zwevende card: los van de zijkanten, rounded, met margin. Tekst
             bold wit en groter. ═══ */}
-      <div style={{
+      <div style={volleBreedte ? {
+        margin: 0,
+        background: 'rgba(255,255,255,0.03)',
+        borderTop: '1px solid rgba(255,255,255,0.08)',
+        borderBottom: '1px solid rgba(255,255,255,0.08)',
+        display: 'grid',
+        gridTemplateColumns: `repeat(${toonHuidig ? 5 : 4}, 1fr)`,
+        overflow: 'hidden',
+      } : {
         margin: isMobile ? '0 1rem' : '0 1.5rem',
         background: 'rgba(255,255,255,0.03)',
         border: '1px solid rgba(255,255,255,0.08)',
@@ -278,14 +300,21 @@ export default function WeightStatsGrid({ stats = {}, client = {}, fridayData = 
         overflow: 'hidden',
       }}>
         {[
+          ...(toonHuidig ? [{
+            label: 'Huidig',
+            sub: laatsteDatum || 'geen meting',
+            val: laatsteGewicht != null ? `${laatsteGewicht}` : '—',
+            color: '#fff',
+            isPrimary: true,
+          }] : []),
           {
             label: 'Deze week',
             sub: cur
               ? `${cur.count} meting${cur.count === 1 ? '' : 'en'}`
               : 'geen meting',
             val: cur ? `${cur.avg}` : '—',
-            color: '#FFD700',
-            isPrimary: true,
+            color: '#fff',
+            isPrimary: !toonHuidig,
           },
           {
             label: 'Vorige week',
@@ -318,7 +347,7 @@ export default function WeightStatsGrid({ stats = {}, client = {}, fridayData = 
         ].map((s, i) => (
           <div key={i} style={{
             padding: isMobile ? '0.8rem 0.55rem' : '1rem 0.85rem',
-            borderRight: i < 3 ? '1px solid rgba(255,255,255,0.06)' : 'none',
+            borderRight: i < (toonHuidig ? 4 : 3) ? '1px solid rgba(255,255,255,0.06)' : 'none',
             display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 4,
             minWidth: 0,
           }}>
@@ -326,7 +355,7 @@ export default function WeightStatsGrid({ stats = {}, client = {}, fridayData = 
               display: 'flex', alignItems: 'center', gap: 4,
               fontSize: isMobile ? '0.7rem' : '0.78rem',
               fontWeight: 900,
-              color: s.isPrimary ? '#FFD700' : '#fff',
+              color: '#fff',
               letterSpacing: '-0.01em',
               whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
               maxWidth: '100%',

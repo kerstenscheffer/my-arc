@@ -123,7 +123,7 @@ export default function WorkoutColumn({ db, workoutData, exerciseProgress = {}, 
           <div style={{ display: 'flex', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
             {[{ label: 'VOLTOOID', val: workoutData.completedWorkouts, color: '#10b981' }, { label: 'TOTAAL', val: workoutData.totalWorkouts, color: '#fff' }, { label: 'LAATSTE', val: formatDaysAgo(workoutData.daysSinceWorkout), color: workoutData.daysSinceWorkout <= 3 ? '#10b981' : workoutData.daysSinceWorkout <= 7 ? '#f59e0b' : '#ef4444' }].map((s, i) => (
               <div key={i} style={{ flex: 1, textAlign: 'center', padding: isMobile ? '0.4rem 0.125rem' : '0.5rem 0.25rem', borderRight: i < 2 ? '1px solid rgba(255,255,255,0.04)' : 'none' }}>
-                <div style={{ fontSize: '0.72rem', fontWeight: '700', color: 'rgba(255,255,255,0.45)', letterSpacing: '-0.01em', marginBottom: '0.1rem' }}>{s.label}</div>
+                <div style={{ fontSize: '0.72rem', fontWeight: '700', color: 'rgba(255,255,255,0.55)', letterSpacing: '-0.01em', marginBottom: '0.1rem' }}>{s.label}</div>
                 <div style={{ fontSize: isMobile ? '0.8rem' : '0.9rem', fontWeight: '800', color: s.color, lineHeight: 1 }}>{s.val}</div>
               </div>
             ))}
@@ -137,7 +137,7 @@ export default function WorkoutColumn({ db, workoutData, exerciseProgress = {}, 
               {workoutData?.schema ? (
                 <>
                   <div style={{ fontSize: '0.72rem', fontWeight: '600', color: '#fff' }}>{workoutData.schema.name || 'Workout Plan'}</div>
-                  <div style={{ fontSize: '0.72rem', color: 'rgba(255,255,255,0.45)' }}>{workoutData.schema.days_per_week || '-'}d/week · {workoutData.schema.experience_level || '-'}</div>
+                  <div style={{ fontSize: '0.72rem', color: 'rgba(255,255,255,0.55)' }}>{workoutData.schema.days_per_week || '-'}d/week · {workoutData.schema.experience_level || '-'}</div>
                 </>
               ) : (
                 <div style={{ fontSize: '0.72rem', fontWeight: '600', color: 'rgba(255,255,255,0.5)' }}>Geen schema</div>
@@ -236,7 +236,7 @@ export default function WorkoutColumn({ db, workoutData, exerciseProgress = {}, 
               </div>
             </button>
             )
-          }) : <div style={{ padding: '2rem 1rem', textAlign: 'center', color: 'rgba(255,255,255,0.45)', fontSize: '0.75rem' }}>Geen workouts</div>}
+          }) : <div style={{ padding: '2rem 1rem', textAlign: 'center', color: 'rgba(255,255,255,0.55)', fontSize: '0.75rem' }}>Geen workouts</div>}
         </div>
       </div>
     )
@@ -357,7 +357,7 @@ export default function WorkoutColumn({ db, workoutData, exerciseProgress = {}, 
                 <ChevronRight size={12} color="rgba(255,255,255,0.15)" />
               </div>
             </button>
-          )) : <div style={{ padding: '2rem 1rem', textAlign: 'center', color: 'rgba(255,255,255,0.45)', fontSize: '0.75rem' }}>Geen data</div>}
+          )) : <div style={{ padding: '2rem 1rem', textAlign: 'center', color: 'rgba(255,255,255,0.55)', fontSize: '0.75rem' }}>Geen data</div>}
         </div>
       </div>
     )
@@ -379,7 +379,7 @@ export default function WorkoutColumn({ db, workoutData, exerciseProgress = {}, 
           <div style={{ display: 'flex', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
             {[{ label: 'BESTE', val: `${latest.bestWeight}kg`, color: '#fff' }, { label: 'REPS', val: `×${latest.bestReps}`, color: '#fff' }, { label: 'SESSIES', val: entries.length, color: '#fff' }, ...(wDiff !== null && wDiff !== 0 ? [{ label: 'TREND', val: `${wDiff > 0 ? '+' : ''}${wDiff}kg`, color: wDiff > 0 ? '#10b981' : '#ef4444' }] : [])].map((s, i) => (
               <div key={i} style={{ flex: 1, textAlign: 'center', padding: isMobile ? '0.4rem 0.125rem' : '0.5rem 0.25rem', borderRight: i < 3 ? '1px solid rgba(255,255,255,0.04)' : 'none' }}>
-                <div style={{ fontSize: '0.72rem', fontWeight: '700', color: 'rgba(255,255,255,0.45)', letterSpacing: '-0.01em', marginBottom: '0.1rem' }}>{s.label}</div>
+                <div style={{ fontSize: '0.72rem', fontWeight: '700', color: 'rgba(255,255,255,0.55)', letterSpacing: '-0.01em', marginBottom: '0.1rem' }}>{s.label}</div>
                 <div style={{ fontSize: isMobile ? '0.75rem' : '0.85rem', fontWeight: '800', color: s.color, lineHeight: 1 }}>{s.val}</div>
               </div>
             ))}
@@ -403,7 +403,7 @@ export default function WorkoutColumn({ db, workoutData, exerciseProgress = {}, 
               {e.sets?.length > 0 && <div style={{ display: 'flex', gap: '0.2rem', flexWrap: 'wrap' }}>{e.sets.map((s, si) => <SetDisplay key={si} s={s} />)}</div>}
             </div>
           ))}
-          {entries.length === 0 && <div style={{ padding: '2rem 1rem', textAlign: 'center', color: 'rgba(255,255,255,0.45)', fontSize: '0.75rem' }}>Geen progressie</div>}
+          {entries.length === 0 && <div style={{ padding: '2rem 1rem', textAlign: 'center', color: 'rgba(255,255,255,0.55)', fontSize: '0.75rem' }}>Geen progressie</div>}
         </div>
       </div>
     )
