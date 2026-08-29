@@ -4,7 +4,7 @@
 // naar Output te navigeren.
 
 import { useState, useEffect } from 'react'
-import { Lightbulb, X, Plus, ExternalLink, Trash2, Check, RotateCcw, Pencil } from 'lucide-react'
+import { Lightbulb, X, Plus, ExternalLink, Trash2, Check, RotateCcw, Pencil, Layers, FolderPlus } from 'lucide-react'
 
 const PURPLE = '#8b5cf6'
 const GREEN = '#10b981'
@@ -27,19 +27,78 @@ export default function ContentIdeasWidget({ db, coachId, open: openProp, onOpen
   // sneller voor één-regel ideeën.
   const [editingId, setEditingId] = useState(null)
   const [editingValue, setEditingValue] = useState('')
+  // Secties uit `content_sections` — dezelfde tabel die Output gebruikt, dus
+  // wat je hier aanmaakt staat daar ook. 'all' = geen filter, 'geen' = ideeën
+  // zonder sectie.
+  const [sections, setSections] = useState([])
+  const [filter, setFilter] = useState('all')
+
+  // Sectie-beheer — dezelfde tabel en dezelfde regels als in Output, zodat
+  // een sectie die je hier maakt daar meteen bestaat.
+  const addSection = async () => {
+    const title = window.prompt('Naam van de sectie?')?.trim()
+    if (!title || !coachId) return
+    const { data, error } = await db.supabase.from('content_sections')
+      .insert({ coach_id: coachId, title, position: sections.length })
+      .select().single()
+    if (error) { alert(`Sectie maken mislukt — ${error.message}`); return }
+    setSections(prev => [...prev, data])
+    setFilter(data.id)
+  }
+
+  const renameSection = async (sec) => {
+    const title = window.prompt('Nieuwe naam?', sec.title)?.trim()
+    if (!title || title === sec.title) return
+    const { error } = await db.supabase.from('content_sections')
+      .update({ title, updated_at: new Date().toISOString() }).eq('id', sec.id)
+    if (error) { alert(`Hernoemen mislukt — ${error.message}`); return }
+    setSections(prev => prev.map(x => x.id === sec.id ? { ...x, title } : x))
+  }
+
+  const deleteSection = async (sec) => {
+    if (!window.confirm(`Sectie "${sec.title}" verwijderen? De ideeën blijven staan onder "Geen sectie".`)) return
+    // De foreign key staat op ON DELETE SET NULL, dus de ideeën zelf overleven.
+    const { error } = await db.supabase.from('content_sections').delete().eq('id', sec.id)
+    if (error) { alert(`Verwijderen mislukt — ${error.message}`); return }
+    setSections(prev => prev.filter(x => x.id !== sec.id))
+    setIdeas(prev => prev.map(i => i.section_id === sec.id ? { ...i, section_id: null } : i))
+    if (filter === sec.id) setFilter('all')
+  }
+
+  // Idee naar een andere sectie schuiven.
+  const moveIdea = async (idea, sectionId) => {
+    const next = sectionId || null
+    setIdeas(prev => prev.map(i => i.id === idea.id ? { ...i, section_id: next } : i))
+    const { error } = await db.supabase.from('content_items')
+      .update({ section_id: next, updated_at: new Date().toISOString() })
+      .eq('id', idea.id)
+    if (error) {
+      console.error('move idea failed:', error)
+      setIdeas(prev => prev.map(i => i.id === idea.id ? { ...i, section_id: idea.section_id } : i))
+    }
+  }
 
   const load = async () => {
     if (!db?.supabase || !coachId) return
     setLoading(true)
-    const { data, error } = await db.supabase
-      .from('content_items')
-      .select('id, title, type, created_at, posted_at')
-      .eq('coach_id', coachId)
-      .eq('status', 'idea')
-      .order('created_at', { ascending: false })
-      .limit(50)
+    const [{ data, error }, { data: secs }] = await Promise.all([
+      db.supabase
+        .from('content_items')
+        .select('id, title, type, created_at, posted_at, section_id')
+        .eq('coach_id', coachId)
+        .eq('status', 'idea')
+        .order('created_at', { ascending: false })
+        .limit(200),
+      db.supabase
+        .from('content_sections')
+        .select('id, title, position, created_at')
+        .eq('coach_id', coachId)
+        .order('position', { ascending: true })
+        .order('created_at', { ascending: true }),
+    ])
     if (error) console.error('load content_items failed:', error)
     setIdeas(data || [])
+    setSections(secs || [])
     setLoading(false)
   }
 
@@ -57,9 +116,11 @@ export default function ContentIdeasWidget({ db, coachId, open: openProp, onOpen
         title: t,
         type: 'reel',
         status: 'idea',
+        // Staat er een sectie open? Dan landt het idee daar meteen in.
+        section_id: (filter === 'all' || filter === 'geen') ? null : filter,
         created_at: new Date().toISOString(),
       })
-      .select('id, title, type, created_at, posted_at')
+      .select('id, title, type, created_at, posted_at, section_id')
       .single()
     setAdding(false)
     if (error) { console.error('insert content_item failed:', error); return }
@@ -164,7 +225,7 @@ export default function ContentIdeasWidget({ db, coachId, open: openProp, onOpen
           style={{
             position: 'fixed',
             top: 0, right: 0, bottom: 0,
-            width: 'min(380px, 100vw)',
+            width: 'min(470px, 100vw)',
             background: '#0a0a0a',
             borderLeft: '1px solid rgba(255,255,255,0.08)',
             zIndex: 2147483550,
@@ -210,9 +271,60 @@ export default function ContentIdeasWidget({ db, coachId, open: openProp, onOpen
             </div>
           </div>
 
+          {/* Body: sectie-rail links, invoer + lijst rechts — zelfde indeling
+              als QuickTodoModal. Stond eerst als chips bovenaan; met meer dan
+              een handvol secties moest je daar horizontaal scrollen. */}
+          <div style={{ display: 'flex', flex: 1, minHeight: 0 }}>
+
+          <div style={{ width: 130, flexShrink: 0, borderRight: '1px solid rgba(255,255,255,0.06)', padding: '0.6rem 0.45rem', overflowY: 'auto' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '0 0.3rem 0.4rem' }}>
+              <span style={{ flex: 1, fontSize: '0.52rem', fontWeight: 800, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.3)' }}>Secties</span>
+              <button onClick={addSection} title="Nieuwe sectie"
+                style={{ width: 18, height: 18, borderRadius: 5, background: 'rgba(255,255,255,0.05)', border: 'none', color: 'rgba(255,255,255,0.45)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <FolderPlus size={11} />
+              </button>
+            </div>
+            {[{ id: 'all', title: 'Alles' }, ...sections, ...(ideas.some(i => !i.section_id) ? [{ id: 'geen', title: 'Geen sectie' }] : [])].map(sec => {
+              const aan = filter === sec.id
+              const aantal = sec.id === 'all'
+                ? ideas.filter(i => showPosted || !i.posted_at).length
+                : ideas.filter(i => (showPosted || !i.posted_at) && (sec.id === 'geen' ? !i.section_id : i.section_id === sec.id)).length
+              const echt = sec.id !== 'all' && sec.id !== 'geen'
+              return (
+                <div key={sec.id} style={{ display: 'flex', alignItems: 'center', gap: 2, marginBottom: 2 }}>
+                  <button
+                    onClick={() => setFilter(sec.id)}
+                    onDoubleClick={() => { if (echt) renameSection(sec) }}
+                    title={echt ? 'Dubbelklik om te hernoemen' : sec.title}
+                    style={{
+                      flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 5,
+                      padding: '0.4rem 0.45rem', borderRadius: 7,
+                      background: aan ? 'rgba(139,92,246,0.16)' : 'transparent',
+                      border: `1px solid ${aan ? PURPLE + '66' : 'transparent'}`,
+                      cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit',
+                    }}>
+                    {sec.id === 'all'
+                      ? <Layers size={11} color={aan ? '#c4b5fd' : 'rgba(255,255,255,0.45)'} style={{ flexShrink: 0 }} />
+                      : <span style={{ flexShrink: 0, width: 7, height: 7, borderRadius: '50%', background: aan ? PURPLE : 'rgba(255,255,255,0.25)' }} />}
+                    <span style={{ flex: 1, minWidth: 0, fontSize: '0.68rem', fontWeight: aan ? 800 : 600, color: aan ? '#c4b5fd' : 'rgba(255,255,255,0.7)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{sec.title}</span>
+                    <span style={{ flexShrink: 0, fontSize: '0.56rem', fontWeight: 800, color: aan ? '#c4b5fd' : 'rgba(255,255,255,0.3)' }}>{aantal}</span>
+                  </button>
+                  {echt && aan && (
+                    <button onClick={() => deleteSection(sec)} title="Sectie verwijderen"
+                      style={{ flexShrink: 0, width: 18, height: 18, borderRadius: 5, background: 'transparent', border: 'none', color: '#ef4444', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <Trash2 size={10} />
+                    </button>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+
+          <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
+
           {/* Add new */}
           <div style={{
-            padding: '0.75rem 1rem',
+            padding: '0.75rem 0.85rem',
             borderBottom: '1px solid rgba(255,255,255,0.04)',
             display: 'flex', flexDirection: 'column', gap: '0.5rem',
           }}>
@@ -252,7 +364,9 @@ export default function ContentIdeasWidget({ db, coachId, open: openProp, onOpen
               {adding ? 'Toevoegen…' : 'Toevoegen'}
             </button>
             <div style={{ fontSize: '0.6rem', color: 'rgba(255,255,255,0.3)', fontWeight: 600 }}>
-              Belandt in Output → Ideeën. Bewerk details daar (script, b-rollen, format).
+              {filter !== 'all' && filter !== 'geen'
+                ? `Landt in "${sections.find(x => x.id === filter)?.title || 'sectie'}". `
+                : ''}Belandt in Output → Ideeën. Bewerk details daar (script, b-rollen, format).
             </div>
           </div>
 
@@ -264,11 +378,16 @@ export default function ContentIdeasWidget({ db, coachId, open: openProp, onOpen
               </div>
             )}
             {(() => {
-              const visible = showPosted ? ideas : ideas.filter(i => !i.posted_at)
+              const opStatus = showPosted ? ideas : ideas.filter(i => !i.posted_at)
+              const visible = filter === 'all'
+                ? opStatus
+                : opStatus.filter(i => filter === 'geen' ? !i.section_id : i.section_id === filter)
               if (!loading && visible.length === 0) {
                 return (
                   <div style={{ padding: '1.5rem', color: 'rgba(255,255,255,0.3)', fontSize: '0.75rem', textAlign: 'center' }}>
-                    {showPosted ? 'Nog geen ideeën.' : 'Geen open ideeën — strak gewerkt 🎉'}
+                    {filter !== 'all'
+                      ? 'Nog geen ideeën in deze sectie.'
+                      : (showPosted ? 'Nog geen ideeën.' : 'Geen open ideeën — strak gewerkt 🎉')}
                   </div>
                 )
               }
@@ -356,6 +475,26 @@ export default function ContentIdeasWidget({ db, coachId, open: openProp, onOpen
                         <Pencil size={11} />
                       </button>
                     )}
+                    {/* Verplaatsen naar een andere sectie — alleen zichtbaar
+                        zodra er secties bestaan. */}
+                    {sections.length > 0 && (
+                      <select
+                        value={idea.section_id || ''}
+                        onChange={(e) => moveIdea(idea, e.target.value || null)}
+                        title="Verplaats naar sectie"
+                        onClick={(e) => e.stopPropagation()}
+                        style={{
+                          flexShrink: 0, maxWidth: 88, padding: '0.2rem 0.25rem', borderRadius: 6,
+                          background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)',
+                          color: 'rgba(255,255,255,0.55)', fontSize: '0.6rem', fontWeight: 700,
+                          fontFamily: 'inherit', cursor: 'pointer', outline: 'none',
+                        }}>
+                        <option value="" style={{ background: '#0a0a0a' }}>Geen sectie</option>
+                        {sections.map(sec => (
+                          <option key={sec.id} value={sec.id} style={{ background: '#0a0a0a' }}>{sec.title}</option>
+                        ))}
+                      </select>
+                    )}
                     <button
                       onClick={() => handleDelete(idea)}
                       title="Verwijderen"
@@ -373,6 +512,9 @@ export default function ContentIdeasWidget({ db, coachId, open: openProp, onOpen
               })
             })()}
           </div>
+
+          </div>{/* einde rechterkolom */}
+          </div>{/* einde body */}
         </div>
       )}
     </>
