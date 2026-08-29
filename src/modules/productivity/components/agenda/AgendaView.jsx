@@ -4,7 +4,7 @@
 // tasks sit in the right sidebar.
 
 import { useState, useMemo, useEffect, useRef } from 'react'
-import { ChevronLeft, ChevronRight, Calendar, Coffee, Users, Inbox, Plus, Repeat, Pencil, X } from 'lucide-react'
+import { ChevronLeft, ChevronRight, ChevronUp, ChevronDown, Calendar, Coffee, Users, Inbox, Plus, Repeat, Pencil, X } from 'lucide-react'
 import AgendaBlockModal from './AgendaBlockModal'
 import FloatingPanel from '../FloatingPanel'
 import {
@@ -335,6 +335,100 @@ export default function AgendaView({
       !t.scheduled_day && t.status !== 'completed' && !t.completed_at
     )
   }, [allTasks])
+
+  // Ongeplande taken gegroepeerd per sectie — zelfde indeling als de
+  // todo-modal (DayDetailView): secties onder elkaar, elk inklapbaar met een
+  // gekleurde kop en de taken eronder. Vervangt de horizontale tabs; die
+  // dwongen je steeds één sectie tegelijk te bekijken.
+  const [dichtgeklapt, setDichtgeklapt] = useState({})
+
+  const ongeplandPerSectie = useMemo(() => {
+    const groepen = (sections || [])
+      .filter(sec => sec.id !== 'unassigned')
+      .map(sec => ({
+        id: sec.id,
+        title: sec.title,
+        color: sec.color || '#10b981',
+        tasks: unscheduledTasks.filter(t => t.section_id === sec.id),
+      }))
+      .filter(g => g.tasks.length > 0)
+
+    // Taken zonder sectie onderaan, zodat ze niet tussen je echte kolommen
+    // verdwijnen.
+    const losse = unscheduledTasks.filter(t => !t.section_id)
+    if (losse.length > 0) groepen.push({ id: 'geen', title: 'Overig', color: '#10b981', tasks: losse })
+    return groepen
+  }, [unscheduledTasks, sections])
+
+  // Gedeelde lijst voor beide "Niet gepland"-panelen, zodat ze niet uit elkaar
+  // kunnen lopen. `sleepbaar` staat alleen aan in het paneel dat drag-and-drop
+  // ondersteunt; het andere werkt via aantikken (armedTask).
+  const OngeplandeLijst = ({ sleepbaar = false, legeTekst }) => (
+    <div style={{ padding: '0.5rem', display: 'flex', flexDirection: 'column', gap: '0.45rem' }}>
+      {ongeplandPerSectie.length === 0 && (
+        <div style={{ padding: '1.2rem 0.5rem', textAlign: 'center', color: 'rgba(255,255,255,0.25)', fontSize: '0.7rem', fontWeight: 500, lineHeight: 1.4 }}>
+          {legeTekst}
+        </div>
+      )}
+      {ongeplandPerSectie.map(sec => {
+        const open = !dichtgeklapt[sec.id]
+        return (
+          <div key={sec.id} style={{ background: '#0a0a0a', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 8, overflow: 'hidden' }}>
+            <button
+              onClick={() => setDichtgeklapt(prev => ({ ...prev, [sec.id]: open }))}
+              style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '0.4rem', padding: '0.4rem 0.6rem', background: 'transparent', border: 'none', borderBottom: open ? `1px solid ${sec.color}20` : 'none', cursor: 'pointer', fontFamily: 'inherit', touchAction: 'manipulation' }}>
+              <span style={{ width: 6, height: 6, borderRadius: '50%', background: sec.color, flexShrink: 0 }} />
+              <span style={{ flex: 1, textAlign: 'left', fontSize: '0.7rem', fontWeight: 800, color: sec.color }}>{sec.title}</span>
+              <span style={{ fontSize: '0.6rem', fontWeight: 800, color: sec.color, opacity: 0.6 }}>{sec.tasks.length}</span>
+              {open ? <ChevronUp size={11} color="rgba(255,255,255,0.3)" /> : <ChevronDown size={11} color="rgba(255,255,255,0.3)" />}
+            </button>
+
+            {open && (
+              <div style={{ padding: '0.35rem', display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
+                {sec.tasks.map(task => {
+                  const color = task.color || sec.color
+                  const isArmed = armedTask?.id === task.id
+                  return (
+                    <div
+                      key={task.id}
+                      draggable={sleepbaar}
+                      onDragStart={sleepbaar ? (e) => onTaskDragStart(e, task, 'sidebar') : undefined}
+                      onDragEnd={sleepbaar ? onTaskDragEnd : undefined}
+                      onClick={() => setArmedTask(prev => prev?.id === task.id ? null : task)}
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: '0.4rem',
+                        padding: '0.45rem 0.55rem',
+                        background: isArmed ? 'rgba(255,215,0,0.14)' : 'rgba(255,255,255,0.03)',
+                        border: isArmed ? '1px solid #FFD700' : '1px solid rgba(255,255,255,0.05)',
+                        borderLeft: `3px solid ${color}`,
+                        borderRadius: 6,
+                        cursor: sleepbaar ? 'grab' : 'pointer',
+                        touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+                      }}
+                    >
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#fff', lineHeight: 1.25, wordBreak: 'break-word' }}>
+                          {task.title}
+                        </div>
+                        <div style={{ fontSize: '0.55rem', color: isArmed ? '#FFD700' : 'rgba(255,255,255,0.35)', fontWeight: 600, marginTop: 2 }}>
+                          {isArmed ? 'Tik op een dag/tijd →' : (task.estimated_minutes ? `${task.estimated_minutes} min` : 'Tik om in te plannen')}
+                        </div>
+                      </div>
+                      <button onClick={(e) => { e.stopPropagation(); onTaskClick && onTaskClick(task) }}
+                        title="Bewerk taak"
+                        style={{ flexShrink: 0, width: 24, height: 24, borderRadius: 6, background: 'rgba(255,255,255,0.06)', border: 'none', color: 'rgba(255,255,255,0.5)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', touchAction: 'manipulation' }}>
+                        <Pencil size={11} />
+                      </button>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+        )
+      })}
+    </div>
+  )
 
   // ── Drag handlers ─────────────────────────────────────────────────────────
   const onTaskDragStart = (e, task, source) => {
@@ -886,35 +980,9 @@ export default function AgendaView({
               iconColor="rgba(255,255,255,0.6)"
               isMobile={isMobile}
               align="right"
-              panelWidth={260}
+              panelWidth={isMobile ? 260 : 380}
             >
-              <div style={{ padding: '0.5rem', display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-                {unscheduledTasks.length === 0 && (
-                  <div style={{ padding: '1.2rem 0.5rem', textAlign: 'center', color: 'rgba(255,255,255,0.25)', fontSize: '0.7rem', fontWeight: 500, lineHeight: 1.4 }}>
-                    Geen losse taken. Tik een taak aan om in te plannen.
-                  </div>
-                )}
-                {unscheduledTasks.map(task => {
-                  const color = task.color || sectionColorById[task.section_id] || '#10b981'
-                  const isArmed = armedTask?.id === task.id
-                  return (
-                    <div key={task.id}
-                      onClick={() => setArmedTask(prev => prev?.id === task.id ? null : task)}
-                      style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', padding: '0.5rem 0.6rem', background: isArmed ? 'rgba(255,215,0,0.14)' : 'rgba(255,255,255,0.04)', border: isArmed ? '1px solid #FFD700' : '1px solid rgba(255,255,255,0.07)', borderLeft: `3px solid ${color}`, borderRadius: 6, cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}>
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{task.title}</div>
-                        <div style={{ fontSize: '0.55rem', color: isArmed ? '#FFD700' : 'rgba(255,255,255,0.35)', fontWeight: 600, marginTop: 2 }}>
-                          {isArmed ? 'Tik op tijdslot →' : (task.estimated_minutes ? `${task.estimated_minutes} min` : 'Tik om in te plannen')}
-                        </div>
-                      </div>
-                      <button onClick={(e) => { e.stopPropagation(); onTaskClick && onTaskClick(task) }}
-                        style={{ flexShrink: 0, width: 24, height: 24, borderRadius: 6, background: 'rgba(255,255,255,0.06)', border: 'none', color: 'rgba(255,255,255,0.5)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', touchAction: 'manipulation' }}>
-                        <Pencil size={11} />
-                      </button>
-                    </div>
-                  )
-                })}
-              </div>
+              <OngeplandeLijst legeTekst="Geen losse taken. Tik een taak aan om in te plannen." />
             </FloatingPanel>
           </div>
           <button onClick={() => setEditingBlock({})}
@@ -982,70 +1050,13 @@ export default function AgendaView({
               iconColor="rgba(255,255,255,0.6)"
               isMobile={isMobile}
               align="right"
-              panelWidth={260}
+              panelWidth={isMobile ? 260 : 380}
             >
               <div
                 onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move' }}
                 onDrop={onSidebarDrop}
-                style={{
-                  padding: '0.5rem',
-                  display: 'flex', flexDirection: 'column', gap: '0.4rem',
-                }}
               >
-                {unscheduledTasks.length === 0 && (
-                  <div style={{
-                    padding: '1.2rem 0.5rem', textAlign: 'center',
-                    color: 'rgba(255,255,255,0.25)',
-                    fontSize: '0.7rem', fontWeight: 500, lineHeight: 1.4,
-                  }}>
-                    Geen losse taken. Sleep een blok hierheen om uit te plannen.
-                  </div>
-                )}
-                {unscheduledTasks.map(task => {
-                  const color = task.color || sectionColorById[task.section_id] || '#10b981'
-                  const isArmed = armedTask?.id === task.id
-                  return (
-                    <div
-                      key={task.id}
-                      draggable
-                      onDragStart={(e) => onTaskDragStart(e, task, 'sidebar')}
-                      onDragEnd={onTaskDragEnd}
-                      // Tik = armen voor plaatsing (tik nogmaals = annuleren).
-                      onClick={() => setArmedTask(prev => prev?.id === task.id ? null : task)}
-                      style={{
-                        display: 'flex', alignItems: 'center', gap: '0.4rem',
-                        padding: '0.5rem 0.6rem',
-                        background: isArmed ? 'rgba(255,215,0,0.14)' : 'rgba(255,255,255,0.04)',
-                        border: isArmed ? '1px solid #FFD700' : '1px solid rgba(255,255,255,0.07)',
-                        borderLeft: `3px solid ${color}`,
-                        borderRadius: 6,
-                        cursor: 'pointer',
-                        touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-                      }}
-                    >
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{
-                          fontSize: '0.75rem', fontWeight: 700, color: '#fff',
-                          letterSpacing: '-0.01em', lineHeight: 1.25,
-                          whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
-                        }}>
-                          {task.title}
-                        </div>
-                        <div style={{ fontSize: '0.55rem', color: isArmed ? '#FFD700' : 'rgba(255,255,255,0.35)', fontWeight: 600, marginTop: 2 }}>
-                          {isArmed ? 'Tik op een dag/tijd →' : (task.estimated_minutes ? `${task.estimated_minutes} min` : 'Tik om in te plannen')}
-                        </div>
-                      </div>
-                      {/* Potlood — opent alsnog de bewerk-modal */}
-                      <button
-                        onClick={(e) => { e.stopPropagation(); onTaskClick && onTaskClick(task) }}
-                        title="Bewerk taak"
-                        style={{ flexShrink: 0, width: 24, height: 24, borderRadius: 6, background: 'rgba(255,255,255,0.06)', border: 'none', color: 'rgba(255,255,255,0.5)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', touchAction: 'manipulation' }}
-                      >
-                        <Pencil size={11} />
-                      </button>
-                    </div>
-                  )
-                })}
+                <OngeplandeLijst sleepbaar legeTekst="Geen losse taken. Sleep een blok hierheen om uit te plannen." />
               </div>
             </FloatingPanel>
           </div>
