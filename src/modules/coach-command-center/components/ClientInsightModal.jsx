@@ -60,6 +60,17 @@ export default function ClientInsightModal({ isOpen, onClose, client, isMobile, 
   const [photoZoom, setPhotoZoom] = useState(false)
   const [showGallery, setShowGallery] = useState(false)  // volledig foto-overzicht (grid)
   const [mobileTab, setMobileTab] = useState('weight')
+  // Desktop: welke secties naast elkaar staan. De rail vinkt ze aan en uit,
+  // dus dit is een lijst en geen enkele keuze. Minimaal één blijft staan —
+  // een leeg paneel is geen bruikbare toestand.
+  const [openSecties, setOpenSecties] = useState(['weight'])
+  const toggleSectie = (id) => {
+    setOpenSecties(prev => (
+      prev.includes(id)
+        ? (prev.length === 1 ? prev : prev.filter(x => x !== id))
+        : [...prev, id]
+    ))
+  }
   const [showLog, setShowLog] = useState(false)
   const [showNotify, setShowNotify] = useState(false)
   const [showIntake, setShowIntake] = useState(false)
@@ -123,6 +134,57 @@ export default function ClientInsightModal({ isOpen, onClose, client, isMobile, 
     { id: 'journey', label: 'Journey',  icon: TrendingUp },
   ]
 
+  // Eén definitie per sectie voor desktop én mobiel. Stond eerder twee keer
+  // in het bestand (één blok per weergave), waardoor een prop-wijziging in de
+  // ene helft stilletjes langs de andere ging.
+  const renderSectie = (id, klein) => {
+    if (id === 'weight') return (
+      <WeightColumn
+        client={effectiveClient} weightData={weightData} circumData={circumData}
+        photos={photos} coachingPlan={effectiveClient.coachingPlan} isMobile={klein}
+        onPhotoClick={(idx) => { setSelectedPhotoIndex(idx); setPhotoZoom(true) }}
+        onDownloadPhoto={(idx) => downloadPhoto(photos[idx], idx)}
+        onOpenGallery={() => setShowGallery(true)}
+      />
+    )
+    if (id === 'workout') return (
+      <WorkoutColumn
+        db={db} workoutData={workoutData} exerciseProgress={exerciseProgress}
+        isMobile={klein} onNavigateWorkout={onNavigateWorkout}
+        client={effectiveClient} onClose={onClose}
+      />
+    )
+    if (id === 'meals') return (
+      <MealsColumn
+        client={effectiveClient} mealData={mealData} isMobile={klein}
+        onNavigatePlan={onNavigatePlan} onClose={onClose}
+        db={db} coachId={coachId}
+        onGeneratePlan={(planId) => { onNavigatePlan && onNavigatePlan(effectiveClient.id, planId); onClose() }}
+      />
+    )
+    if (id === 'data') return (
+      <ClientDataColumn
+        client={effectiveClient} db={db} isMobile={klein}
+        onClientUpdate={handleClientUpdate}
+      />
+    )
+    if (id === 'checkin') return (
+      <CheckinsColumn client={effectiveClient} db={db} isMobile={klein} />
+    )
+    if (id === 'journey') return db ? (
+      <ClientJourneyTimeline
+        db={db}
+        clients={[effectiveClient]}
+        selectedClient={effectiveClient}
+        onSelectClient={() => {}}
+        coachId={coachId}
+        isMobile={klein}
+        onOpenMealPanel={onOpenMealPanel}
+        onOpenWorkoutPanel={onOpenWorkoutPanel}
+      />
+    ) : null
+    return null
+  }
   return (
     <>
       <div onClick={onClose} style={{
@@ -252,12 +314,11 @@ export default function ClientInsightModal({ isOpen, onClose, client, isMobile, 
             onClientUpdate={handleClientUpdate}
           />
 
-          {/* ═══ DESKTOP CONTENT — rail links, één paneel rechts ═══ */}
-          {/* Voorheen stonden alle vijf kolommen tegelijk naast elkaar, elk
-              inklapbaar, met een sleepbare splitter en Journey als lade
-              eronder. Dat gaf vijf smalle kokers en drie manieren om iets te
-              openen. Nu: één sectie tegelijk, volle breedte, gekozen via de
-              rail — zelfde patroon als de Plan Analyzer. */}
+          {/* ═══ DESKTOP CONTENT — rail links, gekozen secties rechts ═══ */}
+          {/* De rail is een aan/uit-keuze, geen radioknop: elke sectie die je
+              aanzet komt er als eigen kolom bij te staan. Eén aan = volle
+              breedte, drie aan = drie kolommen naast elkaar. Zo bepaal je zelf
+              wat je naast elkaar wil vergelijken. */}
           {!isMobile && (
             <div style={{ flex: 1, display: 'flex', minHeight: 0, overflow: 'hidden' }}>
 
@@ -269,9 +330,10 @@ export default function ClientInsightModal({ isOpen, onClose, client, isMobile, 
               }}>
                 {SECTIES.map(sec => {
                   const Icon = sec.icon
-                  const aan = mobileTab === sec.id
+                  const aan = openSecties.includes(sec.id)
                   return (
-                    <button key={sec.id} onClick={() => setMobileTab(sec.id)} title={sec.label}
+                    <button key={sec.id} onClick={() => toggleSectie(sec.id)}
+                      title={aan ? `${sec.label} verbergen` : `${sec.label} erbij`}
                       style={{
                         display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3,
                         padding: '0.55rem 0.2rem', borderRadius: 10, cursor: 'pointer',
@@ -288,112 +350,51 @@ export default function ClientInsightModal({ isOpen, onClose, client, isMobile, 
                 })}
               </div>
 
-              {/* Paneel — de gekozen sectie over de volle breedte. */}
-              <div style={{ flex: 1, minWidth: 0, overflow: 'auto', WebkitOverflowScrolling: 'touch' }}>
-                {mobileTab === 'weight' && (
-                  <WeightColumn
-                    client={effectiveClient} weightData={weightData} circumData={circumData}
-                    photos={photos} coachingPlan={effectiveClient.coachingPlan} isMobile={false}
-                    onPhotoClick={(idx) => { setSelectedPhotoIndex(idx); setPhotoZoom(true) }}
-                    onDownloadPhoto={(idx) => downloadPhoto(photos[idx], idx)}
-                    onOpenGallery={() => setShowGallery(true)}
-                  />
-                )}
-                {mobileTab === 'workout' && (
-                  <WorkoutColumn
-                    db={db} workoutData={workoutData} exerciseProgress={exerciseProgress}
-                    isMobile={false} onNavigateWorkout={onNavigateWorkout}
-                    client={effectiveClient} onClose={onClose}
-                  />
-                )}
-                {mobileTab === 'meals' && (
-                  <MealsColumn
-                    client={effectiveClient} mealData={mealData} isMobile={false}
-                    onNavigatePlan={onNavigatePlan} onClose={onClose}
-                    db={db} coachId={coachId}
-                    onGeneratePlan={(planId) => { onNavigatePlan && onNavigatePlan(effectiveClient.id, planId); onClose() }}
-                  />
-                )}
-                {mobileTab === 'data' && (
-                  <ClientDataColumn
-                    client={effectiveClient} db={db} isMobile={false}
-                    onClientUpdate={handleClientUpdate}
-                  />
-                )}
-                {mobileTab === 'checkin' && (
-                  <CheckinsColumn client={effectiveClient} db={db} isMobile={false} />
-                )}
-                {mobileTab === 'journey' && (
-                  db ? (
-                    <ClientJourneyTimeline
-                      db={db}
-                      clients={[effectiveClient]}
-                      selectedClient={effectiveClient}
-                      onSelectClient={() => {}}
-                      coachId={coachId}
-                      isMobile={false}
-                      onOpenMealPanel={onOpenMealPanel}
-                      onOpenWorkoutPanel={onOpenWorkoutPanel}
-                    />
-                  ) : null
-                )}
+              {/* Kolommen — één per aangezette sectie, gelijk verdeeld. Vanaf
+                  twee kolommen geldt een ondergrens van 300px: zet je alle zes
+                  aan, dan schuift de rij liever horizontaal dan dat je zes
+                  onleesbare kokers van 220px krijgt. */}
+              <div style={{ flex: 1, minWidth: 0, display: 'flex', overflowX: 'auto', overflowY: 'hidden' }}>
+              {SECTIES.filter(sec => openSecties.includes(sec.id)).map((sec, i) => (
+                <div key={sec.id} style={{
+                  flex: '1 1 0',
+                  minWidth: openSecties.length > 1 ? 300 : 0,
+                  overflow: 'auto', WebkitOverflowScrolling: 'touch',
+                  borderLeft: i > 0 ? '1px solid rgba(255,255,255,0.07)' : 'none',
+                }}>
+                  {/* Kop alleen zodra er meer dan één kolom staat; bij één
+                      kolom weet je uit de rail al waar je naar kijkt. */}
+                  {openSecties.length > 1 && (
+                    <div style={{
+                      position: 'sticky', top: 0, zIndex: 5,
+                      display: 'flex', alignItems: 'center', gap: '0.35rem',
+                      padding: '0.4rem 0.7rem',
+                      background: 'rgba(10,10,10,0.97)',
+                      borderBottom: '1px solid rgba(255,255,255,0.06)',
+                    }}>
+                      <sec.icon size={13} color="#fff" />
+                      <span style={{ fontSize: '0.72rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.01em' }}>{sec.label}</span>
+                      <div style={{ flex: 1 }} />
+                      <button onClick={() => toggleSectie(sec.id)} title={`${sec.label} verbergen`}
+                        style={{ ...kopKnop(), width: 22, height: 22 }}>
+                        <X size={13} />
+                      </button>
+                    </div>
+                  )}
+                  {renderSectie(sec.id, false)}
+                </div>
+              ))}
               </div>
             </div>
           )}
 
           {/* ═══ MOBILE CONTENT ═══ */}
+          {/* Op een telefoon blijft het één sectie tegelijk: twee kolommen
+              naast elkaar is daar onleesbaar. */}
           {isMobile && (
             // Home-indicator van de iPhone dekte anders de onderste regel af.
-            <div style={{ flex: 1, overflow: 'hidden', paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
-              {mobileTab === 'weight' && (
-                <WeightColumn
-                  client={effectiveClient} weightData={weightData} circumData={circumData}
-                  photos={photos} coachingPlan={effectiveClient.coachingPlan} isMobile={true}
-                  onPhotoClick={(idx) => { setSelectedPhotoIndex(idx); setPhotoZoom(true) }}
-                  onDownloadPhoto={(idx) => downloadPhoto(photos[idx], idx)}
-                  onOpenGallery={() => setShowGallery(true)}
-                />
-              )}
-              {mobileTab === 'workout' && (
-                <WorkoutColumn
-                  db={db} workoutData={workoutData} exerciseProgress={exerciseProgress}
-                  isMobile={true} onNavigateWorkout={onNavigateWorkout}
-                  client={effectiveClient} onClose={onClose}
-                />
-              )}
-              {mobileTab === 'meals' && (
-                <MealsColumn
-                  client={effectiveClient} mealData={mealData} isMobile={true}
-                  onNavigatePlan={onNavigatePlan} onClose={onClose}
-                  db={db} coachId={coachId}
-                  onGeneratePlan={(planId) => { onNavigatePlan && onNavigatePlan(effectiveClient.id, planId); onClose() }}
-                />
-              )}
-              {mobileTab === 'data' && (
-                <ClientDataColumn
-                  client={effectiveClient} db={db} isMobile={true}
-                  onClientUpdate={handleClientUpdate}
-                />
-              )}
-              {mobileTab === 'checkin' && (
-                <CheckinsColumn
-                  client={effectiveClient} db={db} isMobile={true}
-                />
-              )}
-              {mobileTab === 'journey' && db && (
-                <div style={{ height: '100%', overflow: 'auto', WebkitOverflowScrolling: 'touch' }}>
-                  <ClientJourneyTimeline
-                    db={db}
-                    clients={[effectiveClient]}
-                    selectedClient={effectiveClient}
-                    onSelectClient={() => {}}
-                    coachId={coachId}
-                    isMobile={true}
-                    onOpenMealPanel={onOpenMealPanel}
-                    onOpenWorkoutPanel={onOpenWorkoutPanel}
-                  />
-                </div>
-              )}
+            <div style={{ flex: 1, overflow: 'auto', WebkitOverflowScrolling: 'touch', paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
+              {renderSectie(mobileTab, true)}
             </div>
           )}
         </div>
