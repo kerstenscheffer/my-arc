@@ -223,8 +223,8 @@ function EditableRow({ label, value, field, type = 'text', options, suffix, isMo
 // ── Macro Rules Block ──
 // Twee blokken in één paneel:
 //   1. Onderhoud — Mifflin BMR × activity + optionele training/cardio/log
-//      correctie. "Bereken & opslaan onderhoud" → schrijft clients.tdee +
-//      maintenance_settings.
+//      correctie. Schrijft clients.tdee + maintenance_settings automatisch,
+//      800ms nadat de coach een factor heeft aangepast. Geen knop.
 //   2. Macro's — gebruikt OPGESLAGEN tdee + tekort om de macro-targets
 //      volgens macroRules te berekenen. "Bereken & opslaan macro's" →
 //      schrijft target_calories/protein/carbs/fat.
@@ -541,6 +541,9 @@ function MacroRulesBlock({ client, db, onClientUpdate, isMobile }) {
   // Preview-state: berekende macros worden hier opgeslagen totdat de coach
   // ze expliciet bevestigt.
   const [pendingMacros, setPendingMacros] = useState(null)
+  // Handmatig bijgestelde macro's. null = toon gewoon wat er op de klant staat.
+  const [macroDraft, setMacroDraft] = useState(null)
+  const [macrosOpslaan, setMacrosOpslaan] = useState(false)
   // Handmatige doel-kcal invoer: coach kan de berekende doel-kcal overschrijven,
   // waarna de macro's uit die kcal worden herberekend.
   const [editingKcal, setEditingKcal] = useState(false)
@@ -549,9 +552,12 @@ function MacroRulesBlock({ client, db, onClientUpdate, isMobile }) {
   const [showTdeeDetail, setShowTdeeDetail] = useState(
     !Number.isFinite(parseFloat(client?.tdee))
   )
-  const [showMacroDetail, setShowMacroDetail] = useState(
-    !Number.isFinite(parseFloat(client?.target_calories))
-  )
+  const [tdeeOpslaan, setTdeeOpslaan] = useState(false)
+  // Pas automatisch opslaan nadat de coach zélf iets heeft aangeraakt. Bij het
+  // laden zet een effect namelijk `trainingDays` op de waarde uit het
+  // workout-schema; zonder deze rem zou het openen van een klantkaart al een
+  // schrijfactie en een logboekregel opleveren.
+  const aangeraakt = useRef(false)
   const [liveWeight, setLiveWeight] = useState(null)
   // {realTdee, days, avgKcal, deltaKg} | null
   const [logEstimate, setLogEstimate] = useState(null)
@@ -785,18 +791,11 @@ function MacroRulesBlock({ client, db, onClientUpdate, isMobile }) {
     } catch (e) { console.error('saveField', e) }
   }
 
-  const handleSaveTdee = async () => {
-    if (busy || !db?.supabase || !client?.id) return
-    if (computedTdee == null) {
-      alert(
-        'Geen TDEE-waarde te berekenen.\n\nKies één van deze opties:\n\n' +
-        '1. Vink "Handmatige TDEE" aan en typ de waarde\n' +
-        '2. Vul lengte / geboortedatum / geslacht in bij Profiel\n' +
-        '3. Vink "Eet-/weeg-log" aan (vereist ≥5 dagen logs)'
-      )
-      return
-    }
-    setBusy('tdee')
+  // De TDEE wordt automatisch bewaard zodra de coach een factor aanpast; er
+  // is geen knop meer voor. Zie het effect verderop voor het wanneer.
+  const bewaarTdee = async () => {
+    if (!db?.supabase || !client?.id || computedTdee == null) return
+    setTdeeOpslaan(true)
     try {
       const settings = {
         lifestyle_level: lifestyleLevel,
@@ -815,12 +814,25 @@ function MacroRulesBlock({ client, db, onClientUpdate, isMobile }) {
       onClientUpdate?.(payload)
       await logClientChanges({ db, clientId: client.id, before, after: payload, source: 'save_tdee' })
     } catch (e) { console.error('save tdee', e) }
-    setBusy(null)
+    setTdeeOpslaan(false)
   }
 
   // Macro-bereken: NIET direct opslaan. Stop het resultaat in
   // `pendingMacros` zodat het naast de huidige waarden geprevieuwd kan
   // worden. Coach bevestigt expliciet via een aparte knop.
+  // ── Automatisch opslaan van de TDEE ──────────────────────────────────
+  // Wacht 800ms na de laatste wijziging, zodat typen in een getalveld niet
+  // per toetsaanslag schrijft. Slaat alleen aan als de coach zelf iets heeft
+  // aangeraakt (zie `aangeraakt`) én de uitkomst echt afwijkt van wat er staat.
+  React.useEffect(() => {
+    if (!aangeraakt.current) return
+    if (computedTdee == null) return
+    const t = setTimeout(() => { bewaarTdee() }, 800)
+    return () => clearTimeout(t)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [computedTdee, lifestyleLevel, trainingDays, kcalPerSession, includeTraining,
+      cardioActivities, includeCardio, includeLog, includeManual, manualTdee])
+
   const handleComputeMacros = () => {
     if (busy) return
     const tdee = savedTdee ?? computedTdee
@@ -879,10 +891,68 @@ function MacroRulesBlock({ client, db, onClientUpdate, isMobile }) {
       onClientUpdate?.(payload)
       await logClientChanges({ db, clientId: client.id, before, after: payload, source: 'confirm_macros' })
       setPendingMacros(null)
+      setMacroDraft(null)
       setSurplusDraft(null); setEditingS(false)
     } catch (e) { console.error('confirm macros', e) }
     setBusy(null)
   }
+
+  // ── Handmatig bijstellen van de macro's ───────────────────────────────
+  // Koolhydraten zijn de sluitpost: eiwit en vet volgen uit lichaamsgewicht en
+  // wat overblijft van het kcal-budget gaat naar koolhydraten. Verhoog je het
+  // vet, dan zakken de koolhydraten mee zodat het totaal gelijk blijft — dat
+  // is precies hoe je het met de hand ook zou doen.
+  const herberekenMacros = (veld, ruw, basis) => {
+    const n = Math.max(0, parseInt(ruw) || 0)
+    const m = { ...basis, [veld]: n }
+
+    if (veld === 'target_carbs') {
+      // Zet je de koolhydraten zélf, dan is er niets meer om mee te schuiven:
+      // het totaal volgt uit de drie macro's.
+      m.target_calories = Math.round(m.target_protein * 4 + m.target_carbs * 4 + m.target_fat * 9)
+      return m
+    }
+
+    const rest = m.target_calories - (m.target_protein * 4 + m.target_fat * 9)
+    if (rest < 0) {
+      // Eiwit + vet passen niet binnen het budget. Koolhydraten kunnen niet
+      // negatief, dus die gaan op 0 en het totaal wordt opgetrokken naar wat
+      // er werkelijk in zit.
+      m.target_carbs = 0
+      m.target_calories = Math.round(m.target_protein * 4 + m.target_fat * 9)
+    } else {
+      m.target_carbs = Math.round(rest / 4)
+    }
+    return m
+  }
+
+  const bewaarMacros = async (m) => {
+    if (!db?.supabase || !client?.id || !m) return
+    setMacrosOpslaan(true)
+    try {
+      const payload = {
+        target_calories: m.target_calories,
+        target_protein: m.target_protein,
+        target_carbs: m.target_carbs,
+        target_fat: m.target_fat,
+        manual_macro_targets: true,
+      }
+      const before = pickTrackedFields(client)
+      await db.supabase.from('clients').update(payload).eq('id', client.id)
+      onClientUpdate?.(payload)
+      await logClientChanges({ db, clientId: client.id, before, after: payload, source: 'macro_handmatig' })
+    } catch (e) { console.error('bewaar macros', e) }
+    setMacrosOpslaan(false)
+  }
+
+  // Zelfde vertraging als bij de TDEE: typen in een veld mag niet per
+  // toetsaanslag schrijven.
+  React.useEffect(() => {
+    if (!macroDraft) return
+    const t = setTimeout(() => { bewaarMacros(macroDraft) }, 800)
+    return () => clearTimeout(t)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [macroDraft])
 
   // ── Render helpers ────────────────────────────────────────────────────
   const row = (label, val, color = C.text) => (
@@ -1012,7 +1082,13 @@ function MacroRulesBlock({ client, db, onClientUpdate, isMobile }) {
   const bmrMissing = missing.length > 0 ? `Vul ${missing.join(' / ')} in bij Profiel om BMR te berekenen.` : null
 
   return (
-    <div style={{
+    <div
+      // Elke aanraking binnen dit blok — vinkje, dropdown, invoerveld — geeft
+      // de automatische opslag vrij. Eén plek in plaats van een vlag in alle
+      // acht de setters.
+      onPointerDownCapture={() => { aangeraakt.current = true }}
+      onKeyDownCapture={() => { aangeraakt.current = true }}
+      style={{
       background: 'rgba(255,255,255,0.025)',
       borderTop: `1px solid ${C.border}`,
       borderBottom: `1px solid ${C.border}`,
@@ -1022,14 +1098,7 @@ function MacroRulesBlock({ client, db, onClientUpdate, isMobile }) {
           Inklapbare header: dichtgeklapt zie je alleen de opgeslagen TDEE
           + modus, open zie je alle factoren + Bereken-knop. */}
       <button
-        onClick={() => {
-          // Onderhoud en macro's zijn twee stappen van dezelfde handeling.
-          // Ga je onderhoud bewerken, dan hoort het tekort er direct onder te
-          // staan in plaats van achter een tweede uitklap.
-          const open = !showTdeeDetail
-          setShowTdeeDetail(open)
-          if (open) setShowMacroDetail(true)
-        }}
+        onClick={() => setShowTdeeDetail(v => !v)}
         style={{
           width: '100%',
           padding: isMobile ? '0.55rem 0.75rem' : '0.65rem 1rem',
@@ -1289,132 +1358,38 @@ function MacroRulesBlock({ client, db, onClientUpdate, isMobile }) {
         dimmed: !includeManual,
       })}
 
-      {/* Berekende TDEE — totaal als heldere afsluiter */}
+      {/* ── De hele rekensom op één regel ──────────────────────────────
+          Dit waren vier blokken onder elkaar: de berekende TDEE, een regel
+          met de opgeslagen waarde, een uitklapkop "Macro's", en daarin nog
+          eens twee regels voor het tekort en het doel. Terwijl het één som
+          is: onderhoud plus of min het tekort geeft het doel. */}
       <div style={{
-        padding: isMobile ? '0.6rem 0.75rem 0.65rem' : '0.7rem 1rem 0.75rem',
+        padding: isMobile ? '0.7rem 0.75rem' : '0.8rem 1rem',
         borderTop: `1px solid ${C.border}`,
-        background: 'rgba(255,255,255,0.06)',
-        display: 'flex', alignItems: 'baseline', justifyContent: 'space-between',
+        display: 'flex', alignItems: 'baseline', gap: 10, flexWrap: 'wrap',
       }}>
-        <span style={{
-          fontSize: '0.88rem', color: '#fff', fontWeight: 900,
-          letterSpacing: '-0.01em',
-        }}>
-          Berekende TDEE
+        <span style={{ fontSize: '0.85rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.01em' }}>
+          Onderhoud
         </span>
-        <span style={{
-          fontSize: isMobile ? '1.15rem' : '1.3rem', fontWeight: 900,
-          color: computedTdee != null ? '#fff' : 'rgba(255,255,255,0.35)',
-          letterSpacing: '-0.02em',
-        }}>
-          {computedTdee != null ? `${computedTdee} kcal` : '—'}
-        </span>
-      </div>
-      {savedTdee != null && (
-        <div style={{
-          padding: isMobile ? '0.3rem 0.75rem 0.5rem' : '0.35rem 1rem 0.55rem',
-          fontSize: '0.78rem', fontWeight: 700,
-          display: 'flex', alignItems: 'center', gap: 6,
-        }}>
-          <span style={{ color: 'rgba(255,255,255,0.5)' }}>Opgeslagen:</span>
-          <span style={{ color: '#fff', fontWeight: 900 }}>{savedTdee} kcal</span>
-          {savedTdee !== computedTdee && computedTdee != null && (
-            <span style={{ color: C.amber, fontWeight: 800, marginLeft: 'auto' }}>
-              wijkt af van berekend
-            </span>
-          )}
-        </div>
-      )}
-
-      {/* Bereken & opslaan hoort ónder de instellingen: je stelt eerst de
-          factoren in en bevestigt dan. Stond boven de lijst, dus je moest
-          terug omhoog scrollen om je eigen invoer op te slaan. */}
-      <div style={{ padding: isMobile ? '0.5rem 0.75rem 0.7rem' : '0.6rem 1rem 0.8rem' }}>
-        <button
-          onClick={handleSaveTdee}
-          disabled={busy != null}
+        <span
+          title={tdeeOpslaan ? 'Opslaan…' : savedTdee != null ? `Opgeslagen: ${savedTdee} kcal` : 'Nog niet opgeslagen'}
           style={{
-            width: '100%',
-            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-            padding: '0.55rem 0.9rem',
-            background: '#fff', border: 'none', borderRadius: 8,
-            color: '#0a0a0a',
-            fontSize: '0.85rem', fontWeight: 900, fontFamily: 'inherit',
-            cursor: busy ? 'wait' : 'pointer', minHeight: 38,
-            opacity: busy != null ? 0.6 : 1,
-          }}
-        >
-          <RefreshCw size={14} strokeWidth={2.6} />
-          {busy === 'tdee' ? 'Bezig…' : 'Bereken & opslaan onderhoud'}
-        </button>
-      </div>
-
-      </>}
-
-      {/* ════════════════════ BLOK 2 — MACRO'S ════════════════════
-          Inklapbaar net als Onderhoud. Dicht: alleen opgeslagen kcal/macros
-          + Bewerken-toggle. Open: surplus-editor + Bereken-knop. */}
-      <button
-        onClick={() => setShowMacroDetail(v => !v)}
-        style={{
-          width: '100%',
-          padding: isMobile ? '0.55rem 0.75rem' : '0.65rem 1rem',
-          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-          background: 'none',
-          border: 'none', borderTop: `1px solid ${C.border}`,
-          cursor: 'pointer', color: 'inherit', fontFamily: 'inherit',
-        }}
-      >
-        <span style={{ fontSize: '0.95rem', color: '#fff', letterSpacing: '-0.02em', fontWeight: 900 }}>
-          Macro's
+            fontSize: '1.15rem', fontWeight: 900, letterSpacing: '-0.02em',
+            color: computedTdee != null ? '#fff' : 'rgba(255,255,255,0.35)',
+            opacity: tdeeOpslaan ? 0.5 : 1, transition: 'opacity 0.2s ease',
+          }}>
+          {computedTdee != null ? computedTdee : '—'}
         </span>
-        <span style={{
-          display: 'flex', alignItems: 'baseline', gap: 8, flexWrap: 'wrap',
-          justifyContent: 'flex-end',
-        }}>
-          {!showMacroDetail && (
-            <span style={{
-              fontSize: '0.72rem', color: C.text50, fontWeight: 700,
-              display: 'flex', gap: 6, alignItems: 'baseline',
-            }}>
-              <span style={{ color: C.gold, fontWeight: 900, fontSize: '0.95rem' }}>
-                {client?.target_calories ? `${client.target_calories}` : '—'}
-              </span>
-              <span style={{ color: C.gold, fontWeight: 700, fontSize: '0.72rem' }}>kcal</span>
-              {client?.target_protein != null && <span style={{ color: C.orange }}>{Math.round(client.target_protein)}E</span>}
-              {client?.target_carbs   != null && <span style={{ color: C.green }}>{Math.round(client.target_carbs)}K</span>}
-              {client?.target_fat     != null && <span style={{ color: C.amber }}>{Math.round(client.target_fat)}V</span>}
-            </span>
-          )}
-          <span style={{ fontSize: '0.72rem', color: C.text50, fontWeight: 700, letterSpacing: '0.05em' }}>
-            {showMacroDetail ? 'Inklappen ▴' : 'Bewerken ▾'}
-          </span>
-        </span>
-      </button>
 
-      {showMacroDetail && <>
-
-      {/* Surplus / Deficit — editable binnen het regel-bereik */}
-      <div style={{
-        display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-        padding: isMobile ? '0.5rem 0.75rem' : '0.55rem 1rem',
-        borderTop: `1px solid ${C.borderItem}`,
-      }}>
-        <span style={{ fontSize: '0.85rem', color: '#fff', letterSpacing: '-0.01em', fontWeight: 900 }}>
-          Tekort / surplus
-          <span style={{ marginLeft: 6, color: 'rgba(255,255,255,0.45)', fontWeight: 700, fontSize: '0.78rem' }}>
-            aanbevolen {rule.min === rule.max ? '0' : `${rule.min} t/m ${rule.max}`}
-          </span>
-        </span>
+        {/* Tekort of surplus — klik om te wijzigen. */}
         {editingS ? (
           <input
             autoFocus type="number"
             value={surplusDraft ?? (client?.surplus ?? '')}
             onChange={(e) => setSurplusDraft(e.target.value)}
             onBlur={() => {
-              // Geen clamping meer — wat de coach intypt wordt bewaard,
-              // zelfs als het buiten de "aanbevolen" range valt. De range
-              // staat ernaast als hint maar is niet bindend.
+              // Geen clamping: wat de coach intypt wordt bewaard, ook buiten
+              // de aanbevolen range. Die staat alleen als hint in de tooltip.
               if (surplusDraft != null && surplusDraft !== '') {
                 const val = parseInt(surplusDraft) || 0
                 saveField('surplus', val)
@@ -1424,37 +1399,27 @@ function MacroRulesBlock({ client, db, onClientUpdate, isMobile }) {
             }}
             onKeyDown={(e) => { if (e.key === 'Enter') e.target.blur() }}
             style={{
-              width: 90, textAlign: 'right',
+              width: 80, textAlign: 'center',
               background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.15)',
-              borderRadius: 6, color: '#fff', fontSize: '0.9rem', fontWeight: 900,
-              fontFamily: 'inherit', padding: '0.2rem 0.4rem',
+              borderRadius: 6, color: '#fff', fontSize: '1.05rem', fontWeight: 900,
+              fontFamily: 'inherit', padding: '0.1rem 0.3rem',
             }}
           />
         ) : (
           <span
             onClick={() => setEditingS(true)}
+            title={`Tekort / surplus — aanbevolen ${rule.min === rule.max ? '0' : `${rule.min} t/m ${rule.max}`}`}
             style={{
-              fontSize: '0.95rem', fontWeight: 900,
+              fontSize: '1.15rem', fontWeight: 900, cursor: 'pointer', letterSpacing: '-0.02em',
               color: liveSurplus < 0 ? C.red : liveSurplus > 0 ? C.green : 'rgba(255,255,255,0.5)',
-              cursor: 'pointer',
-            }}
-          >
-            {liveSurplus > 0 ? '+' : ''}{liveSurplus} kcal
-            {client?.surplus == null && (
-              <span style={{ marginLeft: 5, fontSize: '0.78rem', color: 'rgba(255,255,255,0.5)', fontWeight: 700 }}>niet ingesteld</span>
-            )}
+            }}>
+            {liveSurplus > 0 ? '+' : liveSurplus < 0 ? '−' : '±'}{Math.abs(liveSurplus)}
           </span>
         )}
-      </div>
 
-      {/* Doel kcal — bewerkbaar: klik en typ een eigen kcal-doel, dan worden de
-          macro's daaruit berekend (verschijnen in de preview hieronder). */}
-      <div style={{
-        display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-        padding: isMobile ? '0.5rem 0.75rem' : '0.55rem 1rem',
-        borderBottom: `1px solid ${C.borderItem}`,
-      }}>
-        <span style={{ fontSize: '0.85rem', color: '#fff', letterSpacing: '-0.01em', fontWeight: 900 }}>Doel kcal</span>
+        <span style={{ fontSize: '1.05rem', fontWeight: 700, color: 'rgba(255,255,255,0.3)' }}>=</span>
+
+        {/* Doel kcal — klik om zelf een waarde te zetten. */}
         {editingKcal ? (
           <input
             type="number" autoFocus
@@ -1463,10 +1428,10 @@ function MacroRulesBlock({ client, db, onClientUpdate, isMobile }) {
             onBlur={(e) => { setEditingKcal(false); applyManualKcal(e.target.value) }}
             onKeyDown={(e) => { if (e.key === 'Enter') e.target.blur() }}
             style={{
-              width: 100, textAlign: 'right',
+              width: 95, textAlign: 'center',
               background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.15)',
-              borderRadius: 6, color: '#fff', fontSize: '0.9rem', fontWeight: 900,
-              fontFamily: 'inherit', padding: '0.2rem 0.4rem',
+              borderRadius: 6, color: '#fff', fontSize: '1.05rem', fontWeight: 900,
+              fontFamily: 'inherit', padding: '0.1rem 0.3rem',
             }}
           />
         ) : (
@@ -1474,14 +1439,17 @@ function MacroRulesBlock({ client, db, onClientUpdate, isMobile }) {
             onClick={() => setEditingKcal(true)}
             title="Klik om zelf een doel-kcal in te voeren"
             style={{
-              fontSize: '0.95rem', fontWeight: 900, color: '#fff',
-              cursor: 'pointer',
-            }}
-          >
-            {targetCal != null ? `${targetCal} kcal` : 'Typ doel'}
+              fontSize: '1.3rem', fontWeight: 900, color: '#fff',
+              letterSpacing: '-0.02em', cursor: 'pointer',
+            }}>
+            {targetCal != null ? targetCal : '—'}
           </span>
         )}
+        <span style={{ fontSize: '0.85rem', fontWeight: 900, color: 'rgba(255,255,255,0.5)', letterSpacing: '-0.01em' }}>
+          doel kcal
+        </span>
       </div>
+
 
       {/* Zelfde volgorde als bij onderhoud: eerst instellen, dan pas de knop.
           Stond boven het tekort-veld, dus je stelde iets in en moest terug
@@ -1653,48 +1621,72 @@ function MacroRulesBlock({ client, db, onClientUpdate, isMobile }) {
         )
       })()}
 
-      {/* ── Ingestelde macro-targets (huidige opgeslagen waarden) ── */}
+      {/* ── Macro-targets — direct bewerkbaar ────────────────────────────
+          Stond als zwevend kaartje met marge, ronde hoeken en vier omkaderde
+          vakken die alleen lazen. Wilde je één waarde bijstellen, dan moest je
+          eerst "Bereken macro's" klikken en daarna in de voorbeeldweergave
+          typen. Nu vier velden die je meteen aanpast; koolhydraten schuiven
+          mee zodat het kcal-totaal klopt. */}
       <div style={{
-        margin: isMobile ? '0.5rem 0.75rem 0.4rem' : '0.6rem 1rem 0.45rem',
-        padding: isMobile ? '0.75rem 0.85rem' : '0.85rem 1rem',
-        background: 'rgba(255,255,255,0.04)',
-        border: '1px solid rgba(255,255,255,0.2)',
-        borderRadius: 14,
+        display: 'grid',
+        gridTemplateColumns: 'repeat(4, 1fr)',
+        borderTop: `1px solid ${C.border}`,
+        borderBottom: `1px solid ${C.border}`,
       }}>
-        <div style={{
-          fontSize: isMobile ? '0.7rem' : '0.75rem', color: C.gold,
-          letterSpacing: '0.06em', fontWeight: 900, marginBottom: 10,
-        }}>
-          🎯 Doelen & Macro's
-        </div>
-        <div style={{ display: 'flex', gap: 8 }}>
-          {[
-            { label: 'Kcal',  val: client?.target_calories, color: C.gold, unit: '' },
-            { label: 'Eiwit', val: client?.target_protein,  color: C.gold, unit: 'g' },
-            { label: 'Koolh', val: client?.target_carbs,    color: C.gold, unit: 'g' },
-            { label: 'Vet',   val: client?.target_fat,      color: C.gold, unit: 'g' },
-          ].map(m => (
-            <div key={m.label} style={{
-              flex: 1, padding: isMobile ? '0.55rem 0.35rem' : '0.65rem 0.4rem',
-              background: 'rgba(0,0,0,0.3)',
-              border: `1px solid ${m.color}33`,
-              borderRadius: 10, textAlign: 'center',
+        {[
+          { label: 'Kcal',  veld: 'target_calories', eenheid: '' },
+          { label: 'Eiwit', veld: 'target_protein',  eenheid: 'g' },
+          { label: 'Koolh', veld: 'target_carbs',    eenheid: 'g' },
+          { label: 'Vet',   veld: 'target_fat',      eenheid: 'g' },
+        ].map((m, i) => {
+          const huidig = macroDraft || {
+            target_calories: Math.round(client?.target_calories) || 0,
+            target_protein:  Math.round(client?.target_protein)  || 0,
+            target_carbs:    Math.round(client?.target_carbs)    || 0,
+            target_fat:      Math.round(client?.target_fat)      || 0,
+          }
+          // Koolhydraten zijn de sluitpost en veranderen vanzelf mee; dat
+          // maken we zichtbaar door ze iets te dimmen.
+          const sluitpost = m.veld === 'target_carbs'
+          return (
+            <div key={m.veld} style={{
+              padding: isMobile ? '0.5rem 0.4rem' : '0.55rem 0.6rem',
+              borderRight: i < 3 ? `1px solid ${C.borderItem}` : 'none',
+              display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0,
+              opacity: macrosOpslaan ? 0.55 : 1, transition: 'opacity 0.2s ease',
             }}>
-              <div style={{
-                fontSize: isMobile ? '0.62rem' : '0.66rem', color: 'rgba(255,255,255,0.65)', fontWeight: 800,
+              <span style={{
+                fontSize: '0.72rem', fontWeight: 800,
+                color: sluitpost ? 'rgba(255,255,255,0.4)' : 'rgba(255,255,255,0.55)',
                 letterSpacing: '-0.01em',
-              }}>{m.label}</div>
-              <div style={{
-                fontSize: isMobile ? '1.35rem' : '1.5rem',
-                fontWeight: 900, color: m.color, marginTop: 4, lineHeight: 1, letterSpacing: '-0.02em',
               }}>
-                {m.val ? Math.round(m.val) : '—'}
-                {m.val && m.unit ? <span style={{ fontSize: '0.55em', fontWeight: 700, opacity: 0.6, marginLeft: 1 }}>{m.unit}</span> : null}
+                {m.label}{sluitpost ? ' ·' : ''}
+              </span>
+              <div style={{ display: 'flex', alignItems: 'baseline', gap: 2, minWidth: 0 }}>
+                <input
+                  type="number"
+                  value={huidig[m.veld] || 0}
+                  onChange={(e) => setMacroDraft(herberekenMacros(m.veld, e.target.value, huidig))}
+                  onClick={(e) => e.target.select()}
+                  style={{
+                    width: '100%', minWidth: 0,
+                    background: 'none', border: 'none', outline: 'none', padding: 0,
+                    color: '#fff', fontFamily: 'inherit',
+                    fontSize: isMobile ? '1.15rem' : '1.3rem',
+                    fontWeight: 900, letterSpacing: '-0.02em',
+                  }}
+                />
+                {m.eenheid && (
+                  <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'rgba(255,255,255,0.4)' }}>
+                    {m.eenheid}
+                  </span>
+                )}
               </div>
             </div>
-          ))}
-        </div>
+          )
+        })}
       </div>
+
 
       {/* ── Projectie: waar je uitkomt met huidige instellingen ──
           Gebruikt expliciet het OPGESLAGEN tekort, niet het rule-default
