@@ -2,7 +2,7 @@
 // CoachCommandCenter.jsx - v3.5
 // + onOpenWorkoutPanel prop toegevoegd voor Workout SOP widget
 import React, { useState, useEffect, useRef } from 'react'
-import { Search, Users, AlertTriangle, Loader2, ArrowLeft, Video, X, UserPlus } from 'lucide-react'
+import { Search, AlertTriangle, Loader2, ArrowLeft, Video, X, UserPlus } from 'lucide-react'
 import CommandCenterService from './CommandCenterService'
 import ClientWeightCard from './components/ClientWeightCard'
 import ClientJourneyTimeline from '../client-journey/ClientJourneyTimeline'
@@ -14,7 +14,6 @@ export default function CoachCommandCenter({ db, onSelectClient, setActiveTab, o
   const [loading, setLoading] = useState(true)
   const [clientsWithData, setClientsWithData] = useState([])
   const [searchQuery, setSearchQuery] = useState('')
-  const [searchOpen, setSearchOpen] = useState(false)
   const [statusFilter, setStatusFilter] = useState('active')
   const [urgencyFilter, setUrgencyFilter] = useState('all')
   const [stats, setStats] = useState({ total: 0, active: 0, inactive: 0, urgent: 0, warning: 0, ok: 0, fridayMissing: 0 })
@@ -22,6 +21,16 @@ export default function CoachCommandCenter({ db, onSelectClient, setActiveTab, o
   const [showAddClient, setShowAddClient] = useState(false)
   const [journeyClient, setJourneyClient] = useState(null)
   const [coachId, setCoachId] = useState(null)
+  // Dropdown-stijl: dik wit, geen accentkleur. Vervangt de gekleurde
+  // filterpillen die eerder een eigen rij innamen.
+  const selectStijl = {
+    flexShrink: 0, height: 36, padding: '0 0.6rem', borderRadius: 10,
+    background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)',
+    color: '#fff', fontSize: '0.85rem', fontWeight: 800, fontFamily: 'inherit',
+    cursor: 'pointer', outline: 'none', maxWidth: 170,
+  }
+  const optieStijl = { background: '#0a0a0a', color: '#fff' }
+
   const serviceRef = useRef(new CommandCenterService(db))
   const service = serviceRef.current
 
@@ -219,57 +228,87 @@ export default function CoachCommandCenter({ db, onSelectClient, setActiveTab, o
         backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)',
         display: 'flex', alignItems: 'center', gap: isMobile ? '0.5rem' : '0.75rem'
       }}>
-        <h1 style={{ fontSize: isMobile ? '1.2rem' : '1.4rem', fontWeight: 900, color: '#FFD700', margin: 0, letterSpacing: '-0.02em', whiteSpace: 'nowrap', flexShrink: 0 }}>⚡ Command</h1>
-        <span style={{ fontSize: '0.62rem', fontWeight: 800, color: 'rgba(0,0,0,0.85)', background: '#FFD700', padding: '2px 7px', borderRadius: 6, letterSpacing: '0.02em', whiteSpace: 'nowrap', flexShrink: 0 }}>{stats.active}/{stats.total}</span>
-        <div style={{ flex: 1 }} />
-        <button onClick={() => setActiveView('clients')} style={{ padding: isMobile ? '0.4rem 0.7rem' : '0.45rem 0.85rem', background: activeView === 'clients' ? 'rgba(255,215,0,0.14)' : 'transparent', border: 'none', borderRadius: 14, color: activeView === 'clients' ? '#FFD700' : 'rgba(255,255,255,0.4)', fontSize: isMobile ? '0.7rem' : '0.75rem', fontWeight: activeView === 'clients' ? 800 : 600, cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', display: 'flex', alignItems: 'center', gap: '0.3rem', minHeight: '36px' }}><Users size={14} /> Clients</button>
-        <button onClick={() => setActiveView('video')} style={{ padding: isMobile ? '0.4rem 0.6rem' : '0.45rem 0.7rem', background: activeView === 'video' ? 'rgba(255,215,0,0.14)' : 'transparent', border: 'none', borderRadius: 14, color: activeView === 'video' ? '#FFD700' : 'rgba(255,255,255,0.3)', fontSize: isMobile ? '0.7rem' : '0.75rem', fontWeight: activeView === 'video' ? 800 : 600, cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', display: 'flex', alignItems: 'center', gap: '0.3rem', minHeight: '36px' }}><Video size={14} /></button>
-        <button onClick={() => { setSearchOpen(!searchOpen); if (searchOpen) setSearchQuery('') }} style={{ width: '36px', height: '36px', borderRadius: 12, background: searchOpen ? 'rgba(255,215,0,0.14)' : 'rgba(255,255,255,0.04)', border: 'none', color: searchOpen ? '#FFD700' : 'rgba(255,255,255,0.4)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', flexShrink: 0 }}>{searchOpen ? <X size={15} /> : <Search size={15} />}</button>
-        <button
-          onClick={() => setShowAddClient(true)}
-          title="Nieuwe klant toevoegen"
-          aria-label="Nieuwe klant toevoegen"
-          style={{
-            width: '36px', height: '36px', borderRadius: 12,
-            background: 'linear-gradient(135deg, #FFD700 0%, #D4AF37 100%)',
-            border: 'none',
-            color: '#0a0a0a',
-            cursor: 'pointer',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-            flexShrink: 0,
-            boxShadow: '0 4px 12px rgba(255,215,0,0.32)',
-          }}
+        {/* Eén regel: filters links, zoek + camera + nieuwe klant rechts.
+            Geen titel, geen gekleurde chips, geen bolletjes — de statusfilters
+            zaten eerder als losse pillen op een tweede rij en dat kostte hoogte
+            zonder iets toe te voegen. */}
+        <select
+          value={statusFilter}
+          onChange={e => { setStatusFilter(e.target.value); setUrgencyFilter('all') }}
+          style={selectStijl}
         >
+          <option value="active" style={optieStijl}>Actief · {stats.active}</option>
+          <option value="inactive" style={optieStijl}>Inactief · {stats.inactive}</option>
+          <option value="all" style={optieStijl}>Alle · {stats.total}</option>
+        </select>
+
+        {statusFilter === 'active' && (
+          <select
+            value={urgencyFilter}
+            onChange={e => setUrgencyFilter(e.target.value)}
+            style={selectStijl}
+          >
+            <option value="all" style={optieStijl}>Alle urgenties · {stats.active}</option>
+            <option value="urgent" style={optieStijl}>Urgent · {stats.urgent}</option>
+            <option value="warning" style={optieStijl}>Aandacht · {stats.warning}</option>
+            <option value="ok" style={optieStijl}>Op schema · {stats.ok}</option>
+          </select>
+        )}
+
+        <div style={{ flex: 1, minWidth: 8 }} />
+
+        {/* Zoeken staat nu inline; dat scheelt een klik en een aparte rij. */}
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 6, flexShrink: 1, minWidth: 0,
+          maxWidth: isMobile ? 150 : 260,
+          padding: '0 0.6rem', height: 36, borderRadius: 10,
+          background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)',
+        }}>
+          <Search size={14} color="rgba(255,255,255,0.45)" style={{ flexShrink: 0 }} />
+          <input
+            type="text" placeholder="Zoek klant" value={searchQuery}
+            onChange={e => setSearchQuery(e.target.value)}
+            style={{ flex: 1, minWidth: 0, background: 'transparent', border: 'none', outline: 'none', color: '#fff', fontSize: '0.85rem', fontWeight: 700, fontFamily: 'inherit' }}
+          />
+          {searchQuery && (
+            <button onClick={() => setSearchQuery('')} style={{ flexShrink: 0, background: 'none', border: 'none', color: 'rgba(255,255,255,0.4)', cursor: 'pointer', padding: 0, display: 'flex' }}>
+              <X size={13} />
+            </button>
+          )}
+        </div>
+
+        <button onClick={() => setActiveView(activeView === 'video' ? 'clients' : 'video')}
+          title={activeView === 'video' ? 'Terug naar klanten' : 'Video-feedback'}
+          style={{
+            flexShrink: 0, width: 36, height: 36, borderRadius: 10, cursor: 'pointer',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            background: activeView === 'video' ? '#fff' : 'rgba(255,255,255,0.05)',
+            border: activeView === 'video' ? 'none' : '1px solid rgba(255,255,255,0.1)',
+            color: activeView === 'video' ? '#000' : 'rgba(255,255,255,0.7)',
+            touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+          }}>
+          <Video size={15} strokeWidth={2.4} />
+        </button>
+
+        <button onClick={() => setShowAddClient(true)}
+          title="Nieuwe klant toevoegen" aria-label="Nieuwe klant toevoegen"
+          style={{
+            flexShrink: 0, height: 36, padding: isMobile ? '0 0.7rem' : '0 0.9rem',
+            borderRadius: 10, background: '#fff', border: 'none', color: '#000',
+            fontSize: '0.82rem', fontWeight: 900, fontFamily: 'inherit', cursor: 'pointer',
+            display: 'flex', alignItems: 'center', gap: 6,
+            touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+          }}>
           <UserPlus size={15} strokeWidth={2.6} />
+          {!isMobile && 'Klant'}
         </button>
       </div>
 
-      {searchOpen && (
-        <div style={{ padding: isMobile ? '0.5rem 1rem' : '0.5rem 2rem', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
-          <input type="text" placeholder="Zoek client..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} autoFocus style={{ width: '100%', padding: '0.5rem 0.75rem', background: 'rgba(255,215,0,0.04)', border: '1px solid rgba(255,215,0,0.12)', borderRadius: '8px', color: '#fff', fontSize: '0.85rem', outline: 'none' }} />
-        </div>
-      )}
 
       {activeView === 'video' && <div style={{ padding: isMobile ? '1rem' : '2rem' }}><CoachVideoFeedback db={db} /></div>}
 
       {activeView === 'clients' && (
         <>
-          {/* FILTER BAR */}
-          <div style={{ padding: isMobile ? '0.5rem 1rem' : '0.625rem 2rem', borderBottom: '1px solid rgba(255,255,255,0.04)', display: 'flex', gap: isMobile ? '0.25rem' : '0.375rem', overflowX: 'auto', WebkitOverflowScrolling: 'touch', alignItems: 'center' }}>
-            {[{ id: 'active', label: 'Actief', count: stats.active, color: '#10b981' }, { id: 'inactive', label: 'Inactief', count: stats.inactive, color: '#6b7280' }, { id: 'all', label: 'Alle', count: stats.total, color: '#FFD700' }].map(btn => (
-              <button key={btn.id} onClick={() => { setStatusFilter(btn.id); setUrgencyFilter('all') }} style={{ padding: isMobile ? '0.35rem 0.7rem' : '0.4rem 0.8rem', background: statusFilter === btn.id ? `${btn.color}1f` : 'rgba(255,255,255,0.03)', border: 'none', borderRadius: 14, color: statusFilter === btn.id ? btn.color : 'rgba(255,255,255,0.4)', fontSize: isMobile ? '0.65rem' : '0.7rem', fontWeight: statusFilter === btn.id ? 800 : 600, cursor: 'pointer', whiteSpace: 'nowrap', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', display: 'flex', alignItems: 'center', gap: '0.25rem', minHeight: '30px' }}>
-                {btn.label}<span style={{ fontSize: '0.55rem', fontWeight: 800, opacity: statusFilter === btn.id ? 1 : 0.5 }}>{btn.count}</span>
-              </button>
-            ))}
-            <div style={{ width: '1px', height: '16px', background: 'rgba(255,255,255,0.08)', margin: '0 0.125rem', flexShrink: 0 }} />
-            {statusFilter === 'active' && [{ id: 'all', label: 'Alle', count: stats.active, color: '#FFD700' }, { id: 'urgent', label: '🔴', count: stats.urgent, color: '#ef4444' }, { id: 'warning', label: '🟡', count: stats.warning, color: '#f59e0b' }, { id: 'ok', label: '🟢', count: stats.ok, color: '#10b981' }].map(btn => (
-              <button key={btn.id} onClick={() => setUrgencyFilter(btn.id)} style={{ padding: isMobile ? '0.35rem 0.55rem' : '0.4rem 0.65rem', background: urgencyFilter === btn.id ? `${btn.color}1f` : 'rgba(255,255,255,0.03)', border: 'none', borderRadius: 14, color: urgencyFilter === btn.id ? btn.color : 'rgba(255,255,255,0.35)', fontSize: isMobile ? '0.65rem' : '0.7rem', fontWeight: urgencyFilter === btn.id ? 800 : 600, cursor: 'pointer', whiteSpace: 'nowrap', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', display: 'flex', alignItems: 'center', gap: '0.2rem', minHeight: '30px' }}>
-                {btn.label}<span style={{ fontSize: '0.55rem', opacity: 0.6 }}>{btn.count}</span>
-              </button>
-            ))}
-          </div>
-
           {stats.fridayMissing > 0 && new Date().getDay() === 5 && (
             <div style={{ padding: isMobile ? '0.4rem 1rem' : '0.5rem 2rem', background: 'rgba(255,215,0,0.06)', borderBottom: '1px solid rgba(255,215,0,0.15)', display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: isMobile ? '0.7rem' : '0.75rem', fontWeight: '600', color: '#FFD700' }}>
               <AlertTriangle size={14} /> Vrijdag! {stats.fridayMissing} client(s) nog niet gewogen

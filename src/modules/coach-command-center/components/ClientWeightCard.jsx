@@ -50,7 +50,7 @@ export default function ClientWeightCard({ client, isMobile, onToggleStatus, onD
     const status = weightData?.weightStatus
     if (status === 'never' || status === 'overdue' || weightData?.fridayMissing) return '#ef4444'
     if (status === 'warning') return '#f59e0b'
-    if (status === 'today' || status === 'recent') return '#FFD700'
+    if (status === 'today' || status === 'recent') return '#10b981'
     return '#333'
   }
 
@@ -135,7 +135,7 @@ export default function ClientWeightCard({ client, isMobile, onToggleStatus, onD
 
   // Gedeelde stat-config voor de gewicht-progressie.
   const progressionStats = [
-    { label: 'Deze week',   val: curAvg ?? '—',  color: '#FFD700' },
+    { label: 'Deze week',   val: curAvg ?? '—',  color: '#fff' },
     { label: 'Vorige week', val: prevAvg ?? '—', color: '#fff' },
     {
       label: 'Verschil',
@@ -152,7 +152,7 @@ export default function ClientWeightCard({ client, isMobile, onToggleStatus, onD
   return (
     <div style={{
       background: '#0a0a0a',
-      border: '1px solid rgba(255,215,0,0.15)',
+      border: '1px solid rgba(255,255,255,0.08)',
       borderLeft: cardBorderLeft,
       borderRadius: isMobile ? '12px' : '14px',
       overflow: 'hidden', position: 'relative',
@@ -193,7 +193,7 @@ export default function ClientWeightCard({ client, isMobile, onToggleStatus, onD
             )}
           </div>
           {goalLabel && (
-            <span style={{ display: 'inline-block', marginTop: '0.25rem', fontSize: '0.62rem', fontWeight: 700, color: 'rgba(255,215,0,0.6)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+            <span style={{ display: 'inline-block', marginTop: '0.25rem', fontSize: '0.68rem', fontWeight: 800, color: 'rgba(255,255,255,0.55)' }}>
               {goalLabel}
             </span>
           )}
@@ -201,10 +201,10 @@ export default function ClientWeightCard({ client, isMobile, onToggleStatus, onD
 
         <div style={{ flexShrink: 0, textAlign: 'right' }}>
           <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.2rem', justifyContent: 'flex-end' }}>
-            <span style={{ fontSize: isMobile ? '1.6rem' : '1.85rem', fontWeight: 900, color: isInactive ? '#6b7280' : '#FFD700', letterSpacing: '-0.03em', lineHeight: 1 }}>
+            <span style={{ fontSize: isMobile ? '1.6rem' : '1.85rem', fontWeight: 900, color: isInactive ? '#6b7280' : '#fff', letterSpacing: '-0.03em', lineHeight: 1 }}>
               {latest?.weight ? latest.weight.toFixed(1) : '—'}
             </span>
-            <span style={{ fontSize: '0.6rem', fontWeight: 700, color: isInactive ? 'rgba(107,114,128,0.5)' : 'rgba(255,215,0,0.45)', marginBottom: '0.1rem' }}>kg</span>
+            <span style={{ fontSize: '0.6rem', fontWeight: 700, color: isInactive ? 'rgba(107,114,128,0.5)' : 'rgba(255,255,255,0.4)', marginBottom: '0.1rem' }}>kg</span>
             {trend && !isInactive && (
               trend === 'down'
                 ? <TrendingDown size={15} color="#10b981" style={{ marginLeft: '0.2rem' }} />
@@ -238,7 +238,7 @@ export default function ClientWeightCard({ client, isMobile, onToggleStatus, onD
             >
               {progressionStats.map((s, i) => (
                 <div key={i} style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', minWidth: 0, gap: 2 }}>
-                  <span style={{ fontSize: isMobile ? '0.6rem' : '0.62rem', fontWeight: 700, color: 'rgba(255,255,255,0.5)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '100%' }}>
+                  <span style={{ fontSize: isMobile ? '0.66rem' : '0.7rem', fontWeight: 800, color: 'rgba(255,255,255,0.6)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '100%' }}>
                     {s.label}
                   </span>
                   <span style={{ fontSize: isMobile ? '1rem' : '1.1rem', fontWeight: 900, color: s.color, lineHeight: 1 }}>
@@ -246,7 +246,7 @@ export default function ClientWeightCard({ client, isMobile, onToggleStatus, onD
                   </span>
                 </div>
               ))}
-              <span style={{ fontSize: '0.85rem', color: 'rgba(255,215,0,0.4)', fontWeight: 700, justifySelf: 'end' }}>▾</span>
+              <span style={{ fontSize: '0.85rem', color: 'rgba(255,255,255,0.35)', fontWeight: 700, justifySelf: 'end' }}>▾</span>
             </button>
           ) : (
             <div
@@ -255,21 +255,21 @@ export default function ClientWeightCard({ client, isMobile, onToggleStatus, onD
                 display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 6,
                 padding: isMobile ? '0.7rem 0.85rem' : '0.75rem 1rem',
                 borderBottom: '1px solid rgba(255,255,255,0.05)',
-                background: 'rgba(255,215,0,0.02)', cursor: 'pointer',
+                background: 'rgba(255,255,255,0.02)', cursor: 'pointer',
               }}
             >
               {[
-                { label: 'Deze week (Ma-Zo)',   sub: thisWeek.count > 0 ? `${thisWeek.count} meting${thisWeek.count === 1 ? '' : 'en'} · ${fmtWeekRange(thisWeek.monday, thisWeek.sunday)}` : `geen metingen · ${fmtWeekRange(thisWeek.monday, thisWeek.sunday)}`, val: curAvg ?? '—', color: '#FFD700' },
+                { label: 'Deze week (Ma-Zo)',   sub: thisWeek.count > 0 ? `${thisWeek.count} meting${thisWeek.count === 1 ? '' : 'en'} · ${fmtWeekRange(thisWeek.monday, thisWeek.sunday)}` : `geen metingen · ${fmtWeekRange(thisWeek.monday, thisWeek.sunday)}`, val: curAvg ?? '—', color: '#fff' },
                 { label: 'Vorige week (Ma-Zo)', sub: lastWeek.count > 0 ? `${lastWeek.count} meting${lastWeek.count === 1 ? '' : 'en'} · ${fmtWeekRange(lastWeek.monday, lastWeek.sunday)}` : `geen metingen · ${fmtWeekRange(lastWeek.monday, lastWeek.sunday)}`, val: prevAvg ?? '—', color: '#fff' },
                 { label: 'vs Vorige week', sub: weekDiff !== null ? 'verschil tussen weekgemiddelden' : 'geen vergelijking', val: weekDiff !== null ? `${weekDiff > 0 ? '+' : ''}${weekDiff}` : '—', color: weekDiff !== null ? weightGoalColor(weekDiff, client.weekly_weight_goal) : 'rgba(255,255,255,0.4)' },
                 { label: 'Sinds start', sub: startDateLabel ? `eerste meting · ${startDateLabel}` : 'geen startmeting', val: totalChange !== null ? `${totalChange > 0 ? '+' : ''}${totalChange}` : '—', color: totalChange !== null ? weightGoalColor(totalChange, client.weekly_weight_goal) : 'rgba(255,255,255,0.4)' },
               ].map((s, i) => (
                 <div key={i} style={{ padding: '0.5rem 0.6rem', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: 8, display: 'flex', flexDirection: 'column', gap: 3 }}>
-                  <div style={{ fontSize: '0.62rem', fontWeight: 700, color: 'rgba(255,255,255,0.55)' }}>{s.label}</div>
+                  <div style={{ fontSize: '0.7rem', fontWeight: 800, color: '#fff' }}>{s.label}</div>
                   <div style={{ fontSize: isMobile ? '1.2rem' : '1.3rem', fontWeight: 900, color: s.color, lineHeight: 1 }}>
                     {s.val}<span style={{ fontSize: '0.65rem', fontWeight: 600, opacity: 0.5, marginLeft: 4 }}>kg</span>
                   </div>
-                  <div style={{ fontSize: '0.6rem', color: 'rgba(255,255,255,0.4)', fontWeight: 600 }}>{s.sub}</div>
+                  <div style={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.45)', fontWeight: 600 }}>{s.sub}</div>
                 </div>
               ))}
               <div style={{ gridColumn: '1 / -1', fontSize: '0.6rem', color: 'rgba(255,255,255,0.4)', textAlign: 'center', marginTop: 2, fontWeight: 600 }}>
@@ -282,15 +282,15 @@ export default function ClientWeightCard({ client, isMobile, onToggleStatus, onD
 
       {/* ── ROW 3 — notitie + acties (Log · Inzicht · ⋯) ── */}
       <div style={{ display: 'flex', alignItems: 'center', padding: isMobile ? '0.55rem 0.85rem' : '0.6rem 1rem', gap: '0.5rem', minHeight: '44px' }}>
-        <span onClick={() => setShowLog(true)} style={{ flex: 1, minWidth: 0, fontSize: '0.7rem', color: previewNote ? 'rgba(255,255,255,0.55)' : 'rgba(255,255,255,0.18)', fontStyle: previewNote ? 'italic' : 'normal', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', cursor: 'pointer', touchAction: 'manipulation' }}>
+        <span onClick={() => setShowLog(true)} style={{ flex: 1, minWidth: 0, fontSize: '0.76rem', fontWeight: 600, color: previewNote ? 'rgba(255,255,255,0.65)' : 'rgba(255,255,255,0.28)', fontStyle: previewNote ? 'italic' : 'normal', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', cursor: 'pointer', touchAction: 'manipulation' }}>
           {previewNote || 'Geen notities...'}
         </span>
 
-        <button onClick={() => setShowLog(true)} style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', padding: '0.35rem 0.6rem', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', color: 'rgba(255,255,255,0.7)', fontSize: '0.65rem', fontWeight: 800, cursor: 'pointer', flexShrink: 0, touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', minHeight: '32px' }}>
+        <button onClick={() => setShowLog(true)} style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', padding: '0.35rem 0.6rem', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', color: '#fff', fontSize: '0.7rem', fontWeight: 800, cursor: 'pointer', flexShrink: 0, touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', minHeight: '32px' }}>
           <BookOpen size={12} /> Log
         </button>
 
-        <button onClick={() => setShowInsight(true)} style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', padding: '0.35rem 0.7rem', background: 'rgba(255,215,0,0.1)', border: '1px solid rgba(255,215,0,0.35)', borderRadius: '8px', color: '#FFD700', fontSize: '0.65rem', fontWeight: 800, cursor: 'pointer', flexShrink: 0, touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', minHeight: '32px' }}>
+        <button onClick={() => setShowInsight(true)} style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', padding: '0.35rem 0.7rem', background: '#fff', border: 'none', borderRadius: '8px', color: '#000', fontSize: '0.7rem', fontWeight: 900, cursor: 'pointer', flexShrink: 0, touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', minHeight: '32px' }}>
           <BarChart3 size={12} /> Inzicht
         </button>
 
@@ -301,7 +301,7 @@ export default function ClientWeightCard({ client, isMobile, onToggleStatus, onD
           {showMenu && (
             <>
               <div onClick={() => setShowMenu(false)} style={{ position: 'fixed', inset: 0, zIndex: 99 }} />
-              <div style={{ position: 'absolute', bottom: '100%', right: 0, marginBottom: '0.25rem', zIndex: 100, background: '#111', border: '1px solid rgba(255,215,0,0.15)', borderRadius: '10px', overflow: 'hidden', minWidth: '150px', boxShadow: '0 -8px 24px rgba(0,0,0,0.6)' }}>
+              <div style={{ position: 'absolute', bottom: '100%', right: 0, marginBottom: '0.25rem', zIndex: 100, background: '#111', border: '1px solid rgba(255,255,255,0.12)', borderRadius: '10px', overflow: 'hidden', minWidth: '150px', boxShadow: '0 -8px 24px rgba(0,0,0,0.6)' }}>
                 {hasPhone && !isInactive && (
                   <button onClick={() => { openWhatsApp(); setShowMenu(false) }} style={{ width: '100%', padding: '0.6rem 0.85rem', background: 'transparent', border: 'none', color: '#25D366', fontSize: '0.78rem', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.45rem', textAlign: 'left', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}>
                     <MessageCircle size={15} /> WhatsApp
