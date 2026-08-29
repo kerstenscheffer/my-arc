@@ -61,6 +61,7 @@ export default function WorkoutPlan({ client, schema, db, onFocusChange }) {
   useEffect(() => { if (onFocusChange) onFocusChange(workoutOpen) }, [workoutOpen, onFocusChange])
   // Plan-wissel: modal met alle door de coach toegewezen plannen.
   const [showPlanSwitch, setShowPlanSwitch] = useState(false)
+  const [weekOffset, setWeekOffset] = useState(0)
 
   const currentDate = new Date()
   const weekDays = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
@@ -171,6 +172,8 @@ export default function WorkoutPlan({ client, schema, db, onFocusChange }) {
           }}
           onOpenWizard={() => setShowWizard(true)}
           onSwitchPlan={() => setShowPlanSwitch(true)}
+          weekOffset={weekOffset}
+          onWeekOffsetChange={setWeekOffset}
         />
       </div></FadeOnScroll>}
 

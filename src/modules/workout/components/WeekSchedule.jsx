@@ -1,14 +1,25 @@
 // src/modules/workout/components/WeekSchedule.jsx
 import useIsMobile from '../../../hooks/useIsMobile'
-import { AlertCircle, RefreshCw } from 'lucide-react'
+import { AlertCircle, RefreshCw, ChevronLeft, ChevronRight } from 'lucide-react'
 import { useState, useEffect } from 'react'
 import WeekGrid from './week-schedule/WeekGrid'
 import ActionButtons from './week-schedule/ActionButtons'
+
+// Bereken de maandag van de huidige week (lokale tijd).
+function getThisMonday() {
+  const d = new Date()
+  const day = d.getDay() // 0=zo, 1=ma, ...
+  const diff = (day === 0 ? -6 : 1 - day)
+  d.setDate(d.getDate() + diff)
+  d.setHours(0, 0, 0, 0)
+  return d
+}
 
 export default function WeekSchedule({
   weekSchedule, schema, swapMode, selectedWorkout,
   completedWorkouts = [], todayIndex, onDayClick,
   clientId, db, workoutService, onScheduleUpdate, onSwitchPlan,
+  weekOffset = 0, onWeekOffsetChange,
 }) {
   const isMobile = useIsMobile()
   const [localSwapMode, setLocalSwapMode] = useState(false)
@@ -192,17 +203,74 @@ export default function WeekSchedule({
         )}
       </div>
 
-      {/* WeekGrid */}
-      <div style={{ padding: isMobile ? '0 0.75rem' : '0 1rem' }}>
-        <WeekGrid
-          tempSchedule={tempSchedule} weekDays={weekDays} todayIndex={todayIndex}
-          completedWorkouts={completedWorkouts} selectedWorkout={selectedWorkout}
-          selectedForSwap={selectedForSwap} swapMode={swapMode} localSwapMode={localSwapMode}
-          getWorkoutData={getWorkoutData} onDayClick={onDayClick} onSwapClick={handleSwapClick}
-          onShift={handleShift}
-          isMobile={isMobile}
-        />
-      </div>
+      {/* Weeknavigatie — vorige/volgende week */}
+      {(() => {
+        const monday = getThisMonday()
+        monday.setDate(monday.getDate() + weekOffset * 7)
+        const sunday = new Date(monday)
+        sunday.setDate(sunday.getDate() + 6)
+        const fmt = (d) => d.toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })
+        const isCurrentWeek = weekOffset === 0
+        const dayDates = Array.from({ length: 7 }, (_, i) => {
+          const d = new Date(monday); d.setDate(d.getDate() + i); return d
+        })
+        return (
+          <>
+            <div style={{
+              padding: isMobile ? '0 0.75rem 0.5rem' : '0 1rem 0.625rem',
+              display: 'flex', alignItems: 'center', gap: 8,
+            }}>
+              <button
+                onClick={() => onWeekOffsetChange && onWeekOffsetChange(weekOffset - 1)}
+                aria-label="Vorige week"
+                style={{
+                  background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)',
+                  borderRadius: 8, padding: isMobile ? '5px 10px' : '6px 12px',
+                  color: 'rgba(255,255,255,0.7)', cursor: 'pointer', display: 'flex', alignItems: 'center',
+                  touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+                }}
+              >
+                <ChevronLeft size={isMobile ? 14 : 16} strokeWidth={2.5} />
+              </button>
+              <div style={{
+                flex: 1, textAlign: 'center',
+                fontSize: isMobile ? '0.72rem' : '0.78rem',
+                fontWeight: 700,
+                color: isCurrentWeek ? '#FFD700' : 'rgba(255,255,255,0.55)',
+                letterSpacing: '0.03em',
+              }}>
+                {isCurrentWeek ? 'Deze week' : `${fmt(monday)} – ${fmt(sunday)}`}
+              </div>
+              <button
+                onClick={() => onWeekOffsetChange && onWeekOffsetChange(weekOffset + 1)}
+                aria-label="Volgende week"
+                style={{
+                  background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)',
+                  borderRadius: 8, padding: isMobile ? '5px 10px' : '6px 12px',
+                  color: 'rgba(255,255,255,0.7)', cursor: 'pointer', display: 'flex', alignItems: 'center',
+                  touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+                }}
+              >
+                <ChevronRight size={isMobile ? 14 : 16} strokeWidth={2.5} />
+              </button>
+            </div>
+
+            {/* WeekGrid */}
+            <div style={{ padding: isMobile ? '0 0.75rem' : '0 1rem' }}>
+              <WeekGrid
+                tempSchedule={tempSchedule} weekDays={weekDays} todayIndex={todayIndex}
+                completedWorkouts={completedWorkouts} selectedWorkout={selectedWorkout}
+                selectedForSwap={selectedForSwap} swapMode={swapMode} localSwapMode={localSwapMode}
+                getWorkoutData={getWorkoutData} onDayClick={onDayClick} onSwapClick={handleSwapClick}
+                onShift={handleShift}
+                isMobile={isMobile}
+                dayDates={dayDates}
+                isViewOnly={!isCurrentWeek}
+              />
+            </div>
+          </>
+        )
+      })()}
 
       {localSwapMode && (
         <div style={{ padding: isMobile ? '0 1rem' : '0 1.25rem' }}>

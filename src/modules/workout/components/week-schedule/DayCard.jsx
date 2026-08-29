@@ -20,6 +20,7 @@ export default function DayCard({
   isMobile, weekDaysDutch,
   onClick, swapMode,
   onShiftLeft, onShiftRight, canShiftLeft, canShiftRight,
+  dayDate, isViewOnly,
 }) {
   const isCustom = workoutKey?.startsWith('custom_')
   const isActivity = ['cardio', 'swimming', 'hiking', 'cycling', 'running'].includes(workoutKey)
@@ -66,7 +67,7 @@ export default function DayCard({
 
   // Onderaan-padding maakt ruimte voor de chevron-rij, of voor de
   // completed-check, of voor "RUST".
-  const showArrows = hasContent && !isCompleted
+  const showArrows = hasContent && !isCompleted && !isViewOnly
   const bottomPadding = showArrows
     ? (isMobile ? 24 : 28)
     : (isMobile ? 8 : 10)
@@ -95,6 +96,8 @@ export default function DayCard({
     transition: 'background 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease',
   }
 
+  const dateNum = dayDate ? dayDate.getDate() : null
+
   // ── Gouden pill bovenaan voor vandaag (edge-to-edge binnen de card-rand)
   const todayPill = (
     <div style={{
@@ -109,7 +112,7 @@ export default function DayCard({
       lineHeight: 1,
       textAlign: 'center',
     }}>
-      {weekDaysDutch[dayIndex]}
+      {weekDaysDutch[dayIndex]}{dateNum ? ` ${dateNum}` : ''}
     </div>
   )
 
@@ -125,7 +128,7 @@ export default function DayCard({
       lineHeight: 1,
       paddingBottom: isMobile ? 6 : 8,
     }}>
-      {weekDaysDutch[dayIndex]}
+      {weekDaysDutch[dayIndex]}{dateNum ? ` ${dateNum}` : ''}
     </div>
   )
 
@@ -164,13 +167,14 @@ export default function DayCard({
     <div style={{ position: 'relative', minWidth: 0 }}>
       {hasContent ? (
         <div
-          onClick={handleClick}
+          onClick={isViewOnly ? undefined : handleClick}
           style={{
             ...sharedCardStyle,
             background: tone.bg,
             border: `1px solid ${tone.border}`,
             boxShadow: tone.glow,
-            cursor: 'pointer',
+            cursor: isViewOnly ? 'default' : 'pointer',
+            opacity: isViewOnly ? 0.75 : 1,
           }}
         >
           {isToday ? todayPill : dayLabel}
