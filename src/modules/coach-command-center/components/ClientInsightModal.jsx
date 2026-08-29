@@ -14,19 +14,6 @@ import CoachingPeriodPanel from './CoachingPeriodPanel'
 import SendNotificationModal from '../../notifications/SendNotificationModal'
 import IntakeSummaryModal from '../../../coach/tabs/client-info/IntakeSummaryModal'
 
-const COLS = [
-  { id: 'weight',  label: 'Gewicht',   color: '#fff' },
-  { id: 'workout', label: 'Training',  color: '#fff' },
-  { id: 'meals',   label: 'Voeding',   color: '#fff' },
-  { id: 'data',    label: 'Gegevens',  color: '#fff' },
-  { id: 'checkin', label: 'Check-ins', color: '#fff' },
-]
-
-// Top-level component zodat z'n referentie stabiel blijft tussen renders.
-// Voorheen werd ColWrapper binnen ClientInsightModal gedefinieerd; React
-// kreeg dan elke render een nieuw functie-type en mounted de hele subtree
-// (incl. ClientDataColumn-state als activeSection) opnieuw. Daardoor
-// "sprong" de Gegevens-kolom terug naar de Profiel-tab na elke save.
 // Kopknop: kaal icoon, geen vak eromheen. Vier omkaderde knoppen met tekst
 // namen de halve kopregel in; als icoon met tooltip is het even duidelijk en
 // veel rustiger. Raakvlak blijft 32px zodat het op een telefoon te tikken is.
@@ -39,48 +26,6 @@ const kopKnop = (primair = false) => ({
   touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
 })
 
-function ColWrapper({ id, children, isLast, collapsed, onToggle }) {
-  const col = COLS.find(c => c.id === id)
-  const isCollapsed = collapsed.has(id)
-  return (
-    <div style={{
-      display: 'flex', flexDirection: 'row',
-      flex: isCollapsed ? '0 0 32px' : 1,
-      minWidth: 0,
-      borderRight: isLast ? 'none' : '1px solid rgba(255,255,255,0.06)',
-      overflow: 'hidden',
-      transition: 'flex 0.2s ease',
-    }}>
-      {!isCollapsed && (
-        <div style={{ flex: 1, overflow: 'hidden', minWidth: 0 }}>
-          {children}
-        </div>
-      )}
-      <button
-        onClick={() => onToggle(id)}
-        title={isCollapsed ? `${col?.label} uitklappen` : `${col?.label} inklappen`}
-        style={{
-          flexShrink: 0, width: '20px',
-          background: isCollapsed ? 'rgba(255,255,255,0.02)' : 'transparent',
-          border: 'none',
-          borderLeft: isCollapsed ? 'none' : '1px solid rgba(255,255,255,0.04)',
-          cursor: 'pointer', display: 'flex', flexDirection: 'column',
-          alignItems: 'center', justifyContent: 'center', gap: '0.4rem',
-          padding: '0.5rem 0', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-        }}
-      >
-        {isCollapsed ? (
-          <>
-            <span style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)', fontSize: '0.42rem', fontWeight: '700', color: col?.color || 'rgba(255,255,255,0.3)', textTransform: 'uppercase', letterSpacing: '0.1em', userSelect: 'none', whiteSpace: 'nowrap' }}>{col?.label}</span>
-            <ChevronRight size={9} color={col?.color || 'rgba(255,255,255,0.3)'} />
-          </>
-        ) : (
-          <ChevronLeft size={9} color="rgba(255,255,255,0.15)" />
-        )}
-      </button>
-    </div>
-  )
-}
 
 // Groepeer de foto's per MAAND (relatief vanaf de eerste foto) en binnen elke
 // maand per DAG, zodat foto's van dezelfde dag (voor/zij/achter) bij elkaar
@@ -115,9 +60,6 @@ export default function ClientInsightModal({ isOpen, onClose, client, isMobile, 
   const [photoZoom, setPhotoZoom] = useState(false)
   const [showGallery, setShowGallery] = useState(false)  // volledig foto-overzicht (grid)
   const [mobileTab, setMobileTab] = useState('weight')
-  // Default-collapse 'data' so the new 5-column layout stays comfortable.
-  // Coach can re-expand it via the "Secties"-toggles in the hover header.
-  const [collapsed, setCollapsed] = useState(() => new Set(['data']))
   const [showLog, setShowLog] = useState(false)
   const [showNotify, setShowNotify] = useState(false)
   const [showIntake, setShowIntake] = useState(false)
@@ -166,14 +108,6 @@ export default function ClientInsightModal({ isOpen, onClose, client, isMobile, 
     if (!d) return '-'
     const dt = new Date(d)
     return dt.toLocaleDateString('nl-NL', { day: 'numeric', month: 'short', year: dt.getFullYear() !== new Date().getFullYear() ? 'numeric' : undefined })
-  }
-
-  const toggleCollapse = (id) => {
-    setCollapsed(prev => {
-      const next = new Set(prev)
-      next.has(id) ? next.delete(id) : next.add(id)
-      return next
-    })
   }
 
 
@@ -230,27 +164,6 @@ export default function ClientInsightModal({ isOpen, onClose, client, isMobile, 
                       → {parseFloat(effectiveClient.target_weight).toFixed(1)}kg
                     </span>
                   )}
-                  <div style={{ width: '1px', height: '12px', background: 'rgba(255,255,255,0.08)', flexShrink: 0 }} />
-                  <div style={{ display: 'flex', gap: '0.2rem', alignItems: 'center' }}>
-                    <span style={{ fontSize: '0.42rem', color: 'rgba(255,255,255,0.2)', textTransform: 'uppercase', letterSpacing: '0.06em', marginRight: '0.2rem' }}>Secties:</span>
-                    {COLS.map(col => {
-                      const isCol = collapsed.has(col.id)
-                      return (
-                        <button key={col.id} onClick={() => toggleCollapse(col.id)} style={{
-                          padding: '0.15rem 0.45rem',
-                          background: isCol ? 'rgba(255,255,255,0.03)' : `${col.color}15`,
-                          border: `1px solid ${isCol ? 'rgba(255,255,255,0.08)' : col.color + '35'}`,
-                          borderRadius: '4px', color: isCol ? 'rgba(255,255,255,0.18)' : col.color,
-                          fontSize: '0.45rem', fontWeight: '700', cursor: 'pointer',
-                          textTransform: 'uppercase', letterSpacing: '0.05em',
-                          touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-                          transition: 'all 0.15s ease', minHeight: '22px'
-                        }}>
-                          {isCol ? '+ ' : '— '}{col.label}
-                        </button>
-                      )
-                    })}
-                  </div>
                   <div style={{ flex: 1 }} />
                   <button onClick={() => setShowIntake(true)} title="Bekijk intake" style={kopKnop()}>
                     <ClipboardCheck size={17} />
@@ -276,36 +189,32 @@ export default function ClientInsightModal({ isOpen, onClose, client, isMobile, 
           {/* ═══ MOBILE HEADER ═══ */}
           {isMobile && (
             <>
+              {/* Vijf knoppen van 36-40px plus 0,5rem tussenruimte vraten op een
+                  telefoon van 360px de hele regel op; de naam bleef als drie
+                  letters met puntjes over. Nu 34px met minimale tussenruimte,
+                  zodat de naam zelf ook nog leesbaar is. */}
               <div style={{
-                padding: '0.5rem 0.75rem', borderBottom: '1px solid rgba(255,255,255,0.06)',
-                display: 'flex', alignItems: 'center', gap: '0.5rem', flexShrink: 0
+                padding: '0.4rem 0.6rem', borderBottom: '1px solid rgba(255,255,255,0.06)',
+                display: 'flex', alignItems: 'center', gap: '0.1rem', flexShrink: 0
               }}>
-                <span style={{ fontSize: '0.95rem', fontWeight: 900, color: '#fff', flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                <span style={{ fontSize: '0.95rem', fontWeight: 900, color: '#fff', flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', paddingRight: '0.3rem' }}>
                   {effectiveClient.first_name} {effectiveClient.last_name}
                 </span>
-                <button onClick={() => setShowIntake(true)} title="Bekijk intake" style={{
-                  display: 'flex', alignItems: 'center', gap: '0.2rem',
-                  padding: '0.3rem 0.5rem',
-                  background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)',
-                  borderRadius: '6px', color: 'rgba(255,255,255,0.4)',
-                  fontSize: '0.6rem', fontWeight: 700, cursor: 'pointer',
-                  touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', minHeight: '28px',
-                  flexShrink: 0
-                }}>
-                  <ClipboardCheck size={11} /> Intake
+                <button onClick={() => setShowIntake(true)} title="Bekijk intake" style={{ ...kopKnop(), width: 34, height: 34 }}>
+                  <ClipboardCheck size={17} />
                 </button>
-                <button onClick={() => setShowLog(true)} title="Logboek" style={{ ...kopKnop(), width: 36, height: 36 }}>
+                <button onClick={() => setShowLog(true)} title="Logboek" style={{ ...kopKnop(), width: 34, height: 34 }}>
                   <BookOpen size={17} />
                 </button>
-                <button onClick={() => setShowNotify(true)} title="Stuur notificatie" style={{ ...kopKnop(true), width: 36, height: 36 }}>
+                <button onClick={() => setShowNotify(true)} title="Stuur notificatie" style={{ ...kopKnop(true), width: 34, height: 34 }}>
                   <Bell size={17} strokeWidth={2.4} />
                 </button>
                 {onSwitchToClientView && (
-                  <button onClick={() => { onClose(); onSwitchToClientView(effectiveClient) }} title="Bekijk als client" style={{ ...kopKnop(), width: 36, height: 36 }}>
+                  <button onClick={() => { onClose(); onSwitchToClientView(effectiveClient) }} title="Bekijk als client" style={{ ...kopKnop(), width: 34, height: 34 }}>
                     <ExternalLink size={17} />
                   </button>
                 )}
-                <button onClick={onClose} title="Sluiten" style={{ ...kopKnop(), width: 40, height: 40 }}>
+                <button onClick={onClose} title="Sluiten" style={{ ...kopKnop(), width: 36, height: 36 }}>
                   <X size={19} strokeWidth={2.4} />
                 </button>
               </div>
@@ -318,11 +227,11 @@ export default function ClientInsightModal({ isOpen, onClose, client, isMobile, 
                   const isActive = mobileTab === tab.id
                   return (
                     <button key={tab.id} onClick={() => setMobileTab(tab.id)} style={{
-                      flexShrink: 0, flex: 1, padding: '0.55rem 0', minWidth: '52px',
+                      flexShrink: 0, flex: 1, padding: '0.6rem 0', minWidth: '56px',
                       background: 'transparent', border: 'none',
                       borderBottom: isActive ? '2px solid #fff' : '2px solid transparent',
                       color: isActive ? '#fff' : 'rgba(255,255,255,0.4)',
-                      fontSize: '0.6rem', fontWeight: isActive ? 900 : 700,
+                      fontSize: '0.68rem', fontWeight: isActive ? 900 : 700,
                       cursor: 'pointer', display: 'flex', alignItems: 'center',
                       justifyContent: 'center', gap: '0.15rem',
                       touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent'
@@ -434,7 +343,8 @@ export default function ClientInsightModal({ isOpen, onClose, client, isMobile, 
 
           {/* ═══ MOBILE CONTENT ═══ */}
           {isMobile && (
-            <div style={{ flex: 1, overflow: 'hidden' }}>
+            // Home-indicator van de iPhone dekte anders de onderste regel af.
+            <div style={{ flex: 1, overflow: 'hidden', paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
               {mobileTab === 'weight' && (
                 <WeightColumn
                   client={effectiveClient} weightData={weightData} circumData={circumData}
