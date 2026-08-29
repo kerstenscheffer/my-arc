@@ -1,7 +1,7 @@
 // src/modules/coach-command-center/components/ClientInsightModal.jsx
 // ClientInsightModal.jsx - v8.3
 // + onOpenMealPanel prop toegevoegd voor Meal Plan SOP widget
-import React, { useState, useRef, useCallback } from 'react'
+import React, { useState, useRef } from 'react'
 import { X, Scale, Dumbbell, UtensilsCrossed, ChevronLeft, ChevronRight, ChevronDown, TrendingUp, User, BookOpen, ClipboardCheck, Bell, Download, ExternalLink } from 'lucide-react'
 import WeightColumn from './insight/WeightColumn'
 import WorkoutColumn from './insight/WorkoutColumn'
@@ -15,11 +15,11 @@ import SendNotificationModal from '../../notifications/SendNotificationModal'
 import IntakeSummaryModal from '../../../coach/tabs/client-info/IntakeSummaryModal'
 
 const COLS = [
-  { id: 'weight',  label: 'Gewicht',   color: '#FFD700' },
-  { id: 'workout', label: 'Training',  color: '#FFD700' },
-  { id: 'meals',   label: 'Voeding',   color: '#FFD700' },
-  { id: 'data',    label: 'Gegevens',  color: '#FFD700' },
-  { id: 'checkin', label: 'Check-ins', color: '#FFD700' },
+  { id: 'weight',  label: 'Gewicht',   color: '#fff' },
+  { id: 'workout', label: 'Training',  color: '#fff' },
+  { id: 'meals',   label: 'Voeding',   color: '#fff' },
+  { id: 'data',    label: 'Gegevens',  color: '#fff' },
+  { id: 'checkin', label: 'Check-ins', color: '#fff' },
 ]
 
 // Top-level component zodat z'n referentie stabiel blijft tussen renders.
@@ -104,10 +104,6 @@ export default function ClientInsightModal({ isOpen, onClose, client, isMobile, 
   const [showGallery, setShowGallery] = useState(false)  // volledig foto-overzicht (grid)
   const [mobileTab, setMobileTab] = useState('weight')
   const [showHeader, setShowHeader] = useState(false)
-  const [splitRatio, setSplitRatio] = useState(60)
-  const [isDragging, setIsDragging] = useState(false)
-  // Journey-vak standaard ingeklapt; klik op de header klapt'm open.
-  const [journeyCollapsed, setJourneyCollapsed] = useState(true)
   // Default-collapse 'data' so the new 5-column layout stays comfortable.
   // Coach can re-expand it via the "Secties"-toggles in the hover header.
   const [collapsed, setCollapsed] = useState(() => new Set(['data']))
@@ -169,36 +165,17 @@ export default function ClientInsightModal({ isOpen, onClose, client, isMobile, 
     })
   }
 
-  const handleDragStart = useCallback((e) => {
-    e.preventDefault()
-    setIsDragging(true)
-    const onMove = (ev) => {
-      if (!containerRef.current) return
-      const rect = containerRef.current.getBoundingClientRect()
-      const clientY = ev.touches ? ev.touches[0].clientY : ev.clientY
-      const pct = ((clientY - rect.top) / rect.height) * 100
-      setSplitRatio(Math.max(25, Math.min(80, pct)))
-    }
-    const onEnd = () => {
-      setIsDragging(false)
-      document.removeEventListener('mousemove', onMove)
-      document.removeEventListener('mouseup', onEnd)
-      document.removeEventListener('touchmove', onMove)
-      document.removeEventListener('touchend', onEnd)
-    }
-    document.addEventListener('mousemove', onMove)
-    document.addEventListener('mouseup', onEnd)
-    document.addEventListener('touchmove', onMove, { passive: false })
-    document.addEventListener('touchend', onEnd)
-  }, [])
 
-  const mobileTabs = [
-    { id: 'weight',  label: 'Gewicht',   icon: Scale,            color: '#FFD700' },
-    { id: 'workout', label: 'Training',  icon: Dumbbell,         color: '#FFD700' },
-    { id: 'meals',   label: 'Voeding',   icon: UtensilsCrossed,  color: '#FFD700' },
-    { id: 'checkin', label: 'Check-in',  icon: ClipboardCheck,   color: '#FFD700' },
-    { id: 'data',    label: 'Gegevens',  icon: User,             color: '#FFD700' },
-    { id: 'journey', label: 'Journey',   icon: TrendingUp,       color: '#FFD700' },
+  // Eén lijst voor de rail (desktop) én de tabbalk (mobiel), zodat ze niet
+  // uit elkaar kunnen lopen. Journey is nu een gewone sectie i.p.v. een
+  // aparte lade onderaan.
+  const SECTIES = [
+    { id: 'weight',  label: 'Gewicht',  icon: Scale },
+    { id: 'workout', label: 'Training', icon: Dumbbell },
+    { id: 'meals',   label: 'Voeding',  icon: UtensilsCrossed },
+    { id: 'data',    label: 'Gegevens', icon: User },
+    { id: 'checkin', label: 'Check-in', icon: ClipboardCheck },
+    { id: 'journey', label: 'Journey',  icon: TrendingUp },
   ]
 
   return (
@@ -210,8 +187,10 @@ export default function ClientInsightModal({ isOpen, onClose, client, isMobile, 
       }}>
         <div onClick={e => e.stopPropagation()} ref={containerRef} style={{
           flex: 1, display: 'flex', flexDirection: 'column',
-          maxWidth: isMobile ? '100%' : '1600px',
-          width: '100%', margin: '0 auto',
+          // Volle breedte. Stond op max 1600px omdat er vijf kolommen naast
+          // elkaar pasten; met de rail + één paneel is dat alleen nog
+          // weggegooid scherm.
+          width: '100%',
           background: '#0a0a0a', overflow: 'hidden', position: 'relative',
           // iPhone Dynamic Island / notch beschermt anders de header met
           // de X-knop → onbereikbaar voor jou. Safe-area-inset op de
@@ -234,7 +213,7 @@ export default function ClientInsightModal({ isOpen, onClose, client, isMobile, 
             >
               {showHeader && (
                 <div style={{ padding: '0.5rem 1rem', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                  <span style={{ fontSize: '0.85rem', fontWeight: '800', color: '#FFD700', letterSpacing: '-0.02em', flexShrink: 0 }}>
+                  <span style={{ fontSize: '0.9rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.02em', flexShrink: 0 }}>
                     {effectiveClient.first_name} {effectiveClient.last_name}
                   </span>
                   {effectiveClient.target_weight && (
@@ -287,8 +266,8 @@ export default function ClientInsightModal({ isOpen, onClose, client, isMobile, 
                   <button onClick={() => setShowNotify(true)} title="Stuur notificatie" style={{
                     display: 'flex', alignItems: 'center', gap: '0.2rem',
                     padding: '0.25rem 0.5rem',
-                    background: 'rgba(255,215,0,0.08)', border: '1px solid rgba(255,215,0,0.25)',
-                    borderRadius: '5px', color: '#FFD700',
+                    background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.14)',
+                    borderRadius: '5px', color: '#fff',
                     fontSize: '0.55rem', fontWeight: 800, cursor: 'pointer',
                     touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', minHeight: '22px',
                     textTransform: 'uppercase', letterSpacing: '0.04em',
@@ -333,7 +312,7 @@ export default function ClientInsightModal({ isOpen, onClose, client, isMobile, 
                 padding: '0.5rem 0.75rem', borderBottom: '1px solid rgba(255,255,255,0.06)',
                 display: 'flex', alignItems: 'center', gap: '0.5rem', flexShrink: 0
               }}>
-                <span style={{ fontSize: '0.9rem', fontWeight: '800', color: '#FFD700', flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                <span style={{ fontSize: '0.95rem', fontWeight: 900, color: '#fff', flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                   {effectiveClient.first_name} {effectiveClient.last_name}
                 </span>
                 <button onClick={() => setShowIntake(true)} title="Bekijk intake" style={{
@@ -361,8 +340,8 @@ export default function ClientInsightModal({ isOpen, onClose, client, isMobile, 
                 <button onClick={() => setShowNotify(true)} title="Stuur notificatie" style={{
                   display: 'flex', alignItems: 'center', gap: '0.2rem',
                   padding: '0.3rem 0.55rem',
-                  background: 'rgba(255,215,0,0.1)', border: '1px solid rgba(255,215,0,0.3)',
-                  borderRadius: '6px', color: '#FFD700',
+                  background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.14)',
+                  borderRadius: '6px', color: '#fff',
                   fontSize: '0.6rem', fontWeight: 800, cursor: 'pointer',
                   touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', minHeight: '28px',
                   flexShrink: 0,
@@ -397,21 +376,21 @@ export default function ClientInsightModal({ isOpen, onClose, client, isMobile, 
                 display: 'flex', borderBottom: '1px solid rgba(255,255,255,0.06)',
                 flexShrink: 0, overflowX: 'auto', scrollbarWidth: 'none'
               }}>
-                {mobileTabs.map(tab => {
+                {SECTIES.map(tab => {
                   const TabIcon = tab.icon
                   const isActive = mobileTab === tab.id
                   return (
                     <button key={tab.id} onClick={() => setMobileTab(tab.id)} style={{
-                      flexShrink: 0, flex: 1, padding: '0.5rem 0', minWidth: '52px',
+                      flexShrink: 0, flex: 1, padding: '0.55rem 0', minWidth: '52px',
                       background: 'transparent', border: 'none',
-                      borderBottom: isActive ? `2px solid ${tab.color}` : '2px solid transparent',
-                      color: isActive ? tab.color : 'rgba(255,255,255,0.3)',
-                      fontSize: '0.48rem', fontWeight: isActive ? '700' : '500',
+                      borderBottom: isActive ? '2px solid #fff' : '2px solid transparent',
+                      color: isActive ? '#fff' : 'rgba(255,255,255,0.4)',
+                      fontSize: '0.6rem', fontWeight: isActive ? 900 : 700,
                       cursor: 'pointer', display: 'flex', alignItems: 'center',
                       justifyContent: 'center', gap: '0.15rem',
                       touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent'
                     }}>
-                      <TabIcon size={11} />{tab.label}
+                      <TabIcon size={13} />{tab.label}
                     </button>
                   )
                 })}
@@ -427,11 +406,45 @@ export default function ClientInsightModal({ isOpen, onClose, client, isMobile, 
             onClientUpdate={handleClientUpdate}
           />
 
-          {/* ═══ DESKTOP CONTENT ═══ */}
+          {/* ═══ DESKTOP CONTENT — rail links, één paneel rechts ═══ */}
+          {/* Voorheen stonden alle vijf kolommen tegelijk naast elkaar, elk
+              inklapbaar, met een sleepbare splitter en Journey als lade
+              eronder. Dat gaf vijf smalle kokers en drie manieren om iets te
+              openen. Nu: één sectie tegelijk, volle breedte, gekozen via de
+              rail — zelfde patroon als de Plan Analyzer. */}
           {!isMobile && (
-            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-              <div style={{ height: journeyCollapsed ? 'auto' : `${splitRatio}%`, flex: journeyCollapsed ? 1 : 'none', display: 'flex', minHeight: 0, overflow: 'hidden' }}>
-                <ColWrapper id="weight" collapsed={collapsed} onToggle={toggleCollapse}>
+            <div style={{ flex: 1, display: 'flex', minHeight: 0, overflow: 'hidden' }}>
+
+              {/* Rail — smal, iconen boven het label. */}
+              <div style={{
+                width: 78, flexShrink: 0, display: 'flex', flexDirection: 'column',
+                gap: 4, padding: '0.6rem 0.4rem', overflowY: 'auto',
+                borderRight: '1px solid rgba(255,255,255,0.07)',
+              }}>
+                {SECTIES.map(sec => {
+                  const Icon = sec.icon
+                  const aan = mobileTab === sec.id
+                  return (
+                    <button key={sec.id} onClick={() => setMobileTab(sec.id)} title={sec.label}
+                      style={{
+                        display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3,
+                        padding: '0.55rem 0.2rem', borderRadius: 10, cursor: 'pointer',
+                        background: aan ? 'rgba(255,255,255,0.1)' : 'transparent',
+                        border: `1px solid ${aan ? 'rgba(255,255,255,0.2)' : 'transparent'}`,
+                        color: aan ? '#fff' : 'rgba(255,255,255,0.45)',
+                        fontFamily: 'inherit', touchAction: 'manipulation',
+                        WebkitTapHighlightColor: 'transparent',
+                      }}>
+                      <Icon size={17} strokeWidth={aan ? 2.4 : 2} />
+                      <span style={{ fontSize: '0.6rem', fontWeight: aan ? 900 : 700, letterSpacing: '-0.01em' }}>{sec.label}</span>
+                    </button>
+                  )
+                })}
+              </div>
+
+              {/* Paneel — de gekozen sectie over de volle breedte. */}
+              <div style={{ flex: 1, minWidth: 0, overflow: 'auto', WebkitOverflowScrolling: 'touch' }}>
+                {mobileTab === 'weight' && (
                   <WeightColumn
                     client={effectiveClient} weightData={weightData} circumData={circumData}
                     photos={photos} coachingPlan={effectiveClient.coachingPlan} isMobile={false}
@@ -439,77 +452,33 @@ export default function ClientInsightModal({ isOpen, onClose, client, isMobile, 
                     onDownloadPhoto={(idx) => downloadPhoto(photos[idx], idx)}
                     onOpenGallery={() => setShowGallery(true)}
                   />
-                </ColWrapper>
-                <ColWrapper id="workout" collapsed={collapsed} onToggle={toggleCollapse}>
+                )}
+                {mobileTab === 'workout' && (
                   <WorkoutColumn
                     db={db} workoutData={workoutData} exerciseProgress={exerciseProgress}
                     isMobile={false} onNavigateWorkout={onNavigateWorkout}
                     client={effectiveClient} onClose={onClose}
                   />
-                </ColWrapper>
-                <ColWrapper id="meals" collapsed={collapsed} onToggle={toggleCollapse}>
+                )}
+                {mobileTab === 'meals' && (
                   <MealsColumn
                     client={effectiveClient} mealData={mealData} isMobile={false}
                     onNavigatePlan={onNavigatePlan} onClose={onClose}
                     db={db} coachId={coachId}
                     onGeneratePlan={(planId) => { onNavigatePlan && onNavigatePlan(effectiveClient.id, planId); onClose() }}
                   />
-                </ColWrapper>
-                <ColWrapper id="data" collapsed={collapsed} onToggle={toggleCollapse}>
+                )}
+                {mobileTab === 'data' && (
                   <ClientDataColumn
                     client={effectiveClient} db={db} isMobile={false}
                     onClientUpdate={handleClientUpdate}
                   />
-                </ColWrapper>
-                <ColWrapper id="checkin" isLast collapsed={collapsed} onToggle={toggleCollapse}>
-                  <CheckinsColumn
-                    client={effectiveClient} db={db} isMobile={false}
-                  />
-                </ColWrapper>
-              </div>
-
-              {/* DRAGGABLE DIVIDER — alleen zichtbaar wanneer journey open is */}
-              {!journeyCollapsed && (
-                <div
-                  onMouseDown={handleDragStart} onTouchStart={handleDragStart}
-                  style={{
-                    height: '6px', flexShrink: 0,
-                    background: isDragging ? 'rgba(255,215,0,0.15)' : 'rgba(255,255,255,0.03)',
-                    borderTop: '1px solid rgba(255,255,255,0.06)',
-                    borderBottom: '1px solid rgba(255,255,255,0.06)',
-                    cursor: 'row-resize', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    transition: isDragging ? 'none' : 'background 0.2s ease', touchAction: 'none'
-                  }}
-                >
-                  <div style={{
-                    width: '40px', height: '3px', borderRadius: '2px',
-                    background: isDragging ? 'rgba(255,215,0,0.4)' : 'rgba(255,255,255,0.1)',
-                    transition: isDragging ? 'none' : 'background 0.2s ease'
-                  }} />
-                </div>
-              )}
-
-              {/* JOURNEY — klikbare header, standaard ingeklapt */}
-              <button
-                onClick={() => setJourneyCollapsed(c => !c)}
-                style={{
-                  flexShrink: 0, height: '44px', width: '100%',
-                  display: 'flex', alignItems: 'center', gap: '0.5rem',
-                  padding: '0 1.25rem',
-                  background: journeyCollapsed ? 'rgba(255,215,0,0.04)' : 'rgba(255,215,0,0.08)',
-                  border: 'none', borderTop: '1px solid rgba(255,215,0,0.15)',
-                  cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-                }}
-              >
-                <TrendingUp size={15} color="#FFD700" strokeWidth={2.4} />
-                <span style={{ fontSize: '0.8rem', fontWeight: 800, color: '#fff', letterSpacing: '0.01em' }}>Journey</span>
-                <span style={{ flex: 1 }} />
-                <ChevronDown size={16} color="rgba(255,215,0,0.6)" style={{ transform: journeyCollapsed ? 'none' : 'rotate(180deg)', transition: 'transform 0.18s ease' }} />
-              </button>
-
-              {!journeyCollapsed && (
-                <div style={{ flex: 1, overflow: 'auto', WebkitOverflowScrolling: 'touch', minHeight: 0 }}>
-                  {db ? (
+                )}
+                {mobileTab === 'checkin' && (
+                  <CheckinsColumn client={effectiveClient} db={db} isMobile={false} />
+                )}
+                {mobileTab === 'journey' && (
+                  db ? (
                     <ClientJourneyTimeline
                       db={db}
                       clients={[effectiveClient]}
@@ -520,13 +489,9 @@ export default function ClientInsightModal({ isOpen, onClose, client, isMobile, 
                       onOpenMealPanel={onOpenMealPanel}
                       onOpenWorkoutPanel={onOpenWorkoutPanel}
                     />
-                  ) : (
-                    <div style={{ padding: '2rem', textAlign: 'center', color: 'rgba(255,255,255,0.2)', fontSize: '0.75rem' }}>
-                      Journey niet beschikbaar
-                    </div>
-                  )}
-                </div>
-              )}
+                  ) : null
+                )}
+              </div>
             </div>
           )}
 
@@ -611,8 +576,8 @@ export default function ClientInsightModal({ isOpen, onClose, client, isMobile, 
                 <div key={mo.month} style={{ marginBottom: '1.5rem' }}>
                   {/* Maand-kop */}
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, margin: '0 0 0.75rem', position: 'sticky', top: 0, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(6px)', padding: '0.35rem 0', zIndex: 1 }}>
-                    <span style={{ fontSize: '0.62rem', fontWeight: 900, color: '#FFD700', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Maand {mo.month}</span>
-                    <div style={{ flex: 1, height: 1, background: 'rgba(255,215,0,0.15)' }} />
+                    <span style={{ fontSize: '0.75rem', fontWeight: 900, color: '#fff' }}>Maand {mo.month}</span>
+                    <div style={{ flex: 1, height: 1, background: 'rgba(255,255,255,0.12)' }} />
                   </div>
                   {/* Dag-clusters */}
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.9rem' }}>
@@ -627,7 +592,7 @@ export default function ClientInsightModal({ isOpen, onClose, client, isMobile, 
                               </div>
                               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6, padding: '0.35rem 0.45rem' }}>
                                 <span style={{ fontSize: '0.6rem', color: 'rgba(255,255,255,0.5)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.photo_type || 'foto'}</span>
-                                <button onClick={(e) => { e.stopPropagation(); downloadPhoto(p, idx) }} title="Download foto" style={{ width: 28, height: 28, flexShrink: 0, borderRadius: 7, background: 'rgba(255,215,0,0.14)', border: '1px solid rgba(255,215,0,0.4)', color: '#FFD700', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0, touchAction: 'manipulation' }}>
+                                <button onClick={(e) => { e.stopPropagation(); downloadPhoto(p, idx) }} title="Download foto" style={{ width: 28, height: 28, flexShrink: 0, borderRadius: 7, background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.2)', color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0, touchAction: 'manipulation' }}>
                                   <Download size={13} />
                                 </button>
                               </div>
@@ -679,7 +644,7 @@ export default function ClientInsightModal({ isOpen, onClose, client, isMobile, 
             {/* Downloadknop voor de huidige foto */}
             <button
               onClick={(e) => { e.stopPropagation(); downloadPhoto(photos[selectedPhotoIndex], selectedPhotoIndex) }}
-              style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', minHeight: 44, padding: '0 1.1rem', borderRadius: 12, background: '#FFD700', color: '#000', border: 'none', fontSize: '0.85rem', fontWeight: 800, cursor: 'pointer', boxShadow: '0 6px 18px rgba(255,215,0,0.22)', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', minHeight: 44, padding: '0 1.1rem', borderRadius: 12, background: '#fff', color: '#000', border: 'none', fontSize: '0.85rem', fontWeight: 900, cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}
             >
               <Download size={16} /> Download foto
             </button>
@@ -689,7 +654,7 @@ export default function ClientInsightModal({ isOpen, onClose, client, isMobile, 
           {photos.length > 1 && (
             <div onClick={e => e.stopPropagation()} style={{ display: 'flex', gap: '0.4rem', marginTop: '0.75rem', overflowX: 'auto', maxWidth: '92vw', padding: '0.25rem', WebkitOverflowScrolling: 'touch' }}>
               {photos.map((p, idx) => (
-                <div key={p.id} onClick={() => setSelectedPhotoIndex(idx)} style={{ width: 52, height: 52, flexShrink: 0, borderRadius: 8, overflow: 'hidden', cursor: 'pointer', border: idx === selectedPhotoIndex ? '2px solid #FFD700' : '2px solid rgba(255,255,255,0.15)', opacity: idx === selectedPhotoIndex ? 1 : 0.6 }}>
+                <div key={p.id} onClick={() => setSelectedPhotoIndex(idx)} style={{ width: 52, height: 52, flexShrink: 0, borderRadius: 8, overflow: 'hidden', cursor: 'pointer', border: idx === selectedPhotoIndex ? '2px solid #fff' : '2px solid rgba(255,255,255,0.15)', opacity: idx === selectedPhotoIndex ? 1 : 0.6 }}>
                   <img src={p.photo_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                 </div>
               ))}
