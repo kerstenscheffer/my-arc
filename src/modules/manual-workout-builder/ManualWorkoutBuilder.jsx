@@ -8,7 +8,7 @@ import TemplateManager from './components/TemplateManager'
 import DayTemplatePickerModal from './components/DayTemplatePickerModal'
 import ClientAssigner from './components/ClientAssigner'
 import ClientPlanManagerModal from './components/ClientPlanManagerModal'
-import { Plus, Save, Users, FileText, ChevronDown, Video, Trash2, Search, X, Calendar } from 'lucide-react'
+import { Plus, Save, Users, FileText, ChevronDown, Video, Trash2, Search, X, AlertTriangle } from 'lucide-react'
 import PDFExportButton from './components/PDFExportButton'
 import ExerciseLibraryModal from './components/ExerciseLibraryModal'
 
@@ -25,6 +25,7 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
   // gekozen zijn. Valt de selectie weg (dag verwijderd, ander plan geladen),
   // dan pakken we de eerste.
   const [instellingenOpen, setInstellingenOpen] = useState(false)
+  const [intakeOpen, setIntakeOpen] = useState(true)
   const [showExerciseSelector, setShowExerciseSelector] = useState(false)
   const [showTemplateManager, setShowTemplateManager] = useState(false)
   const [showClientAssigner, setShowClientAssigner] = useState(false)
@@ -63,6 +64,10 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
   useEffect(() => {
     if (!selectedClient) return
     loadClientSchemas(selectedClient)
+    // Ook de intake ophalen. Dat gebeurde alleen bij het kiezen van een klant
+    // ín de builder; kwam je hier binnen met een klant al geselecteerd vanuit
+    // CoachHub, dan bleef het intake-paneel leeg.
+    loadTrainingInfo(selectedClient.id)
   }, [selectedClient?.id])
 
   const loadClientSchemas = async (client, openAssigner = true) => {
@@ -83,8 +88,19 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
 
   const loadTrainingInfo = async (clientId) => {
     try {
+      // Alles wat voor het bouwen van een schema uitmaakt. De velden liggen
+      // verspreid over `clients` omdat ze uit verschillende intake-versies
+      // komen; hieronder worden ze samengevoegd tot één beeld. Niet alles is
+      // bij elke klant ingevuld — lege velden vallen weg in de weergave.
       const { data: cd } = await db.supabase.from('clients')
-        .select('preferred_training_days, primary_goal, work_schedule, first_name, last_name')
+        .select([
+          'preferred_training_days', 'primary_goal', 'work_schedule',
+          'first_name', 'last_name',
+          'experience', 'training_experience',
+          'injuries', 'gym_name', 'workout_type',
+          'days_per_week', 'workout_days_per_week', 'training_days',
+          'minutes_per_session', 'training_time', 'workout_schedule',
+        ].join(', '))
         .eq('id', clientId).single()
       let intakeDays = []
       try {
@@ -358,6 +374,64 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
   const cInput = { background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, padding: '0.45rem 0.6rem', color: '#fff', fontSize: '0.82rem', minHeight: 36, outline: 'none', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }
   const cSelect = { ...cInput, cursor: 'pointer', flex: 1, minWidth: 116 }
 
+  // ── Intake, vertaald naar wat je nodig hebt om een schema te bouwen ────
+  // Dezelfde gedachte als het klantpaneel in de Plan Analyzer bij voeding:
+  // de antwoorden uit de intake staan ernaast terwijl je bouwt, zodat je niet
+  // eerst naar het klantdossier hoeft. De velden komen uit verschillende
+  // intake-versies en zijn lang niet allemaal gevuld; wat leeg is valt weg.
+  const intake = (() => {
+    if (!trainingInfo) return null
+    const t = trainingInfo
+    const eersteGetal = (...vals) => vals.map(v => parseInt(v, 10)).find(n => Number.isFinite(n) && n > 0) || null
+    const tekst = (v) => (typeof v === 'string' && v.trim() ? v.trim() : null)
+
+    const dagenPerWeek = eersteGetal(t.workout_days_per_week, t.days_per_week, t.training_days)
+    const voorkeurDagen = Array.isArray(t.preferred_training_days) ? t.preferred_training_days : []
+    // Werkdagen komen als object {ma: ..., di: ...}; alleen de dagen waar echt
+    // iets staat zijn werkdagen.
+    const werkdagen = t.work_schedule && typeof t.work_schedule === 'object'
+      ? Object.entries(t.work_schedule).filter(([, v]) => v).map(([k]) => k)
+      : []
+
+    const regels = [
+      { label: 'Ervaring',   waarde: tekst(t.training_experience) || tekst(t.experience) },
+      { label: 'Doel',       waarde: GOAL_LABELS[t.primary_goal] || tekst(t.primary_goal) },
+      { label: 'Dagen/week', waarde: dagenPerWeek ? `${dagenPerWeek}×` : null },
+      { label: 'Duur',       waarde: t.minutes_per_session ? `${t.minutes_per_session} min` : null },
+      { label: 'Voorkeur',   waarde: voorkeurDagen.length ? voorkeurDagen.map(d => DAY_ABBR[d] || d).join(' ') : null },
+      { label: 'Intake-dagen', waarde: t.intakeDays?.length ? t.intakeDays.map(d => DAY_ABBR[d] || d).join(' ') : null },
+      { label: 'Tijd',       waarde: t.training_time ? String(t.training_time).slice(0, 5) : null },
+      { label: 'Werkdagen',  waarde: werkdagen.length ? werkdagen.map(d => DAY_ABBR[d] || d.slice(0, 2)).join(' ') : null },
+      { label: 'Gym',        waarde: tekst(t.gym_name) },
+      { label: 'Type',       waarde: tekst(t.workout_type) },
+    ].filter(r => r.waarde)
+
+    return { regels, blessures: tekst(t.injuries), dagenPerWeek }
+  })()
+
+  // Zet het aantal dagen uit de intake om in lege dagen in het plan. Alleen
+  // aanvullen, nooit verwijderen — anders gooi je werk weg met één klik.
+  const neemDagenOver = () => {
+    const doel = intake?.dagenPerWeek
+    if (!doel) return
+    const tekort = doel - workoutPlan.days.length
+    if (tekort <= 0) return
+    // In één keer toevoegen. addEmptyDay() in een lus zou dat niet kunnen:
+    // die gebruikt Date.now() als id, en binnen dezelfde milliseconde krijg je
+    // dan dagen met hetzelfde id — React verwart ze en bewerkingen landen op
+    // de verkeerde dag.
+    const basis = Date.now()
+    const nieuweDagen = Array.from({ length: tekort }, (_, i) => ({
+      id: basis + i, name: '', focus: '', exercises: [], geschatteTijd: '60 minutes',
+    }))
+    setWorkoutPlan(prev => ({
+      ...prev,
+      days: [...prev.days, ...nieuweDagen],
+      days_per_week: prev.days.length + tekort,
+    }))
+    setActiveDay(nieuweDagen[0].id)
+  }
+
   // Zijpaneel-knop: plat, volle breedte, geen vakje eromheen.
   const zijKnop = (extra = {}) => ({
     display: 'flex', alignItems: 'center', gap: 7,
@@ -443,6 +517,54 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
           </select>
         )}
 
+        {/* ── Intake — de antwoorden van de klant, naast je werk ──────── */}
+        {intake && (intake.regels.length > 0 || intake.blessures) && (
+          <div style={{ borderTop: '1px solid rgba(255,255,255,0.07)', paddingTop: '0.6rem' }}>
+            <button onClick={() => setIntakeOpen(v => !v)} style={zijKnop({ color: '#fff', fontWeight: 900 })}>
+              <ChevronDown size={14} style={{ transform: intakeOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s' }} />
+              Intake
+              {intake.blessures && (
+                <span style={{ marginLeft: 'auto', display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: '0.75rem', fontWeight: 800, color: '#f59e0b' }}>
+                  <AlertTriangle size={12} /> blessure
+                </span>
+              )}
+            </button>
+
+            {intakeOpen && (
+              <div style={{ marginTop: '0.35rem', display: 'flex', flexDirection: 'column', gap: 3 }}>
+                {/* Blessures bovenaan en in amber: dat is een beperking op wat
+                    je in het schema mag zetten, geen achtergrondinformatie. */}
+                {intake.blessures && (
+                  <div style={{
+                    display: 'flex', gap: 6, alignItems: 'flex-start',
+                    padding: '0.4rem 0', marginBottom: 2,
+                    fontSize: '0.8rem', fontWeight: 700, color: '#f59e0b', lineHeight: 1.35,
+                  }}>
+                    <AlertTriangle size={13} style={{ flexShrink: 0, marginTop: 2 }} />
+                    <span>{intake.blessures}</span>
+                  </div>
+                )}
+
+                {intake.regels.map(r => (
+                  <div key={r.label} style={{ display: 'flex', alignItems: 'baseline', gap: 8, fontSize: '0.8rem' }}>
+                    <span style={{ flexShrink: 0, minWidth: 88, fontWeight: 700, color: 'rgba(255,255,255,0.45)' }}>{r.label}</span>
+                    <span style={{ flex: 1, minWidth: 0, fontWeight: 800, color: '#fff' }}>{r.waarde}</span>
+                  </div>
+                ))}
+
+                {/* Eén actie: het aantal dagen uit de intake overnemen. Vult
+                    alleen aan tot dat aantal; bestaande dagen blijven staan. */}
+                {intake.dagenPerWeek > workoutPlan.days.length && (
+                  <button onClick={neemDagenOver} style={zijKnop({ marginTop: 4, color: '#fff', fontWeight: 900 })}>
+                    <Plus size={13} strokeWidth={2.8} />
+                    Vul aan naar {intake.dagenPerWeek} dagen
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
         {/* ── Dagen — dit is de navigatie ─────────────────────────────── */}
         <div>
           <div style={{ fontSize: '0.72rem', fontWeight: 900, color: 'rgba(255,255,255,0.45)', marginBottom: 6 }}>
@@ -509,19 +631,6 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
                 <option value="intermediate">Intermediate</option>
                 <option value="advanced">Advanced</option>
               </select>
-
-              {/* Intake-voorkeuren van de klant — alleen relevant bij het opzetten. */}
-              {trainingInfo && (
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, alignItems: 'center', fontSize: '0.75rem', fontWeight: 700, color: 'rgba(255,255,255,0.55)' }}>
-                  <Calendar size={12} style={{ flexShrink: 0 }} />
-                  {trainingInfo.preferred_training_days?.length > 0 && (
-                    <>Voorkeur: {trainingInfo.preferred_training_days.map(d => DAY_ABBR[d] || d).join(' ')}</>
-                  )}
-                  {trainingInfo.intakeDays?.length > 0 && (
-                    <span style={{ color: 'rgba(255,255,255,0.4)' }}>· intake {trainingInfo.intakeDays.map(d => DAY_ABBR[d] || d).join(' ')}</span>
-                  )}
-                </div>
-              )}
             </div>
           )}
         </div>
