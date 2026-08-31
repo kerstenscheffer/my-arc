@@ -1343,19 +1343,37 @@ async getClientSchemas(clientId) {
 
   async assignWorkoutToClient(clientId, schemaId) {
     try {
-      // Update client's assigned schema
+      // Naast assigned_schema_id ook meteen een week-schedule wegschrijven.
+      //
+      // Deze functie zette alleen assigned_schema_id. clients.workout_schedule
+      // bleef leeg tot de klant zelf de app opende — pas dán bouwde de
+      // client-kant een default. Tot die tijd toonde de coach-agenda geen
+      // enkele trainingsdag, want die leest workout_schedule als bron. Negen
+      // van de zesendertig klanten met een plan stonden zo op leeg.
+      //
+      // setActiveWorkoutPlan en assignTemplateToClient deden dit al wél; deze
+      // route was de uitzondering.
+      const { data: sc } = await supabase
+        .from('workout_schemas').select('week_structure').eq('id', schemaId).maybeSingle()
+      const schedule = this._defaultScheduleFromStructure(sc?.week_structure)
+
+      const payload = {
+        assigned_schema_id: schemaId,
+        updated_at: new Date().toISOString(),
+      }
+      // Alleen zetten als er echt iets uit te rekenen viel; een leeg object
+      // zou een bestaande, door de klant aangepaste indeling wissen.
+      if (schedule && Object.keys(schedule).length > 0) payload.workout_schedule = schedule
+
       const { data, error } = await supabase
         .from('clients')
-        .update({ 
-          assigned_schema_id: schemaId,
-          updated_at: new Date().toISOString()
-        })
+        .update(payload)
         .eq('id', clientId)
         .select()
         .single()
-      
+
       if (error) throw error
-      
+
       this.clearCache(`client_${clientId}`)
       return data
     } catch (error) {
