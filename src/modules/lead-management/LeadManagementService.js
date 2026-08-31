@@ -1791,12 +1791,20 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
           .gte('first_reply_at', startISO)
           .lt('first_reply_at', endISO)
           .is('deleted_at', null),
+        // Let op: een Supabase query-builder is een thenable, geen Promise —
+        // hij heeft wél .then() maar GEEN .catch(). Die er direct op aanroepen
+        // gooit "b.catch is not a function" nog vóór de query vertrekt, en die
+        // fout sloopt de hele Promise.all. Vandaar .then(…, …) met een tweede
+        // argument: dat vangt de afwijzing zonder .catch nodig te hebben.
         this.db.supabase
           .from('lead_reaction_events')
           .select('delta')
           .gte('created_at', startISO)
           .lt('created_at', endISO)
-          .catch(e => { console.warn('reaction events read failed:', e?.message); return { data: [] } }),
+          .then(
+            (res) => res,
+            (e) => { console.warn('reaction events read failed:', e?.message); return { data: [] } },
+          ),
       ])
       let reactionEventsInWindow = ((rxResult?.data) || []).reduce((s, e) => s + (Number(e.delta) || 0), 0)
       if (reactionEventsInWindow < 0) reactionEventsInWindow = 0
