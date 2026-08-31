@@ -69,6 +69,7 @@ export default class CommandCenterService {
         .in('client_id', clientIds)
         .order('photo_date', { ascending: false })
         .order('created_at', { ascending: false })
+        .limit(clientIds.length * 20)
       if (error) { console.error('❌ Photo error:', error); return {} }
       const photosByClient = {}
       clientIds.forEach(id => { photosByClient[id] = { photos: [], totalCount: 0, progressCount: 0, lastPhotoDate: null, lastPhoto: null } })
@@ -309,12 +310,13 @@ export default class CommandCenterService {
   async getClientsLatestCoachingLog(clientIds) {
     if (!clientIds || clientIds.length === 0) return {}
     try {
-      // Haal alle logs op, gesorteerd desc — we pakken de eerste per client
+      // Haal de laatste N logs op (1 per client is genoeg), gesorteerd desc
       const { data, error } = await this.supabase
         .from('client_coaching_logs')
         .select('id, client_id, status, note, created_at')
         .in('client_id', clientIds)
         .order('created_at', { ascending: false })
+        .limit(clientIds.length * 5)
       if (error) { console.error('❌ Coaching log error:', error); return {} }
       const byClient = {}
       data?.forEach(log => {

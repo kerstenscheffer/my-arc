@@ -110,7 +110,6 @@ async createLead(leadData) {
     }
 
     if (error) throw error
-    console.log('✅ Lead created:', data.id, insertData.campaign_id ? `(campaign: ${insertData.campaign_id})` : '')
     return data
   } catch (error) {
     console.error('❌ Create lead failed:', error)
@@ -1398,13 +1397,24 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
       today.setHours(0, 0, 0, 0)
       const todayISO = today.toISOString()
 
-      const { data: movements, error: movError } = await this.db.supabase
-        .from('lead_movements')
-        .select('*')
-        .gte('moved_at', todayISO)
-        .order('moved_at', { ascending: false })
+      const [
+        { data: movements, error: movError },
+        { data: touchedLeads, error: touchError },
+      ] = await Promise.all([
+        this.db.supabase
+          .from('lead_movements')
+          .select('*')
+          .gte('moved_at', todayISO)
+          .order('moved_at', { ascending: false }),
+        this.db.supabase
+          .from('call_leads')
+          .select('id, first_name, last_name, created_at, last_touched, lead_source')
+          .gte('last_touched', todayISO)
+          .is('deleted_at', null),
+      ])
 
       if (movError) throw movError
+      if (touchError) throw touchError
 
       const movementsBySection = {}
       const movementsList = []
@@ -1412,7 +1422,7 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
       ;(movements || []).forEach(mov => {
         const toSection = mov.to_section_title || 'Unknown'
         const fromSection = mov.from_section_title || 'Niet toegewezen'
-        
+
         if (!movementsBySection[toSection]) {
           movementsBySection[toSection] = { count: 0, leads: [] }
         }
@@ -1426,14 +1436,6 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
           time: new Date(mov.moved_at).toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit' })
         })
       })
-
-      const { data: touchedLeads, error: touchError } = await this.db.supabase
-        .from('call_leads')
-        .select('id, first_name, last_name, created_at, last_touched, lead_source')
-        .gte('last_touched', todayISO)
-        .is('deleted_at', null)
-
-      if (touchError) throw touchError
 
       const newOutreach = (touchedLeads || []).filter(lead => {
         const created = new Date(lead.created_at)
@@ -1770,38 +1772,34 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
       const reactedLeads   = reactedCount || 0
       const followedLeads  = followedCount || 0
       const notReactedYet  = newLeads - reactedLeads
-      // Follow-ups SENT in the window (regardless of lead creation date) —
-      // uses last_followup_sent_at on every lead the coach owns.
-      const { count: followupsInWindow } = await this.db.supabase
-        .from('call_leads')
-        .select('id', { count: 'exact', head: true })
-        .gte('last_followup_sent_at', startISO)
-        .lt('last_followup_sent_at', endISO)
-        .is('deleted_at', null)
-      // Reacties IN het venster (ongeacht aanmaakdatum) — telt elke lead die
-      // in deze periode z'n eerste reactie kreeg (first_reply_at). Dit is de
-      // juiste maat voor "reacties deze week/maand"; reactedLeads telt alleen
-      // reacties op leads die óók in het venster zijn aangemaakt en mist dus
-      // reacties op oudere leads.
-      const { count: reactionsInWindow } = await this.db.supabase
-        .from('call_leads')
-        .select('id', { count: 'exact', head: true })
-        .gte('first_reply_at', startISO)
-        .lt('first_reply_at', endISO)
-        .is('deleted_at', null)
-      // Élke losse reactie in het venster (uit het reactie-logje) — telt ook
-      // de 2e/3e reactie van dezelfde lead. Som van de delta's (zodat een
-      // teruggeklikte misklik netjes wegvalt).
-      let reactionEventsInWindow = 0
-      try {
-        const { data: rxEvents } = await this.db.supabase
+      // Follow-ups SENT in the window, reacties IN het venster (first_reply_at),
+      // en losse reactie-events — alle drie parallel ophalen.
+      const [
+        { count: followupsInWindow },
+        { count: reactionsInWindow },
+        rxResult,
+      ] = await Promise.all([
+        this.db.supabase
+          .from('call_leads')
+          .select('id', { count: 'exact', head: true })
+          .gte('last_followup_sent_at', startISO)
+          .lt('last_followup_sent_at', endISO)
+          .is('deleted_at', null),
+        this.db.supabase
+          .from('call_leads')
+          .select('id', { count: 'exact', head: true })
+          .gte('first_reply_at', startISO)
+          .lt('first_reply_at', endISO)
+          .is('deleted_at', null),
+        this.db.supabase
           .from('lead_reaction_events')
           .select('delta')
           .gte('created_at', startISO)
           .lt('created_at', endISO)
-        reactionEventsInWindow = (rxEvents || []).reduce((s, e) => s + (Number(e.delta) || 0), 0)
-        if (reactionEventsInWindow < 0) reactionEventsInWindow = 0
-      } catch (e) { console.warn('reaction events read failed:', e?.message) }
+          .catch(e => { console.warn('reaction events read failed:', e?.message); return { data: [] } }),
+      ])
+      let reactionEventsInWindow = ((rxResult?.data) || []).reduce((s, e) => s + (Number(e.delta) || 0), 0)
+      if (reactionEventsInWindow < 0) reactionEventsInWindow = 0
       return {
         newLeads,
         reactedLeads, notReactedYet, followedLeads,
@@ -1841,13 +1839,25 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
   // the exclusive upper bound (both ISO strings, e.g. midnight boundaries).
   async getRangeActivity(coachId, startISO, endISO) {
     try {
-      const { data: movements, error: movError } = await this.db.supabase
-        .from('lead_movements')
-        .select('*')
-        .gte('moved_at', startISO)
-        .lt('moved_at', endISO)
-        .order('moved_at', { ascending: false })
+      const [
+        { data: movements, error: movError },
+        { data: touchedLeads, error: touchError },
+      ] = await Promise.all([
+        this.db.supabase
+          .from('lead_movements')
+          .select('*')
+          .gte('moved_at', startISO)
+          .lt('moved_at', endISO)
+          .order('moved_at', { ascending: false }),
+        this.db.supabase
+          .from('call_leads')
+          .select('id, first_name, last_name, created_at, last_touched, lead_source')
+          .gte('last_touched', startISO)
+          .lt('last_touched', endISO)
+          .is('deleted_at', null),
+      ])
       if (movError) throw movError
+      if (touchError) throw touchError
 
       const movementsBySection = {}
       const movementsList = []
@@ -1868,13 +1878,6 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
       // Touches: any lead whose last_touched falls in this window. New
       // outreach = those whose created_at also falls inside; otherwise it's
       // a follow-up of an older lead.
-      const { data: touchedLeads, error: touchError } = await this.db.supabase
-        .from('call_leads')
-        .select('id, first_name, last_name, created_at, last_touched, lead_source')
-        .gte('last_touched', startISO)
-        .lt('last_touched', endISO)
-        .is('deleted_at', null)
-      if (touchError) throw touchError
 
       const startT = new Date(startISO).getTime()
       const endT = new Date(endISO).getTime()
@@ -2898,16 +2901,17 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
         // Chunk de .in()-query — met duizenden lead-ids wordt de URL anders te
         // lang. Per batch de movements in het venster ophalen.
         const moves = []
+        const movBatches = []
         for (let i = 0; i < leadIds.length; i += 300) {
           const chunk = leadIds.slice(i, i + 300)
-          const { data } = await this.db.supabase
+          movBatches.push(this.db.supabase
             .from('lead_movements')
             .select('lead_id, to_section_title, moved_at')
             .in('lead_id', chunk)
             .gte('moved_at', startISO)
-            .lt('moved_at', endISO)
-          if (data) moves.push(...data)
+            .lt('moved_at', endISO))
         }
+        ;(await Promise.all(movBatches)).forEach(({ data }) => { if (data) moves.push(...data) })
         ;(moves || []).forEach(m => {
           const t = (m.to_section_title || '').toLowerCase()
           if (NEGATIVE_FUNNEL_WORDS.some(w => t.includes(w))) return
@@ -3053,42 +3057,43 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
       // oude reacties (van vóór de campagne) de cijfers.
       const anchor = new Map((leads || []).map(l => [l.id, l.campaign_message_sent_at ? new Date(l.campaign_message_sent_at).getTime() : null]))
 
-      // 1) REACTIES ná campagne — uit lead_reaction_events (elke +1 op de reactie-
-      //    teller wordt daar met timestamp gelogd). Zo tellen we alléén reacties
-      //    ná het campagne-bericht, niet historische reacties op oude berichten.
-      const repliedAfter = new Set()
-      for (let i = 0; i < leadIds.length; i += 300) {
-        const chunk = leadIds.slice(i, i + 300)
-        const { data } = await this.db.supabase
-          .from('lead_reaction_events')
-          .select('lead_id, delta, created_at')
-          .in('lead_id', chunk)
-          .gt('delta', 0)
-        ;(data || []).forEach(ev => {
-          const a = anchor.get(ev.lead_id)
-          if (!a || !ev.created_at) return
-          if (new Date(ev.created_at).getTime() >= a) repliedAfter.add(ev.lead_id)
-        })
-      }
-
-      // 2) DIEPERE FUNNEL ná campagne — uit lead_movements (voorgesteld/ingepland/
-      //    sale-secties) met moved_at ná het campagne-bericht.
+      // 1) REACTIES + 2) DIEPERE FUNNEL — beide sets chunk-queries parallel starten.
       const stageKeywords = [
         { key: 'callProposed',  words: ['voorgesteld', 'voorstel'] },
         { key: 'callScheduled', words: ['sales call', 'ingepland', 'scheduled', 'booking', 'afspraak', 'meeting'] },
         { key: 'sale',          words: ['sale', 'verkocht', 'klant', 'client', 'gewonnen', 'won', 'deal'] },
       ]
-      const perLeadStages = new Map()
-      const reachedCall = new Set()
+      const rxBatches = []
+      const movBatches2 = []
       for (let i = 0; i < leadIds.length; i += 300) {
         const chunk = leadIds.slice(i, i + 300)
-        const { data } = await this.db.supabase
+        rxBatches.push(this.db.supabase
+          .from('lead_reaction_events')
+          .select('lead_id, delta, created_at')
+          .in('lead_id', chunk)
+          .gt('delta', 0))
+        movBatches2.push(this.db.supabase
           .from('lead_movements')
           .select('lead_id, to_section_title, moved_at')
-          .in('lead_id', chunk)
+          .in('lead_id', chunk))
+      }
+      const [rxResults, movResults] = await Promise.all([
+        Promise.all(rxBatches),
+        Promise.all(movBatches2),
+      ])
+      const repliedAfter = new Set()
+      rxResults.forEach(({ data }) => {
+        ;(data || []).forEach(ev => {
+          const a = anchor.get(ev.lead_id)
+          if (!a || !ev.created_at) return
+          if (new Date(ev.created_at).getTime() >= a) repliedAfter.add(ev.lead_id)
+        })
+      })
+      const perLeadStages = new Map()
+      const reachedCall = new Set()
+      movResults.forEach(({ data }) => {
         ;(data || []).forEach(m => {
           const a = anchor.get(m.lead_id)
-          // Geen anker (geen campagne-bericht-stempel) → niks telt als na-campagne.
           if (!a) return
           if (!m.moved_at || new Date(m.moved_at).getTime() < a) return
           const t = (m.to_section_title || '').toLowerCase()
@@ -3103,7 +3108,7 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
             }
           }
         })
-      }
+      })
 
       const campIds = [...new Set((leads || []).map(l => l.outreach_campaign_id).filter(Boolean))]
       const { data: camps } = campIds.length
