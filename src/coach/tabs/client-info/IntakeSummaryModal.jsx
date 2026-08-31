@@ -4,7 +4,8 @@
 //   2. Voeding      -> voedings-velden uit de `clients` tabel (deel 2)
 //   3. Training     -> `user_workout_preferences` tabel (deel 3)
 import { useState, useEffect } from 'react'
-import { X, User, Utensils, Dumbbell, CheckCircle2, Clock } from 'lucide-react'
+import { X, User, Utensils, Dumbbell, CheckCircle2, Clock, CalendarDays } from 'lucide-react'
+import ClientAgendaView from '../../../modules/client-agenda/ClientAgendaView'
 
 const GREEN = '#10b981'
 
@@ -328,18 +329,81 @@ const PART3_SECTIONS = [
   }
 ]
 
+
+// ---- vraagteksten ----------------------------------------------------------
+// Letterlijk overgenomen uit de intake zelf (src/modules/public-intake/
+// components/phase1 en phase3, de <Q>-elementen). Zo leest de coach dezelfde
+// vraag als de klant beantwoordde. Staat een veld hier niet in, dan wordt het
+// label als vraag getoond.
+const VRAGEN = {
+  first_name: 'Wat is je voornaam?',
+  last_name: 'En je achternaam?',
+  email: 'Wat is je e-mailadres?',
+  phone: 'En je telefoonnummer?',
+  gender: 'Wat is je geslacht?',
+  date_of_birth: 'Wanneer ben je geboren?',
+  height: 'Hoe lang ben je?',
+  current_weight: 'Wat weeg je nu?',
+  current_body_fat: 'Op welk lichaam lijk je het meest?',
+  current_body_fat_2: 'Zat je ertussenin? (tweede keuze)',
+  primary_goal: 'Wat is je hoofddoel?',
+  target_weight: 'Wat is je streefgewicht?',
+  has_weight_goal: 'Heb je een gewichtsdoel?',
+  target_body_fat: 'Tot welk lichaam wil je?',
+  muscle_goal_type: 'Wat voor lichaam wil je opbouwen?',
+  lichaam_omschrijving: 'Omschrijf jouw ideale lichaam',
+  fitness_doel_tags: 'Wat betekent fitter worden voor jou?',
+  goal_timeline: 'Wanneer wil je dit bereiken?',
+  goal_urgency: 'Hoe belangrijk is dit doel voor je?',
+  motivation: 'Waarom wil je dit bereiken?',
+  activity_level: 'Hoe actief ben je op dit moment?',
+  cooking_time: 'Hoeveel tijd wil je kwijt aan koken?',
+  stress_level: 'Hoeveel stress heb je op dit moment?',
+  medical_conditions: 'Heb je medische aandoeningen?',
+  previous_coaching: 'Heb je eerder coaching of een dieet gevolgd?',
+  wat_werkte_eerder: 'Wat werkte er eerder wél voor jou?',
+  waarom_gestopt: 'Waarom stopte je precies?',
+  biggest_obstacle: 'Wat is je grootste obstakel?',
+  coaching_style_pref: 'Welke coaching stijl past bij jou?',
+  coaching_expectations: 'Wat verwacht je van de coaching?',
+  coaching_goal_tags: 'Wat wil je halen uit dit traject, naast fysiek resultaat?',
+  training_willingness: 'Wil je gaan trainen?',
+  no_training_reason: 'Wat houdt je tegen?',
+  default_experience_level: 'Hoe lang train je al?',
+  default_time_per_session: 'Hoe lang zou je kunnen trainen per sessie?',
+  training_location: 'Waar train je?',
+  current_training: 'Hoe ziet je huidige training eruit?',
+  injuries: 'Heb je blessures of pijn die je training beperken?',
+  avoid_exercises: 'Zijn er oefeningen die je wil vermijden?',
+  cardio_current: 'Doe je op dit moment al aan cardio?',
+  cardio_wants: 'Wil je cardio opnemen in je schema?',
+  cardio_type: 'Welke cardio doe je het liefst?',
+  cardio_frequency: 'Hoe vaak per week wil je cardio doen?',
+  cardio_duration: 'Hoe lang per cardiosessie?',
+  preferred_training_days: 'Welke dagen wil je trainen?',
+  training_time: 'Hoe laat train je meestal?',
+  sleep_hours: 'Hoeveel slaap je per nacht?',
+  default_days_per_week: 'Hoeveel dagen per week wil je trainen?',
+}
+
 // ---- render helpers --------------------------------------------------------
 
-function renderSections(sections, data) {
+function renderSections(sections, data, toonLeeg = true) {
   const rendered = sections
     .map((section) => {
       const rows = section.fields
         .map((f) => {
           const raw = data?.[f.key]
-          if (isEmpty(raw)) return null
-          const value = f.fmt ? f.fmt(raw) : String(raw)
-          if (isEmpty(value)) return null
-          return { label: f.label, value }
+          const leeg = isEmpty(raw)
+          const value = leeg ? null : (f.fmt ? f.fmt(raw) : String(raw))
+          // Onbeantwoorde vragen blijven staan: de coach wil zien wát er
+          // gevraagd is, ook als de klant het heeft overgeslagen.
+          if ((leeg || isEmpty(value)) && !toonLeeg) return null
+          return {
+            label: f.label,
+            vraag: VRAGEN[f.key] || f.label,
+            value: (leeg || isEmpty(value)) ? null : value,
+          }
         })
         .filter(Boolean)
       return rows.length ? { title: section.title, rows } : null
@@ -386,38 +450,41 @@ function renderSections(sections, data) {
           border: '1px solid rgba(255,255,255,0.06)'
         }}
       >
+        {/* Vraag boven, antwoord eronder. Stond eerder als label links en
+            waarde rechts uitgelijnd; bij lange antwoorden werd dat een smalle
+            koker tegen de rechterrand. Zo leest het als het gesprek dat het is. */}
         {section.rows.map((row) => (
           <div
             key={row.label}
             style={{
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'flex-start',
-              gap: '1rem',
+              display: 'flex', flexDirection: 'column', gap: 3,
               padding: '0.7rem 0.9rem',
               background: '#111'
             }}
           >
             <span
               style={{
-                fontSize: '0.8rem',
-                color: 'rgba(255,255,255,0.55)',
-                flexShrink: 0
+                fontSize: '0.82rem',
+                fontWeight: 700,
+                color: 'rgba(255,255,255,0.5)',
+                lineHeight: 1.35,
               }}
             >
-              {row.label}
+              {row.vraag}
             </span>
             <span
               style={{
-                fontSize: '0.85rem',
-                color: '#fff',
-                fontWeight: '500',
-                textAlign: 'right',
+                fontSize: '0.92rem',
+                color: row.value ? '#fff' : 'rgba(255,255,255,0.3)',
+                fontWeight: row.value ? 800 : 600,
+                fontStyle: row.value ? 'normal' : 'italic',
                 wordBreak: 'break-word',
-                whiteSpace: 'pre-wrap'
+                whiteSpace: 'pre-wrap',
+                letterSpacing: '-0.01em',
               }}
             >
-              {row.value}
+              <span style={{ color: 'rgba(255,255,255,0.35)', fontWeight: 700 }}>Antwoord: </span>
+              {row.value || 'niet ingevuld'}
             </span>
           </div>
         ))}
@@ -532,7 +599,10 @@ export default function IntakeSummaryModal({ db, client, isMobile, onClose }) {
   const tabs = [
     { id: 'part1', label: 'Persoonlijk', icon: User, done: client?.intake_completed },
     { id: 'part2', label: 'Voeding', icon: Utensils, done: np?.completed || client?.intake_completed },
-    { id: 'part3', label: 'Training', icon: Dumbbell, done: training?.workout_completed || (hasTrainingData && client?.intake_completed) }
+    { id: 'part3', label: 'Training', icon: Dumbbell, done: training?.workout_completed || (hasTrainingData && client?.intake_completed) },
+    // Het eindplaatje: werk, slaap, training en maaltijden in één week.
+    // Dit is waar de losse antwoorden op uitkomen, dus het hoort hier.
+    { id: 'agenda', label: 'Agenda', icon: CalendarDays, done: false }
   ]
 
   const fullName = [client?.first_name, client?.last_name].filter(Boolean).join(' ') || 'Client'
@@ -657,6 +727,16 @@ export default function IntakeSummaryModal({ db, client, isMobile, onClose }) {
             WebkitOverflowScrolling: 'touch'
           }}
         >
+          {activeTab === 'agenda' && (
+            <div style={{ margin: '-0.5rem -0.25rem' }}>
+              <ClientAgendaView
+                client={client}
+                db={db}
+                isMobile={isMobile}
+                viewerRole="coach"
+              />
+            </div>
+          )}
           {activeTab === 'part1' && renderSections(PART1_SECTIONS, client)}
           {activeTab === 'part2' &&
             (loadingNp ? (

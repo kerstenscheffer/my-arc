@@ -998,6 +998,21 @@ export default function PlanAnalyzer({
                   singleDay={DAYS[activeDay]?.id}
                   refreshKey={agendaRefreshKey}
                   mealPlanId={selectedConceptId || planMeta?.id || null}
+                  // Maaltijd wisselen of verwijderen vanuit de agenda. Loopt
+                  // langs dezelfde handlers als de meal-cards, zodat totalen
+                  // herberekend worden en het plan één schrijfpad houdt.
+                  onMealSelect={({ day, slot, meal }) => {
+                    const idx = DAYS.findIndex(d => d.id === day)
+                    if (idx < 0 || !slot) return
+                    setActiveDay(idx)
+                    handleSwap(idx, slot, meal || weekData?.[idx]?.meals?.[slot] || null)
+                  }}
+                  onMealDelete={async ({ day, slot }) => {
+                    const idx = DAYS.findIndex(d => d.id === day)
+                    if (idx < 0 || !slot) return
+                    await handleDelete(idx, slot)
+                    setAgendaRefreshKey(k => k + 1)
+                  }}
                   onMealTimingChange={({ day, slot, newTiming }) => {
                     const idx = DAYS.findIndex(d => d.id === day)
                     if (idx < 0 || !slot || !newTiming) return

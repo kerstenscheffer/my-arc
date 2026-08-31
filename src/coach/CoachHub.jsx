@@ -33,6 +33,7 @@ import CoachNotificationBell from '../modules/notifications/CoachNotificationBel
 import PortalSwitchButton from '../components/PortalSwitchButton'
 import IssueNotesWidget from '../components/IssueNotesWidget'
 import QuickTodoModal from '../components/QuickTodoModal'
+import IntakeLookupModal from '../components/IntakeLookupModal'
 import ContentIdeasWidget from '../components/ContentIdeasWidget'
 import ClientProblemsWidget from '../components/ClientProblemsWidget'
 import WidgetSidebar from '../components/WidgetSidebar'
@@ -203,6 +204,9 @@ export default function CoachHub() {
   // tegelijk geopend, plus live counts voor de badge per knop.
   const [widgetOpen, setWidgetOpen] = useState(null)
   const [showTodoModal, setShowTodoModal] = useState(false)
+  // Intake van een willekeurige klant opzoeken, vanaf elke pagina. Zat eerder
+  // alleen achter de klantkaart in Coach Command.
+  const [showIntakeLookup, setShowIntakeLookup] = useState(false)
   // Klantmodus: verbergt de coach-only balken (quick-link sidebar + goals-balk)
   // zodat een klant die meekijkt niet alles ziet. Onthouden in localStorage.
   const [clientMode, setClientMode] = useState(() => {
@@ -1133,6 +1137,11 @@ export default function CoachHub() {
             onClick: () => setShowTodoModal(true),
           },
           {
+            id: 'intake', label: 'Intake', Icon: ClipboardCheck, color: G.primary,
+            active: showIntakeLookup,
+            onClick: () => setShowIntakeLookup(true),
+          },
+          {
             id: 'issues', label: 'Issues', Icon: Bug, color: '#fca5a5',
             active: widgetOpen === 'issues', badge: widgetCounts.issues,
             goldBadge: issuesClaudePending,
@@ -1150,6 +1159,15 @@ export default function CoachHub() {
           },
         ]}
       />}
+
+      {showIntakeLookup && (
+        <IntakeLookupModal
+          db={db}
+          clients={clients}
+          isMobile={isMobile}
+          onClose={() => setShowIntakeLookup(false)}
+        />
+      )}
 
       {showTodoModal && (
         <QuickTodoModal

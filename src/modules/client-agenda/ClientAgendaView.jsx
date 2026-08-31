@@ -5,7 +5,7 @@
 // lezen, zodat de coach in één blik ziet hoe de week eruit ziet.
 
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Calendar, Utensils, Dumbbell, Moon, Briefcase, AlertCircle, Plus, Trash2, Check, X, ChevronLeft, ChevronRight } from 'lucide-react'
+import { Calendar, Utensils, Dumbbell, Moon, Briefcase, AlertCircle, Plus, Trash2, Check, X, ChevronLeft, ChevronRight, Repeat } from 'lucide-react'
 import { ClientAgendaService, DAYS, DAY_LABELS_NL, DAY_LABELS_NL_LONG, getMondayOf, dateForDay, toIsoDate, recurringIdFor } from './ClientAgendaService'
 
 const COLORS = {
@@ -676,7 +676,12 @@ function ScopePromptModal({
 //  • type=meal → schrijft nieuwe `timing` naar week_structure (geen delete)
 //  • type=training|sleep|work|custom + bestaande dbId → update row
 //  • placeholder of nieuw → insert nieuwe row in client_agenda_blocks
-function BlockEditModal({ block, client, service, isMobile, onClose, onSaved, onTimeSaveRequest }) {
+// `onMealSelect` / `onMealDelete` worden alleen meegegeven door de Plan
+// Analyzer. Daar leven de maaltijden (client_meal_plans.week_structure) en
+// staat de logica die totalen herberekent en wegschrijft — dat willen we hier
+// niet dupliceren. Zonder die props verschijnen de knoppen niet, zodat de
+// klant-agenda en het coach-agenda-tabblad onveranderd blijven.
+function BlockEditModal({ block, client, service, isMobile, onClose, onSaved, onTimeSaveRequest, onMealSelect, onMealDelete }) {
   const isMeal = block.type === 'meal'
   const isPlaceholder = block.source === 'placeholder'
   const isNew = !!block.isNew
@@ -989,6 +994,50 @@ function BlockEditModal({ block, client, service, isMobile, onClose, onSaved, on
           background: 'rgba(0,0,0,0.3)',
           display: 'flex', gap: 8,
         }}>
+          {/* Maaltijd: kiezen en verwijderen gaat via de Plan Analyzer.
+              De gewone blok-verwijderknop kan hier niet: een maaltijd is geen
+              agenda-blok met een dbId maar een slot in het weekplan. */}
+          {isMeal && onMealSelect && (
+            <button
+              onClick={() => { onMealSelect({ day: block.day, slot: block.meta?.slot, meal: block.meta?.meal || null }); onClose() }}
+              disabled={saving || !block.meta?.slot}
+              style={{
+                padding: '0.55rem 0.8rem',
+                background: 'transparent',
+                border: '1px solid rgba(255,255,255,0.25)',
+                borderRadius: 8, color: '#fff',
+                fontSize: '0.75rem', fontWeight: 800,
+                cursor: saving ? 'not-allowed' : 'pointer',
+                display: 'flex', alignItems: 'center', gap: 5,
+              }}
+            >
+              <Repeat size={13} /> Andere maaltijd
+            </button>
+          )}
+          {isMeal && onMealDelete && (
+            <button
+              onClick={async () => {
+                if (!block.meta?.slot) return
+                if (!confirm(`"${block.label || 'Deze maaltijd'}" uit het plan verwijderen?`)) return
+                setSaving(true)
+                try { await onMealDelete({ day: block.day, slot: block.meta.slot }); onClose() }
+                catch (e) { setErr(e.message || 'Verwijderen mislukt') }
+                finally { setSaving(false) }
+              }}
+              disabled={saving || !block.meta?.slot}
+              style={{
+                padding: '0.55rem 0.8rem',
+                background: 'transparent',
+                border: '1px solid rgba(239,68,68,0.35)',
+                borderRadius: 8, color: '#ef4444',
+                fontSize: '0.75rem', fontWeight: 800,
+                cursor: saving ? 'not-allowed' : 'pointer',
+                display: 'flex', alignItems: 'center', gap: 5,
+              }}
+            >
+              <Trash2 size={13} /> Verwijder
+            </button>
+          )}
           {hasDbId && !isMeal && (
             <button
               onClick={handleDelete}
@@ -1061,6 +1110,9 @@ export default function ClientAgendaView({
   // (vóór de DB-save) zodat plan-analyzer's MealCard meteen kan updaten
   // i.p.v. wachten op de async reload.
   onMealTimingChange,
+  // Alleen gevuld vanuit de Plan Analyzer — zie BlockEditModal.
+  onMealSelect,
+  onMealDelete,
   // Forceer een specifiek meal-plan (i.p.v. de actieve). Plan-analyzer
   // werkt vaak met een concept-plan dat NIET is_active=true is. Zonder
   // deze prop laadde de agenda het verkeerde plan en gingen edits in
@@ -1670,6 +1722,8 @@ export default function ClientAgendaView({
           client={client}
           service={service}
           isMobile={isMobile}
+          onMealSelect={onMealSelect}
+          onMealDelete={onMealDelete}
           onClose={() => setEditingBlock(null)}
           onSaved={async () => { setEditingBlock(null); await reload() }}
           onTimeSaveRequest={handleTimeSaveFromModal}
