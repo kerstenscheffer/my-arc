@@ -1,3 +1,4 @@
+import { preWorkoutVoorDag, PRE_WORKOUT_SLOT } from './utils/preWorkoutMeal'
 // src/modules/meal-plan/AIMealPlanService.js
 // Complete service layer voor AI Meal Dashboard - WATER TRACKING FIXED
 export default class AIMealPlanService {
@@ -33,7 +34,11 @@ async loadAIDashboardData(clientId) {
       this.getAIRecentHistory(clientId, 7)
     ])
       
-    const todayMeals = await this.getTodayFromWeekStructure(activePlan, todayProgress)
+    // workout_schedule van de klant erbij: bepaalt of de pre-workout maaltijd
+    // vandaag meedoet.
+    const { data: klant } = await this.supabase
+      .from('clients').select('workout_schedule').eq('id', clientId).maybeSingle()
+    const todayMeals = await this.getTodayFromWeekStructure(activePlan, todayProgress, klant?.workout_schedule)
     const nextMeal = this.calculateNextMeal(todayMeals, todayProgress?.consumed_meals)
 const dailyTotals = await this.calculateDailyTotals(clientId, todayMeals, todayProgress, activePlan)
     
@@ -82,7 +87,9 @@ const dailyTotals = await this.calculateDailyTotals(clientId, todayMeals, todayP
       return null
     }
   }
-  async getTodayFromWeekStructure(plan, todayProgress) {
+  // `workoutSchedule` = clients.workout_schedule. Nodig om te bepalen of
+  // vandaag een trainingsdag is, en dus of de pre-workout maaltijd meetelt.
+  async getTodayFromWeekStructure(plan, todayProgress, workoutSchedule = null) {
     if (!plan?.week_structure) return []
     
     try {
@@ -228,6 +235,21 @@ const dailyTotals = await this.calculateDailyTotals(clientId, todayMeals, todayP
         protein: m.protein
       })))
       
+      // ── Pre-workout maaltijd ──
+      // Eén maaltijd op planniveau die alleen op trainingsdagen meedoet. Hij
+      // staat niet in week_structure, dus de blokken hierboven zien 'm niet.
+      // Meetellen hier is belangrijk: anders zou de klant de maaltijd wél op
+      // z'n scherm zien maar zouden de dagtotalen er niet bij kloppen.
+      const preWorkout = preWorkoutVoorDag(plan, workoutSchedule, dayName, dayPlan)
+      if (preWorkout) {
+        meals.push(buildMealEntry(
+          preWorkout, preWorkout, PRE_WORKOUT_SLOT,
+          preWorkout.display_label || 'Pre-workout',
+          preWorkout.timing || '15:30',
+          PRE_WORKOUT_SLOT,
+        ))
+      }
+
       return meals
     } catch (error) {
       console.error('Error extracting today meals:', error)

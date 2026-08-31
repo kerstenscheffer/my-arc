@@ -3,6 +3,7 @@
 // ✅ FOOD LOG: Loads consumed_meals, combined totals, log button
 // ✅ EDIT: editingMeal state + FoodLogModal editMeal prop
 import React, { useState, useEffect } from 'react'
+import { preWorkoutVoorDag, PRE_WORKOUT_SLOT } from '../utils/preWorkoutMeal'
 import DayScheduleHeader from './day-schedule/DayScheduleHeader'
 import DaySelector from './day-schedule/DaySelector'
 import DailyTotalsBar from './day-schedule/DailyTotalsBar'
@@ -279,6 +280,26 @@ export default function AIDaySchedule({
           meal_id: d.id || d.meal_id,
         })
       }
+      // ── Pre-workout maaltijd ──
+      // Staat één keer op het plan en hoort er alleen bij op trainingsdagen.
+      // Hij zit niet in week_structure, dus de lus hierboven ziet 'm niet —
+      // daarom hier apart. Welke dagen trainingsdagen zijn komt uit
+      // clients.workout_schedule: verschuift de klant een training, dan
+      // verhuist deze maaltijd vanzelf mee.
+      const preWorkout = preWorkoutVoorDag(activePlan, client?.workout_schedule, dayKey, dayPlan)
+      if (preWorkout) {
+        const pwTijd = parseTime(preWorkout.timing) ?? 15.5
+        meals.push({
+          ...preWorkout,
+          slot: PRE_WORKOUT_SLOT,
+          display_label: preWorkout.display_label || 'Pre-workout',
+          timeSlot: preWorkout.display_label || 'Pre-workout',
+          plannedTime: pwTijd,
+          meal_name: preWorkout.name || preWorkout.meal_name || 'Pre-workout',
+          meal_id: preWorkout.id || preWorkout.meal_id,
+        })
+      }
+
       // Op geplande tijd sorteren zodat de volgorde klopt (ook voor custom slots).
       meals.sort((a, b) => (a.plannedTime ?? 12) - (b.plannedTime ?? 12))
       setDisplayMeals(meals)
