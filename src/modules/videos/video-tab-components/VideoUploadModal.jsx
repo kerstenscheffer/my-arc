@@ -5,6 +5,7 @@ import { createPortal } from 'react-dom'
 import { Upload, X, Youtube, Camera, Image as ImageIcon, Globe, Check, Home, Dumbbell, Utensils, ShoppingCart, Phone, User } from 'lucide-react'
 import useIsMobile from '../../../hooks/useIsMobile'
 import videoService from '../VideoService'
+import { getBronMeta } from '../utils/youtubeHelpers'
 
 const GOLD = '#FFD700'
 
@@ -274,7 +275,7 @@ export default function VideoUploadModal({
               type="url"
               value={formData.video_url}
               onChange={(e) => setFormData({ ...formData, video_url: e.target.value })}
-              placeholder="https://youtube.com/watch?v=... of /shorts/..."
+              placeholder="YouTube, Instagram Reel, TikTok of Zoom Clip"
               style={inputStyle}
             />
           </div>
@@ -376,8 +377,31 @@ export default function VideoUploadModal({
               gap: '0.3rem'
             }}>
               <Camera size={10} />
-              Thumbnail (aanbevolen voor shorts)
+              Omslag
             </label>
+
+            {/* Instagram, TikTok en Zoom leveren geen omslag: Instagram toont
+                sinds 2020 geen og:image meer aan uitgelogde bezoekers en hun
+                oEmbed vereist een goedgekeurde Facebook-app. Zonder eigen
+                omslag blijft de kaart dus leeg — vandaar deze waarschuwing
+                zodra zo'n link geplakt wordt. YouTube regelt het zelf. */}
+            {(() => {
+              const bron = getBronMeta(formData.video_url)
+              if (!bron || !bron.omslagZelf || thumbnailPreview) return null
+              return (
+                <div style={{
+                  display: 'flex', alignItems: 'flex-start', gap: 6,
+                  marginBottom: '0.5rem',
+                  fontSize: '0.75rem', fontWeight: 700, lineHeight: 1.4,
+                  color: bron.kleur,
+                }}>
+                  <span>
+                    {bron.label} levert geen omslag — upload er zelf een, anders
+                    blijft de kaart leeg.
+                  </span>
+                </div>
+              )
+            })()}
 
             {thumbnailPreview ? (
               <div style={{

@@ -5,7 +5,7 @@ import React, { useState, useEffect } from 'react'
 import { Play, CheckCircle2, Video } from 'lucide-react'
 import clientVideoService from './ClientVideoService'
 import VideoPlayerModal from './VideoPlayerModal'
-import { extractYouTubeId, getYouTubeThumbnail, formatDuration } from './utils/youtubeHelpers'
+import { extractYouTubeId, getYouTubeThumbnail, formatDuration, getBronMeta } from './utils/youtubeHelpers'
 
 const CATEGORY_META = {
   education:  { label: 'Uitleg',     color: '#10b981' },
@@ -228,6 +228,10 @@ function VideoCard({ item, onClick, isMobile }) {
   const videoId = extractYouTubeId(video.video_url)
   const thumbnail = video.thumbnail_url || (videoId ? getYouTubeThumbnail(videoId, 'hqdefault') : null)
   const isWatched = item.status === 'completed' || !!item.viewed_at
+  // Merkje bij bronnen die buiten de app openen, zodat de klant weet dat 'ie
+  // naar Instagram of TikTok gestuurd wordt voordat 'ie tikt.
+  const bron = getBronMeta(video.video_url)
+  const toonBron = bron && bron.label !== 'YouTube' && bron.label !== 'Link'
   const duration = formatDuration(video.duration_seconds)
   const cardWidth = isMobile ? '150px' : '180px'
 
@@ -257,6 +261,18 @@ function VideoCard({ item, onClick, isMobile }) {
         paddingBottom: '56.25%',
         background: '#000',
       }}>
+        {toonBron && (
+          <div style={{
+            position: 'absolute', right: 5, top: 5, zIndex: 3,
+            padding: '0.12rem 0.35rem', borderRadius: 5,
+            background: 'rgba(0,0,0,0.72)',
+            border: `1px solid ${bron.kleur}`,
+            color: bron.kleur,
+            fontSize: '0.6rem', fontWeight: 900,
+          }}>
+            {bron.label}
+          </div>
+        )}
         {thumbnail ? (
           <img
             src={thumbnail}

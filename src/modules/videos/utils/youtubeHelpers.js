@@ -60,10 +60,16 @@ export const getYouTubeEmbedUrl = (videoId, options = {}) => {
 
 /**
  * Bepaal het type videobron van een URL.
- *  - youtube  → embedbaar in een iframe (youtubeId)
- *  - zoom     → NIET embedbaar (x-frame-options: SAMEORIGIN) → extern openen
- *  - external → onbekende http-link → extern openen
- *  - none     → geen url
+ *  - youtube    → embedbaar in een iframe (youtubeId)
+ *  - zoom-embed → Zoom Clip, embedbaar
+ *  - zoom       → andere zoom-link, NIET embedbaar → extern openen
+ *  - instagram  → Reel/post. Instagram blokkeert iframes én levert sinds 2020
+ *                 geen publieke omslag meer (geen og:image voor uitgelogde
+ *                 bezoekers, oEmbed vereist een goedgekeurde Facebook-app).
+ *                 Dus: extern openen, omslag handmatig uploaden.
+ *  - tiktok     → zelfde verhaal als Instagram
+ *  - external   → onbekende http-link → extern openen
+ *  - none       → geen url
  */
 export const getVideoSource = (url) => {
   const youtubeId = extractYouTubeId(url)
@@ -71,9 +77,27 @@ export const getVideoSource = (url) => {
   const zoomEmbed = getZoomEmbedUrl(url)
   if (zoomEmbed) return { kind: 'zoom-embed', embedUrl: zoomEmbed, url }
   if (url && /zoom\.us/i.test(url)) return { kind: 'zoom', url }  // andere zoom-link (bv. rec) → extern
+  if (url && /instagram\.com/i.test(url)) return { kind: 'instagram', url }
+  if (url && /tiktok\.com/i.test(url)) return { kind: 'tiktok', url }
   if (url) return { kind: 'external', url }
   return { kind: 'none', url: null }
 }
+
+/**
+ * Naam + kleur per bron, voor labels op kaarten en in de speler.
+ * `omslagZelf` = deze bron levert geen automatische thumbnail, dus de coach
+ * moet er zelf een uploaden (het uploadveld staat al in de video-modal).
+ */
+export const BRON_META = {
+  youtube:      { label: 'YouTube',   kleur: '#ff0000', omslagZelf: false },
+  'zoom-embed': { label: 'Zoom',      kleur: '#2d8cff', omslagZelf: true },
+  zoom:         { label: 'Zoom',      kleur: '#2d8cff', omslagZelf: true },
+  instagram:    { label: 'Instagram', kleur: '#e1306c', omslagZelf: true },
+  tiktok:       { label: 'TikTok',    kleur: '#25f4ee', omslagZelf: true },
+  external:     { label: 'Link',      kleur: 'rgba(255,255,255,0.5)', omslagZelf: true },
+}
+
+export const getBronMeta = (url) => BRON_META[getVideoSource(url).kind] || null
 
 /**
  * Zoom Clip → embedbare iframe-URL. Zet een /clips/share/<id> om naar

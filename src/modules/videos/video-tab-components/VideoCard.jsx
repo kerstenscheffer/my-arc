@@ -4,6 +4,7 @@ import React from 'react'
 import { Play, Eye, Users, Trash2, Edit, Globe } from 'lucide-react'
 import useIsMobile from '../../../hooks/useIsMobile'
 import videoService from '../VideoService'
+import { getBronMeta } from '../utils/youtubeHelpers'
 
 const GOLD = '#FFD700'
 
@@ -17,6 +18,10 @@ export default function VideoCard({
 }) {
   const isMobile = useIsMobile()
   const thumbnailUrl = videoService.getThumbnailUrl(video)
+  // Merkje bij niet-YouTube-bronnen. YouTube laat ik leeg: dat is de standaard
+  // en een label bij elke kaart zou alleen maar ruis zijn.
+  const bron = getBronMeta(video?.video_url)
+  const toonBron = bron && bron.label !== 'YouTube' && bron.label !== 'Link'
   const isDefault = video.default_pages && video.default_pages.length > 0
 
   const iconBtnStyle = (color = 'rgba(255,255,255,0.5)') => ({
@@ -73,6 +78,20 @@ export default function VideoCard({
             }
           }}
         />
+
+        {/* Bron-merkje rechtsonder op de omslag. */}
+        {toonBron && (
+          <div style={{
+            position: 'absolute', right: 6, bottom: 6, zIndex: 2,
+            padding: '0.15rem 0.4rem', borderRadius: 5,
+            background: 'rgba(0,0,0,0.7)',
+            border: `1px solid ${bron.kleur}`,
+            color: bron.kleur,
+            fontSize: '0.62rem', fontWeight: 900, letterSpacing: '-0.01em',
+          }}>
+            {bron.label}
+          </div>
+        )}
 
         {/* Standaard badge (goud, linksboven) */}
         {isDefault && (
