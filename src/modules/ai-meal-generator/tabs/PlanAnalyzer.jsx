@@ -7,6 +7,7 @@ import DayNavigator, { DAYS } from './plan-analyzer/DayNavigator'
 import DayMacroBar from './plan-analyzer/DayMacroBar'
 import MealCard from './plan-analyzer/MealCard'
 import SwapModal from './plan-analyzer/SwapModal'
+import { PRE_WORKOUT_SLOT } from '../../meal-plan/utils/preWorkoutMeal'
 import ClientContextPanel from './plan-analyzer/ClientContextPanel'
 import AutoBalancer from './plan-analyzer/AutoBalancer'
 import WeekBalancer from './plan-analyzer/WeekBalancer'
@@ -49,6 +50,10 @@ export default function PlanAnalyzer({
   const [weekData, setWeekData] = useState(null)
   const [targets, setTargets] = useState(dailyTargets || null)
   const [planMeta, setPlanMeta] = useState(null)
+  // Eén pre-workout maaltijd voor het hele plan. Staat bewust NIET in
+  // week_structure: zo verschuift hij mee als de klant z'n trainingsdagen
+  // verplaatst, zonder dat het plan herschreven hoeft te worden.
+  const [preWorkoutMeal, setPreWorkoutMeal] = useState(null)
   // Zichtbare opslag-status van week-wijzigingen (swaps/edits) in de titelbalk.
   const [weekSaveState, setWeekSaveState] = useState('idle')
   const [conceptPlans, setConceptPlans] = useState([])
@@ -292,6 +297,7 @@ export default function PlanAnalyzer({
       // hierboven is de enige bron van targets — anders kreeg je soms de plan-macro's
       // (race condition tussen plan-load en clientRecord-load).
       setPlanMeta({ id: data.id, name: data.template_name, isActive: data.is_active, clientId: data.client_id, createdAt: data.created_at, stats: data.stats, aiGenerated: data.ai_generated })
+      setPreWorkoutMeal(data.pre_workout_meal || null)
       setActivated(data.is_active || false)
       setHistory([JSON.parse(JSON.stringify(days))]); setHistoryIndex(0)
     } catch (err) { console.error('Concept load error:', err) }
@@ -400,8 +406,37 @@ export default function PlanAnalyzer({
   }
 
   const handleSwap = (dayIndex, slot, meal) => setSwapState({ dayIndex, slot, meal })
+
+  // Pre-workout maaltijd zetten of wissen. Schrijft naar een eigen kolom, niet
+  // naar week_structure — zie de opmerking bij de state hierboven.
+  const bewaarPreWorkout = async (meal) => {
+    const planId = planMeta?.id || selectedConceptId || null
+    setPreWorkoutMeal(meal)
+    if (!planId) return
+    setWeekSaveState('saving')
+    const { data, error } = await db.supabase
+      .from('client_meal_plans')
+      .update({ pre_workout_meal: meal })
+      .eq('id', planId)
+      .select('id')
+    if (error || !data?.length) {
+      console.error('❌ Pre-workout maaltijd opslaan mislukt:', error || 'geen rij bijgewerkt')
+      setWeekSaveState('error')
+    } else {
+      setWeekSaveState('saved')
+      setTimeout(() => setWeekSaveState(s => (s === 'saved' ? 'idle' : s)), 2000)
+    }
+  }
+
   const handleSwapSelect = async (newMeal) => {
-    if (!swapState || !weekData) return
+    if (!swapState) return
+    // Pre-workout loopt langs de normale week-update heen.
+    if (swapState.slot === PRE_WORKOUT_SLOT) {
+      await bewaarPreWorkout(newMeal)
+      setSwapState(null)
+      return
+    }
+    if (!weekData) return
     const updated = [...weekData]
     const placed = withSlotTiming(newMeal, swapState.slot, updated[swapState.dayIndex].meals[swapState.slot])
     updated[swapState.dayIndex] = { ...updated[swapState.dayIndex], meals: { ...updated[swapState.dayIndex].meals, [swapState.slot]: placed } }
