@@ -1223,55 +1223,51 @@ export default function PlanAnalyzer({
               />
               {/* ── PRE-WORKOUT ────────────────────────────────────────────
                   Eén maaltijd voor het hele plan, die alleen op trainingsdagen
-                  meetelt. Op een rustdag laten we 'm grijs zien in plaats van
-                  te verbergen: anders lijkt de instelling verdwenen zodra je
-                  naar een rustdag klikt. */}
-              <div style={{
-                display: 'flex', alignItems: 'center', gap: 10,
-                padding: m ? '0.6rem 0.75rem' : '0.65rem 1rem',
-                borderBottom: '1px solid rgba(255,255,255,0.06)',
-                opacity: currentDayIsTraining ? 1 : 0.45,
-              }}>
-                <span style={{
-                  flexShrink: 0, fontSize: '0.8rem', fontWeight: 900, color: '#fff',
-                  letterSpacing: '-0.01em',
-                }}>
-                  Pre-workout
-                </span>
-
-                {preWorkoutMeal ? (
-                  <>
-                    <span style={{ flex: 1, minWidth: 0, fontSize: '0.85rem', fontWeight: 800, color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      {preWorkoutMeal.name}
-                    </span>
-                    <span style={{ flexShrink: 0, fontSize: '0.78rem', fontWeight: 800, color: 'rgba(255,255,255,0.55)', whiteSpace: 'nowrap' }}>
-                      {Math.round(preWorkoutMeal.calories || 0)} kcal
-                    </span>
-                    <button
-                      onClick={() => handleSwap(null, PRE_WORKOUT_SLOT, preWorkoutMeal)}
-                      style={{ flexShrink: 0, background: 'none', border: 'none', color: '#fff', fontFamily: 'inherit', fontSize: '0.78rem', fontWeight: 900, cursor: 'pointer', padding: 0 }}>
-                      Wissel
-                    </button>
-                    <button
-                      onClick={() => bewaarPreWorkout(null)}
-                      title="Pre-workout maaltijd verwijderen"
-                      style={{ flexShrink: 0, background: 'none', border: 'none', color: 'rgba(255,255,255,0.4)', cursor: 'pointer', padding: 0, display: 'flex' }}>
-                      <X size={14} />
-                    </button>
-                  </>
-                ) : (
-                  <>
-                    <span style={{ flex: 1, minWidth: 0, fontSize: '0.78rem', fontWeight: 700, color: 'rgba(255,255,255,0.45)' }}>
-                      Niet ingesteld
-                    </span>
-                    <button
-                      onClick={() => handleSwap(null, PRE_WORKOUT_SLOT, null)}
-                      style={{ flexShrink: 0, background: 'none', border: 'none', color: '#fff', fontFamily: 'inherit', fontSize: '0.78rem', fontWeight: 900, cursor: 'pointer', padding: 0 }}>
-                      Kies maaltijd
-                    </button>
-                  </>
-                )}
-              </div>
+                  meetelt. Als volwaardige MealCard, zodat je 'm net als elke
+                  andere maaltijd kunt openklappen, wisselen en verwijderen.
+                  Op een rustdag blijft de kaart staan maar gedimd — anders
+                  lijkt je instelling verdwenen zodra je naar dinsdag klikt,
+                  en zou je 'm daar ook niet kunnen weghalen. */}
+              {preWorkoutMeal ? (
+                <div style={{ opacity: currentDayIsTraining ? 1 : 0.45, position: 'relative' }}>
+                  {!currentDayIsTraining && (
+                    <div style={{
+                      padding: m ? '0.35rem 0.75rem 0' : '0.4rem 1rem 0',
+                      fontSize: '0.75rem', fontWeight: 800, color: 'rgba(255,255,255,0.5)',
+                    }}>
+                      Pre-workout · telt niet mee op een rustdag
+                    </div>
+                  )}
+                  <MealCard
+                    db={db} meal={preWorkoutMeal} slot={PRE_WORKOUT_SLOT} dayIndex={activeDay}
+                    mealSchedule={mealSchedule} isPreWorkout
+                    isEmpty={false}
+                    onSwap={() => handleSwap(null, PRE_WORKOUT_SLOT, preWorkoutMeal)}
+                    onDelete={() => bewaarPreWorkout(null)}
+                    onUpdateMeal={(_di, _slot, bijgewerkt) => bewaarPreWorkout(bijgewerkt)}
+                    conflicts={getMealConflicts(preWorkoutMeal)}
+                    isMobile={m}
+                  />
+                </div>
+              ) : (
+                <button
+                  onClick={() => handleSwap(null, PRE_WORKOUT_SLOT, null)}
+                  style={{
+                    width: '100%', display: 'flex', alignItems: 'center', gap: 8,
+                    padding: m ? '0.6rem 0.75rem' : '0.65rem 1rem',
+                    borderBottom: '1px solid rgba(255,255,255,0.06)',
+                    background: 'none', border: 'none', cursor: 'pointer',
+                    fontFamily: 'inherit', textAlign: 'left',
+                  }}>
+                  <Plus size={14} strokeWidth={2.8} color="#fff" />
+                  <span style={{ fontSize: '0.85rem', fontWeight: 900, color: '#fff' }}>
+                    Pre-workout maaltijd instellen
+                  </span>
+                  <span style={{ marginLeft: 'auto', fontSize: '0.75rem', fontWeight: 700, color: 'rgba(255,255,255,0.45)' }}>
+                    verschijnt op trainingsdagen
+                  </span>
+                </button>
+              )}
 
               {currentDay && sortedSlots.map(slot => {
                 const meal = currentDay.meals[slot]

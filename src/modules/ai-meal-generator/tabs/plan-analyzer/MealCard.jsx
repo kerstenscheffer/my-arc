@@ -431,13 +431,18 @@ export default function MealCard({
           m={m}
           active={showEditModal}
         />
-        <div style={{ width: 1, background: DIVIDER, alignSelf: 'stretch' }} />
-        <ActionCell
-          icon={<CalendarDays size={m ? 13 : 14} />}
-          label="Dagen"
-          onClick={(e) => { e.stopPropagation(); onApplyToDays?.(dayIndex, slot, meal) }}
-          m={m}
-        />
+        {/* "Dagen" alleen tonen als er iets mee te doen valt. De pre-workout
+            maaltijd geeft deze prop niet mee — die geldt al voor élke
+            trainingsdag, dus daar zou de knop niets doen. */}
+        {onApplyToDays && (<>
+          <div style={{ width: 1, background: DIVIDER, alignSelf: 'stretch' }} />
+          <ActionCell
+            icon={<CalendarDays size={m ? 13 : 14} />}
+            label="Dagen"
+            onClick={(e) => { e.stopPropagation(); onApplyToDays(dayIndex, slot, meal) }}
+            m={m}
+          />
+        </>)}
         <div style={{ width: 1, background: DIVIDER, alignSelf: 'stretch' }} />
         <ActionCell
           icon={<Trash2 size={m ? 13 : 14} />}
