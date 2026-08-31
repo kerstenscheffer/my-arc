@@ -77,10 +77,32 @@ export const getVideoSource = (url) => {
   const zoomEmbed = getZoomEmbedUrl(url)
   if (zoomEmbed) return { kind: 'zoom-embed', embedUrl: zoomEmbed, url }
   if (url && /zoom\.us/i.test(url)) return { kind: 'zoom', url }  // andere zoom-link (bv. rec) → extern
+  const igEmbed = getInstagramEmbedUrl(url)
+  if (igEmbed) return { kind: 'instagram-embed', embedUrl: igEmbed, url }
   if (url && /instagram\.com/i.test(url)) return { kind: 'instagram', url }
   if (url && /tiktok\.com/i.test(url)) return { kind: 'tiktok', url }
   if (url) return { kind: 'external', url }
   return { kind: 'none', url: null }
+}
+
+/**
+ * Instagram Reel/post → embedbare URL.
+ *
+ * De gewone reel-pagina zit achter een loginmuur, maar /embed/ is een aparte
+ * pagina die Instagram juist beschikbaar stelt om in te sluiten: die stuurt
+ * geen x-frame-options en zet geen frame-ancestors in de CSP. Getest 31-08-2026.
+ *
+ * Werkt alleen voor berichten van een OPENBAAR account; bij een privéaccount
+ * toont de embed een lege kaart. Daarom blijft de externe-link-terugval bestaan.
+ *
+ * Het pad-type (reel/p/tv) blijft behouden — Instagram accepteert per type.
+ */
+export const getInstagramEmbedUrl = (url) => {
+  if (!url || typeof url !== 'string') return null
+  const m = url.match(/instagram\.com\/(reel|reels|p|tv)\/([A-Za-z0-9_-]+)/i)
+  if (!m) return null
+  const type = m[1].toLowerCase() === 'reels' ? 'reel' : m[1].toLowerCase()
+  return `https://www.instagram.com/${type}/${m[2]}/embed/`
 }
 
 /**
@@ -92,6 +114,8 @@ export const BRON_META = {
   youtube:      { label: 'YouTube',   kleur: '#ff0000', omslagZelf: false },
   'zoom-embed': { label: 'Zoom',      kleur: '#2d8cff', omslagZelf: true },
   zoom:         { label: 'Zoom',      kleur: '#2d8cff', omslagZelf: true },
+  // De embed brengt z'n eigen omslag mee, dus daar hoeft niets geüpload.
+  'instagram-embed': { label: 'Instagram', kleur: '#e1306c', omslagZelf: false },
   instagram:    { label: 'Instagram', kleur: '#e1306c', omslagZelf: true },
   tiktok:       { label: 'TikTok',    kleur: '#25f4ee', omslagZelf: true },
   external:     { label: 'Link',      kleur: 'rgba(255,255,255,0.5)', omslagZelf: true },

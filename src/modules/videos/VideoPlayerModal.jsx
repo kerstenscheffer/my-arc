@@ -5,7 +5,7 @@ import React, { useState, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { X, Star, Play, ExternalLink } from 'lucide-react'
 import clientVideoService from './ClientVideoService'
-import { extractYouTubeId, getYouTubeEmbedUrl, getZoomEmbedUrl, getBronMeta } from './utils/youtubeHelpers'
+import { extractYouTubeId, getYouTubeEmbedUrl, getZoomEmbedUrl, getInstagramEmbedUrl, getBronMeta } from './utils/youtubeHelpers'
 
 export default function VideoPlayerModal({ item, onClose }) {
   const [rating, setRating] = useState(item?.client_rating || 0)
@@ -19,7 +19,11 @@ export default function VideoPlayerModal({ item, onClose }) {
   const embedUrl = videoId ? getYouTubeEmbedUrl(videoId, { autoplay: true, mute: false }) : null
   // Zoom Clips embedden via /clips/embed/ (wél embedbaar).
   const zoomEmbed = getZoomEmbedUrl(video?.video_url)
-  const playerEmbed = embedUrl || zoomEmbed
+  // Instagram Reels: /embed/ is wél in te sluiten (geen x-frame-options,
+  // geen frame-ancestors). Alleen bij openbare accounts — is het bericht
+  // privé, dan toont de embed een lege kaart en helpt de knop eronder.
+  const igEmbed = getInstagramEmbedUrl(video?.video_url)
+  const playerEmbed = embedUrl || zoomEmbed || igEmbed
   // Overige niet-embedbare links → extern openen.
   const externalUrl = (!playerEmbed && video?.video_url) ? video.video_url : null
   // Welke dienst het is, zodat de knop 'Openen in Instagram' kan zeggen in
@@ -143,10 +147,15 @@ export default function VideoPlayerModal({ item, onClose }) {
         </div>
 
         {/* PLAYER */}
+        {/* Instagram-embeds zijn staand; in het 16:9-kader zou de reel een
+            postzegel worden met zwarte balken. Vandaar een hogere verhouding
+            en een maximum zodat 'ie op desktop niet het scherm uit groeit. */}
         <div style={{
           position: 'relative',
           width: '100%',
-          paddingBottom: '56.25%',
+          maxWidth: igEmbed ? 460 : '100%',
+          margin: igEmbed ? '0 auto' : undefined,
+          paddingBottom: igEmbed ? '128%' : '56.25%',
           background: '#000',
           flexShrink: 0,
         }}>
@@ -162,6 +171,10 @@ export default function VideoPlayerModal({ item, onClose }) {
               }}
               allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"
               allowFullScreen
+              // Instagram's embed-pagina is iets hoger dan het kader en zet
+              // anders een scrollbalk in het frame.
+              scrolling={igEmbed ? 'no' : undefined}
+              title={video?.title || 'Video'}
             />
           ) : externalUrl ? (
             <div
