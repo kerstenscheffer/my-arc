@@ -1,56 +1,90 @@
 // src/pages/PaymentSuccessRedirect.jsx
 // Bevestigingspagina na een geslaagde Stripe-betaling (route /success).
-// Toont kort dat de betaling gelukt is en stuurt daarna automatisch door naar
-// de intake (/myintake) zodat de klant meteen kan onboarden. Er blijft een
-// knop staan voor als de automatische redirect geblokkeerd wordt.
+// Meldt dat de betaling gelukt is en telt af naar de intake (/myintake).
+//
+// Kaal en groot: dit scherm zie je drie tellen. Er stond eerder een kaart met
+// rand, een emoji van 4rem, groene tekst en een knop met hover-animatie — vijf
+// dingen om te lezen op een moment dat er maar één ding hoeft te landen.
 import { useEffect, useState } from 'react'
 
 const INTAKE_URL = '/myintake'
-const REDIRECT_MS = 3000
+const SECONDEN = 5
 
 export default function PaymentSuccessRedirect() {
-  const [seconds, setSeconds] = useState(Math.round(REDIRECT_MS / 1000))
+  const [seconden, setSeconden] = useState(SECONDEN)
 
   useEffect(() => {
-    const redirect = setTimeout(() => { window.location.href = INTAKE_URL }, REDIRECT_MS)
-    const tick = setInterval(() => setSeconds((s) => (s > 0 ? s - 1 : 0)), 1000)
-    return () => { clearTimeout(redirect); clearInterval(tick) }
+    // Eén timer die per seconde afloopt en bij nul doorstuurt. Een aparte
+    // setTimeout naast de interval kan met het aftellen uit de pas lopen —
+    // dan springt de pagina weg terwijl er nog een cijfer staat.
+    const tick = setInterval(() => {
+      setSeconden((s) => {
+        if (s <= 1) {
+          clearInterval(tick)
+          window.location.href = INTAKE_URL
+          return 0
+        }
+        return s - 1
+      })
+    }, 1000)
+    return () => clearInterval(tick)
   }, [])
 
   return (
     <div style={{
       minHeight: '100vh',
-      background: 'linear-gradient(180deg, #0a0a0a 0%, #171717 100%)',
-      display: 'flex', alignItems: 'center', justifyContent: 'center',
-      padding: '2rem', textAlign: 'center'
+      background: '#0a0a0a',
+      display: 'flex', flexDirection: 'column',
+      alignItems: 'center', justifyContent: 'center',
+      padding: '2rem', textAlign: 'center',
+      // Safe area voor de notch/home-indicator: dit is vaak een telefoon.
+      paddingTop: 'calc(2rem + env(safe-area-inset-top, 0px))',
+      paddingBottom: 'calc(2rem + env(safe-area-inset-bottom, 0px))',
     }}>
-      <div style={{
-        maxWidth: '500px', background: 'rgba(17, 17, 17, 0.8)',
-        backdropFilter: 'blur(10px)', borderRadius: '20px',
-        padding: '3rem', border: '2px solid #10b981'
+      <h1 style={{
+        margin: 0,
+        fontSize: 'clamp(2.5rem, 11vw, 5rem)',
+        fontWeight: 900, color: '#fff',
+        letterSpacing: '-0.04em', lineHeight: 1,
       }}>
-        <div style={{ fontSize: '4rem', marginBottom: '1rem' }}>🎉</div>
-        <h1 style={{ fontSize: '2rem', fontWeight: 700, color: '#10b981', marginBottom: '1rem' }}>
-          Betaling gelukt!
-        </h1>
-        <p style={{ color: 'rgba(255, 255, 255, 0.7)', marginBottom: '2rem', lineHeight: 1.6 }}>
-          Welkom bij MY ARC! Je gaat nu automatisch door naar de intake
-          {seconds > 0 ? ` (${seconds})` : ''}...
-        </p>
-        <button
-          onClick={() => { window.location.href = INTAKE_URL }}
-          style={{
-            padding: '1rem 2rem',
-            background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-            border: 'none', borderRadius: '10px', color: '#fff',
-            fontSize: '1rem', fontWeight: 600, cursor: 'pointer', transition: 'all 0.3s ease'
-          }}
-          onMouseEnter={(e) => { e.target.style.transform = 'translateY(-2px)'; e.target.style.boxShadow = '0 8px 20px rgba(16, 185, 129, 0.3)' }}
-          onMouseLeave={(e) => { e.target.style.transform = 'translateY(0)'; e.target.style.boxShadow = 'none' }}
-        >
-          Direct naar de intake
-        </button>
+        Betaling gelukt
+      </h1>
+
+      <p style={{
+        margin: '1.25rem 0 0',
+        fontSize: 'clamp(1rem, 4vw, 1.35rem)',
+        fontWeight: 800, color: 'rgba(255,255,255,0.6)',
+        letterSpacing: '-0.01em',
+      }}>
+        Je wordt doorverwezen naar de intake
+      </p>
+
+      {/* Het aftellen is de enige beweging op de pagina, dus mag het groot. */}
+      <div style={{
+        marginTop: '2.5rem',
+        fontSize: 'clamp(5rem, 26vw, 11rem)',
+        fontWeight: 900, color: '#fff',
+        letterSpacing: '-0.06em', lineHeight: 1,
+        fontVariantNumeric: 'tabular-nums',
+      }}>
+        {seconden}
       </div>
+
+      {/* Vangnet voor als de doorverwijzing geblokkeerd wordt (in-app browsers
+          van Instagram en Facebook doen dat soms). Bewust ingetogen. */}
+      <button
+        onClick={() => { window.location.href = INTAKE_URL }}
+        style={{
+          marginTop: '2.5rem', padding: '0.6rem 0.4rem',
+          background: 'none', border: 'none',
+          color: 'rgba(255,255,255,0.45)',
+          fontSize: '0.9rem', fontWeight: 800, fontFamily: 'inherit',
+          cursor: 'pointer', minHeight: 44,
+          touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+        }}
+      >
+        Direct naar de intake
+      </button>
     </div>
   )
 }
