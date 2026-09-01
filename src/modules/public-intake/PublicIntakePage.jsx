@@ -386,6 +386,11 @@ export default function PublicIntakePage() {
         target_body_fat: data.target_body_fat ? parseFloat(data.target_body_fat) : null,
         activity_level: data.activity_level || null,
         work_schedule: data.week_schedule || null,
+        // Het antwoord op "Wat voor werk doe je?" ontbrak in deze mapping,
+        // waardoor clients.job_type leeg bleef terwijl de klant het wél had
+        // ingevuld. Alleen schrijven als er iets is: anders zou een
+        // heropgeslagen intake een bestaande waarde wissen.
+        ...(data.job_type ? { job_type: data.job_type } : {}),
         cooking_time: data.cooking_time ? ({ minimal: 20, low: 30, moderate: 60, high: 90 }[data.cooking_time] || null) : null,
         preferred_training_days: data.preferred_training_days || null,
         sleep_hours: data.sleep_hours ? parseFloat(data.sleep_hours) : null,

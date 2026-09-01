@@ -95,9 +95,47 @@ const getBlockImage = (block) => {
 // kortere blokken later (komen er bovenop). Beide volle breedte, beide 100%
 // opaque. Tekst in elke card staat bovenaan zodat de onderliggende titel
 // boven de overlay zichtbaar blijft.
-function sortForOverlap(blocks) {
-  if (!blocks?.length) return blocks
-  return [...blocks].sort((a, b) => (b.end - b.start) - (a.end - a.start))
+// Overlappende blokken naast elkaar in plaats van op elkaar.
+//
+// Hiervoor werden ze simpelweg gestapeld: langste achter, kortste ervoor. Bij
+// iemand die van 09:00 tot 18:00 in de winkel staat verdween daarmee de héle
+// werkdag achter de maaltijden en de training — precies het blok waar je naar
+// zoekt. Nu krijgt elke groep overlappende blokken evenveel breedte.
+//
+// Werkwijze: blokken op starttijd, dan groeperen zolang ze elkaar raken
+// (transitief — A overlapt B, B overlapt C ⇒ één groep). Binnen een groep
+// komt een blok in de eerste kolom die op dat moment vrij is.
+function layoutBlocks(blocks) {
+  if (!blocks?.length) return []
+  const gesorteerd = [...blocks].sort((a, b) => (a.start - b.start) || (b.end - a.end))
+
+  const uit = []
+  let groep = []
+  let groepEind = -Infinity
+
+  const sluitGroep = () => {
+    if (!groep.length) return
+    // Kolommen: elk blok in de eerste kolom waarvan het laatste blok al klaar is.
+    const kolomEind = []
+    groep.forEach(b => {
+      let k = kolomEind.findIndex(eind => eind <= b.start)
+      if (k === -1) { k = kolomEind.length; kolomEind.push(b.end) }
+      else kolomEind[k] = b.end
+      b._kolom = k
+    })
+    groep.forEach(b => { b._kolommen = kolomEind.length })
+    uit.push(...groep)
+    groep = []
+    groepEind = -Infinity
+  }
+
+  gesorteerd.forEach(b => {
+    if (groep.length && b.start >= groepEind) sluitGroep()
+    groep.push(b)
+    groepEind = Math.max(groepEind, b.end)
+  })
+  sluitGroep()
+  return uit
 }
 
 function AgendaBlock({ block, isMobile, onClick, onPointerDownDrag, draggable, isGhost, isDragSource, isSelected, selectieModus }) {
@@ -142,7 +180,10 @@ function AgendaBlock({ block, isMobile, onClick, onPointerDownDrag, draggable, i
         top: `${top}%`,
         height: `${height}%`,
         minHeight: block.type === 'meal' && imageUrl ? 32 : undefined,
-        left: 3, right: 3,
+        // Kolom binnen de overlap-groep. Eén blok = volle breedte, twee
+        // blokken = ieder de helft, enzovoort.
+        left: `calc(${((block._kolom || 0) / (block._kolommen || 1)) * 100}% + 3px)`,
+        width: `calc(${100 / (block._kolommen || 1)}% - 6px)`,
         background: isSelected ? 'rgba(255,255,255,0.14)' : isGhost ? `${block.color}33` : 'rgba(255,255,255,0.025)',
         border: isSelected ? '1px solid #fff' : isGhost ? `1px dashed ${block.color}` : '1px solid rgba(255,255,255,0.05)',
         boxShadow: isSelected ? '0 0 0 1px #fff inset' : undefined,
@@ -169,7 +210,10 @@ function AgendaBlock({ block, isMobile, onClick, onPointerDownDrag, draggable, i
           background: `url(${imageUrl}) center/cover`,
           position: 'relative',
         }}>
-          {block.type === 'meal' && (
+          {/* Naam op de foto. Zat alleen op maaltijden; werk en slaap kregen
+              wel een foto maar zonder tekst — dan zie je niet waar je naar
+              kijkt. Nu voor elk bloktype hetzelfde. */}
+          {(
             <>
               <div style={{
                 position: 'absolute', inset: 0,
@@ -213,7 +257,7 @@ function AgendaBlock({ block, isMobile, onClick, onPointerDownDrag, draggable, i
       }}>
         {/* Top: voor meals met foto staat het slot-label op de foto.
             Voor andere blokken (of meals zonder foto) topLabel hier. */}
-        {!(block.type === 'meal' && showImage) && (
+        {!showImage && (
           <div style={{
             display: 'flex', alignItems: 'center',
             justifyContent: 'space-between', gap: 4,
@@ -246,7 +290,7 @@ function AgendaBlock({ block, isMobile, onClick, onPointerDownDrag, draggable, i
 
         {/* Voor meals met foto: titel + tijd op één rij bovenaan.
             Eén regel, max ~22 tekens — anders ellipsis. */}
-        {block.type === 'meal' && showImage && (() => {
+        {showImage && (() => {
           const MAX_TITLE_CHARS = 22
           const raw = mainTitle || topLabel || ''
           const titleText = raw.length > MAX_TITLE_CHARS ? `${raw.slice(0, MAX_TITLE_CHARS - 1).trimEnd()}…` : raw
@@ -275,7 +319,7 @@ function AgendaBlock({ block, isMobile, onClick, onPointerDownDrag, draggable, i
         })()}
 
         {/* Hoofdnaam — alleen voor non-meal blokken of meal zonder foto */}
-        {mainTitle && sizeMode !== 'mini' && !(block.type === 'meal' && showImage) && (
+        {mainTitle && sizeMode !== 'mini' && !showImage && (
           <div style={{
             fontSize: isMobile ? '0.7rem' : '0.78rem',
             fontWeight: 800, color: '#fff',
@@ -471,7 +515,7 @@ function DayColumn({
           outlineOffset: -2,
         }}
       >
-        {sortForOverlap(blocks).map(b => (
+        {layoutBlocks(blocks).map(b => (
           <AgendaBlock
             key={b.id}
             block={b}

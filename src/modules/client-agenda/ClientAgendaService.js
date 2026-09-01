@@ -29,11 +29,31 @@ const NL_TO_EN_DAY = {
   vr: 'friday', za: 'saturday', zo: 'sunday',
 }
 // Intake-type mapping naar onze block-types.
+// De weekbouwer schrijft het SOORT BAAN als blok-type (zie WORK_TYPES in
+// public-intake/components/WeekBuilder). Deze tabel kende alleen 'anders' en
+// 'werk', waardoor kantoor-, horeca-, fysiek- en winkel-uren stilletjes uit de
+// agenda vielen. Van de 15 klanten met een werkschema was er maar één type
+// dat doorkwam.
 const INTAKE_TYPE_MAP = {
   slaap: 'sleep',
   training: 'training',
-  anders: 'work',
   werk: 'work',
+  anders: 'work',
+  kantoor: 'work',
+  horeca: 'work',
+  fysiek: 'work',
+  winkel: 'work',
+}
+
+// Wat voor werk het is, voor het label op het blok. "Winkel 06:00-15:00" zegt
+// meer dan "Werk 06:00-15:00", en dat is precies waarvoor de coach kijkt.
+const WERK_LABEL = {
+  kantoor: 'Kantoor',
+  horeca: 'Horeca',
+  fysiek: 'Fysiek werk',
+  winkel: 'Winkel',
+  anders: 'Werk',
+  werk: 'Werk',
 }
 
 // Maandag van de week voor een gegeven datum (lokale tz).
@@ -161,6 +181,7 @@ export class ClientAgendaService {
           intakePlaceholders[enDay][ourType].push({
             start: timeStrToMinutes(blk.start),
             end: timeStrToMinutes(blk.end),
+            bron: blk.type,
           })
         })
       })
@@ -476,7 +497,7 @@ export class ClientAgendaService {
         intakeWork.forEach((blk, i) => {
           blocksByDay[day].push({
             id: `work-intake-${day}-${i}`,
-            day, type: 'work', label: 'Werk',
+            day, type: 'work', label: WERK_LABEL[blk.bron] || 'Werk',
             start: blk.start, end: blk.end,
             color: WORK_COLOR, source: 'intake',
             editable: true,
