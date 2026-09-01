@@ -13,6 +13,45 @@ The repo has **lots of legacy/backup files alongside active code**. Before assum
 4. **There are dead empty module directories** — see "Suspicious / orphan" below.
 5. When in doubt, ask the user before deleting or "fixing" a file that looks legacy.
 
+## ⚠️ READ FIRST — Een groene build bewijst niets
+
+Deze codebase heeft twee foutsoorten die **wél bouwen en wél door de linter komen**, en pas stukgaan als iemand de knop indrukt. Controleer ze zelf; niemand anders vangt ze op.
+
+### 1. Schrijf je naar een kolom? Controleer of die bestaat.
+
+De payload gaat bij o.a. `saveNutritionPreferences` en de meeste services **rechtstreeks** in `.insert()` / `.update()`. PostgREST weigert een onbekende kolom met een fout die wordt doorgegooid — dus niet alleen jouw nieuwe veld faalt, de **hele opslag** faalt. Voor elke gebruiker.
+
+```sql
+select column_name from information_schema.columns
+where table_schema='public' and table_name='<tabel>' and column_name='<kolom>';
+```
+
+Bestaat de kolom niet, voeg 'm toe in dezelfde wijziging. Test daarna met een echte insert en ruim de testrij op.
+
+*(1 sep 2026: `current_habits` in de voedingsintake had de hele intake-opslag gebroken.)*
+
+### 2. Een Supabase query-builder is géén Promise.
+
+Hij heeft wel `.then()` maar **geen `.catch()`**. `.catch()` erop aanroepen gooit `b.catch is not a function` nog vóór de query vertrekt, en sloopt daarmee een omliggende `Promise.all`.
+
+```js
+// fout — gooit synchroon
+supabase.from('x').select('y').catch(e => ({ data: [] }))
+
+// goed — tweede argument van then vangt de afwijzing
+supabase.from('x').select('y').then(r => r, e => ({ data: [] }))
+```
+
+*(31 aug 2026: dit zette drie stats in de lead-balk stilletjes op nul.)*
+
+### 3. Een ontbrekende import bouwt gewoon door.
+
+Staat een naam elders in hetzelfde bestand, dan komt 'ie langs `no-undef` en crasht 'ie pas bij het renderen. Loop na elke wijziging de JSX-componenten na tegen de imports.
+
+### 4. Gebruik `git stash` niet in dit repo.
+
+Er draait een auto-sync die elke ~10 minuten commit en pusht. Die racet met je stash; een `stash pop` kan "No stash entries found" geven terwijl je werk weg lijkt. Wil je de stand vóór je wijziging zien, gebruik dan `git show HEAD:<pad>`.
+
 ## Stack
 
 - **Frontend**: React 19, Vite 7, Tailwind 4, `react-router-dom` v7 (but routing is hand-rolled by `window.location.pathname` in App.jsx, not via `<BrowserRouter>`)
