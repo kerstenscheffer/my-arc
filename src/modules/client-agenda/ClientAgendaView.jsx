@@ -79,13 +79,22 @@ const MEAL_FALLBACK = {
 const WORKOUT_FALLBACK = 'https://images.unsplash.com/photo-1517836357463-d25dfeac3438?w=200&h=200&fit=crop&q=80'
 const SLEEP_FALLBACK   = 'https://images.unsplash.com/photo-1531353826977-0941b4779a1c?w=200&h=200&fit=crop&q=80'
 const WORK_FALLBACK    = 'https://images.unsplash.com/photo-1497366216548-37526070297c?w=200&h=200&fit=crop&q=80'
+// Per soort baan een passend beeld. Een bureaufoto bij een winkel- of
+// horecadienst zegt niets; het label staat er overheen, maar de foto hoort
+// mee te vertellen wat voor dag het is.
+const WERK_FOTO = {
+  Kantoor:       'https://images.unsplash.com/photo-1497366216548-37526070297c?w=200&h=200&fit=crop&q=80',
+  Horeca:        'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=200&h=200&fit=crop&q=80',
+  Winkel:        'https://images.unsplash.com/photo-1441986300917-64674bd600d8?w=200&h=200&fit=crop&q=80',
+  'Fysiek werk': 'https://images.unsplash.com/photo-1504328345606-18bbc8c9d7d1?w=200&h=200&fit=crop&q=80',
+}
 
 const getBlockImage = (block) => {
   if (block.meta?.image_url) return block.meta.image_url
   if (block.type === 'meal') return MEAL_FALLBACK[block.meta?.slot] || MEAL_FALLBACK.lunch
   if (block.type === 'training') return WORKOUT_FALLBACK
   if (block.type === 'sleep')    return SLEEP_FALLBACK
-  if (block.type === 'work')     return WORK_FALLBACK
+  if (block.type === 'work')     return WERK_FOTO[block.label] || WORK_FALLBACK
   return null
 }
 
@@ -164,7 +173,7 @@ function AgendaBlock({ block, isMobile, onClick, onPointerDownDrag, draggable, i
     ? block.label
     : block.type === 'training' ? 'Training'
     : block.type === 'sleep'    ? 'Slaap'
-    : block.type === 'work'     ? 'Werk'
+    : block.type === 'work'     ? (block.label || 'Werk')
     : 'Custom'
 
   // Hoofdnaam — meal-naam, workout-schema, of label voor sleep/work
@@ -208,6 +217,9 @@ function AgendaBlock({ block, isMobile, onClick, onPointerDownDrag, draggable, i
           width: isMobile ? 56 : 68,
           flexShrink: 0,
           background: `url(${imageUrl}) center/cover`,
+          // Etensfoto's zijn licht; een slaapkamer bij nacht of een kantoor
+          // niet. Zonder deze correctie werden die kaarten bijna zwart.
+          filter: block.type === 'meal' ? undefined : 'brightness(1.5) saturate(1.15)',
           position: 'relative',
         }}>
           {/* Naam op de foto. Zat alleen op maaltijden; werk en slaap kregen
@@ -217,7 +229,9 @@ function AgendaBlock({ block, isMobile, onClick, onPointerDownDrag, draggable, i
             <>
               <div style={{
                 position: 'absolute', inset: 0,
-                background: 'linear-gradient(180deg, rgba(0,0,0,0.55) 0%, rgba(0,0,0,0.75) 100%)',
+                background: block.type === 'meal'
+                  ? 'linear-gradient(180deg, rgba(0,0,0,0.55) 0%, rgba(0,0,0,0.75) 100%)'
+                  : 'linear-gradient(180deg, rgba(0,0,0,0.2) 0%, rgba(0,0,0,0.45) 100%)',
                 pointerEvents: 'none',
               }} />
               <div style={{
@@ -228,7 +242,7 @@ function AgendaBlock({ block, isMobile, onClick, onPointerDownDrag, draggable, i
                 <span style={{
                   fontSize: isMobile ? '0.55rem' : '0.6rem',
                   fontWeight: 900,
-                  color: block.color,
+                  color: block.type === 'meal' ? block.color : '#fff',
                   textTransform: 'uppercase', letterSpacing: '0.08em',
                   textAlign: 'center', lineHeight: 1.1,
                   textShadow: '0 1px 3px rgba(0,0,0,0.8)',
