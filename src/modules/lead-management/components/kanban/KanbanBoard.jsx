@@ -91,6 +91,12 @@ export default function KanbanBoard({
   const [callDateInput, setCallDateInput] = useState('')
   const [callTimeInput, setCallTimeInput] = useState('')
   // Openstaande calls (datum+tijd voorbij, nog niet afgehandeld) — pop-up bij openen.
+  // Vrouwelijke leads worden standaard niet opgehaald — dat scheelt payload
+  // bij het openen van het bord. De keuze wordt onthouden zodat je 'm niet
+  // elke sessie opnieuw hoeft te maken.
+  const [metVrouwen, setMetVrouwen] = useState(() => {
+    try { return localStorage.getItem('leadsMetVrouwen') === 'true' } catch { return false }
+  })
   const [dueCalls, setDueCalls] = useState([])
   const [showDueCalls, setShowDueCalls] = useState(false)
   // Bovenste stats-balk in/uitklapbaar (mobiel standaard dicht = rustiger).
@@ -844,12 +850,19 @@ export default function KanbanBoard({
 
   useEffect(() => {
     if (leadService && coachId) { loadBoard(true); loadActivityData() }
-  }, [leadService, coachId])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [leadService, coachId, metVrouwen])
+
+  const wisselVrouwen = () => {
+    const nieuw = !metVrouwen
+    setMetVrouwen(nieuw)
+    try { localStorage.setItem('leadsMetVrouwen', String(nieuw)) } catch { /* private mode */ }
+  }
 
   const loadBoard = async (isInitialLoad = false) => {
     try {
       setLoading(true)
-      const board = await leadService.getKanbanBoard(coachId)
+      const board = await leadService.getKanbanBoard(coachId, { metVrouwen })
       if (isInitialLoad) { setSections(board); setOriginalSections(board) }
       else {
         const currentOrder = sections.filter(s => s.id !== 'unassigned').map(s => s.id)
@@ -1955,6 +1968,14 @@ export default function KanbanBoard({
             <button onClick={() => setShowStats(v => !v)} title={showStats ? 'Statistieken verbergen' : 'Statistieken tonen'}
               style={{ width: 30, height: 30, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: showStats ? 'rgba(255,215,0,0.14)' : 'rgba(255,255,255,0.04)', border: `1px solid ${showStats ? 'rgba(255,215,0,0.4)' : 'rgba(255,255,255,0.08)'}`, borderRadius: 8, color: showStats ? '#FFD700' : 'rgba(255,255,255,0.5)', cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}>
               <BarChart3 size={15} />
+            </button>
+
+            {/* Vrouwelijke leads meenemen. Standaard uit: dat scheelt ~1720
+                van de ~6900 leads bij het openen van het bord. */}
+            <button onClick={wisselVrouwen}
+              title={metVrouwen ? 'Vrouwen worden meegeladen — klik om ze over te slaan' : 'Vrouwen worden overgeslagen — klik om ze op te halen'}
+              style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: 5, padding: '0.45rem 0.65rem', background: metVrouwen ? 'rgba(255,255,255,0.14)' : 'rgba(255,255,255,0.04)', border: `1px solid ${metVrouwen ? 'rgba(255,255,255,0.4)' : 'rgba(255,255,255,0.08)'}`, borderRadius: 8, color: metVrouwen ? '#fff' : 'rgba(255,255,255,0.5)', fontSize: '0.68rem', fontWeight: 800, cursor: 'pointer', minHeight: 30, touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}>
+              <Users size={14} /> {metVrouwen ? 'Incl. vrouwen' : 'Excl. vrouwen'}
             </button>
 
             {/* Sectie */}

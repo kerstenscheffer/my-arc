@@ -705,7 +705,11 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
     }
   }
 
-  async getKanbanBoard(coachId) {
+  // `metVrouwen = false` laat vrouwelijke leads uit de query. Dat scheelt
+  // payload bij het openen van het bord. Let op: het filtert op de kolom
+  // gender, en die is bij het merendeel van de leads leeg — die komen dus
+  // gewoon mee. Alleen expliciet als 'female' gemarkeerde leads blijven weg.
+  async getKanbanBoard(coachId, { metVrouwen = false } = {}) {
     try {
       // Drie onafhankelijke queries parallel uitvoeren i.p.v. sequentieel.
       // Voorheen: sections → sectionItems → allLeads (3 round trips achter elkaar).
@@ -718,7 +722,7 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
         this._fetchAllRows(() => this.db.supabase
           .from('lead_section_items')
           .select('lead_id, section_id, position, previous_section_id, previous_section_title, previous_section_color, moved_to_stale_at')),
-        this._fetchAllRows(() => this.db.supabase
+        this._fetchAllRows(() => { const q = this.db.supabase
           .from('call_leads')
           // Slanke selectie i.p.v. `select *`: alleen de kolommen die de kaart +
           // bord-logica gebruiken. De zware jsonb-kolommen (dm_node_history,
@@ -739,7 +743,13 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
           `)
           // Geen coach_id filter — RLS bepaalt de toegang (team-membership of eigen leads).
           .is('deleted_at', null)
-          .order('created_at', { ascending: false }))
+          .order('created_at', { ascending: false })
+          // Vrouwen standaard overslaan. Bewust `or(gender.is.null, ...)` en
+          // niet simpelweg neq('gender','female'): in SQL is NULL <> 'female'
+          // niet waar, dus neq zou ook de 4193 leads zónder geslacht wegfilteren
+          // — dan hou je er 981 van de 6894 over in plaats van 5174.
+          return metVrouwen ? q : q.or('gender.is.null,gender.neq.female')
+        })
       ])
       const leadMap = new Map((allLeads || []).map(lead => [lead.id, lead]))
       const assignedLeadIds = new Set((sectionItems || []).map(item => item.lead_id))
