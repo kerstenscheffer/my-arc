@@ -609,6 +609,14 @@ export default function KanbanBoard({
     if (mode === 'reply-asc') {
       return [...leads].sort((a, b) => num(a.reply_count) - num(b.reply_count))
     }
+    // Veel reacties eerst — de leads die het meest terugpraten bovenaan.
+    // Bij gelijk aantal de meest recente reactie eerst, anders staan de
+    // koudste leads met evenveel reacties er willekeurig doorheen.
+    if (mode === 'reply-desc') {
+      return [...leads].sort((a, b) =>
+        (num(b.reply_count) - num(a.reply_count)) ||
+        (t(b.first_reply_at) - t(a.first_reply_at)))
+    }
     if (mode === 'created-desc') {
       return [...leads].sort((a, b) => t(b.created_at) - t(a.created_at))
     }
@@ -630,6 +638,7 @@ export default function KanbanBoard({
     { id: 'default',       label: 'Standaard' },
     { id: 'followup-asc',  label: 'Weinig opvolgingen ↑' },
     { id: 'followup-desc', label: 'Veel opvolgingen ↓' },
+    { id: 'reply-desc',    label: 'Veel reacties ↓' },
     { id: 'reply-asc',     label: 'Geen reactie eerst' },
     { id: 'created-desc',  label: 'Nieuwste eerst' },
     { id: 'created-asc',   label: 'Oudste eerst' },
