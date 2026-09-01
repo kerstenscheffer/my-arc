@@ -82,6 +82,31 @@ export default function CheckinDetailView({
   
   const clientName = `${checkin.clients?.first_name || ''} ${checkin.clients?.last_name || ''}`.trim()
   const sectionDetails = checkin.section_details || {}
+
+  // Vanaf september 2026 vult de client een ander formulier in: harde cijfers
+  // in plaats van een score per onderdeel. De oude scoretegels zijn dan leeg,
+  // dus die tonen we niet — we tonen de antwoorden die er wél zijn. Oude
+  // check-ins (versie 1, of zonder vlag) blijven hun vertrouwde weergave houden.
+  const isV2 = checkin.formulier_versie === 2
+  const nietLeeg = (v) => v !== null && v !== undefined && v !== ''
+  const v2Cijfers = [
+    { label: 'Trainingen',
+      waarde: nietLeeg(checkin.training_gedaan)
+        ? `${checkin.training_gedaan}${nietLeeg(checkin.training_gepland) ? ` van ${checkin.training_gepland}` : ''}`
+        : null },
+    { label: 'Gelogd in de app',   waarde: checkin.training_gelogd },
+    { label: 'Sets tot falen',     waarde: checkin.training_falen },
+    { label: 'Dagen gewogen',      waarde: nietLeeg(checkin.dagen_gewogen) ? `${checkin.dagen_gewogen} van 7` : null },
+    { label: 'Dagen op plan',      waarde: nietLeeg(checkin.dagen_voeding) ? `${checkin.dagen_voeding} van 7` : null },
+    { label: 'Alcohol',            waarde: nietLeeg(checkin.alcohol_aantal) ? `${checkin.alcohol_aantal} drankjes` : null },
+    { label: 'Slaap gemiddeld',    waarde: nietLeeg(checkin.slaap_uren_gem) ? `${checkin.slaap_uren_gem} uur` : null },
+    { label: 'Energie',            waarde: nietLeeg(checkin.energie_score) ? `${checkin.energie_score}/10` : null },
+  ].filter(r => nietLeeg(r.waarde))
+  const v2Open = [
+    { label: 'Kostte de meeste moeite', waarde: checkin.struggles },
+    { label: 'Vastgelopen op',          waarde: checkin.vastgelopen },
+    { label: 'Ging beter dan verwacht', waarde: checkin.wins },
+  ].filter(r => nietLeeg(r.waarde))
   
   // Calculate average score
   const scores = [
@@ -309,7 +334,44 @@ export default function CheckinDetailView({
         </div>
       </div>
       
-      {/* Scores Grid */}
+      {/* Nieuw formulier (versie 2): cijfers als lijst, open antwoorden eronder. */}
+      {isV2 && (
+        <div style={{ marginBottom: '1.5rem' }}>
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(4, 1fr)',
+            gap: '0.6rem', marginBottom: v2Open.length ? '1rem' : 0,
+          }}>
+            {v2Cijfers.map(r => (
+              <div key={r.label} style={{
+                padding: '0.7rem 0.8rem',
+                background: 'rgba(255,255,255,0.03)',
+                border: '1px solid rgba(255,255,255,0.08)',
+                borderRadius: 10,
+              }}>
+                <div style={{ fontSize: '0.72rem', fontWeight: 700, color: 'rgba(255,255,255,0.5)' }}>{r.label}</div>
+                <div style={{ fontSize: '1rem', fontWeight: 900, color: '#fff', marginTop: 2, letterSpacing: '-0.01em' }}>{r.waarde}</div>
+              </div>
+            ))}
+          </div>
+          {v2Open.map(r => (
+            <div key={r.label} style={{ marginBottom: '0.6rem' }}>
+              <div style={{ fontSize: '0.75rem', fontWeight: 800, color: 'rgba(255,255,255,0.5)', marginBottom: 3 }}>{r.label}</div>
+              <div style={{
+                fontSize: '0.9rem', fontWeight: 700, color: '#fff', lineHeight: 1.5,
+                whiteSpace: 'pre-wrap',
+                padding: '0.7rem 0.85rem',
+                background: 'rgba(255,255,255,0.03)',
+                border: '1px solid rgba(255,255,255,0.08)',
+                borderRadius: 10,
+              }}>{r.waarde}</div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Scores Grid — alleen voor check-ins van het oude formulier. */}
+      {!isV2 && (
       <div style={{
         display: 'grid',
         gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(3, 1fr)',
@@ -381,6 +443,7 @@ export default function CheckinDetailView({
           )
         })}
       </div>
+      )}
       
       {/* Expanded Section Details */}
       {expandedSection && sectionDetails[expandedSection] && (
