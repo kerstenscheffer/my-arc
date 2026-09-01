@@ -12,11 +12,11 @@ const COLORS = {
   bg: '#0a0a0a',
   panel: 'rgba(255,255,255,0.04)',
   border: 'rgba(255,255,255,0.08)',
-  borderItem: 'rgba(255,255,255,0.05)',
+  borderItem: 'rgba(255,255,255,0.09)',
   text: '#fff',
-  text50: 'rgba(255,255,255,0.5)',
-  text25: 'rgba(255,255,255,0.25)',
-  gold: '#FFD700',
+  text50: 'rgba(255,255,255,0.6)',
+  text25: 'rgba(255,255,255,0.45)',
+  gold: '#ffffff',  // 6 cijfers: elders wordt hier een alfa-suffix achter geplakt
   amber: '#f59e0b',
   blue: '#3b82f6',
   indigo: '#6366f1',
@@ -27,6 +27,15 @@ const COLORS = {
 const HOUR_START = 6
 const HOUR_END = 23
 const HOURS = Array.from({ length: HOUR_END - HOUR_START + 1 }, (_, i) => HOUR_START + i)
+
+// Hoogte van het weekrooster. Stond als los getal in zowel DayColumn als
+// TimeAxis; die moeten gelijk blijven of de uurlabels sluiten niet meer aan
+// op de lijntjes. Verlaagd van 850/680 zodat de hele agenda — kop, weekbalk,
+// selectiebalk en rooster — op één scherm past zonder scrollen.
+const GRID_HOOGTE = { desktop: 600, mobiel: 470 }
+const KOP_HOOGTE = { desktop: '1.75rem', mobiel: '1.55rem' }
+const kopHoogte = (isMobile) => (isMobile ? KOP_HOOGTE.mobiel : KOP_HOOGTE.desktop)
+const gridHoogte = (isMobile) => (isMobile ? GRID_HOOGTE.mobiel : GRID_HOOGTE.desktop)
 const MINUTES_VISIBLE = (HOUR_END - HOUR_START) * 60
 
 const minToTop = (min) => {
@@ -91,12 +100,12 @@ function sortForOverlap(blocks) {
   return [...blocks].sort((a, b) => (b.end - b.start) - (a.end - a.start))
 }
 
-function AgendaBlock({ block, isMobile, onClick, onPointerDownDrag, draggable, isGhost, isDragSource }) {
+function AgendaBlock({ block, isMobile, onClick, onPointerDownDrag, draggable, isGhost, isDragSource, isSelected, selectieModus }) {
   const top = minToTop(block.start)
   const height = Math.max(2.2, minToTop(block.end) - top)
   const isPlaceholder = block.meta?.placeholder
   const isPlaceholderTime = block.meta?.placeholder_time
-  const clickable = block.editable && onClick
+  const clickable = (block.editable || selectieModus) && onClick
   const durationMin = block.end - block.start
 
   // Visuele dichtheid op basis van blokhoogte:
@@ -126,18 +135,19 @@ function AgendaBlock({ block, isMobile, onClick, onPointerDownDrag, draggable, i
   return (
     <div
       title={`${topLabel}${mainTitle ? ` — ${mainTitle}` : ''}\n${formatTime(block.start)}–${formatTime(block.end)}${clickable ? '\n(tik om te bewerken · sleep voor 10-min verzet of andere dag)' : ''}`}
-      onPointerDown={draggable ? (e) => onPointerDownDrag?.(e, block) : undefined}
-      onClick={(!draggable && clickable) ? () => onClick(block) : undefined}
+      onPointerDown={(draggable && !selectieModus) ? (e) => onPointerDownDrag?.(e, block) : undefined}
+      onClick={((selectieModus || !draggable) && clickable) ? () => onClick(block) : undefined}
       style={{
         position: 'absolute',
         top: `${top}%`,
         height: `${height}%`,
         minHeight: block.type === 'meal' && imageUrl ? 32 : undefined,
         left: 3, right: 3,
-        background: isGhost ? `${block.color}33` : 'rgba(255,255,255,0.025)',
-        border: isGhost ? `1px dashed ${block.color}` : '1px solid rgba(255,255,255,0.05)',
+        background: isSelected ? 'rgba(255,255,255,0.14)' : isGhost ? `${block.color}33` : 'rgba(255,255,255,0.025)',
+        border: isSelected ? '1px solid #fff' : isGhost ? `1px dashed ${block.color}` : '1px solid rgba(255,255,255,0.05)',
+        boxShadow: isSelected ? '0 0 0 1px #fff inset' : undefined,
         borderLeft: `3px solid ${block.color}`,
-        borderRadius: 12,
+        borderRadius: 0,
         overflow: 'hidden',
         opacity: isDragSource ? 0.25 : isGhost ? 0.85 : (isPlaceholder ? 0.55 : 1),
         cursor: draggable ? 'grab' : (clickable ? 'pointer' : 'default'),
@@ -282,7 +292,7 @@ function AgendaBlock({ block, isMobile, onClick, onPointerDownDrag, draggable, i
         )}
         {mainTitle && sizeMode === 'mini' && !isMobile && (
           <div style={{
-            fontSize: '0.5rem', color: COLORS.text50,
+            fontSize: '0.72rem', color: COLORS.text50,
             whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
             lineHeight: 1.2,
           }}>
@@ -355,7 +365,7 @@ function AgendaBlock({ block, isMobile, onClick, onPointerDownDrag, draggable, i
 function DayColumn({
   day, blocks, isMobile, onBlockClick, onAddClick,
   onBlockPointerDownDrag, isDropTarget, ghostBlock, sourceBlockId, gridRef,
-  dateForHeader, isToday,
+  dateForHeader, isToday, geselecteerd, selectieModus,
 }) {
   return (
     <div
@@ -363,42 +373,52 @@ function DayColumn({
         flex: 1, minWidth: 0,
         borderRight: `1px solid ${COLORS.border}`,
         position: 'relative',
-        background: isDropTarget ? 'rgba(255,215,0,0.04)' : COLORS.panel,
+        background: isDropTarget ? 'rgba(255,255,255,0.04)' : COLORS.panel,
         transition: 'background 0.12s ease',
       }}>
       {/* Header */}
       <div style={{
-        padding: isMobile ? '0.4rem 0.3rem' : '0.5rem 0.4rem',
-        textAlign: 'center',
+        height: kopHoogte(isMobile),
+        padding: isMobile ? '0 0.3rem' : '0 0.4rem',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
         borderBottom: `1px solid ${COLORS.border}`,
         background: 'rgba(0,0,0,0.3)',
-        position: 'relative',
+        position: 'relative', boxSizing: 'border-box',
       }}>
+        {/* Eén regel: WOENSDAG 2 SEPT. Stond als drie regels onder elkaar —
+            dagnaam, datum, aantal items — wat de kop hoger maakte dan de
+            informatie rechtvaardigt. Het aantal items zie je al doordat de
+            blokken eronder staan. */}
         <div style={{
-          fontSize: isMobile ? '0.55rem' : '0.6rem',
-          fontWeight: 800,
-          color: isToday ? COLORS.gold : COLORS.text50,
-          textTransform: 'uppercase', letterSpacing: '0.06em',
+          display: 'flex', alignItems: 'baseline', justifyContent: 'center',
+          gap: 5, flexWrap: 'nowrap', whiteSpace: 'nowrap',
         }}>
-          {isMobile ? DAY_LABELS_NL[day] : DAY_LABELS_NL_LONG[day]}
-        </div>
-        {dateForHeader && (
-          <div style={{
-            fontSize: isMobile ? '0.6rem' : '0.7rem',
-            color: isToday ? COLORS.gold : '#fff',
-            fontWeight: isToday ? 800 : 700,
-            marginTop: 1,
-            lineHeight: 1,
+          <span style={{
+            fontSize: isMobile ? '0.62rem' : '0.72rem',
+            fontWeight: 900,
+            color: '#fff',
+            opacity: isToday ? 1 : 0.55,
+            letterSpacing: '-0.01em',
+            textTransform: 'uppercase',
           }}>
-            {dateForHeader.getDate()} {dateForHeader.toLocaleDateString('nl-NL', { month: 'short' })}
-          </div>
-        )}
-        <div style={{
-          fontSize: '0.5rem', color: COLORS.text25, marginTop: 2,
-        }}>
-          {blocks.filter(b => !b.meta?.placeholder).length} item{blocks.filter(b => !b.meta?.placeholder).length === 1 ? '' : 's'}
+            {isMobile ? DAY_LABELS_NL[day] : DAY_LABELS_NL_LONG[day]}
+          </span>
+          {dateForHeader && (
+            <span style={{
+              fontSize: isMobile ? '0.62rem' : '0.72rem',
+              fontWeight: 900,
+              color: '#fff',
+              opacity: isToday ? 1 : 0.75,
+              letterSpacing: '-0.01em',
+              textTransform: 'uppercase',
+            }}>
+              {dateForHeader.getDate()} {dateForHeader.toLocaleDateString('nl-NL', { month: 'short' }).replace('.', '')}
+            </span>
+          )}
+          {/* Sterretje blijft: het meldt dat een blok voor deze dag afwijkt
+              van het vaste weekpatroon, en dat zie je nergens anders. */}
           {blocks.some(b => b.meta?.isOverridden) && (
-            <span style={{ marginLeft: 4, color: COLORS.gold, fontWeight: 800 }}>★</span>
+            <span style={{ color: '#fff', fontWeight: 900, fontSize: '0.72rem' }}>★</span>
           )}
         </div>
         {onAddClick && (
@@ -412,7 +432,7 @@ function DayColumn({
               padding: 0,
               background: 'rgba(255,255,255,0.04)',
               border: `1px solid ${COLORS.border}`,
-              borderRadius: 4,
+              borderRadius: 0,
               color: COLORS.text50,
               cursor: 'pointer',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -428,7 +448,7 @@ function DayColumn({
         data-day={day}
         style={{
           position: 'relative',
-          height: isMobile ? 680 : 850,
+          height: gridHoogte(isMobile),
           // Grid-lijntjes elke uur. HOURS heeft 18 labels (6 t/m 23) maar
           // het venster zelf is 17 uur breed (6:00 → 23:00). Pattern moet
           // ook 17-step zijn anders sluiten label en lijntjes niet aan.
@@ -452,6 +472,8 @@ function DayColumn({
             draggable={b.editable && !!onBlockPointerDownDrag && !b.meta?.wrapHalf}
             onPointerDownDrag={onBlockPointerDownDrag}
             isDragSource={sourceBlockId === b.id}
+            isSelected={!!geselecteerd?.has(b.id)}
+            selectieModus={selectieModus}
           />
         ))}
         {ghostBlock && (
@@ -476,11 +498,11 @@ function TimeAxis({ isMobile }) {
         padding: isMobile ? '0.4rem 0.3rem' : '0.5rem 0.4rem',
         borderBottom: `1px solid ${COLORS.border}`,
         background: 'rgba(0,0,0,0.3)',
-        height: isMobile ? '2.05rem' : '2.45rem',
+        height: kopHoogte(isMobile),
       }} />
       <div style={{
         position: 'relative',
-        height: isMobile ? 680 : 850,
+        height: gridHoogte(isMobile),
       }}>
         {HOURS.map((h, idx) => (
           <div key={h} style={{
@@ -491,12 +513,13 @@ function TimeAxis({ isMobile }) {
             // een 17-uur venster — alles schoof daardoor ~30 min op.
             top: `${(idx / (HOURS.length - 1)) * 100}%`,
             left: 0, right: 0,
-            fontSize: '0.5rem',
-            color: COLORS.text25,
+            fontSize: isMobile ? '0.62rem' : '0.7rem',
+            color: 'rgba(255,255,255,0.55)',
             textAlign: 'right',
             paddingRight: 4,
             paddingTop: 1,
-            fontWeight: 600,
+            fontWeight: 900,
+            letterSpacing: '-0.02em',
           }}>
             {String(h).padStart(2, '0')}
           </div>
@@ -531,13 +554,13 @@ function ScopePromptModal({
 
   const btnBase = {
     width: '100%', padding: '0.65rem 0.9rem',
-    border: 'none', borderRadius: 10,
+    border: 'none', borderRadius: 0,
     fontSize: '0.78rem', fontWeight: 700,
     cursor: 'pointer',
   }
   const btnPrimary = {
     ...btnBase, fontSize: '0.82rem', fontWeight: 800,
-    background: `linear-gradient(135deg, ${COLORS.gold} 0%, #D4AF37 100%)`,
+    background: '#fff',
     color: '#000',
   }
   const btnSecondary = {
@@ -563,7 +586,7 @@ function ScopePromptModal({
         style={{
           width: '100%', maxWidth: 420,
           background: 'linear-gradient(135deg, #1a1a1a 0%, #0d0d0d 100%)',
-          borderRadius: 14, border: `1px solid ${COLORS.border}`,
+          borderRadius: 0, border: `1px solid ${COLORS.border}`,
           overflow: 'hidden',
         }}
       >
@@ -637,7 +660,7 @@ function ScopePromptModal({
                       padding: '0.55rem 0.4rem',
                       background: isOn ? `${COLORS.gold}20` : 'rgba(255,255,255,0.04)',
                       border: `1px solid ${isOn ? COLORS.gold : COLORS.border}`,
-                      borderRadius: 8,
+                      borderRadius: 0,
                       color: isOn ? COLORS.gold : COLORS.text50,
                       fontSize: '0.7rem', fontWeight: 800,
                       cursor: 'pointer',
@@ -812,7 +835,7 @@ function BlockEditModal({ block, client, service, isMobile, onClose, onSaved, on
         style={{
           width: '100%', maxWidth: 460,
           background: 'linear-gradient(135deg, #1a1a1a 0%, #0d0d0d 100%)',
-          borderRadius: 16, border: `1px solid ${COLORS.border}`,
+          borderRadius: 0, border: `1px solid ${COLORS.border}`,
           overflow: 'hidden',
         }}
       >
@@ -831,7 +854,7 @@ function BlockEditModal({ block, client, service, isMobile, onClose, onSaved, on
               {isNew ? 'Nieuw blok' : `Bewerk ${TYPE_LABEL_NL[block.type] || block.type}`}
             </h3>
             <div style={{
-              fontSize: '0.6rem', color: COLORS.text50, marginTop: 2,
+              fontSize: '0.72rem', color: COLORS.text50, marginTop: 2,
               textTransform: 'uppercase', letterSpacing: '0.05em',
             }}>
               {DAY_LABELS_NL_LONG[block.day]}
@@ -843,7 +866,7 @@ function BlockEditModal({ block, client, service, isMobile, onClose, onSaved, on
             width: 32, height: 32, padding: 0,
             background: 'rgba(255,255,255,0.05)',
             border: '1px solid rgba(255,255,255,0.1)',
-            borderRadius: 8, color: COLORS.text50,
+            borderRadius: 0, color: COLORS.text50,
             cursor: 'pointer',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
           }}>
@@ -857,7 +880,7 @@ function BlockEditModal({ block, client, service, isMobile, onClose, onSaved, on
           {!isMeal && isNew && (
             <div style={{ marginBottom: 12 }}>
               <label style={{
-                display: 'block', fontSize: '0.55rem',
+                display: 'block', fontSize: '0.72rem',
                 color: COLORS.text50, fontWeight: 700,
                 textTransform: 'uppercase', letterSpacing: '0.05em',
                 marginBottom: 6,
@@ -870,7 +893,7 @@ function BlockEditModal({ block, client, service, isMobile, onClose, onSaved, on
                       padding: '0.4rem 0.7rem',
                       background: type === t ? `${COLORS.gold}20` : 'rgba(255,255,255,0.04)',
                       border: `1px solid ${type === t ? COLORS.gold : COLORS.border}`,
-                      borderRadius: 8,
+                      borderRadius: 0,
                       color: type === t ? COLORS.gold : COLORS.text50,
                       fontSize: '0.75rem', fontWeight: 700,
                       cursor: 'pointer',
@@ -886,7 +909,7 @@ function BlockEditModal({ block, client, service, isMobile, onClose, onSaved, on
           {!isMeal && (
             <div style={{ marginBottom: 12 }}>
               <label style={{
-                display: 'block', fontSize: '0.55rem',
+                display: 'block', fontSize: '0.72rem',
                 color: COLORS.text50, fontWeight: 700,
                 textTransform: 'uppercase', letterSpacing: '0.05em',
                 marginBottom: 6,
@@ -900,7 +923,7 @@ function BlockEditModal({ block, client, service, isMobile, onClose, onSaved, on
                   padding: '0.55rem 0.7rem',
                   background: 'rgba(0,0,0,0.4)',
                   border: `1px solid ${COLORS.border}`,
-                  borderRadius: 8, color: '#fff',
+                  borderRadius: 0, color: '#fff',
                   fontSize: '0.85rem', fontFamily: 'inherit',
                   outline: 'none',
                 }}
@@ -912,7 +935,7 @@ function BlockEditModal({ block, client, service, isMobile, onClose, onSaved, on
           <div style={{ display: 'flex', gap: 10 }}>
             <div style={{ flex: 1 }}>
               <label style={{
-                display: 'block', fontSize: '0.55rem',
+                display: 'block', fontSize: '0.72rem',
                 color: COLORS.text50, fontWeight: 700,
                 textTransform: 'uppercase', letterSpacing: '0.05em',
                 marginBottom: 6,
@@ -926,7 +949,7 @@ function BlockEditModal({ block, client, service, isMobile, onClose, onSaved, on
                   padding: '0.55rem 0.7rem',
                   background: 'rgba(0,0,0,0.4)',
                   border: `1px solid ${COLORS.border}`,
-                  borderRadius: 8, color: '#fff',
+                  borderRadius: 0, color: '#fff',
                   fontSize: '0.9rem', fontFamily: 'inherit',
                   fontWeight: 700,
                   outline: 'none',
@@ -936,7 +959,7 @@ function BlockEditModal({ block, client, service, isMobile, onClose, onSaved, on
             {!isMeal && (
               <div style={{ flex: 1 }}>
                 <label style={{
-                  display: 'block', fontSize: '0.55rem',
+                  display: 'block', fontSize: '0.72rem',
                   color: COLORS.text50, fontWeight: 700,
                   textTransform: 'uppercase', letterSpacing: '0.05em',
                   marginBottom: 6,
@@ -950,7 +973,7 @@ function BlockEditModal({ block, client, service, isMobile, onClose, onSaved, on
                     padding: '0.55rem 0.7rem',
                     background: 'rgba(0,0,0,0.4)',
                     border: `1px solid ${COLORS.border}`,
-                    borderRadius: 8, color: '#fff',
+                    borderRadius: 0, color: '#fff',
                     fontSize: '0.9rem', fontFamily: 'inherit',
                     fontWeight: 700,
                     outline: 'none',
@@ -965,8 +988,8 @@ function BlockEditModal({ block, client, service, isMobile, onClose, onSaved, on
               marginTop: 10, padding: '0.5rem 0.7rem',
               background: 'rgba(245,158,11,0.08)',
               border: '1px solid rgba(245,158,11,0.25)',
-              borderRadius: 8,
-              fontSize: '0.65rem', color: COLORS.text50,
+              borderRadius: 0,
+              fontSize: '0.72rem', color: COLORS.text50,
               lineHeight: 1.5,
             }}>
               Tijd-aanpassing schrijft direct naar het meal-plan
@@ -979,7 +1002,7 @@ function BlockEditModal({ block, client, service, isMobile, onClose, onSaved, on
               marginTop: 10, padding: '0.5rem 0.7rem',
               background: 'rgba(239,68,68,0.1)',
               border: '1px solid rgba(239,68,68,0.3)',
-              borderRadius: 8,
+              borderRadius: 0,
               fontSize: '0.7rem', color: '#fca5a5',
             }}>
               {err}
@@ -1005,7 +1028,7 @@ function BlockEditModal({ block, client, service, isMobile, onClose, onSaved, on
                 padding: '0.55rem 0.8rem',
                 background: 'transparent',
                 border: '1px solid rgba(255,255,255,0.25)',
-                borderRadius: 8, color: '#fff',
+                borderRadius: 0, color: '#fff',
                 fontSize: '0.75rem', fontWeight: 800,
                 cursor: saving ? 'not-allowed' : 'pointer',
                 display: 'flex', alignItems: 'center', gap: 5,
@@ -1029,7 +1052,7 @@ function BlockEditModal({ block, client, service, isMobile, onClose, onSaved, on
                 padding: '0.55rem 0.8rem',
                 background: 'transparent',
                 border: '1px solid rgba(239,68,68,0.35)',
-                borderRadius: 8, color: '#ef4444',
+                borderRadius: 0, color: '#ef4444',
                 fontSize: '0.75rem', fontWeight: 800,
                 cursor: saving ? 'not-allowed' : 'pointer',
                 display: 'flex', alignItems: 'center', gap: 5,
@@ -1046,7 +1069,7 @@ function BlockEditModal({ block, client, service, isMobile, onClose, onSaved, on
                 padding: '0.55rem 0.8rem',
                 background: 'transparent',
                 border: '1px solid rgba(239,68,68,0.35)',
-                borderRadius: 8, color: '#ef4444',
+                borderRadius: 0, color: '#ef4444',
                 fontSize: '0.75rem', fontWeight: 700,
                 cursor: saving ? 'not-allowed' : 'pointer',
                 display: 'flex', alignItems: 'center', gap: 5,
@@ -1063,7 +1086,7 @@ function BlockEditModal({ block, client, service, isMobile, onClose, onSaved, on
               padding: '0.55rem 0.9rem',
               background: 'transparent',
               border: `1px solid ${COLORS.border}`,
-              borderRadius: 8, color: COLORS.text50,
+              borderRadius: 0, color: COLORS.text50,
               fontSize: '0.75rem', fontWeight: 700,
               cursor: saving ? 'not-allowed' : 'pointer',
             }}
@@ -1075,8 +1098,8 @@ function BlockEditModal({ block, client, service, isMobile, onClose, onSaved, on
             disabled={saving}
             style={{
               padding: '0.55rem 1rem',
-              background: saving ? 'rgba(255,215,0,0.1)' : `linear-gradient(135deg, ${COLORS.gold} 0%, #D4AF37 100%)`,
-              border: 'none', borderRadius: 8,
+              background: saving ? 'rgba(255,255,255,0.25)' : '#fff',
+              border: 'none', borderRadius: 0,
               color: saving ? COLORS.text50 : '#000',
               fontSize: '0.8rem', fontWeight: 800,
               cursor: saving ? 'not-allowed' : 'pointer',
@@ -1135,6 +1158,12 @@ export default function ClientAgendaView({
   const [weekAnchor, setWeekAnchor] = useState(() => getMondayOf(new Date()))
   // Prompt voor recurring scope ("alleen deze datum" vs "voor altijd").
   const [scopePrompt, setScopePrompt] = useState(null)
+  // Meerdere blokken tegelijk verzetten of verwijderen. Bewust een aparte
+  // modus: buiten die modus opent een tik het bewerkvenster en werkt slepen,
+  // en dat botst met aantikken om te selecteren.
+  const [selectieModus, setSelectieModus] = useState(false)
+  const [geselecteerd, setGeselecteerd] = useState(() => new Set())
+  const [bulkBezig, setBulkBezig] = useState(false)
 
   const service = useMemo(() => db?.supabase ? new ClientAgendaService(db.supabase) : null, [db])
 
@@ -1172,8 +1201,89 @@ export default function ClientAgendaView({
   // Client mag meal-blokken niet aanraken (eigendomsgebied van coach).
   // Andere blokken (training/sleep/work/custom) mag client editen.
   const handleBlockClick = (block) => {
+    if (selectieModus) {
+      setGeselecteerd(prev => {
+        const next = new Set(prev)
+        next.has(block.id) ? next.delete(block.id) : next.add(block.id)
+        return next
+      })
+      return
+    }
     if (isClient && block.type === 'meal') return
     setEditingBlock(block)
+  }
+
+  // Alle blokken van de zichtbare dagen, om van een id terug naar het blok te
+  // komen bij de bulk-acties.
+  const blokPerId = useMemo(() => {
+    const m = new Map()
+    Object.values(data?.blocksByDay || {}).forEach(lijst => (lijst || []).forEach(b => m.set(b.id, b)))
+    return m
+  }, [data])
+
+  const stopSelectie = () => { setSelectieModus(false); setGeselecteerd(new Set()) }
+
+  // Alles tegelijk een aantal minuten opschuiven. Placeholders slaan we over:
+  // die bestaan nog niet in de database, dus er valt niets te verzetten.
+  const bulkVerschuif = async (delta) => {
+    if (bulkBezig || !geselecteerd.size) return
+    setBulkBezig(true)
+    const overgeslagen = []
+    try {
+      for (const id of geselecteerd) {
+        const b = blokPerId.get(id)
+        if (!b || !b.editable) { overgeslagen.push(b?.label || id); continue }
+        const nieuw = Math.max(0, Math.min(24 * 60 - 10, (b.start || 0) + delta))
+        await service.shiftBlock({
+          block: { ...b, clientId: client.id },
+          newStartMin: nieuw,
+          toDay: null,
+          mealPlanId: data?.mealPlan?.id,
+        })
+      }
+      await reload()
+      if (overgeslagen.length) {
+        setMoveError(`${overgeslagen.length} blok(ken) overgeslagen — niet verplaatsbaar`)
+        setTimeout(() => setMoveError(null), 3500)
+      }
+      stopSelectie()
+    } catch (e) {
+      console.error('bulk verschuiven mislukt:', e)
+      setMoveError(e.message || 'Verplaatsen mislukt')
+      setTimeout(() => setMoveError(null), 3500)
+    } finally { setBulkBezig(false) }
+  }
+
+  // Verwijderen. Maaltijden zijn geen agenda-blok maar een slot in het
+  // weekplan — die gaan via de Plan Analyzer (onMealDelete). Zonder die
+  // callback slaan we ze over in plaats van iets verkeerds te wissen.
+  const bulkVerwijder = async () => {
+    if (bulkBezig || !geselecteerd.size) return
+    const blokken = [...geselecteerd].map(id => blokPerId.get(id)).filter(Boolean)
+    if (!confirm(`${blokken.length} item(s) verwijderen?`)) return
+    setBulkBezig(true)
+    const overgeslagen = []
+    try {
+      for (const b of blokken) {
+        if (b.type === 'meal') {
+          if (onMealDelete && b.meta?.slot) await onMealDelete({ day: b.day, slot: b.meta.slot })
+          else overgeslagen.push(b.label)
+          continue
+        }
+        if (!b.dbId) { overgeslagen.push(b.label); continue }
+        await service.deleteBlock(b.dbId)
+      }
+      await reload()
+      if (overgeslagen.length) {
+        setMoveError(`${overgeslagen.length} overgeslagen — hier niet te verwijderen`)
+        setTimeout(() => setMoveError(null), 4000)
+      }
+      stopSelectie()
+    } catch (e) {
+      console.error('bulk verwijderen mislukt:', e)
+      setMoveError(e.message || 'Verwijderen mislukt')
+      setTimeout(() => setMoveError(null), 3500)
+    } finally { setBulkBezig(false) }
   }
   const handleAddClick = (day) => setEditingBlock({
     isNew: true, day, type: 'custom',
@@ -1567,7 +1677,7 @@ export default function ClientAgendaView({
             width: 24, height: 24, padding: 0,
             background: 'rgba(255,255,255,0.04)',
             border: `1px solid ${COLORS.border}`,
-            borderRadius: 5, color: COLORS.text50,
+            borderRadius: 0, color: COLORS.text50,
             cursor: 'pointer',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
           }}
@@ -1575,7 +1685,7 @@ export default function ClientAgendaView({
           <ChevronLeft size={12} />
         </button>
         <div style={{
-          fontSize: '0.6rem', color: isThisWeek ? COLORS.gold : '#fff',
+          fontSize: '0.72rem', color: isThisWeek ? COLORS.gold : '#fff',
           fontWeight: 700,
         }}>
           {isThisWeek ? 'Deze week' : `Week van ${weekAnchor.toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })}`}
@@ -1587,7 +1697,7 @@ export default function ClientAgendaView({
             width: 24, height: 24, padding: 0,
             background: 'rgba(255,255,255,0.04)',
             border: `1px solid ${COLORS.border}`,
-            borderRadius: 5, color: COLORS.text50,
+            borderRadius: 0, color: COLORS.text50,
             cursor: 'pointer',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
           }}
@@ -1600,10 +1710,10 @@ export default function ClientAgendaView({
             title="Naar deze week"
             style={{
               padding: '0.2rem 0.45rem',
-              background: 'rgba(255,215,0,0.06)',
+              background: 'rgba(255,255,255,0.06)',
               border: `1px solid ${COLORS.gold}40`,
-              borderRadius: 5, color: COLORS.gold,
-              fontSize: '0.5rem', fontWeight: 800,
+              borderRadius: 0, color: COLORS.gold,
+              fontSize: '0.72rem', fontWeight: 800,
               cursor: 'pointer',
               textTransform: 'uppercase', letterSpacing: '0.05em',
             }}
@@ -1620,8 +1730,8 @@ export default function ClientAgendaView({
           padding: '0.5rem 0.75rem',
           background: 'rgba(245,158,11,0.08)',
           border: '1px solid rgba(245,158,11,0.25)',
-          borderRadius: 8,
-          fontSize: '0.65rem',
+          borderRadius: 0,
+          fontSize: '0.72rem',
           color: 'rgba(255,255,255,0.7)',
         }}>
           <AlertCircle size={14} color={COLORS.amber} style={{ flexShrink: 0, marginTop: 1 }} />
@@ -1635,12 +1745,94 @@ export default function ClientAgendaView({
         </div>
       )}
 
+      {/* ── Meerdere tegelijk ─────────────────────────────────────────── */}
+      {!isClient && (
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap',
+          padding: '0.4rem 0',
+        }}>
+          {!selectieModus ? (
+            <button
+              onClick={() => setSelectieModus(true)}
+              style={{
+                display: 'inline-flex', alignItems: 'center', gap: 5,
+                padding: '0.35rem 0.6rem', borderRadius: 0,
+                background: 'none', border: `1px solid ${COLORS.border}`,
+                color: 'rgba(255,255,255,0.7)', fontFamily: 'inherit',
+                fontSize: '0.75rem', fontWeight: 800, cursor: 'pointer',
+                touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+              }}
+            >
+              <Check size={12} /> Selecteren
+            </button>
+          ) : (
+            <>
+              <span style={{ fontSize: '0.8rem', fontWeight: 900, color: '#fff' }}>
+                {geselecteerd.size} geselecteerd
+              </span>
+
+              {/* Verzetten in stappen van een half uur — de eenheid waarin je
+                  een dagindeling in de praktijk verschuift. */}
+              {[-60, -30, 30, 60].map(delta => (
+                <button
+                  key={delta}
+                  onClick={() => bulkVerschuif(delta)}
+                  disabled={!geselecteerd.size || bulkBezig}
+                  style={{
+                    padding: '0.35rem 0.55rem', borderRadius: 0,
+                    background: 'none', border: `1px solid ${COLORS.border}`,
+                    color: '#fff', fontFamily: 'inherit',
+                    fontSize: '0.75rem', fontWeight: 800,
+                    cursor: (!geselecteerd.size || bulkBezig) ? 'not-allowed' : 'pointer',
+                    opacity: (!geselecteerd.size || bulkBezig) ? 0.35 : 1,
+                    touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+                  }}
+                >
+                  {delta > 0 ? `+${delta}` : delta} min
+                </button>
+              ))}
+
+              <button
+                onClick={bulkVerwijder}
+                disabled={!geselecteerd.size || bulkBezig}
+                style={{
+                  display: 'inline-flex', alignItems: 'center', gap: 5,
+                  padding: '0.35rem 0.6rem', borderRadius: 0,
+                  background: 'none', border: '1px solid rgba(239,68,68,0.4)',
+                  color: '#ef4444', fontFamily: 'inherit',
+                  fontSize: '0.75rem', fontWeight: 800,
+                  cursor: (!geselecteerd.size || bulkBezig) ? 'not-allowed' : 'pointer',
+                  opacity: (!geselecteerd.size || bulkBezig) ? 0.35 : 1,
+                  touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+                }}
+              >
+                <Trash2 size={12} /> Verwijder
+              </button>
+
+              <div style={{ flex: 1 }} />
+              <button
+                onClick={stopSelectie}
+                disabled={bulkBezig}
+                style={{
+                  padding: '0.35rem 0.6rem', borderRadius: 0,
+                  background: 'none', border: 'none',
+                  color: 'rgba(255,255,255,0.5)', fontFamily: 'inherit',
+                  fontSize: '0.75rem', fontWeight: 800, cursor: 'pointer',
+                }}
+              >
+                {bulkBezig ? 'Bezig…' : 'Klaar'}
+              </button>
+            </>
+          )}
+        </div>
+      )}
+
       {/* Week grid */}
       <div style={{
         flex: 1,
         display: 'flex',
         border: `1px solid ${COLORS.border}`,
-        borderRadius: 10,
+        borderRadius: 0,
         overflow: 'hidden',
         background: COLORS.bg,
       }}>
@@ -1657,6 +1849,8 @@ export default function ClientAgendaView({
               isMobile={isMobile}
               onBlockClick={handleBlockClick}
               onAddClick={handleAddClick}
+              geselecteerd={geselecteerd}
+              selectieModus={selectieModus}
               onBlockPointerDownDrag={handleBlockPointerDown}
               isDropTarget={drag && drag.moved && drag.targetDay === day && drag.originDay !== day}
               ghostBlock={ghostByDay[day]}
@@ -1680,8 +1874,8 @@ export default function ClientAgendaView({
           pointerEvents: 'none',
           background: 'rgba(0,0,0,0.85)',
           backdropFilter: 'blur(8px)',
-          border: '1px solid rgba(255,215,0,0.35)',
-          borderRadius: 10,
+          border: '1px solid rgba(255,255,255,0.35)',
+          borderRadius: 0,
           padding: '0.4rem 0.7rem',
           color: '#fff',
           fontSize: '1.5rem',
@@ -1689,7 +1883,7 @@ export default function ClientAgendaView({
           letterSpacing: '-0.02em',
           lineHeight: 1,
           fontVariantNumeric: 'tabular-nums',
-          boxShadow: '0 8px 24px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,215,0,0.08)',
+          boxShadow: '0 8px 24px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,255,255,0.08)',
         }}>
           {formatTime(drag.newStart)}
         </div>
@@ -1705,7 +1899,7 @@ export default function ClientAgendaView({
           padding: '0.7rem 1.1rem',
           background: 'rgba(239,68,68,0.96)', color: '#fff',
           fontSize: '0.82rem', fontWeight: 800,
-          borderRadius: 10, zIndex: 9999,
+          borderRadius: 0, zIndex: 9999,
           boxShadow: '0 8px 28px rgba(0,0,0,0.55), 0 0 0 1px rgba(239,68,68,0.4)',
           maxWidth: '92vw',
           textAlign: 'center',
@@ -1732,7 +1926,7 @@ export default function ClientAgendaView({
 
       {/* Footer */}
       <div style={{
-        fontSize: '0.55rem', color: COLORS.text25,
+        fontSize: '0.72rem', color: COLORS.text25,
         textAlign: 'right', fontStyle: 'italic',
       }}>
         Bron: {mealPlan?.template_name ? `meal-plan "${mealPlan.template_name}"` : 'geen meal-plan'}

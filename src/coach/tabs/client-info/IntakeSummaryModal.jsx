@@ -386,6 +386,103 @@ const VRAGEN = {
   default_days_per_week: 'Hoeveel dagen per week wil je trainen?',
 }
 
+
+// ---- weekindeling in tekst ------------------------------------------------
+// clients.work_schedule bevat per dag wat de klant in de weekbouwer heeft
+// aangeklikt: [{ start, end, type }] met type 'kantoor' | 'slaap' | 'training'
+// | 'horeca' | 'fysiek' | … Het agenda-plaatje toont dat visueel; hieronder
+// staat wát er is ingevuld, in woorden. Beide hebben nut: het plaatje voor de
+// verhoudingen, de tekst om te zien welk antwoord erachter zit.
+const DAG_NL = { ma: 'Maandag', di: 'Dinsdag', wo: 'Woensdag', do: 'Donderdag', vr: 'Vrijdag', za: 'Zaterdag', zo: 'Zondag' }
+const DAG_ORDE = ['ma', 'di', 'wo', 'do', 'vr', 'za', 'zo']
+const TYPE_NL = {
+  kantoor: 'Kantoor of thuis', fysiek: 'Fysiek werk', horeca: 'Horeca',
+  winkel: 'Winkel', anders: 'Werk', werk: 'Werk',
+  slaap: 'Slaap', training: 'Training',
+}
+
+function WeekInTekst({ client, isMobile }) {
+  const ws = client?.work_schedule
+  const heeftWeek = ws && typeof ws === 'object' && Object.keys(ws).length > 0
+
+  const losseAntwoorden = [
+    { vraag: 'Wat voor werk doe je?', antwoord: client?.job_type || null },
+    { vraag: 'Hoeveel slaap je per nacht?', antwoord: client?.sleep_hours ? `${client.sleep_hours} uur` : null },
+    { vraag: 'Hoe laat train je meestal?', antwoord: client?.training_time ? String(client.training_time).slice(0, 5) : null },
+    {
+      vraag: 'Op welke dagen wil of kan je trainen?',
+      antwoord: Array.isArray(client?.preferred_training_days) && client.preferred_training_days.length
+        ? client.preferred_training_days.map(d => DAG_NL[d] || d).join(', ')
+        : null,
+    },
+  ]
+
+  return (
+    <div style={{ marginTop: '1rem' }}>
+      <div style={{
+        fontSize: '0.72rem', fontWeight: 900, letterSpacing: '0.08em',
+        textTransform: 'uppercase', color: GREEN, marginBottom: '0.6rem',
+      }}>
+        Wat is ingevuld
+      </div>
+
+      <div style={{
+        display: 'flex', flexDirection: 'column', gap: 1,
+        background: 'rgba(255,255,255,0.06)',
+        border: '1px solid rgba(255,255,255,0.06)',
+        overflow: 'hidden',
+      }}>
+        {losseAntwoorden.map(r => (
+          <div key={r.vraag} style={{ display: 'flex', flexDirection: 'column', gap: 3, padding: '0.7rem 0.9rem', background: '#111' }}>
+            <span style={{ fontSize: '0.82rem', fontWeight: 700, color: 'rgba(255,255,255,0.5)' }}>{r.vraag}</span>
+            <span style={{
+              fontSize: '0.92rem', fontWeight: r.antwoord ? 800 : 600,
+              color: r.antwoord ? '#fff' : 'rgba(255,255,255,0.3)',
+              fontStyle: r.antwoord ? 'normal' : 'italic',
+            }}>
+              <span style={{ color: 'rgba(255,255,255,0.35)', fontWeight: 700 }}>Antwoord: </span>
+              {r.antwoord || 'niet ingevuld'}
+            </span>
+          </div>
+        ))}
+
+        {DAG_ORDE.filter(d => heeftWeek && Array.isArray(ws[d]) && ws[d].length).map(d => {
+          // Dubbele regels komen voor in de opgeslagen data (dezelfde baan
+          // twee keer weggeschreven); ontdubbelen op tijd+type.
+          const gezien = new Set()
+          const items = ws[d].filter(it => {
+            const k = `${it.type}|${it.start}|${it.end}`
+            if (gezien.has(k)) return false
+            gezien.add(k); return true
+          })
+          return (
+            <div key={d} style={{ display: 'flex', flexDirection: 'column', gap: 3, padding: '0.7rem 0.9rem', background: '#111' }}>
+              <span style={{ fontSize: '0.82rem', fontWeight: 700, color: 'rgba(255,255,255,0.5)' }}>
+                Hoe ziet {DAG_NL[d].toLowerCase()} eruit?
+              </span>
+              <span style={{ fontSize: isMobile ? '0.88rem' : '0.92rem', fontWeight: 800, color: '#fff', lineHeight: 1.5 }}>
+                <span style={{ color: 'rgba(255,255,255,0.35)', fontWeight: 700 }}>Antwoord: </span>
+                {items.map((it, i) => (
+                  <span key={i}>
+                    {i > 0 && <span style={{ color: 'rgba(255,255,255,0.3)' }}> · </span>}
+                    {TYPE_NL[it.type] || it.type} {it.start}–{it.end}
+                  </span>
+                ))}
+              </span>
+            </div>
+          )
+        })}
+
+        {!heeftWeek && (
+          <div style={{ padding: '0.7rem 0.9rem', background: '#111', fontSize: '0.85rem', fontWeight: 600, fontStyle: 'italic', color: 'rgba(255,255,255,0.3)' }}>
+            Weekindeling niet ingevuld — werk, slaap en training zijn niet doorgegeven.
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
 // ---- render helpers --------------------------------------------------------
 
 function renderSections(sections, data, toonLeeg = true) {
@@ -735,6 +832,7 @@ export default function IntakeSummaryModal({ db, client, isMobile, onClose }) {
                 isMobile={isMobile}
                 viewerRole="coach"
               />
+              <WeekInTekst client={client} isMobile={isMobile} />
             </div>
           )}
           {activeTab === 'part1' && renderSections(PART1_SECTIONS, client)}
