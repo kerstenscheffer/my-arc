@@ -31,7 +31,7 @@ const GOAL_LABELS = {
   fitness: 'Fitter worden', general_fitness: 'Fitter worden',
 }
 
-export default function ClientWeightCard({ client, isMobile, onToggleStatus, onDeleted, showStatusToggle = false, onNavigatePlan, onNavigateWorkout, db, coachId, onOpenMealPanel, onOpenWorkoutPanel }) {
+export default function ClientWeightCard({ client, isMobile, onToggleStatus, onDeleted, showStatusToggle = false, onNavigatePlan, onNavigateWorkout, onNavigateTab, db, coachId, onOpenMealPanel, onOpenWorkoutPanel }) {
   const [showInsight, setShowInsight]   = useState(false)
   const [showLog, setShowLog]           = useState(false)
   const [showMenu, setShowMenu]         = useState(false)
@@ -343,6 +343,7 @@ export default function ClientWeightCard({ client, isMobile, onToggleStatus, onD
           isMobile={isMobile}
           onNavigatePlan={onNavigatePlan}
           onNavigateWorkout={onNavigateWorkout}
+          onNavigateTab={onNavigateTab}
           db={db}
           coachId={coachId}
           onOpenMealPanel={onOpenMealPanel}

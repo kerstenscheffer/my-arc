@@ -363,8 +363,19 @@ export default function WeekBuilder({ data, onChange, onComplete, isMobile }) {
     const diff = (wh * 60 + wm) > (sh * 60 + sm)
       ? (wh * 60 + wm) - (sh * 60 + sm)
       : 1440 - (sh * 60 + sm) + (wh * 60 + wm)
+    // Het antwoord op "Wat voor werk doe je?" ging alleen het week_schedule in
+    // als `type` op de werkblokken, en werd nergens als los antwoord bewaard.
+    // Daardoor bleef clients.job_type leeg en stond de vraag in de coach-intake
+    // altijd op "niet ingevuld". Bij meerdere banen alle labels, gescheiden
+    // door een komma.
+    const baanLabels = (savedJobs.length ? savedJobs.map(j => j.type) : jobTypes.map(j => j?.id))
+      .filter(Boolean)
+      .map(id => WORK_TYPES.find(w => w.id === id)?.label || id)
+    const uniekeBanen = [...new Set(baanLabels)]
+
     const result = {
       week_schedule,
+      job_type: uniekeBanen.length ? uniekeBanen.join(', ') : null,
       preferred_training_days: trainingDays,
       training_time: trainingTime || null,
       sleep_time: st, wake_time: wt,

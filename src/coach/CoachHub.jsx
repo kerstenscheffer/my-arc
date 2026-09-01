@@ -366,6 +366,17 @@ export default function CoachHub() {
     setMoreOpen(false)
   }
 
+  // Vanuit een modal naar het gereedschap van deze klant springen. De korte
+  // vertraging komt uit de bestaande sprongen hierboven: het doel-tabblad
+  // leest `selectedClient` bij het monteren, dus die moet eerst staan.
+  const gaNaarMetKlant = (tabId, klant) => {
+    if (klant) {
+      const volledig = clients.find(c => c.id === klant.id) || klant
+      setSelectedClient(volledig)
+    }
+    setTimeout(() => navigateTo(tabId), 50)
+  }
+
   const goBack = () => {
     if (navStack.length === 0) return
     const prev = navStack[navStack.length - 1]
@@ -423,6 +434,7 @@ export default function CoachHub() {
               if (client) setSelectedClient(client)
               setTimeout(() => navigateTo('workout-builder'), 50)
             }}
+            onNavigateTab={gaNaarMetKlant}
             onOpenMealPanel={(id) => setMealPanelClientId(id)}
             onOpenWorkoutPanel={(id) => setWorkoutPanelClientId(id)}
           />
@@ -1166,6 +1178,7 @@ export default function CoachHub() {
           clients={clients}
           isMobile={isMobile}
           onClose={() => setShowIntakeLookup(false)}
+          onNavigate={gaNaarMetKlant}
         />
       )}
 

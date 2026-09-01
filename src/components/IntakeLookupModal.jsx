@@ -14,7 +14,7 @@ import { createPortal } from 'react-dom'
 import { Search, X, User, ClipboardCheck } from 'lucide-react'
 import IntakeSummaryModal from '../coach/tabs/client-info/IntakeSummaryModal'
 
-export default function IntakeLookupModal({ db, isMobile, onClose, clients: clientsProp }) {
+export default function IntakeLookupModal({ db, isMobile, onClose, clients: clientsProp, onNavigate }) {
   const [clients, setClients] = useState(clientsProp || [])
   const [laden, setLaden] = useState(!clientsProp)
   const [zoek, setZoek] = useState('')
@@ -58,6 +58,9 @@ export default function IntakeLookupModal({ db, isMobile, onClose, clients: clie
         client={gekozen}
         isMobile={isMobile}
         onClose={() => setGekozen(null)}
+        // Springen naar een tabblad sluit ook deze kiezer — anders blijf je
+        // met een modal over de pagina heen kijken waar je net heen ging.
+        onNavigate={onNavigate ? (naar, c) => { onNavigate(naar, c); onClose?.() } : undefined}
       />
     )
   }

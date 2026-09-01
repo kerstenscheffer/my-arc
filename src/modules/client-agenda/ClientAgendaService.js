@@ -18,7 +18,7 @@
 //   snack*                 → 15 min
 //   training               → 60 min, default 17:00
 //   sleep                  → 23:00–07:00 (placeholder)
-//   work                   → 09:00–17:00 (placeholder, mon-fri)
+//   work                   → alleen uit de intake; niets ingevuld = geen blok
 
 export const DAYS = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday']
 
@@ -94,8 +94,6 @@ const TRAINING_DEFAULT_START = 17 * 60
 const TRAINING_DEFAULT_DURATION = 60
 const SLEEP_START = 23 * 60
 const SLEEP_END = 7 * 60 // wraps midnight — block split
-const WORK_START = 9 * 60
-const WORK_END = 17 * 60
 
 const parseTime = (timeStr) => {
   if (!timeStr) return null
@@ -446,7 +444,6 @@ export class ClientAgendaService {
     // ── Werk ──
     DAYS.forEach(day => {
       const dbWork = customByDayType[day].work
-      const isWeekday = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'].includes(day)
       if (dbWork.length > 0) {
         dbWork.forEach(row => {
           const start = timeStrToMinutes(row.start_time)
@@ -467,30 +464,25 @@ export class ClientAgendaService {
           }
         })
       } else {
-        // Intake-werkuren als die er zijn, anders standaard mon-fri
-        // 09:00-17:00 fallback. Intake mag meerdere werk-blokken op één
-        // dag hebben (b.v. ochtend-shift + middag-shift).
+        // Alleen werkuren tonen die de klant écht heeft opgegeven. Eén dag
+        // mag meerdere blokken hebben (ochtend- plus middagshift).
+        //
+        // Hier stond een terugval: geen intake-werkuren → toch een blok
+        // 09:00-17:00 op ma t/m vr. Dat verzon werk dat niemand had
+        // ingevuld, bij 41 van de 57 klanten, en maakte de agenda voller
+        // dan de werkelijkheid. Werk toevoegen kan nog steeds met de
+        // plus-knop bovenaan de dag.
         const intakeWork = intakePlaceholders[day]?.work || []
-        if (intakeWork.length > 0) {
-          intakeWork.forEach((blk, i) => {
-            blocksByDay[day].push({
-              id: `work-intake-${day}-${i}`,
-              day, type: 'work', label: 'Werk',
-              start: blk.start, end: blk.end,
-              color: WORK_COLOR, source: 'intake',
-              editable: true,
-              meta: { placeholder: true, from_intake: true },
-            })
-          })
-        } else if (isWeekday) {
+        intakeWork.forEach((blk, i) => {
           blocksByDay[day].push({
-            id: `work-${day}`,
+            id: `work-intake-${day}-${i}`,
             day, type: 'work', label: 'Werk',
-            start: WORK_START, end: WORK_END,
-            color: WORK_COLOR, source: 'placeholder',
-            editable: true, meta: { placeholder: true },
+            start: blk.start, end: blk.end,
+            color: WORK_COLOR, source: 'intake',
+            editable: true,
+            meta: { placeholder: true, from_intake: true },
           })
-        }
+        })
       }
     })
 

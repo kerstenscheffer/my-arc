@@ -4,7 +4,7 @@
 //   2. Voeding      -> voedings-velden uit de `clients` tabel (deel 2)
 //   3. Training     -> `user_workout_preferences` tabel (deel 3)
 import { useState, useEffect } from 'react'
-import { X, User, Utensils, Dumbbell, CheckCircle2, Clock, CalendarDays } from 'lucide-react'
+import { X, User, Utensils, Dumbbell, CheckCircle2, Clock, CalendarDays, ExternalLink } from 'lucide-react'
 import ClientAgendaView from '../../../modules/client-agenda/ClientAgendaView'
 
 const GREEN = '#10b981'
@@ -592,7 +592,10 @@ function renderSections(sections, data, toonLeeg = true) {
 
 // ---- component -------------------------------------------------------------
 
-export default function IntakeSummaryModal({ db, client, isMobile, onClose }) {
+// `onNavigate(bestemming, client)` wordt door CoachHub ingevuld: die zet de
+// klant als geselecteerd en springt naar het juiste tabblad. Zonder die prop
+// verschijnen de knoppen niet — dan is er geen plek om heen te springen.
+export default function IntakeSummaryModal({ db, client, isMobile, onClose, onNavigate }) {
   const [activeTab, setActiveTab] = useState('part1')
   const [training, setTraining] = useState(null)
   const [clientTraining, setClientTraining] = useState(null)
@@ -824,6 +827,35 @@ export default function IntakeSummaryModal({ db, client, isMobile, onClose }) {
             WebkitOverflowScrolling: 'touch'
           }}
         >
+          {/* Doorsteek naar het gereedschap dat bij dit tabblad hoort. Je
+              leest de intake meestal om er iets mee te doen; zo hoef je niet
+              eerst het modal te sluiten en de klant opnieuw op te zoeken. */}
+          {onNavigate && (() => {
+            const doel = {
+              part1:  { naar: 'command',        tekst: 'Open in Coach Command' },
+              part2:  { naar: 'ai-meals',       tekst: 'Open in Plan Analyzer' },
+              part3:  { naar: 'workout-builder', tekst: 'Open in Workout Builder' },
+              agenda: { naar: 'client-agenda',  tekst: 'Open in Agenda' },
+            }[activeTab]
+            if (!doel) return null
+            return (
+              <button
+                onClick={() => { onNavigate(doel.naar, client); onClose?.() }}
+                style={{
+                  width: '100%', marginBottom: '0.85rem',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7,
+                  padding: '0.6rem', border: 'none', borderRadius: 0,
+                  background: '#fff', color: '#0a0a0a',
+                  fontSize: '0.85rem', fontWeight: 900, fontFamily: 'inherit',
+                  cursor: 'pointer',
+                  touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+                }}
+              >
+                <ExternalLink size={14} strokeWidth={2.6} /> {doel.tekst}
+              </button>
+            )
+          })()}
+
           {activeTab === 'agenda' && (
             <div style={{ margin: '-0.5rem -0.25rem' }}>
               <ClientAgendaView

@@ -365,7 +365,7 @@ function AgendaBlock({ block, isMobile, onClick, onPointerDownDrag, draggable, i
 function DayColumn({
   day, blocks, isMobile, onBlockClick, onAddClick,
   onBlockPointerDownDrag, isDropTarget, ghostBlock, sourceBlockId, gridRef,
-  dateForHeader, isToday, geselecteerd, selectieModus,
+  dateForHeader, isToday, geselecteerd, selectieModus, onGridClick, plaatsModus,
 }) {
   return (
     <div
@@ -446,9 +446,17 @@ function DayColumn({
       <div
         ref={gridRef}
         data-day={day}
+        // In plaats-modus is de héle kolom een doelwit: waar je tikt, komt
+        // het item. De tijd volgt uit de verticale positie van de klik.
+        onClick={plaatsModus ? (e) => {
+          if (e.target !== e.currentTarget) return  // klik op een blok telt niet
+          const r = e.currentTarget.getBoundingClientRect()
+          onGridClick?.(day, (e.clientY - r.top) / r.height)
+        } : undefined}
         style={{
           position: 'relative',
           height: gridHoogte(isMobile),
+          cursor: plaatsModus ? 'copy' : undefined,
           // Grid-lijntjes elke uur. HOURS heeft 18 labels (6 t/m 23) maar
           // het venster zelf is 17 uur breed (6:00 → 23:00). Pattern moet
           // ook 17-step zijn anders sluiten label en lijntjes niet aan.
@@ -1164,6 +1172,10 @@ export default function ClientAgendaView({
   const [selectieModus, setSelectieModus] = useState(false)
   const [geselecteerd, setGeselecteerd] = useState(() => new Set())
   const [bulkBezig, setBulkBezig] = useState(false)
+  // Iets inplannen: eerst een soort aanklikken, dan een plek in de agenda.
+  // Zelfde patroon als de takenagenda — geen sleepwerk nodig, en het werkt
+  // net zo goed op een telefoon.
+  const [teplaatsen, setTeplaatsen] = useState(null)
 
   const service = useMemo(() => db?.supabase ? new ClientAgendaService(db.supabase) : null, [db])
 
@@ -1222,6 +1234,56 @@ export default function ClientAgendaView({
   }, [data])
 
   const stopSelectie = () => { setSelectieModus(false); setGeselecteerd(new Set()) }
+
+  // Vaste keuzes voor wat je snel wil inplannen. Duur in minuten, want die
+  // verschilt sterk: boodschappen doe je in een uur, meal prep kost er twee.
+  const SNELKEUZES = [
+    { id: 'boodschappen', label: 'Boodschappen', duur: 60,  kleur: '#22c55e' },
+    { id: 'mealprep',     label: 'Meal prep',    duur: 120, kleur: '#f59e0b' },
+    { id: 'cardio',       label: 'Cardio',       duur: 45,  kleur: '#06b6d4' },
+    { id: 'wandelen',     label: 'Wandelen',     duur: 45,  kleur: '#84cc16' },
+    { id: 'werk',         label: 'Werk',         duur: 480, kleur: '#64748b' },
+    { id: 'afspraak',     label: 'Afspraak',     duur: 60,  kleur: '#a855f7' },
+  ]
+
+  // Klik in het rooster → tijd. `fractie` is de verticale positie (0 = bovenaan
+  // = HOUR_START). Afronden op kwartieren: preciezer aanklikken lukt toch niet
+  // en dit leest netter terug.
+  const plaatsOpGrid = async (day, fractie) => {
+    if (!teplaatsen || bulkBezig) return
+    const minuut = HOUR_START * 60 + Math.max(0, Math.min(1, fractie)) * MINUTES_VISIBLE
+    const start = Math.round(minuut / 15) * 15
+    const eind = Math.min(24 * 60, start + teplaatsen.duur)
+    setBulkBezig(true)
+    try {
+      await service.upsertBlock({
+        id: null,
+        clientId: client.id,
+        day,
+        type: 'custom',
+        label: teplaatsen.label,
+        sublabel: null,
+        startMin: start,
+        endMin: eind,
+        color: teplaatsen.kleur,
+      })
+      await reload()
+      // Bewust niet uitzetten: meestal plan je er meteen nog een paar in.
+      // Klaar ben je met Escape of de knop 'Stop'.
+    } catch (e) {
+      console.error('inplannen mislukt:', e)
+      setMoveError(e.message || 'Inplannen mislukt')
+      setTimeout(() => setMoveError(null), 3500)
+    } finally { setBulkBezig(false) }
+  }
+
+  // Escape stopt het plaatsen — anders blijf je per ongeluk blokken zetten.
+  useEffect(() => {
+    if (!teplaatsen) return
+    const onKey = (e) => { if (e.key === 'Escape') setTeplaatsen(null) }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [teplaatsen])
 
   // Alles tegelijk een aantal minuten opschuiven. Placeholders slaan we over:
   // die bestaan nog niet in de database, dus er valt niets te verzetten.
@@ -1745,6 +1807,56 @@ export default function ClientAgendaView({
         </div>
       )}
 
+      {/* ── Snel inplannen ────────────────────────────────────────────
+          Kies een soort, tik dan een plek in de agenda. Bewust geen slepen:
+          dat werkt slecht op een telefoon en botst met het verzetten van
+          bestaande blokken. */}
+      {!isClient && !selectieModus && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', padding: '0.4rem 0' }}>
+          {SNELKEUZES.map(k => {
+            const aan = teplaatsen?.id === k.id
+            return (
+              <button
+                key={k.id}
+                onClick={() => setTeplaatsen(aan ? null : k)}
+                style={{
+                  display: 'inline-flex', alignItems: 'center', gap: 5,
+                  padding: '0.35rem 0.6rem', borderRadius: 0,
+                  background: aan ? '#fff' : 'none',
+                  border: `1px solid ${aan ? '#fff' : COLORS.border}`,
+                  color: aan ? '#000' : 'rgba(255,255,255,0.75)',
+                  fontFamily: 'inherit', fontSize: '0.75rem', fontWeight: 900,
+                  cursor: 'pointer',
+                  touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+                }}
+              >
+                <span style={{ width: 7, height: 7, background: k.kleur, flexShrink: 0 }} />
+                {k.label}
+              </button>
+            )
+          })}
+
+          {teplaatsen && (
+            <>
+              <span style={{ fontSize: '0.78rem', fontWeight: 800, color: 'rgba(255,255,255,0.6)', marginLeft: 4 }}>
+                {bulkBezig ? 'Bezig…' : `Tik een plek in de agenda · ${teplaatsen.duur} min`}
+              </span>
+              <div style={{ flex: 1 }} />
+              <button
+                onClick={() => setTeplaatsen(null)}
+                style={{
+                  padding: '0.35rem 0.6rem', background: 'none', border: 'none',
+                  color: 'rgba(255,255,255,0.5)', fontFamily: 'inherit',
+                  fontSize: '0.75rem', fontWeight: 800, cursor: 'pointer',
+                }}
+              >
+                Stop
+              </button>
+            </>
+          )}
+        </div>
+      )}
+
       {/* ── Meerdere tegelijk ─────────────────────────────────────────── */}
       {!isClient && (
         <div style={{
@@ -1851,6 +1963,8 @@ export default function ClientAgendaView({
               onAddClick={handleAddClick}
               geselecteerd={geselecteerd}
               selectieModus={selectieModus}
+              plaatsModus={!!teplaatsen}
+              onGridClick={plaatsOpGrid}
               onBlockPointerDownDrag={handleBlockPointerDown}
               isDropTarget={drag && drag.moved && drag.targetDay === day && drag.originDay !== day}
               ghostBlock={ghostByDay[day]}

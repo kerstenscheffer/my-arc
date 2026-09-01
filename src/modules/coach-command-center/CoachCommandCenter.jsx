@@ -9,7 +9,7 @@ import ClientJourneyTimeline from '../client-journey/ClientJourneyTimeline'
 import CoachVideoFeedback from '../video-feedback/CoachVideoFeedback'
 import AddClientModal from './components/AddClientModal'
 
-export default function CoachCommandCenter({ db, onSelectClient, setActiveTab, onNavigatePlan, onNavigateWorkout, onOpenMealPanel, onOpenWorkoutPanel }) {
+export default function CoachCommandCenter({ db, onSelectClient, setActiveTab, onNavigatePlan, onNavigateWorkout, onNavigateTab, onOpenMealPanel, onOpenWorkoutPanel }) {
   const isMobile = window.innerWidth <= 768
   const [loading, setLoading] = useState(true)
   const [clientsWithData, setClientsWithData] = useState([])
@@ -341,6 +341,7 @@ export default function CoachCommandCenter({ db, onSelectClient, setActiveTab, o
                 onOpenJourney={() => setJourneyClient(client)}
                 onNavigatePlan={onNavigatePlan}
                 onNavigateWorkout={onNavigateWorkout}
+                onNavigateTab={onNavigateTab}
                 db={db}
                 coachId={coachId}
                 onOpenMealPanel={onOpenMealPanel}

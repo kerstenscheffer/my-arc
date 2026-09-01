@@ -55,7 +55,7 @@ function groupPhotosByMonthAndDay(photos) {
   return months
 }
 
-export default function ClientInsightModal({ isOpen, onClose, client, isMobile, onNavigatePlan, onNavigateWorkout, db, coachId, onOpenMealPanel, onOpenWorkoutPanel, onSwitchToClientView }) {
+export default function ClientInsightModal({ isOpen, onClose, client, isMobile, onNavigatePlan, onNavigateWorkout, onNavigateTab, db, coachId, onOpenMealPanel, onOpenWorkoutPanel, onSwitchToClientView }) {
   const [selectedPhotoIndex, setSelectedPhotoIndex] = useState(0)
   const [photoZoom, setPhotoZoom] = useState(false)
   const [showGallery, setShowGallery] = useState(false)  // volledig foto-overzicht (grid)
@@ -526,6 +526,15 @@ export default function ClientInsightModal({ isOpen, onClose, client, isMobile, 
           client={effectiveClient}
           isMobile={isMobile}
           onClose={() => setShowIntake(false)}
+          // Vanaf de klantkaart bestaan er al doorsteken naar plan en workout;
+          // die hergebruiken we zodat er één route naar elk tabblad is.
+          onNavigate={(naar, c) => {
+            setShowIntake(false)
+            onClose()
+            if (naar === 'ai-meals') onNavigatePlan?.(c.id, null)
+            else if (naar === 'workout-builder') onNavigateWorkout?.(c.id)
+            else onNavigateTab?.(naar, c)
+          }}
         />
       )}
 
