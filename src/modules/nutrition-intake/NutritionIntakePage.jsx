@@ -7,6 +7,7 @@ import React, { useState, useEffect } from 'react'
 import DatabaseService from '../../services/DatabaseService'
 import { findClient } from '../../lib/publicIntakeApi'
 import './services/NutritionIntakeService'
+import CurrentMealsFlow from './components/nutrition-flow/CurrentMealsFlow'
 import EatPatternFlow   from './components/nutrition-flow/EatPatternFlow'
 import KnowledgeFlow    from './components/nutrition-flow/KnowledgeFlow'
 import RestrictionsFlow from './components/nutrition-flow/RestrictionsFlow'
@@ -16,11 +17,12 @@ import ExtrasFlow       from './components/nutrition-flow/ExtrasFlow'
 const isMobileCheck = () => window.innerWidth <= 768
 
 const FLOWS = [
-  { id: 'eat_pattern',  label: 'Eetpatroon' },
-  { id: 'knowledge',    label: 'Kennis' },
-  { id: 'restrictions', label: 'Restricties' },
-  { id: 'practical',    label: 'Praktisch' },
-  { id: 'extras',       label: 'Extras' },
+  { id: 'current_meals', label: 'Huidige gewoonten' },
+  { id: 'eat_pattern',   label: 'Eetpatroon' },
+  { id: 'knowledge',     label: 'Kennis' },
+  { id: 'restrictions',  label: 'Restricties' },
+  { id: 'practical',     label: 'Praktisch' },
+  { id: 'extras',        label: 'Extras' },
 ]
 
 const TABS = [
@@ -75,6 +77,16 @@ function mapToNutritionPreferences(flowData) {
       // Wat werkt
       wat_werkte:              flowData.wat_werkte             || null,
       wat_werkte_toelichting:  flowData.wat_werkte_toelichting || null,
+    },
+    current_habits: {
+      ontbijt:     flowData.current_meals_ontbijt || null,
+      lunch:       flowData.current_meals_lunch   || null,
+      diner:       flowData.current_meals_diner   || null,
+      snack:       flowData.current_meals_snack   || null,
+      extra_count: parseInt(flowData.current_meals_extra_count || '0', 10),
+      extras: Array.from({ length: parseInt(flowData.current_meals_extra_count || '0', 10) }, (_, i) =>
+        flowData[`current_meals_extra_${i}`] || null
+      ).filter(Boolean),
     },
     supplement_preferences: {
       openness: flowData.supps_openheid || null,
@@ -299,11 +311,12 @@ export default function NutritionIntakePage() {
 
         <ProgressBar activeFlow={activeFlow} totalFlows={FLOWS.length} isMobile={isMobile} />
 
-        {activeFlow === 0 && <EatPatternFlow  {...flowProps} />}
-        {activeFlow === 1 && <KnowledgeFlow   {...flowProps} />}
-        {activeFlow === 2 && <RestrictionsFlow {...flowProps} />}
-        {activeFlow === 3 && <PracticalFlow   {...flowProps} />}
-        {activeFlow === 4 && <ExtrasFlow      {...flowProps} onNext={handleFlowNext} />}
+        {activeFlow === 0 && <CurrentMealsFlow {...flowProps} />}
+        {activeFlow === 1 && <EatPatternFlow  {...flowProps} />}
+        {activeFlow === 2 && <KnowledgeFlow   {...flowProps} />}
+        {activeFlow === 3 && <RestrictionsFlow {...flowProps} />}
+        {activeFlow === 4 && <PracticalFlow   {...flowProps} />}
+        {activeFlow === 5 && <ExtrasFlow      {...flowProps} onNext={handleFlowNext} />}
 
         {isSubmitting && (
           <div style={{ padding: '1rem', textAlign: 'center' }}>
