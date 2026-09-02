@@ -637,6 +637,23 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
 
         {/* ── Acties — onder elkaar i.p.v. tien knoppen op een rij ─────── */}
         <div style={{ borderTop: '1px solid rgba(255,255,255,0.07)', paddingTop: '0.6rem', display: 'flex', flexDirection: 'column', gap: 1 }}>
+          {/* Opslaan bovenaan: het is de actie die je het vaakst doet, en
+              onderaan de kolom viel 'ie buiten beeld. */}
+          <button onClick={selectedSchemaId ? saveToClientSchema : saveAsTemplate}
+            disabled={saving || workoutPlan.days.length === 0 || (!selectedSchemaId && !workoutPlan.name)}
+            style={{
+              marginBottom: '0.5rem', width: '100%',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+              padding: '0.6rem', borderRadius: 8, border: 'none',
+              background: '#fff', color: '#0a0a0a',
+              fontSize: '0.85rem', fontWeight: 900, fontFamily: 'inherit',
+              cursor: saving ? 'wait' : 'pointer',
+              opacity: (workoutPlan.days.length === 0 || (!selectedSchemaId && !workoutPlan.name)) ? 0.45 : 1,
+              touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+            }}>
+            <Save size={15} strokeWidth={2.6} />
+            {saving ? 'Opslaan…' : selectedSchemaId ? 'Opslaan in client plan' : 'Opslaan als template'}
+          </button>
           <button onClick={() => setShowPlanManager(true)} style={zijKnop({ color: '#fff', fontWeight: 900 })}>
             <Users size={14} /> Plannen toewijzen
           </button>
@@ -666,22 +683,6 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
             </button>
           </div>
 
-          {/* Eén primaire actie onderaan. */}
-          <button onClick={selectedSchemaId ? saveToClientSchema : saveAsTemplate}
-            disabled={saving || workoutPlan.days.length === 0 || (!selectedSchemaId && !workoutPlan.name)}
-            style={{
-              marginTop: '0.5rem', width: '100%',
-              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-              padding: '0.6rem', borderRadius: 8, border: 'none',
-              background: '#fff', color: '#0a0a0a',
-              fontSize: '0.85rem', fontWeight: 900, fontFamily: 'inherit',
-              cursor: saving ? 'wait' : 'pointer',
-              opacity: (workoutPlan.days.length === 0 || (!selectedSchemaId && !workoutPlan.name)) ? 0.45 : 1,
-              touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-            }}>
-            <Save size={15} strokeWidth={2.6} />
-            {saving ? 'Opslaan…' : selectedSchemaId ? 'Opslaan in client plan' : 'Opslaan als template'}
-          </button>
         </div>
       </div>
 
