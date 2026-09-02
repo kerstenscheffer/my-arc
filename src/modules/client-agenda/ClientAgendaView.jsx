@@ -24,19 +24,26 @@ const COLORS = {
   green: '#22c55e',
 }
 
-// Tijdas: 6:00 → 23:00 (slaap wordt apart als block aan rand getoond)
+// Tijdas: 6:00 → 24:00 (slaap wordt apart als block aan rand getoond)
 const HOUR_START = 6
-const HOUR_END = 23
+// Tot middernacht. Stond op 23, waardoor een slaapblok dat om 22:00 begint
+// op 23:00 werd afgeknipt en dus korter leek dan het is.
+const HOUR_END = 24
 const HOURS = Array.from({ length: HOUR_END - HOUR_START + 1 }, (_, i) => HOUR_START + i)
 
 // Hoogte van het weekrooster. Stond als los getal in zowel DayColumn als
 // TimeAxis; die moeten gelijk blijven of de uurlabels sluiten niet meer aan
 // op de lijntjes. Verlaagd van 850/680 zodat de hele agenda — kop, weekbalk,
 // selectiebalk en rooster — op één scherm past zonder scrollen.
-const GRID_HOOGTE = { desktop: 600, mobiel: 470 }
+// Ondergrens, geen vaste maat. Het rooster vult de ruimte die het krijgt:
+// past het hele venster (6:00-23:00) er ruim in, dan wordt het hoger; is er
+// weinig ruimte, dan drukt het samen tot dit minimum en scrollt de omhullende.
+// Eerder was dit een harde 600px binnen een overflow:hidden — dan verdwenen
+// de laatste uren gewoon, en dat is precies wat je niet wil zien in een agenda.
+const GRID_MIN_HOOGTE = { desktop: 520, mobiel: 430 }
 const KOP_HOOGTE = { desktop: '1.75rem', mobiel: '1.55rem' }
 const kopHoogte = (isMobile) => (isMobile ? KOP_HOOGTE.mobiel : KOP_HOOGTE.desktop)
-const gridHoogte = (isMobile) => (isMobile ? GRID_HOOGTE.mobiel : GRID_HOOGTE.desktop)
+const gridMinHoogte = (isMobile) => (isMobile ? GRID_MIN_HOOGTE.mobiel : GRID_MIN_HOOGTE.desktop)
 const MINUTES_VISIBLE = (HOUR_END - HOUR_START) * 60
 
 const minToTop = (min) => {
@@ -435,6 +442,7 @@ function DayColumn({
         flex: 1, minWidth: 0,
         borderRight: `1px solid ${COLORS.border}`,
         position: 'relative',
+        display: 'flex', flexDirection: 'column',
         background: isDropTarget ? 'rgba(255,255,255,0.04)' : COLORS.panel,
         transition: 'background 0.12s ease',
       }}>
@@ -517,7 +525,7 @@ function DayColumn({
         } : undefined}
         style={{
           position: 'relative',
-          height: gridHoogte(isMobile),
+          flex: 1, minHeight: gridMinHoogte(isMobile),
           cursor: plaatsModus ? 'copy' : undefined,
           // Grid-lijntjes elke uur. HOURS heeft 18 labels (6 t/m 23) maar
           // het venster zelf is 17 uur breed (6:00 → 23:00). Pattern moet
@@ -563,6 +571,7 @@ function TimeAxis({ isMobile }) {
     <div style={{
       width: isMobile ? 28 : 36, flexShrink: 0,
       borderRight: `1px solid ${COLORS.border}`,
+      display: 'flex', flexDirection: 'column',
     }}>
       <div style={{
         padding: isMobile ? '0.4rem 0.3rem' : '0.5rem 0.4rem',
@@ -572,7 +581,7 @@ function TimeAxis({ isMobile }) {
       }} />
       <div style={{
         position: 'relative',
-        height: gridHoogte(isMobile),
+        flex: 1, minHeight: gridMinHoogte(isMobile),
       }}>
         {HOURS.map((h, idx) => (
           <div key={h} style={{
@@ -591,7 +600,7 @@ function TimeAxis({ isMobile }) {
             fontWeight: 900,
             letterSpacing: '-0.02em',
           }}>
-            {String(h).padStart(2, '0')}
+            {String(h % 24).padStart(2, '0')}
           </div>
         ))}
       </div>
@@ -2007,7 +2016,10 @@ export default function ClientAgendaView({
         display: 'flex',
         border: `1px solid ${COLORS.border}`,
         borderRadius: 0,
-        overflow: 'hidden',
+        // Verticaal scrollen i.p.v. verbergen: raakt de ruimte onder het
+        // minimum, dan scroll je naar de late uren in plaats van ze kwijt
+        // te raken. Horizontaal blijft dicht, de zeven dagen passen altijd.
+        overflowY: 'auto', overflowX: 'hidden',
         background: COLORS.bg,
       }}>
         <TimeAxis isMobile={isMobile} />
