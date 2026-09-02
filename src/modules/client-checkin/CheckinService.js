@@ -334,31 +334,34 @@ export default class CheckinService {
         }
       }
 
-      const totals = checkins.reduce((acc, c) => {
-        acc.voeding += c.voeding_score || 0
-        acc.weekend += c.weekend_score || 0
-        acc.slaap += c.slaap_score || 0
-        acc.training += c.training_score || 0
-        acc.energie += c.energie_score || 0
-        acc.motivatie += c.motivatie_score || 0
-        return acc
-      }, { voeding: 0, weekend: 0, slaap: 0, training: 0, energie: 0, motivatie: 0 })
+      // Per onderdeel apart tellen hoeveel check-ins er een score voor
+      // hadden. Delen door het totaal aantal check-ins trok de gemiddelden
+      // omlaag zodra een onderdeel ontbrak — en bij het formulier vanaf
+      // sep 2026 ontbreken voeding, weekend, slaap, training en motivatie
+      // allemaal.
+      const totals = { voeding: 0, weekend: 0, slaap: 0, training: 0, energie: 0, motivatie: 0 }
+      const tellers = { voeding: 0, weekend: 0, slaap: 0, training: 0, energie: 0, motivatie: 0 }
+      const velden = { voeding: 'voeding_score', weekend: 'weekend_score', slaap: 'slaap_score',
+                       training: 'training_score', energie: 'energie_score', motivatie: 'motivatie_score' }
+      for (const c of checkins) {
+        for (const [k, veld] of Object.entries(velden)) {
+          const n = Number(c[veld])
+          if (Number.isFinite(n) && n > 0) { totals[k] += n; tellers[k]++ }
+        }
+      }
+      const gem = (k) => (tellers[k] ? (totals[k] / tellers[k]).toFixed(1) : '0.0')
 
       const count = checkins.length
 
       const stats = {
         total: count,
-        avgVoeding: (totals.voeding / count).toFixed(1),
-        avgWeekend: (totals.weekend / count).toFixed(1),
-        avgSlaap: (totals.slaap / count).toFixed(1),
-        avgTraining: (totals.training / count).toFixed(1),
-        avgEnergie: (totals.energie / count).toFixed(1),
-        avgMotivatie: (totals.motivatie / count).toFixed(1),
-        avgOverall: (
-          (totals.voeding + totals.weekend + totals.slaap +
-            totals.training + totals.energie + totals.motivatie) /
-          (count * 6)
-        ).toFixed(1)
+        avgVoeding: gem('voeding'),
+        avgWeekend: gem('weekend'),
+        avgSlaap: gem('slaap'),
+        avgTraining: gem('training'),
+        avgEnergie: gem('energie'),
+        avgMotivatie: gem('motivatie'),
+        avgOverall: this.calculateAverage(checkins).toFixed(1)
       }
 
       // Calculate trend
@@ -394,33 +397,38 @@ export default class CheckinService {
   calculateAverage(checkins) {
     if (!checkins || checkins.length === 0) return 0
 
-    const total = checkins.reduce((sum, c) => {
-      return sum +
-        (c.voeding_score || 0) +
-        (c.weekend_score || 0) +
-        (c.slaap_score || 0) +
-        (c.training_score || 0) +
-        (c.energie_score || 0) +
-        (c.motivatie_score || 0)
-    }, 0)
-
-    return total / (checkins.length * 6)
+    // Som en teller over alleen de ingevulde scores — zie de opmerking bij
+    // calculateOverallScore. Deelde eerder door checkins × 6.
+    let som = 0, aantal = 0
+    for (const c of checkins) {
+      for (const v of [c.voeding_score, c.weekend_score, c.slaap_score,
+                       c.training_score, c.energie_score, c.motivatie_score]) {
+        const n = Number(v)
+        if (Number.isFinite(n) && n > 0) { som += n; aantal++ }
+      }
+    }
+    return aantal ? som / aantal : 0
   }
 
   calculateOverallScore(checkin) {
     if (!checkin) return 0
 
+    // Delen door het AANTAL INGEVULDE scores, niet hard door zes. Het
+    // formulier vanaf sep 2026 heeft er nog maar één (energie); door zes
+    // delen maakte daar 7 tot 1.2 van — een prima week las als een ramp.
+    // Ook oude check-ins met een overgeslagen score worden nu niet meer
+    // omlaag getrokken.
     const scores = [
-      checkin.voeding_score || 0,
-      checkin.weekend_score || 0,
-      checkin.slaap_score || 0,
-      checkin.training_score || 0,
-      checkin.energie_score || 0,
-      checkin.motivatie_score || 0
-    ]
+      checkin.voeding_score,
+      checkin.weekend_score,
+      checkin.slaap_score,
+      checkin.training_score,
+      checkin.energie_score,
+      checkin.motivatie_score,
+    ].map(Number).filter(n => Number.isFinite(n) && n > 0)
 
-    const total = scores.reduce((sum, score) => sum + score, 0)
-    return (total / 6).toFixed(1)
+    if (scores.length === 0) return 0
+    return (scores.reduce((sum, n) => sum + n, 0) / scores.length).toFixed(1)
   }
 
   getWeekStart() {

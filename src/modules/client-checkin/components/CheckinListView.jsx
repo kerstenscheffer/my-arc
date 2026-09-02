@@ -60,6 +60,10 @@ export default function CheckinListView({
   
   // Calculate average score for a check-in
   const getAverageScore = (checkin) => {
+    // Het formulier vanaf sep 2026 (versie 2) heeft nog maar één score:
+    // energie. Die als gemiddelde over zes onderdelen tonen suggereert een
+    // totaalbeeld dat er niet is. 0 = geen bolletje in de lijst.
+    if (checkin?.formulier_versie === 2) return 0
     const scores = [
       checkin.voeding_score,
       checkin.weekend_score,

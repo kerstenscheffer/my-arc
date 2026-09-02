@@ -41,6 +41,10 @@ const scoreColor = (n) => {
 }
 
 const overallScore = (c) => {
+  // Het formulier vanaf sep 2026 (versie 2) heeft nog maar één score:
+  // energie. Die als "gemiddelde" presenteren suggereert een totaalbeeld dat
+  // er niet is — dus geen cijfer tonen bij die check-ins.
+  if (c?.formulier_versie === 2) return null
   const fields = ['voeding_score', 'training_score', 'slaap_score', 'weekend_score', 'energie_score', 'motivatie_score']
   const vals = fields.map(f => parseFloat(c[f])).filter(v => Number.isFinite(v) && v > 0)
   if (vals.length === 0) return null
@@ -165,6 +169,42 @@ function CheckinCard({ checkin, isMobile }) {
             </div>
           )}
 
+          {/* Harde cijfers uit het formulier vanaf sep 2026. De oude
+              secties hieronder blijven leeg bij zo'n check-in en vallen
+              vanzelf weg; deze rij vervangt ze. */}
+          {checkin.formulier_versie === 2 && (() => {
+            const vul = (v) => v !== null && v !== undefined && v !== ''
+            const rijen = [
+              { label: 'Trainingen', val: vul(checkin.training_gedaan)
+                  ? `${checkin.training_gedaan}${vul(checkin.training_gepland) ? `/${checkin.training_gepland}` : ''}` : null },
+              { label: 'Gelogd',     val: checkin.training_gelogd },
+              { label: 'Tot falen',  val: checkin.training_falen },
+              { label: 'Gewogen',    val: vul(checkin.dagen_gewogen) ? `${checkin.dagen_gewogen}/7` : null },
+              { label: 'Op plan',    val: vul(checkin.dagen_voeding) ? `${checkin.dagen_voeding}/7` : null },
+              { label: 'Alcohol',    val: vul(checkin.alcohol_aantal) ? `${checkin.alcohol_aantal}` : null },
+              { label: 'Slaap',      val: vul(checkin.slaap_uren_gem) ? `${checkin.slaap_uren_gem}u` : null },
+            ].filter(r => vul(r.val))
+            if (!rijen.length) return null
+            return (
+              <div style={{
+                display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(88px, 1fr))',
+                gap: 6, padding: '0.5rem 0',
+              }}>
+                {rijen.map(r => (
+                  <div key={r.label} style={{
+                    padding: '0.4rem 0.5rem',
+                    background: 'rgba(255,255,255,0.04)',
+                    border: '1px solid rgba(255,255,255,0.08)',
+                    borderRadius: 7,
+                  }}>
+                    <div style={{ fontSize: '0.68rem', fontWeight: 700, color: G.textFaint }}>{r.label}</div>
+                    <div style={{ fontSize: '0.88rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.01em' }}>{r.val}</div>
+                  </div>
+                ))}
+              </div>
+            )
+          })()}
+
           {/* Wins / struggles */}
           {checkin.wins && (
             <NoteBlock label="Wins" text={checkin.wins} accent={G.good}>
@@ -173,6 +213,12 @@ function CheckinCard({ checkin, isMobile }) {
           )}
           {checkin.struggles && (
             <NoteBlock label="Struggles" text={checkin.struggles} accent={G.warn}>
+              <AlertTriangle size={10} />
+            </NoteBlock>
+          )}
+
+          {checkin.vastgelopen && (
+            <NoteBlock label="Vastgelopen op" text={checkin.vastgelopen} accent={G.warn}>
               <AlertTriangle size={10} />
             </NoteBlock>
           )}
