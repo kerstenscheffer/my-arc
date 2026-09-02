@@ -1,7 +1,7 @@
 // src/modules/ai-meal-generator/MealPlanGenerator.jsx
 // v2.0 — Gold/black CoachHub styling, no extra wrapper, full width
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useLayoutEffect, useRef } from 'react'
 import { Users, BarChart3, AlertCircle, Check } from 'lucide-react'
 
 import ClientSelector from './tabs/ClientSelector'
@@ -31,6 +31,26 @@ const TABS = [
 const DEMO_EMAIL = 'demo@myarcfitness.internal'
 
 export default function MealPlanGenerator({ db, clients = [], conceptPlanId, selectedClient: propSelectedClient, coachId}) {
+  // De tabbalk hierboven is sticky. Alles wat in een tab zélf sticky wil
+  // staan (de zijbalk van de Analyzer, het dock-paneel, de plantitel) moet
+  // daar precies onder beginnen, anders schuift het eronder weg. We meten de
+  // balk in plaats van de hoogte te gokken: hij verandert met de tekstgrootte
+  // en met de veilige zone bovenaan op een telefoon.
+  const tabBarRef = useRef(null)
+  const [tabBarBottom, setTabBarBottom] = useState(76)
+  useLayoutEffect(() => {
+    const meet = () => {
+      const el = tabBarRef.current
+      if (!el) return
+      // getComputedStyle rekent de calc() met env() al voor ons uit.
+      const top = parseFloat(getComputedStyle(el).top) || 0
+      setTabBarBottom(Math.round(top + el.offsetHeight))
+    }
+    meet()
+    window.addEventListener('resize', meet)
+    return () => window.removeEventListener('resize', meet)
+  }, [])
+
   const isMobile = window.innerWidth <= 768
   const m = isMobile
 
@@ -185,7 +205,7 @@ export default function MealPlanGenerator({ db, clients = [], conceptPlanId, sel
       )
       case 3: return (
         <PlanAnalyzer
-          coachId={coachId}
+          coachId={coachId} topOffset={tabBarBottom}
           db={db} generatedPlan={generatedPlan} analyzedData={analyzedData}
           planModifications={planModifications} setPlanModifications={setPlanModifications}
           dailyTargets={dailyTargets} isMobile={m}
@@ -212,7 +232,7 @@ export default function MealPlanGenerator({ db, clients = [], conceptPlanId, sel
     <div style={{ minHeight: '100vh', background: '#0a0a0a' }}>
 
       {/* ═══ TAB BAR + INLINE CLIENT PICKER — sticky ═══ */}
-      <div style={{
+      <div ref={tabBarRef} style={{
         display: 'flex', alignItems: 'stretch',
         borderBottom: `1px solid ${G.border}`,
         background: 'rgba(10, 10, 10, 0.97)',

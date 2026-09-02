@@ -46,7 +46,7 @@ const MAX_HISTORY = 50
 export default function PlanAnalyzer({
   db, generatedPlan, planModifications, setPlanModifications,
   dailyTargets, isMobile, conceptPlanId, clientId, onPlanActivated,
-  onConceptLoaded, coachId
+  onConceptLoaded, coachId, topOffset = 76
 }) {
   const [activeDay, setActiveDay] = useState(0)
   // Agenda opent nu in het dock-vak (dockedSection === 'agenda').
@@ -334,6 +334,12 @@ export default function PlanAnalyzer({
   // selectedConceptId || planMeta?.id. Verschilden die twee, dan landde de
   // pre-workout maaltijd in het ene plan terwijl de tijdlijn het andere
   // toonde — en leek de maaltijd verdwenen. Nu één constante.
+  // Waar begint de ruimte onder de sticky tabbalk, en hoeveel hoogte houden
+  // we over? Beide stonden hardgecodeerd: de zijbalk en het dock-paneel
+  // kleefden aan top:0 en verdwenen daardoor onder die balk.
+  const kleefTop = topOffset
+  const paneelHoogte = `calc(100dvh - ${topOffset + ZWEVENDE_NAV_HOOGTE}px)`
+
   const actievePlanId = planMeta?.id || selectedConceptId || null
 
   // ════════════ HELPERS ════════════
@@ -868,9 +874,10 @@ export default function PlanAnalyzer({
         display: 'flex', flexDirection: 'column', alignItems: 'center',
         padding: '10px 0', gap: 6,
         overflowY: 'auto', WebkitOverflowScrolling: 'touch',
-        // Meescrollen met de pagina, niet mee naar beneden verdwijnen.
-        position: 'sticky', top: 0,
-        maxHeight: `calc(100dvh - ${ZWEVENDE_NAV_HOOGTE}px)`,
+        // Meescrollen met de pagina, niet mee naar beneden verdwijnen —
+        // en beginnen onder de tabbalk, niet eronder verdwijnen.
+        position: 'sticky', top: kleefTop,
+        maxHeight: paneelHoogte,
       }}>
         {/* Activeer knop */}
         {planMeta && (() => {
@@ -994,10 +1001,10 @@ export default function PlanAnalyzer({
           // eronder onder de vouw viel. Nu is het precies zo hoog als het
           // scherm (min de zwevende navbalk) en scrollt alleen de inhoud;
           // de knoppenbalk onderin blijft daardoor altijd zichtbaar.
-          height: `calc(100dvh - ${ZWEVENDE_NAV_HOOGTE}px)`,
+          height: paneelHoogte,
           ...(m
-            ? { position: 'fixed', left: 72, right: 0, top: 0, zIndex: 40 }
-            : { position: 'sticky', top: 0, flexBasis: dockWidth, width: dockWidth }),
+            ? { position: 'fixed', left: 72, right: 0, top: kleefTop, zIndex: 40 }
+            : { position: 'sticky', top: kleefTop, flexBasis: dockWidth, width: dockWidth }),
         }}>
           {/* Swap + "toepassen op dagen" openen met voorrang in het modal vak
               (getriggerd door de knoppen op een meal card). */}
@@ -1121,8 +1128,15 @@ export default function PlanAnalyzer({
         />
       )}
 
-      {/* ════════════ MAIN BUILDER ════════════ */}
-      <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+      {/* ════════════ MAIN BUILDER ════════════
+          Kleeft onder de tabbalk, net als de zijbalk en het dock. Deze kolom
+          had al flex:1 + overflow:hidden met scrollende kinderen — die opzet
+          werkt alleen als de kolom een échte hoogte heeft. Zonder dat groeide
+          hij door en verdween de plantitel onder de tabbalk. */}
+      <div style={{
+        flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden',
+        position: 'sticky', top: kleefTop, height: paneelHoogte,
+      }}>
 
         {/* Titel van het geladen plan — bewerkbaar, slaat hard op dit plan op. */}
         {(planMeta || selectedConceptId) && (
