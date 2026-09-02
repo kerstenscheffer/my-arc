@@ -1,7 +1,7 @@
 // src/coach/CoachHub.jsx - REFACTOR v3.0
 // Gold Theme | Top Tabs | Hash Routing | Categorized Dropdown | Compact
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useLayoutEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import DatabaseService from '../services/DatabaseService'
 import useIsMobile from '../hooks/useIsMobile'
@@ -52,7 +52,7 @@ import LabHub from '../modules/lab/LabHub'
 import {
   Home, Wand2, Send, Users, ClipboardCheck, UserPlus, Shield,
   Sparkles, Trophy, Video, Phone, Activity, BarChart3, LogOut,
-  Menu, X, ChevronDown, ChevronRight, Dumbbell, Target, Crown, FileText,
+  Menu, X, ChevronDown, ChevronRight, Dumbbell, Target, Crown, FileText, Columns2,
   Flame, Globe, Save, Zap, DollarSign, Pill, MoreHorizontal, Settings, Calendar,
   Bell, Bug, Lightbulb, AlertCircle, Image as ImageIcon, FlaskConical,
   Eye, EyeOff, ListTodo, ArrowLeft
@@ -139,6 +139,12 @@ const MORE_CATEGORIES = [
   }
 ]
 
+// De zwevende navbalk staat fixed op bottom:30 en is ~70px hoog.
+const ZWEVENDE_NAV_RUIMTE = 105
+
+const SPLIT_KEY = 'myarc_coachhub_split_tab'
+const SPLIT_RATIO_KEY = 'myarc_coachhub_split_ratio'
+
 // All valid tab IDs for hash routing
 const ALL_TAB_IDS = [
   ...PRIMARY_TABS.map(t => t.id),
@@ -174,6 +180,70 @@ const setHashTab = (id) => {
 // ============================================
 export default function CoachHub() {
   const [activeTab, setActiveTab] = useState(getHashTab)
+  // ── Split screen ──────────────────────────────────────────────────────
+  // Twee tabbladen naast elkaar, bijvoorbeeld het voedingsplan links en de
+  // workout builder rechts. null = uit. Alleen op desktop: op een telefoon
+  // levert een halve kolom niets bruikbaars op.
+  // Blijft bewaard over een herlaad heen — je zit er meestal een tijd in.
+  const [splitTab, setSplitTab] = useState(() => {
+    try {
+      const v = localStorage.getItem(SPLIT_KEY)
+      return v && ALL_TAB_IDS.includes(v) ? v : null
+    } catch { return null }
+  })
+  const [splitRatio, setSplitRatio] = useState(() => {
+    const v = Number(localStorage.getItem(SPLIT_RATIO_KEY))
+    return Number.isFinite(v) && v >= 25 && v <= 75 ? v : 50
+  })
+  const splitRef = useRef(null)
+
+  useEffect(() => {
+    try {
+      if (splitTab) localStorage.setItem(SPLIT_KEY, splitTab)
+      else localStorage.removeItem(SPLIT_KEY)
+    } catch { /* private mode */ }
+  }, [splitTab])
+
+  // Sleep de scheidslijn. Percentages i.p.v. pixels, zodat de verhouding
+  // klopt blijft als het venster van formaat verandert.
+  const startSplitResize = (e) => {
+    e.preventDefault()
+    const bak = splitRef.current
+    if (!bak) return
+    const verplaats = (ev) => {
+      const r = bak.getBoundingClientRect()
+      const pct = ((ev.clientX - r.left) / r.width) * 100
+      setSplitRatio(Math.min(75, Math.max(25, pct)))
+    }
+    const stop = () => {
+      window.removeEventListener('pointermove', verplaats)
+      window.removeEventListener('pointerup', stop)
+      try { localStorage.setItem(SPLIT_RATIO_KEY, String(Math.round(splitRatioRef.current))) } catch { /* ignore */ }
+    }
+    window.addEventListener('pointermove', verplaats)
+    window.addEventListener('pointerup', stop)
+  }
+  // Hoe hoog mag de split-strook zijn? Dat hangt af van waar 'ie begint (de
+  // header erboven verandert van hoogte met de doelgroepenbalk en de veilige
+  // zone) en van de zwevende navbalk onderaan. Meten in plaats van een getal
+  // invullen dat op de ene schermmaat wel en op de andere niet klopt.
+  const [splitHoogte, setSplitHoogte] = useState('70vh')
+  useLayoutEffect(() => {
+    if (!splitActief) return
+    const meet = () => {
+      const el = splitRef.current
+      if (!el) return
+      const top = Math.round(el.getBoundingClientRect().top + window.scrollY)
+      setSplitHoogte(`calc(100dvh - ${top + ZWEVENDE_NAV_RUIMTE}px)`)
+    }
+    meet()
+    window.addEventListener('resize', meet)
+    return () => window.removeEventListener('resize', meet)
+  }, [splitActief])
+
+  const splitRatioRef = useRef(splitRatio)
+  useEffect(() => { splitRatioRef.current = splitRatio }, [splitRatio])
+
   const [navStack, setNavStack] = useState([]) // tab-geschiedenis voor de terug-knop
   const [moreOpen, setMoreOpen] = useState(false)
   const [loading, setLoading] = useState(false)
@@ -386,13 +456,17 @@ export default function CoachHub() {
     setMoreOpen(false)
   }
 
+  // Split alleen op desktop. Op een telefoon is een halve kolom onbruikbaar,
+  // en de meeste tabs hebben daar al hun eigen mobiele indeling.
+  const splitActief = !!splitTab && !isMobile && !clientMode
+
   const isPrimaryTab = PRIMARY_TABS.some(t => t.id === activeTab)
   const isMoreTab = !isPrimaryTab
 
   // ============================================
   // RENDER TAB CONTENT
   // ============================================
-  const renderTabContent = () => {
+  const renderTabContent = (tabId = activeTab) => {
     if (loading) {
       return (
         <div style={{
@@ -415,7 +489,7 @@ export default function CoachHub() {
       )
     }
 
-    switch (activeTab) {
+    switch (tabId) {
       case 'command':
         return (
           <CoachCommandCenter 
@@ -792,6 +866,30 @@ export default function CoachHub() {
               </>
             )}
           </div>
+
+          {/* Split screen — twee tabbladen naast elkaar. Alleen op desktop:
+              op een telefoon houd je twee halve kolommen over waar niets in
+              past. Start standaard met de workout builder ernaast, want dat
+              is de combinatie waarvoor dit gebouwd is (voeding + training). */}
+          {!isMobile && (
+            <button
+              onClick={() => setSplitTab(t => t ? null : (activeTab === 'workout-builder' ? 'ai-meals' : 'workout-builder'))}
+              title={splitTab ? 'Split screen uit' : 'Split screen: tweede tabblad ernaast'}
+              style={{
+                flexShrink: 0, padding: '0 0.9rem',
+                display: 'flex', alignItems: 'center', gap: '0.35rem',
+                background: 'transparent', border: 'none',
+                borderBottom: splitTab ? `2px solid ${G.primary}` : '2px solid transparent',
+                color: splitTab ? G.primary : 'rgba(255,255,255,0.35)',
+                fontSize: '0.8rem', fontWeight: splitTab ? 700 : 500,
+                cursor: 'pointer', fontFamily: 'inherit',
+                touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+              }}
+            >
+              <Columns2 size={16} />
+              Split
+            </button>
+          )}
         </div>
         )}
       </header>
@@ -831,9 +929,55 @@ export default function CoachHub() {
         minHeight: 'calc(100vh - 100px)',
         // Ruimte onderaan voor de floating bottom-nav (zelfde pattern als
         // ClientDashboard) — anders verdwijnt content onder de balk.
-        paddingBottom: '120px',
+        paddingBottom: splitActief ? 0 : '120px',
       }}>
-        {renderTabContent()}
+        {splitActief ? (
+          // Twee tabbladen naast elkaar. De hele strook is schermhoog en elk
+          // paneel scrollt apart — anders schuift de rechterkant mee als je
+          // links naar beneden gaat, en dat is precies wat je niet wil bij
+          // twee dingen die je naast elkaar legt.
+          <div ref={splitRef} style={{
+            display: 'flex', alignItems: 'stretch',
+            height: splitHoogte,
+          }}>
+            <div style={{ width: `${splitRatio}%`, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
+              <PaneelKop
+                tabId={activeTab}
+                onKies={(id) => navigateTo(id)}
+                kant="links"
+              />
+              <div style={{ flex: 1, minWidth: 0, overflow: 'auto', WebkitOverflowScrolling: 'touch' }}>
+                {renderTabContent(activeTab)}
+              </div>
+            </div>
+
+            <div
+              onPointerDown={startSplitResize}
+              title="Sleep om de verdeling te wijzigen"
+              style={{
+                width: 7, flexShrink: 0, cursor: 'col-resize',
+                background: 'rgba(255,255,255,0.06)',
+                borderLeft: '1px solid rgba(255,255,255,0.08)',
+                borderRight: '1px solid rgba(255,255,255,0.08)',
+                touchAction: 'none',
+              }}
+              onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.2)' }}
+              onMouseLeave={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.06)' }}
+            />
+
+            <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
+              <PaneelKop
+                tabId={splitTab}
+                onKies={(id) => setSplitTab(id)}
+                onSluit={() => setSplitTab(null)}
+                kant="rechts"
+              />
+              <div style={{ flex: 1, minWidth: 0, overflow: 'auto', WebkitOverflowScrolling: 'touch' }}>
+                {renderTabContent(splitTab)}
+              </div>
+            </div>
+          </div>
+        ) : renderTabContent()}
       </main>
 
       {/* ═══ FLOATING BOTTOM NAV ═══ */}
@@ -1229,6 +1373,66 @@ export default function CoachHub() {
         input, select, textarea { font-size: 16px !important; }
         button { font-family: inherit; }
       `}</style>
+    </div>
+  )
+}
+
+
+// ── Paneel-kop voor split screen ────────────────────────────────────────────
+// Per helft: welk tabblad staat hier, en een keuzelijst om te wisselen. Een
+// native select i.p.v. een eigen dropdown: hij past in 26px hoogte, groepeert
+// vanzelf per categorie en werkt met het toetsenbord.
+function PaneelKop({ tabId, onKies, onSluit, kant }) {
+  return (
+    <div style={{
+      display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0,
+      padding: '0.35rem 0.6rem',
+      background: '#0d0d0d',
+      borderBottom: '1px solid rgba(255,255,255,0.08)',
+    }}>
+      <span style={{
+        fontSize: '0.55rem', fontWeight: 800, letterSpacing: '0.1em',
+        textTransform: 'uppercase', color: 'rgba(255,255,255,0.25)', flexShrink: 0,
+      }}>
+        {kant}
+      </span>
+      <select
+        value={tabId || ''}
+        onChange={(e) => onKies(e.target.value)}
+        style={{
+          flex: 1, minWidth: 0,
+          background: 'rgba(255,255,255,0.05)',
+          border: '1px solid rgba(255,255,255,0.1)',
+          borderRadius: 6, color: '#fff',
+          fontSize: '0.78rem', fontWeight: 800, fontFamily: 'inherit',
+          padding: '0.25rem 0.4rem', outline: 'none', cursor: 'pointer',
+        }}
+      >
+        {PRIMARY_TABS.map(t => (
+          <option key={t.id} value={t.id} style={{ background: '#111' }}>{t.label}</option>
+        ))}
+        {MORE_CATEGORIES.map(cat => (
+          <optgroup key={cat.label} label={cat.label} style={{ background: '#111' }}>
+            {cat.items.map(i => (
+              <option key={i.id} value={i.id} style={{ background: '#111' }}>{i.label}</option>
+            ))}
+          </optgroup>
+        ))}
+      </select>
+      {onSluit && (
+        <button
+          onClick={onSluit}
+          title="Split sluiten"
+          style={{
+            width: 24, height: 24, flexShrink: 0,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            background: 'none', border: 'none', color: 'rgba(255,255,255,0.4)',
+            cursor: 'pointer', touchAction: 'manipulation',
+          }}
+        >
+          <X size={14} />
+        </button>
+      )}
     </div>
   )
 }
