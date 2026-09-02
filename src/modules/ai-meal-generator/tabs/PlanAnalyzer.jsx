@@ -12,6 +12,8 @@ import ClientContextPanel from './plan-analyzer/ClientContextPanel'
 import AutoBalancer from './plan-analyzer/AutoBalancer'
 import WeekBalancer from './plan-analyzer/WeekBalancer'
 import WeekOverview from './plan-analyzer/WeekOverview'
+import SupplementDaySection from './plan-analyzer/SupplementDaySection'
+import { laadSupplementen } from '../../supplements/utils/supplementSchedule'
 import ClientAgendaView from '../../client-agenda/ClientAgendaView'
 import MacroHero from '../../meal-plan/components/MacroHero'
 import PlanSwitcherModal from './plan-analyzer/PlanSwitcherModal'
@@ -54,6 +56,7 @@ export default function PlanAnalyzer({
   // week_structure: zo verschuift hij mee als de klant z'n trainingsdagen
   // verplaatst, zonder dat het plan herschreven hoeft te worden.
   const [preWorkoutMeal, setPreWorkoutMeal] = useState(null)
+  const [supplementen, setSupplementen] = useState([])
   // Zichtbare opslag-status van week-wijzigingen (swaps/edits) in de titelbalk.
   const [weekSaveState, setWeekSaveState] = useState('idle')
   const [conceptPlans, setConceptPlans] = useState([])
@@ -308,6 +311,16 @@ export default function PlanAnalyzer({
     try { const { data } = await db.supabase.from('client_meal_plans').select('id, template_name, daily_calories, daily_protein, is_active, ai_generated, created_at, stats').eq('client_id', cId).eq('is_active', false).order('created_at', { ascending: false }).limit(10); setConceptPlans(data || []) } catch {}
     setLoadingConcepts(false)
   }
+
+  // Supplementen van de klant — alleen-lezen, uit het actieve
+  // supplementenplan. Verschijnt als kopje onder de maaltijden.
+  useEffect(() => {
+    if (!resolvedClientId) { setSupplementen([]); return }
+    let afgebroken = false
+    laadSupplementen(db.supabase, resolvedClientId)
+      .then(lijst => { if (!afgebroken) setSupplementen(lijst) })
+    return () => { afgebroken = true }
+  }, [db, resolvedClientId])
 
   // ════════════ HELPERS ════════════
 
@@ -756,6 +769,23 @@ export default function PlanAnalyzer({
   const currentDayIsTraining = trainingDays?.length > 0
     ? trainingDays.includes(DAY_CODE_BY_INDEX[activeDay])
     : !!currentDay?.is_training_day
+  // Kloktijd per maaltijd-slot voor de actieve dag, in minuten. Bron voor
+  // supplementen die aan een maaltijd hangen ("neem bij het ontbijt").
+  const maaltijdTijdenVanDag = (() => {
+    const uit = {}
+    SLOTS.forEach(slot => {
+      const ruw = currentDay?.meals?.[slot]?.timing
+      const tijd = isClockTime(ruw) ? ruw : (currentDay?.meals?.[slot] ? SLOT_DEFAULT_TIMES[slot] : null)
+      if (!tijd) return
+      const mm = /^(\d{1,2}):(\d{2})/.exec(tijd)
+      if (mm) uit[slot] = parseInt(mm[1], 10) * 60 + parseInt(mm[2], 10)
+    })
+    // supplement_plans gebruikt 'snack' als losse verwijzing; koppel die aan
+    // de eerste snack die de dag heeft.
+    if (uit.snack == null) uit.snack = uit.snack1 ?? uit.snack2 ?? uit.snack3
+    return uit
+  })()
+
   const preWorkoutSlot = getPreWorkoutSlot(activeDay)
   const sortedSlots = currentDay ? getSortedSlots(currentDay.meals) : SLOTS
   const warningCount = weekData?.reduce((count, day) => {
@@ -1326,6 +1356,16 @@ export default function PlanAnalyzer({
                   </button>
                 )
               })()}
+
+              {/* ── SUPPLEMENTEN ──
+                  Uit het actieve supplementenplan. De maaltijdtijden van déze
+                  dag gaan mee, zodat "bij het ontbijt" de echte ontbijttijd
+                  pakt in plaats van een vaste 08:00. */}
+              <SupplementDaySection
+                supplementen={supplementen}
+                maaltijdTijden={maaltijdTijdenVanDag}
+                isMobile={m}
+              />
             </div>
           </div>
         )}

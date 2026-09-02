@@ -20,6 +20,8 @@
 //   sleep                  → 23:00–07:00 (placeholder)
 //   work                   → alleen uit de intake; niets ingevuld = geen blok
 
+import { laadSupplementen, groepeerPerMoment, doseringTekst } from '../supplements/utils/supplementSchedule'
+
 export const DAYS = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday']
 
 // Intake-form gebruikt NL-afkortingen (ma/di/wo/do/vr/za/zo).
@@ -106,6 +108,8 @@ const SLOT_DEFAULT_TIME = {
   snack6: '23:00', snack7: '23:30', snack8: '23:59',
 }
 const SLOT_COLOR = '#f59e0b' // amber voor meals
+const SUPPLEMENT_COLOR = '#22c55e' // groen — onderscheidt zich van maaltijd-amber
+const SUPPLEMENT_DURATION = 20
 const TRAINING_COLOR = '#3b82f6' // blue
 const SLEEP_COLOR = '#6366f1' // indigo
 const WORK_COLOR = '#64748b' // slate (placeholder)
@@ -158,13 +162,14 @@ export class ClientAgendaService {
     const weekEndDate = new Date(anchor); weekEndDate.setDate(weekEndDate.getDate() + 6)
     const weekEnd = toIsoDate(weekEndDate)
 
-    const [mealPlan, schema, customBlocks, workoutSchedule, overrides, intakeSchedule] = await Promise.all([
+    const [mealPlan, schema, customBlocks, workoutSchedule, overrides, intakeSchedule, supplementen] = await Promise.all([
       forcedMealPlanId ? this._loadMealPlanById(forcedMealPlanId) : this._loadMealPlan(clientId),
       this._loadWorkoutSchema(clientId),
       this._loadCustomBlocks(clientId),
       this._loadWorkoutSchedule(clientId),
       this._loadOverrides(clientId, weekStart, weekEnd),
       this._loadIntakeSchedule(clientId),
+      laadSupplementen(this.supabase, clientId),
     ])
 
     // Bouw per dag een lookup van intake-blokken per type. Gebruikt als
@@ -204,6 +209,11 @@ export class ClientAgendaService {
 
     const blocksByDay = {}
     DAYS.forEach(d => { blocksByDay[d] = [] })
+    // Per dag de kloktijd per maaltijd-slot. Supplementen met een
+    // meal_reference haken hierop aan, zodat ze meeschuiven als de coach een
+    // maaltijd verzet.
+    const mealTimesByDay = {}
+    DAYS.forEach(d => { mealTimesByDay[d] = {} })
 
     // ── Meals ──
     // Legacy plans store week_structure as {setA, setB, training_days}.
@@ -244,6 +254,7 @@ export class ClientAgendaService {
           const timing = parseTime(meal.timing) ?? parseTime(SLOT_DEFAULT_TIME[slot])
           if (timing == null) return
           const duration = SLOT_DURATION[slot] || 30
+          mealTimesByDay[day][slot] = timing
           blocksByDay[day].push({
             id: `meal-${day}-${slot}`,
             day, type: 'meal',
@@ -448,6 +459,46 @@ export class ClientAgendaService {
             icon: preWorkout.icon || null,
             mealPlanId: mealPlan.id,
           },
+        })
+      })
+    }
+
+    // ── Supplementen ──
+    // Uit supplement_plans (status active). Meerdere supplementen op hetzelfde
+    // moment worden één blok: drie pillen om 07:00 zijn voor de coach één
+    // handeling, en drie losse blokjes zouden de tijdlijn dichtslibben.
+    // Niet sleepbaar — de tijd hoort bij het supplementenplan, niet bij de
+    // agenda. Wijzigen gaat in de Supplementen-tab.
+    if (supplementen.length > 0) {
+      DAYS.forEach(day => {
+        groepeerPerMoment(supplementen, mealTimesByDay[day]).forEach((moment, i) => {
+          // Zonder tijdstip ("flexible") hoort het niet op een tijdlijn.
+          // De dagweergave toont die wel, onder "Flexibel".
+          if (moment.minuten == null) return
+          const namen = moment.items.map(x => x.name).filter(Boolean)
+          blocksByDay[day].push({
+            id: `supplement-${day}-${i}`,
+            day, type: 'supplement',
+            label: 'Supplementen',
+            sublabel: namen.join(' · '),
+            start: moment.minuten,
+            end: Math.min(24 * 60, moment.minuten + SUPPLEMENT_DURATION),
+            color: SUPPLEMENT_COLOR,
+            source: 'supplement_plan',
+            editable: false,
+            meta: {
+              supplement: true,
+              aantal: moment.items.length,
+              emojis: moment.items.map(x => x.emoji).filter(Boolean).join(''),
+              items: moment.items.map(x => ({
+                naam: x.name,
+                emoji: x.emoji || null,
+                dosering: doseringTekst(x),
+                notitie: x.timing?.notes || null,
+                prioriteit: x.priority_level || null,
+              })),
+            },
+          })
         })
       })
     }

@@ -5,7 +5,7 @@
 // lezen, zodat de coach in één blik ziet hoe de week eruit ziet.
 
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Calendar, Utensils, Dumbbell, Moon, Briefcase, AlertCircle, Plus, Trash2, Check, X, ChevronLeft, ChevronRight, Repeat } from 'lucide-react'
+import { Calendar, Utensils, Dumbbell, Moon, Briefcase, Pill, AlertCircle, Plus, Trash2, Check, X, ChevronLeft, ChevronRight, Repeat } from 'lucide-react'
 import { ClientAgendaService, DAYS, DAY_LABELS_NL, DAY_LABELS_NL_LONG, getMondayOf, dateForDay, toIsoDate, recurringIdFor } from './ClientAgendaService'
 
 const COLORS = {
@@ -21,6 +21,7 @@ const COLORS = {
   blue: '#3b82f6',
   indigo: '#6366f1',
   slate: '#64748b',
+  green: '#22c55e',
 }
 
 // Tijdas: 6:00 → 23:00 (slaap wordt apart als block aan rand getoond)
@@ -58,6 +59,7 @@ const TYPE_ICON = {
   training: Dumbbell,
   sleep: Moon,
   work: Briefcase,
+  supplement: Pill,
 }
 
 const LEGEND_ITEMS = [
@@ -65,6 +67,7 @@ const LEGEND_ITEMS = [
   { type: 'training', color: COLORS.blue,   label: 'Training' },
   { type: 'sleep',    color: COLORS.indigo, label: 'Slaap (placeholder)' },
   { type: 'work',     color: COLORS.slate,  label: 'Werk (placeholder)' },
+  { type: 'supplement', color: COLORS.green, label: 'Supplementen' },
 ]
 
 // Fallback foto's identiek aan day-schedule/MealCard.jsx zodat de
@@ -174,6 +177,7 @@ function AgendaBlock({ block, isMobile, onClick, onPointerDownDrag, draggable, i
     : block.type === 'training' ? 'Training'
     : block.type === 'sleep'    ? 'Slaap'
     : block.type === 'work'     ? (block.label || 'Werk')
+    : block.type === 'supplement' ? (block.meta?.emojis || 'Supplementen')
     : 'Custom'
 
   // Hoofdnaam — meal-naam, workout-schema, of label voor sleep/work
