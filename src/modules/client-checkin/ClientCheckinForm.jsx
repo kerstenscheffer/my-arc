@@ -15,14 +15,6 @@ import { useState, useEffect } from 'react'
 import { CheckCircle } from 'lucide-react'
 import CheckinService from './CheckinService'
 
-const GOUD = {
-  primary: '#FFD700',
-  secondary: '#D4AF37',
-  border: 'rgba(255, 215, 0, 0.3)',
-  glow: 'rgba(255, 215, 0, 0.2)',
-  background: 'rgba(255, 215, 0, 0.08)',
-}
-
 const KAART = '#161616'
 const RAND = '#2a2a2a'
 const GRIJS = '#8a8a8a'
@@ -109,12 +101,32 @@ const SECTIES = [
 
 const SCHAAL = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
 
+// Eén vraag per scherm. De secties blijven als kopje boven de vraag staan,
+// zodat je weet in welk deel je zit, maar er is geen scherm meer met zeven
+// vragen tegelijk.
+const VRAGEN = SECTIES.flatMap(sec => sec.velden.map(v => ({ ...v, kop: sec.kop })))
+
+// Hoeveel trainingen staan er gepland? Eerst het toegewezen schema (dat is
+// wat de klant daadwerkelijk voor zich ziet), anders wat er in de intake is
+// opgegeven. Zo hoeft de klant dit niet zelf op te zoeken.
+const geplandeTrainingen = (client) => {
+  const ws = client?.workout_schedule
+  if (ws && typeof ws === 'object') {
+    const n = Object.values(ws).filter(Boolean).length
+    if (n > 0) return n
+  }
+  const alt = [client?.workout_days_per_week, client?.days_per_week, client?.training_days]
+    .map(v => parseInt(v, 10)).find(n => Number.isFinite(n) && n > 0)
+  return alt || null
+}
+
 export default function ClientCheckinForm({ db, client, onSubmitted, onClose }) {
   const isMobile = window.innerWidth <= 768
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
   const [submitted, setSubmitted] = useState(false)
   const [formData, setFormData] = useState({})
+  const [stap, setStap] = useState(0)
 
   const service = new CheckinService(db)
 
@@ -138,6 +150,13 @@ export default function ClientCheckinForm({ db, client, onSubmitted, onClose }) 
       setLoading(false)
     }
   }
+
+  // Aantal geplande trainingen alvast invullen zodra de klant bekend is.
+  // De klant kan het overschrijven als het die week anders lag.
+  useEffect(() => {
+    const n = geplandeTrainingen(client)
+    if (n) setFormData(prev => (prev.training_gepland == null ? { ...prev, training_gepland: n } : prev))
+  }, [client])
 
   const updateField = (id, value) => setFormData(prev => ({ ...prev, [id]: value }))
 
@@ -187,11 +206,11 @@ export default function ClientCheckinForm({ db, client, onSubmitted, onClose }) 
   })
 
   const keuzeStijl = (aan, vast) => ({
-    background: KAART,
-    border: `1px solid ${aan ? GOUD.primary : RAND}`,
+    border: `1px solid ${aan ? '#fff' : RAND}`,
     borderRadius: 999, padding: vast ? '10px 0' : '10px 18px',
     width: vast || undefined, textAlign: vast ? 'center' : undefined,
-    fontSize: 15, fontWeight: 800, color: aan ? GOUD.primary : '#fff',
+    background: aan ? '#fff' : KAART,
+    fontSize: 15, fontWeight: 800, color: aan ? '#0A0A0A' : '#fff',
     cursor: 'pointer', fontFamily: 'inherit',
     touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
   })
@@ -276,7 +295,7 @@ export default function ClientCheckinForm({ db, client, onSubmitted, onClose }) 
       <div style={{ padding: '3rem', display: 'flex', justifyContent: 'center' }}>
         <div style={{
           width: 44, height: 44,
-          border: `3px solid ${GOUD.border}`, borderTopColor: GOUD.primary,
+          border: '3px solid rgba(255,255,255,0.15)', borderTopColor: '#fff',
           borderRadius: '50%', animation: 'spin 1s linear infinite',
         }} />
         <style>{'@keyframes spin { to { transform: rotate(360deg); } }'}</style>
@@ -287,77 +306,86 @@ export default function ClientCheckinForm({ db, client, onSubmitted, onClose }) 
   // ── Al ingevuld deze week ─────────────────────────────────────────────
   if (submitted) {
     return (
-      <div style={{ padding: isMobile ? '2rem 1rem' : '3rem', textAlign: 'center' }}>
-        <div style={{
-          width: isMobile ? 100 : 120, height: isMobile ? 100 : 120,
-          borderRadius: 24,
-          background: `linear-gradient(135deg, ${GOUD.background} 0%, rgba(0,0,0,0.3) 100%)`,
-          border: `1px solid ${GOUD.border}`,
-          boxShadow: `0 8px 32px ${GOUD.glow}`,
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          margin: '0 auto 1.5rem',
-        }}>
-          <CheckCircle size={isMobile ? 48 : 56} color={GOUD.primary} />
-        </div>
-        <h2 style={{ fontSize: isMobile ? '1.5rem' : '1.75rem', fontWeight: 800, color: GOUD.primary, marginBottom: '0.75rem' }}>
+      <div style={{ padding: isMobile ? '2.5rem 1rem' : '3rem', textAlign: 'center' }}>
+        <CheckCircle size={isMobile ? 48 : 56} color="#fff" style={{ marginBottom: '1.25rem' }} />
+        <h2 style={{ fontSize: isMobile ? '1.5rem' : '1.75rem', fontWeight: 900, color: '#fff', marginBottom: '0.75rem', letterSpacing: '-0.02em' }}>
           Check-in verstuurd
         </h2>
-        <p style={{ color: 'rgba(255,255,255,0.6)', fontSize: isMobile ? '0.95rem' : '1rem' }}>
+        <p style={{ color: GRIJS, fontSize: isMobile ? '0.95rem' : '1rem', fontWeight: 700 }}>
           Je hoort binnen 24 uur van me met feedback en eventuele bijsturing.
         </p>
       </div>
     )
   }
 
-  // ── Formulier ─────────────────────────────────────────────────────────
+  // ── Formulier — één vraag per scherm ──────────────────────────────────
+  const vraag = VRAGEN[stap]
+  const laatste = stap === VRAGEN.length - 1
+  // Voortgang telt de vraag waar je nu op staat mee, zodat de balk direct
+  // beweegt als je begint in plaats van pas na de eerste stap.
+  const voortgang = ((stap + 1) / VRAGEN.length) * 100
+
   return (
     <div style={{
       color: '#fff', fontWeight: 700, lineHeight: 1.4,
-      padding: isMobile ? '2vh 1rem 4vh' : '2vh 1.5rem 4vh',
+      padding: isMobile ? '1.25rem 1rem 2rem' : '1.5rem 1.5rem 2rem',
       maxWidth: 820, margin: '0 auto',
+      display: 'flex', flexDirection: 'column', minHeight: isMobile ? '60vh' : 420,
     }}>
-      <header style={{ marginBottom: '5vh' }}>
-        <h1 style={{ fontSize: isMobile ? 26 : 42, fontWeight: 800, letterSpacing: '-0.01em' }}>
-          Je wekelijkse check-in
-        </h1>
-        <p style={{ color: GRIJS, fontSize: 16, marginTop: '1.5vh', fontWeight: 700 }}>
-          Kost je nog geen 2 minuten. Vul hem eerlijk in, dan kan ik je gericht bijsturen.
-        </p>
-      </header>
+      {/* Voortgang */}
+      <div style={{ marginBottom: '2.5vh' }}>
+        <div style={{ height: 4, background: 'rgba(255,255,255,0.1)', borderRadius: 999, overflow: 'hidden' }}>
+          <div style={{ width: `${voortgang}%`, height: '100%', background: '#fff', transition: 'width 0.25s ease' }} />
+        </div>
+        <div style={{
+          display: 'flex', justifyContent: 'space-between', alignItems: 'baseline',
+          marginTop: '1vh', fontSize: 12, fontWeight: 800, letterSpacing: '0.14em',
+          textTransform: 'uppercase', color: GRIJS,
+        }}>
+          <span style={{ color: '#fff' }}>{vraag.kop}</span>
+          <span>{stap + 1} / {VRAGEN.length}</span>
+        </div>
+      </div>
 
-      {SECTIES.map(sec => (
-        <section key={sec.kop} style={{ marginBottom: '5vh' }}>
-          <div style={{
-            fontSize: 12, fontWeight: 800, letterSpacing: '0.3em',
-            textTransform: 'uppercase', color: '#fff',
-            paddingBottom: '1.2vh', borderBottom: `1px solid ${RAND}`, marginBottom: '3vh',
-          }}>
-            {sec.kop}
-          </div>
-          {sec.velden.map(renderVeld)}
-        </section>
-      ))}
+      {/* De vraag */}
+      <div style={{ flex: 1 }}>
+        {renderVeld(vraag)}
+      </div>
 
-      <button
-        type="button" onClick={handleSubmit} disabled={submitting}
-        style={{
-          background: GOUD.primary, color: '#0A0A0A',
-          border: 'none', borderRadius: 12, padding: '16px 34px',
-          fontFamily: 'inherit', fontSize: 17, fontWeight: 800,
-          cursor: submitting ? 'wait' : 'pointer', marginTop: '3vh',
-          opacity: submitting ? 0.6 : 1,
-          touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-        }}
-      >
-        {submitting ? 'Versturen…' : 'Check-in versturen'}
-      </button>
-
-      <footer style={{
-        marginTop: '7vh', paddingTop: '3vh', borderTop: `1px solid ${RAND}`,
-        color: GRIJS, fontSize: 14, fontWeight: 700,
-      }}>
-        Je hoort binnen 24 uur van me met feedback en eventuele bijsturing.
-      </footer>
+      {/* Navigatie */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: '3vh' }}>
+        {stap > 0 && (
+          <button type="button" onClick={() => setStap(s => s - 1)}
+            style={{
+              background: 'none', border: 'none', color: GRIJS,
+              fontFamily: 'inherit', fontSize: 15, fontWeight: 800, cursor: 'pointer',
+              padding: '14px 4px', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+            }}>
+            Terug
+          </button>
+        )}
+        <div style={{ flex: 1 }} />
+        {!laatste ? (
+          <button type="button" onClick={() => setStap(s => s + 1)}
+            style={{
+              background: '#fff', color: '#0A0A0A', border: 'none', borderRadius: 12,
+              padding: '15px 30px', fontFamily: 'inherit', fontSize: 16, fontWeight: 900,
+              cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+            }}>
+            Volgende
+          </button>
+        ) : (
+          <button type="button" onClick={handleSubmit} disabled={submitting}
+            style={{
+              background: '#fff', color: '#0A0A0A', border: 'none', borderRadius: 12,
+              padding: '15px 30px', fontFamily: 'inherit', fontSize: 16, fontWeight: 900,
+              cursor: submitting ? 'wait' : 'pointer', opacity: submitting ? 0.6 : 1,
+              touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+            }}>
+            {submitting ? 'Versturen…' : 'Versturen'}
+          </button>
+        )}
+      </div>
     </div>
   )
 }
