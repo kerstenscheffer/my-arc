@@ -7,7 +7,7 @@ import DayNavigator, { DAYS } from './plan-analyzer/DayNavigator'
 import DayMacroBar from './plan-analyzer/DayMacroBar'
 import MealCard from './plan-analyzer/MealCard'
 import SwapModal from './plan-analyzer/SwapModal'
-import { PRE_WORKOUT_SLOT } from '../../meal-plan/utils/preWorkoutMeal'
+import { PRE_WORKOUT_SLOT, totalenMetPreWorkout } from '../../meal-plan/utils/preWorkoutMeal'
 import ClientContextPanel from './plan-analyzer/ClientContextPanel'
 import AutoBalancer from './plan-analyzer/AutoBalancer'
 import WeekBalancer from './plan-analyzer/WeekBalancer'
@@ -35,7 +35,12 @@ import { openMealPlanForPrint, openCoachingGuideForPrint } from '../mealplanhtml
 // laten, anders ligt hun knoppenbalk eronder.
 const ZWEVENDE_NAV_HOOGTE = 105
 
-const SLOTS = ['breakfast', 'snack1', 'lunch', 'snack2', 'dinner', 'snack3', 'snack4', 'snack5', 'snack6', 'snack7', 'snack8']
+// 'pre_workout' staat bewust achteraan: SLOTS.slice(0, n) bepaalt welke lege
+// slots als "nog te vullen" worden getoond, en dat moet een pre-workout niet
+// zijn. Hij stond eerder helemaal niet in deze lijst, waardoor een
+// pre_workout-slot uit week_structure onzichtbaar was in de dagweergave en
+// niet meetelde in het dagtotaal.
+const SLOTS = ['breakfast', 'snack1', 'lunch', 'snack2', 'dinner', 'snack3', 'snack4', 'snack5', 'snack6', 'snack7', 'snack8', 'pre_workout']
 const SLOT_DEFAULT_TIMES = {
   breakfast: '07:30', snack1: '10:30', lunch: '13:00',
   snack2: '15:30', dinner: '19:00', snack3: '21:30',
@@ -231,7 +236,7 @@ export default function PlanAnalyzer({
       if (day.dinner) meals.dinner = day.dinner
       if (day.snacks) day.snacks.forEach((s, si) => { if (s) meals[`snack${si + 1}`] = s })
       SLOTS.filter(s => s.startsWith('snack')).forEach(s => { if (day[s]) meals[s] = day[s] })
-      return { dayId: DAYS[i].id, meals, totals: day.totals || calculateTotals(meals), is_training_day: day.is_training_day || false }
+      return { dayId: DAYS[i].id, meals, totals: calculateTotals(meals), is_training_day: day.is_training_day || false }
     })
     setWeekData(days); setTargets(dailyTargets); setPlanMeta(null)
     setHistory([JSON.parse(JSON.stringify(days))]); setHistoryIndex(0)
@@ -288,7 +293,7 @@ export default function PlanAnalyzer({
           original_fat: slot.original_fat || slot.fat,
         }
       })
-      return { dayId: day.id, meals, totals: dd.totals || calculateTotals(meals), is_training_day: dd.is_training_day || false }
+      return { dayId: day.id, meals, totals: calculateTotals(meals), is_training_day: dd.is_training_day || false }
     })
   }
 
@@ -810,6 +815,17 @@ export default function PlanAnalyzer({
   // ze, want creatine of een shake zet je meestal juist daarop.
   const trainingDayKeys = trainingDayIndices.map(i => DAYS[i]?.id).filter(Boolean)
 
+  // Dagtotaal inclusief de pre-workout maaltijd uit de losse kolom. Die staat
+  // niet in week_structure en dus niet in currentDay.meals, waardoor het
+  // dagtotaal 265 kcal te laag uitkwam terwijl de kaart wél op het scherm
+  // stond. Alleen op trainingsdagen, want alleen dan eet de klant hem — en
+  // niet als de dag zelf al een pre_workout-slot heeft, anders tel je dubbel.
+  const dagTotalen = (() => {
+    const basis = currentDay?.totals
+    const teltMee = preWorkoutMeal && currentDayIsTraining && !currentDay?.meals?.[PRE_WORKOUT_SLOT]
+    return totalenMetPreWorkout(basis, teltMee ? preWorkoutMeal : null)
+  })()
+
   const preWorkoutSlot = getPreWorkoutSlot(activeDay)
   const sortedSlots = currentDay ? getSortedSlots(currentDay.meals) : SLOTS
   const warningCount = weekData?.reduce((count, day) => {
@@ -1010,7 +1026,7 @@ export default function PlanAnalyzer({
               (getriggerd door de knoppen op een meal card). */}
           {swapState ? (
             <SwapModal embedded db={db} slot={swapState.slot} currentMeal={swapState.meal}
-              dayIndex={swapState.dayIndex} dayTotals={currentDay?.totals} targets={targets}
+              dayIndex={swapState.dayIndex} dayTotals={dagTotalen} targets={targets}
               trainingDays={trainingDayIndices}
               onSelect={handleSwapSelect} onMultiDaySelect={handleMultiDaySelect}
               onClose={() => setSwapState(null)} isMobile={m} />
@@ -1228,10 +1244,10 @@ export default function PlanAnalyzer({
           {viewMode === 'week' && (
             <MacroHero
               consumed={{
-                calories: currentDay?.totals?.kcal || currentDay?.totals?.calories || 0,
-                protein:  currentDay?.totals?.protein || 0,
-                carbs:    currentDay?.totals?.carbs || 0,
-                fat:      currentDay?.totals?.fat || 0,
+                calories: dagTotalen.kcal,
+                protein:  dagTotalen.protein,
+                carbs:    dagTotalen.carbs,
+                fat:      dagTotalen.fat,
               }}
               targets={targets || {}}
               db={db}
@@ -1308,10 +1324,10 @@ export default function PlanAnalyzer({
             }}>
               <MacroHero
                 consumed={{
-                  calories: currentDay?.totals?.kcal || currentDay?.totals?.calories || 0,
-                  protein:  currentDay?.totals?.protein || 0,
-                  carbs:    currentDay?.totals?.carbs || 0,
-                  fat:      currentDay?.totals?.fat || 0,
+                  calories: dagTotalen.kcal,
+                  protein:  dagTotalen.protein,
+                  carbs:    dagTotalen.carbs,
+                  fat:      dagTotalen.fat,
                 }}
                 targets={targets || {}}
                 db={db}
