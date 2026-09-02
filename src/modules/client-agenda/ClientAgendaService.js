@@ -20,7 +20,7 @@
 //   sleep                  → 23:00–07:00 (placeholder)
 //   work                   → alleen uit de intake; niets ingevuld = geen blok
 
-import { laadSupplementen, groepeerPerMoment, doseringTekst } from '../supplements/utils/supplementSchedule'
+import { laadSupplementen, groepeerPerMoment, doseringTekst, geldtOpDag } from '../supplements/utils/supplementSchedule'
 
 export const DAYS = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday']
 
@@ -471,7 +471,11 @@ export class ClientAgendaService {
     // agenda. Wijzigen gaat in de Supplementen-tab.
     if (supplementen.length > 0) {
       DAYS.forEach(day => {
-        groepeerPerMoment(supplementen, mealTimesByDay[day]).forEach((moment, i) => {
+        // Per dag filteren: een supplement kan aan bepaalde dagen zijn
+        // toegewezen (bv. creatine alleen op trainingsdagen).
+        const vandaag = supplementen.filter(x => geldtOpDag(x, day))
+        if (vandaag.length === 0) return
+        groepeerPerMoment(vandaag, mealTimesByDay[day]).forEach((moment, i) => {
           // Zonder tijdstip ("flexible") hoort het niet op een tijdlijn.
           // De dagweergave toont die wel, onder "Flexibel".
           if (moment.minuten == null) return

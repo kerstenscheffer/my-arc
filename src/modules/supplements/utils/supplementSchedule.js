@@ -33,6 +33,29 @@ export const MOMENT_LABEL = {
   flexible: 'Flexibel',
 }
 
+export const DAG_SLEUTELS = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday']
+export const DAG_KORT = { monday: 'Ma', tuesday: 'Di', wednesday: 'Wo', thursday: 'Do', friday: 'Vr', saturday: 'Za', sunday: 'Zo' }
+
+/**
+ * Op welke dagen geldt dit supplement?
+ *
+ * Ontbreekt `days`, dan geldt het elke dag. Dat is bewust: alle bestaande
+ * plannen hebben het veld niet en die zijn dagelijks bedoeld. Een leeg
+ * array betekent wél "geen enkele dag" — dat is een expliciete keuze van
+ * de coach, geen ontbrekende data.
+ */
+export const dagenVanSupplement = (supp) => {
+  const d = supp?.days
+  if (!Array.isArray(d)) return DAG_SLEUTELS
+  return d.filter(x => DAG_SLEUTELS.includes(x))
+}
+
+export const geldtOpDag = (supp, dagSleutel) => {
+  if (!dagSleutel) return true
+  if (!Array.isArray(supp?.days)) return true
+  return supp.days.includes(dagSleutel)
+}
+
 const parseKlok = (str) => {
   const m = /^(\d{1,2}):(\d{2})/.exec(String(str || ''))
   if (!m) return null

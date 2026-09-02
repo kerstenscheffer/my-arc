@@ -2,7 +2,7 @@
 // v4.0 — Sidebar layout: linker icon nav + compacte builder rechts
 
 import React, { useState, useEffect, useCallback, useRef } from 'react'
-import { BarChart3, FileText, ChevronLeft, ChevronRight, AlertTriangle, Zap, Grid3X3, Calendar, List, Download, MessageSquare, Play, Check, Loader, Clock, RotateCcw, RotateCw, Copy, X, Plus, Repeat, Bookmark } from 'lucide-react'
+import { BarChart3, FileText, ChevronLeft, ChevronRight, AlertTriangle, Zap, Grid3X3, Calendar, List, Download, MessageSquare, Play, Check, Loader, Clock, RotateCcw, RotateCw, Copy, X, Plus, Repeat, Bookmark, Pill } from 'lucide-react'
 import DayNavigator, { DAYS } from './plan-analyzer/DayNavigator'
 import DayMacroBar from './plan-analyzer/DayMacroBar'
 import MealCard from './plan-analyzer/MealCard'
@@ -13,6 +13,7 @@ import AutoBalancer from './plan-analyzer/AutoBalancer'
 import WeekBalancer from './plan-analyzer/WeekBalancer'
 import WeekOverview from './plan-analyzer/WeekOverview'
 import SupplementDaySection from './plan-analyzer/SupplementDaySection'
+import SupplementAssignPanel from './plan-analyzer/SupplementAssignPanel'
 import { laadSupplementen } from '../../supplements/utils/supplementSchedule'
 import ClientAgendaView from '../../client-agenda/ClientAgendaView'
 import MacroHero from '../../meal-plan/components/MacroHero'
@@ -786,6 +787,10 @@ export default function PlanAnalyzer({
     return uit
   })()
 
+  // Trainingsdagen als 'monday'-sleutels — het supplementenpaneel markeert
+  // ze, want creatine of een shake zet je meestal juist daarop.
+  const trainingDayKeys = trainingDayIndices.map(i => DAYS[i]?.id).filter(Boolean)
+
   const preWorkoutSlot = getPreWorkoutSlot(activeDay)
   const sortedSlots = currentDay ? getSortedSlots(currentDay.meals) : SLOTS
   const warningCount = weekData?.reduce((count, day) => {
@@ -825,6 +830,7 @@ export default function PlanAnalyzer({
     { id: 'agenda', icon: <Calendar size={18} />,  label: 'Agenda',  active: dockedSection === 'agenda', onClick: () => toggleDock('agenda') },
     { id: 'swaps',  icon: <Repeat size={18} />,    label: 'Swaps',   active: dockedSection === 'swaps',  onClick: () => toggleDock('swaps') },
     { id: 'library', icon: <List size={18} />, label: 'Opslaan', active: dockedSection === 'library', onClick: () => toggleDock('library'), badge: allClientPlans.length > 0 ? allClientPlans.length : null },
+    { id: 'supp',   icon: <Pill size={18} />,   label: 'Supp',    active: dockedSection === 'supp',    onClick: () => toggleDock('supp'), badge: supplementen.length > 0 ? supplementen.length : null },
   ]
 
   const sidebarBottom = [
@@ -1010,6 +1016,17 @@ export default function PlanAnalyzer({
               onRenamed={handlePlanRenamedElsewhere}
               onSaveAsTemplate={() => setShowPlanLibrary(true)}
               onClose={() => setDockedSection(null)} isMobile={m} />
+          )}
+          {dockedSection === 'supp' && (
+            <SupplementAssignPanel db={db} clientId={resolvedClientId} isMobile={m}
+              trainingDays={trainingDayKeys}
+              onSaved={() => {
+                // Opnieuw laden zodat de dagkaarten meteen kloppen, en de
+                // agenda ververst zodat de tijdlijn de nieuwe dagen toont.
+                laadSupplementen(db.supabase, resolvedClientId).then(setSupplementen)
+                setAgendaRefreshKey(k => k + 1)
+              }}
+              onClose={() => setDockedSection(null)} />
           )}
           {dockedSection === 'agenda' && (clientRecord || resolvedClientId) && (
             <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: '#0a0a0a' }}>
@@ -1364,6 +1381,7 @@ export default function PlanAnalyzer({
               <SupplementDaySection
                 supplementen={supplementen}
                 maaltijdTijden={maaltijdTijdenVanDag}
+                dagSleutel={DAYS[activeDay]?.id}
                 isMobile={m}
               />
             </div>
