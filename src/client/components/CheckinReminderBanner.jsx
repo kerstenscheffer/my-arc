@@ -6,8 +6,19 @@
 // Reappears every day until filled (intentionally persistent).
 
 import React, { useEffect, useState } from 'react'
-import { ClipboardCheck, X } from 'lucide-react'
+import { ClipboardCheck, X, ArrowRight } from 'lucide-react'
 import CheckinService from '../../modules/client-checkin/CheckinService'
+
+// De coachnaam staat nergens als kolom: coach_team_members heeft alleen een
+// id en auth.users is voor de client niet leesbaar. Daarom hier een kleine
+// tabel op coach-id. Valt terug op "Je coach" zodra er een coach bijkomt die
+// hier niet in staat — beter een neutrale zin dan een verkeerde naam.
+const COACH_NAAM = {
+  '5a0135ac-3188-499d-8682-ed6a179e5541': 'Kersten',
+  '1ac7dbd8-1a8d-459c-8a81-62d22af5fa3b': 'Marcel',
+}
+const coachNaam = (client) =>
+  COACH_NAAM[client?.trainer_id] || COACH_NAAM[client?.coach_id] || 'Je coach'
 
 const SNOOZE_KEY = 'myarc_checkin_snooze_until'
 const SNOOZE_HOURS = 24
@@ -73,9 +84,9 @@ export default function CheckinReminderBanner({ client, db, onOpen, isMobile: pr
         display: 'flex',
         alignItems: 'center',
         gap: '0.625rem',
-        padding: isMobile ? '0.625rem 0.875rem' : '0.75rem 1.25rem',
-        background: 'linear-gradient(90deg, rgba(255, 215, 0, 0.18) 0%, rgba(212, 175, 55, 0.12) 100%)',
-        borderBottom: '1px solid rgba(255, 215, 0, 0.35)',
+        padding: isMobile ? '0.8rem 0.875rem' : '0.95rem 1.25rem',
+        background: 'rgba(255, 255, 255, 0.07)',
+        borderBottom: '1px solid rgba(255, 255, 255, 0.16)',
         cursor: 'pointer',
         position: 'sticky',
         top: 0,
@@ -88,34 +99,35 @@ export default function CheckinReminderBanner({ client, db, onOpen, isMobile: pr
         width: isMobile ? '32px' : '36px',
         height: isMobile ? '32px' : '36px',
         borderRadius: '8px',
-        background: 'rgba(255, 215, 0, 0.25)',
-        border: '1px solid rgba(255, 215, 0, 0.5)',
+        background: 'rgba(255, 255, 255, 0.12)',
+        border: '1px solid rgba(255, 255, 255, 0.28)',
         display: 'flex', alignItems: 'center', justifyContent: 'center',
         flexShrink: 0,
       }}>
-        <ClipboardCheck size={isMobile ? 16 : 18} color="#FFD700" />
+        <ClipboardCheck size={isMobile ? 16 : 18} color="#ffffff" />
       </div>
 
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{
-          fontSize: isMobile ? '0.5rem' : '0.55rem',
-          fontWeight: 800,
-          color: 'rgba(255, 215, 0, 0.85)',
-          textTransform: 'uppercase',
-          letterSpacing: '0.08em',
-          lineHeight: 1,
-          marginBottom: '0.2rem',
-        }}>
-          Wekelijkse check-in
-        </div>
-        <div style={{
-          fontSize: isMobile ? '0.78rem' : '0.85rem',
+          fontSize: isMobile ? '0.82rem' : '0.9rem',
           fontWeight: 700,
-          color: '#fff',
+          color: 'rgba(255,255,255,0.7)',
           letterSpacing: '-0.01em',
           lineHeight: 1.2,
         }}>
-          Vul je reflectie in →
+          {coachNaam(client)} wacht op je check-in!
+        </div>
+        {/* De actie is het grootst: dat is waar de klant op moet tikken. */}
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 5,
+          fontSize: isMobile ? '1.15rem' : '1.35rem',
+          fontWeight: 900,
+          color: '#fff',
+          letterSpacing: '-0.02em',
+          lineHeight: 1.15,
+          marginTop: '0.1rem',
+        }}>
+          Vul direct in <ArrowRight size={isMobile ? 18 : 21} strokeWidth={2.8} />
         </div>
       </div>
 
@@ -129,7 +141,7 @@ export default function CheckinReminderBanner({ client, db, onOpen, isMobile: pr
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           background: 'transparent',
           border: 'none',
-          color: 'rgba(255, 215, 0, 0.5)',
+          color: 'rgba(255, 255, 255, 0.5)',
           cursor: 'pointer',
           touchAction: 'manipulation',
           WebkitTapHighlightColor: 'transparent',

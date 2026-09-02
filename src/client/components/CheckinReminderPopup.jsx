@@ -37,17 +37,17 @@ const shakeIntervalFor = (daysLate) => {
 
 // Visueel palet — voor de modal blijft kleur-escalatie (goud → amber →
 // rood) omdat dat scherper aandacht trekt zodra je te laat bent. De pill
-// is altijd goud zodat 'ie past bij de rest van de app.
+// is wit; rood en amber blijven, want die dragen betekenis (te laat / gemist).
 const paletteFor = (mode) => {
   if (mode === 'overdue') return { bg: 'rgba(239,68,68,0.18)', border: 'rgba(239,68,68,0.5)',  fg: '#ef4444', icon: AlertCircle }
   if (mode === 'missed')  return { bg: 'rgba(245,158,11,0.18)', border: 'rgba(245,158,11,0.45)', fg: '#f59e0b', icon: ClipboardCheck }
-  return                          { bg: 'rgba(255,215,0,0.18)',  border: 'rgba(255,215,0,0.45)',  fg: '#FFD700', icon: ClipboardCheck }
+  return                          { bg: 'rgba(255,255,255,0.12)', border: 'rgba(255,255,255,0.35)', fg: '#ffffff', icon: ClipboardCheck }
 }
 
 const PILL_PALETTE = {
-  bg: 'rgba(255,215,0,0.14)',
-  border: '#FFD700',
-  fg: '#FFD700',
+  bg: 'rgba(255,255,255,0.12)',
+  border: '#ffffff',
+  fg: '#ffffff',
 }
 
 export default function CheckinReminderPopup({ client, db, onOpen, isMobile: propMobile, version = 0 }) {
@@ -168,7 +168,7 @@ export default function CheckinReminderPopup({ client, db, onOpen, isMobile: pro
             cursor: 'pointer',
             touchAction: 'manipulation',
             whiteSpace: 'nowrap',
-            boxShadow: '0 -8px 24px rgba(255,215,0,0.18), 0 -2px 8px rgba(0,0,0,0.4)',
+            boxShadow: '0 -8px 24px rgba(0,0,0,0.5), 0 -2px 8px rgba(0,0,0,0.4)',
             animation: shaking ? 'checkinShake 0.85s cubic-bezier(.36,.07,.19,.97) both' : 'none',
             transition: 'transform 0.18s ease',
           }}
@@ -226,11 +226,11 @@ export default function CheckinReminderPopup({ client, db, onOpen, isMobile: pro
         style={{
           width: '100%', maxWidth: 420,
           background: '#0a0a0a',
-          border: '1px solid rgba(255,215,0,0.3)',
+          border: '1px solid rgba(255,255,255,0.18)',
           borderRadius: 16,
           padding: isMobile ? '1.1rem 1.1rem 1rem' : '1.4rem 1.4rem 1.2rem',
           color: '#fff',
-          boxShadow: '0 30px 80px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,215,0,0.06)',
+          boxShadow: '0 30px 80px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,255,255,0.06)',
           animation: 'checkinPopIn 0.22s cubic-bezier(0.34, 1.56, 0.64, 1)',
           position: 'relative',
         }}
@@ -279,7 +279,7 @@ export default function CheckinReminderPopup({ client, db, onOpen, isMobile: pro
           style={{
             width: '100%', minHeight: 50,
             display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.45rem',
-            background: 'linear-gradient(135deg, #FFD700 0%, #D4AF37 100%)',
+            background: '#ffffff',
             border: 'none', borderRadius: 10,
             color: '#000', fontWeight: 800, fontSize: '0.95rem',
             cursor: 'pointer', touchAction: 'manipulation',
