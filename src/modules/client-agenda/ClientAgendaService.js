@@ -98,7 +98,7 @@ export const DAY_LABELS_NL = { monday: 'Ma', tuesday: 'Di', wednesday: 'Wo', thu
 export const DAY_LABELS_NL_LONG = { monday: 'Maandag', tuesday: 'Dinsdag', wednesday: 'Woensdag', thursday: 'Donderdag', friday: 'Vrijdag', saturday: 'Zaterdag', sunday: 'Zondag' }
 
 const SLOT_DURATION = { breakfast: 15, lunch: 15, dinner: 15, snack1: 15, snack2: 15, snack3: 15 }
-const SLOT_LABEL = { breakfast: 'Ontbijt', lunch: 'Lunch', dinner: 'Avondeten', snack1: 'Snack', snack2: 'Snack', snack3: 'Snack' }
+const SLOT_LABEL = { breakfast: 'Ontbijt', lunch: 'Lunch', dinner: 'Avondeten', snack1: 'Snack', snack2: 'Snack', snack3: 'Snack', pre_workout: 'Pre-workout' }
 // Fallback-kloktijd per slot: meals uit ai_meals dragen .timing soms als
 // maaltijd-type-array (['lunch']) i.p.v. een klok-tijd. Zonder fallback zou
 // zo'n meal uit de agenda verdwijnen. Zelfde defaults als de Plan Analyzer.
@@ -110,6 +110,7 @@ const SLOT_DEFAULT_TIME = {
 const SLOT_COLOR = '#f59e0b' // amber voor meals
 const SUPPLEMENT_COLOR = '#22c55e' // groen — onderscheidt zich van maaltijd-amber
 const SUPPLEMENT_DURATION = 20
+const PRE_WORKOUT_SLOT = 'pre_workout'
 const TRAINING_COLOR = '#3b82f6' // blue
 const SLEEP_COLOR = '#6366f1' // indigo
 const WORK_COLOR = '#64748b' // slate (placeholder)
@@ -221,6 +222,12 @@ export class ClientAgendaService {
     // maaltijd verzet.
     const mealTimesByDay = {}
     DAYS.forEach(d => { mealTimesByDay[d] = {} })
+    // De pre_workout-slot uit week_structure draagt een vaste kloktijd (bij
+    // Elijah 12:00). Dat is voor een pre-workout maaltijd betekenisloos: hij
+    // hoort vóór de training, en die staat op 17:00 of 19:00. We houden deze
+    // slots hier apart en plaatsen ze verderop, zodra de trainingstijden
+    // bekend zijn.
+    const preWorkoutUitPlan = {}
 
     // ── Meals ──
     // Legacy plans store week_structure as {setA, setB, training_days}.
@@ -262,6 +269,10 @@ export class ClientAgendaService {
           if (timing == null) return
           const duration = SLOT_DURATION[slot] || 30
           mealTimesByDay[day][slot] = timing
+          if (slot === PRE_WORKOUT_SLOT) {
+            preWorkoutUitPlan[day] = { meal, timing, duration }
+            return
+          }
           blocksByDay[day].push({
             id: `meal-${day}-${slot}`,
             day, type: 'meal',
