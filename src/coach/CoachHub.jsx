@@ -871,29 +871,6 @@ export default function CoachHub() {
             )}
           </div>
 
-          {/* Split screen — twee tabbladen naast elkaar. Alleen op desktop:
-              op een telefoon houd je twee halve kolommen over waar niets in
-              past. Start standaard met de workout builder ernaast, want dat
-              is de combinatie waarvoor dit gebouwd is (voeding + training). */}
-          {!isMobile && (
-            <button
-              onClick={() => setSplitTab(t => t ? null : (activeTab === 'workout-builder' ? 'ai-meals' : 'workout-builder'))}
-              title={splitTab ? 'Split screen uit' : 'Split screen: tweede tabblad ernaast'}
-              style={{
-                flexShrink: 0, padding: '0 0.9rem',
-                display: 'flex', alignItems: 'center', gap: '0.35rem',
-                background: 'transparent', border: 'none',
-                borderBottom: splitTab ? `2px solid ${G.primary}` : '2px solid transparent',
-                color: splitTab ? G.primary : 'rgba(255,255,255,0.35)',
-                fontSize: '0.8rem', fontWeight: splitTab ? 700 : 500,
-                cursor: 'pointer', fontFamily: 'inherit',
-                touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-              }}
-            >
-              <Columns2 size={16} />
-              Split
-            </button>
-          )}
         </div>
         )}
       </header>
@@ -1076,6 +1053,41 @@ export default function CoachHub() {
               Meer
             </span>
           </button>
+
+          {/* Split — twee tabbladen naast elkaar. Hoort in deze balk en niet
+              alleen in de header: die scrollt weg zodra je in een tab werkt,
+              en dan is de knop nergens te bekennen. Alleen desktop. */}
+          {!isMobile && (
+            <button
+              onClick={() => setSplitTab(t => t ? null : (activeTab === 'workout-builder' ? 'ai-meals' : 'workout-builder'))}
+              title={splitTab ? 'Split screen uit' : 'Split screen: tweede tabblad ernaast'}
+              style={{
+                flex: 1,
+                display: 'flex', flexDirection: 'column',
+                alignItems: 'center', gap: 3,
+                padding: '0.45rem 0.3rem',
+                background: splitTab ? 'rgba(255,215,0,0.1)' : 'transparent',
+                border: 'none', borderRadius: 14,
+                cursor: 'pointer', fontFamily: 'inherit',
+                touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+                minHeight: 44, minWidth: 44,
+              }}
+            >
+              <Columns2
+                size={22}
+                color={splitTab ? G.primary : 'rgba(255,255,255,0.42)'}
+                strokeWidth={splitTab ? 2.5 : 1.9}
+              />
+              <span style={{
+                fontSize: '0.58rem',
+                fontWeight: splitTab ? 800 : 600,
+                color: splitTab ? G.primary : 'rgba(255,255,255,0.35)',
+                letterSpacing: '-0.01em', lineHeight: 1,
+              }}>
+                Split
+              </span>
+            </button>
+          )}
 
           {/* Wissel (naar client portal) — custom render PortalSwitchButton */}
           <div style={{ flex: 1, display: 'flex', justifyContent: 'center' }}>
