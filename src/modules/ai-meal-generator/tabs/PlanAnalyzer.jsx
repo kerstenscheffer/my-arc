@@ -13,7 +13,7 @@ import AutoBalancer from './plan-analyzer/AutoBalancer'
 import WeekBalancer from './plan-analyzer/WeekBalancer'
 import WeekOverview from './plan-analyzer/WeekOverview'
 import SupplementDaySection from './plan-analyzer/SupplementDaySection'
-import SupplementAssignPanel from './plan-analyzer/SupplementAssignPanel'
+import SupplementPanel from './plan-analyzer/SupplementPanel'
 import { laadSupplementen } from '../../supplements/utils/supplementSchedule'
 import ClientAgendaView from '../../client-agenda/ClientAgendaView'
 import MacroHero from '../../meal-plan/components/MacroHero'
@@ -1018,7 +1018,8 @@ export default function PlanAnalyzer({
               onClose={() => setDockedSection(null)} isMobile={m} />
           )}
           {dockedSection === 'supp' && (
-            <SupplementAssignPanel db={db} clientId={resolvedClientId} isMobile={m}
+            <SupplementPanel db={db} clientId={resolvedClientId} isMobile={m}
+              coachId={coachId} clientRecord={clientRecord}
               trainingDays={trainingDayKeys}
               onSaved={() => {
                 // Opnieuw laden zodat de dagkaarten meteen kloppen, en de
