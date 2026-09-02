@@ -110,6 +110,13 @@ const TRAINING_COLOR = '#3b82f6' // blue
 const SLEEP_COLOR = '#6366f1' // indigo
 const WORK_COLOR = '#64748b' // slate (placeholder)
 
+// Pre-workout maaltijd: staat op het plan (client_meal_plans.pre_workout_meal),
+// niet in week_structure. Hij hoort dus niet bij een vaste dag maar bij de
+// training — hij schuift mee als de trainingsdag verschuift. In de agenda
+// plaatsen we hem daarom relatief aan het trainingsblok van die dag.
+const PRE_WORKOUT_LEAD = 60   // minuten vóór aanvang training
+const PRE_WORKOUT_DURATION = 15
+
 const TRAINING_DEFAULT_START = 17 * 60
 const TRAINING_DEFAULT_DURATION = 60
 const SLEEP_START = 23 * 60
@@ -311,6 +318,9 @@ export class ClientAgendaService {
     // vlag in het meal-plan kan stale zijn en mag dan NIET extra dagen bijtellen.
     // Alleen zonder bruikbaar schema vallen we terug op die vlag.
     const canResolveWorkouts = !!workoutSchedule && !!schema?.week_structure
+    // Vroegste trainingsstart per dag — nodig om de pre-workout maaltijd
+    // ervoor te kunnen zetten.
+    const trainingStartByDay = {}
     DAYS.forEach(day => {
       const dbTrainings = customByDayType[day].training
       const workoutKey = scheduleLookup(day)
@@ -340,12 +350,17 @@ export class ClientAgendaService {
       // syncs). Dedupe bovendien identieke rijen (zelfde tijd/sublabel) per dag.
       const showDbTrainings = !canResolveWorkouts || !!dayWorkout
       const seenTraining = new Set()
+      const noteerStart = (min) => {
+        if (!Number.isFinite(min)) return
+        if (trainingStartByDay[day] == null || min < trainingStartByDay[day]) trainingStartByDay[day] = min
+      }
       if (showDbTrainings) dbTrainings.forEach(row => {
         const dedupeKey = `${row.start_time}|${row.end_time}|${row.sublabel || ''}`
         if (seenTraining.has(dedupeKey)) return
         seenTraining.add(dedupeKey)
         const start = timeStrToMinutes(row.start_time)
         const end = timeStrToMinutes(row.end_time)
+        noteerStart(start)
         blocksByDay[day].push({
           id: `db-${row.id}`,
           dbId: row.id,
@@ -367,6 +382,7 @@ export class ClientAgendaService {
         const intakeTrainings = intakePlaceholders[day]?.training || []
         if (intakeTrainings.length > 0) {
           intakeTrainings.forEach((blk, i) => {
+            noteerStart(blk.start)
             blocksByDay[day].push({
               id: `training-intake-${day}-${i}`,
               day, type: 'training',
@@ -380,6 +396,7 @@ export class ClientAgendaService {
             })
           })
         } else {
+          noteerStart(TRAINING_DEFAULT_START)
           blocksByDay[day].push({
             id: `training-placeholder-${day}`,
             day, type: 'training',
@@ -395,6 +412,45 @@ export class ClientAgendaService {
         }
       }
     })
+
+    // ── Pre-workout maaltijd ──
+    // Eén maaltijd op het plan, die alleen op trainingsdagen telt. We hangen
+    // hem aan het trainingsblok van die dag i.p.v. aan een vast tijdstip:
+    // verplaatst de coach de training, dan verhuist de maaltijd mee.
+    // Niet editable — hij hoort bij het plan, niet bij deze ene dag. Wie hem
+    // wil wijzigen doet dat in de Plan Analyzer (dagweergave).
+    const preWorkout = mealPlan?.pre_workout_meal
+    if (preWorkout && typeof preWorkout === 'object') {
+      DAYS.forEach(day => {
+        const trainStart = trainingStartByDay[day]
+        if (!Number.isFinite(trainStart)) return
+        // Niet vóór middernacht duwen bij een vroege ochtendtraining.
+        const start = Math.max(0, trainStart - PRE_WORKOUT_LEAD)
+        blocksByDay[day].push({
+          id: `meal-${day}-pre_workout`,
+          day, type: 'meal',
+          label: 'Pre-workout',
+          sublabel: preWorkout.name || preWorkout.meal_name,
+          start,
+          end: Math.min(trainStart, start + PRE_WORKOUT_DURATION),
+          color: SLOT_COLOR,
+          source: 'meal_plan',
+          sourceId: preWorkout.meal_id || preWorkout.id,
+          editable: false,
+          meta: {
+            slot: 'pre_workout',
+            preWorkout: true,
+            kcal: preWorkout.calories,
+            protein: preWorkout.protein,
+            carbs: preWorkout.carbs,
+            fat: preWorkout.fat,
+            image_url: preWorkout.image_url || null,
+            icon: preWorkout.icon || null,
+            mealPlanId: mealPlan.id,
+          },
+        })
+      })
+    }
 
     // ── Slaap ──
     // Wrap-around (start > end) wordt visueel in twee halves gesplitst,
@@ -616,7 +672,7 @@ export class ClientAgendaService {
   async _loadMealPlan(clientId) {
     const { data, error } = await this.supabase
       .from('client_meal_plans')
-      .select('id, template_name, week_structure, is_active')
+      .select('id, template_name, week_structure, is_active, pre_workout_meal')
       .eq('client_id', clientId)
       .eq('is_active', true)
       .maybeSingle()
@@ -630,7 +686,7 @@ export class ClientAgendaService {
   async _loadMealPlanById(planId) {
     const { data, error } = await this.supabase
       .from('client_meal_plans')
-      .select('id, template_name, week_structure, is_active')
+      .select('id, template_name, week_structure, is_active, pre_workout_meal')
       .eq('id', planId)
       .maybeSingle()
     if (error) { console.warn('loadMealPlanById', error); return null }
