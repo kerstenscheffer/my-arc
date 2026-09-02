@@ -443,43 +443,64 @@ export class ClientAgendaService {
     })
 
     // ── Pre-workout maaltijd ──
-    // Eén maaltijd op het plan, die alleen op trainingsdagen telt. We hangen
-    // hem aan het trainingsblok van die dag i.p.v. aan een vast tijdstip:
-    // verplaatst de coach de training, dan verhuist de maaltijd mee.
-    // Niet editable — hij hoort bij het plan, niet bij deze ene dag. Wie hem
-    // wil wijzigen doet dat in de Plan Analyzer (dagweergave).
-    const preWorkout = mealPlan?.pre_workout_meal
-    if (preWorkout && typeof preWorkout === 'object') {
-      DAYS.forEach(day => {
-        const trainStart = trainingStartByDay[day]
-        if (!Number.isFinite(trainStart)) return
-        // Niet vóór middernacht duwen bij een vroege ochtendtraining.
-        const start = Math.max(0, trainStart - PRE_WORKOUT_LEAD)
-        blocksByDay[day].push({
-          id: `meal-${day}-pre_workout`,
-          day, type: 'meal',
-          label: 'Pre-workout',
-          sublabel: preWorkout.name || preWorkout.meal_name,
-          start,
-          end: Math.min(trainStart, start + PRE_WORKOUT_DURATION),
-          color: SLOT_COLOR,
-          source: 'meal_plan',
-          sourceId: preWorkout.meal_id || preWorkout.id,
-          editable: false,
-          meta: {
-            slot: 'pre_workout',
-            preWorkout: true,
-            kcal: preWorkout.calories,
-            protein: preWorkout.protein,
-            carbs: preWorkout.carbs,
-            fat: preWorkout.fat,
-            image_url: preWorkout.image_url || null,
-            icon: preWorkout.icon || null,
-            mealPlanId: mealPlan.id,
-          },
-        })
+    // Twee bronnen, één regel: hij hoort een uur vóór de training van díe dag.
+    //   1. client_meal_plans.pre_workout_meal — één maaltijd voor het hele
+    //      plan, bedoeld om mee te schuiven met de trainingsdagen.
+    //   2. week_structure[dag].pre_workout — de oudere manier, met een vaste
+    //      kloktijd erin. Die tijd negeren we bewust: 12:00 zegt niets over
+    //      een training om 19:00, en dat was precies de klacht.
+    // Traint de klant die dag niet, dan valt de maaltijd terug op zijn eigen
+    // opgeslagen tijd. Hem laten verdwijnen zou de dagtotalen stilletjes
+    // veranderen; een maaltijd verstoppen is erger dan een matige tijd.
+    const preWorkoutVanPlan = mealPlan?.pre_workout_meal
+    DAYS.forEach(day => {
+      const uitSlot = preWorkoutUitPlan[day]
+      // De losse kolom wint: die is de nieuwe plek en de coach zet 'm daar.
+      const maaltijd = (preWorkoutVanPlan && typeof preWorkoutVanPlan === 'object')
+        ? preWorkoutVanPlan
+        : uitSlot?.meal
+      if (!maaltijd) return
+
+      const trainStart = trainingStartByDay[day]
+      const traint = Number.isFinite(trainStart)
+      // Uit de losse kolom komt hij alleen op trainingsdagen; die maaltijd
+      // hóórt bij de training en staat verder nergens in het weekschema.
+      if (!traint && !uitSlot) return
+
+      const duur = uitSlot?.duration || PRE_WORKOUT_DURATION
+      const start = traint
+        ? Math.max(0, trainStart - PRE_WORKOUT_LEAD)
+        : uitSlot.timing
+      const eind = traint
+        ? Math.min(trainStart, start + duur)
+        : start + duur
+
+      blocksByDay[day].push({
+        id: `meal-${day}-${PRE_WORKOUT_SLOT}`,
+        day, type: 'meal',
+        label: SLOT_LABEL[PRE_WORKOUT_SLOT],
+        sublabel: maaltijd.name || maaltijd.meal_name,
+        start, end: eind,
+        color: SLOT_COLOR,
+        source: 'meal_plan',
+        sourceId: maaltijd.meal_id || maaltijd.id,
+        // Niet sleepbaar: de tijd volgt de training. Verzet je de training,
+        // dan verhuist de maaltijd mee.
+        editable: false,
+        meta: {
+          slot: PRE_WORKOUT_SLOT,
+          preWorkout: true,
+          volgtTraining: traint,
+          kcal: maaltijd.calories,
+          protein: maaltijd.protein,
+          carbs: maaltijd.carbs,
+          fat: maaltijd.fat,
+          image_url: maaltijd.image_url || null,
+          icon: maaltijd.icon || null,
+          mealPlanId: mealPlan?.id,
+        },
       })
-    }
+    })
 
     // ── Supplementen ──
     // Uit supplement_plans (status active). Meerdere supplementen op hetzelfde
