@@ -196,6 +196,10 @@ export default function CoachHub() {
     return Number.isFinite(v) && v >= 25 && v <= 75 ? v : 50
   })
   const splitRef = useRef(null)
+  // De sleep-handler leest de verhouding bij het loslaten; via een ref, want
+  // de listener wordt één keer aangehaakt en zou anders de oude waarde zien.
+  const splitRatioRef = useRef(splitRatio)
+  useEffect(() => { splitRatioRef.current = splitRatio }, [splitRatio])
 
   useEffect(() => {
     try {
@@ -223,26 +227,6 @@ export default function CoachHub() {
     window.addEventListener('pointermove', verplaats)
     window.addEventListener('pointerup', stop)
   }
-  // Hoe hoog mag de split-strook zijn? Dat hangt af van waar 'ie begint (de
-  // header erboven verandert van hoogte met de doelgroepenbalk en de veilige
-  // zone) en van de zwevende navbalk onderaan. Meten in plaats van een getal
-  // invullen dat op de ene schermmaat wel en op de andere niet klopt.
-  const [splitHoogte, setSplitHoogte] = useState('70vh')
-  useLayoutEffect(() => {
-    if (!splitActief) return
-    const meet = () => {
-      const el = splitRef.current
-      if (!el) return
-      const top = Math.round(el.getBoundingClientRect().top + window.scrollY)
-      setSplitHoogte(`calc(100dvh - ${top + ZWEVENDE_NAV_RUIMTE}px)`)
-    }
-    meet()
-    window.addEventListener('resize', meet)
-    return () => window.removeEventListener('resize', meet)
-  }, [splitActief])
-
-  const splitRatioRef = useRef(splitRatio)
-  useEffect(() => { splitRatioRef.current = splitRatio }, [splitRatio])
 
   const [navStack, setNavStack] = useState([]) // tab-geschiedenis voor de terug-knop
   const [moreOpen, setMoreOpen] = useState(false)
@@ -296,6 +280,30 @@ export default function CoachHub() {
   
   const db = DatabaseService
   const isMobile = useIsMobile()
+
+  // Split alleen op desktop. Op een telefoon is een halve kolom onbruikbaar,
+  // en de meeste tabs hebben daar al hun eigen mobiele indeling.
+  // Staat hier en niet bij de split-state hierboven: het leunt op isMobile en
+  // clientMode, die pas op deze regel bestaan.
+  const splitActief = !!splitTab && !isMobile && !clientMode
+
+  // Hoe hoog mag de split-strook zijn? Dat hangt af van waar 'ie begint (de
+  // header erboven verandert van hoogte met de doelgroepenbalk en de veilige
+  // zone) en van de zwevende navbalk onderaan. Meten in plaats van een getal
+  // invullen dat op de ene schermmaat wel en op de andere niet klopt.
+  const [splitHoogte, setSplitHoogte] = useState('70vh')
+  useLayoutEffect(() => {
+    if (!splitActief) return
+    const meet = () => {
+      const el = splitRef.current
+      if (!el) return
+      const top = Math.round(el.getBoundingClientRect().top + window.scrollY)
+      setSplitHoogte(`calc(100dvh - ${top + ZWEVENDE_NAV_RUIMTE}px)`)
+    }
+    meet()
+    window.addEventListener('resize', meet)
+    return () => window.removeEventListener('resize', meet)
+  }, [splitActief])
   const moreRef = useRef(null)
   
   // ============================================
@@ -455,10 +463,6 @@ export default function CoachHub() {
     setActiveTab(prev)
     setMoreOpen(false)
   }
-
-  // Split alleen op desktop. Op een telefoon is een halve kolom onbruikbaar,
-  // en de meeste tabs hebben daar al hun eigen mobiele indeling.
-  const splitActief = !!splitTab && !isMobile && !clientMode
 
   const isPrimaryTab = PRIMARY_TABS.some(t => t.id === activeTab)
   const isMoreTab = !isPrimaryTab
