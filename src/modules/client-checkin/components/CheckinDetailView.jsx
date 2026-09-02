@@ -103,6 +103,7 @@ export default function CheckinDetailView({
     { label: 'Energie',            waarde: nietLeeg(checkin.energie_score) ? `${checkin.energie_score}/10` : null },
   ].filter(r => nietLeeg(r.waarde))
   const v2Open = [
+    { label: 'Hoe het gaat',            waarde: checkin.hoe_gaat_het },
     { label: 'Kostte de meeste moeite', waarde: checkin.struggles },
     { label: 'Vastgelopen op',          waarde: checkin.vastgelopen },
     { label: 'Ging beter dan verwacht', waarde: checkin.wins },

@@ -23,6 +23,19 @@ const GRIJS = '#8a8a8a'
 // vraagtekst op één plek en kan er niets uit de pas lopen met de opslag.
 const SECTIES = [
   {
+    kop: 'Even bijpraten',
+    velden: [
+      {
+        id: 'hoe_gaat_het', type: 'tekst',
+        // {naam} wordt bij het renderen vervangen door de voornaam. Staat
+        // bewust vóór de cijfers: eerst even mens, dan pas de week doorrekenen.
+        vraag: 'Hoe gaat het met je, {naam}?',
+        hulp: 'We gaan straks in op de cijfers, maar eerst even dit.',
+        placeholder: 'Hoe zit je erbij deze week?',
+      },
+    ],
+  },
+  {
     kop: 'Je week in cijfers',
     velden: [
       {
@@ -217,10 +230,16 @@ export default function ClientCheckinForm({ db, client, onSubmitted, onClose }) 
 
   const renderVeld = (v) => {
     const waarde = formData[v.id]
+    // Zonder bekende voornaam wordt "Hoe gaat het met je, {naam}?" netjes
+    // "Hoe gaat het met je?" in plaats van een lege komma.
+    const voornaam = (client?.first_name || '').trim()
+    const vraagTekst = v.vraag.includes('{naam}')
+      ? (voornaam ? v.vraag.replace('{naam}', voornaam) : v.vraag.replace(', {naam}', ''))
+      : v.vraag
     return (
       <div key={v.id} style={{ marginBottom: '3vh' }}>
         <div style={{ fontSize: isMobile ? 17 : 21, fontWeight: 800, color: '#fff' }}>
-          {v.vraag}
+          {vraagTekst}
         </div>
         {v.hulp && (
           <div style={{ color: GRIJS, fontSize: 14, fontWeight: 700, marginTop: '0.6vh' }}>

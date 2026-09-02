@@ -169,6 +169,13 @@ function CheckinCard({ checkin, isMobile }) {
             </div>
           )}
 
+          {/* Openingsvraag — staat vooraan omdat het de toon van de week zet. */}
+          {checkin.hoe_gaat_het && (
+            <NoteBlock label="Hoe het gaat" text={checkin.hoe_gaat_het} accent={G.primary}>
+              <MessageSquare size={10} />
+            </NoteBlock>
+          )}
+
           {/* Harde cijfers uit het formulier vanaf sep 2026. De oude
               secties hieronder blijven leeg bij zo'n check-in en vallen
               vanzelf weg; deze rij vervangt ze. */}
