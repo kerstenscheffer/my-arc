@@ -30,6 +30,11 @@ import { openMealPlanForPrint, openCoachingGuideForPrint } from '../mealplanhtml
 // Slots — de 6 vaste + extra snack-slots zodat er geen harde max van 6
 // maaltijden meer is. Alles wordt op tijd gesorteerd bij het tonen; lege
 // extra-slots verschijnen pas als je ze vult via "Maaltijd toevoegen".
+// De zwevende navbalk van CoachHub staat fixed op bottom:30 en is ~70px
+// hoog. Panelen die tot onderaan het scherm lopen moeten die ruimte vrij
+// laten, anders ligt hun knoppenbalk eronder.
+const ZWEVENDE_NAV_HOOGTE = 105
+
 const SLOTS = ['breakfast', 'snack1', 'lunch', 'snack2', 'dinner', 'snack3', 'snack4', 'snack5', 'snack6', 'snack7', 'snack8']
 const SLOT_DEFAULT_TIMES = {
   breakfast: '07:30', snack1: '10:30', lunch: '13:00',
@@ -842,7 +847,7 @@ export default function PlanAnalyzer({
   ]
 
   return (
-    <div style={{ display: 'flex', height: '100%', minHeight: '400px', background: '#0a0a0a', position: 'relative' }}>
+    <div style={{ display: 'flex', alignItems: 'flex-start', height: '100%', minHeight: '400px', background: '#0a0a0a', position: 'relative' }}>
 
       {/* ════════════ SIDEBAR ════════════
           Bredere kolom (72/92 ipv 56/80), iconen 18px (was 14), labels
@@ -855,6 +860,9 @@ export default function PlanAnalyzer({
         display: 'flex', flexDirection: 'column', alignItems: 'center',
         padding: '10px 0', gap: 6,
         overflowY: 'auto', WebkitOverflowScrolling: 'touch',
+        // Meescrollen met de pagina, niet mee naar beneden verdwijnen.
+        position: 'sticky', top: 0,
+        maxHeight: `calc(100dvh - ${ZWEVENDE_NAV_HOOGTE}px)`,
       }}>
         {/* Activeer knop */}
         {planMeta && (() => {
@@ -974,9 +982,14 @@ export default function PlanAnalyzer({
           borderRight: '1px solid rgba(255,255,255,0.06)',
           transform: 'translateZ(0)', overflow: 'hidden',
           display: 'flex', flexDirection: 'column',
+          // Het paneel groeide mee met de pagina, waardoor de opslaan-knop
+          // eronder onder de vouw viel. Nu is het precies zo hoog als het
+          // scherm (min de zwevende navbalk) en scrollt alleen de inhoud;
+          // de knoppenbalk onderin blijft daardoor altijd zichtbaar.
+          height: `calc(100dvh - ${ZWEVENDE_NAV_HOOGTE}px)`,
           ...(m
-            ? { position: 'absolute', left: 72, right: 0, top: 0, bottom: 0, zIndex: 40 }
-            : { position: 'relative', flexBasis: dockWidth, width: dockWidth }),
+            ? { position: 'fixed', left: 72, right: 0, top: 0, zIndex: 40 }
+            : { position: 'sticky', top: 0, flexBasis: dockWidth, width: dockWidth }),
         }}>
           {/* Swap + "toepassen op dagen" openen met voorrang in het modal vak
               (getriggerd door de knoppen op een meal card). */}
