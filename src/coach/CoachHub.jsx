@@ -5,6 +5,7 @@ import { useState, useEffect, useLayoutEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import DatabaseService from '../services/DatabaseService'
 import useIsMobile from '../hooks/useIsMobile'
+import { ModalHostProvider } from './ModalHost'
 
 // Component Imports (ALL PRESERVED)
 import CoachCommandCenter from '../modules/coach-command-center/CoachCommandCenter'
@@ -196,6 +197,12 @@ export default function CoachHub() {
     return Number.isFinite(v) && v >= 25 && v <= 75 ? v : 50
   })
   const splitRef = useRef(null)
+  // DOM-knopen van beide helften, zodat modals daarin kunnen landen in plaats
+  // van op document.body. State en geen ref: de kinderen moeten opnieuw
+  // renderen zodra de knoop bestaat, anders portalt de eerste modal alsnog
+  // naar het scherm.
+  const [hostLinks, setHostLinks] = useState(null)
+  const [hostRechts, setHostRechts] = useState(null)
   // De sleep-handler leest de verhouding bij het loslaten; via een ref, want
   // de listener wordt één keer aangehaakt en zou anders de oude waarde zien.
   const splitRatioRef = useRef(splitRatio)
@@ -921,14 +928,23 @@ export default function CoachHub() {
             display: 'flex', alignItems: 'stretch',
             height: splitHoogte,
           }}>
-            <div style={{ width: `${splitRatio}%`, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
+            {/* De transform maakt van deze helft een positioneringskader: alles
+                wat erbinnen position:fixed gebruikt (coach-insight modal,
+                swap-schermen) rekent voortaan tegen deze helft in plaats van
+                tegen het hele scherm. Zonder dit dekt één modal je beide
+                helften af en heb je niets meer aan de split. */}
+            <div style={{
+              width: `${splitRatio}%`, minWidth: 0,
+              display: 'flex', flexDirection: 'column',
+              position: 'relative', transform: 'translateZ(0)',
+            }} ref={setHostLinks}>
               <PaneelKop
                 tabId={activeTab}
                 onKies={(id) => navigateTo(id)}
                 kant="links"
               />
               <div style={{ flex: 1, minWidth: 0, overflow: 'auto', WebkitOverflowScrolling: 'touch' }}>
-                {renderTabContent(activeTab)}
+                <ModalHostProvider value={hostLinks}>{renderTabContent(activeTab)}</ModalHostProvider>
               </div>
             </div>
 
@@ -946,7 +962,11 @@ export default function CoachHub() {
               onMouseLeave={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.06)' }}
             />
 
-            <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
+            <div style={{
+              flex: 1, minWidth: 0,
+              display: 'flex', flexDirection: 'column',
+              position: 'relative', transform: 'translateZ(0)',
+            }} ref={setHostRechts}>
               <PaneelKop
                 tabId={splitTab}
                 onKies={(id) => setSplitTab(id)}
@@ -954,7 +974,7 @@ export default function CoachHub() {
                 kant="rechts"
               />
               <div style={{ flex: 1, minWidth: 0, overflow: 'auto', WebkitOverflowScrolling: 'touch' }}>
-                {renderTabContent(splitTab)}
+                <ModalHostProvider value={hostRechts}>{renderTabContent(splitTab)}</ModalHostProvider>
               </div>
             </div>
           </div>

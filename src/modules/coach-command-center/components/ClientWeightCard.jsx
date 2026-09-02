@@ -4,6 +4,10 @@
 // deactiveer). Gradients eruit → solide #0a0a0a.
 import React, { useState } from 'react'
 import { createPortal } from 'react-dom'
+// In split screen mag een modal niet het hele scherm afdekken maar alleen de
+// helft waar de tab in staat. useModalHost geeft die helft terug; buiten split
+// screen gewoon document.body, dus daar verandert er niets.
+import { useModalHost } from '../../../coach/ModalHost'
 import {
   TrendingDown, TrendingUp,
   MessageCircle, Power, MoreHorizontal, Trash2,
@@ -32,6 +36,7 @@ const GOAL_LABELS = {
 }
 
 export default function ClientWeightCard({ client, isMobile, onToggleStatus, onDeleted, showStatusToggle = false, onNavigatePlan, onNavigateWorkout, onNavigateTab, db, coachId, onOpenMealPanel, onOpenWorkoutPanel }) {
+  const modalHost = useModalHost()
   const [showInsight, setShowInsight]   = useState(false)
   const [showLog, setShowLog]           = useState(false)
   const [showMenu, setShowMenu]         = useState(false)
@@ -362,7 +367,7 @@ export default function ClientWeightCard({ client, isMobile, onToggleStatus, onD
             }
           }}
         />,
-        document.body
+        modalHost
       )}
 
       {showLog && createPortal(
@@ -373,7 +378,7 @@ export default function ClientWeightCard({ client, isMobile, onToggleStatus, onD
           isMobile={isMobile}
           onClose={() => setShowLog(false)}
         />,
-        document.body
+        modalHost
       )}
     </div>
   )
