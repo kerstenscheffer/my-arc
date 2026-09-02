@@ -489,6 +489,7 @@ export default function CoachHub() {
             selectedClient={selectedClient}
             onClientSelect={setSelectedClient}
             conceptPlanId={reviewPlanId}
+            coachId={user?.id || null}
           />
         )
       case 'meal-templates':

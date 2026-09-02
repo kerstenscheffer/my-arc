@@ -328,6 +328,14 @@ export default function PlanAnalyzer({
     return () => { afgebroken = true }
   }, [db, resolvedClientId])
 
+  // Welk plan is er in beeld? Dit stond op tien plekken uitgeschreven, en op
+  // twee verschillende manieren: alles wat SCHRIJFT gebruikte
+  // planMeta?.id || selectedConceptId, terwijl de agenda LAS met
+  // selectedConceptId || planMeta?.id. Verschilden die twee, dan landde de
+  // pre-workout maaltijd in het ene plan terwijl de tijdlijn het andere
+  // toonde — en leek de maaltijd verdwenen. Nu één constante.
+  const actievePlanId = planMeta?.id || selectedConceptId || null
+
   // ════════════ HELPERS ════════════
 
   const calculateTotals = (meals) => {
@@ -375,7 +383,7 @@ export default function PlanAnalyzer({
   // ════════════ PERSIST ════════════
 
   const persistWeekData = async (updated) => {
-    const planId = planMeta?.id || selectedConceptId || null
+    const planId = actievePlanId
     if (planId) {
       const ws = {}
       updated.forEach(d => { ws[d.dayId] = { ...d.meals, totals: d.totals, is_training_day: d.is_training_day } })
@@ -429,7 +437,7 @@ export default function PlanAnalyzer({
   // Pre-workout maaltijd zetten of wissen. Schrijft naar een eigen kolom, niet
   // naar week_structure — zie de opmerking bij de state hierboven.
   const bewaarPreWorkout = async (meal) => {
-    const planId = planMeta?.id || selectedConceptId || null
+    const planId = actievePlanId
     setPreWorkoutMeal(meal)
     if (!planId) return
     setWeekSaveState('saving')
@@ -498,7 +506,7 @@ export default function PlanAnalyzer({
     if (!ws) return
     const days = await hydrateWeekStructure(ws)
     if (!days) return
-    const planId = planMeta?.id || selectedConceptId || null
+    const planId = actievePlanId
     // Geen open plan maar wél een client (bv. een sjabloon toepassen op een verse
     // klant zoals Lisa) → maak direct een nieuw client_meal_plans-plan aan, zodat
     // het geladen sjabloon ook écht opslaat (persistWeekData no-opt zonder plan-id).
@@ -583,7 +591,7 @@ export default function PlanAnalyzer({
   // terugkomst weer inleest. (De bibliotheek-modal doet iets anders: die legt
   // een los sjabloon in meal_plan_templates en laat dit plan ongemoeid.)
   const handleRenamePlan = async (nextName) => {
-    const planId = planMeta?.id || selectedConceptId || null
+    const planId = actievePlanId
     if (!planId) throw new Error('Plan is nog niet opgeslagen')
     const { data, error } = await db.supabase
       .from('client_meal_plans')
@@ -600,7 +608,7 @@ export default function PlanAnalyzer({
   // Rename via de plan-switcher: als het om het geopende plan gaat moet de
   // titelbalk direct meebewegen, anders blijft daar de oude naam staan.
   const handlePlanRenamedElsewhere = (planId, nextName) => {
-    if (planId !== (planMeta?.id || selectedConceptId)) return
+    if (planId !== actievePlanId) return
     setPlanMeta(p => (p ? { ...p, name: nextName } : p))
   }
 
@@ -1058,7 +1066,7 @@ export default function PlanAnalyzer({
                   viewerRole="coach"
                   singleDay={DAYS[activeDay]?.id}
                   refreshKey={agendaRefreshKey}
-                  mealPlanId={selectedConceptId || planMeta?.id || null}
+                  mealPlanId={actievePlanId}
                   // Maaltijd wisselen of verwijderen vanuit de agenda. Loopt
                   // langs dezelfde handlers als de meal-cards, zodat totalen
                   // herberekend worden en het plan één schrijfpad houdt.
@@ -1086,7 +1094,7 @@ export default function PlanAnalyzer({
                     })
                   }}
                   onMealUpdate={() => {
-                    const reloadId = selectedConceptId || planMeta?.id
+                    const reloadId = actievePlanId
                     if (reloadId) loadConceptPlan(reloadId)
                   }}
                 />
@@ -1121,7 +1129,7 @@ export default function PlanAnalyzer({
           <PlanTitleBar
             name={planMeta?.name}
             isActive={activated || planMeta?.isActive}
-            canEdit={!!(planMeta?.id || selectedConceptId)}
+            canEdit={!!actievePlanId}
             onRename={handleRenamePlan}
             weekSaveState={weekSaveState}
             isMobile={m}
@@ -1235,7 +1243,7 @@ export default function PlanAnalyzer({
                 isMobile={m}
                 viewerRole="coach"
                 refreshKey={agendaRefreshKey}
-                mealPlanId={selectedConceptId || planMeta?.id || null}
+                mealPlanId={actievePlanId}
                 onMealTimingChange={({ day, slot, newTiming }) => {
                   // Synchroon: update weekData lokaal zodat MealCard direct
                   // de nieuwe tijd toont. Agenda's async DB-save runt apart.
@@ -1256,7 +1264,7 @@ export default function PlanAnalyzer({
                   })
                 }}
                 onMealUpdate={() => {
-                  const reloadId = selectedConceptId || planMeta?.id
+                  const reloadId = actievePlanId
                   if (reloadId) loadConceptPlan(reloadId)
                 }}
               />

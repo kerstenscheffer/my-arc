@@ -30,7 +30,7 @@ const TABS = [
 // Vaste demo-client (voor voorbeeldplannen). Herkend op dit e-mailadres.
 const DEMO_EMAIL = 'demo@myarcfitness.internal'
 
-export default function MealPlanGenerator({ db, clients = [], conceptPlanId, selectedClient: propSelectedClient }) {
+export default function MealPlanGenerator({ db, clients = [], conceptPlanId, selectedClient: propSelectedClient, coachId}) {
   const isMobile = window.innerWidth <= 768
   const m = isMobile
 
@@ -185,6 +185,7 @@ export default function MealPlanGenerator({ db, clients = [], conceptPlanId, sel
       )
       case 3: return (
         <PlanAnalyzer
+          coachId={coachId}
           db={db} generatedPlan={generatedPlan} analyzedData={analyzedData}
           planModifications={planModifications} setPlanModifications={setPlanModifications}
           dailyTargets={dailyTargets} isMobile={m}

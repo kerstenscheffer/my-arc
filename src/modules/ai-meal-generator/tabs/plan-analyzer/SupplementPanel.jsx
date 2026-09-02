@@ -123,11 +123,17 @@ export default function SupplementPanel({ db, clientId, coachId, clientRecord, t
             gewicht, frequentie,
             clientRecord?.primary_goal === 'bulk' ? 'bulk' : 'cut')
         : []
+      // Terugval op de ingelogde gebruiker: de coachId-prop liep niet overal
+      // door, waardoor plannen zonder coach_id ontstonden.
+      let coach = coachId || null
+      if (!coach) {
+        try { coach = (await db.getCurrentUser())?.id || null } catch { coach = null }
+      }
       const { data, error } = await db.supabase
         .from('supplement_plans')
         .insert({
           client_id: clientId,
-          coach_id: coachId || null,
+          coach_id: coach,
           supplements: start,
           status: 'active',
           client_weight: Math.round(Number(clientRecord?.current_weight)) || null,
@@ -163,6 +169,18 @@ export default function SupplementPanel({ db, clientId, coachId, clientRecord, t
       setFout(e.message || 'Opslaan mislukt')
     } finally { setBezig(false) }
   }
+
+  // Automatisch opslaan. Een aparte knop leverde stilletjes verlies op: je
+  // klikt dagen aan, sluit het paneel en denkt dat het staat. Nu bewaart hij
+  // driekwart seconde na je laatste wijziging; de knop onderin is er nog als
+  // bevestiging (en om handmatig te forceren), niet meer als voorwaarde.
+  useEffect(() => {
+    if (!vuil || !plan?.id || bezig) return
+    const t = setTimeout(() => { opslaan() }, 750)
+    return () => clearTimeout(t)
+    // opslaan hangt aan supplementen/plan; die staan hieronder al in de lijst.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [vuil, supplementen, plan?.id])
 
   const alGekozen = new Set(supplementen.map(s => s.template_id).filter(Boolean))
   const beschikbaar = templates.filter(t => !alGekozen.has(t.supplement_id))
@@ -370,7 +388,7 @@ export default function SupplementPanel({ db, clientId, coachId, clientRecord, t
           }}>
             {bezig ? <Loader size={14} style={{ animation: 'spin 1s linear infinite' }} />
               : !vuil ? <Check size={14} /> : null}
-            {bezig ? 'Opslaan…' : vuil ? 'Opslaan' : 'Opgeslagen'}
+            {bezig ? 'Opslaan…' : vuil ? 'Wijzigingen bewaren…' : 'Opgeslagen'}
           </button>
         </div>
       )}
