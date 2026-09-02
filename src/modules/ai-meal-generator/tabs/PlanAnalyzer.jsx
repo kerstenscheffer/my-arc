@@ -343,7 +343,12 @@ export default function PlanAnalyzer({
   // we over? Beide stonden hardgecodeerd: de zijbalk en het dock-paneel
   // kleefden aan top:0 en verdwenen daardoor onder die balk.
   const kleefTop = topOffset
-  const paneelHoogte = `calc(100dvh - ${topOffset + ZWEVENDE_NAV_HOOGTE}px)`
+  // Kolommen lopen door tot de onderkant van het scherm. Eerder ging de
+  // navbalk-ruimte van de hele hoogte af; dan eindigt álles te vroeg en houd
+  // je een zwarte band over. De navbalk zweeft nu over de onderkant heen, en
+  // alleen wat daar écht onder zou verdwijnen (knoppenbalken, de laatste
+  // maaltijdkaart) krijgt onderaan wat lucht.
+  const paneelHoogte = `calc(100dvh - ${topOffset}px)`
 
   const actievePlanId = planMeta?.id || selectedConceptId || null
 
@@ -889,6 +894,7 @@ export default function PlanAnalyzer({
         borderRight: '1px solid rgba(255,255,255,0.05)',
         display: 'flex', flexDirection: 'column', alignItems: 'center',
         padding: '10px 0', gap: 6,
+        paddingBottom: ZWEVENDE_NAV_HOOGTE,
         overflowY: 'auto', WebkitOverflowScrolling: 'touch',
         // Meescrollen met de pagina, niet mee naar beneden verdwijnen —
         // en beginnen onder de tabbalk, niet eronder verdwijnen.
@@ -1011,6 +1017,9 @@ export default function PlanAnalyzer({
         <div style={{
           flexShrink: 0, minWidth: 0, background: '#0a0a0a',
           borderRight: '1px solid rgba(255,255,255,0.06)',
+          // Het paneel loopt tot onderaan, maar de inhoud (incl. de
+          // opslaan-knop onderin) blijft boven de zwevende navbalk.
+          paddingBottom: ZWEVENDE_NAV_HOOGTE,
           transform: 'translateZ(0)', overflow: 'hidden',
           display: 'flex', flexDirection: 'column',
           // Het paneel groeide mee met de pagina, waardoor de opslaan-knop
@@ -1317,10 +1326,12 @@ export default function PlanAnalyzer({
             flexDirection: m ? 'column' : 'row',
             WebkitOverflowScrolling: 'touch',
           }}>
-            {/* Meal-cards strook — MacroHero erboven, beide samen scrollend */}
+            {/* Meal-cards strook — MacroHero erboven, beide samen scrollend.
+                Onderaan ruimte voor de zwevende navbalk, anders ligt de
+                laatste maaltijdkaart eronder. */}
             <div style={{
               flex: 1, overflowY: 'auto', WebkitOverflowScrolling: 'touch',
-              minWidth: 0,
+              minWidth: 0, paddingBottom: ZWEVENDE_NAV_HOOGTE,
             }}>
               <MacroHero
                 consumed={{
