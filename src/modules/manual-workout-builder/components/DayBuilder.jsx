@@ -17,6 +17,9 @@ export default function DayBuilder({
   // the whole exercise object so the modal can show name + current
   // video_url / thumbnail_url without an extra fetch.
   const [videoEditing, setVideoEditing] = useState(null)
+  // Tijdens het typen mag het veld even leeg of ongeldig zijn zonder dat de
+  // dag meteen op 60 terugvalt. null = toon gewoon wat er in de dag staat.
+  const [tempMinuten, setTempMinuten] = useState(null)
 
   const handleSaveName = () => { onUpdate({ ...day, name: tempName || `Dag ${dayNumber}` }); setEditingName(false) }
   const handleSaveFocus = () => { onUpdate({ ...day, focus: tempFocus || '' }); setEditingFocus(false) }
@@ -37,6 +40,7 @@ export default function DayBuilder({
   }
 
   const totalVolume = day.exercises.reduce((sum, ex) => sum + (ex.sets || 0), 0)
+  const minuten = tempMinuten !== null ? tempMinuten : (parseInt(day.geschatteTijd, 10) || 60)
 
   // Compacte icon-knop (leadsysteem-stijl) voor de dag-acties.
   const iconBtn = {
@@ -123,19 +127,49 @@ export default function DayBuilder({
           </div>
         </div>
 
-        {/* Regel 2: flush stat-bar (oefeningen · sets · minuten) */}
+        {/* Regel 2: flush stat-bar (oefeningen · sets · minuten).
+            Oefeningen en sets rollen uit de inhoud; de minuten zijn een
+            schatting die de coach zelf zet — die stond op een hardgecodeerde
+            60 en was nergens te wijzigen, terwijl hij wel doorloopt naar de
+            PDF en naar het trainingsblok in de agenda. */}
         {!collapsed && (
           <div style={{ display: 'flex', marginTop: '0.7rem', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 8, overflow: 'hidden' }}>
             {[
               { v: day.exercises.length, l: 'Oefeningen' },
               { v: totalVolume, l: 'Sets' },
-              { v: parseInt(day.geschatteTijd) || 60, l: 'Min' },
             ].map((s, i) => (
               <div key={s.l} style={{ flex: 1, minWidth: 0, padding: isMobile ? '0.5rem 0.4rem' : '0.55rem 0.6rem', borderLeft: i === 0 ? 'none' : '1px solid rgba(255,255,255,0.06)', textAlign: 'center' }}>
                 <div style={{ fontSize: isMobile ? '0.95rem' : '1.1rem', fontWeight: 900, color: '#fff', lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>{s.v}</div>
                 <div style={{ fontSize: '0.5rem', fontWeight: 700, letterSpacing: '0.05em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.3)', marginTop: 3 }}>{s.l}</div>
               </div>
             ))}
+            <div style={{ flex: 1, minWidth: 0, padding: isMobile ? '0.5rem 0.4rem' : '0.55rem 0.6rem', borderLeft: '1px solid rgba(255,255,255,0.06)', textAlign: 'center' }}>
+              <input
+                type="number"
+                min="5" max="240" step="5"
+                value={minuten}
+                onClick={e => e.stopPropagation()}
+                onChange={e => {
+                  // Leeg laten mag tijdens het typen; pas bij een geldig
+                  // getal schrijven we naar de dag.
+                  const ruw = e.target.value
+                  setTempMinuten(ruw)
+                  const n = parseInt(ruw, 10)
+                  if (Number.isFinite(n) && n > 0) onUpdate({ ...day, geschatteTijd: `${n} minutes` })
+                }}
+                onBlur={() => setTempMinuten(null)}
+                style={{
+                  width: '100%', background: 'transparent', border: 'none', outline: 'none',
+                  textAlign: 'center', fontFamily: 'inherit',
+                  fontSize: isMobile ? '0.95rem' : '1.1rem', fontWeight: 900, color: '#fff',
+                  lineHeight: 1, fontVariantNumeric: 'tabular-nums',
+                  padding: 0, MozAppearance: 'textfield',
+                }}
+              />
+              <div style={{ fontSize: '0.5rem', fontWeight: 700, letterSpacing: '0.05em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.3)', marginTop: 3 }}>
+                Min
+              </div>
+            </div>
           </div>
         )}
       </div>

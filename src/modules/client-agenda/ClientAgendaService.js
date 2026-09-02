@@ -123,6 +123,13 @@ const PRE_WORKOUT_DURATION = 15
 
 const TRAINING_DEFAULT_START = 17 * 60
 const TRAINING_DEFAULT_DURATION = 60
+// De coach zet per trainingsdag een geschatte tijd in de workout builder
+// (week_structure[dagX].geschatteTijd, bv. "75 minutes"). Het blok tekende
+// altijd 60 minuten, waardoor die instelling nergens te zien was.
+const workoutDuur = (dayWorkout) => {
+  const n = parseInt(dayWorkout?.geschatteTijd, 10)
+  return Number.isFinite(n) && n >= 5 && n <= 300 ? n : TRAINING_DEFAULT_DURATION
+}
 const SLEEP_START = 23 * 60
 const SLEEP_END = 7 * 60 // wraps midnight — block split
 
@@ -414,7 +421,7 @@ export class ClientAgendaService {
             label: 'Training',
             sublabel: workoutTitle || 'Tijd nog niet ingesteld',
             start: TRAINING_DEFAULT_START,
-            end: TRAINING_DEFAULT_START + TRAINING_DEFAULT_DURATION,
+            end: TRAINING_DEFAULT_START + workoutDuur(dayWorkout),
             color: TRAINING_COLOR,
             source: 'placeholder',
             editable: true,
