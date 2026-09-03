@@ -7,12 +7,15 @@ import { FlowProgress } from './phase1/FlowStep'
 import BasicsFlow    from './phase1/BasicsFlow'
 import BodyFlow      from './phase1/BodyFlow'
 import GoalFlow      from './phase1/GoalFlow'
+// Nulmeting: staat direct na Doel — de klant heeft net gezegd waar hij heen
+// wil, dus dit is het moment om vast te leggen waar hij vandaan komt.
+import BaselineFlow  from './phase1/BaselineFlow'
 import LifestyleFlow from './phase1/LifestyleFlow'
 import HealthFlow    from './phase1/HealthFlow'
 import CoachingFlow  from './phase1/CoachingFlow'
 import { calculateTDEE, calculateTargetCalories, calculateMacros } from '../services/TDEECalculator'
 
-const SECTIONS = ['Basis', 'Lichaam', 'Doel', 'Levensstijl', 'Gezondheid', 'Coaching']
+const SECTIONS = ['Basis', 'Lichaam', 'Doel', 'Nulmeting', 'Levensstijl', 'Gezondheid', 'Coaching']
 
 export default function IntakePhase1({ data, onChange, onComplete, isMobile }) {
   const [sectionIndex, setSectionIndex] = useState(0)
@@ -101,9 +104,10 @@ export default function IntakePhase1({ data, onChange, onComplete, isMobile }) {
         {sectionIndex === 0 && <BasicsFlow    {...sectionProps} onNext={goNext} />}
         {sectionIndex === 1 && <BodyFlow      {...sectionProps} onNext={goNext} />}
         {sectionIndex === 2 && <GoalFlow      {...sectionProps} onNext={goNext} />}
-        {sectionIndex === 3 && <LifestyleFlow {...sectionProps} onNext={goNext} />}
-        {sectionIndex === 4 && <HealthFlow    {...sectionProps} onNext={goNext} />}
-        {sectionIndex === 5 && <CoachingFlow  {...sectionProps} onNext={handleComplete} />}
+        {sectionIndex === 3 && <BaselineFlow  {...sectionProps} onNext={goNext} />}
+        {sectionIndex === 4 && <LifestyleFlow {...sectionProps} onNext={goNext} />}
+        {sectionIndex === 5 && <HealthFlow    {...sectionProps} onNext={goNext} />}
+        {sectionIndex === 6 && <CoachingFlow  {...sectionProps} onNext={handleComplete} />}
       </div>
     </div>
   )

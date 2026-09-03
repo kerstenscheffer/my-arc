@@ -2,7 +2,7 @@
 // Stap 3: Doel — primary goal, streefgewicht/vet%, timeline, urgentie, motivatie
 
 import React, { useState } from 'react'
-import { Q, Hint, NextBtn, BackBtn, BigOption, PhotoGrid, OptionGrid, TextField, Slider, NumberField } from './FlowStep'
+import { Q, Hint, NextBtn, BackBtn, SkipBtn, BigOption, PhotoGrid, OptionGrid, TextField, Slider, NumberField } from './FlowStep'
 import { Flame, Dumbbell, Scale, Activity } from 'lucide-react'
 
 const BF_TARGET_OPTIONS = [
@@ -458,9 +458,16 @@ export default function GoalFlow({ data, onChange, onNext, onBack, isMobile }) {
               value={motivationExtra}
               onChange={e => {
                 setMotivationExtra(e.target.value)
-                // Combineer tags + eigen tekst
+                // Combineer tags + eigen tekst voor de leesbare samenvatting,
+                // maar bewaar de eigen woorden óók apart. In de samenvoeging
+                // is niet meer te zien wat de klant zelf schreef, en juist dat
+                // wil je als coach letterlijk terugkunnen lezen.
                 const tags = (data.motivation_tags || []).map(t => MOTIVATION_OPTIONS.find(o => o.value === t)?.label || t).join(', ')
-                update('motivation', [tags, e.target.value].filter(Boolean).join('. '))
+                onChange({
+                  ...data,
+                  motivation: [tags, e.target.value].filter(Boolean).join('. '),
+                  motivation_verbatim: e.target.value || null,
+                })
               }}
               placeholder="Bijv: Ik wil me beter voelen in mijn kleren..."
               rows={2}
@@ -477,11 +484,32 @@ export default function GoalFlow({ data, onChange, onNext, onBack, isMobile }) {
             />
           </div>
           <NextBtn
-            onClick={handleOnNext}
+            onClick={() => go('quick_win')}
             disabled={!data.motivation_tags?.length && !motivationExtra}
             label="VOLGENDE →"
             isMobile={isMobile}
           />
+        </>
+
+      // Kleine eerste winst. Staat los van het grote doel: een streefgewicht
+      // over zes maanden zegt niets over de eerste twee weken, en juist daar
+      // haakt iemand af of niet.
+      case 'quick_win':
+        return <>
+          <BackBtn onBack={goBack} />
+          <Q isMobile={isMobile}>Wat zou voor jou al een klein succes zijn in de eerste 2 weken?</Q>
+          <Hint isMobile={isMobile}>
+            Iets kleins en concreets. Bijv: drie keer trainen, of geen avondsnacks.
+          </Hint>
+          <TextField
+            multiline
+            placeholder="Bijv: elke ochtend ontbijten zonder erover na te denken…"
+            value={data.quick_win_2weeks || ''}
+            onChange={v => update('quick_win_2weeks', v)}
+            isMobile={isMobile}
+          />
+          <NextBtn onClick={handleOnNext} label="VOLGENDE →" isMobile={isMobile} />
+          <SkipBtn onClick={handleOnNext} label="Overslaan" isMobile={isMobile} />
         </>
 
       default: return null

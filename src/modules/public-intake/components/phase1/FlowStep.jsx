@@ -400,3 +400,46 @@ export function FlowProgress({ sections, currentSection, isMobile }) {
     </div>
   )
 }
+
+// ── Schaal 1-10 ───────────────────────────────────────────────────────────────
+// Tien knoppen i.p.v. een slider: op een telefoon is tikken preciezer dan
+// slepen, en je ziet meteen wat je gekozen hebt zonder het handvat vast te
+// houden. Twee rijen van vijf zodat elke knop een fatsoenlijk raakvlak houdt.
+export function SchaalTien({ value, onChange, laag = 'Heel laag', hoog = 'Heel hoog', isMobile }) {
+  return (
+    <div style={{ marginBottom: '0.9rem' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: isMobile ? 5 : 6 }}>
+        {Array.from({ length: 10 }, (_, i) => i + 1).map(n => {
+          const aan = Number(value) === n
+          return (
+            <button
+              key={n}
+              type="button"
+              onClick={() => onChange(n)}
+              style={{
+                padding: isMobile ? '0.75rem 0' : '0.8rem 0',
+                background: aan ? '#fff' : 'rgba(255,255,255,0.04)',
+                border: `1px solid ${aan ? '#fff' : 'rgba(255,255,255,0.12)'}`,
+                color: aan ? '#0a0a0a' : 'rgba(255,255,255,0.55)',
+                fontSize: isMobile ? '1rem' : '1.05rem',
+                fontWeight: 900, fontFamily: 'inherit',
+                cursor: 'pointer', minHeight: 44,
+                touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+                transition: 'background 0.12s ease',
+              }}
+            >
+              {n}
+            </button>
+          )
+        })}
+      </div>
+      <div style={{
+        display: 'flex', justifyContent: 'space-between', marginTop: '0.4rem',
+        fontSize: '0.62rem', fontWeight: 700, color: 'rgba(255,255,255,0.3)',
+      }}>
+        <span>1 · {laag}</span>
+        <span>10 · {hoog}</span>
+      </div>
+    </div>
+  )
+}
