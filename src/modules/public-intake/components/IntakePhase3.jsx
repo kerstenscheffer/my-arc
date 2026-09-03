@@ -57,28 +57,6 @@ export default function IntakePhase3({ data, onChange, onComplete, personalData,
 
   return (
     <div style={{ padding: isMobile ? '1rem' : '1.25rem' }}>
-      {personalData?.motivation && (
-        <div style={{
-          marginBottom: '1.25rem',
-          padding: isMobile ? '0.65rem 0.75rem' : '0.75rem 1rem',
-          background: 'rgba(255,215,0,0.02)',
-          borderLeft: '2px solid rgba(255,215,0,0.35)',
-          borderRadius: '0 8px 8px 0'
-        }}>
-          <div style={{ fontSize: '0.42rem', fontWeight: 800, color: 'rgba(255,215,0,0.5)', letterSpacing: '0.08em', marginBottom: '0.2rem' }}>
-            WAAROM JIJ DIT DOET
-          </div>
-          <div style={{
-            fontSize: isMobile ? '0.62rem' : '0.65rem', color: 'rgba(255,255,255,0.4)',
-            fontStyle: 'italic', lineHeight: 1.5, fontWeight: 500,
-            overflow: 'hidden', display: '-webkit-box',
-            WebkitLineClamp: 2, WebkitBoxOrient: 'vertical'
-          }}>
-            "{personalData.motivation}"
-          </div>
-        </div>
-      )}
-
       {toonSlot && (
         <div style={{ padding: isMobile ? '1rem' : '1.25rem' }}>
           <Q isMobile={isMobile}>
