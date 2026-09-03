@@ -49,36 +49,105 @@ const BASE_SLOTS = [
 //
 // Bewust nagebouwd in plaats van een plaatje: scherp op elk scherm, geen
 // bestand dat zoekraakt, en het volgt vanzelf de stijl van de app.
+const VOORBEELD = {
+  titel: 'Volkoren wrap met ei, kaas en kipfilet',
+  moment: 'Ontbijt',
+  kcal: 898,
+  macros: [
+    { pct: 29, gram: 46, label: 'Koolhydr', kleur: '#f59e0b' },
+    { pct: 35, gram: 54, label: 'Vetten',   kleur: '#a855f7' },
+    { pct: 36, gram: 57, label: 'Eiwitten', kleur: '#eab308' },
+  ],
+  onderdelen: [
+    { naam: 'Eieren',                        sub: '300g',        kcal: 465 },
+    { naam: 'Olijf olie extra vierge',       sub: 'Jumbo, 5g',   kcal: 41 },
+    { naam: 'Kaas 48+ jong',                 sub: '40g',         kcal: 148 },
+    { naam: 'Tortilla wraps naturel',        sub: '81g',         kcal: 244 },
+  ],
+}
+
 function VoorbeeldKaart({ isMobile, groot }) {
-  const macro = (waarde, label) => (
-    <span style={{ display: 'inline-flex', alignItems: 'baseline', gap: 3 }}>
-      <span style={{ fontSize: groot ? (isMobile ? '1.3rem' : '1.5rem') : '0.42rem', fontWeight: 900, color: '#fff' }}>{waarde}</span>
-      <span style={{ fontSize: groot ? '0.6rem' : '0.24rem', fontWeight: 800, color: 'rgba(255,255,255,0.35)', letterSpacing: '0.06em' }}>{label}</span>
-    </span>
-  )
+  const M = VOORBEELD
+  // De ring uit de app: drie macro's als segmenten, in dezelfde volgorde.
+  const ring = (() => {
+    let op = 0
+    const stops = M.macros.map(m => {
+      const van = op; op += m.pct
+      return `${m.kleur} ${van}% ${op}%`
+    }).join(', ')
+    return `conic-gradient(${stops}, rgba(255,255,255,0.1) ${op}% 100%)`
+  })()
+  const ringMaat = groot ? 68 : 22
+
   return (
     <div style={{
       border: '1px solid rgba(255,255,255,0.12)',
-      background: 'linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.02))',
-      padding: groot ? (isMobile ? '1rem 1.1rem' : '1.2rem 1.3rem') : '4px 5px',
-      width: groot ? 'min(340px, 88vw)' : undefined,
+      background: '#111',
+      width: groot ? 'min(360px, 90vw)' : undefined,
       height: groot ? undefined : '100%',
-      display: 'flex', flexDirection: 'column', justifyContent: 'center',
+      display: 'flex', flexDirection: 'column',
       boxSizing: 'border-box', overflow: 'hidden',
+      textAlign: 'left',
     }}>
       <div style={{
-        fontSize: groot ? (isMobile ? '1rem' : '1.1rem') : '0.34rem',
-        fontWeight: 900, color: '#fff', letterSpacing: '-0.01em',
-        marginBottom: groot ? '0.55rem' : '2px', lineHeight: 1.15,
+        padding: groot ? (isMobile ? '0.8rem 0.9rem' : '0.9rem 1rem') : '3px 4px',
+        borderBottom: groot ? '1px solid rgba(255,255,255,0.08)' : 'none',
       }}>
-        Kwark met bosvruchten
+        <div style={{
+          fontSize: groot ? (isMobile ? '0.95rem' : '1.05rem') : '0.3rem',
+          fontWeight: 900, color: '#fff', lineHeight: 1.2, letterSpacing: '-0.01em',
+        }}>{M.titel}</div>
       </div>
-      <div style={{ display: 'flex', gap: groot ? (isMobile ? 12 : 16) : 3, flexWrap: 'wrap' }}>
-        {macro(380, 'KCAL')}{macro(61, 'EIWIT')}{macro(25, 'KOOLH')}{macro(3, 'VET')}
-      </div>
+
       {groot && (
-        <div style={{ marginTop: '0.6rem', paddingTop: '0.5rem', borderTop: '1px solid rgba(255,255,255,0.08)', fontSize: '0.75rem', color: 'rgba(255,255,255,0.45)', lineHeight: 1.5 }}>
-          Magere kwark 500g · Bosvruchten 100g
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.6rem 0.9rem', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+          <span style={{ fontSize: '0.78rem', color: 'rgba(255,255,255,0.4)', fontWeight: 600 }}>Maaltijd</span>
+          <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#fff', border: '1px solid rgba(255,255,255,0.25)', borderRadius: 6, padding: '0.25rem 0.6rem' }}>{M.moment}</span>
+        </div>
+      )}
+
+      <div style={{
+        display: 'flex', alignItems: 'center',
+        gap: groot ? (isMobile ? 12 : 18) : 3,
+        padding: groot ? '0.85rem 0.9rem' : '2px 4px',
+        borderBottom: groot ? '1px solid rgba(255,255,255,0.08)' : 'none',
+      }}>
+        <div style={{
+          width: ringMaat, height: ringMaat, borderRadius: '50%', flexShrink: 0,
+          background: ring, display: 'flex', alignItems: 'center', justifyContent: 'center',
+        }}>
+          <div style={{
+            width: ringMaat - (groot ? 14 : 6), height: ringMaat - (groot ? 14 : 6),
+            borderRadius: '50%', background: '#111',
+            display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+          }}>
+            <span style={{ fontSize: groot ? '0.95rem' : '0.28rem', fontWeight: 900, color: '#fff', lineHeight: 1 }}>{M.kcal}</span>
+            {groot && <span style={{ fontSize: '0.45rem', fontWeight: 800, color: 'rgba(255,255,255,0.35)', letterSpacing: '0.08em' }}>CAL</span>}
+          </div>
+        </div>
+        <div style={{ flex: 1, display: 'flex', justifyContent: 'space-between', gap: groot ? 8 : 2 }}>
+          {M.macros.map(m => (
+            <div key={m.label} style={{ textAlign: 'center', minWidth: 0 }}>
+              <div style={{ fontSize: groot ? '0.6rem' : '0.2rem', fontWeight: 800, color: m.kleur }}>{m.pct} %</div>
+              <div style={{ fontSize: groot ? (isMobile ? '0.95rem' : '1rem') : '0.3rem', fontWeight: 900, color: '#fff', lineHeight: 1.1 }}>{m.gram} g</div>
+              <div style={{ fontSize: groot ? '0.55rem' : '0.18rem', fontWeight: 700, color: m.kleur }}>{m.label}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {groot && (
+        <div style={{ padding: '0.75rem 0.9rem 0.9rem' }}>
+          <div style={{ fontSize: '0.85rem', fontWeight: 900, color: '#fff', marginBottom: '0.6rem' }}>Onderdelen maaltijd</div>
+          {M.onderdelen.map(o => (
+            <div key={o.naam} style={{ display: 'flex', alignItems: 'baseline', gap: 8, padding: '0.4rem 0', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: '0.82rem', fontWeight: 700, color: '#fff' }}>{o.naam}</div>
+                <div style={{ fontSize: '0.66rem', color: 'rgba(255,255,255,0.35)' }}>{o.sub}</div>
+              </div>
+              <div style={{ fontSize: '0.82rem', fontWeight: 800, color: 'rgba(255,255,255,0.6)' }}>{o.kcal}</div>
+            </div>
+          ))}
         </div>
       )}
     </div>
@@ -120,7 +189,7 @@ function VoorbeeldTegel({ isMobile }) {
           </div>
           <VoorbeeldKaart isMobile={isMobile} groot />
           <div style={{ fontSize: '0.8rem', color: 'rgba(255,255,255,0.5)', textAlign: 'center', lineHeight: 1.55, maxWidth: 300 }}>
-            Naam, calorieën en de macro's. Staan de hoeveelheden erbij, helemaal top.
+            Naam, calorieën, de macro's en de ingrediënten met hoeveelheden. Hoe completer, hoe beter ik je plan kan maken.
           </div>
         </div>,
         document.body
