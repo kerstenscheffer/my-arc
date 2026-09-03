@@ -911,15 +911,21 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
   // Openstaande calls: leads waarvan de laatste ingepland-movement een call_date
   // heeft, nog niet is afgehandeld (call_happened = null), de lead nog in die
   // ingepland-sectie staat, én de call-datum+tijd voorbij is.
-  async getDueScheduledCalls(scheduledSectionIds = []) {
+  // @param {boolean} toonToekomstig  ook leads die "denkt erover na" staan met
+  //   een datum die nog niet bereikt is. Uit bij het automatisch openen (dan
+  //   wil je alleen wat vandaag speelt), aan bij het handmatig openen van de
+  //   knop — daar wil je élke openstaande call kunnen afronden.
+  async getDueScheduledCalls(scheduledSectionIds = [], toonToekomstig = false) {
     try {
       if (!scheduledSectionIds || scheduledSectionIds.length === 0) return []
       const { data: movs, error } = await this.db.supabase
         .from('lead_movements')
-        .select('id, lead_id, lead_name, to_section_id, to_section_title, call_date, call_time, moved_at')
+        .select('id, lead_id, lead_name, to_section_id, to_section_title, call_date, call_time, moved_at, call_happened, outcome_type, followup_date')
         .in('to_section_id', scheduledSectionIds)
         .not('call_date', 'is', null)
-        .is('call_happened', null)
+        // Nog niet afgehandeld, óf gevoerd met "denkt erover na" — die laatste
+        // hoort terug te komen op zijn eigen datum.
+        .or('call_happened.is.null,outcome_type.eq.thinking')
         .is('reverted_at', null)
         .order('moved_at', { ascending: false })
       if (error) throw error
@@ -936,18 +942,49 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
       const currentSection = new Map((items || []).map(it => [it.lead_id, it.section_id]))
 
       const now = new Date()
+      const vandaag = new Date().toISOString().split('T')[0]
       const due = []
       for (const [leadId, mv] of latestByLead) {
         if (currentSection.get(leadId) !== mv.to_section_id) continue
-        const dt = new Date(`${mv.call_date}T${mv.call_time || '23:59'}:00`)
-        if (isNaN(dt.getTime()) || dt > now) continue
-        due.push({ movementId: mv.id, leadId, leadName: mv.lead_name, sectionId: mv.to_section_id, sectionTitle: mv.to_section_title, callDate: mv.call_date, callTime: mv.call_time })
+        const denktNa = mv.outcome_type === 'thinking'
+        if (denktNa) {
+          // Call is gevoerd, de lead denkt na. Pas tonen vanaf de afgesproken
+          // datum — behalve als de coach de lijst zelf opent.
+          if (!toonToekomstig && mv.followup_date && mv.followup_date > vandaag) continue
+        } else {
+          const dt = new Date(`${mv.call_date}T${mv.call_time || '23:59'}:00`)
+          if (isNaN(dt.getTime()) || dt > now) continue
+        }
+        due.push({
+          movementId: mv.id, leadId, leadName: mv.lead_name,
+          sectionId: mv.to_section_id, sectionTitle: mv.to_section_title,
+          callDate: mv.call_date, callTime: mv.call_time,
+          denktNa, followupDate: mv.followup_date || null,
+        })
       }
       due.sort((a, b) => `${a.callDate}${a.callTime || ''}`.localeCompare(`${b.callDate}${b.callTime || ''}`))
       return due
     } catch (e) {
       console.error('getDueScheduledCalls failed:', e)
       return []
+    }
+  }
+
+  // "Denkt erover na": de call is wél gevoerd (telt dus mee in de call-stats),
+  // maar er is nog geen ja of nee. De lead blijft in de ingepland-sectie en
+  // komt op followup_date vanzelf terug in de pop-up.
+  async markCallThinking(movementId, followupDate) {
+    try {
+      if (!movementId) return { success: false }
+      const { error } = await this.db.supabase
+        .from('lead_movements')
+        .update({ call_happened: true, outcome_type: 'thinking', followup_date: followupDate || null })
+        .eq('id', movementId)
+      if (error) throw error
+      return { success: true }
+    } catch (e) {
+      console.error('markCallThinking failed:', e)
+      return { success: false, error: e.message }
     }
   }
 

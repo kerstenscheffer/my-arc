@@ -1373,7 +1373,10 @@ export default function KanbanBoard({
   const openDueCalls = async () => {
     try {
       const schedIds = sections.filter(s => s.id !== 'unassigned' && isScheduledSectionTitle(s.title)).map(s => s.id)
-      setDueCalls(schedIds.length ? await leadService.getDueScheduledCalls(schedIds) : [])
+      // true = ook de leads die nog nadenken en wiens datum nog niet bereikt
+      // is. Bij het handmatig openen wil je élke openstaande call kunnen
+      // afronden; bij het automatisch openen alleen wat vandaag speelt.
+      setDueCalls(schedIds.length ? await leadService.getDueScheduledCalls(schedIds, true) : [])
     } catch (e) { console.warn('due calls open failed:', e?.message) }
     setShowDueCalls(true)
   }
@@ -1401,6 +1404,13 @@ export default function KanbanBoard({
         await leadService.cancelScheduledCall(dc.movementId)
         const proposed = sections.find(s => s.id !== 'unassigned' && /voorgesteld|voorstel/i.test(s.title || ''))
         if (proposed) await handleMoveLeadToSection(lead, dc.sectionId, proposed.id)
+        setStatsRefreshKey(k => k + 1)
+        return
+      }
+      if (kind === 'thinking') {
+        // Lead denkt na: call telt als gevoerd, lead blijft waar hij staat en
+        // komt op de gekozen datum terug in de pop-up.
+        await leadService.markCallThinking(dc.movementId, extra.followupDate || null)
         setStatsRefreshKey(k => k + 1)
         return
       }

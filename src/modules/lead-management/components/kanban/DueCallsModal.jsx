@@ -7,16 +7,22 @@
 import { useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useModalHost } from '../../../../coach/ModalHost'
-import { X, Phone, Check, XCircle, Trophy, CalendarClock, UserX, CalendarX } from 'lucide-react'
+import { X, Phone, Check, XCircle, Trophy, CalendarClock, UserX, CalendarX, Hourglass } from 'lucide-react'
 
 const inp = (flex) => ({ flex, padding: '8px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.15)', background: '#1a1a1a', color: '#fff', fontSize: '0.85rem', boxSizing: 'border-box' })
 const chip = (color) => ({ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '0.6rem', borderRadius: 9, border: `1px solid ${color}55`, background: `${color}18`, color, fontWeight: 800, fontSize: '0.8rem', cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' })
 
 function DueCallItem({ dc, onOutcome }) {
-  const [step, setStep] = useState(1)         // 1 | 'h' (gevoerd) | 'n' (niet gevoerd)
+  // Een lead die "denkt erover na" heeft de call al gevoerd. Die hoeft die
+  // stap niet nog eens: meteen de sale-of-niet keuze.
+  const [step, setStep] = useState(dc.denktNa ? 'h' : 1)
   const [reschedule, setReschedule] = useState(false)
+  const [denkt, setDenkt] = useState(false)
   const [date, setDate] = useState(dc.callDate || new Date().toISOString().split('T')[0])
   const [time, setTime] = useState(dc.callTime || new Date().toTimeString().slice(0, 5))
+  // Standaard een week vooruit — dat is de gebruikelijke bedenktijd.
+  const overEenWeek = () => { const d = new Date(); d.setDate(d.getDate() + 7); return d.toISOString().split('T')[0] }
+  const [denkDatum, setDenkDatum] = useState(dc.followupDate || overEenWeek())
 
   const fmt = () => {
     try {
@@ -33,7 +39,14 @@ function DueCallItem({ dc, onOutcome }) {
         <Phone size={14} color="#06b6d4" />
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontWeight: 800, color: '#fff', fontSize: '0.9rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{dc.leadName || 'Lead'}</div>
-          <div style={{ fontSize: '0.62rem', color: 'rgba(255,255,255,0.4)' }}>Call was: {fmt()}</div>
+          <div style={{ fontSize: '0.62rem', color: 'rgba(255,255,255,0.4)' }}>
+            Call was: {fmt()}
+            {dc.denktNa && (
+              <span style={{ color: '#eab308', fontWeight: 800 }}>
+                {' · denkt na'}{dc.followupDate ? ` tot ${new Date(dc.followupDate).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })}` : ''}
+              </span>
+            )}
+          </div>
         </div>
       </div>
 
@@ -44,10 +57,30 @@ function DueCallItem({ dc, onOutcome }) {
         </div>
       )}
 
-      {step === 'h' && (
-        <div style={{ display: 'flex', gap: 8 }}>
+      {step === 'h' && !denkt && (
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           <button style={chip('#FFD700')} onClick={() => onOutcome(dc, 'sale')}><Trophy size={14} /> Sale</button>
           <button style={chip('#ef4444')} onClick={() => onOutcome(dc, 'saleLost')}><XCircle size={14} /> Sale verloren</button>
+          <button style={chip('#eab308')} onClick={() => setDenkt(true)}><Hourglass size={14} /> Denkt erover na</button>
+        </div>
+      )}
+
+      {/* Denkt erover na: de call telt als gevoerd, de lead blijft staan en
+          komt op de gekozen datum vanzelf weer in deze lijst. */}
+      {step === 'h' && denkt && (
+        <div>
+          <div style={{ fontSize: '0.68rem', color: 'rgba(255,255,255,0.45)', marginBottom: 6 }}>
+            Wanneer kom je hierop terug?
+          </div>
+          <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
+            <input type="date" value={denkDatum} onChange={e => setDenkDatum(e.target.value)} style={inp(1)} />
+          </div>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button style={chip('#eab308')} onClick={() => onOutcome(dc, 'thinking', { followupDate: denkDatum || null })}>
+              <Hourglass size={14} /> Opslaan
+            </button>
+            <button style={{ ...chip('rgba(255,255,255,0.4)'), flex: 0.5 }} onClick={() => setDenkt(false)}>Terug</button>
+          </div>
         </div>
       )}
 
