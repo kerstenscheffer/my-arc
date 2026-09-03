@@ -100,7 +100,11 @@ const ALLOWED_UPDATE_FIELDS = new Set([
   'gym_name', 'injuries',
   // IntakeFlowService — nutrition intake mapping
   'meals_per_day', 'loved_foods', 'hated_foods', 'cooking_skill',
-  'allergies', 'variety_preference', 'training_time'
+  'allergies', 'variety_preference', 'training_time',
+  // Upgrade sep 2026: nulmeting-toelichting, snelle winst, eigen woorden bij
+  // motivatie, supplementen, weekagenda-toelichting + eigen blokken, slotwoord.
+  'quick_win_2weeks', 'motivation_verbatim', 'supplementen_nu',
+  'agenda_toelichting', 'eigen_blokken', 'intake_slotwoord'
 ]);
 
 export default async function handler(req, res) {
@@ -145,6 +149,40 @@ export default async function handler(req, res) {
 
       if (error) throw error;
       return res.status(200).json({ client: data?.[0] || null });
+    }
+
+    // Nulmeting wegschrijven. Aparte actie omdat dit naar client_baselines
+    // gaat en niet naar clients: elk meetmoment is een eigen rij, zodat de
+    // intake-meting en latere hermetingen naast elkaar te leggen zijn.
+    if (action === 'save-baseline') {
+      const { clientId, meting, bron } = req.body;
+      if (!clientId || !meting || typeof meting !== 'object') {
+        return res.status(400).json({ error: 'clientId and meting required' });
+      }
+      // Alleen de vijf schalen + toelichting; alles daarbuiten negeren.
+      const schaal = (v) => {
+        const n = parseInt(v, 10);
+        return Number.isFinite(n) && n >= 1 && n <= 10 ? n : null;
+      };
+      const rij = {
+        client_id: clientId,
+        bron: bron === 'hermeting' ? 'hermeting' : 'intake',
+        energie: schaal(meting.energie),
+        in_je_vel: schaal(meting.in_je_vel),
+        kracht: schaal(meting.kracht),
+        slaap: schaal(meting.slaap),
+        voeding_grip: schaal(meting.voeding_grip),
+        toelichting: typeof meting.toelichting === 'string' ? meting.toelichting.slice(0, 4000) : null,
+      };
+      // Niets ingevuld → niets opslaan, anders krijg je lege meetmomenten
+      // die een latere vergelijking vertroebelen.
+      const heeftIets = ['energie', 'in_je_vel', 'kracht', 'slaap', 'voeding_grip']
+        .some((k) => rij[k] !== null) || !!rij.toelichting;
+      if (!heeftIets) return res.status(200).json({ success: true, skipped: true });
+
+      const { error } = await supabase.from('client_baselines').insert(rij);
+      if (error) throw error;
+      return res.status(200).json({ success: true });
     }
 
     if (action === 'update-client') {

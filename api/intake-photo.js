@@ -89,8 +89,11 @@ export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
   try {
-    const { email, dataUrl } = req.body || {};
-    if (!email || typeof email !== 'string') return res.status(400).json({ error: 'E-mailadres ontbreekt' });
+    const { email, clientId, dataUrl, soort } = req.body || {};
+    // 'profiel' = profielfoto (één per klant, vaste naam).
+    // 'voeding' = screenshot uit een voedingsapp (meerdere per klant).
+    const type = soort === 'voeding' ? 'voeding' : 'profiel';
+    if (!email && !clientId) return res.status(400).json({ error: 'E-mailadres of clientId ontbreekt' });
 
     const foto = leesDataUrl(dataUrl);
     if (foto.fout) return res.status(400).json({ error: foto.fout });
@@ -106,18 +109,21 @@ export default async function handler(req, res) {
 
     // Klant opzoeken op e-mail. Zonder bestaande klant slaan we niets op:
     // anders kan iedereen de bucket volschrijven met willekeurige adressen.
-    const { data: klant, error: zoekFout } = await supabase
-      .from('clients')
-      .select('id')
-      .ilike('email', email.trim())
-      .limit(1)
-      .maybeSingle();
+    const vraag = supabase.from('clients').select('id').limit(1);
+    const { data: klant, error: zoekFout } = await (clientId
+      ? vraag.eq('id', clientId)
+      : vraag.ilike('email', email.trim())).maybeSingle();
     if (zoekFout) throw zoekFout;
-    if (!klant) return res.status(404).json({ error: 'Geen klant gevonden bij dit e-mailadres' });
+    if (!klant) return res.status(404).json({ error: 'Geen klant gevonden' });
 
     // Pad uit het klant-id, niet uit invoer. Vaste naam per klant zodat een
     // nieuwe foto de oude vervangt in plaats van bestanden op te stapelen.
-    const pad = `${klant.id}/profiel.${foto.ext}`;
+    // Profielfoto: vaste naam, zodat een nieuwe de oude vervangt.
+    // Voedings-screenshots: er mogen er meerdere zijn, dus een oplopende naam
+    // op basis van de tijd. Beide keren komt het pad uit het klant-id.
+    const pad = type === 'voeding'
+      ? `${klant.id}/voeding/${Date.now()}.${foto.ext}`
+      : `${klant.id}/profiel.${foto.ext}`;
     const { error: uploadFout } = await supabase.storage
       .from('client-photos')
       .upload(pad, foto.bytes, { contentType: foto.mime, upsert: true });
@@ -128,11 +134,16 @@ export default async function handler(req, res) {
     // de oude foto tonen na een nieuwe upload.
     const url = `${pub.publicUrl}?v=${Date.now()}`;
 
-    const { error: updateFout } = await supabase
-      .from('clients')
-      .update({ profile_photo_url: url })
-      .eq('id', klant.id);
-    if (updateFout) throw updateFout;
+    // Alleen de profielfoto landt op de klant. Screenshots horen bij de
+    // voedingsintake en worden daar in nutrition_preferences bewaard; deze
+    // functie geeft alleen de url terug.
+    if (type === 'profiel') {
+      const { error: updateFout } = await supabase
+        .from('clients')
+        .update({ profile_photo_url: url })
+        .eq('id', klant.id);
+      if (updateFout) throw updateFout;
+    }
 
     return res.status(200).json({ success: true, url });
   } catch (e) {

@@ -87,10 +87,18 @@ function mapToNutritionPreferences(flowData) {
       extras: Array.from({ length: parseInt(flowData.current_meals_extra_count || '0', 10) }, (_, i) =>
         flowData[`current_meals_extra_${i}`] || null
       ).filter(Boolean),
+      eerder_geprobeerd: flowData.eerder_geprobeerd || null,
     },
     supplement_preferences: {
       openness: flowData.supps_openheid || null,
+      // Wat de klant nu al slikt. Losse tekst, geen keuzelijst: merknamen en
+      // doseringen laten zich niet in knoppen vangen.
+      huidige: flowData.supplementen_nu || null,
     },
+    // Kolommen op nutrition_preferences zelf (niet genest): screenshots uit
+    // een voedingsapp en wat er volgens de klant al goed werkt.
+    voeding_screenshots: flowData.voeding_screenshots || [],
+    wat_werkt_goed: flowData.wat_werkt_goed || null,
     cheat_meals: {
       frequency:        flowData.cheat_aanpak || null,
       social_frequency: flowData.sociaal_eten || null,
@@ -231,6 +239,9 @@ export default function NutritionIntakePage() {
     onChange: handleFlowDataChange,
     onNext: handleFlowNext,
     onBack: activeFlow > 0 ? handleFlowBack : null,
+    // De screenshot-upload in CurrentMealsFlow heeft het klant-id nodig: de
+    // serverless functie bepaalt daarmee waar het bestand landt.
+    clientId,
     isMobile,
   }
 

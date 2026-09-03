@@ -6,6 +6,7 @@ import PracticalFlow from './phase3/PracticalFlow'
 import FocusFlow from './phase3/FocusFlow'
 import CardioFlow from './phase3/CardioFlow'
 import LimitationsFlow from './phase3/LimitationsFlow'
+import { Q, Hint, NextBtn, SkipBtn, TextField } from './phase1/FlowStep'
 
 // Secties per profiel
 // Beginner:   experience → practical → focus → cardio → limitations
@@ -17,7 +18,13 @@ export default function IntakePhase3({ data, onChange, onComplete, personalData,
   const [isBeginner, setIsBeginner] = useState(false)
   const [isExperienced, setIsExperienced] = useState(false)
 
+  // Afsluitende open vraag. Hangt aan handleComplete i.p.v. aan een sectie-
+  // index: er zijn drie manieren om hier te eindigen (beginner, ervaren, en
+  // "ik wil niet trainen"), en via deze route mist geen daarvan hem.
+  const [toonSlot, setToonSlot] = useState(false)
+
   const handleComplete = () => {
+    if (!toonSlot) { setToonSlot(true); window.scrollTo({ top: 0, behavior: 'smooth' }); return }
     console.log('🏁 Phase3 handleComplete — data:', data)
     onComplete({
       ...data,
@@ -72,6 +79,28 @@ export default function IntakePhase3({ data, onChange, onComplete, personalData,
         </div>
       )}
 
+      {toonSlot && (
+        <div style={{ padding: isMobile ? '1rem' : '1.25rem' }}>
+          <Q isMobile={isMobile}>
+            Vertel alles wat je kwijt wil over jezelf, en wat je graag zou willen doen, bereiken of krijgen in de coaching.
+          </Q>
+          <Hint isMobile={isMobile}>
+            Laatste vraag. Schrijf zoveel als je wil — dit lees ik als eerste.
+          </Hint>
+          <TextField
+            multiline
+            placeholder="Alles wat je kwijt wil…"
+            value={data.intake_slotwoord || ''}
+            onChange={v => onChange({ ...data, intake_slotwoord: v })}
+            isMobile={isMobile}
+          />
+          <NextBtn onClick={handleComplete} label="INTAKE AFRONDEN →" isMobile={isMobile} />
+          <SkipBtn onClick={handleComplete} label="Overslaan en afronden" isMobile={isMobile} />
+        </div>
+      )}
+
+      {!toonSlot && (<>
+
       {/* SECTION 0 — Altijd: willingness + experience */}
       {section === 0 && (
         <ExperienceFlow
@@ -112,6 +141,8 @@ export default function IntakePhase3({ data, onChange, onComplete, personalData,
       {isExperienced && section === 5 && (
         <LimitationsFlow {...sharedProps} onNext={handleComplete} onBack={goBack} />
       )}
+
+      </>)}
     </div>
   )
 }

@@ -30,3 +30,13 @@ export async function updateClient(clientId, fields) {
   await call('update-client', { clientId, fields })
   return true
 }
+
+/**
+ * Sla een meetmoment op (nulmeting uit de intake, of een latere hermeting).
+ * Elke aanroep maakt een nieuwe rij in client_baselines, zodat je ze naast
+ * elkaar kunt leggen. Lege metingen worden server-side genegeerd.
+ */
+export async function saveBaseline(clientId, meting, bron = 'intake') {
+  await call('save-baseline', { clientId, meting, bron })
+  return true
+}

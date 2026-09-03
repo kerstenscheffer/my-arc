@@ -3,7 +3,7 @@ import React, { useState, useEffect, useRef } from 'react'
 import IntakePhase1 from './components/IntakePhase1'
 import IntakePhase3 from './components/IntakePhase3'
 import DatabaseService from '../../services/DatabaseService'
-import { findClient, updateClient } from '../../lib/publicIntakeApi'
+import { findClient, updateClient, saveBaseline} from '../../lib/publicIntakeApi'
 
 const supabase = DatabaseService.supabase
 
@@ -403,6 +403,16 @@ export default function PublicIntakePage() {
         coaching_goals_extra: data.coaching_goals_extra || null,
         wat_werkte_eerder: data.wat_werkte_eerder || null,
         waarom_gestopt: data.waarom_gestopt || null,
+        // Upgrade sep 2026. Deze mapping is de plek waar een nieuw veld
+        // stilletjes verdwijnt als je 'm vergeet — zie job_type. Wie hier een
+        // regel bijzet, moet 'm ook in ALLOWED_UPDATE_FIELDS van
+        // api/public-intake.js zetten, anders filtert de server 'm er weer uit.
+        quick_win_2weeks: data.quick_win_2weeks || null,
+        motivation_verbatim: data.motivation_verbatim || null,
+        agenda_toelichting: data.agenda_toelichting || null,
+        eigen_blokken: data.eigen_blokken || null,
+        // baseline gaat NIET mee in deze update: die hoort in een eigen rij
+        // (client_baselines), zie de saveBaseline hieronder.
         muscle_goal_type: data.muscle_goal_type || null,
         muscle_focus_tags: data.muscle_focus_tags || null,
         lichaam_omschrijving: data.lichaam_omschrijving || null,
@@ -415,6 +425,15 @@ export default function PublicIntakePage() {
         target_carbs: data.target_carbs || null, target_fat: data.target_fat || null,
         intake_completed: true, intake_completed_at: new Date().toISOString()
       }) } catch (e) { updateError = e }
+
+      // Nulmeting apart wegschrijven. Bewust ná de client-update en in een
+      // eigen try: mislukt dit, dan is de rest van de intake al veilig
+      // opgeslagen en verliest de klant niets.
+      if (data.baseline) {
+        try { await saveBaseline(clientId, data.baseline, 'intake') }
+        catch (e) { console.warn('Nulmeting opslaan mislukt:', e?.message) }
+      }
+
 
       if (updateError) {
         console.error('❌ Update mislukt:', updateError)
@@ -488,6 +507,9 @@ export default function PublicIntakePage() {
         training_time: prefs.training_time,
         gym_name: prefs.gym_name,
         injuries: prefs.injuries,
+        // Afsluitende open vraag. Alleen schrijven als er iets staat, anders
+        // wist een tussentijdse autosave wat de klant net had getypt.
+        ...(dataArg?.intake_slotwoord ? { intake_slotwoord: dataArg.intake_slotwoord } : {}),
       })
     } catch (e) { console.warn('clients spiegel-write mislukt (niet-blokkerend):', e?.message) }
 

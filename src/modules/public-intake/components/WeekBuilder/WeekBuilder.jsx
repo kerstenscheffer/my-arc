@@ -38,6 +38,20 @@ function Hint({ children, isMobile }) {
   )
 }
 
+// Eigen terugkerende blokken: dingen die de knoppenreeks niet vangt, zoals
+// "yoga vrijdag 10:00-11:00". Ze gaan als gewone blokken het week_schedule in,
+// zodat ze meetellen bij het bepalen wanneer iemand kan trainen.
+const DAG_LABELS = { ma: 'Maandag', di: 'Dinsdag', wo: 'Woensdag', do: 'Donderdag', vr: 'Vrijdag', za: 'Zaterdag', zo: 'Zondag' }
+const eigenVeld = (isMobile) => ({
+  padding: isMobile ? '0.7rem 0.8rem' : '0.75rem 0.9rem',
+  background: '#0d0d0d',
+  border: '1px solid rgba(255,255,255,0.1)',
+  color: '#fff',
+  fontSize: isMobile ? '0.85rem' : '0.9rem',
+  fontWeight: 600, fontFamily: 'inherit', outline: 'none',
+  minHeight: 44, boxSizing: 'border-box',
+})
+
 function BackBtn({ onBack }) {
   if (!onBack) return null
   return (
@@ -217,6 +231,9 @@ export default function WeekBuilder({ data, onChange, onComplete, onBack, isMobi
   const [step,    setStep]    = useState('sleep_time')
   const [history, setHistory] = useState([])
   const [saved,   setSaved]   = useState(false)
+  const [eigenBlokken, setEigenBlokken] = useState(data.eigen_blokken || [])
+  const [nieuwBlok, setNieuwBlok] = useState({ naam: '', dag: 'ma', start: '', eind: '' })
+  const [toelichting, setToelichting] = useState(data.agenda_toelichting || '')
 
   const go = (next) => { setHistory(h => [...h, step]); setStep(next) }
   const goBack = () => {
@@ -373,8 +390,22 @@ export default function WeekBuilder({ data, onChange, onComplete, onBack, isMobi
       .map(id => WORK_TYPES.find(w => w.id === id)?.label || id)
     const uniekeBanen = [...new Set(baanLabels)]
 
+    // Eigen blokken als gewone blokken in het weekschema. Daardoor tellen ze
+    // mee bij het bepalen wanneer iemand kan trainen — anders zijn het losse
+    // notities die niemand meeneemt. type 'anders' zodat bestaande lezers
+    // (agenda, intake-modal) er niet over struikelen.
+    const week_schedule_met_eigen = { ...week_schedule }
+    ;(eigenBlokken || []).forEach(b => {
+      if (!b?.dag || !b.start || !b.eind) return
+      const dag = week_schedule_met_eigen[b.dag] ? [...week_schedule_met_eigen[b.dag]] : []
+      dag.push({ type: 'anders', label: b.naam, start: b.start, end: b.eind })
+      week_schedule_met_eigen[b.dag] = dag
+    })
+
     const result = {
-      week_schedule,
+      week_schedule: week_schedule_met_eigen,
+      eigen_blokken: eigenBlokken || [],
+      agenda_toelichting: toelichting || null,
       job_type: uniekeBanen.length ? uniekeBanen.join(', ') : null,
       preferred_training_days: trainingDays,
       training_time: trainingTime || null,
@@ -711,7 +742,62 @@ export default function WeekBuilder({ data, onChange, onComplete, onBack, isMobi
         ].map(opt => (
           <BigOption key={opt.time} label={opt.label} sub={opt.sub} onClick={() => setTrainingTime(opt.time)} selected={trainingTime === opt.time} isMobile={isMobile} />
         ))}
-        <NextBtn onClick={handleFinish} label="WEEK OPSLAAN →" disabled={!trainingTime} isMobile={isMobile} />
+        <NextBtn onClick={() => go('extra')} disabled={!trainingTime} isMobile={isMobile} />
+      </>
+    )
+
+    // Vangnet voor wat de knoppen niet vangen: eigen terugkerende blokken en
+    // een vrij tekstvak. De blokken tellen mee in de beschikbaarheid.
+    if (step === 'extra') return (
+      <>
+        <BackBtn onBack={goBack} />
+        <Q isMobile={isMobile}>Heb je nog vaste dingen in je week?</Q>
+        <Hint isMobile={isMobile}>
+          Denk aan yoga, fysio, kinderen ophalen. We houden er rekening mee bij het inplannen van je trainingen.
+        </Hint>
+
+        {eigenBlokken.length > 0 && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: '0.7rem' }}>
+            {eigenBlokken.map((b, i) => (
+              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '0.6rem 0.75rem', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)' }}>
+                <span style={{ flex: 1, minWidth: 0, fontSize: '0.85rem', fontWeight: 800, color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{b.naam}</span>
+                <span style={{ flexShrink: 0, fontSize: '0.72rem', fontWeight: 700, color: 'rgba(255,255,255,0.5)' }}>{DAG_LABELS[b.dag] || b.dag} {b.start}–{b.eind}</span>
+                <button type="button" onClick={() => setEigenBlokken(v => v.filter((_, j) => j !== i))} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.35)', fontSize: '1.2rem', cursor: 'pointer', padding: '0 2px', lineHeight: 1, minHeight: 32 }}>×</button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: '1rem' }}>
+          <input value={nieuwBlok.naam} onChange={e => setNieuwBlok(b => ({ ...b, naam: e.target.value }))} placeholder="Wat is het? Bijv. yoga" style={eigenVeld(isMobile)} />
+          <div style={{ display: 'flex', gap: 6 }}>
+            <select value={nieuwBlok.dag} onChange={e => setNieuwBlok(b => ({ ...b, dag: e.target.value }))} style={{ ...eigenVeld(isMobile), flex: 1.2 }}>
+              {Object.entries(DAG_LABELS).map(([k, v]) => <option key={k} value={k} style={{ background: '#111' }}>{v}</option>)}
+            </select>
+            <input type="time" value={nieuwBlok.start} onChange={e => setNieuwBlok(b => ({ ...b, start: e.target.value }))} style={{ ...eigenVeld(isMobile), flex: 1 }} />
+            <input type="time" value={nieuwBlok.eind} onChange={e => setNieuwBlok(b => ({ ...b, eind: e.target.value }))} style={{ ...eigenVeld(isMobile), flex: 1 }} />
+          </div>
+          <button type="button"
+            disabled={!nieuwBlok.naam.trim() || !nieuwBlok.start || !nieuwBlok.eind}
+            onClick={() => { setEigenBlokken(v => [...v, { ...nieuwBlok, naam: nieuwBlok.naam.trim() }]); setNieuwBlok({ naam: '', dag: nieuwBlok.dag, start: '', eind: '' }) }}
+            style={{
+              padding: '0.7rem', minHeight: 44,
+              background: (!nieuwBlok.naam.trim() || !nieuwBlok.start || !nieuwBlok.eind) ? 'rgba(255,255,255,0.05)' : '#fff',
+              border: '1px solid rgba(255,255,255,0.15)',
+              color: (!nieuwBlok.naam.trim() || !nieuwBlok.start || !nieuwBlok.eind) ? 'rgba(255,255,255,0.25)' : '#0a0a0a',
+              fontSize: '0.8rem', fontWeight: 900, fontFamily: 'inherit', cursor: 'pointer',
+              touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+            }}>+ Toevoegen</button>
+        </div>
+
+        <div style={{ fontSize: '0.72rem', fontWeight: 700, color: 'rgba(255,255,255,0.4)', marginBottom: '0.4rem', lineHeight: 1.5 }}>
+          Lukt het niet om via de knoppen je week aan te geven? Typ hier zoveel mogelijk aan mij — maar probeer eerst de knoppen.
+        </div>
+        <textarea value={toelichting} onChange={e => setToelichting(e.target.value)}
+          placeholder="Bijv: ik werk onregelmatig, om de week nachtdienst…" rows={4}
+          style={{ ...eigenVeld(isMobile), width: '100%', resize: 'none', lineHeight: 1.5 }} />
+
+        <NextBtn onClick={handleFinish} label="WEEK OPSLAAN →" isMobile={isMobile} />
       </>
     )
 

@@ -56,6 +56,28 @@ export default function ExtrasFlow({ data, onChange, onNext, onBack, isMobile })
           />
         ))}
       </div>
+
+      {/* Wat de klant nu al slikt. Losse tekst i.p.v. knoppen: merknamen en
+          doseringen laten zich niet in een keuzelijst vangen, en je wil weten
+          wat er al ligt voordat je iets adviseert. */}
+      <div style={{ marginTop: '1.5rem' }}>
+        <Q isMobile={isMobile}>Welke supplementen neem je nu?</Q>
+        <Hint isMobile={isMobile}>Merk en dosering als je het weet. Neem je niets, laat dan leeg.</Hint>
+        <textarea
+          value={data.supplementen_nu || ''}
+          onChange={e => update('supplementen_nu', e.target.value)}
+          placeholder="Bijv: creatine 5g, vitamine D 1000IE in de winter…"
+          rows={3}
+          style={{
+            width: '100%', boxSizing: 'border-box',
+            padding: isMobile ? '0.75rem 0.9rem' : '0.8rem 1rem',
+            background: '#0d0d0d', border: '1px solid rgba(255,255,255,0.1)',
+            color: '#fff', fontSize: isMobile ? '0.85rem' : '0.9rem',
+            fontWeight: 500, fontFamily: 'inherit', outline: 'none',
+            resize: 'none', lineHeight: 1.5,
+          }}
+        />
+      </div>
     </div>
   )
 

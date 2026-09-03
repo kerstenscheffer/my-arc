@@ -4,6 +4,8 @@
 //   2. Voeding      -> voedings-velden uit de `clients` tabel (deel 2)
 //   3. Training     -> `user_workout_preferences` tabel (deel 3)
 import { useState, useEffect } from 'react'
+import { createPortal } from 'react-dom'
+import { BASELINE_VRAGEN } from '../../../modules/public-intake/baselineVragen'
 import { X, User, Utensils, Dumbbell, CheckCircle2, Clock, CalendarDays, ExternalLink } from 'lucide-react'
 import ClientAgendaView from '../../../modules/client-agenda/ClientAgendaView'
 
@@ -54,6 +56,12 @@ const MAPS = {
 
 const fmtMap = (map) => (v) => map[v] ?? humanize(v)
 const fmtBool = (v) => (v ? 'Ja' : 'Nee')
+// Eigen weekblokken: "yoga — vrijdag 10:00-11:00", één per regel.
+const DAG_VOLUIT = { ma: 'maandag', di: 'dinsdag', wo: 'woensdag', do: 'donderdag', vr: 'vrijdag', za: 'zaterdag', zo: 'zondag' }
+const fmtBlokken = (v) => {
+  if (!Array.isArray(v) || !v.length) return null
+  return v.map(b => `${b.naam} — ${DAG_VOLUIT[b.dag] || b.dag} ${b.start}-${b.eind}`).join('\n')
+}
 const fmtArr = (map) => (v) =>
   (Array.isArray(v) ? v : [v]).map((x) => (map ? map[x] ?? humanize(x) : humanize(x))).join(', ')
 const fmtDate = (v) => {
@@ -127,6 +135,10 @@ function flattenNp(np) {
   put('intake_calorieen_geteld', pi.calorieen_geteld)
   put('intake_plan_gevolgd', pi.plan_gevolgd)
   put('intake_supps', sp.openness)
+  put('intake_supps_huidige', sp.huidige)
+  put('intake_wat_werkt_goed', np.wat_werkt_goed)
+  put('intake_eerder_geprobeerd', (np.current_habits || {}).eerder_geprobeerd)
+  put('intake_voeding_screenshots', np.voeding_screenshots)
   put('intake_cheat', cm.frequency)
   put('intake_sociaal', cm.social_frequency)
   put('intake_ontbijt', mealSummary(w, 'ontbijt'))
@@ -139,6 +151,106 @@ function flattenNp(np) {
 }
 
 // ---- veld-definities per deel ---------------------------------------------
+
+
+// ── Nulmeting ───────────────────────────────────────────────────────────────
+// Eén rij per meetmoment, vijf schalen naast elkaar. Zo leg je de intake en
+// een hermeting letterlijk onder elkaar en zie je in één oogopslag wat er is
+// veranderd. Verschil t.o.v. de vorige meting staat erachter.
+function Nulmeting({ metingen, isMobile }) {
+  if (!metingen?.length) return null
+  const datum = (d) => new Date(d).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short', year: 'numeric' })
+  return (
+    <div style={{ marginBottom: '1.25rem' }}>
+      <div style={{
+        fontSize: '0.62rem', fontWeight: 900, color: 'rgba(255,255,255,0.35)',
+        textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '0.6rem',
+      }}>
+        Nulmeting
+      </div>
+
+      {metingen.map((m, i) => {
+        const vorige = metingen[i + 1]
+        return (
+          <div key={m.id} style={{
+            marginBottom: '0.7rem', padding: isMobile ? '0.7rem' : '0.8rem 0.9rem',
+            background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)',
+          }}>
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: '0.6rem' }}>
+              <span style={{ fontSize: '0.85rem', fontWeight: 900, color: '#fff' }}>{datum(m.measured_at)}</span>
+              <span style={{ fontSize: '0.68rem', fontWeight: 700, color: 'rgba(255,255,255,0.35)' }}>
+                {m.bron === 'hermeting' ? 'hermeting' : 'bij de intake'}
+              </span>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: `repeat(${isMobile ? 3 : 5}, 1fr)`, gap: 6 }}>
+              {BASELINE_VRAGEN.map(v => {
+                const w = m[v.veld]
+                const delta = vorige && w != null && vorige[v.veld] != null ? w - vorige[v.veld] : null
+                return (
+                  <div key={v.veld} style={{ textAlign: 'center', padding: '0.5rem 0.2rem', background: 'rgba(255,255,255,0.03)' }}>
+                    <div style={{ fontSize: '1.25rem', fontWeight: 900, color: w == null ? 'rgba(255,255,255,0.2)' : '#fff', lineHeight: 1 }}>
+                      {w ?? '—'}
+                    </div>
+                    {delta != null && delta !== 0 && (
+                      <div style={{ fontSize: '0.6rem', fontWeight: 800, marginTop: 2, color: delta > 0 ? '#10b981' : '#ef4444' }}>
+                        {delta > 0 ? `+${delta}` : delta}
+                      </div>
+                    )}
+                    <div style={{ fontSize: '0.55rem', fontWeight: 700, color: 'rgba(255,255,255,0.3)', marginTop: 3, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                      {v.kort}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+
+            {m.toelichting && (
+              <div style={{ marginTop: '0.6rem', fontSize: '0.82rem', color: 'rgba(255,255,255,0.75)', lineHeight: 1.55, fontStyle: 'italic' }}>
+                "{m.toelichting}"
+              </div>
+            )}
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
+// ── Screenshots uit een voedingsapp ─────────────────────────────────────────
+// Klein in de lijst, klik voor volledig scherm: de getallen op zo'n screenshot
+// zijn op 80 pixels onleesbaar.
+function Screenshots({ urls, isMobile }) {
+  const [groot, setGroot] = useState(null)
+  if (!urls?.length) return null
+  return (
+    <div style={{ marginBottom: '1.25rem' }}>
+      <div style={{
+        fontSize: '0.62rem', fontWeight: 900, color: 'rgba(255,255,255,0.35)',
+        textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '0.6rem',
+      }}>
+        Screenshots voedingsapp
+      </div>
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+        {urls.map((u, i) => (
+          <button key={i} onClick={() => setGroot(u)} style={{ padding: 0, border: '1px solid rgba(255,255,255,0.15)', background: 'none', cursor: 'zoom-in', lineHeight: 0 }}>
+            <img src={u} alt={`screenshot ${i + 1}`} style={{ width: isMobile ? 84 : 104, height: isMobile ? 84 : 104, objectFit: 'cover', display: 'block' }} />
+          </button>
+        ))}
+      </div>
+      {groot && createPortal(
+        <div onClick={() => setGroot(null)} style={{
+          position: 'fixed', inset: 0, zIndex: 2147483600,
+          background: 'rgba(0,0,0,0.95)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+          padding: '1.5rem', cursor: 'zoom-out',
+        }}>
+          <img src={groot} alt="screenshot" style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }} />
+        </div>,
+        document.body
+      )}
+    </div>
+  )
+}
 
 const PART1_SECTIONS = [
   {
@@ -171,6 +283,8 @@ const PART1_SECTIONS = [
       { key: 'target_body_fat', label: 'Streef-vetpercentage', fmt: fmtNum('%') },
       { key: 'muscle_goal_type', label: 'Spierdoel', fmt: fmtMap(MAPS.muscle_goal_type) },
       { key: 'lichaam_omschrijving', label: 'Gewenst lichaam' },
+      { key: 'quick_win_2weeks', label: 'Klein succes in 2 weken' },
+      { key: 'motivation_verbatim', label: 'Waarom — eigen woorden' },
       { key: 'fitness_doel_tags', label: 'Fitnessdoelen', fmt: fmtArr() },
       { key: 'goal_timeline', label: 'Tijdlijn', fmt: fmtMap(MAPS.goal_timeline) },
       { key: 'goal_deadline', label: 'Deadline', fmt: fmtDate },
@@ -204,6 +318,17 @@ const PART1_SECTIONS = [
       { key: 'coaching_expectations', label: 'Verwachtingen' },
       { key: 'coaching_goal_tags', label: 'Coachingdoelen', fmt: fmtArr() },
       { key: 'coaching_goals_extra', label: 'Extra doelen' }
+    ]
+  },
+  {
+    // Alles wat de klant zelf heeft getypt, bij elkaar. Dit lees je als eerste
+    // en het staat anders verspreid over vijf secties.
+    title: 'In eigen woorden',
+    fields: [
+      { key: 'intake_slotwoord', label: 'Slotwoord' },
+      { key: 'agenda_toelichting', label: 'Toelichting op de week' },
+      { key: 'eigen_blokken', label: 'Eigen vaste blokken', fmt: fmtBlokken },
+      { key: 'supplementen_nu', label: 'Slikt nu' }
     ]
   }
 ]
@@ -252,6 +377,9 @@ const PART2_SECTIONS = [
     title: 'Supplementen & sociaal',
     fields: [
       { key: 'intake_supps', label: 'Supplementen', fmt: fmtMap(N.supps) },
+      { key: 'intake_supps_huidige', label: 'Slikt nu' },
+      { key: 'intake_wat_werkt_goed', label: 'Werkt goed volgens klant' },
+      { key: 'intake_eerder_geprobeerd', label: 'Al geprobeerd' },
       { key: 'intake_cheat', label: 'Cheat meals', fmt: fmtMap(N.cheat) },
       { key: 'intake_sociaal', label: 'Buiten de deur eten', fmt: fmtMap(N.social) }
     ]
@@ -602,6 +730,25 @@ export default function IntakeSummaryModal({ db, client, isMobile, onClose, onNa
   const [loadingTraining, setLoadingTraining] = useState(true)
   const [np, setNp] = useState(null)
   const [loadingNp, setLoadingNp] = useState(true)
+  // Meetmomenten: nieuwste eerst, zodat een hermeting bovenaan staat en de
+  // intake-nulmeting eronder — precies zoals je ze wil vergelijken.
+  const [metingen, setMetingen] = useState([])
+  useEffect(() => {
+    if (!client?.id || !db?.supabase) return
+    let weg = false
+    db.supabase
+      .from('client_baselines')
+      .select('*')
+      .eq('client_id', client.id)
+      .order('measured_at', { ascending: false })
+      .then(({ data, error }) => {
+        if (weg) return
+        if (error) { console.warn('[IntakeSummaryModal] nulmeting laden mislukt:', error.message); return }
+        setMetingen(data || [])
+      }, (e) => console.warn('[IntakeSummaryModal] nulmeting laden mislukt:', e?.message))
+    return () => { weg = true }
+  }, [client?.id, db])
+
 
   useEffect(() => {
     let cancelled = false
@@ -867,7 +1014,12 @@ export default function IntakeSummaryModal({ db, client, isMobile, onClose, onNa
               <WeekInTekst client={client} isMobile={isMobile} />
             </div>
           )}
-          {activeTab === 'part1' && renderSections(PART1_SECTIONS, client)}
+          {activeTab === 'part1' && (
+            <>
+              <Nulmeting metingen={metingen} isMobile={isMobile} />
+              {renderSections(PART1_SECTIONS, client)}
+            </>
+          )}
           {activeTab === 'part2' &&
             (loadingNp ? (
               <div
@@ -884,7 +1036,10 @@ export default function IntakeSummaryModal({ db, client, isMobile, onClose, onNa
                 <Clock size={16} /> Voeding laden…
               </div>
             ) : (
-              renderSections(PART2_SECTIONS, { ...client, ...flattenNp(np) })
+              <>
+                <Screenshots urls={np?.voeding_screenshots} isMobile={isMobile} />
+                {renderSections(PART2_SECTIONS, { ...client, ...flattenNp(np) })}
+              </>
             ))}
           {activeTab === 'part3' &&
             (loadingTraining ? (
