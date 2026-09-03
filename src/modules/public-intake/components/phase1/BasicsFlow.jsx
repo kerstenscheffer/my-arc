@@ -8,12 +8,34 @@ import DatabaseService from '../../../../services/DatabaseService'
 
 const supabase = DatabaseService.supabase
 
-const STEPS = ['voornaam', 'achternaam', 'email', 'telefoon', 'geslacht', 'geboortejaar', 'geboortedatum']
+const STEPS = ['voornaam', 'achternaam', 'email', 'telefoon', 'geslacht', 'geboortejaar', 'geboortedatum', 'foto']
+
+// De foto gaat naar /api/intake-photo, dat 'm met de service key in storage
+// zet. De browser mag daar niet zelf bij: de intake draait zonder login en
+// dan zou de bucket voor iedereen openstaan.
+//
+// Voor het versturen verkleinen we naar 512px en jpeg-kwaliteit 0.85. Een
+// telefoonfoto is zo 4-8 MB; dat past niet in een serverless request en is
+// voor een rondje van 40 pixels sowieso zinloos.
+const FOTO_MAX = 512
+async function verkleinFoto(file) {
+  const bitmap = await createImageBitmap(file)
+  const schaal = Math.min(1, FOTO_MAX / Math.max(bitmap.width, bitmap.height))
+  const b = Math.round(bitmap.width * schaal)
+  const h = Math.round(bitmap.height * schaal)
+  const canvas = document.createElement('canvas')
+  canvas.width = b; canvas.height = h
+  canvas.getContext('2d').drawImage(bitmap, 0, 0, b, h)
+  return canvas.toDataURL('image/jpeg', 0.85)
+}
 
 export default function BasicsFlow({ data, onChange, onNext, onBack, isMobile }) {
   const [step, setStep] = useState('voornaam')
   const [history, setHistory] = useState([])
   const [emailChecking, setEmailChecking] = useState(false)
+  const [fotoUrl, setFotoUrl] = useState(data.profile_photo_url || null)
+  const [fotoBezig, setFotoBezig] = useState(false)
+  const [fotoFout, setFotoFout] = useState(null)
   const [emailError,    setEmailError]    = useState(null)
 
   const go = (next) => { setHistory(h => [...h, step]); setStep(next) }
@@ -375,11 +397,71 @@ export default function BasicsFlow({ data, onChange, onNext, onBack, isMobile })
             )}
           </div>
           <NextBtn
-            onClick={handleOnNext}
+            onClick={() => go('foto')}
             disabled={!data.date_of_birth}
             label="VOLGENDE →"
             isMobile={isMobile}
           />
+        </>
+
+      case 'foto':
+        return <>
+          <BackBtn onBack={goBack} />
+          <Q isMobile={isMobile}>Heb je een foto van jezelf?</Q>
+          <Hint isMobile={isMobile}>
+            Zodat je coach een gezicht bij je naam heeft. Overslaan mag.
+          </Hint>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.9rem', margin: '0.6rem 0 1rem' }}>
+            <div style={{
+              width: 84, height: 84, borderRadius: '50%', flexShrink: 0,
+              background: fotoUrl ? `url(${fotoUrl}) center/cover` : 'rgba(255,255,255,0.05)',
+              border: '1px solid rgba(255,255,255,0.12)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontSize: '1.6rem', color: 'rgba(255,255,255,0.2)',
+            }}>
+              {!fotoUrl && '👤'}
+            </div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <label style={{
+                display: 'inline-block', padding: '0.6rem 1rem', borderRadius: 0,
+                background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.15)',
+                color: '#fff', fontSize: '0.78rem', fontWeight: 800,
+                cursor: fotoBezig ? 'wait' : 'pointer',
+              }}>
+                {fotoBezig ? 'Bezig…' : fotoUrl ? 'Andere foto' : 'Foto kiezen'}
+                <input
+                  type="file" accept="image/*" disabled={fotoBezig}
+                  style={{ display: 'none' }}
+                  onChange={async (e) => {
+                    const file = e.target.files?.[0]
+                    e.target.value = ''
+                    if (!file) return
+                    setFotoFout(null); setFotoBezig(true)
+                    try {
+                      const dataUrl = await verkleinFoto(file)
+                      const res = await fetch('/api/intake-photo', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ email: data.email, dataUrl }),
+                      })
+                      const uit = await res.json().catch(() => ({}))
+                      if (!res.ok) throw new Error(uit.error || `Upload mislukt (${res.status})`)
+                      setFotoUrl(uit.url)
+                      update('profile_photo_url', uit.url)
+                    } catch (err) {
+                      setFotoFout(err.message || 'Uploaden mislukt')
+                    } finally { setFotoBezig(false) }
+                  }}
+                />
+              </label>
+              {fotoFout && (
+                <div style={{ marginTop: 6, fontSize: '0.7rem', fontWeight: 700, color: '#ef4444' }}>{fotoFout}</div>
+              )}
+            </div>
+          </div>
+
+          <NextBtn onClick={handleOnNext} label={fotoUrl ? 'VOLGENDE →' : 'OVERSLAAN →'} isMobile={isMobile} />
         </>
 
       default: return null
