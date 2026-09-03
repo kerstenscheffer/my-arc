@@ -11,7 +11,7 @@
 // het verschil tussen doorklikken en afhaken.
 
 import React from 'react'
-import { Q, Hint, NextBtn, BackBtn, SkipBtn, TextField, SchaalTien } from './FlowStep'
+import { Q, Hint, NextBtn, SkipBtn, TextField, SchaalTien } from './FlowStep'
 import { BASELINE_VRAGEN } from '../../baselineVragen'
 
 const STAPPEN = [...BASELINE_VRAGEN.map(v => v.veld), 'toelichting']

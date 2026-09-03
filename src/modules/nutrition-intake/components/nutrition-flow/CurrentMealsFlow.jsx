@@ -41,6 +41,48 @@ const BASE_SLOTS = [
   { key: 'snack',   label: 'Snack',      placeholder: 'Bijv: kwark met fruit' },
 ]
 
+
+// Voorbeeld van wat een bruikbare screenshot laat zien: naam, kcal en de drie
+// macro's. Als kaart in de pagina i.p.v. een plaatje — scherp op elk scherm,
+// geen asset om kwijt te raken, en hij volgt vanzelf de stijl van de app.
+function ScreenshotVoorbeeld({ isMobile }) {
+  const macro = (waarde, label) => (
+    <span style={{ display: 'inline-flex', alignItems: 'baseline', gap: 3 }}>
+      <span style={{ fontSize: isMobile ? '0.9rem' : '0.95rem', fontWeight: 900, color: '#fff' }}>{waarde}</span>
+      <span style={{ fontSize: '0.55rem', fontWeight: 800, color: 'rgba(255,255,255,0.35)', letterSpacing: '0.06em' }}>{label}</span>
+    </span>
+  )
+  return (
+    <div style={{ marginBottom: '0.9rem' }}>
+      <div style={{ fontSize: '0.7rem', fontWeight: 800, color: 'rgba(255,255,255,0.45)', marginBottom: '0.4rem' }}>
+        Dit is wat ik graag zie:
+      </div>
+      <div style={{
+        border: '1px solid rgba(255,255,255,0.12)',
+        background: 'linear-gradient(180deg, rgba(255,255,255,0.05), rgba(255,255,255,0.02))',
+        padding: isMobile ? '0.7rem 0.8rem' : '0.8rem 0.9rem',
+        maxWidth: 320,
+      }}>
+        <div style={{ fontSize: isMobile ? '0.9rem' : '0.95rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.01em', marginBottom: '0.45rem' }}>
+          Kwark met bosvruchten
+        </div>
+        <div style={{ display: 'flex', gap: isMobile ? 10 : 14, flexWrap: 'wrap' }}>
+          {macro(380, 'KCAL')}
+          {macro(61, 'EIWIT')}
+          {macro(25, 'KOOLH')}
+          {macro(3, 'VET')}
+        </div>
+        <div style={{ marginTop: '0.5rem', paddingTop: '0.45rem', borderTop: '1px solid rgba(255,255,255,0.08)', fontSize: '0.7rem', color: 'rgba(255,255,255,0.4)', lineHeight: 1.5 }}>
+          Magere kwark 500g · Bosvruchten 100g
+        </div>
+      </div>
+      <div style={{ fontSize: '0.68rem', color: 'rgba(255,255,255,0.35)', marginTop: '0.4rem', lineHeight: 1.5 }}>
+        Naam, calorieën en de macro's. Hoeveelheden erbij is helemaal top.
+      </div>
+    </div>
+  )
+}
+
 function MealSlot({
   slotKey, label, placeholder, value, onChange, isMobile, removable, onRemove,
   shots = [], onShots, werktGoed, onWerktGoed, uploaden,
@@ -272,6 +314,8 @@ export default function CurrentMealsFlow({ data, onChange, onNext, onBack, isMob
       </Hint>
 
       <div style={{ marginTop: '1.25rem' }}>
+        <ScreenshotVoorbeeld isMobile={isMobile} />
+
         {BASE_SLOTS.map(slot => (
           <MealSlot
             key={slot.key}

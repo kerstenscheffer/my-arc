@@ -2,7 +2,7 @@
 // Stap 1-4: Eetpatroon drill-down — 2 kolommen via flex, lijst klapt uit onder card
 import React, { useState } from 'react'
 import { createPortal } from 'react-dom'
-import { Q, Hint, NextBtn, BackBtn, BigOption } from '../../../public-intake/components/phase1/FlowStep'
+import { Q, Hint, NextBtn, BigOption } from '../../../public-intake/components/phase1/FlowStep'
 
 // Minimum aantal "dingen" dat per maaltijd ingevuld moet zijn vóór doorgaan.
 // "Ding" = sub-item (specifiek gerecht), custom toegevoegd item, of een
