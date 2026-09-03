@@ -7,6 +7,7 @@
 
 import { useState } from 'react'
 import { createPortal } from 'react-dom'
+import { useModalHost } from '../../../coach/ModalHost'
 import { X, UserPlus, Loader2, Eye, EyeOff, AlertCircle, Check } from 'lucide-react'
 import { signUpNewClient } from '../../../lib/supabase'
 
@@ -16,6 +17,7 @@ const initial = {
 }
 
 export default function AddClientModal({ open, db, coachId, onClose, onCreated, isMobile = false }) {
+  const modalHost = useModalHost()
   const [form, setForm] = useState(initial)
   const [showPw, setShowPw] = useState(false)
   const [busy, setBusy] = useState(false)
@@ -376,7 +378,7 @@ export default function AddClientModal({ open, db, coachId, onClose, onCreated, 
       `}</style>
     </div>
   )
-  return createPortal(node, document.body)
+  return createPortal(node, modalHost)
 }
 
 function Label({ children }) {

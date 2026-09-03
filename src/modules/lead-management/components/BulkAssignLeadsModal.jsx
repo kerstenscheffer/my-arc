@@ -13,6 +13,7 @@
 
 import { useState, useEffect, useMemo } from 'react'
 import { createPortal } from 'react-dom'
+import { useModalHost } from '../../../coach/ModalHost'
 import {
   X, Link2, Check, Calendar, Send, ChevronDown, ChevronUp, AlertCircle,
 } from 'lucide-react'
@@ -25,6 +26,7 @@ const formatDate = (iso) => {
 }
 
 export default function BulkAssignLeadsModal({ coachId, isMobile, onClose, onDone }) {
+  const modalHost = useModalHost()
   const [campaigns, setCampaigns] = useState([])
   const [sendsByCampaign, setSendsByCampaign] = useState({}) // { campaign_id: { min, max } }
   const [leads, setLeads] = useState([])                    // unattributed
@@ -341,7 +343,7 @@ export default function BulkAssignLeadsModal({ coachId, isMobile, onClose, onDon
         </div>
       </div>
     </div>,
-    document.body
+    modalHost
   )
 }
 

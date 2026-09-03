@@ -8,6 +8,7 @@
 
 import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
+import { useModalHost } from '../../../../coach/ModalHost'
 import {
   X, Send, FileText, AlertTriangle, ArrowRight, CheckCircle,
   ChevronDown, Plus, Check,
@@ -18,6 +19,7 @@ const GOLD = '#FFD700'
 export default function LeadSourceModal({
   isOpen, onClose, lead, db, coachId, onAttributed,
 }) {
+  const modalHost = useModalHost()
   const isMobile = typeof window !== 'undefined' && window.innerWidth <= 768
 
   const [campaigns, setCampaigns] = useState([])
@@ -330,7 +332,7 @@ export default function LeadSourceModal({
     </div>
   )
 
-  return createPortal(sheet, document.body)
+  return createPortal(sheet, modalHost)
 }
 
 function ChoiceCard({ active, onClick, icon, title, sub, children }) {

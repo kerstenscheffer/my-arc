@@ -14,6 +14,7 @@
 
 import { useEffect, useRef, useState, useCallback } from 'react'
 import { createPortal } from 'react-dom'
+import { useModalHost } from '../../../coach/ModalHost'
 import {
   X, Play, Pause, RotateCcw, Minus, Plus,
   Video, VideoOff, Circle, Square, Download, RefreshCw, Camera,
@@ -65,6 +66,7 @@ const mmss = (totalSec) => {
 }
 
 export default function TeleprompterModal({ isOpen, onClose, script, title }) {
+  const modalHost = useModalHost()
   const scrollRef = useRef(null)
   const rafRef = useRef(null)
   const lastTickRef = useRef(0)
@@ -646,5 +648,5 @@ export default function TeleprompterModal({ isOpen, onClose, script, title }) {
     </div>
   )
 
-  return createPortal(modal, document.body)
+  return createPortal(modal, modalHost)
 }

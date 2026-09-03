@@ -3,6 +3,7 @@
 // Toewijzing gebeurt apart via de bestaande VideoAssignModal (hergebruik).
 import React, { useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
+import { useModalHost } from '../../coach/ModalHost'
 import { X, Check, GraduationCap, Search } from 'lucide-react'
 import useIsMobile from '../../hooks/useIsMobile'
 import videoService from './VideoService'
@@ -10,6 +11,7 @@ import videoService from './VideoService'
 const GOLD = '#FFD700'
 
 export default function CourseManagerModal({ course, videos = [], onClose, onSaved }) {
+  const modalHost = useModalHost()
   const isMobile = useIsMobile()
   const [title, setTitle] = useState(course?.title || '')
   const [description, setDescription] = useState(course?.description || '')
@@ -134,6 +136,6 @@ export default function CourseManagerModal({ course, videos = [], onClose, onSav
         </div>
       </div>
     </div>,
-    document.body
+    modalHost
   )
 }

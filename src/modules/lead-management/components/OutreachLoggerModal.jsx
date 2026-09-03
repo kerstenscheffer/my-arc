@@ -6,6 +6,7 @@
 
 import { useState, useEffect, useMemo, useRef } from 'react'
 import { createPortal } from 'react-dom'
+import { useModalHost } from '../../../coach/ModalHost'
 import {
   X, Plus, Send, Trash2, Archive, ArchiveRestore, MessageSquare,
   Trophy, CalendarDays, Pencil, Check, Link2,
@@ -34,6 +35,7 @@ const STAGES = [
 ]
 
 export default function OutreachLoggerModal({ coachId, isMobile, onClose }) {
+  const modalHost = useModalHost()
   const [campaigns, setCampaigns] = useState([])
   const [sendsByCampaign, setSendsByCampaign] = useState({})       // total lifetime per campaign
   const [todaySends, setTodaySends] = useState({})                 // { campaign_id: today's count }
@@ -462,7 +464,7 @@ export default function OutreachLoggerModal({ coachId, isMobile, onClose }) {
         </div>
       </div>
     </div>,
-    document.body
+    modalHost
   )
 }
 

@@ -4,9 +4,11 @@
 // met kopieer-knop zodat de coach de succesvolle voorstellen kan hergebruiken.
 import { useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
+import { useModalHost } from '../../../coach/ModalHost'
 import { X, PhoneCall, Check, Copy } from 'lucide-react'
 
 export default function CallProposalsModal({ leadService, coachId, isMobile = false, onClose }) {
+  const modalHost = useModalHost()
   const [loading, setLoading] = useState(true)
   const [report, setReport] = useState(null)
   const [onlyReached, setOnlyReached] = useState(false)
@@ -130,6 +132,6 @@ export default function CallProposalsModal({ leadService, coachId, isMobile = fa
         </div>
       </div>
     </div>,
-    document.body
+    modalHost
   )
 }

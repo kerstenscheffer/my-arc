@@ -7,11 +7,13 @@
 // coach de voornaam overtypt — één misklik in een menu mag dit nooit doen.
 import { useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
+import { useModalHost } from '../../../coach/ModalHost'
 import { X, AlertTriangle, Trash2, Loader2 } from 'lucide-react'
 
 const RED = '#ef4444'
 
 export default function DeleteClientModal({ db, client, isMobile, onClose, onDeleted }) {
+  const modalHost = useModalHost()
   const [preview, setPreview] = useState(null)
   const [typed, setTyped] = useState('')
   const [busy, setBusy] = useState(false)
@@ -138,6 +140,6 @@ export default function DeleteClientModal({ db, client, isMobile, onClose, onDel
         </div>
       </div>
     </div>,
-    document.body
+    modalHost
   )
 }

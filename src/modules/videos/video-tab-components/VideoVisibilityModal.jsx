@@ -6,6 +6,7 @@
 // Plus een globale zichtbaar/verborgen schakelaar (is_active).
 import React, { useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
+import { useModalHost } from '../../../coach/ModalHost'
 import { X, Globe, Check, PlayCircle, Home, Dumbbell, Utensils, ShoppingCart, Camera, Phone, User, Eye, EyeOff, Users } from 'lucide-react'
 import useIsMobile from '../../../hooks/useIsMobile'
 import videoService from '../VideoService'
@@ -41,6 +42,7 @@ const clientName = (c, idx) =>
   : c.first_name || c.last_name || c.email || `Client ${idx + 1}`
 
 export default function VideoVisibilityModal({ video, clients = [], onClose, onSaved }) {
+  const modalHost = useModalHost()
   const isMobile = useIsMobile()
   const hadDefaults = (Array.isArray(video.default_pages) && video.default_pages.length > 0) || !!video.show_in_slider
 
@@ -224,6 +226,6 @@ export default function VideoVisibilityModal({ video, clients = [], onClose, onS
         </div>
       </div>
     </div>,
-    document.body
+    modalHost
   )
 }

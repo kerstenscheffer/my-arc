@@ -2,6 +2,7 @@
 // v1.1 — Categorieën: algemeen, status, whatsapp, call_prep
 import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { createPortal } from 'react-dom'
+import { useModalHost } from '../../../coach/ModalHost'
 import { X, GripVertical, Minus, Maximize2, Plus, Loader2, MessageCircle, BarChart2, Phone, FileText, History } from 'lucide-react'
 
 const STATUS_OPTIONS = [
@@ -39,6 +40,7 @@ function formatDate(iso) {
 }
 
 export default function CoachingLogModal({ client, db, coachId, onClose, isMobile, onLogSaved }) {
+  const modalHost = useModalHost()
   const [logs, setLogs]           = useState([])
   const [loading, setLoading]     = useState(true)
   const [saving, setSaving]       = useState(false)
@@ -432,7 +434,7 @@ export default function CoachingLogModal({ client, db, coachId, onClose, isMobil
       />
       {modal}
     </>,
-    document.body
+    modalHost
   )
 }
 

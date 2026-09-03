@@ -5,6 +5,7 @@
 
 import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
+import { useModalHost } from '../../../coach/ModalHost'
 import {
   X, ChevronLeft, ChevronRight, ChevronDown, Calendar, Zap, TrendingUp, Info,
   MessageCircle, Users, Phone, Trophy, Activity, BarChart3, PhoneCall,
@@ -74,6 +75,7 @@ const pct = (num, den) => {
 }
 
 export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, isMobile: propMobile, onTargetsSaved }) {
+  const modalHost = useModalHost()
   const isMobile = propMobile ?? (typeof window !== 'undefined' && window.innerWidth <= 768)
   // periodMode: 'day' = single day window, 'week' = Monday→Sunday window.
   // anchorDate is the reference point — for 'day' it's the chosen day,
@@ -1287,7 +1289,7 @@ export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, 
         </div>
       )}
     </>,
-    document.body
+    modalHost
   )
 }
 

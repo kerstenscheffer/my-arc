@@ -3,6 +3,7 @@
 
 import React, { useState, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
+import { useModalHost } from '../../../../coach/ModalHost'
 import { X, Search, ChevronRight, Zap, Calendar, ChevronDown, ChevronUp } from 'lucide-react'
 
 const DAYS_SHORT = ['Ma', 'Di', 'Wo', 'Do', 'Vr', 'Za', 'Zo']
@@ -145,6 +146,7 @@ export default function SwapModal({
   db, slot, currentMeal, dayIndex, dayTotals, targets, trainingDays = [],
   onSelect, onMultiDaySelect, onClose, isMobile, embedded = false
 }) {
+  const modalHost = useModalHost()
   const [meals, setMeals]               = useState([])
   const [search, setSearch]             = useState('')
   const [loading, setLoading]           = useState(true)
@@ -690,7 +692,7 @@ export default function SwapModal({
   if (embedded) return (
     <div style={{ position: 'relative', width: '100%', height: '100%', transform: 'translateZ(0)', overflow: 'hidden' }}>{modal}</div>
   )
-  return createPortal(modal, document.body)
+  return createPortal(modal, modalHost)
 }
 
 // Filter-dropdown — bold witte trigger + uitklaplijst met (multi-select) opties.

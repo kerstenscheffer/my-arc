@@ -3,6 +3,7 @@
 
 import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { createPortal } from 'react-dom'
+import { useModalHost } from '../../../../coach/ModalHost'
 import { User, ChevronDown, ChevronRight, X, Minus, Maximize2, GripVertical, Check } from 'lucide-react'
 
 // ── Sub image map ──
@@ -61,6 +62,7 @@ const MEAL_SOP_STEPS = [
 
 export default function ClientContextPanel({ db, clientId, isMobile, isFloating = false, onClose }) {
   console.log('🍽️ ClientContextPanel render — clientId:', clientId, '— isFloating:', isFloating)
+  const modalHost = useModalHost()
   const [cd, setCd]         = useState(null)
   const [np, setNp]         = useState(null)
   const [journey, setJourney] = useState(null)
@@ -518,7 +520,7 @@ export default function ClientContextPanel({ db, clientId, isMobile, isFloating 
     </div>
   )
 
-  if (isFloating) return createPortal(panelContent, document.body)
+  if (isFloating) return createPortal(panelContent, modalHost)
   return panelContent
 }
 

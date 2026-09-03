@@ -5,12 +5,14 @@
 
 import React, { useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
+import { useModalHost } from '../../../../coach/ModalHost'
 import { X, Bookmark, Trash2, Download, Loader } from 'lucide-react'
 
 export default function PlanLibraryModal({
   db, coachId, weekData, planMeta, clientName = '',
   onLoad, onClose, isMobile, embedded = false,
 }) {
+  const modalHost = useModalHost()
   const m = isMobile
   const [name, setName] = useState(() =>
     planMeta?.name ? `${planMeta.name} (kopie)` : (clientName ? `Plan ${clientName}` : ''))
@@ -170,6 +172,6 @@ export default function PlanLibraryModal({
     <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.95)', zIndex: 10000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
       <div onClick={e => e.stopPropagation()} style={{ width: '100%', maxWidth: 480, height: m ? '90vh' : '70vh', borderRadius: 12, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.06)' }}>{modal}</div>
     </div>,
-    document.body
+    modalHost
   )
 }

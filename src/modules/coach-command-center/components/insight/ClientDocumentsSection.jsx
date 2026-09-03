@@ -3,9 +3,11 @@
 
 import React, { useState, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
+import { useModalHost } from '../../../../coach/ModalHost'
 import { Upload, FileText, Trash2, ExternalLink, Loader, X } from 'lucide-react'
 
 export default function ClientDocumentsSection({ db, clientId, coachId, isMobile, isClientView = false }) {
+  const modalHost = useModalHost()
   const [documents, setDocuments] = useState([])
   const [loading, setLoading] = useState(true)
   const [uploading, setUploading] = useState(false)
@@ -122,7 +124,7 @@ export default function ClientDocumentsSection({ db, clientId, coachId, isMobile
         />
       </div>
     </div>,
-    document.body
+    modalHost
   )
 
   return (

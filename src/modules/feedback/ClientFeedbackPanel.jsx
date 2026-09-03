@@ -1,6 +1,7 @@
 // src/modules/feedback/ClientFeedbackPanel.jsx
 import React, { useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
+import { useModalHost } from '../../coach/ModalHost'
 import { MessageSquare, HelpCircle, Lightbulb, X, Send, ChevronRight, Check, Clock, Bell } from 'lucide-react'
 
 const TABS = [
@@ -31,6 +32,7 @@ const MSG_TYPE_LABELS = {
 }
 
 export default function ClientFeedbackPanel({ db, client, currentPage }) {
+  const modalHost = useModalHost()
   const isMobile = window.innerWidth <= 768
   const [open, setOpen] = useState(false)
   const [tab, setTab] = useState('messages')
@@ -588,5 +590,5 @@ export default function ClientFeedbackPanel({ db, client, currentPage }) {
     </>
   )
 
-  return createPortal(modal, document.body)
+  return createPortal(modal, modalHost)
 }

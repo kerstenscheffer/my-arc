@@ -4,6 +4,7 @@
 
 import { useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
+import { useModalHost } from '../../../coach/ModalHost'
 import { X, MessageCircle } from 'lucide-react'
 import ConversationNavigator from '../utils/ConversationNavigator'
 import DMConversationService from '../utils/DMConversationService'
@@ -18,6 +19,7 @@ export default function DMConversationModal({
   sections = [],
   onLeadMoved
 }) {
+  const modalHost = useModalHost()
   const [conversation, setConversation] = useState(null)
   const [loading, setLoading] = useState(true)
   const [service] = useState(() => new DMConversationService(db))
@@ -73,7 +75,7 @@ export default function DMConversationModal({
         }} />
         <style>{`@keyframes dmSpin { to { transform: rotate(360deg); } }`}</style>
       </div>,
-      document.body
+      modalHost
     )
   }
 
@@ -194,6 +196,6 @@ export default function DMConversationModal({
         @keyframes dmFadeIn { from { opacity: 0; } to { opacity: 1; } }
       `}</style>
     </div>,
-    document.body
+    modalHost
   )
 }

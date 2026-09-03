@@ -5,6 +5,7 @@
 //   fixedKey   → get_fixed_notification_recipients (afgeleid uit de meldingen)
 import { useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
+import { useModalHost } from '../../coach/ModalHost'
 import { X, User } from 'lucide-react'
 
 const GOLD = '#FFD700'
@@ -18,6 +19,7 @@ const fmt = (iso) => {
 }
 
 export default function RecipientsModal({ db, title, scheduleId, fixedKey, isMobile, onClose }) {
+  const modalHost = useModalHost()
   const [rows, setRows] = useState(null)
   const [error, setError] = useState(null)
 
@@ -77,6 +79,6 @@ export default function RecipientsModal({ db, title, scheduleId, fixedKey, isMob
         </div>
       </div>
     </div>,
-    document.body
+    modalHost
   )
 }

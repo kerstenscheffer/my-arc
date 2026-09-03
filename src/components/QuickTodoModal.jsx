@@ -7,6 +7,7 @@
 // Coaching): filtert de lijst én bepaalt in welke sectie een nieuwe to-do landt.
 import { useState, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
+import { useModalHost } from '../coach/ModalHost'
 import { X, Plus, Check, Trash2, ArrowRight, ListTodo, Inbox, Layers, Pencil, GripVertical, Play } from 'lucide-react'
 import ProductivityService from '../modules/productivity/ProductivityService'
 
@@ -30,6 +31,7 @@ const DUR_FILTERS = [
 ]
 
 export default function QuickTodoModal({ db, coachId, onClose, onOpenProductivity, isMobile, onStartTask, activeTaskId }) {
+  const modalHost = useModalHost()
   const [svc] = useState(() => new ProductivityService(db.supabase))
   const [tasks, setTasks] = useState([])
   const [sections, setSections] = useState([])
@@ -584,5 +586,5 @@ export default function QuickTodoModal({ db, coachId, onClose, onOpenProductivit
     </div>
   )
 
-  return createPortal(<>{modal}{addModal}</>, document.body)
+  return createPortal(<>{modal}{addModal}</>, modalHost)
 }

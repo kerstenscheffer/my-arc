@@ -943,7 +943,8 @@ export default function CoachHub() {
                 onKies={(id) => navigateTo(id)}
                 kant="links"
               />
-              <div style={{ flex: 1, minWidth: 0, overflow: 'auto', WebkitOverflowScrolling: 'touch' }}>
+              <div style={{ flex: 1, minWidth: 0, overflow: 'auto', WebkitOverflowScrolling: 'touch',
+                '--paneel-hoogte': '100%', '--paneel-afstand': '0px', '--paneel-top': '0px' }}>
                 <ModalHostProvider value={hostLinks}>{renderTabContent(activeTab)}</ModalHostProvider>
               </div>
             </div>
@@ -973,7 +974,8 @@ export default function CoachHub() {
                 onSluit={() => setSplitTab(null)}
                 kant="rechts"
               />
-              <div style={{ flex: 1, minWidth: 0, overflow: 'auto', WebkitOverflowScrolling: 'touch' }}>
+              <div style={{ flex: 1, minWidth: 0, overflow: 'auto', WebkitOverflowScrolling: 'touch',
+                '--paneel-hoogte': '100%', '--paneel-afstand': '0px', '--paneel-top': '0px' }}>
                 <ModalHostProvider value={hostRechts}>{renderTabContent(splitTab)}</ModalHostProvider>
               </div>
             </div>

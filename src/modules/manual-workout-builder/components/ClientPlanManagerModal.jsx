@@ -3,11 +3,13 @@
 // plannen → activeer/verwijder, of wijs een extra plan toe vanuit je templates.
 import { useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
+import { useModalHost } from '../../../coach/ModalHost'
 import { X, Search, ChevronLeft, ChevronRight, Plus, Trash2, Dumbbell, Star, Pencil } from 'lucide-react'
 
 const GOLD = '#FFD700'
 
 export default function ClientPlanManagerModal({ clients = [], templates = [], db, isMobile = false, onClose, onEditInBuilder }) {
+  const modalHost = useModalHost()
   const [sel, setSel] = useState(null)          // gekozen klant
   const [query, setQuery] = useState('')
   const [data, setData] = useState(null)        // { plans, activeId }
@@ -143,7 +145,7 @@ export default function ClientPlanManagerModal({ clients = [], templates = [], d
         )}
       </div>
     </div>,
-    document.body
+    modalHost
   )
 }
 

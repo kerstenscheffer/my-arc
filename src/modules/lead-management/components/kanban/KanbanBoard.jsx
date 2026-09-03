@@ -5,6 +5,7 @@
 
 import { useState, useEffect, useLayoutEffect, useCallback, useRef } from 'react'
 import { createPortal } from 'react-dom'
+import { useModalHost } from '../../../../coach/ModalHost'
 import { Plus, Settings, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, GripVertical, Save, RotateCcw, Users, Instagram, Search, X, ArrowUp, ArrowUpDown, Clock, Maximize2, Minimize2, CheckCircle, Send, Zap, Flame, Phone, SlidersHorizontal, BarChart3, Megaphone } from 'lucide-react'
 import KanbanCard from './KanbanCard'
 import AddLeadModal from './AddLeadModal'
@@ -68,6 +69,7 @@ export default function KanbanBoard({
   campaigns = [], activeCampaign = null,
   leadViews = [], activeLeadView = 'kanban', onSelectLeadView, onOpenSOP,
 }) {
+  const modalHost = useModalHost()
   const [viewMode, setViewMode] = useState('leads')
   const [sections, setSections] = useState([])
   const [originalSections, setOriginalSections] = useState([])
@@ -2225,7 +2227,7 @@ export default function KanbanBoard({
           }}>
           <ArrowUp size={isMobile ? 20 : 18} strokeWidth={2.6} /> Naar boven
         </button>,
-        document.body
+        modalHost
       )}
 
       {/* ═══ FULLSCREEN — clean, no gradients ═══ */}
@@ -2316,7 +2318,7 @@ export default function KanbanBoard({
           )}
           {showSectionModal && <SectionModal isMobile={isMobile} section={selectedSection} onClose={() => { setShowSectionModal(false); setSelectedSection(null) }} onSubmit={selectedSection ? (u) => handleUpdateSection(selectedSection.id, u) : handleCreateSection} onDelete={selectedSection ? () => handleDeleteSection(selectedSection.id) : null} />}
         </div>,
-        document.body
+        modalHost
       )}
 
       {salesCallLead && (
@@ -2477,7 +2479,7 @@ export default function KanbanBoard({
             </div>
           </div>
         </div>,
-        document.body
+        modalHost
       )}
 
       {/* Openstaande calls — pop-up met 2-staps afhandeling (gevoerd → sale/

@@ -11,6 +11,7 @@
 
 import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
+import { useModalHost } from '../../../coach/ModalHost'
 import { X, Video, Image as ImageIcon, Trash2, Save, ExternalLink } from 'lucide-react'
 import ExerciseService from '../../../services/ExerciseService'
 
@@ -31,6 +32,7 @@ const deriveYoutubeThumb = (url) => {
 export default function ExerciseVideoEditor({
   isOpen, onClose, exercise, isMobile = false, onSaved,
 }) {
+  const modalHost = useModalHost()
   const [videoUrl, setVideoUrl] = useState('')
   const [thumbnailUrl, setThumbnailUrl] = useState('')
   const [saving, setSaving] = useState(false)

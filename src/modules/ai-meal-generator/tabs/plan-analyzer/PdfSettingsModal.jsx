@@ -3,12 +3,14 @@
 // alleen weekschema / één dag), swaps meenemen en een eigen titel.
 import { useState } from 'react'
 import { createPortal } from 'react-dom'
+import { useModalHost } from '../../../../coach/ModalHost'
 import { X, FileDown, Calendar, LayoutGrid, CalendarDays } from 'lucide-react'
 import { DAYS } from './DayNavigator'
 
 const GOLD = '#FFD700'
 
 export default function PdfSettingsModal({ onGenerate, onClose, hasSwaps = false, defaultTitle = '', isMobile = false }) {
+  const modalHost = useModalHost()
   const [scope, setScope] = useState('week')        // 'week' | 'weekschema' | 'day'
   const [day, setDay] = useState('monday')
   const [includeSwaps, setIncludeSwaps] = useState(hasSwaps)
@@ -117,6 +119,6 @@ export default function PdfSettingsModal({ onGenerate, onClose, hasSwaps = false
         </div>
       </div>
     </div>,
-    document.body
+    modalHost
   )
 }

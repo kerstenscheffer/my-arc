@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
+import { useModalHost } from '../../../../coach/ModalHost'
 import { X } from 'lucide-react'
 
 const SOURCE_OPTIONS = [
@@ -10,6 +11,7 @@ const SOURCE_OPTIONS = [
 ]
 
 export default function AddLeadModal({ isMobile, onClose, onSubmit }) {
+  const modalHost = useModalHost()
   const [formData, setFormData] = useState({
     firstName: '',
     lastName: '',
@@ -159,6 +161,6 @@ export default function AddLeadModal({ isMobile, onClose, onSubmit }) {
         </form>
       </div>
     </div>,
-    document.body
+    modalHost
   )
 }

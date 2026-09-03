@@ -11,10 +11,12 @@
 // plekken zijn die hetzelfde tonen en uit elkaar gaan lopen.
 import { useState, useEffect, useMemo } from 'react'
 import { createPortal } from 'react-dom'
+import { useModalHost } from '../coach/ModalHost'
 import { Search, X, User, ClipboardCheck } from 'lucide-react'
 import IntakeSummaryModal from '../coach/tabs/client-info/IntakeSummaryModal'
 
 export default function IntakeLookupModal({ db, isMobile, onClose, clients: clientsProp, onNavigate }) {
+  const modalHost = useModalHost()
   const [clients, setClients] = useState(clientsProp || [])
   const [laden, setLaden] = useState(!clientsProp)
   const [zoek, setZoek] = useState('')
@@ -171,6 +173,6 @@ export default function IntakeLookupModal({ db, isMobile, onClose, clients: clie
         </div>
       </div>
     </div>,
-    document.body
+    modalHost
   )
 }

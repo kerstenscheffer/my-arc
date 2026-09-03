@@ -4,6 +4,7 @@
 
 import { useState, useRef, useEffect } from 'react'
 import { createPortal } from 'react-dom'
+import { useModalHost } from '../../../../coach/ModalHost'
 import {
   X, PhoneCall, Target, AlertCircle, Zap, Heart, Flag,
   CheckCircle, XCircle, UserPlus, Copy, ExternalLink, Loader
@@ -85,6 +86,7 @@ const SALES_FIELDS = [
 ]
 
 export default function SalesCallModal({ lead, db, coachId, isMobile, onClose, onLeadUpdate }) {
+  const modalHost = useModalHost()
   const existingNotes = lead?.sales_call_notes || {}
 
   const [salesData, setSalesData] = useState({
@@ -597,6 +599,6 @@ export default function SalesCallModal({ lead, db, coachId, isMobile, onClose, o
 
       <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
     </div>,
-    document.body
+    modalHost
   )
 }

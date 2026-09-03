@@ -4,6 +4,7 @@
 // of cardio-velden) gebeurt in een groter modal — zo blijft de pagina rustig.
 import { useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
+import { useModalHost } from '../../../coach/ModalHost'
 import { Video, Trash2, ChevronUp, ChevronDown, Dumbbell, Pencil, X } from 'lucide-react'
 import useExerciseImage from '../hooks/useExerciseImage'
 
@@ -33,6 +34,7 @@ const EQUIPMENT_OPTIONS = [
 export default function BuilderExerciseCard({
   exercise, index, total, isMobile, db, client, onField, onMove, onDelete, onVideo,
 }) {
+  const modalHost = useModalHost()
   const { imageUrl, loadingImage, hasVideo } = useExerciseImage(exercise, db, client)
   const photoSize = isMobile ? 52 : 62
   const hasVid = hasVideo || !!exercise.video_url
@@ -250,6 +252,6 @@ function ExerciseEditModal({ exercise, isCardio, isMobile, hasVid, onField, onVi
         </div>
       </div>
     </div>,
-    document.body
+    modalHost
   )
 }

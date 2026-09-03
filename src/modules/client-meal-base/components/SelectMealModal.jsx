@@ -3,6 +3,7 @@
 
 import React, { useEffect } from 'react'
 import { createPortal } from 'react-dom'
+import { useModalHost } from '../../../coach/ModalHost'
 import { X, UtensilsCrossed } from 'lucide-react'
 
 export default function SelectMealModal({ 
@@ -18,6 +19,7 @@ export default function SelectMealModal({
   console.log('📋 [SelectMealModal] Props:', { isOpen, mealsCount: meals?.length, category, slotNumber })
 
   useEffect(() => {
+  const modalHost = useModalHost()
     if (isOpen) {
       console.log('✅ [SelectMealModal] Modal opened via Portal')
       // Prevent body scroll when modal is open
@@ -299,5 +301,5 @@ export default function SelectMealModal({
   // 🌟 RENDER VIA PORTAL - Mounts directly to document.body
   // This ensures the modal is COMPLETELY independent from parent modals
   console.log('🚀 [SelectMealModal] Rendering via createPortal to document.body')
-  return createPortal(modalContent, document.body)
+  return createPortal(modalContent, modalHost)
 }

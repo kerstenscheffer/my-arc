@@ -3,6 +3,7 @@
 
 import React, { useState, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
+import { useModalHost } from '../../../../coach/ModalHost'
 import { X, Search, Plus, Trash2, Save, Copy, Zap, ChefHat } from 'lucide-react'
 import { resolveFoodImage } from '../../../meal-plan/foodImageFallback'
 
@@ -18,6 +19,7 @@ const LABEL_GROUPS = [
 ]
 
 export default function MealEditModal({ db, meal, slot, dayIndex, onSave, onClose, isMobile, embedded = false, clientMode = false }) {
+  const modalHost = useModalHost()
   const m = isMobile
   const [activeTab, setActiveTab] = useState('ingredients')
   const [mealName, setMealName]         = useState(meal?.name || meal?.meal_name || '')
@@ -363,7 +365,7 @@ export default function MealEditModal({ db, meal, slot, dayIndex, onSave, onClos
   )
 
   if (embedded) return modal
-  return createPortal(modal, document.body)
+  return createPortal(modal, modalHost)
 }
 
 function stepAmtBtn(m) {

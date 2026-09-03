@@ -2,6 +2,7 @@
 // v2.0 — Brand styling + page_context keys matchen ClientDashboard
 import React, { useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
+import { useModalHost } from '../../../coach/ModalHost'
 import { 
   Send, X, Users, FileVideo, Calendar,
   Home, Dumbbell, Utensils, ShoppingCart, Camera, Phone, User
@@ -29,6 +30,7 @@ export default function VideoAssignModal({
   onClose, 
   onAssign 
 }) {
+  const modalHost = useModalHost()
   const [selectedClients, setSelectedClients] = useState([])
   const [selectAll, setSelectAll] = useState(false)
   const [assignmentData, setAssignmentData] = useState({
@@ -488,6 +490,6 @@ export default function VideoAssignModal({
 
       <style>{`.assign-modal-body::-webkit-scrollbar { display: none; }`}</style>
     </div>,
-    document.body
+    modalHost
   )
 }

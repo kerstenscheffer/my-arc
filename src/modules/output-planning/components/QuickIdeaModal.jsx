@@ -5,6 +5,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
+import { useModalHost } from '../../../coach/ModalHost'
 import { X, Save, Video, Plus, Trash2, Check } from 'lucide-react'
 
 const GOLD = '#FFD700'
@@ -33,6 +34,7 @@ export default function QuickIdeaModal({
   sections = [],          // [{id, title}] — user inbox sections
   defaultSectionId = null, // pre-selected section when adding new
 }) {
+  const modalHost = useModalHost()
   const [title, setTitle] = useState('')
   const [type, setType] = useState('reel')
   const [hook, setHook] = useState('')
@@ -478,5 +480,5 @@ export default function QuickIdeaModal({
     </div>
   )
 
-  return createPortal(sheet, document.body)
+  return createPortal(sheet, modalHost)
 }

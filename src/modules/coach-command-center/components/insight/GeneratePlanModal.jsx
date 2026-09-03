@@ -4,10 +4,12 @@
 
 import React from 'react'
 import { createPortal } from 'react-dom'
+import { useModalHost } from '../../../../coach/ModalHost'
 import { X } from 'lucide-react'
 import GuidedPlanFlow from './GuidedPlanFlow'
 
 export default function GeneratePlanModal({ client, db, coachId, onClose, onSuccess, isMobile }) {
+  const modalHost = useModalHost()
   const m = isMobile
 
   const modal = (
@@ -59,5 +61,5 @@ export default function GeneratePlanModal({ client, db, coachId, onClose, onSucc
     </div>
   )
 
-  return createPortal(modal, document.body)
+  return createPortal(modal, modalHost)
 }

@@ -4,11 +4,13 @@
 
 import React, { useState } from 'react'
 import { createPortal } from 'react-dom'
+import { useModalHost } from '../../../../coach/ModalHost'
 import { X, CalendarDays, Check } from 'lucide-react'
 
 const DAYS_SHORT = ['Ma', 'Di', 'Wo', 'Do', 'Vr', 'Za', 'Zo']
 
 export default function ApplyDaysModal({ meal, slot, dayIndex, trainingDays = [], onApply, onClose, isMobile, embedded = false }) {
+  const modalHost = useModalHost()
   const m = isMobile
   const [selectedDays, setSelectedDays] = useState([dayIndex])
   const [applied, setApplied] = useState(false)
@@ -109,5 +111,5 @@ export default function ApplyDaysModal({ meal, slot, dayIndex, trainingDays = []
   )
 
   if (embedded) return modal
-  return createPortal(modal, document.body)
+  return createPortal(modal, modalHost)
 }

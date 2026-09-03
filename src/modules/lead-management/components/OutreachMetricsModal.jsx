@@ -8,6 +8,7 @@
 
 import { useState, useEffect, useMemo } from 'react'
 import { createPortal } from 'react-dom'
+import { useModalHost } from '../../../coach/ModalHost'
 import {
   X, BarChart3, Send, MessageCircle, PhoneCall, Trophy, ArrowUpDown,
   Flame, TrendingUp,
@@ -21,6 +22,7 @@ const FUNNEL = [
 ]
 
 export default function OutreachMetricsModal({ coachId, isMobile, onClose }) {
+  const modalHost = useModalHost()
   const [loading, setLoading] = useState(true)
   const [campaigns, setCampaigns] = useState([])
   const [sendsByCampaign, setSendsByCampaign] = useState({})
@@ -257,7 +259,7 @@ export default function OutreachMetricsModal({ coachId, isMobile, onClose }) {
         </div>
       </div>
     </div>,
-    document.body
+    modalHost
   )
 }
 

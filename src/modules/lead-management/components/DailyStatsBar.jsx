@@ -4,6 +4,7 @@
 
 import { useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
+import { useModalHost } from '../../../coach/ModalHost'
 import { Activity, Target, Clock, TrendingUp, MessageCircle, Users, Calendar, FileText, Zap, ChevronDown, ChevronUp, Flame, BookOpen, X, CheckCircle, BarChart3, Send } from 'lucide-react'
 import { exportDailyReport } from '../utils/exportDailyReport'
 import WeekStatsModal from './WeekStatsModal'
@@ -68,6 +69,7 @@ export default function DailyStatsBar({
   dailyGoal = 100,
   onExportPDF
 }) {
+  const modalHost = useModalHost()
   const [isExpanded, setIsExpanded] = useState(false)
   const [showSOP, setShowSOP] = useState(false)
   const [showWeek, setShowWeek] = useState(false)
@@ -624,6 +626,6 @@ export function SOPModal({ isMobile, onClose }) {
         @keyframes sopFadeIn { from { opacity: 0; } to { opacity: 1; } }
       `}</style>
     </div>,
-    document.body
+    modalHost
   )
 }

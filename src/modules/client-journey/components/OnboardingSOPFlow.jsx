@@ -1,6 +1,7 @@
 // src/modules/client-journey/components/OnboardingSOPFlow.jsx
 import React, { useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
+import { useModalHost } from '../../../coach/ModalHost'
 import { Check, Copy, ChevronRight, ChevronDown, AlertTriangle, X, ExternalLink, Pencil, RotateCcw } from 'lucide-react'
 import IntakeCallPanel from './calls/IntakeCallPanel'
 
@@ -131,6 +132,7 @@ const STEPS = [
 
 // ─── MAIN COMPONENT ─────────────────────────────────────────────
 export default function OnboardingSOPFlow({ db, selectedClient, onStartSetup, onOpenMealPanel, onOpenWorkoutPanel }) {
+  const modalHost = useModalHost()
   const isMobile = window.innerWidth <= 768
 
   const [currentStep, setCurrentStep] = useState(selectedClient?.onboarding_step ?? 0)
@@ -793,7 +795,7 @@ export default function OnboardingSOPFlow({ db, selectedClient, onStartSetup, on
             />
           </div>
         </div>,
-        document.body
+        modalHost
       )}
     </div>
   )

@@ -10,6 +10,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
+import { useModalHost } from '../../../coach/ModalHost'
 import { X, Search, Video, ListFilter, Loader2 } from 'lucide-react'
 import ExerciseVideoEditor from './ExerciseVideoEditor'
 
@@ -18,6 +19,7 @@ const GOLD = '#FFD700'
 export default function ExerciseLibraryModal({
   isOpen, onClose, db, isMobile = false,
 }) {
+  const modalHost = useModalHost()
   const [loading, setLoading] = useState(false)
   const [exercises, setExercises] = useState([])
   const [search, setSearch] = useState('')

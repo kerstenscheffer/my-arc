@@ -14,6 +14,7 @@
 
 import { useState, useRef, useEffect } from 'react'
 import { createPortal } from 'react-dom'
+import { useModalHost } from '../../../../coach/ModalHost'
 import {
   X, Trash2, User, Target, Phone as PhoneCall, Magnet, FileText,
   Plus, AlertCircle, Zap, Heart, Flame, Check, Save,
@@ -88,6 +89,7 @@ export default function LeadDetailModalV2({
   db = null,
   coachId = null,
 }) {
+  const modalHost = useModalHost()
   const [activeTab, setActiveTab] = useState(initialTab)
 
   // Local edit state — optimistic; persists via debounced onEdit calls.
@@ -571,7 +573,7 @@ export default function LeadDetailModalV2({
         </div>
       </div>
     </div>,
-    document.body
+    modalHost
   )
 }
 

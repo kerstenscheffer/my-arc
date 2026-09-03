@@ -3,6 +3,7 @@
 
 import React, { useState } from 'react'
 import { createPortal } from 'react-dom'
+import { useModalHost } from '../../../../coach/ModalHost'
 import { X, Clock, Check } from 'lucide-react'
 
 const SLOT_CONFIG = {
@@ -17,6 +18,7 @@ const SLOT_CONFIG = {
 const SLOTS = ['breakfast', 'snack1', 'lunch', 'snack2', 'dinner', 'snack3']
 
 export default function TimingModal({ weekData, onApply, onClose, isMobile, embedded = false }) {
+  const modalHost = useModalHost()
   const m = isMobile
 
   // Initialiseer tijden vanuit bestaande data (eerste dag met een waarde per slot)
@@ -166,5 +168,5 @@ export default function TimingModal({ weekData, onApply, onClose, isMobile, embe
   )
 
   if (embedded) return modal
-  return createPortal(modal, document.body)
+  return createPortal(modal, modalHost)
 }

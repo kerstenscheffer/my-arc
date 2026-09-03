@@ -4,6 +4,7 @@
 
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { createPortal } from 'react-dom'
+import { useModalHost } from '../../../coach/ModalHost'
 import { Flame, X, Copy, Check, GripHorizontal, Trash2, Plus, Eraser, Pencil, EyeOff, Eye, FolderPlus, MessageSquare } from 'lucide-react'
 
 // GOLD THEME
@@ -328,6 +329,7 @@ const iconBtn = (color) => ({
 })
 
 export default function DMBibleModal({ isMobile = false, db = null, coachId = null, triggerVariant = 'fab' }) {
+  const modalHost = useModalHost()
   const [isOpen, setIsOpen] = useState(false)
   const [activeCategory, setActiveCategory] = useState('eerste-dikker')
   const [copiedIndex, setCopiedIndex] = useState(null)

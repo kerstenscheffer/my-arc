@@ -6,6 +6,7 @@
 
 import { useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
+import { useModalHost } from '../../coach/ModalHost'
 import { 
   Calendar, 
   Target, 
@@ -79,6 +80,7 @@ const generateWeekDays = (monday) => {
 }
 
 export default function CoachOutputDashboard({ db }) {
+  const modalHost = useModalHost()
   const [isMobile, setIsMobile] = useState(window.innerWidth <= 768)
   
   // Handle resize
@@ -464,7 +466,7 @@ export default function CoachOutputDashboard({ db }) {
         >
           {renderContent(true)}
         </div>,
-        document.body
+        modalHost
       )}
       
       {/* CSS Animations + Mobile Fixes */}

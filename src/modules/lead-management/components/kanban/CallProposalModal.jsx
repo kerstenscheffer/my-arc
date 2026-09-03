@@ -10,6 +10,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
+import { useModalHost } from '../../../../coach/ModalHost'
 import { X, Send, PhoneCall, Eraser } from 'lucide-react'
 
 const GOLD = '#FFD700'
@@ -17,6 +18,7 @@ const GOLD = '#FFD700'
 export default function CallProposalModal({
   isOpen, onClose, lead, db, coachId, isMobile = false,
 }) {
+  const modalHost = useModalHost()
   const [text, setText] = useState('')
   const [saving, setSaving] = useState(false)
   const [previous, setPrevious] = useState([])

@@ -7,6 +7,7 @@
 // Een nieuwe regel staat bewust UIT — hij stuurt pas iets nadat je 'm aanzet.
 import { useState, useEffect, useCallback } from 'react'
 import { createPortal } from 'react-dom'
+import { useModalHost } from '../../coach/ModalHost'
 import {
   Plus, X, Trash2, Clock, Users, Scale, UtensilsCrossed, Dumbbell,
   Bell, Eye, Loader2, AlertCircle, ClipboardCheck, Camera,
@@ -96,6 +97,7 @@ const fmtLastRun = (iso) => {
 }
 
 export default function ScheduledNotifications({ db, coachId, isMobile }) {
+  const modalHost = useModalHost()
   const [rules, setRules] = useState([])
   const [counts, setCounts] = useState({})   // schedule_id → aantal verzonden
   const [loading, setLoading] = useState(true)
@@ -472,7 +474,7 @@ function RuleEditor({ db, isMobile, rule, onClose, onSave }) {
         </div>
       </div>
     </div>,
-    document.body
+    modalHost
   )
 }
 

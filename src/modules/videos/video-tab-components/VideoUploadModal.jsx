@@ -2,6 +2,7 @@
 // v2.0 — Brand styling (flush/goud) + mijn categorie dropdown + category_id support
 import React, { useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
+import { useModalHost } from '../../../coach/ModalHost'
 import { Upload, X, Youtube, Camera, Image as ImageIcon, Globe, Check, Home, Dumbbell, Utensils, ShoppingCart, Phone, User } from 'lucide-react'
 import useIsMobile from '../../../hooks/useIsMobile'
 import videoService from '../VideoService'
@@ -30,6 +31,7 @@ export default function VideoUploadModal({
   clients = [],
   db
 }) {
+  const modalHost = useModalHost()
   const [formData, setFormData] = useState({
     title: '',
     description: '',
@@ -816,6 +818,6 @@ export default function VideoUploadModal({
         @keyframes vm-spin { to { transform: rotate(360deg); } }
       `}</style>
     </div>,
-    document.body
+    modalHost
   )
 }

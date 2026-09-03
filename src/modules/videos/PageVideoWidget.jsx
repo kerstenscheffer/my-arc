@@ -4,6 +4,7 @@
 
 import React, { useState, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
+import { useModalHost } from '../../coach/ModalHost'
 import { Play, X, Video, CheckCircle2, ChevronLeft, GraduationCap, Eye, ExternalLink } from 'lucide-react'
 import videoService from './VideoService'
 import PageFilesBlock from './PageFilesBlock'
@@ -34,6 +35,7 @@ const isYouTubeShort = (url) => {
 }
 
 export default function PageVideoWidget({ client, db, pageContext = 'home', open: openProp, onOpenChange, onCountChange }) {
+  const modalHost = useModalHost()
   const controlled = typeof openProp === 'boolean' && typeof onOpenChange === 'function'
   const [videos, setVideos] = useState([])
   const [filesCount, setFilesCount] = useState(0)
@@ -985,6 +987,6 @@ function FullscreenPlayer({ item, onClose, onWatched, onCompleted }) {
         </button>
       </div>
     </div>,
-    document.body
+    modalHost
   )
 }

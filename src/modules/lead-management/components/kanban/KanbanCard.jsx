@@ -6,6 +6,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
+import { useModalHost } from '../../../../coach/ModalHost'
 import {
   MessageCircle, Plus, Minus,
   ArrowLeftCircle, Clock, CheckCircle, Circle, Flame,
@@ -96,6 +97,7 @@ export default function KanbanCard({
   onMagnetAttached,
   activeCampaign = null,
 }) {
+  const modalHost = useModalHost()
   const [showReturnDropdown, setShowReturnDropdown] = useState(false)
   const [showMoveDropdown, setShowMoveDropdown] = useState(false)
   const [movePos, setMovePos] = useState({ top: 0, left: 0 })
@@ -688,7 +690,7 @@ export default function KanbanCard({
                 )
               })}
             </div>,
-            document.body
+            modalHost
           )}
 
           {/* Tweede dag-teller ("{n}d", sinds stale-move) verwijderd — alleen de
@@ -880,7 +882,7 @@ export default function KanbanCard({
                     </div>
                   ))}
                 </div>,
-                document.body
+                modalHost
               )}
             </>
           )}
@@ -921,7 +923,7 @@ export default function KanbanCard({
                     </div>
                   ))}
                 </div>,
-                document.body
+                modalHost
               )}
             </div>
           )}

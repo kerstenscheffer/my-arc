@@ -2,10 +2,12 @@
 
 import React, { useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
+import { useModalHost } from '../../../../coach/ModalHost'
 import { X, CheckCircle, Circle, Trash2, Pencil, Check, Zap, ChevronRight, Copy, Loader, AlertTriangle, Bookmark } from 'lucide-react'
 import TemplateLibrary from '../../../meal-templates/TemplateLibrary'
 
 export default function PlanSwitcherModal({ db, clientId, coachId, activePlanId, onSelect, onRenamed, onSaveAsTemplate, weekSaveState = 'idle', onClose, isMobile, embedded = false }) {
+  const modalHost = useModalHost()
   const m = isMobile
   const [tab, setTab] = useState('client')
 
@@ -425,7 +427,7 @@ export default function PlanSwitcherModal({ db, clientId, coachId, activePlanId,
   )
 
   if (embedded) return <>{modal}<style>{`@keyframes psmSpin { to { transform: rotate(360deg) } }`}</style></>
-  return createPortal(<>{modal}<style>{`@keyframes psmSpin { to { transform: rotate(360deg) } }`}</style></>, document.body)
+  return createPortal(<>{modal}<style>{`@keyframes psmSpin { to { transform: rotate(360deg) } }`}</style></>, modalHost)
 }
 
 function Placeholder({ text }) {

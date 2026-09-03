@@ -1,6 +1,7 @@
 // src/modules/faq/CoachFAQManager.jsx
 import React, { useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
+import { useModalHost } from '../../coach/ModalHost'
 import { HelpCircle, Plus, Trash2, Edit2, Save, X, ChevronRight } from 'lucide-react'
 import FAQService from './FAQService'
 
@@ -17,6 +18,7 @@ const DEEPLINK_OPTIONS = [
 const EMPTY_FORM = { parent_id: '', label: '', answer: '', deeplink: '', hint: '', whatsapp: '', icon: 'HelpCircle' }
 
 export default function CoachFAQManager() {
+  const modalHost = useModalHost()
   const isMobile = window.innerWidth <= 768
   const [nodes, setNodes]         = useState([])
   const [loading, setLoading]     = useState(true)
@@ -117,7 +119,7 @@ export default function CoachFAQManager() {
         </div>
       </div>
     </div>,
-    document.body
+    modalHost
   ) : null
 
   // ─── RENDER ────────────────────────────────────────────────────────────────

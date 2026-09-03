@@ -2,6 +2,7 @@
 // Beheer video categorieën — aanmaken, bewerken, verwijderen
 import React, { useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
+import { useModalHost } from '../../coach/ModalHost'
 import { X, Plus, Edit2, Trash2, Check, AlertTriangle } from 'lucide-react'
 import videoService from './VideoService'
 
@@ -22,6 +23,7 @@ const COLOR_PRESETS = [
 ]
 
 export default function CategoryManagerModal({ isOpen, onClose, coachId, onChange }) {
+  const modalHost = useModalHost()
   const [categories, setCategories] = useState([])
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -643,7 +645,7 @@ export default function CategoryManagerModal({ isOpen, onClose, coachId, onChang
 
       <style>{`.cat-mgr-body::-webkit-scrollbar { display: none; }`}</style>
     </div>,
-    document.body
+    modalHost
   )
 }
 

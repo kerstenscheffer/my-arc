@@ -342,13 +342,12 @@ export default function PlanAnalyzer({
   // Waar begint de ruimte onder de sticky tabbalk, en hoeveel hoogte houden
   // we over? Beide stonden hardgecodeerd: de zijbalk en het dock-paneel
   // kleefden aan top:0 en verdwenen daardoor onder die balk.
-  const kleefTop = topOffset
-  // Kolommen lopen door tot de onderkant van het scherm. Eerder ging de
-  // navbalk-ruimte van de hele hoogte af; dan eindigt álles te vroeg en houd
-  // je een zwarte band over. De navbalk zweeft nu over de onderkant heen, en
-  // alleen wat daar écht onder zou verdwijnen (knoppenbalken, de laatste
-  // maaltijdkaart) krijgt onderaan wat lucht.
-  const paneelHoogte = `calc(100dvh - ${topOffset}px)`
+  // In split screen geeft de parent-div --paneel-top, --paneel-hoogte en
+  // --paneel-afstand door zodat de Analyzer zijn halve scherm vult i.p.v.
+  // het hele scherm. Buiten split screen zijn de vars niet gezet en valt de
+  // berekening terug op 100dvh minus de navbalk-offset — exact het oude gedrag.
+  const kleefTop = `var(--paneel-top, ${topOffset}px)`
+  const paneelHoogte = `calc(var(--paneel-hoogte, 100dvh) - var(--paneel-afstand, ${topOffset}px))`
 
   const actievePlanId = planMeta?.id || selectedConceptId || null
 

@@ -10,6 +10,7 @@
 
 import { useState } from 'react'
 import { createPortal } from 'react-dom'
+import { useModalHost } from '../../../coach/ModalHost'
 import {
   Clock, Play, Pause, Square, Settings, Check, X, AlertCircle,
   Calendar, Hourglass,
@@ -71,6 +72,7 @@ function computePeriod(client) {
 }
 
 export default function CoachingPeriodPanel({ client, coachId, isMobile, onClientUpdate }) {
+  const modalHost = useModalHost()
   const [editing, setEditing] = useState(false)
   const [draftStart, setDraftStart] = useState(client.coaching_start_date || new Date().toISOString().split('T')[0])
   const [draftWeeks, setDraftWeeks] = useState(client.coaching_total_weeks || 12)
@@ -455,7 +457,7 @@ export default function CoachingPeriodPanel({ client, coachId, isMobile, onClien
             </div>
           </div>
         </div>,
-        document.body
+        modalHost
       )}
     </>
   )

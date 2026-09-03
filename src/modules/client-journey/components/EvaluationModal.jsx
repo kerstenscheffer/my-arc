@@ -2,6 +2,7 @@
 // v7.1 — client.target_calories als enige bron voor macro targets
 import React, { useState, useMemo, useEffect } from 'react'
 import { createPortal } from 'react-dom'
+import { useModalHost } from '../../../coach/ModalHost'
 import { X, Activity, Sliders, Check, AlertTriangle, Scale, Utensils, Dumbbell, ChevronDown, ChevronUp, Save, Camera, Flame, Plus, Minus } from 'lucide-react'
 
 const C = {
@@ -139,6 +140,7 @@ function MacroEditor({ targetKcal, initProtein, initCarbs, initFat, isMobile, on
 }
 
 export default function EvaluationModal({ isOpen, onClose, weekNumber, coachingPlan, weightHistory, journey, db, isMobile: iMP, onDataRefresh }) {
+  const modalHost = useModalHost()
   const isMobile = iMP ?? window.innerWidth <= 768
   const [showAdj, setShowAdj] = useState(false)
   const [showHist, setShowHist] = useState(false)
@@ -577,7 +579,7 @@ export default function EvaluationModal({ isOpen, onClose, weekNumber, coachingP
         </div>
       </div>
     </div>,
-    document.body
+    modalHost
   )
 }
 

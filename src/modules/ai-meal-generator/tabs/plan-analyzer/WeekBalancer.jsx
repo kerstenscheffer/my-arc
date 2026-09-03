@@ -4,6 +4,7 @@
 
 import React, { useState, useMemo } from 'react'
 import { createPortal } from 'react-dom'
+import { useModalHost } from '../../../../coach/ModalHost'
 import { X, Zap, Check, AlertTriangle, ChevronRight, TrendingDown, TrendingUp, Minus } from 'lucide-react'
 
 const DAYS_NL = ['Maandag', 'Dinsdag', 'Woensdag', 'Donderdag', 'Vrijdag', 'Zaterdag', 'Zondag']
@@ -172,6 +173,7 @@ function analyzeDayIssues(day, targets) {
 }
 
 export default function WeekBalancer({ weekData, targets, onApply, onClose, isMobile }) {
+  const modalHost = useModalHost()
   const [mode, setMode] = useState('smart') // 'smart' | 'scale' | 'perday'
   const [applied, setApplied] = useState(false)
   const [selectedDay, setSelectedDay] = useState(null)
@@ -666,5 +668,5 @@ export default function WeekBalancer({ weekData, targets, onApply, onClose, isMo
     </div>
   )
 
-  return createPortal(modal, document.body)
+  return createPortal(modal, modalHost)
 }

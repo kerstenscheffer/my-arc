@@ -5,6 +5,7 @@
 // guard tegen mobiele click-through (zelfde patroon als AddLeadModal).
 import { useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
+import { useModalHost } from '../../../../coach/ModalHost'
 import { X, Euro, Wallet, CalendarClock, Users, BookmarkCheck } from 'lucide-react'
 
 // Naam van de vaste partner (later aanpasbaar via localStorage).
@@ -13,6 +14,7 @@ const PARTNER_NAME = (() => {
 })()
 
 export default function SaleValueModal({ isMobile, leadName, partnerName = PARTNER_NAME, onSave, onClose }) {
+  const modalHost = useModalHost()
   const [value, setValue] = useState('')
   const [paymentType, setPaymentType] = useState('prepaid') // 'prepaid' | 'monthly'
   const [months, setMonths] = useState('12')
@@ -189,6 +191,6 @@ export default function SaleValueModal({ isMobile, leadName, partnerName = PARTN
         </div>
       </div>
     </div>,
-    document.body
+    modalHost
   )
 }

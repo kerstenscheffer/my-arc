@@ -3,6 +3,7 @@
 // Brand styling, createPortal, correcte page_context keys
 import React, { useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
+import { useModalHost } from '../../../coach/ModalHost'
 import {
   Edit, X, Globe, Camera, Image as ImageIcon, Check, Youtube,
   Home, Dumbbell, Utensils, ShoppingCart, Camera as TrackingIcon, Phone, User
@@ -30,6 +31,7 @@ export default function VideoEditModal({
   customCategories = [],
   db
 }) {
+  const modalHost = useModalHost()
   const [formData, setFormData] = useState({
     title: video.title || '',
     description: video.description || '',
@@ -694,6 +696,6 @@ export default function VideoEditModal({
         @keyframes vm-spin { to { transform: rotate(360deg); } }
       `}</style>
     </div>,
-    document.body
+    modalHost
   )
 }

@@ -7,6 +7,7 @@
 
 import { useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
+import { useModalHost } from '../../coach/ModalHost'
 import {
   Send, X, Check, AlertCircle, Bell, Clock, Loader2,
   Home, Dumbbell, Utensils, TrendingUp,
@@ -43,6 +44,7 @@ const PRIORITIES = [
 ]
 
 export default function SendNotificationModal({ open, onClose, client, db, coachId, isMobile = false }) {
+  const modalHost = useModalHost()
   const [title, setTitle] = useState('')
   const [message, setMessage] = useState('')
   const [priority, setPriority] = useState('normal')
@@ -490,7 +492,7 @@ export default function SendNotificationModal({ open, onClose, client, db, coach
     </div>
   )
 
-  return createPortal(modal, document.body)
+  return createPortal(modal, modalHost)
 }
 
 function formatAgo(date) {

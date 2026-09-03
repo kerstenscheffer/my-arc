@@ -3,9 +3,11 @@
 // een campagne-DM-knop die het campagne-bericht kopieert + het profiel opent.
 import { useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
+import { useModalHost } from '../../../coach/ModalHost'
 import { X, Megaphone, Send, Check, Plus, Pencil, Trash2 } from 'lucide-react'
 
 export default function StartCampaignModal({ leadService, coachId, isMobile = false, onSelect, onClose }) {
+  const modalHost = useModalHost()
   const [loading, setLoading] = useState(true)
   const [campaigns, setCampaigns] = useState([])
   const [creating, setCreating] = useState(false)
@@ -249,6 +251,6 @@ export default function StartCampaignModal({ leadService, coachId, isMobile = fa
         </div>
       </div>
     </div>,
-    document.body
+    modalHost
   )
 }

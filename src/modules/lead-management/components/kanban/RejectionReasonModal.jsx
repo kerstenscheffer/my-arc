@@ -4,6 +4,7 @@
 // + korte guard tegen mobiele click-through (zelfde patroon als SaleValueModal).
 import { useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
+import { useModalHost } from '../../../../coach/ModalHost'
 import { X, PhoneOff } from 'lucide-react'
 
 const PRESET_REASONS = [
@@ -14,6 +15,7 @@ const PRESET_REASONS = [
 ]
 
 export default function RejectionReasonModal({ isMobile, leadName, onSave, onClose }) {
+  const modalHost = useModalHost()
   const [selected, setSelected] = useState(null)
   const [other, setOther] = useState('')
   const [armed, setArmed] = useState(false)
@@ -73,6 +75,6 @@ export default function RejectionReasonModal({ isMobile, leadName, onSave, onClo
         </div>
       </div>
     </div>,
-    document.body
+    modalHost
   )
 }

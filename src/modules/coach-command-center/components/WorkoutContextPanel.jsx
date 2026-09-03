@@ -3,6 +3,7 @@
 
 import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { createPortal } from 'react-dom'
+import { useModalHost } from '../../../coach/ModalHost'
 import { Dumbbell, ChevronDown, ChevronRight, X, Minus, Maximize2, GripVertical, Check } from 'lucide-react'
 
 const DEFAULT_POS  = { x: window.innerWidth - 380, y: 80 }
@@ -103,6 +104,7 @@ const WORKOUT_SOP_STEPS = [
 ]
 
 export default function WorkoutContextPanel({ db, clientId, isMobile, isFloating = false, onClose }) {
+  const modalHost = useModalHost()
   const [cd, setCd]         = useState(null)
   const [wp, setWp]         = useState(null)
   const [journey, setJourney] = useState(null)
@@ -553,7 +555,7 @@ export default function WorkoutContextPanel({ db, clientId, isMobile, isFloating
     </div>
   )
 
-  if (isFloating) return createPortal(panelContent, document.body)
+  if (isFloating) return createPortal(panelContent, modalHost)
   return panelContent
 }
 

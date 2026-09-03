@@ -6,6 +6,7 @@
 // Elke keuze bubbelt via onOutcome(dc, kind, extra) naar de KanbanBoard.
 import { useState } from 'react'
 import { createPortal } from 'react-dom'
+import { useModalHost } from '../../../../coach/ModalHost'
 import { X, Phone, Check, XCircle, Trophy, CalendarClock, UserX, CalendarX } from 'lucide-react'
 
 const inp = (flex) => ({ flex, padding: '8px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.15)', background: '#1a1a1a', color: '#fff', fontSize: '0.85rem', boxSizing: 'border-box' })
@@ -74,6 +75,7 @@ function DueCallItem({ dc, onOutcome }) {
 }
 
 export default function DueCallsModal({ dueCalls, onOutcome, onClose }) {
+  const modalHost = useModalHost()
   const list = dueCalls || []
   return createPortal(
     <div style={{ position: 'fixed', inset: 0, zIndex: 100000, background: 'rgba(0,0,0,0.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
@@ -97,6 +99,6 @@ export default function DueCallsModal({ dueCalls, onOutcome, onClose }) {
         </div>
       </div>
     </div>,
-    document.body
+    modalHost
   )
 }

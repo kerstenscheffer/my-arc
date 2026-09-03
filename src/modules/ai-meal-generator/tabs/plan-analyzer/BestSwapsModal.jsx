@@ -5,6 +5,7 @@
 // (één rij per client + slot, meal_ids als uuid-array). Issue b6c60c21.
 import { useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
+import { useModalHost } from '../../../../coach/ModalHost'
 import { X, Search, Check, Plus, Loader2 } from 'lucide-react'
 
 const GOLD = '#FFD700'
@@ -28,6 +29,7 @@ const mealLabel = (m) => m.internal_name || m.name || 'Maaltijd'
 const emptySlots = () => ({ breakfast: [], lunch: [], dinner: [], snack: [], avondsnack: [], pre_workout: [] })
 
 export default function BestSwapsModal({ clientId, db, isMobile, onClose, embedded = false }) {
+  const modalHost = useModalHost()
   // Twee niveaus:
   //   'default' → coach_swap_defaults, geldt voor ÁL je klanten
   //   'client'  → client_swap_options, uitzondering voor deze ene klant
@@ -364,5 +366,5 @@ export default function BestSwapsModal({ clientId, db, isMobile, onClose, embedd
   if (embedded) return (
     <div style={{ position: 'relative', width: '100%', height: '100%', transform: 'translateZ(0)', overflow: 'hidden' }}>{modal}</div>
   )
-  return createPortal(modal, document.body)
+  return createPortal(modal, modalHost)
 }

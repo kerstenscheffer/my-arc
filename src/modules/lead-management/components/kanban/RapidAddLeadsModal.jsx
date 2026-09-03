@@ -10,6 +10,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
+import { useModalHost } from '../../../../coach/ModalHost'
 import { X, Send, FileText, Zap, RotateCcw, ArrowRight, CornerDownLeft, Check, ChevronDown, Plus } from 'lucide-react'
 
 const GOLD = '#FFD700'
@@ -22,6 +23,7 @@ export default function RapidAddLeadsModal({
   existingNames,
   onAdded, onRemoved,
 }) {
+  const modalHost = useModalHost()
   const normName = (v) => (v || '').toString().trim().toLowerCase().replace(/^@+/, '')
   const [mode, setMode] = useState(null)          // 'campaign' | 'magnet' | null
   const [magnets, setMagnets] = useState([])      // gerangschikt: meest gebruikt eerst
@@ -486,7 +488,7 @@ export default function RapidAddLeadsModal({
     </div>
   )
 
-  return createPortal(sheet, document.body)
+  return createPortal(sheet, modalHost)
 }
 
 function ChoiceBtn({ icon, title, sub, onClick }) {

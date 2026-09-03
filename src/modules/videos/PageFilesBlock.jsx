@@ -7,6 +7,7 @@
 
 import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
+import { useModalHost } from '../../coach/ModalHost'
 import { FileText, Download, X } from 'lucide-react'
 import fileService from './FileService'
 
@@ -18,6 +19,7 @@ const formatBytes = (b) => {
 }
 
 export default function PageFilesBlock({ pageContext, isMobile = false }) {
+  const modalHost = useModalHost()
   const [files, setFiles] = useState([])
   const [loading, setLoading] = useState(true)
   const [viewing, setViewing] = useState(null)
@@ -182,7 +184,7 @@ export default function PageFilesBlock({ pageContext, isMobile = false }) {
             }}
           />
         </div>,
-        document.body
+        modalHost
       )}
     </>
   )

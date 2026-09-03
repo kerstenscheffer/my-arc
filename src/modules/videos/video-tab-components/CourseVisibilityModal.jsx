@@ -8,6 +8,7 @@
 // cursussen aan losse personen toewijzen gebeurt via de "Toewijzen"-knop.
 import React, { useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
+import { useModalHost } from '../../../coach/ModalHost'
 import { X, Globe, Check, PlayCircle, Home, Dumbbell, Utensils, ShoppingCart, Camera, Phone, User, GraduationCap } from 'lucide-react'
 import useIsMobile from '../../../hooks/useIsMobile'
 import videoService from '../VideoService'
@@ -36,6 +37,7 @@ const normalizePages = (arr) => {
 }
 
 export default function CourseVisibilityModal({ course, onClose, onSaved }) {
+  const modalHost = useModalHost()
   const isMobile = useIsMobile()
   const [pages, setPages] = useState([])
   const [showInSlider, setShowInSlider] = useState(false)
@@ -150,6 +152,6 @@ export default function CourseVisibilityModal({ course, onClose, onSaved }) {
         </div>
       </div>
     </div>,
-    document.body
+    modalHost
   )
 }

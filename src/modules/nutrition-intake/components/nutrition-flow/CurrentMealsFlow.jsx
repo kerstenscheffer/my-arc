@@ -147,7 +147,7 @@ export default function CurrentMealsFlow({ data, onChange, onNext, onBack, isMob
     <div style={{ padding: isMobile ? '1.5rem 1rem 2.5rem' : '2rem 1.25rem 3rem' }}>
       {onBack && <BackBtn onBack={onBack} />}
 
-      <Q isMobile={isMobile}>Wat eet je op een typische dag?</Q>
+      <Q isMobile={isMobile}>Wat eet je nu op dagelijkse basis?</Q>
       <Hint isMobile={isMobile}>
         Vul per maaltijdmoment in wat je normaal eet — zo vrij als je wil. Dit helpt je coach je huidige gewoonten begrijpen. Gebruik de suggesties als je inspiratie nodig hebt.
       </Hint>

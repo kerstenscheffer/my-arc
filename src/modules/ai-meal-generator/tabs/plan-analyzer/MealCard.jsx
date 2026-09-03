@@ -7,6 +7,7 @@
 
 import React, { useState, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
+import { useModalHost } from '../../../../coach/ModalHost'
 import { Shuffle, Trash2, Plus, Scale, Pencil, CalendarDays } from 'lucide-react'
 import MealEditModal from './MealEditModal'
 
@@ -72,6 +73,7 @@ export default function MealCard({
   db, meal, slot, dayIndex, mealSchedule, isPreWorkout,
   isEmpty, onSwap, onDelete, onAdd, onUpdateMeal, onApplyToDays, conflicts, isMobile,
 }) {
+  const modalHost = useModalHost()
   const [expanded, setExpanded] = useState(false)
   const [showScaler, setShowScaler]   = useState(false)
   const [showEditModal, setShowEditModal] = useState(false)
@@ -333,7 +335,7 @@ export default function MealCard({
                   })}
                 </div>
               </>,
-              document.body
+              modalHost
             )}
             <span style={{ flex: 1 }} />
             {editingTiming ? (

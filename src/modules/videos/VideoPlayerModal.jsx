@@ -3,11 +3,13 @@
 
 import React, { useState, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
+import { useModalHost } from '../../coach/ModalHost'
 import { X, Star, Play, ExternalLink } from 'lucide-react'
 import clientVideoService from './ClientVideoService'
 import { extractYouTubeId, getYouTubeEmbedUrl, getZoomEmbedUrl, getInstagramEmbedUrl, getBronMeta } from './utils/youtubeHelpers'
 
 export default function VideoPlayerModal({ item, onClose }) {
+  const modalHost = useModalHost()
   const [rating, setRating] = useState(item?.client_rating || 0)
   const [hoverRating, setHoverRating] = useState(0)
   const openTimeRef = useRef(Date.now())
@@ -288,6 +290,6 @@ export default function VideoPlayerModal({ item, onClose }) {
         </div>
       </div>
     </div>,
-    document.body
+    modalHost
   )
 }
