@@ -211,7 +211,7 @@ function TimeGrid({ options, value, value2, onChange, onChange2, isMobile }) {
 
 // ── Hoofd Component ───────────────────────────────────────────────────────────
 
-export default function WeekBuilder({ data, onChange, onComplete, isMobile }) {
+export default function WeekBuilder({ data, onChange, onComplete, onBack, isMobile }) {
 
   // ── Navigatie ──
   const [step,    setStep]    = useState('sleep_time')
@@ -407,6 +407,9 @@ export default function WeekBuilder({ data, onChange, onComplete, isMobile }) {
 
     if (step === 'sleep_time') return (
       <>
+        {/* Eerste stap van de weekagenda: terug betekent hier de vórige vraag
+            uit het leefstijl-blok, niet een stap binnen de agenda. */}
+        <BackBtn onBack={onBack} />
         <Q isMobile={isMobile}>Hoe laat ga je slapen?</Q>
         <TimeGrid options={SLEEP_OPTIONS} value={sleepTime} value2={sleepTime2} onChange={setSleepTime} onChange2={setSleepTime2} isMobile={isMobile} />
         <NextBtn onClick={() => go('wake_time')} disabled={!sleepTime} isMobile={isMobile} />

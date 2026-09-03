@@ -55,9 +55,12 @@ export default function LifestyleFlow({ data, onChange, onNext, onBack, isMobile
 
       case 'week_builder':
         return <>
-          <BackBtn onBack={goBack} />
+          {/* Geen eigen terug-knop hier: de WeekBuilder heeft er per stap al
+              een, en die van hier zou je uit de hele agenda gooien. Vanaf de
+              eerste stap geeft hij 'm via onBack aan ons door. */}
           <WeekBuilder
             data={data}
+            onBack={goBack}
             onChange={fields => updateMultiple(fields)}
             onComplete={result => {
               updateMultiple(result)
