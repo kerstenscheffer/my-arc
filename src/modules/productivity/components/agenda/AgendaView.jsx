@@ -346,9 +346,13 @@ export default function AgendaView({
     unscheduledTasks.forEach(t => { const k = t.section_id || 'geen'; telling[k] = (telling[k] || 0) + 1 })
     return [
       { id: 'all', title: 'Alles', color: '#FFD700', aantal: unscheduledTasks.length },
+      // Alle secties tonen, ook de lege. Ze eruit filteren zodra ze leeg zijn
+      // laat de rail per dag van samenstelling veranderen: een sectie waar je
+      // net alles van hebt ingepland verdwijnt, en dan lijkt hij weg. Leeg
+      // wordt gedimd getoond met een 0.
       ...(sections || [])
-        .filter(sec => sec.id !== 'unassigned' && telling[sec.id])
-        .map(sec => ({ id: sec.id, title: sec.title, color: sec.color || '#10b981', aantal: telling[sec.id] })),
+        .filter(sec => sec.id !== 'unassigned')
+        .map(sec => ({ id: sec.id, title: sec.title, color: sec.color || '#10b981', aantal: telling[sec.id] || 0 })),
       ...(telling.geen ? [{ id: 'geen', title: 'Overig', color: 'rgba(255,255,255,0.6)', aantal: telling.geen }] : []),
     ]
   }, [unscheduledTasks, sections])
@@ -373,6 +377,7 @@ export default function AgendaView({
         <div style={{ fontSize: '0.5rem', fontWeight: 800, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.3)', padding: '0 0.3rem 0.35rem' }}>Secties</div>
         {railItems.map(item => {
           const aan = railFilter === item.id
+          const leeg = item.aantal === 0
           return (
             <button key={item.id} onClick={() => setRailFilter(item.id)} title={item.title}
               style={{
@@ -383,9 +388,9 @@ export default function AgendaView({
                 cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit',
                 touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
               }}>
-              <span style={{ flexShrink: 0, width: 7, height: 7, borderRadius: '50%', background: item.color }} />
-              <span style={{ flex: 1, minWidth: 0, fontSize: '0.68rem', fontWeight: aan ? 800 : 600, color: aan ? '#FFD700' : 'rgba(255,255,255,0.7)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.title}</span>
-              <span style={{ flexShrink: 0, fontSize: '0.56rem', fontWeight: 800, color: aan ? '#FFD700' : 'rgba(255,255,255,0.35)' }}>{item.aantal}</span>
+              <span style={{ flexShrink: 0, width: 7, height: 7, borderRadius: '50%', background: item.color, opacity: leeg ? 0.35 : 1 }} />
+              <span style={{ flex: 1, minWidth: 0, fontSize: '0.68rem', fontWeight: aan ? 800 : 600, color: aan ? '#FFD700' : leeg ? 'rgba(255,255,255,0.32)' : 'rgba(255,255,255,0.7)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.title}</span>
+              <span style={{ flexShrink: 0, fontSize: '0.56rem', fontWeight: 800, color: aan ? '#FFD700' : leeg ? 'rgba(255,255,255,0.18)' : 'rgba(255,255,255,0.35)' }}>{item.aantal}</span>
             </button>
           )
         })}
