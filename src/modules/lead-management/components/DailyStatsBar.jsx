@@ -69,7 +69,6 @@ export default function DailyStatsBar({
   dailyGoal = 100,
   onExportPDF
 }) {
-  const modalHost = useModalHost()
   const [isExpanded, setIsExpanded] = useState(false)
   const [showSOP, setShowSOP] = useState(false)
   const [showWeek, setShowWeek] = useState(false)
@@ -439,6 +438,7 @@ function StatCard({ icon, label, value, highlight = false, progress = null, subt
 // SOP MODAL
 // ============================================
 export function SOPModal({ isMobile, onClose }) {
+  const modalHost = useModalHost()
   const [checkedSteps, setCheckedSteps] = useState({})
   const [collapsedPhases, setCollapsedPhases] = useState(() => {
     const initial = {}

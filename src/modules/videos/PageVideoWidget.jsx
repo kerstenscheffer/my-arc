@@ -35,7 +35,6 @@ const isYouTubeShort = (url) => {
 }
 
 export default function PageVideoWidget({ client, db, pageContext = 'home', open: openProp, onOpenChange, onCountChange }) {
-  const modalHost = useModalHost()
   const controlled = typeof openProp === 'boolean' && typeof onOpenChange === 'function'
   const [videos, setVideos] = useState([])
   const [filesCount, setFilesCount] = useState(0)
@@ -660,6 +659,7 @@ function VideoCard({ item, isLocallyViewed, onClick, isMobile }) {
 // FIX: onWatched callback fires maar triggert GEEN reload meer in parent
 // ============================================
 function FullscreenPlayer({ item, onClose, onWatched, onCompleted }) {
+  const modalHost = useModalHost()
   const YT_PLAYER_ID = 'pvw-yt-player'
   const markedRef = useRef(false)
   const isMobile = window.innerWidth <= 768

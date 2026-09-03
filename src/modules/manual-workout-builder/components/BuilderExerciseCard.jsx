@@ -34,7 +34,6 @@ const EQUIPMENT_OPTIONS = [
 export default function BuilderExerciseCard({
   exercise, index, total, isMobile, db, client, onField, onMove, onDelete, onVideo,
 }) {
-  const modalHost = useModalHost()
   const { imageUrl, loadingImage, hasVideo } = useExerciseImage(exercise, db, client)
   const photoSize = isMobile ? 52 : 62
   const hasVid = hasVideo || !!exercise.video_url
@@ -164,6 +163,7 @@ export default function BuilderExerciseCard({
 // je een oefening opende. Default op [] zodat de datalist ook werkt voordat de
 // lijst geladen is.
 function ExerciseEditModal({ exercise, isCardio, isMobile, hasVid, onField, onVideo, onClose, coachEquip = [] }) {
+  const modalHost = useModalHost()
   const [cardioMenu, setCardioMenu] = useState(false)
   const label = { fontSize: '0.6rem', fontWeight: 800, letterSpacing: '0.05em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.4)', marginBottom: 5, display: 'block' }
   const input = { width: '100%', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 8, color: '#fff', fontSize: '0.85rem', fontWeight: 600, padding: '0.55rem 0.7rem', outline: 'none', fontFamily: 'inherit' }

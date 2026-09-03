@@ -330,6 +330,6 @@ export default function ExerciseVideoEditor({
         </div>
       </div>
     </div>,
-    document.body,
+    modalHost,
   )
 }

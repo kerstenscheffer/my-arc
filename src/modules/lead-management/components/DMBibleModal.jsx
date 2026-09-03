@@ -728,7 +728,7 @@ export default function DMBibleModal({ isMobile = false, db = null, coachId = nu
         }
       `}</style>
     </button>,
-    document.body,
+    modalHost,
   ) : null
 
   const trigger = triggerVariant === 'inline' ? inlineTrigger : fab
@@ -1512,6 +1512,6 @@ export default function DMBibleModal({ isMobile = false, db = null, coachId = nu
           </span>
         </div>
     </div>,
-    document.body,
+    modalHost,
   )
 }

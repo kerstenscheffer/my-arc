@@ -15,11 +15,11 @@ export default function SelectMealModal({
   slotNumber,
   isMobile 
 }) {
+  const modalHost = useModalHost()
   console.log('🎨 [SelectMealModal] Rendering with Portal')
   console.log('📋 [SelectMealModal] Props:', { isOpen, mealsCount: meals?.length, category, slotNumber })
 
   useEffect(() => {
-  const modalHost = useModalHost()
     if (isOpen) {
       console.log('✅ [SelectMealModal] Modal opened via Portal')
       // Prevent body scroll when modal is open

@@ -97,7 +97,6 @@ const fmtLastRun = (iso) => {
 }
 
 export default function ScheduledNotifications({ db, coachId, isMobile }) {
-  const modalHost = useModalHost()
   const [rules, setRules] = useState([])
   const [counts, setCounts] = useState({})   // schedule_id → aantal verzonden
   const [loading, setLoading] = useState(true)
@@ -275,6 +274,7 @@ export default function ScheduledNotifications({ db, coachId, isMobile }) {
 }
 
 function RuleEditor({ db, isMobile, rule, onClose, onSave }) {
+  const modalHost = useModalHost()
   const [draft, setDraft] = useState(rule)
   const [saving, setSaving] = useState(false)
   const [err, setErr] = useState(null)

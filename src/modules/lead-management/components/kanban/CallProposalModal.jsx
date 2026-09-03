@@ -265,6 +265,6 @@ export default function CallProposalModal({
         </div>
       </div>
     </div>,
-    document.body,
+    modalHost,
   )
 }
