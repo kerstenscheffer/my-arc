@@ -346,6 +346,11 @@ export default function PlanAnalyzer({
   // --paneel-afstand door zodat de Analyzer zijn halve scherm vult i.p.v.
   // het hele scherm. Buiten split screen zijn de vars niet gezet en valt de
   // berekening terug op 100dvh minus de navbalk-offset — exact het oude gedrag.
+  // Ruimte voor de zwevende navbalk. Buiten split screen loopt de kolom tot
+  // de onderrand en moet die ruimte er als padding bij. In split screen heeft
+  // de strook 'm al afgetrokken van de hoogte — er dan nóg eens 105px bij
+  // zetten laat onderin elke helft een lege band achter.
+  const navRuimte = `var(--paneel-navruimte, ${ZWEVENDE_NAV_HOOGTE}px)`
   const kleefTop = `var(--paneel-top, ${topOffset}px)`
   const paneelHoogte = `calc(var(--paneel-hoogte, 100dvh) - var(--paneel-afstand, ${topOffset}px))`
 
@@ -893,7 +898,7 @@ export default function PlanAnalyzer({
         borderRight: '1px solid rgba(255,255,255,0.05)',
         display: 'flex', flexDirection: 'column', alignItems: 'center',
         padding: '10px 0', gap: 6,
-        paddingBottom: ZWEVENDE_NAV_HOOGTE,
+        paddingBottom: navRuimte,
         overflowY: 'auto', WebkitOverflowScrolling: 'touch',
         // Meescrollen met de pagina, niet mee naar beneden verdwijnen —
         // en beginnen onder de tabbalk, niet eronder verdwijnen.
@@ -1018,7 +1023,7 @@ export default function PlanAnalyzer({
           borderRight: '1px solid rgba(255,255,255,0.06)',
           // Het paneel loopt tot onderaan, maar de inhoud (incl. de
           // opslaan-knop onderin) blijft boven de zwevende navbalk.
-          paddingBottom: ZWEVENDE_NAV_HOOGTE,
+          paddingBottom: navRuimte,
           transform: 'translateZ(0)', overflow: 'hidden',
           display: 'flex', flexDirection: 'column',
           // Het paneel groeide mee met de pagina, waardoor de opslaan-knop
@@ -1330,7 +1335,7 @@ export default function PlanAnalyzer({
                 laatste maaltijdkaart eronder. */}
             <div style={{
               flex: 1, overflowY: 'auto', WebkitOverflowScrolling: 'touch',
-              minWidth: 0, paddingBottom: ZWEVENDE_NAV_HOOGTE,
+              minWidth: 0, paddingBottom: navRuimte,
             }}>
               <MacroHero
                 consumed={{

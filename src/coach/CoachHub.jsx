@@ -944,7 +944,9 @@ export default function CoachHub() {
                 kant="links"
               />
               <div style={{ flex: 1, minWidth: 0, overflow: 'auto', WebkitOverflowScrolling: 'touch',
-                '--paneel-hoogte': '100%', '--paneel-afstand': '0px', '--paneel-top': '0px' }}>
+                '--paneel-hoogte': '100%', '--paneel-afstand': '0px', '--paneel-top': '0px',
+                // De strook trok de navbalk-ruimte al van z'n hoogte af.
+                '--paneel-navruimte': '0px' }}>
                 <ModalHostProvider value={hostLinks}>{renderTabContent(activeTab)}</ModalHostProvider>
               </div>
             </div>
@@ -975,7 +977,9 @@ export default function CoachHub() {
                 kant="rechts"
               />
               <div style={{ flex: 1, minWidth: 0, overflow: 'auto', WebkitOverflowScrolling: 'touch',
-                '--paneel-hoogte': '100%', '--paneel-afstand': '0px', '--paneel-top': '0px' }}>
+                '--paneel-hoogte': '100%', '--paneel-afstand': '0px', '--paneel-top': '0px',
+                // De strook trok de navbalk-ruimte al van z'n hoogte af.
+                '--paneel-navruimte': '0px' }}>
                 <ModalHostProvider value={hostRechts}>{renderTabContent(splitTab)}</ModalHostProvider>
               </div>
             </div>
