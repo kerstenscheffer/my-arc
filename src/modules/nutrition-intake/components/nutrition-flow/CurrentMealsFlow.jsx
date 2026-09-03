@@ -1,8 +1,9 @@
 // src/modules/nutrition-intake/components/nutrition-flow/CurrentMealsFlow.jsx
 // Stap 0: Huidige eetgewoonten — wat eet je op een typische dag?
 // Vaste structuur (4 slots) met toevoeg-optie, vrije tekst + suggesties
-import React, { useState, useRef, useEffect } from 'react'
-import { Q, Hint, NextBtn, BackBtn } from '../../../public-intake/components/phase1/FlowStep'
+import React, { useState, useRef } from 'react'
+import { createPortal } from 'react-dom'
+import { Q, Hint, NextBtn } from '../../../public-intake/components/phase1/FlowStep'
 
 const vrijVeld = (isMobile) => ({
   width: '100%', boxSizing: 'border-box',
@@ -42,44 +43,89 @@ const BASE_SLOTS = [
 ]
 
 
-// Voorbeeld van wat een bruikbare screenshot laat zien: naam, kcal en de drie
-// macro's. Als kaart in de pagina i.p.v. een plaatje — scherp op elk scherm,
-// geen asset om kwijt te raken, en hij volgt vanzelf de stijl van de app.
-function ScreenshotVoorbeeld({ isMobile }) {
+// Voorbeeld naast de screenshot-knop: een tegel van hetzelfde formaat als een
+// geüploade screenshot, met "voorbeeld" erop. Tikken vergroot 'm. Verdwijnt
+// zodra er een echte screenshot staat — dan snapt de klant het al.
+//
+// Bewust nagebouwd in plaats van een plaatje: scherp op elk scherm, geen
+// bestand dat zoekraakt, en het volgt vanzelf de stijl van de app.
+function VoorbeeldKaart({ isMobile, groot }) {
   const macro = (waarde, label) => (
     <span style={{ display: 'inline-flex', alignItems: 'baseline', gap: 3 }}>
-      <span style={{ fontSize: isMobile ? '0.9rem' : '0.95rem', fontWeight: 900, color: '#fff' }}>{waarde}</span>
-      <span style={{ fontSize: '0.55rem', fontWeight: 800, color: 'rgba(255,255,255,0.35)', letterSpacing: '0.06em' }}>{label}</span>
+      <span style={{ fontSize: groot ? (isMobile ? '1.3rem' : '1.5rem') : '0.42rem', fontWeight: 900, color: '#fff' }}>{waarde}</span>
+      <span style={{ fontSize: groot ? '0.6rem' : '0.24rem', fontWeight: 800, color: 'rgba(255,255,255,0.35)', letterSpacing: '0.06em' }}>{label}</span>
     </span>
   )
   return (
-    <div style={{ marginBottom: '0.9rem' }}>
-      <div style={{ fontSize: '0.7rem', fontWeight: 800, color: 'rgba(255,255,255,0.45)', marginBottom: '0.4rem' }}>
-        Dit is wat ik graag zie:
-      </div>
+    <div style={{
+      border: '1px solid rgba(255,255,255,0.12)',
+      background: 'linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.02))',
+      padding: groot ? (isMobile ? '1rem 1.1rem' : '1.2rem 1.3rem') : '4px 5px',
+      width: groot ? 'min(340px, 88vw)' : undefined,
+      height: groot ? undefined : '100%',
+      display: 'flex', flexDirection: 'column', justifyContent: 'center',
+      boxSizing: 'border-box', overflow: 'hidden',
+    }}>
       <div style={{
-        border: '1px solid rgba(255,255,255,0.12)',
-        background: 'linear-gradient(180deg, rgba(255,255,255,0.05), rgba(255,255,255,0.02))',
-        padding: isMobile ? '0.7rem 0.8rem' : '0.8rem 0.9rem',
-        maxWidth: 320,
+        fontSize: groot ? (isMobile ? '1rem' : '1.1rem') : '0.34rem',
+        fontWeight: 900, color: '#fff', letterSpacing: '-0.01em',
+        marginBottom: groot ? '0.55rem' : '2px', lineHeight: 1.15,
       }}>
-        <div style={{ fontSize: isMobile ? '0.9rem' : '0.95rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.01em', marginBottom: '0.45rem' }}>
-          Kwark met bosvruchten
-        </div>
-        <div style={{ display: 'flex', gap: isMobile ? 10 : 14, flexWrap: 'wrap' }}>
-          {macro(380, 'KCAL')}
-          {macro(61, 'EIWIT')}
-          {macro(25, 'KOOLH')}
-          {macro(3, 'VET')}
-        </div>
-        <div style={{ marginTop: '0.5rem', paddingTop: '0.45rem', borderTop: '1px solid rgba(255,255,255,0.08)', fontSize: '0.7rem', color: 'rgba(255,255,255,0.4)', lineHeight: 1.5 }}>
+        Kwark met bosvruchten
+      </div>
+      <div style={{ display: 'flex', gap: groot ? (isMobile ? 12 : 16) : 3, flexWrap: 'wrap' }}>
+        {macro(380, 'KCAL')}{macro(61, 'EIWIT')}{macro(25, 'KOOLH')}{macro(3, 'VET')}
+      </div>
+      {groot && (
+        <div style={{ marginTop: '0.6rem', paddingTop: '0.5rem', borderTop: '1px solid rgba(255,255,255,0.08)', fontSize: '0.75rem', color: 'rgba(255,255,255,0.45)', lineHeight: 1.5 }}>
           Magere kwark 500g · Bosvruchten 100g
         </div>
-      </div>
-      <div style={{ fontSize: '0.68rem', color: 'rgba(255,255,255,0.35)', marginTop: '0.4rem', lineHeight: 1.5 }}>
-        Naam, calorieën en de macro's. Hoeveelheden erbij is helemaal top.
-      </div>
+      )}
     </div>
+  )
+}
+
+function VoorbeeldTegel({ isMobile }) {
+  const [open, setOpen] = useState(false)
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        title="Voorbeeld van een bruikbare screenshot"
+        style={{
+          position: 'relative', width: 42, height: 42, padding: 0,
+          border: '1px dashed rgba(255,255,255,0.3)', background: 'none',
+          cursor: 'zoom-in', flexShrink: 0,
+        }}
+      >
+        <VoorbeeldKaart isMobile={isMobile} />
+        <span style={{
+          position: 'absolute', left: 0, right: 0, bottom: 0,
+          background: 'rgba(0,0,0,0.75)', color: 'rgba(255,255,255,0.75)',
+          fontSize: '0.42rem', fontWeight: 900, letterSpacing: '0.06em',
+          textTransform: 'uppercase', padding: '1px 0',
+        }}>voorbeeld</span>
+      </button>
+
+      {open && createPortal(
+        <div onClick={() => setOpen(false)} style={{
+          position: 'fixed', inset: 0, zIndex: 2147483600,
+          background: 'rgba(0,0,0,0.94)', display: 'flex', flexDirection: 'column',
+          alignItems: 'center', justifyContent: 'center', gap: '0.9rem',
+          padding: '1.5rem', cursor: 'zoom-out',
+        }}>
+          <div style={{ fontSize: '1rem', fontWeight: 900, color: '#fff', textAlign: 'center' }}>
+            Dit wil ik graag zien
+          </div>
+          <VoorbeeldKaart isMobile={isMobile} groot />
+          <div style={{ fontSize: '0.8rem', color: 'rgba(255,255,255,0.5)', textAlign: 'center', lineHeight: 1.55, maxWidth: 300 }}>
+            Naam, calorieën en de macro's. Staan de hoeveelheden erbij, helemaal top.
+          </div>
+        </div>,
+        document.body
+      )}
+    </>
   )
 }
 
@@ -181,6 +227,7 @@ function MealSlot({
           <input type="file" accept="image/*" multiple disabled={uploaden} style={{ display: 'none' }}
             onChange={e => { const f = [...(e.target.files || [])]; e.target.value = ''; if (f.length) onShots?.(f) }} />
         </label>
+        {shots.length === 0 && <VoorbeeldTegel isMobile={isMobile} />}
         {shots.map((u, i) => (
           <div key={i} style={{ position: 'relative' }}>
             <img src={u} alt="" style={{ width: 42, height: 42, objectFit: 'cover', border: '1px solid rgba(255,255,255,0.15)', display: 'block' }} />
@@ -314,8 +361,6 @@ export default function CurrentMealsFlow({ data, onChange, onNext, onBack, isMob
       </Hint>
 
       <div style={{ marginTop: '1.25rem' }}>
-        <ScreenshotVoorbeeld isMobile={isMobile} />
-
         {BASE_SLOTS.map(slot => (
           <MealSlot
             key={slot.key}
