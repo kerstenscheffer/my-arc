@@ -138,6 +138,10 @@ function flattenNp(np) {
   put('intake_supps_huidige', sp.huidige)
   put('intake_wat_werkt_goed', np.wat_werkt_goed)
   put('intake_eerder_geprobeerd', (np.current_habits || {}).eerder_geprobeerd)
+  // Wat er per maaltijdmoment goed werkt, op één regel per moment.
+  put('intake_werkt_per_moment', Object.entries((np.current_habits || {}).per_moment || {})
+    .map(([k, v]) => (v?.werkt_goed ? `${k}: ${v.werkt_goed}` : null))
+    .filter(Boolean).join('\n') || null)
   put('intake_voeding_screenshots', np.voeding_screenshots)
   put('intake_cheat', cm.frequency)
   put('intake_sociaal', cm.social_frequency)
@@ -378,7 +382,7 @@ const PART2_SECTIONS = [
     fields: [
       { key: 'intake_supps', label: 'Supplementen', fmt: fmtMap(N.supps) },
       { key: 'intake_supps_huidige', label: 'Slikt nu' },
-      { key: 'intake_wat_werkt_goed', label: 'Werkt goed volgens klant' },
+      { key: 'intake_werkt_per_moment', label: 'Werkt goed — per moment' },
       { key: 'intake_eerder_geprobeerd', label: 'Al geprobeerd' },
       { key: 'intake_cheat', label: 'Cheat meals', fmt: fmtMap(N.cheat) },
       { key: 'intake_sociaal', label: 'Buiten de deur eten', fmt: fmtMap(N.social) }

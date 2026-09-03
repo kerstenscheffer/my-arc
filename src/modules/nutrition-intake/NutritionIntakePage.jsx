@@ -88,6 +88,15 @@ function mapToNutritionPreferences(flowData) {
         flowData[`current_meals_extra_${i}`] || null
       ).filter(Boolean),
       eerder_geprobeerd: flowData.eerder_geprobeerd || null,
+      // Per maaltijdmoment: wat er goed aan werkt, en de screenshots die
+      // erbij horen. Zo weet de coach van welke maaltijd hij naar de
+      // getallen kijkt in plaats van naar een losse stapel plaatjes.
+      per_moment: ['ontbijt', 'lunch', 'diner', 'snack'].reduce((acc, k) => {
+        const werkt = flowData[`current_meals_${k}_werkt`] || null
+        const shots = flowData[`current_meals_${k}_shots`] || []
+        if (werkt || shots.length) acc[k] = { werkt_goed: werkt, screenshots: shots }
+        return acc
+      }, {}),
     },
     supplement_preferences: {
       openness: flowData.supps_openheid || null,
@@ -98,7 +107,11 @@ function mapToNutritionPreferences(flowData) {
     // Kolommen op nutrition_preferences zelf (niet genest): screenshots uit
     // een voedingsapp en wat er volgens de klant al goed werkt.
     voeding_screenshots: flowData.voeding_screenshots || [],
-    wat_werkt_goed: flowData.wat_werkt_goed || null,
+    // Samenvatting van de per-moment antwoorden. Het losse globale veld is
+    // vervallen; de kolom blijft bestaan zodat de coach-modal niet verandert.
+    wat_werkt_goed: ['ontbijt', 'lunch', 'diner', 'snack']
+      .map(k => { const v = flowData[`current_meals_${k}_werkt`]; return v ? `${k}: ${v}` : null })
+      .filter(Boolean).join(' · ') || null,
     cheat_meals: {
       frequency:        flowData.cheat_aanpak || null,
       social_frequency: flowData.sociaal_eten || null,

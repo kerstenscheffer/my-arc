@@ -41,7 +41,10 @@ const BASE_SLOTS = [
   { key: 'snack',   label: 'Snack',      placeholder: 'Bijv: kwark met fruit' },
 ]
 
-function MealSlot({ slotKey, label, placeholder, value, onChange, isMobile, removable, onRemove }) {
+function MealSlot({
+  slotKey, label, placeholder, value, onChange, isMobile, removable, onRemove,
+  shots = [], onShots, werktGoed, onWerktGoed, uploaden,
+}) {
   const [showSuggestions, setShowSuggestions] = useState(false)
   const inputRef = useRef(null)
   const suggestions = SUGGESTIONS[slotKey] || SUGGESTIONS.snack
@@ -72,7 +75,7 @@ function MealSlot({ slotKey, label, placeholder, value, onChange, isMobile, remo
           value={value || ''}
           onChange={e => onChange(e.target.value)}
           placeholder={placeholder}
-          rows={2}
+          rows={1}
           style={{
             width: '100%', boxSizing: 'border-box',
             padding: isMobile ? '0.7rem 0.85rem' : '0.75rem 0.9rem',
@@ -120,6 +123,52 @@ function MealSlot({ slotKey, label, placeholder, value, onChange, isMobile, remo
           ))}
         </div>
       )}
+
+      {/* Screenshot uit een tracking-app hoort bij dít moment, niet bij de
+          hele dag: zo weet je van welke maaltijd je naar de getallen kijkt. */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: '0.45rem', flexWrap: 'wrap' }}>
+        <label style={{
+          display: 'inline-flex', alignItems: 'center', gap: 5,
+          padding: '0.4rem 0.7rem', minHeight: 36,
+          background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.18)',
+          color: 'rgba(255,255,255,0.7)', fontSize: '0.68rem', fontWeight: 800,
+          cursor: uploaden ? 'wait' : 'pointer', fontFamily: 'inherit',
+          touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+        }}>
+          {uploaden ? 'Bezig…' : '+ Screenshot'}
+          <input type="file" accept="image/*" multiple disabled={uploaden} style={{ display: 'none' }}
+            onChange={e => { const f = [...(e.target.files || [])]; e.target.value = ''; if (f.length) onShots?.(f) }} />
+        </label>
+        {shots.map((u, i) => (
+          <div key={i} style={{ position: 'relative' }}>
+            <img src={u} alt="" style={{ width: 42, height: 42, objectFit: 'cover', border: '1px solid rgba(255,255,255,0.15)', display: 'block' }} />
+            <button onClick={() => onShots?.(null, i)} style={{
+              position: 'absolute', top: -6, right: -6, width: 18, height: 18, borderRadius: '50%',
+              background: '#0a0a0a', border: '1px solid rgba(255,255,255,0.3)', color: '#fff',
+              fontSize: '0.65rem', lineHeight: 1, cursor: 'pointer', padding: 0,
+            }}>×</button>
+          </div>
+        ))}
+      </div>
+
+      {/* Wat werkt er al bij dit moment — je wil weten wat je moet behouden. */}
+      <div style={{ marginTop: '0.55rem' }}>
+        <div style={{ fontSize: '0.7rem', fontWeight: 800, color: 'rgba(255,255,255,0.45)', marginBottom: '0.25rem' }}>
+          Wat werkt goed?
+        </div>
+        <input
+          value={werktGoed || ''}
+          onChange={e => onWerktGoed?.(e.target.value)}
+          placeholder="Bijv: hier heb ik de hele ochtend genoeg aan"
+          style={{
+            width: '100%', boxSizing: 'border-box',
+            padding: isMobile ? '0.55rem 0.75rem' : '0.6rem 0.8rem',
+            fontSize: isMobile ? '0.8rem' : '0.82rem',
+            background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.1)',
+            color: '#fff', fontFamily: 'inherit', outline: 'none',
+          }}
+        />
+      </div>
     </div>
   )
 }
@@ -127,9 +176,8 @@ function MealSlot({ slotKey, label, placeholder, value, onChange, isMobile, remo
 export default function CurrentMealsFlow({ data, onChange, onNext, onBack, isMobile, clientId }) {
   // Screenshots uit een voedingsapp. Gaan via /api/intake-photo naar storage;
   // de intake draait zonder login, dus de browser mag daar niet zelf bij.
-  const [uploadBezig, setUploadBezig] = useState(false)
+  const [uploadBezig, setUploadBezig] = useState(null)   // slotKey dat nu uploadt
   const [uploadFout, setUploadFout] = useState(null)
-  const shots = data.voeding_screenshots || []
 
   const verkleinNaarDataUrl = async (file) => {
     const bitmap = await createImageBitmap(file)
@@ -140,6 +188,48 @@ export default function CurrentMealsFlow({ data, onChange, onNext, onBack, isMob
     const c = document.createElement('canvas'); c.width = b; c.height = h
     c.getContext('2d').drawImage(bitmap, 0, 0, b, h)
     return c.toDataURL('image/jpeg', 0.82)
+  }
+
+  // Screenshots hangen aan het maaltijdmoment. We bewaren ze per slot
+  // (current_meals_<slot>_shots) én in één platte lijst, zodat de coach-modal
+  // ze als galerij kan tonen zonder elk slot af te lopen.
+  const shotsVan = (slot) => data[`current_meals_${slot}_shots`] || []
+
+  const zetShots = (slot, lijst) => {
+    const alle = BASE_SLOTS.map(m => m.key)
+      .concat(extraSlots.map((_, i) => `extra_${i}`))
+      .flatMap(k => (k === slot ? lijst : (data[`current_meals_${k}_shots`] || [])))
+    onChange({
+      ...data,
+      [`current_meals_${slot}_shots`]: lijst,
+      voeding_screenshots: alle,
+    })
+  }
+
+  const uploadShots = async (slot, files, verwijderIndex) => {
+    if (verwijderIndex != null) {
+      zetShots(slot, shotsVan(slot).filter((_, i) => i !== verwijderIndex))
+      return
+    }
+    setUploadFout(null); setUploadBezig(slot)
+    const nieuw = []
+    try {
+      for (const file of files) {
+        const dataUrl = await verkleinNaarDataUrl(file)
+        const res = await fetch('/api/intake-photo', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ clientId, dataUrl, soort: 'voeding' }),
+        })
+        const uit = await res.json().catch(() => ({}))
+        if (!res.ok) throw new Error(uit.error || `Upload mislukt (${res.status})`)
+        nieuw.push(uit.url)
+      }
+    } catch (err) {
+      setUploadFout(err.message || 'Uploaden mislukt')
+    } finally {
+      if (nieuw.length) zetShots(slot, [...shotsVan(slot), ...nieuw])
+      setUploadBezig(null)
+    }
   }
 
   const [extraSlots, setExtraSlots] = useState(() => {
@@ -173,9 +263,13 @@ export default function CurrentMealsFlow({ data, onChange, onNext, onBack, isMob
     <div style={{ padding: isMobile ? '1.5rem 1rem 2.5rem' : '2rem 1.25rem 3rem' }}>
       {onBack && <BackBtn onBack={onBack} />}
 
+      {/* Twee regels van gelijk gewicht: wat we vragen, en hoeveel we willen
+          weten. De tweede regel is de aansporing en mag niet ondergeschikt
+          ogen aan de eerste. */}
       <Q isMobile={isMobile}>Wat eet je nu op dagelijkse basis?</Q>
+      <Q isMobile={isMobile}>Vertel mij zoveel mogelijk.</Q>
       <Hint isMobile={isMobile}>
-        Vul per maaltijdmoment in wat je normaal eet — zo vrij als je wil. Dit helpt je coach je huidige gewoonten begrijpen. Gebruik de suggesties als je inspiratie nodig hebt.
+        Vul in per moment wat je nu eet, en wat goed bij jou past.
       </Hint>
 
       <div style={{ marginTop: '1.25rem' }}>
@@ -187,9 +281,20 @@ export default function CurrentMealsFlow({ data, onChange, onNext, onBack, isMob
             placeholder={slot.placeholder}
             value={data[`current_meals_${slot.key}`]}
             onChange={val => handleChange(`current_meals_${slot.key}`, val)}
+            shots={shotsVan(slot.key)}
+            onShots={(files, weg) => uploadShots(slot.key, files, weg)}
+            uploaden={uploadBezig === slot.key}
+            werktGoed={data[`current_meals_${slot.key}_werkt`]}
+            onWerktGoed={val => handleChange(`current_meals_${slot.key}_werkt`, val)}
             isMobile={isMobile}
           />
         ))}
+
+        {uploadFout && (
+          <div style={{ marginBottom: '0.7rem', fontSize: '0.72rem', fontWeight: 700, color: '#ef4444' }}>
+            {uploadFout}
+          </div>
+        )}
 
         {extraSlots.map((id, idx) => (
           <MealSlot
@@ -199,6 +304,11 @@ export default function CurrentMealsFlow({ data, onChange, onNext, onBack, isMob
             placeholder="Bijv: proteïnerijpe, appel met nootjes"
             value={data[`current_meals_extra_${idx}`]}
             onChange={val => handleChange(`current_meals_extra_${idx}`, val)}
+            shots={shotsVan(`extra_${idx}`)}
+            onShots={(files, weg) => uploadShots(`extra_${idx}`, files, weg)}
+            uploaden={uploadBezig === `extra_${idx}`}
+            werktGoed={data[`current_meals_extra_${idx}_werkt`]}
+            onWerktGoed={val => handleChange(`current_meals_extra_${idx}_werkt`, val)}
             isMobile={isMobile}
             removable
             onRemove={() => removeExtraSlot(id)}
@@ -217,90 +327,6 @@ export default function CurrentMealsFlow({ data, onChange, onNext, onBack, isMob
         >
           + Extra snackmoment toevoegen
         </button>
-      </div>
-
-      {/* Aansporing vóór het screenshot-blok: hoe meer de klant hier kwijt
-          kan, hoe beter het plan. Bold wit, want dit is de regel die je wil
-          dat ze lezen. */}
-      <div style={{
-        marginTop: '2rem', marginBottom: '0.4rem',
-        fontSize: isMobile ? '1.15rem' : '1.3rem', fontWeight: 900,
-        color: '#fff', letterSpacing: '-0.02em', lineHeight: 1.25,
-      }}>
-        Vertel mij zoveel mogelijk.
-      </div>
-      <div style={{ fontSize: isMobile ? '0.8rem' : '0.85rem', color: 'rgba(255,255,255,0.45)', fontWeight: 500, lineHeight: 1.55, marginBottom: '1.2rem' }}>
-        Alles wat je hieronder deelt gebruik ik om je plan op jou af te stemmen.
-      </div>
-
-      {/* Screenshots uit een voedingsapp — vaak zegt één screenshot meer dan
-          drie vragen, zeker bij iemand die al bijhoudt wat hij eet. */}
-      <div style={{ marginTop: '1.6rem' }}>
-        <Q isMobile={isMobile}>Gebruik je een voedingsapp?</Q>
-        <Hint isMobile={isMobile}>
-          Stuur gerust een paar screenshots van een gewone dag. Optioneel.
-        </Hint>
-
-        {shots.length > 0 && (
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: '0.7rem' }}>
-            {shots.map((url, i) => (
-              <div key={i} style={{ position: 'relative' }}>
-                <img src={url} alt={`screenshot ${i + 1}`} style={{ width: 76, height: 76, objectFit: 'cover', border: '1px solid rgba(255,255,255,0.15)', display: 'block' }} />
-                <button type="button"
-                  onClick={() => onChange({ ...data, voeding_screenshots: shots.filter((_, j) => j !== i) })}
-                  style={{ position: 'absolute', top: -7, right: -7, width: 22, height: 22, borderRadius: '50%', background: '#0a0a0a', border: '1px solid rgba(255,255,255,0.3)', color: '#fff', fontSize: '0.8rem', lineHeight: 1, cursor: 'pointer' }}>×</button>
-              </div>
-            ))}
-          </div>
-        )}
-
-        <label style={{
-          display: 'inline-block', padding: '0.7rem 1.1rem',
-          background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.15)',
-          color: '#fff', fontSize: '0.8rem', fontWeight: 800,
-          cursor: uploadBezig ? 'wait' : 'pointer', minHeight: 44,
-        }}>
-          {uploadBezig ? 'Bezig…' : shots.length ? 'Nog een screenshot' : 'Screenshot toevoegen'}
-          <input type="file" accept="image/*" multiple disabled={uploadBezig} style={{ display: 'none' }}
-            onChange={async (e) => {
-              const files = [...(e.target.files || [])]
-              e.target.value = ''
-              if (!files.length) return
-              setUploadFout(null); setUploadBezig(true)
-              const nieuw = []
-              try {
-                for (const file of files) {
-                  const dataUrl = await verkleinNaarDataUrl(file)
-                  const res = await fetch('/api/intake-photo', {
-                    method: 'POST', headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ clientId, dataUrl, soort: 'voeding' }),
-                  })
-                  const uit = await res.json().catch(() => ({}))
-                  if (!res.ok) throw new Error(uit.error || `Upload mislukt (${res.status})`)
-                  nieuw.push(uit.url)
-                }
-                onChange({ ...data, voeding_screenshots: [...shots, ...nieuw] })
-              } catch (err) {
-                setUploadFout(err.message || 'Uploaden mislukt')
-                if (nieuw.length) onChange({ ...data, voeding_screenshots: [...shots, ...nieuw] })
-              } finally { setUploadBezig(false) }
-            }} />
-        </label>
-        {uploadFout && <div style={{ marginTop: 6, fontSize: '0.7rem', fontWeight: 700, color: '#ef4444' }}>{uploadFout}</div>}
-      </div>
-
-      {/* Wat werkt er al — je wil weten wat je moet behouden, niet alleen wat
-          er moet veranderen. */}
-      <div style={{ marginTop: '1.6rem' }}>
-        <Q isMobile={isMobile}>Werkt hier iets goed voor je volgens jezelf?</Q>
-        <Hint isMobile={isMobile}>Iets waarvan je merkt dat het je past. Optioneel.</Hint>
-        <textarea
-          value={data.wat_werkt_goed || ''}
-          onChange={e => onChange({ ...data, wat_werkt_goed: e.target.value })}
-          placeholder="Bijv: 's ochtends havermout, daar heb ik de hele ochtend genoeg aan…"
-          rows={3}
-          style={vrijVeld(isMobile)}
-        />
       </div>
 
       {/* Wat is er al geprobeerd — voorkomt dat je iets voorstelt dat vorig
