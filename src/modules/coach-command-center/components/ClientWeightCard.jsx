@@ -2,7 +2,7 @@
 // v3.0 — styling-upgrade: goud, bold wit, simpel. Gestript tot de essentie
 // (naam, doel, gewicht+datum, gewicht-progressie, notitie-log, insight-knop,
 // deactiveer). Gradients eruit → solide #0a0a0a.
-import React, { useState } from 'react'
+import React, { useState, useRef} from 'react'
 import { createPortal } from 'react-dom'
 // In split screen mag een modal niet het hele scherm afdekken maar alleen de
 // helft waar de tab in staat. useModalHost geeft die helft terug; buiten split
@@ -40,6 +40,28 @@ export default function ClientWeightCard({ client, isMobile, onToggleStatus, onD
   const [showInsight, setShowInsight]   = useState(false)
   const [showLog, setShowLog]           = useState(false)
   const [showMenu, setShowMenu]         = useState(false)
+  // De kaart heeft overflow:hidden, dus een absoluut geplaatst menu wordt
+  // afgesneden — de Activeer-knop was daardoor nauwelijks te raken. Het menu
+  // gaat nu via een portal buiten de kaart, op de plek van de knop.
+  const menuKnopRef = useRef(null)
+  const [menuPos, setMenuPos] = useState(null)
+
+  const openMenu = () => {
+    const r = menuKnopRef.current?.getBoundingClientRect()
+    if (!r) return
+    // In split screen is de gastheer een getransformeerde helft; position:fixed
+    // rekent dan tegen díe helft. Daarom de coördinaten daarop omrekenen.
+    const h = modalHost?.getBoundingClientRect?.()
+    const breedte = h ? h.width : window.innerWidth
+    const hoogte  = h ? h.height : window.innerHeight
+    const dx = h ? h.left : 0
+    const dy = h ? h.top : 0
+    setMenuPos({
+      bottom: hoogte - (r.top - dy) + 6,
+      right: breedte - (r.right - dx),
+    })
+    setShowMenu(true)
+  }
   const [showDelete, setShowDelete]     = useState(false)
   const [toggling, setToggling]         = useState(false)
   const [statsExpanded, setStatsExpanded] = useState(false)
@@ -294,14 +316,14 @@ export default function ClientWeightCard({ client, isMobile, onToggleStatus, onD
         <button onClick={() => setShowInsight(true)} style={platteKnop}>
           <BarChart3 size={13} /> Inzicht
         </button>
-        <div style={{ position: 'relative' }}>
-          <button onClick={() => setShowMenu(!showMenu)} style={{ ...platteKnop, color: showMenu ? '#fff' : 'rgba(255,255,255,0.5)' }}>
+        <div>
+          <button ref={menuKnopRef} onClick={() => (showMenu ? setShowMenu(false) : openMenu())} style={{ ...platteKnop, color: showMenu ? '#fff' : 'rgba(255,255,255,0.5)' }}>
             <MoreHorizontal size={15} />
           </button>
-          {showMenu && (
+          {showMenu && menuPos && modalHost && createPortal(
             <>
-              <div onClick={() => setShowMenu(false)} style={{ position: 'fixed', inset: 0, zIndex: 99 }} />
-              <div style={{ position: 'absolute', bottom: '100%', right: 0, marginBottom: '0.35rem', zIndex: 100, background: '#111', border: '1px solid rgba(255,255,255,0.12)', borderRadius: '10px', overflow: 'hidden', minWidth: '160px', boxShadow: '0 -8px 24px rgba(0,0,0,0.6)' }}>
+              <div onClick={() => setShowMenu(false)} style={{ position: 'fixed', inset: 0, zIndex: 2147483500 }} />
+              <div style={{ position: 'fixed', bottom: menuPos.bottom, right: menuPos.right, zIndex: 2147483501, background: '#111', border: '1px solid rgba(255,255,255,0.12)', borderRadius: '10px', overflow: 'hidden', minWidth: '160px', boxShadow: '0 -8px 24px rgba(0,0,0,0.6)' }}>
                 {hasPhone && !isInactive && (
                   <button onClick={() => { openWhatsApp(); setShowMenu(false) }} style={{ width: '100%', padding: '0.6rem 0.85rem', background: 'transparent', border: 'none', color: '#25D366', fontSize: '0.78rem', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.45rem', textAlign: 'left', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}>
                     <MessageCircle size={15} /> WhatsApp
@@ -317,7 +339,8 @@ export default function ClientWeightCard({ client, isMobile, onToggleStatus, onD
                   <Trash2 size={15} /> Verwijderen
                 </button>
               </div>
-            </>
+            </>,
+            modalHost
           )}
         </div>
         </div>

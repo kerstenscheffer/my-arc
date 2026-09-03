@@ -1,6 +1,6 @@
 // src/modules/nutrition-intake/components/nutrition-flow/EatPatternFlow.jsx
 // Stap 1-4: Eetpatroon drill-down — 2 kolommen via flex, lijst klapt uit onder card
-import React, { useState } from 'react'
+import React, { useState, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { Q, Hint, NextBtn, BigOption } from '../../../public-intake/components/phase1/FlowStep'
 
@@ -202,6 +202,9 @@ function KolomCards({ cats, maaltijdKey, data, onChange, isMobile }) {
   const textFields = data[`${maaltijdKey}_text`] || {}
   const customItems = data[`${maaltijdKey}_custom`] || {}
   const addInputs  = data[`${maaltijdKey}_addinput`] || {}
+  // Na toevoegen terug naar het veld: je typt er meestal meer dan één achter
+  // elkaar, en opnieuw moeten aantikken breekt dat ritme.
+  const addRefs = useRef({})
 
   const toggleCat = (id) => {
     const updated = selected.includes(id) ? selected.filter(x => x !== id) : [...selected, id]
@@ -225,6 +228,7 @@ function KolomCards({ cats, maaltijdKey, data, onChange, isMobile }) {
   const addCustom = (catId) => {
     const val = (addInputs[catId] || '').trim()
     if (!val) return
+    setTimeout(() => addRefs.current[catId]?.focus(), 0)
     const existing = customItems[catId] || []
     if (existing.includes(val)) return
     onChange({
@@ -336,20 +340,42 @@ function KolomCards({ cats, maaltijdKey, data, onChange, isMobile }) {
                   )
                 })}
 
-                {/* Voeg toe */}
-                <div style={{ display: 'flex', alignItems: 'center', minHeight: '40px' }}>
-                  <div style={{ width: '40px', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <span style={{ fontSize: '0.85rem', color: 'rgba(255,255,255,0.15)', lineHeight: 1 }}>+</span>
-                  </div>
-                  <input type="text" placeholder="Voeg toe..."
+                {/* Zelf toevoegen. Het veld en de knop zijn altijd zichtbaar:
+                    eerder verscheen de knop pas ná het typen en zag het veld
+                    eruit als een grijs regeltje, waardoor het leek alsof je er
+                    maar één ding in kwijt kon. */}
+                <div style={{ display: 'flex', alignItems: 'stretch', gap: 6, marginTop: '0.35rem' }}>
+                  <input type="text"
+                    ref={el => { addRefs.current[cat.id] = el }}
+                    placeholder="Typ zelf iets…"
                     value={addInputs[cat.id] || ''}
                     onChange={e => updateAddInput(cat.id, e.target.value)}
                     onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addCustom(cat.id) } }}
-                    style={{ flex: 1, background: 'transparent', border: 'none', outline: 'none', color: 'rgba(255,255,255,0.5)', fontSize: isMobile ? '0.72rem' : '0.75rem', fontWeight: 500, fontFamily: 'inherit', padding: '0 0.4rem' }}
+                    style={{
+                      flex: 1, minWidth: 0, minHeight: 40,
+                      background: 'rgba(255,255,255,0.04)',
+                      border: '1px solid rgba(255,255,255,0.15)',
+                      outline: 'none', color: '#fff',
+                      fontSize: isMobile ? '0.8rem' : '0.82rem',
+                      fontWeight: 600, fontFamily: 'inherit', padding: '0 0.6rem',
+                    }}
                   />
-                  {(addInputs[cat.id] || '').trim().length > 0 && (
-                    <button onClick={() => addCustom(cat.id)} style={{ width: '32px', flexShrink: 0, background: 'rgba(255,215,0,0.08)', border: 'none', borderLeft: '1px solid rgba(255,215,0,0.15)', color: '#FFD700', fontSize: '0.8rem', fontWeight: 800, cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', alignSelf: 'stretch' }}>+</button>
-                  )}
+                  <button
+                    onClick={() => addCustom(cat.id)}
+                    disabled={!(addInputs[cat.id] || '').trim()}
+                    style={{
+                      flexShrink: 0, padding: '0 0.9rem', minHeight: 40,
+                      background: (addInputs[cat.id] || '').trim() ? '#fff' : 'rgba(255,255,255,0.05)',
+                      border: '1px solid rgba(255,255,255,0.15)',
+                      color: (addInputs[cat.id] || '').trim() ? '#0a0a0a' : 'rgba(255,255,255,0.25)',
+                      fontSize: '0.75rem', fontWeight: 900, fontFamily: 'inherit',
+                      cursor: (addInputs[cat.id] || '').trim() ? 'pointer' : 'default',
+                      touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+                    }}
+                  >Toevoegen</button>
+                </div>
+                <div style={{ fontSize: '0.62rem', color: 'rgba(255,255,255,0.3)', marginTop: '0.25rem', paddingLeft: 2 }}>
+                  Je kunt er zoveel toevoegen als je wil.
                 </div>
               </div>
             )}
