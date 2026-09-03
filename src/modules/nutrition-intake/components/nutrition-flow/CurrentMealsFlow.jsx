@@ -57,7 +57,7 @@ function MealSlot({ slotKey, label, placeholder, value, onChange, isMobile, remo
   return (
     <div style={{ marginBottom: '1rem' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.3rem' }}>
-        <div style={{ fontSize: isMobile ? '0.72rem' : '0.75rem', fontWeight: 800, color: 'rgba(255,215,0,0.7)', letterSpacing: '0.06em', textTransform: 'uppercase' }}>
+        <div style={{ fontSize: isMobile ? '0.95rem' : '1rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.01em' }}>
           {label}
         </div>
         {removable && (
@@ -78,20 +78,20 @@ function MealSlot({ slotKey, label, placeholder, value, onChange, isMobile, remo
             padding: isMobile ? '0.7rem 0.85rem' : '0.75rem 0.9rem',
             fontSize: isMobile ? '0.82rem' : '0.85rem',
             background: 'rgba(255,255,255,0.04)',
-            border: '1px solid rgba(255,215,0,0.15)',
+            border: '1px solid rgba(255,255,255,0.15)',
             color: '#fff', fontFamily: 'inherit',
             lineHeight: 1.5, resize: 'vertical',
             outline: 'none', transition: 'border-color 0.15s ease',
           }}
-          onFocus={e => { e.currentTarget.style.borderColor = 'rgba(255,215,0,0.35)' }}
-          onBlur={e => { e.currentTarget.style.borderColor = 'rgba(255,215,0,0.15)' }}
+          onFocus={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.35)' }}
+          onBlur={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.15)' }}
         />
         <button
           onClick={() => setShowSuggestions(p => !p)}
           style={{
             position: 'absolute', bottom: '0.45rem', right: '0.5rem',
-            background: 'rgba(255,215,0,0.08)', border: '1px solid rgba(255,215,0,0.2)',
-            color: 'rgba(255,215,0,0.6)', fontSize: '0.58rem', fontWeight: 800,
+            background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.2)',
+            color: 'rgba(255,255,255,0.6)', fontSize: '0.58rem', fontWeight: 800,
             cursor: 'pointer', padding: '0.2rem 0.5rem', fontFamily: 'inherit',
             letterSpacing: '0.04em', touchAction: 'manipulation',
           }}
@@ -106,14 +106,14 @@ function MealSlot({ slotKey, label, placeholder, value, onChange, isMobile, remo
               key={s}
               onClick={() => appendSuggestion(s)}
               style={{
-                background: 'rgba(255,215,0,0.07)', border: '1px solid rgba(255,215,0,0.2)',
+                background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.2)',
                 color: 'rgba(255,255,255,0.75)', fontSize: isMobile ? '0.67rem' : '0.7rem',
                 fontWeight: 600, cursor: 'pointer', padding: '0.25rem 0.6rem',
                 fontFamily: 'inherit', touchAction: 'manipulation',
                 transition: 'background 0.15s ease',
               }}
-              onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,215,0,0.14)' }}
-              onMouseLeave={e => { e.currentTarget.style.background = 'rgba(255,215,0,0.07)' }}
+              onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.14)' }}
+              onMouseLeave={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.07)' }}
             >
               {s}
             </button>
@@ -208,8 +208,8 @@ export default function CurrentMealsFlow({ data, onChange, onNext, onBack, isMob
         <button
           onClick={addExtraSlot}
           style={{
-            background: 'transparent', border: '1px dashed rgba(255,215,0,0.2)',
-            color: 'rgba(255,215,0,0.45)', fontSize: isMobile ? '0.72rem' : '0.75rem',
+            background: 'transparent', border: '1px dashed rgba(255,255,255,0.2)',
+            color: 'rgba(255,255,255,0.45)', fontSize: isMobile ? '0.72rem' : '0.75rem',
             fontWeight: 700, cursor: 'pointer', width: '100%',
             padding: '0.6rem', fontFamily: 'inherit', marginBottom: '1.25rem',
             letterSpacing: '0.04em', touchAction: 'manipulation',
@@ -217,6 +217,20 @@ export default function CurrentMealsFlow({ data, onChange, onNext, onBack, isMob
         >
           + Extra snackmoment toevoegen
         </button>
+      </div>
+
+      {/* Aansporing vóór het screenshot-blok: hoe meer de klant hier kwijt
+          kan, hoe beter het plan. Bold wit, want dit is de regel die je wil
+          dat ze lezen. */}
+      <div style={{
+        marginTop: '2rem', marginBottom: '0.4rem',
+        fontSize: isMobile ? '1.15rem' : '1.3rem', fontWeight: 900,
+        color: '#fff', letterSpacing: '-0.02em', lineHeight: 1.25,
+      }}>
+        Vertel mij zoveel mogelijk.
+      </div>
+      <div style={{ fontSize: isMobile ? '0.8rem' : '0.85rem', color: 'rgba(255,255,255,0.45)', fontWeight: 500, lineHeight: 1.55, marginBottom: '1.2rem' }}>
+        Alles wat je hieronder deelt gebruik ik om je plan op jou af te stemmen.
       </div>
 
       {/* Screenshots uit een voedingsapp — vaak zegt één screenshot meer dan

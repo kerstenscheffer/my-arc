@@ -255,9 +255,9 @@ export default function NutritionIntakePage() {
         </div>
         <form onSubmit={handleEmailSubmit}>
           <input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="jouw@email.nl" autoFocus disabled={emailLoading}
-            style={{ width: '100%', padding: isMobile ? '0.85rem 1rem' : '0.9rem 1rem', fontSize: isMobile ? '0.9rem' : '0.95rem', background: '#0a0a0a', border: `1px solid ${emailError ? '#dc2626' : 'rgba(255,215,0,0.25)'}`, color: '#fff', outline: 'none', textAlign: 'center', fontFamily: 'inherit', boxSizing: 'border-box', marginBottom: '0.75rem' }} />
+            style={{ width: '100%', padding: isMobile ? '0.85rem 1rem' : '0.9rem 1rem', fontSize: isMobile ? '0.9rem' : '0.95rem', background: '#0a0a0a', border: `1px solid ${emailError ? '#dc2626' : 'rgba(255,255,255,0.25)'}`, color: '#fff', outline: 'none', textAlign: 'center', fontFamily: 'inherit', boxSizing: 'border-box', marginBottom: '0.75rem' }} />
           {emailError && <div style={{ padding: '0.5rem 0.75rem', background: 'rgba(220,38,38,0.06)', border: '1px solid rgba(220,38,38,0.2)', color: '#dc2626', fontSize: isMobile ? '0.7rem' : '0.75rem', fontWeight: 600, marginBottom: '0.75rem' }}>{emailError}</div>}
-          <button type="submit" disabled={emailLoading} style={{ width: '100%', padding: isMobile ? '0.9rem' : '0.95rem', fontSize: isMobile ? '0.8rem' : '0.85rem', fontWeight: 800, color: '#000', background: emailLoading ? 'rgba(255,215,0,0.4)' : 'linear-gradient(90deg, #FFD700, #FFA500)', border: 'none', cursor: emailLoading ? 'not-allowed' : 'pointer', minHeight: '44px', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', letterSpacing: '0.04em', fontFamily: 'inherit' }}>
+          <button type="submit" disabled={emailLoading} style={{ width: '100%', padding: isMobile ? '0.9rem' : '0.95rem', fontSize: isMobile ? '0.8rem' : '0.85rem', fontWeight: 800, color: '#000', background: emailLoading ? 'rgba(255,255,255,0.4)' : '#ffffff', border: 'none', cursor: emailLoading ? 'not-allowed' : 'pointer', minHeight: '44px', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', letterSpacing: '0.04em', fontFamily: 'inherit' }}>
             {emailLoading ? 'Zoeken...' : 'DOORGAAN →'}
           </button>
         </form>
@@ -270,8 +270,8 @@ export default function NutritionIntakePage() {
   if (emailLoading) return (
     <div style={{ minHeight: '100vh', background: '#000', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
       <div style={{ textAlign: 'center' }}>
-        <div style={{ width: '36px', height: '36px', border: '2px solid rgba(255,215,0,0.15)', borderTopColor: '#FFD700', borderRadius: '50%', margin: '0 auto 0.75rem', animation: 'spin 0.8s linear infinite' }} />
-        <div style={{ fontSize: '0.7rem', color: 'rgba(255,215,0,0.6)', fontWeight: 700 }}>Laden...</div>
+        <div style={{ width: '36px', height: '36px', border: '2px solid rgba(255,255,255,0.15)', borderTopColor: '#ffffff', borderRadius: '50%', margin: '0 auto 0.75rem', animation: 'spin 0.8s linear infinite' }} />
+        <div style={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.6)', fontWeight: 700 }}>Laden...</div>
       </div>
       <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
     </div>
@@ -280,12 +280,12 @@ export default function NutritionIntakePage() {
   if (isSuccess) return (
     <div style={{ minHeight: '100vh', background: '#000', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
       <div style={{ textAlign: 'center', padding: '2rem' }}>
-        <div style={{ width: '52px', height: '52px', borderRadius: '50%', background: 'rgba(255,215,0,0.08)', border: '1px solid rgba(255,215,0,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1rem' }}>
-          <span style={{ fontSize: '1.2rem', color: '#FFD700' }}>✓</span>
+        <div style={{ width: '52px', height: '52px', borderRadius: '50%', background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1rem' }}>
+          <span style={{ fontSize: '1.2rem', color: '#ffffff' }}>✓</span>
         </div>
-        <div style={{ fontSize: isMobile ? '1.3rem' : '1.5rem', fontWeight: 900, color: '#FFD700', letterSpacing: '-0.02em', marginBottom: '0.4rem' }}>Voeding opgeslagen!</div>
+        <div style={{ fontSize: isMobile ? '1.3rem' : '1.5rem', fontWeight: 900, color: '#ffffff', letterSpacing: '-0.02em', marginBottom: '0.4rem' }}>Voeding opgeslagen!</div>
         <div style={{ fontSize: isMobile ? '0.68rem' : '0.72rem', color: 'rgba(255,255,255,0.35)', lineHeight: 1.6 }}>Je coach ontvangt een melding. Je wordt doorgestuurd...</div>
-        <div style={{ width: '36px', height: '36px', border: '2px solid rgba(255,215,0,0.15)', borderTopColor: '#FFD700', borderRadius: '50%', margin: '1.5rem auto 0', animation: 'spin 0.8s linear infinite' }} />
+        <div style={{ width: '36px', height: '36px', border: '2px solid rgba(255,255,255,0.15)', borderTopColor: '#ffffff', borderRadius: '50%', margin: '1.5rem auto 0', animation: 'spin 0.8s linear infinite' }} />
       </div>
       <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
     </div>
@@ -299,27 +299,17 @@ export default function NutritionIntakePage() {
           const isActive = i === 1; const isCompleted = i === 0
           return (
             <div key={tab.label} style={{ flex: 1, padding: isMobile ? '0.55rem 0' : '0.6rem 0', textAlign: 'center', position: 'relative' }}>
-              <div style={{ fontSize: isMobile ? '0.42rem' : '0.45rem', fontWeight: isActive ? 800 : 600, color: isActive ? '#FFD700' : isCompleted ? 'rgba(255,215,0,0.4)' : 'rgba(255,255,255,0.18)', textTransform: 'uppercase', letterSpacing: '0.07em', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.2rem' }}>
+              <div style={{ fontSize: isMobile ? '0.42rem' : '0.45rem', fontWeight: isActive ? 800 : 600, color: isActive ? '#ffffff' : isCompleted ? 'rgba(255,255,255,0.4)' : 'rgba(255,255,255,0.18)', textTransform: 'uppercase', letterSpacing: '0.07em', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.2rem' }}>
                 {isCompleted && <span style={{ fontSize: '0.4rem' }}>✓</span>}
                 {tab.label}
               </div>
-              {isActive && <div style={{ position: 'absolute', bottom: 0, left: '15%', right: '15%', height: '2px', background: 'linear-gradient(90deg, #FFD700, #FFA500)', borderRadius: '1px 1px 0 0' }} />}
+              {isActive && <div style={{ position: 'absolute', bottom: 0, left: '15%', right: '15%', height: '2px', background: '#ffffff', borderRadius: '1px 1px 0 0' }} />}
             </div>
           )
         })}
       </div>
 
       <div style={{ maxWidth: '520px', margin: '0 auto' }}>
-        {clientData && (clientData.primary_goal || clientData.motivation) && (
-          <div style={{ borderBottom: '1px solid rgba(255,215,0,0.06)', padding: isMobile ? '0.6rem 1rem' : '0.7rem 1.25rem', display: 'flex', gap: '0.75rem', alignItems: 'flex-start' }}>
-            <div style={{ width: '2px', background: 'rgba(255,215,0,0.35)', borderRadius: '2px', alignSelf: 'stretch', flexShrink: 0 }} />
-            <div style={{ flex: 1, minWidth: 0 }}>
-              {clientData.primary_goal && <div style={{ fontSize: '0.42rem', fontWeight: 800, color: 'rgba(255,215,0,0.5)', letterSpacing: '0.08em', marginBottom: '0.15rem' }}>{GOAL_LABELS[clientData.primary_goal]}{clientData.target_weight ? ` · ${clientData.target_weight} kg` : ''}</div>}
-              {clientData.motivation && <div style={{ fontSize: isMobile ? '0.62rem' : '0.65rem', color: 'rgba(255,255,255,0.35)', fontWeight: 500, lineHeight: 1.5, fontStyle: 'italic', overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>"{clientData.motivation}"</div>}
-            </div>
-          </div>
-        )}
-
         <ProgressBar activeFlow={activeFlow} totalFlows={FLOWS.length} isMobile={isMobile} />
 
         {activeFlow === 0 && <CurrentMealsFlow {...flowProps} />}
@@ -331,7 +321,7 @@ export default function NutritionIntakePage() {
 
         {isSubmitting && (
           <div style={{ padding: '1rem', textAlign: 'center' }}>
-            <div style={{ width: '36px', height: '36px', border: '2px solid rgba(255,215,0,0.15)', borderTopColor: '#FFD700', borderRadius: '50%', margin: '0 auto', animation: 'spin 0.8s linear infinite' }} />
+            <div style={{ width: '36px', height: '36px', border: '2px solid rgba(255,255,255,0.15)', borderTopColor: '#ffffff', borderRadius: '50%', margin: '0 auto', animation: 'spin 0.8s linear infinite' }} />
           </div>
         )}
       </div>
@@ -343,7 +333,7 @@ export default function NutritionIntakePage() {
 function StickyHeader({ isMobile }) {
   return (
     <div style={{ position: 'sticky', top: 0, zIndex: 50, background: '#000', borderBottom: '1px solid rgba(255,255,255,0.06)', padding: isMobile ? '0.7rem 1rem' : '0.8rem 1.5rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-      <div style={{ fontSize: isMobile ? '0.75rem' : '0.8rem', fontWeight: 900, color: '#FFD700', letterSpacing: '0.12em' }}>MY ARC</div>
+      <img src="/ma-logo-header.png" alt="MY ARC" style={{ height: isMobile ? 20 : 24, width: 'auto', display: 'block' }} />
       <div style={{ fontSize: '0.48rem', fontWeight: 700, color: 'rgba(255,255,255,0.2)', letterSpacing: '0.1em', textTransform: 'uppercase' }}>Intake Formulier</div>
     </div>
   )
@@ -355,10 +345,10 @@ function ProgressBar({ activeFlow, totalFlows, isMobile }) {
     <div style={{ padding: isMobile ? '0.75rem 1rem 0.5rem' : '0.85rem 1.25rem 0.6rem' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.35rem' }}>
         <div style={{ fontSize: '0.45rem', fontWeight: 700, color: 'rgba(255,255,255,0.2)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Voedingsintake</div>
-        <div style={{ fontSize: '0.45rem', fontWeight: 800, color: 'rgba(255,215,0,0.5)', letterSpacing: '0.04em' }}>{pct}%</div>
+        <div style={{ fontSize: '0.45rem', fontWeight: 800, color: 'rgba(255,255,255,0.45)', letterSpacing: '0.04em' }}>{pct}%</div>
       </div>
       <div style={{ height: '2px', background: 'rgba(255,255,255,0.06)', borderRadius: '1px', overflow: 'hidden' }}>
-        <div style={{ height: '100%', width: `${pct}%`, background: 'linear-gradient(90deg, #FFD700, #FFA500)', borderRadius: '1px', transition: 'width 0.4s ease' }} />
+        <div style={{ height: '100%', width: `${pct}%`, background: '#ffffff', borderRadius: '1px', transition: 'width 0.4s ease' }} />
       </div>
     </div>
   )

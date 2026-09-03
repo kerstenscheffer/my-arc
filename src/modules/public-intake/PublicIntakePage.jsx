@@ -578,7 +578,7 @@ export default function PublicIntakePage() {
         padding: isMobile ? '0.7rem 1rem' : '0.8rem 1.5rem',
         display: 'flex', alignItems: 'center', justifyContent: 'space-between'
       }}>
-        <div style={{ fontSize: isMobile ? '0.75rem' : '0.8rem', fontWeight: 900, color: '#FFD700', letterSpacing: '0.12em' }}>MY ARC</div>
+        <img src="/ma-logo-header.png" alt="MY ARC" style={{ height: isMobile ? 20 : 24, width: 'auto', display: 'block' }} />
         <div style={{ fontSize: '0.48rem', fontWeight: 700, color: 'rgba(255,255,255,0.2)', letterSpacing: '0.1em', textTransform: 'uppercase' }}>Intake Formulier</div>
       </div>
 
