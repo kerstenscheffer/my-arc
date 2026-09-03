@@ -190,10 +190,31 @@ export default function ClientWeightCard({ client, isMobile, onToggleStatus, onD
 
       {/* ── ROW 1 — naam · doel  |  gewicht · datum, alles op één regel ── */}
       <div style={{
-        display: 'flex', alignItems: 'baseline',
+        display: 'flex', alignItems: 'center',
         padding: isMobile ? '0.6rem 0.85rem 0.5rem' : '0.7rem 1rem 0.55rem',
         gap: isMobile ? '0.5rem' : '0.625rem',
       }}>
+        {/* Profielfoto uit de intake. Geen foto → initialen, zodat de kaarten
+            dezelfde hoogte en uitlijning houden. */}
+        <div style={{
+          width: isMobile ? 34 : 38, height: isMobile ? 34 : 38, flexShrink: 0,
+          borderRadius: '50%', overflow: 'hidden',
+          background: client.profile_photo_url
+            ? `url(${client.profile_photo_url}) center/cover`
+            : 'rgba(255,255,255,0.06)',
+          border: '1px solid rgba(255,255,255,0.12)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          opacity: isInactive ? 0.45 : 1,
+        }}>
+          {!client.profile_photo_url && (
+            <span style={{
+              fontSize: isMobile ? '0.72rem' : '0.8rem', fontWeight: 900,
+              color: 'rgba(255,255,255,0.35)', letterSpacing: '-0.02em',
+            }}>
+              {`${(client.first_name || '')[0] || ''}${(client.last_name || '')[0] || ''}`.toUpperCase() || '?'}
+            </span>
+          )}
+        </div>
         <div style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'baseline', gap: '0.4rem', overflow: 'hidden' }}>
           <h3 style={{ fontSize: isMobile ? '1rem' : '1.1rem', fontWeight: 800, color: isInactive ? '#6b7280' : '#fff', margin: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', flexShrink: 1, letterSpacing: '-0.01em' }}>
             {client.first_name} {client.last_name}
