@@ -7,8 +7,13 @@ import ExerciseSelector from './components/ExerciseSelector'
 import TemplateManager from './components/TemplateManager'
 import DayTemplatePickerModal from './components/DayTemplatePickerModal'
 import ClientAssigner from './components/ClientAssigner'
+// Dezelfde wizard die de klant op zijn workout-pagina gebruikt om te kiezen
+// welke training op welke dag valt. Hergebruikt i.p.v. nagebouwd: twee
+// versies van hetzelfde scherm lopen gegarandeerd uit elkaar.
+import PlanningWizard from '../workout/components/planning/PlanningWizard'
+import WorkoutService from '../../services/WorkoutService'
 import ClientPlanManagerModal from './components/ClientPlanManagerModal'
-import { Plus, Save, Users, FileText, ChevronDown, Video, Trash2, Search, X, AlertTriangle } from 'lucide-react'
+import { Plus, Save, Users, FileText, ChevronDown, Video, Trash2, Search, X, AlertTriangle, CalendarDays } from 'lucide-react'
 import PDFExportButton from './components/PDFExportButton'
 import ExerciseLibraryModal from './components/ExerciseLibraryModal'
 
@@ -29,6 +34,8 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
   const [showExerciseSelector, setShowExerciseSelector] = useState(false)
   const [showTemplateManager, setShowTemplateManager] = useState(false)
   const [showClientAssigner, setShowClientAssigner] = useState(false)
+  const [showAgenda, setShowAgenda] = useState(false)
+  const [workoutService] = useState(() => new WorkoutService(db.supabase))
   const [showPlanManager, setShowPlanManager] = useState(false)
   const [saving, setSaving] = useState(false)
   const [templates, setTemplates] = useState([])
@@ -661,6 +668,16 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
             style={zijKnop({ opacity: workoutPlan.days.length === 0 ? 0.35 : 1, cursor: workoutPlan.days.length === 0 ? 'not-allowed' : 'pointer' })}>
             <Users size={14} /> Huidig plan toewijzen
           </button>
+          {/* Trainingsagenda — welke training op welke dag. Zelfde wizard als
+              de klant op zijn workout-pagina heeft, dus jullie zien hetzelfde.
+              Vereist een klant én een opgeslagen schema: de wizard koppelt
+              dagen aan week_structure-sleutels van dat schema. */}
+          <button onClick={() => setShowAgenda(true)}
+            disabled={!effectiveClient || !selectedSchemaId}
+            title={!effectiveClient ? 'Kies eerst een klant' : !selectedSchemaId ? 'Kies eerst een opgeslagen plan van deze klant' : 'Welke training op welke dag'}
+            style={zijKnop({ opacity: (!effectiveClient || !selectedSchemaId) ? 0.35 : 1, cursor: (!effectiveClient || !selectedSchemaId) ? 'not-allowed' : 'pointer' })}>
+            <CalendarDays size={14} /> Trainingsagenda
+          </button>
           <button onClick={() => setShowTemplateManager(true)} style={zijKnop()}>
             <FileText size={14} /> Templates
           </button>
@@ -734,6 +751,16 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
           isMobile={isMobile}
         />
       )}
+      {showAgenda && effectiveClient && (
+        <PlanningWizard
+          workoutService={workoutService}
+          clientId={effectiveClient.id}
+          schema={{ week_structure: buildWeekStructure() }}
+          onComplete={() => setShowAgenda(false)}
+          onClose={() => setShowAgenda(false)}
+        />
+      )}
+
       {showClientAssigner && <ClientAssigner clients={clients} workoutPlan={workoutPlan} db={db} initialClient={effectiveClient || null} onClose={() => setShowClientAssigner(false)} isMobile={isMobile} />}
       {showPlanManager && <ClientPlanManagerModal clients={clients} templates={templates} db={db} isMobile={isMobile} onClose={() => setShowPlanManager(false)} onEditInBuilder={(schema) => { loadSchemaIntoBuilder(schema); setShowPlanManager(false) }} />}
 
