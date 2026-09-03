@@ -124,7 +124,6 @@ export default function PracticalFlow({ data, onChange, onNext, onBack, isMobile
   // Stap 3 — Hoeveel maaltijden
   if (step === 3) return (
     <div style={{ padding: pad }}>
-      <BackBtn onBack={goBack} />
       <Q isMobile={isMobile}>Hoeveel maaltijden wil je per dag?</Q>
       <Hint isMobile={isMobile}>
         {data.target_calories
@@ -142,14 +141,13 @@ export default function PracticalFlow({ data, onChange, onNext, onBack, isMobile
         onClick={() => setStep(4)}
         disabled={!data.num_meals}
         isMobile={isMobile}
-      />
+      onBack={goBack} />
     </div>
   )
 
   // Stap 4 — Guidance level (met pre-selectie)
   if (step === 4) return (
     <div style={{ padding: pad }}>
-      <BackBtn onBack={goBack} />
       <Q isMobile={isMobile}>Hoe wil je begeleid worden?</Q>
       <Hint isMobile={isMobile}>
         {data.macros_kennis === 'nee'
@@ -198,7 +196,7 @@ export default function PracticalFlow({ data, onChange, onNext, onBack, isMobile
         onClick={onNext}
         disabled={!data.guidance_level}
         isMobile={isMobile}
-      />
+      onBack={goBack} />
     </div>
   )
 

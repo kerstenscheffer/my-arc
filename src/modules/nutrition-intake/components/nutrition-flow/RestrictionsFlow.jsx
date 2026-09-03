@@ -100,7 +100,6 @@ export default function RestrictionsFlow({ data, onChange, onNext, onBack, isMob
   // Stap 1 — Wat wil je absoluut niet eten (smaak)
   if (step === 1) return (
     <div style={{ padding: pad }}>
-      <BackBtn onBack={onBack} />
       <Q isMobile={isMobile}>Is er iets dat je liever niet eet?</Q>
       <Hint isMobile={isMobile}>Geen allergie — gewoon niet lekker. Tik alles aan dat geldt.</Hint>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.3rem', marginBottom: '0.75rem' }}>
@@ -128,7 +127,7 @@ export default function RestrictionsFlow({ data, onChange, onNext, onBack, isMob
         onChange={v => update('niet_lekker_overig', v)}
         isMobile={isMobile}
       />
-      <NextBtn onClick={() => setStep(2)} isMobile={isMobile} />
+      <NextBtn onClick={() => setStep(2)} isMobile={isMobile} onBack={onBack} />
     </div>
   )
 
@@ -158,7 +157,6 @@ export default function RestrictionsFlow({ data, onChange, onNext, onBack, isMob
   // Stap 3 — Allergieën 3-stap schaal
   if (step === 3) return (
     <div style={{ padding: pad }}>
-      <BackBtn onBack={goBack} />
       <Q isMobile={isMobile}>Heb je allergieën of intoleranties?</Q>
       <Hint isMobile={isMobile}>Geef per product aan hoe erg het is</Hint>
       <div style={{ marginBottom: '0.75rem' }}>
@@ -178,7 +176,7 @@ export default function RestrictionsFlow({ data, onChange, onNext, onBack, isMob
         onChange={v => update('allergen_overig', v)}
         isMobile={isMobile}
       />
-      <NextBtn onClick={onNext} isMobile={isMobile} />
+      <NextBtn onClick={onNext} isMobile={isMobile} onBack={goBack} />
     </div>
   )
 

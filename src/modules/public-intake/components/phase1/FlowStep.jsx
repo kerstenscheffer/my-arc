@@ -40,29 +40,50 @@ export function SectionLabel({ children }) {
 
 // ── Knoppen ───────────────────────────────────────────────────────────────────
 
-export function NextBtn({ onClick, label = 'VOLGENDE →', disabled, isMobile }) {
-  return (
+// Geef onBack mee en de terug-knop komt ernaast te staan in plaats van
+// losjes bovenaan: 2 delen terug, 8 delen door. Allebei bold wit — terug is
+// een gewone keuze, geen noodgreep, maar mag de hoofdactie niet overstemmen.
+export function NextBtn({ onClick, label = 'VOLGENDE →', disabled, isMobile, onBack }) {
+  const hoofd = (
     <button
       onClick={disabled ? null : onClick}
       style={{
-        width: '100%',
+        flex: onBack ? 8 : undefined,
+        width: onBack ? undefined : '100%',
         padding: isMobile ? '0.85rem' : '0.9rem',
-        background: disabled
-          ? 'rgba(255,215,0,0.04)'
-          : 'linear-gradient(90deg, #FFD700, #FFA500)',
-        border: disabled ? '1px solid rgba(255,215,0,0.1)' : 'none',
+        background: disabled ? 'rgba(255,255,255,0.05)' : '#fff',
+        border: disabled ? '1px solid rgba(255,255,255,0.1)' : '1px solid #fff',
         borderRadius: '8px',
-        color: disabled ? 'rgba(255,215,0,0.2)' : '#000',
+        color: disabled ? 'rgba(255,255,255,0.25)' : '#0a0a0a',
         fontSize: isMobile ? '0.85rem' : '0.9rem',
-        fontWeight: 800, letterSpacing: '0.02em',
+        fontWeight: 900, letterSpacing: '0.02em',
         cursor: disabled ? 'default' : 'pointer',
-        fontFamily: 'inherit', marginTop: '0.5rem',
+        fontFamily: 'inherit', minHeight: 48,
         touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
         transition: 'all 0.2s ease'
       }}
       onTouchStart={e => { if (!disabled) e.currentTarget.style.transform = 'scale(0.98)' }}
       onTouchEnd={e => { e.currentTarget.style.transform = 'scale(1)' }}
     >{label}</button>
+  )
+
+  if (!onBack) return <div style={{ marginTop: '0.5rem' }}>{hoofd}</div>
+
+  return (
+    <div style={{ display: 'flex', gap: 8, marginTop: '0.5rem' }}>
+      <button
+        onClick={onBack}
+        style={{
+          flex: 2, padding: isMobile ? '0.85rem 0.4rem' : '0.9rem 0.5rem',
+          background: 'transparent', border: '1px solid rgba(255,255,255,0.25)',
+          borderRadius: '8px', color: '#fff',
+          fontSize: isMobile ? '0.85rem' : '0.9rem', fontWeight: 900,
+          cursor: 'pointer', fontFamily: 'inherit', minHeight: 48,
+          touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+        }}
+      >← Terug</button>
+      {hoofd}
+    </div>
   )
 }
 
@@ -84,9 +105,9 @@ export function SkipBtn({ onClick, label, isMobile }) {
   return (
     <button onClick={onClick} style={{
       background: 'transparent', border: 'none',
-      color: 'rgba(255,255,255,0.2)', fontSize: isMobile ? '0.65rem' : '0.68rem',
-      fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit',
-      padding: '0.2rem 0', marginTop: '0.1rem',
+      color: '#fff', fontSize: isMobile ? '0.78rem' : '0.8rem',
+      fontWeight: 900, cursor: 'pointer', fontFamily: 'inherit',
+      padding: '0.7rem 0', marginTop: '0.1rem', minHeight: 44, width: '100%',
       touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent'
     }}>{label || 'Overslaan →'}</button>
   )

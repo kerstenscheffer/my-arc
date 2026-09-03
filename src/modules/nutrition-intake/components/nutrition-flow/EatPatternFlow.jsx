@@ -398,40 +398,36 @@ export default function EatPatternFlow({ data, onChange, onNext, onBack, isMobil
 
   if (step === 1) return (
     <div style={{ padding: pad }}>
-      <BackBtn onBack={onBack} />
       <Q isMobile={isMobile}>Wat eet je of vind je lekker als ontbijt?</Q>
       <Hint isMobile={isMobile}>Tik aan wat je eet of graag eet — kies er minimaal {MIN_ITEMS_PER_MEAL}</Hint>
       <MaaltijdDrillDown maaltijdKey="ontbijt" data={data} onChange={onChange} isMobile={isMobile} />
       <MealItemCounter count={countMealItems('ontbijt', data)} skipped={isMealSkipped('ontbijt', data)} label="Ontbijt" />
-      <NextBtn onClick={() => setStep(2)} disabled={!canContinueMeal('ontbijt', data)} isMobile={isMobile} />
+      <NextBtn onClick={() => setStep(2)} disabled={!canContinueMeal('ontbijt', data)} isMobile={isMobile} onBack={onBack} />
     </div>
   )
 
   if (step === 2) return (
     <div style={{ padding: pad }}>
-      <BackBtn onBack={goBack} />
       <Q isMobile={isMobile}>Wat eet je of vind je lekker als lunch?</Q>
       <Hint isMobile={isMobile}>Tik aan wat je eet of graag eet — kies er minimaal {MIN_ITEMS_PER_MEAL}</Hint>
       <MaaltijdDrillDown maaltijdKey="lunch" data={data} onChange={onChange} isMobile={isMobile} />
       <MealItemCounter count={countMealItems('lunch', data)} skipped={isMealSkipped('lunch', data)} label="Lunch" />
-      <NextBtn onClick={() => setStep(3)} disabled={!canContinueMeal('lunch', data)} isMobile={isMobile} />
+      <NextBtn onClick={() => setStep(3)} disabled={!canContinueMeal('lunch', data)} isMobile={isMobile} onBack={goBack} />
     </div>
   )
 
   if (step === 3) return (
     <div style={{ padding: pad }}>
-      <BackBtn onBack={goBack} />
       <Q isMobile={isMobile}>Wat eet je of vind je lekker als avondeten?</Q>
       <Hint isMobile={isMobile}>Tik aan wat je eet of graag eet — kies er minimaal {MIN_ITEMS_PER_MEAL}</Hint>
       <MaaltijdDrillDown maaltijdKey="diner" data={data} onChange={onChange} isMobile={isMobile} />
       <MealItemCounter count={countMealItems('diner', data)} skipped={isMealSkipped('diner', data)} label="Avondeten" />
-      <NextBtn onClick={() => setStep(4)} disabled={!canContinueMeal('diner', data)} isMobile={isMobile} />
+      <NextBtn onClick={() => setStep(4)} disabled={!canContinueMeal('diner', data)} isMobile={isMobile} onBack={goBack} />
     </div>
   )
 
   if (step === 4) return (
     <div style={{ padding: pad }}>
-      <BackBtn onBack={goBack} />
       <Q isMobile={isMobile}>Heb je ooit een periode gehad dat het goed ging met eten?</Q>
       <Hint isMobile={isMobile}>Eerlijk antwoord helpt je coach</Hint>
       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem', marginBottom: '0.5rem' }}>
@@ -452,7 +448,7 @@ export default function EatPatternFlow({ data, onChange, onNext, onBack, isMobil
           />
         </div>
       )}
-      <NextBtn onClick={onNext} disabled={!data.wat_werkte} isMobile={isMobile} />
+      <NextBtn onClick={onNext} disabled={!data.wat_werkte} isMobile={isMobile} onBack={goBack} />
     </div>
   )
 

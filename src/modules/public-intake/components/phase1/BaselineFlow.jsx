@@ -36,7 +36,6 @@ export default function BaselineFlow({ data, onChange, onNext, onBack, isMobile 
   if (step === 'toelichting') {
     return (
       <>
-        <BackBtn onBack={terug} />
         <Q isMobile={isMobile}>In je eigen woorden — hoe voel je je nu over je lichaam en je fitheid?</Q>
         <Hint isMobile={isMobile}>
           Geen goed of fout. Dit lezen we straks terug als je vooruitgang boekt.
@@ -48,7 +47,7 @@ export default function BaselineFlow({ data, onChange, onNext, onBack, isMobile 
           onChange={v => zet('toelichting', v)}
           isMobile={isMobile}
         />
-        <NextBtn onClick={onNext} isMobile={isMobile} />
+        <NextBtn onClick={onNext} isMobile={isMobile} onBack={terug} />
         <SkipBtn onClick={onNext} label="Liever niet — overslaan" isMobile={isMobile} />
       </>
     )
@@ -57,7 +56,6 @@ export default function BaselineFlow({ data, onChange, onNext, onBack, isMobile 
   const v = BASELINE_VRAGEN.find(x => x.veld === step)
   return (
     <>
-      <BackBtn onBack={terug} />
       <Q isMobile={isMobile}>{v.vraag}</Q>
       {index === 0 && (
         <Hint isMobile={isMobile}>
@@ -71,7 +69,7 @@ export default function BaselineFlow({ data, onChange, onNext, onBack, isMobile 
         hoog={v.hoog}
         isMobile={isMobile}
       />
-      <NextBtn onClick={vooruit} disabled={!meting[v.veld]} isMobile={isMobile} />
+      <NextBtn onClick={vooruit} disabled={!meting[v.veld]} isMobile={isMobile} onBack={terug} />
     </>
   )
 }

@@ -261,7 +261,6 @@ export default function CurrentMealsFlow({ data, onChange, onNext, onBack, isMob
 
   return (
     <div style={{ padding: isMobile ? '1.5rem 1rem 2.5rem' : '2rem 1.25rem 3rem' }}>
-      {onBack && <BackBtn onBack={onBack} />}
 
       {/* Twee regels van gelijk gewicht: wat we vragen, en hoeveel we willen
           weten. De tweede regel is de aansporing en mag niet ondergeschikt
@@ -347,7 +346,7 @@ export default function CurrentMealsFlow({ data, onChange, onNext, onBack, isMob
         onClick={onNext}
         label={canContinue ? 'VOLGENDE →' : 'OVERSLAAN →'}
         isMobile={isMobile}
-      />
+      onBack={onBack} />
       {!canContinue && (
         <div style={{ marginTop: '0.5rem', textAlign: 'center', fontSize: '0.62rem', color: 'rgba(255,255,255,0.2)' }}>
           Je mag dit overslaan — ook zonder invullen ga je door

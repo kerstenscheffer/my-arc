@@ -82,7 +82,6 @@ export default function KnowledgeFlow({ data, onChange, onNext, onBack, isMobile
   // Stap 3 — Eerder voedingsplan gevolgd?
   if (step === 3) return (
     <div style={{ padding: pad }}>
-      <BackBtn onBack={goBack} />
       <Q isMobile={isMobile}>Heb je eerder een voedingsplan gevolgd?</Q>
       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem', marginBottom: '0.5rem' }}>
         {PLAN_GEVOLGD.map(opt => (
@@ -100,7 +99,7 @@ export default function KnowledgeFlow({ data, onChange, onNext, onBack, isMobile
         onClick={onNext}
         disabled={!data.plan_gevolgd}
         isMobile={isMobile}
-      />
+      onBack={goBack} />
     </div>
   )
 

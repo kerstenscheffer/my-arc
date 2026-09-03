@@ -108,7 +108,6 @@ export default function ExtrasFlow({ data, onChange, onNext, onBack, isMobile })
   // Stap 3 — Hoe vaak sociaal eten
   if (step === 3) return (
     <div style={{ padding: pad }}>
-      <BackBtn onBack={goBack} />
       <Q isMobile={isMobile}>Hoe vaak eet je buiten de deur of bij anderen?</Q>
       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem', marginBottom: '0.25rem' }}>
         {SOCIAAL_OPTIONS.map(opt => (
@@ -126,7 +125,7 @@ export default function ExtrasFlow({ data, onChange, onNext, onBack, isMobile })
         onClick={onNext}
         disabled={!data.sociaal_eten}
         isMobile={isMobile}
-      />
+      onBack={goBack} />
     </div>
   )
 
