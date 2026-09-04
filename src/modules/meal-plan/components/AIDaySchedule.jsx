@@ -2,7 +2,7 @@
 // 🎯 v3.1 - Edit consumed meal support added
 // ✅ FOOD LOG: Loads consumed_meals, combined totals, log button
 // ✅ EDIT: editingMeal state + FoodLogModal editMeal prop
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { preWorkoutVoorDag, PRE_WORKOUT_SLOT } from '../utils/preWorkoutMeal'
 import DayScheduleHeader from './day-schedule/DayScheduleHeader'
 import DaySelector from './day-schedule/DaySelector'
@@ -59,6 +59,8 @@ export default function AIDaySchedule({
   // stond morgen het ontbijt ook doorgestreept. Alleen visueel — er werd
   // niets gelogd — maar je zag wel "Gelogd" staan bij een dag met 0% macro's.
   const [checkedByDay, setCheckedByDay] = useState({})
+  // Welke maaltijden op dit moment worden weggeschreven.
+  const bezigMetLoggen = useRef(new Set())
 
   // Kalenderdatum van een dag-index, afgeleid van vandaag. Zelfde rekensom
   // als loadConsumedMeals gebruikt, hier apart zodat de vinkjes en de
@@ -461,6 +463,13 @@ export default function AIDaySchedule({
           }}
           onPlanMealLog={async (meal) => {
             if (!db?.supabase || !client?.id) return
+            // Slot tegen dubbel klikken. Lezen-dan-schrijven is niet
+            // waterdicht: twee klikken vlak na elkaar lezen allebei "nog niet
+            // gelogd" voordat de eerste heeft ingevoegd. De database heeft
+            // hiervoor ook een unieke index; dit vangt het al eerder af.
+            const logSleutel = `${meal.slot}|${meal.id}`
+            if (bezigMetLoggen.current.has(logSleutel)) return
+            bezigMetLoggen.current.add(logSleutel)
             try {
               // Dubbel-bewaking op de BEKEKEN dag, niet op vandaag.
               //
@@ -473,7 +482,7 @@ export default function AIDaySchedule({
               volgende.setDate(volgende.getDate() + 1)
               const datumVolgende = volgende.toISOString().split('T')[0]
 
-              const { data: existing } = await db.supabase
+              const { data: existing, error: leesFout } = await db.supabase
                 .from('consumed_meals')
                 .select('id')
                 .eq('client_id', client.id)
@@ -483,8 +492,18 @@ export default function AIDaySchedule({
                 .lt('consumed_at', `${datumVolgende}T00:00:00`)
                 .limit(1)
 
+              // Faalt de controle zelf, dan NIET loggen. Dit stond andersom:
+              // bij een mislukte query bleef `existing` undefined, viel de
+              // controle stil weg en werd er alsnog ingevoegd. Een dubbele rij
+              // telt dubbel mee in de dagtotalen — liever een klik die niets
+              // doet dan een getal dat niet klopt.
+              if (leesFout) {
+                console.error('Controle op dubbel loggen mislukt, niet gelogd:', leesFout)
+                return
+              }
+
               if (existing && existing.length > 0) {
-                console.log('⏭️ Plan meal al gelogd op deze dag, overgeslagen')
+                console.log('Plan meal al gelogd op deze dag, overgeslagen')
                 return
               }
 
@@ -546,7 +565,15 @@ export default function AIDaySchedule({
                 console.log('✅ Plan meal auto-logged:', meal.name)
               }
             } catch (err) {
-              console.error('Auto-log plan meal failed:', err)
+              // 23505 = unieke index geraakt: iemand was net voor. Dat is
+              // geen fout maar precies wat we wilden — de maaltijd staat er.
+              if (err?.code === '23505') {
+                console.log('Plan meal stond al gelogd (unieke index)')
+              } else {
+                console.error('Auto-log plan meal failed:', err)
+              }
+            } finally {
+              bezigMetLoggen.current.delete(logSleutel)
             }
           }}
         />
