@@ -175,6 +175,7 @@ export default function PlanAnalyzer({
   // Zichtbare opslag-status van week-wijzigingen (swaps/edits) in de titelbalk.
   const [weekSaveState, setWeekSaveState] = useState('idle')
   const [conceptPlans, setConceptPlans] = useState([])
+  const [actiefPlan, setActiefPlan] = useState(null)
   const [loadingConcepts, setLoadingConcepts] = useState(false)
   const [selectedConceptId, setSelectedConceptId] = useState(conceptPlanId || null)
   const [swapState, setSwapState] = useState(null)
@@ -445,9 +446,32 @@ export default function PlanAnalyzer({
     } catch (err) { console.error('Concept load error:', err) }
   }
 
+  const PLAN_KOLOMMEN = 'id, template_name, daily_calories, daily_protein, is_active, ai_generated, created_at, stats'
+
+  // Concepten en het actieve plan in één keer, naast elkaar.
+  //
+  // Het actieve plan viel hier eerder buiten: de conceptenlijst filtert op
+  // is_active = false. Je zag dus wel "Alle plannen (3)" maar maar twee
+  // regels, en juist het plan dat de klant nu volgt kon je niet openen.
+  //
+  // Let op de vorm van de foutafhandeling: een Supabase query-builder heeft
+  // wel .then() maar geen .catch(). Een .catch() erop gooit synchroon en
+  // sloopt deze hele Promise.all. Vandaar het tweede argument van .then().
   const loadConceptPlansForClient = async (cId) => {
     setLoadingConcepts(true)
-    try { const { data } = await db.supabase.from('client_meal_plans').select('id, template_name, daily_calories, daily_protein, is_active, ai_generated, created_at, stats').eq('client_id', cId).eq('is_active', false).order('created_at', { ascending: false }).limit(10); setConceptPlans(data || []) } catch {}
+    const leeg = { data: [] }
+    const [concepten, actief] = await Promise.all([
+      db.supabase.from('client_meal_plans').select(PLAN_KOLOMMEN)
+        .eq('client_id', cId).eq('is_active', false)
+        .order('created_at', { ascending: false }).limit(10)
+        .then(r => r, () => leeg),
+      db.supabase.from('client_meal_plans').select(PLAN_KOLOMMEN)
+        .eq('client_id', cId).eq('is_active', true)
+        .order('created_at', { ascending: false }).limit(1)
+        .then(r => r, () => leeg),
+    ])
+    setConceptPlans(concepten?.data || [])
+    setActiefPlan(actief?.data?.[0] || null)
     setLoadingConcepts(false)
   }
 
@@ -974,6 +998,41 @@ export default function PlanAnalyzer({
             kiezen sinds de tabbalk weg is. */}
         <ClientKiezer clients={clients} selectedClient={selectedClient}
           onSelectClient={onSelectClient} m={m} />
+
+        {/* Het plan dat de klant nu volgt. Groen, met een streep ernaast en
+            het label "Actief" — zodat je in één blik ziet welk van de drie
+            plannen live staat, en het niet verwart met een concept. */}
+        {actiefPlan && (
+          <button onClick={() => setSelectedConceptId(actiefPlan.id)} style={{
+            width: '100%', display: 'flex', alignItems: 'center', gap: '0.6rem',
+            padding: '0.7rem 0.9rem', marginBottom: '0.6rem',
+            background: 'rgba(16,185,129,0.08)',
+            border: '1px solid rgba(16,185,129,0.35)',
+            borderLeft: '3px solid #10b981',
+            borderRadius: '6px', cursor: 'pointer', textAlign: 'left',
+            fontFamily: 'inherit',
+            touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+          }}>
+            <Check size={16} color="#10b981" style={{ flexShrink: 0 }} />
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                <span style={{
+                  fontSize: '0.85rem', fontWeight: 900, color: '#fff',
+                  overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                }}>{actiefPlan.template_name}</span>
+                <span style={{
+                  flexShrink: 0, padding: '1px 6px', borderRadius: 4,
+                  background: 'rgba(16,185,129,0.18)', color: '#10b981',
+                  fontSize: '0.5rem', fontWeight: 900, letterSpacing: '0.04em',
+                }}>ACTIEF</span>
+              </div>
+              <div style={{ fontSize: '0.55rem', color: 'rgba(255,255,255,0.4)' }}>
+                {actiefPlan.daily_calories} kcal · {actiefPlan.daily_protein}g eiwit · dit ziet je client nu
+              </div>
+            </div>
+            <ChevronRight size={14} color="rgba(16,185,129,0.5)" style={{ flexShrink: 0 }} />
+          </button>
+        )}
 
         {/* Blanco beginnen. Staat bovenaan omdat het de kortste route is:
             geen sjabloon, geen AI, meteen een leeg weekplan om in te bouwen. */}
