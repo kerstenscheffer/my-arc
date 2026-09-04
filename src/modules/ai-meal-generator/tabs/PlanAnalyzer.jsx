@@ -2,7 +2,7 @@
 // v4.0 — Sidebar layout: linker icon nav + compacte builder rechts
 
 import React, { useState, useEffect, useCallback, useRef } from 'react'
-import { BarChart3, FileText, ChevronLeft, ChevronRight, AlertTriangle, Zap, Grid3X3, Calendar, List, Download, MessageSquare, Play, Check, Loader, Clock, RotateCcw, RotateCw, Copy, X, Plus, Repeat, Bookmark, Pill } from 'lucide-react'
+import { BarChart3, FileText, ChevronLeft, ChevronRight, AlertTriangle, Zap, Grid3X3, Calendar, List, Download, MessageSquare, Play, Check, Loader, Clock, RotateCcw, RotateCw, Copy, X, Plus, Repeat, Bookmark, Pill, Users, SlidersHorizontal } from 'lucide-react'
 import DayNavigator, { DAYS } from './plan-analyzer/DayNavigator'
 import DayMacroBar from './plan-analyzer/DayMacroBar'
 import MealCard from './plan-analyzer/MealCard'
@@ -46,6 +46,101 @@ const DOCK_LABELS = {
 // zijn. Hij stond eerder helemaal niet in deze lijst, waardoor een
 // pre_workout-slot uit week_structure onzichtbaar was in de dagweergave en
 // niet meetelde in het dagtotaal.
+// Klant kiezen. Stond in de tabbalk boven de pagina; die balk lag over de
+// zijbalk en het zijvak heen en is weg. Nu op twee plekken: smal in de
+// zijbalk, breed op het beginscherm (dat heeft geen zijbalk, en zonder
+// picker daar zou je helemaal geen klant meer kunnen kiezen).
+//
+// Een echte <select> onzichtbaar over de knop heen: dan krijg je de kiezer
+// van het besturingssysteem, die op een telefoon prettiger werkt dan een
+// eigen uitklaplijst — en er is niets te sluiten of buiten te klikken.
+function ClientKiezer({ clients = [], selectedClient, onSelectClient, compact, m }) {
+  const naam = selectedClient
+    ? `${selectedClient.first_name || ''} ${selectedClient.last_name || ''}`.trim()
+    : ''
+  const gesorteerd = (clients || [])
+    .filter(c => c.email !== DEMO_EMAIL)
+    .slice()
+    .sort((a, b) => `${a.first_name} ${a.last_name}`.localeCompare(`${b.first_name} ${b.last_name}`))
+  const demo = (clients || []).filter(c => c.email === DEMO_EMAIL)
+
+  const kies = (e) => {
+    const c = (clients || []).find(x => x.id === e.target.value) || null
+    onSelectClient?.(c)
+  }
+
+  const select = (
+    <select
+      value={selectedClient?.id || ''}
+      onChange={kies}
+      aria-label="Kies client"
+      style={{
+        position: 'absolute', inset: 0, width: '100%', height: '100%',
+        opacity: 0, cursor: 'pointer', fontFamily: 'inherit',
+      }}
+    >
+      <option value="" style={{ background: '#1a1a1a', color: '#ccc' }}>Kies client…</option>
+      {demo.map(d => (
+        <option key={d.id} value={d.id} style={{ background: '#1a1a1a', color: '#FFD700' }}>Demo persoon</option>
+      ))}
+      {gesorteerd.map(c => (
+        <option key={c.id} value={c.id} style={{ background: '#1a1a1a', color: '#fff' }}>
+          {c.first_name} {c.last_name}
+        </option>
+      ))}
+    </select>
+  )
+
+  if (compact) {
+    // Zijbalk: 72/92px breed, dus alleen de voornaam en die mag afgekapt.
+    return (
+      <div style={{
+        position: 'relative', width: m ? 58 : 78, padding: '8px 4px',
+        display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3,
+        background: selectedClient ? 'rgba(255,215,0,0.14)' : 'rgba(255,255,255,0.025)',
+        border: `1px solid ${selectedClient ? 'rgba(255,215,0,0.45)' : 'rgba(255,255,255,0.07)'}`,
+        borderRadius: 8, cursor: 'pointer',
+      }}>
+        <Users size={18} color={selectedClient ? '#FFD700' : 'rgba(255,255,255,0.65)'} />
+        <span style={{
+          fontSize: '0.58rem', fontWeight: 800,
+          color: selectedClient ? '#FFD700' : 'rgba(255,255,255,0.6)',
+          maxWidth: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+        }}>
+          {selectedClient?.first_name || 'Client'}
+        </span>
+        {select}
+      </div>
+    )
+  }
+
+  return (
+    <div style={{
+      position: 'relative', width: '100%',
+      display: 'flex', alignItems: 'center', gap: '0.45rem',
+      padding: '0.7rem 0.9rem', marginBottom: '0.6rem',
+      background: 'rgba(255,255,255,0.03)',
+      border: `1px solid ${selectedClient ? 'rgba(255,215,0,0.3)' : 'rgba(255,255,255,0.12)'}`,
+      borderRadius: 6, cursor: 'pointer',
+    }}>
+      <Users size={14} color={selectedClient ? '#FFD700' : 'rgba(255,255,255,0.4)'} style={{ flexShrink: 0 }} />
+      <span style={{
+        flex: 1, minWidth: 0, textAlign: 'left',
+        fontSize: '0.72rem', fontWeight: 900,
+        color: selectedClient ? '#fff' : 'rgba(255,255,255,0.4)',
+        overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+      }}>
+        {naam || 'Kies client…'}
+      </span>
+      <ChevronRight size={14} color="rgba(255,255,255,0.25)" style={{ flexShrink: 0 }} />
+      {select}
+    </div>
+  )
+}
+
+// Vaste demo-client (voor voorbeeldplannen). Herkend op dit e-mailadres.
+const DEMO_EMAIL = 'demo@myarcfitness.internal'
+
 const SLOTS = ['breakfast', 'snack1', 'lunch', 'snack2', 'dinner', 'snack3', 'snack4', 'snack5', 'snack6', 'snack7', 'snack8', 'pre_workout']
 const SLOT_DEFAULT_TIMES = {
   breakfast: '07:30', snack1: '10:30', lunch: '13:00',
@@ -57,7 +152,9 @@ const MAX_HISTORY = 50
 export default function PlanAnalyzer({
   db, generatedPlan, planModifications, setPlanModifications,
   dailyTargets, isMobile, conceptPlanId, clientId, onPlanActivated,
-  onConceptLoaded, coachId, topOffset = 76
+  onConceptLoaded, coachId, topOffset = 76,
+  // Uit de weggehaalde tabbalk: klant kiezen en naar het targets-scherm.
+  clients = [], selectedClient = null, onSelectClient, onOpenTargets,
 }) {
   const [activeDay, setActiveDay] = useState(0)
   // Agenda opent nu in het dock-vak (dockedSection === 'agenda').
@@ -370,7 +467,7 @@ export default function PlanAnalyzer({
   // selectedConceptId || planMeta?.id. Verschilden die twee, dan landde de
   // pre-workout maaltijd in het ene plan terwijl de tijdlijn het andere
   // toonde — en leek de maaltijd verdwenen. Nu één constante.
-  // Waar begint de ruimte onder de sticky tabbalk, en hoeveel hoogte houden
+  // Waar begint de ruimte onder de kop van CoachHub, en hoeveel hoogte houden
   // we over? Beide stonden hardgecodeerd: de zijbalk en het dock-paneel
   // kleefden aan top:0 en verdwenen daardoor onder die balk.
   // In split screen geeft de parent-div --paneel-top, --paneel-hoogte en
@@ -873,6 +970,11 @@ export default function PlanAnalyzer({
             {!resolvedClientId ? 'Kies eerst een client' : conceptPlans.length > 0 ? 'Kies een plan of begin blanco' : 'Begin blanco, laad een sjabloon of genereer een plan'}
           </div>
         </div>
+        {/* Zonder zijbalk op dit scherm is dit de enige plek om een klant te
+            kiezen sinds de tabbalk weg is. */}
+        <ClientKiezer clients={clients} selectedClient={selectedClient}
+          onSelectClient={onSelectClient} m={m} />
+
         {/* Blanco beginnen. Staat bovenaan omdat het de kortste route is:
             geen sjabloon, geen AI, meteen een leeg weekplan om in te bouwen. */}
         {resolvedClientId && (
@@ -1039,10 +1141,28 @@ export default function PlanAnalyzer({
         paddingBottom: navRuimte,
         overflowY: 'auto', WebkitOverflowScrolling: 'touch',
         // Meescrollen met de pagina, niet mee naar beneden verdwijnen —
-        // en beginnen onder de tabbalk, niet eronder verdwijnen.
+        // en beginnen onder de kop van CoachHub.
         position: 'sticky', top: kleefTop,
         maxHeight: paneelHoogte,
       }}>
+        {/* Klant + targets. Kwamen uit de tabbalk die over deze zijbalk heen
+            lag. Bovenaan, want je kiest eerst een klant en dan pas de rest. */}
+        <ClientKiezer clients={clients} selectedClient={selectedClient}
+          onSelectClient={onSelectClient} compact m={m} />
+        {onOpenTargets && (
+          <button onClick={onOpenTargets} title="Client & targets instellen" style={{
+            width: m ? 58 : 78, padding: '8px 4px',
+            display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3,
+            background: 'rgba(255,255,255,0.025)',
+            border: '1px solid rgba(255,255,255,0.07)',
+            borderRadius: 8, cursor: 'pointer', fontFamily: 'inherit',
+            touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+          }}>
+            <SlidersHorizontal size={18} color="rgba(255,255,255,0.65)" />
+            <span style={{ fontSize: '0.58rem', fontWeight: 800, color: 'rgba(255,255,255,0.6)' }}>Targets</span>
+          </button>
+        )}
+
         {/* Activeer knop */}
         {planMeta && (() => {
           const isActiveAlready = activated || planMeta?.isActive
@@ -1355,10 +1475,10 @@ export default function PlanAnalyzer({
       )}
 
       {/* ════════════ MAIN BUILDER ════════════
-          Kleeft onder de tabbalk, net als de zijbalk en het dock. Deze kolom
+          Kleeft onder de kop van CoachHub, net als de zijbalk en het dock. Deze kolom
           had al flex:1 + overflow:hidden met scrollende kinderen — die opzet
           werkt alleen als de kolom een échte hoogte heeft. Zonder dat groeide
-          hij door en verdween de plantitel onder de tabbalk. */}
+          hij door en verdween de plantitel onder de kop. */}
       <div style={{
         flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden',
         position: 'sticky', top: kleefTop, height: paneelHoogte,

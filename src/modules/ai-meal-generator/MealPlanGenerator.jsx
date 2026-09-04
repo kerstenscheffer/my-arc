@@ -1,8 +1,8 @@
 // src/modules/ai-meal-generator/MealPlanGenerator.jsx
 // v2.0 — Gold/black CoachHub styling, no extra wrapper, full width
 
-import { useState, useEffect, useLayoutEffect, useRef } from 'react'
-import { Users, BarChart3, AlertCircle, Check } from 'lucide-react'
+import { useState, useEffect, useLayoutEffect } from 'react'
+import { AlertCircle, Check, ChevronLeft } from 'lucide-react'
 
 import ClientSelector from './tabs/ClientSelector'
 import MealSelector from './tabs/MealSelector'
@@ -19,32 +19,28 @@ const G = {
   text: 'rgba(255, 215, 0, 0.6)'
 }
 
-// Alleen nog Client (om een klant te kiezen) + Analyzer. De oude bouw-tabs
-// (Maaltijden/Bouwen/Opslaan) zijn uit de UI gehaald; hun code blijft als
-// switch-case staan zodat er niks breekt. `idx` = de case-index in de switch.
-const TABS = [
-  { id: 'client',  idx: 0, label: 'Client',   icon: Users },
-  { id: 'analyze', idx: 3, label: 'Analyzer', icon: BarChart3 }
-]
-
-// Vaste demo-client (voor voorbeeldplannen). Herkend op dit e-mailadres.
-const DEMO_EMAIL = 'demo@myarcfitness.internal'
+// De tabbalk is weg. Client kiezen en de targets zitten nu in de zijbalk
+// van de Analyzer; de oude bouw-tabs blijven als switch-case bestaan zodat
+// er niks breekt. `idx` = de case-index in renderTabContent.
+const TAB_ANALYZER = 3
+const TAB_CLIENT = 0
 
 export default function MealPlanGenerator({ db, clients = [], conceptPlanId, selectedClient: propSelectedClient, coachId}) {
-  // De tabbalk hierboven is sticky. Alles wat in een tab zélf sticky wil
-  // staan (de zijbalk van de Analyzer, het dock-paneel, de plantitel) moet
-  // daar precies onder beginnen, anders schuift het eronder weg. We meten de
-  // balk in plaats van de hoogte te gokken: hij verandert met de tekstgrootte
-  // en met de veilige zone bovenaan op een telefoon.
-  const tabBarRef = useRef(null)
-  const [tabBarBottom, setTabBarBottom] = useState(76)
+  // Waar mag iets dat sticky is beginnen? Vroeger was dat de onderkant van
+  // de tabbalk hier. Die balk is weg, dus nu is het de plek waar hij stond:
+  // onder de koptekst van CoachHub. Dat is de veilige zone plus 32px.
+  //
+  // Niet hardcoderen op 32: op een telefoon met een notch telt env() mee. We
+  // laten de browser de calc() uitrekenen via een onzichtbaar proefblokje.
+  const [stickyTop, setStickyTop] = useState(32)
   useLayoutEffect(() => {
     const meet = () => {
-      const el = tabBarRef.current
-      if (!el) return
-      // getComputedStyle rekent de calc() met env() al voor ons uit.
-      const top = parseFloat(getComputedStyle(el).top) || 0
-      setTabBarBottom(Math.round(top + el.offsetHeight))
+      const proef = document.createElement('div')
+      proef.style.cssText = 'position:fixed;visibility:hidden;pointer-events:none;top:calc(env(safe-area-inset-top, 0px) + 32px)'
+      document.body.appendChild(proef)
+      const top = parseFloat(getComputedStyle(proef).top)
+      document.body.removeChild(proef)
+      if (!Number.isNaN(top)) setStickyTop(Math.round(top))
     }
     meet()
     window.addEventListener('resize', meet)
@@ -205,7 +201,11 @@ export default function MealPlanGenerator({ db, clients = [], conceptPlanId, sel
       )
       case 3: return (
         <PlanAnalyzer
-          coachId={coachId} topOffset={tabBarBottom}
+          coachId={coachId} topOffset={stickyTop}
+          clients={clients}
+          selectedClient={selectedClient}
+          onSelectClient={setSelectedClient}
+          onOpenTargets={() => setActiveTab(TAB_CLIENT)}
           db={db} generatedPlan={generatedPlan} analyzedData={analyzedData}
           planModifications={planModifications} setPlanModifications={setPlanModifications}
           dailyTargets={dailyTargets} isMobile={m}
@@ -231,94 +231,37 @@ export default function MealPlanGenerator({ db, clients = [], conceptPlanId, sel
   return (
     <div style={{ minHeight: '100vh', background: '#0a0a0a' }}>
 
-      {/* ═══ TAB BAR + INLINE CLIENT PICKER — sticky ═══ */}
-      <div ref={tabBarRef} style={{
-        display: 'flex', alignItems: 'stretch',
-        borderBottom: `1px solid ${G.border}`,
-        background: 'rgba(10, 10, 10, 0.97)',
-        position: 'sticky',
-        top: 'calc(env(safe-area-inset-top, 0px) + 32px)',
-        zIndex: 50,
-      }}>
-        {/* Tabs */}
-        <div style={{ display: 'flex', overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
-          {TABS.map((tab) => {
-            const Icon = tab.icon
-            const isActive = tab.idx === activeTab
-            const isCompleted = generatedPlan && tab.idx < 3
-            return (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.idx)}
-                style={{
-                  minWidth: m ? '58px' : '80px',
-                  padding: m ? '0.6rem 0.2rem' : '0.75rem 0',
-                  background: 'transparent', border: 'none',
-                  borderBottom: isActive ? `2px solid ${G.primary}` : '2px solid transparent',
-                  color: isActive ? G.primary : isCompleted ? '#10b981' : 'rgba(255,255,255,0.35)',
-                  fontSize: m ? '0.58rem' : '0.7rem', fontWeight: isActive ? 700 : 500,
-                  cursor: 'pointer',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  gap: m ? '0.15rem' : '0.3rem',
-                  flexDirection: m ? 'column' : 'row',
-                  touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-                  transition: 'all 0.15s ease', whiteSpace: 'nowrap',
-                  letterSpacing: '-0.01em'
-                }}
-              >
-                <Icon size={m ? 12 : 14} />
-                {tab.label}
-                {isCompleted && !isActive && <Check size={9} color="#10b981" />}
-              </button>
-            )
-          })}
-        </div>
+      {/* De sticky tabbalk stond hier. Hij lag met zIndex 50 over de zijbalk
+          en het zijvak van de Analyzer heen: koppen en knoppen verdwenen
+          eronder. Client kiezen en de targets zitten nu in de zijbalk van de
+          Analyzer zelf, waar ze horen — een sticky laag minder op de pagina.
 
-        {/* Inline client picker — kies direct hier, geen aparte Client-tab nodig */}
+          Alleen de Client-tab (targets instellen) heeft nog een eigen
+          terugweg nodig, want zonder balk kom je er anders niet meer vandaan.
+          Bewust niet sticky: dat is precies het probleem dat we oplossen. */}
+      {activeTab !== TAB_ANALYZER && (
         <div style={{
-          marginLeft: 'auto',
-          display: 'flex', alignItems: 'center', gap: '0.3rem',
-          padding: m ? '0 0.5rem' : '0 0.75rem',
-          borderLeft: `1px solid ${G.border}`,
-          flexShrink: 0,
+          display: 'flex', alignItems: 'center', gap: '0.5rem',
+          padding: m ? '0.5rem 0.75rem' : '0.6rem 1rem',
+          borderBottom: `1px solid ${G.border}`,
         }}>
-          <Users size={11} color={G.text} style={{ flexShrink: 0 }} />
-          <select
-            value={selectedClient?.id || ''}
-            onChange={e => {
-              const client = (clients || []).find(c => c.id === e.target.value) || null
-              setSelectedClient(client)
-            }}
-            style={{
-              background: 'transparent',
-              border: 'none',
-              color: selectedClient ? G.primary : 'rgba(255,255,255,0.3)',
-              fontSize: m ? '0.62rem' : '0.68rem',
-              fontWeight: 600,
-              cursor: 'pointer',
-              outline: 'none',
-              maxWidth: m ? '100px' : '160px',
-            }}
-          >
-            <option value="" style={{ background: '#1a1a1a', color: '#ccc' }}>Kies client…</option>
-            {/* Demo-persoon vastgepind bovenaan — voor voorbeeldplannen. */}
-            {(clients || []).filter(c => c.email === DEMO_EMAIL).map(demo => (
-              <option key={demo.id} value={demo.id} style={{ background: '#1a1a1a', color: '#FFD700' }}>
-                🧪 Demo persoon
-              </option>
-            ))}
-            {(clients || [])
-              .filter(c => c.email !== DEMO_EMAIL)
-              .slice()
-              .sort((a, b) => `${a.first_name} ${a.last_name}`.localeCompare(`${b.first_name} ${b.last_name}`))
-              .map(c => (
-                <option key={c.id} value={c.id} style={{ background: '#1a1a1a', color: '#fff' }}>
-                  {c.first_name} {c.last_name}
-                </option>
-              ))}
-          </select>
+          <button onClick={() => setActiveTab(TAB_ANALYZER)} style={{
+            display: 'flex', alignItems: 'center', gap: '0.35rem',
+            padding: '0.4rem 0.7rem',
+            background: 'rgba(255,255,255,0.04)',
+            border: '1px solid rgba(255,255,255,0.12)',
+            borderRadius: 6, cursor: 'pointer',
+            color: '#fff', fontSize: m ? '0.68rem' : '0.72rem', fontWeight: 900,
+            fontFamily: 'inherit',
+            touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+          }}>
+            <ChevronLeft size={14} /> Analyzer
+          </button>
+          <span style={{ fontSize: m ? '0.68rem' : '0.72rem', fontWeight: 800, color: 'rgba(255,255,255,0.45)' }}>
+            Client &amp; targets
+          </span>
         </div>
-      </div>
+      )}
 
       {/* ═══ STATUS MESSAGES ═══ */}
       {(error || success) && (
