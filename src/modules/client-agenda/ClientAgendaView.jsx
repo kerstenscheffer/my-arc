@@ -7,6 +7,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Calendar, Utensils, Dumbbell, Moon, Briefcase, Pill, AlertCircle, Plus, Trash2, Check, X, ChevronLeft, ChevronRight, Repeat } from 'lucide-react'
 import { ClientAgendaService, DAYS, DAY_LABELS_NL, DAY_LABELS_NL_LONG, getMondayOf, dateForDay, toIsoDate, recurringIdFor } from './ClientAgendaService'
+import { meldMaaltijdTijd, luisterMaaltijdTijd } from '../meal-plan/utils/mealSync'
 
 const COLORS = {
   bg: '#0a0a0a',
@@ -1258,6 +1259,11 @@ export default function ClientAgendaView({
     } catch (e) { console.error(e); setError(e) }
   }
 
+  // Wijzigt de Plan Analyzer een maaltijdtijd in de andere helft van het
+  // scherm, dan halen we de week opnieuw op. Anders staat hier de oude tijd
+  // terwijl je er twee schermen naast elkaar bij hebt.
+  useEffect(() => luisterMaaltijdTijd(() => { reload() }, 'agenda'), [client?.id, weekAnchor, forcedMealPlanId])
+
   useEffect(() => {
     if (!service || !client?.id) return
     let cancelled = false
@@ -1554,6 +1560,17 @@ export default function ClientAgendaView({
             day: d.block.day,
             slot: d.block.meta?.slot,
             newTiming: newTimingStr,
+          })
+
+          // En naar de andere helft van het scherm. onMealTimingChange bereikt
+          // alleen een ouder die de agenda zelf rendert; in split screen staat
+          // de Plan Analyzer in een eigen boom en hoort die er niets van.
+          meldMaaltijdTijd({
+            mealPlanId: d.block.meta?.mealPlanId || forcedMealPlanId || null,
+            day: d.block.day,
+            slot: d.block.meta?.slot,
+            newTiming: newTimingStr,
+            bron: 'agenda',
           })
 
           ;(async () => {

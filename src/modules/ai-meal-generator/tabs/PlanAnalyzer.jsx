@@ -8,6 +8,7 @@ import DayMacroBar from './plan-analyzer/DayMacroBar'
 import MealCard from './plan-analyzer/MealCard'
 import SwapModal from './plan-analyzer/SwapModal'
 import { PRE_WORKOUT_SLOT, totalenMetPreWorkout } from '../../meal-plan/utils/preWorkoutMeal'
+import { meldMaaltijdTijd, luisterMaaltijdTijd } from '../../meal-plan/utils/mealSync'
 import ClientContextPanel from './plan-analyzer/ClientContextPanel'
 import AutoBalancer from './plan-analyzer/AutoBalancer'
 import WeekBalancer from './plan-analyzer/WeekBalancer'
@@ -356,6 +357,22 @@ export default function PlanAnalyzer({
 
   const actievePlanId = planMeta?.id || selectedConceptId || null
 
+  // Verschuift de agenda in de andere helft van het scherm een maaltijd, dan
+  // volgt de kaart hier meteen. Zonder dit staat in split screen links 12:00
+  // en rechts 13:00 voor dezelfde maaltijd, en weet je niet welke klopt.
+  useEffect(() => luisterMaaltijdTijd(({ mealPlanId, day, slot, newTiming }) => {
+    // Andere klant of ander plan in beeld → niet aanraken.
+    if (mealPlanId && actievePlanId && mealPlanId !== actievePlanId) return
+    const idx = DAYS.findIndex(d => d.id === day)
+    if (idx < 0 || !slot || !newTiming) return
+    setWeekData(prev => {
+      if (!prev?.[idx]?.meals?.[slot]) return prev
+      const next = [...prev]
+      next[idx] = { ...next[idx], meals: { ...next[idx].meals, [slot]: { ...next[idx].meals[slot], timing: newTiming } } }
+      return next
+    })
+  }, 'analyzer'), [actievePlanId])
+
   // ════════════ HELPERS ════════════
 
   const calculateTotals = (meals) => {
@@ -450,6 +467,20 @@ export default function PlanAnalyzer({
       : isClockTime(prevMeal?.timing) ? prevMeal.timing
       : (SLOT_DEFAULT_TIMES[slot] || '12:00')
     return { ...meal, timing }
+  }
+
+  // Nieuwe tijden uitzenden naar de agenda in de andere helft. Alleen wat
+  // werkelijk veranderd is, zodat de agenda niet voor elke maaltijd opnieuw
+  // laadt terwijl er niets gebeurde.
+  const meldTijden = (updated) => {
+    ;(updated || []).forEach((dag, i) => {
+      const oud = weekData?.[i]?.meals || {}
+      Object.entries(dag.meals || {}).forEach(([slot, meal]) => {
+        const nieuw = meal?.timing
+        if (!nieuw || nieuw === oud[slot]?.timing) return
+        meldMaaltijdTijd({ mealPlanId: actievePlanId, day: DAYS[i]?.id, slot, newTiming: nieuw, bron: 'analyzer' })
+      })
+    })
   }
 
   const handleSwap = (dayIndex, slot, meal) => setSwapState({ dayIndex, slot, meal })
@@ -1054,7 +1085,7 @@ export default function PlanAnalyzer({
           )}
           {dockedSection === 'timing' && weekData && (
             <TimingModal embedded weekData={weekData}
-              onApply={async (updated) => { await applyWeekUpdate(updated, 'Tijden bijgewerkt'); setDockedSection(null) }}
+              onApply={async (updated) => { await applyWeekUpdate(updated, 'Tijden bijgewerkt'); meldTijden(updated); setDockedSection(null) }}
               onClose={() => setDockedSection(null)} isMobile={m} />
           )}
           {dockedSection === 'dag' && currentDay && (
@@ -1471,7 +1502,7 @@ export default function PlanAnalyzer({
 
       {showTimingModal && weekData && (
         <TimingModal weekData={weekData}
-          onApply={async (updated) => { await applyWeekUpdate(updated, 'Tijden bijgewerkt'); setShowTimingModal(false) }}
+          onApply={async (updated) => { await applyWeekUpdate(updated, 'Tijden bijgewerkt'); meldTijden(updated); setShowTimingModal(false) }}
           onClose={() => setShowTimingModal(false)} isMobile={m} />
       )}
 
