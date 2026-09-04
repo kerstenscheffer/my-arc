@@ -384,14 +384,23 @@ export default function SwapModal({
   }
 
   const modal = (
-    <div onClick={embedded ? undefined : onClose} style={{
+    // Ingebed in het zijvak hoort dit gewoon een blok in de stroom te zijn.
+    // Het stond op position:fixed met inset:0, wat leunt op een transform op
+    // een ouder om binnen het vak te blijven. In split screen zit die ouder
+    // een laag dieper en verdween het paneel uit beeld: het vak was zwart
+    // terwijl de maaltijden wél geladen waren. TimingModal en PlanSwitcher
+    // deden dit al met een ternary; SwapModal, AutoBalancer en BestSwaps niet.
+    <div onClick={embedded ? undefined : onClose} style={embedded ? {
+      display: 'flex', flexDirection: 'column',
+      width: '100%', height: '100%', minHeight: 0,
+      background: '#0a0a0a',
+    } : {
       position: 'fixed', inset: 0,
-      background: embedded ? 'transparent' : 'rgba(0,0,0,0.92)',
-      backdropFilter: embedded ? 'none' : 'blur(8px)', WebkitBackdropFilter: embedded ? 'none' : 'blur(8px)',
+      background: 'rgba(0,0,0,0.92)',
+      backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)',
       zIndex: 10000, display: 'flex',
       alignItems: 'stretch', justifyContent: 'center',
-      // Embedded (in het modal vak) = fullwidth, geen kanten.
-      padding: embedded ? 0 : (m ? '0' : 'min(40px, 4vh) 20px'),
+      padding: m ? '0' : 'min(40px, 4vh) 20px',
     }}>
       <div onClick={e => e.stopPropagation()} style={{
         background: '#0a0a0a',
