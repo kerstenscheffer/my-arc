@@ -358,7 +358,12 @@ export default function AutoBalancer({ dayData, targets, dayIndex, onApply, onCl
   // Embedded: render inline in een getransformeerde container zodat de
   // fixed-modal binnen het dock-paneel valt i.p.v. over het hele scherm.
   if (embedded) return (
-    <div style={{ position: 'relative', width: '100%', height: '100%', transform: 'translateZ(0)', overflow: 'hidden' }}>{modal}</div>
+    // flex:1 + minHeight:0 in plaats van height:100%. Het dock-paneel is een
+    // kolom-flex, dus dit vult altijd de beschikbare hoogte. Een procentuele
+    // hoogte hangt af van of élke ouder in de keten een vaste hoogte heeft, en
+    // in split screen klapte die keten dicht: het paneel opende, maar de lijst
+    // erin was nul pixels hoog en je zag geen maaltijden.
+    <div style={{ position: 'relative', width: '100%', flex: 1, minHeight: 0, transform: 'translateZ(0)', overflow: 'hidden' }}>{modal}</div>
   )
   return createPortal(modal, modalHost)
 }
