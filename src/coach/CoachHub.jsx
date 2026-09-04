@@ -94,7 +94,8 @@ const MORE_CATEGORIES = [
   {
     label: 'Gameplan',
     items: [
-      { id: 'productivity', label: 'Productivity', icon: Target }
+      { id: 'productivity', label: 'Productivity', icon: Target },
+      { id: 'sales', label: 'Sales', icon: DollarSign }
     ]
   },
   {
@@ -109,9 +110,12 @@ const MORE_CATEGORIES = [
     label: 'Plan Making',
     items: [
       { id: 'client-agenda', label: 'Client Agenda', icon: Calendar },
+      { id: 'plan-wizard', label: 'Plan Wizard', icon: Wand2 },
       { id: 'ai-meals', label: 'AI Meals', icon: Sparkles },
       { id: 'workout-builder', label: 'Workout Builder', icon: Dumbbell },
-      { id: 'coachvids', label: 'Videos', icon: Video }
+      { id: 'calls', label: 'Call Planning', icon: Phone },
+      { id: 'coachvids', label: 'Videos', icon: Video },
+      { id: 'workout-analytics', label: 'Workout Analytics', icon: Activity }
     ]
   },
   {
