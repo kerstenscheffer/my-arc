@@ -36,6 +36,18 @@ const HOURS = Array.from({ length: HOUR_END - HOUR_START + 1 }, (_, i) => HOUR_S
 // TimeAxis; die moeten gelijk blijven of de uurlabels sluiten niet meer aan
 // op de lijntjes. Verlaagd van 850/680 zodat de hele agenda — kop, weekbalk,
 // selectiebalk en rooster — op één scherm past zonder scrollen.
+
+// Stappen waarmee je een selectie verzet. Beide richtingen gebruiken
+// dezelfde lijst, zodat "vier uur eerder" niet kan ontbreken omdat
+// iemand alleen de vooruit-kant heeft bijgewerkt.
+const VERZET_STAPPEN = [
+  { min: 10,  label: '10 min' },
+  { min: 30,  label: '30 min' },
+  { min: 45,  label: '45 min' },
+  { min: 60,  label: '1 uur'  },
+  { min: 120, label: '2 uur'  },
+  { min: 240, label: '4 uur'  },
+]
 // Ondergrens, geen vaste maat. Het rooster vult de ruimte die het krijgt:
 // past het hele venster (6:00-23:00) er ruim in, dan wordt het hoger; is er
 // weinig ruimte, dan drukt het samen tot dit minimum en scrollt de omhullende.
@@ -164,6 +176,7 @@ function AgendaBlock({ block, isMobile, onClick, onPointerDownDrag, draggable, i
   const isPlaceholder = block.meta?.placeholder
   const isPlaceholderTime = block.meta?.placeholder_time
   const clickable = (block.editable || selectieModus) && onClick
+  const sleepbaar = draggable && (!selectieModus || isSelected)
   const durationMin = block.end - block.start
 
   // Visuele dichtheid op basis van blokhoogte:
@@ -194,8 +207,15 @@ function AgendaBlock({ block, isMobile, onClick, onPointerDownDrag, draggable, i
   return (
     <div
       title={`${topLabel}${mainTitle ? ` — ${mainTitle}` : ''}\n${formatTime(block.start)}–${formatTime(block.end)}${clickable ? '\n(tik om te bewerken · sleep voor 10-min verzet of andere dag)' : ''}`}
-      onPointerDown={(draggable && !selectieModus) ? (e) => onPointerDownDrag?.(e, block) : undefined}
-      onClick={((selectieModus || !draggable) && clickable) ? () => onClick(block) : undefined}
+      // In selectiemodus mag je een blok dat je hebt aangevinkt slepen: de
+      // hele selectie schuift dan mee. Blokken die nog niet aangevinkt zijn
+      // blijven op aantikken reageren, anders kun je ze niet meer kiezen.
+      //
+      // Nooit allebei tegelijk aanhangen: bij een tik zonder beweging roept
+      // de sleep-afhandeling handleBlockClick al aan, en met een onClick
+      // erbovenop zou je de selectie twee keer omzetten — dus per saldo niets.
+      onPointerDown={sleepbaar ? (e) => onPointerDownDrag?.(e, block) : undefined}
+      onClick={(!sleepbaar && clickable) ? () => onClick(block) : undefined}
       style={{
         position: 'absolute',
         top: `${top}%`,
@@ -212,10 +232,10 @@ function AgendaBlock({ block, isMobile, onClick, onPointerDownDrag, draggable, i
         borderRadius: 0,
         overflow: 'hidden',
         opacity: isDragSource ? 0.25 : isGhost ? 0.85 : (isPlaceholder ? 0.55 : 1),
-        cursor: draggable ? 'grab' : (clickable ? 'pointer' : 'default'),
+        cursor: sleepbaar ? 'grab' : (clickable ? 'pointer' : 'default'),
         transition: isGhost ? 'none' : 'opacity 0.15s ease',
         userSelect: 'none',
-        touchAction: draggable ? 'none' : 'auto',
+        touchAction: sleepbaar ? 'none' : 'auto',
         pointerEvents: isGhost ? 'none' : 'auto',
         display: 'flex',
         zIndex: isGhost ? 5 : 1,
@@ -434,7 +454,7 @@ function AgendaBlock({ block, isMobile, onClick, onPointerDownDrag, draggable, i
 
 function DayColumn({
   day, blocks, isMobile, onBlockClick, onAddClick,
-  onBlockPointerDownDrag, isDropTarget, ghostBlock, sourceBlockId, gridRef,
+  onBlockPointerDownDrag, isDropTarget, ghostBlock, sourceBlockId, groepSleep, gridRef,
   dateForHeader, isToday, geselecteerd, selectieModus, onGridClick, plaatsModus,
 }) {
   return (
@@ -550,18 +570,22 @@ function DayColumn({
             onClick={onBlockClick}
             draggable={b.editable && !!onBlockPointerDownDrag && !b.meta?.wrapHalf}
             onPointerDownDrag={onBlockPointerDownDrag}
-            isDragSource={sourceBlockId === b.id}
+            isDragSource={sourceBlockId === b.id || (groepSleep && !!geselecteerd?.has(b.id))}
             isSelected={!!geselecteerd?.has(b.id)}
             selectieModus={selectieModus}
           />
         ))}
-        {ghostBlock && (
+        {/* Bij een groepsverplaatsing staat hier de hele selectie in
+            schaduw, niet alleen het blok dat je vasthoudt — anders zie je
+            pas na het loslaten wat er met de andere vier gebeurde. */}
+        {(ghostBlock || []).map(g => (
           <AgendaBlock
-            block={ghostBlock}
+            key={g.id}
+            block={g}
             isMobile={isMobile}
             isGhost
           />
-        )}
+        ))}
       </div>
     </div>
   )
@@ -1386,21 +1410,36 @@ export default function ClientAgendaView({
     return () => window.removeEventListener('keydown', onKey)
   }, [teplaatsen])
 
-  // Alles tegelijk een aantal minuten opschuiven. Placeholders slaan we over:
-  // die bestaan nog niet in de database, dus er valt niets te verzetten.
-  const bulkVerschuif = async (delta) => {
+  // De hele selectie verzetten: zoveel minuten, en eventueel zoveel dagen
+  // opzij. Eén functie voor twee ingangen — de dropdown in de balk (dagen
+  // blijven gelijk) en het slepen van een geselecteerd blok (dagen kunnen
+  // meeschuiven). Zo kan het gedrag van die twee niet uit elkaar lopen.
+  //
+  // Placeholders en niet-bewerkbare blokken slaan we over: die bestaan nog
+  // niet in de database, er valt niets aan te verzetten.
+  const verschuifSelectie = async ({ deltaMin = 0, dagDelta = 0 }) => {
     if (bulkBezig || !geselecteerd.size) return
+    if (!deltaMin && !dagDelta) return
     setBulkBezig(true)
     const overgeslagen = []
     try {
       for (const id of geselecteerd) {
         const b = blokPerId.get(id)
         if (!b || !b.editable) { overgeslagen.push(b?.label || id); continue }
-        const nieuw = Math.max(0, Math.min(24 * 60 - 10, (b.start || 0) + delta))
+
+        // Buiten de week valt niets te verplaatsen — dan sla ik het blok
+        // liever over dan het stilletjes op maandag te laten landen.
+        const dagIdx = DAYS.indexOf(b.day)
+        const nieuweDagIdx = dagIdx + dagDelta
+        if (dagIdx < 0 || nieuweDagIdx < 0 || nieuweDagIdx >= DAYS.length) {
+          overgeslagen.push(b.label || id); continue
+        }
+
+        const nieuw = Math.max(0, Math.min(24 * 60 - 10, (b.start || 0) + deltaMin))
         await service.shiftBlock({
           block: { ...b, clientId: client.id },
           newStartMin: nieuw,
-          toDay: null,
+          toDay: dagDelta === 0 ? null : DAYS[nieuweDagIdx],
           mealPlanId: data?.mealPlan?.id,
         })
       }
@@ -1411,11 +1450,13 @@ export default function ClientAgendaView({
       }
       stopSelectie()
     } catch (e) {
-      console.error('bulk verschuiven mislukt:', e)
+      console.error('selectie verschuiven mislukt:', e)
       setMoveError(e.message || 'Verplaatsen mislukt')
       setTimeout(() => setMoveError(null), 3500)
     } finally { setBulkBezig(false) }
   }
+
+  const bulkVerschuif = (delta) => verschuifSelectie({ deltaMin: delta })
 
   // Verwijderen. Maaltijden zijn geen agenda-blok maar een slot in het
   // weekplan — die gaan via de Plan Analyzer (onMealDelete). Zonder die
@@ -1477,6 +1518,10 @@ export default function ClientAgendaView({
       newStart: block.start,
       targetDay: block.day,
       moved: false,
+      // Sleep je een aangevinkt blok in selectiemodus, dan verplaatst de
+      // hele selectie mee. Nu vastleggen en niet bij het loslaten opnieuw
+      // bepalen: de selectie kan tussentijds veranderen.
+      groep: selectieModus && geselecteerd.has(block.id),
     })
   }
 
@@ -1535,6 +1580,18 @@ export default function ClientAgendaView({
       const sameSpot = d.newStart === d.originStart && d.targetDay === d.originDay
       if (sameSpot) return
       if (isClient && d.block.type === 'meal') return
+
+      // Groepsverplaatsing: iedereen schuift hetzelfde aantal minuten en
+      // dagen op als het blok dat je vasthield. Geen scope-vraag hier — bij
+      // een selectie heb je al aangewezen wat er mee moet, en die vraag per
+      // blok stellen zou vijf keer achter elkaar poppen.
+      if (d.groep) {
+        await verschuifSelectie({
+          deltaMin: d.newStart - d.originStart,
+          dagDelta: DAYS.indexOf(d.targetDay) - DAYS.indexOf(d.originDay),
+        })
+        return
+      }
 
       // Recurring scope-prompt — vraag eerst of het 1× of altijd is.
       // Cross-day drag = altijd (anders zou je per datum nieuwe overrides
@@ -1778,16 +1835,46 @@ export default function ClientAgendaView({
   // Het ghost-blok zoals het tijdens drag in de target-kolom zou landen.
   const ghostByDay = useMemo(() => {
     if (!drag || !drag.moved) return {}
-    const duration = (drag.block.meta?.fullEnd ?? drag.block.end) - (drag.block.meta?.fullStart ?? drag.block.start)
-    return {
-      [drag.targetDay]: {
+    const duurVan = (b) => (b.meta?.fullEnd ?? b.end) - (b.meta?.fullStart ?? b.start)
+
+    const zet = (uit, blok) => {
+      if (!uit[blok.day]) uit[blok.day] = []
+      uit[blok.day].push(blok)
+      return uit
+    }
+
+    if (!drag.groep) {
+      return zet({}, {
         ...drag.block,
+        day: drag.targetDay,
         id: `ghost-${drag.block.id}`,
         start: drag.newStart,
-        end: drag.newStart + duration,
-      },
+        end: drag.newStart + duurVan(drag.block),
+      })
     }
-  }, [drag])
+
+    // Groep: dezelfde verschuiving op elk aangevinkt blok, zodat het
+    // voorbeeld precies laat zien wat het loslaten gaat doen.
+    const deltaMin = drag.newStart - drag.originStart
+    const dagDelta = DAYS.indexOf(drag.targetDay) - DAYS.indexOf(drag.originDay)
+    const uit = {}
+    for (const id of geselecteerd) {
+      const b = blokPerId.get(id)
+      if (!b || !b.editable) continue
+      const dagIdx = DAYS.indexOf(b.day)
+      const nieuweDagIdx = dagIdx + dagDelta
+      if (dagIdx < 0 || nieuweDagIdx < 0 || nieuweDagIdx >= DAYS.length) continue
+      const start = Math.max(0, Math.min(24 * 60 - 10, (b.start || 0) + deltaMin))
+      zet(uit, {
+        ...b,
+        day: DAYS[nieuweDagIdx],
+        id: `ghost-${b.id}`,
+        start,
+        end: start + duurVan(b),
+      })
+    }
+    return uit
+  }, [drag, geselecteerd, blokPerId])
 
   // Voor een client-viewer: maak meal-blokken read-only (cursor + click).
   // Belangrijk: dit useMemo moet ÓNCONDITIONEEL vóór elke early-return,
@@ -1995,26 +2082,40 @@ export default function ClientAgendaView({
                 {geselecteerd.size} geselecteerd
               </span>
 
-              {/* Verzetten in stappen van een half uur — de eenheid waarin je
-                  een dagindeling in de praktijk verschuift. */}
-              {[-60, -30, 30, 60].map(delta => (
-                <button
-                  key={delta}
-                  onClick={() => bulkVerschuif(delta)}
-                  disabled={!geselecteerd.size || bulkBezig}
-                  style={{
-                    padding: '0.35rem 0.55rem', borderRadius: 0,
-                    background: 'none', border: `1px solid ${COLORS.border}`,
-                    color: '#fff', fontFamily: 'inherit',
-                    fontSize: '0.75rem', fontWeight: 800,
-                    cursor: (!geselecteerd.size || bulkBezig) ? 'not-allowed' : 'pointer',
-                    opacity: (!geselecteerd.size || bulkBezig) ? 0.35 : 1,
-                    touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-                  }}
-                >
-                  {delta > 0 ? `+${delta}` : delta} min
-                </button>
-              ))}
+              {/* Vier vaste knoppen (-60/-30/+30/+60) dekten te weinig. Nu
+                  één lijst met beide richtingen: kiezen voert direct uit en
+                  de lijst springt terug naar de kop, zodat je 'm meteen
+                  opnieuw kunt gebruiken. */}
+              <select
+                value=""
+                aria-label="Selectie verzetten"
+                disabled={!geselecteerd.size || bulkBezig}
+                onChange={(e) => {
+                  const minuten = parseInt(e.target.value, 10)
+                  e.target.value = ''
+                  if (!Number.isNaN(minuten)) bulkVerschuif(minuten)
+                }}
+                style={{
+                  padding: '0.35rem 0.5rem', borderRadius: 0,
+                  background: '#0a0a0a', border: `1px solid ${COLORS.border}`,
+                  color: '#fff', fontFamily: 'inherit',
+                  fontSize: '0.75rem', fontWeight: 800,
+                  cursor: (!geselecteerd.size || bulkBezig) ? 'not-allowed' : 'pointer',
+                  opacity: (!geselecteerd.size || bulkBezig) ? 0.35 : 1,
+                }}
+              >
+                <option value="">Verzetten…</option>
+                <optgroup label="Later">
+                  {VERZET_STAPPEN.map(o => (
+                    <option key={`later-${o.min}`} value={o.min}>+ {o.label}</option>
+                  ))}
+                </optgroup>
+                <optgroup label="Eerder">
+                  {VERZET_STAPPEN.map(o => (
+                    <option key={`eerder-${o.min}`} value={-o.min}>− {o.label}</option>
+                  ))}
+                </optgroup>
+              </select>
 
               <button
                 onClick={bulkVerwijder}
@@ -2084,6 +2185,7 @@ export default function ClientAgendaView({
               isDropTarget={drag && drag.moved && drag.targetDay === day && drag.originDay !== day}
               ghostBlock={ghostByDay[day]}
               sourceBlockId={drag?.block?.id}
+              groepSleep={!!drag?.groep && !!drag?.moved}
               gridRef={(el) => { gridRefs.current[day] = el }}
               dateForHeader={dForHeader}
               isToday={isToday}
