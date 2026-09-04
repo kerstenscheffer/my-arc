@@ -52,7 +52,22 @@ export default function AIDaySchedule({
   const [currentDay, setCurrentDay] = useState(getTodayIndex())
   const [displayMeals, setDisplayMeals] = useState([])
   const [loading, setLoading] = useState(false)
-  const [checkedMeals, setCheckedMeals] = useState({})
+  // Vinkjes per DAG en slot: { saturday: { breakfast: true } }.
+  //
+  // Dit was één plat object met alleen het slot als sleutel. Eén verzameling
+  // vinkjes voor de hele week dus: vinkte je vandaag het ontbijt af, dan
+  // stond morgen het ontbijt ook doorgestreept. Alleen visueel — er werd
+  // niets gelogd — maar je zag wel "Gelogd" staan bij een dag met 0% macro's.
+  const [checkedByDay, setCheckedByDay] = useState({})
+
+  // Kalenderdatum van een dag-index, afgeleid van vandaag. Zelfde rekensom
+  // als loadConsumedMeals gebruikt, hier apart zodat de vinkjes en de
+  // gelogde maaltijden gegarandeerd naar dezelfde dag kijken.
+  const datumVoorDag = (dayIndex) => {
+    const d = new Date()
+    d.setDate(d.getDate() + (dayIndex - getTodayIndex()))
+    return d.toISOString().split('T')[0]
+  }
   const [showApplyTemplate, setShowApplyTemplate] = useState(false)
 
   // ✅ FOOD LOG: New state
@@ -92,9 +107,17 @@ export default function AIDaySchedule({
       Object.entries(todayProgress.consumed_meals).forEach(([slot, data]) => {
         if (data?.consumed) newChecked[slot] = true
       })
+      // Deze voortgang gaat over VANDAAG, dus komt hij alleen in de bak van
+      // vandaag. Eerder ging hij in de gedeelde bak en gold hij daarmee voor
+      // elke dag die je opende.
+      const vandaagKey = daysOfWeek[getTodayIndex()]?.key
+      if (!vandaagKey) return
       // Mergen i.p.v. vervangen, zodat een (lege) todayProgress de uit de DB
       // herstelde vinkjes hieronder niet wegvaagt.
-      setCheckedMeals(prev => ({ ...prev, ...newChecked }))
+      setCheckedByDay(prev => ({
+        ...prev,
+        [vandaagKey]: { ...(prev[vandaagKey] || {}), ...newChecked },
+      }))
     }
   }, [todayProgress])
 
@@ -103,18 +126,26 @@ export default function AIDaySchedule({
   // niet — die leidden we hier nu af uit de plan_check-rijen van vandaag, gematcht
   // op meal_id (zodat snack1/snack2 los herkend worden), met slot als fallback.
   useEffect(() => {
-    if (currentDay !== getTodayIndex() || !client?.id || !db?.supabase || displayMeals.length === 0) return
+    // Draait nu voor ELKE bekeken dag, niet alleen vandaag. Stond die
+    // beperking er nog, dan laadde een andere dag zijn eigen stand nooit en
+    // liet hij zien wat er toevallig van vandaag in het geheugen stond.
+    if (!client?.id || !db?.supabase || displayMeals.length === 0) return
+    const dagKey = daysOfWeek[currentDay]?.key
+    if (!dagKey) return
     let alive = true
     ;(async () => {
       try {
-        const today = new Date().toISOString().split('T')[0]
+        const datum = datumVoorDag(currentDay)
+        const volgende = new Date(`${datum}T00:00:00`)
+        volgende.setDate(volgende.getDate() + 1)
+        const datumVolgende = volgende.toISOString().split('T')[0]
         const { data } = await db.supabase
           .from('consumed_meals')
           .select('meal_id, meal_type')
           .eq('client_id', client.id)
           .eq('source', 'plan_check')
-          .gte('consumed_at', `${today}T00:00:00`)
-          .lt('consumed_at', `${today}T23:59:59`)
+          .gte('consumed_at', `${datum}T00:00:00`)
+          .lt('consumed_at', `${datumVolgende}T00:00:00`)
         if (!alive || !Array.isArray(data)) return
         const restored = {}
         for (const row of data) {
@@ -122,7 +153,12 @@ export default function AIDaySchedule({
           if (!m && row.meal_type) m = displayMeals.find(dm => dm.slot === row.meal_type)
           if (m) restored[m.slot] = true
         }
-        if (Object.keys(restored).length > 0) setCheckedMeals(prev => ({ ...prev, ...restored }))
+        if (Object.keys(restored).length > 0) {
+          setCheckedByDay(prev => ({
+            ...prev,
+            [dagKey]: { ...(prev[dagKey] || {}), ...restored },
+          }))
+        }
       } catch (e) { console.warn('Vinkjes herstellen mislukt:', e) }
     })()
     return () => { alive = false }
@@ -312,7 +348,17 @@ export default function AIDaySchedule({
     if (onDayChange) onDayChange(daysOfWeek[dayIndex].key)
   }
   
+  // Wat de tijdlijn krijgt: alleen de vinkjes van de dag die je bekijkt.
+  // De tijdlijn zoekt zelf op meal.slot, dus die hoeft niets te weten van
+  // de opdeling per dag.
+  const checkedMeals = checkedByDay[daysOfWeek[currentDay]?.key] || {}
+
   const handleMealCheck = async (meal) => {
+    const dagKey = daysOfWeek[currentDay]?.key
+    const zetVink = (waarde) => setCheckedByDay(prev => ({
+      ...prev,
+      [dagKey]: { ...(prev[dagKey] || {}), [meal.slot]: waarde },
+    }))
     if (checkedMeals[meal.slot]) {
       // Find the corresponding plan_check record so we can delete it.
       // Without this, the record stays in consumed_meals: MacroHero keeps
@@ -331,10 +377,10 @@ export default function AIDaySchedule({
         }
       }
       await onUncheckMeal(meal.slot)
-      setCheckedMeals(prev => ({ ...prev, [meal.slot]: false }))
+      zetVink(false)
     } else {
       await onCheckMeal(meal.slot, meal)
-      setCheckedMeals(prev => ({ ...prev, [meal.slot]: true }))
+      zetVink(true)
     }
   }
   
@@ -463,7 +509,13 @@ export default function AIDaySchedule({
                 // Visual check — replaces the role onMealCheck used to play
                 // here. Done locally so we don't trigger the parent's
                 // handleCheckMeal which would add macros a second time.
-                setCheckedMeals(prev => ({ ...prev, [meal.slot]: true }))
+                // Ook hier per dag: zetVink hoort bij handleMealCheck en
+                // bestaat hier niet.
+                setCheckedByDay(prev => {
+                  const dagKey = daysOfWeek[currentDay]?.key
+                  if (!dagKey) return prev
+                  return { ...prev, [dagKey]: { ...(prev[dagKey] || {}), [meal.slot]: true } }
+                })
                 if (onMealLogged) onMealLogged({
                   calories: meal.calories || 0,
                   protein: meal.protein || 0,
