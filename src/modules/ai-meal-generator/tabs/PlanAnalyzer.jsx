@@ -1146,6 +1146,38 @@ export default function PlanAnalyzer({
               }}
               onClose={() => setDockedSection(null)} />
           )}
+          {/* Vangnet. Elke tak hierboven heeft naast dockedSection nog een
+              voorwaarde — een geselecteerde klant, geladen weekdata. Klopt
+              die niet, dan bleef dit vak zwart en was er niets te zien of te
+              lezen. Nu staat er wát er ontbreekt. */}
+          {dockedSection && !(
+            (dockedSection === 'client' && resolvedClientId) ||
+            (dockedSection === 'timing' && weekData) ||
+            (dockedSection === 'dag' && currentDay) ||
+            (dockedSection === 'swaps') ||
+            (dockedSection === 'library' && resolvedClientId) ||
+            (dockedSection === 'supp') ||
+            (dockedSection === 'agenda' && (clientRecord || resolvedClientId))
+          ) && (
+            <div style={{ padding: '2rem 1.25rem', textAlign: 'center' }}>
+              <div style={{ fontSize: '0.9rem', fontWeight: 900, color: '#fff', marginBottom: '0.5rem' }}>
+                Niets te tonen
+              </div>
+              <div style={{ fontSize: '0.8rem', color: 'rgba(255,255,255,0.45)', lineHeight: 1.6 }}>
+                {!resolvedClientId
+                  ? 'Kies eerst een klant.'
+                  : !weekData
+                    ? 'Er is nog geen weekplan geladen.'
+                    : 'Dit paneel heeft gegevens nodig die er nu niet zijn.'}
+              </div>
+              <button onClick={() => setDockedSection(null)} style={{
+                marginTop: '1rem', padding: '0.5rem 0.9rem', background: 'none',
+                border: '1px solid rgba(255,255,255,0.2)', color: '#fff',
+                fontSize: '0.78rem', fontWeight: 900, fontFamily: 'inherit', cursor: 'pointer',
+              }}>Sluiten</button>
+            </div>
+          )}
+
           {dockedSection === 'agenda' && (clientRecord || resolvedClientId) && (
             <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: '#0a0a0a' }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.6rem 0.8rem', borderBottom: '1px solid rgba(255,215,0,0.2)', flexShrink: 0 }}>
