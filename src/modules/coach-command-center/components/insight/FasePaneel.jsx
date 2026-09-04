@@ -16,7 +16,7 @@ import { DOELEN, beoordeelFase, STATUS_KLEUR } from '../../../weight-tracker/uti
 const vandaag = () => new Date().toISOString().split('T')[0]
 const datumNL = (d) => new Date(d).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short', year: 'numeric' })
 
-export default function FasePaneel({ client, db, history, isMobile, onFaseChange }) {
+export default function FasePaneel({ client, db, history, isMobile, onFaseChange, onActieveFase }) {
   const [fases, setFases] = useState([])
   const [laden, setLaden] = useState(true)
   const [nieuw, setNieuw] = useState(null)
@@ -32,6 +32,9 @@ export default function FasePaneel({ client, db, history, isMobile, onFaseChange
       .order('started_on', { ascending: false })
     if (error) { console.warn('fases laden mislukt:', error.message); setLaden(false); return }
     setFases(data || [])
+    // De statistiekbalk rekent "sinds start" vanaf deze fase, dus die moet
+    // 'm kennen. Eén plek die laadt, één plek die doorgeeft.
+    onActieveFase?.((data || [])[0] || null)
     setLaden(false)
   }
   useEffect(() => { laad() }, [client?.id, db])

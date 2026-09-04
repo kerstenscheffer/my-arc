@@ -11,7 +11,7 @@ import { weightGoalColor } from '../utils/weightGoalColor'
 // gebruikt: daar is dit de bovenste balk van de sectie en hoort hij tegen de
 // randen te staan, met het huidige gewicht als eerste cel. Op de klantpagina
 // blijft het een zwevend kaartje binnen de bestaande opmaak.
-export default function WeightStatsGrid({ stats = {}, client = {}, fridayData = {}, history = [], isMobile = false, coachingPlan = null, volleBreedte = false, toonHuidig = false }) {
+export default function WeightStatsGrid({ stats = {}, client = {}, fridayData = {}, history = [], isMobile = false, coachingPlan = null, volleBreedte = false, toonHuidig = false, fase = null }) {
   const [showWeekly, setShowWeekly] = useState(false)
   const sortedHistory = [...history].sort((a, b) => new Date(a.date) - new Date(b.date))
 
@@ -75,14 +75,30 @@ export default function WeightStatsGrid({ stats = {}, client = {}, fridayData = 
   const cur  = thisWeekData.avg !== null ? thisWeekData : null
   const prev = lastWeekData.avg !== null ? lastWeekData : null
 
-  // Real first-vs-latest entry change for "Sinds start" — no sampling.
-  const firstEntry  = sortedHistory[0]
-  const latestEntry = sortedHistory[sortedHistory.length - 1]
-  const totalChange = (firstEntry && latestEntry && sortedHistory.length >= 2)
-    ? parseFloat((parseFloat(latestEntry.weight) - parseFloat(firstEntry.weight)).toFixed(1))
+  // "Sinds start" telt vanaf het begin van de huidige fase, niet vanaf de
+  // allereerste meting ooit. Na een cut van acht maanden zegt -8,5 kg niets
+  // meer over de build waar je nu in zit; je wil zien wat er in déze fase is
+  // gebeurd. Zonder fase valt het terug op de eerste meting, zoals eerder.
+  const faseStart = fase?.started_on || null
+  const faseHistory = faseStart
+    ? sortedHistory.filter(e => new Date(e.date) >= new Date(faseStart))
+    : sortedHistory
+
+  // Startpunt: het startgewicht van de fase als dat er is, anders de eerste
+  // meting binnen de fase. Het ingevulde startgewicht wint, want dat is wat
+  // de coach als nulpunt heeft afgesproken.
+  const faseStartGewicht = fase?.start_gewicht != null ? parseFloat(fase.start_gewicht) : null
+  const firstEntry  = faseHistory[0]
+  const latestEntry = faseHistory[faseHistory.length - 1]
+  const basisGewicht = faseStartGewicht ?? (firstEntry ? parseFloat(firstEntry.weight) : null)
+
+  const totalChange = (basisGewicht != null && latestEntry && (faseStartGewicht != null || faseHistory.length >= 2))
+    ? parseFloat((parseFloat(latestEntry.weight) - basisGewicht).toFixed(1))
     : null
-  const startDateLabel = firstEntry
-    ? new Date(firstEntry.date).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })
+
+  const startDatum = faseStart || firstEntry?.date || null
+  const startDateLabel = startDatum
+    ? new Date(startDatum).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })
     : null
 
   const weekChange = (cur && prev) ? parseFloat((cur.avg - prev.avg).toFixed(1)) : null
@@ -335,7 +351,7 @@ export default function WeightStatsGrid({ stats = {}, client = {}, fridayData = 
               ? (weekChange < 0 ? TrendingDown : TrendingUp) : null,
           },
           {
-            label: 'Sinds start',
+            label: fase ? 'Sinds start fase' : 'Sinds start',
             sub: startDateLabel ? `vanaf ${startDateLabel}` : 'geen startmeting',
             val: totalChange !== null ? `${totalChange > 0 ? '+' : ''}${totalChange}` : '—',
             color: totalChange !== null

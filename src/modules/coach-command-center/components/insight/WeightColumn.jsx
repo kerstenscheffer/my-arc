@@ -20,6 +20,9 @@ export default function WeightColumn({ client, weightData, circumData, photos, c
   // eerder als scrollvak van 280px in de sectie — dat is veel regels voor iets
   // waar je meestal alleen de laatste paar van wil zien.
   const [alleMetingen, setAlleMetingen] = React.useState(false)
+  // Actieve fase, aangeleverd door FasePaneel. Bepaalt vanaf wanneer
+  // "sinds start" telt.
+  const [actieveFase, setActieveFase] = React.useState(null)
   const ZICHTBAAR = 3
 
   // Week-op-week: groepeer logs per kalenderweek (maandag-start), gemiddelde
@@ -92,8 +95,9 @@ export default function WeightColumn({ client, weightData, circumData, photos, c
           history={history}
           isMobile={isMobile}
           onFaseChange={onClientUpdate}
+          onActieveFase={setActieveFase}
         />
-        {history.length > 0 && <WeightStatsGrid stats={weightData?.stats || {}} client={client} fridayData={{ friday_count: weightData?.fridayCount || 0, total_fridays: 8 }} history={history} isMobile={isMobile} coachingPlan={coachingPlan} volleBreedte toonHuidig />}
+        {history.length > 0 && <WeightStatsGrid stats={weightData?.stats || {}} client={client} fridayData={{ friday_count: weightData?.fridayCount || 0, total_fridays: 8 }} history={history} isMobile={isMobile} coachingPlan={coachingPlan} fase={actieveFase} volleBreedte toonHuidig />}
         {history.length > 0 && (
           <div style={{ padding: isMobile ? '0.5rem 0.75rem' : '0.625rem 1rem', borderTop: '1px solid rgba(255,255,255,0.04)' }}>
             <div style={{
