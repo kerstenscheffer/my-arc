@@ -94,22 +94,13 @@ const MORE_CATEGORIES = [
   {
     label: 'Gameplan',
     items: [
-      { id: 'productivity', label: 'Productivity', icon: Target },
-      { id: 'sales', label: 'Sales', icon: DollarSign }
-    ]
-  },
-  {
-    label: 'Acquisition',
-    items: [
-      { id: 'funnel', label: 'Funnel Analytics', icon: BarChart3 }
+      { id: 'productivity', label: 'Productivity', icon: Target }
     ]
   },
   {
     label: 'Clients',
     items: [
-      { id: 'client-intelligence', label: 'Client Intelligence', icon: Users },
       { id: 'checkins', label: 'Check-ins', icon: ClipboardCheck },
-      { id: 'challenge-hub', label: 'Challenge Hub', icon: Trophy },
       { id: 'faq', label: 'FAQ Manager', icon: FileText },
       { id: 'results', label: 'Resultaten', icon: Trophy }
     ]
@@ -118,24 +109,15 @@ const MORE_CATEGORIES = [
     label: 'Plan Making',
     items: [
       { id: 'client-agenda', label: 'Client Agenda', icon: Calendar },
-      { id: 'plan-wizard', label: 'Plan Wizard', icon: Wand2 },
       { id: 'ai-meals', label: 'AI Meals', icon: Sparkles },
-      { id: 'meal-templates', label: 'Meal Templates', icon: FileText },
-      { id: 'ingredient-photos', label: "Ingredient Foto's", icon: ImageIcon },
-      { id: 'meal-guide', label: 'Voedingsgids', icon: ImageIcon },
-      { id: 'supplements', label: 'Supplementen', icon: Pill },
       { id: 'workout-builder', label: 'Workout Builder', icon: Dumbbell },
-      { id: 'calls', label: 'Call Planning', icon: Phone },
-      { id: 'coachvids', label: 'Videos', icon: Video },
-      { id: 'workout-analytics', label: 'Workout Analytics', icon: Activity }
+      { id: 'coachvids', label: 'Videos', icon: Video }
     ]
   },
   {
     label: 'Systeem',
     items: [
-      { id: 'notifications-hub', label: 'Meldingen', icon: Bell },
-      { id: 'spots', label: 'Spots Manager', icon: Settings },
-      { id: 'lab', label: 'Lab', icon: FlaskConical }
+      { id: 'notifications-hub', label: 'Meldingen', icon: Bell }
     ]
   }
 ]
