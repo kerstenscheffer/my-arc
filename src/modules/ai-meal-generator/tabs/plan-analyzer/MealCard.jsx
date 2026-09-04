@@ -71,7 +71,7 @@ function parseIngredients(ingredients) {
 
 export default function MealCard({
   db, meal, slot, dayIndex, mealSchedule, isPreWorkout,
-  isEmpty, onSwap, onDelete, onAdd, onUpdateMeal, onApplyToDays, conflicts, isMobile,
+  isEmpty, onSwap, onDelete, onAdd, onCreate, onUpdateMeal, onApplyToDays, conflicts, isMobile,
 }) {
   const modalHost = useModalHost()
   const [expanded, setExpanded] = useState(false)
@@ -197,28 +197,48 @@ export default function MealCard({
   const hasMacroChange = scalerMacros && (scalerMacros.calories !== Math.round(meal?.calories || 0))
 
   // ── EMPTY SLOT ──
+  // Twee wegen naar een gevulde slot: een bestaande maaltijd erbij zoeken,
+  // of er zelf een bouwen uit ingredienten. Naast elkaar, met de naam van
+  // de slot erboven zodat je nog steeds ziet waar je zit.
   if (isEmpty || !meal) {
+    const knop = (extra) => ({
+      flex: 1, minWidth: 0,
+      display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+      padding: '0.6rem 0.5rem',
+      borderRadius: 10,
+      fontSize: '0.62rem', fontWeight: 800, fontFamily: 'inherit',
+      cursor: 'pointer', touchAction: 'manipulation',
+      letterSpacing: '0.05em', textTransform: 'uppercase',
+      minHeight: 44,
+      ...extra,
+    })
     return (
-      <button
-        onClick={() => onAdd?.(dayIndex, slot)}
-        style={{
-          margin: m ? '0 0.5rem 0.4rem' : '0 0.75rem 0.5rem',
-          width: 'calc(100% - 1rem)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-          padding: '0.6rem 0.75rem',
+      <div style={{
+        margin: m ? '0 0.5rem 0.4rem' : '0 0.75rem 0.5rem',
+        width: 'calc(100% - 1rem)',
+        display: 'flex', gap: 6,
+      }}>
+        <button onClick={() => onAdd?.(dayIndex, slot)} style={knop({
           background: 'rgba(255,255,255,0.02)',
-          border: `1px dashed ${DIVIDER}`,
-          borderRadius: 10,
+          borderTop: `1px dashed ${DIVIDER}`, borderBottom: `1px dashed ${DIVIDER}`,
+          borderLeft: `1px dashed ${DIVIDER}`, borderRight: `1px dashed ${DIVIDER}`,
           color: 'rgba(255,255,255,0.3)',
-          fontSize: '0.62rem', fontWeight: 700,
-          cursor: 'pointer', touchAction: 'manipulation',
-          letterSpacing: '0.05em', textTransform: 'uppercase',
-          minHeight: 44,
-        }}
-      >
-        <Plus size={12} />
-        {slotLabel} toevoegen
-      </button>
+        })}>
+          <Plus size={12} />
+          {slotLabel} toevoegen
+        </button>
+        {onCreate && (
+          <button onClick={() => onCreate(dayIndex, slot)} style={knop({
+            flex: '0 0 auto', paddingLeft: '0.9rem', paddingRight: '0.9rem',
+            background: 'rgba(255,215,0,0.06)',
+            borderTop: '1px solid rgba(255,215,0,0.3)', borderBottom: '1px solid rgba(255,215,0,0.3)',
+            borderLeft: '1px solid rgba(255,215,0,0.3)', borderRight: '1px solid rgba(255,215,0,0.3)',
+            color: '#FFD700',
+          })}>
+            Maken
+          </button>
+        )}
+      </div>
     )
   }
 

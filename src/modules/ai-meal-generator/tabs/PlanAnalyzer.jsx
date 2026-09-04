@@ -7,6 +7,7 @@ import DayNavigator, { DAYS } from './plan-analyzer/DayNavigator'
 import DayMacroBar from './plan-analyzer/DayMacroBar'
 import MealCard from './plan-analyzer/MealCard'
 import SwapModal from './plan-analyzer/SwapModal'
+import MealMakerModal from './plan-analyzer/MealMakerModal'
 import { PRE_WORKOUT_SLOT, totalenMetPreWorkout } from '../../meal-plan/utils/preWorkoutMeal'
 import { meldMaaltijdTijd, luisterMaaltijdTijd } from '../../meal-plan/utils/mealSync'
 import ClientContextPanel from './plan-analyzer/ClientContextPanel'
@@ -179,6 +180,7 @@ export default function PlanAnalyzer({
   const [loadingConcepts, setLoadingConcepts] = useState(false)
   const [selectedConceptId, setSelectedConceptId] = useState(conceptPlanId || null)
   const [swapState, setSwapState] = useState(null)
+  const [makerState, setMakerState] = useState(null)
   const [applyDaysState, setApplyDaysState] = useState(null)
   const [clientIntake, setClientIntake] = useState(null)
   const [clientRecord, setClientRecord] = useState(null)
@@ -662,21 +664,37 @@ export default function PlanAnalyzer({
     }
   }
 
-  const handleSwapSelect = async (newMeal) => {
-    if (!swapState) return
+  // Een maaltijd in een slot zetten. Losgeknipt zodat kiezen (SwapModal) en
+  // zelf maken (MealMakerModal) exact dezelfde weg gaan — anders zou een
+  // zelfgemaakte maaltijd bijvoorbeeld de tijd van de slot kunnen missen.
+  const plaatsInSlot = async (newMeal, dayIndex, slot, omschrijving) => {
     // Pre-workout loopt langs de normale week-update heen.
-    if (swapState.slot === PRE_WORKOUT_SLOT) {
+    if (slot === PRE_WORKOUT_SLOT) {
       await bewaarPreWorkout(newMeal)
-      setSwapState(null)
       return
     }
     if (!weekData) return
     const updated = [...weekData]
-    const placed = withSlotTiming(newMeal, swapState.slot, updated[swapState.dayIndex].meals[swapState.slot])
-    updated[swapState.dayIndex] = { ...updated[swapState.dayIndex], meals: { ...updated[swapState.dayIndex].meals, [swapState.slot]: placed } }
-    updated[swapState.dayIndex].totals = calculateTotals(updated[swapState.dayIndex].meals)
-    await applyWeekUpdate(updated, `Swap ${DAYS[swapState.dayIndex].full}: ${swapState.meal?.name || 'leeg'} → ${newMeal.name || '?'}`)
+    const placed = withSlotTiming(newMeal, slot, updated[dayIndex].meals[slot])
+    updated[dayIndex] = { ...updated[dayIndex], meals: { ...updated[dayIndex].meals, [slot]: placed } }
+    updated[dayIndex].totals = calculateTotals(updated[dayIndex].meals)
+    await applyWeekUpdate(updated, omschrijving)
+  }
+
+  const handleSwapSelect = async (newMeal) => {
+    if (!swapState) return
+    await plaatsInSlot(newMeal, swapState.dayIndex, swapState.slot,
+      `Swap ${DAYS[swapState.dayIndex].full}: ${swapState.meal?.name || 'leeg'} → ${newMeal.name || '?'}`)
     setSwapState(null)
+  }
+
+  // Zelf gemaakte maaltijd: al opgeslagen in ai_meals, hier alleen nog in
+  // het plan zetten.
+  const handleMakerSaved = async (meal) => {
+    if (!makerState) return
+    await plaatsInSlot(meal, makerState.dayIndex, makerState.slot,
+      `Gemaakt ${DAYS[makerState.dayIndex].full}: ${meal.name || '?'}`)
+    setMakerState(null)
   }
   const handleMultiDaySelect = async (newMeal, slot, dayIndices) => {
     if (!weekData) return
@@ -1334,7 +1352,7 @@ export default function PlanAnalyzer({
           ~40% van de breedte; de bouwer (dag+maaltijden) neemt de rest. Op
           mobiel ligt het paneel als overlay over de bouwer. De transform maakt
           de fixed-modals binnen dit paneel relatief hieraan i.p.v. het scherm. */}
-      {(dockedSection || swapState || applyDaysState) && (
+      {(dockedSection || swapState || applyDaysState || makerState) && (
         <div style={{
           flexShrink: 0, minWidth: 0, background: '#0a0a0a',
           borderRight: '1px solid rgba(255,255,255,0.06)',
@@ -1364,13 +1382,14 @@ export default function PlanAnalyzer({
           }}>
             <span style={{ fontSize: '0.72rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.01em' }}>
               {swapState ? `Maaltijd kiezen · ${swapState.slot}`
+                : makerState ? `Maaltijd maken · ${makerState.slot}`
                 : applyDaysState ? 'Toepassen op dagen'
                 : dockedSection ? DOCK_LABELS[dockedSection] || dockedSection
                 : 'Zijvak'}
             </span>
             <span style={{ flex: 1 }} />
             <button
-              onClick={() => { setSwapState(null); setApplyDaysState(null); setDockedSection(null) }}
+              onClick={() => { setSwapState(null); setMakerState(null); setApplyDaysState(null); setDockedSection(null) }}
               style={{
                 width: 26, height: 26, display: 'flex', alignItems: 'center', justifyContent: 'center',
                 background: 'none', border: '1px solid rgba(255,255,255,0.15)',
@@ -1381,7 +1400,11 @@ export default function PlanAnalyzer({
 
           {/* Swap + "toepassen op dagen" openen met voorrang in het modal vak
               (getriggerd door de knoppen op een meal card). */}
-          {swapState ? (
+          {makerState ? (
+            <MealMakerModal embedded db={db} slot={makerState.slot} isMobile={m}
+              onSaved={handleMakerSaved}
+              onClose={() => setMakerState(null)} />
+          ) : swapState ? (
             <SwapModal embedded db={db} slot={swapState.slot} currentMeal={swapState.meal}
               dayIndex={swapState.dayIndex} dayTotals={dagTotalen} targets={targets}
               trainingDays={trainingDayIndices}
@@ -1434,7 +1457,7 @@ export default function PlanAnalyzer({
               voorwaarde — een geselecteerde klant, geladen weekdata. Klopt
               die niet, dan bleef dit vak zwart en was er niets te zien of te
               lezen. Nu staat er wát er ontbreekt. */}
-          {dockedSection && !(
+          {dockedSection && !makerState && !swapState && !(
             (dockedSection === 'client' && resolvedClientId) ||
             (dockedSection === 'timing' && weekData) ||
             (dockedSection === 'dag' && currentDay) ||
@@ -1786,7 +1809,8 @@ export default function PlanAnalyzer({
                   <MealCard key={slot} db={db} meal={meal} slot={slot} dayIndex={activeDay}
                     mealSchedule={mealSchedule} isPreWorkout={isPreWorkout}
                     isEmpty={!meal} onSwap={handleSwap} onDelete={handleDelete}
-                    onAdd={handleAdd} onUpdateMeal={handleUpdateMeal} onApplyToDays={handleApplyToDays}
+                    onAdd={handleAdd} onCreate={(di, sl) => setMakerState({ dayIndex: di, slot: sl })}
+                    onUpdateMeal={handleUpdateMeal} onApplyToDays={handleApplyToDays}
                     conflicts={conflicts} isMobile={m} />
                 )
               })}
