@@ -36,6 +36,11 @@ import { openMealPlanForPrint, openCoachingGuideForPrint } from '../mealplanhtml
 // laten, anders ligt hun knoppenbalk eronder.
 const ZWEVENDE_NAV_HOOGTE = 105
 
+const DOCK_LABELS = {
+  client: 'Client', timing: 'Tijden', dag: 'Dag', swaps: 'Swaps',
+  library: 'Opslaan', supp: 'Supplementen', agenda: 'Agenda',
+}
+
 // 'pre_workout' staat bewust achteraan: SLOTS.slice(0, n) bepaalt welke lege
 // slots als "nog te vullen" worden getoond, en dat moet een pre-workout niet
 // zijn. Hij stond eerder helemaal niet in deze lijst, waardoor een
@@ -1095,6 +1100,33 @@ export default function PlanAnalyzer({
             ? { position: 'fixed', left: 72, right: 0, top: kleefTop, zIndex: 40 }
             : { position: 'sticky', top: kleefTop, flexBasis: dockWidth, width: dockWidth }),
         }}>
+          {/* Kop van het zijvak. Rendert altijd, ook als het paneel eronder
+              niets teruggeeft. Zonder deze regel is een vak dat niet laadt
+              niet te onderscheiden van een leeg zwart vlak, en dat kostte
+              een halve ochtend zoeken. */}
+          <div style={{
+            flexShrink: 0, display: 'flex', alignItems: 'center', gap: 8,
+            padding: '0.5rem 0.7rem',
+            borderBottom: '1px solid rgba(255,255,255,0.08)',
+            background: '#111',
+          }}>
+            <span style={{ fontSize: '0.72rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.01em' }}>
+              {swapState ? `Maaltijd kiezen · ${swapState.slot}`
+                : applyDaysState ? 'Toepassen op dagen'
+                : dockedSection ? DOCK_LABELS[dockedSection] || dockedSection
+                : 'Zijvak'}
+            </span>
+            <span style={{ flex: 1 }} />
+            <button
+              onClick={() => { setSwapState(null); setApplyDaysState(null); setDockedSection(null) }}
+              style={{
+                width: 26, height: 26, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                background: 'none', border: '1px solid rgba(255,255,255,0.15)',
+                color: 'rgba(255,255,255,0.6)', cursor: 'pointer', fontFamily: 'inherit',
+              }}
+            ><X size={13} /></button>
+          </div>
+
           {/* Swap + "toepassen op dagen" openen met voorrang in het modal vak
               (getriggerd door de knoppen op een meal card). */}
           {swapState ? (
