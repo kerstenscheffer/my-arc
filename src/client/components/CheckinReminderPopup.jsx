@@ -20,6 +20,7 @@ import React, { useEffect, useState, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { ClipboardCheck, X, ArrowRight, Clock, AlertCircle } from 'lucide-react'
 import CheckinService from '../../modules/client-checkin/CheckinService'
+import { trajectLoopt } from '../../modules/client-checkin/trajectStatus'
 
 const daysSinceLastFriday = () => {
   const day = new Date().getDay() // 0=Sun..6=Sat
@@ -75,6 +76,12 @@ export default function CheckinReminderPopup({ client, db, onOpen, isMobile: pro
     let cancelled = false
 
     const evaluate = async () => {
+      // Geen lopend traject = niets te laat. Mensen met alleen een account
+      // kregen hier anders de 'overdue'-melding te zien.
+      if (!trajectLoopt(client)) {
+        setPhase('hidden')
+        return
+      }
       const day = new Date().getDay()
       const isFriday = day === 5
       // Vanaf zaterdag t/m donderdag blijven we vragen zolang de afgelopen
@@ -105,7 +112,7 @@ export default function CheckinReminderPopup({ client, db, onOpen, isMobile: pro
     }
     evaluate()
     return () => { cancelled = true }
-  }, [client?.id, db, version])
+  }, [client, db, version])
 
   // Periodieke schud-animatie van de pill om aandacht te trekken. Alleen
   // actief in 'pill' fase, sneller naarmate je later bent.

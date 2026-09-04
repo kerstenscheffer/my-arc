@@ -8,6 +8,7 @@
 import React, { useEffect, useState } from 'react'
 import { ClipboardCheck, X, ArrowRight } from 'lucide-react'
 import CheckinService from '../../modules/client-checkin/CheckinService'
+import { trajectLoopt } from '../../modules/client-checkin/trajectStatus'
 
 // De coachnaam staat nergens als kolom: coach_team_members heeft alleen een
 // id en auth.users is voor de client niet leesbaar. Daarom hier een kleine
@@ -48,6 +49,13 @@ export default function CheckinReminderBanner({ client, db, onOpen, isMobile: pr
     let cancelled = false
     const check = async () => {
       try {
+        // Nog niet begonnen, gepauzeerd of afgerond? Dan is er niets te laat.
+        // Zonder deze regel kreeg iedereen met alleen een account elke week
+        // te horen dat zijn check-in ontbrak.
+        if (!trajectLoopt(client)) {
+          if (!cancelled) setShow(false)
+          return
+        }
         if (isSnoozed()) {
           if (!cancelled) setShow(false)
           return
@@ -67,7 +75,7 @@ export default function CheckinReminderBanner({ client, db, onOpen, isMobile: pr
     }
     check()
     return () => { cancelled = true }
-  }, [client?.id, db])
+  }, [client, db])
 
   if (loading || !show) return null
 

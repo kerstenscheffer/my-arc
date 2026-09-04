@@ -1,4 +1,5 @@
 // src/modules/client-checkin/CheckinService.js
+import { trajectLoopt, TRAJECT_KOLOMMEN } from './trajectStatus'
 // UPDATED: Support voor section_details JSONB
 // Features: Per-sectie struggles, afspraken, coach notes
 
@@ -268,13 +269,19 @@ export default class CheckinService {
    */
   async getClientsWithoutCheckinThisWeek(coachId) {
     try {
-      const { data: clients, error: clientsError } = await this.supabase
+      const { data: alleClients, error: clientsError } = await this.supabase
         .from('clients')
-        .select('id, first_name, last_name, email')
+        .select(`id, first_name, last_name, email, ${TRAJECT_KOLOMMEN}`)
         .eq('coach_id', coachId)
 
       if (clientsError) throw clientsError
-      if (!clients || clients.length === 0) return []
+      if (!alleClients || alleClients.length === 0) return []
+
+      // Alleen wie echt loopt. Zonder deze zeef stonden hier ook de mensen
+      // van wie het account wel bestaat maar het traject nog niet begonnen
+      // is — die kunnen per definitie niet te laat zijn.
+      const clients = alleClients.filter(trajectLoopt)
+      if (clients.length === 0) return []
 
       // Parallelliseer: 1 query per client tegelijk i.p.v. sequentieel
       const hasCheckinFlags = await Promise.all(
