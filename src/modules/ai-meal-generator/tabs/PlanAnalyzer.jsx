@@ -448,7 +448,26 @@ export default function PlanAnalyzer({
     if (setPlanModifications) { const mods = {}; updated.forEach((d, i) => { mods[i] = d }); setPlanModifications(mods) }
   }
 
+  // Nieuwe tijden uitzenden naar de agenda in de andere helft. Alleen wat
+  // werkelijk veranderd is, zodat de agenda niet voor elke maaltijd opnieuw
+  // laadt terwijl er niets gebeurde.
+  const meldTijden = (updated) => {
+    ;(updated || []).forEach((dag, i) => {
+      const oud = weekData?.[i]?.meals || {}
+      Object.entries(dag.meals || {}).forEach(([slot, meal]) => {
+        const nieuw = meal?.timing
+        if (!nieuw || nieuw === oud[slot]?.timing) return
+        meldMaaltijdTijd({ mealPlanId: actievePlanId, day: DAYS[i]?.id, slot, newTiming: nieuw, bron: 'analyzer' })
+      })
+    })
+  }
+
   const applyWeekUpdate = async (updated, actionDesc) => {
+    // Gewijzigde tijden uitzenden vóór het opslaan: de ontvangers verschuiven
+    // hun blok lokaal en wachten niet op de database. Hier en niet in de
+    // losse handlers, zodat élke route die tijden raakt automatisch meedoet —
+    // de klok op de maaltijdkaart, het tijden-scherm, auto-balance, slepen.
+    meldTijden(updated)
     setWeekData(updated); pushHistory(updated, actionDesc); await persistWeekData(updated)
     // Trigger embedded agenda om de nieuwe meal-data op te halen.
     setAgendaRefreshKey(k => k + 1)
@@ -467,20 +486,6 @@ export default function PlanAnalyzer({
       : isClockTime(prevMeal?.timing) ? prevMeal.timing
       : (SLOT_DEFAULT_TIMES[slot] || '12:00')
     return { ...meal, timing }
-  }
-
-  // Nieuwe tijden uitzenden naar de agenda in de andere helft. Alleen wat
-  // werkelijk veranderd is, zodat de agenda niet voor elke maaltijd opnieuw
-  // laadt terwijl er niets gebeurde.
-  const meldTijden = (updated) => {
-    ;(updated || []).forEach((dag, i) => {
-      const oud = weekData?.[i]?.meals || {}
-      Object.entries(dag.meals || {}).forEach(([slot, meal]) => {
-        const nieuw = meal?.timing
-        if (!nieuw || nieuw === oud[slot]?.timing) return
-        meldMaaltijdTijd({ mealPlanId: actievePlanId, day: DAYS[i]?.id, slot, newTiming: nieuw, bron: 'analyzer' })
-      })
-    })
   }
 
   const handleSwap = (dayIndex, slot, meal) => setSwapState({ dayIndex, slot, meal })
@@ -1085,7 +1090,7 @@ export default function PlanAnalyzer({
           )}
           {dockedSection === 'timing' && weekData && (
             <TimingModal embedded weekData={weekData}
-              onApply={async (updated) => { await applyWeekUpdate(updated, 'Tijden bijgewerkt'); meldTijden(updated); setDockedSection(null) }}
+              onApply={async (updated) => { await applyWeekUpdate(updated, 'Tijden bijgewerkt'); setDockedSection(null) }}
               onClose={() => setDockedSection(null)} isMobile={m} />
           )}
           {dockedSection === 'dag' && currentDay && (
@@ -1502,7 +1507,7 @@ export default function PlanAnalyzer({
 
       {showTimingModal && weekData && (
         <TimingModal weekData={weekData}
-          onApply={async (updated) => { await applyWeekUpdate(updated, 'Tijden bijgewerkt'); meldTijden(updated); setShowTimingModal(false) }}
+          onApply={async (updated) => { await applyWeekUpdate(updated, 'Tijden bijgewerkt'); setShowTimingModal(false) }}
           onClose={() => setShowTimingModal(false)} isMobile={m} />
       )}
 
