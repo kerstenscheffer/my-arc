@@ -16,6 +16,7 @@ const G = {
 export default function BarcodeScanner({ onScan, onClose, onSwitchToSearch }) {
   const isMobile = window.innerWidth <= 768
   const videoRef = useRef(null)
+  const nativeRef = useRef(null)
   const readerRef = useRef(null)
   const timeoutRef = useRef(null)
 
@@ -55,9 +56,53 @@ export default function BarcodeScanner({ onScan, onClose, onSwitchToSearch }) {
     return () => { if (timeoutRef.current) clearInterval(timeoutRef.current) }
   }, [status])
 
+  // De ingebouwde barcodelezer van de telefoon (Chrome op Android, en recente
+  // Safari). Die leest een barcode onder élke hoek en is een stuk sneller dan
+  // ZXing in JavaScript. Lukt het niet, dan valt hij door naar ZXing — dus we
+  // verliezen niets waar hij ontbreekt.
+  const startNativeScanner = async () => {
+    if (typeof window === 'undefined' || !('BarcodeDetector' in window)) return false
+    try {
+      const formaten = await window.BarcodeDetector.getSupportedFormats()
+      const wil = ['ean_13', 'ean_8', 'upc_a', 'upc_e', 'qr_code'].filter(f => formaten.includes(f))
+      if (!wil.length) return false
+
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: {
+          facingMode: isMobile ? { ideal: 'environment' } : 'user',
+          width: { ideal: 1920 }, height: { ideal: 1080 },
+        },
+      })
+      const videoElement = videoRef.current
+      if (!videoElement) { stream.getTracks().forEach(t => t.stop()); return false }
+      videoElement.srcObject = stream
+      videoElement.setAttribute('playsinline', 'true')
+      await videoElement.play()
+
+      const detector = new window.BarcodeDetector({ formats: wil })
+      nativeRef.current = { stream, interval: null }
+      nativeRef.current.interval = setInterval(async () => {
+        if (!videoRef.current || videoRef.current.readyState < 2) return
+        try {
+          const codes = await detector.detect(videoRef.current)
+          const raw = codes?.[0]?.rawValue
+          if (raw) handleScanSuccess(raw)
+        } catch { /* frame overslaan; volgende tik proberen we opnieuw */ }
+      }, 250)
+      return true
+    } catch (e) {
+      console.warn('native barcodelezer niet bruikbaar, terug naar ZXing:', e?.message)
+      return false
+    }
+  }
+
   const startScanning = async () => {
     try {
       setStatus('scanning')
+
+      // Eerst de ingebouwde lezer proberen; die is niet kieskeurig over de
+      // stand van de barcode. Pas als die er niet is, ZXing.
+      if (await startNativeScanner()) return
 
       const hints = new Map()
       hints.set(DecodeHintType.POSSIBLE_FORMATS, [
@@ -112,6 +157,11 @@ export default function BarcodeScanner({ onScan, onClose, onSwitchToSearch }) {
   }
 
   const stopScanning = () => {
+    if (nativeRef.current) {
+      clearInterval(nativeRef.current.interval)
+      nativeRef.current.stream?.getTracks?.().forEach(t => t.stop())
+      nativeRef.current = null
+    }
     if (readerRef.current) {
       try { readerRef.current.reset() } catch { /* reader already torn down */ }
       readerRef.current = null
@@ -158,8 +208,8 @@ export default function BarcodeScanner({ onScan, onClose, onSwitchToSearch }) {
     if (status === 'timeout') return 'Niet herkend — probeer opnieuw of voer handmatig in'
     if (status === 'error')   return 'Camera niet beschikbaar'
     if (status === 'scanning' && scanTime >= 18) return 'Zorg voor goed licht of voer handmatig in'
-    if (status === 'scanning' && scanTime >= 8)  return 'Houd stil — iets dichter op de barcode'
-    return 'Houd de barcode rechtop binnen het kader'
+    if (status === 'scanning' && scanTime >= 8)  return 'Houd stil — iets dichter op de barcode. Draaien hoeft niet.'
+    return 'Barcode in het kader — liggend of staand, allebei goed'
   }
 
   const helperColor = () => {
@@ -211,15 +261,15 @@ export default function BarcodeScanner({ onScan, onClose, onSwitchToSearch }) {
         <div style={{ flex: 1, position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
           <video ref={videoRef} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
 
-          {/* Portrait scan-area frame — matches how staande (vertical)
-              barcodes are presented to the camera. Inside: an animated
-              horizontal laser-line that travels up-and-down so users
-              instantly understand the scan direction. */}
+          {/* Vierkant kader: een productbarcode is breder dan hoog, dus een
+              staand vak liet mensen hun product draaien — en wie dat niet
+              doorhad kwam er niet doorheen. Vierkant accepteert allebei, en
+              de tekst eronder zegt het er expliciet bij. */}
           <div style={{
             position: 'absolute', top: '50%', left: '50%',
             transform: 'translate(-50%, calc(-50% - 28px))',
-            width: isMobile ? 'min(62vw, 240px)' : '260px',
-            height: isMobile ? '320px' : '360px',
+            width: isMobile ? 'min(78vw, 300px)' : '320px',
+            height: isMobile ? 'min(78vw, 300px)' : '320px',
             border: `1.5px solid ${
               status === 'success' ? G.primary
               : status === 'timeout' ? 'rgba(239,68,68,0.55)'
@@ -232,7 +282,9 @@ export default function BarcodeScanner({ onScan, onClose, onSwitchToSearch }) {
               : 'none',
             overflow: 'hidden',
           }}>
-            {/* Animated scan line — horizontal stripe sweeping vertically */}
+            {/* Scanlijn. Blijft een horizontale streep die op en neer gaat,
+                maar hij dekt nu het hele vierkant: hij toont dát er gescand
+                wordt, niet in welke stand je iets moet houden. */}
             {status === 'scanning' && (
               <div style={{
                 position: 'absolute',
