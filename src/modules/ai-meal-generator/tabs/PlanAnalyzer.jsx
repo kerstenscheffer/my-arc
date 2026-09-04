@@ -283,15 +283,39 @@ export default function PlanAnalyzer({
         if (!dd[s]) return
         const slot = dd[s]
         const fullMeal = mealDataMap[slot.meal_id] || mealDataMap[slot.id] || null
+        // Macro's aanvullen als ze in het plan ontbreken.
+        //
+        // Sommige plannen zijn opgeslagen zonder calories/protein/carbs/fat op
+        // de slot — alleen naam, timing en ingrediënten. De dagtotalen werden
+        // dan 0 terwijl er wél maaltijden stonden. De waarden uit ai_meals
+        // kloppen: bij "Rijstwafels met honing & Banaan" geeft de tabel 351
+        // kcal, precies wat je uit de opgeslagen porties berekent.
+        //
+        // Alleen aanvullen, nooit overschrijven: staat er wél een waarde op de
+        // slot, dan is die geschaald door de coach en die moet blijven.
+        const heeftMacros = Number(slot.calories) > 0
+        const macros = (!heeftMacros && fullMeal)
+          ? {
+              calories: Number(fullMeal.calories) || 0,
+              protein: Number(fullMeal.protein) || 0,
+              carbs: Number(fullMeal.carbs) || 0,
+              fat: Number(fullMeal.fat) || 0,
+            }
+          : {}
+
         meals[s] = {
           ...slot,
           ...(fullMeal ? { name: fullMeal.name, internal_name: fullMeal.internal_name, image_url: fullMeal.image_url, ingredients_list: slot.ingredients_list || fullMeal.ingredients_list, preparation_steps: fullMeal.preparation_steps, tips: fullMeal.tips, allergens: fullMeal.allergens, scalable: fullMeal.scalable, difficulty: fullMeal.difficulty, labels: fullMeal.labels } : {}),
+          ...macros,
           name: fullMeal?.name || slot.name || slot.meal_name || slot.title || undefined,
           meal_id: slot.meal_id || slot.id || null,
-          original_calories: slot.original_calories || slot.calories,
-          original_protein: slot.original_protein || slot.protein,
-          original_carbs: slot.original_carbs || slot.carbs,
-          original_fat: slot.original_fat || slot.fat,
+          // Basiswaarden voor de portie-schaler. Vallen mee terug op de zojuist
+          // aangevulde macro's: anders rekent de schaler met een lege basis en
+          // levert elke aanpassing 0 op.
+          original_calories: slot.original_calories || slot.calories || macros.calories,
+          original_protein: slot.original_protein || slot.protein || macros.protein,
+          original_carbs: slot.original_carbs || slot.carbs || macros.carbs,
+          original_fat: slot.original_fat || slot.fat || macros.fat,
         }
       })
       return { dayId: day.id, meals, totals: calculateTotals(meals), is_training_day: dd.is_training_day || false }
