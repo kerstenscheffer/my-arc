@@ -68,6 +68,7 @@ export default function PlanAnalyzer({
   const [agendaRefreshKey, setAgendaRefreshKey] = useState(0)
   const [weekData, setWeekData] = useState(null)
   const [targets, setTargets] = useState(dailyTargets || null)
+  const [blancoBezig, setBlancoBezig] = useState(false)
   const [planMeta, setPlanMeta] = useState(null)
   // Eén pre-workout maaltijd voor het hele plan. Staat bewust NIET in
   // week_structure: zo verschuift hij mee als de klant z'n trainingsdagen
@@ -623,6 +624,60 @@ export default function PlanAnalyzer({
     setDockedSection(null)
   }
 
+  // Blanco beginnen: een leeg weekplan voor deze klant, zonder sjabloon en
+  // zonder AI. Zeven lege dagen; alleen de trainingsdagen worden overgenomen,
+  // zodat de tijdlijn en de pre-workout meteen op de juiste dagen vallen.
+  //
+  // De code->index map staat hier bewust lokaal. De variant bovenin de render
+  // zit NA de vroege return van dit scherm, dus die is nog niet geevalueerd
+  // als je hier klikt; ernaar verwijzen zou hier een ReferenceError geven.
+  const handleStartBlanco = async () => {
+    if (!resolvedClientId || blancoBezig) return
+    const codeNaarIndex = { ma: 0, di: 1, wo: 2, do: 3, vr: 4, za: 5, zo: 6 }
+    const trainingIdx = new Set((trainingDays || []).map(c => codeNaarIndex[c]).filter(i => i != null))
+
+    const days = DAYS.map((d, i) => ({
+      dayId: d.id,
+      meals: {},
+      totals: calculateTotals({}),
+      is_training_day: trainingIdx.has(i),
+    }))
+    const wsToSave = {}
+    days.forEach(d => { wsToSave[d.dayId] = { ...d.meals, totals: d.totals, is_training_day: d.is_training_day } })
+
+    // daily_calories en daily_protein hebben een default in de database
+    // (2000 / 150). Expliciet null meesturen zet die default opzij, dus laat
+    // ik de sleutels weg als er geen targets zijn.
+    const rij = {
+      client_id: resolvedClientId,
+      template_name: 'Blanco plan',
+      week_structure: wsToSave,
+      created_via: 'blanco',
+      // Niet meteen live: de klant hoort geen leeg plan in zijn app te zien.
+      is_active: false,
+    }
+    if (targets?.calories) rij.daily_calories = targets.calories
+    if (targets?.protein) rij.daily_protein = targets.protein
+
+    setBlancoBezig(true)
+    setWeekSaveState('saving')
+    try {
+      const { data, error } = await db.supabase
+        .from('client_meal_plans').insert([rij]).select('id').single()
+      if (error || !data?.id) throw (error || new Error('geen id teruggegeven'))
+      setSelectedConceptId(data.id)
+      loadAllPlanCount(resolvedClientId)
+      setWeekData(days); pushHistory(days, 'Blanco plan gestart')
+      setAgendaRefreshKey(k => k + 1)
+      setWeekSaveState('saved'); setTimeout(() => setWeekSaveState(s => (s === 'saved' ? 'idle' : s)), 2000)
+    } catch (e) {
+      console.error('Blanco plan aanmaken mislukt:', e)
+      setWeekSaveState('error')
+      alert('Blanco plan aanmaken mislukt. Probeer het opnieuw.')
+    }
+    setBlancoBezig(false)
+  }
+
   const handleUpdateMeal = async (dayIndex, slot, updatedMeal) => {
     if (!weekData) return
     const updated = [...weekData]
@@ -818,6 +873,24 @@ export default function PlanAnalyzer({
             {conceptPlans.length > 0 ? 'Selecteer een concept plan' : 'Genereer eerst een plan of selecteer een client'}
           </div>
         </div>
+        {/* Blanco beginnen. Staat bovenaan omdat het de kortste route is:
+            geen sjabloon, geen AI, meteen een leeg weekplan om in te bouwen. */}
+        {resolvedClientId && (
+          <button onClick={handleStartBlanco} disabled={blancoBezig} style={{
+            width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem',
+            padding: '0.7rem 1rem', marginBottom: '0.6rem',
+            background: '#fff',
+            borderTop: 'none', borderBottom: 'none', borderLeft: 'none', borderRight: 'none',
+            borderRadius: '6px', cursor: blancoBezig ? 'default' : 'pointer',
+            color: '#0a0a0a', fontSize: '0.7rem', fontWeight: 900, fontFamily: 'inherit',
+            opacity: blancoBezig ? 0.6 : 1,
+            touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+          }}>
+            {blancoBezig
+              ? <><Loader size={14} className="animate-spin" /> Aanmaken...</>
+              : <><Plus size={14} /> Begin blanco</>}
+          </button>
+        )}
         {resolvedClientId && allClientPlans.length > 0 && (
           <button onClick={() => setShowPlanSwitcher(true)} style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem', padding: '0.625rem 1rem', marginBottom: '0.6rem', background: 'rgba(255,215,0,0.05)', border: '1px solid rgba(255,215,0,0.15)', borderRadius: '6px', cursor: 'pointer', color: '#FFD700', fontSize: '0.65rem', fontWeight: 700, touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}>
             <List size={14} /> Alle plannen bekijken ({allClientPlans.length})
