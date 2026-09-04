@@ -411,10 +411,14 @@ export default function AIMealDashboard({ client, onNavigate, db }) {
   
   const handleSwapMeal = async (originalMeal, newMealId) => {
     try {
+      // De dag waar de klant NAAR KIJKT, niet de dag van vandaag. Dit stond
+      // op dashboardData.dayName: wisselde je iets terwijl je donderdag open
+      // had, dan werd dat als "vandaag" weggeschreven.
+      const dagKey = DAYS_OF_WEEK[dayKeyToIndex(selectedDay)]?.key
       await service.swapAIMeal(
         client.id,
         dashboardData.activePlan?.id,
-        dashboardData.dayName || 'today',
+        dagKey,
         originalMeal.slot,
         newMealId
       )

@@ -834,12 +834,96 @@ async logAIMood(clientId, moodData) {
         console.error('Progress update error:', progressError)
       }
       
+      // ── De wissel vastleggen in het weekplan, bij DEZE ene dag ──
+      //
+      // Hierboven ging de wissel alleen naar ai_meal_progress van vandaag,
+      // met het slot als sleutel. Gevolg: de dag-tijdlijn (die rechtstreeks
+      // uit week_structure leest) zag de wissel helemaal niet, en morgen was
+      // hij weg. Bij een plan waarin elke dag dezelfde maaltijd staat — zoals
+      // bij Luc, zeven keer dezelfde lunch — voelt dat als "de hele week
+      // wisselt mee".
+      //
+      // We schrijven precies één sleutel: week_structure[dag][slot]. Andere
+      // dagen worden niet aangeraakt, ook niet als daar dezelfde maaltijd
+      // staat.
+      await this.swapMealInWeekStructure(planId, day, slot, newMeal)
+
       console.log('✅ Meal swapped successfully')
       return swapData
 
     } catch (error) {
       console.error('Error swapping meal:', error)
       return null
+    }
+  }
+
+  /**
+   * Zet één maaltijd in het weekplan, op één dag.
+   *
+   * Leest het plan opnieuw en schrijft alleen de betreffende dag terug. Niet
+   * de hele week_structure die we toevallig in het geheugen hadden: dan zou
+   * een wissel een gelijktijdige aanpassing van de coach kunnen overschrijven.
+   *
+   * De slot-vorm blijft zoals hij was. Stond er een object met een eigen tijd
+   * of een eigen titel, dan houden we die — anders zou de maaltijd na het
+   * wisselen op de standaardtijd springen.
+   */
+  async swapMealInWeekStructure(planId, day, slot, newMeal) {
+    if (!planId || !day || !slot || !newMeal?.id) return false
+    try {
+      const { data: plan, error: leesFout } = await this.supabase
+        .from('client_meal_plans')
+        .select('week_structure')
+        .eq('id', planId)
+        .single()
+      if (leesFout) throw leesFout
+
+      const week = plan?.week_structure
+      if (!week || !week[day]) {
+        console.warn('Wissel niet in weekplan gezet: dag ontbreekt', day)
+        return false
+      }
+
+      const oud = week[day][slot]
+      const oudObject = (oud && typeof oud === 'object') ? oud : {}
+
+      // Een slot is geen verwijzing maar een volledige momentopname van de
+      // maaltijd: foto, bereidingsstappen, ingredienten, labels, allergenen.
+      // Daarom bouwen we het slot op uit de NIEUWE maaltijd. Zou je alleen
+      // naam en macro's overschrijven op het oude object, dan hield de klant
+      // de foto en het recept van het gerecht dat hij net had weggewisseld.
+      //
+      // Twee dingen komen wel van het oude slot, want die horen bij het slot
+      // en niet bij de maaltijd: de kloktijd die de coach heeft gezet en de
+      // eigen titel (bv. "Pre Workout Meal").
+      const nieuweSlot = {
+        ...newMeal,
+        meal_id: newMeal.id,
+        meal_name: newMeal.name || newMeal.meal_name,
+        timing: oudObject.timing || null,
+        display_label: oudObject.display_label || null,
+      }
+
+      // De original_*-velden en fitScore horen bij de porties van de vorige
+      // maaltijd. Laten staan zou de portie-schaler op oude getallen laten
+      // rekenen; ze horen bij de nieuwe maaltijd opnieuw te ontstaan.
+      delete nieuweSlot.original_calories
+      delete nieuweSlot.original_protein
+      delete nieuweSlot.original_carbs
+      delete nieuweSlot.original_fat
+      delete nieuweSlot.fitScore
+
+      const nieuweWeek = { ...week, [day]: { ...week[day], [slot]: nieuweSlot } }
+
+      const { error: schrijfFout } = await this.supabase
+        .from('client_meal_plans')
+        .update({ week_structure: nieuweWeek })
+        .eq('id', planId)
+      if (schrijfFout) throw schrijfFout
+      return true
+    } catch (e) {
+      console.error('Wissel in weekplan opslaan mislukt:', e)
+      return false
     }
   }
 
