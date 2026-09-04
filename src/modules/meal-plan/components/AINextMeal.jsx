@@ -299,7 +299,9 @@ export default function AINextMeal({
           style={{
             flex: 1,
             background: 'transparent',
-            border: 'none',
+            borderTop: 'none',
+            borderBottom: 'none',
+            borderLeft: 'none',
             borderRight: '1px solid rgba(255, 255, 255, 0.06)',
             borderRadius: 0,
             padding: isMobile ? '0.55rem 0' : '0.65rem 0',
@@ -329,7 +331,9 @@ export default function AINextMeal({
           style={{
             flex: 1,
             background: 'transparent',
-            border: 'none',
+            borderTop: 'none',
+            borderBottom: 'none',
+            borderLeft: 'none',
             borderRight: '1px solid rgba(255, 255, 255, 0.06)',
             borderRadius: 0,
             padding: isMobile ? '0.55rem 0' : '0.65rem 0',

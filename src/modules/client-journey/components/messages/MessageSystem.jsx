@@ -273,7 +273,8 @@ function ActBtn({ onClick, color, label, icon: Icon, flex, isMobile }) {
     <button onClick={onClick} style={{
       flex: flex ? 1 : undefined,
       padding: isMobile ? '0.4rem 0.5rem' : '0.45rem 0.6rem',
-      background: 'transparent', border: 'none',
+      background: 'transparent',
+      borderTop: 'none', borderBottom: 'none', borderLeft: 'none',
       borderRight: '1px solid rgba(255,255,255,0.04)',
       color, fontSize: '0.65rem', fontWeight: 600,
       cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.2rem',

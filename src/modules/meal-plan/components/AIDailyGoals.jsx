@@ -181,7 +181,7 @@ const QuickIntakeModal = ({ isOpen, onClose, onSave, targets, isMobile }) => {
           )}
         </div>
         <div style={{ display: 'flex', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
-          <button onClick={onClose} style={{ flex: 1, background: 'transparent', border: 'none', borderRight: '1px solid rgba(255,255,255,0.04)', padding: '0.75rem', color: 'rgba(255,255,255,0.4)', fontSize: '0.75rem', fontWeight: '700', cursor: 'pointer', minHeight: '44px' }}>Annuleren</button>
+          <button onClick={onClose} style={{ flex: 1, background: 'transparent', borderTop: 'none', borderBottom: 'none', borderLeft: 'none', borderRight: '1px solid rgba(255,255,255,0.04)', padding: '0.75rem', color: 'rgba(255,255,255,0.4)', fontSize: '0.75rem', fontWeight: '700', cursor: 'pointer', minHeight: '44px' }}>Annuleren</button>
           <button onClick={handleSave} style={{ flex: 2, background: 'rgba(16,185,129,0.12)', border: 'none', padding: '0.75rem', color: '#10b981', fontSize: '0.75rem', fontWeight: '800', cursor: 'pointer', minHeight: '44px' }}>Opslaan</button>
         </div>
       </div>

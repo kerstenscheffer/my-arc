@@ -463,7 +463,9 @@ export default function AIAlternativesModal({
                 style={{
                   flex: 1,
                   background: 'transparent',
-                  border: 'none',
+                  borderTop: 'none',
+                  borderBottom: 'none',
+                  borderLeft: 'none',
                   borderRight: '1px solid rgba(255, 255, 255, 0.04)',
                   borderRadius: 0,
                   padding: isMobile ? '0.75rem' : '0.875rem',
