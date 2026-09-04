@@ -30,6 +30,21 @@ export default class CommandCenterService {
 
       if (error) { console.error('❌ Weight error:', error); return clients.map(c => ({ ...c, weightData: null })) }
 
+      // Actieve trajectfase per klant, in één query voor de hele lijst. De
+      // kaart rekent "sinds start" en de kleuren hierop: zonder fase zou een
+      // build met +0,2 kg worden afgemeten tegen het doel dat vóór de fase
+      // op de klant stond.
+      let faseVanKlant = {}
+      try {
+        const { data: fases } = await this.supabase
+          .from('client_phases')
+          .select('client_id, started_on, doel, start_gewicht, week_doel_kg')
+          .in('client_id', clientIds)
+          .order('started_on', { ascending: false })
+        // Nieuwste eerst, dus de eerste die we tegenkomen is de actieve.
+        ;(fases || []).forEach(f => { if (!faseVanKlant[f.client_id]) faseVanKlant[f.client_id] = f })
+      } catch (e) { console.warn('fases laden mislukt (niet-blokkerend):', e?.message) }
+
       const weightByClient = {}
       clientIds.forEach(id => { weightByClient[id] = [] })
       weightLogs?.forEach(log => { if (weightByClient[log.client_id]) weightByClient[log.client_id].push(log) })
@@ -53,7 +68,8 @@ export default class CommandCenterService {
           ...client,
           // Was begrensd op 56 entries — te weinig voor volledige
           // historiek. Geen cap meer; we pakken alles binnen het venster.
-          weightData: { latest: latestLog, history: logs, daysSinceWeighin, fridayCount, weightStatus, fridayMissing, totalLogs: logs.length }
+          weightData: { latest: latestLog, history: logs, daysSinceWeighin, fridayCount, weightStatus, fridayMissing, totalLogs: logs.length },
+          fase: faseVanKlant[client.id] || null
         }
       })
     } catch (error) { console.error('❌ Weight error:', error); return clients.map(c => ({ ...c, weightData: null })) }

@@ -127,14 +127,42 @@ export default function ClientWeightCard({ client, isMobile, onToggleStatus, onD
     : null
 
   const sortedHistory = [...history].sort((a, b) => new Date(a.date) - new Date(b.date))
-  const firstEntry  = sortedHistory[0]
-  const latestEntry = sortedHistory[sortedHistory.length - 1]
-  const totalChange = (firstEntry && latestEntry && sortedHistory.length >= 2)
-    ? parseFloat((parseFloat(latestEntry.weight) - parseFloat(firstEntry.weight)).toFixed(1))
+
+  // Loopt er een fase, dan telt "sinds start" vanaf díe fase en niet vanaf de
+  // allereerste meting. Na een cut van acht maanden zegt -8,5 kg niets meer
+  // over de build die vorige week begon. Zelfde regel als in de insight-modal.
+  const fase = client?.fase || null
+  const faseHistory = fase?.started_on
+    ? sortedHistory.filter(e => new Date(e.date) >= new Date(fase.started_on))
+    : sortedHistory
+
+  const firstEntry  = faseHistory[0]
+  const latestEntry = faseHistory[faseHistory.length - 1]
+  // Het afgesproken startgewicht wint van de eerste meting binnen de fase.
+  const basisGewicht = fase?.start_gewicht != null
+    ? parseFloat(fase.start_gewicht)
+    : (firstEntry ? parseFloat(firstEntry.weight) : null)
+
+  const totalChange = (basisGewicht != null && latestEntry && (fase?.start_gewicht != null || faseHistory.length >= 2))
+    ? parseFloat((parseFloat(latestEntry.weight) - basisGewicht).toFixed(1))
     : null
-  const startDateLabel = firstEntry
-    ? new Date(firstEntry.date).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })
+
+  const startDatum = fase?.started_on || firstEntry?.date || null
+  const startDateLabel = startDatum
+    ? new Date(startDatum).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })
     : null
+
+  // Waartegen kleuren we? De fase, als die er is. De klant-rij komt uit een
+  // lijst die bij het laden is opgehaald en loopt achter zodra je een fase
+  // wijzigt; de fase zelf komt uit dezelfde ophaalronde als deze cijfers.
+  const doelBron = fase
+    ? {
+        primary_goal: fase.doel === 'build' ? 'muscle_gain'
+          : fase.doel === 'cut' ? 'fat_loss'
+          : fase.doel === 'recomp' ? 'recomp' : 'maintenance',
+        weekly_weight_goal: fase.week_doel_kg,
+      }
+    : client
   const totalEntries = sortedHistory.length
 
   const openWhatsApp = () => {
@@ -174,12 +202,12 @@ export default function ClientWeightCard({ client, isMobile, onToggleStatus, onD
     {
       label: 'Verschil',
       val: weekDiff !== null ? `${weekDiff > 0 ? '+' : ''}${weekDiff}` : '—',
-      color: weekDiff !== null ? weightGoalColor(weekDiff, client) : 'rgba(255,255,255,0.4)',
+      color: weekDiff !== null ? weightGoalColor(weekDiff, doelBron) : 'rgba(255,255,255,0.4)',
     },
     {
-      label: 'Sinds start',
+      label: fase ? 'Sinds start fase' : 'Sinds start',
       val: totalChange !== null ? `${totalChange > 0 ? '+' : ''}${totalChange}` : '—',
-      color: totalChange !== null ? weightGoalColor(totalChange, client) : 'rgba(255,255,255,0.4)',
+      color: totalChange !== null ? weightGoalColor(totalChange, doelBron) : 'rgba(255,255,255,0.4)',
     },
   ]
 
@@ -360,8 +388,8 @@ export default function ClientWeightCard({ client, isMobile, onToggleStatus, onD
                 {[
                   { label: 'Deze week (Ma-Zo)',   sub: thisWeek.count > 0 ? `${thisWeek.count} meting${thisWeek.count === 1 ? '' : 'en'} · ${fmtWeekRange(thisWeek.monday, thisWeek.sunday)}` : `geen metingen · ${fmtWeekRange(thisWeek.monday, thisWeek.sunday)}`, val: curAvg ?? '—', color: '#fff' },
                   { label: 'Vorige week (Ma-Zo)', sub: lastWeek.count > 0 ? `${lastWeek.count} meting${lastWeek.count === 1 ? '' : 'en'} · ${fmtWeekRange(lastWeek.monday, lastWeek.sunday)}` : `geen metingen · ${fmtWeekRange(lastWeek.monday, lastWeek.sunday)}`, val: prevAvg ?? '—', color: '#fff' },
-                  { label: 'vs Vorige week', sub: weekDiff !== null ? 'verschil tussen weekgemiddelden' : 'geen vergelijking', val: weekDiff !== null ? `${weekDiff > 0 ? '+' : ''}${weekDiff}` : '—', color: weekDiff !== null ? weightGoalColor(weekDiff, client) : 'rgba(255,255,255,0.4)' },
-                  { label: 'Sinds start', sub: startDateLabel ? `eerste meting · ${startDateLabel}` : 'geen startmeting', val: totalChange !== null ? `${totalChange > 0 ? '+' : ''}${totalChange}` : '—', color: totalChange !== null ? weightGoalColor(totalChange, client) : 'rgba(255,255,255,0.4)' },
+                  { label: 'vs Vorige week', sub: weekDiff !== null ? 'verschil tussen weekgemiddelden' : 'geen vergelijking', val: weekDiff !== null ? `${weekDiff > 0 ? '+' : ''}${weekDiff}` : '—', color: weekDiff !== null ? weightGoalColor(weekDiff, doelBron) : 'rgba(255,255,255,0.4)' },
+                  { label: fase ? 'Sinds start fase' : 'Sinds start', sub: startDateLabel ? `${fase ? 'fase vanaf' : 'eerste meting ·'} ${startDateLabel}` : 'geen startmeting', val: totalChange !== null ? `${totalChange > 0 ? '+' : ''}${totalChange}` : '—', color: totalChange !== null ? weightGoalColor(totalChange, doelBron) : 'rgba(255,255,255,0.4)' },
                 ].map((s, i) => (
                   <div key={i} style={{ padding: '0.5rem 0.6rem', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: 8, display: 'flex', flexDirection: 'column', gap: 3 }}>
                     <div style={{ fontSize: '0.7rem', fontWeight: 800, color: '#fff' }}>{s.label}</div>
