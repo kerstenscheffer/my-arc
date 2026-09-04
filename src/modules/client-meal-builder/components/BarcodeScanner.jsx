@@ -3,8 +3,10 @@
 // silent feedback (no scan-line), late hints, bottom Zoeken|Barcode pill.
 
 import React, { useState, useEffect, useRef } from 'react'
-import { BarcodeFormat, DecodeHintType } from '@zxing/library'
-import { BrowserMultiFormatReader } from '@zxing/library'
+import {
+  BarcodeFormat, DecodeHintType, MultiFormatReader,
+  RGBLuminanceSource, HybridBinarizer, BinaryBitmap,
+} from '@zxing/library'
 import { X, Keyboard, Camera, CheckCircle, Zap, ZapOff, Search, ScanLine } from 'lucide-react'
 
 const G = {
@@ -104,6 +106,17 @@ export default function BarcodeScanner({ onScan, onClose, onSwitchToSearch }) {
       // stand van de barcode. Pas als die er niet is, ZXing.
       if (await startNativeScanner()) return
 
+      // Eigen leeslus in plaats van decodeFromConstraints.
+      //
+      // Waarom: ZXing probeert een gedraaide barcode pas nadat de eerste
+      // poging is mislukt, en doet dat op het volledige camerabeeld van
+      // 1920x1080 met TRY_HARDER aan. In JavaScript op een telefoon is die
+      // tweede poging zo traag dat je 'm in de praktijk zelden haalt — de
+      // ene stand leest vlot, de andere voelt alsof hij niet werkt.
+      //
+      // Hier verkleinen we het beeld eerst en bieden we elke frame allebei
+      // de standen aan, elk als eigen poging. Twee kleine pogingen zijn
+      // samen sneller dan één grote met een trage herkansing erachteraan.
       const hints = new Map()
       hints.set(DecodeHintType.POSSIBLE_FORMATS, [
         BarcodeFormat.EAN_13, BarcodeFormat.EAN_8,
@@ -112,41 +125,83 @@ export default function BarcodeScanner({ onScan, onClose, onSwitchToSearch }) {
       ])
       hints.set(DecodeHintType.TRY_HARDER, true)
 
-      const codeReader = new BrowserMultiFormatReader(hints, 500)
-      readerRef.current = codeReader
+      const lezer = new MultiFormatReader()
+      lezer.setHints(hints)
 
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: {
+          facingMode: isMobile ? { ideal: 'environment' } : 'user',
+          width: { ideal: 1920 }, height: { ideal: 1080 },
+        },
+      })
       const videoElement = videoRef.current
-      if (!videoElement) return
+      if (!videoElement) { stream.getTracks().forEach(t => t.stop()); return }
+      videoElement.srcObject = stream
+      videoElement.setAttribute('playsinline', 'true')
+      await videoElement.play()
 
-      const devices = await codeReader.listVideoInputDevices()
-      if (devices.length === 0) throw new Error('Geen camera gevonden')
+      // Langste zijde terug naar 1280. Genoeg detail voor een EAN-13 en
+      // ruwweg de helft van het rekenwerk van een volledig 1080p-beeld.
+      const MAX_ZIJDE = 1280
+      const doek = document.createElement('canvas')
+      const ctx = doek.getContext('2d', { willReadFrequently: true })
+      const gedraaid = document.createElement('canvas')
+      const ctxGedraaid = gedraaid.getContext('2d', { willReadFrequently: true })
 
-      let selectedDevice = devices[0]
-      if (isMobile && devices.length > 1) {
-        const back = devices.find(d =>
-          d.label.toLowerCase().includes('back') ||
-          d.label.toLowerCase().includes('rear') ||
-          d.label.toLowerCase().includes('environment')
-        )
-        if (back) selectedDevice = back
+      const leesDoek = (c, x) => {
+        const { width: w, height: h } = c
+        if (!w || !h) return null
+        const beeld = x.getImageData(0, 0, w, h).data
+        // Grijswaarden, groen zwaarder gewogen — zoals ZXing zelf ook doet.
+        const grijs = new Uint8ClampedArray(w * h)
+        for (let i = 0, j = 0; i < grijs.length; i++, j += 4) {
+          grijs[i] = (beeld[j] + 2 * beeld[j + 1] + beeld[j + 2]) / 4
+        }
+        const bitmap = new BinaryBitmap(new HybridBinarizer(new RGBLuminanceSource(grijs, w, h)))
+        try {
+          return lezer.decodeWithState(bitmap)
+        } catch {
+          // Niets gevonden in dit beeld. Volgende poging of volgende frame.
+          return null
+        } finally {
+          // decodeWithState houdt status vast tussen aanroepen; zonder reset
+          // blijft een mislukte poging de volgende beinvloeden.
+          lezer.reset()
+        }
       }
 
-      await codeReader.decodeFromConstraints(
-        {
-          video: {
-            deviceId: selectedDevice.deviceId,
-            facingMode: isMobile ? 'environment' : 'user',
-            width: { ideal: 1920 }, height: { ideal: 1080 },
-            focusMode: 'continuous'
-          }
-        },
-        videoElement,
-        (result) => {
-          if (result) {
-            handleScanSuccess(result.text)
-          }
+      readerRef.current = { stream, interval: null }
+      readerRef.current.interval = setInterval(() => {
+        const v = videoRef.current
+        if (!v || v.readyState < 2 || !v.videoWidth) return
+
+        const schaal = Math.min(1, MAX_ZIJDE / Math.max(v.videoWidth, v.videoHeight))
+        const w = Math.round(v.videoWidth * schaal)
+        const h = Math.round(v.videoHeight * schaal)
+        if (doek.width !== w || doek.height !== h) {
+          doek.width = w; doek.height = h
+          gedraaid.width = h; gedraaid.height = w
         }
-      )
+        ctx.drawImage(v, 0, 0, w, h)
+
+        // Stand 1: zoals de camera hem geeft.
+        let uitkomst = leesDoek(doek, ctx)
+
+        // Stand 2: een kwartslag gedraaid. Een streepjescode wordt langs
+        // horizontale lijnen gelezen, dus wat rechtop staat is pas leesbaar
+        // nadat het is gekanteld. Beide richtingen zijn gelijkwaardig, want
+        // ZXing leest een regel ook achterstevoren.
+        if (!uitkomst) {
+          ctxGedraaid.save()
+          ctxGedraaid.translate(h, 0)
+          ctxGedraaid.rotate(Math.PI / 2)
+          ctxGedraaid.drawImage(doek, 0, 0)
+          ctxGedraaid.restore()
+          uitkomst = leesDoek(gedraaid, ctxGedraaid)
+        }
+
+        if (uitkomst?.getText) handleScanSuccess(uitkomst.getText())
+      }, 200)
 
       setScanning(true)
     } catch (error) {
@@ -163,7 +218,10 @@ export default function BarcodeScanner({ onScan, onClose, onSwitchToSearch }) {
       nativeRef.current = null
     }
     if (readerRef.current) {
-      try { readerRef.current.reset() } catch { /* reader already torn down */ }
+      // Sinds we een eigen leeslus draaien staat hier {stream, interval},
+      // niet meer een ZXing-lezer met .reset().
+      clearInterval(readerRef.current.interval)
+      readerRef.current.stream?.getTracks?.().forEach(t => t.stop())
       readerRef.current = null
     }
     setScanning(false)
