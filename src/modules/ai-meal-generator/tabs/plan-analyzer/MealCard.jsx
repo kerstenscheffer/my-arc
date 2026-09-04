@@ -229,11 +229,10 @@ export default function MealCard({
         </button>
         {onCreate && (
           <button onClick={() => onCreate(dayIndex, slot)} style={knop({
-            flex: '0 0 auto', paddingLeft: '0.9rem', paddingRight: '0.9rem',
-            background: 'rgba(255,215,0,0.06)',
-            borderTop: '1px solid rgba(255,215,0,0.3)', borderBottom: '1px solid rgba(255,215,0,0.3)',
-            borderLeft: '1px solid rgba(255,215,0,0.3)', borderRight: '1px solid rgba(255,215,0,0.3)',
-            color: '#FFD700',
+            flex: '0 0 auto', paddingLeft: '1.1rem', paddingRight: '1.1rem',
+            background: '#fff',
+            borderTop: 'none', borderBottom: 'none', borderLeft: 'none', borderRight: 'none',
+            color: '#0a0a0a', fontWeight: 900,
           })}>
             Maken
           </button>

@@ -17,7 +17,7 @@ import { X, Plus, Trash2, Search, Loader, Check } from 'lucide-react'
 
 const GOLD = '#FFD700'
 
-// Slot → meal_type/timing, gelijk aan de indeling die de kiezer gebruikt.
+// Slot → timing-waarde, gelijk aan de indeling die de kiezer gebruikt.
 const SLOT_TO_TYPE = { breakfast: 'breakfast', lunch: 'lunch', dinner: 'dinner' }
 const slotType = (slot) => SLOT_TO_TYPE[slot] || 'snack'
 
@@ -117,7 +117,11 @@ export default function MealMakerModal({
           amount: Number(r.gram) || 0,
           unit: 'gram',
         })),
-        meal_type: slotType(slot),
+        // meal_type NIET zetten. Die kolom gaat niet over het moment van de
+        // dag maar over de textuur, met een check-constraint op
+        // solid/liquid/mixed. 'breakfast' erin duwen laat de database de
+        // hele insert weigeren — betrapt door de opslag echt uit te voeren.
+        // Het moment hoort in timing, net als bij de bestaande maaltijden.
         timing: [slotType(slot)],
       }
       const { data, error } = await db.supabase
