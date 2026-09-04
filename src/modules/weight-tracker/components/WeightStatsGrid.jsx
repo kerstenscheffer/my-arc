@@ -96,6 +96,21 @@ export default function WeightStatsGrid({ stats = {}, client = {}, fridayData = 
     ? parseFloat((parseFloat(latestEntry.weight) - basisGewicht).toFixed(1))
     : null
 
+  // Waartegen kleuren we? De fase, als die er is. Anders de klant-rij.
+  //
+  // De klant-rij komt uit de lijst die bij het laden van de pagina is
+  // opgehaald. Start je een fase en open je de modal opnieuw, dan staat daar
+  // nog het oude doel en werd +0,2 kg in een build rood gekleurd. De fase is
+  // hier de bron van waarheid: die staat in dezelfde sectie op het scherm.
+  const doelBron = fase
+    ? {
+        primary_goal: fase.doel === 'build' ? 'muscle_gain'
+          : fase.doel === 'cut' ? 'fat_loss'
+          : fase.doel === 'recomp' ? 'recomp' : 'maintenance',
+        weekly_weight_goal: fase.week_doel_kg,
+      }
+    : client
+
   const startDatum = faseStart || firstEntry?.date || null
   const startDateLabel = startDatum
     ? new Date(startDatum).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })
@@ -345,7 +360,7 @@ export default function WeightStatsGrid({ stats = {}, client = {}, fridayData = 
             sub: weekChange !== null ? 'week tov week' : '—',
             val: weekChange !== null ? `${weekChange > 0 ? '+' : ''}${weekChange}` : '—',
             color: weekChange !== null
-              ? weightGoalColor(weekChange, client, '#fff')
+              ? weightGoalColor(weekChange, doelBron, '#fff')
               : 'rgba(255,255,255,0.4)',
             icon: weekChange !== null && weekChange !== 0
               ? (weekChange < 0 ? TrendingDown : TrendingUp) : null,
@@ -355,7 +370,7 @@ export default function WeightStatsGrid({ stats = {}, client = {}, fridayData = 
             sub: startDateLabel ? `vanaf ${startDateLabel}` : 'geen startmeting',
             val: totalChange !== null ? `${totalChange > 0 ? '+' : ''}${totalChange}` : '—',
             color: totalChange !== null
-              ? weightGoalColor(totalChange, client, '#fff')
+              ? weightGoalColor(totalChange, doelBron, '#fff')
               : 'rgba(255,255,255,0.4)',
             icon: totalChange !== null && totalChange !== 0
               ? (totalChange < 0 ? TrendingDown : TrendingUp) : null,
