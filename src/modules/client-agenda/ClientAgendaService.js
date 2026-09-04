@@ -376,14 +376,34 @@ export class ClientAgendaService {
       // Als het schema de trainingsdagen bepaalt, tonen we opgeslagen
       // trainingsblokken alleen op échte trainingsdagen. Zo verdwijnen stale
       // rijen die op rustdagen zijn achtergebleven (bv. van oude is_training_day
-      // syncs). Dedupe bovendien identieke rijen (zelfde tijd/sublabel) per dag.
+      // syncs).
       const showDbTrainings = !canResolveWorkouts || !!dayWorkout
       const seenTraining = new Set()
+
+      // Eén training per dag zodra het schema uitsluitsel geeft.
+      //
+      // In client_agenda_blocks stapelen zich blokken op: verzet de coach een
+      // training of wisselt de split, dan blijft de oude rij staan. Bij ks10k
+      // gaf dat op dinsdag zowel "Pull" als "Push" — twee trainingen op een
+      // dag terwijl zijn plan er één voorschrijft.
+      //
+      // Het schema bepaalt WELKE workout er die dag staat; het agenda-blok
+      // levert alleen de TIJD. Bij meerdere rijen houden we daarom die met de
+      // naam die het schema noemt, en anders de laatst bijgewerkte.
+      const teTonenTrainingen = (() => {
+        if (!showDbTrainings || dbTrainings.length <= 1) return dbTrainings
+        if (!canResolveWorkouts || !dayWorkout) return dbTrainings
+        const past = dbTrainings.filter(r =>
+          (r.sublabel || '').trim().toLowerCase() === String(workoutTitle || '').trim().toLowerCase())
+        const keuze = past.length ? past : [...dbTrainings].sort((a, b) =>
+          new Date(b.updated_at || b.created_at || 0) - new Date(a.updated_at || a.created_at || 0))
+        return [keuze[0]]
+      })()
       const noteerStart = (min) => {
         if (!Number.isFinite(min)) return
         if (trainingStartByDay[day] == null || min < trainingStartByDay[day]) trainingStartByDay[day] = min
       }
-      if (showDbTrainings) dbTrainings.forEach(row => {
+      if (showDbTrainings) teTonenTrainingen.forEach(row => {
         const dedupeKey = `${row.start_time}|${row.end_time}|${row.sublabel || ''}`
         if (seenTraining.has(dedupeKey)) return
         seenTraining.add(dedupeKey)
@@ -395,7 +415,10 @@ export class ClientAgendaService {
           dbId: row.id,
           day, type: 'training',
           label: row.label || 'Training',
-          sublabel: row.sublabel || workoutTitle,
+          // Schema wint van de opgeslagen naam: die laatste is een momentopname
+          // van toen het blok werd gemaakt en klopt niet meer na een
+          // split-wissel.
+          sublabel: (canResolveWorkouts && dayWorkout) ? (workoutTitle || row.sublabel) : (row.sublabel || workoutTitle),
           start, end,
           color: row.color || TRAINING_COLOR,
           source: 'client_agenda_blocks',
