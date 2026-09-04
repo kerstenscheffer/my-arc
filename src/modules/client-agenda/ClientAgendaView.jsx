@@ -1251,6 +1251,13 @@ export default function ClientAgendaView({
 
   const service = useMemo(() => db?.supabase ? new ClientAgendaService(db.supabase) : null, [db])
 
+  // Elke agenda krijgt zijn eigen naam. Eerder heette elke instantie 'agenda',
+  // en omdat een luisteraar zijn eigen bron overslaat negeerden twee agenda's
+  // naast elkaar juist elkáár — precies het geval in split screen, waar de
+  // Plan Analyzer ook een agenda toont.
+  const instantieRef = useRef(null)
+  if (!instantieRef.current) instantieRef.current = `agenda-${Math.random().toString(36).slice(2, 9)}`
+
   const reload = async () => {
     if (!service || !client?.id) return
     try {
@@ -1259,10 +1266,27 @@ export default function ClientAgendaView({
     } catch (e) { console.error(e); setError(e) }
   }
 
-  // Wijzigt de Plan Analyzer een maaltijdtijd in de andere helft van het
-  // scherm, dan halen we de week opnieuw op. Anders staat hier de oude tijd
-  // terwijl je er twee schermen naast elkaar bij hebt.
-  useEffect(() => luisterMaaltijdTijd(() => { reload() }, 'agenda'), [client?.id, weekAnchor, forcedMealPlanId])
+  // Verschuift een ander scherm een maaltijd, dan schuiven we het blok hier
+  // meteen mee. Bewust geen herlaad: het bericht vertrekt zodra de gebruiker
+  // loslaat, en de database-opslag loopt daar async achteraan. Een herlaad op
+  // dat moment haalt de óude tijd op. Lokaal verschuiven is bovendien direct.
+  useEffect(() => luisterMaaltijdTijd(({ day, slot, newTiming }) => {
+    if (!day || !slot || !newTiming) return
+    const mm = /^(\d{1,2}):(\d{2})/.exec(newTiming)
+    if (!mm) return
+    const nieuwStart = parseInt(mm[1], 10) * 60 + parseInt(mm[2], 10)
+    setData(prev => {
+      if (!prev?.blocksByDay?.[day]) return prev
+      let geraakt = false
+      const blokken = prev.blocksByDay[day].map(b => {
+        if (b.type !== 'meal' || b.meta?.slot !== slot) return b
+        geraakt = true
+        return { ...b, start: nieuwStart, end: nieuwStart + (b.end - b.start), meta: { ...b.meta, isOverridden: false } }
+      })
+      if (!geraakt) return prev
+      return { ...prev, blocksByDay: { ...prev.blocksByDay, [day]: blokken } }
+    })
+  }, instantieRef.current), [])
 
   useEffect(() => {
     if (!service || !client?.id) return
@@ -1570,7 +1594,7 @@ export default function ClientAgendaView({
             day: d.block.day,
             slot: d.block.meta?.slot,
             newTiming: newTimingStr,
-            bron: 'agenda',
+            bron: instantieRef.current,
           })
 
           ;(async () => {
