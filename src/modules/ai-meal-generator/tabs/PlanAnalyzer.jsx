@@ -870,7 +870,7 @@ export default function PlanAnalyzer({
           <BarChart3 size={28} style={{ color: 'rgba(255,255,255,0.1)', marginBottom: '0.5rem' }} />
           <div style={{ fontSize: '1rem', fontWeight: 800, color: '#fff' }}>Plan Analyzer</div>
           <div style={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.3)', marginTop: '0.15rem' }}>
-            {conceptPlans.length > 0 ? 'Selecteer een concept plan' : 'Genereer eerst een plan of selecteer een client'}
+            {!resolvedClientId ? 'Kies eerst een client' : conceptPlans.length > 0 ? 'Kies een plan of begin blanco' : 'Begin blanco, laad een sjabloon of genereer een plan'}
           </div>
         </div>
         {/* Blanco beginnen. Staat bovenaan omdat het de kortste route is:
