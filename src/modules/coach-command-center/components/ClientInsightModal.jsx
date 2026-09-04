@@ -143,6 +143,7 @@ export default function ClientInsightModal({ isOpen, onClose, client, isMobile, 
         client={effectiveClient} weightData={weightData} circumData={circumData}
         photos={photos} coachingPlan={effectiveClient.coachingPlan} isMobile={klein}
         onOpenGallery={() => setShowGallery(true)}
+        db={db} onClientUpdate={handleClientUpdate}
       />
     )
     if (id === 'workout') return (

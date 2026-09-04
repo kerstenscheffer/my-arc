@@ -8,10 +8,11 @@ import { Scale, Target, Ruler, Camera, Download, Maximize2, ChevronDown, Chevron
 import WeightStatsGrid from '../../../weight-tracker/components/WeightStatsGrid'
 import BeforeAfterCard from '../../../progress/components/BeforeAfterCard'
 import { weightGoalColor } from '../../../weight-tracker/utils/weightGoalColor'
+import FasePaneel from './FasePaneel'
 
 const formatDate = (d) => { if (!d) return '-'; const dt = new Date(d); return dt.toLocaleDateString('nl-NL', { day: 'numeric', month: 'short', year: dt.getFullYear() !== new Date().getFullYear() ? 'numeric' : undefined }) }
 
-export default function WeightColumn({ client, weightData, circumData, photos, coachingPlan, isMobile, onOpenGallery }) {
+export default function WeightColumn({ client, weightData, circumData, photos, coachingPlan, isMobile, onOpenGallery, db, onClientUpdate }) {
   const history = weightData?.history || []
   // 'dag' = dag-op-dag logs · 'week' = week-op-week gemiddelden + verschil
   const [weightView, setWeightView] = React.useState('dag')
@@ -83,6 +84,15 @@ export default function WeightColumn({ client, weightData, circumData, photos, c
       </div>
 
       <div style={{ flex: 1, overflowY: 'auto', WebkitOverflowScrolling: 'touch' }}>
+        {/* Fase bovenaan: die bepaalt hoe je de cijfers eronder moet lezen.
+            +0,1 kg is goed nieuws in een build en slecht in een cut. */}
+        <FasePaneel
+          client={client}
+          db={db}
+          history={history}
+          isMobile={isMobile}
+          onFaseChange={onClientUpdate}
+        />
         {history.length > 0 && <WeightStatsGrid stats={weightData?.stats || {}} client={client} fridayData={{ friday_count: weightData?.fridayCount || 0, total_fridays: 8 }} history={history} isMobile={isMobile} coachingPlan={coachingPlan} volleBreedte toonHuidig />}
         {history.length > 0 && (
           <div style={{ padding: isMobile ? '0.5rem 0.75rem' : '0.625rem 1rem', borderTop: '1px solid rgba(255,255,255,0.04)' }}>
