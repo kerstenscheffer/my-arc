@@ -353,6 +353,8 @@ export default function AIDaySchedule({
   // de opdeling per dag.
   const checkedMeals = checkedByDay[daysOfWeek[currentDay]?.key] || {}
 
+  const isVandaagNu = () => currentDay === getTodayIndex()
+
   const handleMealCheck = async (meal) => {
     const dagKey = daysOfWeek[currentDay]?.key
     const zetVink = (waarde) => setCheckedByDay(prev => ({
@@ -376,10 +378,15 @@ export default function AIDaySchedule({
           console.error('Failed to remove plan_check on uncheck:', e)
         }
       }
-      await onUncheckMeal(meal.slot)
+      // onUncheckMeal en onCheckMeal rekenen met de dagtotalen van VANDAAG
+      // (ze zoeken in dashboardData.todayMeals). Afvinken op een andere dag
+      // zou daarmee vandaags macro's op- of aftellen. De rij in
+      // consumed_meals is hierboven al verwijderd en het vinkje staat lokaal,
+      // dus voor een andere dag hoeft die stap niet.
+      if (isVandaagNu()) await onUncheckMeal(meal.slot)
       zetVink(false)
     } else {
-      await onCheckMeal(meal.slot, meal)
+      if (isVandaagNu()) await onCheckMeal(meal.slot, meal)
       zetVink(true)
     }
   }
@@ -455,20 +462,29 @@ export default function AIDaySchedule({
           onPlanMealLog={async (meal) => {
             if (!db?.supabase || !client?.id) return
             try {
-              // Check if already logged today (prevent duplicates)
-              const today = new Date().toISOString().split('T')[0]
+              // Dubbel-bewaking op de BEKEKEN dag, niet op vandaag.
+              //
+              // Dit keek naar vandaag en matchte op meal_id. Bij een plan waar
+              // elke dag dezelfde maaltijd staat — wat vaak zo is — vond hij
+              // dan altijd de rij van vandaag terug en sloeg hij het loggen
+              // over. Gevolg: op elke andere dag deed de afrond-knop niets.
+              const datum = datumVoorDag(currentDay)
+              const volgende = new Date(`${datum}T00:00:00`)
+              volgende.setDate(volgende.getDate() + 1)
+              const datumVolgende = volgende.toISOString().split('T')[0]
+
               const { data: existing } = await db.supabase
                 .from('consumed_meals')
                 .select('id')
                 .eq('client_id', client.id)
                 .eq('meal_id', meal.id)
                 .eq('source', 'plan_check')
-                .gte('consumed_at', `${today}T00:00:00`)
-                .lt('consumed_at', `${today}T23:59:59`)
+                .gte('consumed_at', `${datum}T00:00:00`)
+                .lt('consumed_at', `${datumVolgende}T00:00:00`)
                 .limit(1)
 
               if (existing && existing.length > 0) {
-                console.log('⏭️ Plan meal already logged today, skipping')
+                console.log('⏭️ Plan meal al gelogd op deze dag, overgeslagen')
                 return
               }
 
@@ -493,7 +509,12 @@ export default function AIDaySchedule({
                   // re-opening from Recent/Edit anchors macros to that.
                   amount: 1,
                   per_unit: 'portion',
-                  consumed_at: new Date().toISOString(),
+                  // Vandaag: het echte tijdstip. Een andere dag: het midden
+                  // van díé dag, anders belandt de log op vandaag en telt hij
+                  // mee in de verkeerde dagtotalen.
+                  consumed_at: (currentDay === getTodayIndex()
+                    ? new Date()
+                    : new Date(`${datum}T12:00:00`)).toISOString(),
                   source: 'plan_check',
                   is_shared: true,
                   is_favorite: false,
