@@ -31,6 +31,9 @@ function MacroBox({ label, icon, color, consumed, target, unitLabel }) {
         {Math.abs(over)}
         <span style={{ fontSize: '0.82em', fontWeight: 700, color: 'rgba(255,255,255,0.4)' }}>{unitLabel} {over >= 0 ? 'over' : 'te veel'}</span>
       </div>
+      <div style={{ fontSize: '0.52rem', fontWeight: 600, color: 'rgba(255,255,255,0.25)', whiteSpace: 'nowrap' }}>
+        {Math.round(consumed || 0)}{unitLabel} / {Math.round(target || 0)}{unitLabel}
+      </div>
     </div>
   )
 }

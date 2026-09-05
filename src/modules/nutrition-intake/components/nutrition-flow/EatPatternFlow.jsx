@@ -407,6 +407,14 @@ function MaaltijdDrillDown({ maaltijdKey, data, onChange, isMobile }) {
   const links  = cats.filter((_, i) => i % 2 === 0)
   const rechts = cats.filter((_, i) => i % 2 === 1)
 
+  // On mobile, single column to avoid visual confusion when a card expands
+  // its sub-list next to options in the adjacent column.
+  if (isMobile) return (
+    <div>
+      <KolomCards cats={cats} maaltijdKey={maaltijdKey} data={data} onChange={onChange} isMobile={isMobile} />
+    </div>
+  )
+
   return (
     <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'flex-start' }}>
       <KolomCards cats={links}  maaltijdKey={maaltijdKey} data={data} onChange={onChange} isMobile={isMobile} />
