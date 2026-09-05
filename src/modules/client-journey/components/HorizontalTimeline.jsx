@@ -44,18 +44,21 @@ export default function HorizontalTimeline({
   // undefined (reading 'type')", en de hele tijdlijn viel om.
   //
   // Een afgelopen traject toon je aan het eind, niet leeg.
-  const midden = Math.min(Math.max(1, selectedWeek || currentWeek || 1), Math.max(1, totalWeeks))
+  // Ook de lengte zelf krijgt een ondergrens: bij totalWeeks 0 of onbekend
+  // zou het venster van week 1 tot week 0 lopen, en dat is weer leeg.
+  const weken = Math.max(1, totalWeeks || 1)
+  const midden = Math.min(Math.max(1, selectedWeek || currentWeek || 1), weken)
 
   const columns = useMemo(() => {
     if (mode === 'full') {
-      return Array.from({ length: totalWeeks + 1 }, (_, i) => ({ week: i, day: null, type: 'week' }))
+      return Array.from({ length: weken + 1 }, (_, i) => ({ week: i, day: null, type: 'week' }))
     }
     if (mode === '1week') {
       return Array.from({ length: 7 }, (_, d) => ({ week: midden, day: d, type: 'day' }))
     }
     // 3weeks
     const wStart = Math.max(1, midden - 1)
-    const wEnd = Math.min(totalWeeks, midden + 2)
+    const wEnd = Math.min(weken, midden + 2)
     const cols = []
     for (let w = wStart; w <= wEnd; w++) {
       for (let d = 0; d < 7; d++) {
@@ -63,7 +66,7 @@ export default function HorizontalTimeline({
       }
     }
     return cols
-  }, [mode, totalWeeks, midden])
+  }, [mode, weken, midden])
 
   // ========== ACTIONS AT COLUMN ==========
   const actionsAt = (catKey, col) => {
@@ -164,7 +167,15 @@ export default function HorizontalTimeline({
       {/* Date range */}
       {mode !== 'full' && (
         <p style={{ textAlign: 'center', fontSize: isMobile ? '0.5rem' : '0.7rem', color: G.gold, fontWeight: '600', margin: '0 0 0.3rem', letterSpacing: '0.04em', textTransform: 'uppercase' }}>
-          {mode === '1week' ? `Week ${selectedWeek || currentWeek}` : `Week ${Math.max(1, (selectedWeek || currentWeek) - 1)} t/m ${Math.min(totalWeeks, (selectedWeek || currentWeek) + 2)}`}
+          {/* Afgelezen uit de kolommen zelf en niet nog eens uitgerekend.
+              Die herhaling liep uiteen zodra het venster werd bijgesteld:
+              er stond "Week 27 t/m 12" boven kolommen die week 11 en 12
+              toonden. */}
+          {mode === '1week'
+            ? `Week ${midden}`
+            : columns.length
+              ? `Week ${columns[0].week} t/m ${columns[columns.length - 1].week}`
+              : ''}
         </p>
       )}
 
