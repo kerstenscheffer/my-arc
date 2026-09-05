@@ -179,28 +179,85 @@ export default function WeekBudgetPaneel({ db, clientId, mealPlan, isMobile }) {
                   <div style={{ fontSize: '0.6rem', fontWeight: 800, color: 'rgba(255,255,255,0.35)', marginBottom: 6 }}>
                     Per dag
                   </div>
-                  <div style={{ display: 'flex', alignItems: 'flex-end', gap: 3 }}>
-                    {perDag.dagen.map(d => {
-                      const hoogste = Math.max(...perDag.dagen.map(x => x.kcal), 1)
-                      const hoogte = Math.max(3, Math.round((d.kcal / hoogste) * 34))
-                      return (
-                        <div key={d.dag} title={`${d.label}: ${getal(d.kcal)} kcal${d.training ? ' · trainingsdag' : ''}`}
-                          style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3 }}>
+                  {(() => {
+                  // Staafjes en de TDEE-lijn delen dezelfde schaal, anders
+                  // zegt "erboven of eronder" niets. De schaal loopt daarom
+                  // tot de hoogste van beide.
+                  const dagTdee = tdee?.tdee || null
+                  const hoogste = Math.max(...perDag.dagen.map(x => x.kcal), dagTdee || 0, 1)
+                  const H = 44
+                  const lijnY = dagTdee ? Math.round((dagTdee / hoogste) * H) : null
+
+                  return (
+                    <>
+                      <div style={{ position: 'relative', display: 'flex', alignItems: 'flex-end', gap: 3, height: H }}>
+                        {perDag.dagen.map(d => {
+                          const hoogte = Math.max(3, Math.round((d.kcal / hoogste) * H))
+                          const boven = dagTdee != null && d.kcal > dagTdee
+                          return (
+                            <div key={d.dag} style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'flex-end', height: '100%' }}>
+                              <div
+                                title={`${d.label}: ${getal(d.kcal)} kcal${dagTdee ? ` · TDEE ${getal(dagTdee)}` : ''}${d.training ? ' · trainingsdag' : ''}`}
+                                style={{
+                                  width: '100%', height: hoogte,
+                                  background: d.training ? '#FFD700' : (boven ? '#f59e0b' : 'rgba(255,255,255,0.28)'),
+                                }}
+                              />
+                            </div>
+                          )
+                        })}
+
+                        {/* De TDEE als streep over de staafjes heen. Per dag
+                            is dat getal gelijk — wat verschilt is of die dag
+                            erboven of eronder uitkomt, en dat lees je zo af. */}
+                        {lijnY != null && (
                           <div style={{
-                            width: '100%', height: hoogte,
-                            background: d.training ? '#FFD700' : 'rgba(255,255,255,0.28)',
+                            position: 'absolute', left: 0, right: 0, bottom: lijnY,
+                            borderTop: '1px dashed rgba(239,68,68,0.75)',
+                            pointerEvents: 'none',
                           }} />
-                          <span style={{ fontSize: '0.55rem', fontWeight: 800, color: 'rgba(255,255,255,0.5)' }}>
-                            {d.label}
-                          </span>
-                          <span style={{ fontSize: '0.52rem', fontWeight: 700, color: 'rgba(255,255,255,0.3)' }}>
-                            {d.kcal >= 1000 ? `${(d.kcal / 1000).toFixed(1)}k` : d.kcal}
-                          </span>
+                        )}
+                      </div>
+
+                      <div style={{ display: 'flex', gap: 3, marginTop: 4 }}>
+                        {perDag.dagen.map(d => {
+                          const verschil = dagTdee != null ? d.kcal - dagTdee : null
+                          return (
+                            <div key={d.dag} style={{ flex: 1, minWidth: 0, textAlign: 'center' }}>
+                              <div style={{ fontSize: '0.55rem', fontWeight: 800, color: 'rgba(255,255,255,0.5)' }}>
+                                {d.label}
+                              </div>
+                              <div style={{ fontSize: '0.52rem', fontWeight: 700, color: 'rgba(255,255,255,0.32)' }}>
+                                {d.kcal >= 1000 ? `${(d.kcal / 1000).toFixed(1)}k` : d.kcal}
+                              </div>
+                              {verschil != null && (
+                                <div style={{
+                                  fontSize: '0.52rem', fontWeight: 800,
+                                  color: verschil <= 0 ? '#10b981' : '#f59e0b',
+                                }}>
+                                  {verschil <= 0 ? '−' : '+'}{Math.abs(verschil) >= 1000
+                                    ? `${(Math.abs(verschil) / 1000).toFixed(1)}k`
+                                    : Math.abs(verschil)}
+                                </div>
+                              )}
+                            </div>
+                          )
+                        })}
+                      </div>
+
+                      {dagTdee != null && (
+                        <div style={{
+                          display: 'flex', alignItems: 'center', gap: 5, marginTop: 6,
+                          fontSize: '0.55rem', fontWeight: 700, color: 'rgba(255,255,255,0.3)',
+                        }}>
+                          <span style={{ width: 14, borderTop: '1px dashed rgba(239,68,68,0.75)' }} />
+                          TDEE {getal(dagTdee)} kcal per dag
                         </div>
-                      )
-                    })}
-                  </div>
-                </div>
+                      )}
+                    </>
+                  )
+                })()}
+              </div>
             </>
           )}
         </div>
