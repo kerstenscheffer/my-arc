@@ -8,6 +8,7 @@ import React, { useState } from 'react'
 import MealCard from './MealCard'
 import { Plus, Eye, EyeOff, Trash2, Edit3, MoreHorizontal, X, Apple } from 'lucide-react'
 import { foodImageFallback } from '../../foodImageFallback'
+import { supplementFoto } from '../../../supplements/utils/supplementFoto'
 
 const MOMENTS = [
   { id: 'breakfast', label: 'Ontbijt' },
@@ -316,31 +317,60 @@ export default function MealTimelineMobile({
                 />
               ))}
 
-              {/* Supplementen op dit moment. Alleen tonen, niet afvinken:
-                  het afvinken van supplementen bestaat nog nergens en een
-                  knop die niets doet is erger dan geen knop. */}
+              {/* Supplementen op dit moment, in dezelfde vorm als een
+                  maaltijdkaart: foto links, naam en dosering ernaast. Als
+                  smalle regel met een emoji-tegeltje vielen ze visueel buiten
+                  de lijst terwijl ze er gewoon bij horen.
+
+                  Geen afvinkknop: dat bestaat nog nergens voor supplementen,
+                  en een knop die niets doet is erger dan geen knop. */}
               {supps.map(sp => (
                 <div key={`supp-${sp.id}`} style={{
-                  display: 'flex', alignItems: 'center', gap: 8,
-                  padding: '0.45rem 0.6rem',
-                  borderTop: '1px solid rgba(255,255,255,0.04)',
+                  margin: isMobile ? '0 0.9rem 0.55rem' : '0 1.25rem 0.7rem',
+                  background: 'rgba(255,255,255,0.025)',
+                  border: '1px solid rgba(255,255,255,0.05)',
+                  borderRadius: 12,
+                  overflow: 'hidden',
+                  display: 'flex', alignItems: 'stretch', minWidth: 0,
                 }}>
                   <div style={{
-                    width: 30, height: 30, flexShrink: 0, borderRadius: 8,
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    background: 'rgba(255,215,0,0.1)',
-                    border: '1px solid rgba(255,215,0,0.25)',
-                    fontSize: '0.9rem',
-                  }}>{sp.emoji}</div>
-                  <span style={{
-                    flex: 1, minWidth: 0, fontSize: '0.78rem', fontWeight: 700, color: 'rgba(255,255,255,0.8)',
-                    overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                  }}>{sp.naam}</span>
-                  {sp.dosering && (
-                    <span style={{ fontSize: '0.68rem', fontWeight: 700, color: 'rgba(255,255,255,0.35)', flexShrink: 0 }}>
-                      {sp.dosering}
-                    </span>
-                  )}
+                    width: isMobile ? 70 : 80, height: isMobile ? 70 : 80, flexShrink: 0,
+                    background: `url(${supplementFoto(sp, 160)}) center/cover`,
+                    position: 'relative',
+                  }}>
+                    {/* Klein gouden hoekje met de emoji: zo blijft zichtbaar
+                        dat dit een supplement is en geen maaltijd. */}
+                    <div style={{
+                      position: 'absolute', left: 4, top: 4,
+                      width: 20, height: 20, borderRadius: 6,
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      background: 'rgba(0,0,0,0.65)', fontSize: '0.7rem',
+                    }}>{sp.emoji}</div>
+                  </div>
+
+                  <div style={{
+                    flex: 1, minWidth: 0,
+                    padding: isMobile ? '0.5rem 0.6rem' : '0.6rem 0.75rem',
+                    display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 2,
+                  }}>
+                    <div style={{
+                      fontSize: isMobile ? '0.55rem' : '0.6rem', fontWeight: 800,
+                      color: '#FFD700', letterSpacing: '0.06em', textTransform: 'uppercase',
+                    }}>
+                      Supplement
+                    </div>
+                    <div style={{
+                      fontSize: isMobile ? '0.9rem' : '0.98rem', fontWeight: 800, color: '#fff',
+                      overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                    }}>
+                      {sp.naam}
+                    </div>
+                    {sp.dosering && (
+                      <div style={{ fontSize: isMobile ? '0.72rem' : '0.78rem', fontWeight: 800, color: 'rgba(255,255,255,0.45)' }}>
+                        {sp.dosering}
+                      </div>
+                    )}
+                  </div>
                 </div>
               ))}
 
