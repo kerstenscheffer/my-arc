@@ -12,9 +12,9 @@
 // zit in een modal die je sluit; wat je hier invult hoort in de database bij
 // de klant te staan, niet in de localStorage van dit ene apparaat.
 
-import React, { useState } from 'react'
+import React, { useState, useRef, useEffect } from 'react'
 import { Check, Copy, Loader2 } from 'lucide-react'
-import { CHECKS, RONDE, CHECK_LABEL, CHECK_KLEUR, VASTE_VRAGEN, samenvatting } from './checkinData'
+import { CHECKS, RONDE, CHECK_LABEL, CHECK_KLEUR, VASTE_VRAGEN, RONDJE, samenvatting } from './checkinData'
 import { veld } from './formulierStijl'
 import { Kop, Label, ToevoegKnop, WisKnop } from './formulierBouwstenen'
 
@@ -24,6 +24,20 @@ export default function CheckinFlow({ waarde, onChange, onOpslaan, opslaan, clie
   const s = waarde
   const zet = (deel) => onChange({ ...s, ...deel })
   const [gekopieerd, setGekopieerd] = useState(false)
+
+  // Welke regel moet de cursor krijgen na de eerstvolgende render.
+  //
+  // Enter voegt een regel toe, maar React tekent die pas na deze render —
+  // en zonder de cursor te verplaatsen typ je gewoon door in het veld waar
+  // je al stond. Dan groeit de eerste regel aan tot één lange zin met lege
+  // regels eronder, wat precies het tegenovergestelde is van de bedoeling.
+  const teFocussen = useRef(null)
+  useEffect(() => {
+    const sleutel = teFocussen.current
+    if (!sleutel) return
+    teFocussen.current = null
+    document.querySelector(`[data-rondje="${sleutel}"]`)?.focus()
+  })
 
   const rij = (lijst, i, deel, sleutel) => {
     const nieuw = [...lijst]
@@ -153,7 +167,54 @@ export default function CheckinFlow({ waarde, onChange, onOpslaan, opslaan, clie
       </div>
 
       {/* ── 03 Na de call ── */}
-      <Kop nummer="03" titel="Na de call" sub="afronden" />
+      {/* ── 03 Het rondje: goed / beter / doelen ── */}
+      <Kop nummer="03" titel="Terugkoppeling" sub="goed · beter · doelen" />
+
+      {RONDJE.map(blok => {
+        const regels = s[blok.id] || ['']
+        return (
+          <div key={blok.id}>
+            <Label>{blok.kop}</Label>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+              {regels.map((tekst, i) => (
+                <div key={i} style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                  <span style={{
+                    width: 12, flexShrink: 0, textAlign: 'center',
+                    fontSize: '0.85rem', fontWeight: 900, color: 'rgba(255,255,255,0.3)', lineHeight: 1,
+                  }}>·</span>
+                  <input
+                    value={tekst}
+                    onChange={e => {
+                      const nieuwe = [...regels]
+                      nieuwe[i] = e.target.value
+                      zet({ [blok.id]: nieuwe })
+                    }}
+                    // Enter maakt een nieuwe regel. Je typt deze punten
+                    // achter elkaar op tijdens het gesprek; dan wil je niet
+                    // steeds naar een knop hoeven.
+                    onKeyDown={e => {
+                      if (e.key !== 'Enter') return
+                      e.preventDefault()
+                      const nieuwe = [...regels]
+                      nieuwe.splice(i + 1, 0, '')
+                      zet({ [blok.id]: nieuwe })
+                      teFocussen.current = `${blok.id}-${i + 1}`
+                    }}
+                    data-rondje={`${blok.id}-${i}`}
+                    placeholder={blok.hint}
+                    style={{ ...veld, flex: 1 }}
+                  />
+                  <WisKnop onClick={() => zet({ [blok.id]: regels.filter((_, j) => j !== i) })} />
+                </div>
+              ))}
+            </div>
+            <ToevoegKnop onClick={() => zet({ [blok.id]: [...regels, ''] })}>regel</ToevoegKnop>
+          </div>
+        )
+      })}
+
+      {/* ── 04 Na de call ── */}
+      <Kop nummer="04" titel="Na de call" sub="afronden" />
 
       <div>
         <Label>Bericht naar client</Label>

@@ -37,12 +37,28 @@ export const VASTE_VRAGEN = [
   { id: 'hulp',   label: 'Wat kan ik doen om het makkelijker te maken?',       hint: 'Wat hij van jou nodig heeft…' },
 ]
 
+// Het rondje dat je aan het eind van een call maakt: wat ging goed, wat kan
+// beter, en waar mikken we volgende week op.
+//
+// Drie losse lijsten en geen rijen van drie naast elkaar: een punt dat goed
+// ging heeft niet per se een verbeterpunt, en een doel voor volgende week
+// staat vaak los van allebei. Ze aan elkaar koppelen dwingt je lege vakjes
+// in te vullen.
+export const RONDJE = [
+  { id: 'www',     kop: 'Wat ging goed',        hint: 'Wat hij deze periode goed heeft gedaan…' },
+  { id: 'ebi',     kop: 'Zou beter zijn als',   hint: 'Wat er volgende week anders kan…' },
+  { id: 'targets', kop: 'Doelen volgende week', hint: 'Waar mikken we op…' },
+]
+
 export const LEEG = {
   checks: { gewicht: '', training: '', voeding: '', opplan: '' },
   voor: '',
   vast: { gevoel: '', lastig: '', hulp: '' },
   waarnemingen: [{ o: '', s: '' }],
   acties: [{ t: '', deadline: '' }],
+  www: [''],
+  ebi: [''],
+  targets: [''],
   notities: '',
   bericht: '',
   volgende: { wanneer: '', onderwerp: '' },
@@ -69,6 +85,14 @@ export function samenvatting(s, clientNaam) {
     r.push('', 'WAT OPVIEL → OPLOSSING')
     w.forEach(x => r.push(`  • ${x.o || '—'} → ${x.s || '—'}`))
   }
+
+  RONDJE.forEach(blok => {
+    const regels = (s[blok.id] || []).map(x => (x || '').trim()).filter(Boolean)
+    if (regels.length) {
+      r.push('', blok.kop.toUpperCase())
+      regels.forEach(x => r.push(`  • ${x}`))
+    }
+  })
 
   const a = (s.acties || []).filter(x => (x.t || '').trim())
   if (a.length) {
@@ -106,6 +130,7 @@ export function heeftInhoud(s) {
   if (Object.values(s.vast || {}).some(v => (v || '').trim())) return true
   if ((s.waarnemingen || []).some(x => (x.o || '').trim() || (x.s || '').trim())) return true
   if ((s.acties || []).some(x => (x.t || '').trim())) return true
+  if (RONDJE.some(b => (s[b.id] || []).some(x => (x || '').trim()))) return true
   if ((s.todos || []).some(x => (x.t || '').trim())) return true
   return false
 }
