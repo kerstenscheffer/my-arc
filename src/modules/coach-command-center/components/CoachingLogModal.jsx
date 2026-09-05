@@ -3,6 +3,8 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { createPortal } from 'react-dom'
 import { useModalHost } from '../../../coach/ModalHost'
+import CheckinFlow from './CheckinFlow'
+import { LEEG as CHECKIN_LEEG, samenvatting } from './checkinData'
 import { X, GripVertical, Minus, Maximize2, Plus, Loader2, MessageCircle, BarChart2, Phone, FileText, History } from 'lucide-react'
 
 const STATUS_OPTIONS = [
@@ -12,17 +14,25 @@ const STATUS_OPTIONS = [
   { id: 'off_track',       label: 'Off track',       color: '#ef4444' },
 ]
 
+// Status, WhatsApp en Call prep zijn eruit: die werden niet gebruikt en
+// maakten de bovenrand vol. Bestaande items in die categorieen blijven in de
+// tijdlijn staan — zie CATEGORIE_LABEL hieronder — ze zijn alleen niet meer
+// te kiezen bij het schrijven.
+//
+// Alles in wit. De kleuren per categorie waren de enige reden dat dit scherm
+// er bont uitzag; wat telt is welk tabblad actief is, en dat lees je aan vet
+// wit tegen dof wit.
 const CATEGORIES = [
-  { id: 'algemeen',   label: 'Algemeen',   icon: FileText,       color: '#FFD700' },
-  { id: 'status',     label: 'Status',     icon: BarChart2,      color: '#10b981' },
-  { id: 'whatsapp',   label: 'WhatsApp',   icon: MessageCircle,  color: '#25D366' },
-  { id: 'call_prep',  label: 'Call prep',  icon: Phone,          color: '#6366f1' },
-  // Auto-log entries die geschreven worden wanneer de coach doel of macro's
-  // van de client aanpast (zie clientChangeLogger). Heeft een ander icoon
-  // zodat ze in de tijdlijn duidelijk onderscheidbaar zijn van handmatige
-  // notes.
-  { id: 'change_log', label: 'Wijziging',  icon: History,        color: '#a855f7' },
+  { id: 'algemeen', label: 'Algemeen', icon: FileText },
+  { id: 'checkin',  label: 'Check-in', icon: Phone },
 ]
+
+// Voor het tonen van bestaande items, ook uit categorieen die je niet meer
+// kunt kiezen. Zonder deze lijst zou een oud WhatsApp-item naamloos worden.
+const CATEGORIE_LABEL = {
+  algemeen: 'Algemeen', checkin: 'Check-in', change_log: 'Wijziging',
+  status: 'Status', whatsapp: 'WhatsApp', call_prep: 'Call prep',
+}
 
 const DEFAULT_SIZE = { w: 400, h: 620 }
 // Gecentreerd openen zodat de modal midden in beeld verschijnt (was rechtsboven,
@@ -48,6 +58,9 @@ export default function CoachingLogModal({ client, db, coachId, onClose, isMobil
   const [status, setStatus]       = useState('on_track')
   const [category, setCategory]   = useState('algemeen')
   const [filterCat, setFilterCat] = useState('all')
+  // De check-in staat los van het notitieveld: het is een formulier, geen
+  // regel tekst. Wordt bij opslaan één logboek-item.
+  const [checkin, setCheckin] = useState(CHECKIN_LEEG)
   const [pos, setPos]             = useState(isMobile ? { x: 0, y: 0 } : DEFAULT_POS)
   const [size, setSize]           = useState(isMobile ? { w: window.innerWidth, h: window.innerHeight } : DEFAULT_SIZE)
   const [minimized, setMinimized] = useState(false)
@@ -90,6 +103,32 @@ export default function CoachingLogModal({ client, db, coachId, onClose, isMobil
         onLogSaved?.(data)
       }
     } catch (e) { console.error('❌ save log:', e) }
+    setSaving(false)
+  }
+
+  const bewaarCheckin = async () => {
+    setSaving(true)
+    try {
+      // note krijgt de leesbare samenvatting zodat de tijdlijn er zonder
+      // extra code iets van kan tonen; de structuur gaat in data.
+      const { data, error } = await db.supabase
+        .from('client_coaching_logs')
+        .insert({
+          client_id: client.id, coach_id: coachId || null,
+          status, category: 'checkin',
+          note: samenvatting(checkin, client.first_name),
+          data: checkin,
+        })
+        .select().single()
+      if (error) throw error
+      setLogs(prev => [data, ...prev])
+      setCheckin(CHECKIN_LEEG)
+      setCategory('algemeen')
+      onLogSaved?.(data)
+    } catch (e) {
+      console.error('check-in opslaan mislukt:', e)
+      alert('Opslaan mislukt — ' + (e?.message || e))
+    }
     setSaving(false)
   }
 
@@ -220,37 +259,38 @@ export default function CoachingLogModal({ client, db, coachId, onClose, isMobil
                 const active = category === cat.id
                 return (
                   <button key={cat.id} onClick={() => setCategory(cat.id)} style={{
-                    flex: 1, padding: '0.25rem 0.15rem',
-                    background: active ? `${cat.color}15` : 'transparent',
-                    border: active ? `1px solid ${cat.color}40` : '1px solid rgba(255,255,255,0.06)',
-                    borderRadius: '4px',
-                    color: active ? cat.color : 'rgba(255,255,255,0.2)',
-                    fontSize: '0.48rem', fontWeight: 700,
+                    flex: 1, padding: '0.4rem 0.3rem',
+                    background: active ? '#fff' : 'transparent',
+                    border: `1px solid ${active ? '#fff' : 'rgba(255,255,255,0.12)'}`,
+                    borderRadius: '6px',
+                    color: active ? '#0a0a0a' : 'rgba(255,255,255,0.5)',
+                    fontSize: '0.68rem', fontWeight: 900,
                     cursor: 'pointer',
                     touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
                     minHeight: '26px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.2rem',
                     transition: 'all 0.15s ease'
                   }}>
-                    <CatIcon size={9} />{cat.label}
+                    <CatIcon size={11} />{cat.label}
                   </button>
                 )
               })}
             </div>
 
-            {/* Status selector — alleen bij algemeen of status */}
-            {(category === 'status' || category === 'algemeen') && (
+            {/* Statuskeuze hoort bij een notitie, niet bij de check-in:
+                daar bepaalt de snelle check hierboven al hoe het ervoor staat. */}
+            {category === 'algemeen' && (
               <div style={{ display: 'flex', gap: '0.2rem', marginBottom: '0.4rem' }}>
                 {STATUS_OPTIONS.map(s => (
                   <button key={s.id} onClick={() => setStatus(s.id)} style={{
                     flex: 1, padding: '0.2rem 0.1rem',
-                    background: status === s.id ? `${s.color}18` : 'transparent',
-                    border: status === s.id ? `1px solid ${s.color}40` : '1px solid rgba(255,255,255,0.04)',
-                    borderRadius: '4px',
-                    color: status === s.id ? s.color : 'rgba(255,255,255,0.2)',
-                    fontSize: '0.45rem', fontWeight: 700,
+                    background: status === s.id ? '#fff' : 'transparent',
+                    border: `1px solid ${status === s.id ? '#fff' : 'rgba(255,255,255,0.12)'}`,
+                    borderRadius: '6px',
+                    color: status === s.id ? '#0a0a0a' : 'rgba(255,255,255,0.5)',
+                    fontSize: '0.62rem', fontWeight: 800,
                     cursor: 'pointer',
                     touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-                    minHeight: '24px', lineHeight: 1.2,
+                    minHeight: '28px', lineHeight: 1.2,
                     transition: 'all 0.15s ease'
                   }}>
                     {s.label}
@@ -259,47 +299,53 @@ export default function CoachingLogModal({ client, db, coachId, onClose, isMobil
               </div>
             )}
 
-            {/* Textarea */}
-            <textarea
-              ref={textareaRef}
-              value={note}
-              onChange={e => setNote(e.target.value)}
-              onKeyDown={handleKeyDown}
-              placeholder={
-                category === 'whatsapp'  ? `WhatsApp bericht voor ${client.first_name}...` :
-                category === 'call_prep' ? `Call voorbereiding voor ${client.first_name}...` :
-                category === 'status'    ? `Huidige situatie van ${client.first_name}...` :
-                `Notitie voor ${client.first_name}... (⌘+Enter)`
-              }
-              rows={3}
-              style={{
-                width: '100%', resize: 'none', boxSizing: 'border-box',
-                background: 'rgba(255,255,255,0.03)',
-                border: `1px solid ${CATEGORIES.find(c => c.id === category)?.color}25`,
-                borderRadius: '6px',
-                color: '#fff', fontSize: '0.75rem', lineHeight: 1.5,
-                padding: '0.5rem 0.625rem',
-                outline: 'none', fontFamily: 'inherit',
-              }}
-            />
-            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '0.375rem' }}>
-              <button onClick={handleSave} disabled={!note.trim() || saving} style={{
-                display: 'flex', alignItems: 'center', gap: '0.25rem',
-                padding: '0.35rem 0.75rem',
-                background: note.trim() ? 'rgba(255,215,0,0.12)' : 'rgba(255,255,255,0.04)',
-                border: note.trim() ? '1px solid rgba(255,215,0,0.3)' : '1px solid rgba(255,255,255,0.06)',
-                borderRadius: '6px',
-                color: note.trim() ? '#FFD700' : 'rgba(255,255,255,0.2)',
-                fontSize: '0.7rem', fontWeight: 700,
-                cursor: note.trim() ? 'pointer' : 'default',
-                opacity: saving ? 0.5 : 1,
-                touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-                minHeight: '32px', transition: 'all 0.15s ease'
-              }}>
-                {saving ? <Loader2 size={11} style={{ animation: 'logSpin 1s linear infinite' }} /> : <Plus size={11} />}
-                Opslaan
-              </button>
-            </div>
+            {/* Bij Check-in het formulier, anders het notitieveld. */}
+            {category === 'checkin' ? (
+              <CheckinFlow
+                waarde={checkin}
+                onChange={setCheckin}
+                onOpslaan={bewaarCheckin}
+                opslaan={saving}
+                clientNaam={client.first_name}
+              />
+            ) : (
+              <>
+                <textarea
+                  ref={textareaRef}
+                  value={note}
+                  onChange={e => setNote(e.target.value)}
+                  onKeyDown={handleKeyDown}
+                  placeholder={`Notitie voor ${client.first_name}… (⌘+Enter)`}
+                  rows={3}
+                  style={{
+                    width: '100%', resize: 'none', boxSizing: 'border-box',
+                    background: 'rgba(255,255,255,0.03)',
+                    border: '1px solid rgba(255,255,255,0.14)',
+                    borderRadius: '6px',
+                    color: '#fff', fontSize: '0.78rem', lineHeight: 1.5,
+                    padding: '0.5rem 0.625rem',
+                    outline: 'none', fontFamily: 'inherit',
+                  }}
+                />
+                <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '0.375rem' }}>
+                  <button onClick={handleSave} disabled={!note.trim() || saving} style={{
+                    display: 'flex', alignItems: 'center', gap: '0.25rem',
+                    padding: '0.4rem 0.9rem',
+                    background: note.trim() ? '#fff' : 'rgba(255,255,255,0.05)',
+                    border: 'none', borderRadius: '6px',
+                    color: note.trim() ? '#0a0a0a' : 'rgba(255,255,255,0.25)',
+                    fontSize: '0.72rem', fontWeight: 900, fontFamily: 'inherit',
+                    cursor: note.trim() ? 'pointer' : 'default',
+                    opacity: saving ? 0.5 : 1,
+                    touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+                    minHeight: '32px',
+                  }}>
+                    {saving ? <Loader2 size={11} style={{ animation: 'logSpin 1s linear infinite' }} /> : <Plus size={11} />}
+                    Opslaan
+                  </button>
+                </div>
+              </>
+            )}
           </div>
 
           {/* ── Filter strip ── */}
@@ -312,12 +358,15 @@ export default function CoachingLogModal({ client, db, coachId, onClose, isMobil
               padding: '0.15rem 0.4rem', borderRadius: '3px', border: 'none',
               background: filterCat === 'all' ? 'rgba(255,255,255,0.08)' : 'transparent',
               color: filterCat === 'all' ? '#fff' : 'rgba(255,255,255,0.25)',
-              fontSize: '0.48rem', fontWeight: 700, cursor: 'pointer',
+              fontSize: '0.66rem', fontWeight: 800, cursor: 'pointer',
               touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', minHeight: '22px'
             }}>
               Alle <span style={{ opacity: 0.5 }}>{logs.length}</span>
             </button>
-            {CATEGORIES.map(cat => {
+            {/* Ook categorieen die je niet meer kunt kiezen, zolang er nog
+                items in zitten. Anders zijn oude notities onvindbaar. */}
+            {Object.keys(CATEGORIE_LABEL).map(id => {
+              const cat = CATEGORIES.find(c => c.id === id) || { id, label: CATEGORIE_LABEL[id], icon: History }
               const CatIcon = cat.icon
               const count = logs.filter(l => (l.category || 'algemeen') === cat.id).length
               if (count === 0) return null
@@ -325,9 +374,9 @@ export default function CoachingLogModal({ client, db, coachId, onClose, isMobil
                 <button key={cat.id} onClick={() => setFilterCat(cat.id)} style={{
                   display: 'flex', alignItems: 'center', gap: '0.15rem',
                   padding: '0.15rem 0.4rem', borderRadius: '3px', border: 'none',
-                  background: filterCat === cat.id ? `${cat.color}15` : 'transparent',
-                  color: filterCat === cat.id ? cat.color : 'rgba(255,255,255,0.25)',
-                  fontSize: '0.48rem', fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap',
+                  background: filterCat === cat.id ? 'rgba(255,255,255,0.12)' : 'transparent',
+                  color: filterCat === cat.id ? '#fff' : 'rgba(255,255,255,0.4)',
+                  fontSize: '0.66rem', fontWeight: 800, cursor: 'pointer', whiteSpace: 'nowrap',
                   touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', minHeight: '22px'
                 }}>
                   <CatIcon size={9} />{cat.label} <span style={{ opacity: 0.5 }}>{count}</span>
@@ -354,33 +403,35 @@ export default function CoachingLogModal({ client, db, coachId, onClose, isMobil
               </div>
             ) : filteredLogs.map((log, i) => {
               const s   = STATUS_OPTIONS.find(o => o.id === log.status) || STATUS_OPTIONS[0]
-              const cat = CATEGORIES.find(c => c.id === (log.category || 'algemeen')) || CATEGORIES[0]
+              const catId = log.category || 'algemeen'
+              const cat = CATEGORIES.find(c => c.id === catId)
+                || { id: catId, label: CATEGORIE_LABEL[catId] || catId, icon: History }
               const CatIcon = cat.icon
               const isFirst = i === 0
               return (
                 <div key={log.id} style={{
                   borderBottom: '1px solid rgba(255,255,255,0.03)',
-                  borderLeft: `2px solid ${cat.color}`,
+                  borderLeft: '2px solid rgba(255,255,255,0.2)',
                   marginLeft: '0.75rem', marginRight: '0.75rem',
                   marginTop: i === 0 ? '0.5rem' : '0',
                   borderRadius: '0 4px 4px 0',
-                  background: isFirst ? `${cat.color}05` : 'transparent',
+                  background: isFirst ? 'rgba(255,255,255,0.03)' : 'transparent',
                   overflow: 'hidden',
                 }}>
                   <div style={{ padding: '0.5rem 0.625rem' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', marginBottom: '0.3rem' }}>
                       <span style={{
                         display: 'inline-flex', alignItems: 'center', gap: '0.15rem',
-                        fontSize: '0.4rem', fontWeight: 700, color: cat.color,
-                        background: `${cat.color}15`, padding: '0.08rem 0.3rem', borderRadius: '2px',
+                        fontSize: '0.55rem', fontWeight: 900, color: '#fff',
+                        background: 'rgba(255,255,255,0.1)', padding: '0.1rem 0.35rem', borderRadius: '3px',
                         textTransform: 'uppercase', letterSpacing: '0.05em'
                       }}>
-                        <CatIcon size={8} />{cat.label}
+                        <CatIcon size={9} />{cat.label}
                       </span>
                       {(log.category === 'status' || log.category === 'algemeen' || !log.category) && (
                         <span style={{
-                          fontSize: '0.4rem', fontWeight: 700, color: s.color,
-                          background: `${s.color}12`, padding: '0.08rem 0.3rem', borderRadius: '2px',
+                          fontSize: '0.55rem', fontWeight: 800, color: 'rgba(255,255,255,0.55)',
+                          background: 'rgba(255,255,255,0.06)', padding: '0.1rem 0.35rem', borderRadius: '3px',
                           textTransform: 'uppercase', letterSpacing: '0.05em'
                         }}>
                           {s.label}
