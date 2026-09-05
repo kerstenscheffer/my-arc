@@ -11,7 +11,7 @@ export default class CommandCenterService {
   }
 
   // ═══ WEIGHT DATA ═══
-  async getClientsWeightData(clients) {
+  async getClientsWeightData(clients, coachId = null) {
     if (!clients || clients.length === 0) return []
     try {
       const clientIds = clients.map(c => c.id)
@@ -53,6 +53,35 @@ export default class CommandCenterService {
         ;(fases || []).forEach(f => { if (!faseVanKlant[f.client_id]) faseVanKlant[f.client_id] = f })
       } catch (e) { console.warn('fases laden mislukt (niet-blokkerend):', e?.message) }
 
+      // Dagelijkse afvinkjes: welke klanten heb ik vandaag gehad, en wanneer
+      // was de vorige keer. Eén query voor de hele lijst — per kaart een
+      // eigen vraag stellen zijn er vierenvijftig bij het openen.
+      //
+      // We halen de laatste twee weken op, niet alleen vandaag: de kaart wil
+      // ook kunnen tonen hoe lang geleden je iemand voor het laatst hebt
+      // afgevinkt, en dat is juist het getal dat ertoe doet.
+      let checkVanKlant = {}
+      try {
+        const vanaf = new Date()
+        vanaf.setDate(vanaf.getDate() - 14)
+        // Op coach filteren als we weten wie het is. Anders zou je bij een
+        // tweede coach diens afvinkjes als de jouwe zien staan.
+        let q = this.supabase
+          .from('coach_daily_checks')
+          .select('client_id, op_datum')
+          .in('client_id', clientIds)
+          .gte('op_datum', vanaf.toISOString().split('T')[0])
+          .order('op_datum', { ascending: false })
+        if (coachId) q = q.eq('coach_id', coachId)
+        const { data: checks, error: checkFout } = await q
+        if (checkFout) console.warn('dagchecks laden mislukt (niet-blokkerend):', checkFout.message)
+        // Nieuwste eerst, dus de eerste die langskomt is de meest recente.
+        ;(checks || []).forEach(r => {
+          if (!checkVanKlant[r.client_id]) checkVanKlant[r.client_id] = { laatste: r.op_datum, dagen: [] }
+          checkVanKlant[r.client_id].dagen.push(r.op_datum)
+        })
+      } catch (e) { console.warn('dagchecks laden mislukt (niet-blokkerend):', e?.message) }
+
       const weightByClient = {}
       clientIds.forEach(id => { weightByClient[id] = [] })
       weightLogs?.forEach(log => { if (weightByClient[log.client_id]) weightByClient[log.client_id].push(log) })
@@ -77,7 +106,8 @@ export default class CommandCenterService {
           // Was begrensd op 56 entries — te weinig voor volledige
           // historiek. Geen cap meer; we pakken alles binnen het venster.
           weightData: { latest: latestLog, history: logs, daysSinceWeighin, fridayCount, weightStatus, fridayMissing, totalLogs: logs.length },
-          fase: faseVanKlant[client.id] || null
+          fase: faseVanKlant[client.id] || null,
+          dagCheck: checkVanKlant[client.id] || null
         }
       })
     } catch (error) { console.error('❌ Weight error:', error); return clients.map(c => ({ ...c, weightData: null })) }

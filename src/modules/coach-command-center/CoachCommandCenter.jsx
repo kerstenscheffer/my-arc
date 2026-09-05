@@ -85,7 +85,7 @@ export default function CoachCommandCenter({ db, onSelectClient, setActiveTab, o
 
       // ── Stap 2: weight + coaching logs (kritisch voor urgentie-sortering) ──
       const [dataWithWeight, coachingLogDataEarly] = await Promise.all([
-        service.getClientsWeightData(clients),
+        service.getClientsWeightData(clients, coachId),
         db.supabase
           .from('client_coaching_logs')
           .select('id, client_id, status, note, created_at')
@@ -105,9 +105,11 @@ export default function CoachCommandCenter({ db, onSelectClient, setActiveTab, o
       // ingegaan las dat als -8,6 kg in plaats van -0,1 kg over deze fase.
       const weightByClient = {}
       const faseByClient = {}
+      const dagCheckByClient = {}
       dataWithWeight.forEach(c => {
         if (c?.weightData) weightByClient[c.id] = c.weightData
         if (c?.fase) faseByClient[c.id] = c.fase
+        if (c?.dagCheck) dagCheckByClient[c.id] = c.dagCheck
       })
 
       setClientsWithData(prev => {
@@ -115,6 +117,7 @@ export default function CoachCommandCenter({ db, onSelectClient, setActiveTab, o
           ...c,
           weightData: weightByClient[c.id] || c.weightData,
           fase: faseByClient[c.id] || c.fase || null,
+          dagCheck: dagCheckByClient[c.id] || c.dagCheck || null,
           latestCoachingLog: coachingLogDataEarly[c.id] || c.latestCoachingLog,
         }))
         const sorted = service.sortByUrgency(merged)

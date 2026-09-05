@@ -2,7 +2,7 @@
 // v3.0 — styling-upgrade: goud, bold wit, simpel. Gestript tot de essentie
 // (naam, doel, gewicht+datum, gewicht-progressie, notitie-log, insight-knop,
 // deactiveer). Gradients eruit → solide #0a0a0a.
-import React, { useState, useRef} from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 // In split screen mag een modal niet het hele scherm afdekken maar alleen de
 // helft waar de tab in staat. useModalHost geeft die helft terug; buiten split
@@ -11,7 +11,7 @@ import { useModalHost } from '../../../coach/ModalHost'
 import {
   TrendingDown, TrendingUp,
   MessageCircle, Power, MoreHorizontal, Trash2,
-  BarChart3, BookOpen, Pause
+  BarChart3, BookOpen, Pause, CheckCircle2, Circle
 } from 'lucide-react'
 import DeleteClientModal from './DeleteClientModal'
 import ClientInsightModal from './ClientInsightModal'
@@ -39,6 +39,28 @@ export default function ClientWeightCard({ client, isMobile, onToggleStatus, onD
   const modalHost = useModalHost()
   const [showInsight, setShowInsight]   = useState(false)
   const [showLog, setShowLog]           = useState(false)
+
+  // Dagelijks afvinken: "deze klant heb ik vandaag gehad".
+  //
+  // De lokale datum van dit apparaat, niet die van de database. De database
+  // staat op UTC, dus vink je iemand om half één 's nachts af, dan zou die
+  // op de vorige dag belanden.
+  const vandaag = new Date().toLocaleDateString('sv-SE')  // JJJJ-MM-DD
+  const [dagen, setDagen] = useState(() => new Set(client?.dagCheck?.dagen || []))
+  const [checkBezig, setCheckBezig] = useState(false)
+  const gehad = dagen.has(vandaag)
+
+  // De kaart verschijnt voordat deze gegevens binnen zijn: het overzicht
+  // laadt in stappen en de afvinkjes komen in de tweede ronde mee. De
+  // beginwaarde van useState draait maar één keer, dus zonder dit blijft
+  // elk vinkje leeg tot je de pagina herlaadt.
+  //
+  // Vergelijkt op inhoud en niet op de array zelf: die is bij elke ronde
+  // een nieuw object, en dan zou een eigen klik meteen worden overschreven.
+  const vanServer = (client?.dagCheck?.dagen || []).join(',')
+  useEffect(() => {
+    setDagen(new Set(vanServer ? vanServer.split(',') : []))
+  }, [vanServer])
   const [showMenu, setShowMenu]         = useState(false)
   // De kaart heeft overflow:hidden, dus een absoluut geplaatst menu wordt
   // afgesneden — de Activeer-knop was daardoor nauwelijks te raken. Het menu
@@ -211,6 +233,48 @@ export default function ClientWeightCard({ client, isMobile, onToggleStatus, onD
     },
   ]
 
+  // Aanwezigheid van de rij is het vinkje, dus afvinken is invoegen en
+  // ongedaan maken is verwijderen.
+  //
+  // Het scherm gaat meteen om en draait terug als het schrijven faalt. Bij
+  // een knopje dat je twintig keer achter elkaar gebruikt is wachten op de
+  // server het verschil tussen bruikbaar en irritant.
+  const wisselDagCheck = async () => {
+    if (checkBezig || !db?.supabase || !client?.id) return
+    const naar = !gehad
+    setCheckBezig(true)
+    setDagen(prev => {
+      const n = new Set(prev)
+      if (naar) n.add(vandaag); else n.delete(vandaag)
+      return n
+    })
+    try {
+      const q = naar
+        ? db.supabase.from('coach_daily_checks')
+            .upsert({ coach_id: coachId, client_id: client.id, op_datum: vandaag },
+                    { onConflict: 'coach_id,client_id,op_datum' })
+        : db.supabase.from('coach_daily_checks').delete()
+            .eq('coach_id', coachId).eq('client_id', client.id).eq('op_datum', vandaag)
+      const { error } = await q
+      if (error) throw error
+    } catch (e) {
+      console.error('afvinken mislukt:', e)
+      setDagen(prev => {
+        const n = new Set(prev)
+        if (naar) n.delete(vandaag); else n.add(vandaag)
+        return n
+      })
+    }
+    setCheckBezig(false)
+  }
+
+  // Hoe lang geleden was de vorige keer? Alleen interessant als vandaag nog
+  // niet is afgevinkt — dan is dat juist het getal dat je wil weten.
+  const laatsteCheck = [...dagen].filter(d => d < vandaag).sort().pop() || null
+  const dagenGeleden = laatsteCheck
+    ? Math.round((new Date(vandaag) - new Date(laatsteCheck)) / 86400000)
+    : null
+
   return (
     <div style={{
       background: '#0a0a0a',
@@ -338,6 +402,32 @@ export default function ClientWeightCard({ client, isMobile, onToggleStatus, onD
           marginLeft: 'auto',
           gap: isMobile ? '0.7rem' : '1rem',
         }}>
+        {/* Dagelijks afvinken. Alleen een icoon: er staan al twee knoppen
+            met tekst naast, en een derde woord maakt de rij te vol op een
+            smalle kaart. */}
+        <button
+          onClick={wisselDagCheck}
+          disabled={checkBezig}
+          title={gehad
+            ? `Vandaag afgevinkt — klik om terug te draaien`
+            : dagenGeleden != null
+              ? `Nog niet afgevinkt vandaag · laatst ${dagenGeleden === 1 ? 'gisteren' : `${dagenGeleden} dagen geleden`}`
+              : 'Nog niet afgevinkt vandaag'}
+          style={{
+            ...platteKnop,
+            color: gehad ? '#10b981' : 'rgba(255,255,255,0.35)',
+            opacity: checkBezig ? 0.5 : 1,
+            cursor: checkBezig ? 'wait' : 'pointer',
+          }}
+        >
+          {gehad ? <CheckCircle2 size={15} /> : <Circle size={15} />}
+          {/* Het aantal dagen alleen tonen als het opvalt. Bij een of twee
+              dagen is er niets aan de hand; vanaf drie wil je het zien
+              zonder de muis stil te houden. */}
+          {!gehad && dagenGeleden != null && dagenGeleden >= 3 && (
+            <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#f59e0b' }}>{dagenGeleden}d</span>
+          )}
+        </button>
         <button onClick={() => setShowLog(true)} style={platteKnop}>
           <BookOpen size={13} /> Log
         </button>
