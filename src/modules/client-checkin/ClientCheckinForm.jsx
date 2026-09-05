@@ -114,6 +114,26 @@ const SECTIES = [
 
 const SCHAAL = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
 
+// De keuzes achter een getalvraag. Uit app_issues: "in het checkin formulier
+// moeten het ipv vrije invul opties, dropdowns worden."
+//
+// De reeks komt uit de vraag zelf (max en step), dus er valt niets te
+// verzinnen: 'van 7' geeft 0 t/m 7, uren slaap met step 0.5 geeft halve uren.
+// Zonder max — alcohol — een ruime bovengrens; wie daarboven zit heeft een
+// ander gesprek nodig dan een invulveld.
+//
+// De open vragen blijven tekst. Een dropdown bij "Hoe gaat het met je?" zou
+// precies het antwoord weghalen waar een check-in voor bestaat.
+const reeksVoor = (v) => {
+  const stap = v.step || 1
+  const max = v.max ?? 20
+  const uit = []
+  for (let n = 0; n <= max + 1e-9; n += stap) {
+    uit.push(Number(n.toFixed(1)))
+  }
+  return uit
+}
+
 // Eén vraag per scherm. De secties blijven als kopje boven de vraag staan,
 // zodat je weet in welk deel je zit, maar er is geen scherm meer met zeven
 // vragen tegelijk.
@@ -249,21 +269,29 @@ export default function ClientCheckinForm({ db, client, onSubmitted, onClose }) 
 
         {(v.type === 'aantal' || v.type === 'aantal-van') && (
           <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: '1.4vh', flexWrap: 'wrap' }}>
-            <input
-              type="number" inputMode="decimal" min={0} max={v.max} step={v.step || 1}
-              placeholder="0" value={waarde ?? ''}
+            <select
+              value={waarde ?? ''}
               onChange={e => updateField(v.id, e.target.value === '' ? null : Number(e.target.value))}
               style={invoerStijl(false)}
-            />
+            >
+              <option value="" style={{ background: '#1a1a1a' }}>—</option>
+              {reeksVoor(v).map(n => (
+                <option key={n} value={n} style={{ background: '#1a1a1a' }}>{n}</option>
+              ))}
+            </select>
             {v.type === 'aantal-van' && (
               <>
                 <span style={{ color: GRIJS, fontSize: 16, fontWeight: 800 }}>{v.na}</span>
-                <input
-                  type="number" inputMode="numeric" min={0} max={v.max}
-                  placeholder="0" value={formData[v.tweedeId] ?? ''}
+                <select
+                  value={formData[v.tweedeId] ?? ''}
                   onChange={e => updateField(v.tweedeId, e.target.value === '' ? null : Number(e.target.value))}
                   style={invoerStijl(false)}
-                />
+                >
+                  <option value="" style={{ background: '#1a1a1a' }}>—</option>
+                  {reeksVoor(v).map(n => (
+                    <option key={n} value={n} style={{ background: '#1a1a1a' }}>{n}</option>
+                  ))}
+                </select>
               </>
             )}
             <span style={{ color: GRIJS, fontSize: 16, fontWeight: 800 }}>{v.slot}</span>
