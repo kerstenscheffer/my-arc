@@ -241,7 +241,7 @@ export default function CoachingLogModal({ client, db, coachId, onClose, isMobil
     }}>
 
       {/* Gold accent line */}
-      <div style={{ height: '2px', background: 'linear-gradient(90deg, #FFD700, #D4AF37, #FFD700)', opacity: 0.6, flexShrink: 0 }} />
+      <div style={{ height: '2px', background: 'rgba(255,255,255,0.5)', flexShrink: 0 }} />
 
       {/* Header */}
       <div
@@ -270,7 +270,23 @@ export default function CoachingLogModal({ client, db, coachId, onClose, isMobil
       {!minimized && (
         <>
           {/* ── Nieuwe entry ── */}
-          <div style={{ padding: '0.625rem 0.75rem', borderBottom: '1px solid rgba(255,255,255,0.04)', flexShrink: 0 }}>
+          {/* Het invoerblok stond op flexShrink: 0 en kon dus nooit krimpen.
+              Met een notitieveld van drie regels viel dat niet op, maar het
+              check-in formulier is een stuk langer: dat liep buiten het
+              venster en de modal staat op overflow hidden, dus scrollen kon
+              niet.
+
+              Nu mag dit blok krimpen én zelf scrollen. Bij de check-in krijgt
+              het de ruimte (het is dan je werkveld), bij een gewone notitie
+              blijft het compact en houdt de tijdlijn eronder zijn plek. */}
+          <div style={{
+            padding: '0.625rem 0.75rem',
+            borderBottom: '1px solid rgba(255,255,255,0.04)',
+            flex: category === 'checkin' ? '1 1 auto' : '0 1 auto',
+            minHeight: 0,
+            overflowY: 'auto',
+            WebkitOverflowScrolling: 'touch',
+          }}>
 
             {/* Categorie selector */}
             <div style={{ display: 'flex', gap: '0.2rem', marginBottom: '0.4rem' }}>
@@ -406,7 +422,14 @@ export default function CoachingLogModal({ client, db, coachId, onClose, isMobil
           </div>
 
           {/* ── Entries ── */}
-          <div style={{ flex: 1, overflowY: 'auto', WebkitOverflowScrolling: 'touch' }}>
+          {/* Tijdens een check-in ben je aan het invullen, niet aan het
+              terugkijken. De tijdlijn geeft dan ruimte af aan het formulier
+              maar blijft bereikbaar door te scrollen. */}
+          <div style={{
+            flex: category === 'checkin' ? '0 1 30%' : 1,
+            minHeight: 0,
+            overflowY: 'auto', WebkitOverflowScrolling: 'touch',
+          }}>
             <style>{`@keyframes logSpin { to { transform: rotate(360deg); } }`}</style>
 
             {loading ? (
