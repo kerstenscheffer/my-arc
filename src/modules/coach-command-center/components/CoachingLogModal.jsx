@@ -67,6 +67,10 @@ export default function CoachingLogModal({ client, db, coachId, onClose, isMobil
   const [conceptGeladen, setConceptGeladen] = useState(false)
   const [conceptStand, setConceptStand] = useState('')  // '', 'bezig', 'bewaard'
   const bewaarTimer = useRef(null)
+  // Laatste stand vasthouden voor het afsluiten. De bewaar-pauze wordt bij
+  // het sluiten afgebroken; zonder dit ben je het laatste dat je typte kwijt
+  // als je binnen een seconde het kruisje pakt.
+  const laatste = useRef({ vuil: false })
   const [pos, setPos]             = useState(isMobile ? { x: 0, y: 0 } : DEFAULT_POS)
   const [size, setSize]           = useState(isMobile ? { w: window.innerWidth, h: window.innerHeight } : DEFAULT_SIZE)
   const [minimized, setMinimized] = useState(false)
@@ -123,6 +127,7 @@ export default function CoachingLogModal({ client, db, coachId, onClose, isMobil
     // venster voor elke klant een lege rij aan. Stond er wél iets en heb je
     // het weer weggehaald, dan hoort het concept ook echt weg te zijn.
     const gevuld = heeftInhoud(checkin)
+    laatste.current = { vuil: true, gevuld, checkin, coachId, clientId: client.id, sb: db.supabase }
     setConceptStand(gevuld ? 'bezig' : '')
     clearTimeout(bewaarTimer.current)
     bewaarTimer.current = setTimeout(async () => {
@@ -135,6 +140,7 @@ export default function CoachingLogModal({ client, db, coachId, onClose, isMobil
               .eq('coach_id', coachId).eq('client_id', client.id)
         const { error } = await q
         if (error) throw error
+        laatste.current.vuil = false
         setConceptStand(gevuld ? 'bewaard' : '')
       } catch (e) {
         console.warn('concept bewaren mislukt:', e?.message)
@@ -143,6 +149,22 @@ export default function CoachingLogModal({ client, db, coachId, onClose, isMobil
     }, 1000)
     return () => clearTimeout(bewaarTimer.current)
   }, [checkin, conceptGeladen, db, client?.id, coachId])
+
+  // Nog één keer wegschrijven bij het sluiten, als de pauze het niet meer
+  // haalde. Bewust een lege lijst: dit hoort alleen bij het écht verdwijnen
+  // van het venster te draaien, niet bij elke wijziging.
+  useEffect(() => () => {
+    const l = laatste.current
+    if (!l.vuil || !l.sb || !l.coachId || !l.clientId) return
+    if (l.gevuld) {
+      l.sb.from('checkin_drafts').upsert(
+        { coach_id: l.coachId, client_id: l.clientId, data: l.checkin, updated_at: new Date().toISOString() },
+        { onConflict: 'coach_id,client_id' }).then(() => {}, () => {})
+    } else {
+      l.sb.from('checkin_drafts').delete()
+        .eq('coach_id', l.coachId).eq('client_id', l.clientId).then(() => {}, () => {})
+    }
+  }, [])
 
   const loadLogs = async () => {
     setLoading(true)
