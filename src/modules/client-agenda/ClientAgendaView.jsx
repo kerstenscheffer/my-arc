@@ -1248,7 +1248,18 @@ export default function ClientAgendaView({
 }) {
   const isMobile = typeof isMobileProp === 'boolean' ? isMobileProp : (typeof window !== 'undefined' && window.innerWidth <= 768)
   const isClient = viewerRole === 'client'
-  const visibleDays = singleDay && DAYS.includes(singleDay) ? [singleDay] : DAYS
+  // Op een telefoon één dag tegelijk.
+  //
+  // Zeven kolommen in ~360px gaf ongeveer 50px per dag: labels afgekapt tot
+  // "SLAA" en "ONTBI", datumkoppen die over elkaar heen liepen, blokken die
+  // je niet kon raken. Met één dag over de volle breedte is elk blok leesbaar
+  // en aantikbaar. De week blijft bereikbaar via de dagkiezer erboven.
+  //
+  // Een expliciete singleDay (de Plan Analyzer geeft die mee) wint altijd.
+  const [mobieleDag, setMobieleDag] = useState(() => DAYS[(new Date().getDay() + 6) % 7])
+  const visibleDays = singleDay && DAYS.includes(singleDay)
+    ? [singleDay]
+    : (isMobile ? [mobieleDag] : DAYS)
   const [loading, setLoading] = useState(true)
   const [data, setData] = useState(null)
   const [error, setError] = useState(null)
@@ -2152,6 +2163,46 @@ export default function ClientAgendaView({
         </div>
       )}
 
+      {/* Dagkiezer — alleen op de telefoon, en alleen als de dag niet van
+          buitenaf is opgelegd. Toont de datum eronder zodat je niet hoeft te
+          gokken welke week je bekijkt. */}
+      {isMobile && !singleDay && (
+        <div style={{
+          display: 'flex', gap: 4, flexShrink: 0,
+          padding: '0.4rem 0', marginBottom: '0.35rem',
+          overflowX: 'auto', WebkitOverflowScrolling: 'touch',
+        }}>
+          {DAYS.map(d => {
+            const datum = weekDates[d]
+            const isVandaag = datum && toIsoDate(datum) === toIsoDate(new Date())
+            const actief = d === mobieleDag
+            return (
+              <button key={d} onClick={() => setMobieleDag(d)} style={{
+                flex: 1, minWidth: 42,
+                display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1,
+                padding: '0.35rem 0.2rem',
+                background: actief ? '#fff' : 'rgba(255,255,255,0.03)',
+                borderTop: `1px solid ${actief ? '#fff' : COLORS.border}`,
+                borderBottom: `1px solid ${actief ? '#fff' : COLORS.border}`,
+                borderLeft: `1px solid ${actief ? '#fff' : COLORS.border}`,
+                borderRight: `1px solid ${actief ? '#fff' : COLORS.border}`,
+                borderRadius: 0, cursor: 'pointer', fontFamily: 'inherit',
+                touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+              }}>
+                <span style={{
+                  fontSize: '0.62rem', fontWeight: 900,
+                  color: actief ? '#0a0a0a' : (isVandaag ? '#FFD700' : 'rgba(255,255,255,0.7)'),
+                }}>{DAY_LABELS_NL[d]}</span>
+                <span style={{
+                  fontSize: '0.55rem', fontWeight: 700,
+                  color: actief ? 'rgba(0,0,0,0.55)' : 'rgba(255,255,255,0.35)',
+                }}>{datum ? datum.getDate() : ''}</span>
+              </button>
+            )
+          })}
+        </div>
+      )}
+
       {/* Week grid */}
       <div style={{
         flex: 1,
@@ -2160,7 +2211,8 @@ export default function ClientAgendaView({
         borderRadius: 0,
         // Verticaal scrollen i.p.v. verbergen: raakt de ruimte onder het
         // minimum, dan scroll je naar de late uren in plaats van ze kwijt
-        // te raken. Horizontaal blijft dicht, de zeven dagen passen altijd.
+        // te raken. Horizontaal blijft dicht: op een breed scherm passen de
+        // zeven dagen, op een telefoon staat er maar één kolom.
         overflowY: 'auto', overflowX: 'hidden',
         background: COLORS.bg,
       }}>
