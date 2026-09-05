@@ -102,7 +102,10 @@ export default function VezelsMicros({ db, maaltijden = [], isMobile }) {
     setLaden(true)
     db.supabase
       .from('ai_ingredients')
-      .select('id, name, sodium_per_100g, vitamins_minerals')
+      // fiber_per_100g hoort hier ook bij: de vezels worden hieruit berekend.
+      // Zonder die kolom is ing.fiber_per_100g undefined, telt alles op tot
+      // nul en staat er 0 g op het scherm zonder enige foutmelding.
+      .select('id, name, fiber_per_100g, sodium_per_100g, vitamins_minerals')
       .in('id', ids)
       .then(({ data }) => { if (leeft) setIngredienten(data || []) },
             (e) => { console.warn('micro-gegevens laden mislukt:', e); if (leeft) setIngredienten([]) })
