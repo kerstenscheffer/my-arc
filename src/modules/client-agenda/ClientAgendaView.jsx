@@ -9,6 +9,7 @@ import { Calendar, Utensils, Dumbbell, Moon, Briefcase, Pill, AlertCircle, Plus,
 import { ClientAgendaService, DAYS, DAY_LABELS_NL, DAY_LABELS_NL_LONG, getMondayOf, dateForDay, toIsoDate, recurringIdFor } from './ClientAgendaService'
 import { meldMaaltijdTijd, luisterMaaltijdTijd } from '../meal-plan/utils/mealSync'
 import WeekBudgetPaneel from './WeekBudgetPaneel'
+import { balkVak, balkVakActief, balkIconKnop, balkScheiding } from './werkbalkStijl'
 
 const COLORS = {
   bg: '#0a0a0a',
@@ -1944,59 +1945,37 @@ export default function ClientAgendaView({
           en aten samen bijna een derde van het scherm op. Ze zijn nu flex-
           items in dezelfde rij; op een smal scherm mag hij afbreken. */}
       <div style={{
-        display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap',
-        flexShrink: 0,
+        display: 'flex', alignItems: 'center', gap: 6, rowGap: 6, flexWrap: 'wrap',
+        flexShrink: 0, paddingBottom: 2,
       }}>
       {werkbalkExtra}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-        <button
-          onClick={() => shiftWeek(-1)}
-          title="Vorige week"
-          style={{
-            width: 24, height: 24, padding: 0,
-            background: 'rgba(255,255,255,0.04)',
-            border: `1px solid ${COLORS.border}`,
-            borderRadius: 0, color: COLORS.text50,
-            cursor: 'pointer',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-          }}
-        >
-          <ChevronLeft size={12} />
+      {werkbalkExtra && <div style={balkScheiding(isMobile)} />}
+
+      {/* Week-navigatie als één segment: pijl, label, pijl tegen elkaar aan.
+          Losse knopjes met een zwevend label ertussen lazen als drie dingen. */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 0, flexShrink: 0 }}>
+        <button onClick={() => shiftWeek(-1)} title="Vorige week"
+          style={balkIconKnop(isMobile)}>
+          <ChevronLeft size={13} />
         </button>
-        <div style={{
-          fontSize: '0.72rem', color: isThisWeek ? COLORS.gold : '#fff',
-          fontWeight: 700,
-        }}>
-          {isThisWeek ? 'Deze week' : `Week van ${weekAnchor.toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })}`}
+        <div style={balkVak(isMobile, {
+          borderLeftWidth: 0, borderRightWidth: 0,
+          color: isThisWeek ? COLORS.gold : '#fff',
+          minWidth: isMobile ? 78 : 96, justifyContent: 'center',
+        })}>
+          {isThisWeek ? 'Deze week' : weekAnchor.toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })}
         </div>
-        <button
-          onClick={() => shiftWeek(1)}
-          title="Volgende week"
-          style={{
-            width: 24, height: 24, padding: 0,
-            background: 'rgba(255,255,255,0.04)',
-            border: `1px solid ${COLORS.border}`,
-            borderRadius: 0, color: COLORS.text50,
-            cursor: 'pointer',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-          }}
-        >
-          <ChevronRight size={12} />
+        <button onClick={() => shiftWeek(1)} title="Volgende week"
+          style={balkIconKnop(isMobile)}>
+          <ChevronRight size={13} />
         </button>
         {!isThisWeek && (
-          <button
-            onClick={() => setWeekAnchor(getMondayOf(new Date()))}
-            title="Naar deze week"
-            style={{
-              padding: '0.2rem 0.45rem',
-              background: 'rgba(255,255,255,0.06)',
-              border: `1px solid ${COLORS.gold}40`,
-              borderRadius: 0, color: COLORS.gold,
-              fontSize: '0.72rem', fontWeight: 800,
-              cursor: 'pointer',
-              textTransform: 'uppercase', letterSpacing: '0.05em',
-            }}
-          >
+          <button onClick={() => setWeekAnchor(getMondayOf(new Date()))} title="Naar deze week"
+            style={balkVak(isMobile, {
+              marginLeft: 4, cursor: 'pointer', color: COLORS.gold,
+              borderTopColor: `${COLORS.gold}55`, borderBottomColor: `${COLORS.gold}55`,
+              borderLeftColor: `${COLORS.gold}55`, borderRightColor: `${COLORS.gold}55`,
+            })}>
             Vandaag
           </button>
         )}
@@ -2013,14 +1992,12 @@ export default function ClientAgendaView({
             !hasSchema && 'Geen workout-schema toegewezen — training-dagen worden niet bepaald.',
             'Placeholders (transparant) kun je gewoon aanklikken — ze worden bij opslaan een echt blok.',
           ].filter(Boolean).join('\n')}
-          style={{
-            display: 'inline-flex', alignItems: 'center', gap: 4, flexShrink: 0,
-            padding: '0.28rem 0.45rem',
+          style={balkVak(isMobile, {
             background: 'rgba(245,158,11,0.1)',
-            border: '1px solid rgba(245,158,11,0.3)',
-            color: COLORS.amber, fontSize: '0.7rem', fontWeight: 800,
-            cursor: 'help',
-          }}
+            borderTopColor: 'rgba(245,158,11,0.3)', borderBottomColor: 'rgba(245,158,11,0.3)',
+            borderLeftColor: 'rgba(245,158,11,0.3)', borderRightColor: 'rgba(245,158,11,0.3)',
+            color: COLORS.amber, cursor: 'help', flexShrink: 0,
+          })}
         >
           <AlertCircle size={12} />
           {[!hasMealPlan, !hasSchema].filter(Boolean).length}
@@ -2032,40 +2009,37 @@ export default function ClientAgendaView({
           dat werkt slecht op een telefoon en botst met het verzetten van
           bestaande blokken. */}
       {!isClient && !selectieModus && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-          {/* Zes chips naast elkaar waren de breedste post in de werkbalk.
-              Eén lijst doet hetzelfde en laat zien wat er gekozen is. Het
-              gekleurde blokje ernaast houdt de kleurcode zichtbaar. */}
-          <span style={{
-            width: 8, height: 8, flexShrink: 0,
-            background: teplaatsen?.kleur || 'rgba(255,255,255,0.15)',
-          }} />
-          <select
-            value={teplaatsen?.id || ''}
-            onChange={(e) => {
-              const k = SNELKEUZES.find(x => x.id === e.target.value)
-              setTeplaatsen(k || null)
-            }}
-            aria-label="Blok inplannen"
-            style={{
-              padding: '0.32rem 0.5rem', borderRadius: 0,
-              background: teplaatsen ? '#fff' : 'rgba(255,255,255,0.04)',
-              border: `1px solid ${teplaatsen ? '#fff' : COLORS.border}`,
-              color: teplaatsen ? '#000' : 'rgba(255,255,255,0.75)',
-              fontFamily: 'inherit', fontSize: '0.75rem', fontWeight: 900,
-              cursor: 'pointer', outline: 'none',
-            }}
-          >
-            <option value="" style={{ background: '#1a1a1a', color: '#ccc' }}>Inplannen…</option>
-            {SNELKEUZES.map(k => (
-              <option key={k.id} value={k.id} style={{ background: '#1a1a1a', color: '#fff' }}>
-                {k.label} · {k.duur} min
-              </option>
-            ))}
-          </select>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+          <div style={balkScheiding(isMobile)} />
+          {/* Zes chips naast elkaar waren de breedste post in de balk. Eén
+              lijst doet hetzelfde. Het kleurblokje zit binnen hetzelfde vak
+              als de lijst; los ernaast zag het eruit als een foutje. */}
+          <div style={(teplaatsen ? balkVakActief : balkVak)(isMobile, { padding: '0 0 0 0.5rem' })}>
+            <span style={{
+              width: 8, height: 8, flexShrink: 0,
+              background: teplaatsen?.kleur || 'rgba(255,255,255,0.2)',
+            }} />
+            <select
+              value={teplaatsen?.id || ''}
+              onChange={(e) => setTeplaatsen(SNELKEUZES.find(x => x.id === e.target.value) || null)}
+              aria-label="Blok inplannen"
+              style={{
+                height: '100%', background: 'transparent', border: 'none',
+                color: 'inherit', font: 'inherit', cursor: 'pointer',
+                outline: 'none', padding: '0 0.5rem 0 0.35rem',
+              }}
+            >
+              <option value="" style={{ background: '#1a1a1a', color: '#ccc' }}>Inplannen…</option>
+              {SNELKEUZES.map(k => (
+                <option key={k.id} value={k.id} style={{ background: '#1a1a1a', color: '#fff' }}>
+                  {k.label} · {k.duur} min
+                </option>
+              ))}
+            </select>
+          </div>
 
           {teplaatsen && (
-            <span style={{ fontSize: '0.72rem', fontWeight: 800, color: 'rgba(255,255,255,0.5)', whiteSpace: 'nowrap' }}>
+            <span style={{ fontSize: '0.7rem', fontWeight: 800, color: 'rgba(255,255,255,0.45)', whiteSpace: 'nowrap' }}>
               {bulkBezig ? 'Bezig…' : 'tik een plek'}
             </span>
           )}
@@ -2073,21 +2047,19 @@ export default function ClientAgendaView({
       )}
 
       {/* ── Meerdere tegelijk ─────────────────────────────────────────── */}
+      {!isClient && !selectieModus && <div style={balkScheiding(isMobile)} />}
       {!isClient && (
         <div style={{
-          display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap',
+          display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap',
+          flexShrink: 0,
         }}>
           {!selectieModus ? (
             <button
               onClick={() => setSelectieModus(true)}
-              style={{
-                display: 'inline-flex', alignItems: 'center', gap: 5,
-                padding: '0.35rem 0.6rem', borderRadius: 0,
-                background: 'none', border: `1px solid ${COLORS.border}`,
-                color: 'rgba(255,255,255,0.7)', fontFamily: 'inherit',
-                fontSize: '0.75rem', fontWeight: 800, cursor: 'pointer',
+              style={balkVak(isMobile, {
+                cursor: 'pointer',
                 touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-              }}
+              })}
             >
               <Check size={12} /> Selecteren
             </button>
@@ -2110,14 +2082,10 @@ export default function ClientAgendaView({
                   e.target.value = ''
                   if (!Number.isNaN(minuten)) bulkVerschuif(minuten)
                 }}
-                style={{
-                  padding: '0.35rem 0.5rem', borderRadius: 0,
-                  background: '#0a0a0a', border: `1px solid ${COLORS.border}`,
-                  color: '#fff', fontFamily: 'inherit',
-                  fontSize: '0.75rem', fontWeight: 800,
+                style={balkVak(isMobile, {
                   cursor: (!geselecteerd.size || bulkBezig) ? 'not-allowed' : 'pointer',
                   opacity: (!geselecteerd.size || bulkBezig) ? 0.35 : 1,
-                }}
+                })}
               >
                 <option value="">Verzetten…</option>
                 <optgroup label="Later">
@@ -2135,16 +2103,15 @@ export default function ClientAgendaView({
               <button
                 onClick={bulkVerwijder}
                 disabled={!geselecteerd.size || bulkBezig}
-                style={{
-                  display: 'inline-flex', alignItems: 'center', gap: 5,
-                  padding: '0.35rem 0.6rem', borderRadius: 0,
-                  background: 'none', border: '1px solid rgba(239,68,68,0.4)',
-                  color: '#ef4444', fontFamily: 'inherit',
-                  fontSize: '0.75rem', fontWeight: 800,
+                style={balkVak(isMobile, {
+                  background: 'rgba(239,68,68,0.08)',
+                  borderTopColor: 'rgba(239,68,68,0.4)', borderBottomColor: 'rgba(239,68,68,0.4)',
+                  borderLeftColor: 'rgba(239,68,68,0.4)', borderRightColor: 'rgba(239,68,68,0.4)',
+                  color: '#ef4444',
                   cursor: (!geselecteerd.size || bulkBezig) ? 'not-allowed' : 'pointer',
                   opacity: (!geselecteerd.size || bulkBezig) ? 0.35 : 1,
                   touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-                }}
+                })}
               >
                 <Trash2 size={12} /> Verwijder
               </button>
@@ -2171,12 +2138,14 @@ export default function ClientAgendaView({
           rekenwerk, en een kilo-voorspelling bij de klant neerleggen is een
           andere beslissing dan deze. */}
       {!isClient && (
+        <div style={{ marginLeft: 'auto', flexShrink: 0 }}>
         <WeekBudgetPaneel
           db={db}
           clientId={client?.id}
           mealPlan={data?.mealPlan}
           isMobile={isMobile}
         />
+        </div>
       )}
       </div>
 

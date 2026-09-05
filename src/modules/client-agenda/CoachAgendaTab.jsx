@@ -4,6 +4,7 @@
 import { useEffect, useState } from 'react'
 import { User } from 'lucide-react'
 import ClientAgendaView from './ClientAgendaView'
+import { balkVak } from './werkbalkStijl'
 
 export default function CoachAgendaTab({ db, clients = [], selectedClient, onClientSelect, isMobile }) {
   const [internalClient, setInternalClient] = useState(selectedClient || null)
@@ -45,20 +46,17 @@ export default function CoachAgendaTab({ db, clients = [], selectedClient, onCli
           ? <ClientAgendaView
               client={internalClient} db={db} isMobile={isMobile}
               werkbalkExtra={(
-                <div style={{ display: 'flex', alignItems: 'center', gap: 5, flexShrink: 0 }}>
-                  <User size={13} color="rgba(255,255,255,0.4)" />
+                <div style={balkVak(isMobile, { padding: '0 0 0 0.5rem', color: '#fff' })}>
+                  <User size={12} color="rgba(255,255,255,0.4)" />
                   <select
                     value={internalClient?.id || ''}
                     onChange={handleChange}
                     aria-label="Client"
                     style={{
-                      maxWidth: isMobile ? 150 : 210,
-                      background: 'rgba(255,255,255,0.05)',
-                      border: '1px solid rgba(255,255,255,0.12)',
-                      borderRadius: 0,
-                      color: '#fff', fontSize: '0.75rem', fontWeight: 800,
-                      padding: '0.32rem 0.45rem',
-                      fontFamily: 'inherit', outline: 'none', cursor: 'pointer',
+                      maxWidth: isMobile ? 140 : 200,
+                      height: '100%', background: 'transparent', border: 'none',
+                      color: 'inherit', font: 'inherit', cursor: 'pointer',
+                      outline: 'none', padding: '0 0.5rem 0 0.35rem',
                     }}
                   >
                     {clients.length === 0 && <option value="">Geen klanten</option>}

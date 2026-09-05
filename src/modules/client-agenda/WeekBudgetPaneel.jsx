@@ -14,6 +14,7 @@
 
 import React, { useState, useEffect } from 'react'
 import { ChevronDown, ChevronRight, Flame } from 'lucide-react'
+import { balkVak, balkVakActief } from './werkbalkStijl'
 
 // Vuistregel: ongeveer 7700 kcal per kilo vetweefsel. Een model, geen wet —
 // vandaar dat het scherm er "ongeveer" bij zet.
@@ -104,17 +105,12 @@ export default function WeekBudgetPaneel({ db, clientId, mealPlan, isMobile }) {
     // over de volle breedte kostte dit een hele regel; nu is het een knop
     // naast de rest en zweeft het paneel over het rooster heen.
     <div style={{ position: 'relative', flexShrink: 0 }}>
-      <button onClick={() => setOpen(o => !o)} title="Weekbudget en tekort" style={{
-        display: 'inline-flex', alignItems: 'center', gap: 6,
-        padding: '0.35rem 0.6rem',
-        background: 'rgba(255,255,255,0.03)',
-        borderTop: `1px solid ${rand}`, borderBottom: `1px solid ${rand}`,
-        borderLeft: `1px solid ${rand}`, borderRight: `1px solid ${rand}`,
-        borderRadius: 0, cursor: 'pointer', fontFamily: 'inherit',
-        color: '#fff', fontSize: '0.75rem', fontWeight: 900, whiteSpace: 'nowrap',
-        touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-      }}>
-        <Flame size={12} style={{ color: '#FFD700' }} />
+      <button onClick={() => setOpen(o => !o)} title="Weekbudget en tekort"
+        style={(open ? balkVakActief : balkVak)(isMobile, {
+          cursor: 'pointer',
+          touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+        })}>
+        <Flame size={12} style={{ color: open ? '#b8860b' : '#FFD700' }} />
         {planWeek != null ? `${getal(planWeek)} kcal` : 'Weekbudget'}
         {open ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
       </button>
