@@ -713,6 +713,7 @@ export default function AIDaySchedule({
       {suppInfo && (
         <SupplementInfoModal
           supplement={suppInfo}
+          db={db}
           isMobile={isMobile}
           onClose={() => setSuppInfo(null)}
         />

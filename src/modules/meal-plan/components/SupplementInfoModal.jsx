@@ -7,14 +7,34 @@
 // klant. Ontbreekt een onderdeel, dan blijft dat blok gewoon weg in plaats
 // van een lege kop te tonen.
 
-import React from 'react'
-import { X, Check, AlertTriangle, Clock } from 'lucide-react'
+import React, { useState, useEffect } from 'react'
+import { X, Check, AlertTriangle, Clock, ExternalLink, BookOpen } from 'lucide-react'
 import { supplementFoto } from '../../supplements/utils/supplementFoto'
 
-export default function SupplementInfoModal({ supplement, isMobile, onClose }) {
-  if (!supplement) return null
+export default function SupplementInfoModal({ supplement, isMobile, onClose, db }) {
   const m = isMobile
   const sp = supplement
+
+  // Bronnen komen uit supplement_templates en niet uit het plan van de klant.
+  // Het plan draagt een momentopname; werk je een bron bij, dan zou die daar
+  // niet in meekomen. Zo leest iedereen meteen de bijgewerkte versie.
+  const [bronnen, setBronnen] = useState(null)   // null = laden
+  useEffect(() => {
+    if (!db?.supabase || !sp?.id) { setBronnen([]); return }
+    let leeft = true
+    db.supabase
+      .from('supplement_templates').select('sources')
+      .eq('supplement_id', sp.id).maybeSingle()
+      .then(({ data }) => { if (leeft) setBronnen(Array.isArray(data?.sources) ? data.sources : []) },
+            () => { if (leeft) setBronnen([]) })
+    return () => { leeft = false }
+  }, [db, sp?.id])
+
+  // Pas hierna afhaken. Een vroege return bóven de hooks laat het aantal
+  // hooks tussen renders verschillen, en dan gooit React
+  // "Rendered more hooks than during the previous render".
+  if (!supplement) return null
+
   const veiligheid = sp.veiligheid || {}
   const waarschuwingen = Array.isArray(veiligheid.warnings) ? veiligheid.warnings : []
   const interacties = Array.isArray(veiligheid.interactions) ? veiligheid.interactions : []
@@ -155,6 +175,52 @@ export default function SupplementInfoModal({ supplement, isMobile, onClose }) {
                   · {w}
                 </div>
               ))}
+            </div>
+          )}
+
+          {/* Bronnen. Onderaan, want je leest ze niet altijd — maar wel
+              volledig, met de kanttekening erbij. Een claim zonder bron en
+              een claim met één kleine studie zien er anders identiek uit. */}
+          {bronnen && bronnen.length > 0 && (
+            <div style={{ marginTop: '1rem' }}>
+              {kop('Waar dit op gebaseerd is', <BookOpen size={11} />)}
+              {bronnen.map((b, i) => (
+                <div key={i} style={{ marginBottom: 8 }}>
+                  <a href={b.url} target="_blank" rel="noreferrer" style={{
+                    display: 'flex', alignItems: 'flex-start', gap: 5,
+                    fontSize: '0.74rem', fontWeight: 700, color: '#6366f1',
+                    textDecoration: 'none', lineHeight: 1.4,
+                  }}>
+                    <ExternalLink size={11} style={{ flexShrink: 0, marginTop: 3 }} />
+                    <span>{b.titel}</span>
+                  </a>
+                  {b.soort && (
+                    <span style={{
+                      display: 'inline-block', marginTop: 3, padding: '1px 6px', borderRadius: 4,
+                      background: 'rgba(255,255,255,0.06)', fontSize: '0.55rem', fontWeight: 800,
+                      color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: '0.04em',
+                    }}>{b.soort}</span>
+                  )}
+                  {b.kanttekening && (
+                    <div style={{ marginTop: 2, fontSize: '0.68rem', fontWeight: 600, color: 'rgba(255,255,255,0.4)', lineHeight: 1.4 }}>
+                      {b.kanttekening}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Geen bronnen betekent "nog niet nagezocht", niet "geen bewijs".
+              Dat verschil hoort er te staan. */}
+          {bronnen && bronnen.length === 0 && sp.voordelen?.length > 0 && (
+            <div style={{
+              marginTop: '0.9rem', padding: '0.55rem 0.7rem', borderRadius: 8,
+              background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)',
+              fontSize: '0.68rem', fontWeight: 600, color: 'rgba(255,255,255,0.4)', lineHeight: 1.4,
+            }}>
+              Bij dit supplement zijn nog geen bronnen vastgelegd. De punten
+              hierboven komen uit het plan van je coach.
             </div>
           )}
 
