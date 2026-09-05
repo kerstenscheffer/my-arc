@@ -31,6 +31,17 @@ const platteKnop = {
   touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
 }
 
+// De drie kleuren die je zelf kunt zetten. Automatisch is geen vierde
+// waarde maar de afwezigheid ervan (null), anders heb je twee manieren om
+// hetzelfde te zeggen.
+const KAART_KLEUREN = [
+  { id: null,      label: 'Automatisch', hex: null },
+  { id: 'groen',   label: 'Goed',        hex: '#10b981' },
+  { id: 'oranje',  label: 'Let op',      hex: '#f59e0b' },
+  { id: 'rood',    label: 'Urgent',      hex: '#ef4444' },
+]
+const KLEUR_HEX = { groen: '#10b981', oranje: '#f59e0b', rood: '#ef4444' }
+
 const GOAL_LABELS = {
   afvallen: 'Afvallen', fat_loss: 'Afvallen', weight_loss: 'Afvallen',
   spieren: 'Spieropbouw', muscle_gain: 'Spieropbouw',
@@ -42,6 +53,15 @@ export default function ClientWeightCard({ client, isMobile, onToggleStatus, onD
   const modalHost = useModalHost()
   const [showInsight, setShowInsight]   = useState(false)
   const [showLog, setShowLog]           = useState(false)
+
+  // Handmatige kleur van de streep links. null = laat de berekening z'n werk
+  // doen. Lokaal bijgehouden zodat de kaart meteen omslaat bij een klik.
+  const [kleur, setKleur] = useState(client?.kaart_kleur || null)
+  const [kleurOpen, setKleurOpen] = useState(false)
+  // Overnemen als de lijst opnieuw wordt opgehaald. De kaart blijft dan
+  // gemount, dus zonder dit blijft de state hangen op wat hij bij de eerste
+  // render zag.
+  useEffect(() => { setKleur(client?.kaart_kleur || null) }, [client?.kaart_kleur])
 
   // Dagelijks afvinken: "deze klant heb ik vandaag gehad".
   //
@@ -105,6 +125,10 @@ export default function ClientWeightCard({ client, isMobile, onToggleStatus, onD
   const trend = getTrend()
 
   const getUrgencyColor = () => {
+    // Een zelf gezette kleur wint van de berekening — dat is het hele punt
+    // ervan. Behalve bij een inactieve klant: die is grijs omdat er niets
+    // loopt, en dat is geen oordeel dat je overschrijft.
+    if (!isInactive && kleur && KLEUR_HEX[kleur]) return KLEUR_HEX[kleur]
     if (isInactive) return '#4b5563'
     const status = weightData?.weightStatus
     if (status === 'never' || status === 'overdue' || weightData?.fridayMissing) return '#ef4444'
@@ -271,6 +295,22 @@ export default function ClientWeightCard({ client, isMobile, onToggleStatus, onD
     setCheckBezig(false)
   }
 
+  // Kleur zetten of terugzetten op automatisch. Meteen op het scherm, en
+  // terugdraaien als het schrijven faalt — net als het afvinkrondje.
+  const zetKleur = async (nieuw) => {
+    const vorige = kleur
+    setKleur(nieuw)
+    setKleurOpen(false)
+    try {
+      const { error } = await db.supabase
+        .from('clients').update({ kaart_kleur: nieuw }).eq('id', client.id)
+      if (error) throw error
+    } catch (e) {
+      console.error('kaartkleur opslaan mislukt:', e)
+      setKleur(vorige)
+    }
+  }
+
   // Hoe lang geleden was de vorige keer? Alleen interessant als vandaag nog
   // niet is afgevinkt — dan is dat juist het getal dat je wil weten.
   const laatsteCheck = [...dagen].filter(d => d < vandaag).sort().pop() || null
@@ -288,6 +328,57 @@ export default function ClientWeightCard({ client, isMobile, onToggleStatus, onD
       transition: 'all 0.2s ease', transform: 'translateZ(0)',
       opacity: isInactive ? 0.55 : 1,
     }}>
+
+      {/* Klikzone over de gekleurde rand. De rand zelf is 3 pixels — daar
+          mik je niet op. Deze strook is breed genoeg om te raken en blijft
+          onzichtbaar, zodat de kaart er niet anders uitziet. */}
+      <button
+        onClick={() => setKleurOpen(o => !o)}
+        title={kleur ? `Kleur staat handmatig op ${kleur}` : 'Kleur volgt de weegstatus — klik om zelf te kiezen'}
+        aria-label="Kaartkleur kiezen"
+        style={{
+          position: 'absolute', left: 0, top: 0, bottom: 0, width: 14,
+          background: 'transparent', border: 'none', padding: 0,
+          cursor: 'pointer', zIndex: 3,
+        }}
+      />
+
+      {/* Het keuzemenu. Vier bolletjes op een rij: automatisch, goed, let op,
+          urgent. Klein en dicht bij de rand waar je vandaan komt. */}
+      {kleurOpen && (
+        <>
+          <div onClick={() => setKleurOpen(false)}
+            style={{ position: 'fixed', inset: 0, zIndex: 40 }} />
+          <div style={{
+            position: 'absolute', left: 8, top: 8, zIndex: 41,
+            display: 'flex', alignItems: 'center', gap: 6,
+            padding: '0.4rem 0.5rem',
+            background: '#111', border: '1px solid rgba(255,255,255,0.14)',
+            borderRadius: 10, boxShadow: '0 8px 24px rgba(0,0,0,0.6)',
+          }}>
+            {KAART_KLEUREN.map(k => {
+              const actief = (kleur || null) === k.id
+              return (
+                <button
+                  key={k.id || 'auto'}
+                  onClick={() => zetKleur(k.id)}
+                  title={k.label}
+                  style={{
+                    width: 22, height: 22, borderRadius: '50%', padding: 0,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    background: k.hex || 'transparent',
+                    // Automatisch heeft geen kleur, dus een streepje als teken.
+                    border: actief ? '2px solid #fff'
+                      : k.hex ? '2px solid transparent' : '2px dashed rgba(255,255,255,0.35)',
+                    cursor: 'pointer', flexShrink: 0,
+                    color: 'rgba(255,255,255,0.6)', fontSize: '0.7rem', fontWeight: 900,
+                  }}
+                >{k.hex ? '' : 'A'}</button>
+              )
+            })}
+          </div>
+        </>
+      )}
 
       {/* ── PAUSE BANNER ── */}
       {isPaused && (
