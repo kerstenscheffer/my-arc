@@ -432,7 +432,7 @@ export default function ClientWeightCard({ client, isMobile, onToggleStatus, onD
           <BookOpen size={13} /> Log
         </button>
         <button onClick={() => setShowInsight(true)} style={platteKnop}>
-          <BarChart3 size={13} /> Inzicht
+          <BarChart3 size={13} /> Inz
         </button>
         <div>
           <button ref={menuKnopRef} onClick={() => (showMenu ? setShowMenu(false) : openMenu())} style={{ ...platteKnop, color: showMenu ? '#fff' : 'rgba(255,255,255,0.5)' }}>
