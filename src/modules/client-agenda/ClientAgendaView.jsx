@@ -55,7 +55,11 @@ const VERZET_STAPPEN = [
 // weinig ruimte, dan drukt het samen tot dit minimum en scrollt de omhullende.
 // Eerder was dit een harde 600px binnen een overflow:hidden — dan verdwenen
 // de laatste uren gewoon, en dat is precies wat je niet wil zien in een agenda.
-const GRID_MIN_HOOGTE = { desktop: 520, mobiel: 430 }
+// Ruimer dan voorheen (520/430). Met 18 uur op 520 pixels is een uur nog
+// geen 30 pixels; een maaltijd van een half uur werd dan een streepje waar
+// niets in past. Google Agenda houdt ongeveer 60 pixels per uur aan, en
+// daar is dit de benadering van binnen de ruimte die deze pagina heeft.
+const GRID_MIN_HOOGTE = { desktop: 700, mobiel: 560 }
 const KOP_HOOGTE = { desktop: '1.75rem', mobiel: '1.55rem' }
 const kopHoogte = (isMobile) => (isMobile ? KOP_HOOGTE.mobiel : KOP_HOOGTE.desktop)
 const gridMinHoogte = (isMobile) => (isMobile ? GRID_MIN_HOOGTE.mobiel : GRID_MIN_HOOGTE.desktop)
@@ -205,7 +209,10 @@ function AgendaBlock({ block, isMobile, onClick, onPointerDownDrag, draggable, i
   const sizeMode = (block.type === 'meal' && imageUrl)
     ? 'full'
     : (durationMin >= 45 ? 'full' : durationMin >= 30 ? 'compact' : 'mini')
-  const showImage = sizeMode === 'full' && imageUrl
+  // Werk krijgt geen foto meer. Het is nu een gevuld gekleurd vlak, en een
+  // kantoorplaatje in de hoek daarvan maakt het alleen maar onrustiger —
+  // wat je wil weten is welke uren bezet zijn en waarmee.
+  const showImage = sizeMode === 'full' && imageUrl && block.type !== 'work'
 
   // Slot/type label
   const topLabel = block.type === 'meal'
@@ -268,7 +275,10 @@ function AgendaBlock({ block, isMobile, onClick, onPointerDownDrag, draggable, i
         touchAction: sleepbaar ? 'none' : 'auto',
         pointerEvents: isGhost ? 'none' : 'auto',
         display: 'flex',
-        zIndex: isGhost ? 5 : isAchter ? 0 : 2,
+        // Werk onderop, de rest erboven. Een blok dat je hebt aangevinkt
+        // komt wel naar voren: anders verdwijnt de witte rand die aangeeft
+        // dat het geselecteerd is achter een maaltijdkaart.
+        zIndex: isGhost ? 5 : isSelected ? 4 : isAchter ? 0 : 2,
       }}
     >
       {/* Foto links — alleen voor 'full' size. Voor meals: donkere overlay
@@ -340,12 +350,14 @@ function AgendaBlock({ block, isMobile, onClick, onPointerDownDrag, draggable, i
           }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 4, minWidth: 0 }}>
               {sizeMode === 'mini' && (
-                <Icon size={9} color={block.color} style={{ flexShrink: 0 }} />
+                <Icon size={9} color={isAchter ? '#fff' : block.color} style={{ flexShrink: 0 }} />
               )}
               <span style={{
                 fontSize: isMobile ? '0.5rem' : '0.55rem',
                 fontWeight: 800,
-                color: block.color,
+                // Op het gevulde vlak wit: de vlakkleur als tekstkleur zou
+                // op zichzelf staan en dus onleesbaar zijn.
+                color: isAchter ? 'rgba(255,255,255,0.9)' : block.color,
                 textTransform: 'uppercase', letterSpacing: '0.1em',
                 whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
                 opacity: 0.9,
@@ -356,7 +368,8 @@ function AgendaBlock({ block, isMobile, onClick, onPointerDownDrag, draggable, i
             {sizeMode !== 'mini' && (
               <span style={{
                 fontSize: isMobile ? '0.48rem' : '0.52rem', fontWeight: 700,
-                color: COLORS.text25, whiteSpace: 'nowrap', flexShrink: 0,
+                color: isAchter ? 'rgba(255,255,255,0.75)' : COLORS.text25,
+                whiteSpace: 'nowrap', flexShrink: 0,
               }}>
                 {formatTime(block.start)}
               </span>
@@ -624,7 +637,9 @@ function DayColumn({
 function TimeAxis({ isMobile }) {
   return (
     <div style={{
-      width: isMobile ? 28 : 36, flexShrink: 0,
+      // Breder: hier past "06:00" in plaats van alleen "06". Op 36 pixels
+      // stond het label tegen de eerste kolom aan geplakt.
+      width: isMobile ? 38 : 54, flexShrink: 0,
       borderRight: `1px solid ${COLORS.border}`,
       display: 'flex', flexDirection: 'column',
     }}>
@@ -647,15 +662,18 @@ function TimeAxis({ isMobile }) {
             // een 17-uur venster — alles schoof daardoor ~30 min op.
             top: `${(idx / (HOURS.length - 1)) * 100}%`,
             left: 0, right: 0,
-            fontSize: isMobile ? '0.62rem' : '0.7rem',
-            color: 'rgba(255,255,255,0.55)',
+            fontSize: isMobile ? '0.58rem' : '0.66rem',
+            color: 'rgba(255,255,255,0.5)',
             textAlign: 'right',
-            paddingRight: 4,
-            paddingTop: 1,
-            fontWeight: 900,
-            letterSpacing: '-0.02em',
+            paddingRight: 7,
+            // Het label hangt onder de lijn die het aanduidt; met de tekst
+            // erop gecentreerd zou 06:00 half boven het venster vallen.
+            paddingTop: 2,
+            fontWeight: 800,
+            letterSpacing: '-0.01em',
+            fontVariantNumeric: 'tabular-nums',
           }}>
-            {String(h % 24).padStart(2, '0')}
+            {String(h % 24).padStart(2, '0')}{isMobile ? '' : ':00'}
           </div>
         ))}
       </div>

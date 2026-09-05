@@ -657,7 +657,13 @@ export class ClientAgendaService {
             dbId: row.id, day, type: 'work',
             label: row.label || 'Werk',
             sublabel: row.sublabel,
-            color: row.color || WORK_COLOR,
+            // Altijd de typekleur, ook als er een kleur in de rij staat.
+            // Die opgeslagen waarde is geen keuze van de coach — er is geen
+            // kleurkiezer — maar een kopie van de typekleur van het moment
+            // dat het blok werd aangemaakt. Liet je die winnen, dan bleven
+            // alle bestaande werkblokken grijsblauw terwijl nieuwe rood
+            // werden, en dan betekent de kleur niets meer.
+            color: WORK_COLOR,
             source: 'client_agenda_blocks', sourceId: row.id,
             editable: true,
           }
