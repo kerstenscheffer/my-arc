@@ -20,13 +20,10 @@ const COLORS = {
   text50: 'rgba(255,255,255,0.6)',
   text25: 'rgba(255,255,255,0.45)',
   gold: '#ffffff',  // 6 cijfers: elders wordt hier een alfa-suffix achter geplakt
+  // Alleen wat dit bestand zelf gebruikt. De kleur per bloktype komt uit
+  // ClientAgendaService en wordt met het blok meegegeven — die hier ook
+  // bijhouden gaf twee lijsten die uit elkaar konden lopen.
   amber: '#f59e0b',
-  blue: '#3b82f6',
-  indigo: '#6366f1',
-  slate: '#64748b',
-  green: '#22c55e',
-  purple: '#a855f7',
-  red: '#e8756a',
 }
 
 // Tijdas: 6:00 → 24:00 (slaap wordt apart als block aan rand getoond)
@@ -93,16 +90,6 @@ const TYPE_ICON = {
   work: Briefcase,
   supplement: Pill,
 }
-
-// Moet gelijk blijven aan de kleuren in ClientAgendaService — de legenda
-// die iets anders vertelt dan de blokken is erger dan geen legenda.
-const LEGEND_ITEMS = [
-  { type: 'meal',     color: COLORS.green,  label: 'Maaltijd' },
-  { type: 'training', color: COLORS.blue,   label: 'Training' },
-  { type: 'sleep',    color: COLORS.purple, label: 'Slaap (placeholder)' },
-  { type: 'work',     color: COLORS.red,    label: 'Werk (placeholder)' },
-  { type: 'supplement', color: COLORS.amber, label: 'Supplementen' },
-]
 
 // Geen foto's meer in de agenda.
 //
