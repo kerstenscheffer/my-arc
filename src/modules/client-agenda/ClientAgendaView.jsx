@@ -7,7 +7,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Calendar, Utensils, Dumbbell, Moon, Briefcase, Pill, AlertCircle, Plus, Trash2, Check, X, ChevronLeft, ChevronRight, Repeat } from 'lucide-react'
 import { ClientAgendaService, DAYS, DAY_LABELS_NL, DAY_LABELS_NL_LONG, getMondayOf, dateForDay, toIsoDate, recurringIdFor } from './ClientAgendaService'
-import { meldMaaltijdTijd, luisterMaaltijdTijd } from '../meal-plan/utils/mealSync'
+import { meldMaaltijdTijd, luisterMaaltijdTijd, luisterPlanGewijzigd, meldPlanGewijzigd } from '../meal-plan/utils/mealSync'
 import WeekBudgetPaneel from './WeekBudgetPaneel'
 import { balkVak, balkVakActief, balkIconKnop, balkScheiding } from './werkbalkStijl'
 
@@ -1298,6 +1298,16 @@ export default function ClientAgendaView({
   const instantieRef = useRef(null)
   if (!instantieRef.current) instantieRef.current = `agenda-${Math.random().toString(36).slice(2, 9)}`
 
+  // De andere helft van het scherm laten weten dat het plan is veranderd.
+  // Alleen na een geslaagde schrijfactie: het bericht betekent "haal opnieuw
+  // op", en dan moet er ook iets nieuws te halen zijn.
+  const meldWijziging = (reden) => meldPlanGewijzigd({
+    clientId: client?.id,
+    mealPlanId: forcedMealPlanId || data?.mealPlan?.id || null,
+    reden,
+    bron: instantieRef.current,
+  })
+
   const reload = async () => {
     if (!service || !client?.id) return
     try {
@@ -1305,6 +1315,20 @@ export default function ClientAgendaView({
       setData(res)
     } catch (e) { console.error(e); setError(e) }
   }
+
+  // Verandert de opbouw van het plan elders — een maaltijd erbij, eruit of
+  // vervangen — dan halen we opnieuw op. Anders dan bij een tijdwijziging:
+  // daar weet je precies welk blok waarheen gaat, hier niet. Raden wat er
+  // veranderd is levert een agenda op die net iets anders zegt dan het plan.
+  //
+  // Alleen als het over dezelfde klant gaat. In split screen kun je links een
+  // andere klant open hebben dan rechts, en dan is een herlaad hier verspilde
+  // moeite.
+  useEffect(() => luisterPlanGewijzigd(({ clientId, mealPlanId }) => {
+    if (clientId && client?.id && clientId !== client.id) return
+    if (mealPlanId && forcedMealPlanId && mealPlanId !== forcedMealPlanId) return
+    reload()
+  }, instantieRef.current), [client?.id, forcedMealPlanId, service, weekAnchor])
 
   // Verschuift een ander scherm een maaltijd, dan schuiven we het blok hier
   // meteen mee. Bewust geen herlaad: het bericht vertrekt zodra de gebruiker
@@ -1460,6 +1484,7 @@ export default function ClientAgendaView({
         })
       }
       await reload()
+      meldWijziging('selectie verzet')
       if (overgeslagen.length) {
         setMoveError(`${overgeslagen.length} blok(ken) overgeslagen — niet verplaatsbaar`)
         setTimeout(() => setMoveError(null), 3500)
@@ -1494,6 +1519,7 @@ export default function ClientAgendaView({
         await service.deleteBlock(b.dbId)
       }
       await reload()
+      meldWijziging('items verwijderd')
       if (overgeslagen.length) {
         setMoveError(`${overgeslagen.length} overgeslagen — hier niet te verwijderen`)
         setTimeout(() => setMoveError(null), 4000)

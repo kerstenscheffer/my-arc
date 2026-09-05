@@ -9,7 +9,7 @@ import MealCard from './plan-analyzer/MealCard'
 import SwapModal from './plan-analyzer/SwapModal'
 import MealMakerModal from './plan-analyzer/MealMakerModal'
 import { PRE_WORKOUT_SLOT, totalenMetPreWorkout } from '../../meal-plan/utils/preWorkoutMeal'
-import { meldMaaltijdTijd, luisterMaaltijdTijd } from '../../meal-plan/utils/mealSync'
+import { meldMaaltijdTijd, luisterMaaltijdTijd, meldPlanGewijzigd, luisterPlanGewijzigd } from '../../meal-plan/utils/mealSync'
 import ClientContextPanel from './plan-analyzer/ClientContextPanel'
 import AutoBalancer from './plan-analyzer/AutoBalancer'
 import WeekBalancer from './plan-analyzer/WeekBalancer'
@@ -634,6 +634,16 @@ export default function PlanAnalyzer({
     })
   }
 
+  // Verandert de agenda in de andere schermhelft het plan — een maaltijd
+  // verwijderd, een blok naar een andere dag — dan halen we het plan opnieuw
+  // op. Zonder dit staat de Analyzer nog naar de oude opbouw te kijken en
+  // schrijf je bij je volgende wijziging de verdwenen maaltijd terug.
+  useEffect(() => luisterPlanGewijzigd(({ clientId, mealPlanId }) => {
+    if (clientId && resolvedClientId && clientId !== resolvedClientId) return
+    if (mealPlanId && actievePlanId && mealPlanId !== actievePlanId) return
+    if (actievePlanId) loadConceptPlan(actievePlanId)
+  }, 'analyzer'), [resolvedClientId, actievePlanId])
+
   const applyWeekUpdate = async (updated, actionDesc) => {
     // Gewijzigde tijden uitzenden vóór het opslaan: de ontvangers verschuiven
     // hun blok lokaal en wachten niet op de database. Hier en niet in de
@@ -641,8 +651,23 @@ export default function PlanAnalyzer({
     // de klok op de maaltijdkaart, het tijden-scherm, auto-balance, slepen.
     meldTijden(updated)
     setWeekData(updated); pushHistory(updated, actionDesc); await persistWeekData(updated)
-    // Trigger embedded agenda om de nieuwe meal-data op te halen.
-    setAgendaRefreshKey(k => k + 1)
+    // Eén melding voor álle agenda's: de ingebedde hiernaast én die in de
+    // andere helft van het scherm. Die tweede staat in een eigen
+    // componentboom en bereik je niet met state — alleen via het
+    // window-kanaal.
+    //
+    // Ná het opslaan versturen: dit bericht betekent "haal opnieuw op", en
+    // dan moet er ook iets nieuws te halen zijn.
+    //
+    // Hier stond ook een teller die alleen de ingebedde agenda ververste.
+    // Die is weg: het kanaal bereikt hem net zo goed, en samen deden ze
+    // hetzelfde werk twee keer.
+    meldPlanGewijzigd({
+      mealPlanId: actievePlanId,
+      clientId: resolvedClientId,
+      reden: actionDesc,
+      bron: 'analyzer',
+    })
   }
 
   // ════════════ MEAL EDITING ════════════
