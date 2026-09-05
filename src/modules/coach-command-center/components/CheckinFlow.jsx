@@ -14,7 +14,7 @@
 
 import React, { useState } from 'react'
 import { Plus, X, Check, Copy, Loader2 } from 'lucide-react'
-import { CHECKS, RONDE, CHECK_LABEL, CHECK_KLEUR, samenvatting } from './checkinData'
+import { CHECKS, RONDE, CHECK_LABEL, CHECK_KLEUR, VASTE_VRAGEN, samenvatting } from './checkinData'
 
 // ── Kleine bouwstenen ──────────────────────────────────────────────────────
 
@@ -146,6 +146,23 @@ export default function CheckinFlow({ waarde, onChange, onOpslaan, opslaan, clie
 
       {/* ── 02 Tijdens de call ── */}
       <Kop nummer="02" titel="Tijdens de call" sub="live" />
+
+      {/* De drie vragen die elke call langskomen. Als vaste velden en niet
+          als losse vraag-regels: dan staan ze er al, en dan sla je ze niet
+          over op de call waar het juist nodig is. */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        {VASTE_VRAGEN.map(q => (
+          <div key={q.id}>
+            <Label>{q.label}</Label>
+            <textarea
+              value={s.vast?.[q.id] || ''}
+              onChange={e => zet({ vast: { ...s.vast, [q.id]: e.target.value } })}
+              placeholder={q.hint}
+              style={{ ...veld, minHeight: 46, resize: 'vertical' }}
+            />
+          </div>
+        ))}
+      </div>
 
       <div>
         <Label>Wat valt op → oplossing</Label>

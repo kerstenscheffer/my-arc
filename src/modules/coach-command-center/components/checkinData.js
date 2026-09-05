@@ -23,9 +23,22 @@ export const CHECK_KLEUR = {
   slecht: '#ef4444',
 }
 
+// Drie vragen die elke call gesteld worden. Vaste velden en geen losse
+// vraag-regels: wat je altijd vraagt hoort al klaar te staan, anders sla je
+// het over op de calls waar het juist telt.
+//
+// De volgorde is niet willekeurig — eerst hoe het gaat, dan waar het wringt,
+// dan wat jij eraan kunt doen. Het derde antwoord is meestal de to-do.
+export const VASTE_VRAGEN = [
+  { id: 'gevoel', label: 'Hoe voel je je?',                                    hint: 'Energie, stemming, motivatie…' },
+  { id: 'lastig', label: 'Wat vind je op dit moment nog lastig?',              hint: 'Waar loopt het vast…' },
+  { id: 'hulp',   label: 'Wat kan ik doen om het makkelijker te maken?',       hint: 'Wat hij van jou nodig heeft…' },
+]
+
 export const LEEG = {
   checks: { gewicht: '', training: '', voeding: '', opplan: '' },
   voor: '',
+  vast: { gevoel: '', lastig: '', hulp: '' },
   waarnemingen: [{ o: '', s: '' }],
   vragen: [{ v: '', a: '' }],
   notities: '',
@@ -42,6 +55,12 @@ export function samenvatting(s, clientNaam) {
   r.push('VOOR DE CALL')
   CHECKS.forEach(c => r.push(`  ${c.label}: ${CHECK_LABEL[s.checks?.[c.id] || '']}`))
   if (s.voor) r.push(`  ${s.voor}`)
+
+  const vast = VASTE_VRAGEN.filter(q => (s.vast?.[q.id] || '').trim())
+  if (vast.length) {
+    r.push('', 'TIJDENS DE CALL')
+    vast.forEach(q => r.push(`  ${q.label}`, `    ${s.vast[q.id].trim()}`))
+  }
 
   const w = (s.waarnemingen || []).filter(x => x.o || x.s)
   if (w.length) {
@@ -82,6 +101,7 @@ export function heeftInhoud(s) {
   if (Object.values(s.checks || {}).some(Boolean)) return true
   if ((s.voor || '').trim() || (s.notities || '').trim() || (s.bericht || '').trim()) return true
   if ((s.volgende?.wanneer || '').trim() || (s.volgende?.onderwerp || '').trim()) return true
+  if (Object.values(s.vast || {}).some(v => (v || '').trim())) return true
   if ((s.waarnemingen || []).some(x => (x.o || '').trim() || (x.s || '').trim())) return true
   if ((s.vragen || []).some(x => (x.v || '').trim() || (x.a || '').trim())) return true
   if ((s.todos || []).some(x => (x.t || '').trim())) return true
