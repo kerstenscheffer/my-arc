@@ -36,11 +36,19 @@ export default class CommandCenterService {
       // op de klant stond.
       let faseVanKlant = {}
       try {
-        const { data: fases } = await this.supabase
+        // Alleen lopende fases: het fasepaneel sluit de vorige af met een
+        // ended_on zodra er een nieuwe start. Zonder dit filter blijft een
+        // afgesloten fase het nulpunt bepalen voor "sinds start".
+        const { data: fases, error: faseFout } = await this.supabase
           .from('client_phases')
           .select('client_id, started_on, doel, start_gewicht, week_doel_kg')
           .in('client_id', clientIds)
+          .is('ended_on', null)
           .order('started_on', { ascending: false })
+        // De fout wel benoemen. Faalt dit stil, dan valt de kaart terug op
+        // de allereerste meting en ziet dat eruit als een rekenfout in
+        // plaats van als ontbrekende data.
+        if (faseFout) console.warn('fases laden mislukt (niet-blokkerend):', faseFout.message)
         // Nieuwste eerst, dus de eerste die we tegenkomen is de actieve.
         ;(fases || []).forEach(f => { if (!faseVanKlant[f.client_id]) faseVanKlant[f.client_id] = f })
       } catch (e) { console.warn('fases laden mislukt (niet-blokkerend):', e?.message) }

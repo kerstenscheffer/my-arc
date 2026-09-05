@@ -98,13 +98,23 @@ export default function CoachCommandCenter({ db, onSelectClient, setActiveTab, o
           })
       ])
 
+      // Let op: de service geeft per klant zowel weightData als fase terug.
+      // Beide moeten hier mee. Werd alleen weightData overgenomen, dan
+      // bleef client.fase leeg en rekende de kaart "sinds start" vanaf de
+      // allereerste meting ooit — bij een klant die net een build is
+      // ingegaan las dat als -8,6 kg in plaats van -0,1 kg over deze fase.
       const weightByClient = {}
-      dataWithWeight.forEach(c => { if (c?.weightData) weightByClient[c.id] = c.weightData })
+      const faseByClient = {}
+      dataWithWeight.forEach(c => {
+        if (c?.weightData) weightByClient[c.id] = c.weightData
+        if (c?.fase) faseByClient[c.id] = c.fase
+      })
 
       setClientsWithData(prev => {
         const merged = prev.map(c => ({
           ...c,
           weightData: weightByClient[c.id] || c.weightData,
+          fase: faseByClient[c.id] || c.fase || null,
           latestCoachingLog: coachingLogDataEarly[c.id] || c.latestCoachingLog,
         }))
         const sorted = service.sortByUrgency(merged)
