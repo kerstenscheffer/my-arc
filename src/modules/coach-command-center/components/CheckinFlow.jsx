@@ -78,7 +78,7 @@ function WisKnop({ onClick }) {
 
 // ── Het formulier ──────────────────────────────────────────────────────────
 
-export default function CheckinFlow({ waarde, onChange, onOpslaan, opslaan, clientNaam }) {
+export default function CheckinFlow({ waarde, onChange, onOpslaan, opslaan, clientNaam, conceptStand }) {
   const s = waarde
   const zet = (deel) => onChange({ ...s, ...deel })
   const [gekopieerd, setGekopieerd] = useState(false)
@@ -244,6 +244,21 @@ export default function CheckinFlow({ waarde, onChange, onOpslaan, opslaan, clie
         </div>
         <ToevoegKnop onClick={() => zet({ todos: [...(s.todos || []), { t: '', klaar: false, deadline: '' }] })}>to-do</ToevoegKnop>
       </div>
+
+      {/* Laten zien dat het tussentijds bewaard is. Zonder dit teken durf je
+          het venster niet te sluiten met een half ingevulde check-in. */}
+      {conceptStand && (
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 5, marginTop: 2,
+          fontSize: '0.62rem', fontWeight: 700, color: 'rgba(255,255,255,0.3)',
+        }}>
+          <span style={{
+            width: 6, height: 6, borderRadius: '50%',
+            background: conceptStand === 'bewaard' ? '#10b981' : 'rgba(255,255,255,0.3)',
+          }} />
+          {conceptStand === 'bewaard' ? 'Tussentijds bewaard' : 'Bewaren…'}
+        </div>
+      )}
 
       {/* Opslaan en kopiëren van het geheel */}
       <div style={{ display: 'flex', gap: 6, marginTop: 4 }}>

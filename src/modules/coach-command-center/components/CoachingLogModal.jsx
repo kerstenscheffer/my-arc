@@ -4,7 +4,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { createPortal } from 'react-dom'
 import { useModalHost } from '../../../coach/ModalHost'
 import CheckinFlow from './CheckinFlow'
-import { LEEG as CHECKIN_LEEG, samenvatting } from './checkinData'
+import { LEEG as CHECKIN_LEEG, samenvatting, heeftInhoud } from './checkinData'
 import { X, GripVertical, Minus, Maximize2, Plus, Loader2, MessageCircle, BarChart2, Phone, FileText, History } from 'lucide-react'
 
 const STATUS_OPTIONS = [
@@ -61,6 +61,12 @@ export default function CoachingLogModal({ client, db, coachId, onClose, isMobil
   // De check-in staat los van het notitieveld: het is een formulier, geen
   // regel tekst. Wordt bij opslaan één logboek-item.
   const [checkin, setCheckin] = useState(CHECKIN_LEEG)
+  // undefined = concept nog niet opgehaald. Belangrijk onderscheid: pas ná
+  // het laden mag er bewaard worden, anders overschrijft een leeg formulier
+  // het concept dat er stond voordat het binnen was.
+  const [conceptGeladen, setConceptGeladen] = useState(false)
+  const [conceptStand, setConceptStand] = useState('')  // '', 'bezig', 'bewaard'
+  const bewaarTimer = useRef(null)
   const [pos, setPos]             = useState(isMobile ? { x: 0, y: 0 } : DEFAULT_POS)
   const [size, setSize]           = useState(isMobile ? { w: window.innerWidth, h: window.innerHeight } : DEFAULT_SIZE)
   const [minimized, setMinimized] = useState(false)
@@ -89,6 +95,54 @@ export default function CoachingLogModal({ client, db, coachId, onClose, isMobil
     window.addEventListener('keydown', opToets)
     return () => window.removeEventListener('keydown', opToets)
   }, [onClose])
+
+  // Lopend concept ophalen bij het openen.
+  useEffect(() => {
+    if (!db?.supabase || !client?.id) return
+    let leeft = true
+    db.supabase
+      .from('checkin_drafts').select('data')
+      .eq('coach_id', coachId || '00000000-0000-0000-0000-000000000000')
+      .eq('client_id', client.id)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (!leeft) return
+        if (data?.data && Object.keys(data.data).length) setCheckin({ ...CHECKIN_LEEG, ...data.data })
+        setConceptGeladen(true)
+      }, () => { if (leeft) setConceptGeladen(true) })
+    return () => { leeft = false }
+  }, [db, client?.id, coachId])
+
+  // Bewaren met een pauze van een seconde. Bij elke toetsaanslag schrijven is
+  // zonde van de verbinding; een seconde stilte betekent dat je even nadenkt
+  // of naar een ander veld gaat, en dat is een prima moment.
+  useEffect(() => {
+    if (!conceptGeladen || !db?.supabase || !client?.id || !coachId) return
+
+    // Leeg formulier hoeft niet bewaard: anders legt het openen van dit
+    // venster voor elke klant een lege rij aan. Stond er wél iets en heb je
+    // het weer weggehaald, dan hoort het concept ook echt weg te zijn.
+    const gevuld = heeftInhoud(checkin)
+    setConceptStand(gevuld ? 'bezig' : '')
+    clearTimeout(bewaarTimer.current)
+    bewaarTimer.current = setTimeout(async () => {
+      try {
+        const q = gevuld
+          ? db.supabase.from('checkin_drafts').upsert(
+              { coach_id: coachId, client_id: client.id, data: checkin, updated_at: new Date().toISOString() },
+              { onConflict: 'coach_id,client_id' })
+          : db.supabase.from('checkin_drafts').delete()
+              .eq('coach_id', coachId).eq('client_id', client.id)
+        const { error } = await q
+        if (error) throw error
+        setConceptStand(gevuld ? 'bewaard' : '')
+      } catch (e) {
+        console.warn('concept bewaren mislukt:', e?.message)
+        setConceptStand('')
+      }
+    }, 1000)
+    return () => clearTimeout(bewaarTimer.current)
+  }, [checkin, conceptGeladen, db, client?.id, coachId])
 
   const loadLogs = async () => {
     setLoading(true)
@@ -140,8 +194,21 @@ export default function CoachingLogModal({ client, db, coachId, onClose, isMobil
         .select().single()
       if (error) throw error
       setLogs(prev => [data, ...prev])
+
+      // Concept opruimen: hij is nu een echt logboek-item. Laat je 'm staan,
+      // dan zie je bij de volgende call je vorige check-in weer terug.
+      // Eerst de tijd stopzetten, anders schrijft de bewaar-pauze het
+      // zojuist verwijderde concept meteen terug.
+      clearTimeout(bewaarTimer.current)
+      try {
+        await db.supabase.from('checkin_drafts').delete()
+          .eq('coach_id', coachId).eq('client_id', client.id)
+      } catch (e) { console.warn('concept opruimen mislukt:', e?.message) }
+
+      // Leeg formulier, en je blijft op het check-in tabblad staan: na
+      // opslaan wil je meestal meteen aan de volgende beginnen.
       setCheckin(CHECKIN_LEEG)
-      setCategory('algemeen')
+      setConceptStand('')
       onLogSaved?.(data)
     } catch (e) {
       console.error('check-in opslaan mislukt:', e)
@@ -343,6 +410,7 @@ export default function CoachingLogModal({ client, db, coachId, onClose, isMobil
                 onOpslaan={bewaarCheckin}
                 opslaan={saving}
                 clientNaam={client.first_name}
+                conceptStand={conceptStand}
               />
             ) : (
               <>

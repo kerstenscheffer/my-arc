@@ -69,3 +69,21 @@ export function samenvatting(s, clientNaam) {
   return r.join('\n')
 }
 
+
+/**
+ * Staat er iets in dit formulier?
+ *
+ * Nodig om te weten of een concept bewaard moet worden. Zonder deze controle
+ * schrijft het openen van het venster voor élke klant een leeg concept weg,
+ * en dan staat de tabel binnen een week vol met rijen die niets betekenen.
+ */
+export function heeftInhoud(s) {
+  if (!s) return false
+  if (Object.values(s.checks || {}).some(Boolean)) return true
+  if ((s.voor || '').trim() || (s.notities || '').trim() || (s.bericht || '').trim()) return true
+  if ((s.volgende?.wanneer || '').trim() || (s.volgende?.onderwerp || '').trim()) return true
+  if ((s.waarnemingen || []).some(x => (x.o || '').trim() || (x.s || '').trim())) return true
+  if ((s.vragen || []).some(x => (x.v || '').trim() || (x.a || '').trim())) return true
+  if ((s.todos || []).some(x => (x.t || '').trim())) return true
+  return false
+}
