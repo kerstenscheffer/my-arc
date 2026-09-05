@@ -551,7 +551,26 @@ export default function PlanAnalyzer({
         .map(([day]) => EN_TO_NL[day])
         .filter(Boolean)
     : null
-  const trainingDays = trainingDaysFromSchedule?.length ? trainingDaysFromSchedule : (clientIntake?.training?.training_days?.length > 0 ? clientIntake.training.training_days : ['ma', 'di', 'wo', 'vr', 'za'])
+  // Trainingsdagen, van hard naar zacht:
+  //   1. workout_schedule — de expliciete koppeling weekdag → schema-dag
+  //   2. het intake-antwoord over trainingsdagen
+  //   3. clients.preferred_training_days — ook uit de intake, maar op de
+  //      klant zelf. Deze stap ontbrak, en daardoor viel iedereen zonder
+  //      workout_schedule meteen door naar de gok hieronder. Bij Mark stond
+  //      daar ["ma","wo","vr","zo"] terwijl de Analyzer dinsdag als
+  //      trainingsdag toonde.
+  //   4. een vaste lijst. Dat is een gok en niets meer; hij verzint vijf
+  //      trainingsdagen voor iemand die er misschien drie heeft. Blijft
+  //      staan zodat het scherm iets toont, maar pas als alles hierboven
+  //      leeg is.
+  const voorkeurDagen = Array.isArray(clientRecord?.preferred_training_days)
+    ? clientRecord.preferred_training_days.filter(Boolean)
+    : []
+  const trainingDays =
+    trainingDaysFromSchedule?.length ? trainingDaysFromSchedule
+    : clientIntake?.training?.training_days?.length > 0 ? clientIntake.training.training_days
+    : voorkeurDagen.length ? voorkeurDagen
+    : ['ma', 'di', 'wo', 'vr', 'za']
   const mealSchedule = clientIntake?.meal_schedule || null
   const trainingTime = clientIntake?.training?.default_time || null
 

@@ -170,7 +170,7 @@ export class ClientAgendaService {
     const weekEndDate = new Date(anchor); weekEndDate.setDate(weekEndDate.getDate() + 6)
     const weekEnd = toIsoDate(weekEndDate)
 
-    const [mealPlan, schema, customBlocks, workoutSchedule, overrides, intakeSchedule, supplementen] = await Promise.all([
+    const [mealPlan, schema, customBlocks, schedulePakket, overrides, intakeSchedule, supplementen] = await Promise.all([
       forcedMealPlanId ? this._loadMealPlanById(forcedMealPlanId) : this._loadMealPlan(clientId),
       this._loadWorkoutSchema(clientId),
       this._loadCustomBlocks(clientId),
@@ -179,6 +179,9 @@ export class ClientAgendaService {
       this._loadIntakeSchedule(clientId),
       laadSupplementen(this.supabase, clientId),
     ])
+
+    const workoutSchedule = schedulePakket?.schedule || null
+    const voorkeurDagen = new Set(schedulePakket?.voorkeurDagen || [])
 
     // Bouw per dag een lookup van intake-blokken per type. Gebruikt als
     // bron voor placeholders die echte tijden uit het intake-formulier
@@ -355,7 +358,12 @@ export class ClientAgendaService {
       const workoutKey = scheduleLookup(day)
       const dayWorkout = (workoutKey && schema?.week_structure?.[workoutKey]) || null
       const isTrainingDayFlag = !!mealPlan?.week_structure?.[day]?.is_training_day
-      const isTrainingDay = canResolveWorkouts ? !!dayWorkout : (!!dayWorkout || isTrainingDayFlag)
+      // Volgorde: het schema is de baas. Kan dat niet, dan de trainingsdagen
+      // uit de intake. Pas als die er ook niet zijn, de vlag uit het
+      // voedingsplan — die is het minst betrouwbaar.
+      const isTrainingDay = canResolveWorkouts
+        ? !!dayWorkout
+        : (!!dayWorkout || (voorkeurDagen.size ? voorkeurDagen.has(day) : isTrainingDayFlag))
 
       // Workout-specifieke meta: titel + oefenaantal als die er zijn.
       // Als er geen specifieke workout voor de dag is val terug op het
@@ -738,7 +746,10 @@ export class ClientAgendaService {
       // voedingsplan, en die vlag kan verouderd zijn — zo krijg je vijf
       // trainingen in beeld terwijl het schema er drie heeft. De weergave
       // meldt dit; stil laten gebeuren kost je een middag zoeken.
-      schemaZonderWeekindeling: !!schema && !workoutSchedule,
+      // Alleen melden als er echt niets beters is. Met de trainingsdagen uit
+      // de intake valt de agenda niet meer terug op het voedingsplan, en dan
+      // is er niets te waarschuwen.
+      schemaZonderWeekindeling: !!schema && !workoutSchedule && voorkeurDagen.size === 0,
       schemaDagen: schema?.week_structure ? Object.keys(schema.week_structure).length : null,
     }
   }
@@ -1221,14 +1232,29 @@ export class ClientAgendaService {
 
   // Mapping dag-naam → workoutKey in week_structure. Bron: clients.workout_schedule.
   // Voorbeeld: { monday: 'pull_a', tuesday: 'push_a', ... }
+  // Geeft zowel de expliciete koppeling (weekdag -> schema-dag) als de
+  // trainingsdagen uit de intake. Die tweede is de terugval wanneer de eerste
+  // ontbreekt; zonder dat viel de agenda terug op is_training_day uit het
+  // voedingsplan, en die vlag kan jaren oud zijn.
   async _loadWorkoutSchedule(clientId) {
     const { data, error } = await this.supabase
       .from('clients')
-      .select('workout_schedule')
+      .select('workout_schedule, preferred_training_days')
       .eq('id', clientId)
       .maybeSingle()
-    if (error) { console.warn('workout_schedule', error); return null }
-    return data?.workout_schedule || null
+    if (error) { console.warn('workout_schedule', error); return { schedule: null, voorkeurDagen: [] } }
+
+    const NL_NAAR_EN = {
+      ma: 'monday', di: 'tuesday', wo: 'wednesday', do: 'thursday',
+      vr: 'friday', za: 'saturday', zo: 'sunday',
+    }
+    const voorkeurDagen = Array.isArray(data?.preferred_training_days)
+      ? data.preferred_training_days
+          .map(c => NL_NAAR_EN[String(c).toLowerCase()])
+          .filter(Boolean)
+      : []
+
+    return { schedule: data?.workout_schedule || null, voorkeurDagen }
   }
 
   async _loadWorkoutSchema(clientId) {
