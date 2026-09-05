@@ -163,6 +163,23 @@ export default function SwapModal({
   const [onlyFavorites, setOnlyFavorites] = useState(false)
   const [expandedMealId, setExpandedMealId] = useState(null)
   const [ingNameCache, setIngNameCache] = useState({})
+
+  // Losse ingrediënten kiezen in plaats van een hele maaltijd. Handig voor
+  // een snack: een appel of een bak kwark is geen recept.
+  //
+  // Wat je kiest wordt als maaltijd in ai_meals gezet en daarna langs exact
+  // hetzelfde pad geplaatst als een gewone maaltijd. Dat is bewust: een slot
+  // in het weekplan draagt een volledige momentopname, en alles verderop
+  // (afvinken, foto's, de dagtotalen) hangt aan meal_id. Een los ingrediënt
+  // zonder meal_id zou daar stilletjes uitvallen. In de bibliotheek staan al
+  // vijftig maaltijden die feitelijk één ingrediënt zijn, dus dit past.
+  const [modus, setModus] = useState('maaltijd')
+  const [ingredienten, setIngredienten] = useState([])
+  const [ingLaden, setIngLaden] = useState(false)
+  const [gekozenIng, setGekozenIng] = useState(null)
+  const [gram, setGram] = useState(100)
+  const [ingBezig, setIngBezig] = useState(false)
+  const ingZoekRef = useRef(0)
   const [loadingIngsFor, setLoadingIngsFor] = useState(null)
   const debounceRef = useRef(null)
   const m = isMobile
@@ -374,6 +391,70 @@ export default function SwapModal({
     setActiveLabels(prev => prev.includes(label) ? prev.filter(l => l !== label) : [...prev, label])
   }
 
+  // Zoeken met een volgnummer erbij: zonder dat kan een traag antwoord op
+  // "kip" een sneller antwoord op "kipfilet" overschrijven.
+  useEffect(() => {
+    if (modus !== 'ingredient') return
+    const term = search.trim()
+    if (term.length < 2) { setIngredienten([]); return }
+    const eigen = ++ingZoekRef.current
+    setIngLaden(true)
+    const t = setTimeout(async () => {
+      try {
+        const { data } = await db.supabase
+          .from('ai_ingredients')
+          .select('id, name, calories_per_100g, protein_per_100g, carbs_per_100g, fat_per_100g, fiber_per_100g, default_portion_gram')
+          .ilike('name', `%${term}%`)
+          .limit(30)
+        if (eigen === ingZoekRef.current) setIngredienten(data || [])
+      } catch (e) {
+        console.error('ingrediënten zoeken mislukt:', e)
+        if (eigen === ingZoekRef.current) setIngredienten([])
+      } finally {
+        if (eigen === ingZoekRef.current) setIngLaden(false)
+      }
+    }, 250)
+    return () => clearTimeout(t)
+  }, [search, modus, db])
+
+  const ingMacros = (ing, g) => {
+    const f = (Number(g) || 0) / 100
+    return {
+      calories: Math.round((Number(ing.calories_per_100g) || 0) * f),
+      protein: Math.round((Number(ing.protein_per_100g) || 0) * f * 10) / 10,
+      carbs: Math.round((Number(ing.carbs_per_100g) || 0) * f * 10) / 10,
+      fat: Math.round((Number(ing.fat_per_100g) || 0) * f * 10) / 10,
+      fiber: Math.round((Number(ing.fiber_per_100g) || 0) * f * 10) / 10,
+    }
+  }
+
+  // Ingrediënt vastleggen als maaltijd en daarna de gewone weg volgen.
+  const kiesIngredient = async () => {
+    if (!gekozenIng || ingBezig) return
+    setIngBezig(true)
+    try {
+      const macro = ingMacros(gekozenIng, gram)
+      const rij = {
+        name: `${gekozenIng.name} ${gram}g`,
+        ...macro,
+        ingredients_list: [{ ingredient_id: gekozenIng.id, amount: Number(gram) || 0, unit: 'gram' }],
+        // meal_type NIET zetten: die kolom gaat over textuur (solid/liquid/
+        // mixed) en heeft een check-constraint. Het moment hoort in timing.
+        timing: [slotToMealType(slot)],
+      }
+      const { data, error } = await db.supabase
+        .from('ai_meals').insert([rij]).select('*').single()
+      if (error || !data?.id) throw (error || new Error('geen id teruggegeven'))
+      setGekozenIng(null)
+      handleMealSelect({ ...data, meal_id: data.id })
+    } catch (e) {
+      console.error('ingrediënt toevoegen mislukt:', e)
+      alert('Ingrediënt toevoegen mislukt: ' + (e.message || 'onbekende fout'))
+    } finally {
+      setIngBezig(false)
+    }
+  }
+
   const handleMealSelect = (meal) => { setSelectedMeal(meal); setShowDayPicker(true) }
   const toggleDay = (i) => setSelectedDays(prev => prev.includes(i) ? prev.filter(d => d !== i) : [...prev, i])
 
@@ -510,6 +591,24 @@ export default function SwapModal({
           <>
             {/* ═══ ZOEK + FILTERS ═══ */}
             <div style={{ flexShrink: 0, borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+              {/* Maaltijd of los ingrediënt */}
+              <div style={{ display: 'flex', gap: 4, padding: m ? '0.5rem 0.75rem 0' : '0.5rem 1rem 0' }}>
+                {[['maaltijd', 'Maaltijden'], ['ingredient', 'Ingrediënten']].map(([w, label]) => {
+                  const aan = modus === w
+                  return (
+                    <button key={w} onClick={() => { setModus(w); setGekozenIng(null) }} style={{
+                      flex: 1, padding: '0.4rem', borderRadius: 0,
+                      background: aan ? '#fff' : 'rgba(255,255,255,0.04)',
+                      borderTop: 'none', borderBottom: 'none', borderLeft: 'none', borderRight: 'none',
+                      color: aan ? '#0a0a0a' : 'rgba(255,255,255,0.6)',
+                      fontFamily: 'inherit', fontSize: m ? '0.72rem' : '0.76rem', fontWeight: 900,
+                      cursor: 'pointer',
+                      touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+                    }}>{label}</button>
+                  )
+                })}
+              </div>
+
               {/* Zoekbalk */}
               <div style={{ padding: m ? '0.5rem 0.75rem 0.35rem' : '0.5rem 1rem 0.35rem' }}>
                 <div style={{
@@ -520,16 +619,18 @@ export default function SwapModal({
                   <Search size={14} color="rgba(255,255,255,0.2)" />
                   <input
                     value={search} onChange={e => setSearch(e.target.value)}
-                    placeholder="Zoek op naam of coach naam..."
+                    placeholder={modus === "ingredient" ? "Zoek een ingrediënt…" : "Zoek op naam of coach naam..."}
                     autoFocus
                     style={{ flex: 1, background: 'transparent', border: 'none', outline: 'none', color: '#fff', fontSize: m ? '0.8rem' : '0.85rem', fontFamily: 'inherit' }}
                   />
-                  {loading && <div style={{ width: '10px', height: '10px', borderRadius: '50%', border: '1.5px solid rgba(255,255,255,0.1)', borderTopColor: '#FFD700', animation: 'spin 0.8s linear infinite', flexShrink: 0 }} />}
+                  {(modus === 'ingredient' ? ingLaden : loading) && <div style={{ width: '10px', height: '10px', borderRadius: '50%', border: '1.5px solid rgba(255,255,255,0.1)', borderTopColor: '#FFD700', animation: 'spin 0.8s linear infinite', flexShrink: 0 }} />}
                 </div>
               </div>
 
-              {/* Filters — label + dropdowns op één regel (bold witte tekst). */}
-              <div style={{
+              {/* Filters — label + dropdowns op één regel (bold witte tekst).
+                  Alleen bij maaltijden: dieet-labels en maaltijdsoorten
+                  bestaan niet op een los ingrediënt. */}
+              {modus === 'maaltijd' && <div style={{
                 display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 8,
                 padding: m ? '0.5rem 0.75rem' : '0.6rem 1rem',
                 borderTop: '1px solid rgba(255,255,255,0.04)',
@@ -562,17 +663,114 @@ export default function SwapModal({
                     × Wis
                   </button>
                 )}
-              </div>
+              </div>}
             </div>
 
             {/* ═══ RESULTATEN ═══ */}
             <div style={{ flex: 1, overflowY: 'auto', WebkitOverflowScrolling: 'touch' }}>
-              {!loading && meals.length === 0 && (
+              {/* ── Ingrediënten ── */}
+              {modus === 'ingredient' && (
+                <>
+                  {gekozenIng ? (
+                    // Portie kiezen. Eerst de hoeveelheid, dan pas vastleggen:
+                    // "150 gram kwark" is iets anders dan "kwark".
+                    <div style={{ padding: m ? '0.8rem 0.75rem' : '0.9rem 1rem' }}>
+                      <div style={{ fontSize: '0.95rem', fontWeight: 900, color: '#fff', marginBottom: 2 }}>
+                        {gekozenIng.name}
+                      </div>
+                      <div style={{ fontSize: '0.65rem', fontWeight: 700, color: 'rgba(255,255,255,0.35)', marginBottom: '0.7rem' }}>
+                        {Math.round(gekozenIng.calories_per_100g || 0)} kcal per 100 gram
+                      </div>
+
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: '0.7rem' }}>
+                        <input
+                          type="number" min="0" inputMode="numeric"
+                          value={gram}
+                          onChange={e => setGram(e.target.value)}
+                          style={{
+                            width: 90, padding: '0.55rem 0.6rem', textAlign: 'right',
+                            background: 'rgba(255,255,255,0.05)',
+                            border: '1px solid rgba(255,255,255,0.12)', borderRadius: 6,
+                            color: '#fff', fontSize: '1rem', fontWeight: 900,
+                            fontFamily: 'inherit', outline: 'none',
+                          }}
+                        />
+                        <span style={{ fontSize: '0.8rem', fontWeight: 800, color: 'rgba(255,255,255,0.5)' }}>gram</span>
+                      </div>
+
+                      {(() => {
+                        const mac = ingMacros(gekozenIng, gram)
+                        return (
+                          <div style={{ display: 'flex', gap: '1rem', marginBottom: '0.9rem' }}>
+                            {[['kcal', mac.calories], ['eiwit', `${mac.protein}g`], ['kh', `${mac.carbs}g`], ['vet', `${mac.fat}g`]].map(([l, v]) => (
+                              <div key={l}>
+                                <div style={{ fontSize: '0.55rem', fontWeight: 700, color: 'rgba(255,255,255,0.3)', textTransform: 'uppercase' }}>{l}</div>
+                                <div style={{ fontSize: '0.95rem', fontWeight: 900, color: '#fff' }}>{v}</div>
+                              </div>
+                            ))}
+                          </div>
+                        )
+                      })()}
+
+                      <div style={{ display: 'flex', gap: 8 }}>
+                        <button onClick={() => setGekozenIng(null)} style={{
+                          padding: '0.6rem 0.9rem', background: 'none',
+                          border: '1px solid rgba(255,255,255,0.15)', borderRadius: 6,
+                          color: 'rgba(255,255,255,0.6)', fontFamily: 'inherit',
+                          fontSize: '0.75rem', fontWeight: 800, cursor: 'pointer',
+                        }}>Terug</button>
+                        <button onClick={kiesIngredient} disabled={ingBezig || !(Number(gram) > 0)} style={{
+                          flex: 1, padding: '0.6rem',
+                          background: Number(gram) > 0 ? '#fff' : 'rgba(255,255,255,0.08)',
+                          borderTop: 'none', borderBottom: 'none', borderLeft: 'none', borderRight: 'none',
+                          borderRadius: 6,
+                          color: Number(gram) > 0 ? '#0a0a0a' : 'rgba(255,255,255,0.3)',
+                          fontFamily: 'inherit', fontSize: '0.78rem', fontWeight: 900,
+                          cursor: ingBezig ? 'default' : 'pointer',
+                        }}>{ingBezig ? 'Bezig…' : 'Kies dit ingrediënt'}</button>
+                      </div>
+                    </div>
+                  ) : (
+                    <>
+                      {!ingLaden && search.trim().length < 2 && (
+                        <div style={{ padding: '2rem', textAlign: 'center', color: 'rgba(255,255,255,0.2)', fontSize: '0.7rem' }}>
+                          Typ minstens twee letters om te zoeken.
+                        </div>
+                      )}
+                      {!ingLaden && search.trim().length >= 2 && ingredienten.length === 0 && (
+                        <div style={{ padding: '2rem', textAlign: 'center', color: 'rgba(255,255,255,0.2)', fontSize: '0.7rem' }}>
+                          Geen ingrediënten gevonden
+                        </div>
+                      )}
+                      {ingredienten.map(ing => (
+                        <div
+                          key={ing.id}
+                          onClick={() => { setGekozenIng(ing); setGram(ing.default_portion_gram || 100) }}
+                          style={{
+                            display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10,
+                            padding: m ? '0.7rem 0.75rem' : '0.75rem 1rem',
+                            borderBottom: '1px solid rgba(255,255,255,0.05)', cursor: 'pointer',
+                          }}
+                        >
+                          <span style={{ flex: 1, minWidth: 0, fontSize: '0.85rem', fontWeight: 800, color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {ing.name}
+                          </span>
+                          <span style={{ fontSize: '0.68rem', fontWeight: 700, color: 'rgba(255,255,255,0.35)', flexShrink: 0 }}>
+                            {Math.round(ing.calories_per_100g || 0)} kcal / 100g
+                          </span>
+                        </div>
+                      ))}
+                    </>
+                  )}
+                </>
+              )}
+
+              {modus === 'maaltijd' && !loading && meals.length === 0 && (
                 <div style={{ padding: '2rem', textAlign: 'center', color: 'rgba(255,255,255,0.2)', fontSize: '0.7rem' }}>
                   Geen maaltijden gevonden
                 </div>
               )}
-              {meals.map(meal => {
+              {modus === 'maaltijd' && meals.map(meal => {
                 const isFav = favorites.has(meal.id)
                 const isExpanded = expandedMealId === meal.id
                 return (
