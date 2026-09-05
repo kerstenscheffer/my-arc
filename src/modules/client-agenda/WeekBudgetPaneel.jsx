@@ -23,37 +23,39 @@ const KCAL_PER_KILO = 7700
 const DAGEN = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday']
 const PRE_WORKOUT_SLOT = 'pre_workout'
 
+const DAG_KORT = {
+  monday: 'Ma', tuesday: 'Di', wednesday: 'Wo', thursday: 'Do',
+  friday: 'Vr', saturday: 'Za', sunday: 'Zo',
+}
+
 /**
- * Wat levert dit weekplan op?
- * Telt de dagtotalen op, plus de losse pre-workout maaltijd op trainingsdagen.
- * Die staat in een eigen kolom en zit dus niet in week_structure — zonder deze
- * stap telt hij nergens mee.
+ * Wat levert dit weekplan op, per dag en in totaal?
+ *
+ * De losse pre-workout maaltijd telt mee op trainingsdagen. Die staat in een
+ * eigen kolom en zit dus niet in week_structure — zonder deze stap telt hij
+ * nergens mee, ook niet in het dagcijfer.
+ *
+ * Niet geexporteerd: naast een component een functie exporteren breekt
+ * hot-reload. Heeft een ander scherm dit nodig, dan hoort het in een eigen
+ * util-bestand.
  */
-// Niet geexporteerd: naast een component een functie exporteren breekt
-// hot-reload. Heeft een ander scherm dit nodig, dan hoort het in een eigen
-// util-bestand.
-function planWeekTotaal(mealPlan) {
+function planPerDag(mealPlan) {
   const week = mealPlan?.week_structure
   if (!week) return null
 
-  let kcal = 0
-  let trainingsdagenZonderEigenSlot = 0
+  const preKcal = Number(mealPlan?.pre_workout_meal?.calories) || 0
 
-  DAGEN.forEach(dag => {
+  const dagen = DAGEN.map(dag => {
     const dagplan = week[dag]
-    if (!dagplan) return
-    kcal += Number(dagplan?.totals?.kcal) || 0
-    // Alleen meetellen als de dag geen eigen pre-workout slot heeft; anders
+    let kcal = Number(dagplan?.totals?.kcal) || 0
+    const training = !!dagplan?.is_training_day
+    // Alleen optellen als de dag geen eigen pre-workout slot heeft; anders
     // zit die maaltijd al in het dagtotaal en zou hij dubbel tellen.
-    if (dagplan.is_training_day && !dagplan[PRE_WORKOUT_SLOT]) {
-      trainingsdagenZonderEigenSlot += 1
-    }
+    if (training && preKcal && !dagplan?.[PRE_WORKOUT_SLOT]) kcal += preKcal
+    return { dag, label: DAG_KORT[dag], kcal: Math.round(kcal), training }
   })
 
-  const pre = mealPlan?.pre_workout_meal
-  if (pre?.calories) kcal += (Number(pre.calories) || 0) * trainingsdagenZonderEigenSlot
-
-  return Math.round(kcal)
+  return { dagen, totaal: dagen.reduce((t, d) => t + d.kcal, 0) }
 }
 
 const getal = (n) => new Intl.NumberFormat('nl-NL').format(Math.round(n))
@@ -77,7 +79,8 @@ export default function WeekBudgetPaneel({ db, clientId, mealPlan, isMobile }) {
     return () => { leeft = false }
   }, [open, tdee, db, clientId])
 
-  const planWeek = planWeekTotaal(mealPlan)
+  const perDag = planPerDag(mealPlan)
+  const planWeek = perDag ? perDag.totaal : null
   const verbranding = tdee?.tdee ? tdee.tdee * 7 : null
   const tekort = (planWeek != null && verbranding != null) ? verbranding - planWeek : null
   const kilos = tekort != null ? tekort / KCAL_PER_KILO : null
@@ -118,7 +121,7 @@ export default function WeekBudgetPaneel({ db, clientId, mealPlan, isMobile }) {
       {open && (
         <div style={{
           position: 'absolute', top: '100%', right: 0, zIndex: 60,
-          width: isMobile ? 'min(88vw, 280px)' : 280,
+          width: isMobile ? 'min(92vw, 320px)' : 320,
           marginTop: 4, padding: '0.5rem 0.7rem 0.7rem',
           border: `1px solid ${rand}`,
           background: '#0f0f0f',
@@ -163,8 +166,41 @@ export default function WeekBudgetPaneel({ db, clientId, mealPlan, isMobile }) {
                       Schatting op 7700 kcal per kilo. Wat de weegschaal doet blijft leidend.
                     </div>
                   </div>
+
                 </>
               )}
+
+                {/* Verdeling over de week. Het weektotaal zegt niets over
+                    hoe scheef de dagen liggen: 2000-2000-2000 leest heel
+                    anders dan 900-900-4200. Staafje op de hoogste dag
+                    geschaald; trainingsdagen in goud, zodat een uitschieter
+                    meteen te plaatsen is. */}
+                <div style={{ marginTop: '0.7rem', paddingTop: '0.6rem', borderTop: '1px solid rgba(255,255,255,0.08)' }}>
+                  <div style={{ fontSize: '0.6rem', fontWeight: 800, color: 'rgba(255,255,255,0.35)', marginBottom: 6 }}>
+                    Per dag
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'flex-end', gap: 3 }}>
+                    {perDag.dagen.map(d => {
+                      const hoogste = Math.max(...perDag.dagen.map(x => x.kcal), 1)
+                      const hoogte = Math.max(3, Math.round((d.kcal / hoogste) * 34))
+                      return (
+                        <div key={d.dag} title={`${d.label}: ${getal(d.kcal)} kcal${d.training ? ' · trainingsdag' : ''}`}
+                          style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3 }}>
+                          <div style={{
+                            width: '100%', height: hoogte,
+                            background: d.training ? '#FFD700' : 'rgba(255,255,255,0.28)',
+                          }} />
+                          <span style={{ fontSize: '0.55rem', fontWeight: 800, color: 'rgba(255,255,255,0.5)' }}>
+                            {d.label}
+                          </span>
+                          <span style={{ fontSize: '0.52rem', fontWeight: 700, color: 'rgba(255,255,255,0.3)' }}>
+                            {d.kcal >= 1000 ? `${(d.kcal / 1000).toFixed(1)}k` : d.kcal}
+                          </span>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
             </>
           )}
         </div>
