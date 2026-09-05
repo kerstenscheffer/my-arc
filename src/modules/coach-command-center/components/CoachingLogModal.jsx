@@ -4,8 +4,11 @@ import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { createPortal } from 'react-dom'
 import { useModalHost } from '../../../coach/ModalHost'
 import CheckinFlow from './CheckinFlow'
+import OnboardingFlow from './OnboardingFlow'
 import { LEEG as CHECKIN_LEEG, samenvatting, heeftInhoud, uitConcept } from './checkinData'
-import { X, GripVertical, Minus, Maximize2, Plus, Loader2, MessageCircle, BarChart2, Phone, FileText, History } from 'lucide-react'
+import { LEEG as ONB_LEEG, samenvatting as onbSamenvatting, heeftInhoud as onbHeeftInhoud } from './onboardingData'
+import { useConcept } from './useConcept'
+import { X, GripVertical, Minus, Maximize2, Plus, Loader2, MessageCircle, BarChart2, Phone, FileText, History, Rocket } from 'lucide-react'
 
 const STATUS_OPTIONS = [
   { id: 'on_track',        label: 'Op schema',      color: '#FFD700' },
@@ -23,14 +26,19 @@ const STATUS_OPTIONS = [
 // er bont uitzag; wat telt is welk tabblad actief is, en dat lees je aan vet
 // wit tegen dof wit.
 const CATEGORIES = [
-  { id: 'algemeen', label: 'Algemeen', icon: FileText },
-  { id: 'checkin',  label: 'Check-in', icon: Phone },
+  { id: 'algemeen',   label: 'Algemeen',   icon: FileText },
+  { id: 'checkin',    label: 'Check-in',   icon: Phone },
+  { id: 'onboarding', label: 'Onboarding', icon: Rocket },
 ]
+
+// De twee formulier-categorieen. Die krijgen de volle hoogte in het venster
+// en slaan op via hun eigen knop, in plaats van via het notitieveld.
+const FORMULIEREN = new Set(['checkin', 'onboarding'])
 
 // Voor het tonen van bestaande items, ook uit categorieen die je niet meer
 // kunt kiezen. Zonder deze lijst zou een oud WhatsApp-item naamloos worden.
 const CATEGORIE_LABEL = {
-  algemeen: 'Algemeen', checkin: 'Check-in', change_log: 'Wijziging',
+  algemeen: 'Algemeen', checkin: 'Check-in', onboarding: 'Onboarding', change_log: 'Wijziging',
   status: 'Status', whatsapp: 'WhatsApp', call_prep: 'Call prep',
 }
 
@@ -61,16 +69,7 @@ export default function CoachingLogModal({ client, db, coachId, onClose, isMobil
   // De check-in staat los van het notitieveld: het is een formulier, geen
   // regel tekst. Wordt bij opslaan één logboek-item.
   const [checkin, setCheckin] = useState(CHECKIN_LEEG)
-  // undefined = concept nog niet opgehaald. Belangrijk onderscheid: pas ná
-  // het laden mag er bewaard worden, anders overschrijft een leeg formulier
-  // het concept dat er stond voordat het binnen was.
-  const [conceptGeladen, setConceptGeladen] = useState(false)
-  const [conceptStand, setConceptStand] = useState('')  // '', 'bezig', 'bewaard'
-  const bewaarTimer = useRef(null)
-  // Laatste stand vasthouden voor het afsluiten. De bewaar-pauze wordt bij
-  // het sluiten afgebroken; zonder dit ben je het laatste dat je typte kwijt
-  // als je binnen een seconde het kruisje pakt.
-  const laatste = useRef({ vuil: false })
+  const [onboarding, setOnboarding] = useState(ONB_LEEG)
   const [pos, setPos]             = useState(isMobile ? { x: 0, y: 0 } : DEFAULT_POS)
   const [size, setSize]           = useState(isMobile ? { w: window.innerWidth, h: window.innerHeight } : DEFAULT_SIZE)
   const [minimized, setMinimized] = useState(false)
@@ -100,71 +99,17 @@ export default function CoachingLogModal({ client, db, coachId, onClose, isMobil
     return () => window.removeEventListener('keydown', opToets)
   }, [onClose])
 
-  // Lopend concept ophalen bij het openen.
-  useEffect(() => {
-    if (!db?.supabase || !client?.id) return
-    let leeft = true
-    db.supabase
-      .from('checkin_drafts').select('data')
-      .eq('coach_id', coachId || '00000000-0000-0000-0000-000000000000')
-      .eq('client_id', client.id)
-      .maybeSingle()
-      .then(({ data }) => {
-        if (!leeft) return
-        if (data?.data && Object.keys(data.data).length) setCheckin(uitConcept(data.data))
-        setConceptGeladen(true)
-      }, () => { if (leeft) setConceptGeladen(true) })
-    return () => { leeft = false }
-  }, [db, client?.id, coachId])
-
-  // Bewaren met een pauze van een seconde. Bij elke toetsaanslag schrijven is
-  // zonde van de verbinding; een seconde stilte betekent dat je even nadenkt
-  // of naar een ander veld gaat, en dat is een prima moment.
-  useEffect(() => {
-    if (!conceptGeladen || !db?.supabase || !client?.id || !coachId) return
-
-    // Leeg formulier hoeft niet bewaard: anders legt het openen van dit
-    // venster voor elke klant een lege rij aan. Stond er wél iets en heb je
-    // het weer weggehaald, dan hoort het concept ook echt weg te zijn.
-    const gevuld = heeftInhoud(checkin)
-    laatste.current = { vuil: true, gevuld, checkin, coachId, clientId: client.id, sb: db.supabase }
-    setConceptStand(gevuld ? 'bezig' : '')
-    clearTimeout(bewaarTimer.current)
-    bewaarTimer.current = setTimeout(async () => {
-      try {
-        const q = gevuld
-          ? db.supabase.from('checkin_drafts').upsert(
-              { coach_id: coachId, client_id: client.id, data: checkin, updated_at: new Date().toISOString() },
-              { onConflict: 'coach_id,client_id' })
-          : db.supabase.from('checkin_drafts').delete()
-              .eq('coach_id', coachId).eq('client_id', client.id)
-        const { error } = await q
-        if (error) throw error
-        laatste.current.vuil = false
-        setConceptStand(gevuld ? 'bewaard' : '')
-      } catch (e) {
-        console.warn('concept bewaren mislukt:', e?.message)
-        setConceptStand('')
-      }
-    }, 1000)
-    return () => clearTimeout(bewaarTimer.current)
-  }, [checkin, conceptGeladen, db, client?.id, coachId])
-
-  // Nog één keer wegschrijven bij het sluiten, als de pauze het niet meer
-  // haalde. Bewust een lege lijst: dit hoort alleen bij het écht verdwijnen
-  // van het venster te draaien, niet bij elke wijziging.
-  useEffect(() => () => {
-    const l = laatste.current
-    if (!l.vuil || !l.sb || !l.coachId || !l.clientId) return
-    if (l.gevuld) {
-      l.sb.from('checkin_drafts').upsert(
-        { coach_id: l.coachId, client_id: l.clientId, data: l.checkin, updated_at: new Date().toISOString() },
-        { onConflict: 'coach_id,client_id' }).then(() => {}, () => {})
-    } else {
-      l.sb.from('checkin_drafts').delete()
-        .eq('coach_id', l.coachId).eq('client_id', l.clientId).then(() => {}, () => {})
-    }
-  }, [])
+  // Elk formulier bewaart zijn eigen lopende concept, gescheiden per soort.
+  // Zonder die scheiding zou een halve onboarding de check-in overschrijven:
+  // beide zouden dezelfde rij claimen.
+  const { stand: checkinStand, wisConcept: wisCheckinConcept } = useConcept({
+    db, coachId, clientId: client?.id, soort: 'checkin',
+    waarde: checkin, zetWaarde: setCheckin, heeftInhoud, uitConcept,
+  })
+  const { stand: onbStand, wisConcept: wisOnbConcept } = useConcept({
+    db, coachId, clientId: client?.id, soort: 'onboarding',
+    waarde: onboarding, zetWaarde: setOnboarding, heeftInhoud: onbHeeftInhoud,
+  })
 
   const loadLogs = async () => {
     setLoading(true)
@@ -200,40 +145,35 @@ export default function CoachingLogModal({ client, db, coachId, onClose, isMobil
     setSaving(false)
   }
 
-  const bewaarCheckin = async () => {
+  // Een formulier opslaan als logboek-item. Check-in en onboarding lopen via
+  // dezelfde weg: note krijgt de leesbare samenvatting zodat de tijdlijn er
+  // zonder extra code iets van kan tonen, de structuur gaat in data.
+  const bewaarFormulier = async (soort) => {
+    const isCheckin = soort === 'checkin'
+    const inhoud = isCheckin ? checkin : onboarding
     setSaving(true)
     try {
-      // note krijgt de leesbare samenvatting zodat de tijdlijn er zonder
-      // extra code iets van kan tonen; de structuur gaat in data.
       const { data, error } = await db.supabase
         .from('client_coaching_logs')
         .insert({
           client_id: client.id, coach_id: coachId || null,
-          status, category: 'checkin',
-          note: samenvatting(checkin, client.first_name),
-          data: checkin,
+          status, category: soort,
+          note: (isCheckin ? samenvatting : onbSamenvatting)(inhoud, client.first_name),
+          data: inhoud,
         })
         .select().single()
       if (error) throw error
       setLogs(prev => [data, ...prev])
 
-      // Concept opruimen: hij is nu een echt logboek-item. Laat je 'm staan,
-      // dan zie je bij de volgende call je vorige check-in weer terug.
-      // Eerst de tijd stopzetten, anders schrijft de bewaar-pauze het
-      // zojuist verwijderde concept meteen terug.
-      clearTimeout(bewaarTimer.current)
-      try {
-        await db.supabase.from('checkin_drafts').delete()
-          .eq('coach_id', coachId).eq('client_id', client.id)
-      } catch (e) { console.warn('concept opruimen mislukt:', e?.message) }
+      await (isCheckin ? wisCheckinConcept : wisOnbConcept)()
 
-      // Leeg formulier, en je blijft op het check-in tabblad staan: na
-      // opslaan wil je meestal meteen aan de volgende beginnen.
-      setCheckin(CHECKIN_LEEG)
-      setConceptStand('')
+      // Leeg formulier, en je blijft op hetzelfde tabblad staan: na opslaan
+      // wil je meestal meteen aan de volgende beginnen.
+      if (isCheckin) setCheckin(CHECKIN_LEEG)
+      else setOnboarding(ONB_LEEG)
       onLogSaved?.(data)
     } catch (e) {
-      console.error('check-in opslaan mislukt:', e)
+      console.error(`${soort} opslaan mislukt:`, e)
       alert('Opslaan mislukt — ' + (e?.message || e))
     }
     setSaving(false)
@@ -365,13 +305,13 @@ export default function CoachingLogModal({ client, db, coachId, onClose, isMobil
               venster en de modal staat op overflow hidden, dus scrollen kon
               niet.
 
-              Nu mag dit blok krimpen én zelf scrollen. Bij de check-in krijgt
-              het de ruimte (het is dan je werkveld), bij een gewone notitie
-              blijft het compact en houdt de tijdlijn eronder zijn plek. */}
+              Nu mag dit blok krimpen én zelf scrollen. Bij een formulier
+              krijgt het de ruimte (het is dan je werkveld), bij een gewone
+              notitie blijft het compact en houdt de tijdlijn zijn plek. */}
           <div style={{
             padding: '0.625rem 0.75rem',
             borderBottom: '1px solid rgba(255,255,255,0.04)',
-            flex: category === 'checkin' ? '1 1 auto' : '0 1 auto',
+            flex: FORMULIEREN.has(category) ? '1 1 auto' : '0 1 auto',
             minHeight: 0,
             overflowY: 'auto',
             WebkitOverflowScrolling: 'touch',
@@ -424,15 +364,25 @@ export default function CoachingLogModal({ client, db, coachId, onClose, isMobil
               </div>
             )}
 
-            {/* Bij Check-in het formulier, anders het notitieveld. */}
+            {/* Bij een formulier-categorie het formulier, anders het
+                notitieveld. */}
             {category === 'checkin' ? (
               <CheckinFlow
                 waarde={checkin}
                 onChange={setCheckin}
-                onOpslaan={bewaarCheckin}
+                onOpslaan={() => bewaarFormulier('checkin')}
                 opslaan={saving}
                 clientNaam={client.first_name}
-                conceptStand={conceptStand}
+                conceptStand={checkinStand}
+              />
+            ) : category === 'onboarding' ? (
+              <OnboardingFlow
+                waarde={onboarding}
+                onChange={setOnboarding}
+                onOpslaan={() => bewaarFormulier('onboarding')}
+                opslaan={saving}
+                clientNaam={client.first_name}
+                conceptStand={onbStand}
               />
             ) : (
               <>
@@ -512,11 +462,11 @@ export default function CoachingLogModal({ client, db, coachId, onClose, isMobil
           </div>
 
           {/* ── Entries ── */}
-          {/* Tijdens een check-in ben je aan het invullen, niet aan het
+          {/* Tijdens een formulier ben je aan het invullen, niet aan het
               terugkijken. De tijdlijn geeft dan ruimte af aan het formulier
               maar blijft bereikbaar door te scrollen. */}
           <div style={{
-            flex: category === 'checkin' ? '0 1 30%' : 1,
+            flex: FORMULIEREN.has(category) ? '0 1 30%' : 1,
             minHeight: 0,
             overflowY: 'auto', WebkitOverflowScrolling: 'touch',
           }}>

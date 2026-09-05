@@ -7,6 +7,8 @@
 // De volgorde volgt het gesprek: eerst waar we naartoe gaan, dan wat je
 // laat zien, dan wat er in de weg zit, dan wat hij zelf gaat doen.
 
+import { wandklokNL } from '../../../utils/tijd'
+
 export const FASES = [
   { id: 'cut',         label: 'Vetverlies',             hint: 'met spierbehoud' },
   { id: 'build',       label: 'Spieropbouw',            hint: 'rustige opbouw' },
@@ -87,7 +89,7 @@ export function samenvatting(s, clientNaam) {
   if (s.notities) r.push('', 'NOTITIES', '  ' + s.notities)
   if (s.bericht) r.push('', 'BERICHT NAAR CLIENT', '  ' + s.bericht)
   if (s.volgende?.wanneer || s.volgende?.onderwerp) {
-    r.push('', `VOLGENDE CALL: ${s.volgende.wanneer || '—'} — ${s.volgende.onderwerp || ''}`)
+    r.push('', `VOLGENDE CALL: ${wandklokNL(s.volgende.wanneer)} — ${s.volgende.onderwerp || ''}`)
   }
   return r.join('\n')
 }

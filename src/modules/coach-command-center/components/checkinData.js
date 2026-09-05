@@ -5,6 +5,8 @@
 // breekt — en omdat het logboek de samenvatting nodig heeft zonder het
 // formulier te renderen.
 
+import { wandklokNL } from '../../../utils/tijd'
+
 export const CHECKS = [
   { id: 'gewicht',  label: 'Gewicht' },
   { id: 'training', label: 'Training' },
@@ -77,7 +79,7 @@ export function samenvatting(s, clientNaam) {
   if (s.notities) r.push('', 'NOTITIES', '  ' + s.notities)
   if (s.bericht) r.push('', 'BERICHT NAAR CLIENT', '  ' + s.bericht)
   if (s.volgende?.wanneer || s.volgende?.onderwerp) {
-    r.push('', `VOLGENDE CALL: ${s.volgende.wanneer || '—'} — ${s.volgende.onderwerp || ''}`)
+    r.push('', `VOLGENDE CALL: ${wandklokNL(s.volgende.wanneer)} — ${s.volgende.onderwerp || ''}`)
   }
 
   const t = (s.todos || []).filter(x => x.t)

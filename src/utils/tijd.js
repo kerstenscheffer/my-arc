@@ -85,3 +85,30 @@ export function geledenLang(waarde, leeg = '') {
   if (dag < 7) return `${dag}d geleden`
   return d.toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })
 }
+
+/**
+ * Een wandklok-invoer leesbaar maken: "2026-09-12T10:00" → "vr 12 sep 10:00".
+ *
+ * Let op het verschil met leesTijdstip hierboven. Dezelfde vorm zonder
+ * tijdzone betekent op twee plekken iets anders:
+ *
+ *   · uit de database is het UTC zonder markering, en moet het als UTC
+ *     gelezen worden;
+ *   · uit een <input type="datetime-local"> is het de tijd die jij op de
+ *     klok hebt gezet, dus al lokaal.
+ *
+ * Die door elkaar halen verschuift een afspraak twee uur. Vandaar twee
+ * functies met elk hun eigen aanname, in plaats van één die moet raden.
+ *
+ * @param {string} waarde  vorm "JJJJ-MM-DDTuu:mm" uit een datetime-local
+ * @param {string} leeg    wat te tonen als er niets is ingevuld
+ */
+export function wandklokNL(waarde, leeg = '—') {
+  if (!waarde) return leeg
+  const d = new Date(waarde)          // lokaal gelezen, precies de bedoeling
+  if (isNaN(d)) return String(waarde)
+  return d.toLocaleString('nl-NL', {
+    weekday: 'short', day: 'numeric', month: 'short',
+    hour: '2-digit', minute: '2-digit',
+  })
+}

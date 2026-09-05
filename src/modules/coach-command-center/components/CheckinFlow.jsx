@@ -13,68 +13,10 @@
 // de klant te staan, niet in de localStorage van dit ene apparaat.
 
 import React, { useState } from 'react'
-import { Plus, X, Check, Copy, Loader2 } from 'lucide-react'
+import { Check, Copy, Loader2 } from 'lucide-react'
 import { CHECKS, RONDE, CHECK_LABEL, CHECK_KLEUR, VASTE_VRAGEN, samenvatting } from './checkinData'
-
-// ── Kleine bouwstenen ──────────────────────────────────────────────────────
-
-const veld = {
-  width: '100%', boxSizing: 'border-box',
-  padding: '0.5rem 0.6rem',
-  background: 'rgba(255,255,255,0.04)',
-  border: '1px solid rgba(255,255,255,0.12)',
-  borderRadius: 8,
-  color: '#fff', fontSize: '0.8rem', fontWeight: 600,
-  fontFamily: 'inherit', outline: 'none', lineHeight: 1.45,
-}
-
-function Kop({ nummer, titel, sub }) {
-  return (
-    <div style={{
-      display: 'flex', alignItems: 'baseline', gap: 8,
-      padding: '0.5rem 0', marginTop: '0.4rem',
-      borderBottom: '1px solid rgba(255,255,255,0.1)',
-    }}>
-      <span style={{ fontSize: '0.66rem', fontWeight: 900, color: 'rgba(255,255,255,0.35)' }}>{nummer}</span>
-      <span style={{ fontSize: '0.85rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.01em' }}>{titel}</span>
-      {sub && <span style={{ marginLeft: 'auto', fontSize: '0.6rem', fontWeight: 700, color: 'rgba(255,255,255,0.25)' }}>{sub}</span>}
-    </div>
-  )
-}
-
-function Label({ children }) {
-  return (
-    <div style={{
-      fontSize: '0.62rem', fontWeight: 900, color: 'rgba(255,255,255,0.45)',
-      textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 5,
-    }}>{children}</div>
-  )
-}
-
-function ToevoegKnop({ onClick, children }) {
-  return (
-    <button onClick={onClick} style={{
-      alignSelf: 'flex-start', display: 'inline-flex', alignItems: 'center', gap: 5,
-      padding: '0.35rem 0.6rem', marginTop: 4,
-      background: 'transparent', border: '1px dashed rgba(255,255,255,0.2)',
-      borderRadius: 7, color: 'rgba(255,255,255,0.55)',
-      fontSize: '0.7rem', fontWeight: 800, fontFamily: 'inherit', cursor: 'pointer',
-    }}>
-      <Plus size={11} /> {children}
-    </button>
-  )
-}
-
-function WisKnop({ onClick }) {
-  return (
-    <button onClick={onClick} aria-label="verwijder" style={{
-      width: 26, height: 26, flexShrink: 0,
-      display: 'flex', alignItems: 'center', justifyContent: 'center',
-      background: 'transparent', border: '1px solid rgba(255,255,255,0.12)',
-      borderRadius: 6, color: 'rgba(255,255,255,0.4)', cursor: 'pointer',
-    }}><X size={12} /></button>
-  )
-}
+import { veld } from './formulierStijl'
+import { Kop, Label, ToevoegKnop, WisKnop } from './formulierBouwstenen'
 
 // ── Het formulier ──────────────────────────────────────────────────────────
 
