@@ -206,7 +206,8 @@ export default function MealTimelineMobile({
   onOpenFoodLog,
   onDeleteConsumedMeal,
   onEditConsumedMeal,
-  onPlanMealLog // NEW: callback when plan meal is checked → auto-log
+  onPlanMealLog, // NEW: callback when plan meal is checked → auto-log
+  supplementenPerMoment = {},
 }) {
   const [showPlan, setShowPlan] = useState(true)
 
@@ -262,9 +263,11 @@ export default function MealTimelineMobile({
             ? group.loggedMeals.filter(m => m.source !== 'plan_check')
             : group.loggedMeals
           const hasPlanMeals = group.planMeals.length > 0 && showPlan
+          const supps = supplementenPerMoment[moment.id] || []
           // Skip moments that have nothing to show — no per-moment "+ add"
-          // button anymore, so an empty header is just noise.
-          if (!hasPlanMeals && visibleLoggedMeals.length === 0) return null
+          // button anymore, so an empty header is just noise. Supplementen
+          // tellen mee: een moment met alleen een pil hoort ook te verschijnen.
+          if (!hasPlanMeals && visibleLoggedMeals.length === 0 && supps.length === 0) return null
           const cal = momentCalories(moment.id)
           const isFirst = renderedCount === 0
           renderedCount += 1
@@ -311,6 +314,34 @@ export default function MealTimelineMobile({
                   isMobile={true}
                   isLast={false}
                 />
+              ))}
+
+              {/* Supplementen op dit moment. Alleen tonen, niet afvinken:
+                  het afvinken van supplementen bestaat nog nergens en een
+                  knop die niets doet is erger dan geen knop. */}
+              {supps.map(sp => (
+                <div key={`supp-${sp.id}`} style={{
+                  display: 'flex', alignItems: 'center', gap: 8,
+                  padding: '0.45rem 0.6rem',
+                  borderTop: '1px solid rgba(255,255,255,0.04)',
+                }}>
+                  <div style={{
+                    width: 30, height: 30, flexShrink: 0, borderRadius: 8,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    background: 'rgba(255,215,0,0.1)',
+                    border: '1px solid rgba(255,215,0,0.25)',
+                    fontSize: '0.9rem',
+                  }}>{sp.emoji}</div>
+                  <span style={{
+                    flex: 1, minWidth: 0, fontSize: '0.78rem', fontWeight: 700, color: 'rgba(255,255,255,0.8)',
+                    overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                  }}>{sp.naam}</span>
+                  {sp.dosering && (
+                    <span style={{ fontSize: '0.68rem', fontWeight: 700, color: 'rgba(255,255,255,0.35)', flexShrink: 0 }}>
+                      {sp.dosering}
+                    </span>
+                  )}
+                </div>
               ))}
 
               {/* Logged meals (excluding plan_check when plan visible) */}

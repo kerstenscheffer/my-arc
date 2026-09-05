@@ -11,6 +11,7 @@ import MealTimelineMobile from './day-schedule/MealTimelineMobile'
 import DayTemplatePickerModal from './DayTemplatePickerModal'
 import FoodLogModal from './food-log/FoodLogModal'
 import MealLoggingService from '../../meal-logging-wizard/MealLoggingService'
+import { laadSupplementen, geldtOpDag, momentVanSupplement, doseringTekst } from '../../supplements/utils/supplementSchedule'
 
 const getTodayIndex = () => {
   const day = new Date().getDay()
@@ -61,6 +62,19 @@ export default function AIDaySchedule({
   const [checkedByDay, setCheckedByDay] = useState({})
   // Welke maaltijden op dit moment worden weggeschreven.
   const bezigMetLoggen = useRef(new Set())
+
+  // Supplementen van de klant. Uit app_issues: "Toegewezen supplementen
+  // moeten ook zichtbaar worden op de client meal pagina op de juiste
+  // tijden." Ze stonden alleen in het coach-paneel; de klant zag ze nergens.
+  const [supplementen, setSupplementen] = useState([])
+  useEffect(() => {
+    if (!db?.supabase || !client?.id) return
+    let leeft = true
+    laadSupplementen(db.supabase, client.id)
+      .then(lijst => { if (leeft) setSupplementen(Array.isArray(lijst) ? lijst : []) })
+      .catch(e => console.warn('Supplementen laden mislukt:', e))
+    return () => { leeft = false }
+  }, [db, client?.id])
 
   // Kalenderdatum van een dag-index, afgeleid van vandaag. Zelfde rekensom
   // als loadConsumedMeals gebruikt, hier apart zodat de vinkjes en de
@@ -350,6 +364,53 @@ export default function AIDaySchedule({
     if (onDayChange) onDayChange(daysOfWeek[dayIndex].key)
   }
   
+  // Supplementen van de bekeken dag, verdeeld over de vier momenten van de
+  // tijdlijn (ontbijt/lunch/diner/tussendoor).
+  //
+  // Een supplement draagt zijn tijd via specific_time, meal_reference of
+  // time_of_day — momentVanSupplement lost dat op tot minuten. Wij hangen het
+  // vervolgens aan de maaltijd die er qua tijd het dichtst bij zit, zodat je
+  // "creatine bij het ontbijt" ook onder het ontbijt ziet staan en niet in
+  // een losse lijst onderaan.
+  const supplementenPerMoment = (() => {
+    const uit = { breakfast: [], lunch: [], dinner: [], snack: [] }
+    const dagKey = daysOfWeek[currentDay]?.key
+    if (!dagKey || supplementen.length === 0) return uit
+
+    // Kloktijd per maaltijd-slot, in minuten. Voedt zowel de koppeling via
+    // meal_reference als het zoeken naar het dichtstbijzijnde moment.
+    const tijdVan = (mm) => Math.round((mm.plannedTime ?? 12) * 60)
+    const maaltijdTijden = {}
+    displayMeals.forEach(mm => { if (mm.slot) maaltijdTijden[mm.slot] = tijdVan(mm) })
+
+    const momentVanSlot = (slot = '') =>
+      slot.includes('breakfast') ? 'breakfast'
+        : slot.includes('lunch') ? 'lunch'
+        : slot.includes('dinner') ? 'dinner'
+        : 'snack'
+
+    supplementen.filter(sp => geldtOpDag(sp, dagKey)).forEach(sp => {
+      const min = momentVanSupplement(sp, maaltijdTijden)
+      let doel = 'snack'
+      if (min != null && displayMeals.length > 0) {
+        let beste = null
+        displayMeals.forEach(mm => {
+          const afstand = Math.abs(tijdVan(mm) - min)
+          if (beste === null || afstand < beste.afstand) beste = { afstand, slot: mm.slot }
+        })
+        if (beste) doel = momentVanSlot(beste.slot)
+      }
+      uit[doel].push({
+        id: sp.supplement_id || sp.id || sp.name,
+        naam: sp.name,
+        emoji: sp.emoji || '💊',
+        dosering: doseringTekst(sp),
+        minuten: min,
+      })
+    })
+    return uit
+  })()
+
   // Wat de tijdlijn krijgt: alleen de vinkjes van de dag die je bekijkt.
   // De tijdlijn zoekt zelf op meal.slot, dus die hoeft niets te weten van
   // de opdeling per dag.
@@ -446,6 +507,7 @@ export default function AIDaySchedule({
         <MealTimelineMobile
           meals={displayMeals}
           checkedMeals={checkedMeals}
+          supplementenPerMoment={supplementenPerMoment}
           onMealCheck={handleMealCheck}
           onOpenInfo={onOpenInfo}
           onOpenAlternatives={onOpenAlternatives}
