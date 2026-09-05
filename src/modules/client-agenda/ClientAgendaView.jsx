@@ -8,6 +8,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { Calendar, Utensils, Dumbbell, Moon, Briefcase, Pill, AlertCircle, Plus, Trash2, Check, X, ChevronLeft, ChevronRight, Repeat } from 'lucide-react'
 import { ClientAgendaService, DAYS, DAY_LABELS_NL, DAY_LABELS_NL_LONG, getMondayOf, dateForDay, toIsoDate, recurringIdFor } from './ClientAgendaService'
 import { meldMaaltijdTijd, luisterMaaltijdTijd } from '../meal-plan/utils/mealSync'
+import WeekBudgetPaneel from './WeekBudgetPaneel'
 
 const COLORS = {
   bg: '#0a0a0a',
@@ -2161,6 +2162,18 @@ export default function ClientAgendaView({
             </>
           )}
         </div>
+      )}
+
+      {/* Weekbudget — uitklapbaar. Alleen voor de coach: het is zijn
+          rekenwerk, en een kilo-voorspelling bij de klant neerleggen is een
+          andere beslissing dan deze. */}
+      {!isClient && (
+        <WeekBudgetPaneel
+          db={db}
+          clientId={client?.id}
+          mealPlan={data?.mealPlan}
+          isMobile={isMobile}
+        />
       )}
 
       {/* Dagkiezer — alleen op de telefoon, en alleen als de dag niet van
