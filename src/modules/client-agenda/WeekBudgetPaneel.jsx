@@ -185,7 +185,10 @@ export default function WeekBudgetPaneel({ db, clientId, mealPlan, isMobile }) {
                   // tot de hoogste van beide.
                   const dagTdee = tdee?.tdee || null
                   const hoogste = Math.max(...perDag.dagen.map(x => x.kcal), dagTdee || 0, 1)
-                  const H = 44
+                  // Ruim hoog: het verschil tussen "vult het blok" en
+                  // "blijft eronder" is de hele boodschap, en op 44px zag je
+                  // dat nauwelijks.
+                  const H = 78
 
                   return (
                     <>
@@ -215,10 +218,13 @@ export default function WeekBudgetPaneel({ db, clientId, mealPlan, isMobile }) {
                                   boxSizing: 'border-box',
                                 }} />
                               )}
+                              {/* Even breed als het blok erachter: zo lees je
+                                  het als een gevuld vak, niet als een doosje
+                                  in een doosje. Wat er boven de vulling aan
+                                  stippelrand overblijft, is het tekort. */}
                               <div style={{
-                                position: 'absolute', bottom: 0,
-                                left: '50%', transform: 'translateX(-50%)',
-                                width: '58%', height: hoogte,
+                                position: 'absolute', left: 0, right: 0, bottom: 0,
+                                height: hoogte,
                                 background: d.training ? '#FFD700' : (boven ? '#f59e0b' : 'rgba(255,255,255,0.55)'),
                               }} />
                             </div>
