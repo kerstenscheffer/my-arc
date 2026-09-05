@@ -51,6 +51,16 @@ export default function SupplementPanel({ db, clientId, coachId, clientRecord, t
   const [supplementen, setSupplementen] = useState([])
   const [templates, setTemplates] = useState([])
   const [toevoegenOpen, setToevoegenOpen] = useState(false)
+  // Zelf een supplement maken. Uit app_issues: "in plan analyzer wil ik zelf
+  // ook supplementen toevoegen, bijv pre workout." De lijst kwam alleen uit
+  // supplement_templates, dus wat daar niet in stond kon je niet toewijzen.
+  const [makenOpen, setMakenOpen] = useState(false)
+  const [nieuw, setNieuw] = useState({
+    name: '', emoji: '💊', category: 'performance', priority_level: 'optional',
+    amount: '1', unit: 'scoop', wanneer: 'maaltijd:pre_workout',
+    vasteTijd: '07:00', instructions: '',
+  })
+  const [maakBezig, setMaakBezig] = useState(false)
   const [bezig, setBezig] = useState(false)
   const [vuil, setVuil] = useState(false)
   const [fout, setFout] = useState(null)
@@ -98,6 +108,76 @@ export default function SupplementPanel({ db, clientId, coachId, clientRecord, t
   const verwijder = (index) => {
     setVuil(true)
     setSupplementen(v => v.filter((_, i) => i !== index))
+  }
+
+  // Keuze uit de dropdown omzetten naar het timing-object.
+  //
+  // supplementSchedule leest de tijd in drie stappen: specific_time hard,
+  // dan meal_reference (schuift mee als de coach die maaltijd verzet), dan
+  // time_of_day als grove terugval. Vandaar deze drie vormen.
+  //
+  // Let op: 'pre_workout' bestaat alleen als meal_reference, niet als
+  // time_of_day — die terugval kent alleen ochtend/middag/avond/nacht. Als
+  // pre-workout daar terecht was gekomen, kreeg het supplement geen tijd en
+  // verscheen het nergens op de tijdlijn.
+  const bouwTiming = (n) => {
+    const [soort, waarde] = String(n.wanneer || '').split(':')
+    if (soort === 'maaltijd') {
+      return { time_of_day: null, with_meal: true, specific_time: null, meal_reference: waarde, notes: null }
+    }
+    if (soort === 'vast') {
+      return { time_of_day: null, with_meal: false, specific_time: n.vasteTijd || '07:00', meal_reference: null, notes: null }
+    }
+    return { time_of_day: waarde || 'morning', with_meal: false, specific_time: null, meal_reference: null, notes: null }
+  }
+
+  // Slug uit de naam: 'Pre Workout Boost' -> 'pre-workout-boost'. Botst hij
+  // met een bestaande, dan komt er een volgnummer achter — supplement_id is
+  // waarop de rest van de code supplementen uit elkaar houdt.
+  const maakSlug = (naam) => {
+    const basis = (naam || '').toLowerCase().trim()
+      .replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'supplement'
+    const bestaand = new Set(templates.map(t => t.supplement_id))
+    if (!bestaand.has(basis)) return basis
+    let n = 2
+    while (bestaand.has(`${basis}-${n}`)) n++
+    return `${basis}-${n}`
+  }
+
+  const bewaarNieuw = async () => {
+    if (maakBezig || nieuw.name.trim().length < 2) return
+    setMaakBezig(true); setFout(null)
+    try {
+      // Alle NOT NULL-kolommen krijgen een waarde. Laat je er één weg, dan
+      // weigert de database de hele rij — niet alleen dat veld.
+      const rij = {
+        supplement_id: maakSlug(nieuw.name),
+        name: nieuw.name.trim(),
+        emoji: nieuw.emoji || '💊',
+        category: nieuw.category,
+        priority_level: nieuw.priority_level,
+        dosage: { amount: String(nieuw.amount || '1'), unit: nieuw.unit, frequency: 'daily' },
+        timing: bouwTiming(nieuw),
+        benefits: [],
+        instructions: nieuw.instructions.trim() || `${nieuw.amount || '1'} ${nieuw.unit} per dag`,
+        active: true,
+      }
+      const { data, error } = await db.supabase
+        .from('supplement_templates').insert([rij]).select('*').single()
+      if (error || !data?.id) throw (error || new Error('geen id teruggegeven'))
+
+      // Meteen in de lijst zodat hij niet pas na herladen bestaat, en direct
+      // toewijzen — dat is waarom je hem maakte.
+      setTemplates(v => [...v, data])
+      setMakenOpen(false)
+      setNieuw(n => ({ ...n, name: '', instructions: '' }))
+      await voegToe(data)
+    } catch (e) {
+      console.error('Supplement maken mislukt:', e)
+      setFout(e.message || 'Supplement maken mislukt')
+    } finally {
+      setMaakBezig(false)
+    }
   }
 
   const voegToe = async (template) => {
@@ -338,13 +418,15 @@ export default function SupplementPanel({ db, clientId, coachId, clientRecord, t
             {/* Toevoegen */}
             <div style={{ padding: m ? '0.6rem 0.7rem' : '0.65rem 0.85rem' }}>
               {!toevoegenOpen ? (
-                <button onClick={() => setToevoegenOpen(true)} disabled={beschikbaar.length === 0} style={{
+                // Niet meer uitschakelen als de lijst op is: zelf maken kan
+                // altijd, en dat is juist waarvoor je hier komt.
+                <button onClick={() => setToevoegenOpen(true)} style={{
                   ...tekstKnop, width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5,
                   padding: '0.6rem', borderRadius: 9,
                   border: '1px dashed rgba(255,255,255,0.15)',
-                  color: beschikbaar.length ? 'rgba(255,255,255,0.6)' : 'rgba(255,255,255,0.2)',
+                  color: 'rgba(255,255,255,0.6)',
                 }}>
-                  <Plus size={14} /> {beschikbaar.length ? 'Supplement toevoegen' : 'Alles al toegevoegd'}
+                  <Plus size={14} /> Supplement toevoegen
                 </button>
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
@@ -366,7 +448,98 @@ export default function SupplementPanel({ db, clientId, coachId, clientRecord, t
                       </span>
                     </button>
                   ))}
-                  <button onClick={() => setToevoegenOpen(false)} style={{ ...tekstKnop, marginTop: 2 }}>
+                  {!makenOpen ? (
+                    <button onClick={() => setMakenOpen(true)} style={{
+                      display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5,
+                      width: '100%', padding: '0.55rem 0.6rem', marginTop: 2,
+                      background: '#fff',
+                      borderTop: 'none', borderBottom: 'none', borderLeft: 'none', borderRight: 'none',
+                      borderRadius: 8, color: '#0a0a0a',
+                      fontSize: '0.78rem', fontWeight: 900, fontFamily: 'inherit', cursor: 'pointer',
+                      touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+                    }}>
+                      <Plus size={14} /> Zelf een supplement maken
+                    </button>
+                  ) : (
+                    <div style={{
+                      display: 'flex', flexDirection: 'column', gap: 6, marginTop: 4,
+                      padding: '0.6rem', borderRadius: 8,
+                      background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.1)',
+                    }}>
+                      <div style={{ display: 'flex', gap: 6 }}>
+                        <input value={nieuw.emoji} onChange={e => setNieuw(n => ({ ...n, emoji: e.target.value.slice(0, 2) }))}
+                          aria-label="Icoon" style={{ ...invoerStijl, width: 46, textAlign: 'center' }} />
+                        <input value={nieuw.name} onChange={e => setNieuw(n => ({ ...n, name: e.target.value }))}
+                          placeholder="Naam, bijv. Pre Workout" style={{ ...invoerStijl, flex: 1 }} />
+                      </div>
+
+                      <div style={{ display: 'flex', gap: 6 }}>
+                        <input value={nieuw.amount} onChange={e => setNieuw(n => ({ ...n, amount: e.target.value }))}
+                          aria-label="Hoeveelheid" style={{ ...invoerStijl, width: 64 }} />
+                        <select value={nieuw.unit} onChange={e => setNieuw(n => ({ ...n, unit: e.target.value }))}
+                          aria-label="Eenheid" style={{ ...invoerStijl, flex: 1 }}>
+                          {['scoop', 'capsule', 'tablet', 'gram', 'mg', 'ml', 'druppels'].map(u => (
+                            <option key={u} value={u} style={{ background: '#1a1a1a' }}>{u}</option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <select value={nieuw.wanneer} onChange={e => setNieuw(n => ({ ...n, wanneer: e.target.value }))}
+                        aria-label="Wanneer" style={invoerStijl}>
+                        <optgroup label="Bij een maaltijd — schuift mee">
+                          <option value="maaltijd:pre_workout" style={{ background: '#1a1a1a' }}>Bij de pre-workout</option>
+                          <option value="maaltijd:breakfast" style={{ background: '#1a1a1a' }}>Bij het ontbijt</option>
+                          <option value="maaltijd:lunch" style={{ background: '#1a1a1a' }}>Bij de lunch</option>
+                          <option value="maaltijd:dinner" style={{ background: '#1a1a1a' }}>Bij het diner</option>
+                        </optgroup>
+                        <optgroup label="Grof moment">
+                          <option value="dagdeel:morning" style={{ background: '#1a1a1a' }}>Ochtend</option>
+                          <option value="dagdeel:afternoon" style={{ background: '#1a1a1a' }}>Middag</option>
+                          <option value="dagdeel:evening" style={{ background: '#1a1a1a' }}>Avond</option>
+                          <option value="dagdeel:before_bed" style={{ background: '#1a1a1a' }}>Voor het slapen</option>
+                        </optgroup>
+                        <optgroup label="Vaste tijd">
+                          <option value="vast:klok" style={{ background: '#1a1a1a' }}>Op een vast tijdstip…</option>
+                        </optgroup>
+                      </select>
+
+                      {nieuw.wanneer.startsWith('vast:') && (
+                        <input type="time" value={nieuw.vasteTijd}
+                          onChange={e => setNieuw(n => ({ ...n, vasteTijd: e.target.value }))}
+                          aria-label="Tijdstip" style={invoerStijl} />
+                      )}
+
+                      <select value={nieuw.category} onChange={e => setNieuw(n => ({ ...n, category: e.target.value }))}
+                        aria-label="Categorie" style={invoerStijl}>
+                        {[['performance', 'Prestatie'], ['recovery', 'Herstel'], ['health', 'Gezondheid'],
+                          ['hormones', 'Hormonen'], ['convenience', 'Gemak']].map(([w, l]) => (
+                          <option key={w} value={w} style={{ background: '#1a1a1a' }}>{l}</option>
+                        ))}
+                      </select>
+
+                      <input value={nieuw.instructions} onChange={e => setNieuw(n => ({ ...n, instructions: e.target.value }))}
+                        placeholder="Instructie (optioneel)" style={invoerStijl} />
+
+                      <div style={{ display: 'flex', gap: 6 }}>
+                        <button onClick={() => setMakenOpen(false)} style={{ ...tekstKnop, flex: 1 }}>
+                          Terug
+                        </button>
+                        <button onClick={bewaarNieuw} disabled={maakBezig || nieuw.name.trim().length < 2} style={{
+                          flex: 2, padding: '0.55rem',
+                          background: nieuw.name.trim().length >= 2 ? '#fff' : 'rgba(255,255,255,0.08)',
+                          borderTop: 'none', borderBottom: 'none', borderLeft: 'none', borderRight: 'none',
+                          borderRadius: 8,
+                          color: nieuw.name.trim().length >= 2 ? '#0a0a0a' : 'rgba(255,255,255,0.3)',
+                          fontSize: '0.78rem', fontWeight: 900, fontFamily: 'inherit',
+                          cursor: maakBezig ? 'default' : 'pointer',
+                        }}>
+                          {maakBezig ? 'Opslaan…' : 'Maken en toewijzen'}
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  <button onClick={() => { setToevoegenOpen(false); setMakenOpen(false) }} style={{ ...tekstKnop, marginTop: 2 }}>
                     Annuleren
                   </button>
                 </div>
@@ -414,6 +587,15 @@ const primaireKnop = {
   background: '#fff', border: '1px solid #fff', color: '#000',
   fontSize: '0.85rem', fontWeight: 900, fontFamily: 'inherit', cursor: 'pointer',
   touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+}
+
+const invoerStijl = {
+  padding: '0.5rem 0.55rem',
+  background: 'rgba(255,255,255,0.05)',
+  border: '1px solid rgba(255,255,255,0.12)',
+  borderRadius: 6,
+  color: '#fff', fontSize: '0.8rem', fontWeight: 700,
+  fontFamily: 'inherit', outline: 'none', minWidth: 0,
 }
 
 const tekstKnop = {
