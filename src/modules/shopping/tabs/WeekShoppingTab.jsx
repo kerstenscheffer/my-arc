@@ -96,6 +96,13 @@ try {
   }
 }
 
+// De sleutels in het meal-plan zijn Engels; op het scherm hoort Nederlands.
+// Zonder deze omzetting stond er "Boodschappenlijst — monday".
+const DAG_NL = {
+  monday: 'Maandag', tuesday: 'Dinsdag', wednesday: 'Woensdag', thursday: 'Donderdag',
+  friday: 'Vrijdag', saturday: 'Zaterdag', sunday: 'Zondag',
+}
+
 export default function WeekShoppingTab({ shoppingData, service, client, onRefresh, db }) {
   const isMobile = window.innerWidth <= 768
 
@@ -348,26 +355,31 @@ export default function WeekShoppingTab({ shoppingData, service, client, onRefre
     return grouped
   }
 
-  const calculateStats = () => {
-    const items = shoppingData?.shoppingList?.items || []
-    const visibleItems = items.filter(item => !deletedItems.includes(item.id))
-    const totalItems = visibleItems.length
-    const checkedCount = Object.keys(checkedItems).filter(id =>
-      checkedItems[id] && !deletedItems.includes(id)
-    ).length
-    const totalCost = visibleItems.reduce((sum, item) => {
-      const amount = editedAmounts[item.id] !== undefined
-        ? editedAmounts[item.id]
-        : (item.displayAmount || item.totalAmount) * weekMultiplier
-      const originalAmount = item.displayAmount || item.totalAmount
-      const costPerUnit = (item.estimatedCost || 0) / originalAmount
-      return sum + (amount * costPerUnit)
-    }, 0)
+  // De cijfers boven de lijst tellen precies wat eronder staat.
+  //
+  // Ze werden hiervoor uit de volle weeklijst gehaald, ongeacht de gekozen
+  // dag: kies je zondag, dan bleef er "42 items · €78" staan terwijl er zes
+  // regels onder stonden. Alleen het aantal categorieën klopte, want dat
+  // ene getal las de gegroepeerde lijst al.
+  //
+  // Nu komt alles uit die gegroepeerde lijst. Dat lost meteen twee dingen
+  // op die uit dezelfde oorzaak kwamen: eigen toegevoegde items telden
+  // helemaal niet mee (die zitten niet in shoppingList.items), en de kosten
+  // werden opnieuw uitgerekend terwijl de dag-verhouding en het aantal weken
+  // er al in verwerkt zaten.
+  const calculateStats = (grouped) => {
+    const zichtbaar = Object.values(grouped || {})
+      .flat()
+      .filter(item => !deletedItems.includes(item.id))
+
+    const totalItems = zichtbaar.length
+    const checkedCount = zichtbaar.filter(item => checkedItems[item.id]).length
+    const totalCost = zichtbaar.reduce((sum, item) => sum + (Number(item.estimatedCost) || 0), 0)
     const progress = totalItems > 0 ? Math.round((checkedCount / totalItems) * 100) : 0
-    const groupedItems = getGroupedItems()
-    const categoriesCount = Object.keys(groupedItems).filter(cat =>
-      groupedItems[cat].some(item => !deletedItems.includes(item.id))
+    const categoriesCount = Object.keys(grouped || {}).filter(cat =>
+      grouped[cat].some(item => !deletedItems.includes(item.id))
     ).length
+
     return { totalItems, checkedCount, totalCost, progress, categoriesCount }
   }
 
@@ -406,7 +418,7 @@ export default function WeekShoppingTab({ shoppingData, service, client, onRefre
   }
 
   const groupedItems = getGroupedItems()
-  const stats = calculateStats()
+  const stats = calculateStats(groupedItems)
 
   // ── EMPTY STATE — clean workout-page-style ──
   if (!shoppingData?.shoppingList?.items?.length) {
@@ -447,7 +459,7 @@ export default function WeekShoppingTab({ shoppingData, service, client, onRefre
   }
 
   const listLabel = selectedDay
-    ? `Boodschappenlijst — ${selectedDay}`
+    ? `Boodschappenlijst — ${DAG_NL[selectedDay] || selectedDay}`
     : weekMultiplier === 1
       ? 'Boodschappenlijst'
       : `Boodschappenlijst — ${weekMultiplier} weken`
