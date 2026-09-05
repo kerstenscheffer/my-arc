@@ -33,18 +33,29 @@ export default function HorizontalTimeline({
   const mode = viewMode || '3weeks'
 
   // ========== BUILD COLUMNS ==========
+  //
+  // Het middelpunt van het venster ligt altijd binnen het traject.
+  //
+  // Zonder die grens liep het mis bij elk traject dat over zijn einddatum
+  // heen is — en dat zijn de meeste: bij een klant in week 28 van een plan
+  // van 12 weken werd het venster week 27 tot en met week 12, dus liep de
+  // lus hieronder nul keer en kwam er een lege lijst uit. ProgressArrow
+  // pakt dan columns[0], en dat bestaat niet: "Cannot read properties of
+  // undefined (reading 'type')", en de hele tijdlijn viel om.
+  //
+  // Een afgelopen traject toon je aan het eind, niet leeg.
+  const midden = Math.min(Math.max(1, selectedWeek || currentWeek || 1), Math.max(1, totalWeeks))
+
   const columns = useMemo(() => {
     if (mode === 'full') {
       return Array.from({ length: totalWeeks + 1 }, (_, i) => ({ week: i, day: null, type: 'week' }))
     }
     if (mode === '1week') {
-      const w = selectedWeek || currentWeek
-      return Array.from({ length: 7 }, (_, d) => ({ week: w, day: d, type: 'day' }))
+      return Array.from({ length: 7 }, (_, d) => ({ week: midden, day: d, type: 'day' }))
     }
     // 3weeks
-    const center = selectedWeek || currentWeek
-    const wStart = Math.max(1, center - 1)
-    const wEnd = Math.min(totalWeeks, center + 2)
+    const wStart = Math.max(1, midden - 1)
+    const wEnd = Math.min(totalWeeks, midden + 2)
     const cols = []
     for (let w = wStart; w <= wEnd; w++) {
       for (let d = 0; d < 7; d++) {
@@ -52,7 +63,7 @@ export default function HorizontalTimeline({
       }
     }
     return cols
-  }, [mode, totalWeeks, selectedWeek, currentWeek])
+  }, [mode, totalWeeks, midden])
 
   // ========== ACTIONS AT COLUMN ==========
   const actionsAt = (catKey, col) => {
@@ -351,6 +362,10 @@ function ConnRow({ columns, colW, h, topCat, botCat, actionsAt, alwaysBot }) {
 // PROGRESS ARROW
 // ============================================
 function ProgressArrow({ columns, colW, isCurrent, isPast, isMobile }) {
+  // Vangrail. De oorzaak van de lege lijst is hierboven weggenomen, maar een
+  // pijl die nergens naar wijst hoort geen witte pagina op te leveren.
+  if (!columns?.length) return null
+
   let currentIdx = columns.findIndex(c => isCurrent(c))
   if (currentIdx === -1) currentIdx = columns.filter(c => isPast(c)).length - 1
   if (currentIdx < 0) currentIdx = 0
