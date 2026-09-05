@@ -365,6 +365,11 @@ export default function DMBibleModal({
   // but filtered by category_id. The default Mijn berichten is category_id
   // = null so legacy notes stay visible.
   const [myDraft, setMyDraft] = useState('')
+  // Titel bij een bericht. Gaat naar de bestaande tag-kolom, dezelfde die de
+  // ingebouwde scripts gebruiken ("Follow-back", "Compliment 1A") en die al
+  // wordt getoond en doorzocht. Geen nieuwe kolom nodig dus.
+  const [myTitel, setMyTitel] = useState('')
+  const [editingNoteTag, setEditingNoteTag] = useState('')
   const [myNotes, setMyNotes] = useState([])         // ALL notes (every cat)
   const [customCategories, setCustomCategories] = useState([])
   const [hiddenBuiltins, setHiddenBuiltins] = useState(new Set())
@@ -401,13 +406,14 @@ export default function DMBibleModal({
     if (!editingNoteId || !db?.supabase) return
     const text = editingNoteText.trim()
     if (!text) return
+    const tag = editingNoteTag.trim() || null
     const prev = myNotes
-    setMyNotes(p => p.map(n => n.id === editingNoteId ? { ...n, text } : n))
-    setEditingNoteId(null); setEditingNoteText('')
+    setMyNotes(p => p.map(n => n.id === editingNoteId ? { ...n, text, tag } : n))
+    setEditingNoteId(null); setEditingNoteText(''); setEditingNoteTag('')
     try {
       const { error } = await db.supabase
         .from('dm_user_messages')
-        .update({ text, updated_at: new Date().toISOString() })
+        .update({ text, tag, updated_at: new Date().toISOString() })
         .eq('id', editingNoteId)
       if (error) throw error
     } catch (e) {
@@ -489,6 +495,7 @@ export default function DMBibleModal({
         coach_id: coachId,
         scope,                                    // leads of coach
         text,
+        tag: myTitel.trim() || null,
         category_id: activeCustomCatId,           // for user-made custom tabs
         builtin_category: activeBuiltinId,        // for the seeded built-in tabs
       }
@@ -499,6 +506,7 @@ export default function DMBibleModal({
       // (chronological — matches the seeded order).
       setMyNotes(prev => [...prev, data])
       setMyDraft('')
+      setMyTitel('')
     } catch (e) {
       console.error('save dm note failed:', e)
       alert('Opslaan mislukt — ' + (e?.message || e))
@@ -508,9 +516,10 @@ export default function DMBibleModal({
   }
 
   const handleClearDraft = () => {
-    if (!myDraft.trim()) return
+    if (!myDraft.trim() && !myTitel.trim()) return
     if (window.confirm('Veld leegmaken? De huidige tekst gaat verloren.')) {
       setMyDraft('')
+      setMyTitel('')
     }
   }
 
@@ -1148,6 +1157,22 @@ export default function DMBibleModal({
                   </span>
                 </div>
 
+                <input
+                  value={myTitel}
+                  onChange={(e) => setMyTitel(e.target.value)}
+                  placeholder="Titel (optioneel)"
+                  maxLength={60}
+                  style={{
+                    width: '100%', boxSizing: 'border-box',
+                    padding: '0.45rem 0.7rem', marginBottom: 6,
+                    background: 'rgba(255,255,255,0.04)',
+                    border: `1px solid ${GOLD.border}`,
+                    borderRadius: 8,
+                    color: '#fff', fontSize: '0.78rem', fontWeight: 800,
+                    fontFamily: 'inherit', outline: 'none',
+                  }}
+                />
+
                 <textarea
                   value={myDraft}
                   onChange={(e) => setMyDraft(e.target.value)}
@@ -1292,6 +1317,27 @@ export default function DMBibleModal({
                                   fontFamily: 'inherit', resize: 'vertical', outline: 'none',
                                 }}
                               />
+                            ) : null}
+
+                            {/* Titel meebewerken. Zonder dit zat je aan de
+                                titel vast zodra je 'm eenmaal had gezet. */}
+                            {isEditing ? (
+                              <input
+                                value={editingNoteTag}
+                                onChange={(e) => setEditingNoteTag(e.target.value)}
+                                onClick={(e) => e.stopPropagation()}
+                                placeholder="Titel (optioneel)"
+                                maxLength={60}
+                                style={{
+                                  width: '100%', boxSizing: 'border-box',
+                                  padding: '0.35rem 0.55rem', marginTop: 4,
+                                  background: 'rgba(255,255,255,0.04)',
+                                  border: '1px solid rgba(255,255,255,0.14)',
+                                  borderRadius: 5,
+                                  color: '#fff', fontSize: '0.75rem', fontWeight: 800,
+                                  fontFamily: 'inherit', outline: 'none',
+                                }}
+                              />
                             ) : (
                               <div style={{
                                 fontSize: isMobile ? '0.8rem' : '0.85rem',
@@ -1315,7 +1361,7 @@ export default function DMBibleModal({
                                   <Check size={11} /> Opslaan
                                 </button>
                                 <button
-                                  onClick={(e) => { e.stopPropagation(); setEditingNoteId(null); setEditingNoteText('') }}
+                                  onClick={(e) => { e.stopPropagation(); setEditingNoteId(null); setEditingNoteText(''); setEditingNoteTag('') }}
                                   style={{
                                     padding: '4px 10px',
                                     background: 'rgba(255,255,255,0.05)',
@@ -1341,7 +1387,7 @@ export default function DMBibleModal({
                                 {isCopied ? <Check size={16} color="#000" /> : <Copy size={14} color="rgba(255,255,255,0.3)" />}
                               </div>
                               <button
-                                onClick={(e) => { e.stopPropagation(); setEditingNoteId(n.id); setEditingNoteText(n.text) }}
+                                onClick={(e) => { e.stopPropagation(); setEditingNoteId(n.id); setEditingNoteText(n.text); setEditingNoteTag(n.tag || '') }}
                                 title="Bewerken"
                                 style={{
                                   height: 26,
