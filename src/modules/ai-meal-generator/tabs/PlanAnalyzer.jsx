@@ -5,6 +5,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react'
 import { BarChart3, FileText, ChevronLeft, ChevronRight, AlertTriangle, Zap, Grid3X3, Calendar, List, Download, MessageSquare, Play, Check, Loader, Clock, RotateCcw, RotateCw, Copy, X, Plus, Repeat, Bookmark, Pill, Users, SlidersHorizontal } from 'lucide-react'
 import DayNavigator, { DAYS } from './plan-analyzer/DayNavigator'
 import DayMacroBar from './plan-analyzer/DayMacroBar'
+import VezelsMicros from './plan-analyzer/VezelsMicros'
 import MealCard from './plan-analyzer/MealCard'
 import SwapModal from './plan-analyzer/SwapModal'
 import MealMakerModal from './plan-analyzer/MealMakerModal'
@@ -1196,6 +1197,17 @@ export default function PlanAnalyzer({
     return totalenMetPreWorkout(basis, teltMee ? preWorkoutMeal : null)
   })()
 
+  // De maaltijden van deze dag als platte lijst, inclusief de losse
+  // pre-workout op trainingsdagen — die zit niet in currentDay.meals maar
+  // telt wel mee, net als bij de kcal.
+  const maaltijdenVanDag = (() => {
+    const uit = Object.values(currentDay?.meals || {}).filter(Boolean)
+    if (preWorkoutMeal && currentDayIsTraining && !currentDay?.meals?.[PRE_WORKOUT_SLOT]) {
+      uit.push(preWorkoutMeal)
+    }
+    return uit
+  })()
+
   const preWorkoutSlot = getPreWorkoutSlot(activeDay)
   const sortedSlots = currentDay ? getSortedSlots(currentDay.meals) : SLOTS
   const warningCount = weekData?.reduce((count, day) => {
@@ -1793,6 +1805,7 @@ export default function PlanAnalyzer({
                 isMobile={m}
                 selectedIsToday={true}
               />
+              <VezelsMicros db={db} maaltijden={maaltijdenVanDag} isMobile={m} />
               {/* ── PRE-WORKOUT ────────────────────────────────────────────
                   Eén maaltijd voor het hele plan, die alleen op trainingsdagen
                   meetelt. Als volwaardige MealCard, zodat je 'm net als elke
