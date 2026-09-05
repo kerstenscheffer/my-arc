@@ -100,33 +100,33 @@ export default function WeekBudgetPaneel({ db, clientId, mealPlan, isMobile }) {
   )
 
   return (
-    <div style={{ flexShrink: 0, marginBottom: '0.4rem' }}>
-      <button onClick={() => setOpen(o => !o)} style={{
-        display: 'flex', alignItems: 'center', gap: 7, width: '100%',
-        padding: isMobile ? '0.5rem 0.6rem' : '0.55rem 0.75rem',
+    // Inline in de werkbalk, met de cijfers als uitklap eronder. Als blok
+    // over de volle breedte kostte dit een hele regel; nu is het een knop
+    // naast de rest en zweeft het paneel over het rooster heen.
+    <div style={{ position: 'relative', flexShrink: 0 }}>
+      <button onClick={() => setOpen(o => !o)} title="Weekbudget en tekort" style={{
+        display: 'inline-flex', alignItems: 'center', gap: 6,
+        padding: '0.35rem 0.6rem',
         background: 'rgba(255,255,255,0.03)',
         borderTop: `1px solid ${rand}`, borderBottom: `1px solid ${rand}`,
         borderLeft: `1px solid ${rand}`, borderRight: `1px solid ${rand}`,
         borderRadius: 0, cursor: 'pointer', fontFamily: 'inherit',
-        color: '#fff', fontSize: '0.78rem', fontWeight: 900,
+        color: '#fff', fontSize: '0.75rem', fontWeight: 900, whiteSpace: 'nowrap',
         touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
       }}>
-        {open ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-        <Flame size={13} style={{ color: '#FFD700' }} />
-        Weekbudget
-        {!open && planWeek != null && (
-          <span style={{ marginLeft: 'auto', fontSize: '0.74rem', fontWeight: 800, color: 'rgba(255,255,255,0.45)' }}>
-            {getal(planWeek)} kcal
-          </span>
-        )}
+        <Flame size={12} style={{ color: '#FFD700' }} />
+        {planWeek != null ? `${getal(planWeek)} kcal` : 'Weekbudget'}
+        {open ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
       </button>
 
       {open && (
         <div style={{
-          padding: isMobile ? '0.4rem 0.6rem 0.6rem' : '0.45rem 0.75rem 0.7rem',
-          borderBottom: `1px solid ${rand}`,
-          borderLeft: `1px solid ${rand}`, borderRight: `1px solid ${rand}`,
-          background: 'rgba(255,255,255,0.015)',
+          position: 'absolute', top: '100%', right: 0, zIndex: 60,
+          width: isMobile ? 'min(88vw, 280px)' : 280,
+          marginTop: 4, padding: '0.5rem 0.7rem 0.7rem',
+          border: `1px solid ${rand}`,
+          background: '#0f0f0f',
+          boxShadow: '0 8px 24px rgba(0,0,0,0.6)',
         }}>
           {planWeek == null ? (
             <div style={{ padding: '0.6rem 0', fontSize: '0.75rem', color: 'rgba(255,255,255,0.4)' }}>

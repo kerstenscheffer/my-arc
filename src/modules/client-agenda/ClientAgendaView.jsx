@@ -1937,12 +1937,15 @@ export default function ClientAgendaView({
       gap: isMobile ? '0.3rem' : '0.4rem',
       height: '100%', overflow: 'hidden',
     }}>
-      {/* Compacte top — alleen week-navigator (titel + legenda zijn weg
-          op gebruikersverzoek voor meer ruimte voor de tijd-grid). */}
+      {/* Eén werkbalk. Week-navigatie, waarschuwingen, snelkeuzes,
+          selecteren en het weekbudget stonden als vijf blokken onder elkaar
+          en aten samen bijna een derde van het scherm op. Ze zijn nu flex-
+          items in dezelfde rij; op een smal scherm mag hij afbreken. */}
       <div style={{
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        gap: 6, flexWrap: 'wrap',
+        display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap',
+        flexShrink: 0,
       }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
         <button
           onClick={() => shiftWeek(-1)}
           title="Vorige week"
@@ -1996,26 +1999,29 @@ export default function ClientAgendaView({
         )}
       </div>
 
-      {/* Empty-state hints */}
+      {/* Ontbrekende gegevens. Stond als blok van drie regels boven de
+          agenda; dat kostte meer hoogte dan het rooster eronder waard was.
+          Nu één icoon met de melding in de tooltip — je ziet dat er iets is,
+          en de tekst is er nog als je hem nodig hebt. */}
       {(!hasMealPlan || !hasSchema) && (
-        <div style={{
-          display: 'flex', gap: '0.5rem',
-          padding: '0.5rem 0.75rem',
-          background: 'rgba(245,158,11,0.08)',
-          border: '1px solid rgba(245,158,11,0.25)',
-          borderRadius: 0,
-          fontSize: '0.72rem',
-          color: 'rgba(255,255,255,0.7)',
-        }}>
-          <AlertCircle size={14} color={COLORS.amber} style={{ flexShrink: 0, marginTop: 1 }} />
-          <div>
-            {!hasMealPlan && <div>Geen actief meal-plan voor deze client — maaltijden ontbreken in de agenda.</div>}
-            {!hasSchema && <div>Geen workout-schema toegewezen — training-dagen worden niet bepaald.</div>}
-            <div style={{ marginTop: 4, color: COLORS.text25, fontStyle: 'italic' }}>
-              Placeholders (transparant) kun je gewoon aanklikken — ze worden bij opslaan een echt blok.
-            </div>
-          </div>
-        </div>
+        <span
+          title={[
+            !hasMealPlan && 'Geen actief meal-plan voor deze client — maaltijden ontbreken in de agenda.',
+            !hasSchema && 'Geen workout-schema toegewezen — training-dagen worden niet bepaald.',
+            'Placeholders (transparant) kun je gewoon aanklikken — ze worden bij opslaan een echt blok.',
+          ].filter(Boolean).join('\n')}
+          style={{
+            display: 'inline-flex', alignItems: 'center', gap: 4, flexShrink: 0,
+            padding: '0.28rem 0.45rem',
+            background: 'rgba(245,158,11,0.1)',
+            border: '1px solid rgba(245,158,11,0.3)',
+            color: COLORS.amber, fontSize: '0.7rem', fontWeight: 800,
+            cursor: 'help',
+          }}
+        >
+          <AlertCircle size={12} />
+          {[!hasMealPlan, !hasSchema].filter(Boolean).length}
+        </span>
       )}
 
       {/* ── Snel inplannen ────────────────────────────────────────────
@@ -2023,7 +2029,7 @@ export default function ClientAgendaView({
           dat werkt slecht op een telefoon en botst met het verzetten van
           bestaande blokken. */}
       {!isClient && !selectieModus && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', padding: '0.4rem 0' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 5, flexWrap: 'wrap' }}>
           {SNELKEUZES.map(k => {
             const aan = teplaatsen?.id === k.id
             return (
@@ -2072,7 +2078,6 @@ export default function ClientAgendaView({
       {!isClient && (
         <div style={{
           display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap',
-          padding: '0.4rem 0',
         }}>
           {!selectieModus ? (
             <button
@@ -2175,6 +2180,7 @@ export default function ClientAgendaView({
           isMobile={isMobile}
         />
       )}
+      </div>
 
       {/* Dagkiezer — alleen op de telefoon, en alleen als de dag niet van
           buitenaf is opgelegd. Toont de datum eronder zodat je niet hoeft te
