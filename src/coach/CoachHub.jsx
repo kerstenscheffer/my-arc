@@ -30,6 +30,7 @@ import MealGuideManager from '../modules/meal-plan/MealGuideManager'
 import SalesSection from '../modules/sales/SalesSection'
 import '../modules/supplements/SupplementPlanService'
 import SupplementsTab from '../modules/supplements/SupplementsTab'
+import DMBibleModal from '../modules/lead-management/components/DMBibleModal'
 import CoachNotificationBell from '../modules/notifications/CoachNotificationBell'
 import PortalSwitchButton from '../components/PortalSwitchButton'
 import IssueNotesWidget from '../components/IssueNotesWidget'
@@ -56,7 +57,7 @@ import {
   Menu, X, ChevronDown, ChevronRight, Dumbbell, Target, Crown, FileText, Columns2,
   Flame, Globe, Save, Zap, DollarSign, Pill, MoreHorizontal, Settings, Calendar,
   Bell, Bug, Lightbulb, AlertCircle, Image as ImageIcon, FlaskConical,
-  Eye, EyeOff, ListTodo, ArrowLeft
+  Eye, EyeOff, ListTodo, ArrowLeft, MessageSquare
 } from 'lucide-react'
 
 // ============================================
@@ -249,6 +250,7 @@ export default function CoachHub() {
   // Intake van een willekeurige klant opzoeken, vanaf elke pagina. Zat eerder
   // alleen achter de klantkaart in Coach Command.
   const [showIntakeLookup, setShowIntakeLookup] = useState(false)
+  const [showBerichten, setShowBerichten] = useState(false)
   // Klantmodus: verbergt de coach-only balken (quick-link sidebar + goals-balk)
   // zodat een klant die meekijkt niet alles ziet. Onthouden in localStorage.
   const [clientMode, setClientMode] = useState(() => {
@@ -1344,12 +1346,28 @@ export default function CoachHub() {
             onClick: () => setWidgetOpen(o => o === 'ideas' ? null : 'ideas'),
           },
           {
-            id: 'problems', label: 'Problemen', Icon: AlertCircle, color: '#fca5a5',
-            active: widgetOpen === 'problems', badge: widgetCounts.problems,
-            onClick: () => setWidgetOpen(o => o === 'problems' ? null : 'problems'),
+            // "Problemen" stond hier en werd niet gebruikt. Daarvoor in de
+            // plaats: snelle berichten aan klanten. Zelfde scherm als het
+            // DM-kopieercentrum bij de leads, maar met een eigen voorraad —
+            // een lead-openingszin hoort niet tussen je klantberichten.
+            id: 'berichten', label: 'Berichten', Icon: MessageSquare, color: '#7dd3fc',
+            active: showBerichten,
+            onClick: () => setShowBerichten(true),
           },
         ]}
       />}
+
+      {showBerichten && (
+        <DMBibleModal
+          db={db}
+          coachId={user?.id}
+          isMobile={isMobile}
+          scope="coach"
+          titel="Snelle berichten"
+          open={showBerichten}
+          onClose={() => setShowBerichten(false)}
+        />
+      )}
 
       {showIntakeLookup && (
         <IntakeLookupModal

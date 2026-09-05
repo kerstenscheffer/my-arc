@@ -7,15 +7,18 @@ import { createPortal } from 'react-dom'
 import { useModalHost } from '../../../coach/ModalHost'
 import { Flame, X, Copy, Check, GripHorizontal, Trash2, Plus, Eraser, Pencil, EyeOff, Eye, FolderPlus, MessageSquare } from 'lucide-react'
 
-// GOLD THEME
+// Wit en rustig. De naam GOLD is blijven staan omdat hij op ruim dertig
+// plekken in dit bestand wordt gebruikt; hem hernoemen levert alleen ruis op
+// in de vergelijking. Wat telt is wat eruit komt: vet wit voor wat actief is,
+// dof wit voor de rest, en geen accentkleuren die om aandacht vragen.
 const GOLD = {
-  primary: '#D4AF37',
-  light: '#FFD700',
-  dark: '#B8860B',
-  glow: 'rgba(212, 175, 55, 0.4)',
-  border: 'rgba(212, 175, 55, 0.3)',
-  bg: 'rgba(212, 175, 55, 0.08)',
-  bgStrong: 'rgba(212, 175, 55, 0.15)'
+  primary: '#ffffff',
+  light: '#ffffff',
+  dark: 'rgba(255,255,255,0.55)',
+  glow: 'rgba(255,255,255,0.18)',
+  border: 'rgba(255,255,255,0.14)',
+  bg: 'rgba(255,255,255,0.06)',
+  bgStrong: 'rgba(255,255,255,0.12)'
 }
 
 // ===== ALL MESSAGES =====
@@ -328,10 +331,31 @@ const iconBtn = (color) => ({
   color, cursor: 'pointer', touchAction: 'manipulation',
 })
 
-export default function DMBibleModal({ isMobile = false, db = null, coachId = null, triggerVariant = 'fab' }) {
+export default function DMBibleModal({
+  isMobile = false, db = null, coachId = null, triggerVariant = 'fab',
+  // Bereik van de bibliotheek. 'leads' is het kopieercentrum bij de leads,
+  // met de ingebouwde scripts. 'coach' zijn de snelle berichten aan klanten:
+  // dezelfde werking, maar zonder die scripts en met een eigen voorraad.
+  scope = 'leads',
+  titel = null,
+  // Van buitenaf openen (de knop in de zijbalk van CoachHub). Zonder deze
+  // twee gedraagt het scherm zich als vanouds met zijn eigen knop.
+  open: openVanBuiten = null,
+  onClose: onCloseVanBuiten = null,
+}) {
   const modalHost = useModalHost()
-  const [isOpen, setIsOpen] = useState(false)
-  const [activeCategory, setActiveCategory] = useState('eerste-dikker')
+  const [isOpenIntern, setIsOpenIntern] = useState(false)
+  const extern = openVanBuiten !== null
+  const isOpen = extern ? openVanBuiten : isOpenIntern
+  const setIsOpen = (waarde) => {
+    if (extern) { if (!waarde) onCloseVanBuiten?.() }
+    else setIsOpenIntern(waarde)
+  }
+
+  // Zonder ingebouwde scripts is er geen vaste eerste tab; dan start je op
+  // je eigen categorieën.
+  const INGEBOUWD = scope === 'leads' ? CATEGORIES : []
+  const [activeCategory, setActiveCategory] = useState(scope === 'leads' ? 'eerste-dikker' : null)
   const [copiedIndex, setCopiedIndex] = useState(null)
   const [searchTerm, setSearchTerm] = useState('')
 
@@ -358,7 +382,7 @@ export default function DMBibleModal({ isMobile = false, db = null, coachId = nu
   //   uuid-string  → category_id = that uuid (custom tab)
   //   built-in id  → builtin_category = that id (DB-backed since seeding)
   const activeCustomCatId = customCategories.find(c => c.id === activeCategory)?.id || null
-  const activeBuiltinId = CATEGORIES.find(c => c.id === activeCategory)?.id || null
+  const activeBuiltinId = INGEBOUWD.find(c => c.id === activeCategory)?.id || null
   // All tabs are now DB-backed and editable, so every tab gets the writer UI.
   const isUserNotesTab = true
 
@@ -396,6 +420,9 @@ export default function DMBibleModal({ isMobile = false, db = null, coachId = nu
   // hardcoded CATEGORIES into the DB. After this, the user owns and can
   // edit/delete/add to every built-in tab.
   const seedBuiltinsIfNeeded = useCallback(async () => {
+    // Alleen het lead-bereik heeft ingebouwde scripts om te zaaien. De snelle
+    // berichten beginnen leeg; die vult de coach zelf.
+    if (scope !== 'leads') return false
     if (!db?.supabase || !coachId) return false
     const { count } = await db.supabase
       .from('dm_user_messages')
@@ -404,10 +431,11 @@ export default function DMBibleModal({ isMobile = false, db = null, coachId = nu
       .not('builtin_category', 'is', null)
     if ((count || 0) > 0) return false
     const rows = []
-    CATEGORIES.forEach(cat => {
+    INGEBOUWD.forEach(cat => {
       cat.messages.forEach(m => {
         rows.push({
           coach_id: coachId,
+          scope: 'leads',   // seeding bestaat alleen voor het lead-bereik
           builtin_category: cat.id,
           tag: m.tag || null,
           text: m.text,
@@ -428,10 +456,10 @@ export default function DMBibleModal({ isMobile = false, db = null, coachId = nu
       await seedBuiltinsIfNeeded()
       const [{ data: notes }, { data: cats }, { data: hidden }] = await Promise.all([
         db.supabase.from('dm_user_messages')
-          .select('*').eq('coach_id', coachId).is('deleted_at', null)
+          .select('*').eq('coach_id', coachId).eq('scope', scope).is('deleted_at', null)
           .order('created_at', { ascending: true }).limit(1000),
         db.supabase.from('dm_categories')
-          .select('*').eq('coach_id', coachId).is('deleted_at', null)
+          .select('*').eq('coach_id', coachId).eq('scope', scope).is('deleted_at', null)
           .order('position', { ascending: true }).order('created_at', { ascending: true }),
         db.supabase.from('dm_hidden_builtins')
           .select('builtin_id').eq('coach_id', coachId),
@@ -459,6 +487,7 @@ export default function DMBibleModal({ isMobile = false, db = null, coachId = nu
     try {
       const payload = {
         coach_id: coachId,
+        scope,                                    // leads of coach
         text,
         category_id: activeCustomCatId,           // for user-made custom tabs
         builtin_category: activeBuiltinId,        // for the seeded built-in tabs
@@ -509,7 +538,7 @@ export default function DMBibleModal({ isMobile = false, db = null, coachId = nu
     try {
       const { data, error } = await db.supabase
         .from('dm_categories')
-        .insert({ coach_id: coachId, name, position: customCategories.length })
+        .insert({ coach_id: coachId, scope, name, position: customCategories.length })
         .select().single()
       if (error) throw error
       setCustomCategories(prev => [...prev, data])
@@ -596,7 +625,7 @@ export default function DMBibleModal({ isMobile = false, db = null, coachId = nu
     setTimeout(() => setCopiedIndex(null), 1500)
   }
 
-  const currentCategory = CATEGORIES.find(c => c.id === activeCategory)
+  const currentCategory = INGEBOUWD.find(c => c.id === activeCategory)
 
   // Search now runs against the DB-backed notes so user edits + additions
   // are searchable. Maps back to {text, tag, category, color} shape that
@@ -609,7 +638,7 @@ export default function DMBibleModal({ isMobile = false, db = null, coachId = nu
                  (n.tag  || '').toLowerCase().includes(q)
         })
         .map(n => {
-          const builtin = n.builtin_category ? CATEGORIES.find(c => c.id === n.builtin_category) : null
+          const builtin = n.builtin_category ? INGEBOUWD.find(c => c.id === n.builtin_category) : null
           const custom = n.category_id ? customCategories.find(c => c.id === n.category_id) : null
           return {
             id: n.id,
@@ -781,7 +810,6 @@ export default function DMBibleModal({ isMobile = false, db = null, coachId = nu
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
             {!isMobile && <GripHorizontal size={13} color="rgba(255,255,255,0.35)" />}
-            <Flame size={22} color={GOLD.light} />
             <div>
               <h2 style={{
                 fontSize: isMobile ? '0.95rem' : '1.1rem',
@@ -789,11 +817,8 @@ export default function DMBibleModal({ isMobile = false, db = null, coachId = nu
                 color: GOLD.light,
                 margin: 0,
               }}>
-                DM COPY CENTER
+                {titel || 'DM Copy Center'}
               </h2>
-              <p style={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.4)', margin: 0 }}>
-                Klik om te kopiëren → Plak in DM
-              </p>
             </div>
           </div>
           <button
@@ -1026,7 +1051,7 @@ export default function DMBibleModal({ isMobile = false, db = null, coachId = nu
               margin: '0.4rem 0.25rem',
             }} />
 
-            {CATEGORIES.filter(cat => showHidden || !hiddenBuiltins.has(cat.id)).map(cat => {
+            {INGEBOUWD.filter(cat => showHidden || !hiddenBuiltins.has(cat.id)).map(cat => {
               const isActive = activeCategory === cat.id && !searchTerm
               const isHidden = hiddenBuiltins.has(cat.id)
               return (
@@ -1102,7 +1127,7 @@ export default function DMBibleModal({ isMobile = false, db = null, coachId = nu
                 so every tab supports add/edit/delete with the same UI. */}
             {!searchTerm && isUserNotesTab && (() => {
               const activeCustom = customCategories.find(c => c.id === activeCategory)
-              const activeBuiltin = CATEGORIES.find(c => c.id === activeCategory)
+              const activeBuiltin = INGEBOUWD.find(c => c.id === activeCategory)
               const tabLabel = activeBuiltin?.label || activeCustom?.name || 'Mijn berichten'
               const tabColor = activeBuiltin?.color || activeCustom?.color || GOLD.light
               return (
@@ -1126,12 +1151,24 @@ export default function DMBibleModal({ isMobile = false, db = null, coachId = nu
                 <textarea
                   value={myDraft}
                   onChange={(e) => setMyDraft(e.target.value)}
-                  placeholder="Schrijf hier je doordachte bericht. Sla 'm op om 'm later opnieuw te gebruiken (klik in de lijst hieronder om te kopiëren)."
-                  rows={isMobile ? 5 : 7}
+                  placeholder="Nieuw bericht…"
+                  rows={1}
+                  // Klein beginnen en meegroeien met de tekst. Vaste vijf tot
+                  // zeven regels namen ruimte in die de berichtenlijst
+                  // eronder harder nodig heeft — ook als je maar één zin
+                  // typt. Bovengrens zodat een lang bericht de lijst niet
+                  // alsnog wegdrukt; daarna scrollt het veld zelf.
+                  onInput={(e) => {
+                    const el = e.target
+                    el.style.height = 'auto'
+                    el.style.height = Math.min(el.scrollHeight, isMobile ? 160 : 220) + 'px'
+                  }}
                   style={{
                     width: '100%', boxSizing: 'border-box',
-                    padding: '0.7rem 0.85rem',
-                    background: 'rgba(0,0,0,0.4)',
+                    padding: '0.55rem 0.7rem',
+                    minHeight: 38, maxHeight: isMobile ? 160 : 220,
+                    resize: 'none', overflowY: 'auto',
+                    background: 'rgba(255,255,255,0.04)',
                     border: `1px solid ${GOLD.border}`,
                     borderRadius: 8,
                     color: '#fff',
@@ -1270,8 +1307,8 @@ export default function DMBibleModal({ isMobile = false, db = null, coachId = nu
                                   onClick={(e) => { e.stopPropagation(); handleSaveEdit() }}
                                   style={{
                                     padding: '4px 10px',
-                                    background: '#10b981', border: 'none', borderRadius: 4,
-                                    color: '#fff', fontSize: '0.7rem', fontWeight: 800,
+                                    background: '#fff', border: 'none', borderRadius: 4,
+                                    color: '#0a0a0a', fontSize: '0.7rem', fontWeight: 800,
                                     cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4,
                                   }}
                                 >
