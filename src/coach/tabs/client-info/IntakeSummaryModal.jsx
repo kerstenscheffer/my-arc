@@ -34,6 +34,15 @@ const MAPS = {
     moderately_active: 'Matig actief',
     very_active: 'Zeer actief'
   },
+  // De zin erachter is precies wat de klant in de intake koos. Alleen
+  // "6.000 – 8.000" tonen laat de coach zelf invullen wat dat betekent,
+  // en juist die duiding is waarom de vraag zo gesteld is.
+  daily_steps: {
+    '4000_6000': '4.000 – 6.000 · zit veel',
+    '6000_8000': '6.000 – 8.000 · loopt regelmatig, zit ook veel',
+    '8000_10000': '8.000 – 10.000 · loopt meer dan hij zit',
+    '10000_plus': '10.000+ · loopt de hele dag door',
+  },
   coaching_style: {
     direct: 'Direct',
     motivating: 'Motiverend',
@@ -300,6 +309,7 @@ const PART1_SECTIONS = [
     title: 'Levensstijl',
     fields: [
       { key: 'activity_level', label: 'Activiteitsniveau', fmt: fmtMap(MAPS.activity_level) },
+      { key: 'daily_steps', label: 'Stappen per dag', fmt: fmtMap(MAPS.daily_steps) },
       { key: 'preferred_training_days', label: 'Trainingsdagen', fmt: fmtArr(MAPS.days) },
       { key: 'training_time', label: 'Trainingstijd' },
       { key: 'sleep_hours', label: 'Slaap', fmt: fmtNum('uur') },
@@ -489,6 +499,7 @@ const VRAGEN = {
   goal_urgency: 'Hoe belangrijk is dit doel voor je?',
   motivation: 'Waarom wil je dit bereiken?',
   activity_level: 'Hoe actief ben je op dit moment?',
+  daily_steps: 'Hoeveel stappen zet je gemiddeld op een dag?',
   cooking_time: 'Hoeveel tijd wil je kwijt aan koken?',
   stress_level: 'Hoeveel stress heb je op dit moment?',
   medical_conditions: 'Heb je medische aandoeningen?',

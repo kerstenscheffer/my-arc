@@ -263,6 +263,7 @@ export default function PublicIntakePage() {
           primary_goal: personalData.primary_goal || null,
           motivation: personalData.motivation || null,
           activity_level: personalData.activity_level || null,
+          daily_steps: personalData.daily_steps || null,
           sleep_hours: personalData.sleep_hours ? parseFloat(personalData.sleep_hours) : null,
           stress_level: personalData.stress_level ? parseFloat(personalData.stress_level) : null,
           coaching_style_pref: personalData.coaching_style_pref || null,
@@ -349,6 +350,7 @@ export default function PublicIntakePage() {
       primary_goal: data.primary_goal,
       motivation: data.motivation,
       activity_level: data.activity_level,
+      daily_steps: data.daily_steps,
       cooking_time: data.cooking_time,
       preferred_training_days: data.preferred_training_days,
       coaching_style_pref: data.coaching_style_pref,
@@ -385,6 +387,7 @@ export default function PublicIntakePage() {
         current_body_fat_2: data.current_body_fat_2 ? parseFloat(data.current_body_fat_2) : null,
         target_body_fat: data.target_body_fat ? parseFloat(data.target_body_fat) : null,
         activity_level: data.activity_level || null,
+        daily_steps: data.daily_steps || null,
         work_schedule: data.week_schedule || null,
         // Het antwoord op "Wat voor werk doe je?" ontbrak in deze mapping,
         // waardoor clients.job_type leeg bleef terwijl de klant het wél had

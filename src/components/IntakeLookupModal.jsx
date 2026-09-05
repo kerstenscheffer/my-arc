@@ -42,6 +42,21 @@ export default function IntakeLookupModal({ db, isMobile, onClose, clients: clie
     return () => { afgebroken = true }
   }, [db, clientsProp])
 
+  // De lijst haalt bewust een smalle selectie op — je toont alleen naam en
+  // e-mail. Maar de intake-weergave leest álle velden van het doorgegeven
+  // object, dus met die smalle rij bleef zo goed als het hele overzicht leeg.
+  // Bij het kiezen halen we daarom eerst de volledige rij op.
+  const kiesKlant = async (c) => {
+    setGekozen(c)   // meteen openen, niet wachten op het netwerk
+    try {
+      const { data } = await db.supabase
+        .from('clients').select('*').eq('id', c.id).maybeSingle()
+      if (data) setGekozen(data)
+    } catch (e) {
+      console.warn('Volledige klantgegevens laden mislukt:', e?.message)
+    }
+  }
+
   const gefilterd = useMemo(() => {
     const q = zoek.trim().toLowerCase()
     const lijst = clients.filter(c => (c.status || 'active') !== 'deleted')
@@ -144,7 +159,7 @@ export default function IntakeLookupModal({ db, isMobile, onClose, clients: clie
             return (
               <button
                 key={c.id}
-                onClick={() => setGekozen(c)}
+                onClick={() => kiesKlant(c)}
                 style={{
                   width: '100%', display: 'flex', alignItems: 'center', gap: 10,
                   padding: '0.7rem 1rem',

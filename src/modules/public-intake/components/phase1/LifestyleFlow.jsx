@@ -23,6 +23,7 @@ export default function LifestyleFlow({ data, onChange, onNext, onBack, isMobile
     if (!data.stress_level) update('stress_level', 5)
     console.log('✅ SECTIE 4 (Levensstijl) klaar:', {
       activiteit: data.activity_level,
+      stappen: data.daily_steps,
       kooktijd: data.cooking_time,
       stress: data.stress_level || 5,
       slaap: data.sleep_hours,
@@ -42,7 +43,7 @@ export default function LifestyleFlow({ data, onChange, onNext, onBack, isMobile
           <Hint isMobile={isMobile}>Los van sport — denk aan je dagelijkse leven.</Hint>
           <PhotoGrid
             value={data.activity_level}
-            onChange={v => { update('activity_level', v); go('week_builder') }}
+            onChange={v => { update('activity_level', v); go('stappen') }}
             isMobile={isMobile}
             options={[
               { value: 'sedentary',         label: 'Weinig beweging',  sub: 'Zit veel, kantoorwerk',       image: 'https://images.unsplash.com/photo-1497032628192-86f99bcd76bc?w=400&h=200&fit=crop&q=80' },
@@ -51,6 +52,38 @@ export default function LifestyleFlow({ data, onChange, onNext, onBack, isMobile
               { value: 'very_active',       label: 'Heel actief',      sub: 'Dagelijks bewegen + fysiek werk', image: 'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?w=400&h=200&fit=crop&q=80' },
             ]}
           />
+        </>
+
+      // Stappen per dag. Los van de vraag hierboven: "matig actief" zegt
+      // niets over hoeveel iemand daadwerkelijk loopt, en juist dat verschil
+      // is bruikbaar bij het bepalen van de dagelijkse verbranding en bij
+      // bijsturen als het gewicht stilstaat.
+      //
+      // Banden in plaats van een precies getal: bijna niemand weet zijn
+      // stappen op honderd nauwkeurig, en een verzonnen precies getal is
+      // erger dan een eerlijke band. De zin erachter is wat mensen herkennen.
+      case 'stappen':
+        return <>
+          <BackBtn onBack={goBack} />
+          <Q isMobile={isMobile}>Hoeveel stappen zet je gemiddeld op een dag?</Q>
+          <Hint isMobile={isMobile}>Een schatting is prima — kies wat het dichtst in de buurt komt.</Hint>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+            {[
+              { value: '4000_6000',  label: '4.000 – 6.000',  sub: 'Ik zit veel' },
+              { value: '6000_8000',  label: '6.000 – 8.000',  sub: 'Ik loop regelmatig, maar zit ook veel' },
+              { value: '8000_10000', label: '8.000 – 10.000', sub: 'Ik loop meer dan ik zit' },
+              { value: '10000_plus', label: '10.000+',        sub: 'Ik loop de hele dag door' },
+            ].map(o => (
+              <BigOption
+                key={o.value}
+                label={o.label}
+                sub={o.sub}
+                selected={data.daily_steps === o.value}
+                onClick={() => { update('daily_steps', o.value); go('week_builder') }}
+                isMobile={isMobile}
+              />
+            ))}
+          </div>
         </>
 
       case 'week_builder':
