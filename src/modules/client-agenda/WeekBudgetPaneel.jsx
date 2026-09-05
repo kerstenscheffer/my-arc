@@ -186,37 +186,44 @@ export default function WeekBudgetPaneel({ db, clientId, mealPlan, isMobile }) {
                   const dagTdee = tdee?.tdee || null
                   const hoogste = Math.max(...perDag.dagen.map(x => x.kcal), dagTdee || 0, 1)
                   const H = 44
-                  const lijnY = dagTdee ? Math.round((dagTdee / hoogste) * H) : null
 
                   return (
                     <>
-                      <div style={{ position: 'relative', display: 'flex', alignItems: 'flex-end', gap: 3, height: H }}>
+                      {/* Per dag een grijs blok met stippelrand: dat is de
+                          verbranding van die dag. De staaf ervoor is wat het
+                          plan geeft. Loopt de staaf tot de bovenrand, dan eet
+                          hij op onderhoud; blijft hij eronder, dan is dat het
+                          tekort van die dag. */}
+                      <div style={{ display: 'flex', alignItems: 'flex-end', gap: 3, height: H }}>
                         {perDag.dagen.map(d => {
                           const hoogte = Math.max(3, Math.round((d.kcal / hoogste) * H))
+                          const tdeeHoogte = dagTdee ? Math.round((dagTdee / hoogste) * H) : null
                           const boven = dagTdee != null && d.kcal > dagTdee
                           return (
-                            <div key={d.dag} style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'flex-end', height: '100%' }}>
-                              <div
-                                title={`${d.label}: ${getal(d.kcal)} kcal${dagTdee ? ` · TDEE ${getal(dagTdee)}` : ''}${d.training ? ' · trainingsdag' : ''}`}
-                                style={{
-                                  width: '100%', height: hoogte,
-                                  background: d.training ? '#FFD700' : (boven ? '#f59e0b' : 'rgba(255,255,255,0.28)'),
-                                }}
-                              />
+                            <div key={d.dag}
+                              title={`${d.label}: ${getal(d.kcal)} kcal${dagTdee ? ` van ${getal(dagTdee)}` : ''}${d.training ? ' · trainingsdag' : ''}`}
+                              style={{ flex: 1, minWidth: 0, position: 'relative', height: '100%' }}>
+                              {tdeeHoogte != null && (
+                                <div style={{
+                                  position: 'absolute', left: 0, right: 0, bottom: 0,
+                                  height: tdeeHoogte,
+                                  background: 'rgba(255,255,255,0.05)',
+                                  borderTop: '1px dashed rgba(255,255,255,0.35)',
+                                  borderBottom: '1px dashed rgba(255,255,255,0.12)',
+                                  borderLeft: '1px dashed rgba(255,255,255,0.18)',
+                                  borderRight: '1px dashed rgba(255,255,255,0.18)',
+                                  boxSizing: 'border-box',
+                                }} />
+                              )}
+                              <div style={{
+                                position: 'absolute', bottom: 0,
+                                left: '50%', transform: 'translateX(-50%)',
+                                width: '58%', height: hoogte,
+                                background: d.training ? '#FFD700' : (boven ? '#f59e0b' : 'rgba(255,255,255,0.55)'),
+                              }} />
                             </div>
                           )
                         })}
-
-                        {/* De TDEE als streep over de staafjes heen. Per dag
-                            is dat getal gelijk — wat verschilt is of die dag
-                            erboven of eronder uitkomt, en dat lees je zo af. */}
-                        {lijnY != null && (
-                          <div style={{
-                            position: 'absolute', left: 0, right: 0, bottom: lijnY,
-                            borderTop: '1px dashed rgba(239,68,68,0.75)',
-                            pointerEvents: 'none',
-                          }} />
-                        )}
                       </div>
 
                       <div style={{ display: 'flex', gap: 3, marginTop: 4 }}>
@@ -250,8 +257,16 @@ export default function WeekBudgetPaneel({ db, clientId, mealPlan, isMobile }) {
                           display: 'flex', alignItems: 'center', gap: 5, marginTop: 6,
                           fontSize: '0.55rem', fontWeight: 700, color: 'rgba(255,255,255,0.3)',
                         }}>
-                          <span style={{ width: 14, borderTop: '1px dashed rgba(239,68,68,0.75)' }} />
-                          TDEE {getal(dagTdee)} kcal per dag
+                          <span style={{
+                            width: 12, height: 9,
+                            background: 'rgba(255,255,255,0.05)',
+                            borderTop: '1px dashed rgba(255,255,255,0.35)',
+                            borderBottom: '1px dashed rgba(255,255,255,0.12)',
+                            borderLeft: '1px dashed rgba(255,255,255,0.18)',
+                            borderRight: '1px dashed rgba(255,255,255,0.18)',
+                            boxSizing: 'border-box', flexShrink: 0,
+                          }} />
+                          Verbranding {getal(dagTdee)} kcal per dag
                         </div>
                       )}
                     </>
