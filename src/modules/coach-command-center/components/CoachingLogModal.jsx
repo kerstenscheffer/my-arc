@@ -72,6 +72,24 @@ export default function CoachingLogModal({ client, db, coachId, onClose, isMobil
 
   useEffect(() => { loadLogs() }, [client.id])
 
+  // Escape sluit. Klikken naast het venster deed dat vroeger; die weg is
+  // dicht sinds de gedimde achtergrond eruit is. Zonder dit blijft alleen het
+  // kruisje over, en dat is lastig als je het venster half buiten beeld hebt
+  // gesleept.
+  //
+  // Niet sluiten terwijl je in een veld staat: dan is Escape bedoeld om je
+  // invoer te laten staan, niet om je hele check-in weg te gooien.
+  useEffect(() => {
+    const opToets = (e) => {
+      if (e.key !== 'Escape') return
+      const t = document.activeElement?.tagName
+      if (t === 'INPUT' || t === 'TEXTAREA' || t === 'SELECT') return
+      onClose?.()
+    }
+    window.addEventListener('keydown', opToets)
+    return () => window.removeEventListener('keydown', opToets)
+  }, [onClose])
+
   const loadLogs = async () => {
     setLoading(true)
     try {
@@ -216,7 +234,9 @@ export default function CoachingLogModal({ client, db, coachId, onClose, isMobil
       borderRadius: isMobile ? 0 : '10px',
       overflow: 'hidden',
       transform: 'translateZ(0)',
-      boxShadow: '0 8px 40px rgba(0,0,0,0.7)',
+      // Zwaardere schaduw nu de gedimde achtergrond weg is: dat is wat het
+      // venster nog van de pagina eronder scheidt.
+      boxShadow: isMobile ? 'none' : '0 12px 48px rgba(0,0,0,0.85), 0 0 0 1px rgba(255,255,255,0.04)',
       cursor: isDragging ? 'grabbing' : 'default',
     }}>
 
@@ -471,22 +491,20 @@ export default function CoachingLogModal({ client, db, coachId, onClose, isMobil
     </div>
   )
 
-  return createPortal(
-    <>
-      {/* Gedimde achtergrond — maakt zichtbaar dát de modal open is en sluit
-          bij klik ernaast. Net onder de modal-z-index. */}
-      <div
-        onClick={onClose}
-        style={{
-          position: 'fixed', inset: 0,
-          background: 'rgba(0,0,0,0.6)',
-          zIndex: 2147482999,
-        }}
-      />
-      {modal}
-    </>,
-    modalHost
-  )
+  // Geen gedimde achtergrond meer.
+  //
+  // Die lag over het hele scherm en ving elke klik op, waardoor je niets
+  // anders kon doen zolang het logboek openstond. Precies verkeerd voor een
+  // venster dat je juist naast je werk wilt hebben: je slaat het logboek erop
+  // na terwijl je in de plananalyzer of de agenda bezig bent.
+  //
+  // Het is een zwevend venster met een eigen rand, schaduw en sluitknop — dat
+  // je het kunt verslepen zegt genoeg over dat het bovenop ligt. Wat je
+  // inlevert is sluiten door ernaast te klikken; dat gaat nu via het kruisje.
+  //
+  // Op een telefoon vult het scherm zich toch helemaal, dus daar veranderde
+  // de achtergrond sowieso niets.
+  return createPortal(modal, modalHost)
 }
 
 const iconBtnStyle = {
