@@ -1222,6 +1222,9 @@ function BlockEditModal({ block, client, service, isMobile, onClose, onSaved, on
 export default function ClientAgendaView({
   client, db, isMobile: isMobileProp,
   viewerRole = 'coach',
+  // Wat de ouder vooraan in de werkbalk wil zetten — CoachAgendaTab schuift
+  // hier zijn klantkiezer in, zodat die geen eigen regel meer kost.
+  werkbalkExtra = null,
   // Als ingevuld (bv. 'monday') toont de view alleen die ene dag-kolom.
   // Handig voor embedded gebruik (plan-analyzer day view) waar maar 1
   // dag relevant is. Week-navigator + datum-headers blijven werken.
@@ -1928,7 +1931,6 @@ export default function ClientAgendaView({
   }
 
   const { hasMealPlan, hasSchema, mealPlan, schema } = data
-  const clientName = `${client.first_name || ''} ${client.last_name || ''}`.trim() || client.email
 
   return (
     <div style={{
@@ -1945,6 +1947,7 @@ export default function ClientAgendaView({
         display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap',
         flexShrink: 0,
       }}>
+      {werkbalkExtra}
       <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
         <button
           onClick={() => shiftWeek(-1)}
@@ -2029,47 +2032,42 @@ export default function ClientAgendaView({
           dat werkt slecht op een telefoon en botst met het verzetten van
           bestaande blokken. */}
       {!isClient && !selectieModus && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 5, flexWrap: 'wrap' }}>
-          {SNELKEUZES.map(k => {
-            const aan = teplaatsen?.id === k.id
-            return (
-              <button
-                key={k.id}
-                onClick={() => setTeplaatsen(aan ? null : k)}
-                style={{
-                  display: 'inline-flex', alignItems: 'center', gap: 5,
-                  padding: '0.35rem 0.6rem', borderRadius: 0,
-                  background: aan ? '#fff' : 'none',
-                  border: `1px solid ${aan ? '#fff' : COLORS.border}`,
-                  color: aan ? '#000' : 'rgba(255,255,255,0.75)',
-                  fontFamily: 'inherit', fontSize: '0.75rem', fontWeight: 900,
-                  cursor: 'pointer',
-                  touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-                }}
-              >
-                <span style={{ width: 7, height: 7, background: k.kleur, flexShrink: 0 }} />
-                {k.label}
-              </button>
-            )
-          })}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+          {/* Zes chips naast elkaar waren de breedste post in de werkbalk.
+              Eén lijst doet hetzelfde en laat zien wat er gekozen is. Het
+              gekleurde blokje ernaast houdt de kleurcode zichtbaar. */}
+          <span style={{
+            width: 8, height: 8, flexShrink: 0,
+            background: teplaatsen?.kleur || 'rgba(255,255,255,0.15)',
+          }} />
+          <select
+            value={teplaatsen?.id || ''}
+            onChange={(e) => {
+              const k = SNELKEUZES.find(x => x.id === e.target.value)
+              setTeplaatsen(k || null)
+            }}
+            aria-label="Blok inplannen"
+            style={{
+              padding: '0.32rem 0.5rem', borderRadius: 0,
+              background: teplaatsen ? '#fff' : 'rgba(255,255,255,0.04)',
+              border: `1px solid ${teplaatsen ? '#fff' : COLORS.border}`,
+              color: teplaatsen ? '#000' : 'rgba(255,255,255,0.75)',
+              fontFamily: 'inherit', fontSize: '0.75rem', fontWeight: 900,
+              cursor: 'pointer', outline: 'none',
+            }}
+          >
+            <option value="" style={{ background: '#1a1a1a', color: '#ccc' }}>Inplannen…</option>
+            {SNELKEUZES.map(k => (
+              <option key={k.id} value={k.id} style={{ background: '#1a1a1a', color: '#fff' }}>
+                {k.label} · {k.duur} min
+              </option>
+            ))}
+          </select>
 
           {teplaatsen && (
-            <>
-              <span style={{ fontSize: '0.78rem', fontWeight: 800, color: 'rgba(255,255,255,0.6)', marginLeft: 4 }}>
-                {bulkBezig ? 'Bezig…' : `Tik een plek in de agenda · ${teplaatsen.duur} min`}
-              </span>
-              <div style={{ flex: 1 }} />
-              <button
-                onClick={() => setTeplaatsen(null)}
-                style={{
-                  padding: '0.35rem 0.6rem', background: 'none', border: 'none',
-                  color: 'rgba(255,255,255,0.5)', fontFamily: 'inherit',
-                  fontSize: '0.75rem', fontWeight: 800, cursor: 'pointer',
-                }}
-              >
-                Stop
-              </button>
-            </>
+            <span style={{ fontSize: '0.72rem', fontWeight: 800, color: 'rgba(255,255,255,0.5)', whiteSpace: 'nowrap' }}>
+              {bulkBezig ? 'Bezig…' : 'tik een plek'}
+            </span>
           )}
         </div>
       )}

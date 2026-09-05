@@ -36,47 +36,40 @@ export default function CoachAgendaTab({ db, clients = [], selectedClient, onCli
       height: '100%', overflow: 'hidden',
       background: '#0a0a0a',
     }}>
-      {/* Client picker */}
-      <div style={{
-        padding: isMobile ? '0.6rem 0.75rem' : '0.75rem 1rem',
-        borderBottom: '1px solid rgba(255,255,255,0.08)',
-        display: 'flex', alignItems: 'center', gap: '0.5rem',
-        flexShrink: 0,
-      }}>
-        <User size={isMobile ? 14 : 16} color="rgba(255,255,255,0.4)" />
-        <span style={{
-          fontSize: '0.55rem', color: 'rgba(255,255,255,0.4)',
-          fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em',
-        }}>
-          Client
-        </span>
-        <select
-          value={internalClient?.id || ''}
-          onChange={handleChange}
-          style={{
-            flex: 1, maxWidth: 360,
-            background: 'rgba(255,255,255,0.05)',
-            border: '1px solid rgba(255,255,255,0.12)',
-            borderRadius: 8,
-            color: '#fff',
-            fontSize: isMobile ? '0.8rem' : '0.85rem',
-            padding: isMobile ? '0.4rem 0.5rem' : '0.5rem 0.6rem',
-            fontWeight: 600,
-            outline: 'none',
-          }}
-        >
-          {clients.length === 0 && <option value="">Geen klanten</option>}
-          {clients.map(c => {
-            const name = `${c.first_name || ''} ${c.last_name || ''}`.trim() || c.email
-            return <option key={c.id} value={c.id} style={{ background: '#111' }}>{name}</option>
-          })}
-        </select>
-      </div>
-
+      {/* De klantkiezer stond als eigen regel boven de agenda. Hij schuift
+          nu de werkbalk van de agenda in, zodat klantnaam, week, inplannen,
+          selecteren en het weekbudget samen op één regel staan. */}
       {/* Agenda view */}
       <div style={{ flex: 1, overflow: 'auto', minHeight: 0 }}>
         {internalClient
-          ? <ClientAgendaView client={internalClient} db={db} isMobile={isMobile} />
+          ? <ClientAgendaView
+              client={internalClient} db={db} isMobile={isMobile}
+              werkbalkExtra={(
+                <div style={{ display: 'flex', alignItems: 'center', gap: 5, flexShrink: 0 }}>
+                  <User size={13} color="rgba(255,255,255,0.4)" />
+                  <select
+                    value={internalClient?.id || ''}
+                    onChange={handleChange}
+                    aria-label="Client"
+                    style={{
+                      maxWidth: isMobile ? 150 : 210,
+                      background: 'rgba(255,255,255,0.05)',
+                      border: '1px solid rgba(255,255,255,0.12)',
+                      borderRadius: 0,
+                      color: '#fff', fontSize: '0.75rem', fontWeight: 800,
+                      padding: '0.32rem 0.45rem',
+                      fontFamily: 'inherit', outline: 'none', cursor: 'pointer',
+                    }}
+                  >
+                    {clients.length === 0 && <option value="">Geen klanten</option>}
+                    {clients.map(c => {
+                      const naam = `${c.first_name || ''} ${c.last_name || ''}`.trim() || c.email
+                      return <option key={c.id} value={c.id} style={{ background: '#111' }}>{naam}</option>
+                    })}
+                  </select>
+                </div>
+              )}
+            />
           : (
             <div style={{ padding: '2rem', color: 'rgba(255,255,255,0.5)', textAlign: 'center' }}>
               Selecteer een client om hun agenda te zien.
