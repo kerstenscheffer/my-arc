@@ -113,7 +113,10 @@ const SUPPLEMENT_DURATION = 20
 const PRE_WORKOUT_SLOT = 'pre_workout'
 const TRAINING_COLOR = '#3b82f6' // blue
 const SLEEP_COLOR = '#6366f1' // indigo
-const WORK_COLOR = '#64748b' // slate (placeholder)
+// Licht rood, zoals de gekleurde dagvullende afspraken in Google Agenda.
+// Was grijsblauw, en dat viel op een donkere agenda weg tegen de lijnen —
+// terwijl werk juist het blok is waar de rest zich omheen moet voegen.
+const WORK_COLOR = '#e8756a'
 
 // Pre-workout maaltijd: staat op het plan (client_meal_plans.pre_workout_meal),
 // niet in week_structure. Hij hoort dus niet bij een vaste dag maar bij de

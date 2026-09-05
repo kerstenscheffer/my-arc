@@ -139,9 +139,20 @@ const getBlockImage = (block) => {
 // Werkwijze: blokken op starttijd, dan groeperen zolang ze elkaar raken
 // (transitief — A overlapt B, B overlapt C ⇒ één groep). Binnen een groep
 // komt een blok in de eerste kolom die op dat moment vrij is.
+//
+// Werk doet niet mee aan die kolomverdeling. Dat blok is de achtergrond van
+// de dag — de uren dat je bezet bent — en niet iets waar een maaltijd naast
+// hoort te staan. Kreeg het wel een kolom, dan werd een werkdag van acht uur
+// een halve strook zodra er één maaltijd in viel. Nu vult het de kolom en
+// liggen de maaltijden erbovenop, zoals in Google Agenda.
 function layoutBlocks(blocks) {
   if (!blocks?.length) return []
-  const gesorteerd = [...blocks].sort((a, b) => (a.start - b.start) || (b.end - a.end))
+
+  const achtergrond = blocks.filter(b => b.type === 'work').map(b => ({ ...b, _achter: true }))
+  const voorgrond = blocks.filter(b => b.type !== 'work')
+  if (!voorgrond.length) return achtergrond
+
+  const gesorteerd = [...voorgrond].sort((a, b) => (a.start - b.start) || (b.end - a.end))
 
   const uit = []
   let groep = []
@@ -169,7 +180,9 @@ function layoutBlocks(blocks) {
     groepEind = Math.max(groepEind, b.end)
   })
   sluitGroep()
-  return uit
+  // Werk eerst in de DOM: bij gelijke z-index wint wat later komt, en de
+  // maaltijden horen bovenop te liggen.
+  return [...achtergrond, ...uit]
 }
 
 function AgendaBlock({ block, isMobile, onClick, onPointerDownDrag, draggable, isGhost, isDragSource, isSelected, selectieModus }) {
@@ -206,6 +219,9 @@ function AgendaBlock({ block, isMobile, onClick, onPointerDownDrag, draggable, i
   // Hoofdnaam — meal-naam, workout-schema, of label voor sleep/work
   const mainTitle = block.sublabel || block.label
 
+  // Achtergrondlaag: werk vult de kolom en ligt onder de rest.
+  const isAchter = !!block._achter && !isGhost
+
   return (
     <div
       title={`${topLabel}${mainTitle ? ` — ${mainTitle}` : ''}\n${formatTime(block.start)}–${formatTime(block.end)}${clickable ? '\n(tik om te bewerken · sleep voor 10-min verzet of andere dag)' : ''}`}
@@ -225,12 +241,24 @@ function AgendaBlock({ block, isMobile, onClick, onPointerDownDrag, draggable, i
         minHeight: block.type === 'meal' && imageUrl ? 32 : undefined,
         // Kolom binnen de overlap-groep. Eén blok = volle breedte, twee
         // blokken = ieder de helft, enzovoort.
-        left: `calc(${((block._kolom || 0) / (block._kolommen || 1)) * 100}% + 3px)`,
-        width: `calc(${100 / (block._kolommen || 1)}% - 6px)`,
-        background: isSelected ? 'rgba(255,255,255,0.14)' : isGhost ? `${block.color}33` : 'rgba(255,255,255,0.025)',
-        border: isSelected ? '1px solid #fff' : isGhost ? `1px dashed ${block.color}` : '1px solid rgba(255,255,255,0.05)',
-        boxShadow: isSelected ? '0 0 0 1px #fff inset' : undefined,
-        borderLeft: `3px solid ${block.color}`,
+        left: isAchter ? 1 : `calc(${((block._kolom || 0) / (block._kolommen || 1)) * 100}% + 3px)`,
+        width: isAchter ? 'calc(100% - 2px)' : `calc(${100 / (block._kolommen || 1)}% - 6px)`,
+        // Werk is een gevuld vlak, de rest een kaart erbovenop.
+        //
+        // Die kaarten moeten ondoorzichtig zijn. Ze stonden op 2,5% wit —
+        // vrijwel doorschijnend, wat prima was boven een lege kolom maar
+        // boven een rood werkblok het rood erdoorheen liet schijnen.
+        background: isSelected ? 'rgba(255,255,255,0.14)'
+          : isGhost ? `${block.color}33`
+          : isAchter ? `${block.color}b3`
+          : '#161616',
+        border: isSelected ? '1px solid #fff'
+          : isGhost ? `1px dashed ${block.color}`
+          : isAchter ? `1px solid ${block.color}`
+          : '1px solid rgba(255,255,255,0.09)',
+        boxShadow: isSelected ? '0 0 0 1px #fff inset'
+          : (!isAchter && !isGhost) ? '0 1px 4px rgba(0,0,0,0.45)' : undefined,
+        borderLeft: isAchter ? `1px solid ${block.color}` : `3px solid ${block.color}`,
         borderRadius: 0,
         overflow: 'hidden',
         opacity: isDragSource ? 0.25 : isGhost ? 0.85 : (isPlaceholder ? 0.55 : 1),
@@ -240,7 +268,7 @@ function AgendaBlock({ block, isMobile, onClick, onPointerDownDrag, draggable, i
         touchAction: sleepbaar ? 'none' : 'auto',
         pointerEvents: isGhost ? 'none' : 'auto',
         display: 'flex',
-        zIndex: isGhost ? 5 : 1,
+        zIndex: isGhost ? 5 : isAchter ? 0 : 2,
       }}
     >
       {/* Foto links — alleen voor 'full' size. Voor meals: donkere overlay
