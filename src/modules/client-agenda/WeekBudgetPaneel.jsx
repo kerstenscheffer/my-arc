@@ -23,6 +23,33 @@ const KCAL_PER_KILO = 7700
 const DAGEN = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday']
 const PRE_WORKOUT_SLOT = 'pre_workout'
 
+// Stappenband uit de intake naast het ingestelde activiteitsniveau.
+//
+// De TDEE wordt NIET opnieuw berekend uit de stappen. Dat getal hangt aan de
+// macro-targets en aan alles wat daarop rekent; er stilletjes iets anders van
+// maken is precies hoe je een fout krijgt die niemand meer kan plaatsen.
+//
+// Wat hier wél gebeurt: melden wanneer de twee elkaar tegenspreken. Iemand
+// die 10.000+ stappen zet maar als "weinig beweging" staat ingesteld heeft
+// vrijwel zeker een te lage verbranding staan — en dat verklaart waarom een
+// plan niet doet wat het zou moeten doen.
+const STAP_LABEL = {
+  '4000_6000': '4.000 – 6.000',
+  '6000_8000': '6.000 – 8.000',
+  '8000_10000': '8.000 – 10.000',
+  '10000_plus': '10.000+',
+}
+
+// Beide op dezelfde schaal van 0 (zit vooral) tot 3 (de hele dag in beweging),
+// zodat "spreken ze elkaar tegen" een rekensom is en geen tabel vol
+// uitzonderingen.
+const STAP_NIVEAU  = { '4000_6000': 0, '6000_8000': 1, '8000_10000': 2, '10000_plus': 3 }
+const ACTIE_NIVEAU = { sedentary: 0, lightly_active: 1, moderately_active: 2, very_active: 3 }
+const ACTIE_LABEL  = {
+  sedentary: 'weinig beweging', lightly_active: 'licht actief',
+  moderately_active: 'matig actief', very_active: 'heel actief',
+}
+
 const DAG_KORT = {
   monday: 'Ma', tuesday: 'Di', wednesday: 'Wo', thursday: 'Do',
   friday: 'Vr', saturday: 'Za', sunday: 'Zo',
@@ -71,7 +98,7 @@ export default function WeekBudgetPaneel({ db, clientId, mealPlan, isMobile }) {
     let leeft = true
     db.supabase
       .from('clients')
-      .select('tdee, target_calories, first_name')
+      .select('tdee, target_calories, first_name, daily_steps, activity_level')
       .eq('id', clientId)
       .maybeSingle()
       .then(({ data }) => { if (leeft) setTdee(data || null) },
@@ -145,6 +172,41 @@ export default function WeekBudgetPaneel({ db, clientId, mealPlan, isMobile }) {
               {verbranding != null && (
                 <>
                   {regel('Verbranding', `${getal(verbranding)} kcal`, 'TDEE maal zeven')}
+
+                  {/* Stappen uit de intake. Alleen tonen als ze er zijn — een
+                      regel "onbekend" helpt niemand. */}
+                  {tdee?.daily_steps && (() => {
+                    const stapN = STAP_NIVEAU[tdee.daily_steps]
+                    const actieN = ACTIE_NIVEAU[tdee.activity_level]
+                    // Pas melden bij een écht verschil. Eén stap ernaast is
+                    // ruis; twee of meer betekent dat er iets niet klopt.
+                    const botst = stapN != null && actieN != null && Math.abs(stapN - actieN) >= 2
+                    const teLaag = botst && stapN > actieN
+                    return (
+                      <div style={{ padding: '0.5rem 0', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                        <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 10 }}>
+                          <div style={{ fontSize: '0.78rem', fontWeight: 800, color: 'rgba(255,255,255,0.75)' }}>
+                            Stappen per dag
+                          </div>
+                          <div style={{ fontSize: '0.95rem', fontWeight: 900, whiteSpace: 'nowrap', color: botst ? '#f59e0b' : '#fff' }}>
+                            {STAP_LABEL[tdee.daily_steps] || tdee.daily_steps}
+                          </div>
+                        </div>
+                        <div style={{ fontSize: '0.62rem', fontWeight: 600, color: 'rgba(255,255,255,0.3)' }}>
+                          {tdee.activity_level
+                            ? `staat ingesteld als ${ACTIE_LABEL[tdee.activity_level] || tdee.activity_level}`
+                            : 'geen activiteitsniveau ingesteld'}
+                        </div>
+                        {botst && (
+                          <div style={{ marginTop: 3, fontSize: '0.62rem', fontWeight: 800, color: '#f59e0b', lineHeight: 1.35 }}>
+                            Die twee spreken elkaar tegen. De verbranding hierboven is
+                            {teLaag ? ' waarschijnlijk te laag' : ' waarschijnlijk te hoog'} — controleer
+                            het activiteitsniveau voordat je op dit tekort stuurt.
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })()}
                   {regel(
                     tekort >= 0 ? 'Tekort' : 'Overschot',
                     `${getal(Math.abs(tekort))} kcal`,
