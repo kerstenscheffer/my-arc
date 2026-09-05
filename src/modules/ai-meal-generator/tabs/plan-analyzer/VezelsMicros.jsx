@@ -45,9 +45,37 @@ export default function VezelsMicros({ db, maaltijden = [], isMobile }) {
   const [ingredienten, setIngredienten] = useState(null)  // null = nog niet geladen
   const [laden, setLaden] = useState(false)
 
-  // Vezels komen van de maaltijd zelf — die staan al in het slot, dus daar is
-  // geen extra query voor nodig.
-  const vezels = maaltijden.reduce((t, mm) => t + (Number(mm?.fiber) || 0), 0)
+  // Vezels worden berekend uit de ingrediënten, niet overgenomen uit het
+  // veld op de maaltijd.
+  //
+  // Dat veld is een momentopname van het moment dat de maaltijd werd
+  // gemaakt, en het beweegt nergens in mee. Schaal je een portie ("Whey
+  // Shake (aangepast)"), dan blijft het staan of springt het naar nul. Bij
+  // 125 van de 453 maaltijden wijkt het meer dan een gram af van de eigen
+  // ingredienten; bij Mark stond een dag op 10,5 g terwijl het er 19,6 waren.
+  //
+  // Heeft een maaltijd geen ingredientenlijst, dan valt hij terug op het
+  // opgeslagen veld — beter iets dan niets, maar dat wordt wel gemeld.
+  const perIngredient = new Map((ingredienten || []).map(x => [x.id, x]))
+  const { vezels, terugvallen } = (() => {
+    let totaal = 0
+    let terugvallen = 0
+    maaltijden.forEach(mm => {
+      const lijst = Array.isArray(mm?.ingredients_list) ? mm.ingredients_list : []
+      const bekend = lijst.filter(r => r?.ingredient_id && perIngredient.has(r.ingredient_id))
+      if (lijst.length === 0 || (ingredienten && bekend.length === 0)) {
+        totaal += Number(mm?.fiber) || 0
+        if (Number(mm?.fiber)) terugvallen += 1
+        return
+      }
+      if (!ingredienten) { totaal += Number(mm?.fiber) || 0; return }
+      bekend.forEach(r => {
+        const ing = perIngredient.get(r.ingredient_id)
+        totaal += (Number(ing.fiber_per_100g) || 0) * (Number(r.amount) || 0) / 100
+      })
+    })
+    return { vezels: totaal, terugvallen }
+  })()
 
   // Welke ingrediënten en hoeveel gram, over alle maaltijden van de dag heen.
   const porties = (() => {
@@ -66,10 +94,10 @@ export default function VezelsMicros({ db, maaltijden = [], isMobile }) {
   const ids = [...porties.keys()]
   const idsSleutel = ids.slice().sort().join(',')
 
-  // Pas ophalen als je openklapt. Dit blok is bijzaak; de dagweergave hoeft er
-  // niet trager van te worden voor iedereen die het nooit opent.
+  // Meteen ophalen, niet pas bij openklappen: de vezels worden hieruit
+  // berekend en staan al op de dichte knop. Eén query op een handvol id's.
   useEffect(() => {
-    if (!open || !db?.supabase || ids.length === 0) return
+    if (!db?.supabase || ids.length === 0) return
     let leeft = true
     setLaden(true)
     db.supabase
@@ -82,7 +110,7 @@ export default function VezelsMicros({ db, maaltijden = [], isMobile }) {
     return () => { leeft = false }
     // idsSleutel en niet ids: een nieuwe array met dezelfde inhoud zou de
     // query bij elke render opnieuw afvuren.
-  }, [open, db, idsSleutel])
+  }, [db, idsSleutel])
 
   const { natrium, micros } = (() => {
     const uit = { natrium: 0, micros: {} }
@@ -178,6 +206,13 @@ export default function VezelsMicros({ db, maaltijden = [], isMobile }) {
               Van de {ingredienten.length} ingrediënten in deze dag zijn geen
               vitaminen en mineralen vastgelegd{natrium > 0 ? '' : ', en ook geen natrium'}.
               Zodra die gegevens er zijn, verschijnen ze hier vanzelf.
+            </div>
+          )}
+
+          {terugvallen > 0 && (
+            <div style={{ marginTop: '0.5rem', fontSize: '0.62rem', fontWeight: 700, color: 'rgba(255,255,255,0.3)', lineHeight: 1.4 }}>
+              {terugvallen} maaltijd{terugvallen > 1 ? 'en' : ''} heeft geen
+              ingrediëntenlijst; daarvoor is de opgeslagen vezelwaarde gebruikt.
             </div>
           )}
 
