@@ -13,7 +13,7 @@ function MacroBox({ label, icon, color, consumed, target, unitLabel }) {
   const circ = 2 * Math.PI * r
   const off = circ - (pct / 100) * circ
   return (
-    <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 12, padding: '0.55rem 0.25rem', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.4rem' }}>
+    <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 12, padding: '0.5rem 0.25rem 0.55rem', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.3rem' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 3, maxWidth: '100%' }}>
         <span style={{ flexShrink: 0, display: 'flex' }}>{icon}</span>
         <span style={{ fontSize: '0.55rem', fontWeight: 800, color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{label}</span>
@@ -27,12 +27,17 @@ function MacroBox({ label, icon, color, consumed, target, unitLabel }) {
           <span style={{ fontSize: '0.72rem', fontWeight: 900, color }}>{pct}<span style={{ fontSize: '0.6em' }}>%</span></span>
         </div>
       </div>
-      <div style={{ fontSize: '0.62rem', fontWeight: 900, color: '#fff', whiteSpace: 'nowrap' }}>
-        {Math.abs(over)}
-        <span style={{ fontSize: '0.82em', fontWeight: 700, color: 'rgba(255,255,255,0.4)' }}>{unitLabel} {over >= 0 ? 'over' : 'te veel'}</span>
-      </div>
-      <div style={{ fontSize: '0.52rem', fontWeight: 600, color: 'rgba(255,255,255,0.25)', whiteSpace: 'nowrap' }}>
-        {Math.round(consumed || 0)}{unitLabel} / {Math.round(target || 0)}{unitLabel}
+      {/* "x over" en "x / y" zijn één blokje: ze zeggen hetzelfde vanuit twee
+          kanten. Met de vaste tussenruimte van de kolom ertussen stond er
+          een gat waar niets gebeurde. */}
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1 }}>
+        <div style={{ fontSize: '0.62rem', fontWeight: 900, color: '#fff', whiteSpace: 'nowrap' }}>
+          {Math.abs(over)}
+          <span style={{ fontSize: '0.82em', fontWeight: 700, color: 'rgba(255,255,255,0.4)' }}>{unitLabel} {over >= 0 ? 'over' : 'te veel'}</span>
+        </div>
+        <div style={{ fontSize: '0.52rem', fontWeight: 600, color: 'rgba(255,255,255,0.25)', whiteSpace: 'nowrap' }}>
+          {Math.round(consumed || 0)}{unitLabel} / {Math.round(target || 0)}{unitLabel}
+        </div>
       </div>
     </div>
   )
