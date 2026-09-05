@@ -230,6 +230,15 @@ function CheckinCard({ checkin, isMobile }) {
             </NoteBlock>
           )}
 
+          {/* Wat er komende week speelt. Boven de vraag-aan-jou, want dit is
+              waar je het plan op aanpast voordat de week begint — niet iets
+              om achteraf te lezen. */}
+          {checkin.komende_week && (
+            <NoteBlock label="Komende week" text={checkin.komende_week} accent={G.primary}>
+              <Calendar size={10} />
+            </NoteBlock>
+          )}
+
           {/* Client's ask: "Wat kan ik voor je doen?" — gold so it stands out */}
           {checkin.algemeen_help && (
             <NoteBlock label="Vraagt jou" text={checkin.algemeen_help} accent={G.primary}>

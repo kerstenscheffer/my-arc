@@ -110,6 +110,22 @@ const SECTIES = [
       },
     ],
   },
+  // Als laatste, want dit is de enige vraag die vooruitkijkt. Eerst de week
+  // afsluiten, dan pas de volgende in.
+  //
+  // Een tekstveld en geen ja/nee: "ja" zonder te weten wát er speelt levert
+  // geen gesprek op, en dan moet de coach het alsnog vragen.
+  {
+    kop: 'Komende week',
+    velden: [
+      {
+        id: 'komende_week', type: 'tekst',
+        vraag: 'Heb je volgende week een activiteit of iets waardoor je het plan niet kan volgen?',
+        hulp: 'Bijvoorbeeld een bruiloft, weekend weg, drukke werkweek of vakantie.',
+        placeholder: 'Zo niet, laat leeg.',
+      },
+    ],
+  },
 ]
 
 const SCHAAL = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
