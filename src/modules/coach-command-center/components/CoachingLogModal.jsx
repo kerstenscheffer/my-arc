@@ -4,7 +4,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { createPortal } from 'react-dom'
 import { useModalHost } from '../../../coach/ModalHost'
 import CheckinFlow from './CheckinFlow'
-import { LEEG as CHECKIN_LEEG, samenvatting, heeftInhoud } from './checkinData'
+import { LEEG as CHECKIN_LEEG, samenvatting, heeftInhoud, uitConcept } from './checkinData'
 import { X, GripVertical, Minus, Maximize2, Plus, Loader2, MessageCircle, BarChart2, Phone, FileText, History } from 'lucide-react'
 
 const STATUS_OPTIONS = [
@@ -111,7 +111,7 @@ export default function CoachingLogModal({ client, db, coachId, onClose, isMobil
       .maybeSingle()
       .then(({ data }) => {
         if (!leeft) return
-        if (data?.data && Object.keys(data.data).length) setCheckin({ ...CHECKIN_LEEG, ...data.data })
+        if (data?.data && Object.keys(data.data).length) setCheckin(uitConcept(data.data))
         setConceptGeladen(true)
       }, () => { if (leeft) setConceptGeladen(true) })
     return () => { leeft = false }

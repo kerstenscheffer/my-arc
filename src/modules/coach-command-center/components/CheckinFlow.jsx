@@ -180,20 +180,28 @@ export default function CheckinFlow({ waarde, onChange, onOpslaan, opslaan, clie
         <ToevoegKnop onClick={() => zet({ waarnemingen: [...(s.waarnemingen || []), { o: '', s: '' }] })}>regel</ToevoegKnop>
       </div>
 
+      {/* Wat de klant gaat doen. Bewust zonder afvinkhokje, anders dan bij
+          je eigen to-do's: een opgeslagen check-in is een logboek-item dat
+          je niet meer bijwerkt, dus dat vinkje zou nooit aangaan. */}
       <div>
-        <Label>Vraag → antwoord</Label>
+        <Label>Actiepunten klant</Label>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-          {(s.vragen || []).map((it, i) => (
-            <div key={i} style={{ display: 'flex', gap: 6, alignItems: 'flex-start' }}>
-              <textarea value={it.v} onChange={e => rij(s.vragen, i, { v: e.target.value }, 'vragen')}
-                placeholder="Vraag…" style={{ ...veld, minHeight: 40, resize: 'vertical' }} />
-              <textarea value={it.a} onChange={e => rij(s.vragen, i, { a: e.target.value }, 'vragen')}
-                placeholder="Antwoord…" style={{ ...veld, minHeight: 40, resize: 'vertical' }} />
-              <WisKnop onClick={() => wis(s.vragen, i, 'vragen')} />
+          {(s.acties || []).map((it, i) => (
+            <div key={i} style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+              <span style={{
+                width: 20, flexShrink: 0, textAlign: 'center',
+                fontSize: '0.7rem', fontWeight: 900, color: 'rgba(255,255,255,0.3)',
+              }}>{i + 1}</span>
+              <input value={it.t} onChange={e => rij(s.acties, i, { t: e.target.value }, 'acties')}
+                placeholder="Wat gaat hij doen…" style={{ ...veld, flex: 1 }} />
+              <input type="date" value={it.deadline || ''}
+                onChange={e => rij(s.acties, i, { deadline: e.target.value }, 'acties')}
+                style={{ ...veld, width: 'auto', flex: '0 0 auto', fontSize: '0.7rem' }} />
+              <WisKnop onClick={() => wis(s.acties, i, 'acties')} />
             </div>
           ))}
         </div>
-        <ToevoegKnop onClick={() => zet({ vragen: [...(s.vragen || []), { v: '', a: '' }] })}>vraag</ToevoegKnop>
+        <ToevoegKnop onClick={() => zet({ acties: [...(s.acties || []), { t: '', deadline: '' }] })}>actiepunt</ToevoegKnop>
       </div>
 
       <div>

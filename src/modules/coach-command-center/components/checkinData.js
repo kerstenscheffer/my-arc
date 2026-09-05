@@ -40,7 +40,7 @@ export const LEEG = {
   voor: '',
   vast: { gevoel: '', lastig: '', hulp: '' },
   waarnemingen: [{ o: '', s: '' }],
-  vragen: [{ v: '', a: '' }],
+  acties: [{ t: '', deadline: '' }],
   notities: '',
   bericht: '',
   volgende: { wanneer: '', onderwerp: '' },
@@ -68,10 +68,10 @@ export function samenvatting(s, clientNaam) {
     w.forEach(x => r.push(`  • ${x.o || '—'} → ${x.s || '—'}`))
   }
 
-  const v = (s.vragen || []).filter(x => x.v || x.a)
-  if (v.length) {
-    r.push('', 'VRAGEN')
-    v.forEach(x => r.push(`  V: ${x.v || ''}`, `  A: ${x.a || ''}`))
+  const a = (s.acties || []).filter(x => (x.t || '').trim())
+  if (a.length) {
+    r.push('', 'ACTIEPUNTEN VOOR JOU')
+    a.forEach(x => r.push(`  • ${x.t.trim()}${x.deadline ? ` (voor ${x.deadline})` : ''}`))
   }
 
   if (s.notities) r.push('', 'NOTITIES', '  ' + s.notities)
@@ -103,7 +103,25 @@ export function heeftInhoud(s) {
   if ((s.volgende?.wanneer || '').trim() || (s.volgende?.onderwerp || '').trim()) return true
   if (Object.values(s.vast || {}).some(v => (v || '').trim())) return true
   if ((s.waarnemingen || []).some(x => (x.o || '').trim() || (x.s || '').trim())) return true
-  if ((s.vragen || []).some(x => (x.v || '').trim() || (x.a || '').trim())) return true
+  if ((s.acties || []).some(x => (x.t || '').trim())) return true
   if ((s.todos || []).some(x => (x.t || '').trim())) return true
   return false
+}
+
+/**
+ * Een bewaard concept klaarmaken voor het formulier.
+ *
+ * Ouder concept kan nog `vragen` bevatten van toen dat blok vraag-antwoord
+ * heette. Die stilletjes laten vallen betekent dat iemand een half ingevulde
+ * check-in kwijtraakt zonder dat er iets misging — daarom worden ze
+ * omgezet naar actiepunten in plaats van genegeerd.
+ */
+export function uitConcept(data) {
+  const s = { ...LEEG, ...(data || {}) }
+  const oud = (data?.vragen || []).filter(x => (x?.v || '').trim() || (x?.a || '').trim())
+  if (oud.length && !(s.acties || []).some(x => (x.t || '').trim())) {
+    s.acties = oud.map(x => ({ t: [x.v, x.a].filter(Boolean).join(' — '), deadline: '' }))
+  }
+  delete s.vragen
+  return s
 }
