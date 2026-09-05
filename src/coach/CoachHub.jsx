@@ -271,9 +271,14 @@ export default function CoachHub() {
 
   // Split alleen op desktop. Op een telefoon is een halve kolom onbruikbaar,
   // en de meeste tabs hebben daar al hun eigen mobiele indeling.
-  // Staat hier en niet bij de split-state hierboven: het leunt op isMobile en
-  // clientMode, die pas op deze regel bestaan.
-  const splitActief = !!splitTab && !isMobile && !clientMode
+  // Staat hier en niet bij de split-state hierboven: het leunt op isMobile,
+  // die pas op deze regel bestaat.
+  //
+  // Klantmodus telt hier bewust NIET meer mee. Die stond er als voorzorg in,
+  // maar zorgde ervoor dat de verbergknop je split screen dichtklapte —
+  // terwijl juist dan twee tabs naast elkaar met de balken weg een prima
+  // combinatie is. De split-weergave leunt verder nergens op clientMode.
+  const splitActief = !!splitTab && !isMobile
 
   // Hoe hoog mag de split-strook zijn? Dat hangt af van waar 'ie begint (de
   // header erboven verandert van hoogte met de doelgroepenbalk en de veilige
@@ -286,12 +291,18 @@ export default function CoachHub() {
       const el = splitRef.current
       if (!el) return
       const top = Math.round(el.getBoundingClientRect().top + window.scrollY)
-      setSplitHoogte(`calc(100dvh - ${top + ZWEVENDE_NAV_RUIMTE}px)`)
+      // In klantmodus is de zwevende navbalk verborgen, dus die ruimte
+      // hoeft niet gereserveerd te worden — anders houdt de split onderaan
+      // ruim honderd pixels leeg over.
+      const navRuimte = clientMode ? 12 : ZWEVENDE_NAV_RUIMTE
+      setSplitHoogte(`calc(100dvh - ${top + navRuimte}px)`)
     }
     meet()
     window.addEventListener('resize', meet)
     return () => window.removeEventListener('resize', meet)
-  }, [splitActief])
+    // clientMode hoort erbij: verdwijnen de balken erboven, dan begint de
+    // split hoger en klopt de gemeten hoogte niet meer.
+  }, [splitActief, clientMode])
   const moreRef = useRef(null)
   
   // ============================================
