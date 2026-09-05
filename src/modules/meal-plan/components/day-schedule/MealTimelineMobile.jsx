@@ -6,7 +6,7 @@
 // "Voedingsmiddel toevoegen" per section
 import React, { useState } from 'react'
 import MealCard from './MealCard'
-import { Plus, Eye, EyeOff, Trash2, Edit3, MoreHorizontal, X, Apple } from 'lucide-react'
+import { Plus, Eye, EyeOff, Trash2, Edit3, MoreHorizontal, X, Apple, Info, Check } from 'lucide-react'
 import { foodImageFallback } from '../../foodImageFallback'
 import { supplementFoto } from '../../../supplements/utils/supplementFoto'
 
@@ -209,6 +209,9 @@ export default function MealTimelineMobile({
   onEditConsumedMeal,
   onPlanMealLog, // NEW: callback when plan meal is checked → auto-log
   supplementenPerMoment = {},
+  supplementLogs,
+  onSupplementCheck,
+  onSupplementInfo,
 }) {
   const [showPlan, setShowPlan] = useState(true)
 
@@ -324,15 +327,20 @@ export default function MealTimelineMobile({
 
                   Geen afvinkknop: dat bestaat nog nergens voor supplementen,
                   en een knop die niets doet is erger dan geen knop. */}
-              {supps.map(sp => (
+              {supps.map(sp => {
+                const afgevinkt = !!supplementLogs?.has?.(sp.id)
+                return (
                 <div key={`supp-${sp.id}`} style={{
                   margin: isMobile ? '0 0.9rem 0.55rem' : '0 1.25rem 0.7rem',
                   background: 'rgba(255,255,255,0.025)',
                   border: '1px solid rgba(255,255,255,0.05)',
                   borderRadius: 12,
                   overflow: 'hidden',
-                  display: 'flex', alignItems: 'stretch', minWidth: 0,
+                  opacity: afgevinkt ? 0.55 : 1,
+                  transition: 'opacity 0.2s ease',
+                  display: 'flex', flexDirection: 'column',
                 }}>
+                  <div style={{ display: 'flex', alignItems: 'stretch', minWidth: 0 }}>
                   <div style={{
                     width: isMobile ? 70 : 80, height: isMobile ? 70 : 80, flexShrink: 0,
                     background: `url(${supplementFoto(sp, 160)}) center/cover`,
@@ -371,8 +379,40 @@ export default function MealTimelineMobile({
                       </div>
                     )}
                   </div>
+                  </div>
+
+                  {/* Zelfde knoppenbalk als een maaltijdkaart: info links,
+                      afronden rechts. Zonder deze rij zag de kaart eruit als
+                      een maaltijd maar deed hij niets. */}
+                  <div style={{ display: 'flex', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+                    <button onClick={() => onSupplementInfo?.(sp)} style={{
+                      flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5,
+                      padding: isMobile ? '0.5rem' : '0.55rem',
+                      background: 'transparent', border: 'none',
+                      color: 'rgba(255,255,255,0.5)', fontFamily: 'inherit',
+                      fontSize: isMobile ? '0.68rem' : '0.72rem', fontWeight: 700,
+                      cursor: 'pointer',
+                      touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+                    }}>
+                      <Info size={12} /> Info
+                    </button>
+                    <div style={{ width: 1, background: 'rgba(255,255,255,0.05)', alignSelf: 'stretch' }} />
+                    <button onClick={() => onSupplementCheck?.(sp)} style={{
+                      flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5,
+                      padding: isMobile ? '0.5rem' : '0.55rem',
+                      background: 'transparent', border: 'none',
+                      color: afgevinkt ? '#10b981' : 'rgba(255,255,255,0.5)',
+                      fontFamily: 'inherit',
+                      fontSize: isMobile ? '0.68rem' : '0.72rem', fontWeight: 700,
+                      cursor: 'pointer',
+                      touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+                    }}>
+                      <Check size={12} /> {afgevinkt ? 'Genomen' : 'Afronden'}
+                    </button>
+                  </div>
                 </div>
-              ))}
+                )
+              })}
 
               {/* Logged meals (excluding plan_check when plan visible) */}
               {visibleLoggedMeals.map(meal => (

@@ -12,6 +12,7 @@ import DayTemplatePickerModal from './DayTemplatePickerModal'
 import FoodLogModal from './food-log/FoodLogModal'
 import MealLoggingService from '../../meal-logging-wizard/MealLoggingService'
 import { laadSupplementen, geldtOpDag, momentVanSupplement, doseringTekst } from '../../supplements/utils/supplementSchedule'
+import SupplementInfoModal from './SupplementInfoModal'
 
 const getTodayIndex = () => {
   const day = new Date().getDay()
@@ -67,6 +68,9 @@ export default function AIDaySchedule({
   // moeten ook zichtbaar worden op de client meal pagina op de juiste
   // tijden." Ze stonden alleen in het coach-paneel; de klant zag ze nergens.
   const [supplementen, setSupplementen] = useState([])
+  // Welke supplementen zijn op de bekeken dag afgevinkt.
+  const [suppLogs, setSuppLogs] = useState(new Set())
+  const [suppInfo, setSuppInfo] = useState(null)
   useEffect(() => {
     if (!db?.supabase || !client?.id) return
     let leeft = true
@@ -372,6 +376,58 @@ export default function AIDaySchedule({
   // vervolgens aan de maaltijd die er qua tijd het dichtst bij zit, zodat je
   // "creatine bij het ontbijt" ook onder het ontbijt ziet staan en niet in
   // een losse lijst onderaan.
+  // Afvinkjes van de bekeken dag ophalen. Per dag, net als bij de
+  // maaltijden: een supplement dat je gisteren nam zegt niets over vandaag.
+  useEffect(() => {
+    if (!db?.supabase || !client?.id) return
+    let leeft = true
+    const datum = datumVoorDag(currentDay)
+    db.supabase
+      .from('supplement_logs')
+      .select('supplement_id')
+      .eq('client_id', client.id)
+      .eq('log_date', datum)
+      .then(({ data }) => { if (leeft) setSuppLogs(new Set((data || []).map(r => r.supplement_id))) },
+            (e) => { console.warn('supplement-logs laden mislukt:', e) })
+    return () => { leeft = false }
+  }, [db, client?.id, currentDay])
+
+  // Supplement afvinken of het vinkje weer weghalen.
+  const wisselSupplement = async (sp) => {
+    if (!db?.supabase || !client?.id || !sp?.id) return
+    const datum = datumVoorDag(currentDay)
+    const stond = suppLogs.has(sp.id)
+    // Eerst lokaal omzetten zodat de knop meteen reageert; loopt de opslag
+    // mis, dan draaien we het terug.
+    setSuppLogs(prev => {
+      const next = new Set(prev)
+      stond ? next.delete(sp.id) : next.add(sp.id)
+      return next
+    })
+    try {
+      if (stond) {
+        const { error } = await db.supabase.from('supplement_logs').delete()
+          .eq('client_id', client.id).eq('supplement_id', sp.id).eq('log_date', datum)
+        if (error) throw error
+      } else {
+        const { error } = await db.supabase.from('supplement_logs').insert([{
+          client_id: client.id, supplement_id: sp.id,
+          supplement_name: sp.naam, log_date: datum,
+        }])
+        // 23505 = de unieke sleutel: stond er al. Geen fout, precies de
+        // bedoeling — het vinkje mag gewoon blijven staan.
+        if (error && error.code !== '23505') throw error
+      }
+    } catch (e) {
+      console.error('Supplement afvinken mislukt:', e)
+      setSuppLogs(prev => {
+        const next = new Set(prev)
+        stond ? next.add(sp.id) : next.delete(sp.id)
+        return next
+      })
+    }
+  }
+
   const supplementenPerMoment = (() => {
     const uit = { breakfast: [], lunch: [], dinner: [], snack: [] }
     const dagKey = daysOfWeek[currentDay]?.key
@@ -401,11 +457,21 @@ export default function AIDaySchedule({
         if (beste) doel = momentVanSlot(beste.slot)
       }
       uit[doel].push({
-        id: sp.supplement_id || sp.id || sp.name,
+        // template_id is de sleutel waarop de rest van de supplementcode
+        // werkt en waarop we het afvinken bewaren. Valt die weg, dan de naam.
+        id: sp.template_id || sp.supplement_id || sp.id || sp.name,
         naam: sp.name,
         emoji: sp.emoji || '💊',
         dosering: doseringTekst(sp),
         minuten: min,
+        // Voor het info-scherm. Komt rechtstreeks uit het plan, dus wat de
+        // coach heeft toegewezen is wat de klant leest.
+        instructies: sp.instructions || null,
+        voordelen: Array.isArray(sp.benefits) ? sp.benefits : [],
+        veiligheid: sp.safety_notes || null,
+        tijdNotitie: sp.timing?.notes || null,
+        doseringNotitie: sp.dosage?.note || null,
+        categorie: sp.category || null,
       })
     })
     return uit
@@ -508,6 +574,9 @@ export default function AIDaySchedule({
           meals={displayMeals}
           checkedMeals={checkedMeals}
           supplementenPerMoment={supplementenPerMoment}
+          supplementLogs={suppLogs}
+          onSupplementCheck={wisselSupplement}
+          onSupplementInfo={setSuppInfo}
           onMealCheck={handleMealCheck}
           onOpenInfo={onOpenInfo}
           onOpenAlternatives={onOpenAlternatives}
@@ -638,6 +707,14 @@ export default function AIDaySchedule({
               bezigMetLoggen.current.delete(logSleutel)
             }
           }}
+        />
+      )}
+
+      {suppInfo && (
+        <SupplementInfoModal
+          supplement={suppInfo}
+          isMobile={isMobile}
+          onClose={() => setSuppInfo(null)}
         />
       )}
 

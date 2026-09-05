@@ -7,6 +7,7 @@ import React, { useState } from 'react'
 import { UtensilsCrossed, ExternalLink, ChevronRight, ArrowLeft, Zap, BarChart3 } from 'lucide-react'
 import GeneratePlanModal from './GeneratePlanModal'
 import ClientDocumentsSection from './ClientDocumentsSection'
+import SupplementTrouw from './SupplementTrouw'
 
 const formatDate = (d) => { if (!d) return '-'; const dt = new Date(d); return dt.toLocaleDateString('nl-NL', { day: 'numeric', month: 'short', year: dt.getFullYear() !== new Date().getFullYear() ? 'numeric' : undefined }) }
 
@@ -200,6 +201,12 @@ export default function MealsColumn({ client, mealData, isMobile, onNavigatePlan
             </div>
           ) : (
             <div style={{ padding: '2rem 1rem', textAlign: 'center', color: 'rgba(255,255,255,0.55)', fontSize: '0.75rem' }}>Geen voedingsdata</div>
+          )}
+
+          {/* Supplementen horen bij voeding, dus hier en niet in een eigen
+              kolom. Toont zichzelf niet als er geen supplementplan is. */}
+          {db && client?.id && (
+            <SupplementTrouw db={db} client={client} isMobile={isMobile} />
           )}
 
           {/* ── DOCUMENTEN SECTIE ── */}
