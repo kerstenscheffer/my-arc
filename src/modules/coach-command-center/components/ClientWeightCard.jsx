@@ -21,9 +21,12 @@ import { weightGoalColor } from '../../weight-tracker/utils/weightGoalColor'
 // Platte actieknop: geen vlak, geen rand — alleen icoon + woord. Drie
 // omkaderde knoppen naast elkaar maakten de kaart onrustig.
 const platteKnop = {
-  display: 'inline-flex', alignItems: 'center', gap: '0.3rem',
+  display: 'inline-flex', alignItems: 'center', gap: '0.25rem',
   background: 'none', border: 'none', padding: 0,
-  color: '#fff', fontSize: '0.78rem', fontWeight: 800, fontFamily: 'inherit',
+  // Klein gehouden zodat de cijfers en de knoppen samen op één regel
+  // passen. Bij een klant in een fase staat er "Sinds start fase" in
+  // plaats van "Sinds start", en op 0,78rem brak de rij dan af.
+  color: '#fff', fontSize: '0.7rem', fontWeight: 800, fontFamily: 'inherit',
   cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0,
   touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
 }
@@ -378,7 +381,7 @@ export default function ClientWeightCard({ client, isMobile, onToggleStatus, onD
           <button onClick={() => setStatsExpanded(true)}
             title="Toon alle weekcijfers"
             style={{
-              display: 'flex', alignItems: 'baseline', gap: isMobile ? '0.7rem' : '0.95rem',
+              display: 'flex', alignItems: 'baseline', gap: isMobile ? '0.55rem' : '0.75rem',
               background: 'none', border: 'none', padding: 0, cursor: 'pointer',
               fontFamily: 'inherit', flexShrink: 1, minWidth: 0, overflow: 'hidden',
               touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
@@ -400,7 +403,7 @@ export default function ClientWeightCard({ client, isMobile, onToggleStatus, onD
         <div style={{
           display: 'flex', alignItems: 'center', flexShrink: 0,
           marginLeft: 'auto',
-          gap: isMobile ? '0.7rem' : '1rem',
+          gap: isMobile ? '0.55rem' : '0.7rem',
         }}>
         {/* Dagelijks afvinken. Alleen een icoon: er staan al twee knoppen
             met tekst naast, en een derde woord maakt de rij te vol op een
