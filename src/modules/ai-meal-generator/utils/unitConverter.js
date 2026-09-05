@@ -12,7 +12,11 @@ const UNIT_RULES = [
 
   // ── BROOD / SNEETJES ──
   {
-    keywords: ['brood', 'bread', 'toast', 'boterham', 'snee', 'volkoren', 'rogge', 'witbrood', 'bruinbrood', 'meergranen', 'tijgerbrood', 'stokbrood'],
+    // Let op: 'volkoren', 'rogge' en 'meergranen' staan hier bewust NIET los.
+    // Dat zijn smaakwoorden, geen vormwoorden — volkoren bestaat ook als
+    // wrap, pasta, rijst en couscous. Stonden ze hier wel, dan werd een
+    // volkoren wrap van 120 gram geteld als vier sneetjes.
+    keywords: ['brood', 'bread', 'toast', 'boterham', 'snee', 'witbrood', 'bruinbrood', 'stokbrood'],
     gramsPerUnit: 30,
     unit: 'sneetje', unitPlural: 'sneetjes',
     // Bron: Voedingscentrum, 1 sneetje brood ≈ 25-35g
@@ -58,10 +62,20 @@ const UNIT_RULES = [
 
   // ── WRAP / TORTILLA ──
   {
-    keywords: ['wrap', 'tortilla', 'flatbread', 'pitabrood', 'pita'],
+    keywords: ['wrap', 'tortilla', 'flatbread'],
     gramsPerUnit: 55,
     unit: 'wrap', unitPlural: 'wraps',
     // Bron: Gemiddelde tortilla wrap ≈ 45-65g
+  },
+
+  // ── PITA ──
+  // Eigen regel en niet bij de wraps: anders staat er "2 wraps" onder een
+  // pitabrood. Een pita is ook zwaarder dan een tortilla.
+  {
+    keywords: ['pitabrood', 'pita'],
+    gramsPerUnit: 60,
+    unit: 'pitabrood', unitPlural: 'pitabroodjes',
+    // Bron: AH/Jumbo productlabel, 1 pitabroodje ≈ 55-65g
   },
 
   // ── PANNENKOEK ──
@@ -121,13 +135,27 @@ export function toHumanAmount(name, grams) {
 
   const nameLower = name.toLowerCase()
 
-  const rule = UNIT_RULES.find(r =>
-    r.keywords.some(keyword =>
-      BOUNDARY_KEYWORDS.has(keyword)
-        ? new RegExp(`\\b${keyword}\\b`).test(nameLower)
-        : nameLower.includes(keyword)
-    )
-  )
+  // Het lángste passende keyword wint, niet het eerste in de lijst.
+  //
+  // Anders bepaalt de volgorde van de regels de uitkomst: 'brood' staat
+  // boven de wrap-regel, dus pitabrood werd geteld als sneetjes brood van
+  // 30 gram in plaats van als pita van 55. Met deze weging wint 'pitabrood'
+  // van 'brood' en 'boterham' van 'boter', ongeacht waar ze staan.
+  const past = (keyword) =>
+    BOUNDARY_KEYWORDS.has(keyword)
+      ? new RegExp(`\\b${keyword}\\b`).test(nameLower)
+      : nameLower.includes(keyword)
+
+  let rule = null
+  let besteLengte = 0
+  for (const r of UNIT_RULES) {
+    for (const keyword of r.keywords) {
+      if (keyword.length > besteLengte && past(keyword)) {
+        rule = r
+        besteLengte = keyword.length
+      }
+    }
+  }
 
   if (!rule) return `${Math.round(grams)}g`
 
