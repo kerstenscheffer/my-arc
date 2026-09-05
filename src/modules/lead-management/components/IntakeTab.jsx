@@ -8,6 +8,7 @@ import {
   DollarSign, Target, Heart
 } from 'lucide-react'
 import IntakeService from '../../../intake/IntakeService'
+import { geledenLang } from '../../../utils/tijd'
 
 // GOLD-BLACK THEME (matches parent)
 const GOLD = {
@@ -32,20 +33,6 @@ const STATUSES = [
 ]
 
 const getStatus = (key) => STATUSES.find(s => s.key === key) || STATUSES[0]
-
-function timeAgo(date) {
-  if (!date) return ''
-  const now = new Date()
-  const d = new Date(date)
-  const mins = Math.floor((now - d) / 60000)
-  if (mins < 1) return 'Zojuist'
-  if (mins < 60) return `${mins}m geleden`
-  const hrs = Math.floor(mins / 60)
-  if (hrs < 24) return `${hrs}u geleden`
-  const days = Math.floor(hrs / 24)
-  if (days < 7) return `${days}d geleden`
-  return d.toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })
-}
 
 export default function IntakeTab({ isMobile }) {
   const [leads, setLeads] = useState([])
@@ -357,7 +344,7 @@ export default function IntakeTab({ isMobile }) {
                         gap: '0.3rem'
                       }}>
                         <Clock size={10} />
-                        {timeAgo(lead.created_at)}
+                        {geledenLang(lead.created_at)}
                       </div>
                     </div>
                   </div>
@@ -545,7 +532,7 @@ function IntakeDetailModal({ lead, isMobile, onClose, onStatusChange, onDelete, 
                 gap: '0.3rem'
               }}>
                 <Clock size={10} />
-                {timeAgo(lead.created_at)}
+                {geledenLang(lead.created_at)}
                 <span style={{ margin: '0 0.25rem', opacity: 0.4 }}>•</span>
                 <span style={{ color: st.color }}>{st.label}</span>
               </div>

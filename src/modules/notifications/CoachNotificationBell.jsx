@@ -2,6 +2,7 @@
 // Simple notification bell for CoachHub - reads coach_notifications table
 import { useState, useEffect, useRef } from 'react'
 import { Bell, X, Check, ChevronRight, AlertCircle, FileText, Utensils, LifeBuoy, ClipboardCheck, PlayCircle } from 'lucide-react'
+import { geleden } from '../../utils/tijd'
 
 export default function CoachNotificationBell({ db, isMobile, onNavigate, open: openProp, onOpenChange, onCountChange }) {
   const controlled = typeof openProp === 'boolean' && typeof onOpenChange === 'function'
@@ -116,16 +117,6 @@ export default function CoachNotificationBell({ db, isMobile, onNavigate, open: 
     }
   }
 
-  const timeAgo = (dateStr) => {
-    const diff = Date.now() - new Date(dateStr).getTime()
-    const mins = Math.floor(diff / 60000)
-    if (mins < 1) return 'net'
-    if (mins < 60) return `${mins}m`
-    const hours = Math.floor(mins / 60)
-    if (hours < 24) return `${hours}u`
-    const days = Math.floor(hours / 24)
-    return `${days}d`
-  }
 
   return (
     <>
@@ -339,7 +330,7 @@ export default function CoachNotificationBell({ db, isMobile, onNavigate, open: 
                       fontWeight: 600,
                       color: 'rgba(255,255,255,0.2)'
                     }}>
-                      {timeAgo(notif.created_at)}
+                      {geleden(notif.created_at)}
                     </span>
                     {!notif.read_status && (
                       <div style={{

@@ -8,6 +8,7 @@ import {
   ArrowRight, MoreVertical, X, Send, StickyNote, Trash2
 } from 'lucide-react'
 import IntakeService from './IntakeService'
+import { geledenLang } from '../utils/tijd'
 
 const isMobile = window.innerWidth <= 768
 
@@ -23,20 +24,6 @@ const STATUSES = [
 const getStatus = (key) => STATUSES.find(s => s.key === key) || STATUSES[0]
 
 // ── Time ago helper ──
-function timeAgo(date) {
-  if (!date) return ''
-  const now = new Date()
-  const d = new Date(date)
-  const mins = Math.floor((now - d) / 60000)
-  if (mins < 1) return 'Zojuist'
-  if (mins < 60) return `${mins}m geleden`
-  const hrs = Math.floor(mins / 60)
-  if (hrs < 24) return `${hrs}u geleden`
-  const days = Math.floor(hrs / 24)
-  if (days < 7) return `${days}d geleden`
-  return d.toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })
-}
-
 export default function LeadManager() {
   const [leads, setLeads] = useState([])
   const [loading, setLoading] = useState(true)
@@ -246,7 +233,7 @@ export default function LeadManager() {
                     </div>
                     <div>
                       <div style={{ fontSize: isMobile ? '0.88rem' : '0.92rem', fontWeight: '700', color: '#fff' }}>{lead.contact_name}</div>
-                      <div style={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.3)' }}>{timeAgo(lead.created_at)}</div>
+                      <div style={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.3)' }}>{geledenLang(lead.created_at)}</div>
                     </div>
                   </div>
                   <ChevronRight size={16} color="rgba(255,255,255,0.2)" />
@@ -358,7 +345,7 @@ function LeadDetailModal({ lead, onClose, onStatusChange, onDelete, onRefresh })
             }}>{lead.contact_name?.charAt(0)?.toUpperCase()}</div>
             <div>
               <h2 style={{ fontSize: '1.1rem', fontWeight: '800', margin: 0, color: '#fff' }}>{lead.contact_name}</h2>
-              <div style={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.35)' }}>{timeAgo(lead.created_at)}</div>
+              <div style={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.35)' }}>{geledenLang(lead.created_at)}</div>
             </div>
           </div>
           <button onClick={onClose} style={{

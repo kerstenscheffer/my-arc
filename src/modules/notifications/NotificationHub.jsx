@@ -13,21 +13,12 @@ import {
 } from 'lucide-react'
 import ScheduledNotifications from './ScheduledNotifications'
 import FixedNotifications from './FixedNotifications'
+import { geleden } from '../../utils/tijd'
 
 const GOLD = '#FFD700'
 const GREEN = '#10b981'
 const RED = '#ef4444'
 const AMBER = '#f59e0b'
-
-const timeAgo = (iso) => {
-  try {
-    const diff = (Date.now() - new Date(iso).getTime()) / 1000
-    if (diff < 60) return 'net'
-    if (diff < 3600) return `${Math.floor(diff / 60)}m`
-    if (diff < 86400) return `${Math.floor(diff / 3600)}u`
-    return `${Math.floor(diff / 86400)}d`
-  } catch { return '' }
-}
 
 export default function NotificationHub({ db }) {
   const isMobile = typeof window !== 'undefined' && window.innerWidth <= 768
@@ -169,7 +160,7 @@ export default function NotificationHub({ db }) {
               <div style={{ fontSize: '0.8rem', fontWeight: n.read_status ? 600 : 800, color: n.read_status ? 'rgba(255,255,255,0.6)' : '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{n.title}</div>
               {n.message && <div style={{ fontSize: '0.68rem', color: 'rgba(255,255,255,0.4)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{n.message}</div>}
             </div>
-            <span style={{ flexShrink: 0, fontSize: '0.62rem', color: 'rgba(255,255,255,0.3)', fontWeight: 700 }}>{timeAgo(n.created_at)}</span>
+            <span style={{ flexShrink: 0, fontSize: '0.62rem', color: 'rgba(255,255,255,0.3)', fontWeight: 700 }}>{geleden(n.created_at)}</span>
           </div>
         ))}
       </div>
