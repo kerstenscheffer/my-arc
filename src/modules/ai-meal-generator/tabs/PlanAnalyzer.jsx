@@ -1859,29 +1859,58 @@ export default function PlanAnalyzer({
                 )
               })}
 
-              {/* Nieuwe maaltijd toevoegen — pakt de eerstvolgende vrije slot
-                  en opent de kies-modal. */}
+              {/* Nieuwe maaltijd: zoeken of zelf bouwen. Beide pakken de
+                  eerstvolgende vrije slot van deze dag. Dezelfde twee wegen
+                  als op een lege slot-kaart, zodat het overal hetzelfde werkt. */}
               {currentDay && (() => {
                 const freeSlot = SLOTS.find(s => !currentDay.meals?.[s])
+                if (!freeSlot) return (
+                  <div style={{
+                    width: '100%', marginTop: '0.6rem', padding: m ? '0.7rem' : '0.8rem',
+                    textAlign: 'center', borderRadius: 12,
+                    background: 'rgba(255,255,255,0.03)',
+                    border: '1px dashed rgba(255,255,255,0.1)',
+                    color: 'rgba(255,255,255,0.25)',
+                    fontSize: m ? '0.78rem' : '0.85rem', fontWeight: 800,
+                  }}>
+                    Alle maaltijd-slots gevuld
+                  </div>
+                )
                 return (
-                  <button
-                    onClick={() => freeSlot && handleAdd(activeDay, freeSlot)}
-                    disabled={!freeSlot}
-                    style={{
-                      width: '100%', marginTop: '0.6rem',
-                      display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem',
-                      padding: m ? '0.7rem' : '0.8rem',
-                      background: freeSlot ? 'rgba(255,215,0,0.08)' : 'rgba(255,255,255,0.03)',
-                      border: `1px dashed ${freeSlot ? 'rgba(255,215,0,0.4)' : 'rgba(255,255,255,0.1)'}`,
-                      borderRadius: 12,
-                      color: freeSlot ? '#FFD700' : 'rgba(255,255,255,0.25)',
-                      fontSize: m ? '0.78rem' : '0.85rem', fontWeight: 800,
-                      cursor: freeSlot ? 'pointer' : 'not-allowed',
-                      touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', fontFamily: 'inherit',
-                    }}
-                  >
-                    <Plus size={16} /> {freeSlot ? 'Maaltijd toevoegen' : 'Alle maaltijd-slots gevuld'}
-                  </button>
+                  <div style={{ display: 'flex', gap: 8, marginTop: '0.6rem' }}>
+                    <button
+                      onClick={() => handleAdd(activeDay, freeSlot)}
+                      style={{
+                        flex: 1, minWidth: 0,
+                        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem',
+                        padding: m ? '0.7rem' : '0.8rem',
+                        background: 'rgba(255,215,0,0.08)',
+                        border: '1px dashed rgba(255,215,0,0.4)',
+                        borderRadius: 12, color: '#FFD700',
+                        fontSize: m ? '0.78rem' : '0.85rem', fontWeight: 800,
+                        cursor: 'pointer', fontFamily: 'inherit',
+                        touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+                      }}
+                    >
+                      <Plus size={16} /> Maaltijd toevoegen
+                    </button>
+                    <button
+                      onClick={() => setMakerState({ dayIndex: activeDay, slot: freeSlot })}
+                      style={{
+                        flex: '0 0 auto',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.35rem',
+                        padding: m ? '0.7rem 1.1rem' : '0.8rem 1.3rem',
+                        background: '#fff',
+                        borderTop: 'none', borderBottom: 'none', borderLeft: 'none', borderRight: 'none',
+                        borderRadius: 12, color: '#0a0a0a',
+                        fontSize: m ? '0.78rem' : '0.85rem', fontWeight: 900,
+                        cursor: 'pointer', fontFamily: 'inherit',
+                        touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+                      }}
+                    >
+                      Maken
+                    </button>
+                  </div>
                 )
               })()}
 
