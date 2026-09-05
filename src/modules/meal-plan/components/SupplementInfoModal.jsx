@@ -18,17 +18,32 @@ export default function SupplementInfoModal({ supplement, isMobile, onClose, db 
   // Bronnen komen uit supplement_templates en niet uit het plan van de klant.
   // Het plan draagt een momentopname; werk je een bron bij, dan zou die daar
   // niet in meekomen. Zo leest iedereen meteen de bijgewerkte versie.
-  const [bronnen, setBronnen] = useState(null)   // null = laden
+  const [sjabloon, setSjabloon] = useState(null)   // null = laden
   useEffect(() => {
-    if (!db?.supabase || !sp?.id) { setBronnen([]); return }
+    if (!db?.supabase || !sp?.id) { setSjabloon({ sources: [], benefits: null }); return }
     let leeft = true
     db.supabase
-      .from('supplement_templates').select('sources')
+      .from('supplement_templates').select('sources, benefits')
       .eq('supplement_id', sp.id).maybeSingle()
-      .then(({ data }) => { if (leeft) setBronnen(Array.isArray(data?.sources) ? data.sources : []) },
-            () => { if (leeft) setBronnen([]) })
+      .then(({ data }) => { if (leeft) setSjabloon(data || { sources: [], benefits: null }) },
+            () => { if (leeft) setSjabloon({ sources: [], benefits: null }) })
     return () => { leeft = false }
   }, [db, sp?.id])
+
+  const bronnen = sjabloon ? (Array.isArray(sjabloon.sources) ? sjabloon.sources : []) : null
+
+  // Wat de klant leest komt bij voorkeur uit het sjabloon, niet uit het plan.
+  //
+  // Het plan draagt een momentopname van het moment dat het supplement werd
+  // toegewezen. Corrigeer je een claim in het sjabloon — zoals de
+  // testosteron-bewering bij magnesium — dan zou die correctie in bestaande
+  // plannen blijven hangen. Dat is precies verkeerd om: een claim die je
+  // hebt teruggenomen mag nergens meer staan.
+  //
+  // Heeft het sjabloon niets, dan valt hij terug op wat er in het plan staat.
+  const voordelen = (Array.isArray(sjabloon?.benefits) && sjabloon.benefits.length > 0)
+    ? sjabloon.benefits
+    : (sp.voordelen || [])
 
   // Pas hierna afhaken. Een vroege return bóven de hooks laat het aantal
   // hooks tussen renders verschillen, en dan gooit React
@@ -141,10 +156,10 @@ export default function SupplementInfoModal({ supplement, isMobile, onClose, db 
             </div>
           )}
 
-          {sp.voordelen?.length > 0 && (
+          {voordelen.length > 0 && (
             <div style={{ marginBottom: '1rem' }}>
               {kop('Waarvoor')}
-              {sp.voordelen.map((v, i) => (
+              {voordelen.map((v, i) => (
                 <div key={i} style={{ display: 'flex', gap: 7, alignItems: 'flex-start', marginBottom: 4 }}>
                   <Check size={13} style={{ color: '#10b981', flexShrink: 0, marginTop: 2 }} />
                   <span style={{ fontSize: '0.78rem', fontWeight: 600, color: 'rgba(255,255,255,0.75)', lineHeight: 1.45 }}>
@@ -213,7 +228,7 @@ export default function SupplementInfoModal({ supplement, isMobile, onClose, db 
 
           {/* Geen bronnen betekent "nog niet nagezocht", niet "geen bewijs".
               Dat verschil hoort er te staan. */}
-          {bronnen && bronnen.length === 0 && sp.voordelen?.length > 0 && (
+          {bronnen && bronnen.length === 0 && voordelen.length > 0 && (
             <div style={{
               marginTop: '0.9rem', padding: '0.55rem 0.7rem', borderRadius: 8,
               background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)',
@@ -224,7 +239,7 @@ export default function SupplementInfoModal({ supplement, isMobile, onClose, db 
             </div>
           )}
 
-          {!sp.instructies && !sp.voordelen?.length && !veiligheid.max_dose && (
+          {!sp.instructies && voordelen.length === 0 && !veiligheid.max_dose && (
             <div style={{ padding: '1rem 0', fontSize: '0.78rem', color: 'rgba(255,255,255,0.35)', textAlign: 'center' }}>
               Er is verder geen informatie bij dit supplement vastgelegd.
             </div>
