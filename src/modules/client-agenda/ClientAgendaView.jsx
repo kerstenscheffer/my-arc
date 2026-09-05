@@ -1931,7 +1931,7 @@ export default function ClientAgendaView({
     )
   }
 
-  const { hasMealPlan, hasSchema, mealPlan, schema } = data
+  const { hasMealPlan, hasSchema, mealPlan, schema, schemaZonderWeekindeling, schemaDagen } = data
 
   return (
     <div style={{
@@ -1985,11 +1985,12 @@ export default function ClientAgendaView({
           agenda; dat kostte meer hoogte dan het rooster eronder waard was.
           Nu één icoon met de melding in de tooltip — je ziet dat er iets is,
           en de tekst is er nog als je hem nodig hebt. */}
-      {(!hasMealPlan || !hasSchema) && (
+      {(!hasMealPlan || !hasSchema || schemaZonderWeekindeling) && (
         <span
           title={[
             !hasMealPlan && 'Geen actief meal-plan voor deze client — maaltijden ontbreken in de agenda.',
             !hasSchema && 'Geen workout-schema toegewezen — training-dagen worden niet bepaald.',
+            schemaZonderWeekindeling && `Het schema is toegewezen${schemaDagen ? ` (${schemaDagen} dagen)` : ''}, maar er staat niet vast op welke weekdagen het valt. De agenda toont daarom de trainingsdagen uit het voedingsplan, en die kunnen verouderd zijn.`,
             'Placeholders (transparant) kun je gewoon aanklikken — ze worden bij opslaan een echt blok.',
           ].filter(Boolean).join('\n')}
           style={balkVak(isMobile, {
@@ -2000,7 +2001,7 @@ export default function ClientAgendaView({
           })}
         >
           <AlertCircle size={12} />
-          {[!hasMealPlan, !hasSchema].filter(Boolean).length}
+          {[!hasMealPlan, !hasSchema, schemaZonderWeekindeling].filter(Boolean).length}
         </span>
       )}
 

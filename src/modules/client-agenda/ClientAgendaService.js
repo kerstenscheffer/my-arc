@@ -733,6 +733,13 @@ export class ClientAgendaService {
       weekStart, weekEnd,
       hasMealPlan: !!mealPlan,
       hasSchema: !!schema,
+      // Er is wél een schema toegewezen, maar nergens staat welke weekdagen
+      // dat zijn. De agenda valt dan terug op is_training_day uit het
+      // voedingsplan, en die vlag kan verouderd zijn — zo krijg je vijf
+      // trainingen in beeld terwijl het schema er drie heeft. De weergave
+      // meldt dit; stil laten gebeuren kost je een middag zoeken.
+      schemaZonderWeekindeling: !!schema && !workoutSchedule,
+      schemaDagen: schema?.week_structure ? Object.keys(schema.week_structure).length : null,
     }
   }
 
