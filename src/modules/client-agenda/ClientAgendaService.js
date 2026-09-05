@@ -107,12 +107,20 @@ const SLOT_DEFAULT_TIME = {
   dinner: '19:00', snack3: '21:30', snack4: '22:00', snack5: '22:30',
   snack6: '23:00', snack7: '23:30', snack8: '23:59',
 }
-const SLOT_COLOR = '#f59e0b' // amber voor meals
-const SUPPLEMENT_COLOR = '#22c55e' // groen — onderscheidt zich van maaltijd-amber
+// Kleur per soort blok. Eén kleur per betekenis, en geen twee soorten die
+// op elkaar lijken — dat is het enige dat de agenda nog leesbaar houdt nu
+// de foto's eruit zijn.
+const SLOT_COLOR = '#22c55e' // groen voor maaltijden
+// Supplementen waren groen; die zijn naar amber verhuisd toen maaltijden
+// groen werden. Twee groenen naast elkaar in dezelfde kolom zijn niet uit
+// elkaar te houden, en supplementen staan juist vaak náást een maaltijd.
+const SUPPLEMENT_COLOR = '#f59e0b'
 const SUPPLEMENT_DURATION = 20
 const PRE_WORKOUT_SLOT = 'pre_workout'
 const TRAINING_COLOR = '#3b82f6' // blue
-const SLEEP_COLOR = '#6366f1' // indigo
+// Paars. Was indigo, en dat lag zo dicht bij het blauw van training dat
+// een slaapblok en een workout in dezelfde kolom hetzelfde leken.
+const SLEEP_COLOR = '#a855f7'
 // Licht rood, zoals de gekleurde dagvullende afspraken in Google Agenda.
 // Was grijsblauw, en dat viel op een donkere agenda weg tegen de lijnen —
 // terwijl werk juist het blok is waar de rest zich omheen moet voegen.

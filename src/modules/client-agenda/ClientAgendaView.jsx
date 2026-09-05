@@ -25,6 +25,8 @@ const COLORS = {
   indigo: '#6366f1',
   slate: '#64748b',
   green: '#22c55e',
+  purple: '#a855f7',
+  red: '#e8756a',
 }
 
 // Tijdas: 6:00 → 24:00 (slaap wordt apart als block aan rand getoond)
@@ -59,7 +61,11 @@ const VERZET_STAPPEN = [
 // geen 30 pixels; een maaltijd van een half uur werd dan een streepje waar
 // niets in past. Google Agenda houdt ongeveer 60 pixels per uur aan, en
 // daar is dit de benadering van binnen de ruimte die deze pagina heeft.
-const GRID_MIN_HOOGTE = { desktop: 700, mobiel: 560 }
+// Ongeveer 60 pixels per uur over een venster van 18 uur, net als Google
+// Agenda. Dit past niet meer op één scherm — de omhullende scrollt, en dat
+// is hier de bedoeling: met alles samengeperst op 520 pixels stonden vier
+// maaltijden in de ochtend als streepjes op elkaar.
+const GRID_MIN_HOOGTE = { desktop: 1080, mobiel: 900 }
 const KOP_HOOGTE = { desktop: '1.75rem', mobiel: '1.55rem' }
 const kopHoogte = (isMobile) => (isMobile ? KOP_HOOGTE.mobiel : KOP_HOOGTE.desktop)
 const gridMinHoogte = (isMobile) => (isMobile ? GRID_MIN_HOOGTE.mobiel : GRID_MIN_HOOGTE.desktop)
@@ -88,46 +94,25 @@ const TYPE_ICON = {
   supplement: Pill,
 }
 
+// Moet gelijk blijven aan de kleuren in ClientAgendaService — de legenda
+// die iets anders vertelt dan de blokken is erger dan geen legenda.
 const LEGEND_ITEMS = [
-  { type: 'meal',     color: COLORS.amber,  label: 'Maaltijd' },
+  { type: 'meal',     color: COLORS.green,  label: 'Maaltijd' },
   { type: 'training', color: COLORS.blue,   label: 'Training' },
-  { type: 'sleep',    color: COLORS.indigo, label: 'Slaap (placeholder)' },
-  { type: 'work',     color: COLORS.slate,  label: 'Werk (placeholder)' },
-  { type: 'supplement', color: COLORS.green, label: 'Supplementen' },
+  { type: 'sleep',    color: COLORS.purple, label: 'Slaap (placeholder)' },
+  { type: 'work',     color: COLORS.red,    label: 'Werk (placeholder)' },
+  { type: 'supplement', color: COLORS.amber, label: 'Supplementen' },
 ]
 
-// Fallback foto's identiek aan day-schedule/MealCard.jsx zodat de
-// agenda dezelfde visuele taal toont als de client-meal pagina.
-const MEAL_FALLBACK = {
-  breakfast: 'https://images.unsplash.com/photo-1525351484163-7529414344d8?w=200&h=200&fit=crop&q=80',
-  lunch:     'https://images.unsplash.com/photo-1547592166-23ac45744acd?w=200&h=200&fit=crop&q=80',
-  dinner:    'https://images.unsplash.com/photo-1555939594-58d7cb561ad1?w=200&h=200&fit=crop&q=80',
-  snack1:    'https://images.unsplash.com/photo-1490474504059-bf2db5ab2348?w=200&h=200&fit=crop&q=80',
-  snack2:    'https://images.unsplash.com/photo-1490474504059-bf2db5ab2348?w=200&h=200&fit=crop&q=80',
-}
-const WORKOUT_FALLBACK = 'https://images.unsplash.com/photo-1517836357463-d25dfeac3438?w=200&h=200&fit=crop&q=80'
-const SLEEP_FALLBACK   = 'https://images.unsplash.com/photo-1531353826977-0941b4779a1c?w=200&h=200&fit=crop&q=80'
-const WORK_FALLBACK    = 'https://images.unsplash.com/photo-1497366216548-37526070297c?w=200&h=200&fit=crop&q=80'
-// Per soort baan een passend beeld. Een bureaufoto bij een winkel- of
-// horecadienst zegt niets; het label staat er overheen, maar de foto hoort
-// mee te vertellen wat voor dag het is.
-const WERK_FOTO = {
-  Kantoor:       'https://images.unsplash.com/photo-1497366216548-37526070297c?w=200&h=200&fit=crop&q=80',
-  Horeca:        'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=200&h=200&fit=crop&q=80',
-  Winkel:        'https://images.unsplash.com/photo-1441986300917-64674bd600d8?w=200&h=200&fit=crop&q=80',
-  'Fysiek werk': 'https://images.unsplash.com/photo-1504328345606-18bbc8c9d7d1?w=200&h=200&fit=crop&q=80',
-}
+// Geen foto's meer in de agenda.
+//
+// Elk blok had een plaatje: een bord eten, een sportschool, een slaapkamer.
+// Zeven kolommen naast elkaar met elk acht van die miniaturen werd een
+// lappendeken waarin je juist niet meer zag hoe je dag loopt. De kleur van
+// het blok zegt wat voor soort het is en de tekst zegt de rest; dat is
+// genoeg, en het scheelt ook nog zeven keer acht netwerkverzoeken.
 
-const getBlockImage = (block) => {
-  if (block.meta?.image_url) return block.meta.image_url
-  if (block.type === 'meal') return MEAL_FALLBACK[block.meta?.slot] || MEAL_FALLBACK.lunch
-  if (block.type === 'training') return WORKOUT_FALLBACK
-  if (block.type === 'sleep')    return SLEEP_FALLBACK
-  if (block.type === 'work')     return WERK_FOTO[block.label] || WORK_FALLBACK
-  return null
-}
-
-// MealCard-stijl agenda blok. Foto links, slot-label + naam + macros
+// Agenda blok: gekleurde rand, slot-label + naam + tijd
 // rechts. Zelfde visuele taal als day-schedule/MealCard.jsx.
 // Render-order voor overlap: langste blok eerst in DOM (komt onder te liggen),
 // kortere blokken later (komen er bovenop). Beide volle breedte, beide 100%
@@ -205,14 +190,13 @@ function AgendaBlock({ block, isMobile, onClick, onPointerDownDrag, draggable, i
   // Uitzondering: meal-blokken (incl. snacks van 15 min) krijgen altijd
   // de foto+naam layout zodat het visueel consistent is.
   const Icon = TYPE_ICON[block.type] || Calendar
-  const imageUrl = getBlockImage(block)
-  const sizeMode = (block.type === 'meal' && imageUrl)
-    ? 'full'
-    : (durationMin >= 45 ? 'full' : durationMin >= 30 ? 'compact' : 'mini')
+  // Hoeveel past er in het blok? Puur op duur; maaltijden kregen hiervoor
+  // altijd 'full' omdat ze een foto hadden, maar zonder foto is een blok
+  // van een kwartier gewoon een blok van een kwartier.
+  const sizeMode = durationMin >= 45 ? 'full' : durationMin >= 30 ? 'compact' : 'mini'
   // Werk krijgt geen foto meer. Het is nu een gevuld gekleurd vlak, en een
   // kantoorplaatje in de hoek daarvan maakt het alleen maar onrustiger —
   // wat je wil weten is welke uren bezet zijn en waarmee.
-  const showImage = sizeMode === 'full' && imageUrl && block.type !== 'work'
 
   // Slot/type label
   const topLabel = block.type === 'meal'
@@ -245,7 +229,9 @@ function AgendaBlock({ block, isMobile, onClick, onPointerDownDrag, draggable, i
         position: 'absolute',
         top: `${top}%`,
         height: `${height}%`,
-        minHeight: block.type === 'meal' && imageUrl ? 32 : undefined,
+        // Een maaltijd van een kwartier is 15 pixels hoog; daar past de
+        // regel met naam niet in. Ondergrens zodat hij leesbaar blijft.
+        minHeight: sizeMode === 'mini' ? 20 : undefined,
         // Kolom binnen de overlap-groep. Eén blok = volle breedte, twee
         // blokken = ieder de helft, enzovoort.
         left: isAchter ? 1 : `calc(${((block._kolom || 0) / (block._kolommen || 1)) * 100}% + 3px)`,
@@ -281,54 +267,6 @@ function AgendaBlock({ block, isMobile, onClick, onPointerDownDrag, draggable, i
         zIndex: isGhost ? 5 : isSelected ? 4 : isAchter ? 0 : 2,
       }}
     >
-      {/* Foto links — alleen voor 'full' size. Voor meals: donkere overlay
-          met slot-label (Ontbijt/Lunch/Diner) eroverheen zodat het type
-          herkenbaar blijft ook als de card kort is. */}
-      {showImage && (
-        <div style={{
-          width: isMobile ? 56 : 68,
-          flexShrink: 0,
-          background: `url(${imageUrl}) center/cover`,
-          // Etensfoto's zijn licht; een slaapkamer bij nacht of een kantoor
-          // niet. Zonder deze correctie werden die kaarten bijna zwart.
-          filter: block.type === 'meal' ? undefined : 'brightness(1.5) saturate(1.15)',
-          position: 'relative',
-        }}>
-          {/* Naam op de foto. Zat alleen op maaltijden; werk en slaap kregen
-              wel een foto maar zonder tekst — dan zie je niet waar je naar
-              kijkt. Nu voor elk bloktype hetzelfde. */}
-          {(
-            <>
-              <div style={{
-                position: 'absolute', inset: 0,
-                background: block.type === 'meal'
-                  ? 'linear-gradient(180deg, rgba(0,0,0,0.55) 0%, rgba(0,0,0,0.75) 100%)'
-                  : 'linear-gradient(180deg, rgba(0,0,0,0.2) 0%, rgba(0,0,0,0.45) 100%)',
-                pointerEvents: 'none',
-              }} />
-              <div style={{
-                position: 'absolute', inset: 0,
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                padding: '2px 4px',
-              }}>
-                <span style={{
-                  fontSize: isMobile ? '0.55rem' : '0.6rem',
-                  fontWeight: 900,
-                  color: block.type === 'meal' ? block.color : '#fff',
-                  textTransform: 'uppercase', letterSpacing: '0.08em',
-                  textAlign: 'center', lineHeight: 1.1,
-                  textShadow: '0 1px 3px rgba(0,0,0,0.8)',
-                  whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
-                  maxWidth: '100%',
-                }}>
-                  {topLabel}{isPlaceholderTime && ' *'}
-                </span>
-              </div>
-            </>
-          )}
-        </div>
-      )}
-
       {/* Tekst-content rechts — bovenaan uitgelijnd zodat lange blokken
           (bv. werk 8u) hun titel niet in het midden krijgen, en zodat
           overlay-blokken de onderliggende titel niet verbergen. */}
@@ -343,7 +281,7 @@ function AgendaBlock({ block, isMobile, onClick, onPointerDownDrag, draggable, i
       }}>
         {/* Top: voor meals met foto staat het slot-label op de foto.
             Voor andere blokken (of meals zonder foto) topLabel hier. */}
-        {!showImage && (
+        {(
           <div style={{
             display: 'flex', alignItems: 'center',
             justifyContent: 'space-between', gap: 4,
@@ -364,6 +302,20 @@ function AgendaBlock({ block, isMobile, onClick, onPointerDownDrag, draggable, i
               }}>
                 {topLabel}{isPlaceholderTime && ' *'}
               </span>
+              {/* Bij de kleinste maat past er maar één regel, en die moet
+                  de naam bevatten — "SNACK" alleen zegt niets, "SNACK ·
+                  Magere kwark met blauwe bessen" wel. Horizontaal is er
+                  ruimte zat; verticaal niet. */}
+              {sizeMode === 'mini' && mainTitle && (
+                <span style={{
+                  fontSize: isMobile ? '0.58rem' : '0.68rem',
+                  fontWeight: 800, color: '#fff', minWidth: 0,
+                  whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+                  letterSpacing: '-0.015em',
+                }}>
+                  {mainTitle}
+                </span>
+              )}
             </div>
             {sizeMode !== 'mini' && (
               <span style={{
@@ -377,38 +329,9 @@ function AgendaBlock({ block, isMobile, onClick, onPointerDownDrag, draggable, i
           </div>
         )}
 
-        {/* Voor meals met foto: titel + tijd op één rij bovenaan.
-            Eén regel, max ~22 tekens — anders ellipsis. */}
-        {showImage && (() => {
-          const MAX_TITLE_CHARS = 22
-          const raw = mainTitle || topLabel || ''
-          const titleText = raw.length > MAX_TITLE_CHARS ? `${raw.slice(0, MAX_TITLE_CHARS - 1).trimEnd()}…` : raw
-          return (
-            <div style={{
-              display: 'flex', alignItems: 'baseline',
-              justifyContent: 'space-between', gap: 6,
-            }}>
-              <div style={{
-                fontSize: isMobile ? '0.62rem' : '0.68rem',
-                fontWeight: 800, color: '#fff',
-                lineHeight: 1.2, letterSpacing: '-0.015em',
-                whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
-                minWidth: 0,
-              }}>
-                {titleText}
-              </div>
-              <span style={{
-                fontSize: isMobile ? '0.48rem' : '0.52rem', fontWeight: 700,
-                color: COLORS.text25, whiteSpace: 'nowrap', flexShrink: 0,
-              }}>
-                {formatTime(block.start)}
-              </span>
-            </div>
-          )
-        })()}
-
-        {/* Hoofdnaam — alleen voor non-meal blokken of meal zonder foto */}
-        {mainTitle && sizeMode !== 'mini' && !showImage && (
+        {/* Hoofdnaam. Stond er voor maaltijden in een eigen variant naast
+            de foto; nu dezelfde regel voor elk bloktype. */}
+        {mainTitle && sizeMode !== 'mini' && (
           <div style={{
             fontSize: isMobile ? '0.7rem' : '0.78rem',
             fontWeight: 800, color: '#fff',
@@ -419,15 +342,6 @@ function AgendaBlock({ block, isMobile, onClick, onPointerDownDrag, draggable, i
             WebkitBoxOrient: 'vertical',
             overflow: 'hidden',
             textOverflow: 'ellipsis',
-          }}>
-            {mainTitle}
-          </div>
-        )}
-        {mainTitle && sizeMode === 'mini' && !isMobile && (
-          <div style={{
-            fontSize: '0.72rem', color: COLORS.text50,
-            whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
-            lineHeight: 1.2,
           }}>
             {mainTitle}
           </div>
