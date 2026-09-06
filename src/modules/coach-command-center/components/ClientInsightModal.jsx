@@ -2,7 +2,7 @@
 // ClientInsightModal.jsx - v8.3
 // + onOpenMealPanel prop toegevoegd voor Meal Plan SOP widget
 import React, { useState, useRef } from 'react'
-import { X, Scale, Dumbbell, UtensilsCrossed, ChevronLeft, ChevronRight, ChevronDown, TrendingUp, User, BookOpen, ClipboardCheck, Bell, Download, ExternalLink } from 'lucide-react'
+import { X, Scale, Dumbbell, UtensilsCrossed, ChevronLeft, ChevronRight, ChevronDown, TrendingUp, User, BookOpen, ClipboardCheck, Bell, Download, ExternalLink, CalendarCheck } from 'lucide-react'
 import WeightColumn from './insight/WeightColumn'
 import WorkoutColumn from './insight/WorkoutColumn'
 import MealsColumn from './insight/MealsColumn'
@@ -26,6 +26,20 @@ const kopKnop = (primair = false) => ({
   touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
 })
 
+
+// Maandelijkse check: na 28 dagen coaching (of 28 dagen na de vorige check)
+// verschijnt een banner in de modal. Status bewaard in localStorage per client.
+const _mkKey = (id) => `myarc_monthly_check_${id}`
+const _getLastCheck = (id) => { try { return localStorage.getItem(_mkKey(id)) || null } catch { return null } }
+const _saveCheck = (id) => { try { localStorage.setItem(_mkKey(id), new Date().toISOString()) } catch {} }
+const _isCheckDue = (client) => {
+  const start = client.coaching_start_date
+  if (!start || !['active', 'paused'].includes(client.coaching_status || 'active')) return false
+  const startMs = new Date(start + 'T00:00:00').getTime()
+  const last = _getLastCheck(client.id)
+  const refMs = last ? new Date(last).getTime() : startMs
+  return (Date.now() - refMs) / 86400000 >= 28
+}
 
 // Groepeer de foto's per MAAND (relatief vanaf de eerste foto) en binnen elke
 // maand per DAG, zodat foto's van dezelfde dag (voor/zij/achter) bij elkaar
@@ -76,11 +90,14 @@ export default function ClientInsightModal({ isOpen, onClose, client, isMobile, 
   const [showIntake, setShowIntake] = useState(false)
 
   const [localClient, setLocalClient] = useState(null)
+  const [monthlyChecked, setMonthlyChecked] = useState(false)
   const containerRef = useRef(null)
 
   if (!isOpen || !client) return null
 
   const effectiveClient = localClient ? { ...client, ...localClient } : client
+  const showMonthlyReminder = !monthlyChecked && _isCheckDue(effectiveClient)
+  const handleMonthlyCheckDone = () => { _saveCheck(effectiveClient.id); setMonthlyChecked(true) }
 
   const handleClientUpdate = (updatedFields) => {
     setLocalClient(prev => ({ ...(prev || {}), ...updatedFields }))
@@ -256,6 +273,28 @@ export default function ClientInsightModal({ isOpen, onClose, client, isMobile, 
               onClientUpdate={handleClientUpdate}
             />
           )}
+          {/* ═══ MAANDELIJKSE CHECK BANNER (desktop) ═══ */}
+          {!isMobile && showMonthlyReminder && (
+            <div style={{
+              flexShrink: 0, display: 'flex', alignItems: 'center', gap: '0.5rem',
+              padding: '0.45rem 1rem',
+              background: 'rgba(255,180,0,0.07)',
+              borderBottom: '1px solid rgba(255,180,0,0.18)',
+            }}>
+              <CalendarCheck size={14} style={{ color: '#FFD700', flexShrink: 0 }} />
+              <span style={{ flex: 1, fontSize: '0.78rem', color: 'rgba(255,220,100,0.85)' }}>
+                Maandelijkse check — staat {effectiveClient.first_name} nog op schema?
+              </span>
+              <button onClick={handleMonthlyCheckDone} style={{
+                background: 'rgba(255,215,0,0.12)', border: '1px solid rgba(255,215,0,0.28)',
+                borderRadius: 6, color: '#FFD700', fontSize: '0.72rem', fontWeight: 700,
+                padding: '0.2rem 0.65rem', cursor: 'pointer', flexShrink: 0,
+                touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+              }}>
+                Check gedaan ✓
+              </button>
+            </div>
+          )}
 
           {/* ═══ MOBILE HEADER ═══ */}
           {isMobile && (
@@ -296,6 +335,28 @@ export default function ClientInsightModal({ isOpen, onClose, client, isMobile, 
                 isMobile={isMobile}
                 onClientUpdate={handleClientUpdate}
               />
+              {/* ═══ MAANDELIJKSE CHECK BANNER (mobiel) ═══ */}
+              {showMonthlyReminder && (
+                <div style={{
+                  flexShrink: 0, display: 'flex', alignItems: 'center', gap: '0.4rem',
+                  padding: '0.4rem 0.8rem',
+                  background: 'rgba(255,180,0,0.07)',
+                  borderBottom: '1px solid rgba(255,180,0,0.18)',
+                }}>
+                  <CalendarCheck size={13} style={{ color: '#FFD700', flexShrink: 0 }} />
+                  <span style={{ flex: 1, fontSize: '0.73rem', color: 'rgba(255,220,100,0.85)' }}>
+                    Maandcheck — staat {effectiveClient.first_name} nog op schema?
+                  </span>
+                  <button onClick={handleMonthlyCheckDone} style={{
+                    background: 'rgba(255,215,0,0.12)', border: '1px solid rgba(255,215,0,0.28)',
+                    borderRadius: 6, color: '#FFD700', fontSize: '0.68rem', fontWeight: 700,
+                    padding: '0.18rem 0.5rem', cursor: 'pointer', flexShrink: 0,
+                    touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+                  }}>
+                    ✓ Gedaan
+                  </button>
+                </div>
+              )}
               <div style={{
                 display: 'flex', borderBottom: '1px solid rgba(255,255,255,0.06)',
                 flexShrink: 0, overflowX: 'auto', scrollbarWidth: 'none'
