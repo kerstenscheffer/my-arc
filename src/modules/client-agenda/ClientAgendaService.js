@@ -848,6 +848,79 @@ export class ClientAgendaService {
   // Werk-schedule uit het intake-formulier (jsonb in clients.work_schedule).
   // Bevat slaap/training/anders tijden per dag — perfect als bron voor
   // placeholder-blokken in de agenda.
+  /**
+   * Aanvang van de training per weekdag, in minuten sinds middernacht.
+   *
+   * Dezelfde drie bronnen in dezelfde volgorde als loadWeek gebruikt voor de
+   * trainingsblokken:
+   *   1. client_agenda_blocks — de tijd die de coach heeft gezet
+   *   2. de intake — wat de klant zelf opgaf
+   *   3. TRAINING_DEFAULT_START — als we het echt niet weten
+   *
+   * Bestaat omdat de maaltijdpagina moet weten hoe laat de pre-workout
+   * maaltijd hoort. Die tijd hier nog eens uitrekenen zou betekenen dat de
+   * agenda 05:30 toont en de maaltijdpagina iets anders zodra een van de drie
+   * bronnen verandert — en dan weet de klant niet meer wanneer hij moet eten.
+   *
+   * @returns {Promise<Object>} { monday: 440, wednesday: 390, … } — alleen
+   *          dagen waarop getraind wordt.
+   */
+  async getTrainingStartsPerDag(clientId) {
+    const leeg = {}
+    if (!clientId) return leeg
+    try {
+      const [blokken, klant] = await Promise.all([
+        this.supabase.from('client_agenda_blocks')
+          .select('day, start_time').eq('client_id', clientId).eq('type', 'training')
+          .then(r => r, e => ({ data: null, error: e })),
+        this.supabase.from('clients')
+          .select('work_schedule, workout_schedule').eq('id', clientId).maybeSingle()
+          .then(r => r, e => ({ data: null, error: e })),
+      ])
+
+      const uit = {}
+
+      // 1. Opgeslagen agenda-blokken. Bij meerdere op een dag telt de
+      //    vroegste: je eet vóór de eerste training.
+      ;(blokken?.data || []).forEach(r => {
+        const min = timeStrToMinutes(r.start_time)
+        if (!Number.isFinite(min)) return
+        if (uit[r.day] == null || min < uit[r.day]) uit[r.day] = min
+      })
+
+      // 2. Intake-tijden, alleen voor dagen zonder eigen blok.
+      const intake = klant?.data?.work_schedule
+      if (intake && typeof intake === 'object') {
+        Object.entries(intake).forEach(([nlDag, items]) => {
+          const dag = NL_TO_EN_DAY[nlDag]
+          if (!dag || !Array.isArray(items) || uit[dag] != null) return
+          items.forEach(blk => {
+            if (INTAKE_TYPE_MAP[blk?.type] !== 'training' || !blk?.start) return
+            const min = timeStrToMinutes(blk.start)
+            if (!Number.isFinite(min)) return
+            if (uit[dag] == null || min < uit[dag]) uit[dag] = min
+          })
+        })
+      }
+
+      // 3. Trainingsdagen zonder tijd uit 1 of 2 krijgen de standaardtijd —
+      //    dezelfde die loadWeek voor zijn placeholder-blok gebruikt.
+      const schema = klant?.data?.workout_schedule
+      if (schema && typeof schema === 'object') {
+        Object.keys(schema).forEach(k => {
+          if (!schema[k]) return
+          const dag = String(k).toLowerCase()
+          if (DAYS.includes(dag) && uit[dag] == null) uit[dag] = TRAINING_DEFAULT_START
+        })
+      }
+
+      return uit
+    } catch (e) {
+      console.warn('trainingstijden laden mislukt (niet-blokkerend):', e?.message)
+      return leeg
+    }
+  }
+
   async _loadIntakeSchedule(clientId) {
     const { data, error } = await this.supabase
       .from('clients')

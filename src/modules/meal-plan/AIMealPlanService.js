@@ -1,4 +1,5 @@
-import { preWorkoutVoorDag, PRE_WORKOUT_SLOT, preWorkoutTijd, tijdNaarMinuten } from './utils/preWorkoutMeal'
+import { preWorkoutVoorDag, PRE_WORKOUT_SLOT, preWorkoutTijd } from './utils/preWorkoutMeal'
+import { ClientAgendaService } from '../client-agenda/ClientAgendaService'
 // src/modules/meal-plan/AIMealPlanService.js
 // Complete service layer voor AI Meal Dashboard - WATER TRACKING FIXED
 export default class AIMealPlanService {
@@ -133,8 +134,18 @@ const dailyTotals = await this.calculateDailyTotals(clientId, todayMeals, todayP
       // of een referentie-object (met .meal_id). In beide gevallen zitten timing en
       // display_label op het slot-niveau en worden ze hier bewaard voordat getMealData
       // ze overschrijft met data uit de ai_meals tabel.
+      // Alleen een echte kloktijd telt als tijd.
+      //
+      // Het veld timing draagt twee dingen door elkaar: bij 599 slots staat er
+      // "06:00", bij 135 een lijst met momenten als ["breakfast","lunch",
+      // "post_workout"]. Die tweede vorm belandde ongefilterd in plannedTime,
+      // waar een array staat waar een tijd hoort — de maaltijd sorteert dan
+      // verkeerd en toont onzin als tijdstip.
+      const alsKloktijd = (v) =>
+        (typeof v === 'string' && /^\s*\d{1,2}:\d{2}/.test(v)) ? v.trim() : null
+
       const getSlotMeta = (slotRef) => ({
-        timing: typeof slotRef === 'object' && slotRef !== null ? (slotRef.timing || null) : null,
+        timing: typeof slotRef === 'object' && slotRef !== null ? alsKloktijd(slotRef.timing) : null,
         display_label: typeof slotRef === 'object' && slotRef !== null ? (slotRef.display_label || null) : null,
       })
 
@@ -146,7 +157,7 @@ const dailyTotals = await this.calculateDailyTotals(clientId, todayMeals, todayP
           ...mealData,
           slot,
           display_label: display_label || mealData.display_label || null,
-          timing: timing || (typeof mealData.timing === 'string' ? mealData.timing : null) || null,
+          timing: timing || alsKloktijd(mealData.timing) || null,
           timeSlot: display_label || defaultTimeSlot,
           plannedTime: timing || defaultPlannedTime,
           isConsumed: swaps[swapKey]?.consumed || false,
@@ -240,7 +251,7 @@ const dailyTotals = await this.calculateDailyTotals(clientId, todayMeals, todayP
         const entry = buildMealEntry(
           preWorkout, preWorkout, PRE_WORKOUT_SLOT,
           preWorkout.display_label || 'Pre-workout',
-          preWorkoutTijd(trainingStartMin, preWorkout.timing) || '15:30',
+          preWorkoutTijd(trainingStartMin, alsKloktijd(preWorkout.timing)) || '15:30',
           PRE_WORKOUT_SLOT,
         )
         entry.volgtTraining = Number.isFinite(trainingStartMin)
@@ -265,14 +276,10 @@ const dailyTotals = await this.calculateDailyTotals(clientId, todayMeals, todayP
    */
   async getTrainingStartVandaag(clientId) {
     try {
+      const agenda = new ClientAgendaService(this.supabase)
+      const perDag = await agenda.getTrainingStartsPerDag(clientId)
       const dag = new Date().toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase()
-      const { data, error } = await this.supabase
-        .from('client_agenda_blocks')
-        .select('start_time')
-        .eq('client_id', clientId).eq('type', 'training').eq('day', dag)
-      if (error) throw error
-      const tijden = (data || []).map(r => tijdNaarMinuten(r.start_time)).filter(Number.isFinite)
-      return tijden.length ? Math.min(...tijden) : null
+      return Number.isFinite(perDag?.[dag]) ? perDag[dag] : null
     } catch (e) {
       console.warn('trainingstijd laden mislukt (niet-blokkerend):', e?.message)
       return null

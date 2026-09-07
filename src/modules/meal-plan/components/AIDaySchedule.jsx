@@ -3,7 +3,8 @@
 // ✅ FOOD LOG: Loads consumed_meals, combined totals, log button
 // ✅ EDIT: editingMeal state + FoodLogModal editMeal prop
 import React, { useState, useEffect, useRef } from 'react'
-import { preWorkoutVoorDag, PRE_WORKOUT_SLOT } from '../utils/preWorkoutMeal'
+import { preWorkoutVoorDag, PRE_WORKOUT_SLOT, preWorkoutTijd } from '../utils/preWorkoutMeal'
+import { ClientAgendaService } from '../../client-agenda/ClientAgendaService'
 import DayScheduleHeader from './day-schedule/DayScheduleHeader'
 import DaySelector from './day-schedule/DaySelector'
 import DailyTotalsBar from './day-schedule/DailyTotalsBar'
@@ -270,6 +271,19 @@ export default function AIDaySchedule({
     // loadConsumedMeals(currentDay).
   }
 
+  // Aanvang van de training per weekdag, uit dezelfde rijen die de agenda
+  // tekent. De pre-workout maaltijd hangt hieraan: hij hoort een uur vóór de
+  // training, niet op de kloktijd die in het maaltijd-slot is meegekomen.
+  const [trainingStarts, setTrainingStarts] = useState({})
+  useEffect(() => {
+    if (!db?.supabase || !client?.id) return
+    let leeft = true
+    new ClientAgendaService(db.supabase).getTrainingStartsPerDag(client.id)
+      .then(perDag => { if (leeft) setTrainingStarts(perDag || {}) },
+            e => console.warn('trainingstijden laden mislukt:', e?.message))
+    return () => { leeft = false }
+  }, [db, client?.id])
+
   const loadDayMeals = async (dayIndex) => {
     if (!activePlan?.week_structure) { setDisplayMeals([]); return }
     setLoading(true)
@@ -325,7 +339,12 @@ export default function AIDaySchedule({
         const d = await getMealData(stored)
         if (!d) continue
         const label = displayLabel || meta.label || pretty(slot)
-        const plannedTime = parseTime(typeof stored === 'object' ? stored.timing : null) ?? meta.time ?? 12
+        let plannedTime = parseTime(typeof stored === 'object' ? stored.timing : null) ?? meta.time ?? 12
+        // De pre-workout maaltijd volgt de training van die dag.
+        if (slot === PRE_WORKOUT_SLOT) {
+          const uitTraining = parseTime(preWorkoutTijd(trainingStarts[dayKey], null))
+          if (uitTraining != null) plannedTime = uitTraining
+        }
         meals.push({
           ...d,
           slot,
@@ -348,7 +367,7 @@ export default function AIDaySchedule({
         ? null
         : preWorkoutVoorDag(activePlan, client?.workout_schedule, dayKey, dayPlan)
       if (preWorkout) {
-        const pwTijd = parseTime(preWorkout.timing) ?? 15.5
+        const pwTijd = parseTime(preWorkoutTijd(trainingStarts[dayKey], preWorkout.timing)) ?? 15.5
         meals.push({
           ...preWorkout,
           slot: PRE_WORKOUT_SLOT,
