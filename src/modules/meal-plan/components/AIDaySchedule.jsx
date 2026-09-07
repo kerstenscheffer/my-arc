@@ -81,13 +81,44 @@ export default function AIDaySchedule({
     return () => { leeft = false }
   }, [db, client?.id])
 
-  // Kalenderdatum van een dag-index, afgeleid van vandaag. Zelfde rekensom
-  // als loadConsumedMeals gebruikt, hier apart zodat de vinkjes en de
-  // gelogde maaltijden gegarandeerd naar dezelfde dag kijken.
+  // Kalenderdatum van een dag-index, afgeleid van vandaag.
+  //
+  // Op lokale datumdelen, niet via toISOString(). Die geeft de UTC-datum, en
+  // die loopt hier twee uur achter: tussen 00:00 en 02:00 kreeg je gisteren
+  // terug en keek de hele pagina naar de verkeerde dag.
   const datumVoorDag = (dayIndex) => {
     const d = new Date()
     d.setDate(d.getDate() + (dayIndex - getTodayIndex()))
-    return d.toISOString().split('T')[0]
+    const mm = String(d.getMonth() + 1).padStart(2, '0')
+    const dd = String(d.getDate()).padStart(2, '0')
+    return `${d.getFullYear()}-${mm}-${dd}`
+  }
+
+  // Begin en eind van een dag, als echte tijdstippen.
+  //
+  // Elke query naar consumed_meals hoort hier langs. Er stonden drie eigen
+  // varianten van deze rekensom in dit bestand en twee daarvan waren stuk:
+  //
+  //   const volgende = new Date(`${datum}T00:00:00`)  // lokale middernacht
+  //   volgende.setDate(volgende.getDate() + 1)        // = 22:00 UTC diezelfde dag
+  //   volgende.toISOString().split('T')[0]            // → dezelfde datum
+  //
+  // De bovengrens werd dus gelijk aan de ondergrens: `gte X and lt X` levert
+  // altijd nul rijen. Daardoor vond het vinkjes-herstel nooit een afgevinkte
+  // maaltijd terug (na herladen stond alles weer op "Afronden" terwijl de
+  // macro's wél meetelden) en zag de dubbel-log-bewaking nooit een bestaande
+  // rij, zodat dezelfde maaltijd eindeloos opnieuw geteld kon worden.
+  //
+  // Ook de grenzen zelf gaan nu als volledige tijdstempel mee. Een kale
+  // "2026-09-07T00:00:00" leest Postgres als UTC, dus viel alles wat een
+  // klant tussen 00:00 en 02:00 logde in de dag ervoor.
+  const dagVenster = (dayIndex) => {
+    const start = new Date()
+    start.setDate(start.getDate() + (dayIndex - getTodayIndex()))
+    start.setHours(0, 0, 0, 0)
+    const eind = new Date(start)
+    eind.setDate(eind.getDate() + 1)
+    return { vanaf: start.toISOString(), tot: eind.toISOString() }
   }
   const [showApplyTemplate, setShowApplyTemplate] = useState(false)
 
@@ -156,17 +187,15 @@ export default function AIDaySchedule({
     let alive = true
     ;(async () => {
       try {
-        const datum = datumVoorDag(currentDay)
-        const volgende = new Date(`${datum}T00:00:00`)
-        volgende.setDate(volgende.getDate() + 1)
-        const datumVolgende = volgende.toISOString().split('T')[0]
-        const { data } = await db.supabase
+        const { vanaf, tot } = dagVenster(currentDay)
+        const { data, error } = await db.supabase
           .from('consumed_meals')
           .select('meal_id, meal_type')
           .eq('client_id', client.id)
           .eq('source', 'plan_check')
-          .gte('consumed_at', `${datum}T00:00:00`)
-          .lt('consumed_at', `${datumVolgende}T00:00:00`)
+          .gte('consumed_at', vanaf)
+          .lt('consumed_at', tot)
+        if (error) throw error
         if (!alive || !Array.isArray(data)) return
         const restored = {}
         for (const row of data) {
@@ -203,22 +232,14 @@ export default function AIDaySchedule({
   const loadConsumedMeals = async (dayIndex) => {
     if (!db?.supabase || !client?.id) return
     try {
-      const today = new Date()
-      const diff = dayIndex - getTodayIndex()
-      const targetDate = new Date(today)
-      targetDate.setDate(today.getDate() + diff)
-      const dateStr = targetDate.toISOString().split('T')[0]
-      // Use next-day midnight as upper bound to include the full last second.
-      const nd = new Date(targetDate)
-      nd.setDate(targetDate.getDate() + 1)
-      const nextDateStr = nd.toISOString().split('T')[0]
+      const { vanaf, tot } = dagVenster(dayIndex)
 
       const { data, error } = await db.supabase
         .from('consumed_meals')
         .select('*')
         .eq('client_id', client.id)
-        .gte('consumed_at', `${dateStr}T00:00:00`)
-        .lt('consumed_at', `${nextDateStr}T00:00:00`)
+        .gte('consumed_at', vanaf)
+        .lt('consumed_at', tot)
         .order('consumed_at', { ascending: true })
 
       if (error) throw error
@@ -630,8 +651,12 @@ export default function AIDaySchedule({
             if (!db?.supabase || !client?.id) return
             // Slot tegen dubbel klikken. Lezen-dan-schrijven is niet
             // waterdicht: twee klikken vlak na elkaar lezen allebei "nog niet
-            // gelogd" voordat de eerste heeft ingevoegd. De database heeft
-            // hiervoor ook een unieke index; dit vangt het al eerder af.
+            // gelogd" voordat de eerste heeft ingevoegd.
+            //
+            // Hier stond dat de database dat met een unieke index alsnog
+            // afvangt. Die index bestaat niet — nagekeken in pg_indexes op
+            // consumed_meals. Deze controle is dus het enige wat dubbel
+            // tellen tegenhoudt; behandel 'm navenant.
             const logSleutel = `${meal.slot}|${meal.id}`
             if (bezigMetLoggen.current.has(logSleutel)) return
             bezigMetLoggen.current.add(logSleutel)
@@ -642,10 +667,7 @@ export default function AIDaySchedule({
               // elke dag dezelfde maaltijd staat — wat vaak zo is — vond hij
               // dan altijd de rij van vandaag terug en sloeg hij het loggen
               // over. Gevolg: op elke andere dag deed de afrond-knop niets.
-              const datum = datumVoorDag(currentDay)
-              const volgende = new Date(`${datum}T00:00:00`)
-              volgende.setDate(volgende.getDate() + 1)
-              const datumVolgende = volgende.toISOString().split('T')[0]
+              const { vanaf, tot } = dagVenster(currentDay)
 
               const { data: existing, error: leesFout } = await db.supabase
                 .from('consumed_meals')
@@ -653,8 +675,8 @@ export default function AIDaySchedule({
                 .eq('client_id', client.id)
                 .eq('meal_id', meal.id)
                 .eq('source', 'plan_check')
-                .gte('consumed_at', `${datum}T00:00:00`)
-                .lt('consumed_at', `${datumVolgende}T00:00:00`)
+                .gte('consumed_at', vanaf)
+                .lt('consumed_at', tot)
                 .limit(1)
 
               // Faalt de controle zelf, dan NIET loggen. Dit stond andersom:
@@ -668,7 +690,17 @@ export default function AIDaySchedule({
               }
 
               if (existing && existing.length > 0) {
-                console.log('Plan meal al gelogd op deze dag, overgeslagen')
+                // Wél het vinkje zetten. Stond de maaltijd al gelogd terwijl
+                // de kaart "Afronden" liet zien, dan deed een klik hier
+                // helemaal niets en bleef de klant achter met een knop die
+                // niet reageert. De macro's blijven ongemoeid: die rij telt
+                // al mee in de dagtotalen.
+                setCheckedByDay(prev => {
+                  const dagKey = daysOfWeek[currentDay]?.key
+                  if (!dagKey) return prev
+                  return { ...prev, [dagKey]: { ...(prev[dagKey] || {}), [meal.slot]: true } }
+                })
+                console.log('Plan meal stond al gelogd op deze dag; alleen vinkje bijgewerkt')
                 return
               }
 
@@ -698,7 +730,7 @@ export default function AIDaySchedule({
                   // mee in de verkeerde dagtotalen.
                   consumed_at: (currentDay === getTodayIndex()
                     ? new Date()
-                    : new Date(`${datum}T12:00:00`)).toISOString(),
+                    : new Date(`${datumVoorDag(currentDay)}T12:00:00`)).toISOString(),
                   source: 'plan_check',
                   is_shared: true,
                   is_favorite: false,
