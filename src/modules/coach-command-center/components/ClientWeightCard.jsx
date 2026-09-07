@@ -273,6 +273,10 @@ export default function ClientWeightCard({ client, isMobile, onToggleStatus, onD
     setDagen(prev => {
       const n = new Set(prev)
       if (naar) n.add(vandaag); else n.delete(vandaag)
+      // De teller in de kop van het overzicht rekent op client.dagCheck.
+      // Zonder dit bericht blijft die op het oude getal staan terwijl het
+      // rondje op deze kaart al is omgeslagen.
+      onDagCheckChange?.(client.id, [...n])
       return n
     })
     try {
@@ -289,6 +293,7 @@ export default function ClientWeightCard({ client, isMobile, onToggleStatus, onD
       setDagen(prev => {
         const n = new Set(prev)
         if (naar) n.delete(vandaag); else n.add(vandaag)
+        onDagCheckChange?.(client.id, [...n])
         return n
       })
     }

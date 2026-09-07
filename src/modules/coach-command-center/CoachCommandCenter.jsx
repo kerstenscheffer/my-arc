@@ -1,7 +1,7 @@
 // src/modules/coach-command-center/CoachCommandCenter.jsx
 // CoachCommandCenter.jsx - v3.5
 // + onOpenWorkoutPanel prop toegevoegd voor Workout SOP widget
-import React, { useState, useEffect, useRef } from 'react'
+import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { Search, AlertTriangle, Loader2, ArrowLeft, Video, X, UserPlus } from 'lucide-react'
 import CommandCenterService from './CommandCenterService'
 import ClientWeightCard from './components/ClientWeightCard'
@@ -175,6 +175,24 @@ export default function CoachCommandCenter({ db, onSelectClient, setActiveTab, o
     }
   }
 
+  // Hoeveel van je actieve klanten heb je vandaag afgevinkt?
+  //
+  // Bewust over álle actieve klanten en niet over wat het filter toont: de
+  // vraag is "hoever ben ik vandaag", en dat antwoord hoort niet te
+  // veranderen omdat je even op Urgent filtert.
+  // Een kaart die wordt afgevinkt geeft zijn nieuwe stand door, zodat de
+  // teller in de kop meteen meebeweegt in plaats van pas na een herlaadbeurt.
+  const verwerkDagCheck = useCallback((clientId, dagen) => {
+    setClientsWithData(prev => prev.map(c =>
+      c.id === clientId ? { ...c, dagCheck: { ...(c.dagCheck || {}), dagen } } : c
+    ))
+  }, [])
+
+  const vandaagStr = new Date().toLocaleDateString('sv-SE')
+  const actieveKlanten = clientsWithData.filter(c => c.status === 'active')
+  const gehadVandaag = actieveKlanten.filter(c => c.dagCheck?.dagen?.includes(vandaagStr)).length
+  const nogTeGaan = actieveKlanten.length - gehadVandaag
+
   const filteredClients = clientsWithData.filter(client => {
     if (statusFilter !== 'all' && client.status !== statusFilter) return false
     if (searchQuery && !`${client.first_name} ${client.last_name}`.toLowerCase().includes(searchQuery.toLowerCase())) return false
@@ -322,6 +340,48 @@ export default function CoachCommandCenter({ db, onSelectClient, setActiveTab, o
           <UserPlus size={15} strokeWidth={2.6} />
           {!isMobile && 'Klant'}
         </button>
+
+        {/* Hoever ben ik vandaag: hoeveel klanten heb ik afgevinkt.
+            De ring loopt vol naarmate je de lijst afwerkt; het getal eronder
+            zegt hoeveel er nog te gaan zijn. Alleen een percentage zou
+            verbergen of het om twee of om twintig klanten gaat. */}
+        {actieveKlanten.length > 0 && (
+          <div
+            title={`${gehadVandaag} van ${actieveKlanten.length} klanten vandaag afgevinkt · nog ${nogTeGaan} te gaan`}
+            style={{
+              flexShrink: 0, position: 'relative',
+              width: 56, height: 56,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}
+          >
+            <svg width="56" height="56" viewBox="0 0 56 56" style={{ position: 'absolute', inset: 0, transform: 'rotate(-90deg)' }}>
+              <circle cx="28" cy="28" r="24" fill="none"
+                stroke="rgba(255,255,255,0.09)" strokeWidth="4" />
+              <circle cx="28" cy="28" r="24" fill="none"
+                stroke={nogTeGaan === 0 ? '#10b981' : '#FFD700'} strokeWidth="4" strokeLinecap="round"
+                // De omtrek is 2πr; het niet-getekende deel is wat er nog te
+                // gaan is. Bij nul afgevinkt blijft de ring dus leeg.
+                strokeDasharray={2 * Math.PI * 24}
+                strokeDashoffset={2 * Math.PI * 24 * (1 - gehadVandaag / actieveKlanten.length)}
+                style={{ transition: 'stroke-dashoffset 0.3s ease' }} />
+            </svg>
+            {/* Het aantal groot, het totaal klein eronder. In één maat naast
+                elkaar ("13/13") wordt het bij twee cijfers te vol om in een
+                oogopslag te lezen. */}
+            <span style={{
+              position: 'relative', display: 'flex', flexDirection: 'column',
+              alignItems: 'center', lineHeight: 1,
+              color: nogTeGaan === 0 ? '#10b981' : '#fff',
+              fontVariantNumeric: 'tabular-nums',
+            }}>
+              <span style={{ fontSize: '1rem', fontWeight: 900 }}>{gehadVandaag}</span>
+              <span style={{
+                fontSize: '0.58rem', fontWeight: 800,
+                color: nogTeGaan === 0 ? 'rgba(16,185,129,0.7)' : 'rgba(255,255,255,0.4)',
+              }}>/{actieveKlanten.length}</span>
+            </span>
+          </div>
+        )}
       </div>
 
 
@@ -359,6 +419,7 @@ export default function CoachCommandCenter({ db, onSelectClient, setActiveTab, o
                 coachId={coachId}
                 onOpenMealPanel={onOpenMealPanel}
                 onOpenWorkoutPanel={onOpenWorkoutPanel}
+                onDagCheckChange={verwerkDagCheck}
               />
             ))}
           </div>
