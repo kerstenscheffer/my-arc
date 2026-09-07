@@ -10,7 +10,7 @@ import ClientAssigner from './components/ClientAssigner'
 // Dezelfde wizard die de klant op zijn workout-pagina gebruikt om te kiezen
 // welke training op welke dag valt. Hergebruikt i.p.v. nagebouwd: twee
 // versies van hetzelfde scherm lopen gegarandeerd uit elkaar.
-import PlanningWizard from '../workout/components/planning/PlanningWizard'
+import WeekPlanner from '../workout/components/planning/WeekPlanner'
 import WorkoutService from '../../services/WorkoutService'
 import ClientPlanManagerModal from './components/ClientPlanManagerModal'
 import { Plus, Save, Users, FileText, ChevronDown, Video, Trash2, Search, X, AlertTriangle, CalendarDays } from 'lucide-react'
@@ -668,15 +668,17 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
             style={zijKnop({ opacity: workoutPlan.days.length === 0 ? 0.35 : 1, cursor: workoutPlan.days.length === 0 ? 'not-allowed' : 'pointer' })}>
             <Users size={14} /> Huidig plan toewijzen
           </button>
-          {/* Trainingsagenda — welke training op welke dag. Zelfde wizard als
-              de klant op zijn workout-pagina heeft, dus jullie zien hetzelfde.
-              Vereist een klant én een opgeslagen schema: de wizard koppelt
-              dagen aan week_structure-sleutels van dat schema. */}
+          {/* Trainingsweek — de zeven dagen naast elkaar, per dag bladeren
+              met pijltjes. Was een wizard van vier stappen; bij het plannen
+              van een week wil je juist alles tegelijk zien, want je kijkt
+              naar de spreiding en niet naar één dag.
+              Vereist een klant én een opgeslagen schema: de dagen worden
+              gekoppeld aan week_structure-sleutels van dat schema. */}
           <button onClick={() => setShowAgenda(true)}
             disabled={!effectiveClient || !selectedSchemaId}
-            title={!effectiveClient ? 'Kies eerst een klant' : !selectedSchemaId ? 'Kies eerst een opgeslagen plan van deze klant' : 'Welke training op welke dag'}
+            title={!effectiveClient ? 'Kies eerst een klant' : !selectedSchemaId ? 'Kies eerst een opgeslagen plan van deze klant' : 'De week van deze klant plannen'}
             style={zijKnop({ opacity: (!effectiveClient || !selectedSchemaId) ? 0.35 : 1, cursor: (!effectiveClient || !selectedSchemaId) ? 'not-allowed' : 'pointer' })}>
-            <CalendarDays size={14} /> Trainingsagenda
+            <CalendarDays size={14} /> Trainingsweek
           </button>
           <button onClick={() => setShowTemplateManager(true)} style={zijKnop()}>
             <FileText size={14} /> Templates
@@ -752,9 +754,10 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
         />
       )}
       {showAgenda && effectiveClient && (
-        <PlanningWizard
+        <WeekPlanner
           workoutService={workoutService}
           clientId={effectiveClient.id}
+          clientNaam={`${effectiveClient.first_name || ''} ${effectiveClient.last_name || ''}`.trim()}
           schema={{ week_structure: buildWeekStructure() }}
           onComplete={() => setShowAgenda(false)}
           onClose={() => setShowAgenda(false)}
