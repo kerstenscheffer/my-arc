@@ -49,7 +49,7 @@ const GOAL_LABELS = {
   fitness: 'Fitter worden', general_fitness: 'Fitter worden',
 }
 
-export default function ClientWeightCard({ client, isMobile, onToggleStatus, onDeleted, showStatusToggle = false, onNavigatePlan, onNavigateWorkout, onNavigateTab, db, coachId, onOpenMealPanel, onOpenWorkoutPanel }) {
+export default function ClientWeightCard({ client, isMobile, onToggleStatus, onDeleted, showStatusToggle = false, onNavigatePlan, onNavigateWorkout, onNavigateTab, db, coachId, onOpenMealPanel, onOpenWorkoutPanel, onDagCheckChange }) {
   const modalHost = useModalHost()
   const [showInsight, setShowInsight]   = useState(false)
   const [showLog, setShowLog]           = useState(false)
@@ -270,15 +270,18 @@ export default function ClientWeightCard({ client, isMobile, onToggleStatus, onD
     if (checkBezig || !db?.supabase || !client?.id) return
     const naar = !gehad
     setCheckBezig(true)
-    setDagen(prev => {
-      const n = new Set(prev)
-      if (naar) n.add(vandaag); else n.delete(vandaag)
-      // De teller in de kop van het overzicht rekent op client.dagCheck.
-      // Zonder dit bericht blijft die op het oude getal staan terwijl het
-      // rondje op deze kaart al is omgeslagen.
-      onDagCheckChange?.(client.id, [...n])
-      return n
-    })
+    // De nieuwe stand eerst uitrekenen, dan pas beide kanten bijwerken.
+    //
+    // De melding aan de ouder mag niet ín de updater van setDagen: die draait
+    // tijdens het renderen, en een setState van een ánder component daarin
+    // laat React de boom omvallen ("Cannot update a component while rendering
+    // a different component") — een zwart scherm bij één klik.
+    const nieuweDagen = new Set(dagen)
+    if (naar) nieuweDagen.add(vandaag); else nieuweDagen.delete(vandaag)
+    setDagen(nieuweDagen)
+    // De teller in de kop van het overzicht rekent op client.dagCheck; zonder
+    // dit bericht blijft die op het oude getal staan.
+    onDagCheckChange?.(client.id, [...nieuweDagen])
     try {
       const q = naar
         ? db.supabase.from('coach_daily_checks')
@@ -290,12 +293,10 @@ export default function ClientWeightCard({ client, isMobile, onToggleStatus, onD
       if (error) throw error
     } catch (e) {
       console.error('afvinken mislukt:', e)
-      setDagen(prev => {
-        const n = new Set(prev)
-        if (naar) n.delete(vandaag); else n.add(vandaag)
-        onDagCheckChange?.(client.id, [...n])
-        return n
-      })
+      const terug = new Set(dagen)
+      if (naar) terug.delete(vandaag); else terug.add(vandaag)
+      setDagen(terug)
+      onDagCheckChange?.(client.id, [...terug])
     }
     setCheckBezig(false)
   }
