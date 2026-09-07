@@ -759,7 +759,9 @@ export default function ManualWorkoutBuilder({ db, clients, selectedClient }) {
           clientId={effectiveClient.id}
           clientNaam={`${effectiveClient.first_name || ''} ${effectiveClient.last_name || ''}`.trim()}
           schema={{ week_structure: buildWeekStructure() }}
-          onComplete={() => setShowAgenda(false)}
+          // Bewust niet sluiten na opslaan: je plant een week in meerdere
+          // zetten en wil daarna zien wat er staat. Het venster meldt zelf
+          // dat alles bewaard is; sluiten doe je met het kruisje.
           onClose={() => setShowAgenda(false)}
         />
       )}
