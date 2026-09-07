@@ -23,14 +23,16 @@ export default function ClientViewTab({ db, isMobile }) {
   const [laden, setLaden] = useState(true)
   const [zoek, setZoek] = useState('')
   const [gekozen, setGekozen] = useState(null)
+  const [poging, setPoging] = useState(0)
 
   useEffect(() => {
     let leeft = true
+    setLaden(true)
     db.getAllClients()
       .then(lijst => { if (leeft) { setClients(lijst || []); setLaden(false) } })
       .catch(e => { console.error('klanten laden mislukt:', e); if (leeft) setLaden(false) })
     return () => { leeft = false }
-  }, [db])
+  }, [db, poging])
 
   const gefilterd = useMemo(() => {
     const q = zoek.trim().toLowerCase()
@@ -82,7 +84,22 @@ export default function ClientViewTab({ db, isMobile }) {
         {laden ? (
           <div style={{ color: 'rgba(255,255,255,0.35)', fontSize: '0.8rem' }}>Laden…</div>
         ) : gefilterd.length === 0 ? (
-          <div style={{ color: 'rgba(255,255,255,0.35)', fontSize: '0.8rem' }}>Geen klanten gevonden.</div>
+          <div style={{ color: 'rgba(255,255,255,0.35)', fontSize: '0.8rem' }}>
+            {zoek.trim() ? 'Geen klant met die naam.' : (
+              <>
+                {/* Een lege lijst zonder zoekterm betekent bijna altijd dat de
+                    query net misging — bijvoorbeeld terwijl het inlogtoken
+                    ververst werd. Zonder deze knop blijft "geen klanten" staan
+                    tot je de hele pagina herlaadt. */}
+                Geen klanten geladen.{' '}
+                <button onClick={() => setPoging(p => p + 1)} style={{
+                  background: 'none', border: 'none', padding: 0,
+                  color: '#FFD700', fontSize: '0.8rem', fontWeight: 800,
+                  fontFamily: 'inherit', cursor: 'pointer', textDecoration: 'underline',
+                }}>Opnieuw proberen</button>
+              </>
+            )}
+          </div>
         ) : (
           <div style={{
             display: 'grid',

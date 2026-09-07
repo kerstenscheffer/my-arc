@@ -418,7 +418,10 @@ export default function ClientDashboard({ previewClientId = null, ingebed = fals
         />
       )}
 
-      <WidgetSidebar
+      {/* De zwevende widgetbalk van de klant hoort niet in een meekijk-paneel.
+          Hij dekt in die smalle kolom de inhoud af, en zijn knoppen openen
+          de meldingen en vragen van de klant — niet waarvoor je meekijkt. */}
+      {!ingebed && <WidgetSidebar
         isMobile={isMobile}
         buttons={[
           {
@@ -437,7 +440,7 @@ export default function ClientDashboard({ previewClientId = null, ingebed = fals
             onClick: () => setWidgetOpen(o => o === 'video' ? null : 'video'),
           },
         ]}
-      />
+      />}
 
       {/* Om dezelfde reden ook het formulier zelf niet. */}
       {!ingebed && <CheckinModal
