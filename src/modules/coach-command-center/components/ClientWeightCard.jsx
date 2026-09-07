@@ -466,10 +466,15 @@ export default function ClientWeightCard({ client, isMobile, onToggleStatus, onD
       {/* ── ROW 2 — kerncijfers links, acties rechts, op één regel ── */}
       {/* Alleen Verschil en Sinds start: deze week / vorige week staan in de
           uitklap en het huidige gewicht staat al op de regel hierboven. */}
-      {/* Wrapt op smalle schermen: twee cijfers plus drie knoppen passen niet
-          altijd op 375px. Past het wél, dan blijft het één regel. */}
+      {/* Wrapt alleen op een telefoon: twee cijfers plus drie knoppen passen
+          daar niet op 375px.
+          Op desktop nooit. Bij een klant in een fase staat er "Sinds start
+          fase" in plaats van "Sinds start", en dat duwde de knoppen naar een
+          tweede regel zodra het venster iets smaller stond — één kaart in het
+          raster werd dan hoger dan de rest. Het cijferblok krimpt liever mee;
+          dat mag het, het heeft al een eigen overflow. */}
       <div style={{
-        display: 'flex', alignItems: 'center', flexWrap: 'wrap',
+        display: 'flex', alignItems: 'center', flexWrap: isMobile ? 'wrap' : 'nowrap',
         rowGap: '0.45rem',
         padding: isMobile ? '0 0.85rem 0.6rem' : '0 1rem 0.65rem',
         gap: isMobile ? '0.7rem' : '1rem',
