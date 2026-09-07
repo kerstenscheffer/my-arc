@@ -7,9 +7,18 @@ export default function TimelineProgress({ meals, checkedMeals, onToggleMeal }) 
   if (!meals || meals.length === 0) return null
   
   const currentTime = new Date().getHours() + new Date().getMinutes() / 60
-  
-  // Sort meals by plannedTime
-  const sortedMeals = [...meals].sort((a, b) => a.plannedTime - b.plannedTime)
+
+  // plannedTime komt in twee vormen binnen: als getal (12.5) uit de vaste
+  // slot-tijden, en als tekst ("12:30") zodra de coach zelf een tijd heeft
+  // gezet. Math.floor("12:30") is NaN, en dat stond hier letterlijk als
+  // "NaN:NaN" op het scherm van de klant.
+  const alsUren = (v) => {
+    if (typeof v === 'number' && Number.isFinite(v)) return v
+    const m = /^\s*(\d{1,2}):(\d{2})/.exec(String(v || ''))
+    return m ? parseInt(m[1], 10) + parseInt(m[2], 10) / 60 : null
+  }
+
+  const sortedMeals = [...meals].sort((a, b) => (alsUren(a.plannedTime) ?? 12) - (alsUren(b.plannedTime) ?? 12))
   
   return (
     <div style={{
@@ -65,13 +74,15 @@ export default function TimelineProgress({ meals, checkedMeals, onToggleMeal }) 
         }}>
           {sortedMeals.map((meal, idx) => {
             const isChecked = checkedMeals[idx]
-            const isPast = meal.plannedTime < currentTime
-            const isCurrent = Math.abs(meal.plannedTime - currentTime) < 1
-            const isNext = !isChecked && !isCurrent && meal.plannedTime > currentTime
-            
+            const uren = alsUren(meal.plannedTime)
+            const isPast = uren != null && uren < currentTime
+            const isCurrent = uren != null && Math.abs(uren - currentTime) < 1
+            const isNext = !isChecked && !isCurrent && uren != null && uren > currentTime
+
             const getTimeString = () => {
-              const hours = Math.floor(meal.plannedTime)
-              const minutes = Math.round((meal.plannedTime - hours) * 60)
+              if (uren == null) return ''
+              const hours = Math.floor(uren)
+              const minutes = Math.round((uren - hours) * 60)
               return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`
             }
             

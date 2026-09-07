@@ -51,7 +51,16 @@ const pageThemes = {
   profile:      { primary: '#FFD700' }
 }
 
-export default function ClientDashboard() {
+/**
+ * @param {string} [previewClientId]  Toon de weergave van deze klant in
+ *        plaats van die van de ingelogde gebruiker. De coach blijft gewoon
+ *        ingelogd — er wordt niet van account gewisseld en er komt geen
+ *        wachtwoord aan te pas; we tonen dezelfde schermen met de gegevens
+ *        van die klant, die de coach toch al mag inzien.
+ * @param {boolean} [ingebed]  Draait binnen een paneel in CoachHub in plaats
+ *        van als hele pagina. Onderdrukt alles wat buiten dat paneel reikt.
+ */
+export default function ClientDashboard({ previewClientId = null, ingebed = false } = {}) {
   const [currentView, setCurrentView] = useState('home')
   const [user, setUser] = useState(null)
   const [client, setClient] = useState(null)
@@ -106,6 +115,9 @@ export default function ClientDashboard() {
   }, [])
 
   useEffect(() => {
+    // Niet in een paneel: deze regel geldt voor de hele pagina en zou het
+    // zoomen op de coach-kant ernaast ook uitzetten.
+    if (ingebed) return
     let metaViewport = document.querySelector('meta[name="viewport"]')
     if (!metaViewport) {
       metaViewport = document.createElement('meta')
@@ -113,9 +125,9 @@ export default function ClientDashboard() {
       document.head.appendChild(metaViewport)
     }
     metaViewport.content = 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no'
-  }, [])
+  }, [ingebed])
   
-  useEffect(() => { loadClientData() }, [])
+  useEffect(() => { loadClientData() }, [previewClientId])
 
   const loadClientData = async () => {
     try {
@@ -123,11 +135,18 @@ export default function ClientDashboard() {
       if (!authUser?.email) { setError('Geen gebruiker gevonden'); setLoading(false); return }
       setUser(authUser)
 
-      const previewClientId = localStorage.getItem('coachPreviewClientId')
+      // Drie wegen naar "welke klant tonen we":
+      //   1. de prop — het paneel in CoachHub, blijft staan zolang je kijkt
+      //   2. de localStorage-sleutel — de bestaande "bekijk als klant" die de
+      //      hele app omschakelt; die is eenmalig en wordt hier opgeruimd
+      //   3. het ingelogde account — de klant zelf
+      const uitSleutel = localStorage.getItem('coachPreviewClientId')
       let clientData
       if (previewClientId) {
-        localStorage.removeItem('coachPreviewClientId')
         clientData = await db.getClient(previewClientId)
+      } else if (uitSleutel) {
+        localStorage.removeItem('coachPreviewClientId')
+        clientData = await db.getClient(uitSleutel)
       } else {
         clientData = await db.getClientByEmail(authUser.email)
       }
@@ -247,14 +266,17 @@ export default function ClientDashboard() {
     }}>
       <PWAUpdateBanner />
 
-      {/* Weekly check-in nag — center popup on Friday + missed-Friday window */}
-      <CheckinReminderPopup
+      {/* Weekly check-in nag — center popup on Friday + missed-Friday window.
+          Niet in een meekijk-paneel: die herinnering is aan de klant gericht,
+          en de knop eronder zou een check-in indienen op zijn naam terwijl de
+          coach erachter zit. */}
+      {!ingebed && <CheckinReminderPopup
         client={client}
         db={db}
         isMobile={isMobile}
         onOpen={() => setShowCheckinModal(true)}
         version={checkinVersion}
-      />
+      />}
 
       {/* ── Main Content ── */}
       {/* Geen header en geen side-nav meer: enige navigatie is de floating
@@ -417,14 +439,15 @@ export default function ClientDashboard() {
         ]}
       />
 
-      <CheckinModal
+      {/* Om dezelfde reden ook het formulier zelf niet. */}
+      {!ingebed && <CheckinModal
         isOpen={showCheckinModal}
         onClose={() => setShowCheckinModal(false)}
         onSubmitted={() => setCheckinVersion(v => v + 1)}
         client={client}
         db={db}
         isMobile={isMobile}
-      />
+      />}
 
       <style>{`
         @keyframes fadeIn {

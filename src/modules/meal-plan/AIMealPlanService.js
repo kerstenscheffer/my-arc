@@ -151,15 +151,26 @@ const dailyTotals = await this.calculateDailyTotals(clientId, todayMeals, todayP
 
       // Bouwt een meal-push-object met slot-metadata (timing + display_label) die
       // altijd wint van wat er eventueel in mealData zit.
+      // "12:30" → 12.5. plannedTime is overal een getal in uren: de tijdlijn,
+      // de volgende-maaltijd-kaart en de dagbalk rekenen ermee. Hier stond de
+      // ruwe tekst in, waardoor Math.floor er NaN van maakte en er letterlijk
+      // "NaN:NaN" op het scherm van de klant kwam te staan. De leesbare vorm
+      // hoort in `timing`, niet hier.
+      const urenVan = (tekst) => {
+        const m = /^\s*(\d{1,2}):(\d{2})/.exec(String(tekst || ''))
+        return m ? parseInt(m[1], 10) + parseInt(m[2], 10) / 60 : null
+      }
+
       const buildMealEntry = (mealData, slotRef, slot, defaultTimeSlot, defaultPlannedTime, swapKey) => {
         const { timing, display_label } = getSlotMeta(slotRef)
+        const eigenTijd = timing || alsKloktijd(mealData.timing) || null
         return {
           ...mealData,
           slot,
           display_label: display_label || mealData.display_label || null,
-          timing: timing || alsKloktijd(mealData.timing) || null,
+          timing: eigenTijd,
           timeSlot: display_label || defaultTimeSlot,
-          plannedTime: timing || defaultPlannedTime,
+          plannedTime: urenVan(eigenTijd) ?? defaultPlannedTime,
           isConsumed: swaps[swapKey]?.consumed || false,
           consumedAt: swaps[swapKey]?.time || null,
           meal_name: mealData.name || mealData.meal_name,
@@ -206,8 +217,8 @@ const dailyTotals = await this.calculateDailyTotals(clientId, todayMeals, todayP
           // wat de kaart aan de klant toont. Alleen het eerste zetten liet de
           // maaltijd op de goede plek staan met nog steeds "12:00" ernaast.
           if (slot === PRE_WORKOUT_SLOT) {
-            const tijd = preWorkoutTijd(trainingStartMin, entry.plannedTime)
-            if (tijd) { entry.plannedTime = tijd; entry.timing = tijd }
+            const tijd = preWorkoutTijd(trainingStartMin, entry.timing)
+            if (tijd) { entry.timing = tijd; entry.plannedTime = urenVan(tijd) ?? entry.plannedTime }
             entry.volgtTraining = Number.isFinite(trainingStartMin)
           }
           meals.push(entry)
@@ -255,11 +266,12 @@ const dailyTotals = await this.calculateDailyTotals(clientId, todayMeals, todayP
         const entry = buildMealEntry(
           preWorkout, preWorkout, PRE_WORKOUT_SLOT,
           preWorkout.display_label || 'Pre-workout',
-          preWorkoutTijd(trainingStartMin, alsKloktijd(preWorkout.timing)) || '15:30',
+          urenVan(preWorkoutTijd(trainingStartMin, alsKloktijd(preWorkout.timing))) ?? 15.5,
           PRE_WORKOUT_SLOT,
         )
+        const pwTekst = preWorkoutTijd(trainingStartMin, alsKloktijd(preWorkout.timing))
+        if (pwTekst) { entry.timing = pwTekst; entry.plannedTime = urenVan(pwTekst) ?? entry.plannedTime }
         entry.volgtTraining = Number.isFinite(trainingStartMin)
-        if (typeof entry.plannedTime === 'string') entry.timing = entry.plannedTime
         meals.push(entry)
       }
 

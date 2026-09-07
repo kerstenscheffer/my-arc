@@ -10,6 +10,7 @@ import { ModalHostProvider } from './ModalHost'
 // Component Imports (ALL PRESERVED)
 import CoachCommandCenter from '../modules/coach-command-center/CoachCommandCenter'
 import ClientInfoTab from './tabs/ClientInfoTab'
+import ClientViewTab from './tabs/ClientViewTab'
 import CoachChallengeHub from './pages/CoachChallengeHub'
 import MealPlanGenerator from '../modules/ai-meal-generator/MealPlanGenerator'
 import { CallPlanningTab } from '../modules/call-planning/CallPlanningComponents'
@@ -102,6 +103,7 @@ const MORE_CATEGORIES = [
     label: 'Clients',
     items: [
       { id: 'checkins', label: 'Check-ins', icon: ClipboardCheck },
+      { id: 'client-view', label: 'Meekijken', icon: Eye },
       { id: 'results', label: 'Resultaten', icon: Trophy }
     ]
   },
@@ -535,6 +537,9 @@ export default function CoachHub() {
         return <SalesSection db={db} />
       case 'funnel':
         return <FunnelDashboard isMobile={isMobile} />
+      case 'client-view':
+        return <ClientViewTab db={db} isMobile={isMobile} />
+
       case 'client-intelligence':
         return (
           <ClientInfoTab
