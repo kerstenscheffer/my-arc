@@ -152,47 +152,51 @@ const dailyTotals = await this.calculateDailyTotals(clientId, todayMeals, todayP
         }
       }
 
-      // Process breakfast
-      if (dayPlan.breakfast) {
-        const swapData = swaps.breakfast
+      // Alle slots die in het dagplan staan, niet een vaste lijst.
+      //
+      // Hier stonden losse blokken voor breakfast, lunch, dinner, snack1 en
+      // snack2. Alles daarbuiten viel stil weg: een pre-workout maaltijd die
+      // de coach op een trainingsdag zette verscheen niet bij de klant, en
+      // hetzelfde gold voor snack3 en verder. Geen foutmelding, de maaltijd
+      // was er gewoon niet — bij zeven klanten tegelijk.
+      //
+      // De tijdlijn (AIDaySchedule) deed dit al goed; deze functie liep
+      // achter. Twee wegen naar dezelfde maaltijden die iets anders doen is
+      // precies hoe zoiets ontstaat.
+      const NIET_MAALTIJD = new Set(['totals', 'is_training_day', 'dayId', 'scaling', 'snacks', 'meals'])
+      const leesbaar = (slot) => slot.charAt(0).toUpperCase() + slot.slice(1).replace(/_/g, ' ')
+
+      for (const slot of Object.keys(dayPlan)) {
+        if (NIET_MAALTIJD.has(slot) || !dayPlan[slot]) continue
+        const slotRef = dayPlan[slot]
+        // Een leeg object is geen maaltijd; die komen voor als restant van
+        // een verwijderde regel.
+        if (typeof slotRef === 'object' && !slotRef.calories && !slotRef.meal_id && !slotRef.id) continue
+
+        const swapData = swaps[slot]
         const mealData = swapData?.was_swapped
           ? (swapData.edited_meal || await this.getMealById(swapData.meal_id))
-          : await getMealData(dayPlan.breakfast)
+          : await getMealData(slotRef)
 
         if (mealData) {
-          meals.push(buildMealEntry(mealData, dayPlan.breakfast, 'breakfast', this.formatSlotName('breakfast'), this.getPlannedTime('breakfast'), 'breakfast'))
+          meals.push(buildMealEntry(
+            mealData, slotRef, slot,
+            this.formatSlotName(slot) === slot ? leesbaar(slot) : this.formatSlotName(slot),
+            this.getPlannedTime(slot),
+            slot,
+          ))
         }
       }
 
-      // Process lunch
-      if (dayPlan.lunch) {
-        const swapData = swaps.lunch
-        const mealData = swapData?.was_swapped
-          ? (swapData.edited_meal || await this.getMealById(swapData.meal_id))
-          : await getMealData(dayPlan.lunch)
-
-        if (mealData) {
-          meals.push(buildMealEntry(mealData, dayPlan.lunch, 'lunch', this.formatSlotName('lunch'), this.getPlannedTime('lunch'), 'lunch'))
-        }
-      }
-
-      // Process dinner
-      if (dayPlan.dinner) {
-        const swapData = swaps.dinner
-        const mealData = swapData?.was_swapped
-          ? (swapData.edited_meal || await this.getMealById(swapData.meal_id))
-          : await getMealData(dayPlan.dinner)
-
-        if (mealData) {
-          meals.push(buildMealEntry(mealData, dayPlan.dinner, 'dinner', this.formatSlotName('dinner'), this.getPlannedTime('dinner'), 'dinner'))
-        }
-      }
-
-      // Process snacks array
+      // De snacks-array is een andere vorm dan de losse slot-sleutels: een
+      // lijst in plaats van snack1/snack2/… Die houdt zijn eigen lus.
       if (dayPlan.snacks && Array.isArray(dayPlan.snacks)) {
         for (let idx = 0; idx < dayPlan.snacks.length; idx++) {
           const snack = dayPlan.snacks[idx]
           const slotName = `snack${idx + 1}`
+          // Overslaan als dezelfde sleutel ook los in het dagplan stond,
+          // anders staat de snack er twee keer.
+          if (dayPlan[slotName]) continue
           const swapData = swaps[slotName]
 
           const mealData = swapData?.was_swapped
@@ -205,29 +209,6 @@ const dailyTotals = await this.calculateDailyTotals(clientId, todayMeals, todayP
         }
       }
 
-      // Check direct snack properties
-      if (dayPlan.snack1) {
-        const swapData = swaps.snack1
-        const mealData = swapData?.was_swapped
-          ? (swapData.edited_meal || await this.getMealById(swapData.meal_id))
-          : await getMealData(dayPlan.snack1)
-
-        if (mealData) {
-          meals.push(buildMealEntry(mealData, dayPlan.snack1, 'snack1', this.formatSlotName('snack1'), this.getPlannedTime('snack1'), 'snack1'))
-        }
-      }
-
-      if (dayPlan.snack2) {
-        const swapData = swaps.snack2
-        const mealData = swapData?.was_swapped
-          ? (swapData.edited_meal || await this.getMealById(swapData.meal_id))
-          : await getMealData(dayPlan.snack2)
-
-        if (mealData) {
-          meals.push(buildMealEntry(mealData, dayPlan.snack2, 'snack2', this.formatSlotName('snack2'), this.getPlannedTime('snack2'), 'snack2'))
-        }
-      }
-      
       console.log('✅ Extracted meals:', meals.length, meals.map(m => ({
         slot: m.slot,
         name: m.meal_name || m.name,
@@ -235,12 +216,15 @@ const dailyTotals = await this.calculateDailyTotals(clientId, todayMeals, todayP
         protein: m.protein
       })))
       
-      // ── Pre-workout maaltijd ──
-      // Eén maaltijd op planniveau die alleen op trainingsdagen meedoet. Hij
-      // staat niet in week_structure, dus de blokken hierboven zien 'm niet.
-      // Meetellen hier is belangrijk: anders zou de klant de maaltijd wél op
-      // z'n scherm zien maar zouden de dagtotalen er niet bij kloppen.
-      const preWorkout = preWorkoutVoorDag(plan, workoutSchedule, dayName, dayPlan)
+      // ── Pre-workout maaltijd op planniveau ──
+      // Naast het slot per dag bestaat er een variant die één keer op het
+      // plan staat en meeschuift met de trainingsdagen. Die staat niet in
+      // week_structure, dus de lus hierboven ziet 'm niet.
+      // Alleen als de dag zelf geen pre-workout slot heeft — die is hierboven
+      // al meegenomen en zou anders twee keer op het scherm staan.
+      const preWorkout = dayPlan[PRE_WORKOUT_SLOT]
+        ? null
+        : preWorkoutVoorDag(plan, workoutSchedule, dayName, dayPlan)
       if (preWorkout) {
         meals.push(buildMealEntry(
           preWorkout, preWorkout, PRE_WORKOUT_SLOT,

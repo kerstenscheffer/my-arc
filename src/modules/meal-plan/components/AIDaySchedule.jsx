@@ -342,7 +342,11 @@ export default function AIDaySchedule({
       // daarom hier apart. Welke dagen trainingsdagen zijn komt uit
       // clients.workout_schedule: verschuift de klant een training, dan
       // verhuist deze maaltijd vanzelf mee.
-      const preWorkout = preWorkoutVoorDag(activePlan, client?.workout_schedule, dayKey, dayPlan)
+      // Niet als de dag zelf al een pre-workout slot heeft: die is in de lus
+      // hierboven al opgepikt en zou anders twee keer op de tijdlijn staan.
+      const preWorkout = dayPlan?.[PRE_WORKOUT_SLOT]
+        ? null
+        : preWorkoutVoorDag(activePlan, client?.workout_schedule, dayKey, dayPlan)
       if (preWorkout) {
         const pwTijd = parseTime(preWorkout.timing) ?? 15.5
         meals.push({
