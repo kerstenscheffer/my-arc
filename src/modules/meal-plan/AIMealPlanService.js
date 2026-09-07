@@ -201,9 +201,13 @@ const dailyTotals = await this.calculateDailyTotals(clientId, todayMeals, todayP
             slot,
           )
           // De pre-workout maaltijd volgt de training, niet zijn eigen slot-tijd.
+          //
+          // Beide velden bijwerken: plannedTime stuurt de sortering, timing is
+          // wat de kaart aan de klant toont. Alleen het eerste zetten liet de
+          // maaltijd op de goede plek staan met nog steeds "12:00" ernaast.
           if (slot === PRE_WORKOUT_SLOT) {
             const tijd = preWorkoutTijd(trainingStartMin, entry.plannedTime)
-            if (tijd) entry.plannedTime = tijd
+            if (tijd) { entry.plannedTime = tijd; entry.timing = tijd }
             entry.volgtTraining = Number.isFinite(trainingStartMin)
           }
           meals.push(entry)
@@ -255,6 +259,7 @@ const dailyTotals = await this.calculateDailyTotals(clientId, todayMeals, todayP
           PRE_WORKOUT_SLOT,
         )
         entry.volgtTraining = Number.isFinite(trainingStartMin)
+        if (typeof entry.plannedTime === 'string') entry.timing = entry.plannedTime
         meals.push(entry)
       }
 

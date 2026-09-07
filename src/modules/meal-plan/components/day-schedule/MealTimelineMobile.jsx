@@ -10,38 +10,10 @@ import { Plus, Eye, EyeOff, Trash2, Edit3, MoreHorizontal, X, Apple, Info, Check
 import { foodImageFallback } from '../../foodImageFallback'
 import { supplementFoto } from '../../../supplements/utils/supplementFoto'
 
-const MOMENTS = [
-  { id: 'breakfast', label: 'Ontbijt' },
-  { id: 'lunch', label: 'Lunch' },
-  { id: 'dinner', label: 'Diner' },
-  { id: 'snack', label: 'Tussendoortjes' }
-]
-
-// Map plan slot names to moments.
-// display_label (set by coach in plan-analyzer) is checked first so a meal
-// explicitly labelled 'Diner' groups into the Diner section even when its
-// underlying slot key is 'lunch'.
-const slotToMoment = (slot, displayLabel) => {
-  const dl = (displayLabel || '').toLowerCase()
-  if (dl === 'ontbijt' || dl.includes('breakfast')) return 'breakfast'
-  if (dl === 'lunch' || dl.includes('middag')) return 'lunch'
-  if (dl === 'diner' || dl.includes('dinner') || dl.includes('avond')) return 'dinner'
-  if (dl === 'snack' || dl.includes('tussendoor')) return 'snack'
-  const s = (slot || '').toLowerCase()
-  if (s.includes('breakfast') || s.includes('ontbijt')) return 'breakfast'
-  if (s.includes('lunch') || s.includes('middag')) return 'lunch'
-  if (s.includes('dinner') || s.includes('diner') || s.includes('avond')) return 'dinner'
-  return 'snack'
-}
-
-// Map consumed meal_type to moments
-const typeToMoment = (mealType) => {
-  const t = (mealType || '').toLowerCase()
-  if (t === 'breakfast') return 'breakfast'
-  if (t === 'lunch') return 'lunch'
-  if (t === 'dinner') return 'dinner'
-  return 'snack'
-}
+// De indeling in Ontbijt / Lunch / Diner / Tussendoortjes is vervallen: de
+// lijst staat nu op kloktijd. Daarmee zijn ook de mappers weg die een slot
+// naar zo'n vak vertaalden — alles wat geen ontbijt, lunch of diner heette
+// belandde daarin, en dat zette een kwark van 09:30 onder het avondeten.
 
 // ═══════════════════════════════════════════
 // LOGGED MEAL ROW (inline, not separate component)
@@ -215,24 +187,55 @@ export default function MealTimelineMobile({
 }) {
   const [showPlan, setShowPlan] = useState(true)
 
-  // Group plan meals by moment
-  const grouped = {}
-  MOMENTS.forEach(m => { grouped[m.id] = { planMeals: [], loggedMeals: [] } })
-
-  meals.forEach(meal => {
-    const moment = slotToMoment(meal.slot, meal.display_label)
-    if (grouped[moment]) grouped[moment].planMeals.push(meal)
-  })
-
-  consumedMeals.forEach(meal => {
-    const moment = typeToMoment(meal.meal_type)
-    if (grouped[moment]) grouped[moment].loggedMeals.push(meal)
-  })
-
-  // Calculate logged calories per moment
-  const momentCalories = (momentId) => {
-    return grouped[momentId].loggedMeals.reduce((sum, m) => sum + (m.calories || 0), 0)
+  // Eén lijst op kloktijd, geen groepen per moment.
+  //
+  // Hiervoor stond alles in vier vakken: Ontbijt, Lunch, Diner en
+  // Tussendoortjes. Alles wat niet een van de eerste drie was viel in dat
+  // laatste vak, onderaan de pagina — een kwark om 09:30 stond daardoor
+  // ónder het avondeten, en een pre-workout maaltijd om 06:20 helemaal
+  // onderaan. Op een dagoverzicht wil je zien wat er ná elkaar komt.
+  //
+  // Alles wat een tijd heeft doet mee: plan-maaltijden, wat de klant zelf
+  // logde, en supplementen.
+  const minutenVan = (v) => {
+    if (typeof v === 'number' && Number.isFinite(v)) return Math.round(v * 60)
+    const m = /^\s*(\d{1,2}):(\d{2})/.exec(String(v || ''))
+    return m ? parseInt(m[1], 10) * 60 + parseInt(m[2], 10) : null
   }
+  const tijdVanGelogd = (m) => {
+    if (!m?.consumed_at) return null
+    const d = new Date(m.consumed_at)
+    return isNaN(d) ? null : d.getHours() * 60 + d.getMinutes()
+  }
+
+  const items = []
+  meals.forEach((meal, i) => items.push({
+    soort: 'plan', sleutel: `plan-${meal.slot}-${i}`, data: meal,
+    // plannedTime is de bron: die is voor de pre-workout maaltijd al
+    // omgerekend naar de trainingstijd. timing is de terugval.
+    min: minutenVan(meal.plannedTime) ?? minutenVan(meal.timing) ?? 12 * 60,
+  }))
+  ;(consumedMeals || []).forEach(meal => {
+    // Een afgevinkte plan-maaltijd staat al als kaart in de lijst; hem hier
+    // nog eens tonen zou hetzelfde eten twee keer laten zien.
+    if (showPlan && meal.source === 'plan_check') return
+    items.push({
+      soort: 'gelogd', sleutel: `logged-${meal.id}`, data: meal,
+      min: tijdVanGelogd(meal) ?? 12 * 60,
+    })
+  })
+  Object.values(supplementenPerMoment || {}).flat().forEach(sp => items.push({
+    soort: 'supplement', sleutel: `supp-${sp.id}`, data: sp,
+    min: Number.isFinite(sp.sorteerMin) ? sp.sorteerMin : 12 * 60,
+  }))
+
+  // Bij een gelijke tijd eerst het plan, dan het supplement, dan wat er
+  // gelogd is — zo staat de bedoeling boven de uitvoering.
+  const RANG = { plan: 0, supplement: 1, gelogd: 2 }
+  items.sort((a, b) => (a.min - b.min) || (RANG[a.soort] - RANG[b.soort]))
+
+  const klok = (min) =>
+    `${String(Math.floor(min / 60) % 24).padStart(2, '0')}:${String(min % 60).padStart(2, '0')}`
 
   // Handle plan meal check → auto-log to consumed_meals.
   // CRITICAL: when NEW-logging, only fire `onPlanMealLog` (it handles both
@@ -247,187 +250,135 @@ export default function MealTimelineMobile({
     if (onMealCheck) onMealCheck(meal)
   }
 
-  const hasPlan = meals.length > 0
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column' }}>
       {/* "Plan verbergen / Plan tonen" toggle weggehaald — was ruis
           tussen dag-navigatie en eerste maaltijd. Plan staat altijd aan. */}
 
-      {/* ── Per-moment sections ── */}
-      {(() => {
-        // Track which moment-section is the first that actually renders, so we
-        // can skip the top border on it (otherwise we'd get a stray line under
-        // the plan-toggle when the early moments are empty).
-        let renderedCount = 0
-        return MOMENTS.map(moment => {
-          const group = grouped[moment.id]
-          // Filter out plan_check entries when plan is visible (they show as MealCard instead)
-          const visibleLoggedMeals = showPlan
-            ? group.loggedMeals.filter(m => m.source !== 'plan_check')
-            : group.loggedMeals
-          const hasPlanMeals = group.planMeals.length > 0 && showPlan
-          const supps = supplementenPerMoment[moment.id] || []
-          // Skip moments that have nothing to show — no per-moment "+ add"
-          // button anymore, so an empty header is just noise. Supplementen
-          // tellen mee: een moment met alleen een pil hoort ook te verschijnen.
-          if (!hasPlanMeals && visibleLoggedMeals.length === 0 && supps.length === 0) return null
-          const cal = momentCalories(moment.id)
-          const isFirst = renderedCount === 0
-          renderedCount += 1
-
+      {/* ── Alles op tijd, van vroeg naar laat ── */}
+      {items.map(item => {
+        if (item.soort === 'plan') {
+          const meal = item.data
           return (
-            <div key={moment.id}>
-              {/* Moment header — geen achtergrond/borders meer, valt nu
-                  losjes boven de zwevende kaarten. Iets meer ruimte boven
-                  zodat groepen visueel uit elkaar liggen. */}
+            <MealCard
+              key={item.sleutel}
+              meal={meal}
+              isChecked={checkedMeals[meal.slot]}
+              onCheck={() => handlePlanCheck(meal)}
+              onInfo={() => onOpenInfo(meal)}
+              onAlternatives={() => onOpenAlternatives(meal)}
+              isMobile={true}
+              isLast={false}
+            />
+          )
+        }
+
+        if (item.soort === 'gelogd') {
+          return (
+            <LoggedMealRow
+              key={item.sleutel}
+              meal={item.data}
+              onDelete={onDeleteConsumedMeal}
+              onEdit={onEditConsumedMeal}
+              isMobile={isMobile}
+            />
+          )
+        }
+
+        // Supplement — zelfde beeldtaal als een maaltijdkaart, met de tijd
+        // erbij zodat je ziet waarom hij hier staat.
+        const sp = item.data
+        const afgevinkt = !!supplementLogs?.has?.(sp.id)
+        return (
+          <div key={item.sleutel} style={{
+            margin: isMobile ? '0 0.9rem 0.55rem' : '0 1.25rem 0.7rem',
+            background: 'rgba(255,255,255,0.025)',
+            border: '1px solid rgba(255,255,255,0.05)',
+            borderRadius: 12,
+            overflow: 'hidden',
+            opacity: afgevinkt ? 0.55 : 1,
+            transition: 'opacity 0.2s ease',
+            display: 'flex', flexDirection: 'column',
+          }}>
+            <div style={{ display: 'flex', alignItems: 'stretch', minWidth: 0 }}>
               <div style={{
-                display: 'flex', alignItems: 'baseline', justifyContent: 'space-between',
-                padding: isMobile
-                  ? `${isFirst ? '0.55rem' : '0.85rem'} 1.1rem 0.4rem`
-                  : `${isFirst ? '0.65rem' : '1rem'} 1.5rem 0.5rem`,
+                width: isMobile ? 70 : 80, height: isMobile ? 70 : 80, flexShrink: 0,
+                background: `url(${supplementFoto(sp, 160)}) center/cover`,
+                position: 'relative',
               }}>
                 <div style={{
-                  fontSize: isMobile ? '0.78rem' : '0.85rem',
-                  fontWeight: 800,
-                  color: 'rgba(255,255,255,0.85)',
-                  letterSpacing: '-0.01em',
+                  position: 'absolute', left: 4, top: 4,
+                  width: 20, height: 20, borderRadius: 6,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  background: 'rgba(0,0,0,0.65)', fontSize: '0.7rem',
+                }}>{sp.emoji}</div>
+              </div>
+
+              <div style={{
+                flex: 1, minWidth: 0,
+                padding: isMobile ? '0.5rem 0.6rem' : '0.6rem 0.75rem',
+                display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 2,
+              }}>
+                <div style={{
+                  display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 6,
                 }}>
-                  {moment.label}
-                </div>
-                {cal > 0 && (
-                  <div style={{
-                    fontSize: isMobile ? '0.62rem' : '0.68rem',
-                    fontWeight: 700,
-                    color: 'rgba(255,255,255,0.3)',
+                  <span style={{
+                    fontSize: isMobile ? '0.55rem' : '0.6rem', fontWeight: 800,
+                    color: '#FFD700', letterSpacing: '0.06em', textTransform: 'uppercase',
                   }}>
-                    {cal} kcal
+                    Supplement
+                  </span>
+                  {Number.isFinite(item.min) && (
+                    <span style={{
+                      fontSize: isMobile ? '0.62rem' : '0.68rem', fontWeight: 800,
+                      color: 'rgba(255,255,255,0.35)', flexShrink: 0,
+                    }}>{klok(item.min)}</span>
+                  )}
+                </div>
+                <div style={{
+                  fontSize: isMobile ? '0.9rem' : '0.98rem', fontWeight: 800, color: '#fff',
+                  overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                }}>
+                  {sp.naam}
+                </div>
+                {sp.dosering && (
+                  <div style={{ fontSize: isMobile ? '0.72rem' : '0.78rem', fontWeight: 800, color: 'rgba(255,255,255,0.45)' }}>
+                    {sp.dosering}
                   </div>
                 )}
               </div>
-
-              {/* Plan meals (when toggle is on) */}
-              {hasPlanMeals && group.planMeals.map((meal, idx) => (
-                <MealCard
-                  key={`plan-${meal.slot}-${idx}`}
-                  meal={meal}
-                  isChecked={checkedMeals[meal.slot]}
-                  onCheck={() => handlePlanCheck(meal)}
-                  onInfo={() => onOpenInfo(meal)}
-                  onAlternatives={() => onOpenAlternatives(meal)}
-                  isMobile={true}
-                  isLast={false}
-                />
-              ))}
-
-              {/* Supplementen op dit moment, in dezelfde vorm als een
-                  maaltijdkaart: foto links, naam en dosering ernaast. Als
-                  smalle regel met een emoji-tegeltje vielen ze visueel buiten
-                  de lijst terwijl ze er gewoon bij horen.
-
-                  Geen afvinkknop: dat bestaat nog nergens voor supplementen,
-                  en een knop die niets doet is erger dan geen knop. */}
-              {supps.map(sp => {
-                const afgevinkt = !!supplementLogs?.has?.(sp.id)
-                return (
-                <div key={`supp-${sp.id}`} style={{
-                  margin: isMobile ? '0 0.9rem 0.55rem' : '0 1.25rem 0.7rem',
-                  background: 'rgba(255,255,255,0.025)',
-                  border: '1px solid rgba(255,255,255,0.05)',
-                  borderRadius: 12,
-                  overflow: 'hidden',
-                  opacity: afgevinkt ? 0.55 : 1,
-                  transition: 'opacity 0.2s ease',
-                  display: 'flex', flexDirection: 'column',
-                }}>
-                  <div style={{ display: 'flex', alignItems: 'stretch', minWidth: 0 }}>
-                  <div style={{
-                    width: isMobile ? 70 : 80, height: isMobile ? 70 : 80, flexShrink: 0,
-                    background: `url(${supplementFoto(sp, 160)}) center/cover`,
-                    position: 'relative',
-                  }}>
-                    {/* Klein gouden hoekje met de emoji: zo blijft zichtbaar
-                        dat dit een supplement is en geen maaltijd. */}
-                    <div style={{
-                      position: 'absolute', left: 4, top: 4,
-                      width: 20, height: 20, borderRadius: 6,
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      background: 'rgba(0,0,0,0.65)', fontSize: '0.7rem',
-                    }}>{sp.emoji}</div>
-                  </div>
-
-                  <div style={{
-                    flex: 1, minWidth: 0,
-                    padding: isMobile ? '0.5rem 0.6rem' : '0.6rem 0.75rem',
-                    display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 2,
-                  }}>
-                    <div style={{
-                      fontSize: isMobile ? '0.55rem' : '0.6rem', fontWeight: 800,
-                      color: '#FFD700', letterSpacing: '0.06em', textTransform: 'uppercase',
-                    }}>
-                      Supplement
-                    </div>
-                    <div style={{
-                      fontSize: isMobile ? '0.9rem' : '0.98rem', fontWeight: 800, color: '#fff',
-                      overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                    }}>
-                      {sp.naam}
-                    </div>
-                    {sp.dosering && (
-                      <div style={{ fontSize: isMobile ? '0.72rem' : '0.78rem', fontWeight: 800, color: 'rgba(255,255,255,0.45)' }}>
-                        {sp.dosering}
-                      </div>
-                    )}
-                  </div>
-                  </div>
-
-                  {/* Zelfde knoppenbalk als een maaltijdkaart: info links,
-                      afronden rechts. Zonder deze rij zag de kaart eruit als
-                      een maaltijd maar deed hij niets. */}
-                  <div style={{ display: 'flex', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
-                    <button onClick={() => onSupplementInfo?.(sp)} style={{
-                      flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5,
-                      padding: isMobile ? '0.5rem' : '0.55rem',
-                      background: 'transparent', border: 'none',
-                      color: 'rgba(255,255,255,0.5)', fontFamily: 'inherit',
-                      fontSize: isMobile ? '0.68rem' : '0.72rem', fontWeight: 700,
-                      cursor: 'pointer',
-                      touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-                    }}>
-                      <Info size={12} /> Info
-                    </button>
-                    <div style={{ width: 1, background: 'rgba(255,255,255,0.05)', alignSelf: 'stretch' }} />
-                    <button onClick={() => onSupplementCheck?.(sp)} style={{
-                      flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5,
-                      padding: isMobile ? '0.5rem' : '0.55rem',
-                      background: 'transparent', border: 'none',
-                      color: afgevinkt ? '#10b981' : 'rgba(255,255,255,0.5)',
-                      fontFamily: 'inherit',
-                      fontSize: isMobile ? '0.68rem' : '0.72rem', fontWeight: 700,
-                      cursor: 'pointer',
-                      touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-                    }}>
-                      <Check size={12} /> {afgevinkt ? 'Genomen' : 'Afronden'}
-                    </button>
-                  </div>
-                </div>
-                )
-              })}
-
-              {/* Logged meals (excluding plan_check when plan visible) */}
-              {visibleLoggedMeals.map(meal => (
-                <LoggedMealRow
-                  key={`logged-${meal.id}`}
-                  meal={meal}
-                  onDelete={onDeleteConsumedMeal}
-                  onEdit={onEditConsumedMeal}
-                  isMobile={isMobile}
-                />
-              ))}
             </div>
-          )
-        })
-      })()}
+
+            <div style={{ display: 'flex', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+              <button onClick={() => onSupplementInfo?.(sp)} style={{
+                flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5,
+                padding: isMobile ? '0.5rem' : '0.55rem',
+                background: 'transparent', border: 'none',
+                color: 'rgba(255,255,255,0.5)', fontFamily: 'inherit',
+                fontSize: isMobile ? '0.68rem' : '0.72rem', fontWeight: 700,
+                cursor: 'pointer',
+                touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+              }}>
+                <Info size={12} /> Info
+              </button>
+              <div style={{ width: 1, background: 'rgba(255,255,255,0.05)', alignSelf: 'stretch' }} />
+              <button onClick={() => onSupplementCheck?.(sp)} style={{
+                flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5,
+                padding: isMobile ? '0.5rem' : '0.55rem',
+                background: 'transparent', border: 'none',
+                color: afgevinkt ? '#10b981' : 'rgba(255,255,255,0.5)',
+                fontFamily: 'inherit',
+                fontSize: isMobile ? '0.68rem' : '0.72rem', fontWeight: 700,
+                cursor: 'pointer',
+                touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+              }}>
+                <Check size={12} /> {afgevinkt ? 'Genomen' : 'Afronden'}
+              </button>
+            </div>
+          </div>
+        )
+      })}
 
       {/* Wijde gele "Voedingsmiddel toevoegen" knop weggehaald —
           de floating FAB rechtsonder is de enige log-actie op de pagina. */}

@@ -340,10 +340,13 @@ export default function AIDaySchedule({
         if (!d) continue
         const label = displayLabel || meta.label || pretty(slot)
         let plannedTime = parseTime(typeof stored === 'object' ? stored.timing : null) ?? meta.time ?? 12
-        // De pre-workout maaltijd volgt de training van die dag.
+        // De pre-workout maaltijd volgt de training van die dag. Ook `timing`
+        // bijwerken: dat is het veld dat de kaart toont, plannedTime stuurt
+        // alleen de volgorde.
+        let toonTijd = (typeof stored === 'object' && typeof stored.timing === 'string') ? stored.timing : null
         if (slot === PRE_WORKOUT_SLOT) {
-          const uitTraining = parseTime(preWorkoutTijd(trainingStarts[dayKey], null))
-          if (uitTraining != null) plannedTime = uitTraining
+          const uitTraining = preWorkoutTijd(trainingStarts[dayKey], null)
+          if (uitTraining) { plannedTime = parseTime(uitTraining); toonTijd = uitTraining }
         }
         meals.push({
           ...d,
@@ -351,6 +354,9 @@ export default function AIDaySchedule({
           display_label: displayLabel || d.display_label || null,
           timeSlot: label,
           plannedTime,
+          // Ná de spread: de maaltijd uit ai_meals draagt zijn eigen timing
+          // en die zou de berekende tijd anders overschrijven.
+          timing: toonTijd,
           meal_name: d.name || d.meal_name || label,
           meal_id: d.id || d.meal_id,
         })
@@ -367,9 +373,11 @@ export default function AIDaySchedule({
         ? null
         : preWorkoutVoorDag(activePlan, client?.workout_schedule, dayKey, dayPlan)
       if (preWorkout) {
-        const pwTijd = parseTime(preWorkoutTijd(trainingStarts[dayKey], preWorkout.timing)) ?? 15.5
+        const pwTekst = preWorkoutTijd(trainingStarts[dayKey], preWorkout.timing)
+        const pwTijd = parseTime(pwTekst) ?? 15.5
         meals.push({
           ...preWorkout,
+          timing: typeof pwTekst === 'string' ? pwTekst : null,
           slot: PRE_WORKOUT_SLOT,
           display_label: preWorkout.display_label || 'Pre-workout',
           timeSlot: preWorkout.display_label || 'Pre-workout',
@@ -480,6 +488,9 @@ export default function AIDaySchedule({
         if (beste) doel = momentVanSlot(beste.slot)
       }
       uit[doel].push({
+        // Kloktijd in minuten, zodat de tijdlijn hem tussen de maaltijden
+        // kan zetten in plaats van onderaan een groep.
+        sorteerMin: min,
         // template_id is de sleutel waarop de rest van de supplementcode
         // werkt en waarop we het afvinken bewaren. Valt die weg, dan de naam.
         id: sp.template_id || sp.supplement_id || sp.id || sp.name,
