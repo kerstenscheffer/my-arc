@@ -2371,6 +2371,51 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
   //   - totalBooked:   totale geboekte contractwaarde (alle sales)
   //   - months:        cashflow-projectie per maand (vooruitbetaald = alles in de
   //                    sale-maand; maandelijks = totaal/looptijd, gespreid)
+  /**
+   * Wat er in een periode werkelijk aan geld binnenkwam, tegenover de
+   * orderwaarde die in die periode is verkocht.
+   *
+   * Die twee lopen uiteen zodra iemand in termijnen betaalt of eerst
+   * reserveert: een order van 550 met 50 aanbetaling levert die week 50 op,
+   * niet 550. Beide getallen kloppen, ze beantwoorden een andere vraag —
+   * "hoeveel heb ik verkocht" tegenover "hoeveel is er binnen".
+   *
+   * Leunt op get_payment_schedule, dezelfde bron als het cashflow-tabblad en
+   * de partner-uitbetaling, zodat de getallen niet uit elkaar kunnen lopen.
+   * Die RPC geeft per betaalmoment een `komt_nog`-vlag; alleen momenten die
+   * al geweest zijn tellen mee.
+   *
+   * Let op: dit is het betaalschema, niet een bevestigde incasso. Er is geen
+   * koppeling met de bank of met Stripe — de betaling van een klant wordt
+   * nergens afgevinkt. "Binnengekomen" betekent hier dus: de afgesproken
+   * betaaldatum is verstreken.
+   */
+  async getRangeCashCollected(coachId, startISO, endISO) {
+    try {
+      const dag = (iso) => new Date(iso).toISOString().split('T')[0]
+      // Het venster is [start, end) — de RPC is inclusief aan beide kanten,
+      // dus een dag eraf, anders telt de eerste dag van de volgende week mee.
+      const tot = new Date(endISO); tot.setDate(tot.getDate() - 1)
+      const { data, error } = await this.db.supabase.rpc('get_payment_schedule', {
+        p_coach_id: coachId || null,
+        p_van: dag(startISO),
+        p_tot: tot.toISOString().split('T')[0],
+      })
+      if (error) throw error
+      const regels = (data || []).filter(r => !r.komt_nog)
+      return {
+        bedrag: regels.reduce((som, r) => som + (Number(r.bedrag) || 0), 0),
+        aantal: regels.length,
+        // Wat er in dit venster nog moet komen; handig voor de tooltip.
+        verwacht: (data || []).filter(r => r.komt_nog)
+          .reduce((som, r) => som + (Number(r.bedrag) || 0), 0),
+      }
+    } catch (e) {
+      console.error('Binnengekomen bedrag laden mislukt:', e)
+      return null
+    }
+  }
+
   async getRevenueProjection(coachId, monthsAhead = 12, monthsBehind = 5) {
     try {
       const { data } = await this.db.supabase

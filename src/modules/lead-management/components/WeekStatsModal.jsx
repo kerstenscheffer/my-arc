@@ -10,7 +10,7 @@ import {
   X, ChevronLeft, ChevronRight, ChevronDown, Calendar, Zap, TrendingUp, Info,
   MessageCircle, Users, Phone, Trophy, Activity, BarChart3, PhoneCall,
   Send, FileText, Percent, UserX, Eye, Download, LineChart as LineChartIcon,
-  RotateCcw, Target, Save, UserPlus, CalendarCheck, Euro, PhoneOff, XCircle, Check, Ban,
+  RotateCcw, Target, Save, UserPlus, CalendarCheck, Euro, Wallet, PhoneOff, XCircle, Check, Ban,
 } from 'lucide-react'
 import { exportStatsPDF } from '../utils/exportStatsPDF'
 import CallProposalsModal from './CallProposalsModal'
@@ -93,6 +93,9 @@ export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, 
   const [timeSeries, setTimeSeries] = useState([])
   const [callProposals, setCallProposals] = useState([])
   const [avgBeforeCall, setAvgBeforeCall] = useState(null)
+  // Wat er in deze periode aan geld binnenkwam, naast de verkochte
+  // orderwaarde. Zie getRangeCashCollected voor het verschil.
+  const [cash, setCash] = useState(null)
   // Bump om de stats opnieuw te laden na het terugdraaien van een verplaatsing.
   const [reloadKey, setReloadKey] = useState(0)
   const [revertingId, setRevertingId] = useState(null)
@@ -326,16 +329,21 @@ export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, 
             ? leadService.getRangeAvgFollowupsBeforeCall(coachId, start.toISOString(), end.toISOString())
             : Promise.resolve(null),
         ])
+        const geld = leadService.getRangeCashCollected
+          ? await leadService.getRangeCashCollected(coachId, start.toISOString(), end.toISOString())
+          : null
         if (!cancelled) {
           setActivity(a); setFunnel(f); setSourceBreakdown(srcs); setReactionStats(rxn)
           setTimeSeries(ts || [])
           setCallProposals(props || [])
           setAvgBeforeCall(avgB)
+          setCash(geld)
         }
       } catch (e) {
         console.error('WeekStatsModal load failed:', e)
         if (!cancelled) {
           setActivity(null); setFunnel(null); setSourceBreakdown(null); setReactionStats(null)
+          setCash(null)
         }
       } finally {
         if (!cancelled) setLoading(false)
@@ -451,7 +459,8 @@ export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, 
     { label: 'Calls gepland', value: funnel?.callBooked?.count ?? 0, Icon: Calendar, color: '#6366f1', info: 'Het totaal aantal calls dat VOOR deze periode staat: elke call waarvan de call-datum erin valt, of die nu gevoerd is, no-show of nog open. Dit is je week-agenda.' },
     { label: 'Call gevoerd', value: funnel?.callHeld?.count ?? 0, Icon: Phone,      color: '#10b981', info: 'Ingeplande calls die je écht hebt gevoerd (afgehandeld als sale of sale verloren), geteld op de call-datum.' },
     { label: 'Sales',        value: totalSales,                Icon: Trophy,        color: '#FFD700', stage: 'sale', info: 'Gewonnen deals (naar een "Sale"-kolom verplaatst). Klik voor de lijst.' },
-    { label: 'Omzet',        value: '€' + Math.round(funnel?.sale?.omzet || 0).toLocaleString('nl-NL'), Icon: Euro, color: '#22c55e', info: 'Totale orderwaarde van de sales in deze periode.' },
+    { label: 'Orderwaarde',  value: '€' + Math.round(funnel?.sale?.omzet || 0).toLocaleString('nl-NL'), Icon: Euro, color: '#FFD700', info: 'Wat je deze periode hebt verkocht: de volledige orderwaarde van elke sale, geteld op de dag van de sale. Bij termijnen of een reservering staat hier de hele deal, ook al komt het geld later.' },
+    { label: 'Binnengekomen', value: cash ? '€' + Math.round(cash.bedrag).toLocaleString('nl-NL') : '—', Icon: Wallet, color: '#22c55e', info: 'Wat er deze periode aan geld binnenkwam: aanbetalingen, restbetalingen en maandtermijnen waarvan de betaaldatum is verstreken. Let op — dit is het betaalschema, niet een bevestigde incasso. Er is geen koppeling met de bank, dus het zegt dat de afgesproken datum geweest is.' + (cash?.verwacht ? ` Er staat nog €${Math.round(cash.verwacht).toLocaleString('nl-NL')} open in deze periode.` : '') },
     { label: 'No-shows',     value: totalNoShows,              Icon: UserX,         color: '#ef4444', stage: 'noShow', info: 'Ingeplande calls waarbij de lead niet kwam opdagen, geteld op de call-datum. Klik voor de lijst.' },
     { label: 'Afgewezen',    value: funnel?.callRejected?.count ?? 0, Icon: PhoneOff, color: '#f97316', stage: 'callRejected', info: 'Leads die het call-voorstel afwezen (naar "Call afgewezen"). Klik voor de reden-verdeling.' },
     { label: 'Sale verloren', value: funnel?.saleLost?.count ?? 0, Icon: XCircle, color: '#ef4444', stage: 'saleLost', info: 'Gevoerde calls die niet in een sale eindigden. Klik voor de objectie-verdeling.' },
