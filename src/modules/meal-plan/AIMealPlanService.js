@@ -1,4 +1,4 @@
-import { preWorkoutVoorDag, PRE_WORKOUT_SLOT } from './utils/preWorkoutMeal'
+import { preWorkoutVoorDag, PRE_WORKOUT_SLOT, preWorkoutTijd, tijdNaarMinuten } from './utils/preWorkoutMeal'
 // src/modules/meal-plan/AIMealPlanService.js
 // Complete service layer voor AI Meal Dashboard - WATER TRACKING FIXED
 export default class AIMealPlanService {
@@ -38,7 +38,11 @@ async loadAIDashboardData(clientId) {
     // vandaag meedoet.
     const { data: klant } = await this.supabase
       .from('clients').select('workout_schedule').eq('id', clientId).maybeSingle()
-    const todayMeals = await this.getTodayFromWeekStructure(activePlan, todayProgress, klant?.workout_schedule)
+    // Hoe laat traint hij vandaag? De pre-workout maaltijd hangt daaraan, niet
+    // aan de kloktijd die in het maaltijd-slot staat.
+    const trainingStart = await this.getTrainingStartVandaag(clientId)
+    const todayMeals = await this.getTodayFromWeekStructure(
+      activePlan, todayProgress, klant?.workout_schedule, trainingStart)
     const nextMeal = this.calculateNextMeal(todayMeals, todayProgress?.consumed_meals)
 const dailyTotals = await this.calculateDailyTotals(clientId, todayMeals, todayProgress, activePlan)
     
@@ -89,7 +93,7 @@ const dailyTotals = await this.calculateDailyTotals(clientId, todayMeals, todayP
   }
   // `workoutSchedule` = clients.workout_schedule. Nodig om te bepalen of
   // vandaag een trainingsdag is, en dus of de pre-workout maaltijd meetelt.
-  async getTodayFromWeekStructure(plan, todayProgress, workoutSchedule = null) {
+  async getTodayFromWeekStructure(plan, todayProgress, workoutSchedule = null, trainingStartMin = null) {
     if (!plan?.week_structure) return []
     
     try {
@@ -179,12 +183,19 @@ const dailyTotals = await this.calculateDailyTotals(clientId, todayMeals, todayP
           : await getMealData(slotRef)
 
         if (mealData) {
-          meals.push(buildMealEntry(
+          const entry = buildMealEntry(
             mealData, slotRef, slot,
             this.formatSlotName(slot) === slot ? leesbaar(slot) : this.formatSlotName(slot),
             this.getPlannedTime(slot),
             slot,
-          ))
+          )
+          // De pre-workout maaltijd volgt de training, niet zijn eigen slot-tijd.
+          if (slot === PRE_WORKOUT_SLOT) {
+            const tijd = preWorkoutTijd(trainingStartMin, entry.plannedTime)
+            if (tijd) entry.plannedTime = tijd
+            entry.volgtTraining = Number.isFinite(trainingStartMin)
+          }
+          meals.push(entry)
         }
       }
 
@@ -226,12 +237,14 @@ const dailyTotals = await this.calculateDailyTotals(clientId, todayMeals, todayP
         ? null
         : preWorkoutVoorDag(plan, workoutSchedule, dayName, dayPlan)
       if (preWorkout) {
-        meals.push(buildMealEntry(
+        const entry = buildMealEntry(
           preWorkout, preWorkout, PRE_WORKOUT_SLOT,
           preWorkout.display_label || 'Pre-workout',
-          preWorkout.timing || '15:30',
+          preWorkoutTijd(trainingStartMin, preWorkout.timing) || '15:30',
           PRE_WORKOUT_SLOT,
-        ))
+        )
+        entry.volgtTraining = Number.isFinite(trainingStartMin)
+        meals.push(entry)
       }
 
       return meals
@@ -240,6 +253,32 @@ const dailyTotals = await this.calculateDailyTotals(clientId, todayMeals, todayP
       return []
     }
   }
+  /**
+   * Aanvang van de training van vandaag, in minuten sinds middernacht.
+   *
+   * Uit client_agenda_blocks — dezelfde rij die de agenda tekent, zodat de
+   * maaltijdpagina en de agenda dezelfde tijd tonen. Staat er niets, dan
+   * null: dan valt de maaltijd terug op zijn eigen opgeslagen tijd.
+   *
+   * Bij meerdere trainingen op één dag telt de vroegste; je eet vóór de
+   * eerste.
+   */
+  async getTrainingStartVandaag(clientId) {
+    try {
+      const dag = new Date().toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase()
+      const { data, error } = await this.supabase
+        .from('client_agenda_blocks')
+        .select('start_time')
+        .eq('client_id', clientId).eq('type', 'training').eq('day', dag)
+      if (error) throw error
+      const tijden = (data || []).map(r => tijdNaarMinuten(r.start_time)).filter(Number.isFinite)
+      return tijden.length ? Math.min(...tijden) : null
+    } catch (e) {
+      console.warn('trainingstijd laden mislukt (niet-blokkerend):', e?.message)
+      return null
+    }
+  }
+
   async getMealById(mealId) {
     try {
       // Clean all possible suffixes

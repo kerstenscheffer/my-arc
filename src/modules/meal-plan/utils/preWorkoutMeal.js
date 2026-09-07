@@ -77,3 +77,48 @@ export const totalenMetPreWorkout = (totals, maaltijd) => {
     fat: basis.fat + Math.round(maaltijd.fat || 0),
   }
 }
+
+// ── Tijdstip van de pre-workout maaltijd ──────────────────────────────────
+//
+// Hij hoort een uur vóór de training van díe dag. De kloktijd die in het slot
+// staat (bij Mark 12:00) zegt niets: die is meegekomen uit het sjabloon en
+// verandert niet als de training om 07:20 blijkt te staan.
+//
+// Deze constante is dezelfde als PRE_WORKOUT_LEAD in ClientAgendaService.
+// Stond die tijd op twee plekken los, dan zou de agenda 06:20 tonen en de
+// maaltijdpagina iets anders — en dan weet de klant niet meer wanneer hij
+// moet eten.
+export const PRE_WORKOUT_LEAD_MIN = 60
+
+/** "07:20:00" of "07:20" → minuten sinds middernacht, of null. */
+export const tijdNaarMinuten = (t) => {
+  const m = /^(\d{1,2}):(\d{2})/.exec(String(t || ''))
+  if (!m) return null
+  const u = parseInt(m[1], 10), min = parseInt(m[2], 10)
+  if (!Number.isFinite(u) || !Number.isFinite(min)) return null
+  return u * 60 + min
+}
+
+/** Minuten sinds middernacht → "06:20". */
+export const minutenNaarTijd = (min) => {
+  const m = Math.max(0, Math.round(min))
+  return `${String(Math.floor(m / 60) % 24).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`
+}
+
+/**
+ * Hoe laat eet de klant zijn pre-workout maaltijd op deze dag?
+ *
+ * @param {number|null} trainingStartMin  aanvang training in minuten, of null
+ * @param {string|null} eigenTijd         de tijd die in het slot staat
+ * @returns {string|null} "HH:MM", of null als er niets te zeggen valt
+ *
+ * Traint de klant die dag niet — of weten we de tijd niet — dan valt hij terug
+ * op zijn eigen opgeslagen tijd. Een maaltijd zonder tijd tonen is slechter
+ * dan een matige tijd tonen.
+ */
+export const preWorkoutTijd = (trainingStartMin, eigenTijd = null) => {
+  if (Number.isFinite(trainingStartMin)) {
+    return minutenNaarTijd(Math.max(0, trainingStartMin - PRE_WORKOUT_LEAD_MIN))
+  }
+  return eigenTijd || null
+}
