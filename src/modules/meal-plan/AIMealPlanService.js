@@ -747,70 +747,114 @@ async logAIMood(clientId, moodData) {
   // ========================================
   // ALTERNATIVES & SWAPS - COMPLETELY FIXED
   // ========================================
+  // Alternatieven voor één maaltijd, gerangschikt op hoe dicht ze bij de
+  // macro's van het origineel liggen.
+  //
+  // Hiervoor telde deze functie hoeveel LABELS twee maaltijden deelden en
+  // sorteerde daarop; calorieën en eiwit speelden geen enkele rol. Twee
+  // problemen tegelijk:
+  //
+  // - De labels zijn er niet fijn genoeg voor. `high_protein` staat op 345 van
+  //   de 482 maaltijden, `quick` op 195 — overlap tellen op zulke labels ligt
+  //   dicht bij willekeur.
+  // - Erger: het duwde naar HETZELFDE gerecht. Bij een ontbijt van 691 kcal /
+  //   53g eiwit kwamen als top drie drie cottage-cheese-varianten van rond de
+  //   200 kcal en 18g eiwit. Wisselde een klant daarop, dan verdween er 495
+  //   kcal en 35g eiwit uit zijn dag zonder dat iets dat zei.
+  //
+  // Nagerekend over de hele bibliotheek zat die oude rangschikking gemiddeld
+  // 166 tot 216 kcal naast het origineel, en viel maar ~20% binnen 10%.
+  //
+  // Nu telt de macro-afstand, met eiwit apart gewogen omdat dat de macro is
+  // die je in een cut beschermt. Koolhydraten en vet wegen mee maar lichter:
+  // die mogen schuiven, zeker rond een training.
   async getSmartAlternatives(currentMeal, timeSlot) {
     try {
-      console.log('🔍 Getting alternatives for:', currentMeal.meal_name || currentMeal.name)
-      
-      // Get time category
       const timeCategory = this.getTimeCategory(timeSlot || currentMeal.slot)
-      
-      // Get current meal details
       const mealId = currentMeal.meal_id || currentMeal.id
-      const currentMealData = await this.getMealById(mealId)
-      const labels = currentMealData?.labels || []
-      
-      // Simple query without problematic operators
-      let query = this.supabase
-        .from('ai_meals')
-        .select('*')
-        .limit(50)
-      
-      // Add timing filter if available
-      if (timeCategory) {
-        query = query.contains('timing', [timeCategory])
+      const currentMealData = mealId ? await this.getMealById(mealId) : null
+
+      // De macro's van het SLOT zijn de maatstaf, niet die van de maaltijd in
+      // de bibliotheek: heeft de coach de portie geschaald, dan is dat wat de
+      // klant eet en dus wat een swap moet evenaren.
+      const getal = (...opties) => {
+        for (const o of opties) { const n = Number(o); if (Number.isFinite(n) && n > 0) return n }
+        return 0
       }
-      
-      const { data, error } = await query
-      
-      if (error) {
-        console.error('Query error:', error)
-        // Fallback: get any meals
-        const { data: fallbackData } = await this.supabase
+      const doel = {
+        calories: getal(currentMeal.calories, currentMealData?.calories),
+        protein: getal(currentMeal.protein, currentMealData?.protein),
+        carbs: getal(currentMeal.carbs, currentMealData?.carbs),
+        fat: getal(currentMeal.fat, currentMealData?.fat),
+      }
+
+      const ingredientenVan = (m) => {
+        const lijst = Array.isArray(m?.ingredients_list) ? m.ingredients_list : []
+        return new Set(lijst.map(i => i?.ingredient_id).filter(Boolean))
+      }
+      const huidigeIngredienten = ingredientenVan(currentMeal.ingredients_list ? currentMeal : currentMealData)
+
+      // Maaltijden met needs_review blijven buiten de pool.
+      //
+      // Bij 58 maaltijden loopt de opgegeven kcal meer dan 25% uit de pas met
+      // de som van hun ingrediënten — "Broodje Kroket" staat op 625 kcal
+      // terwijl de ingrediënten op 10 uitkomen. 57 daarvan dragen deze vlag al
+      // van de eerdere meal-db-scan. Zolang niet nagekeken is welke kant fout
+      // is, horen ze niet in een lijst die zichzelf op macro's aanprijst: een
+      // verkeerd getal met een keurmerk eromheen is erger dan geen suggestie.
+      const bouwQuery = (metTiming) => {
+        let q = this.supabase
           .from('ai_meals')
           .select('*')
-          .limit(20)
-        
-        return fallbackData || []
+          .gt('calories', 0)
+          .or('needs_review.is.null,needs_review.eq.false')
+        if (metTiming && timeCategory) q = q.contains('timing', [timeCategory])
+        return q
       }
-      
-      // Filter and score meals manually
-      let alternatives = data || []
-      
-      // Calculate match scores if we have labels
-      if (labels.length > 0) {
-        alternatives = alternatives.map(meal => {
-          const mealLabels = meal.labels || []
-          let matchScore = 0
-          
-          // Count matching labels
-          if (Array.isArray(mealLabels) && Array.isArray(labels)) {
-            labels.forEach(label => {
-              if (mealLabels.includes(label)) {
-                matchScore++
-              }
-            })
-          }
-          
-          return { ...meal, matchScore }
+
+      // Geen .limit() meer. Die stond op 50 zonder ORDER BY, dus van de 201
+      // ontbijten was een willekeurig kwart bereikbaar. De hele bibliotheek is
+      // 482 rijen; per moment zijn dat er ~200 en die kosten niets.
+      let { data, error } = await bouwQuery(true)
+      if (error) throw error
+
+      // Levert het moment niets op (of bestaat de categorie niet), dan liever
+      // de hele bibliotheek op macro's dan een willekeurige greep.
+      if (!data || data.length === 0) {
+        const terugval = await bouwQuery(false)
+        data = terugval.data || []
+      }
+
+      const kcalRef = Math.max(doel.calories, 150)
+      const eiwitRef = Math.max(doel.protein, 10)
+
+      const gescoord = data
+        .filter(m => m.id !== mealId)
+        .map(m => {
+          const dKcal = Math.abs((m.calories || 0) - doel.calories) / kcalRef
+          const dEiwit = Math.abs((m.protein || 0) - doel.protein) / eiwitRef
+          // Koolhydraten en vet als kcal-equivalent, zodat 1g vet niet even
+          // zwaar telt als 1g koolhydraat.
+          const dRest = (Math.abs((m.carbs || 0) - doel.carbs) * 4
+                       + Math.abs((m.fat || 0) - doel.fat) * 9) / kcalRef
+
+          // Hoeveel ingrediënten delen ze? Jaccard, 0 = compleet ander gerecht.
+          const eigen = ingredientenVan(m)
+          let gedeeld = 0
+          huidigeIngredienten.forEach(id => { if (eigen.has(id)) gedeeld++ })
+          const unie = huidigeIngredienten.size + eigen.size - gedeeld
+          const overlap = unie > 0 ? gedeeld / unie : 0
+
+          // Lager is beter. De overlap-opslag is bewust klein: hij kiest tussen
+          // twee even goede matches, maar wint het nooit van een macro-gat.
+          const afstand = 3 * dKcal + 2 * dEiwit + 1 * dRest + 0.5 * overlap
+
+          return { ...m, swapAfstand: afstand, swapOverlap: overlap }
         })
-        
-        // Sort by match score
-        alternatives.sort((a, b) => (b.matchScore || 0) - (a.matchScore || 0))
-      }
-      
-      // Return top 20
-      return alternatives.slice(0, 20)
-      
+        .sort((a, b) => a.swapAfstand - b.swapAfstand)
+
+      return gescoord.slice(0, 20)
+
     } catch (error) {
       console.error('Error getting alternatives:', error)
       return []

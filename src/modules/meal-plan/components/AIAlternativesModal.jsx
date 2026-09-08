@@ -68,10 +68,20 @@ export default function AIAlternativesModal({
         favs = await service.getAIFavorites(clientId)
       } catch (e) { /* no favs */ }
       
+      // Pool voor de handmatige filters (Zelfde kcal / Meer eiwit / Minder
+      // kcal / Alles). Twee dingen aangepast:
+      //
+      // - needs_review eruit, om dezelfde reden als in getSmartAlternatives:
+      //   bij die maaltijden loopt de opgegeven kcal uit de pas met hun
+      //   ingrediënten, en juist deze filters beloven een kcal-vergelijking.
+      // - De .limit(200) is weg. Die kapte 482 maaltijden af zonder ORDER BY,
+      //   dus "Zelfde kcal" sorteerde een willekeurige greep op kcal en zei
+      //   daar "beste match" bij.
       const { data: meals } = await db.supabase
         .from('ai_meals')
         .select('*')
-        .limit(200)
+        .gt('calories', 0)
+        .or('needs_review.is.null,needs_review.eq.false')
 
       // Door de coach gecureerde swaps voor dit slot.
       // Via get_effective_swap_options i.p.v. rechtstreeks client_swap_options:
