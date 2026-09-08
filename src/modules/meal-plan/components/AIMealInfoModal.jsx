@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react'
 import { X, Info, ChefHat, Euro, Lightbulb, Clock, Package, AlertCircle, CheckCircle, Sparkles, Pencil } from 'lucide-react'
 import { toHumanAmount } from '../../ai-meal-generator/utils/unitConverter'
 import ClientMealEditModal from './ClientMealEditModal'
+import MealPrepModal from './MealPrepModal'
 
 export default function AIMealInfoModal({ isOpen, onClose, meal, db, service, client, planId, dayName, isToday, onSaved }) {
   const isMobile = window.innerWidth <= 768
@@ -12,9 +13,13 @@ export default function AIMealInfoModal({ isOpen, onClose, meal, db, service, cl
   const [loading, setLoading] = useState(false)
   const [dbMealData, setDbMealData] = useState(null)
   const [showEdit, setShowEdit] = useState(false)
+  const [showPrep, setShowPrep] = useState(false)
 
   // Client kan de maaltijd aanpassen zolang we weten in welk plan + slot 'ie zit.
   const canEdit = !!(planId && meal?.slot && client?.id)
+  // Preppen vraagt minder: alleen een klant om het bakje bij op te slaan. Een
+  // maaltijd hoeft niet uit een plan te komen om 'm voor te kunnen koken.
+  const canPrep = !!client?.id
 
 
   useEffect(() => {
@@ -122,10 +127,19 @@ export default function AIMealInfoModal({ isOpen, onClose, meal, db, service, cl
         <div style={{ position: 'relative', height: isMobile ? '180px' : '220px', flexShrink: 0 }}>
           <div style={{ position: 'absolute', inset: 0, backgroundImage: `url(${getMealImage()})`, backgroundSize: 'cover', backgroundPosition: 'center' }} />
           <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to top, #0a0a0a 0%, rgba(0,0,0,0.3) 40%, transparent 70%)' }} />
-          <button onClick={onClose} style={{ position: 'absolute', top: '0.75rem', right: '0.75rem', width: '36px', height: '36px', background: 'rgba(0,0,0,0.5)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '10px', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}><X size={18} /></button>
-          {canEdit && (
-            <button onClick={() => setShowEdit(true)} style={{ position: 'absolute', top: '0.75rem', right: '3.35rem', height: '36px', padding: '0 0.8rem', background: 'rgba(255,215,0,0.9)', border: '1px solid rgba(255,215,0,0.5)', borderRadius: '10px', color: '#0a0a0a', display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.72rem', fontWeight: 800, cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}><Pencil size={13} /> Aanpassen</button>
-          )}
+          {/* Knoprij rechtsboven. Deze knoppen stonden los gepositioneerd met
+              een vaste right-offset per knop; bij een derde knop erbij ga je
+              dan zitten rekenen en schuift er eentje over de ander. Eén flex-rij
+              legt ze vanzelf naast elkaar. */}
+          <div style={{ position: 'absolute', top: '0.75rem', right: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+            {canPrep && (
+              <button onClick={() => setShowPrep(true)} style={{ height: '36px', padding: '0 0.8rem', background: 'rgba(16,185,129,0.92)', border: '1px solid rgba(16,185,129,0.5)', borderRadius: '10px', color: '#04140e', display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.72rem', fontWeight: 800, cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}><ChefHat size={13} /> Meal preppen</button>
+            )}
+            {canEdit && (
+              <button onClick={() => setShowEdit(true)} style={{ height: '36px', padding: '0 0.8rem', background: 'rgba(255,215,0,0.9)', border: '1px solid rgba(255,215,0,0.5)', borderRadius: '10px', color: '#0a0a0a', display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.72rem', fontWeight: 800, cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}><Pencil size={13} /> Aanpassen</button>
+            )}
+            <button onClick={onClose} style={{ width: '36px', height: '36px', flexShrink: 0, background: 'rgba(0,0,0,0.5)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '10px', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}><X size={18} /></button>
+          </div>
           <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, padding: isMobile ? '0 1rem 0.75rem' : '0 1.5rem 1rem' }}>
             <div style={{ fontSize: isMobile ? '1.15rem' : '1.35rem', fontWeight: '800', color: '#fff', letterSpacing: '-0.02em', marginBottom: '0.4rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
               {meal.name || meal.meal_name}
@@ -162,6 +176,16 @@ export default function AIMealInfoModal({ isOpen, onClose, meal, db, service, cl
         </div>
       </div>
       <style>{`@keyframes infoFadeIn { from { opacity: 0; } to { opacity: 1; } } @keyframes infoSpin { to { transform: rotate(360deg); } }`}</style>
+
+      {showPrep && canPrep && (
+        <MealPrepModal
+          meal={effectiveMeal}
+          ingredients={ingredients}
+          client={client}
+          db={db}
+          onClose={() => setShowPrep(false)}
+        />
+      )}
 
       {showEdit && canEdit && (
         <ClientMealEditModal
