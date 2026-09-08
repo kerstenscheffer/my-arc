@@ -2,7 +2,7 @@
 // v4.0 — Sidebar layout: linker icon nav + compacte builder rechts
 
 import React, { useState, useEffect, useCallback, useRef } from 'react'
-import { BarChart3, FileText, ChevronLeft, ChevronRight, AlertTriangle, Zap, Grid3X3, Calendar, List, Download, MessageSquare, Play, Check, Loader, Clock, RotateCcw, RotateCw, Copy, X, Plus, Repeat, Bookmark, Pill, Users, SlidersHorizontal } from 'lucide-react'
+import { BarChart3, FileText, ChevronLeft, ChevronRight, AlertTriangle, Zap, Grid3X3, Calendar, CalendarDays, List, Download, MessageSquare, Play, Check, Loader, Clock, RotateCcw, RotateCw, Copy, X, Plus, Repeat, Bookmark, Pill, Users, SlidersHorizontal } from 'lucide-react'
 import DayNavigator, { DAYS } from './plan-analyzer/DayNavigator'
 import DayMacroBar from './plan-analyzer/DayMacroBar'
 import VezelsMicros from './plan-analyzer/VezelsMicros'
@@ -25,6 +25,7 @@ import PdfSettingsModal from './plan-analyzer/PdfSettingsModal'
 import TimingModal from './plan-analyzer/TimingModal'
 import BestSwapsModal from './plan-analyzer/BestSwapsModal'
 import PlanLibraryModal from './plan-analyzer/PlanLibraryModal'
+import DayLibraryModal from './plan-analyzer/DayLibraryModal'
 import PlanTitleBar from './plan-analyzer/PlanTitleBar'
 import ApplyDaysModal from './plan-analyzer/ApplyDaysModal'
 import { checkMealConflicts, buildConflictClientData } from './plan-analyzer/ConflictChecker'
@@ -41,6 +42,7 @@ const ZWEVENDE_NAV_HOOGTE = 105
 const DOCK_LABELS = {
   client: 'Client', timing: 'Tijden', dag: 'Dag', swaps: 'Swaps',
   library: 'Opslaan', supp: 'Supplementen', agenda: 'Agenda',
+  dagen: 'Dagen bewaren',
 }
 
 // 'pre_workout' staat bewust achteraan: SLOTS.slice(0, n) bepaalt welke lege
@@ -761,6 +763,49 @@ export default function PlanAnalyzer({
     })
     await applyWeekUpdate(updated, `${meal.name || 'Maaltijd'} toegepast op ${dayIndices.length} dag${dayIndices.length !== 1 ? 'en' : ''}`)
   }
+
+  // Een opgeslagen dag terugzetten op de gekozen weekdagen.
+  //
+  // De maaltijden komen uit meal_plan_templates en dragen daar alleen op wat
+  // er bij het opslaan in stond. Ze gaan langs dezelfde hydrate-helper als een
+  // geladen plan, zodat naam, foto en macro's uit ai_meals worden aangevuld —
+  // anders staat er een dag met lege kaarten en een dagtotaal van 0.
+  //
+  // Die helper werkt per week, dus de ene dag wordt eerst over alle zeven
+  // dagen uitgesmeerd en daarna pakken we er één uit. Dat is goedkoper dan
+  // een tweede hydratatie-route ernaast die na de volgende wijziging aan
+  // ai_meals uit de pas gaat lopen.
+  const handleApplyDayTemplate = async (weekStructure, dayIndices, naam) => {
+    if (!weekData || !dayIndices?.length) return
+    const slots = weekStructure?.day || weekStructure
+    if (!slots || typeof slots !== 'object') return
+
+    const alsWeek = {}
+    DAYS.forEach(d => { alsWeek[d.id] = slots })
+    const gehydrateerd = await hydrateWeekStructure(alsWeek)
+    const bron = gehydrateerd?.[0]
+    if (!bron) return
+
+    const updated = [...weekData]
+    dayIndices.forEach(di => {
+      const nieuw = {}
+      // Per slot langs withSlotTiming: een maaltijd zonder klok-tijd valt terug
+      // op wat er op die dag stond en anders op de slot-tijd. Zonder dat slaat
+      // de agenda hem over.
+      Object.entries(bron.meals || {}).forEach(([slot, meal]) => {
+        if (meal) nieuw[slot] = withSlotTiming(meal, slot, updated[di]?.meals?.[slot])
+      })
+      // is_training_day blijft van de doeldag: dat hoort bij het schema van de
+      // klant, niet bij de maaltijden die je erop plakt.
+      updated[di] = { ...updated[di], meals: nieuw }
+      updated[di].totals = calculateTotals(nieuw)
+    })
+
+    await applyWeekUpdate(
+      updated,
+      `Dag "${naam || 'opgeslagen dag'}" op ${dayIndices.length} dag${dayIndices.length !== 1 ? 'en' : ''} gezet`,
+    )
+  }
   const handleDelete = async (dayIndex, slot) => {
     if (!weekData) return
     const mealName = weekData[dayIndex].meals[slot]?.name || 'maaltijd'
@@ -1243,6 +1288,7 @@ export default function PlanAnalyzer({
     { id: 'client', icon: '👤',                    label: 'Client',  active: dockedSection === 'client', onClick: () => toggleDock('client') },
     { id: 'timing', icon: <Clock size={18} />,     label: 'Tijden',  active: dockedSection === 'timing', onClick: () => toggleDock('timing') },
     { id: 'dag',    icon: <Zap size={18} />,       label: 'Dag',     active: dockedSection === 'dag',    onClick: () => toggleDock('dag') },
+    { id: 'dagen',  icon: <CalendarDays size={18} />, label: 'Dagen', active: dockedSection === 'dagen', onClick: () => toggleDock('dagen') },
     { id: 'week',   icon: <Grid3X3 size={18} />,   label: 'Week',    active: viewMode === 'week',        onClick: () => setViewMode(v => v === 'week' ? 'day' : 'week') },
     { id: 'agenda', icon: <Calendar size={18} />,  label: 'Agenda',  active: dockedSection === 'agenda', onClick: () => toggleDock('agenda') },
     { id: 'swaps',  icon: <Repeat size={18} />,    label: 'Swaps',   active: dockedSection === 'swaps',  onClick: () => toggleDock('swaps') },
@@ -1484,6 +1530,15 @@ export default function PlanAnalyzer({
             <AutoBalancer embedded dayData={currentDay} targets={targets} dayIndex={activeDay}
               onApply={handleAutoBalance} onClose={() => setDockedSection(null)} isMobile={m} />
           )}
+          {dockedSection === 'dagen' && weekData && (
+            <DayLibraryModal embedded db={db} coachId={coachId}
+              weekData={weekData} activeDay={activeDay}
+              dayName={DAYS[activeDay]?.full || DAYS[activeDay]?.label || ''}
+              clientName={clientRecord?.first_name || ''}
+              trainingDays={trainingDayIndices}
+              onApply={handleApplyDayTemplate}
+              onClose={() => setDockedSection(null)} isMobile={m} />
+          )}
           {/* Ook zonder geselecteerde klant te openen: dan staat 'ie in
               standaard-modus, zodat je je vaste swaps kunt zetten. */}
           {dockedSection === 'swaps' && (
@@ -1517,6 +1572,7 @@ export default function PlanAnalyzer({
             (dockedSection === 'client' && resolvedClientId) ||
             (dockedSection === 'timing' && weekData) ||
             (dockedSection === 'dag' && currentDay) ||
+            (dockedSection === 'dagen' && weekData) ||
             (dockedSection === 'swaps') ||
             (dockedSection === 'library' && resolvedClientId) ||
             (dockedSection === 'supp') ||
