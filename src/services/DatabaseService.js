@@ -2,6 +2,7 @@
 // 🔧 FIXED VERSION - Met correcte tabel namen en error handling
 
 import { supabase, signUpNewClient } from '../lib/supabase'
+import { KLASSIEKE_SJABLONEN_FILTER } from '../lib/mealTemplateTypes'
 import { extendDatabaseService } from './DatabaseServiceOptimized'
 import NotificationService from '../modules/notifications/NotificationService';
 
@@ -3037,7 +3038,7 @@ async getMealPlanTemplates() {
     const { data, error } = await supabase
       .from('meal_plan_templates')
       .select('*')
-      .or('plan_type.is.null,plan_type.neq.full_week')
+      .or(KLASSIEKE_SJABLONEN_FILTER)
       .order('created_at', { ascending: false })
     
     if (error) throw error

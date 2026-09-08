@@ -21,6 +21,8 @@
 // - ✅ 2x variatie per week (Set A / Set B)
 // - ✅ Training day indicator (is_training_day)
 
+import { isKlassiekSjabloon } from '../../lib/mealTemplateTypes'
+
 class TemplateLibrary {
   constructor(supabase) {
     this.supabase = supabase
@@ -39,9 +41,9 @@ class TemplateLibrary {
         .order('created_at', { ascending: false })
 
       if (error) throw error
-      // full_week-plannen worden apart opgeslagen vanuit de Plan Analyzer en horen
-      // niet in deze setA/setB-gebaseerde template-tab. Filter ze eruit.
-      const templates = (data || []).filter(t => t.plan_type !== 'full_week')
+      // Hele weken en losse dagen worden vanuit de Plan Analyzer opgeslagen en
+      // horen niet in deze setA/setB-gebaseerde template-tab.
+      const templates = (data || []).filter(isKlassiekSjabloon)
       console.log(`✅ Loaded ${templates.length} templates for coach ${coachId}`)
       return templates
     } catch (error) {

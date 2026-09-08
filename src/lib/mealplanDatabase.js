@@ -1,5 +1,6 @@
 // src/lib/mealplanDatabase.js — Clean & Complete Version
 import { supabase } from './supabase'
+import { KLASSIEKE_SJABLONEN_FILTER } from './mealTemplateTypes'
 
 // ===== MEALS CATALOG =====
 export async function getMeals({ q = '', tags = [], limit = 50 } = {}) {
@@ -79,7 +80,7 @@ export async function listMealPlanTemplates() {
   const { data, error } = await supabase
     .from('meal_plan_templates')
     .select('id, title, description, targets, created_at')
-    .or('plan_type.is.null,plan_type.neq.full_week')
+    .or(KLASSIEKE_SJABLONEN_FILTER)
     .order('created_at', { ascending: false })
   
   if (error) throw error

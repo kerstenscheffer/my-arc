@@ -17,6 +17,7 @@
 // 6. Send coach notification: "plan ready for review"
 
 import { getClient as apiGetClient, updateClient as apiUpdateClient } from '../../../lib/publicIntakeApi'
+import { KLASSIEKE_SJABLONEN_FILTER } from '../../../lib/mealTemplateTypes'
 
 class IntakeFlowService {
   constructor(supabase) {
@@ -349,7 +350,7 @@ class IntakeFlowService {
         .from('meal_plan_templates')
         .select('*')
         .eq('coach_id', coachId)
-        .or('plan_type.is.null,plan_type.neq.full_week')
+        .or(KLASSIEKE_SJABLONEN_FILTER)
         .order('created_at', { ascending: false })
 
       if (error) throw error
