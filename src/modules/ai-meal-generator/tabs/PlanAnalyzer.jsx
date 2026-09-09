@@ -728,9 +728,37 @@ export default function PlanAnalyzer({
     await applyWeekUpdate(updated, omschrijving)
   }
 
+  // Schaal een maaltijd zodat kcal overeenkomt met targetCalories.
+  // Schaalt macros en gram/ml-ingrediënthoeveelheden proportioneel.
+  // Geeft het origineel terug als schaling niet zinvol is (ontbrekende data,
+  // verwaarloosbaar verschil, of extreem-grote factor).
+  const scaleMealToCalories = (meal, targetCalories) => {
+    const src = parseFloat(meal?.calories) || 0
+    const tgt = parseFloat(targetCalories) || 0
+    if (src <= 0 || tgt <= 0 || Math.abs(src - tgt) < 1) return meal
+    const f = tgt / src
+    if (f > 10 || f < 0.05) return meal
+    return {
+      ...meal,
+      calories: Math.round(tgt),
+      protein:  Math.round((parseFloat(meal.protein) || 0) * f * 10) / 10,
+      carbs:    Math.round((parseFloat(meal.carbs)   || 0) * f * 10) / 10,
+      fat:      Math.round((parseFloat(meal.fat)     || 0) * f * 10) / 10,
+      fiber:    meal.fiber != null ? Math.round((parseFloat(meal.fiber) || 0) * f * 10) / 10 : meal.fiber,
+      ingredients_list: (meal.ingredients_list || []).map(ing => ({
+        ...ing,
+        amount: (['gram', 'g', 'ml'].includes((ing.unit || '').toLowerCase()))
+          ? Math.round((parseFloat(ing.amount) || 0) * f * 10) / 10
+          : ing.amount,
+      })),
+    }
+  }
+
   const handleSwapSelect = async (newMeal) => {
     if (!swapState) return
-    await plaatsInSlot(newMeal, swapState.dayIndex, swapState.slot,
+    const targetCal = parseFloat(swapState.meal?.calories) || 0
+    const scaled = targetCal > 0 ? scaleMealToCalories(newMeal, targetCal) : newMeal
+    await plaatsInSlot(scaled, swapState.dayIndex, swapState.slot,
       `Swap ${DAYS[swapState.dayIndex].full}: ${swapState.meal?.name || 'leeg'} → ${newMeal.name || '?'}`)
     setSwapState(null)
   }
@@ -746,7 +774,12 @@ export default function PlanAnalyzer({
   const handleMultiDaySelect = async (newMeal, slot, dayIndices) => {
     if (!weekData) return
     const updated = [...weekData]
-    dayIndices.forEach(di => { updated[di] = { ...updated[di], meals: { ...updated[di].meals, [slot]: withSlotTiming(newMeal, slot, updated[di].meals[slot]) } }; updated[di].totals = calculateTotals(updated[di].meals) })
+    dayIndices.forEach(di => {
+      const existingCal = parseFloat(weekData[di]?.meals?.[slot]?.calories) || 0
+      const scaled = existingCal > 0 ? scaleMealToCalories(newMeal, existingCal) : newMeal
+      updated[di] = { ...updated[di], meals: { ...updated[di].meals, [slot]: withSlotTiming(scaled, slot, updated[di].meals[slot]) } }
+      updated[di].totals = calculateTotals(updated[di].meals)
+    })
     await applyWeekUpdate(updated, `Swap ${slot} op ${dayIndices.length} dagen → ${newMeal.name}`)
     setSwapState(null)
   }
