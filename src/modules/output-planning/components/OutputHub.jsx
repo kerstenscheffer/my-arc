@@ -11,7 +11,7 @@
 import { useEffect, useState } from 'react'
 import {
   Plus, Inbox, Package, CheckCircle, Video, Edit3, Trash2,
-  ChevronDown, ChevronRight, CalendarPlus, X, Clock, GripVertical,
+  ChevronDown, ChevronRight, CalendarPlus, X, Clock, GripVertical, Archive,
 } from 'lucide-react'
 
 import BatchService from '../../content-batches/BatchService'
@@ -71,6 +71,8 @@ export default function OutputHub({ db, onPlanned }) {
   const [openInbox, setOpenInbox] = useState(false)
   const [openBatches, setOpenBatches] = useState(true)
   const [openReady, setOpenReady] = useState(true)
+  // Archief dicht: het is terugkijkwerk, geen werklijst.
+  const [openArchief, setOpenArchief] = useState(false)
 
   // Per-section expanded state (keyed by section id; '__none__' for the
   // unsectioned virtual group). All collapsed by default.
@@ -739,23 +741,54 @@ export default function OutputHub({ db, onPlanned }) {
             {sectionHeader(
               <Package size={isMobile ? 16 : 18} color={GOLD} />,
               'Batches',
-              batches.length,
+              actieveBatches.length,
               openBatches, setOpenBatches,
             )}
             {openBatches && (
               <BatchesListView
-                batches={batches}
+                batches={actieveBatches}
                 loading={false}
                 onCreateBatch={null}   /* button lives in the top bar */
                 onEditItem={handleEditBatchItem}
                 onViewItem={(item, batch) => setItemView({ item, format: batch?.format || null })}
                 onPlanItem={(item) => setBatchItemToPlan(item)}
                 onPlanBatch={(batch) => setBatchToPlan(batch)}
+                onCompleteBatch={handleCompleteBatch}
                 onDeleteBatch={handleDeleteBatch}
+                emptyText="Nog geen batches. Gebruik Nieuwe Batch bovenaan om te starten."
                 isMobile={isMobile}
               />
             )}
           </section>
+
+          {/* ── ARCHIEF ───────────────────────────────────────────────────────
+              Afgeronde batches. Geen inplan-knop meer: een batch die klaar is
+              hoort niet opnieuw in de agenda te belanden. Terugzetten kan wel,
+              met de pijl. */}
+          {archiefBatches.length > 0 && (
+            <section>
+              {sectionHeader(
+                <Archive size={isMobile ? 16 : 18} color="rgba(255,255,255,0.45)" />,
+                'Archief',
+                archiefBatches.length,
+                openArchief, setOpenArchief,
+              )}
+              {openArchief && (
+                <BatchesListView
+                  batches={archiefBatches}
+                  loading={false}
+                  onCreateBatch={null}
+                  onEditItem={handleEditBatchItem}
+                  onViewItem={(item, batch) => setItemView({ item, format: batch?.format || null })}
+                  onReopenBatch={handleReopenBatch}
+                  onDeleteBatch={handleDeleteBatch}
+                  title={null}
+                  emptyText="Nog niets afgerond."
+                  isMobile={isMobile}
+                />
+              )}
+            </section>
+          )}
 
           {/* ── KLAAR OM TE PLANNEN ───────────────────────────────────────── */}
           <section>

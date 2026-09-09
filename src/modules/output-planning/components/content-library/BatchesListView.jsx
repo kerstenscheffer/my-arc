@@ -65,6 +65,9 @@ export default function BatchesListView({
   onCompleteBatch,
   onReopenBatch,
   emptyText = 'Nog geen batches. Klik op Nieuwe Batch om te starten.',
+  // Eigen kopje. Staat de lijst al onder een sectiekop (zoals in het archief),
+  // geef dan null mee — anders staat er "Archief" met daaronder "Batches".
+  title = 'Batches',
   isMobile,
 }) {
   const [expandedId, setExpandedId] = useState(null)
@@ -73,12 +76,13 @@ export default function BatchesListView({
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: isMobile ? '0.625rem' : '0.75rem' }}>
+      {(title || onCreateBatch) && (
       <div style={{
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         marginBottom: isMobile ? '0.25rem' : '0.5rem',
       }}>
         <div style={{ fontSize: isMobile ? '0.95rem' : '1.1rem', fontWeight: 700, color: '#fff' }}>
-          Batches
+          {title}
         </div>
         {onCreateBatch && (
           <button
@@ -97,6 +101,7 @@ export default function BatchesListView({
           </button>
         )}
       </div>
+      )}
 
       {loading && (
         <div style={{ padding: '2rem', textAlign: 'center', color: 'rgba(255,255,255,0.5)' }}>
