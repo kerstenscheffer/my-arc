@@ -1,5 +1,21 @@
 apply plugin: 'com.android.application'
 
+// Ondertekening voor de Play Store.
+//
+// De sleutel en zijn wachtwoorden staan in android/keystore.properties, buiten
+// git. Ontbreekt dat bestand, dan bouwt een release-build gewoon ongetekend
+// verder in plaats van te klappen — zo blijft de repo werken op een machine
+// zonder sleutel (CI, of een verse checkout).
+//
+// De upload-sleutel is niet te vervangen: raak je 'm kwijt, dan kun je nooit
+// meer een update uitbrengen op dezelfde app. Bewaar 'm los van dit project.
+def keystorePropertiesFile = rootProject.file("keystore.properties")
+def keystoreProperties = new Properties()
+def hasKeystore = keystorePropertiesFile.exists()
+if (hasKeystore) {
+    keystoreProperties.load(new FileInputStream(keystorePropertiesFile))
+}
+
 android {
     namespace = "com.myarcfitness.app"
     compileSdk = rootProject.ext.compileSdkVersion
@@ -16,10 +32,23 @@ android {
             ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
+    signingConfigs {
+        if (hasKeystore) {
+            release {
+                storeFile rootProject.file(keystoreProperties['storeFile'])
+                storePassword keystoreProperties['storePassword']
+                keyAlias keystoreProperties['keyAlias']
+                keyPassword keystoreProperties['keyPassword']
+            }
+        }
+    }
     buildTypes {
         release {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+            if (hasKeystore) {
+                signingConfig signingConfigs.release
+            }
         }
     }
 }
