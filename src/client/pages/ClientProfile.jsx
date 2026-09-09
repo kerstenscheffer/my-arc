@@ -88,17 +88,28 @@ export default function ClientProfile({ client, user, onClientUpdate }) {
     window.location.href = '/'
   }
 
+  // Account + alle gegevens echt weggooien.
+  //
+  // Dit zette eerder clients.deleted_at. Die kolom bestaat niet, dus de update
+  // faalde altijd op een onbekende kolom en de klant kreeg "Fout bij
+  // verwijderen" — de knop heeft nooit iets gedaan. Er stond ook nergens code
+  // die op zo'n vlag filterde, dus zelfs als de kolom er was geweest kon je
+  // daarna gewoon weer inloggen.
+  //
+  // Nu via de RPC verwijder_mijn_account(): die ruimt de klantrij op (de rest
+  // cascadeert) en verwijdert daarna de inlog uit auth.users. Dat laatste kan
+  // niet vanuit de app, en zonder dat blijft inloggen werken terwijl de klant
+  // denkt dat hij weg is. Google Play eist echte verwijdering.
   const handleDeleteAccount = async () => {
     if (deleteConfirm !== 'VERWIJDER') return
     setDeleting(true)
     try {
-      await db.supabase.from('clients').update({
-        deleted_at: new Date().toISOString()
-      }).eq('id', client.id)
+      const { error } = await db.supabase.rpc('verwijder_mijn_account')
+      if (error) throw error
       await db.signOut()
       window.location.href = '/'
     } catch (error) {
-      alert('Fout bij verwijderen: ' + error.message)
+      alert('Fout bij verwijderen: ' + (error.message || error))
       setDeleting(false)
     }
   }
@@ -525,7 +536,11 @@ export default function ClientProfile({ client, user, onClientUpdate }) {
               <div style={{ fontSize: '1rem', fontWeight: '800', color: '#fff' }}>Account verwijderen</div>
             </div>
             <p style={{ fontSize: '0.85rem', color: 'rgba(255,255,255,0.5)', lineHeight: '1.6', marginBottom: '1.25rem' }}>
-              Je account en alle data worden binnen 30 dagen permanent verwijderd. Dit kan niet ongedaan worden gemaakt.
+              {/* Stond op "binnen 30 dagen" terwijl er niets werd verwijderd.
+                  Nu gebeurt het meteen, en dan hoort dat er ook te staan. */}
+              Je account, je plannen en al je voortgang worden direct en
+              permanent verwijderd. Je kunt daarna niet meer inloggen. Dit kan
+              niet ongedaan worden gemaakt.
             </p>
             <p style={{ fontSize: '0.8rem', color: 'rgba(255,255,255,0.4)', marginBottom: '0.5rem' }}>
               Typ <strong style={{ color: '#ef4444' }}>VERWIJDER</strong> om te bevestigen:
