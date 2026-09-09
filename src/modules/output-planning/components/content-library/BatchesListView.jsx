@@ -6,6 +6,7 @@
 import { useState } from 'react'
 import {
   Plus, ChevronDown, ChevronRight, Edit3, Trash2, CalendarPlus, Package, Eye,
+  Check, RotateCcw,
 } from 'lucide-react'
 
 // Korte preview van de ingevulde format-velden (naast/onder de titel).
@@ -58,6 +59,12 @@ export default function BatchesListView({
   onViewItem,
   onPlanBatch,
   onDeleteBatch,
+  // Afronden zet de batch in het archief; heropenen haalt hem er weer uit.
+  // De lijst krijgt er telkens één van de twee: de werklijst kan afronden,
+  // het archief kan heropenen.
+  onCompleteBatch,
+  onReopenBatch,
+  emptyText = 'Nog geen batches. Klik op Nieuwe Batch om te starten.',
   isMobile,
 }) {
   const [expandedId, setExpandedId] = useState(null)
@@ -103,7 +110,7 @@ export default function BatchesListView({
           border: '1px dashed rgba(255,255,255,0.1)', borderRadius: '8px',
           color: 'rgba(255,255,255,0.55)', fontSize: isMobile ? '0.85rem' : '0.95rem',
         }}>
-          Nog geen batches. Klik op <strong>Nieuwe Batch</strong> om te starten.
+          {emptyText}
         </div>
       )}
 
@@ -159,6 +166,30 @@ export default function BatchesListView({
                     : (batch.created_at && <span>{formatDate(batch.created_at)}</span>)}
                 </div>
               </div>
+              {onCompleteBatch && (
+                <span
+                  onClick={(e) => { e.stopPropagation(); onCompleteBatch(batch) }}
+                  style={{
+                    padding: '8px', borderRadius: 6, cursor: 'pointer',
+                    color: '#10b981',
+                  }}
+                  title="Batch afronden — gaat naar het archief"
+                >
+                  <Check size={16} strokeWidth={2.6} />
+                </span>
+              )}
+              {onReopenBatch && (
+                <span
+                  onClick={(e) => { e.stopPropagation(); onReopenBatch(batch) }}
+                  style={{
+                    padding: '8px', borderRadius: 6, cursor: 'pointer',
+                    color: 'rgba(255,255,255,0.55)',
+                  }}
+                  title="Terug naar de werklijst"
+                >
+                  <RotateCcw size={15} />
+                </span>
+              )}
               {onPlanBatch && (
                 <span
                   onClick={(e) => { e.stopPropagation(); onPlanBatch(batch) }}

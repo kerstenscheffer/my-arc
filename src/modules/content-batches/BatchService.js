@@ -323,6 +323,55 @@ class BatchService {
     }
   }
 
+  // ============================================
+  // AFRONDEN / ARCHIEF
+  // ============================================
+
+  // Een batch afronden: hij verdwijnt uit de werklijst en komt in het archief.
+  //
+  // De status wordt 'completed' en niet 'archived'. Dat laatste lijkt logischer
+  // en er stond zelfs al een GEARCHIVEERD-label klaar in BatchesListView, maar
+  // de database weigert het: content_batches_status_check laat alleen draft,
+  // ready, planned en completed toe. Een insert met 'archived' faalt en neemt
+  // de hele update mee. 'completed' betekent hier hetzelfde en bestaat al.
+  async rondBatchAf(batchId) {
+    try {
+      const { data, error } = await this.supabase
+        .from('content_batches')
+        .update({ status: 'completed', updated_at: new Date().toISOString() })
+        .eq('id', batchId)
+        .select()
+        .single()
+      if (error) throw error
+      return data
+    } catch (error) {
+      console.error('❌ Batch afronden mislukt:', error)
+      throw error
+    }
+  }
+
+  // Terug uit het archief. Heeft de batch een opnamemoment, dan hoort hij weer
+  // op 'planned' — anders zou hij als losse klus in de lijst staan terwijl er
+  // een datum in de agenda staat.
+  async heropenBatch(batchId, heeftOpnamemoment = false) {
+    try {
+      const { data, error } = await this.supabase
+        .from('content_batches')
+        .update({
+          status: heeftOpnamemoment ? 'planned' : 'ready',
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', batchId)
+        .select()
+        .single()
+      if (error) throw error
+      return data
+    } catch (error) {
+      console.error('❌ Batch heropenen mislukt:', error)
+      throw error
+    }
+  }
+
   // Haal het opnamemoment weer weg.
   async unplanBatchShoot(batchId) {
     try {

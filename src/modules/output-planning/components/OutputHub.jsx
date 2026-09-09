@@ -351,6 +351,33 @@ export default function OutputHub({ db, onPlanned }) {
     }
   }
 
+  // Afronden en heropenen. Geen bevestiging: het is één klik terug, en een
+  // dialoog voor iets omkeerbaars leert je alleen om weg te klikken.
+  const handleCompleteBatch = async (batch) => {
+    try {
+      const bij = await batchService.rondBatchAf(batch.id)
+      setBatches(prev => prev.map(b => (b.id === batch.id ? { ...b, ...bij } : b)))
+      setOpenArchief(true)
+    } catch (e) {
+      alert(`Afronden mislukt — ${e?.message || e}`)
+    }
+  }
+
+  const handleReopenBatch = async (batch) => {
+    try {
+      const bij = await batchService.heropenBatch(batch.id, !!batch.shoot_date)
+      setBatches(prev => prev.map(b => (b.id === batch.id ? { ...b, ...bij } : b)))
+    } catch (e) {
+      alert(`Terugzetten mislukt — ${e?.message || e}`)
+    }
+  }
+
+  // Eén lijst uit de database, hier gesplitst. Afgeronde batches blijven dus
+  // gewoon meekomen in de bestaande query — geen tweede laadpad dat kan gaan
+  // afwijken, en het archief staat meteen open zonder extra rondje.
+  const actieveBatches = batches.filter(b => b.status !== 'completed')
+  const archiefBatches = batches.filter(b => b.status === 'completed')
+
   // ── Styles ───────────────────────────────────────────────────────────────
   const sectionHeader = (icon, label, count, open, setOpen, trailing = null) => (
     <div style={{
