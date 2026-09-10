@@ -406,14 +406,11 @@ export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, 
   const totalCalls = funnel?.callScheduled?.count || 0
   const totalSales = funnel?.sale?.count || 0
   const totalNoShows = funnel?.noShow?.count || 0
-  // Show-up en no-show worden berekend over AFGEHANDELDE calls (gevoerd + no-show),
-  // niet over ingeplande — een no-show hoort vaak bij een call die in een vorige
+  // No-show wordt berekend over AFGEHANDELDE calls (gevoerd + no-show), niet
+  // over ingeplande — een no-show hoort vaak bij een call die in een vorige
   // maand werd ingepland, wat anders >100% of negatieve rates gaf.
   const callsHeld = funnel?.callHeld?.count || 0
   const handledCalls = callsHeld + totalNoShows
-  const showRate = handledCalls > 0
-    ? Math.round((callsHeld / handledCalls) * 100)
-    : null
 
   // Reactie-stats — uses the lead-card counters as the source of truth:
   //   reply_count   > 0  → lead reacted (Reactie-knop)
@@ -445,6 +442,33 @@ export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, 
   // stats-bar — geen vakjes meer.
   // Close rate = sales / gevoerde calls (Sale + Sale verloren), niet ingeplande.
   const proposedToScheduled = totalCallProposed > 0 ? Math.round((totalCalls / totalCallProposed) * 100) : null
+
+  // De trechter als keten: reactie → voorstel → ingepland → show-up → close.
+  // Elke stap deelt door de stap ervoor, zodat je ziet wáár je leads weglekken.
+  //
+  // Reactie→voorstel deelt door dezelfde Reacties-teller die in de rij
+  // hierboven staat, zodat de som op het scherm klopt: 3 van 102.
+  //
+  // Eerst stond hier funnel.replied — dat telt leads die je naar een
+  // "gereageerd"-kolom versleept, en die kolom gebruik je niet. Uitkomst was
+  // "3 van 0" en een streepje. Let op de keerzijde: de Reacties-teller telt
+  // reactie-momenten, dus twee reacties van dezelfde lead tellen dubbel. Dit
+  // percentage leest daarom als "reacties die tot een voorstel leidden", niet
+  // als "leads die reageerden".
+  const reactiesInPeriode = reactionStats?.reactionEventsInWindow
+    ?? reactionStats?.reactionsInWindow ?? reactedLeads ?? 0
+  const repliedToProposed = reactiesInPeriode > 0
+    ? Math.round((totalCallProposed / reactiesInPeriode) * 100)
+    : null
+
+  // Ingepland→show-up deelt door de calls die in deze periode STONDEN
+  // (callBooked, op call-datum), niet door wat je in deze periode inplande:
+  // een call die je vandaag boekt voor volgende maand kan nu nog niemand
+  // opdagen. Beide kanten op call-datum, dus dit kan nooit boven 100 komen.
+  const callsBooked = funnel?.callBooked?.count || 0
+  const scheduledToShow = callsBooked > 0
+    ? Math.round((callsHeld / callsBooked) * 100)
+    : null
   const noShowRate = handledCalls > 0 ? Math.round((totalNoShows / handledCalls) * 100) : null
   const closeRate = callsHeld > 0 ? Math.round((totalSales / callsHeld) * 100) : null
   const pct1 = (v) => (v == null ? '—' : `${v}%`)
@@ -466,13 +490,17 @@ export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, 
     { label: 'Sale verloren', value: funnel?.saleLost?.count ?? 0, Icon: XCircle, color: '#ef4444', stage: 'saleLost', info: 'Gevoerde calls die niet in een sale eindigden. Klik voor de objectie-verdeling.' },
     { label: 'Niet geschikt', value: funnel?.notSuitable?.count ?? 0, Icon: Ban, color: '#64748b', stage: 'notSuitable', info: 'Leads die je als geen goede fit hebt gemarkeerd (naar "Niet geschikt"). Klik voor de lijst.' },
   ]
+  // Eerst de trechter op volgorde — reactie → voorstel → ingepland → show-up →
+  // close — daarna de losse stats. Zo lees je van links naar rechts waar je
+  // leads weglekken, in plaats van vier percentages door elkaar.
   const pctItems = [
+    { label: 'Reactie→voorstel', value: pct1(repliedToProposed), Icon: MessageCircle, color: '#10b981', sub: frac(totalCallProposed, reactiesInPeriode), info: 'Van de reacties deze periode, hoeveel % er een call-voorstel uit kwam. Deelt door dezelfde Reacties-teller als hierboven; die telt reactie-momenten, dus twee reacties van dezelfde lead tellen als twee.' },
+    { label: 'Voorstel→call', value: pct1(proposedToScheduled), Icon: PhoneCall,     color: '#a855f7', sub: frac(totalCalls, totalCallProposed),    info: 'Van de leads aan wie je een call voorstelde, hoeveel % ook echt een call inplande.' },
+    { label: 'Call→show-up',  value: pct1(scheduledToShow),     Icon: CalendarCheck, color: '#06b6d4', sub: frac(callsHeld, callsBooked),           info: 'Van de calls die in deze periode stonden, hoeveel % er ook echt kwam opdagen. Beide kanten op de call-datum, dus een call die je nu boekt voor volgende maand telt hier nog niet mee.' },
+    { label: 'Show→close',    value: pct1(closeRate),           Icon: Trophy,        color: '#22c55e', sub: frac(totalSales, callsHeld),            info: 'Van de gevoerde calls, hoeveel % je sloot als sale.' },
     { label: 'Response',      value: pct1(responseRate),        Icon: MessageCircle, color: '#3b82f6', sub: frac(reactedLeads, newLeadsInPeriod),   info: 'Van de nieuwe leads deze periode, hoeveel % er reageerde.' },
     { label: 'Opvolg',        value: pct1(chaseShare),          Icon: Send,          color: '#f59e0b', sub: frac(followedLeads, newLeadsInPeriod),   info: 'Van de nieuwe leads, hoeveel % je moest opvolgen (follow-up nodig had).' },
-    { label: 'Voorstel→call', value: pct1(proposedToScheduled), Icon: PhoneCall,     color: '#a855f7', sub: frac(totalCalls, totalCallProposed),    info: 'Van de leads aan wie je een call voorstelde, hoeveel % ook echt een call inplande.' },
-    { label: 'Show-up',       value: pct1(showRate),            Icon: CalendarCheck, color: '#06b6d4', sub: frac(callsHeld, handledCalls),          info: 'Van de afgehandelde calls (gevoerd + no-show), hoeveel % kwam opdagen.' },
-    { label: 'No-show',       value: pct1(noShowRate),          Icon: UserX,         color: '#ef4444', sub: frac(totalNoShows, handledCalls),       info: 'Van de afgehandelde calls, hoeveel % niet kwam opdagen.' },
-    { label: 'Close rate',    value: pct1(closeRate),           Icon: Trophy,        color: '#22c55e', sub: frac(totalSales, callsHeld),            info: 'Van de gevoerde calls, hoeveel % je sloot als sale.' },
+    { label: 'No-show',       value: pct1(noShowRate),          Icon: UserX,         color: '#ef4444', sub: frac(totalNoShows, handledCalls),       info: 'Van de afgehandelde calls (gevoerd + no-show), hoeveel % niet kwam opdagen.' },
   ]
 
   const modal = (

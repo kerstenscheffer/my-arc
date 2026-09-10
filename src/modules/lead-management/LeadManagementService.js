@@ -840,6 +840,31 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
         this.db.supabase.from('call_leads').update({ last_touched: new Date().toISOString() }).eq('id', leadId),
       ])
 
+      // Zet je een NIEUWE call-datum op een lead die al een openstaande call
+      // had, dan is die oude afspraak verhuisd — geen tweede afspraak.
+      //
+      // Dit is de tweede weg naar een verplaatsing. De pop-up met openstaande
+      // calls gaat via rescheduleScheduledCall, maar een call die nog niet
+      // voorbij is verplaats je door de lead opnieuw in de ingepland-sectie te
+      // zetten met een andere datum. Dan bleef de oude rij gewoon open staan,
+      // met zijn eigen call_date, en telde "Calls gepland" ze allebei. Bij twee
+      // leads stonden er zo twee afspraken in dezelfde week terwijl het er één
+      // was.
+      //
+      // Alleen rijen zonder uitkomst (call_happened is null) worden gemarkeerd.
+      // Een call die al gevoerd of gemist is, is afgerond; een nieuwe afspraak
+      // daarna is een écht tweede gesprek en hoort wél apart te tellen.
+      if (callDate) {
+        const { error: verhuisFout } = await this.db.supabase
+          .from('lead_movements')
+          .update({ call_happened: false, outcome_type: 'rescheduled' })
+          .eq('lead_id', leadId)
+          .not('call_date', 'is', null)
+          .is('call_happened', null)
+          .is('reverted_at', null)
+        if (verhuisFout) console.warn('oude afspraak markeren mislukt:', verhuisFout.message)
+      }
+
       const movementId = await this.logMovement({
         leadId, leadName, fromSectionId, fromSectionTitle,
         toSectionId: targetSectionId, toSectionTitle, coachId, callDate, callTime
@@ -1024,7 +1049,25 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
   // ingeplande call vast in dezelfde sectie met nieuwe datum/tijd.
   async rescheduleScheduledCall(oldMovementId, { leadId, leadName, sectionId, sectionTitle, callDate, callTime, coachId }) {
     try {
-      if (oldMovementId) await this.resolveScheduledCall(oldMovementId, false)
+      if (oldMovementId) {
+        // De oude afspraak krijgt outcome_type='rescheduled'.
+        //
+        // Alleen call_happened=false zetten was niet genoeg: die oude rij houdt
+        // zijn call_date, en "Calls gepland" telt elke call-datum in de periode.
+        // Verplaats je een call binnen dezelfde week, dan stonden er ineens twee
+        // afspraken in je agenda terwijl het er één is.
+        //
+        // Aan de rij zelf was dat niet te zien — een verplaatste call en een
+        // no-show zien er allebei uit als call_happened=false zonder
+        // outcome_type. Vandaar dit eigen label; het onderscheidt "deze afspraak
+        // is verhuisd" van "de lead kwam niet opdagen", en die twee horen ook
+        // echt verschillend geteld te worden.
+        const { error: markeerFout } = await this.db.supabase
+          .from('lead_movements')
+          .update({ call_happened: false, outcome_type: 'rescheduled' })
+          .eq('id', oldMovementId)
+        if (markeerFout) throw markeerFout
+      }
       const movementId = await this.logMovement({
         leadId, leadName, fromSectionId: sectionId, fromSectionTitle: sectionTitle,
         toSectionId: sectionId, toSectionTitle: sectionTitle, coachId, callDate, callTime,
@@ -2228,6 +2271,10 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
           const bookedSeen = new Set()
           ;(schedRows || []).forEach(r => {
             if (!r.lead_id || !r.call_date) return
+            // Een verplaatste afspraak telt niet mee: hij staat verderop nog een
+            // keer op zijn nieuwe datum. Dedupen op lead + call-datum ving dat
+            // niet, want na het verplaatsen zijn de datums juist verschillend.
+            if (r.outcome_type === 'rescheduled') return
             if (r.call_date < startDate || r.call_date > endDate) return
             const key = `${r.lead_id}|${r.call_date}`
             if (bookedSeen.has(key)) return
@@ -2239,6 +2286,11 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
           const latestByLead = new Map()
           ;(schedRows || []).forEach(r => {
             if (!r.lead_id) return
+            // Ook hier de verhuisde afspraken overslaan. Dit ging meestal al
+            // goed omdat de nieuwe call later valt en dus "de laatste" is, maar
+            // verplaats je een call naar VOREN, dan blijft de oude rij de
+            // laatste op call_date en werd de lead als no-show geteld.
+            if (r.outcome_type === 'rescheduled') return
             const prev = latestByLead.get(r.lead_id)
             if (!prev || r.call_date > prev.call_date ||
                 (r.call_date === prev.call_date && r.moved_at > prev.moved_at)) {
