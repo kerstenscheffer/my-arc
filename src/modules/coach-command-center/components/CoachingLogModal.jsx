@@ -136,11 +136,11 @@ export default function CoachingLogModal({ client, db, coachId, onClose, isMobil
         .from('client_coaching_logs')
         .insert({ client_id: client.id, coach_id: coachId || null, status, note: note.trim(), category })
         .select().single()
-      if (!error && data) {
-        setLogs(prev => [data, ...prev])
-        setNote('')
-        onLogSaved?.(data)
-      }
+      if (error) throw error
+      if (data) setLogs(prev => [data, ...prev])
+      else await loadLogs()
+      setNote('')
+      onLogSaved?.(data)
     } catch (e) { console.error('❌ save log:', e) }
     setSaving(false)
   }
