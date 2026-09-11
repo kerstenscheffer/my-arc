@@ -43,10 +43,23 @@ export default function CoachFileManager({ coachId }) {
     try {
       const data = await fileService.listForCoach(coachId)
       setFiles(data)
+      vulVoorbeeldenAan(data)
     } catch (e) {
       console.error('Load files failed:', e)
     } finally {
       setLoading(false)
+    }
+  }
+
+  // Bestanden van vóór de voorbeeldweergave hebben er nog geen. In plaats van
+  // ze voorgoed zonder te laten staan maken we ze hier alsnog, één voor één op
+  // de achtergrond. Eén tegelijk, want elk voorbeeld haalt de hele PDF op en
+  // rendert 'm; drie gidsen tegelijk laat de pagina haperen.
+  const vulVoorbeeldenAan = async (lijst) => {
+    const zonder = (lijst || []).filter(f => !f.thumb_url && (f.file_type || '').toLowerCase() === 'pdf')
+    for (const f of zonder) {
+      const url = await fileService.maakVoorbeeldAchteraf(f)
+      if (url) setFiles(prev => prev.map(x => (x.id === f.id ? { ...x, thumb_url: url } : x)))
     }
   }
 
@@ -168,7 +181,20 @@ export default function CoachFileManager({ coachId }) {
             }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10, justifyContent: 'space-between' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0, flex: 1 }}>
-                  <FileText size={18} color="#fca5a5" style={{ flexShrink: 0 }} />
+                  {/* Zelfde voorbeeld als de klant ziet, zodat je hier
+                      controleert wat er straks in de app staat. */}
+                  {f.thumb_url ? (
+                    <div style={{
+                      width: 42, height: 42, flexShrink: 0, borderRadius: 7,
+                      overflow: 'hidden', border: '1px solid rgba(255,255,255,0.1)', background: '#0a0a0a',
+                    }}>
+                      <img src={f.thumb_url} alt=""
+                        style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'top' }}
+                        onError={e => { e.currentTarget.style.display = 'none' }} />
+                    </div>
+                  ) : (
+                    <FileText size={18} color="#fca5a5" style={{ flexShrink: 0 }} />
+                  )}
                   <div style={{ minWidth: 0, flex: 1 }}>
                     <a
                       href={f.file_url} target="_blank" rel="noopener noreferrer"
