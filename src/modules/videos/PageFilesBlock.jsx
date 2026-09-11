@@ -40,22 +40,28 @@ export default function PageFilesBlock({ pageContext, isMobile = false }) {
 
   return (
     <>
-      <div style={{
-        marginTop: isMobile ? '0.85rem' : '1rem',
-        padding: isMobile ? '0.85rem 1rem' : '1rem 1.25rem',
-        background: '#171717',
-        border: '1px solid rgba(255,215,0,0.18)',
-        borderRadius: 14,
-      }}>
+      {/* Geen kader om het blok: de voorbeelden zweven op de achtergrond van
+          het paneel. Een doos om een doos om een afbeelding gaf drie randen
+          over elkaar.
+
+          De scheidingslijn erboven doet het werk dat het kader deed: hij zegt
+          waar de video's ophouden en de gidsen beginnen. Ruim bemeten marge
+          eromheen, want zonder kader is witruimte het enige wat de twee
+          blokken uit elkaar houdt. */}
+      <div style={{ marginTop: isMobile ? '1.4rem' : '1.7rem' }}>
+        <div style={{
+          height: 1, background: 'rgba(255,255,255,0.1)',
+          marginBottom: isMobile ? '1rem' : '1.15rem',
+        }} />
         <div style={{
           fontSize: isMobile ? '0.7rem' : '0.75rem',
           fontWeight: 800, color: '#FFD700',
           textTransform: 'uppercase', letterSpacing: '0.1em',
-          marginBottom: '0.7rem',
+          marginBottom: isMobile ? '0.8rem' : '0.9rem',
           display: 'flex', alignItems: 'center', gap: 6,
         }}>
           <FileText size={isMobile ? 13 : 14} strokeWidth={2.4} />
-          Bestanden
+          Gidsen
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: isMobile ? 14 : 16 }}>
           {files.map(f => (
