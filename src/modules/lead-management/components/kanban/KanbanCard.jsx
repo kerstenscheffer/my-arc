@@ -81,6 +81,8 @@ export default function KanbanCard({
   lead,
   sectionColor,
   isMobile,
+  // Naam onleesbaar maken voor een deelbare screenshot van het bord.
+  verbergNaam = false,
   onDragStart,
   onEdit,
   onDelete,
@@ -125,6 +127,23 @@ export default function KanbanCard({
   const [updatingFollowup, setUpdatingFollowup] = useState(false)
   // Brief "Gekopieerd!" feedback after click-to-copy on the name.
   const [nameCopied, setNameCopied] = useState(false)
+
+  // Wat er op de kaart staat. Verborgen: de eerste letter en bolletjes, met
+  // ongeveer de lengte van de echte naam — dan blijft het bord er normaal
+  // uitzien op een screenshot in plaats van dat de kolommen versmallen.
+  // Bolletjes en geen blur: een blur is op een screenshot soms nog te lezen,
+  // en tekst die weg is, is weg.
+  const toonNaam = (() => {
+    const voor = (lead.first_name || '').trim()
+    const achter = (lead.last_name || '').trim()
+    if (!verbergNaam) return `${voor} ${achter}`.trim()
+    const maskeer = (deel) => {
+      if (!deel) return ''
+      const rest = Math.min(Math.max(deel.length - 1, 2), 8)
+      return deel.charAt(0).toUpperCase() + '•'.repeat(rest)
+    }
+    return `${maskeer(voor)} ${maskeer(achter)}`.trim() || '•••••'
+  })()
   const [snoozingLead, setSnoozingLead] = useState(false)
   const [contactedToday, setContactedToday] = useState(false)
   const [updatingContacted, setUpdatingContacted] = useState(false)
@@ -589,6 +608,10 @@ export default function KanbanCard({
           <span
             onClick={async (e) => {
               e.stopPropagation()
+              // Niet kopiëren zolang de naam verborgen is: je zet 'm uit om
+              // hem niet te delen, en dan wil je 'm ook niet per ongeluk in je
+              // klembord hebben staan.
+              if (verbergNaam) return
               const fullName = `${lead.first_name || ''} ${lead.last_name || ''}`.trim()
               if (!fullName) return
               try {
@@ -606,7 +629,7 @@ export default function KanbanCard({
               setNameCopied(true)
               setTimeout(() => setNameCopied(false), 1100)
             }}
-            title="Klik om naam te kopiëren"
+            title={verbergNaam ? 'Naam verborgen voor een screenshot' : 'Klik om naam te kopiëren'}
             style={{
               flex: 1, position: 'relative',
               fontSize: isMobile ? '0.8rem' : '0.85rem',
@@ -616,13 +639,13 @@ export default function KanbanCard({
                 : (contactedToday ? '#9ca3af' : (isCallReady ? '#FFD700' : '#fff')),
               whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
               lineHeight: 1,
-              cursor: 'pointer',
-              borderBottom: '1px dotted rgba(255,255,255,0.18)',
+              cursor: verbergNaam ? 'default' : 'pointer',
+              borderBottom: verbergNaam ? 'none' : '1px dotted rgba(255,255,255,0.18)',
               transition: 'color 0.15s ease',
               touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
             }}
           >
-            {lead.first_name} {lead.last_name}
+            {toonNaam}
             {nameCopied && (
               <span style={{
                 position: 'absolute',

@@ -6,7 +6,7 @@
 import { useState, useEffect, useLayoutEffect, useCallback, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { useModalHost } from '../../../../coach/ModalHost'
-import { Plus, Settings, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, GripVertical, Save, RotateCcw, Users, Instagram, Search, X, ArrowUp, ArrowUpDown, Clock, Maximize2, Minimize2, CheckCircle, Send, Zap, Flame, Phone, SlidersHorizontal, BarChart3, Megaphone } from 'lucide-react'
+import { Plus, Settings, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, GripVertical, Save, RotateCcw, Users, Instagram, Search, X, ArrowUp, ArrowUpDown, Clock, Maximize2, Minimize2, CheckCircle, Send, Zap, Flame, Phone, SlidersHorizontal, BarChart3, Megaphone, Eye, EyeOff } from 'lucide-react'
 import KanbanCard from './KanbanCard'
 import AddLeadModal from './AddLeadModal'
 import SaleValueModal from './SaleValueModal'
@@ -99,6 +99,18 @@ export default function KanbanBoard({
   const [metVrouwen, setMetVrouwen] = useState(() => {
     try { return localStorage.getItem('leadsMetVrouwen') === 'true' } catch { return false }
   })
+  // Namen verbergen op de kaarten, om een screenshot van het bord te kunnen
+  // delen zonder dat er namen van leads op staan. Onthouden in localStorage:
+  // je maakt zelden één screenshot, en na een herlaadbeurt opnieuw aanzetten
+  // is precies het moment waarop je het vergeet.
+  const [namenVerborgen, setNamenVerborgen] = useState(() => {
+    try { return localStorage.getItem('leadsNamenVerborgen') === 'true' } catch { return false }
+  })
+  const wisselNamen = () => {
+    const nieuw = !namenVerborgen
+    setNamenVerborgen(nieuw)
+    try { localStorage.setItem('leadsNamenVerborgen', String(nieuw)) } catch { /* private mode */ }
+  }
   const [dueCalls, setDueCalls] = useState([])
   const [showDueCalls, setShowDueCalls] = useState(false)
   // Bovenste stats-balk in/uitklapbaar (mobiel standaard dicht = rustiger).
@@ -1527,6 +1539,7 @@ export default function KanbanBoard({
           coachId={coachId} db={db} onRefresh={loadBoard}
           onMagnetAttached={handleMagnetAttachedForLead}
           activeCampaign={runCampaign}
+          verbergNaam={namenVerborgen}
         />
       </div>
     )
@@ -2006,6 +2019,13 @@ export default function KanbanBoard({
             <button onClick={() => setShowStats(v => !v)} title={showStats ? 'Statistieken verbergen' : 'Statistieken tonen'}
               style={{ width: 30, height: 30, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: showStats ? 'rgba(255,215,0,0.14)' : 'rgba(255,255,255,0.04)', border: `1px solid ${showStats ? 'rgba(255,215,0,0.4)' : 'rgba(255,255,255,0.08)'}`, borderRadius: 8, color: showStats ? '#FFD700' : 'rgba(255,255,255,0.5)', cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}>
               <BarChart3 size={15} />
+            </button>
+
+            {/* Namen verbergen — voor een deelbare screenshot van het bord. */}
+            <button onClick={wisselNamen}
+              title={namenVerborgen ? 'Namen zijn verborgen — klik om ze te tonen' : 'Namen verbergen voor een screenshot'}
+              style={{ width: 30, height: 30, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: namenVerborgen ? 'rgba(255,215,0,0.14)' : 'rgba(255,255,255,0.04)', border: `1px solid ${namenVerborgen ? 'rgba(255,215,0,0.4)' : 'rgba(255,255,255,0.08)'}`, borderRadius: 8, color: namenVerborgen ? '#FFD700' : 'rgba(255,255,255,0.5)', cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}>
+              {namenVerborgen ? <EyeOff size={15} /> : <Eye size={15} />}
             </button>
 
             {/* Vrouwelijke leads meenemen. Standaard uit: dat scheelt ~1720
