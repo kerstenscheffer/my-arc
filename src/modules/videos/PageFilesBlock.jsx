@@ -53,15 +53,24 @@ export default function PageFilesBlock({ pageContext, isMobile = false }) {
           height: 1, background: 'rgba(255,255,255,0.1)',
           marginBottom: isMobile ? '1rem' : '1.15rem',
         }} />
+        {/* Zelfde kop als de video-rijen erboven: gekleurd streepje, wit vet
+            en in kapitalen. Stond in goud met een icoontje en las daardoor als
+            een ander soort blok, terwijl het hetzelfde soort blok is. */}
         <div style={{
-          fontSize: isMobile ? '0.7rem' : '0.75rem',
-          fontWeight: 800, color: '#FFD700',
-          textTransform: 'uppercase', letterSpacing: '0.1em',
+          display: 'flex', alignItems: 'center', gap: '0.5rem',
           marginBottom: isMobile ? '0.8rem' : '0.9rem',
-          display: 'flex', alignItems: 'center', gap: 6,
         }}>
-          <FileText size={isMobile ? 13 : 14} strokeWidth={2.4} />
-          Gidsen
+          <div style={{ width: 3, height: 12, background: '#FFD700', borderRadius: 2 }} />
+          <div style={{
+            fontSize: isMobile ? '0.62rem' : '0.68rem',
+            fontWeight: 800, color: '#fff',
+            textTransform: 'uppercase', letterSpacing: '0.06em',
+          }}>
+            Gidsen
+          </div>
+          <div style={{ fontSize: '0.55rem', color: 'rgba(255,255,255,0.25)', fontWeight: 700 }}>
+            · {files.length}
+          </div>
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: isMobile ? 14 : 16 }}>
           {files.map(f => (

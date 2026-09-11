@@ -510,13 +510,15 @@ function VideoCard({ item, isLocallyViewed, onClick, isMobile }) {
   return (
     <button
       onClick={onClick}
+      /* Geen doos om de kaart. De gidsen eronder tonen een afbeelding met de
+         titel eronder, zonder rand; een videokaart in een omlijnd vakje zag
+         eruit als een ander soort blok terwijl het hetzelfde is. De
+         afgeronde hoek zit nu op het beeld zelf. */
       style={{
         flexShrink: 0,
         width: cardWidth,
-        background: '#111',
-        border: '1px solid rgba(255, 255, 255, 0.06)',
-        borderRadius: '8px',
-        overflow: 'hidden',
+        background: 'transparent',
+        border: 'none',
         cursor: 'pointer',
         padding: 0,
         textAlign: 'left',
@@ -530,6 +532,7 @@ function VideoCard({ item, isLocallyViewed, onClick, isMobile }) {
         width: '100%',
         aspectRatio: '16 / 9',
         background: '#000',
+        borderRadius: 10,
         overflow: 'hidden'
       }}>
         {thumbnail ? (
@@ -619,13 +622,12 @@ function VideoCard({ item, isLocallyViewed, onClick, isMobile }) {
         )}
       </div>
 
-      <div style={{
-        padding: isMobile ? '0.4rem 0.5rem 0.5rem' : '0.5rem 0.6rem 0.625rem'
-      }}>
+      <div style={{ marginTop: 7 }}>
         <div style={{
-          fontSize: isMobile ? '0.7rem' : '0.75rem',
-          fontWeight: '700',
+          fontSize: isMobile ? '0.78rem' : '0.82rem',
+          fontWeight: '800',
           color: '#fff',
+          letterSpacing: '-0.01em',
           lineHeight: 1.3,
           display: '-webkit-box',
           WebkitLineClamp: 2,
