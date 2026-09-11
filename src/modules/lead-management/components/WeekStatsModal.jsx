@@ -65,13 +65,6 @@ const sundayOf = (mondayDate) => {
   return d
 }
 
-const fmtRange = (monday) => {
-  const sun = new Date(monday); sun.setDate(monday.getDate() + 6)
-  const left = monday.toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })
-  const right = sun.toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })
-  return `${left} – ${right}`
-}
-
 const isoWeek = (date) => {
   const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()))
   const day = d.getUTCDay() || 7
@@ -84,13 +77,6 @@ const isoWeek = (date) => {
 // SourceRow staat buiten de hoofdcomponent en kan niet bij de pct1 daarbinnen.
 const toonPct = (v) => (v == null ? '—' : `${v}%`)
 
-const sameMonday = (a, b) => mondayOf(a).getTime() === mondayOf(b).getTime()
-const sameDay = (a, b) => {
-  const x = new Date(a), y = new Date(b)
-  return x.getFullYear() === y.getFullYear()
-    && x.getMonth() === y.getMonth()
-    && x.getDate() === y.getDate()
-}
 const fmtDay = (date) => date.toLocaleDateString('nl-NL', {
   weekday: 'long', day: 'numeric', month: 'short',
 })
@@ -439,10 +425,6 @@ export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, 
   const goNext = () => schuifPeriode(1)
   const goToday = () => setAnchorDate(new Date())
 
-  const sameMonth = (a, b) => {
-    const x = new Date(a), y = new Date(b)
-    return x.getFullYear() === y.getFullYear() && x.getMonth() === y.getMonth()
-  }
   const nu = new Date()
   // Valt vandaag binnen het getoonde venster? Dat werkt voor elke periode —
   // ook voor kwartaal, jaar en een handmatig bereik — en scheelt een ternary
