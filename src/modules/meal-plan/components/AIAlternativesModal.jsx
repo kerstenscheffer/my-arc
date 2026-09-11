@@ -19,6 +19,7 @@ export default function AIAlternativesModal({
   const [alternatives, setAlternatives] = useState([])
   const [favorites, setFavorites] = useState([])
   const [allMeals, setAllMeals] = useState([])
+  const [customMeals, setCustomMeals] = useState([])
   const [coachOptions, setCoachOptions] = useState([]) // door coach gecureerde swaps voor dit slot
   const [loading, setLoading] = useState(true)
   const [selectedMeal, setSelectedMeal] = useState(null)
@@ -105,9 +106,25 @@ export default function AIAlternativesModal({
         }
       } catch (e) { /* geen curatie → gewoon de normale pool */ }
 
+      // Eigen maaltijden van de klant (ai_custom_meals), zodat je ook daarnaar
+      // kunt wisselen. getMealById ondersteunt al custom-meal-IDs.
+      let custom = []
+      try {
+        const clientId = client?.id
+        if (clientId) {
+          const { data: customData } = await db.supabase
+            .from('ai_custom_meals')
+            .select('id, name, calories, protein, carbs, fat, image_url, section')
+            .eq('client_id', clientId)
+            .eq('is_active', true)
+          custom = (customData || []).map(m => ({ ...m, _isCustom: true }))
+        }
+      } catch {}
+
       setAlternatives(smartAlts || [])
       setFavorites(favs || [])
       setAllMeals(meals || [])
+      setCustomMeals(custom)
       setCoachOptions(curated)
       // Heeft de coach opties ingesteld? Toon die als eerste.
       if (curated.length > 0) setActiveFilter('coach')
@@ -161,8 +178,12 @@ export default function AIAlternativesModal({
     }
 
     if (searchTerm) {
+      // Doorzoek bij een actieve zoekopdracht de volledige pool (ai_meals +
+      // eigen maaltijden), ongeacht het actieve filter. Zo kom je nooit vast
+      // te zitten achter een filter als je een specifieke maaltijdnaam intypt.
       const term = searchTerm.toLowerCase()
-      meals = meals.filter(m =>
+      const fullPool = [...allMeals, ...customMeals].filter(m => m.id !== currentMeal?.id)
+      return fullPool.filter(m =>
         m.name?.toLowerCase().includes(term) ||
         m.name_en?.toLowerCase().includes(term)
       )
@@ -596,16 +617,30 @@ function SwapMealRow({ meal, currentMeal, isSelected, onSelect, isMobile, getDif
       }}>
         {/* Name */}
         <div style={{
-          fontSize: isMobile ? '0.8rem' : '0.85rem',
-          fontWeight: '700',
-          color: isSelected ? '#fff' : 'rgba(255, 255, 255, 0.85)',
-          whiteSpace: 'nowrap',
-          overflow: 'hidden',
-          textOverflow: 'ellipsis',
-          letterSpacing: '-0.01em',
-          marginBottom: '0.2rem'
+          display: 'flex', alignItems: 'center', gap: '0.35rem',
+          marginBottom: '0.2rem', overflow: 'hidden'
         }}>
-          {meal.name}
+          <div style={{
+            fontSize: isMobile ? '0.8rem' : '0.85rem',
+            fontWeight: '700',
+            color: isSelected ? '#fff' : 'rgba(255, 255, 255, 0.85)',
+            whiteSpace: 'nowrap',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            letterSpacing: '-0.01em',
+          }}>
+            {meal.name}
+          </div>
+          {meal._isCustom && (
+            <span style={{
+              flexShrink: 0,
+              fontSize: '0.55rem', fontWeight: '800',
+              color: '#FFD700', background: 'rgba(255,215,0,0.1)',
+              border: '1px solid rgba(255,215,0,0.25)',
+              borderRadius: '4px', padding: '0.1rem 0.3rem',
+              textTransform: 'uppercase', letterSpacing: '0.04em'
+            }}>Eigen</span>
+          )}
         </div>
 
         {/* Macros + diff indicators */}

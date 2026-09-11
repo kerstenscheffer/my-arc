@@ -239,16 +239,43 @@ export default function SearchTab({ db, onSelect, isMobile, client, onQuickLog, 
   // ── MAALTIJDEN search ──
   const searchMeals = async (query) => {
     try {
-      const { data: meals } = await db.supabase
-        .from('ai_meals')
-        .select('id, name, name_en, calories, protein, carbs, fat, image_url, timing, ingredients_list')
-        .or(`name.ilike.%${query}%,name_en.ilike.%${query}%`)
-        .limit(20)
+      const [mealsRes, customRes] = await Promise.all([
+        db.supabase
+          .from('ai_meals')
+          .select('id, name, name_en, calories, protein, carbs, fat, image_url, timing, ingredients_list')
+          .or(`name.ilike.%${query}%,name_en.ilike.%${query}%`)
+          .limit(20),
+        client?.id
+          ? db.supabase
+              .from('ai_custom_meals')
+              .select('id, name, calories, protein, carbs, fat, image_url, ingredients_list')
+              .eq('client_id', client.id)
+              .eq('is_active', true)
+              .ilike('name', `%${query}%`)
+              .limit(10)
+          : Promise.resolve({ data: [] })
+      ])
 
       const allResults = []
-      if (meals) {
+
+      // Eigen maaltijden van de klant eerst (meest herkenbaar)
+      if (customRes.data) {
+        customRes.data.slice().sort((a, b) => computeRelevance(a.name, query) - computeRelevance(b.name, query))
+          .forEach(m => {
+            allResults.push({
+              id: m.id, name: m.name,
+              calories: Math.round(m.calories || 0), protein: Math.round(m.protein || 0),
+              carbs: Math.round(m.carbs || 0), fat: Math.round(m.fat || 0),
+              image_url: m.image_url, type: 'custom_meal', source: 'custom',
+              sourceLabel: 'Eigen', per100g: false,
+              ingredients: Array.isArray(m.ingredients_list) ? m.ingredients_list : []
+            })
+          })
+      }
+
+      if (mealsRes.data) {
         // Sort by relevance so exact "rijst" outranks "rijst-yoghurt-bowl" etc.
-        const sortedMeals = meals.slice().sort((a, b) => {
+        const sortedMeals = mealsRes.data.slice().sort((a, b) => {
           const rA = computeRelevance(a.name, query)
           const rB = computeRelevance(b.name, query)
           return rA - rB

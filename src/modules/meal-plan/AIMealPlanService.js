@@ -889,10 +889,12 @@ async logAIMood(clientId, moodData) {
         .single()
       
       if (swapError) {
-        console.error('Swap insert error:', swapError)
-        throw swapError
+        // FK violation when new_meal_id references ai_custom_meals instead of
+        // ai_meals — log a warning and continue; the progress + week_structure
+        // updates below are the functional ones.
+        console.warn('⚠️ Swap log not stored (custom meal or FK mismatch):', swapError.message)
       }
-      
+
       // Update progress
       let progress = await this.getAIProgress(clientId, today)
       if (!progress.consumed_meals) progress.consumed_meals = {}
@@ -940,7 +942,7 @@ async logAIMood(clientId, moodData) {
       await this.swapMealInWeekStructure(planId, day, slot, newMeal)
 
       console.log('✅ Meal swapped successfully')
-      return swapData
+      return true
 
     } catch (error) {
       console.error('Error swapping meal:', error)
