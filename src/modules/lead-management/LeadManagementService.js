@@ -995,18 +995,39 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
     }
   }
 
+  // Eén uitkomst wegschrijven op een call-movement.
+  //
+  // Met .select() erachter, en dan kijken of er echt een rij terugkomt. Dat is
+  // hier geen overdaad: de update-policy op lead_movements staat alleen
+  // coach_id = auth.uid() toe, dus bij de call van een teamlid raakt de update
+  // nul rijen. PostgREST geeft daar GEEN fout bij — je krijgt 204 en een lege
+  // lijst. De code dacht dus dat het gelukt was, terwijl er niets veranderde,
+  // en de openstaande-call-pop-up bleef terugkomen zonder enige melding.
+  async schrijfCallUitkomst(movementId, velden, watGingMis) {
+    try {
+      if (!movementId) return { success: false, error: 'Geen call meegegeven' }
+      const { data, error } = await this.db.supabase
+        .from('lead_movements').update(velden).eq('id', movementId).select('id')
+      if (error) throw error
+      if (!data || data.length === 0) {
+        return { success: false, geenRechten: true,
+          error: 'Deze call staat op naam van een teamlid — je kunt hem niet afhandelen.' }
+      }
+      return { success: true }
+    } catch (e) {
+      console.error(`${watGingMis} failed:`, e)
+      return { success: false, error: e.message }
+    }
+  }
+
   // "Denkt erover na": de call is wél gevoerd (telt dus mee in de call-stats),
   // maar er is nog geen ja of nee. De lead blijft in de ingepland-sectie en
   // komt op followup_date vanzelf terug in de pop-up.
   async markCallThinking(movementId, followupDate) {
     try {
-      if (!movementId) return { success: false }
-      const { error } = await this.db.supabase
-        .from('lead_movements')
-        .update({ call_happened: true, outcome_type: 'thinking', followup_date: followupDate || null })
-        .eq('id', movementId)
-      if (error) throw error
-      return { success: true }
+      return await this.schrijfCallUitkomst(movementId,
+        { call_happened: true, outcome_type: 'thinking', followup_date: followupDate || null },
+        'markCallThinking')
     } catch (e) {
       console.error('markCallThinking failed:', e)
       return { success: false, error: e.message }
@@ -1016,11 +1037,8 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
   // Markeer een ingeplande call als wel/niet gevoerd (drijft de "Call gevoerd"-stat).
   async resolveScheduledCall(movementId, happened) {
     try {
-      if (!movementId) return { success: false }
-      const { error } = await this.db.supabase
-        .from('lead_movements').update({ call_happened: !!happened }).eq('id', movementId)
-      if (error) throw error
-      return { success: true }
+      return await this.schrijfCallUitkomst(movementId,
+        { call_happened: !!happened }, 'resolveScheduledCall')
     } catch (e) {
       console.error('resolveScheduledCall failed:', e)
       return { success: false, error: e.message }
