@@ -30,6 +30,34 @@ const mondayOf = (date) => {
   return d
 }
 
+// yyyy-mm-dd op lokale datumdelen. Niet via toISOString(): die geeft de
+// UTC-datum en levert hier 's avonds de dag ervoor op.
+const isoDatum = (d) => {
+  const x = new Date(d)
+  const mm = String(x.getMonth() + 1).padStart(2, '0')
+  const dd = String(x.getDate()).padStart(2, '0')
+  return `${x.getFullYear()}-${mm}-${dd}`
+}
+
+// Keuzes in de periode-dropdown. 'custom' staat achteraan: de vaste periodes
+// gebruik je dagelijks, een eigen bereik is het uitzonderingsgeval.
+const PERIODE_OPTIES = [
+  { id: 'day', label: 'Dag' },
+  { id: 'week', label: 'Week' },
+  { id: 'month', label: 'Maand' },
+  { id: 'quarter', label: 'Kwartaal' },
+  { id: 'year', label: 'Jaar' },
+  { id: 'custom', label: 'Handmatig' },
+]
+
+// Eerste dag van het kwartaal waar deze datum in valt.
+const kwartaalStart = (d) => {
+  const x = new Date(d.getFullYear(), Math.floor(d.getMonth() / 3) * 3, 1)
+  x.setHours(0, 0, 0, 0)
+  return x
+}
+const kwartaalNr = (d) => Math.floor(d.getMonth() / 3) + 1
+
 const sundayOf = (mondayDate) => {
   const d = new Date(mondayDate)
   d.setDate(d.getDate() + 6)
@@ -77,11 +105,18 @@ const pct = (num, den) => {
 export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, isMobile: propMobile, onTargetsSaved }) {
   const modalHost = useModalHost()
   const isMobile = propMobile ?? (typeof window !== 'undefined' && window.innerWidth <= 768)
-  // periodMode: 'day' = single day window, 'week' = Monday→Sunday window.
-  // anchorDate is the reference point — for 'day' it's the chosen day,
-  // for 'week' we use its Monday.
+  // periodMode bepaalt het venster rond anchorDate: dag, week (ma→zo), maand,
+  // kwartaal, jaar, of een zelfgekozen periode ('custom', dan tellen de twee
+  // datumvelden en doet anchorDate niet mee).
   const [periodMode, setPeriodMode] = useState('week')
   const [anchorDate, setAnchorDate] = useState(() => new Date())
+  // Handmatige periode. Start op deze maand, zodat er meteen iets staat als je
+  // 'm kiest in plaats van een leeg scherm.
+  const [customStart, setCustomStart] = useState(() => {
+    const d = new Date(); d.setDate(1)
+    return isoDatum(d)
+  })
+  const [customEnd, setCustomEnd] = useState(() => isoDatum(new Date()))
   const [loading, setLoading] = useState(true)
   const [activity, setActivity] = useState(null)
   const [funnel, setFunnel] = useState(null)
@@ -291,6 +326,26 @@ export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, 
       e.setHours(0, 0, 0, 0)
       return { start: s, end: e }
     }
+    if (periodMode === 'quarter') {
+      const s = kwartaalStart(anchorDate)
+      const e = new Date(s); e.setMonth(e.getMonth() + 3)
+      return { start: s, end: e }
+    }
+    if (periodMode === 'year') {
+      const s = new Date(anchorDate.getFullYear(), 0, 1); s.setHours(0, 0, 0, 0)
+      const e = new Date(anchorDate.getFullYear() + 1, 0, 1); e.setHours(0, 0, 0, 0)
+      return { start: s, end: e }
+    }
+    if (periodMode === 'custom') {
+      const s = new Date(`${customStart}T00:00:00`)
+      // De einddatum telt mee: kies je 1 t/m 30 sep, dan hoort 30 sep erbij.
+      // Het venster is [start, end), dus een dag erbij.
+      const e = new Date(`${customEnd}T00:00:00`); e.setDate(e.getDate() + 1)
+      // Datums omgedraaid ingevuld? Draai ze om in plaats van een leeg scherm
+      // te tonen.
+      if (isNaN(s) || isNaN(e)) return { start: mondayOf(anchorDate), end: new Date(mondayOf(anchorDate).getTime() + 7 * 864e5) }
+      return s <= e ? { start: s, end: e } : { start: e, end: s }
+    }
     const s = mondayOf(anchorDate)
     const e = new Date(s); e.setDate(e.getDate() + 7)
     return { start: s, end: e }
@@ -368,37 +423,52 @@ export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, 
 
   if (!isOpen) return null
 
-  const goPrev = () => {
+  // Eén stap vooruit of achteruit. Bij een handmatige periode heeft "vorige"
+  // geen betekenis — dan staan de pijlen uit.
+  const isCustom = periodMode === 'custom'
+  const schuifPeriode = (richting) => {
+    if (isCustom) return
     const next = new Date(anchorDate)
-    if (periodMode === 'month') next.setMonth(next.getMonth() - 1)
-    else next.setDate(anchorDate.getDate() - (periodMode === 'day' ? 1 : 7))
+    if (periodMode === 'month') next.setMonth(next.getMonth() + richting)
+    else if (periodMode === 'quarter') next.setMonth(next.getMonth() + 3 * richting)
+    else if (periodMode === 'year') next.setFullYear(next.getFullYear() + richting)
+    else next.setDate(anchorDate.getDate() + (periodMode === 'day' ? 1 : 7) * richting)
     setAnchorDate(next)
   }
-  const goNext = () => {
-    const next = new Date(anchorDate)
-    if (periodMode === 'month') next.setMonth(next.getMonth() + 1)
-    else next.setDate(anchorDate.getDate() + (periodMode === 'day' ? 1 : 7))
-    setAnchorDate(next)
-  }
+  const goPrev = () => schuifPeriode(-1)
+  const goNext = () => schuifPeriode(1)
   const goToday = () => setAnchorDate(new Date())
 
   const sameMonth = (a, b) => {
     const x = new Date(a), y = new Date(b)
     return x.getFullYear() === y.getFullYear() && x.getMonth() === y.getMonth()
   }
-  const isCurrentPeriod = periodMode === 'day'
-    ? sameDay(anchorDate, new Date())
-    : periodMode === 'month'
-      ? sameMonth(anchorDate, new Date())
-      : sameMonday(anchorDate, new Date())
+  const nu = new Date()
+  // Valt vandaag binnen het getoonde venster? Dat werkt voor elke periode —
+  // ook voor kwartaal, jaar en een handmatig bereik — en scheelt een ternary
+  // per periodesoort.
+  const isCurrentPeriod = nu >= start && nu < end
   const todayMidnight = new Date(); todayMidnight.setHours(0, 0, 0, 0)
-  const isFuturePeriod = periodMode === 'day'
-    ? new Date(anchorDate).setHours(0,0,0,0) > todayMidnight.getTime()
-    : periodMode === 'month'
-      ? (anchorDate.getFullYear() > todayMidnight.getFullYear()
-        || (anchorDate.getFullYear() === todayMidnight.getFullYear()
-          && anchorDate.getMonth() > todayMidnight.getMonth()))
-      : mondayOf(anchorDate).getTime() > mondayOf(new Date()).getTime()
+  // De volgende-pijl uit zodra het venster al voorbij vandaag loopt. Bij een
+  // handmatige periode is er geen volgende, dus daar staat hij sowieso uit.
+  const isFuturePeriod = isCustom || start.getTime() > todayMidnight.getTime()
+
+  // Wat er in de kop staat. Stond als drie geneste ternary's op vier plekken;
+  // met zes periodesoorten wordt dat onleesbaar, dus één keer hier.
+  const periodeWoord = { day: 'dag', week: 'week', month: 'maand', quarter: 'kwartaal', year: 'jaar', custom: 'periode' }[periodMode]
+  const dagKort = (d) => d.toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })
+  const laatsteDag = new Date(end.getTime() - 864e5)   // end is exclusief
+  const periodeTitel = (() => {
+    if (isCustom) return 'Eigen periode'
+    if (periodMode === 'day') return isCurrentPeriod ? 'Vandaag' : fmtDay(anchorDate).split(' ').slice(0, -2).join(' ')
+    if (periodMode === 'month') return `${anchorDate.toLocaleDateString('nl-NL', { month: 'long', year: 'numeric' })}${isCurrentPeriod ? ' · Deze maand' : ''}`
+    if (periodMode === 'quarter') return `Q${kwartaalNr(anchorDate)} ${anchorDate.getFullYear()}${isCurrentPeriod ? ' · Dit kwartaal' : ''}`
+    if (periodMode === 'year') return `${anchorDate.getFullYear()}${isCurrentPeriod ? ' · Dit jaar' : ''}`
+    return `Week ${isoWeek(mondayOf(anchorDate))}${isCurrentPeriod ? ' · Deze week' : ''}`
+  })()
+  const periodeBereik = periodMode === 'day'
+    ? fmtDay(anchorDate)
+    : `${dagKort(start)} – ${dagKort(laatsteDag)}${periodMode === 'year' || periodMode === 'custom' ? ` ${laatsteDag.getFullYear()}` : ''}`
 
   const totalReplies = funnel?.replied?.count || 0
   const totalConvs = funnel?.conversation?.count || 0
@@ -538,23 +608,54 @@ export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, 
           <div style={{ flexShrink: 0, color: '#fff', fontWeight: 800, fontSize: '0.9rem', whiteSpace: 'nowrap' }}>
             Stats
           </div>
-          {/* Dag/Week/Maand — segment-control op dezelfde regel */}
-          <div style={{ display: 'inline-flex', flexShrink: 0, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 10, padding: 3, gap: 3, marginLeft: 4 }}>
-            {['day', 'week', 'month'].map(mode => {
-              const active = periodMode === mode
-              const labels = { day: 'Dag', week: 'Week', month: 'Maand' }
-              return (
-                <button key={mode} onClick={() => setPeriodMode(mode)} style={{
-                  minHeight: 30, padding: isMobile ? '0 0.6rem' : '0 0.85rem', border: 'none', borderRadius: 7,
-                  background: active ? 'rgba(255,215,0,0.16)' : 'transparent',
-                  color: active ? GOLD : 'rgba(255,255,255,0.55)',
-                  fontSize: isMobile ? '0.72rem' : '0.76rem', fontWeight: 800,
-                  cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-                  transition: 'all 0.15s ease',
-                }}>{labels[mode]}</button>
-              )
-            })}
-          </div>
+          {/* Periode-keuze. Was een segment-rij met drie knoppen; met zes
+              periodes past dat niet meer op een telefoon, en een dropdown
+              houdt de kop rustig. */}
+          <select
+            value={periodMode}
+            onChange={(e) => setPeriodMode(e.target.value)}
+            style={{
+              flexShrink: 0, marginLeft: 4, minHeight: 32,
+              padding: isMobile ? '0 1.6rem 0 0.6rem' : '0 1.8rem 0 0.8rem',
+              background: 'rgba(255,255,255,0.04)',
+              border: '1px solid rgba(255,255,255,0.1)', borderRadius: 10,
+              color: '#fff', fontSize: isMobile ? '0.74rem' : '0.78rem', fontWeight: 800,
+              fontFamily: 'inherit', cursor: 'pointer', outline: 'none',
+              appearance: 'none', WebkitAppearance: 'none',
+              // Eigen pijltje: zonder appearance:none tekent Safari een grijze
+              // knop die niet bij de rest past.
+              backgroundImage: 'url("data:image/svg+xml;utf8,<svg xmlns=\'http://www.w3.org/2000/svg\' width=\'10\' height=\'6\' viewBox=\'0 0 10 6\'><path d=\'M1 1l4 4 4-4\' stroke=\'rgba(255,255,255,0.5)\' stroke-width=\'1.5\' fill=\'none\' stroke-linecap=\'round\'/></svg>")',
+              backgroundRepeat: 'no-repeat',
+              backgroundPosition: `right ${isMobile ? '0.5rem' : '0.6rem'} center`,
+            }}
+          >
+            {PERIODE_OPTIES.map(o => (
+              <option key={o.id} value={o.id} style={{ background: '#0a0a0a', color: '#fff' }}>{o.label}</option>
+            ))}
+          </select>
+
+          {/* Datumvelden, alleen bij een handmatige periode. Beide datums
+              tellen mee — kies je 1 t/m 30 sep, dan hoort 30 sep erbij. */}
+          {periodMode === 'custom' && (
+            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
+              {[[customStart, setCustomStart], [customEnd, setCustomEnd]].map(([waarde, zet], i) => (
+                <span key={i} style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                  {i === 1 && <span style={{ color: 'rgba(255,255,255,0.35)', fontSize: '0.75rem' }}>–</span>}
+                  <input
+                    type="date" value={waarde} max={isoDatum(new Date())}
+                    onChange={(e) => zet(e.target.value)}
+                    style={{
+                      minHeight: 32, padding: '0 0.5rem',
+                      background: 'rgba(255,255,255,0.04)',
+                      border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8,
+                      color: '#fff', fontSize: isMobile ? '0.7rem' : '0.74rem', fontWeight: 700,
+                      fontFamily: 'inherit', outline: 'none', colorScheme: 'dark',
+                    }}
+                  />
+                </span>
+              ))}
+            </div>
+          )}
           <div style={{ flex: 1, minWidth: 8 }} />
           <button
             onClick={openRevenuePanel}
@@ -586,11 +687,11 @@ export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, 
               if (pdfBusy || loading) return
               setPdfBusy(true)
               try {
+                // Zelfde kop als in de modal, zodat de PDF laat zien over
+                // welke periode je kijkt — ook bij kwartaal, jaar of handmatig.
                 const periodLabel = periodMode === 'day'
                   ? fmtDay(anchorDate)
-                  : periodMode === 'month'
-                    ? anchorDate.toLocaleDateString('nl-NL', { month: 'long', year: 'numeric' })
-                    : `Week ${isoWeek(mondayOf(anchorDate))} · ${fmtRange(mondayOf(anchorDate))}`
+                  : `${periodeTitel} · ${periodeBereik}`
                 // De PDF gebruikt EXACT dezelfde item-arrays als de modal, zodat
                 // getallen 1-op-1 kloppen en de simpele inline-stijl matcht.
                 const res = await exportStatsPDF({
@@ -636,28 +737,18 @@ export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, 
           display: 'flex', alignItems: 'center', gap: '0.4rem',
           borderBottom: '1px solid rgba(255,255,255,0.04)',
         }}>
-          <button onClick={goPrev} title={periodMode === 'day' ? 'Vorige dag' : periodMode === 'month' ? 'Vorige maand' : 'Vorige week'} style={navBtn}>
+          <button onClick={goPrev} disabled={isCustom} title={`Vorige ${periodeWoord}`} style={{ ...navBtn, opacity: isCustom ? 0.3 : 1, cursor: isCustom ? 'not-allowed' : 'pointer' }}>
             <ChevronLeft size={16} />
           </button>
           <div style={{ flex: 1, textAlign: 'center', minWidth: 0 }}>
             <div style={{ fontSize: '0.65rem', fontWeight: 800, color: GOLD, letterSpacing: '0.06em', textTransform: 'uppercase' }}>
-              {periodMode === 'day'
-                ? (isCurrentPeriod ? 'Vandaag' : fmtDay(anchorDate).split(' ').slice(0, -2).join(' '))
-                : periodMode === 'month'
-                  ? `${anchorDate.toLocaleDateString('nl-NL', { month: 'long', year: 'numeric' })}${isCurrentPeriod ? ' · Deze maand' : ''}`
-                  : `Week ${isoWeek(mondayOf(anchorDate))}${isCurrentPeriod ? ' · Deze week' : ''}`
-              }
+              {periodeTitel}
             </div>
             <div style={{ fontSize: '0.78rem', fontWeight: 600, color: '#fff', marginTop: 2 }}>
-              {periodMode === 'day'
-                ? fmtDay(anchorDate)
-                : periodMode === 'month'
-                  ? `${new Date(anchorDate.getFullYear(), anchorDate.getMonth(), 1).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })} – ${new Date(anchorDate.getFullYear(), anchorDate.getMonth() + 1, 0).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })}`
-                  : fmtRange(mondayOf(anchorDate))
-              }
+              {periodeBereik}
             </div>
           </div>
-          <button onClick={goNext} title={periodMode === 'day' ? 'Volgende dag' : periodMode === 'month' ? 'Volgende maand' : 'Volgende week'} disabled={isFuturePeriod} style={{ ...navBtn, opacity: isFuturePeriod ? 0.3 : 1, cursor: isFuturePeriod ? 'not-allowed' : 'pointer' }}>
+          <button onClick={goNext} title={`Volgende ${periodeWoord}`} disabled={isFuturePeriod} style={{ ...navBtn, opacity: isFuturePeriod ? 0.3 : 1, cursor: isFuturePeriod ? 'not-allowed' : 'pointer' }}>
             <ChevronRight size={16} />
           </button>
         </div>
@@ -907,7 +998,7 @@ export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, 
                     fontWeight: 700, fontSize: '0.78rem',
                     cursor: 'pointer', touchAction: 'manipulation',
                   }}>
-                    <Calendar size={14} /> Terug naar {periodMode === 'day' ? 'vandaag' : periodMode === 'month' ? 'deze maand' : 'deze week'}
+                    <Calendar size={14} /> Terug naar {periodMode === 'day' ? 'vandaag' : `deze ${periodeWoord}`}
                   </button>
                 </div>
               )}
@@ -922,7 +1013,7 @@ export default function WeekStatsModal({ isOpen, onClose, leadService, coachId, 
                   color: 'rgba(255,255,255,0.4)',
                   fontSize: '0.85rem',
                 }}>
-                  Geen activiteit in deze {periodMode === 'day' ? 'dag' : periodMode === 'month' ? 'maand' : 'week'}.
+                  Geen activiteit in deze {periodeWoord}.
                 </div>
               )}
             </>
