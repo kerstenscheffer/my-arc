@@ -31,6 +31,7 @@
     "jspdf-autotable": "^5.0.2",
     "lucide-react": "^0.540.0",
     "node-fetch": "^2.7.0",
+    "pdfjs-dist": "^6.3.289",
     "puppeteer": "^24.18.0",
     "quagga": "^0.12.1",
     "react": "^19.1.1",
