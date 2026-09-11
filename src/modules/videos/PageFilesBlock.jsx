@@ -60,15 +60,14 @@ export default function PageFilesBlock({ pageContext, isMobile = false }) {
           display: 'flex', alignItems: 'center', gap: '0.5rem',
           marginBottom: isMobile ? '0.8rem' : '0.9rem',
         }}>
-          <div style={{ width: 3, height: 12, background: '#FFD700', borderRadius: 2 }} />
+          <div style={{ width: 3, height: isMobile ? 17 : 19, background: '#FFD700', borderRadius: 2 }} />
           <div style={{
-            fontSize: isMobile ? '0.62rem' : '0.68rem',
-            fontWeight: 800, color: '#fff',
-            textTransform: 'uppercase', letterSpacing: '0.06em',
+            fontSize: isMobile ? '1rem' : '1.1rem',
+            fontWeight: 800, color: '#fff', letterSpacing: '-0.015em',
           }}>
             Gidsen
           </div>
-          <div style={{ fontSize: '0.55rem', color: 'rgba(255,255,255,0.25)', fontWeight: 700 }}>
+          <div style={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.3)', fontWeight: 700 }}>
             · {files.length}
           </div>
         </div>

@@ -338,9 +338,9 @@ export default function PageVideoWidget({ client, db, pageContext = 'home', open
           {!activeCourse && courseList.length > 0 && (
             <div style={{ padding: isMobile ? '0.75rem 0' : '0.875rem 0', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
               <div style={{ padding: isMobile ? '0 1rem 0.5rem' : '0 1.125rem 0.625rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <GraduationCap size={13} color={GREEN} />
-                <div style={{ fontSize: isMobile ? '0.62rem' : '0.68rem', fontWeight: 800, color: '#fff', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Cursussen</div>
-                <div style={{ fontSize: '0.55rem', color: 'rgba(255,255,255,0.25)', fontWeight: 700 }}>· {courseList.length}</div>
+                <GraduationCap size={16} color={GREEN} />
+                <div style={{ fontSize: isMobile ? '1rem' : '1.1rem', fontWeight: 800, color: '#fff', letterSpacing: '-0.015em' }}>Cursussen</div>
+                <div style={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.3)', fontWeight: 700 }}>· {courseList.length}</div>
               </div>
               <div className="pvw-row" style={{ display: 'flex', gap: '0.5rem', padding: isMobile ? '0 1rem' : '0 1.125rem', overflowX: 'auto', WebkitOverflowScrolling: 'touch', scrollbarWidth: 'none' }}>
                 {courseList.map(course => {
@@ -443,38 +443,41 @@ function CategoryRow({ title, color, items, viewedIds, onSelect, isMobile, isUnc
       }}>
         <div style={{
           width: '3px',
-          height: '12px',
+          height: isMobile ? '17px' : '19px',
           background: color,
           borderRadius: '2px',
           opacity: isUncategorized ? 0.5 : 1
         }} />
+        {/* Zelfde maat als het kopje boven de gidsen. Stond op 0.62rem in
+            kapitalen; dat las als een labeltje in plaats van als de titel van
+            een blok, en werd bij de gidsen te klein bevonden. */}
         <div style={{
-          fontSize: isMobile ? '0.62rem' : '0.68rem',
+          fontSize: isMobile ? '1rem' : '1.1rem',
           fontWeight: '800',
           color: '#fff',
-          textTransform: 'uppercase',
-          letterSpacing: '0.06em'
+          letterSpacing: '-0.015em'
         }}>
           {title}
         </div>
         <div style={{
-          fontSize: '0.55rem',
-          color: 'rgba(255, 255, 255, 0.25)',
+          fontSize: '0.7rem',
+          color: 'rgba(255, 255, 255, 0.3)',
           fontWeight: '700'
         }}>
           · {items.length}
         </div>
       </div>
 
+      {/* Onder elkaar in plaats van een horizontale strook. In die strook
+          waren de video's 180px breed terwijl de gidsen eronder de volle
+          breedte pakken — twee formaten voor hetzelfde soort kaart, en de
+          video's verloren het. Zelfde tussenruimte als bij de gidsen. */}
       <div
-        className="pvw-row"
         style={{
           display: 'flex',
-          gap: '0.5rem',
-          padding: isMobile ? '0 1rem' : '0 1.125rem',
-          overflowX: 'auto',
-          WebkitOverflowScrolling: 'touch',
-          scrollbarWidth: 'none'
+          flexDirection: 'column',
+          gap: isMobile ? 14 : 16,
+          padding: isMobile ? '0 1rem' : '0 1.125rem'
         }}
       >
         {items.map((item, idx) => (
@@ -488,7 +491,6 @@ function CategoryRow({ title, color, items, viewedIds, onSelect, isMobile, isUnc
         ))}
       </div>
 
-      <style>{`.pvw-row::-webkit-scrollbar { display: none; }`}</style>
     </div>
   )
 }
@@ -505,7 +507,9 @@ function VideoCard({ item, isLocallyViewed, onClick, isMobile }) {
   const isWatched = isLocallyViewed || item.status === 'completed' || !!item.viewed_at
   const isShort = isYouTubeShort(video.video_url)
 
-  const cardWidth = isMobile ? '160px' : '180px'
+  // Volle breedte, net als een gids. Het beeld blijft 16:9, dus de kaart
+  // groeit mee met het paneel in plaats van een postzegel te blijven.
+  const cardWidth = '100%'
 
   return (
     <button
@@ -515,7 +519,6 @@ function VideoCard({ item, isLocallyViewed, onClick, isMobile }) {
          eruit als een ander soort blok terwijl het hetzelfde is. De
          afgeronde hoek zit nu op het beeld zelf. */
       style={{
-        flexShrink: 0,
         width: cardWidth,
         background: 'transparent',
         border: 'none',
@@ -624,7 +627,7 @@ function VideoCard({ item, isLocallyViewed, onClick, isMobile }) {
 
       <div style={{ marginTop: 7 }}>
         <div style={{
-          fontSize: isMobile ? '0.78rem' : '0.82rem',
+          fontSize: isMobile ? '0.85rem' : '0.9rem',
           fontWeight: '800',
           color: '#fff',
           letterSpacing: '-0.01em',
@@ -633,8 +636,7 @@ function VideoCard({ item, isLocallyViewed, onClick, isMobile }) {
           WebkitLineClamp: 2,
           WebkitBoxOrient: 'vertical',
           overflow: 'hidden',
-          marginBottom: '0.2rem',
-          minHeight: '1.8rem'
+          marginBottom: '0.15rem'
         }}>
           {video.title}
         </div>
