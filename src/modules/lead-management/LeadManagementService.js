@@ -1050,13 +1050,8 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
   // 'm NIET meetelt (afzeggen ≠ niet komen opdagen).
   async cancelScheduledCall(movementId) {
     try {
-      if (!movementId) return { success: false }
-      const { error } = await this.db.supabase
-        .from('lead_movements')
-        .update({ call_happened: false, outcome_type: 'cancelled' })
-        .eq('id', movementId)
-      if (error) throw error
-      return { success: true }
+      return await this.schrijfCallUitkomst(movementId,
+        { call_happened: false, outcome_type: 'cancelled' }, 'cancelScheduledCall')
     } catch (e) {
       console.error('cancelScheduledCall failed:', e)
       return { success: false, error: e.message }
@@ -1080,11 +1075,11 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
         // outcome_type. Vandaar dit eigen label; het onderscheidt "deze afspraak
         // is verhuisd" van "de lead kwam niet opdagen", en die twee horen ook
         // echt verschillend geteld te worden.
-        const { error: markeerFout } = await this.db.supabase
-          .from('lead_movements')
-          .update({ call_happened: false, outcome_type: 'rescheduled' })
-          .eq('id', oldMovementId)
-        if (markeerFout) throw markeerFout
+        const gemarkeerd = await this.schrijfCallUitkomst(oldMovementId,
+          { call_happened: false, outcome_type: 'rescheduled' }, 'rescheduleScheduledCall')
+        // Lukt het markeren niet, dan ook geen nieuwe afspraak wegleggen: dan
+        // zouden er twee open calls naast elkaar staan en telt hij dubbel.
+        if (!gemarkeerd.success) return { success: false, ...gemarkeerd }
       }
       const movementId = await this.logMovement({
         leadId, leadName, fromSectionId: sectionId, fromSectionTitle: sectionTitle,

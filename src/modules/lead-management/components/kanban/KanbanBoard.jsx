@@ -1386,22 +1386,37 @@ export default function KanbanBoard({
   //                      sale- resp. sale-verloren-sectie (opent bedrag-/objectie-modal).
   //   noShow           → niet gevoerd + verplaats naar no-show-sectie.
   //   reschedule       → niet gevoerd + nieuwe ingeplande call (datum/tijd).
+  // Een uitkomst die niet is opgeslagen mag niet stilletjes van het scherm
+  // verdwijnen. De call is hierboven al uit de lijst gehaald voor een vlotte
+  // reactie; lukt het schrijven niet, dan zetten we hem terug en zeggen we
+  // waarom. Zonder dit lijkt de klik te werken en staat de call na een
+  // herlaadbeurt gewoon weer open — precies hoe de pop-up bleef terugkomen.
+  // Geeft true als het goed ging.
+  const meldMislukt = (res, dc) => {
+    if (res?.success) return true
+    setDueCalls(prev => (prev.some(d => d.movementId === dc.movementId) ? prev : [...prev, dc]))
+    alert(res?.error || 'Opslaan mislukt')
+    return false
+  }
+
   const handleDueCallOutcome = async (dc, kind, extra = {}) => {
     setDueCalls(prev => prev.filter(d => d.movementId !== dc.movementId))
     const lead = (sections.find(s => s.id === dc.sectionId)?.leads || []).find(l => l.id === dc.leadId)
       || { id: dc.leadId, first_name: dc.leadName || '' }
     try {
       if (kind === 'reschedule') {
-        await leadService.rescheduleScheduledCall(dc.movementId, {
+        const resVerpl = await leadService.rescheduleScheduledCall(dc.movementId, {
           leadId: dc.leadId, leadName: dc.leadName, sectionId: dc.sectionId, sectionTitle: dc.sectionTitle,
           callDate: extra.callDate || null, callTime: extra.callTime || null, coachId,
         })
+        meldMislukt(resVerpl, dc)
         return
       }
       if (kind === 'afgezegd') {
         // Lead heeft de call afgezegd → call annuleren (telt niet als no-show)
         // en terug naar "Call voorgesteld" zodat je 'm opnieuw kunt inplannen.
-        await leadService.cancelScheduledCall(dc.movementId)
+        const resAfg = await leadService.cancelScheduledCall(dc.movementId)
+        if (!meldMislukt(resAfg, dc)) return
         const proposed = sections.find(s => s.id !== 'unassigned' && /voorgesteld|voorstel/i.test(s.title || ''))
         if (proposed) await handleMoveLeadToSection(lead, dc.sectionId, proposed.id)
         setStatsRefreshKey(k => k + 1)
@@ -1410,12 +1425,14 @@ export default function KanbanBoard({
       if (kind === 'thinking') {
         // Lead denkt na: call telt als gevoerd, lead blijft waar hij staat en
         // komt op de gekozen datum terug in de pop-up.
-        await leadService.markCallThinking(dc.movementId, extra.followupDate || null)
+        const res = await leadService.markCallThinking(dc.movementId, extra.followupDate || null)
+        if (!meldMislukt(res, dc)) return
         setStatsRefreshKey(k => k + 1)
         return
       }
       const happened = (kind === 'sale' || kind === 'saleLost')
-      await leadService.resolveScheduledCall(dc.movementId, happened)
+      const resUitkomst = await leadService.resolveScheduledCall(dc.movementId, happened)
+      if (!meldMislukt(resUitkomst, dc)) return
       let target = null
       if (kind === 'sale') target = sections.find(s => s.id !== 'unassigned' && isSaleSectionTitle(s.title))
       else if (kind === 'saleLost') target = sections.find(s => s.id !== 'unassigned' && isSaleLostSectionTitle(s.title))
