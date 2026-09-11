@@ -1,12 +1,14 @@
 // src/modules/workout/components/todays-workout/components/ExerciseCard.jsx
 import { useState, useEffect } from 'react'
-import { Play, RefreshCw, CheckCircle, Check, Dumbbell, Send, BookmarkPlus, Youtube, Info, MessageSquare } from 'lucide-react'
+import { Play, RefreshCw, CheckCircle, Check, Dumbbell, Send, BookmarkPlus, Youtube, Info, MessageSquare, Minus, Plus } from 'lucide-react'
 import ExerciseHistory from './ExerciseHistory'
 import InfoModal from './InfoModal'
 import SwapModal from './SwapModal'
 import ExerciseLogModal from './ExerciseLogModal'
 import ClientFeedbackModal from './ClientFeedbackModal'
 import ExerciseService from '../../../../../services/ExerciseService'
+import WorkoutServiceNew from '../../../services/WorkoutServiceNew'
+import { plannedSetCount } from '../../../utils/exerciseCompletion'
 
 const getFallbackImage = (exercise) => {
   const name = (exercise.name || '').toLowerCase()
@@ -44,6 +46,7 @@ export default function ExerciseCard({
   const [isPermanent, setIsPermanent] = useState(!exercise._pendingPermanent)
   const [hasVideo, setHasVideo] = useState(false)
   const [hasFeedback, setHasFeedback] = useState(false)
+  const [setsBezig, setSetsBezig] = useState(false)
 
   // Sync localExercise als de exercise prop verandert. We luisteren niet
   // alleen op naam — na een permanent-swap kunnen óók flags wijzigen
@@ -52,7 +55,7 @@ export default function ExerciseCard({
   useEffect(() => {
     setLocalExercise(exercise)
     setIsPermanent(!exercise._pendingPermanent)
-  }, [exercise.name, exercise._isWeeklyOverride, exercise._pendingPermanent, exercise.image_url])
+  }, [exercise.name, exercise.sets, exercise._isWeeklyOverride, exercise._pendingPermanent, exercise.image_url])
 
   useEffect(() => {
     if (exercise.name && client?.id) { loadPreviousLog(); checkFeedback() }
@@ -154,6 +157,46 @@ export default function ExerciseCard({
     try { setPreviousLog(await db.getPreviousExerciseLog(client.id, exercise.name)) }
     catch { setPreviousLog(null) }
     finally { setLoadingHistory(false) }
+  }
+
+  // Aantal sets bijstellen door de klant zelf.
+  //
+  // Uit een klantvraag: "hoe zet ik dat ik maar 2 setjes wil in plaats van 3,
+  // want er staat nu geen voltooid omdat de app denkt dat ik er nog 1 moet."
+  // De voltooid-check vergelijkt gelogde sets met het geplande aantal uit het
+  // schema; wie er minder doet komt daar nooit aan.
+  //
+  // Opgeslagen als week-override, dezelfde weg als het wisselen van een
+  // oefening. Dus: geldt voor deze week, raakt het schema van de coach niet,
+  // en volgende week staat er weer wat de coach bedoelde. Dat is hier het
+  // juiste bereik — je wilt niet dat één drukke week het plan permanent
+  // verlaagt.
+  const wijzigSets = async (richting) => {
+    if (setsBezig || !client?.id || !schema?.id || !workoutDayKey) return
+    const huidig = plannedSetCount(localExercise)
+    const nieuw = Math.max(1, Math.min(10, huidig + richting))
+    if (nieuw === huidig) return
+
+    setSetsBezig(true)
+    const bijgewerkt = { ...localExercise, sets: nieuw, _setsAangepast: true }
+    // Direct tonen; de database volgt. Gaat dat mis, dan draaien we terug.
+    setLocalExercise(bijgewerkt)
+    try {
+      const bewaard = await WorkoutServiceNew.saveWeeklyOverride(
+        client.id, schema.id, workoutDayKey, index, bijgewerkt, db
+      )
+      if (!bewaard) throw new Error('niet opgeslagen')
+      if (navigator.vibrate) navigator.vibrate(30)
+      // De voltooid-status hangt aan het geplande aantal, dus de lijst moet
+      // opnieuw rekenen — anders blijft "nog 1 set" staan terwijl je er net
+      // eentje af haalde.
+      if (onLogsUpdate) onLogsUpdate({ reloadSchema: true })
+    } catch (e) {
+      console.error('Sets aanpassen mislukt:', e)
+      setLocalExercise(localExercise)
+      alert('Kon het aantal sets niet opslaan. Probeer het nog eens.')
+    }
+    setSetsBezig(false)
   }
 
   const handleSwapComplete = async (result) => {
@@ -322,15 +365,33 @@ export default function ExerciseCard({
               </div>
             ) : (
               <div style={{ display: 'flex', gap: isMobile ? '0.55rem' : '0.7rem', overflow: 'hidden' }}>
-                {exercise.sets && (
-                  <div style={{ display: 'flex', alignItems: 'baseline', gap: 2 }}>
-                    <span style={{ fontSize: isMobile ? '0.72rem' : '0.78rem', fontWeight: 800, color: 'rgba(255,255,255,0.7)' }}>{exercise.sets}</span>
-                    <span style={{ fontSize: isMobile ? '0.52rem' : '0.58rem', fontWeight: 700, color: 'rgba(255,255,255,0.3)', textTransform: 'uppercase' }}>sets</span>
+                {localExercise.sets && (
+                  /* Sets met een min/plus eromheen: doe je er deze week minder,
+                     dan zet je het hier bij en klopt "voltooid" weer. Goud zodra
+                     je afwijkt van wat de coach plande, zodat het zichtbaar
+                     blijft dat je iets hebt aangepast. */
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); wijzigSets(-1) }}
+                      disabled={setsBezig || plannedSetCount(localExercise) <= 1}
+                      title="Eén set minder deze week"
+                      style={setsKnop(plannedSetCount(localExercise) <= 1 || setsBezig)}
+                    ><Minus size={10} strokeWidth={3} /></button>
+                    <div style={{ display: 'flex', alignItems: 'baseline', gap: 2, minWidth: 26, justifyContent: 'center' }}>
+                      <span style={{ fontSize: isMobile ? '0.72rem' : '0.78rem', fontWeight: 800, color: localExercise._setsAangepast ? '#FFD700' : 'rgba(255,255,255,0.7)' }}>{localExercise.sets}</span>
+                      <span style={{ fontSize: isMobile ? '0.52rem' : '0.58rem', fontWeight: 700, color: 'rgba(255,255,255,0.3)', textTransform: 'uppercase' }}>sets</span>
+                    </div>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); wijzigSets(1) }}
+                      disabled={setsBezig || plannedSetCount(localExercise) >= 10}
+                      title="Eén set erbij deze week"
+                      style={setsKnop(plannedSetCount(localExercise) >= 10 || setsBezig)}
+                    ><Plus size={10} strokeWidth={3} /></button>
                   </div>
                 )}
-                {exercise.reps && (
+                {localExercise.reps && (
                   <div style={{ display: 'flex', alignItems: 'baseline', gap: 2 }}>
-                    <span style={{ fontSize: isMobile ? '0.72rem' : '0.78rem', fontWeight: 800, color: 'rgba(255,255,255,0.7)' }}>{exercise.reps}</span>
+                    <span style={{ fontSize: isMobile ? '0.72rem' : '0.78rem', fontWeight: 800, color: 'rgba(255,255,255,0.7)' }}>{localExercise.reps}</span>
                     <span style={{ fontSize: isMobile ? '0.52rem' : '0.58rem', fontWeight: 700, color: 'rgba(255,255,255,0.3)', textTransform: 'uppercase' }}>reps</span>
                   </div>
                 )}
@@ -425,6 +486,19 @@ export default function ExerciseCard({
 }
 
 // MealCard-stijl actie-cel: icoon + label, gecentreerd, flex-1.
+// Klein rond knopje naast het aantal sets. Los gehouden zodat de min en de
+// plus er gegarandeerd hetzelfde uitzien.
+const setsKnop = (uit) => ({
+  width: 18, height: 18, flexShrink: 0, padding: 0,
+  display: 'flex', alignItems: 'center', justifyContent: 'center',
+  background: 'rgba(255,255,255,0.06)',
+  border: '1px solid rgba(255,255,255,0.12)',
+  borderRadius: 5,
+  color: uit ? 'rgba(255,255,255,0.2)' : 'rgba(255,255,255,0.6)',
+  cursor: uit ? 'not-allowed' : 'pointer',
+  touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+})
+
 function ActionCell({ icon, label, onClick, isMobile, checked, badge, flex = 1 }) {
   const color = checked ? '#10b981' : 'rgba(255,255,255,0.7)'
   return (

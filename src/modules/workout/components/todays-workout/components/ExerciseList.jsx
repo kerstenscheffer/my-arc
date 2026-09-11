@@ -27,7 +27,11 @@ export default function ExerciseList({
   // reference equality doesn't fire React's useEffect, leaving the list
   // stale until a hard refresh.
   const exercisesSignature = (exercises || [])
-    .map(e => `${e.name}|${e._pendingPermanent ? 1 : 0}|${e._isWeeklyOverride ? 1 : 0}|${e.image_url || ''}`)
+    // `sets` hoort in deze vingerafdruk: past een klant het aantal sets aan,
+    // dan verandert de naam niet en zou de lijst anders op het oude aantal
+    // blijven staan tot een harde verversing — en daarmee ook op de oude
+    // voltooid-status, want die rekent met het geplande aantal.
+    .map(e => `${e.name}|${e.sets}|${e._pendingPermanent ? 1 : 0}|${e._isWeeklyOverride ? 1 : 0}|${e.image_url || ''}`)
     .join(',')
   useEffect(() => { setLocalExercises(exercises || []) }, [exercisesSignature])
 
