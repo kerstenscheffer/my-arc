@@ -87,40 +87,151 @@ export default function ExerciseHistory({ exerciseName, previousLog, loading, cl
     )
   }
 
-  // forceLoad mode — toon direct de volledige history zonder previousLog nodig
+  // forceLoad — de volledige historie zoals hij in het blad staat.
+  //
+  // Was een tabel met twee kolommen in grijs, en elke rij een tikje
+  // doorzichtiger dan de vorige. Je zag wát je deed, maar niet waar het om
+  // gaat: word je sterker. Nu de zwaarste set bovenaan, per sessie het
+  // verschil met de keer ervoor, en een lijntje van het verloop.
   if (forceLoad) {
+    // Eén regel per sessiedag. Er staan soms twee logs van dezelfde dag in
+    // (dubbele sessies uit het verleden); die horen bij elkaar.
+    const perDag = new Map()
+    fullHistory.forEach(log => {
+      const dag = (log.created_at || '').slice(0, 10)
+      const sets = Array.isArray(log.sets) ? log.sets.filter(x => (x.weight || 0) > 0 || (x.reps || 0) > 0) : []
+      if (!dag || sets.length === 0) return          // lege sessies overslaan
+      const bestaand = perDag.get(dag) || { dag, sets: [] }
+      bestaand.sets = [...bestaand.sets, ...sets]
+      perDag.set(dag, bestaand)
+    })
+
+    const topsetVan = (sets) => sets.reduce((best, x) =>
+      (x.weight || 0) > (best.weight || 0) ||
+      ((x.weight || 0) === (best.weight || 0) && (x.reps || 0) > (best.reps || 0)) ? x : best,
+      { weight: 0, reps: 0 })
+
+    const sessies = [...perDag.values()]
+      .sort((a, b) => b.dag.localeCompare(a.dag))
+      .map(s => ({
+        ...s,
+        top: topsetVan(s.sets),
+        volume: s.sets.reduce((n, x) => n + (x.weight || 0) * (x.reps || 0), 0),
+      }))
+
+    // Zwaarste set ooit, en wanneer.
+    const pr = sessies.reduce((best, s) =>
+      !best || s.top.weight > best.top.weight ||
+      (s.top.weight === best.top.weight && s.top.reps > best.top.reps) ? s : best, null)
+
+    // Verschil met de sessie ervóór. Eerst het gewicht, en bij gelijk gewicht
+    // de reps — meer herhalingen op hetzelfde gewicht is ook vooruitgang.
+    const verschil = (i) => {
+      const nu = sessies[i], vorige = sessies[i + 1]
+      if (!vorige) return null
+      const dKg = (nu.top.weight || 0) - (vorige.top.weight || 0)
+      if (dKg !== 0) return { tekst: `${dKg > 0 ? '+' : ''}${Number(dKg.toFixed(1))} kg`, op: dKg > 0 }
+      const dReps = (nu.top.reps || 0) - (vorige.top.reps || 0)
+      if (dReps !== 0) return { tekst: `${dReps > 0 ? '+' : ''}${dReps} rep${Math.abs(dReps) === 1 ? '' : 's'}`, op: dReps > 0 }
+      return { tekst: 'gelijk', op: null }
+    }
+
+    // Lijntje van de topset door de tijd, oud → nieuw.
+    const reeks = [...sessies].reverse().map(s => s.top.weight || 0)
+    const min = Math.min(...reeks), max = Math.max(...reeks)
+    const punten = reeks.length > 1
+      ? reeks.map((v, i) => {
+          const x = (i / (reeks.length - 1)) * 100
+          const y = max === min ? 50 : 100 - ((v - min) / (max - min)) * 100
+          return `${x.toFixed(1)},${(y * 0.8 + 10).toFixed(1)}`
+        }).join(' ')
+      : null
+
     return (
-      <div style={{ padding: isMobile ? '0.75rem 1rem' : '0.875rem 1.25rem' }}>
+      <div>
         {loadingHistory && (
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '1rem 0' }}>
             <div style={{ width: '14px', height: '14px', border: '2px solid rgba(255,215,0,0.15)', borderTopColor: '#FFD700', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
-            <span style={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.35)', fontWeight: '600' }}>Laden...</span>
+            <span style={{ fontSize: '0.8rem', color: 'rgba(255,255,255,0.5)', fontWeight: 700 }}>Laden…</span>
           </div>
         )}
 
-        {!loadingHistory && historyLoaded && fullHistory.length === 0 && (
-          <div style={{ textAlign: 'center', padding: '1rem 0', fontSize: isMobile ? '0.75rem' : '0.8rem', color: 'rgba(255,255,255,0.25)', fontWeight: '600', fontStyle: 'italic' }}>
-            Geen eerdere sessies gevonden
+        {!loadingHistory && historyLoaded && sessies.length === 0 && (
+          <div style={{ padding: '1.5rem 0', textAlign: 'center', fontSize: '0.85rem', color: 'rgba(255,255,255,0.4)', fontWeight: 700 }}>
+            Nog geen sessies met deze oefening.
           </div>
         )}
 
-        {!loadingHistory && fullHistory.length > 0 && (
-          <div style={{ display: 'flex', flexDirection: 'column' }}>
-            <div style={{ display: 'grid', gridTemplateColumns: '60px 1fr', gap: '0.5rem', paddingBottom: '0.375rem', marginBottom: '0.25rem', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-              <span style={{ fontSize: '0.52rem', color: 'rgba(255,255,255,0.25)', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Datum</span>
-              <span style={{ fontSize: '0.52rem', color: 'rgba(255,255,255,0.25)', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Sets</span>
-            </div>
-            {fullHistory.map((log, i) => (
-              <div key={i} style={{ display: 'grid', gridTemplateColumns: '60px 1fr', gap: '0.5rem', padding: '0.35rem 0', borderBottom: i < fullHistory.length - 1 ? '1px solid rgba(255,255,255,0.04)' : 'none', opacity: Math.max(0.45, 1 - i * 0.08) }}>
-                <span style={{ fontSize: isMobile ? '0.65rem' : '0.7rem', color: i === 0 ? 'rgba(255,215,0,0.6)' : 'rgba(255,255,255,0.35)', fontWeight: '700' }}>
-                  {formatDate(log.created_at)}
-                </span>
-                <span style={{ fontSize: isMobile ? '0.7rem' : '0.75rem', color: i === 0 ? 'rgba(255,255,255,0.8)' : 'rgba(255,255,255,0.45)', fontWeight: '700', fontFamily: 'monospace', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                  {formatSetsCompact(log.sets)}
-                </span>
+        {!loadingHistory && sessies.length > 0 && (
+          <>
+            {/* Wat je wilt weten voor je gaat tillen: hoe zwaar ging het ooit,
+                en hoe vaak heb je deze oefening gedaan. */}
+            <div style={{ display: 'flex', alignItems: 'flex-end', gap: '1.5rem', marginBottom: '0.9rem' }}>
+              <div>
+                <div style={{ fontSize: '0.62rem', fontWeight: 900, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Zwaarste set</div>
+                <div style={{ fontSize: '1.5rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.03em', fontVariantNumeric: 'tabular-nums', lineHeight: 1.1 }}>
+                  {pr.top.weight}<span style={{ fontSize: '0.6em', color: 'rgba(255,255,255,0.4)' }}>kg</span>
+                  <span style={{ color: 'rgba(255,255,255,0.25)', fontSize: '0.7em' }}> × </span>
+                  {pr.top.reps}
+                </div>
+                <div style={{ fontSize: '0.66rem', fontWeight: 700, color: 'rgba(255,255,255,0.35)' }}>{formatDate(pr.dag)}</div>
               </div>
-            ))}
-          </div>
+              <div>
+                <div style={{ fontSize: '0.62rem', fontWeight: 900, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Sessies</div>
+                <div style={{ fontSize: '1.5rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.03em', fontVariantNumeric: 'tabular-nums', lineHeight: 1.1 }}>
+                  {sessies.length}
+                </div>
+              </div>
+
+              {punten && (
+                <svg viewBox="0 0 100 100" preserveAspectRatio="none" style={{ flex: 1, height: 44, minWidth: 60 }}>
+                  <polyline points={punten} fill="none" stroke="#FFD700" strokeWidth="3" strokeLinejoin="round" strokeLinecap="round" vectorEffect="non-scaling-stroke" />
+                </svg>
+              )}
+            </div>
+
+            {/* Per sessie: datum, de topset dik wit, alle sets eronder, en wat
+                het verschil met de vorige keer was. Geen vervagende rijen meer
+                — oudere sessies zijn niet minder waar. */}
+            <div>
+              {sessies.map((s, i) => {
+                const v = verschil(i)
+                const isPr = s.dag === pr.dag
+                return (
+                  <div key={s.dag} style={{
+                    display: 'flex', alignItems: 'baseline', gap: '0.7rem',
+                    padding: '0.55rem 0',
+                    borderTop: i === 0 ? 'none' : '1px solid rgba(255,255,255,0.07)',
+                  }}>
+                    <div style={{ width: 58, flexShrink: 0, fontSize: '0.72rem', fontWeight: 800, color: 'rgba(255,255,255,0.45)' }}>
+                      {formatDate(s.dag)}
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: '0.95rem', fontWeight: 900, color: '#fff', fontVariantNumeric: 'tabular-nums' }}>
+                        {s.top.weight}<span style={{ fontSize: '0.72em', color: 'rgba(255,255,255,0.4)' }}>kg</span>
+                        <span style={{ color: 'rgba(255,255,255,0.25)', fontSize: '0.8em' }}> × </span>
+                        {s.top.reps}
+                        {isPr && <span style={{ marginLeft: 7, fontSize: '0.6rem', fontWeight: 900, color: '#FFD700', letterSpacing: '0.06em' }}>PR</span>}
+                      </div>
+                      {s.sets.length > 1 && (
+                        <div style={{ fontSize: '0.72rem', fontWeight: 700, color: 'rgba(255,255,255,0.4)', marginTop: 1, fontVariantNumeric: 'tabular-nums' }}>
+                          {s.sets.map(x => `${x.weight || 0}×${x.reps || 0}`).join('  ')}
+                        </div>
+                      )}
+                    </div>
+                    {v && (
+                      <div style={{
+                        flexShrink: 0, fontSize: '0.72rem', fontWeight: 900,
+                        color: v.op === null ? 'rgba(255,255,255,0.3)' : v.op ? '#10b981' : 'rgba(255,255,255,0.45)',
+                      }}>
+                        {v.tekst}
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+          </>
         )}
         <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
       </div>
