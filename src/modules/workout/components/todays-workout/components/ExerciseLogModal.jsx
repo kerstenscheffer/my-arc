@@ -705,12 +705,42 @@ export default function ExerciseLogModal({ db, client, exercise, onClose, isMobi
 
             {/* Historie hoort bij de cijfers: het is dezelfde oefening, alleen
                 van vorige keren. Stond tussen de notitie-knoppen onderaan. */}
-            <div style={{ display: 'flex', gap: 6, marginTop: '0.45rem', flexWrap: 'wrap' }}>
-              {/* Stipje als er al een notitie staat: anders moet je 'm openen
-                  om te weten dat je iets hebt opgeschreven. */}
-              <Pil actief={showExerciseNote} onClick={() => setShowExerciseNote(!showExerciseNote)} icoon={<MessageSquare size={12} strokeWidth={2.4} />} label="Notitie" stip={!!exerciseNote} />
-              <Pil actief={showHistory} onClick={() => setShowHistory(!showHistory)} icoon={<History size={12} strokeWidth={2.4} />} label="Historie" />
-            </div>
+            {/* Vorige sessie hoort bij de cijfers erboven: het is dezelfde
+                oefening van vorige keer. Stond onder de foto, los van de rest. */}
+            {previousPerformance?.sets?.length > 0 && (
+              <div style={{ marginTop: '0.5rem' }}>
+                <div style={{
+                  fontSize: '0.62rem', fontWeight: 900, color: 'rgba(255,255,255,0.4)',
+                  textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '0.2rem',
+                }}>
+                  Vorige sessie
+                  {previousPerformance.date && (
+                    <span style={{ color: 'rgba(255,255,255,0.3)' }}>
+                      {' · '}{new Date(previousPerformance.date).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })}
+                    </span>
+                  )}
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                  {previousPerformance.sets.map((x, i) => (
+                    <div key={i} style={{
+                      display: 'flex', alignItems: 'baseline', gap: '0.5rem',
+                      fontSize: isMobile ? '0.85rem' : '0.9rem', fontWeight: 900,
+                      color: '#fff', fontVariantNumeric: 'tabular-nums',
+                    }}>
+                      <span style={{ fontSize: '0.72em', fontWeight: 800, color: 'rgba(255,255,255,0.4)', minWidth: '3.2em' }}>
+                        Set {i + 1}
+                      </span>
+                      <span style={{ whiteSpace: 'nowrap' }}>
+                        {x.weight}<span style={{ color: 'rgba(255,255,255,0.35)', fontSize: '0.72em', fontWeight: 800 }}>kg</span>
+                        <span style={{ color: 'rgba(255,255,255,0.25)', fontSize: '0.8em', margin: '0 0.18em' }}>×</span>
+                        {x.reps}
+                        {x.partials > 0 && <span style={{ color: 'rgba(255,215,0,0.7)', fontSize: '0.72em', fontWeight: 800 }}> +{x.partials}p</span>}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
 
           <div style={{ background: 'rgba(255,255,255,0.09)' }} />
@@ -745,49 +775,16 @@ export default function ExerciseLogModal({ db, client, exercise, onClose, isMobi
         ) : (
           <>
             {/* ── VORIGE PRESTATIES ── */}
-            {/* Vorige sessie zonder vakjes: de getallen zijn de inhoud, en zeven
-                omkaderde blokjes naast elkaar lezen als een rij knoppen terwijl
-                je er niets mee doet. Dik wit voor wat je moet verslaan. */}
-            {previousPerformance?.sets?.length > 0 && (
-              <div style={{ padding: isMobile ? '0.7rem 1rem 0' : '0.8rem 1.25rem 0' }}>
-                <div style={{
-                  fontSize: '0.66rem', fontWeight: 900, color: '#fff',
-                  textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '0.35rem',
-                }}>
-                  Vorige sessie
-                  {previousPerformance.date && (
-                    <span style={{ color: 'rgba(255,255,255,0.35)' }}>
-                      {' · '}{new Date(previousPerformance.date).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })}
-                    </span>
-                  )}
-                </div>
-                {/* Onder elkaar, met het setnummer ervoor: zo zie je in één
-                    kolom of je zwaarder ging én of je de reps hield. Naast
-                    elkaar moest je tellen welke set je voor je had. */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                  {previousPerformance.sets.map((s, i) => (
-                    <div key={i} style={{
-                      display: 'flex', alignItems: 'baseline', gap: '0.5rem',
-                      fontSize: isMobile ? '0.95rem' : '1.05rem', fontWeight: 900,
-                      color: '#fff', fontVariantNumeric: 'tabular-nums',
-                    }}>
-                      <span style={{
-                        fontSize: '0.68em', fontWeight: 800, color: 'rgba(255,255,255,0.4)',
-                        minWidth: '3.1em',
-                      }}>
-                        Set {i + 1}
-                      </span>
-                      <span style={{ whiteSpace: 'nowrap' }}>
-                        {s.weight}<span style={{ color: 'rgba(255,255,255,0.35)', fontSize: '0.72em', fontWeight: 800 }}>kg</span>
-                        <span style={{ color: 'rgba(255,255,255,0.25)', fontSize: '0.8em', margin: '0 0.18em' }}>×</span>
-                        {s.reps}
-                        {s.partials > 0 && <span style={{ color: 'rgba(255,215,0,0.7)', fontSize: '0.72em', fontWeight: 800 }}> +{s.partials}p</span>}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
+            {/* Notitie en historie hier, waar de vorige sessie stond: het zijn
+                dingen die je opzoekt vlak voor of na het loggen, niet terwijl
+                je naar je cijfers kijkt. */}
+            <div style={{
+              display: 'flex', gap: 6, flexWrap: 'wrap',
+              padding: isMobile ? '0.8rem 1rem 0' : '0.9rem 1.25rem 0',
+            }}>
+              <Pil actief={showExerciseNote} onClick={() => setShowExerciseNote(!showExerciseNote)} icoon={<MessageSquare size={12} strokeWidth={2.4} />} label="Notitie" stip={!!exerciseNote} />
+              <Pil actief={showHistory} onClick={() => setShowHistory(!showHistory)} icoon={<History size={12} strokeWidth={2.4} />} label="Historie" />
+            </div>
 
             {/* Zwevende actieknoppen, direct onder de vorige sessie. Stonden
                 onderaan het scherm; met een paar sets erin scrolde je heen en
