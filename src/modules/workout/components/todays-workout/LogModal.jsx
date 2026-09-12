@@ -8,6 +8,7 @@ import { useState, useEffect } from 'react'
 import ExerciseList from './components/ExerciseList'
 import WorkoutFlowWizard from './WorkoutFlowWizard'
 import CustomExerciseModal from './components/CustomExerciseModal'
+import { actieveOefeningen } from '../../utils/exerciseCompletion'
 
 export default function LogModal({
   workout, todaysLogs, onClose, onLogsUpdate, client, schema, db,
@@ -23,10 +24,11 @@ export default function LogModal({
   // en nu de kop blijft staan terwijl je scrolt is dat de logische plek.
 
   // ✅ Live exercises state — synct met workout prop na swap + reload
-  // Overgeslagen oefeningen (prullenbak → "alleen deze week") horen niet in de
-  // doorloop-flow; die zou anders op een oefening blijven staan die de klant
-  // net uit de lijst haalde.
-  const [liveExercises, setLiveExercises] = useState(actieveOefeningen(workout.exercises))
+  // Let op: dit is de vólle lijst, inclusief wat deze week is overgeslagen.
+  // ExerciseList schrijft week-overrides op index, dus daar mag niets
+  // tussenuit vallen. Filteren gebeurt pas waar we tellen of doorlopen.
+  const [liveExercises, setLiveExercises] = useState(workout.exercises || [])
+  const teDoen = actieveOefeningen(liveExercises)
 
   const handleCustomExerciseSave = (newExercise) => {
     setLiveExercises(prev => [...prev, {
@@ -57,7 +59,7 @@ export default function LogModal({
   useEffect(() => {
     if (todaysLogs && liveExercises) {
       const logged = new Set(todaysLogs.map(l => l.exercise_name))
-      setCompletedCount(liveExercises.filter(ex => logged.has(ex.name)).length)
+      setCompletedCount(actieveOefeningen(liveExercises).filter(ex => logged.has(ex.name)).length)
     }
   }, [todaysLogs, liveExercises])
 
@@ -98,7 +100,7 @@ export default function LogModal({
   if (showWorkoutFlow) {
     return (
       <WorkoutFlowWizard
-        exercises={liveExercises}
+        exercises={teDoen}
         client={client}
         db={db}
         onComplete={handleWorkoutFlowComplete}
@@ -107,7 +109,7 @@ export default function LogModal({
     )
   }
 
-  const totalExercises = liveExercises.length || 0
+  const totalExercises = teDoen.length || 0
   const progressPct = totalExercises > 0 ? (completedCount / totalExercises) * 100 : 0
 
   return (
