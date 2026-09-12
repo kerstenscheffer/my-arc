@@ -155,7 +155,7 @@ export default function AttachmentSelector({ suggested, value, onChange, isMobil
             <div style={{
               fontSize: isMobile ? '0.74rem' : '0.8rem', fontWeight: 700,
               color: current ? 'rgba(255,255,255,0.7)' : 'rgba(255,255,255,0.35)', marginTop: 3,
-              overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+              lineHeight: 1.2, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden',
             }}>
               {current ? current.nl : 'Kiezen…'}
             </div>

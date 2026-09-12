@@ -101,7 +101,7 @@ export default function MachineSettings({ value = {}, onChange, previousSettings
             }}>
               Instellingen
             </div>
-            <div style={{ fontSize: isMobile ? '0.74rem' : '0.8rem', fontWeight: 700, color: hasCurrentValues ? 'rgba(255,255,255,0.7)' : 'rgba(255,255,255,0.35)', marginTop: 3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            <div style={{ fontSize: isMobile ? '0.74rem' : '0.8rem', fontWeight: 700, color: hasCurrentValues ? 'rgba(255,255,255,0.7)' : 'rgba(255,255,255,0.35)', marginTop: 3, lineHeight: 1.2 }}>
               {hasCurrentValues ? 'Ingevuld' : hasPrevious ? 'Vorige er nog' : 'Leeg'}
             </div>
           </div>

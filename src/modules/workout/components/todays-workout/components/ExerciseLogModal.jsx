@@ -698,9 +698,11 @@ export default function ExerciseLogModal({ db, client, exercise, onClose, isMobi
                 {Math.floor(rusttijd.sec / 60)}:{String(rusttijd.sec % 60).padStart(2, '0')}
                 <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.78em', fontWeight: 800 }}> rust</span>
               </span>
-              {saving && <span style={{ color: '#FFD700', fontSize: '0.72em' }}>opslaan…</span>}
-              {!saving && loggedSets.length > 0 && <span style={{ color: '#10b981', fontSize: '0.72em' }}>opgeslagen</span>}
-              {editingIndex !== null && <span style={{ color: '#FFD700', fontSize: '0.72em' }}>set {editingIndex + 1} aanpassen</span>}
+              {/* Status als teken achter de cijfers, niet op een eigen regel:
+                  dat brak het blok in tweeën voor één woord. */}
+              {saving && <span style={{ color: '#FFD700', fontSize: '0.62em', fontWeight: 800 }}>opslaan…</span>}
+              {!saving && loggedSets.length > 0 && <Check size={13} strokeWidth={3.2} color="#10b981" />}
+              {editingIndex !== null && <span style={{ color: '#FFD700', fontSize: '0.62em', fontWeight: 800 }}>set {editingIndex + 1}</span>}
             </div>
 
             {/* Historie hoort bij de cijfers: het is dezelfde oefening, alleen
@@ -708,10 +710,10 @@ export default function ExerciseLogModal({ db, client, exercise, onClose, isMobi
             {/* Vorige sessie hoort bij de cijfers erboven: het is dezelfde
                 oefening van vorige keer. Stond onder de foto, los van de rest. */}
             {previousPerformance?.sets?.length > 0 && (
-              <div style={{ marginTop: '0.5rem' }}>
+              <div style={{ marginTop: '0.45rem' }}>
                 <div style={{
-                  fontSize: '0.62rem', fontWeight: 900, color: 'rgba(255,255,255,0.4)',
-                  textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '0.2rem',
+                  fontSize: '0.6rem', fontWeight: 900, color: 'rgba(255,255,255,0.35)',
+                  textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '0.15rem',
                 }}>
                   Vorige sessie
                   {previousPerformance.date && (
@@ -720,12 +722,12 @@ export default function ExerciseLogModal({ db, client, exercise, onClose, isMobi
                     </span>
                   )}
                 </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                <div style={{ display: 'flex', flexDirection: 'column' }}>
                   {previousPerformance.sets.map((x, i) => (
                     <div key={i} style={{
                       display: 'flex', alignItems: 'baseline', gap: '0.5rem',
-                      fontSize: isMobile ? '0.85rem' : '0.9rem', fontWeight: 900,
-                      color: '#fff', fontVariantNumeric: 'tabular-nums',
+                      fontSize: isMobile ? '0.82rem' : '0.88rem', fontWeight: 900,
+                      color: '#fff', fontVariantNumeric: 'tabular-nums', lineHeight: 1.45,
                     }}>
                       <span style={{ fontSize: '0.72em', fontWeight: 800, color: 'rgba(255,255,255,0.4)', minWidth: '3.2em' }}>
                         Set {i + 1}
@@ -780,7 +782,7 @@ export default function ExerciseLogModal({ db, client, exercise, onClose, isMobi
                 je naar je cijfers kijkt. */}
             <div style={{
               display: 'flex', gap: 6, flexWrap: 'wrap',
-              padding: isMobile ? '0.8rem 1rem 0' : '0.9rem 1.25rem 0',
+              padding: isMobile ? '0.7rem 1rem 0' : '0.8rem 1.25rem 0',
             }}>
               <Pil actief={showExerciseNote} onClick={() => setShowExerciseNote(!showExerciseNote)} icoon={<MessageSquare size={12} strokeWidth={2.4} />} label="Notitie" stip={!!exerciseNote} />
               <Pil actief={showHistory} onClick={() => setShowHistory(!showHistory)} icoon={<History size={12} strokeWidth={2.4} />} label="Historie" />
@@ -809,7 +811,7 @@ export default function ExerciseLogModal({ db, client, exercise, onClose, isMobi
             {!rust && (
               <div style={{
                 display: 'flex', gap: '0.5rem',
-                padding: isMobile ? '0.8rem 1rem' : '0.9rem 1.25rem',
+                padding: isMobile ? '0.65rem 1rem 0.8rem' : '0.75rem 1.25rem 0.9rem',
               }}>
                 <button
                   onClick={() => { setEditingIndex(null); setShowWizard(true) }}
