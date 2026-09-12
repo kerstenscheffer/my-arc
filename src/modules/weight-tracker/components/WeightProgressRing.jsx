@@ -115,40 +115,44 @@ function HorizontalPicker({ value, onChange, disabled, savedLabel = false, onEdi
           overflow: 'hidden',
         }}
       >
-        {/* Vinkje: opgeslagen. Stond eerder als "Opgeslagen"-pill naast een
-            tweede, groot getal boven de schuif. */}
+        {/* Opgeslagen: een wit vinkje en het potlood om aan te passen, samen
+            onder het gelogde getal. Het vinkje stond eerst rechts ernaast en
+            liep daar over het volgende getal heen. */}
         {savedLabel && (
           <div style={{
-            position: 'absolute', top: '50%', left: `calc(50% + ${ITEM_W / 2}px + 10px)`,
-            transform: 'translateY(-50%)', zIndex: 4, pointerEvents: 'none',
-            display: 'flex', alignItems: 'center', color: '#fff',
+            position: 'absolute', bottom: 6, left: '50%', transform: 'translateX(-50%)',
+            zIndex: 4, display: 'flex', alignItems: 'center', gap: 10,
           }}>
-            <Check size={isMobile ? 18 : 20} strokeWidth={3.2} />
+            {onEdit && (
+              <button
+                onClick={onEdit}
+                aria-label="Gewicht aanpassen"
+                style={{
+                  width: 26, height: 26, padding: 0,
+                  background: 'transparent', border: 'none', borderRadius: 7,
+                  color: '#fff', opacity: 0.7,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+                }}
+              >
+                <Pencil size={14} strokeWidth={2.6} />
+              </button>
+            )}
+            <Check size={15} strokeWidth={3.2} color="#fff" />
           </div>
-        )}
-        {/* Potlood linksonder aan het gelogde getal, in plaats van een brede
-            "Aanpassen"-knop die als los onderdeel voelde. */}
-        {savedLabel && onEdit && (
-          <button
-            onClick={onEdit}
-            aria-label="Gewicht aanpassen"
-            style={{
-              position: 'absolute', bottom: 4, left: `calc(50% - ${ITEM_W / 2}px - 34px)`,
-              zIndex: 4, width: 30, height: 30, padding: 0,
-              background: 'transparent', border: 'none', borderRadius: 8,
-              color: '#fff', opacity: 0.75,
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              cursor: 'pointer', pointerEvents: 'auto',
-              touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-            }}
-          >
-            <Pencil size={15} strokeWidth={2.6} />
-          </button>
         )}
         <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: '60px', background: 'linear-gradient(to right, #0a0a0a, transparent)', zIndex: 2, pointerEvents: 'none' }} />
         <div style={{ position: 'absolute', right: 0, top: 0, bottom: 0, width: '60px', background: 'linear-gradient(to left, #0a0a0a, transparent)', zIndex: 2, pointerEvents: 'none' }} />
-        <div style={{ position: 'absolute', top: 0, bottom: 0, left: `calc(50% - ${ITEM_W / 2}px)`, width: '1.5px', background: 'rgba(255,255,255,0.55)', zIndex: 3, pointerEvents: 'none' }} />
-        <div style={{ position: 'absolute', top: 0, bottom: 0, left: `calc(50% + ${ITEM_W / 2}px)`, width: '1.5px', background: 'rgba(255,255,255,0.55)', zIndex: 3, pointerEvents: 'none' }} />
+        {/* Markering van het midden: een zacht vlak achter het getal in plaats
+            van twee harde streepjes die dwars door de schuif liepen. */}
+        <div style={{
+          position: 'absolute', top: 8, bottom: 8,
+          left: `calc(50% - ${ITEM_W / 2 + 6}px)`, width: `${ITEM_W + 12}px`,
+          background: 'rgba(255,255,255,0.05)',
+          border: '1px solid rgba(255,255,255,0.1)',
+          borderRadius: 12,
+          zIndex: 1, pointerEvents: 'none',
+        }} />
 
         <div
           ref={ref}
@@ -179,6 +183,7 @@ function HorizontalPicker({ value, onChange, disabled, savedLabel = false, onEdi
                 style={{
                   flexShrink: 0, width: `${ITEM_W}px`, height: '100%',
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  paddingBottom: savedLabel ? 18 : 0,
                   cursor: disabled ? 'default' : 'pointer',
                   touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
                   fontSize: sel ? (isMobile ? '2.1rem' : '2.5rem') : (isMobile ? '0.8rem' : '0.9rem'),
