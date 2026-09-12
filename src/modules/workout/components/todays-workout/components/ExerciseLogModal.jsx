@@ -777,20 +777,34 @@ export default function ExerciseLogModal({ db, client, exercise, onClose, isMobi
         ) : (
           <>
             {/* ── VORIGE PRESTATIES ── */}
-            {/* Notitie en historie hier, waar de vorige sessie stond: het zijn
-                dingen die je opzoekt vlak voor of na het loggen, niet terwijl
-                je naar je cijfers kijkt. */}
-            <div style={{
-              display: 'flex', gap: 6, flexWrap: 'wrap',
-              padding: isMobile ? '0.7rem 1rem 0' : '0.8rem 1.25rem 0',
-            }}>
-              <Pil actief={showExerciseNote} onClick={() => setShowExerciseNote(!showExerciseNote)} icoon={<MessageSquare size={12} strokeWidth={2.4} />} label="Notitie" stip={!!exerciseNote} />
-              <Pil actief={showHistory} onClick={() => setShowHistory(!showHistory)} icoon={<History size={12} strokeWidth={2.4} />} label="Historie" />
-            </div>
 
             {/* Zwevende actieknoppen, direct onder de vorige sessie. Stonden
                 onderaan het scherm; met een paar sets erin scrolde je heen en
                 weer tussen wat je net logde en de knop om verder te gaan. */}
+
+
+            {/* Wat je vandaag logde staat bovenaan, direct onder je vorige
+                sessie: daar kijk je naar terwijl je bezig bent. De knop om
+                te loggen staat eronder, en wat je af en toe opzoekt weer
+                daaronder. */}
+            {loggedSets.map((set, i) => (
+              <LoggedSetRow key={i} set={set} index={i}
+                onAddDropset={(idx) => { setDropsetIndex(idx); setShowWizard(false) }}
+                onEdit={handleEditSet}  // ✅ nu gevuld
+                onDelete={handleDeleteSet}
+                isMobile={isMobile}
+              />
+            ))}
+
+            {loggedSets.length === 0 && !wizardActive && (
+              <div style={{
+                padding: isMobile ? '0.9rem 1rem 0.2rem' : '1rem 1.25rem 0.3rem',
+                fontSize: '0.82rem', fontWeight: 700, color: 'rgba(255,255,255,0.3)',
+              }}>
+                Nog geen sets gelogd vandaag.
+              </div>
+            )}
+
             {/* Tijdens de rust staat de timer op de plek van de knoppen, dus
                 direct onder de vorige sessie en direct bóven je gelogde sets.
                 Stond onderaan het scherm; dan kijk je naar de klok terwijl de
@@ -876,14 +890,16 @@ export default function ExerciseLogModal({ db, client, exercise, onClose, isMobi
               </div>
             )}
 
-            {loggedSets.map((set, i) => (
-              <LoggedSetRow key={i} set={set} index={i}
-                onAddDropset={(idx) => { setDropsetIndex(idx); setShowWizard(false) }}
-                onEdit={handleEditSet}  // ✅ nu gevuld
-                onDelete={handleDeleteSet}
-                isMobile={isMobile}
-              />
-            ))}
+            {/* Notitie en historie hier, waar de vorige sessie stond: het zijn
+                dingen die je opzoekt vlak voor of na het loggen, niet terwijl
+                je naar je cijfers kijkt. */}
+            <div style={{
+              display: 'flex', gap: 6, flexWrap: 'wrap',
+              padding: isMobile ? '0.7rem 1rem 0' : '0.8rem 1.25rem 0',
+            }}>
+              <Pil actief={showExerciseNote} onClick={() => setShowExerciseNote(!showExerciseNote)} icoon={<MessageSquare size={12} strokeWidth={2.4} />} label="Notitie" stip={!!exerciseNote} />
+              <Pil actief={showHistory} onClick={() => setShowHistory(!showHistory)} icoon={<History size={12} strokeWidth={2.4} />} label="Historie" />
+            </div>
 
             {dropsetActive && <DropsetInput onSave={handleDropsetSave} onCancel={() => setDropsetIndex(null)} isMobile={isMobile} />}
 
@@ -897,13 +913,6 @@ export default function ExerciseLogModal({ db, client, exercise, onClose, isMobi
                 editMode={editingIndex !== null}
                 snel={rustTimerAan && editingIndex === null}
               />
-            )}
-
-            {loggedSets.length === 0 && !wizardActive && (
-              <div style={{ textAlign: 'center', padding: isMobile ? '3rem 1rem' : '4rem 1.25rem', color: 'rgba(255,255,255,0.2)' }}>
-                <Dumbbell size={36} style={{ marginBottom: '0.75rem', opacity: 0.2 }} />
-                <p style={{ fontSize: isMobile ? '0.8rem' : '0.85rem', fontWeight: '600', margin: 0 }}>Nog geen sets gelogd</p>
-              </div>
             )}
 
           </>
