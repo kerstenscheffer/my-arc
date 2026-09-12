@@ -3,7 +3,7 @@ import useIsMobile from '../../hooks/useIsMobile'
 import ClientWorkoutChart from './components/ClientWorkoutChart'
 import { useState, useEffect, useRef } from 'react'
 import { useLanguage } from '../../contexts/LanguageContext'
-import { Calendar, Clock, ChevronLeft, ChevronRight, ChevronDown, RefreshCw } from 'lucide-react'
+import { Calendar, Clock, ChevronLeft, ChevronRight, ChevronDown, RefreshCw, TrendingUp, History } from 'lucide-react'
 import PlanSwitchModal from './components/PlanSwitchModal'
 
 import WeekSchedule from './components/WeekSchedule'
@@ -12,6 +12,7 @@ import WorkoutChallengeSidebar from '../../client/components/WorkoutChallengeSid
 import WorkoutProgressToast from './components/WorkoutProgressToast'
 import CardioLogSection from './components/CardioLogSection'
 import WorkoutHistory from '../progress/WorkoutHistory'
+import BladModal from './components/todays-workout/components/BladModal'
 import FadeOnScroll from '../../components/FadeOnScroll'
 import PlanningWizard from './components/planning/PlanningWizard'
 
@@ -22,7 +23,6 @@ import WorkoutService from '../../services/WorkoutService'
 export default function WorkoutPlan({ client, schema, db, onFocusChange }) {
   const { t } = useLanguage()
   const isMobile = useIsMobile()
-  const chartsRef = useRef(null)
   const chartWidgetRef = useRef(null)
 
   const [workoutService] = useState(() => new WorkoutService(db.supabase))
@@ -54,6 +54,7 @@ export default function WorkoutPlan({ client, schema, db, onFocusChange }) {
   // en de week-planning sectie. Zelfde black-bar stijl als de koolh/vet-balk
   // op de meal-pagina (SubtleCarbsFatBar).
   const [historyOpen, setHistoryOpen] = useState(false)
+  const [krachtOpen, setKrachtOpen] = useState(false)
   // Focus-mode: TodaysWorkoutMain meldt via callback wanneer de dropdown
   // open is. Dan verbergen we week-schedule, chart en bottom-strip — én via
   // onFocusChange (door-bubbled naar ClientDashboard) ook de bottom-nav.
@@ -115,12 +116,9 @@ export default function WorkoutPlan({ client, schema, db, onFocusChange }) {
     }, 80)
   }
 
-  const handleToastViewChart = () => {
-    if (chartsRef.current) {
-      const pos = chartsRef.current.getBoundingClientRect().top + window.pageYOffset
-      window.scrollTo({ top: pos - (isMobile ? 100 : 150), behavior: 'smooth' })
-    }
-  }
+  // Het compliment verwijst naar de grafiek; die zit nu in een blad in plaats
+  // van ergens onderaan de pagina, dus openen we dat blad.
+  const handleToastViewChart = () => setKrachtOpen(true)
 
   const handleWizardComplete = (newSchedule) => { setWeekSchedule(newSchedule); setShowWizard(false) }
   const handleWorkoutCompleted = () => { setChallengeRefreshKey(prev => prev + 1) }
@@ -170,6 +168,22 @@ export default function WorkoutPlan({ client, schema, db, onFocusChange }) {
       </div>
 
 
+      {/* Twee knoppen tussen de workout van vandaag en de weekplanning: het
+          krachtoverzicht en de geschiedenis. Stonden eerder als inline blokken
+          verderop de pagina — een grafiek en een lijst die je zelden nodig
+          hebt maar wel elke keer voorbij moest scrollen. */}
+      {!workoutOpen && (
+        <div style={{
+          display: 'flex', gap: isMobile ? 8 : 10,
+          padding: isMobile ? '1.1rem 1rem 0' : '1.4rem 1.5rem 0',
+        }}>
+          <OverzichtKnop icon={<TrendingUp size={isMobile ? 17 : 19} strokeWidth={2.6} />}
+            label="Kracht" onClick={() => setKrachtOpen(true)} isMobile={isMobile} />
+          <OverzichtKnop icon={<History size={isMobile ? 17 : 19} strokeWidth={2.6} />}
+            label="Historie" onClick={() => setHistoryOpen(true)} isMobile={isMobile} />
+        </div>
+      )}
+
       {/* Jouw week planning — onder de workout van vandaag. Die staat bovenaan:
           negen van de tien keer open je deze pagina om vandaag te trainen,
           niet om de week te herschikken. */}
@@ -213,84 +227,12 @@ export default function WorkoutPlan({ client, schema, db, onFocusChange }) {
 
       {/* PageVideoWidget gemigreerd naar centrale WidgetSidebar in ClientDashboard. */}
 
-      {/* ── Geschiedenis-balk — inline dropdown tussen workout-dropdown en
-            week-planning. Zelfde stijl als de koolh/vet-balk op de meal-pagina
-            (zwarte bg, subtiele border, rounded 10). Klik = inline expand. */}
-      {!workoutOpen && (
-        <FadeOnScroll>
-        <div style={{
-          padding: isMobile ? '2.5rem 1rem 0.25rem' : '3rem 1.25rem 0.375rem',
-        }}>
-          <div style={{
-            background: '#171717',
-            border: '1px solid rgba(255,255,255,0.08)',
-            borderRadius: 10,
-            overflow: 'hidden',
-            transition: 'border-color 0.2s ease',
-          }}>
-            <button
-              onClick={() => setHistoryOpen(p => !p)}
-              aria-expanded={historyOpen}
-              aria-label="Workout-geschiedenis"
-              style={{
-                width: '100%',
-                background: 'transparent',
-                border: 'none',
-                padding: isMobile ? '0.55rem 0.85rem' : '0.65rem 1.05rem',
-                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                cursor: 'pointer',
-                touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-              }}
-            >
-              <span style={{
-                display: 'flex', alignItems: 'center', gap: 8,
-                fontSize: isMobile ? '0.62rem' : '0.7rem',
-                fontWeight: 800, color: '#FFD700',
-                textTransform: 'uppercase', letterSpacing: '0.1em',
-              }}>
-                <Clock size={isMobile ? 12 : 14} strokeWidth={2.4} />
-                Geschiedenis
-              </span>
-              <ChevronDown
-                size={isMobile ? 16 : 18}
-                strokeWidth={2.4}
-                style={{
-                  color: 'rgba(255,255,255,0.55)',
-                  transform: historyOpen ? 'rotate(180deg)' : 'rotate(0deg)',
-                  transition: 'transform 0.2s ease',
-                }}
-              />
-            </button>
-
-            {historyOpen && (
-              <div style={{
-                borderTop: '1px solid rgba(255,255,255,0.06)',
-                maxHeight: isMobile ? '60vh' : '55vh',
-                overflowY: 'auto',
-                WebkitOverflowScrolling: 'touch',
-              }}>
-                <WorkoutHistory db={db} clientId={client?.id} onBack={null} />
-              </div>
-            )}
-          </div>
-        </div>
-        </FadeOnScroll>
-      )}
-
-
       {/* Cardio staat nu tussen de zeven dagen en de weekbalk (zie
           WeekSchedule → tussenBlok), niet meer los onderaan de pagina. */}
 
       {/* WorkoutHistory inline section + WorkoutPhotoSlider removed —
           history now lives behind de Geschiedenis-icon (modal below).
           Photo slider was generic Unsplash decoration with no data. */}
-
-      {!workoutOpen && <FadeOnScroll><div ref={chartsRef} style={{
-        padding: isMobile ? '0 1rem' : '0 1.5rem',
-        marginTop: isMobile ? '3rem' : '3.5rem',
-      }}>
-        <ClientWorkoutChart db={db} client={client} />
-      </div></FadeOnScroll>}
 
       {/* Bottom "Mijn workout / Plan / Geschiedenis"-strip verwijderd —
           Geschiedenis zit nu in de inline dropdown-bar boven WeekSchedule,
@@ -301,8 +243,14 @@ export default function WorkoutPlan({ client, schema, db, onFocusChange }) {
         <PlanningWizard schema={localSchema} clientId={client?.id} db={db} workoutService={workoutService} onClose={() => setShowWizard(false)} onComplete={handleWizardComplete} />
       )}
 
-      {/* showPlanEditor + showHistoryModal modals weggehaald — geen entrypoints
-          meer, Geschiedenis zit inline boven WeekSchedule. */}
+      {/* Krachtoverzicht en geschiedenis in hetzelfde blad als de historie in
+          het log-scherm, zodat die drie zich hetzelfde gedragen. */}
+      <BladModal open={krachtOpen} titel="Krachtoverzicht" onClose={() => setKrachtOpen(false)}>
+        <ClientWorkoutChart db={db} client={client} />
+      </BladModal>
+      <BladModal open={historyOpen} titel="Historie" onClose={() => setHistoryOpen(false)}>
+        <WorkoutHistory db={db} clientId={client?.id} onBack={null} />
+      </BladModal>
 
       <style>{`
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
@@ -313,5 +261,30 @@ export default function WorkoutPlan({ client, schema, db, onFocusChange }) {
         html { scroll-behavior: smooth; }
       `}</style>
     </div>
+  )
+}
+
+// Knop naar een overzicht-blad. Twee gelijke helften, dik wit, zoals de rest
+// van de pagina.
+function OverzichtKnop({ icon, label, onClick, isMobile }) {
+  return (
+    <button
+      onClick={onClick}
+      style={{
+        flex: 1, minWidth: 0,
+        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+        padding: isMobile ? '0.65rem' : '0.75rem',
+        background: 'transparent',
+        border: '1.5px solid rgba(255,255,255,0.22)',
+        borderRadius: 12,
+        color: '#fff',
+        fontSize: isMobile ? '0.82rem' : '0.9rem', fontWeight: 900,
+        letterSpacing: '-0.015em', fontFamily: 'inherit',
+        cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+      }}
+    >
+      {icon}
+      {label}
+    </button>
   )
 }
