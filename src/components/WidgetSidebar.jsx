@@ -23,7 +23,10 @@ export default function WidgetSidebar({ buttons = [], isMobile = false }) {
       aria-label="Widgets"
       style={{
         position: 'fixed',
-        right: isMobile ? 8 : 16,
+        // Tegen de rand geplakt in plaats van er los naast: scheelt breedte
+        // en het leest als een uitschuifbaar randje in plaats van een
+        // zwevend blokje midden in beeld.
+        right: 0,
         // Boven de bottom-nav uitkomen. Bottom-nav zit op 30px + ~64px hoog
         // + safe-area. Plus marge → ~120px van onderen.
         bottom: 'calc(120px + env(safe-area-inset-bottom, 0px))',
@@ -31,9 +34,10 @@ export default function WidgetSidebar({ buttons = [], isMobile = false }) {
         backdropFilter: 'blur(20px)',
         WebkitBackdropFilter: 'blur(20px)',
         border: '1px solid rgba(255,255,255,0.08)',
-        borderRadius: 22,
-        boxShadow: '0 18px 48px rgba(0,0,0,0.55), 0 0 0 1px rgba(255,215,0,0.04)',
-        padding: isMobile ? '0.5rem 0.2rem' : '0.6rem 0.3rem',
+        borderRight: 'none',
+        borderRadius: '18px 0 0 18px',
+        boxShadow: '-8px 12px 40px rgba(0,0,0,0.6)',
+        padding: isMobile ? '0.5rem 0.25rem 0.5rem 0.35rem' : '0.6rem 0.3rem 0.6rem 0.45rem',
         zIndex: 99,
         display: 'flex',
         flexDirection: 'column',
