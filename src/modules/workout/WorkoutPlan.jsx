@@ -199,13 +199,9 @@ export default function WorkoutPlan({ client, schema, db, onFocusChange }) {
       {/* TodaysLogToast removed — same heaviest-lift info already lives in
           TodaysWorkoutCard. WorkoutProgressToast stays for the 30-day
           PR/stagnation insights that aren't visible elsewhere. */}
-      {!workoutOpen && (
-        <FadeOnScroll>
-          <div style={{ marginTop: isMobile ? '2.5rem' : '3rem' }}>
-            <WorkoutProgressToast client={client} db={db} onViewChart={handleToastViewChart} />
-          </div>
-        </FadeOnScroll>
-      )}
+      {/* Het compliment schuift zichzelf rechtsboven in beeld; het hoeft dus
+          geen plek meer in de paginastroom. */}
+      {!workoutOpen && <WorkoutProgressToast client={client} db={db} onViewChart={handleToastViewChart} />}
       {!workoutOpen && (
         <FadeOnScroll>
           <div style={{ marginTop: isMobile ? '2rem' : '2.5rem' }}>

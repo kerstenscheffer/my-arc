@@ -3,10 +3,12 @@
 // fixed-overlay; staat tussen TodaysWorkoutMain en WeekSchedule in normale
 // document-flow zodat'ie meescrollt en niet midden-in-beeld blijft hangen.
 import { useState, useEffect } from 'react'
-import { X, Flame, Target, Zap, ChevronRight } from 'lucide-react'
+import { X, Flame, Target, Zap } from 'lucide-react'
 
-// Coach-foto (zelfde als CoachNoteCard) — komt linksboven in de toast.
-const COACH_PHOTO_URL = 'https://i.ibb.co/mCQzTZrZ/ea169061-c9f1-4b4d-ab88-fc746cbde003.jpg'
+// Coach-foto — vult de rechterkant van de melding. Lokaal bestand in plaats
+// van de externe ibb-link die hier eerst stond: een melding die de coach zelf
+// laat zien moet niet afhangen van een gratis image-host.
+const COACH_PHOTO_URL = '/coach-compliment.jpg'
 
 // Wisselende positieve aanmoedigingen — vervangen het statische
 // "Progressie/Streak/Plateau"-label. Per insight-type een eigen pool,
@@ -55,7 +57,9 @@ const pickPraise = (type, seed = '') => {
 export default function WorkoutProgressToast({ client, db, onViewChart }) {
   const isMobile = window.innerWidth <= 768
   const [insight, setInsight] = useState(null)
-  const [dismissed, setDismissed] = useState(false)
+  // Twee stappen bij sluiten: eerst terug naar rechts uitschuiven, dan pas weg.
+  const [sluiten, setSluiten] = useState(false)
+  const [weg, setWeg] = useState(false)
 
   useEffect(() => {
     // Check if dismissed today
@@ -63,7 +67,7 @@ export default function WorkoutProgressToast({ client, db, onViewChart }) {
     const today = new Date().toDateString()
 
     if (dismissedDate === today) {
-      setDismissed(true)
+      setWeg(true)
       return
     }
 
@@ -217,8 +221,9 @@ export default function WorkoutProgressToast({ client, db, onViewChart }) {
   }
 
   const handleDismiss = () => {
-    setDismissed(true)
+    setSluiten(true)
     localStorage.setItem('workout_toast_dismissed', new Date().toDateString())
+    setTimeout(() => setWeg(true), 400)
   }
 
   const handleClick = () => {
@@ -227,174 +232,98 @@ export default function WorkoutProgressToast({ client, db, onViewChart }) {
     }
   }
 
-  if (dismissed || !insight) return null
+  if (weg || !insight) return null
 
   const isClickable = !!(onViewChart && insight.exercise)
+  const breedte = isMobile ? 'min(330px, 88vw)' : 380
+  const hoogte = isMobile ? 116 : 132
 
   return (
-    <div style={{
-      padding: isMobile ? '0 1rem' : '0 1.25rem',
-      animation: 'workoutInsightFadeIn 0.4s ease',
-    }}>
-      <div
-        onClick={isClickable ? handleClick : undefined}
-        style={{
-          position: 'relative',
-          background: 'linear-gradient(135deg, rgba(255,215,0,0.06) 0%, rgba(255,215,0,0.02) 100%)',
-          border: '1px solid rgba(255,215,0,0.28)',
-          borderLeft: '3px solid #FFD700',
-          borderRadius: 12,
-          padding: isMobile ? '0.85rem 1rem' : '1rem 1.15rem',
-          cursor: isClickable ? 'pointer' : 'default',
-          transition: 'transform 0.15s ease, border-color 0.15s ease',
-          touchAction: 'manipulation',
-          WebkitTapHighlightColor: 'transparent',
-          display: 'flex',
-          alignItems: 'center',
-          gap: isMobile ? 10 : 12,
-        }}
-        onMouseEnter={(e) => {
-          if (isClickable && !isMobile) {
-            e.currentTarget.style.transform = 'translateY(-1px)'
-            e.currentTarget.style.borderColor = 'rgba(255,215,0,0.5)'
-          }
-        }}
-        onMouseLeave={(e) => {
-          if (isClickable && !isMobile) {
-            e.currentTarget.style.transform = 'translateY(0)'
-            e.currentTarget.style.borderColor = 'rgba(255,215,0,0.28)'
-          }
-        }}
-      >
-        {/* Coach-foto — vervangt de oude gouden icoon-cirkel met Flame/Target/Zap. */}
-        <img
-          src={COACH_PHOTO_URL}
-          alt="Coach"
-          style={{
-            width: isMobile ? 40 : 44,
-            height: isMobile ? 40 : 44,
-            borderRadius: '50%',
-            objectFit: 'cover',
-            border: '2px solid rgba(255,215,0,0.55)',
-            flexShrink: 0,
-            boxShadow: '0 4px 12px rgba(255,215,0,0.22)',
-          }}
-        />
+    <div
+      onClick={isClickable ? handleClick : undefined}
+      style={{
+        position: 'fixed',
+        right: 0,
+        top: isMobile ? 'calc(env(safe-area-inset-top, 0px) + 84px)' : 108,
+        zIndex: 96,
+        width: breedte, height: hoogte,
+        borderRadius: '16px 0 0 16px',
+        overflow: 'hidden',
+        background: '#0a0a0a',
+        border: '1px solid rgba(255,255,255,0.12)',
+        borderRight: 'none',
+        boxShadow: '0 16px 44px rgba(0,0,0,0.6)',
+        cursor: isClickable ? 'pointer' : 'default',
+        touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+        animation: `${sluiten ? 'complimentUit' : 'complimentIn'} 0.42s cubic-bezier(0.22, 1, 0.36, 1) forwards`,
+      }}
+    >
+      {/* Foto rechts; de linkerhelft loopt weg in het zwart zodat de tekst er
+          overheen kan beginnen in plaats van ernaast te moeten passen. */}
+      <div style={{
+        position: 'absolute', top: 0, right: 0, bottom: 0,
+        width: '62%',
+        backgroundImage: `url(${COACH_PHOTO_URL})`,
+        backgroundSize: 'cover',
+        // Het beeld is staand (665x1182) en de kop zit rond 45% van de hoogte;
+        // in een liggend vak van ~130px valt met 18% alleen het plafond binnen.
+        backgroundPosition: 'center 42%',
+      }} />
+      <div style={{
+        position: 'absolute', inset: 0, pointerEvents: 'none',
+        background: 'linear-gradient(90deg, #0a0a0a 0%, #0a0a0a 32%, rgba(10,10,10,0.88) 50%, rgba(10,10,10,0.45) 74%, rgba(10,10,10,0.05) 100%)',
+      }} />
 
-        {/* Content */}
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{
-            display: 'flex', alignItems: 'center', gap: 7,
-            marginBottom: 3,
-          }}>
-            <span style={{
-              fontSize: '0.58rem', fontWeight: 800,
-              color: '#FFD700', opacity: 0.85,
-              textTransform: 'uppercase', letterSpacing: '0.1em',
-            }}>
-              {pickPraise(insight.type, insight.exercise || '')}
-            </span>
-          </div>
-          {/* Oefeningnaam mag inkorten; de gewicht-progressie (metric) staat
-              in een flexShrink:0 gouden stuk en blijft dus ALTIJD leesbaar. */}
-          <div style={{
-            display: 'flex', alignItems: 'baseline', gap: 6,
-            fontSize: isMobile ? '0.95rem' : '1.05rem',
-            fontWeight: 900,
-            letterSpacing: '-0.015em',
-            lineHeight: 1.2,
-            marginBottom: 2,
-          }}>
-            {insight.name ? (
-              <>
-                <span style={{
-                  color: '#fff',
-                  overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                  minWidth: 0, flexShrink: 1,
-                }}>
-                  {insight.name}
-                </span>
-                {insight.metric && (
-                  <span style={{ color: '#FFD700', flexShrink: 0, whiteSpace: 'nowrap' }}>
-                    {insight.metric}
-                  </span>
-                )}
-              </>
-            ) : (
-              <span style={{
-                color: '#fff',
-                overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0,
-              }}>
-                {insight.title}
-              </span>
-            )}
-          </div>
-          <div style={{
-            fontSize: isMobile ? '0.76rem' : '0.82rem',
-            color: 'rgba(255,255,255,0.7)',
-            fontWeight: 600,
-            lineHeight: 1.4,
-          }}>
-            {insight.message}
-          </div>
-        </div>
-
-        {/* Action buttons */}
+      {/* Tekst — begint links en loopt tot over de helft van de foto. */}
+      <div style={{
+        position: 'absolute', top: 0, bottom: 0, left: 0,
+        width: '72%',
+        padding: isMobile ? '0.7rem 0.5rem 0.7rem 0.9rem' : '0.85rem 0.6rem 0.85rem 1.1rem',
+        display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 3,
+      }}>
         <div style={{
-          display: 'flex', alignItems: 'center', gap: 6,
-          flexShrink: 0,
+          fontSize: isMobile ? '1.05rem' : '1.2rem',
+          fontWeight: 900, color: '#fff',
+          letterSpacing: '-0.025em', lineHeight: 1.1,
+          textShadow: '0 2px 10px rgba(0,0,0,0.8)',
         }}>
-          {isClickable && (
-            <div style={{
-              width: isMobile ? 30 : 32, height: isMobile ? 30 : 32,
-              borderRadius: 8,
-              background: 'rgba(255,215,0,0.12)',
-              border: '1px solid rgba(255,215,0,0.35)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              color: '#FFD700',
-            }}>
-              <ChevronRight size={isMobile ? 15 : 16} strokeWidth={2.6} />
-            </div>
-          )}
-          <button
-            onClick={(e) => { e.stopPropagation(); handleDismiss() }}
-            aria-label="Sluit melding"
-            style={{
-              width: isMobile ? 30 : 32, height: isMobile ? 30 : 32,
-              borderRadius: 8,
-              background: 'rgba(255,255,255,0.03)',
-              border: '1px solid rgba(255,255,255,0.08)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              cursor: 'pointer',
-              touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-              padding: 0,
-              color: 'rgba(255,255,255,0.55)',
-              transition: 'all 0.15s ease',
-            }}
-            onMouseEnter={(e) => {
-              if (!isMobile) {
-                e.currentTarget.style.background = 'rgba(239,68,68,0.12)'
-                e.currentTarget.style.borderColor = 'rgba(239,68,68,0.35)'
-                e.currentTarget.style.color = '#fff'
-              }
-            }}
-            onMouseLeave={(e) => {
-              if (!isMobile) {
-                e.currentTarget.style.background = 'rgba(255,255,255,0.03)'
-                e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)'
-                e.currentTarget.style.color = 'rgba(255,255,255,0.55)'
-              }
-            }}
-          >
-            <X size={isMobile ? 14 : 15} strokeWidth={2.4} />
-          </button>
+          {pickPraise(insight.type, insight.exercise || '')}
+        </div>
+        <div style={{
+          fontSize: isMobile ? '0.74rem' : '0.8rem',
+          fontWeight: 800, color: 'rgba(255,255,255,0.72)',
+          lineHeight: 1.3,
+          overflow: 'hidden', textOverflow: 'ellipsis',
+          display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical',
+          textShadow: '0 2px 8px rgba(0,0,0,0.8)',
+        }}>
+          {insight.name ? `${insight.name} ${insight.metric || ''}`.trim() : insight.title}
         </div>
       </div>
 
+      <button
+        onClick={(e) => { e.stopPropagation(); handleDismiss() }}
+        aria-label="Sluit melding"
+        style={{
+          position: 'absolute', top: 5, right: 6,
+          width: 24, height: 24, padding: 0,
+          background: 'rgba(0,0,0,0.45)', border: 'none', borderRadius: 7,
+          color: '#fff', opacity: 0.85,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+        }}
+      >
+        <X size={13} strokeWidth={2.8} />
+      </button>
+
       <style>{`
-        @keyframes workoutInsightFadeIn {
-          from { opacity: 0; transform: translateY(-6px); }
-          to   { opacity: 1; transform: translateY(0); }
+        @keyframes complimentIn {
+          from { transform: translateX(105%); opacity: 0; }
+          to   { transform: translateX(0);    opacity: 1; }
+        }
+        @keyframes complimentUit {
+          from { transform: translateX(0);    opacity: 1; }
+          to   { transform: translateX(105%); opacity: 0; }
         }
       `}</style>
     </div>
