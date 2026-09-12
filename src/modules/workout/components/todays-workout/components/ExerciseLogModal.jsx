@@ -893,12 +893,19 @@ export default function ExerciseLogModal({ db, client, exercise, onClose, isMobi
             {/* Notitie en historie hier, waar de vorige sessie stond: het zijn
                 dingen die je opzoekt vlak voor of na het loggen, niet terwijl
                 je naar je cijfers kijkt. */}
+            {/* Zelfde indeling als de knoppenrij erboven: links het vak van
+                Set toevoegen, rechts een even brede lege plek als de
+                timer-knop. Zo staan de pillen midden onder Set toevoegen en
+                niet midden op het scherm. */}
             <div style={{
-              display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'center',
+              display: 'flex', gap: '0.5rem',
               padding: isMobile ? '0.1rem 1rem 0' : '0.15rem 1.25rem 0',
             }}>
-              <Pil actief={showExerciseNote} onClick={() => setShowExerciseNote(!showExerciseNote)} icoon={<MessageSquare size={12} strokeWidth={2.4} />} label="Notitie" stip={!!exerciseNote} />
-              <Pil actief={showHistory} onClick={() => setShowHistory(!showHistory)} icoon={<History size={12} strokeWidth={2.4} />} label="Historie" />
+              <div style={{ flex: 1, display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'center' }}>
+                <Pil actief={showExerciseNote} onClick={() => setShowExerciseNote(!showExerciseNote)} icoon={<MessageSquare size={12} strokeWidth={2.4} />} label="Notitie" stip={!!exerciseNote} />
+                <Pil actief={showHistory} onClick={() => setShowHistory(!showHistory)} icoon={<History size={12} strokeWidth={2.4} />} label="Historie" />
+              </div>
+              <div aria-hidden style={{ flexShrink: 0, width: isMobile ? 128 : 148 }} />
             </div>
 
             {dropsetActive && <DropsetInput onSave={handleDropsetSave} onCancel={() => setDropsetIndex(null)} isMobile={isMobile} />}
