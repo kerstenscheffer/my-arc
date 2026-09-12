@@ -32,9 +32,10 @@ const DAYS_OF_WEEK = [
   { id: 5, name: 'Za', key: 'saturday' },
   { id: 6, name: 'Zo', key: 'sunday' },
 ]
-// Voeding-foto-banner onder de dag-header (zelfde idee als de boodschappen-
-// pagina). Vaste, sfeer-zettende foto van gezonde voeding.
-const MEAL_BANNER_URL = 'https://images.unsplash.com/photo-1512621776951-a57141f2eefd?w=900&h=400&fit=crop&q=80'
+// Kop van de voedingspagina: foto die onderin dood loopt in het zwart, met de
+// titel eroverheen. Zelfde vorm als de kop van de workout-pagina, zodat de
+// twee pagina's op elkaar lijken.
+const MEAL_BANNER_URL = 'https://images.unsplash.com/photo-1512621776951-a57141f2eefd?w=1200&h=700&fit=crop&q=80'
 
 const getTodayIndex = () => {
   const day = new Date().getDay()
@@ -539,6 +540,29 @@ export default function AIMealDashboard({ client, onNavigate, db }) {
       animation: 'fadeIn 0.5s ease'
     }}>
 
+      {/* ════ KOP MET FOTO — zelfde vorm als de workout-pagina ════ */}
+      <div style={{ position: 'relative', width: '100%', height: isMobile ? 200 : 250 }}>
+        <div style={{
+          position: 'absolute', inset: 0,
+          backgroundImage: `url(${MEAL_BANNER_URL})`,
+          backgroundSize: 'cover', backgroundPosition: 'center',
+        }} />
+        <div style={{
+          position: 'absolute', inset: 0, pointerEvents: 'none',
+          background: 'linear-gradient(180deg, rgba(10,10,10,0.5) 0%, rgba(10,10,10,0) 32%, rgba(10,10,10,0.78) 70%, #0a0a0a 100%)',
+        }} />
+        <div style={{
+          position: 'absolute', left: 0, right: 0, bottom: isMobile ? 10 : 14,
+          padding: isMobile ? '0 1rem' : '0 1.5rem',
+          fontSize: isMobile ? '1.7rem' : '2.4rem',
+          fontWeight: 900, color: '#fff',
+          letterSpacing: '-0.03em', lineHeight: 1.05,
+          textShadow: '0 2px 12px rgba(0,0,0,0.6)',
+        }}>
+          Jouw voeding
+        </div>
+      </div>
+
       {/* ════ GECONSOLIDEERDE DAG-HEADER ════
           Pijlen ⇄ + klikbare dagnaam (opent agenda/samenvatting modal).
           Vervangt: MealPageHeader (Plan/Free toggle + history/more iconen)
@@ -550,14 +574,6 @@ export default function AIMealDashboard({ client, onNavigate, db }) {
         onOpenSummary={() => setModals(prev => ({ ...prev, summary: true }))}
         isMobile={isMobile}
       />
-
-      {/* ════ VOEDING-FOTO-BANNER — net onder de dag (zoals boodschappen) ════ */}
-      <div style={{ padding: isMobile ? '0 0.75rem 0.6rem' : '0 1.5rem 0.75rem' }}>
-        <div style={{ width: '100%', height: isMobile ? 110 : 150, borderRadius: 14, position: 'relative', overflow: 'hidden' }}>
-          <div style={{ position: 'absolute', inset: 0, backgroundImage: `url(${MEAL_BANNER_URL})`, backgroundSize: 'cover', backgroundPosition: 'center' }} />
-          <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, transparent 45%, rgba(0,0,0,0.6) 100%)' }} />
-        </div>
-      </div>
 
       {/* ════ NEW MACRO HERO — selected-day aware ════ */}
       {(() => {
