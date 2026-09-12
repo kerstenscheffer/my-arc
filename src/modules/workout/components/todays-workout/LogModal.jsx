@@ -3,18 +3,14 @@
 // Was modal — nu een **inline component**. Renders direct in de pagina flow:
 // geen backdrop, geen close-knop, geen body scroll-lock. Component-naam blijft
 // LogModal voor compat met bestaande imports.
-import { CheckCircle, Check, MessageSquare, ChevronDown, Zap, ThumbsUp, Moon, TrendingDown, Thermometer, Plus, Timer } from 'lucide-react'
-import { useState, useEffect, useRef } from 'react'
+import { CheckCircle, Check, MessageSquare, ChevronDown, Zap, ThumbsUp, Moon, TrendingDown, Thermometer, Plus } from 'lucide-react'
+import { useState, useEffect } from 'react'
 import ExerciseList from './components/ExerciseList'
 import WorkoutFlowWizard from './WorkoutFlowWizard'
 import CustomExerciseModal from './components/CustomExerciseModal'
 
 export default function LogModal({
   workout, todaysLogs, onClose, onLogsUpdate, client, schema, db,
-  // Timer wordt door TodaysWorkoutMain beheerd zodat'ie ook doortikt nadat de
-  // dropdown is gesloten. Bediening: klik = start/stop, dubbel-tap = reset.
-  timerElapsedSec = 0, timerRunning = false, timerStarted = false,
-  timerFinished = false, onTimerToggle, onTimerReset,
 }) {
   const isMobile = window.innerWidth <= 768
   const [completedCount, setCompletedCount] = useState(0)
@@ -22,40 +18,9 @@ export default function LogModal({
   const [isWorkoutCompleted, setIsWorkoutCompleted] = useState(false)
   const [showWorkoutFlow, setShowWorkoutFlow] = useState(false)
   const [showCustomModal, setShowCustomModal] = useState(false)
-  // Timer-state komt van TodaysWorkoutMain (zie props) zodat'ie ook doortikt
-  // wanneer de dropdown gesloten wordt en auto-stopt bij de laatste log. Local
-  // alias zodat de bestaande naam-referenties hieronder ongewijzigd blijven.
-  const timerSec = timerElapsedSec
-  const formatElapsed = (s) => {
-    const h = Math.floor(s / 3600)
-    const m = Math.floor((s % 3600) / 60)
-    const sec = s % 60
-    return h > 0
-      ? `${h}:${m.toString().padStart(2, '0')}:${sec.toString().padStart(2, '0')}`
-      : `${m}:${sec.toString().padStart(2, '0')}`
-  }
-
-  // Timer-bediening: één tik = start/stop (toggle), snelle dubbel-tik = reset.
-  // De single-tap wordt 280ms uitgesteld zodat'ie niet ook afgaat bij een
-  // dubbel-tik.
-  const lastTapRef = useRef(0)
-  const tapTimeoutRef = useRef(null)
-  const handleTimerTap = () => {
-    const now = Date.now()
-    if (now - lastTapRef.current < 280) {
-      // Dubbel-tik → reset
-      clearTimeout(tapTimeoutRef.current)
-      lastTapRef.current = 0
-      onTimerReset && onTimerReset()
-    } else {
-      lastTapRef.current = now
-      clearTimeout(tapTimeoutRef.current)
-      tapTimeoutRef.current = setTimeout(() => {
-        lastTapRef.current = 0
-        onTimerToggle && onTimerToggle()
-      }, 280)
-    }
-  }
+  // De timer staat sinds deze wijziging in de kop (TodaysWorkoutCard), boven
+  // de foto van de dag. Hij hoorde bij de lijst maar zweefde over de pagina,
+  // en nu de kop blijft staan terwijl je scrolt is dat de logische plek.
 
   // ✅ Live exercises state — synct met workout prop na swap + reload
   const [liveExercises, setLiveExercises] = useState(workout.exercises || [])
@@ -143,7 +108,7 @@ export default function LogModal({
   const progressPct = totalExercises > 0 ? (completedCount / totalExercises) * 100 : 0
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', width: '100%', paddingTop: isMobile ? 14 : 18, paddingBottom: isMobile ? 120 : 130 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', width: '100%', paddingTop: isMobile ? 10 : 14, paddingBottom: isMobile ? 130 : 140 }}>
 
       {/* ── CONTENT — exercise list ── */}
       <div style={{ width: '100%' }}>
@@ -167,53 +132,6 @@ export default function LogModal({
 
         {/* "+ Eigen oefening" link weggehaald — vervangen door de floating FAB
             in ExerciseList (linksonder, MealLogFAB-stijl). */}
-      </div>
-
-      {/* ── ZWEVENDE TIMER ──
-            Was een Lucide-klokicoon van 68px met de tijd in de wijzerplaat.
-            Zodra je boven het uur kwam paste "3:19:06" niet meer binnen die
-            cirkel en liep de tekst eroverheen. Nu een pil: die groeit gewoon
-            mee met de tekst.
-
-            De pump-knop stond ernaast en is weg; foto's maak je in de
-            Voortgang-tab. ── */}
-      <div
-        role="button"
-        tabIndex={0}
-        onClick={handleTimerTap}
-        aria-label="Workout timer — tik om te starten of te pauzeren, dubbel-tik om te resetten"
-        title={timerRunning ? 'Tik om te pauzeren · dubbel-tik = reset' : timerStarted ? 'Tik om verder te tellen · dubbel-tik = reset' : 'Tik om te starten'}
-        style={{
-          position: 'fixed',
-          // Linksboven: je kijkt er tijdens het trainen af en toe naar, en
-          // onderin zat hij in de weg van de knoppen waar je wél op tikt.
-          left: isMobile ? 12 : 18,
-          top: `calc(env(safe-area-inset-top, 0px) + ${isMobile ? 12 : 16}px)`,
-          zIndex: 89,
-          display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 7,
-          width: isMobile ? 112 : 124,
-          height: isMobile ? 42 : 46, padding: '0 0.6rem',
-          borderRadius: 999,
-          // Omgekeerd: wit vlak met zwarte tijd. Op een foto of een donkere
-          // lijst valt donker-op-donker weg, en dit is iets waar je tijdens het
-          // trainen even snel naar kijkt.
-          background: timerFinished ? '#10b981' : '#fff',
-          border: 'none',
-          cursor: 'pointer',
-          boxShadow: '0 8px 22px rgba(0,0,0,0.5)',
-          touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-        }}
-      >
-        {timerFinished
-          ? <Check size={15} color="#0a0a0a" strokeWidth={3} />
-          : <Timer size={15} strokeWidth={2.4} color={timerRunning ? '#0a0a0a' : 'rgba(10,10,10,0.45)'} />}
-        <span style={{
-          fontSize: isMobile ? '0.95rem' : '1rem', fontWeight: 900,
-          color: timerFinished ? '#0a0a0a' : timerRunning ? '#0a0a0a' : 'rgba(10,10,10,0.5)',
-          fontVariantNumeric: 'tabular-nums', letterSpacing: '-0.02em', lineHeight: 1,
-        }}>
-          {timerStarted ? formatElapsed(timerSec) : '0:00'}
-        </span>
       </div>
 
       {/* "Workout Voltooid" panel weggehaald — niet meer nodig op de pagina. */}

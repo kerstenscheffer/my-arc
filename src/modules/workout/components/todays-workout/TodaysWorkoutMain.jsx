@@ -316,39 +316,58 @@ export default function TodaysWorkoutMain({ client, schema, db, workoutService, 
     </div>
   )
 
+  const kaart = (
+    <TodaysWorkoutCard
+      workout={todaysWorkout}
+      onLogClick={() => { setExpanded(e => !e); loadTodaysLogs() }}
+      logsCount={todaysLogs.length}
+      isCompleted={isWorkoutFullyLogged(todaysWorkout?.exercises, todaysLogs)}
+      completionPct={workoutCompletionPct(todaysWorkout?.exercises, todaysLogs)}
+      client={client}
+      db={db}
+      isExpanded={expanded}
+      timerElapsedSec={timerElapsedSec}
+      timerRunning={timerRunning}
+      timerStarted={timerStarted}
+      timerFinished={timerFinished}
+      onTimerToggle={toggleTimer}
+      onTimerReset={resetTimer}
+    />
+  )
+
+  // Uitgeklapt is dit een scherm op zichzelf: de kop met de foto, de timer en
+  // de naam blijft staan, en alleen de oefeningen scrollen. Stond eerder als
+  // twee blokken in de paginascroll, waardoor je de kop kwijt was zodra je
+  // naar de vierde oefening ging — en dus ook de timer en de sluitknop.
+  if (expanded) {
+    return (
+      <>
+        <div style={{
+          position: 'fixed', inset: 0, height: '100dvh', zIndex: 70,
+          background: '#0a0a0a',
+          display: 'flex', flexDirection: 'column',
+        }}>
+          <div style={{ flexShrink: 0 }}>{kaart}</div>
+          <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', WebkitOverflowScrolling: 'touch' }}>
+            <LogModal
+              workout={todaysWorkout}
+              todaysLogs={todaysLogs}
+              onClose={loadTodaysLogs}
+              onLogsUpdate={handleLogsUpdate}
+              client={client}
+              schema={freshSchema}
+              db={db}
+            />
+          </div>
+        </div>
+        <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+      </>
+    )
+  }
+
   return (
     <>
-      {/* Header-card: altijd zichtbaar, klikbaar om de oefenlijst uit te klappen. */}
-      <TodaysWorkoutCard
-        workout={todaysWorkout}
-        onLogClick={() => { setExpanded(e => !e); loadTodaysLogs() }}
-        logsCount={todaysLogs.length}
-        isCompleted={isWorkoutFullyLogged(todaysWorkout?.exercises, todaysLogs)}
-        completionPct={workoutCompletionPct(todaysWorkout?.exercises, todaysLogs)}
-        client={client}
-        db={db}
-        isExpanded={expanded}
-      />
-
-      {/* Inline workout-content — alleen tonen als de card uitgeklapt is. */}
-      {expanded && (
-        <LogModal
-          workout={todaysWorkout}
-          todaysLogs={todaysLogs}
-          onClose={loadTodaysLogs}
-          onLogsUpdate={handleLogsUpdate}
-          client={client}
-          schema={freshSchema}
-          db={db}
-          timerElapsedSec={timerElapsedSec}
-          timerRunning={timerRunning}
-          timerStarted={timerStarted}
-          timerFinished={timerFinished}
-          onTimerToggle={toggleTimer}
-          onTimerReset={resetTimer}
-        />
-      )}
-
+      {kaart}
       <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
     </>
   )

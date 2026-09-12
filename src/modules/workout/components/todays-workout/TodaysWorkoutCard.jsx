@@ -6,9 +6,17 @@
 // icoon zonder tekst — dat is nu een knop met tekst + pijl.
 
 import React, { useState, useEffect } from 'react'
-import { Check, ChevronDown } from 'lucide-react'
+import { Check, ChevronDown, Timer } from 'lucide-react'
+import { useRef } from 'react'
 
-export default function TodaysWorkoutCard({ workout, onLogClick, logsCount, isCompleted: isCompletedProp, completionPct = 0, client, db, isExpanded }) {
+export default function TodaysWorkoutCard({
+  workout, onLogClick, logsCount, isCompleted: isCompletedProp, completionPct = 0,
+  client, db, isExpanded,
+  // De workout-timer hoort bij de kop: die blijft staan terwijl je door de
+  // oefeningen scrolt. Zweefde eerder los over de pagina.
+  timerElapsedSec = 0, timerRunning = false, timerStarted = false,
+  timerFinished = false, onTimerToggle, onTimerReset,
+}) {
   const [isMobile, setIsMobile] = useState(window.innerWidth <= 768)
 
   useEffect(() => {
@@ -16,6 +24,36 @@ export default function TodaysWorkoutCard({ workout, onLogClick, logsCount, isCo
     window.addEventListener('resize', handleResize)
     return () => window.removeEventListener('resize', handleResize)
   }, [])
+
+  const formatElapsed = (s) => {
+    const h = Math.floor(s / 3600)
+    const m = Math.floor((s % 3600) / 60)
+    const sec = s % 60
+    return h > 0
+      ? `${h}:${m.toString().padStart(2, '0')}:${sec.toString().padStart(2, '0')}`
+      : `${m}:${sec.toString().padStart(2, '0')}`
+  }
+
+  // Eén tik = start/stop, snelle dubbeltik = reset. De enkele tik wacht 280ms
+  // zodat hij niet ook afgaat bij een dubbeltik.
+  const lastTapRef = useRef(0)
+  const tapTimeoutRef = useRef(null)
+  const handleTimerTap = (e) => {
+    e.stopPropagation()
+    const now = Date.now()
+    if (now - lastTapRef.current < 280) {
+      clearTimeout(tapTimeoutRef.current)
+      lastTapRef.current = 0
+      onTimerReset && onTimerReset()
+    } else {
+      lastTapRef.current = now
+      clearTimeout(tapTimeoutRef.current)
+      tapTimeoutRef.current = setTimeout(() => {
+        lastTapRef.current = 0
+        onTimerToggle && onTimerToggle()
+      }, 280)
+    }
+  }
 
   const getWorkoutImage = () => {
     if (!workout) return null
@@ -75,6 +113,38 @@ export default function TodaysWorkoutCard({ workout, onLogClick, logsCount, isCo
             <div style={{ width: `${pct}%`, height: '100%', background: accent, transition: 'width 0.3s ease' }} />
           </div>
         )}
+
+        {/* Balk over de foto: timer links, sluiten rechts. Allebei op dezelfde
+            hoogte, zodat de bovenrand van de foto één rij is in plaats van
+            twee losse zwevende knoppen. */}
+        <div
+          role="button"
+          tabIndex={0}
+          onClick={handleTimerTap}
+          aria-label="Workout timer — tik om te starten of te pauzeren, dubbel-tik om te resetten"
+          title={timerRunning ? 'Tik om te pauzeren · dubbel-tik = reset' : timerStarted ? 'Tik om verder te tellen · dubbel-tik = reset' : 'Tik om te starten'}
+          style={{
+            position: 'absolute',
+            top: `calc(env(safe-area-inset-top, 0px) + 10px)`, left: 10,
+            display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 7,
+            width: 112, height: 40, borderRadius: 999,
+            background: timerFinished ? '#10b981' : '#fff',
+            border: 'none', cursor: 'pointer',
+            boxShadow: '0 8px 22px rgba(0,0,0,0.5)',
+            touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+          }}
+        >
+          {timerFinished
+            ? <Check size={15} color="#0a0a0a" strokeWidth={3} />
+            : <Timer size={15} strokeWidth={2.4} color={timerRunning ? '#0a0a0a' : 'rgba(10,10,10,0.45)'} />}
+          <span style={{
+            fontSize: '0.95rem', fontWeight: 900,
+            color: timerFinished ? '#0a0a0a' : timerRunning ? '#0a0a0a' : 'rgba(10,10,10,0.5)',
+            fontVariantNumeric: 'tabular-nums', letterSpacing: '-0.02em', lineHeight: 1,
+          }}>
+            {timerStarted ? formatElapsed(timerElapsedSec) : '0:00'}
+          </span>
+        </div>
 
         <button
           onClick={onLogClick}
