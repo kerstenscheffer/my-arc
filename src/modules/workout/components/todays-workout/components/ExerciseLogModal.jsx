@@ -1,7 +1,7 @@
 // src/modules/workout/components/todays-workout/components/ExerciseLogModal.jsx
 import { useState, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
-import { X, Plus, Dumbbell, CheckCircle, MoreVertical, MessageSquare, Edit3, History, Play, Timer, Info } from 'lucide-react'
+import { X, Plus, Dumbbell, CheckCircle, MoreVertical, MessageSquare, History, Play, Timer } from 'lucide-react'
 import ExerciseHistory from './ExerciseHistory'
 import AttachmentSelector from './AttachmentSelector'
 import MachineSettings from './MachineSettings'
@@ -263,9 +263,7 @@ export default function ExerciseLogModal({ db, client, exercise, onClose, isMobi
   const [editingIndex, setEditingIndex] = useState(null) // ✅ Nieuw: track welke set wordt bewerkt
   const [dropsetIndex, setDropsetIndex] = useState(null)
   const [exerciseNote, setExerciseNote] = useState('')
-  const [workoutNote, setWorkoutNote] = useState('')
   const [showExerciseNote, setShowExerciseNote] = useState(false)
-  const [showWorkoutNote, setShowWorkoutNote] = useState(false)
   const [showHistory, setShowHistory] = useState(false)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -279,7 +277,6 @@ export default function ExerciseLogModal({ db, client, exercise, onClose, isMobi
   // foto is de basis en de play-knop verschijnt alleen als er iets te spelen is.
   const [media, setMedia] = useState(null)
   const [toonVideo, setToonVideo] = useState(false)
-  const [toonInfo, setToonInfo] = useState(false)
 
   // Rusttimer: na een gelogde set loopt je rusttijd, en daarna staat het
   // invoerscherm er weer. Zo hoef je tussen de sets niets aan te raken.
@@ -368,9 +365,8 @@ export default function ExerciseLogModal({ db, client, exercise, onClose, isMobi
     if (!client?.id || !db) { setLoading(false); return }
     try {
       const today = new Date().toISOString().split('T')[0]
-      const { data: sessions } = await db.supabase.from('workout_sessions').select('id, notes').eq('client_id', client.id).eq('workout_date', today)
+      const { data: sessions } = await db.supabase.from('workout_sessions').select('id').eq('client_id', client.id).eq('workout_date', today)
       if (sessions?.length > 0) {
-        if (sessions[0].notes) setWorkoutNote(sessions[0].notes)
         const { data: progress } = await db.supabase.from('workout_progress').select('*').in('session_id', sessions.map(s => s.id)).eq('exercise_name', exercise.name).order('created_at', { ascending: true })
         if (progress?.length > 0) {
           const existingSets = []
@@ -498,14 +494,6 @@ export default function ExerciseLogModal({ db, client, exercise, onClose, isMobi
     } catch (e) { console.error('❌ Machine settings save failed:', e) }
   }
 
-  const saveWorkoutDayNote = async () => {
-    if (!client?.id || !db) return
-    try {
-      const today = new Date().toISOString().split('T')[0]
-      await db.supabase.from('workout_sessions').update({ notes: workoutNote }).eq('client_id', client.id).eq('workout_date', today)
-      if (navigator.vibrate) navigator.vibrate([20, 40, 20])
-    } catch (e) { console.error('❌ Note save failed:', e) }
-  }
 
   const lastSet = loggedSets.length > 0 ? loggedSets[loggedSets.length - 1] : null
   const editingSet = editingIndex !== null ? loggedSets[editingIndex] : null
@@ -651,23 +639,10 @@ export default function ExerciseLogModal({ db, client, exercise, onClose, isMobi
 
             {/* Historie hoort bij de cijfers: het is dezelfde oefening, alleen
                 van vorige keren. Stond tussen de notitie-knoppen onderaan. */}
-            <button
-              onClick={() => setShowHistory(!showHistory)}
-              aria-pressed={showHistory}
-              style={{
-                display: 'inline-flex', alignItems: 'center', gap: 5,
-                marginTop: '0.45rem', padding: '0.3rem 0.6rem 0.3rem 0.5rem',
-                background: showHistory ? 'rgba(255,255,255,0.1)' : 'transparent',
-                border: `1px solid ${showHistory ? 'rgba(255,255,255,0.35)' : 'rgba(255,255,255,0.15)'}`,
-                borderRadius: 999, color: '#fff',
-                fontSize: '0.7rem', fontWeight: 800, letterSpacing: '0.02em',
-                cursor: 'pointer', fontFamily: 'inherit',
-                touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-              }}
-            >
-              <History size={12} strokeWidth={2.4} />
-              Historie
-            </button>
+            <div style={{ display: 'flex', gap: 6, marginTop: '0.45rem', flexWrap: 'wrap' }}>
+              <Pil actief={showExerciseNote} onClick={() => setShowExerciseNote(!showExerciseNote)} icoon={<MessageSquare size={12} strokeWidth={2.4} />} label="Notitie" />
+              <Pil actief={showHistory} onClick={() => setShowHistory(!showHistory)} icoon={<History size={12} strokeWidth={2.4} />} label="Historie" />
+            </div>
           </div>
 
           <div style={{ background: 'rgba(255,255,255,0.09)' }} />
@@ -826,49 +801,10 @@ export default function ExerciseLogModal({ db, client, exercise, onClose, isMobi
               </div>
             )}
 
-            {/* Wat de coach bij deze oefening heeft voorgeschreven. Stond in het
-                aparte infoscherm; die tabbladen zijn opgeheven en dit is het
-                enige deel dat per oefening verschilde. */}
-            {toonInfo && (
-              <div style={{ padding: isMobile ? '0.75rem 1rem' : '0.875rem 1.25rem', borderTop: '1px solid rgba(255,255,255,0.04)' }}>
-                <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(3, 1fr)', gap: '0.5rem' }}>
-                  {[
-                    { label: 'Sets', waarde: exercise.sets },
-                    { label: 'Reps', waarde: exercise.reps },
-                    { label: 'Rust', waarde: exercise.rust },
-                    { label: 'Spiergroep', waarde: exercise.primairSpieren },
-                    { label: 'Materiaal', waarde: exercise.equipment },
-                    { label: 'RIR', waarde: exercise.rpe },
-                  ].filter(r => r.waarde !== null && r.waarde !== undefined && r.waarde !== '').map(r => (
-                    <div key={r.label} style={{
-                      background: 'rgba(255,255,255,0.03)', borderRadius: 10,
-                      padding: '0.5rem 0.6rem',
-                    }}>
-                      <div style={{ fontSize: '0.6rem', fontWeight: 800, color: 'rgba(255,255,255,0.35)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{r.label}</div>
-                      <div style={{ fontSize: isMobile ? '0.85rem' : '0.9rem', fontWeight: 800, color: '#fff', marginTop: 2, textTransform: 'capitalize' }}>{r.waarde}</div>
-                    </div>
-                  ))}
-                </div>
-                {exercise.notes && (
-                  <div style={{ marginTop: '0.6rem', padding: '0.6rem 0.7rem', background: 'rgba(255,215,0,0.06)', border: '1px solid rgba(255,215,0,0.2)', borderRadius: 10 }}>
-                    <div style={{ fontSize: '0.6rem', fontWeight: 800, color: '#FFD700', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 3 }}>Van je coach</div>
-                    <div style={{ fontSize: isMobile ? '0.8rem' : '0.85rem', fontWeight: 600, color: 'rgba(255,255,255,0.75)', lineHeight: 1.45, whiteSpace: 'pre-wrap' }}>{exercise.notes}</div>
-                  </div>
-                )}
-              </div>
-            )}
-
             {showExerciseNote && (
               <div style={{ padding: isMobile ? '0.75rem 1rem' : '0.875rem 1.25rem', borderTop: '1px solid rgba(255,255,255,0.04)' }}>
                 <div style={{ fontSize: isMobile ? '0.66rem' : '0.72rem', color: '#FFD700', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '0.5rem', opacity: 0.85 }}>Notitie bij oefening</div>
                 <textarea value={exerciseNote} onChange={(e) => setExerciseNote(e.target.value)} onBlur={() => saveToDatabase(loggedSets)} placeholder="Bv. Schouder voelde stijf..." style={{ width: '100%', minHeight: '60px', padding: '0.6rem', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: '8px', color: '#fff', fontSize: isMobile ? '0.78rem' : '0.85rem', fontWeight: '500', resize: 'vertical', outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box' }} />
-              </div>
-            )}
-
-            {showWorkoutNote && (
-              <div style={{ padding: isMobile ? '0.75rem 1rem' : '0.875rem 1.25rem', borderTop: '1px solid rgba(255,255,255,0.04)' }}>
-                <div style={{ fontSize: isMobile ? '0.66rem' : '0.72rem', color: '#FFD700', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '0.5rem', opacity: 0.85 }}>Notitie bij workout dag</div>
-                <textarea value={workoutNote} onChange={(e) => setWorkoutNote(e.target.value)} onBlur={saveWorkoutDayNote} placeholder="Bv. Slecht geslapen, weinig gegeten..." style={{ width: '100%', minHeight: '60px', padding: '0.6rem', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: '8px', color: '#fff', fontSize: isMobile ? '0.78rem' : '0.85rem', fontWeight: '500', resize: 'vertical', outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box' }} />
               </div>
             )}
 
@@ -901,42 +837,6 @@ export default function ExerciseLogModal({ db, client, exercise, onClose, isMobi
         />
       )}
 
-      {/* FOOTER */}
-      {!wizardActive && !dropsetActive && (
-        <div style={{
-          borderTop: '1px solid rgba(255,255,255,0.06)',
-          padding: isMobile ? '0.85rem 1rem' : '1rem 1.5rem',
-          paddingBottom: `calc(env(safe-area-inset-bottom, 0px) + ${isMobile ? '0.85rem' : '1rem'})`,
-          flexShrink: 0,
-        }}>
-          {/* Voettekst is nu alleen nog de vier secundaire acties; de knoppen
-              om te loggen staan boven, bij je sets. */}
-          <div style={{ display: 'flex', gap: '0.4rem' }}>
-            <ToggleBtn
-              active={toonInfo}
-              onClick={() => setToonInfo(!toonInfo)}
-              icon={<Info size={isMobile ? 13 : 14} strokeWidth={2.2} />}
-              label="Info"
-              isMobile={isMobile}
-            />
-            <ToggleBtn
-              active={showExerciseNote}
-              onClick={() => setShowExerciseNote(!showExerciseNote)}
-              icon={<MessageSquare size={isMobile ? 13 : 14} strokeWidth={2.2} />}
-              label="Notitie"
-              isMobile={isMobile}
-            />
-            <ToggleBtn
-              active={showWorkoutNote}
-              onClick={() => setShowWorkoutNote(!showWorkoutNote)}
-              icon={<Edit3 size={isMobile ? 13 : 14} strokeWidth={2.2} />}
-              label="Dag-note"
-              isMobile={isMobile}
-            />
-          </div>
-        </div>
-      )}
-
       <style>{`
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
         @keyframes spin { to { transform: rotate(360deg); } }
@@ -946,33 +846,26 @@ export default function ExerciseLogModal({ db, client, exercise, onClose, isMobi
   )
 }
 
-// Secundaire toggle-knop in de footer-rij. Gouden tint wanneer actief,
-// donker glass wanneer rust. Min-height 44 voor tap-targets.
-function ToggleBtn({ active, onClick, icon, label, isMobile }) {
+// Klein pilletje onder de cijfers. Vervangt de knoppenrij onderaan het
+// scherm: die nam een hele band in beslag voor twee dingen die je af en toe
+// opentikt.
+function Pil({ actief, onClick, icoon, label }) {
   return (
     <button
       onClick={onClick}
-      aria-pressed={active}
+      aria-pressed={actief}
       style={{
-        flex: 1,
-        padding: isMobile ? '0.55rem 0.4rem' : '0.65rem 0.5rem',
-        background: active ? 'rgba(255,215,0,0.12)' : 'rgba(255,255,255,0.04)',
-        border: `1px solid ${active ? 'rgba(255,215,0,0.4)' : 'rgba(255,255,255,0.08)'}`,
-        borderRadius: 10,
-        color: active ? '#FFD700' : 'rgba(255,255,255,0.7)',
-        fontSize: isMobile ? '0.66rem' : '0.72rem',
-        fontWeight: 800,
-        textTransform: 'uppercase',
-        letterSpacing: '0.06em',
-        cursor: 'pointer',
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        gap: 5,
-        minHeight: 44,
+        display: 'inline-flex', alignItems: 'center', gap: 5,
+        padding: '0.3rem 0.6rem 0.3rem 0.5rem',
+        background: actief ? 'rgba(255,255,255,0.1)' : 'transparent',
+        border: `1px solid ${actief ? 'rgba(255,255,255,0.35)' : 'rgba(255,255,255,0.15)'}`,
+        borderRadius: 999, color: '#fff',
+        fontSize: '0.7rem', fontWeight: 800, letterSpacing: '0.02em',
+        cursor: 'pointer', fontFamily: 'inherit',
         touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-        transition: 'background 0.15s ease, border-color 0.15s ease, color 0.15s ease',
       }}
     >
-      {icon}
+      {icoon}
       {label}
     </button>
   )
