@@ -722,22 +722,25 @@ export default function ExerciseLogModal({ db, client, exercise, onClose, isMobi
                     </span>
                   )}
                 </div>
-                <div style={{ display: 'flex', flexDirection: 'column' }}>
+                {/* Naast elkaar: twee of drie sets vullen een halve regel, en
+                    onder elkaar kostte dat drie regels in een blok dat juist
+                    compact moet zijn. Het setnummer staat klein boven het
+                    getal, zodat je niet hoeft te tellen. */}
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: isMobile ? '0.15rem 0.9rem' : '0.15rem 1.1rem' }}>
                   {previousPerformance.sets.map((x, i) => (
-                    <div key={i} style={{
-                      display: 'flex', alignItems: 'baseline', gap: '0.5rem',
-                      fontSize: isMobile ? '0.82rem' : '0.88rem', fontWeight: 900,
-                      color: '#fff', fontVariantNumeric: 'tabular-nums', lineHeight: 1.45,
-                    }}>
-                      <span style={{ fontSize: '0.72em', fontWeight: 800, color: 'rgba(255,255,255,0.4)', minWidth: '3.2em' }}>
+                    <div key={i} style={{ minWidth: 0 }}>
+                      <div style={{ fontSize: '0.58rem', fontWeight: 800, color: 'rgba(255,255,255,0.35)', letterSpacing: '0.04em', lineHeight: 1 }}>
                         Set {i + 1}
-                      </span>
-                      <span style={{ whiteSpace: 'nowrap' }}>
+                      </div>
+                      <div style={{
+                        fontSize: isMobile ? '0.85rem' : '0.9rem', fontWeight: 900, color: '#fff',
+                        fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap', marginTop: 1,
+                      }}>
                         {x.weight}<span style={{ color: 'rgba(255,255,255,0.35)', fontSize: '0.72em', fontWeight: 800 }}>kg</span>
-                        <span style={{ color: 'rgba(255,255,255,0.25)', fontSize: '0.8em', margin: '0 0.18em' }}>×</span>
+                        <span style={{ color: 'rgba(255,255,255,0.25)', fontSize: '0.8em', margin: '0 0.14em' }}>×</span>
                         {x.reps}
                         {x.partials > 0 && <span style={{ color: 'rgba(255,215,0,0.7)', fontSize: '0.72em', fontWeight: 800 }}> +{x.partials}p</span>}
-                      </span>
+                      </div>
                     </div>
                   ))}
                 </div>
