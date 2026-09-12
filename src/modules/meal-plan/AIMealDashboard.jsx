@@ -534,28 +534,21 @@ export default function AIMealDashboard({ client, onNavigate, db }) {
 
   return (
     <div style={{
-      minHeight: '100vh',
-      // Flat #0a0a0a matched de rest van ClientDashboard. De oude gradient
-      // (→ #171717) liet onderaan een lichtere strook zien tegen het
-      // donkere parent-blok dat erdoor uitkwam — daar kwam het "andere
-      // zwart blok onderaan" vandaan.
+      // Vast scherm in plaats van een lange pagina: de kop (foto, dag, ringen)
+      // blijft staan en alleen de maaltijden en supplementen scrollen —
+      // hetzelfde als het oefeningen-scherm. Onder de zwevende onderbalk
+      // (z-index 101) en onder de log-knop (90), zodat die bereikbaar blijven.
+      position: 'fixed', inset: 0, height: '100dvh', zIndex: 1,
       background: '#0a0a0a',
-      paddingTop: 0,
-      // ClientDashboard's <main> heeft al 120px buffer voor de floating
-      // navbar, maar de meal-pagina heeft een rij MealLogFAB op bottom:110
-      // én eindigt met week-overzichten waarvan de onderste content vaak
-      // gedeeltelijk onder de bar verdween. Extra 180px geeft de klant
-      // ruimte om er voorbij te scrollen.
-      paddingBottom: 180,
+      display: 'flex', flexDirection: 'column',
       overflowX: 'hidden',
-      maxWidth: '100vw',
       animation: 'fadeIn 0.5s ease'
     }}>
 
       {/* ════ KOP MET FOTO — zelfde vorm als de workout-pagina ════
           De dag met de pijlen ligt op de foto, in plaats van een losse titel
           erboven en een balk eronder. */}
-      <div style={{ position: 'relative', width: '100%', height: isMobile ? 200 : 250 }}>
+      <div style={{ position: 'relative', width: '100%', height: isMobile ? 200 : 250, flexShrink: 0 }}>
         <div style={{
           position: 'absolute', inset: 0,
           backgroundImage: `url(${MEAL_BANNER_URL})`,
@@ -639,6 +632,14 @@ export default function AIMealDashboard({ client, onNavigate, db }) {
         )
       })()}
 
+      {/* Alles hieronder scrolt; de kop erboven blijft staan. */}
+      <div style={{
+        flex: 1, minHeight: 0,
+        overflowY: 'auto', WebkitOverflowScrolling: 'touch',
+        // Ruimte voor de zwevende onderbalk en de log-knop.
+        paddingBottom: 180,
+      }}>
+
       {/* Coach meal suggestions — gefilterd op tijd van de dag */}
       <CoachMealSuggestions db={db} isMobile={isMobile} />
 
@@ -699,7 +700,9 @@ export default function AIMealDashboard({ client, onNavigate, db }) {
         onPastDayUpdate={() => setPastDayRefreshKey(k => k + 1)}
       />
 
-      {/* Eén ronde gele log-knop — vervangt alle inline log-knoppen. */}
+      </div>
+
+      {/* Eén ronde witte log-knop — vervangt alle inline log-knoppen. */}
       <MealLogFAB
         onClick={() => { setFoodLogTab('search'); setFoodLogTrigger(n => n + 1) }}
         isMobile={isMobile}

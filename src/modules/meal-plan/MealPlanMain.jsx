@@ -91,7 +91,9 @@ export default function MealPlanMain({ client, onNavigate, db }) {
   // De tabs Voedingsgids / Gelegenheden / Slim kiezen zijn voor nu verborgen
   // (op verzoek). Alleen het plan wordt getoond. De componenten + 'tab'-state
   // blijven bestaan zodat we ze later weer kunnen aanzetten.
-  return (
+  // Het AI-dashboard is zelf een vast scherm (eigen scrollgebied), dus daar
+  // hoeft hier geen extra volle-hoogte wikkel omheen.
+  return hasAIPlan ? planPanel : (
     <div style={{ minHeight: '100vh', background: '#0a0a0a' }}>
       {planPanel}
     </div>
