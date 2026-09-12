@@ -3,12 +3,11 @@
 // Was modal — nu een **inline component**. Renders direct in de pagina flow:
 // geen backdrop, geen close-knop, geen body scroll-lock. Component-naam blijft
 // LogModal voor compat met bestaande imports.
-import { CheckCircle, Check, MessageSquare, ChevronDown, Zap, ThumbsUp, Moon, TrendingDown, Thermometer, Plus, Camera, Timer } from 'lucide-react'
+import { CheckCircle, Check, MessageSquare, ChevronDown, Zap, ThumbsUp, Moon, TrendingDown, Thermometer, Plus, Timer } from 'lucide-react'
 import { useState, useEffect, useRef } from 'react'
 import ExerciseList from './components/ExerciseList'
 import WorkoutFlowWizard from './WorkoutFlowWizard'
 import CustomExerciseModal from './components/CustomExerciseModal'
-import PumpGalleryModal from './PumpGalleryModal'
 
 export default function LogModal({
   workout, todaysLogs, onClose, onLogsUpdate, client, schema, db,
@@ -23,7 +22,6 @@ export default function LogModal({
   const [isWorkoutCompleted, setIsWorkoutCompleted] = useState(false)
   const [showWorkoutFlow, setShowWorkoutFlow] = useState(false)
   const [showCustomModal, setShowCustomModal] = useState(false)
-  const [showPumpGallery, setShowPumpGallery] = useState(false)
   // Timer-state komt van TodaysWorkoutMain (zie props) zodat'ie ook doortikt
   // wanneer de dropdown gesloten wordt en auto-stopt bij de laatste log. Local
   // alias zodat de bestaande naam-referenties hieronder ongewijzigd blijven.
@@ -129,60 +127,6 @@ export default function LogModal({
 
   const handleWorkoutFlowComplete = () => { setShowWorkoutFlow(false); if (onLogsUpdate) onLogsUpdate(); handleFinishWorkout() }
 
-  // Pump-knop opent niet langer de camera direct. We tonen eerst de
-  // gallery (PumpGalleryModal) zodat de gebruiker zijn archief ziet — de
-  // camera-flow zit als CTA in die gallery. Geen auto-finish meer hier.
-  const handleOpenPumpGallery = () => {
-    setShowPumpGallery(true)
-  }
-
-  const handlePumpGalleryClose = () => {
-    setShowPumpGallery(false)
-  }
-
-  const buildPumpStats = () => {
-    const logs = Array.isArray(todaysLogs) ? todaysLogs : []
-    let setsCount = 0
-    let volume = 0
-    logs.forEach(log => {
-      // workout_progress.sets is jsonb — array of { reps, weight, completed }
-      const sets = Array.isArray(log?.sets) ? log.sets : []
-      sets.forEach(s => {
-        if (s?.completed === false) return
-        setsCount += 1
-        const reps = Number(s?.reps) || 0
-        const weight = Number(s?.weight) || 0
-        volume += reps * weight
-      })
-    })
-    // Kcal via ACSM MET-formule:
-    //   kcal/min = (MET × 3.5 × kg_lichaam) / 200
-    // MET 5.5 = matig-zware krachttraining (Compendium of Physical Activities,
-    // Ainsworth et al.). Zonder bekend gewicht: fallback 75 kg.
-    //
-    // De tijd-invoer komt 1) uit de Flow-timer als die gebruikt is, anders
-    // 2) een schatting van ~2.5 minuten per set (≈ 45s werk + 90-100s rust,
-    // ACSM-richtlijn voor krachttraining). Zo werkt formule 1 altijd.
-    const timerUsed = timerSec > 0
-    const SEC_PER_SET_ESTIMATE = 150
-    const effectiveSec = timerUsed
-      ? timerSec
-      : (setsCount > 0 ? setsCount * SEC_PER_SET_ESTIMATE : 0)
-    const weightKg = Number(client?.current_weight) || 75
-    const kcalPerMin = (5.5 * 3.5 * weightKg) / 200
-    const kcal = effectiveSec > 0
-      ? Math.max(1, Math.round((effectiveSec / 60) * kcalPerMin))
-      : null
-    return {
-      workoutName: workout?.name || workout?.day_display_name || 'Workout',
-      exercisesCount: completedCount || (Array.isArray(liveExercises) ? liveExercises.length : 0),
-      setsCount: setsCount > 0 ? setsCount : null,
-      volume: volume > 0 ? volume : null,
-      timerSec: timerUsed ? timerSec : null,
-      kcal,
-    }
-  }
-
   if (showWorkoutFlow) {
     return (
       <WorkoutFlowWizard
@@ -225,106 +169,47 @@ export default function LogModal({
             in ExerciseList (linksonder, MealLogFAB-stijl). */}
       </div>
 
-      {/* ── FLOATING SECUNDAIRE FABS — Pump + Timer, beide kleine ronde
-            cirkels naast de "+ Oefening" FAB linksonder. Display-only:
-            timer start/stopt automatisch met de eerste/laatste log. ── */}
-      <>
-        {/* Pump — ronde gouden knop, opent gallery. */}
-        <button
-          onClick={handleOpenPumpGallery}
-          aria-label="Pump foto's bekijken en toevoegen"
-          style={{
-            position: 'fixed',
-            left: isMobile ? 92 : 110,
-            bottom: `calc(env(safe-area-inset-bottom, 0px) + ${isMobile ? 24 : 28}px)`,
-            zIndex: 89,
-            width: isMobile ? 54 : 58,
-            height: isMobile ? 54 : 58,
-            borderRadius: '50%',
-            background: 'linear-gradient(135deg, rgba(20,20,20,0.96) 0%, rgba(8,8,8,0.96) 100%)',
-            border: '2px solid rgba(255,215,0,0.6)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            cursor: 'pointer',
-            padding: 0,
-            boxShadow: 'inset 0 0 0 3px rgba(255,215,0,0.08), 0 12px 28px rgba(255,215,0,0.2), 0 4px 12px rgba(0,0,0,0.45)',
-            touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-            transition: 'transform 0.15s ease',
-          }}
-          onTouchStart={(e) => e.currentTarget.style.transform = 'scale(0.92)'}
-          onTouchEnd={(e) => e.currentTarget.style.transform = 'scale(1)'}
-        >
-          <Camera size={isMobile ? 22 : 24} color="#FFD700" strokeWidth={2.4} />
-        </button>
+      {/* ── ZWEVENDE TIMER ──
+            Was een Lucide-klokicoon van 68px met de tijd in de wijzerplaat.
+            Zodra je boven het uur kwam paste "3:19:06" niet meer binnen die
+            cirkel en liep de tekst eroverheen. Nu een pil: die groeit gewoon
+            mee met de tekst.
 
-        {/* Timer — de Lucide Timer-icoon IS de knop. Geen losse cirkel
-              eromheen. De live mm:ss staat in het midden van de wijzerplaat
-              (iets onder center omdat het icoon een steel-tip bovenop heeft).
-              Display-only: starten/stoppen gebeurt automatisch. */}
-        <div
-          role="button"
-          tabIndex={0}
-          onClick={handleTimerTap}
-          aria-label="Workout timer — tik om te starten/stoppen, dubbel-tik om te resetten"
-          title={timerRunning ? 'Tik om te pauzeren · dubbel-tik = reset' : timerStarted ? 'Tik om verder te tellen · dubbel-tik = reset' : 'Tik om te starten'}
-          style={{
-            cursor: 'pointer',
-            // Boven de "+ Oefening"-FAB (die staat op left 18/28, bottom 24/28,
-            // 76/84 groot). Horizontaal gecentreerd op die knop, met een gaatje
-            // erboven zodat de timer er netjes bovenop zit.
-            position: 'fixed',
-            left: isMobile ? 22 : 33,
-            bottom: `calc(env(safe-area-inset-bottom, 0px) + ${isMobile ? 112 : 124}px)`,
-            zIndex: 89,
-            width: isMobile ? 68 : 74,
-            height: isMobile ? 68 : 74,
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            background: 'transparent', border: 'none', padding: 0,
-            filter: timerFinished
-              ? 'drop-shadow(0 6px 14px rgba(16,185,129,0.4))'
-              : timerRunning
-                ? 'drop-shadow(0 6px 18px rgba(255,215,0,0.55))'
-                : 'drop-shadow(0 4px 10px rgba(0,0,0,0.55))',
-            transition: 'filter 0.25s ease',
-            animation: timerRunning ? 'workoutTimerPulse 2.2s ease-in-out infinite' : 'none',
-          }}
-        >
-          {/* Lucide Timer-icoon = de visuele "cirkel" zelf. */}
-          <Timer
-            size={isMobile ? 68 : 74}
-            strokeWidth={1.5}
-            color={timerFinished ? '#10b981' : '#FFD700'}
-            style={{ position: 'absolute', inset: 0 }}
-          />
-          {/* Live tijd-display binnen de wijzerplaat. */}
-          <div style={{
-            position: 'relative', zIndex: 2,
-            marginTop: isMobile ? 8 : 9,
-            display: 'flex', flexDirection: 'column', alignItems: 'center',
-            gap: 0,
-          }}>
-            {timerFinished && (
-              <Check size={isMobile ? 9 : 10} color="#10b981" strokeWidth={3} style={{ marginBottom: -1 }} />
-            )}
-            <span style={{
-              fontSize: isMobile ? '0.72rem' : '0.82rem',
-              fontWeight: 900,
-              color: timerFinished ? '#10b981' : timerRunning ? '#fff' : 'rgba(255,255,255,0.55)',
-              fontVariantNumeric: 'tabular-nums',
-              letterSpacing: '-0.03em',
-              lineHeight: 1,
-              textShadow: timerRunning ? '0 0 6px rgba(255,215,0,0.45)' : 'none',
-            }}>
-              {timerStarted ? formatElapsed(timerSec) : '0:00'}
-            </span>
-          </div>
-        </div>
-        <style>{`
-          @keyframes workoutTimerPulse {
-            0%, 100% { filter: drop-shadow(0 6px 18px rgba(255,215,0,0.45)); }
-            50%      { filter: drop-shadow(0 8px 22px rgba(255,215,0,0.65)); }
-          }
-        `}</style>
-      </>
+            De pump-knop stond ernaast en is weg; foto's maak je in de
+            Voortgang-tab. ── */}
+      <div
+        role="button"
+        tabIndex={0}
+        onClick={handleTimerTap}
+        aria-label="Workout timer — tik om te starten of te pauzeren, dubbel-tik om te resetten"
+        title={timerRunning ? 'Tik om te pauzeren · dubbel-tik = reset' : timerStarted ? 'Tik om verder te tellen · dubbel-tik = reset' : 'Tik om te starten'}
+        style={{
+          position: 'fixed',
+          left: isMobile ? 18 : 28,
+          bottom: `calc(env(safe-area-inset-bottom, 0px) + ${isMobile ? 108 : 120}px)`,
+          zIndex: 89,
+          display: 'inline-flex', alignItems: 'center', gap: 7,
+          height: isMobile ? 42 : 46, padding: '0 0.85rem',
+          borderRadius: 999,
+          background: 'rgba(10,10,10,0.92)',
+          backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)',
+          border: `1px solid ${timerFinished ? 'rgba(16,185,129,0.5)' : timerRunning ? 'rgba(255,255,255,0.5)' : 'rgba(255,255,255,0.18)'}`,
+          cursor: 'pointer',
+          boxShadow: '0 8px 22px rgba(0,0,0,0.5)',
+          touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+        }}
+      >
+        {timerFinished
+          ? <Check size={15} color="#10b981" strokeWidth={3} />
+          : <Timer size={15} strokeWidth={2.4} color={timerRunning ? '#fff' : 'rgba(255,255,255,0.5)'} />}
+        <span style={{
+          fontSize: isMobile ? '0.95rem' : '1rem', fontWeight: 900,
+          color: timerFinished ? '#10b981' : timerRunning ? '#fff' : 'rgba(255,255,255,0.55)',
+          fontVariantNumeric: 'tabular-nums', letterSpacing: '-0.02em', lineHeight: 1,
+        }}>
+          {timerStarted ? formatElapsed(timerSec) : '0:00'}
+        </span>
+      </div>
 
       {/* "Workout Voltooid" panel weggehaald — niet meer nodig op de pagina. */}
 
@@ -337,14 +222,6 @@ export default function LogModal({
           schema={schema}
         />
       )}
-
-      <PumpGalleryModal
-        isOpen={showPumpGallery}
-        onClose={handlePumpGalleryClose}
-        client={client}
-        db={db}
-        stats={buildPumpStats()}
-      />
 
       <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
     </div>
