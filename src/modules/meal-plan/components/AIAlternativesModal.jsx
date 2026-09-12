@@ -3,6 +3,9 @@
 // Props IDENTIEK: { isOpen, onClose, currentMeal, onSelectMeal, db, service }
 import React, { useState, useEffect } from 'react'
 import MealCard from './day-schedule/MealCard'
+// Hetzelfde blad als de historie in het workout-log-scherm; één vorm voor
+// "extra scherm dat vanaf onderen openschuift" in de hele app.
+import BladModal from '../../workout/components/todays-workout/components/BladModal'
 import { X, Search, Check, ArrowUp, ArrowDown, Minus } from 'lucide-react'
 
 export default function AIAlternativesModal({
@@ -200,7 +203,7 @@ export default function AIAlternativesModal({
 
   const getDiff = (newVal, oldVal) => {
     const diff = Math.round((newVal || 0) - (oldVal || 0))
-    if (diff > 0) return { text: `+${diff}`, color: '#FFD700', Icon: ArrowUp }
+    if (diff > 0) return { text: `+${diff}`, color: '#fff', Icon: ArrowUp }
     if (diff < 0) return { text: `${diff}`, color: '#ef4444', Icon: ArrowDown }
     return { text: '0', color: 'rgba(255,255,255,0.3)', Icon: Minus }
   }
@@ -415,106 +418,98 @@ export default function AIAlternativesModal({
           )}
         </div>
 
-        {/* ── Footer — compare & confirm ── */}
+      </div>
+
+      {/* Bevestigen in een blad, hetzelfde als de historie in het log-scherm:
+          de nieuwe maaltijd als kaart, het verschil met de huidige eronder en
+          dan pas de knop. Stond eerder als strook onderaan het venster,
+          waardoor de vergelijking half over de lijst viel. */}
+      <BladModal
+        open={!!selectedMeal}
+        titel="Wissel hiermee?"
+        onClose={() => setSelectedMeal(null)}
+        zIndex={10002}
+      >
         {selectedMeal && (
-          <div style={{
-            borderTop: '1px solid rgba(255, 255, 255, 0.06)',
-            flexShrink: 0
-          }}>
-            {/* Compare bar */}
+          <>
+            <div style={{ margin: '0 -1.25rem 0.9rem' }}>
+              <MealCard
+                meal={{
+                  name: selectedMeal.name,
+                  image_url: selectedMeal.image_url,
+                  slot: selectedMeal.slot || currentMeal?.slot,
+                  calories: selectedMeal.calories, protein: selectedMeal.protein,
+                  carbs: selectedMeal.carbs, fat: selectedMeal.fat,
+                }}
+                momentLabel={selectedMeal._isCustom ? 'Eigen maaltijd' : 'Nieuw'}
+                isMobile={isMobile}
+                acties={[]}
+              />
+            </div>
+
             <div style={{
-              display: 'flex',
-              justifyContent: 'center',
-              gap: isMobile ? '1rem' : '1.5rem',
-              padding: '0.5rem 1rem',
-              borderBottom: '1px solid rgba(255, 255, 255, 0.04)'
+              fontSize: '0.62rem', fontWeight: 800, color: 'rgba(255,255,255,0.4)',
+              textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '0.5rem',
             }}>
+              Verschil met {currentMeal?.name || 'je huidige maaltijd'}
+            </div>
+
+            <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1.1rem' }}>
               {[
                 { label: 'kcal', diff: getDiff(selectedMeal.calories, currentMeal?.calories) },
                 { label: 'eiwit', diff: getDiff(selectedMeal.protein, currentMeal?.protein) },
                 { label: 'koolh', diff: getDiff(selectedMeal.carbs, currentMeal?.carbs) },
-                { label: 'vet', diff: getDiff(selectedMeal.fat, currentMeal?.fat) }
-              ].map(item => {
-                const DiffIcon = item.diff.Icon
-                return (
-                  <div key={item.label} style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '0.2rem'
+                { label: 'vet', diff: getDiff(selectedMeal.fat, currentMeal?.fat) },
+              ].map(item => (
+                <div key={item.label} style={{
+                  flex: 1, minWidth: 0, textAlign: 'center',
+                  padding: '0.5rem 0.25rem',
+                  border: '1px solid rgba(255,255,255,0.1)', borderRadius: 10,
+                }}>
+                  <div style={{
+                    fontSize: isMobile ? '0.95rem' : '1.05rem', fontWeight: 900,
+                    color: item.diff.color, letterSpacing: '-0.02em', lineHeight: 1.1,
                   }}>
-                    <DiffIcon size={10} color={item.diff.color} />
-                    <span style={{
-                      fontSize: isMobile ? '0.65rem' : '0.7rem',
-                      fontWeight: '800',
-                      color: item.diff.color
-                    }}>
-                      {item.diff.text}
-                    </span>
-                    <span style={{
-                      fontSize: isMobile ? '0.5rem' : '0.55rem',
-                      fontWeight: '600',
-                      color: 'rgba(255, 255, 255, 0.2)',
-                      textTransform: 'uppercase'
-                    }}>
-                      {item.label}
-                    </span>
+                    {item.diff.text}
                   </div>
-                )
-              })}
+                  <div style={{
+                    fontSize: '0.55rem', fontWeight: 800, color: 'rgba(255,255,255,0.35)',
+                    textTransform: 'uppercase', letterSpacing: '0.06em', marginTop: 2,
+                  }}>
+                    {item.label}
+                  </div>
+                </div>
+              ))}
             </div>
 
-            {/* Action buttons */}
-            <div style={{ display: 'flex' }}>
-              <button
-                onClick={onClose}
-                style={{
-                  flex: 1,
-                  background: 'transparent',
-                  borderTop: 'none',
-                  borderBottom: 'none',
-                  borderLeft: 'none',
-                  borderRight: '1px solid rgba(255, 255, 255, 0.04)',
-                  borderRadius: 0,
-                  padding: isMobile ? '0.75rem' : '0.875rem',
-                  color: 'rgba(255, 255, 255, 0.4)',
-                  fontSize: isMobile ? '0.75rem' : '0.8rem',
-                  fontWeight: '700',
-                  cursor: 'pointer',
-                  minHeight: '44px',
-                  touchAction: 'manipulation',
-                  WebkitTapHighlightColor: 'transparent'
-                }}
-              >
-                Annuleren
-              </button>
-              <button
-                onClick={() => onSelectMeal(selectedMeal.id)}
-                style={{
-                  flex: 2,
-                  background: 'rgba(255, 215, 0, 0.12)',
-                  border: 'none',
-                  borderRadius: 0,
-                  padding: isMobile ? '0.75rem' : '0.875rem',
-                  color: '#FFD700',
-                  fontSize: isMobile ? '0.75rem' : '0.8rem',
-                  fontWeight: '800',
-                  cursor: 'pointer',
-                  minHeight: '44px',
-                  touchAction: 'manipulation',
-                  WebkitTapHighlightColor: 'transparent',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '0.35rem'
-                }}
-              >
-                <Check size={15} strokeWidth={2.5} />
-                Wissel hiermee
-              </button>
-            </div>
-          </div>
+            <button
+              onClick={() => onSelectMeal(selectedMeal.id)}
+              style={{
+                width: '100%', minHeight: 50, marginBottom: '0.5rem',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7,
+                background: '#fff', border: 'none', borderRadius: 12,
+                color: '#0a0a0a', fontSize: '0.95rem', fontWeight: 900,
+                fontFamily: 'inherit', cursor: 'pointer',
+                touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+              }}
+            >
+              <Check size={16} strokeWidth={3} /> Wissel hiermee
+            </button>
+            <button
+              onClick={() => setSelectedMeal(null)}
+              style={{
+                width: '100%', minHeight: 40,
+                background: 'transparent', border: 'none',
+                color: 'rgba(255,255,255,0.45)', fontSize: '0.8rem', fontWeight: 800,
+                fontFamily: 'inherit', cursor: 'pointer',
+                touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+              }}
+            >
+              Annuleren
+            </button>
+          </>
         )}
-      </div>
+      </BladModal>
 
       <style>{`
         @keyframes altFadeIn {
