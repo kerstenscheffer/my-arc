@@ -11,7 +11,7 @@
 // week onderuit haalde.
 
 import { useEffect, useState } from 'react'
-import { Utensils, Check, X } from 'lucide-react'
+import { Check, X } from 'lucide-react'
 import { EISEN, haalStand } from '../../../modules/challenge-monitor/challengeEisen'
 
 const EIS = EISEN.find(e => e.key === 'voeding')
@@ -32,19 +32,8 @@ export default function MealProgressView({ client, db, challengeData }) {
     return () => { afgebroken = true }
   }, [client?.id, challengeData?.id, challengeData?.end_date])
 
-  const kader = (inhoud) => (
-    <div style={{
-      background: 'linear-gradient(135deg, rgba(16,185,129,0.08) 0%, rgba(16,185,129,0.03) 100%)',
-      borderRadius: 16, padding: isMobile ? '1.1rem' : '1.5rem',
-      border: '1px solid rgba(16,185,129,0.18)',
-    }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: '1.1rem' }}>
-        <Utensils size={18} color="#10b981" />
-        <div style={{ fontSize: '1rem', fontWeight: 800, color: '#fff' }}>Voeding</div>
-      </div>
-      {inhoud}
-    </div>
-  )
+  // Geen gekleurd kader: de tab erboven zegt al waar je naar kijkt.
+  const kader = (inhoud) => <div>{inhoud}</div>
 
   if (laden) return kader(<div style={{ color: 'rgba(255,255,255,0.4)', textAlign: 'center', padding: '2rem' }}>Voeding ophalen…</div>)
   if (!stand) return kader(<div style={{ color: 'rgba(255,255,255,0.4)', textAlign: 'center', padding: '2rem' }}>Geen gegevens.</div>)
@@ -71,7 +60,11 @@ export default function MealProgressView({ client, db, challengeData }) {
 
   return kader(
     <>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: isMobile ? 8 : 12, marginBottom: '1.4rem' }}>
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: isMobile ? 'repeat(3, 1fr)' : 'repeat(3, minmax(0, 150px))',
+        gap: isMobile ? 8 : 10, marginBottom: '1.4rem',
+      }}>
         <Vak label={`van de ${EIS.nodig} weken nodig`} waarde={geldigeWeken} kleur={geldigeWeken >= EIS.nodig ? '#10b981' : '#f97316'} isMobile={isMobile} />
         <Vak label="goede dagen" waarde={v.geldige_dagen || 0} isMobile={isMobile} />
         <Vak label="dagen in periode" waarde={dagen.length} isMobile={isMobile} />
@@ -138,7 +131,7 @@ export default function MealProgressView({ client, db, challengeData }) {
 function Vak({ label, waarde, kleur = '#fff', isMobile }) {
   return (
     <div style={{
-      background: 'rgba(0,0,0,0.25)', borderRadius: 12,
+      background: 'rgba(255,255,255,0.035)', borderRadius: 12,
       padding: isMobile ? '0.7rem 0.5rem' : '0.9rem', textAlign: 'center',
     }}>
       <div style={{ fontSize: isMobile ? '1.3rem' : '1.6rem', fontWeight: 900, color: kleur, fontVariantNumeric: 'tabular-nums', lineHeight: 1 }}>

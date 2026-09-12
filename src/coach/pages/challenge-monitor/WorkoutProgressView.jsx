@@ -11,7 +11,7 @@
 // zelf, dan zie je hier een ander getal dan in de tabel, en gaat het over geld.
 
 import { useEffect, useState } from 'react'
-import { Dumbbell, Check, X, AlertTriangle } from 'lucide-react'
+import { Check, X, AlertTriangle } from 'lucide-react'
 import { EISEN, haalStand } from '../../../modules/challenge-monitor/challengeEisen'
 
 const EIS = EISEN.find(e => e.key === 'workouts')
@@ -49,8 +49,10 @@ export default function WorkoutProgressView({ client, db, challengeData }) {
   return (
     <Kader>
       <div style={{
-        display: 'grid', gridTemplateColumns: isMobile ? 'repeat(3, 1fr)' : 'repeat(3, 1fr)',
-        gap: isMobile ? 8 : 12, marginBottom: '1.4rem',
+        // Op een breed scherm de vakjes niet uitrekken: drie getallen over
+        // 1400px uitgesmeerd lezen slechter dan drie compacte blokken links.
+        display: 'grid', gridTemplateColumns: isMobile ? 'repeat(3, 1fr)' : 'repeat(3, minmax(0, 150px))',
+        gap: isMobile ? 8 : 10, marginBottom: '1.4rem',
       }}>
         <Vak label={`van de ${EIS.nodig} nodig`} waarde={geldig} kleur={geldig >= EIS.nodig ? '#10b981' : '#f97316'} isMobile={isMobile} />
         <Vak label="sessies gestart" waarde={sessies} isMobile={isMobile} />
@@ -120,27 +122,17 @@ export default function WorkoutProgressView({ client, db, challengeData }) {
   )
 }
 
+// Geen gekleurd kader om het blok: het staat al onder een tab die zegt waar
+// je naar kijkt, en een oranje doos om een tabel maakt het scherm onrustiger
+// zonder iets toe te voegen.
 function Kader({ children }) {
-  const isMobile = window.innerWidth <= 768
-  return (
-    <div style={{
-      background: 'linear-gradient(135deg, rgba(249,115,22,0.08) 0%, rgba(249,115,22,0.03) 100%)',
-      borderRadius: 16, padding: isMobile ? '1.1rem' : '1.5rem',
-      border: '1px solid rgba(249,115,22,0.18)',
-    }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: '1.1rem' }}>
-        <Dumbbell size={18} color="#f97316" />
-        <div style={{ fontSize: '1rem', fontWeight: 800, color: '#fff' }}>Workouts</div>
-      </div>
-      {children}
-    </div>
-  )
+  return <div>{children}</div>
 }
 
 function Vak({ label, waarde, kleur = '#fff', isMobile }) {
   return (
     <div style={{
-      background: 'rgba(0,0,0,0.25)', borderRadius: 12,
+      background: 'rgba(255,255,255,0.035)', borderRadius: 12,
       padding: isMobile ? '0.7rem 0.5rem' : '0.9rem', textAlign: 'center',
     }}>
       <div style={{ fontSize: isMobile ? '1.3rem' : '1.6rem', fontWeight: 900, color: kleur, fontVariantNumeric: 'tabular-nums', lineHeight: 1 }}>

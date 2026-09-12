@@ -111,20 +111,12 @@ export default function WeightProgressView({ client, db, challengeData }) {
 
   if (!weightData.history || weightData.history.length === 0) {
     return (
+      // Lege staat zonder kader: een grijze doos om één zin heen is ruis.
       <div style={{
-        background: 'rgba(255, 255, 255, 0.03)',
-        borderRadius: '16px',
-        padding: isMobile ? '1.5rem' : '2rem',
-        border: '1px solid rgba(255, 255, 255, 0.1)',
-        textAlign: 'center'
+        padding: '2rem 0', textAlign: 'center',
+        fontSize: '0.9rem', fontWeight: 700, color: 'rgba(255,255,255,0.4)',
       }}>
-        <Scale size={48} color="rgba(255, 255, 255, 0.3)" style={{ marginBottom: '1rem' }} />
-        <div style={{
-          fontSize: isMobile ? '0.95rem' : '1.05rem',
-          color: 'rgba(255, 255, 255, 0.6)'
-        }}>
-          Nog geen weight-ins voor deze challenge
-        </div>
+        Nog geen wegingen in deze challenge.
       </div>
     )
   }
@@ -132,12 +124,9 @@ export default function WeightProgressView({ client, db, challengeData }) {
   const isLosing = weightData.totalChange < 0
 
   return (
-    <div style={{
-      background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.1) 0%, rgba(16, 185, 129, 0.05) 100%)',
-      borderRadius: '16px',
-      padding: isMobile ? '1.25rem' : '1.75rem',
-      border: '1px solid rgba(16, 185, 129, 0.2)'
-    }}>
+    // Geen gekleurd kader: de tab erboven zegt al waar je naar kijkt, en
+    // vijf verschillend getinte dozen onder elkaar maakten het scherm druk.
+    <div>
       {/* Header Stats */}
       <div style={{
         display: 'grid',

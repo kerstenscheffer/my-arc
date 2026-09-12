@@ -101,12 +101,9 @@ export default function PhotoProgressView({ client, db, challengeData }) {
   })
 
   return (
-    <div style={{
-      background: 'linear-gradient(135deg, rgba(139, 92, 246, 0.1) 0%, rgba(139, 92, 246, 0.05) 100%)',
-      borderRadius: '16px',
-      padding: isMobile ? '1.25rem' : '1.75rem',
-      border: '1px solid rgba(139, 92, 246, 0.2)'
-    }}>
+    // Geen gekleurd kader: de tab erboven zegt al waar je naar kijkt, en
+    // vijf verschillend getinte dozen onder elkaar maakten het scherm druk.
+    <div>
       {/* Header Stats */}
       <div style={{
         display: 'grid',
