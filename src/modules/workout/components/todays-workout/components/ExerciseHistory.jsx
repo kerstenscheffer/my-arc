@@ -2,6 +2,24 @@
 import { History, TrendingUp, ChevronDown } from 'lucide-react'
 import { useState, useEffect } from 'react'
 
+// Eén kerncijfer in het kopblok: kopje, getal, regel eronder. Als component
+// zodat beide kolommen dezelfde opbouw hebben en op dezelfde hoogte staan.
+function Kerncijfer({ kopje, cijfer, onder }) {
+  return (
+    <div>
+      <div style={{ fontSize: '0.62rem', fontWeight: 900, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+        {kopje}
+      </div>
+      <div style={{ fontSize: '1.5rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.03em', fontVariantNumeric: 'tabular-nums', lineHeight: 1.15, marginTop: 2 }}>
+        {cijfer}
+      </div>
+      <div style={{ fontSize: '0.68rem', fontWeight: 700, color: 'rgba(255,255,255,0.35)', marginTop: 1 }}>
+        {onder}
+      </div>
+    </div>
+  )
+}
+
 export default function ExerciseHistory({ exerciseName, previousLog, loading, client, db, defaultExpanded = false, forceLoad = false }) {
   const isMobile = window.innerWidth <= 768
   const [expanded, setExpanded] = useState(defaultExpanded)
@@ -164,26 +182,28 @@ export default function ExerciseHistory({ exerciseName, previousLog, loading, cl
           <>
             {/* Wat je wilt weten voor je gaat tillen: hoe zwaar ging het ooit,
                 en hoe vaak heb je deze oefening gedaan. */}
+            {/* Twee kolommen met dezelfde opbouw: kopje, cijfer, regel eronder.
+                Stonden eerder op verschillende hoogtes omdat alleen de
+                zwaarste set een datum onder zich had. */}
             <div style={{
-              display: 'flex', alignItems: 'flex-end', gap: '1.5rem',
+              display: 'flex', alignItems: 'flex-start', gap: '1.6rem',
               paddingBottom: '1rem', marginBottom: '1rem',
               borderBottom: '1px solid rgba(255,255,255,0.12)',
             }}>
-              <div>
-                <div style={{ fontSize: '0.62rem', fontWeight: 900, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Zwaarste set</div>
-                <div style={{ fontSize: '1.5rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.03em', fontVariantNumeric: 'tabular-nums', lineHeight: 1.1 }}>
+              <Kerncijfer
+                kopje="Zwaarste set"
+                cijfer={<>
                   {pr.top.weight}<span style={{ fontSize: '0.6em', color: 'rgba(255,255,255,0.4)' }}>kg</span>
                   <span style={{ color: 'rgba(255,255,255,0.25)', fontSize: '0.7em' }}> × </span>
                   {pr.top.reps}
-                </div>
-                <div style={{ fontSize: '0.66rem', fontWeight: 700, color: 'rgba(255,255,255,0.35)' }}>{formatDate(pr.dag)}</div>
-              </div>
-              <div>
-                <div style={{ fontSize: '0.62rem', fontWeight: 900, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Sessies</div>
-                <div style={{ fontSize: '1.5rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.03em', fontVariantNumeric: 'tabular-nums', lineHeight: 1.1 }}>
-                  {sessies.length}
-                </div>
-              </div>
+                </>}
+                onder={formatDate(pr.dag)}
+              />
+              <Kerncijfer
+                kopje="Sessies"
+                cijfer={sessies.length}
+                onder={`sinds ${formatDate(sessies[sessies.length - 1].dag)}`}
+              />
 
               {reeks.length > 1 && (
                 <div style={{ flex: 1, minWidth: 60, display: 'flex', alignItems: 'flex-end', justifyContent: 'flex-end', gap: 2, height: 46 }}>
@@ -214,7 +234,6 @@ export default function ExerciseHistory({ exerciseName, previousLog, loading, cl
             <div>
               {sessies.map((s, i) => {
                 const v = verschil(i)
-                const isPr = s.dag === pr.dag
                 // Maandkop zodra de maand wisselt. Negentien regels achter
                 // elkaar met alleen "11 sep, 7 sep, 4 sep" laat je zoeken naar
                 // waar het ene blok ophoudt en het andere begint.
@@ -225,7 +244,7 @@ export default function ExerciseHistory({ exerciseName, previousLog, loading, cl
                   <div key={s.dag}>
                   {nieuweMaand && (
                     <div style={{
-                      fontSize: '0.62rem', fontWeight: 900, color: 'rgba(255,255,255,0.3)',
+                      fontSize: '0.66rem', fontWeight: 900, color: '#fff',
                       textTransform: 'uppercase', letterSpacing: '0.1em',
                       marginTop: i === 0 ? 0 : '1rem', marginBottom: '0.2rem',
                     }}>
@@ -248,10 +267,9 @@ export default function ExerciseHistory({ exerciseName, previousLog, loading, cl
                         {s.top.weight}<span style={{ fontSize: '0.72em', color: 'rgba(255,255,255,0.4)' }}>kg</span>
                         <span style={{ color: 'rgba(255,255,255,0.25)', fontSize: '0.8em' }}> × </span>
                         {s.top.reps}
-                        {isPr && <span style={{ marginLeft: 7, fontSize: '0.6rem', fontWeight: 900, color: '#FFD700', letterSpacing: '0.06em' }}>PR</span>}
                       </div>
                       {s.sets.length > 1 && (
-                        <div style={{ fontSize: '0.7rem', fontWeight: 700, color: 'rgba(255,255,255,0.38)', marginTop: 2, fontVariantNumeric: 'tabular-nums' }}>
+                        <div style={{ fontSize: '0.74rem', fontWeight: 800, color: 'rgba(255,255,255,0.8)', marginTop: 2, fontVariantNumeric: 'tabular-nums' }}>
                           {s.sets.length} sets · {s.sets.map(x => `${x.weight || 0}×${x.reps || 0}`).join('  ')}
                         </div>
                       )}
