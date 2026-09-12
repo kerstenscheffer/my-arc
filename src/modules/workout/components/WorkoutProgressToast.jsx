@@ -236,7 +236,7 @@ export default function WorkoutProgressToast({ client, db, onViewChart }) {
 
   const isClickable = !!(onViewChart && insight.exercise)
   const breedte = isMobile ? 'min(330px, 88vw)' : 380
-  const hoogte = isMobile ? 116 : 132
+  const hoogte = isMobile ? 84 : 94
 
   return (
     <div
@@ -262,7 +262,7 @@ export default function WorkoutProgressToast({ client, db, onViewChart }) {
           overheen kan beginnen in plaats van ernaast te moeten passen. */}
       <div style={{
         position: 'absolute', top: 0, right: 0, bottom: 0,
-        width: '80%',
+        width: '28%',
         backgroundImage: `url(${COACH_PHOTO_URL})`,
         backgroundSize: 'cover',
         // Het beeld is staand (665x1182) en de kop zit rond 45% van de hoogte;
@@ -271,20 +271,19 @@ export default function WorkoutProgressToast({ client, db, onViewChart }) {
       }} />
       <div style={{
         position: 'absolute', inset: 0, pointerEvents: 'none',
-        background: 'linear-gradient(90deg, #0a0a0a 0%, #0a0a0a 20%, rgba(10,10,10,0.9) 40%, rgba(10,10,10,0.5) 66%, rgba(10,10,10,0.05) 100%)',
+        background: 'linear-gradient(90deg, #0a0a0a 0%, #0a0a0a 62%, rgba(10,10,10,0.75) 78%, rgba(10,10,10,0.2) 92%, rgba(10,10,10,0) 100%)',
       }} />
 
       {/* Tekst — begint links en loopt tot over de helft van de foto. */}
       <div style={{
         position: 'absolute', top: 0, bottom: 0, left: 0,
-        // De zwarte kolom is 20% breed; de tekst loopt daar overheen tot in de
-        // fade, want in 20% van 330px past geen leesbare regel.
-        width: '66%',
-        padding: isMobile ? '0.7rem 0.5rem 0.7rem 0.9rem' : '0.85rem 0.6rem 0.85rem 1.1rem',
+        // Tekst pakt de linkerkant en loopt tot net over de rand van de foto.
+        width: '78%',
+        padding: isMobile ? '0.5rem 0.4rem 0.5rem 0.9rem' : '0.6rem 0.5rem 0.6rem 1.1rem',
         display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 3,
       }}>
         <div style={{
-          fontSize: isMobile ? '1.05rem' : '1.2rem',
+          fontSize: isMobile ? '0.98rem' : '1.1rem',
           fontWeight: 900, color: '#fff',
           letterSpacing: '-0.025em', lineHeight: 1.1,
           textShadow: '0 2px 10px rgba(0,0,0,0.8)',
@@ -292,11 +291,11 @@ export default function WorkoutProgressToast({ client, db, onViewChart }) {
           {pickPraise(insight.type, insight.exercise || '')}
         </div>
         <div style={{
-          fontSize: isMobile ? '0.74rem' : '0.8rem',
+          fontSize: isMobile ? '0.7rem' : '0.76rem',
           fontWeight: 800, color: 'rgba(255,255,255,0.72)',
           lineHeight: 1.3,
           overflow: 'hidden', textOverflow: 'ellipsis',
-          display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical',
+          display: '-webkit-box', WebkitLineClamp: 1, WebkitBoxOrient: 'vertical',
           textShadow: '0 2px 8px rgba(0,0,0,0.8)',
         }}>
           {insight.name ? `${insight.name} ${insight.metric || ''}`.trim() : insight.title}
