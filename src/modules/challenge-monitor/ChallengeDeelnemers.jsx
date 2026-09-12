@@ -10,32 +10,11 @@
 
 import { useEffect, useState } from 'react'
 import { Trophy, RefreshCw, AlertTriangle } from 'lucide-react'
-
-// De eisen van de 6-weken 80/20-challenge. Hier en niet in de RPC: dit zijn de
-// spelregels van déze challenge, niet van het tellen. Een volgende challenge
-// krijgt andere getallen zonder dat de query verandert.
-const EISEN = [
-  { key: 'workouts',  label: 'Workouts',  nodig: 14, van: 18 },
-  { key: 'wegingen',  label: 'Wegingen',  nodig: 18, van: 24 },
-  { key: 'voeding',   label: 'Voeding',   nodig: 5,  van: 6, eenheid: 'wk' },
-  { key: 'checkins',  label: 'Check-ins', nodig: 6,  van: 6 },
-  { key: 'fotos',     label: "Foto's",    nodig: 3,  van: 3 },
-  { key: 'calls',     label: 'Calls',     nodig: 3,  van: 4 },
-]
+import { EISEN, waardenUit, naloopGrens } from './challengeEisen'
 
 const GOUD = '#FFD700'
 const GROEN = '#10b981'
 const ROOD = '#ef4444'
-
-// Uit de RPC-uitkomst de zes waarden halen die tegen de eisen gelegd worden.
-const waardenUit = (stand) => ({
-  workouts: stand?.workouts?.geldig ?? 0,
-  wegingen: stand?.wegingen ?? 0,
-  voeding: stand?.voeding?.geldige_weken ?? 0,
-  checkins: stand?.checkins ?? 0,
-  fotos: stand?.fotos ?? 0,
-  calls: stand?.calls ?? 0,
-})
 
 export default function ChallengeDeelnemers({ db, isMobile, onSelectClient }) {
   const [rijen, setRijen] = useState([])
@@ -49,15 +28,11 @@ export default function ChallengeDeelnemers({ db, isMobile, onSelectClient }) {
       // staan nog vier deelnames uit 2025 die niemand ooit heeft afgesloten;
       // die horen niet tussen de mensen wier geld nu op het spel staat. Twee
       // weken naloop, want de uitbetaling gebeurt na de einddatum.
-      const grens = new Date()
-      grens.setDate(grens.getDate() - 14)
-      const vanaf = grens.toISOString().slice(0, 10)
-
       const { data: deelnames, error } = await db.supabase
         .from('challenge_assignments')
         .select('id, client_id, challenge_type, start_date, end_date, is_active, is_paused, clients(first_name, last_name)')
         .eq('is_active', true)
-        .gte('end_date', vanaf)
+        .gte('end_date', naloopGrens())
         .order('start_date', { ascending: false })
       if (error) throw error
 

@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react'
 import { Trophy, ChevronDown, RefreshCw, Users, AlertCircle, Target, Pause, Play } from 'lucide-react'
 
 // IMPORT CHALLENGE MONITOR VIEWS
-import ChallengeHomeBanner from '../../client/components/ChallengeHomeBanner'
+import ChallengeBanner from '../../modules/challenge-monitor/ChallengeBanner'
 import ChallengeGoalManager from '../tabs/client-info/ChallengeGoalManager'
 import WorkoutProgressView from './challenge-monitor/WorkoutProgressView'
 import MealProgressView from './challenge-monitor/MealProgressView'
@@ -683,11 +683,11 @@ export default function CoachChallengeHub({ db, clients }) {
           {selectedClient && (
             <>
               {activeView === 'overview' && (
-                <ChallengeHomeBanner 
-                  key={refreshKey}  // 🔥 FIX 3: Force re-render on data update
+                <ChallengeBanner
                   client={selectedClient}
                   db={db}
                   isCoachView={true}
+                  refreshKey={refreshKey}
                 />
               )}
               

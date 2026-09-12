@@ -26,26 +26,27 @@ export default function LastActivityView({ client, db, challengeData }) {
       const today = new Date()
       
       const activityPromises = [
-        // Last weigh-in
+        // Laatste weging — weight_challenge_logs, niet weight_history: die
+        // laatste heeft één rij uit oktober 2025 en stond hier dus altijd leeg.
         db.supabase
-          .from('weight_history')
+          .from('weight_challenge_logs')
           .select('date, weight')
           .eq('client_id', client.id)
           .gte('date', startDate.toISOString().split('T')[0])
           .order('date', { ascending: false })
           .limit(1)
-          .single(),
+          .maybeSingle(),
         
-        // Last workout
+        // Laatste workout — workout_sessions, niet workout_completions: die
+        // tabel is sinds 9 juni 2026 leeg, dus hier stond nooit meer iets.
         db.supabase
-          .from('workout_completions')
-          .select('workout_date, completed')
+          .from('workout_sessions')
+          .select('workout_date')
           .eq('client_id', client.id)
-          .eq('completed', true)
           .gte('workout_date', startDate.toISOString().split('T')[0])
           .order('workout_date', { ascending: false })
           .limit(1)
-          .single(),
+          .maybeSingle(),
         
         // Last photo
         db.supabase
@@ -55,15 +56,21 @@ export default function LastActivityView({ client, db, challengeData }) {
           .gte('created_at', startDate.toISOString())
           .order('created_at', { ascending: false })
           .limit(1)
-          .single(),
+          .maybeSingle(),
         
-        // Last call (check challenge_assignment_goals for calls)
+        // Laatste call — uit client_calls zelf. Stond op
+        // challenge_assignment_goals, een tabel met drie rijen uit oktober
+        // 2025 die niemand meer bijwerkt; de datum die hier verscheen was de
+        // laatste keer dat iemand dat doel handmatig aanraakte.
         db.supabase
-          .from('challenge_assignment_goals')
-          .select('updated_at, current_value, goal_type')
-          .eq('assignment_id', challengeData.id)
-          .eq('goal_type', 'calls')
-          .single()
+          .from('client_calls')
+          .select('completed_date')
+          .eq('client_id', client.id)
+          .eq('status', 'completed')
+          .gte('completed_date', startDate.toISOString())
+          .order('completed_date', { ascending: false })
+          .limit(1)
+          .maybeSingle()
       ]
 
       const results = await Promise.all(activityPromises)
@@ -91,8 +98,8 @@ export default function LastActivityView({ client, db, challengeData }) {
           icon: Dumbbell,
           color: '#f97316',
           date: results[1].data.workout_date,
-          value: 'Completed',
-          timestamp: new Date(results[1].data.workout_date)
+          value: 'Gestart',
+          timestamp: new Date(`${results[1].data.workout_date}T00:00:00`)
         })
       }
       
@@ -110,15 +117,15 @@ export default function LastActivityView({ client, db, challengeData }) {
       }
       
       // Process calls
-      if (results[3].data && results[3].data.updated_at) {
+      if (results[3].data && results[3].data.completed_date) {
         activityList.push({
           type: 'call',
-          label: 'Calls',
+          label: 'Call',
           icon: Phone,
           color: '#3b82f6',
-          date: results[3].data.updated_at.split('T')[0],
-          value: `${results[3].data.current_value || 0} calls`,
-          timestamp: new Date(results[3].data.updated_at)
+          date: results[3].data.completed_date.split('T')[0],
+          value: 'Gehad',
+          timestamp: new Date(results[3].data.completed_date)
         })
       }
 

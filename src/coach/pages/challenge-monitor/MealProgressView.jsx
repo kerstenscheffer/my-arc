@@ -1,524 +1,150 @@
 // src/coach/pages/challenge-monitor/MealProgressView.jsx
-import { useState, useEffect } from 'react'
-import { Utensils, CheckCircle, XCircle, Calendar, TrendingUp, Zap, AlertCircle } from 'lucide-react'
+//
+// De voedingsweken van één deelnemer.
+//
+// Las ai_meal_progress en telde elke dag met "enige" registratie als goed. Dat
+// is een andere regel dan de challenge hanteert (70% van de geplande
+// maaltijden, en een week telt bij 5 goede dagen), dus dit scherm en de teller
+// gaven verschillende antwoorden over dezelfde week.
+//
+// Nu uit get_challenge_stand, met de dagen erbij zodat je ziet welke dag een
+// week onderuit haalde.
+
+import { useEffect, useState } from 'react'
+import { Utensils, Check, X } from 'lucide-react'
+import { EISEN, haalStand } from '../../../modules/challenge-monitor/challengeEisen'
+
+const EIS = EISEN.find(e => e.key === 'voeding')
+const DAGEN_PER_WEEK = 5   // zelfde drempel als de RPC-parameter p_dagen_per_week
 
 export default function MealProgressView({ client, db, challengeData }) {
   const isMobile = window.innerWidth <= 768
-  const [mealData, setMealData] = useState({
-    total: 0,
-    totalTracked: 0,
-    byWeek: {},
-    streak: 0,
-    compliance: 0,
-    todayComplete: false,
-    todayPercentage: 0,
-    averageCompletion: 0
-  })
-  const [loading, setLoading] = useState(true)
+  const [stand, setStand] = useState(null)
+  const [laden, setLaden] = useState(true)
 
   useEffect(() => {
-    loadMealData()
-  }, [client?.id, challengeData])
+    let afgebroken = false
+    setLaden(true)
+    haalStand(db, challengeData ? { ...challengeData, client_id: client?.id } : null)
+      .then(s => { if (!afgebroken) setStand(s) })
+      .catch(e => console.error('Voedings-stand laden mislukt:', e))
+      .finally(() => { if (!afgebroken) setLaden(false) })
+    return () => { afgebroken = true }
+  }, [client?.id, challengeData?.id, challengeData?.end_date])
 
-  async function loadMealData() {
-    if (!client?.id || !challengeData) return
-
-    try {
-      const startDate = new Date(challengeData.start_date)
-      const endDate = new Date(challengeData.end_date)
-      
-      // Load all meal progress
-      const { data: mealDays } = await db.supabase
-        .from('ai_meal_progress')
-        .select('date, meals_consumed, manual_intake, completion_percentage')
-        .eq('client_id', client.id)
-        .gte('date', startDate.toISOString().split('T')[0])
-        .lte('date', endDate.toISOString().split('T')[0])
-        .order('date', { ascending: true })
-
-      // Process by week with detailed tracking
-      const byWeek = {}
-      for (let week = 1; week <= 8; week++) {
-        byWeek[week] = {
-          complete: [],  // Days with ≥50% completion
-          partial: [],   // Days with <50% but >0% completion
-          total: 0
-        }
-      }
-
-      let totalCompletionPercentage = 0
-      let daysWithData = 0
-      let trackedDaysCount = 0
-
-      mealDays?.forEach(day => {
-        const mealDate = new Date(day.date)
-        const daysSinceStart = Math.floor((mealDate - startDate) / (1000 * 60 * 60 * 24))
-        const weekNum = Math.min(8, Math.floor(daysSinceStart / 7) + 1)
-        
-        // Check if day has ANY tracking
-        const hasTracking = day.meals_consumed > 0 || 
-                          day.manual_intake !== null || 
-                          day.completion_percentage > 0
-        
-        if (hasTracking) {
-          trackedDaysCount++
-          
-          // Determine completion level
-          const percentage = day.completion_percentage || 0
-          
-          if (percentage >= 50) {
-            // Complete day (counts for challenge)
-            byWeek[weekNum].complete.push({
-              date: day.date,
-              percentage: percentage,
-              dayOfWeek: mealDate.toLocaleDateString('nl-NL', { weekday: 'short' })
-            })
-            byWeek[weekNum].total++
-          } else if (percentage > 0) {
-            // Partial day (tracked but not complete)
-            byWeek[weekNum].partial.push({
-              date: day.date,
-              percentage: percentage,
-              dayOfWeek: mealDate.toLocaleDateString('nl-NL', { weekday: 'short' })
-            })
-          }
-          
-          if (percentage > 0) {
-            totalCompletionPercentage += percentage
-            daysWithData++
-          }
-        }
-      })
-
-      // Calculate streak (only for ≥50% days)
-      let streak = 0
-      const today = new Date()
-      const todayStr = today.toISOString().split('T')[0]
-      const todayMeal = mealDays?.find(m => m.date === todayStr)
-      const todayComplete = todayMeal?.completion_percentage >= 50
-      const todayPercentage = todayMeal?.completion_percentage || 0
-
-      // Calculate streak from today or yesterday
-      let checkDate = todayComplete ? new Date(today) : new Date(today.setDate(today.getDate() - 1))
-      
-      for (let i = 0; i < 56; i++) {
-        const dateStr = checkDate.toISOString().split('T')[0]
-        const dayMeal = mealDays?.find(m => m.date === dateStr)
-        
-        if (dayMeal?.completion_percentage >= 50) {
-          streak++
-          checkDate.setDate(checkDate.getDate() - 1)
-        } else {
-          break
-        }
-      }
-
-      // Count total complete days (≥50%)
-      const totalCompleteDays = Object.values(byWeek).reduce(
-        (sum, week) => sum + week.complete.length, 0
-      )
-
-      const compliance = Math.round((totalCompleteDays / 45) * 100)
-      const averageCompletion = daysWithData > 0 
-        ? Math.round(totalCompletionPercentage / daysWithData)
-        : 0
-
-      setMealData({
-        total: totalCompleteDays,
-        totalTracked: trackedDaysCount,
-        byWeek,
-        streak,
-        compliance,
-        todayComplete,
-        todayPercentage,
-        averageCompletion
-      })
-    } catch (error) {
-      console.error('Error loading meal data:', error)
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  if (loading) {
-    return (
-      <div style={{
-        display: 'flex',
-        justifyContent: 'center',
-        alignItems: 'center',
-        minHeight: '200px',
-        color: 'rgba(255, 255, 255, 0.6)'
-      }}>
-        Loading meal data...
-      </div>
-    )
-  }
-
-  return (
+  const kader = (inhoud) => (
     <div style={{
-      background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.1) 0%, rgba(16, 185, 129, 0.05) 100%)',
-      borderRadius: '16px',
-      padding: isMobile ? '1.25rem' : '1.75rem',
-      border: '1px solid rgba(16, 185, 129, 0.2)'
+      background: 'linear-gradient(135deg, rgba(16,185,129,0.08) 0%, rgba(16,185,129,0.03) 100%)',
+      borderRadius: 16, padding: isMobile ? '1.1rem' : '1.5rem',
+      border: '1px solid rgba(16,185,129,0.18)',
     }}>
-      {/* Header Stats */}
-      <div style={{
-        display: 'grid',
-        gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(4, 1fr)',
-        gap: isMobile ? '0.75rem' : '1rem',
-        marginBottom: '1.5rem'
-      }}>
-        <div style={{
-          background: 'rgba(255, 255, 255, 0.05)',
-          borderRadius: '12px',
-          padding: isMobile ? '0.875rem' : '1rem',
-          border: '1px solid rgba(255, 255, 255, 0.1)',
-          textAlign: 'center'
-        }}>
-          <Utensils size={20} color="#10b981" style={{ marginBottom: '0.5rem' }} />
-          <div style={{
-            fontSize: isMobile ? '1.25rem' : '1.5rem',
-            fontWeight: '700',
-            color: '#fff',
-            marginBottom: '0.25rem'
-          }}>
-            {mealData.total}/45
-          </div>
-          <div style={{
-            fontSize: isMobile ? '0.7rem' : '0.75rem',
-            color: 'rgba(255, 255, 255, 0.6)',
-            textTransform: 'uppercase',
-            letterSpacing: '0.05em'
-          }}>
-            Complete Days
-          </div>
-        </div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: '1.1rem' }}>
+        <Utensils size={18} color="#10b981" />
+        <div style={{ fontSize: '1rem', fontWeight: 800, color: '#fff' }}>Voeding</div>
+      </div>
+      {inhoud}
+    </div>
+  )
 
-        <div style={{
-          background: 'rgba(255, 255, 255, 0.05)',
-          borderRadius: '12px',
-          padding: isMobile ? '0.875rem' : '1rem',
-          border: '1px solid rgba(255, 255, 255, 0.1)',
-          textAlign: 'center'
-        }}>
-          <CheckCircle size={20} color="#fbbf24" style={{ marginBottom: '0.5rem' }} />
-          <div style={{
-            fontSize: isMobile ? '1.25rem' : '1.5rem',
-            fontWeight: '700',
-            color: '#fff',
-            marginBottom: '0.25rem'
-          }}>
-            {mealData.compliance}%
-          </div>
-          <div style={{
-            fontSize: isMobile ? '0.7rem' : '0.75rem',
-            color: 'rgba(255, 255, 255, 0.6)',
-            textTransform: 'uppercase',
-            letterSpacing: '0.05em'
-          }}>
-            Compliance
-          </div>
-        </div>
+  if (laden) return kader(<div style={{ color: 'rgba(255,255,255,0.4)', textAlign: 'center', padding: '2rem' }}>Voeding ophalen…</div>)
+  if (!stand) return kader(<div style={{ color: 'rgba(255,255,255,0.4)', textAlign: 'center', padding: '2rem' }}>Geen gegevens.</div>)
 
-        <div style={{
-          background: 'rgba(255, 255, 255, 0.05)',
-          borderRadius: '12px',
-          padding: isMobile ? '0.875rem' : '1rem',
-          border: '1px solid rgba(255, 255, 255, 0.1)',
-          textAlign: 'center'
-        }}>
-          <Zap size={20} color="#f97316" style={{ marginBottom: '0.5rem' }} />
-          <div style={{
-            fontSize: isMobile ? '1.25rem' : '1.5rem',
-            fontWeight: '700',
-            color: '#fff',
-            marginBottom: '0.25rem'
-          }}>
-            {mealData.streak}
-          </div>
-          <div style={{
-            fontSize: isMobile ? '0.7rem' : '0.75rem',
-            color: 'rgba(255, 255, 255, 0.6)',
-            textTransform: 'uppercase',
-            letterSpacing: '0.05em'
-          }}>
-            Streak
-          </div>
-        </div>
+  const v = stand.voeding || {}
+  const weken = v.weken || []
+  const dagen = v.dagen || []
+  const geldigeWeken = v.geldige_weken || 0
 
-        <div style={{
-          background: 'rgba(255, 255, 255, 0.05)',
-          borderRadius: '12px',
-          padding: isMobile ? '0.875rem' : '1rem',
-          border: '1px solid rgba(255, 255, 255, 0.1)',
-          textAlign: 'center'
-        }}>
-          <TrendingUp size={20} color="#8b5cf6" style={{ marginBottom: '0.5rem' }} />
-          <div style={{
-            fontSize: isMobile ? '1.25rem' : '1.5rem',
-            fontWeight: '700',
-            color: '#fff',
-            marginBottom: '0.25rem'
-          }}>
-            {mealData.averageCompletion}%
-          </div>
-          <div style={{
-            fontSize: isMobile ? '0.7rem' : '0.75rem',
-            color: 'rgba(255, 255, 255, 0.6)',
-            textTransform: 'uppercase',
-            letterSpacing: '0.05em'
-          }}>
-            Avg Daily
-          </div>
-        </div>
+  // De dagen bij hun week zoeken. De RPC groepeert op maandag (date_trunc
+  // 'week'), dus hier dezelfde maandag uitrekenen in plaats van op index.
+  const maandagVan = (d) => {
+    const dt = new Date(`${d}T00:00:00`)
+    const verschuiving = (dt.getDay() + 6) % 7
+    dt.setDate(dt.getDate() - verschuiving)
+    return dt.toISOString().slice(0, 10)
+  }
+  const dagenPerWeek = new Map()
+  dagen.forEach(d => {
+    const k = maandagVan(d.dag)
+    if (!dagenPerWeek.has(k)) dagenPerWeek.set(k, [])
+    dagenPerWeek.get(k).push(d)
+  })
+
+  return kader(
+    <>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: isMobile ? 8 : 12, marginBottom: '1.4rem' }}>
+        <Vak label={`van de ${EIS.nodig} weken nodig`} waarde={geldigeWeken} kleur={geldigeWeken >= EIS.nodig ? '#10b981' : '#f97316'} isMobile={isMobile} />
+        <Vak label="goede dagen" waarde={v.geldige_dagen || 0} isMobile={isMobile} />
+        <Vak label="dagen in periode" waarde={dagen.length} isMobile={isMobile} />
       </div>
 
-      {/* Today's Status */}
-      <div style={{
-        background: mealData.todayPercentage >= 50 
-          ? 'rgba(16, 185, 129, 0.1)' 
-          : mealData.todayPercentage > 0
-            ? 'rgba(251, 191, 36, 0.1)'
-            : 'rgba(220, 38, 38, 0.1)',
-        borderRadius: '12px',
-        padding: isMobile ? '0.875rem' : '1rem',
-        border: `1px solid ${
-          mealData.todayPercentage >= 50 
-            ? 'rgba(16, 185, 129, 0.3)'
-            : mealData.todayPercentage > 0
-              ? 'rgba(251, 191, 36, 0.3)'
-              : 'rgba(220, 38, 38, 0.3)'
-        }`,
-        marginBottom: '1.5rem',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between'
-      }}>
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '0.75rem'
-        }}>
-          {mealData.todayPercentage >= 50 ? (
-            <CheckCircle size={20} color="#10b981" />
-          ) : mealData.todayPercentage > 0 ? (
-            <AlertCircle size={20} color="#fbbf24" />
-          ) : (
-            <XCircle size={20} color="#dc2626" />
-          )}
-          <div>
-            <div style={{
-              fontSize: isMobile ? '0.9rem' : '0.95rem',
-              color: '#fff',
-              fontWeight: '600'
-            }}>
-              Vandaag: {mealData.todayPercentage}% compleet
-            </div>
-            <div style={{
-              fontSize: isMobile ? '0.75rem' : '0.8rem',
-              color: 'rgba(255, 255, 255, 0.6)',
-              marginTop: '0.1rem'
-            }}>
-              {mealData.todayPercentage >= 50 
-                ? 'Telt mee voor challenge ✓'
-                : mealData.todayPercentage > 0
-                  ? 'Nog niet compleet (min. 50% nodig)'
-                  : 'Log je maaltijden voor vandaag'}
-            </div>
-          </div>
+      {weken.length === 0 ? (
+        <div style={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.85rem', padding: '1.5rem 0', textAlign: 'center' }}>
+          Geen voedingsgegevens in deze periode.
         </div>
-        {mealData.todayPercentage < 100 && (
-          <div style={{
-            fontSize: isMobile ? '0.8rem' : '0.85rem',
-            padding: '0.25rem 0.5rem',
-            background: 'rgba(255, 255, 255, 0.1)',
-            borderRadius: '6px',
-            color: 'rgba(255, 255, 255, 0.7)'
-          }}>
-            {100 - mealData.todayPercentage}% te gaan
-          </div>
-        )}
-      </div>
-
-      {/* Challenge Info Box */}
-      <div style={{
-        background: 'rgba(255, 255, 255, 0.03)',
-        borderRadius: '12px',
-        padding: isMobile ? '0.875rem' : '1rem',
-        border: '1px solid rgba(255, 255, 255, 0.1)',
-        marginBottom: '1.5rem'
-      }}>
-        <div style={{
-          fontSize: isMobile ? '0.8rem' : '0.85rem',
-          color: 'rgba(255, 255, 255, 0.8)',
-          lineHeight: 1.5
-        }}>
-          <strong style={{ color: '#fff' }}>Challenge Requirement:</strong> 45 dagen met minimaal 50% completion.
-          <br />
-          <span style={{ color: 'rgba(255, 255, 255, 0.6)' }}>
-            Tracked: {mealData.totalTracked} dagen • Complete: {mealData.total} dagen • 
-            Nog nodig: {Math.max(0, 45 - mealData.total)} dagen
-          </span>
-        </div>
-      </div>
-
-      {/* Week by Week Breakdown */}
-      <div>
-        <h3 style={{
-          fontSize: isMobile ? '0.95rem' : '1.05rem',
-          fontWeight: '600',
-          color: '#fff',
-          marginBottom: '1rem',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '0.5rem'
-        }}>
-          <Calendar size={18} />
-          Week by Week Progress
-        </h3>
-
-        <div style={{
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '0.75rem'
-        }}>
-          {[1, 2, 3, 4, 5, 6, 7, 8].map(week => {
-            const weekData = mealData.byWeek[week] || { complete: [], partial: [], total: 0 }
-            const isCurrentWeek = week === challengeData.currentWeek
-            const isPastWeek = week < challengeData.currentWeek
-            const weekCompliance = Math.round((weekData.complete.length / 7) * 100)
-            const isCompliant = weekCompliance >= 80 // 6/7 days
-
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {weken.map((w, i) => {
+            const ok = w.dagen >= DAGEN_PER_WEEK
             return (
-              <div
-                key={week}
-                style={{
-                  background: isCurrentWeek 
-                    ? 'rgba(16, 185, 129, 0.1)' 
-                    : 'rgba(255, 255, 255, 0.03)',
-                  borderRadius: '12px',
-                  padding: isMobile ? '0.875rem' : '1rem',
-                  border: `1px solid ${isCurrentWeek 
-                    ? 'rgba(16, 185, 129, 0.3)' 
-                    : 'rgba(255, 255, 255, 0.1)'}`,
-                  transition: 'all 0.3s ease'
-                }}
-              >
-                <div style={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                  marginBottom: (weekData.complete.length > 0 || weekData.partial.length > 0) ? '0.75rem' : 0
-                }}>
-                  <div style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '0.75rem'
-                  }}>
-                    <span style={{
-                      fontSize: isMobile ? '0.85rem' : '0.9rem',
-                      fontWeight: '600',
-                      color: isCurrentWeek ? '#10b981' : '#fff'
-                    }}>
-                      Week {week}
-                    </span>
-                    {isCurrentWeek && (
-                      <span style={{
-                        fontSize: '0.7rem',
-                        padding: '0.15rem 0.4rem',
-                        background: 'rgba(16, 185, 129, 0.2)',
-                        borderRadius: '4px',
-                        color: '#34d399',
-                        fontWeight: '600'
-                      }}>
-                        CURRENT
-                      </span>
-                    )}
+              <div key={w.week} style={{
+                padding: '0.7rem 0.8rem', borderRadius: 10,
+                background: ok ? 'rgba(16,185,129,0.07)' : 'rgba(255,255,255,0.025)',
+                border: `1px solid ${ok ? 'rgba(16,185,129,0.2)' : 'rgba(255,255,255,0.05)'}`,
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 7 }}>
+                  {ok ? <Check size={14} color="#10b981" strokeWidth={3} /> : <X size={14} color="rgba(255,255,255,0.25)" strokeWidth={3} />}
+                  <div style={{ fontSize: isMobile ? '0.78rem' : '0.83rem', fontWeight: 800, color: '#fff' }}>
+                    Week {i + 1}
                   </div>
-
+                  <div style={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.35)', fontWeight: 600 }}>
+                    vanaf {new Date(`${w.week}T00:00:00`).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })}
+                  </div>
+                  <div style={{ flex: 1 }} />
                   <div style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '0.5rem'
+                    fontSize: '0.8rem', fontWeight: 900, fontVariantNumeric: 'tabular-nums',
+                    color: ok ? '#10b981' : 'rgba(255,255,255,0.45)',
                   }}>
-                    <span style={{
-                      fontSize: isMobile ? '0.8rem' : '0.85rem',
-                      fontWeight: '600',
-                      color: isCompliant ? '#10b981' : '#fff'
-                    }}>
-                      {weekData.complete.length}/7 ({weekCompliance}%)
-                    </span>
-                    {isPastWeek && (
-                      isCompliant ? (
-                        <CheckCircle size={16} color="#10b981" />
-                      ) : (
-                        <XCircle size={16} color="#ef4444" />
-                      )
-                    )}
+                    {w.dagen}<span style={{ color: 'rgba(255,255,255,0.2)' }}>/{DAGEN_PER_WEEK}</span>
                   </div>
                 </div>
-
-                {/* Day badges */}
-                {(weekData.complete.length > 0 || weekData.partial.length > 0) && (
-                  <div style={{
-                    display: 'flex',
-                    gap: '0.5rem',
-                    flexWrap: 'wrap'
-                  }}>
-                    {/* Complete days (≥50%) */}
-                    {weekData.complete.map((day, idx) => (
-                      <div
-                        key={`complete-${idx}`}
-                        style={{
-                          padding: '0.25rem 0.5rem',
-                          background: 'rgba(16, 185, 129, 0.2)',
-                          borderRadius: '6px',
-                          border: '1px solid rgba(16, 185, 129, 0.3)',
-                          fontSize: '0.75rem',
-                          color: '#34d399',
-                          fontWeight: '500',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '0.25rem'
-                        }}
-                      >
-                        {day.dayOfWeek}
-                        <span style={{ opacity: 0.8, fontSize: '0.7rem' }}>
-                          {day.percentage}%
-                        </span>
-                      </div>
-                    ))}
-                    
-                    {/* Partial days (<50%) */}
-                    {weekData.partial.map((day, idx) => (
-                      <div
-                        key={`partial-${idx}`}
-                        style={{
-                          padding: '0.25rem 0.5rem',
-                          background: 'rgba(251, 191, 36, 0.15)',
-                          borderRadius: '6px',
-                          border: '1px solid rgba(251, 191, 36, 0.25)',
-                          fontSize: '0.75rem',
-                          color: '#fde047',
-                          fontWeight: '500',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '0.25rem'
-                        }}
-                      >
-                        {day.dayOfWeek}
-                        <span style={{ opacity: 0.8, fontSize: '0.7rem' }}>
-                          {day.percentage}%
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                )}
+                {/* De losse dagen: hoveren geeft hoeveel maaltijden er gelogd zijn */}
+                <div style={{ display: 'flex', gap: 4 }}>
+                  {(dagenPerWeek.get(w.week) || []).map(d => (
+                    <div key={d.dag}
+                         title={`${new Date(`${d.dag}T00:00:00`).toLocaleDateString('nl-NL', { weekday: 'long', day: 'numeric', month: 'long' })} — ${d.gelogd} van ${d.slots} maaltijden`}
+                         style={{
+                           flex: 1, height: 6, borderRadius: 3,
+                           background: d.telt ? '#10b981'
+                             : d.gelogd > 0 ? 'rgba(255,215,0,0.4)'
+                             : 'rgba(255,255,255,0.08)',
+                         }} />
+                  ))}
+                </div>
               </div>
             )
           })}
         </div>
+      )}
+
+      <div style={{ marginTop: '0.9rem', fontSize: '0.68rem', color: 'rgba(255,255,255,0.3)', lineHeight: 1.5 }}>
+        Een dag telt mee bij 70% van de maaltijden uit het actieve plan, een week
+        bij {DAGEN_PER_WEEK} goede dagen. {EIS.uitleg.charAt(0).toUpperCase() + EIS.uitleg.slice(1)}.
+        Een geel streepje is een dag waarop wél gelogd is, maar te weinig.
       </div>
+    </>
+  )
+}
+
+function Vak({ label, waarde, kleur = '#fff', isMobile }) {
+  return (
+    <div style={{
+      background: 'rgba(0,0,0,0.25)', borderRadius: 12,
+      padding: isMobile ? '0.7rem 0.5rem' : '0.9rem', textAlign: 'center',
+    }}>
+      <div style={{ fontSize: isMobile ? '1.3rem' : '1.6rem', fontWeight: 900, color: kleur, fontVariantNumeric: 'tabular-nums', lineHeight: 1 }}>
+        {waarde}
+      </div>
+      <div style={{ fontSize: '0.62rem', fontWeight: 700, color: 'rgba(255,255,255,0.4)', marginTop: 4 }}>{label}</div>
     </div>
   )
 }

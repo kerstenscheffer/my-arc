@@ -79,6 +79,17 @@ workouts as (
     count(*) filter (where coalesce(g.planned_sets, 0) = 0) as onbepaald
   from w_gepland g left join w_gelogd l on l.session_id = g.id
 ),
+-- Dezelfde regel als hierboven, maar per sessie in plaats van geteld. De
+-- detailschermen tekenden hun eigen versie uit workout_completions (dood sinds
+-- 9 juni 2026) en kwamen daardoor op andere getallen uit dan de teller.
+w_detail as (
+  select g.workout_date,
+         coalesce(g.planned_sets, 0) as planned_sets,
+         coalesce(l.done_sets, 0) as done_sets,
+         (coalesce(g.planned_sets, 0) > 0
+          and coalesce(l.done_sets, 0)::numeric / g.planned_sets >= p_workout_pct) as telt
+  from w_gepland g left join w_gelogd l on l.session_id = g.id
+),
 plan as (
   select week_structure from client_meal_plans
   where client_id = p_client_id and is_active order by created_at desc limit 1
@@ -113,11 +124,23 @@ select jsonb_build_object(
   'workouts', jsonb_build_object(
       'geldig', (select geldig from workouts),
       'sessies', (select sessies_totaal from workouts),
-      'onbepaald', (select onbepaald from workouts)),
+      'onbepaald', (select onbepaald from workouts),
+      'dagen', (select coalesce(jsonb_agg(jsonb_build_object(
+                    'datum', d.workout_date,
+                    'gepland', d.planned_sets,
+                    'gedaan', d.done_sets,
+                    'telt', d.telt) order by d.workout_date), '[]'::jsonb)
+                  from w_detail d)),
   'wegingen', (select count(distinct date) from weight_challenge_logs
                 where client_id = p_client_id and date between p_start and p_eind),
   'voeding', jsonb_build_object(
       'geldige_dagen', (select count(*) from v_geldig where telt),
+      'dagen', (select coalesce(jsonb_agg(jsonb_build_object(
+                   'dag', vd.dag, 'slots', vd.slots,
+                   'gelogd', coalesce(vg.n, 0), 'telt', g.telt) order by vd.dag), '[]'::jsonb)
+                 from v_dagen vd
+                 join v_geldig g on g.dag = vd.dag
+                 left join v_gelogd vg on vg.dag = vd.dag),
       'geldige_weken', (select count(*) from v_weken where geldige_dagen >= p_dagen_per_week),
       'weken', (select coalesce(jsonb_agg(jsonb_build_object('week', week_start, 'dagen', geldige_dagen) order by week_start), '[]'::jsonb) from v_weken)),
   'checkins', (select count(*) from client_checkins

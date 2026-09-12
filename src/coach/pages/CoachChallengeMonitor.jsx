@@ -1,7 +1,7 @@
 // src/coach/pages/CoachChallengeMonitor.jsx
 import { useState, useEffect } from 'react'
 import { Trophy, ChevronDown, RefreshCw, Users, AlertCircle } from 'lucide-react'
-import ChallengeHomeBanner from '../../client/components/ChallengeHomeBanner'
+import ChallengeBanner from '../../modules/challenge-monitor/ChallengeBanner'
 import WorkoutProgressView from './challenge-monitor/WorkoutProgressView'
 import MealProgressView from './challenge-monitor/MealProgressView'
 import WeightProgressView from './challenge-monitor/WeightProgressView'
@@ -363,7 +363,7 @@ export default function CoachChallengeMonitor({ db, clients }) {
       {selectedClient && (
         <>
           {activeView === 'overview' && (
-            <ChallengeHomeBanner 
+            <ChallengeBanner 
               client={selectedClient}
               db={db}
               isCoachView={true}

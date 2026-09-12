@@ -1,354 +1,152 @@
 // src/coach/pages/challenge-monitor/WorkoutProgressView.jsx
-import { useState, useEffect } from 'react'
-import { Dumbbell, CheckCircle, XCircle, Calendar, TrendingUp } from 'lucide-react'
+//
+// De workouts van één deelnemer, sessie voor sessie.
+//
+// Las workout_completions: die tabel is sinds 9 juni 2026 leeg gebleven, dus
+// dit scherm stond op nul terwijl er wel getraind werd. En het rekende met
+// "24 workouts in 8 weken", los van welke challenge er loopt.
+//
+// De regel én de losse sessies komen nu uit get_challenge_stand — dezelfde
+// bron als de banner erboven en het deelnemersoverzicht. Rekent dit scherm
+// zelf, dan zie je hier een ander getal dan in de tabel, en gaat het over geld.
+
+import { useEffect, useState } from 'react'
+import { Dumbbell, Check, X, AlertTriangle } from 'lucide-react'
+import { EISEN, haalStand } from '../../../modules/challenge-monitor/challengeEisen'
+
+const EIS = EISEN.find(e => e.key === 'workouts')
 
 export default function WorkoutProgressView({ client, db, challengeData }) {
   const isMobile = window.innerWidth <= 768
-  const [workoutData, setWorkoutData] = useState({
-    total: 0,
-    completed: [],
-    byWeek: {},
-    streak: 0,
-    compliance: 0
-  })
-  const [loading, setLoading] = useState(true)
+  const [stand, setStand] = useState(null)
+  const [laden, setLaden] = useState(true)
 
   useEffect(() => {
-    loadWorkoutData()
-  }, [client?.id, challengeData])
+    let afgebroken = false
+    setLaden(true)
+    haalStand(db, challengeData ? { ...challengeData, client_id: client?.id } : null)
+      .then(s => { if (!afgebroken) setStand(s) })
+      .catch(e => console.error('Workout-stand laden mislukt:', e))
+      .finally(() => { if (!afgebroken) setLaden(false) })
+    return () => { afgebroken = true }
+  }, [client?.id, challengeData?.id, challengeData?.end_date])
 
-  async function loadWorkoutData() {
-    if (!client?.id || !challengeData) return
+  if (laden) return <Kader><div style={{ color: 'rgba(255,255,255,0.4)', textAlign: 'center', padding: '2rem' }}>Workouts ophalen…</div></Kader>
+  if (!stand) return <Kader><div style={{ color: 'rgba(255,255,255,0.4)', textAlign: 'center', padding: '2rem' }}>Geen gegevens.</div></Kader>
 
-    try {
-      const startDate = new Date(challengeData.start_date)
-      const endDate = new Date(challengeData.end_date)
-      
-      // Load all workout completions
-      const { data: workouts } = await db.supabase
-        .from('workout_completions')
-        .select('*')
-        .eq('client_id', client.id)
-        .gte('workout_date', startDate.toISOString().split('T')[0])
-        .lte('workout_date', endDate.toISOString().split('T')[0])
-        .order('workout_date', { ascending: true })
+  const { geldig = 0, sessies = 0, onbepaald = 0, dagen = [] } = stand.workouts || {}
+  const start = new Date(`${stand.periode.start}T00:00:00`)
+  const weekVan = (datum) => Math.floor((new Date(`${datum}T00:00:00`) - start) / 604800000) + 1
 
-      // Process by week
-      const byWeek = {}
-      for (let week = 1; week <= 8; week++) {
-        byWeek[week] = []
-      }
-
-      workouts?.forEach(workout => {
-        const workoutDate = new Date(workout.workout_date)
-        const daysSinceStart = Math.floor((workoutDate - startDate) / (1000 * 60 * 60 * 24))
-        const weekNum = Math.min(8, Math.floor(daysSinceStart / 7) + 1)
-        
-        if (workout.completed) {
-          byWeek[weekNum].push({
-            date: workout.workout_date,
-            dayOfWeek: workoutDate.toLocaleDateString('nl-NL', { weekday: 'short' })
-          })
-        }
-      })
-
-      // Calculate streak
-      let streak = 0
-      const today = new Date()
-      const completedDates = workouts
-        ?.filter(w => w.completed)
-        .map(w => w.workout_date)
-        .sort((a, b) => new Date(b) - new Date(a)) || []
-
-      for (let i = 0; i < completedDates.length; i++) {
-        const expectedDate = new Date(today)
-        expectedDate.setDate(today.getDate() - i)
-        
-        if (completedDates[i] === expectedDate.toISOString().split('T')[0]) {
-          streak++
-        } else {
-          break
-        }
-      }
-
-      const totalCompleted = workouts?.filter(w => w.completed).length || 0
-      const compliance = Math.round((totalCompleted / 24) * 100)
-
-      setWorkoutData({
-        total: totalCompleted,
-        completed: workouts?.filter(w => w.completed) || [],
-        byWeek,
-        streak,
-        compliance
-      })
-    } catch (error) {
-      console.error('Error loading workout data:', error)
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  if (loading) {
-    return (
-      <div style={{
-        display: 'flex',
-        justifyContent: 'center',
-        alignItems: 'center',
-        minHeight: '200px',
-        color: 'rgba(255, 255, 255, 0.6)'
-      }}>
-        Loading workout data...
-      </div>
-    )
-  }
-
-  const weekDays = ['Ma', 'Di', 'Wo', 'Do', 'Vr', 'Za', 'Zo']
+  // Per week groeperen zodat je in één oogopslag ziet wáár het misging.
+  const perWeek = new Map()
+  dagen.forEach(d => {
+    const wk = weekVan(d.datum)
+    if (!perWeek.has(wk)) perWeek.set(wk, [])
+    perWeek.get(wk).push(d)
+  })
 
   return (
-    <div style={{
-      background: 'linear-gradient(135deg, rgba(249, 115, 22, 0.1) 0%, rgba(249, 115, 22, 0.05) 100%)',
-      borderRadius: '16px',
-      padding: isMobile ? '1.25rem' : '1.75rem',
-      border: '1px solid rgba(249, 115, 22, 0.2)'
-    }}>
-      {/* Header Stats */}
+    <Kader>
       <div style={{
-        display: 'grid',
-        gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(4, 1fr)',
-        gap: isMobile ? '0.75rem' : '1rem',
-        marginBottom: '1.5rem'
+        display: 'grid', gridTemplateColumns: isMobile ? 'repeat(3, 1fr)' : 'repeat(3, 1fr)',
+        gap: isMobile ? 8 : 12, marginBottom: '1.4rem',
       }}>
-        <div style={{
-          background: 'rgba(255, 255, 255, 0.05)',
-          borderRadius: '12px',
-          padding: isMobile ? '0.875rem' : '1rem',
-          border: '1px solid rgba(255, 255, 255, 0.1)',
-          textAlign: 'center'
-        }}>
-          <Dumbbell size={20} color="#f97316" style={{ marginBottom: '0.5rem' }} />
-          <div style={{
-            fontSize: isMobile ? '1.25rem' : '1.5rem',
-            fontWeight: '700',
-            color: '#fff',
-            marginBottom: '0.25rem'
-          }}>
-            {workoutData.total}/24
-          </div>
-          <div style={{
-            fontSize: isMobile ? '0.7rem' : '0.75rem',
-            color: 'rgba(255, 255, 255, 0.6)',
-            textTransform: 'uppercase',
-            letterSpacing: '0.05em'
-          }}>
-            Workouts
-          </div>
-        </div>
-
-        <div style={{
-          background: 'rgba(255, 255, 255, 0.05)',
-          borderRadius: '12px',
-          padding: isMobile ? '0.875rem' : '1rem',
-          border: '1px solid rgba(255, 255, 255, 0.1)',
-          textAlign: 'center'
-        }}>
-          <CheckCircle size={20} color="#10b981" style={{ marginBottom: '0.5rem' }} />
-          <div style={{
-            fontSize: isMobile ? '1.25rem' : '1.5rem',
-            fontWeight: '700',
-            color: '#fff',
-            marginBottom: '0.25rem'
-          }}>
-            {workoutData.compliance}%
-          </div>
-          <div style={{
-            fontSize: isMobile ? '0.7rem' : '0.75rem',
-            color: 'rgba(255, 255, 255, 0.6)',
-            textTransform: 'uppercase',
-            letterSpacing: '0.05em'
-          }}>
-            Compliance
-          </div>
-        </div>
-
-        <div style={{
-          background: 'rgba(255, 255, 255, 0.05)',
-          borderRadius: '12px',
-          padding: isMobile ? '0.875rem' : '1rem',
-          border: '1px solid rgba(255, 255, 255, 0.1)',
-          textAlign: 'center'
-        }}>
-          <TrendingUp size={20} color="#fbbf24" style={{ marginBottom: '0.5rem' }} />
-          <div style={{
-            fontSize: isMobile ? '1.25rem' : '1.5rem',
-            fontWeight: '700',
-            color: '#fff',
-            marginBottom: '0.25rem'
-          }}>
-            {workoutData.streak}
-          </div>
-          <div style={{
-            fontSize: isMobile ? '0.7rem' : '0.75rem',
-            color: 'rgba(255, 255, 255, 0.6)',
-            textTransform: 'uppercase',
-            letterSpacing: '0.05em'
-          }}>
-            Day Streak
-          </div>
-        </div>
-
-        <div style={{
-          background: 'rgba(255, 255, 255, 0.05)',
-          borderRadius: '12px',
-          padding: isMobile ? '0.875rem' : '1rem',
-          border: '1px solid rgba(255, 255, 255, 0.1)',
-          textAlign: 'center'
-        }}>
-          <Calendar size={20} color="#8b5cf6" style={{ marginBottom: '0.5rem' }} />
-          <div style={{
-            fontSize: isMobile ? '1.25rem' : '1.5rem',
-            fontWeight: '700',
-            color: '#fff',
-            marginBottom: '0.25rem'
-          }}>
-            {Math.round(workoutData.total / challengeData.currentWeek * 10) / 10}
-          </div>
-          <div style={{
-            fontSize: isMobile ? '0.7rem' : '0.75rem',
-            color: 'rgba(255, 255, 255, 0.6)',
-            textTransform: 'uppercase',
-            letterSpacing: '0.05em'
-          }}>
-            Per Week
-          </div>
-        </div>
+        <Vak label={`van de ${EIS.nodig} nodig`} waarde={geldig} kleur={geldig >= EIS.nodig ? '#10b981' : '#f97316'} isMobile={isMobile} />
+        <Vak label="sessies gestart" waarde={sessies} isMobile={isMobile} />
+        <Vak label="telde niet mee" waarde={sessies - geldig} isMobile={isMobile} />
       </div>
 
-      {/* Week by Week Breakdown */}
-      <div>
-        <h3 style={{
-          fontSize: isMobile ? '0.95rem' : '1.05rem',
-          fontWeight: '600',
-          color: '#fff',
-          marginBottom: '1rem',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '0.5rem'
-        }}>
-          <Calendar size={18} />
-          Week by Week Progress
-        </h3>
-
+      {onbepaald > 0 && (
         <div style={{
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '0.75rem'
+          display: 'flex', alignItems: 'center', gap: 7, marginBottom: '1.1rem',
+          fontSize: '0.72rem', fontWeight: 600, color: '#f59e0b',
         }}>
-          {[1, 2, 3, 4, 5, 6, 7, 8].map(week => {
-            const weekWorkouts = workoutData.byWeek[week] || []
-            const isCurrentWeek = week === challengeData.currentWeek
-            const isPastWeek = week < challengeData.currentWeek
-            const expectedWorkouts = 3 // 3 per week minimum
-            const isCompliant = weekWorkouts.length >= expectedWorkouts
-
-            return (
-              <div
-                key={week}
-                style={{
-                  background: isCurrentWeek 
-                    ? 'rgba(249, 115, 22, 0.1)' 
-                    : 'rgba(255, 255, 255, 0.03)',
-                  borderRadius: '12px',
-                  padding: isMobile ? '0.875rem' : '1rem',
-                  border: `1px solid ${isCurrentWeek 
-                    ? 'rgba(249, 115, 22, 0.3)' 
-                    : 'rgba(255, 255, 255, 0.1)'}`,
-                  transition: 'all 0.3s ease'
-                }}
-              >
-                <div style={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                  marginBottom: weekWorkouts.length > 0 ? '0.75rem' : 0
-                }}>
-                  <div style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '0.75rem'
-                  }}>
-                    <span style={{
-                      fontSize: isMobile ? '0.85rem' : '0.9rem',
-                      fontWeight: '600',
-                      color: isCurrentWeek ? '#f97316' : '#fff'
-                    }}>
-                      Week {week}
-                    </span>
-                    {isCurrentWeek && (
-                      <span style={{
-                        fontSize: '0.7rem',
-                        padding: '0.15rem 0.4rem',
-                        background: 'rgba(249, 115, 22, 0.2)',
-                        borderRadius: '4px',
-                        color: '#fb923c',
-                        fontWeight: '600'
-                      }}>
-                        CURRENT
-                      </span>
-                    )}
-                  </div>
-
-                  <div style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '0.5rem'
-                  }}>
-                    <span style={{
-                      fontSize: isMobile ? '0.8rem' : '0.85rem',
-                      fontWeight: '600',
-                      color: weekWorkouts.length >= expectedWorkouts ? '#10b981' : '#fff'
-                    }}>
-                      {weekWorkouts.length}/3
-                    </span>
-                    {isPastWeek && (
-                      isCompliant ? (
-                        <CheckCircle size={16} color="#10b981" />
-                      ) : (
-                        <XCircle size={16} color="#ef4444" />
-                      )
-                    )}
-                  </div>
-                </div>
-
-                {/* Workout days */}
-                {weekWorkouts.length > 0 && (
-                  <div style={{
-                    display: 'flex',
-                    gap: '0.5rem',
-                    flexWrap: 'wrap'
-                  }}>
-                    {weekWorkouts.map((workout, idx) => (
-                      <div
-                        key={idx}
-                        style={{
-                          padding: '0.25rem 0.5rem',
-                          background: 'rgba(16, 185, 129, 0.2)',
-                          borderRadius: '6px',
-                          border: '1px solid rgba(16, 185, 129, 0.3)',
-                          fontSize: '0.75rem',
-                          color: '#34d399',
-                          fontWeight: '500'
-                        }}
-                      >
-                        {workout.dayOfWeek}
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )
-          })}
+          <AlertTriangle size={13} />
+          {onbepaald} sessie{onbepaald === 1 ? '' : 's'} zonder herleidbaar schema: het aantal geplande sets is onbekend, dus die kunnen niet worden beoordeeld.
         </div>
+      )}
+
+      {dagen.length === 0 ? (
+        <div style={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.85rem', padding: '1.5rem 0', textAlign: 'center' }}>
+          Nog geen workouts gestart in deze periode.
+        </div>
+      ) : (
+        [...perWeek.keys()].sort((a, b) => a - b).map(wk => (
+          <div key={wk} style={{ marginBottom: '1rem' }}>
+            <div style={{
+              fontSize: '0.62rem', fontWeight: 800, color: 'rgba(255,255,255,0.35)',
+              textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6,
+            }}>
+              Week {wk} · {perWeek.get(wk).filter(d => d.telt).length} van {perWeek.get(wk).length} geldig
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+              {perWeek.get(wk).map(d => {
+                const pct = d.gepland > 0 ? Math.round((d.gedaan / d.gepland) * 100) : null
+                return (
+                  <div key={d.datum} style={{
+                    display: 'flex', alignItems: 'center', gap: 10,
+                    padding: '0.5rem 0.7rem', borderRadius: 8,
+                    background: d.telt ? 'rgba(16,185,129,0.07)' : 'rgba(255,255,255,0.025)',
+                    fontSize: isMobile ? '0.75rem' : '0.8rem',
+                  }}>
+                    {d.telt
+                      ? <Check size={14} color="#10b981" strokeWidth={3} />
+                      : <X size={14} color="rgba(255,255,255,0.25)" strokeWidth={3} />}
+                    <div style={{ color: '#fff', fontWeight: 700, minWidth: isMobile ? 78 : 104 }}>
+                      {new Date(`${d.datum}T00:00:00`).toLocaleDateString('nl-NL', { weekday: 'short', day: 'numeric', month: 'short' })}
+                    </div>
+                    <div style={{ flex: 1, color: 'rgba(255,255,255,0.5)', fontVariantNumeric: 'tabular-nums' }}>
+                      {d.gepland > 0 ? `${d.gedaan} van ${d.gepland} sets` : `${d.gedaan} sets · plan onbekend`}
+                    </div>
+                    {pct !== null && (
+                      <div style={{
+                        fontWeight: 800, fontVariantNumeric: 'tabular-nums',
+                        color: d.telt ? '#10b981' : 'rgba(255,255,255,0.4)',
+                      }}>{pct}%</div>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        ))
+      )}
+
+      <div style={{ marginTop: '0.8rem', fontSize: '0.68rem', color: 'rgba(255,255,255,0.3)' }}>
+        Een workout telt mee vanaf 70% van de geplande sets. {EIS.uitleg}.
       </div>
+    </Kader>
+  )
+}
+
+function Kader({ children }) {
+  const isMobile = window.innerWidth <= 768
+  return (
+    <div style={{
+      background: 'linear-gradient(135deg, rgba(249,115,22,0.08) 0%, rgba(249,115,22,0.03) 100%)',
+      borderRadius: 16, padding: isMobile ? '1.1rem' : '1.5rem',
+      border: '1px solid rgba(249,115,22,0.18)',
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: '1.1rem' }}>
+        <Dumbbell size={18} color="#f97316" />
+        <div style={{ fontSize: '1rem', fontWeight: 800, color: '#fff' }}>Workouts</div>
+      </div>
+      {children}
+    </div>
+  )
+}
+
+function Vak({ label, waarde, kleur = '#fff', isMobile }) {
+  return (
+    <div style={{
+      background: 'rgba(0,0,0,0.25)', borderRadius: 12,
+      padding: isMobile ? '0.7rem 0.5rem' : '0.9rem', textAlign: 'center',
+    }}>
+      <div style={{ fontSize: isMobile ? '1.3rem' : '1.6rem', fontWeight: 900, color: kleur, fontVariantNumeric: 'tabular-nums', lineHeight: 1 }}>
+        {waarde}
+      </div>
+      <div style={{ fontSize: '0.62rem', fontWeight: 700, color: 'rgba(255,255,255,0.4)', marginTop: 4 }}>{label}</div>
     </div>
   )
 }
