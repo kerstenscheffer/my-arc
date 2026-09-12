@@ -229,7 +229,9 @@ export default function DayCard({
               : '1px dashed rgba(255,255,255,0.12)',
             boxShadow: isToday ? tone.glow : 'none',
             cursor: swapMode ? 'pointer' : 'default',
-            justifyContent: isToday ? 'flex-start' : 'center',
+            // Dag + datum staan bovenaan, net als bij een trainingsdag; anders
+            // liep de rij dag-labels niet door over de rustdagen heen.
+            justifyContent: 'flex-start',
           }}
         >
           {isToday ? todayPill : dayLabel}
@@ -239,8 +241,8 @@ export default function DayCard({
             color: 'rgba(255,255,255,0.28)',
             letterSpacing: '0.1em',
             textTransform: 'uppercase',
-            marginTop: isToday ? 'auto' : 0,
-            marginBottom: isToday ? 'auto' : 0,
+            marginTop: 'auto',
+            marginBottom: 'auto',
           }}>
             Rust
           </div>
