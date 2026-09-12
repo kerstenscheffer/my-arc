@@ -175,7 +175,7 @@ export default function WorkoutPlan({ client, schema, db, onFocusChange }) {
       {!workoutOpen && (
         <div style={{
           display: 'flex', gap: isMobile ? 8 : 10,
-          padding: isMobile ? '1.1rem 1rem 0' : '1.4rem 1.5rem 0',
+          padding: isMobile ? '2.25rem 1rem 0' : '2.75rem 1.5rem 0',
         }}>
           <OverzichtKnop icon={<TrendingUp size={isMobile ? 17 : 19} strokeWidth={2.6} />}
             label="Kracht" onClick={() => setKrachtOpen(true)} isMobile={isMobile} />
@@ -187,7 +187,7 @@ export default function WorkoutPlan({ client, schema, db, onFocusChange }) {
       {/* Jouw week planning — onder de workout van vandaag. Die staat bovenaan:
           negen van de tien keer open je deze pagina om vandaag te trainen,
           niet om de week te herschikken. */}
-      {!workoutOpen && <FadeOnScroll><div id="week-schedule" style={{ marginTop: isMobile ? '2.25rem' : '3rem' }}>
+      {!workoutOpen && <FadeOnScroll><div id="week-schedule" style={{ marginTop: isMobile ? '3.5rem' : '4.25rem' }}>
         <WeekSchedule
           weekSchedule={weekSchedule}
           schema={localSchema}

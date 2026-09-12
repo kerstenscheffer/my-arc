@@ -99,7 +99,7 @@ export default function CardioLogSection({ client, db, isMobile }) {
   // Kop in dezelfde vorm als "Vandaags workout" bovenaan de pagina: foto die
   // onderin dood loopt in het zwart, met de titel eroverheen.
   const kop = (
-    <div style={{ position: 'relative', width: '100%', height: m ? 150 : 190, marginTop: m ? '1.75rem' : '2.25rem' }}>
+    <div style={{ position: 'relative', width: '100%', height: m ? 150 : 190, marginTop: m ? '3.25rem' : '4rem' }}>
       <div style={{
         position: 'absolute', inset: 0,
         backgroundImage: `url(${cardioFoto()})`,

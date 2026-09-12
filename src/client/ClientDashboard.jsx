@@ -327,6 +327,24 @@ export default function ClientDashboard({ previewClientId = null, ingebed = fals
         </div>
       </main>
 
+      {/* ── Onderrand van het scherm laten weglopen in het zwart ──
+          Eén laag voor alle pagina's: content die onder de zwevende balk
+          doorloopt vervaagt in plaats van er hard achter te verdwijnen, en de
+          balk zelf krijgt lucht onder zich. Raakt geen kliks (pointerEvents
+          none) en ligt onder de knoppen die daar zweven (90) en onder de balk
+          (101). In focus-mode weg, want dan is het hele scherm de training. */}
+      {!focusMode && (
+        <div
+          aria-hidden
+          style={{
+            position: 'fixed', left: 0, right: 0, bottom: 0,
+            height: isMobile ? 150 : 170,
+            pointerEvents: 'none', zIndex: 80,
+            background: 'linear-gradient(180deg, rgba(10,10,10,0) 0%, rgba(10,10,10,0.55) 42%, rgba(10,10,10,0.9) 72%, #0a0a0a 100%)',
+          }}
+        />
+      )}
+
       {/* ── Floating Bottom Nav — verbergen in focus-mode (bv. workout-dropdown open) ── */}
       {!focusMode && <nav style={{
         position: 'fixed',
