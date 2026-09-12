@@ -2,7 +2,7 @@
 // 🎯 v3.1 — Edit flow race fix: useEffect deps gefixt + diagnostic log
 import React, { useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
-import { X, ArrowLeft, Check, Scan, AlertCircle } from 'lucide-react'
+import { X, ArrowLeft, Check, AlertCircle, Star, Apple, UtensilsCrossed, Zap } from 'lucide-react'
 import FoodLogHeader from './FoodLogHeader'
 import SearchTab from './SearchTab'
 import QuickAddTab from './QuickAddTab'
@@ -26,7 +26,10 @@ export default function FoodLogModal({
   startTab = 'search',
 }) {
   const isMobile = window.innerWidth <= 768
-  const [activeTab, setActiveTab] = useState(startTab)
+  // Twee dingen sturen het scherm: de schuifknop (zoeken of scannen) en de
+  // vier knoppen eronder (favorieten / producten / mijn maaltijden / snel).
+  const [weergave, setWeergave] = useState('zoeken')
+  const [filter, setFilter] = useState(startTab === 'meals' ? 'maaltijden' : 'producten')
   const [selectedItem, setSelectedItem] = useState(null)
   const [loggingService, setLoggingService] = useState(null)
   const [successData, setSuccessData] = useState(null)
@@ -44,15 +47,20 @@ export default function FoodLogModal({
   useEffect(() => {
     if (!isOpen) {
       setSelectedItem(null)
-      setActiveTab(startTab)
+      setWeergave('zoeken')
+      setFilter(startTab === 'meals' ? 'maaltijden' : 'producten')
       setSuccessData(null)
       setAddIngredientCallback(null)
       setBuildingMeal(null)
     }
   }, [isOpen, startTab])
 
-  // Openen op het meegegeven tabblad.
-  useEffect(() => { if (isOpen) setActiveTab(startTab) }, [isOpen, startTab])
+  // Openen op het meegegeven onderdeel ('meals' = Mijn maaltijden).
+  useEffect(() => {
+    if (!isOpen) return
+    setWeergave('zoeken')
+    setFilter(startTab === 'meals' ? 'maaltijden' : 'producten')
+  }, [isOpen, startTab])
 
   // ✅ FIX v3.1: editMeal flow — race fixed door op editMeal.id te listenen
   // Vorige versie luisterde alleen op [isOpen, editMeal] referentie wat issues gaf
@@ -122,7 +130,7 @@ export default function FoodLogModal({
       } : prev)
       setAddIngredientCallback(null)
       setSelectedItem(null)
-      setActiveTab('meals')
+      setFilter('maaltijden')
       return
     }
 
@@ -323,16 +331,40 @@ export default function FoodLogModal({
             <X size={16} />
           </button>
 
-          {activeTab !== 'scan' && (
-            <FoodLogHeader
-              activeTab={activeTab}
-              onTabChange={setActiveTab}
-              isMobile={isMobile}
-            />
+          <FoodLogHeader
+            weergave={weergave}
+            onWeergave={setWeergave}
+            isMobile={isMobile}
+          />
+
+          {weergave === 'zoeken' && (
+            <FilterKnoppen filter={filter} zet={setFilter} isMobile={isMobile} />
           )}
 
           <div style={{ flex: 1, overflowY: 'auto', WebkitOverflowScrolling: 'touch' }}>
-            {activeTab === 'search' && (
+            {weergave === 'scannen' ? (
+              <ScanTab
+                db={db}
+                onSelect={(item) => {
+                  setWeergave('zoeken')
+                  handleSelectItem(item)
+                }}
+                onBack={() => setWeergave('zoeken')}
+                onClose={onClose}
+                isMobile={isMobile}
+              />
+            ) : filter === 'snel' ? (
+              <QuickAddTab onLog={handleLog} isMobile={isMobile} db={db} />
+            ) : filter === 'maaltijden' ? (
+              <MyMealsTab
+                client={client} db={db} onLog={handleLog} isMobile={isMobile}
+                buildingMeal={buildingMeal} setBuildingMeal={setBuildingMeal}
+                onRequestAddIngredient={() => {
+                  setAddIngredientCallback(true)
+                  setFilter('producten')
+                }}
+              />
+            ) : (
               <SearchTab
                 db={db}
                 onSelect={handleSelectItem}
@@ -340,58 +372,11 @@ export default function FoodLogModal({
                 client={client}
                 onQuickLog={handleLog}
                 defaultMealMoment={defaultMealMoment}
-              />
-            )}
-            {activeTab === 'quick' && (
-              <QuickAddTab onLog={handleLog} isMobile={isMobile} db={db} />
-            )}
-            {activeTab === 'meals' && (
-              <MyMealsTab
-                client={client} db={db} onLog={handleLog} isMobile={isMobile}
-                buildingMeal={buildingMeal} setBuildingMeal={setBuildingMeal}
-                onRequestAddIngredient={() => {
-                  setAddIngredientCallback(true)
-                  setActiveTab('search')
-                }}
-              />
-            )}
-            {activeTab === 'scan' && (
-              <ScanTab
-                db={db}
-                onSelect={(item) => {
-                  setActiveTab('search')
-                  handleSelectItem(item)
-                }}
-                onBack={() => setActiveTab('search')}
-                onClose={onClose}
-                isMobile={isMobile}
+                bron={filter === 'favorieten' ? 'favorieten' : 'alles'}
               />
             )}
           </div>
 
-          {activeTab === 'search' && (
-            <button
-              onClick={() => setActiveTab('scan')}
-              style={{
-                position: 'fixed',
-                bottom: isMobile ? '1.5rem' : '2rem',
-                left: '50%', transform: 'translateX(-50%)',
-                zIndex: 10001,
-                padding: isMobile ? '0.75rem 1.25rem' : '0.875rem 1.5rem',
-                background: '#fff', border: 'none', borderRadius: '10px',
-                color: '#0a0a0a', fontSize: isMobile ? '0.75rem' : '0.8rem',
-                fontWeight: 900, cursor: 'pointer',
-                display: 'flex', alignItems: 'center',
-                gap: '0.375rem', minHeight: '44px',
-                touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-                boxShadow: '0 6px 20px rgba(0,0,0,0.5)',
-                letterSpacing: '0.02em'
-              }}
-            >
-              <Scan size={16} strokeWidth={2.5} />
-              Barcode scannen
-            </button>
-          )}
         </>
       ) : null}
 
@@ -411,4 +396,50 @@ export default function FoodLogModal({
   )
 
   return createPortal(modal, document.body)
+}
+
+// Vier knoppen die bepalen waar je zoekt: je favorieten, alle producten, je
+// eigen maaltijden of snel invoeren. Vervangt de drie tabbladen bovenaan.
+function FilterKnoppen({ filter, zet, isMobile }) {
+  const knoppen = [
+    { id: 'favorieten', label: 'Favoriet', Icon: Star },
+    { id: 'producten', label: 'Producten', Icon: Apple },
+    { id: 'maaltijden', label: 'Mijn maaltijden', Icon: UtensilsCrossed },
+    { id: 'snel', label: 'Snel', Icon: Zap },
+  ]
+  return (
+    <div style={{
+      display: 'flex', gap: 6, flexShrink: 0,
+      padding: isMobile ? '0 1rem 0.6rem' : '0 1.25rem 0.75rem',
+    }}>
+      {knoppen.map(k => {
+        const aan = filter === k.id
+        return (
+          <button
+            key={k.id}
+            onClick={() => zet(k.id)}
+            title={k.label}
+            style={{
+              flex: 1, minWidth: 0, minHeight: 44,
+              display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 3,
+              background: aan ? 'rgba(255,255,255,0.12)' : 'transparent',
+              border: `1px solid ${aan ? '#fff' : 'rgba(255,255,255,0.14)'}`,
+              borderRadius: 12,
+              color: aan ? '#fff' : 'rgba(255,255,255,0.5)',
+              fontSize: isMobile ? '0.58rem' : '0.62rem',
+              fontWeight: aan ? 900 : 700,
+              fontFamily: 'inherit', cursor: 'pointer',
+              touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+              transition: 'all 0.15s ease',
+            }}
+          >
+            <k.Icon size={16} strokeWidth={aan ? 2.6 : 2} fill={k.id === 'favorieten' && aan ? '#fff' : 'none'} />
+            <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '100%' }}>
+              {k.label}
+            </span>
+          </button>
+        )
+      })}
+    </div>
+  )
 }

@@ -1,23 +1,23 @@
 // src/modules/meal-plan/components/food-log/FoodLogHeader.jsx
-// Compacte kop: titel in bold wit + de drie tabbladen. Actief tabblad is wit
-// in plaats van goud, net als de rest van de voedingsschermen.
-// Macros stat-bar removed — that info already lives in RemainingPill on
-// the meal page (the screen the user just came from).
+//
+// Kop van het log-venster: titel in bold wit en daaronder een schuifknop
+// tussen zoeken en barcode scannen. De drie tabbladen (Zoeken / Snel /
+// Maaltijden) zijn vervallen — waar je zoekt kies je nu met de vier knoppen
+// eronder, en scannen was een losse knop die over de lijst zweefde.
 
 import React from 'react'
+import { Search, Scan } from 'lucide-react'
 
-export default function FoodLogHeader({ activeTab, onTabChange, isMobile }) {
-  const tabs = [
-    { id: 'search', label: 'Zoeken' },
-    { id: 'quick',  label: 'Snel' },
-    { id: 'meals',  label: 'Maaltijden' }
-  ]
+const STANDEN = [
+  { id: 'zoeken', label: 'Zoeken', Icon: Search },
+  { id: 'scannen', label: 'Scannen', Icon: Scan },
+]
 
+export default function FoodLogHeader({ weergave, onWeergave, isMobile }) {
   return (
     <div style={{ flexShrink: 0 }}>
-      {/* ── Compact centered title ── */}
       <div style={{
-        padding: isMobile ? '0.625rem 3rem 0.4rem' : '0.75rem 4rem 0.5rem',
+        padding: isMobile ? '0.7rem 3rem 0.5rem' : '0.85rem 4rem 0.6rem',
         textAlign: 'center',
       }}>
         <div style={{
@@ -28,35 +28,48 @@ export default function FoodLogHeader({ activeTab, onTabChange, isMobile }) {
         </div>
       </div>
 
-      {/* ── Tabs ── */}
-      <div style={{
-        display: 'flex',
-        borderBottom: '1px solid rgba(255, 255, 255, 0.06)'
-      }}>
-        {tabs.map(tab => {
-          const isActive = activeTab === tab.id
-          return (
-            <button
-              key={tab.id}
-              onClick={() => onTabChange(tab.id)}
-              style={{
-                flex: 1, padding: isMobile ? '0.5rem 0' : '0.625rem 0',
-                background: 'transparent', border: 'none',
-                borderBottom: isActive ? '2px solid #fff' : '2px solid transparent',
-                color: isActive ? '#fff' : 'rgba(255, 255, 255, 0.4)',
-                fontSize: isMobile ? '0.82rem' : '0.88rem',
-                fontWeight: isActive ? 900 : 700,
-                cursor: 'pointer',
-                touchAction: 'manipulation',
-                WebkitTapHighlightColor: 'transparent',
-                minHeight: '38px', transition: 'all 0.15s ease',
-                letterSpacing: '-0.005em',
-              }}
-            >
-              {tab.label}
-            </button>
-          )
-        })}
+      {/* Schuifknop: het witte blokje schuift naar de gekozen stand. */}
+      <div style={{ padding: isMobile ? '0 1rem 0.6rem' : '0 1.25rem 0.75rem' }}>
+        <div style={{
+          position: 'relative',
+          display: 'flex',
+          background: 'rgba(255,255,255,0.06)',
+          border: '1px solid rgba(255,255,255,0.1)',
+          borderRadius: 999,
+          padding: 3,
+        }}>
+          <div style={{
+            position: 'absolute', top: 3, bottom: 3,
+            left: weergave === 'scannen' ? 'calc(50% + 1.5px)' : 3,
+            width: 'calc(50% - 4.5px)',
+            background: '#fff', borderRadius: 999,
+            transition: 'left 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+          }} />
+          {STANDEN.map(stand => {
+            const aan = weergave === stand.id
+            return (
+              <button
+                key={stand.id}
+                onClick={() => onWeergave(stand.id)}
+                style={{
+                  position: 'relative', zIndex: 1,
+                  flex: 1, minHeight: 36,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                  background: 'transparent', border: 'none', borderRadius: 999,
+                  color: aan ? '#0a0a0a' : 'rgba(255,255,255,0.6)',
+                  fontSize: isMobile ? '0.8rem' : '0.85rem',
+                  fontWeight: aan ? 900 : 800,
+                  fontFamily: 'inherit', cursor: 'pointer',
+                  touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+                  transition: 'color 0.15s ease',
+                }}
+              >
+                <stand.Icon size={15} strokeWidth={2.6} />
+                {stand.label}
+              </button>
+            )
+          })}
+        </div>
       </div>
     </div>
   )

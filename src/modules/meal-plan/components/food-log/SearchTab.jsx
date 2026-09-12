@@ -5,20 +5,9 @@
 
 import React, { useState, useRef, useEffect } from 'react'
 import MealCard from '../day-schedule/MealCard'
-import Keuze from '../Keuze'
 import { Search, Loader, X, ChevronRight, Plus, Star } from 'lucide-react'
 import FatSecretService from './FatSecretService'
 import { foodImageFallback } from '../../foodImageFallback'
-
-// Twee keuzes in plaats van drie chips: wát je zoekt en wáár je zoekt.
-const SOORTEN = [
-  { id: 'products', label: 'Ingrediënten' },
-  { id: 'meals',    label: 'Maaltijden' },
-]
-const BRONNEN = [
-  { id: 'alles',      label: 'Overal' },
-  { id: 'favorieten', label: 'Favorieten' },
-]
 
 // Relevance score: lower = better.
 // 0  exact match
@@ -44,9 +33,10 @@ const computeRelevance = (name, query) => {
   return 5
 }
 
-export default function SearchTab({ db, onSelect, isMobile, client, onQuickLog, defaultMealMoment }) {
-  const [mode, setMode] = useState('products')
-  const [bron, setBron] = useState('alles')
+// `bron` komt van de knoppenrij in het log-venster: 'alles' of 'favorieten'.
+export default function SearchTab({ db, onSelect, isMobile, client, onQuickLog, defaultMealMoment, bron = 'alles' }) {
+  // Zoeken doet altijd producten; maaltijden en snel zitten in eigen knoppen.
+  const mode = 'products'
   const [searchTerm, setSearchTerm] = useState('')
   const [results, setResults] = useState([])
   const [loading, setLoading] = useState(false)
@@ -73,12 +63,6 @@ export default function SearchTab({ db, onSelect, isMobile, client, onQuickLog, 
       setRecentsLoading(false)
     }
   }, [client?.id])
-
-  useEffect(() => {
-    if (searchTerm && searchTerm.length >= 2) {
-      runSearch(searchTerm)
-    }
-  }, [mode])
 
   // ── Load recent consumed meals ──
   const loadRecents = async () => {
@@ -470,16 +454,6 @@ export default function SearchTab({ db, onSelect, isMobile, client, onQuickLog, 
             </button>
           )}
         </div>
-      </div>
-
-      {/* ── Twee keuzes: wat en waar ── */}
-      <div style={{
-        display: 'flex', alignItems: 'center',
-        padding: isMobile ? '0 1rem 0.75rem' : '0 1.25rem 0.875rem',
-      }}>
-        <Keuze waarde={mode} opties={SOORTEN} zet={setMode} isMobile={isMobile} />
-        <div style={{ width: 1, height: 16, background: 'rgba(255,255,255,0.15)', flexShrink: 0 }} />
-        <Keuze waarde={bron} opties={BRONNEN} zet={setBron} isMobile={isMobile} uitlijning="rechts" />
       </div>
 
       {loading && (
