@@ -14,14 +14,14 @@
 // kapot ging.
 
 import { useState, useEffect } from 'react'
-import { RefreshCw, Plus, X, Pause, Play, AlertTriangle, Check, Search } from 'lucide-react'
+import { RefreshCw, Plus, X, Pause, Play, AlertTriangle, Check, Search, Info } from 'lucide-react'
 import WorkoutProgressView from './challenge-monitor/WorkoutProgressView'
 import MealProgressView from './challenge-monitor/MealProgressView'
 import WeightProgressView from './challenge-monitor/WeightProgressView'
 import PhotoProgressView from './challenge-monitor/PhotoProgressView'
 import LastActivityView from './challenge-monitor/LastActivityView'
 import {
-  EISEN, SOORTEN, waardenUit, allesGehaald, naloopGrens, tijdlijn,
+  EISEN, SOORTEN, ALGEMENE_UITLEG, waardenUit, allesGehaald, naloopGrens, tijdlijn,
 } from '../../modules/challenge-monitor/challengeEisen'
 
 const GROEN = '#10b981'
@@ -53,6 +53,7 @@ export default function CoachChallengeHub({ db, clients }) {
   const [melding, setMelding] = useState(null)
   const [bevestigStop, setBevestigStop] = useState(null)
   const [zoek, setZoek] = useState('')
+  const [toonUitleg, setToonUitleg] = useState(false)
 
   const [open, setOpen] = useState(null)      // client_id van de opengeklapte rij
   const [tab, setTab] = useState('workouts')
@@ -206,8 +207,22 @@ export default function CoachChallengeHub({ db, clients }) {
 
       {/* Kop: titel, stand in één regel, en de enige primaire actie */}
       <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.7rem', flexWrap: 'wrap', marginBottom: '0.9rem' }}>
-        <div style={{ fontSize: isMobile ? '1.15rem' : '1.3rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.02em' }}>
-          Challenge
+        <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+          <div style={{ fontSize: isMobile ? '1.15rem' : '1.3rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.02em' }}>
+            Challenge
+          </div>
+          {/* Zelfde gebaar als bij de lead-stats: tik op ⓘ en de uitleg klapt
+              open. De klant ziet dezelfde teksten bij zijn eigen stand, zodat
+              jullie hetzelfde verhaal hebben als iemand belt over een getal. */}
+          <button onClick={() => setToonUitleg(v => !v)} title="Hoe worden deze getallen geteld?"
+            aria-label="Uitleg" aria-expanded={toonUitleg}
+            style={{
+              display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+              width: 20, height: 20, padding: 0, background: 'none', border: 'none',
+              cursor: 'pointer', color: toonUitleg ? '#FFD700' : 'rgba(255,255,255,0.35)',
+            }}>
+            <Info size={15} />
+          </button>
         </div>
         <div style={{ fontSize: '0.8rem', fontWeight: 700, color: 'rgba(255,255,255,0.45)' }}>
           {rijen.length} {rijen.length === 1 ? 'deelnemer' : 'deelnemers'}
@@ -232,6 +247,35 @@ export default function CoachChallengeHub({ db, clients }) {
           {toonToewijzen ? 'Sluiten' : 'Toewijzen'}
         </button>
       </div>
+
+      {toonUitleg && (
+        <div style={{
+          borderTop: LIJN, borderBottom: LIJN, padding: '0.9rem 0', marginBottom: '1.1rem',
+        }}>
+          <div style={{
+            fontSize: '0.82rem', fontWeight: 700, color: 'rgba(255,255,255,0.65)',
+            lineHeight: 1.5, marginBottom: '0.9rem', maxWidth: 720,
+          }}>
+            {ALGEMENE_UITLEG}
+          </div>
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fill, minmax(320px, 1fr))',
+            gap: '0.8rem 1.6rem',
+          }}>
+            {EISEN.map(e => (
+              <div key={e.key}>
+                <div style={{ fontSize: '0.82rem', fontWeight: 800, color: '#fff', marginBottom: 2 }}>
+                  {e.label} <span style={{ color: 'rgba(255,255,255,0.3)' }}>{e.nodig}/{e.van}</span>
+                </div>
+                <div style={{ fontSize: '0.76rem', fontWeight: 600, color: 'rgba(255,255,255,0.5)', lineHeight: 1.45 }}>
+                  {e.info}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {melding && (
         <div style={{
@@ -406,9 +450,8 @@ export default function CoachChallengeHub({ db, clients }) {
       )}
 
       {rijen.length > 0 && (
-        <div style={{ marginTop: '0.7rem', fontSize: '0.72rem', fontWeight: 600, color: 'rgba(255,255,255,0.4)', lineHeight: 1.5 }}>
-          Een workout telt bij 70% van de geplande sets, een voedingsdag bij 70% van de geplande maaltijden,
-          en een week bij 5 goede dagen. Klik een rij aan voor de details.
+        <div style={{ marginTop: '0.7rem', fontSize: '0.72rem', fontWeight: 600, color: 'rgba(255,255,255,0.4)' }}>
+          Klik een rij aan voor de details. De telregels staan achter de ⓘ bovenaan.
         </div>
       )}
 

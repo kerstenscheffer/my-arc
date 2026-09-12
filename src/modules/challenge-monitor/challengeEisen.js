@@ -13,14 +13,49 @@
 // migratie aan te pas komt.
 
 // 6-weken 80/20-challenge: haal je alle zes, dan krijg je je inleg terug.
+//
+// `uitleg` is de korte regel (tooltips, onderschriften). `info` is de tekst
+// achter het ⓘ-knopje: die legt uit hóé er geteld wordt, want dat is precies
+// wat mensen vragen zodra een getal lager uitvalt dan ze verwachtten.
 export const EISEN = [
-  { key: 'workouts',  label: 'Workouts',   nodig: 14, van: 18, uitleg: '14 van de 18 geplande workouts' },
-  { key: 'wegingen',  label: 'Wegingen',   nodig: 18, van: 24, uitleg: '18 van de 24 weegmomenten' },
-  { key: 'voeding',   label: 'Voeding',    nodig: 5,  van: 6,  uitleg: '5 van de 6 weken minstens 5 goede voedingsdagen' },
-  { key: 'checkins',  label: 'Check-ins',  nodig: 6,  van: 6,  uitleg: 'elke week een check-in' },
-  { key: 'fotos',     label: "Foto's",     nodig: 3,  van: 3,  uitleg: 'begin-, tussen- en eindfoto' },
-  { key: 'calls',     label: 'Calls',      nodig: 3,  van: 4,  uitleg: '3 van de 4 coachgesprekken' },
+  {
+    key: 'workouts', label: 'Workouts', nodig: 14, van: 18,
+    uitleg: '14 van de 18 geplande workouts',
+    info: 'Een workout telt mee zodra je 70% van de geplande sets hebt afgevinkt. Alleen starten is dus niet genoeg, maar de laatste set laten liggen kost je hem niet. Je hebt er 14 nodig van de 18 die in je schema staan.',
+  },
+  {
+    key: 'wegingen', label: 'Wegingen', nodig: 18, van: 24,
+    uitleg: '18 van de 24 weegmomenten',
+    info: 'Elke dag dat je je gewicht invult telt als één weging. Twee keer op dezelfde dag wegen telt één keer. Je hebt er 18 nodig van de 24 weegmomenten in de challenge.',
+  },
+  {
+    key: 'voeding', label: 'Voeding', nodig: 5, van: 6,
+    uitleg: '5 van de 6 weken minstens 5 goede voedingsdagen',
+    info: 'Een dag telt mee als je 70% van de maaltijden uit je plan hebt afgevinkt. Vijf van zulke dagen maken een geldige week. Je hebt 5 geldige weken nodig van de 6 — één slechte week mag dus.',
+  },
+  {
+    key: 'checkins', label: 'Check-ins', nodig: 6, van: 6,
+    uitleg: 'elke week een check-in',
+    info: 'De wekelijkse check-in die je in de app invult. Eén per week, zes in totaal. Deze mag je niet missen.',
+  },
+  {
+    key: 'fotos', label: "Foto's", nodig: 3, van: 3,
+    uitleg: 'begin-, tussen- en eindfoto',
+    info: "Voortgangsfoto's: één aan het begin, één halverwege en één aan het eind. Alle drie zijn nodig — daarmee laten we het resultaat zien.",
+  },
+  {
+    key: 'calls', label: 'Calls', nodig: 3, van: 4,
+    uitleg: '3 van de 4 coachgesprekken',
+    info: 'Coachgesprekken die daadwerkelijk gevoerd zijn. Een afgezegde of gemiste call telt niet. Je hebt er 3 nodig van de 4 die gepland staan.',
+  },
 ]
+
+// De regel achter de hele challenge, voor het ⓘ-knopje bovenaan.
+export const ALGEMENE_UITLEG =
+  'Haal je alle zes de eisen binnen de looptijd, dan krijg je je inleg terug. ' +
+  'Een eis die je binnen hebt kleurt groen. De tellers lopen automatisch mee met ' +
+  'wat je in de app afvinkt, dus je hoeft niets door te geven — wat hier staat is ' +
+  'wat er geteld is.'
 
 // Hoeveel dagen na de einddatum een deelname nog in de overzichten hoort. De
 // uitbetaling gebeurt ná afloop, dus meteen verbergen is te vroeg.

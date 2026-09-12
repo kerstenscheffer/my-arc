@@ -13,8 +13,8 @@
 // antwoord kunnen geven over hetzelfde geld.
 
 import { useEffect, useState } from 'react'
-import { Trophy, Activity, Utensils, Weight, Camera, Phone, ClipboardCheck, X } from 'lucide-react'
-import { EISEN, waardenUit, allesGehaald, challengeNaam, haalDeelname, haalStand, tijdlijn } from './challengeEisen'
+import { Trophy, Activity, Utensils, Weight, Camera, Phone, ClipboardCheck, X, Info } from 'lucide-react'
+import { EISEN, ALGEMENE_UITLEG, waardenUit, allesGehaald, challengeNaam, haalDeelname, haalStand, tijdlijn } from './challengeEisen'
 
 const GOUD = '#FFD700'
 const GROEN = '#10b981'
@@ -33,6 +33,9 @@ export default function ChallengeProgressTab({ db, client, isMobile = false }) {
   const [stand, setStand] = useState(null)
   const [open, setOpen] = useState(false)
   const [fout, setFout] = useState(null)
+  // Welke uitleg openstaat: de sleutel van een eis, of 'algemeen'. Eén tegelijk,
+  // zodat het paneel niet uitdijt tot een lap tekst.
+  const [uitleg, setUitleg] = useState(null)
 
   const laad = async () => {
     setFout(null)
@@ -104,7 +107,7 @@ export default function ChallengeProgressTab({ db, client, isMobile = false }) {
       {/* De knop zelf. Ingeklapt is dit alles wat je ziet: een beker en hoeveel
           eisen je hebt. Uitgeklapt is het de kop van het paneel. */}
       <button
-        onClick={() => setOpen(o => !o)}
+        onClick={() => { setOpen(o => !o); setUitleg(null) }}
         aria-expanded={open}
         aria-label={open ? 'Challenge-stand sluiten' : 'Challenge-stand openen'}
         style={{
@@ -141,12 +144,19 @@ export default function ChallengeProgressTab({ db, client, isMobile = false }) {
       {open && (
         <div style={{ padding: '0 12px 12px' }}>
           <div style={{
+            display: 'flex', alignItems: 'center', gap: 5, marginBottom: 10,
             fontSize: '0.72rem', fontWeight: 800, color: 'rgba(255,255,255,0.4)',
-            marginBottom: 10,
           }}>
-            {challengeNaam(deelname.challenge_type)} · dag {dag} van {totaal}
-            {deelname.is_paused && <span style={{ color: '#f97316' }}> · gepauzeerd</span>}
+            <span>
+              {challengeNaam(deelname.challenge_type)} · dag {dag} van {totaal}
+              {deelname.is_paused && <span style={{ color: '#f97316' }}> · gepauzeerd</span>}
+            </span>
+            <UitlegKnop aan={uitleg === 'algemeen'} onClick={() => setUitleg(u => u === 'algemeen' ? null : 'algemeen')} />
           </div>
+
+          {uitleg === 'algemeen' && (
+            <UitlegVak titel="Hoe het werkt" tekst={ALGEMENE_UITLEG} onSluit={() => setUitleg(null)} />
+          )}
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
             {EISEN.map(e => {
@@ -155,15 +165,14 @@ export default function ChallengeProgressTab({ db, client, isMobile = false }) {
               const Icoon = ICONEN[e.key]
               const pct = Math.min(100, (val / e.nodig) * 100)
               return (
-                <div key={e.key} title={e.uitleg}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 3 }}>
+                <div key={e.key}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 3 }}>
                     <Icoon size={13} color={ok ? GROEN : 'rgba(255,255,255,0.4)'} style={{ flexShrink: 0 }} />
-                    <div style={{
-                      flex: 1, minWidth: 0, fontSize: '0.8rem', fontWeight: 800,
-                      color: ok ? GROEN : '#fff',
-                    }}>
+                    <div style={{ fontSize: '0.8rem', fontWeight: 800, color: ok ? GROEN : '#fff' }}>
                       {e.label}
                     </div>
+                    <UitlegKnop aan={uitleg === e.key} onClick={() => setUitleg(u => u === e.key ? null : e.key)} />
+                    <div style={{ flex: 1 }} />
                     <div style={{
                       fontSize: '0.8rem', fontWeight: 900, fontVariantNumeric: 'tabular-nums',
                       color: ok ? GROEN : '#fff', flexShrink: 0,
@@ -178,6 +187,9 @@ export default function ChallengeProgressTab({ db, client, isMobile = false }) {
                       transition: 'width 0.3s ease',
                     }} />
                   </div>
+                  {uitleg === e.key && (
+                    <UitlegVak titel={e.label} tekst={e.info} onSluit={() => setUitleg(null)} />
+                  )}
                 </div>
               )
             })}
@@ -194,6 +206,50 @@ export default function ChallengeProgressTab({ db, client, isMobile = false }) {
           </div>
         </div>
       )}
+    </div>
+  )
+}
+
+// Het ⓘ-knopje: klein, grijs, goud als het openstaat. Zelfde gebaar als in de
+// lead-stats — je tikt erop en de uitleg verschijnt eronder, in plaats van een
+// tooltip die op een telefoon nooit verschijnt.
+function UitlegKnop({ aan, onClick }) {
+  return (
+    <button
+      onClick={(e) => { e.stopPropagation(); onClick() }}
+      title="Hoe wordt dit geteld?"
+      aria-label="Uitleg"
+      style={{
+        display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+        width: 16, height: 16, padding: 0, flexShrink: 0,
+        background: 'none', border: 'none', cursor: 'pointer',
+        color: aan ? GOUD : 'rgba(255,255,255,0.3)',
+      }}
+    >
+      <Info size={12} />
+    </button>
+  )
+}
+
+function UitlegVak({ titel, tekst, onSluit }) {
+  return (
+    <div style={{
+      display: 'flex', alignItems: 'flex-start', gap: 7,
+      margin: '7px 0 3px', padding: '0.5rem 0.6rem',
+      background: 'rgba(255,215,0,0.07)', border: '1px solid rgba(255,215,0,0.2)',
+      borderRadius: 8,
+    }}>
+      <Info size={12} color={GOUD} style={{ flexShrink: 0, marginTop: 2 }} />
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: '0.7rem', fontWeight: 800, color: '#fff', marginBottom: 2 }}>{titel}</div>
+        <div style={{ fontSize: '0.7rem', fontWeight: 600, color: 'rgba(255,255,255,0.65)', lineHeight: 1.45 }}>{tekst}</div>
+      </div>
+      <button onClick={onSluit} aria-label="Uitleg sluiten" style={{
+        background: 'none', border: 'none', padding: 2, flexShrink: 0,
+        color: 'rgba(255,255,255,0.4)', cursor: 'pointer',
+      }}>
+        <X size={11} />
+      </button>
     </div>
   )
 }
