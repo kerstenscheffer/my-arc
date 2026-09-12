@@ -4,8 +4,8 @@
 //
 //   1. Melding rechtsboven die vanaf rechts inschuift, in dezelfde vorm als
 //      het compliment op de workout-pagina.
-//   2. Persistente pill-widget — verschijnt zodra de klant de modal
-//      wegklikt. Blijft hangen rechtsonder totdat de check-in is
+//   2. Persistente pill-widget — verschijnt zodra de klant de melding
+//      wegklikt, en opent bij een tik meteen het check-in-formulier. Blijft hangen rechtsonder totdat de check-in is
 //      ingevuld of de pagina opnieuw geladen wordt (dan opnieuw modal).
 //      Schudt elke ~25 seconden om aandacht te trekken.
 //
@@ -124,13 +124,15 @@ export default function CheckinReminderPopup({ client, db, onOpen, isMobile: pro
   if (phase === 'init' || phase === 'hidden') return null
 
   const handleDismiss = () => setPhase('pill')
+  // Zowel vanaf de melding als vanaf de pill: het formulier opent direct.
+  // De pill opende eerst de melding rechtsboven — dan sta je na twee tikken
+  // pas bij het formulier dat je al wilde invullen.
   const handleOpenForm = () => {
     setPhase('pill')  // na invullen + return zien we 'm als pill, en
                       // bij volgende pageload zal evaluate hem opnieuw
                       // verbergen als de check-in is opgeslagen.
     onOpen?.()
   }
-  const handlePillClick = () => setPhase('modal')
 
   const palette = paletteFor(mode)
   const Icon = palette.icon
@@ -151,7 +153,7 @@ export default function CheckinReminderPopup({ client, db, onOpen, isMobile: pro
     return createPortal(
       <>
         <button
-          onClick={handlePillClick}
+          onClick={handleOpenForm}
           aria-label="Open check-in"
           style={{
             position: 'fixed',
