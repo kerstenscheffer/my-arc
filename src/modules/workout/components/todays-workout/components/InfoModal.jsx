@@ -4,7 +4,10 @@ import { useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import ExerciseService from '../../../../../services/ExerciseService'
 
-export default function InfoModal({ exercise, onClose, db, client, defaultTab }) {
+// `zIndex` omdat dit scherm ook bovenop het log-scherm geopend wordt. Stond
+// vast op 9999, en het log-scherm zit op 10000 — dan verscheen de video
+// erachter en leek de play-knop niets te doen.
+export default function InfoModal({ exercise, onClose, db, client, defaultTab, zIndex = 9999 }) {
   const isMobile = window.innerWidth <= 768
   const [visible, setVisible] = useState(false)
   const [activeTab, setActiveTab] = useState(defaultTab || 'video')
@@ -74,7 +77,7 @@ export default function InfoModal({ exercise, onClose, db, client, defaultTab })
 
   return createPortal(
     <div
-      style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.95)', zIndex: 9999, display: 'flex', flexDirection: 'column', opacity: visible ? 1 : 0, transition: 'opacity 0.3s ease-out' }}
+      style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.95)', zIndex, display: 'flex', flexDirection: 'column', opacity: visible ? 1 : 0, transition: 'opacity 0.3s ease-out' }}
       onClick={(e) => { if (e.target === e.currentTarget) handleClose() }}
     >
       {/* HEADER */}

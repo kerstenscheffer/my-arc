@@ -500,7 +500,14 @@ export default function ExerciseLogModal({ db, client, exercise, onClose, isMobi
   const lastSet = loggedSets.length > 0 ? loggedSets[loggedSets.length - 1] : null
   const editingSet = editingIndex !== null ? loggedSets[editingIndex] : null
 
-  const heeftVideo = !!(media?.video_url || media?.fallback_video_url)
+  // Alleen een play-knop bij een video die ook echt speelt. In `exercises`
+  // staat bij 241 van de 249 oefeningen alleen een YouTube-zóéklink als
+  // fallback ("results?search_query=..."); die is niet embedbaar en levert een
+  // scherm met een externe knop op. Een grote play-knop op de foto belooft dan
+  // iets wat er niet is. De zoeklink blijft bereikbaar via de info-knop op de
+  // oefeningkaart.
+  const speelbaar = (url) => !!url && !/youtube\.com\/results\?/.test(url)
+  const heeftVideo = speelbaar(media?.video_url) || speelbaar(media?.fallback_video_url)
   const wizardActive = showWizard && dropsetIndex === null
   const dropsetActive = dropsetIndex !== null && !showWizard
 
@@ -802,7 +809,15 @@ export default function ExerciseLogModal({ db, client, exercise, onClose, isMobi
       )}
 
       {toonVideo && (
-        <InfoModal exercise={exercise} onClose={() => setToonVideo(false)} db={db} client={client} defaultTab="video" />
+        <InfoModal
+          exercise={exercise}
+          onClose={() => setToonVideo(false)}
+          db={db}
+          client={client}
+          defaultTab="video"
+          /* Boven het log-scherm (10000) én boven de invoerwizard (10001). */
+          zIndex={10002}
+        />
       )}
 
       <style>{`
