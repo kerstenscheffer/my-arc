@@ -136,8 +136,10 @@ export default function ExerciseHistory({ exerciseName, previousLog, loading, cl
       return { tekst: 'gelijk', op: null }
     }
 
-    // Lijntje van de topset door de tijd, oud → nieuw.
-    const reeks = [...sessies].reverse().map(s => s.top.weight || 0)
+    // Lijntje op volume (kg × reps opgeteld) en niet op het gewicht: bij
+    // bankdrukken staat 80kg twintig sessies lang stil en werd het een
+    // zigzag van niets. Volume beweegt wél met wat je erbij doet.
+    const reeks = [...sessies].reverse().map(s => s.volume || 0)
     const min = Math.min(...reeks), max = Math.max(...reeks)
     const punten = reeks.length > 1
       ? reeks.map((v, i) => {
@@ -166,7 +168,11 @@ export default function ExerciseHistory({ exerciseName, previousLog, loading, cl
           <>
             {/* Wat je wilt weten voor je gaat tillen: hoe zwaar ging het ooit,
                 en hoe vaak heb je deze oefening gedaan. */}
-            <div style={{ display: 'flex', alignItems: 'flex-end', gap: '1.5rem', marginBottom: '0.9rem' }}>
+            <div style={{
+              display: 'flex', alignItems: 'flex-end', gap: '1.5rem',
+              paddingBottom: '1rem', marginBottom: '1rem',
+              borderBottom: '1px solid rgba(255,255,255,0.12)',
+            }}>
               <div>
                 <div style={{ fontSize: '0.62rem', fontWeight: 900, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Zwaarste set</div>
                 <div style={{ fontSize: '1.5rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.03em', fontVariantNumeric: 'tabular-nums', lineHeight: 1.1 }}>
@@ -197,13 +203,32 @@ export default function ExerciseHistory({ exerciseName, previousLog, loading, cl
               {sessies.map((s, i) => {
                 const v = verschil(i)
                 const isPr = s.dag === pr.dag
+                // Maandkop zodra de maand wisselt. Negentien regels achter
+                // elkaar met alleen "11 sep, 7 sep, 4 sep" laat je zoeken naar
+                // waar het ene blok ophoudt en het andere begint.
+                const maand = new Date(`${s.dag}T00:00:00`).toLocaleDateString('nl-NL', { month: 'long', year: 'numeric' })
+                const vorigeMaand = i === 0 ? null : new Date(`${sessies[i - 1].dag}T00:00:00`).toLocaleDateString('nl-NL', { month: 'long', year: 'numeric' })
+                const nieuweMaand = maand !== vorigeMaand
                 return (
-                  <div key={s.dag} style={{
+                  <div key={s.dag}>
+                  {nieuweMaand && (
+                    <div style={{
+                      fontSize: '0.62rem', fontWeight: 900, color: 'rgba(255,255,255,0.3)',
+                      textTransform: 'uppercase', letterSpacing: '0.1em',
+                      marginTop: i === 0 ? 0 : '1rem', marginBottom: '0.2rem',
+                    }}>
+                      {maand}
+                    </div>
+                  )}
+                  <div style={{
                     display: 'flex', alignItems: 'baseline', gap: '0.7rem',
                     padding: '0.55rem 0',
-                    borderTop: i === 0 ? 'none' : '1px solid rgba(255,255,255,0.07)',
+                    borderTop: nieuweMaand ? 'none' : '1px solid rgba(255,255,255,0.07)',
                   }}>
-                    <div style={{ width: 58, flexShrink: 0, fontSize: '0.72rem', fontWeight: 800, color: 'rgba(255,255,255,0.45)' }}>
+                    {/* Vaste kolommen: datum links, cijfers in het midden, verschil
+                        rechts. Anders schuift elke regel een beetje op en moet je
+                        zoeken waar het volgende getal staat. */}
+                    <div style={{ width: 52, flexShrink: 0, fontSize: '0.72rem', fontWeight: 800, color: 'rgba(255,255,255,0.4)', fontVariantNumeric: 'tabular-nums' }}>
                       {formatDate(s.dag)}
                     </div>
                     <div style={{ flex: 1, minWidth: 0 }}>
@@ -214,19 +239,21 @@ export default function ExerciseHistory({ exerciseName, previousLog, loading, cl
                         {isPr && <span style={{ marginLeft: 7, fontSize: '0.6rem', fontWeight: 900, color: '#FFD700', letterSpacing: '0.06em' }}>PR</span>}
                       </div>
                       {s.sets.length > 1 && (
-                        <div style={{ fontSize: '0.72rem', fontWeight: 700, color: 'rgba(255,255,255,0.4)', marginTop: 1, fontVariantNumeric: 'tabular-nums' }}>
-                          {s.sets.map(x => `${x.weight || 0}×${x.reps || 0}`).join('  ')}
+                        <div style={{ fontSize: '0.7rem', fontWeight: 700, color: 'rgba(255,255,255,0.38)', marginTop: 2, fontVariantNumeric: 'tabular-nums' }}>
+                          {s.sets.length} sets · {s.sets.map(x => `${x.weight || 0}×${x.reps || 0}`).join('  ')}
                         </div>
                       )}
                     </div>
                     {v && (
                       <div style={{
-                        flexShrink: 0, fontSize: '0.72rem', fontWeight: 900,
-                        color: v.op === null ? 'rgba(255,255,255,0.3)' : v.op ? '#10b981' : 'rgba(255,255,255,0.45)',
+                        flexShrink: 0, width: 62, textAlign: 'right',
+                        fontSize: '0.72rem', fontWeight: 900,
+                        color: v.op === null ? 'rgba(255,255,255,0.28)' : v.op ? '#10b981' : 'rgba(255,255,255,0.45)',
                       }}>
                         {v.tekst}
                       </div>
                     )}
+                  </div>
                   </div>
                 )
               })}

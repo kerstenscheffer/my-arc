@@ -1,7 +1,7 @@
 // src/modules/workout/components/todays-workout/components/AttachmentSelector.jsx
 import { useState } from 'react'
-import { createPortal } from 'react-dom'
-import { ChevronDown, X, Check, AlertTriangle } from 'lucide-react'
+import { ChevronDown, Check, AlertTriangle } from 'lucide-react'
+import BladModal from './BladModal'
 import { ATTACHMENTS, getAttachment, getExerciseAttachmentDefaults } from '../../../constants/attachments'
 
 // `compact` = als knopje naast de oefeningtitel in plaats van als eigen blok
@@ -32,110 +32,98 @@ export default function AttachmentSelector({ suggested, value, onChange, isMobil
   // Het keuzescherm. Eén keer beschreven en door beide varianten gebruikt —
   // de compacte knop naast de titel en het volle blok eronder verschillen
   // alleen in hun trigger.
-  const picker = showPicker && createPortal(
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', zIndex: 10001, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}
-          onClick={(e) => { if (e.target === e.currentTarget) setShowPicker(false) }}>
+  // Eén tegel per stuk materiaal. Voorgeschreven boven, de rest eronder met
+  // een waarschuwing erbij.
+  const tegel = (attachment, { gekozen, aanbevolen, buitenPlan }) => (
+    <button
+      key={attachment.id}
+      onClick={() => { onChange(attachment.id); setShowPicker(false) }}
+      style={{
+        background: gekozen ? 'rgba(255,255,255,0.1)' : 'transparent',
+        border: `1px solid ${gekozen ? 'rgba(255,255,255,0.45)' : 'rgba(255,255,255,0.08)'}`,
+        borderRadius: 12, padding: '0.6rem 0.4rem 0.55rem',
+        cursor: 'pointer', position: 'relative',
+        display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 7,
+        fontFamily: 'inherit',
+        touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+      }}
+    >
+      {aanbevolen && !gekozen && (
+        <span style={{
+          position: 'absolute', top: 5, right: 5,
+          fontSize: '0.5rem', fontWeight: 900, color: '#FFD700',
+          letterSpacing: '0.06em', textTransform: 'uppercase',
+        }}>
+          Advies
+        </span>
+      )}
+      {gekozen && (
+        <span style={{
+          position: 'absolute', top: 5, right: 5, width: 16, height: 16, borderRadius: '50%',
+          background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center',
+        }}>
+          <Check size={10} color="#0a0a0a" strokeWidth={3.5} />
+        </span>
+      )}
+      <div style={{
+        width: '100%', aspectRatio: '1 / 1', borderRadius: 9,
+        backgroundImage: `url(${attachment.img})`, backgroundSize: 'cover', backgroundPosition: 'center',
+        opacity: gekozen ? 1 : buitenPlan ? 0.5 : 0.8,
+      }} />
+      <div style={{
+        fontSize: '0.7rem', fontWeight: 800,
+        color: gekozen ? '#fff' : 'rgba(255,255,255,0.6)',
+        textAlign: 'center', lineHeight: 1.25,
+      }}>
+        {attachment.nl}
+      </div>
+    </button>
+  )
 
-          <div style={{ width: '100%', maxWidth: '500px', background: '#0a0a0a', borderRadius: '16px 16px 0 0', border: '1px solid rgba(255,255,255,0.08)', borderBottom: 'none', maxHeight: '70vh', display: 'flex', flexDirection: 'column' }}>
-
-            {/* Header */}
-            <div style={{ padding: '1rem 1.25rem', borderBottom: '1px solid rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
-              <div style={{ fontSize: '0.6rem', fontWeight: '700', color: 'rgba(255,215,0,0.5)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Kies materiaal</div>
-              <button onClick={() => setShowPicker(false)} style={{ width: '32px', height: '32px', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '6px', color: 'rgba(255,255,255,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', touchAction: 'manipulation' }}>
-                <X size={14} strokeWidth={2.5} />
-              </button>
+  const picker = (
+    <BladModal open={showPicker} titel="Kies je materiaal" onClose={() => setShowPicker(false)}>
+      {prescribed.length > 0 && (
+        <>
+          {availableIds && (
+            <div style={{
+              fontSize: '0.66rem', fontWeight: 900, color: '#fff',
+              textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '0.6rem',
+            }}>
+              Voorgeschreven
             </div>
-
-            {/* Grid — voorgeschreven boven, overig onder met aparte koptekst */}
-            <div style={{ flex: 1, overflowY: 'auto', WebkitOverflowScrolling: 'touch', padding: '0.875rem 1rem' }}>
-              {/* Voorgeschreven sectie */}
-              {prescribed.length > 0 && (
-                <>
-                  {availableIds && (
-                    <div style={{
-                      fontSize: '0.5rem', fontWeight: 800,
-                      color: 'rgba(255,215,0,0.5)',
-                      textTransform: 'uppercase', letterSpacing: '0.08em',
-                      marginBottom: '0.5rem',
-                    }}>
-                      Voorgeschreven voor deze oefening
-                    </div>
-                  )}
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.625rem', marginBottom: others.length > 0 ? '1rem' : 0 }}>
-                    {prescribed.map(attachment => {
-                      const isSelected = activeId === attachment.id
-                      const isSug = (suggested === attachment.id && !value) || (autoDefault === attachment.id && !value && !suggested)
-                      return (
-                        <button
-                          key={attachment.id}
-                          onClick={() => { onChange(attachment.id); setShowPicker(false) }}
-                          style={{ background: isSelected ? 'rgba(255,215,0,0.08)' : 'rgba(255,255,255,0.02)', border: `${isSelected ? '2' : '1'}px solid ${isSelected ? 'rgba(255,215,0,0.35)' : 'rgba(255,255,255,0.07)'}`, borderRadius: '8px', padding: '0.625rem 0.5rem', cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.375rem', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', position: 'relative', transition: 'all 0.15s ease' }}>
-                          {isSug && (
-                            <div style={{ position: 'absolute', top: '4px', right: '4px', width: '14px', height: '14px', borderRadius: '50%', background: 'rgba(255,215,0,0.8)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                              <Check size={8} color="#000" strokeWidth={3} />
-                            </div>
-                          )}
-                          <div style={{ width: '52px', height: '52px', borderRadius: '6px', backgroundImage: `url(${attachment.img})`, backgroundSize: 'cover', backgroundPosition: 'center', opacity: isSelected ? 0.9 : 0.55 }} />
-                          <div style={{ fontSize: '0.62rem', fontWeight: '700', color: isSelected ? '#FFD700' : 'rgba(255,255,255,0.5)', textAlign: 'center', lineHeight: 1.3 }}>
-                            {attachment.nl}
-                          </div>
-                        </button>
-                      )
-                    })}
-                  </div>
-                </>
-              )}
-
-              {/* Niet-voorgeschreven sectie — met waarschuwingstekst */}
-              {others.length > 0 && availableIds && (
-                <>
-                  <div style={{
-                    fontSize: '0.5rem', fontWeight: 800,
-                    color: '#f59e0b',
-                    textTransform: 'uppercase', letterSpacing: '0.08em',
-                    marginBottom: 4,
-                    display: 'flex', alignItems: 'center', gap: 5,
-                  }}>
-                    <AlertTriangle size={10} strokeWidth={2.6} />
-                    Overig — niet voorgeschreven
-                  </div>
-                  <div style={{
-                    fontSize: '0.58rem', color: 'rgba(255,255,255,0.45)',
-                    fontWeight: 500, lineHeight: 1.4, marginBottom: '0.625rem',
-                  }}>
-                    Alleen kiezen als je dit met je coach hebt overlegd.
-                  </div>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.625rem' }}>
-                    {others.map(attachment => {
-                      const isSelected = activeId === attachment.id
-                      return (
-                        <button
-                          key={attachment.id}
-                          onClick={() => { onChange(attachment.id); setShowPicker(false) }}
-                          style={{
-                            background: isSelected ? 'rgba(245,158,11,0.08)' : 'rgba(255,255,255,0.015)',
-                            border: `${isSelected ? '2' : '1'}px solid ${isSelected ? 'rgba(245,158,11,0.4)' : 'rgba(255,255,255,0.05)'}`,
-                            borderRadius: '8px', padding: '0.625rem 0.5rem',
-                            cursor: 'pointer',
-                            display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.375rem',
-                            touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-                            position: 'relative', transition: 'all 0.15s ease',
-                            opacity: isSelected ? 1 : 0.55,
-                          }}>
-                          <div style={{ width: '52px', height: '52px', borderRadius: '6px', backgroundImage: `url(${attachment.img})`, backgroundSize: 'cover', backgroundPosition: 'center', opacity: isSelected ? 0.9 : 0.55 }} />
-                          <div style={{ fontSize: '0.62rem', fontWeight: '700', color: isSelected ? '#f59e0b' : 'rgba(255,255,255,0.5)', textAlign: 'center', lineHeight: 1.3 }}>
-                            {attachment.nl}
-                          </div>
-                        </button>
-                      )
-                    })}
-                  </div>
-                </>
-              )}
-            </div>
+          )}
+          <div style={{
+            display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(92px, 1fr))',
+            gap: '0.6rem', marginBottom: others.length > 0 ? '1.4rem' : 0,
+          }}>
+            {prescribed.map(a => tegel(a, {
+              gekozen: activeId === a.id,
+              aanbevolen: (suggested === a.id && !value) || (autoDefault === a.id && !value && !suggested),
+              buitenPlan: false,
+            }))}
           </div>
-        </div>,
-        document.body
+        </>
+      )}
+
+      {others.length > 0 && availableIds && (
+        <>
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3,
+            fontSize: '0.66rem', fontWeight: 900, color: '#f59e0b',
+            textTransform: 'uppercase', letterSpacing: '0.08em',
+          }}>
+            <AlertTriangle size={12} strokeWidth={2.6} />
+            Overig
+          </div>
+          <div style={{ fontSize: '0.72rem', fontWeight: 600, color: 'rgba(255,255,255,0.45)', lineHeight: 1.45, marginBottom: '0.6rem' }}>
+            Niet voorgeschreven voor deze oefening. Kies dit alleen als je het met je coach hebt overlegd.
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(92px, 1fr))', gap: '0.6rem' }}>
+            {others.map(a => tegel(a, { gekozen: activeId === a.id, aanbevolen: false, buitenPlan: true }))}
+          </div>
+        </>
+      )}
+    </BladModal>
   )
 
   if (compact) {
