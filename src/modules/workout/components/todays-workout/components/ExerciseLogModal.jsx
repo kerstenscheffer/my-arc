@@ -701,6 +701,56 @@ export default function ExerciseLogModal({ db, client, exercise, onClose, isMobi
               </div>
             )}
 
+            {/* Zwevende actieknoppen, direct onder de vorige sessie. Stonden
+                onderaan het scherm; met een paar sets erin scrolde je heen en
+                weer tussen wat je net logde en de knop om verder te gaan. */}
+            {!rust && (
+              <div style={{
+                display: 'flex', gap: '0.5rem',
+                padding: isMobile ? '0.8rem 1rem' : '0.9rem 1.25rem',
+              }}>
+                <button
+                  onClick={() => { setEditingIndex(null); setShowWizard(true) }}
+                  style={{
+                    flex: 1, minHeight: 52, padding: '0 1rem',
+                    background: '#fff', border: '1px solid #fff', borderRadius: 14,
+                    color: '#0a0a0a', fontSize: isMobile ? '0.88rem' : '0.95rem',
+                    fontWeight: 900, letterSpacing: '-0.01em',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                    cursor: 'pointer', fontFamily: 'inherit',
+                    boxShadow: '0 10px 24px rgba(0,0,0,0.45)',
+                    touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+                  }}
+                >
+                  <Plus size={isMobile ? 19 : 21} strokeWidth={2.8} />
+                  Set toevoegen
+                </button>
+
+                {/* Ook wit, maar niet gevuld: er hoort één primaire actie per
+                    blok te zijn. Aan/uit blijft aan de gouden rand te zien. */}
+                <button
+                  onClick={wisselRustTimer}
+                  aria-pressed={rustTimerAan}
+                  title={rustTimerAan ? 'Rusttimer uitzetten' : 'Rusttimer: na elke set loopt je rusttijd, daarna staat de volgende set klaar'}
+                  style={{
+                    flexShrink: 0, width: isMobile ? 96 : 118, minHeight: 52,
+                    background: rustTimerAan ? 'rgba(255,215,0,0.14)' : 'transparent',
+                    border: `1.5px solid ${rustTimerAan ? '#FFD700' : 'rgba(255,255,255,0.55)'}`,
+                    borderRadius: 14,
+                    color: rustTimerAan ? '#FFD700' : '#fff',
+                    fontSize: isMobile ? '0.7rem' : '0.75rem', fontWeight: 900,
+                    textTransform: 'uppercase', letterSpacing: '0.05em',
+                    display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 3,
+                    cursor: 'pointer', fontFamily: 'inherit',
+                    touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+                  }}
+                >
+                  <Timer size={isMobile ? 18 : 20} strokeWidth={2.4} />
+                  <span style={{ lineHeight: 1.15, textAlign: 'center' }}>Rust<br />timer</span>
+                </button>
+              </div>
+            )}
+
             {loggedSets.map((set, i) => (
               <LoggedSetRow key={i} set={set} index={i}
                 onAddDropset={(idx) => { setDropsetIndex(idx); setShowWizard(false) }}
@@ -814,66 +864,9 @@ export default function ExerciseLogModal({ db, client, exercise, onClose, isMobi
           paddingBottom: `calc(env(safe-area-inset-bottom, 0px) + ${isMobile ? '0.85rem' : '1rem'})`,
           flexShrink: 0,
         }}>
-          <div style={{ display: 'flex', gap: '0.5rem' }}>
-            {/* Set Toevoegen — primaire CTA, gouden gradient pill conform CTA-token */}
-            <button
-              onClick={() => { setEditingIndex(null); setShowWizard(true) }}
-              style={{
-                flex: 1,
-                padding: isMobile ? '0.85rem' : '1rem',
-                background: 'linear-gradient(135deg, #FFD700 0%, #D4AF37 100%)',
-                border: 'none',
-                borderRadius: 14,
-                color: '#0a0a0a',
-                fontSize: isMobile ? '0.88rem' : '0.95rem',
-                fontWeight: 900,
-                textTransform: 'uppercase',
-                letterSpacing: '0.06em',
-                cursor: 'pointer',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                gap: 8,
-                minHeight: 54,
-                touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-                boxShadow: '0 10px 24px rgba(255,215,0,0.3), 0 2px 6px rgba(0,0,0,0.5)',
-              }}
-            >
-              <Plus size={isMobile ? 20 : 22} strokeWidth={2.6} />
-              Set Toevoegen
-            </button>
-
-            {/* Rusttimer — na elke set loopt je rusttijd en staat de volgende
-                set daarna klaar. Naast de hoofdknop en niet erin: wie gewoon
-                één set wil loggen moet daar geen timer bij krijgen. */}
-            <button
-              onClick={wisselRustTimer}
-              aria-pressed={rustTimerAan}
-              title={rustTimerAan ? 'Rusttimer uitzetten' : 'Rusttimer: na elke set loopt je rusttijd, daarna staat de volgende set klaar'}
-              style={{
-                flexShrink: 0,
-                width: isMobile ? 96 : 118,
-                background: rustTimerAan ? 'rgba(255,215,0,0.16)' : 'rgba(255,255,255,0.05)',
-                border: `1px solid ${rustTimerAan ? 'rgba(255,215,0,0.55)' : 'rgba(255,255,255,0.12)'}`,
-                borderRadius: 14,
-                color: rustTimerAan ? '#FFD700' : 'rgba(255,255,255,0.75)',
-                fontSize: isMobile ? '0.7rem' : '0.75rem',
-                fontWeight: 900,
-                textTransform: 'uppercase',
-                letterSpacing: '0.06em',
-                cursor: 'pointer',
-                display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-                gap: 3,
-                minHeight: 54,
-                fontFamily: 'inherit',
-                touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-              }}
-            >
-              <Timer size={isMobile ? 18 : 20} strokeWidth={2.4} />
-              <span style={{ lineHeight: 1.15, textAlign: 'center' }}>Rust<br />timer</span>
-            </button>
-          </div>
-
-          {/* Toggle-rij: 3 secundaire acties — groter font + grotere iconen */}
-          <div style={{ display: 'flex', gap: '0.4rem', marginTop: '0.6rem' }}>
+          {/* Voettekst is nu alleen nog de vier secundaire acties; de knoppen
+              om te loggen staan boven, bij je sets. */}
+          <div style={{ display: 'flex', gap: '0.4rem' }}>
             <ToggleBtn
               active={toonInfo}
               onClick={() => setToonInfo(!toonInfo)}
