@@ -134,10 +134,13 @@ export default function CheckinReminderPopup({ client, db, onOpen, isMobile: pro
 
   const palette = paletteFor(mode)
   const Icon = palette.icon
-  // Als vraag en met de voornaam erbij: dat leest als je coach die het vraagt
-  // in plaats van als een systeemmelding.
-  const voornaam = client?.first_name?.trim()
-  const vraag = voornaam ? `Check-in invullen, ${voornaam}?` : 'Check-in invullen?'
+  // Als vraag: dat leest als je coach die het vraagt in plaats van als een
+  // systeemmelding. De pill zet de voornaam erbij (daar past geen hele zin),
+  // de melding aan de zijkant stelt de vraag voluit. Namen staan niet altijd
+  // met een hoofdletter in de database, dus die zetten we hier.
+  const ruweNaam = client?.first_name?.trim()
+  const voornaam = ruweNaam ? ruweNaam.charAt(0).toUpperCase() + ruweNaam.slice(1) : ''
+  const pillVraag = voornaam ? `Check-in invullen, ${voornaam}?` : 'Check-in invullen?'
 
   // ── PILL WIDGET ──
   // Gecentreerd boven de floating navbar, met de onderste helft achter
@@ -200,7 +203,7 @@ export default function CheckinReminderPopup({ client, db, onOpen, isMobile: pro
             textShadow: '0 2px 10px rgba(0,0,0,0.85)',
           }}>
             <Icon size={isMobile ? 15 : 17} strokeWidth={2.6} style={{ flexShrink: 0 }} />
-            {vraag}
+            {pillVraag}
             <ArrowRight size={isMobile ? 14 : 16} strokeWidth={2.8} style={{ flexShrink: 0 }} />
           </div>
         </button>
@@ -223,7 +226,7 @@ export default function CheckinReminderPopup({ client, db, onOpen, isMobile: pro
   // in beeld en blijft aan die rand plakken, met de coach-foto rechts en de
   // tekst links eroverheen. Was een schermvullende modal met een donkere waas
   // erachter; dat blokkeerde de hele app voor een herinnering.
-  const title = vraag
+  const title = 'Wil je je check-in invullen?'
   const body = mode === 'friday'
     ? 'Het is vrijdag. Dan kan je coach op je week reageren.'
     : mode === 'overdue'
