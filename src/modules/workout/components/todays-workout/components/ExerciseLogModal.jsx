@@ -722,26 +722,23 @@ export default function ExerciseLogModal({ db, client, exercise, onClose, isMobi
                     </span>
                   )}
                 </div>
-                {/* Naast elkaar: twee of drie sets vullen een halve regel, en
-                    onder elkaar kostte dat drie regels in een blok dat juist
-                    compact moet zijn. Het setnummer staat klein boven het
-                    getal, zodat je niet hoeft te tellen. */}
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: isMobile ? '0.15rem 0.9rem' : '0.15rem 1.1rem' }}>
+                {/* Alles op één regel: "Set 1: 5kg × 9   Set 2: 5kg × 8". Het
+                    label naast het getal in plaats van erboven, dan is het
+                    één regel in plaats van twee. */}
+                <div style={{
+                  display: 'flex', flexWrap: 'wrap', alignItems: 'baseline',
+                  gap: isMobile ? '0.1rem 0.85rem' : '0.1rem 1.1rem',
+                  fontSize: isMobile ? '0.85rem' : '0.9rem', fontWeight: 900,
+                  color: '#fff', fontVariantNumeric: 'tabular-nums',
+                }}>
                   {previousPerformance.sets.map((x, i) => (
-                    <div key={i} style={{ minWidth: 0 }}>
-                      <div style={{ fontSize: '0.58rem', fontWeight: 800, color: 'rgba(255,255,255,0.35)', letterSpacing: '0.04em', lineHeight: 1 }}>
-                        Set {i + 1}
-                      </div>
-                      <div style={{
-                        fontSize: isMobile ? '0.85rem' : '0.9rem', fontWeight: 900, color: '#fff',
-                        fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap', marginTop: 1,
-                      }}>
-                        {x.weight}<span style={{ color: 'rgba(255,255,255,0.35)', fontSize: '0.72em', fontWeight: 800 }}>kg</span>
-                        <span style={{ color: 'rgba(255,255,255,0.25)', fontSize: '0.8em', margin: '0 0.14em' }}>×</span>
-                        {x.reps}
-                        {x.partials > 0 && <span style={{ color: 'rgba(255,215,0,0.7)', fontSize: '0.72em', fontWeight: 800 }}> +{x.partials}p</span>}
-                      </div>
-                    </div>
+                    <span key={i} style={{ whiteSpace: 'nowrap' }}>
+                      <span style={{ fontSize: '0.72em', fontWeight: 800, color: 'rgba(255,255,255,0.4)' }}>Set {i + 1}: </span>
+                      {x.weight}<span style={{ color: 'rgba(255,255,255,0.35)', fontSize: '0.72em', fontWeight: 800 }}>kg</span>
+                      <span style={{ color: 'rgba(255,255,255,0.25)', fontSize: '0.8em', margin: '0 0.14em' }}>×</span>
+                      {x.reps}
+                      {x.partials > 0 && <span style={{ color: 'rgba(255,215,0,0.7)', fontSize: '0.72em', fontWeight: 800 }}> +{x.partials}p</span>}
+                    </span>
                   ))}
                 </div>
               </div>
