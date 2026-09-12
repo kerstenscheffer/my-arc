@@ -128,6 +128,33 @@ const SECTIES = [
   },
 ]
 
+// Elke vierde check-in erbij: hoe bevalt de coaching zelf. Niet elke week —
+// dan wordt het een formaliteit en krijg je "gaat goed" terug. Eens per vier
+// weken heeft iemand genoeg meegemaakt om er iets zinnigs over te zeggen.
+//
+// Twee losse vragen en geen cijfer: een 8 vertelt je niet wat je moet houden
+// of veranderen.
+const COACHING_SECTIE = {
+  kop: 'Over de coaching',
+  velden: [
+    {
+      id: 'coaching_fijnste', type: 'tekst',
+      vraag: 'Wat vind je tot nu toe het fijnste aan de coaching?',
+      hulp: 'Elke vier weken vraag ik dit even — zo weet ik wat ik moet blijven doen.',
+      placeholder: 'Waar heb je het meeste aan gehad?',
+    },
+    {
+      id: 'coaching_verbeterpunt', type: 'tekst',
+      vraag: 'En wat kan er beter?',
+      hulp: 'Eerlijk mag, daar heb ik het meeste aan.',
+      placeholder: 'Wat je mist, wat onduidelijk is, wat anders zou moeten.',
+    },
+  ],
+}
+
+// Om de hoeveel check-ins de coaching-vragen erbij komen.
+const COACHING_INTERVAL = 4
+
 const SCHAAL = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
 
 // De keuzes achter een getalvraag. Uit app_issues: "in het checkin formulier
@@ -153,7 +180,9 @@ const reeksVoor = (v) => {
 // Eén vraag per scherm. De secties blijven als kopje boven de vraag staan,
 // zodat je weet in welk deel je zit, maar er is geen scherm meer met zeven
 // vragen tegelijk.
-const VRAGEN = SECTIES.flatMap(sec => sec.velden.map(v => ({ ...v, kop: sec.kop })))
+const platteVragen = (secties) => secties.flatMap(sec => sec.velden.map(v => ({ ...v, kop: sec.kop })))
+const VRAGEN_BASIS = platteVragen(SECTIES)
+const VRAGEN_MET_COACHING = platteVragen([...SECTIES, COACHING_SECTIE])
 
 // Hoeveel trainingen staan er gepland? Eerst het toegewezen schema (dat is
 // wat de klant daadwerkelijk voor zich ziet), anders wat er in de intake is
@@ -176,6 +205,11 @@ export default function ClientCheckinForm({ db, client, onSubmitted, onClose }) 
   const [submitted, setSubmitted] = useState(false)
   const [formData, setFormData] = useState({})
   const [stap, setStap] = useState(0)
+  // Wordt dit de vierde, achtste, twaalfde…? Dan komen de coaching-vragen
+  // erbij. Tellen op ingediende check-ins en niet op kalenderweken: wie een
+  // week overslaat krijgt de vraag anders op een moment dat er niets te
+  // vertellen valt.
+  const [coachingRonde, setCoachingRonde] = useState(false)
 
   const service = new CheckinService(db)
 
@@ -191,8 +225,12 @@ export default function ClientCheckinForm({ db, client, onSubmitted, onClose }) 
       // openen. We kijken of er sinds de laatste vrijdag al een is ingediend;
       // zo ja, dan het succes-scherm in plaats van het formulier. De cyclus
       // reset elke vrijdag.
-      const hasCheckin = await service.hasCheckinSinceLastFriday(client.id)
+      const [hasCheckin, aantal] = await Promise.all([
+        service.hasCheckinSinceLastFriday(client.id),
+        service.telCheckins(client.id),
+      ])
       setSubmitted(hasCheckin)
+      setCoachingRonde((aantal + 1) % COACHING_INTERVAL === 0)
     } catch (error) {
       console.error('Error checking existing check-in:', error)
     } finally {
@@ -382,11 +420,12 @@ export default function ClientCheckinForm({ db, client, onSubmitted, onClose }) 
   }
 
   // ── Formulier — één vraag per scherm ──────────────────────────────────
-  const vraag = VRAGEN[stap]
-  const laatste = stap === VRAGEN.length - 1
+  const vragen = coachingRonde ? VRAGEN_MET_COACHING : VRAGEN_BASIS
+  const vraag = vragen[stap]
+  const laatste = stap === vragen.length - 1
   // Voortgang telt de vraag waar je nu op staat mee, zodat de balk direct
   // beweegt als je begint in plaats van pas na de eerste stap.
-  const voortgang = ((stap + 1) / VRAGEN.length) * 100
+  const voortgang = ((stap + 1) / vragen.length) * 100
 
   return (
     <div style={{
@@ -406,7 +445,7 @@ export default function ClientCheckinForm({ db, client, onSubmitted, onClose }) 
           textTransform: 'uppercase', color: GRIJS,
         }}>
           <span style={{ color: '#fff' }}>{vraag.kop}</span>
-          <span>{stap + 1} / {VRAGEN.length}</span>
+          <span>{stap + 1} / {vragen.length}</span>
         </div>
       </div>
 

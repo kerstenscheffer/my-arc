@@ -78,6 +78,25 @@ export default class CheckinService {
     }
   }
 
+  // Hoeveel check-ins heeft deze klant al ingediend. Head-count, dus geen
+  // rijen over de lijn en geen last van de 1000-rijen-cap.
+  async telCheckins(clientId) {
+    try {
+      const { count, error } = await this.supabase
+        .from('client_checkins')
+        .select('id', { count: 'exact', head: true })
+        .eq('client_id', clientId)
+        .in('status', ['submitted', 'reviewed'])
+      if (error) throw error
+      return count || 0
+    } catch (error) {
+      // Bij twijfel 0 teruggeven: dan komt de coaching-vraag hooguit een keer
+      // te vroeg, in plaats van dat het formulier helemaal niet opent.
+      console.error('❌ telCheckins failed:', error)
+      return 0
+    }
+  }
+
   async hasCheckinThisWeek(clientId) {
     try {
       const now = new Date()

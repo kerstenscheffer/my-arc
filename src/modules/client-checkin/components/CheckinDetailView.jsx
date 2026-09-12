@@ -107,6 +107,13 @@ export default function CheckinDetailView({
     { label: 'Kostte de meeste moeite', waarde: checkin.struggles },
     { label: 'Vastgelopen op',          waarde: checkin.vastgelopen },
     { label: 'Ging beter dan verwacht', waarde: checkin.wins },
+    // Stond er niet bij, terwijl dit juist het antwoord is waar je iets mee
+    // moet: een bruiloft of vakantie volgende week verandert het plan.
+    { label: 'Komende week',            waarde: checkin.komende_week },
+    // Elke vierde check-in erbij. Alleen tonen als er iets is ingevuld, want
+    // de andere drie weken bestaan deze vragen niet.
+    { label: 'Fijnste aan de coaching', waarde: checkin.coaching_fijnste, feedback: true },
+    { label: 'Kan beter aan de coaching', waarde: checkin.coaching_verbeterpunt, feedback: true },
   ].filter(r => nietLeeg(r.waarde))
   
   // Calculate average score
@@ -357,13 +364,19 @@ export default function CheckinDetailView({
           </div>
           {v2Open.map(r => (
             <div key={r.label} style={{ marginBottom: '0.6rem' }}>
-              <div style={{ fontSize: '0.75rem', fontWeight: 800, color: 'rgba(255,255,255,0.5)', marginBottom: 3 }}>{r.label}</div>
+              <div style={{
+                fontSize: '0.75rem', fontWeight: 800, marginBottom: 3,
+                color: r.feedback ? '#FFD700' : 'rgba(255,255,255,0.5)',
+              }}>{r.label}</div>
               <div style={{
                 fontSize: '0.9rem', fontWeight: 700, color: '#fff', lineHeight: 1.5,
                 whiteSpace: 'pre-wrap',
                 padding: '0.7rem 0.85rem',
-                background: 'rgba(255,255,255,0.03)',
-                border: '1px solid rgba(255,255,255,0.08)',
+                // Feedback óver de coaching in goud: dat is geen weekcijfer maar
+                // iets waar jij iets mee moet, en het staat er maar eens per
+                // vier weken. Anders scrol je er zo overheen.
+                background: r.feedback ? 'rgba(255,215,0,0.06)' : 'rgba(255,255,255,0.03)',
+                border: `1px solid ${r.feedback ? 'rgba(255,215,0,0.25)' : 'rgba(255,255,255,0.08)'}`,
                 borderRadius: 10,
               }}>{r.waarde}</div>
             </div>
