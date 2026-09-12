@@ -89,6 +89,48 @@ class WorkoutServiceNew {
     }
   }
 
+  // Na het permanent verwijderen van een oefening schuift alles erachter een
+  // plek naar voren. De week-overrides hangen aan een index, dus zonder deze
+  // correctie landt een gewisselde oefening of een aangepast aantal sets
+  // stilletjes op de verkeerde oefening.
+  async verschuifOverridesNaVerwijderen(clientId, schemaId, dayKey, verwijderdeIndex, db) {
+    if (!clientId || !schemaId || !dayKey) return false
+    try {
+      const weekStart = this.getCurrentWeekStart()
+      const client = this._client(db)
+      const alle = await this.getWeeklyOverrides(clientId, schemaId, db)
+      const teVerplaatsen = alle
+        .filter(o => o.day_key === dayKey && parseInt(o.exercise_index) > verwijderdeIndex)
+        .map(o => ({
+          client_id: clientId, schema_id: schemaId, week_start: weekStart,
+          day_key: dayKey,
+          exercise_index: parseInt(o.exercise_index) - 1,
+          exercise_data: o.exercise_data
+        }))
+
+      const { error } = await client
+        .from('client_exercise_overrides')
+        .delete()
+        .eq('client_id', clientId)
+        .eq('schema_id', schemaId)
+        .eq('week_start', weekStart)
+        .eq('day_key', dayKey)
+        .gte('exercise_index', verwijderdeIndex)
+      if (error) throw error
+
+      if (teVerplaatsen.length) {
+        const { error: insErr } = await client
+          .from('client_exercise_overrides')
+          .insert(teVerplaatsen)
+        if (insErr) throw insErr
+      }
+      return true
+    } catch (error) {
+      console.error('❌ verschuifOverridesNaVerwijderen failed:', error)
+      return false
+    }
+  }
+
   applyOverridesToSchema(schema, overrides) {
     if (!schema?.week_structure || !overrides?.length) {
       console.log('⚠️ applyOverrides — leeg:', { hasWeekStructure: !!schema?.week_structure, overridesCount: overrides?.length })

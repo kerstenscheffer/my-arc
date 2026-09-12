@@ -23,7 +23,10 @@ export default function LogModal({
   // en nu de kop blijft staan terwijl je scrolt is dat de logische plek.
 
   // ✅ Live exercises state — synct met workout prop na swap + reload
-  const [liveExercises, setLiveExercises] = useState(workout.exercises || [])
+  // Overgeslagen oefeningen (prullenbak → "alleen deze week") horen niet in de
+  // doorloop-flow; die zou anders op een oefening blijven staan die de klant
+  // net uit de lijst haalde.
+  const [liveExercises, setLiveExercises] = useState(actieveOefeningen(workout.exercises))
 
   const handleCustomExerciseSave = (newExercise) => {
     setLiveExercises(prev => [...prev, {

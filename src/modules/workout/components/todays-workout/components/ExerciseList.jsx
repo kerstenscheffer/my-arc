@@ -1,9 +1,10 @@
 // src/modules/workout/components/todays-workout/components/ExerciseList.jsx
 import { useState, useEffect, useRef } from 'react'
-import { Plus, Trash2 } from 'lucide-react'
+import { Plus, Trash2, RotateCcw } from 'lucide-react'
 import ExerciseCard from './ExerciseCard'
 import AddExerciseModal from './AddExerciseModal'
 import { isExerciseFullyLogged } from '../../../utils/exerciseCompletion'
+import WorkoutServiceNew from '../../../services/WorkoutServiceNew'
 
 export default function ExerciseList({
   exercises, todaysLogs, onLogsUpdate,
@@ -15,6 +16,7 @@ export default function ExerciseList({
   const [localExercises, setLocalExercises] = useState(exercises || [])
   const [deletingIndex, setDeletingIndex] = useState(null)
   const [swipedIndex, setSwipedIndex] = useState(null)
+  const [terugzetBezig, setTerugzetBezig] = useState(false)
 
   useEffect(() => {
     localExercises.forEach((_, index) => {
@@ -31,7 +33,7 @@ export default function ExerciseList({
     // dan verandert de naam niet en zou de lijst anders op het oude aantal
     // blijven staan tot een harde verversing — en daarmee ook op de oude
     // voltooid-status, want die rekent met het geplande aantal.
-    .map(e => `${e.name}|${e.sets}|${e._pendingPermanent ? 1 : 0}|${e._isWeeklyOverride ? 1 : 0}|${e.image_url || ''}`)
+    .map(e => `${e.name}|${e.sets}|${e._pendingPermanent ? 1 : 0}|${e._isWeeklyOverride ? 1 : 0}|${e._overgeslagen ? 1 : 0}|${e.image_url || ''}`)
     .join(',')
   useEffect(() => { setLocalExercises(exercises || []) }, [exercisesSignature])
 
@@ -75,6 +77,11 @@ export default function ExerciseList({
       setLocalExercises(updatedExercises)
       setSwipedIndex(null)
       await saveExercises(updatedExercises)
+      // Week-overrides hangen aan de index; alles achter de verwijderde
+      // oefening schuift een plek op.
+      if (client?.id && schema?.id && workoutDayKey) {
+        await WorkoutServiceNew.verschuifOverridesNaVerwijderen(client.id, schema.id, workoutDayKey, index, db)
+      }
       if (navigator.vibrate) navigator.vibrate([30, 60, 30])
       if (onLogsUpdate) onLogsUpdate({ reloadSchema: true })
     } catch (error) {
@@ -83,6 +90,49 @@ export default function ExerciseList({
     } finally {
       setDeletingIndex(null)
     }
+  }
+
+  // Prullenbak op de card. 'permanent' haalt de oefening uit het schema van de
+  // coach; 'week' zet er een week-override overheen met een overgeslagen-vlag,
+  // zodat de oefening op zijn plek blijft staan (de overrides zijn
+  // index-gebonden) maar nergens meer meetelt.
+  const handleVerwijder = async (index, modus) => {
+    if (modus === 'permanent') return handleDelete(index)
+    if (!client?.id || !schema?.id || !workoutDayKey) throw new Error('geen schema')
+    const bron = localExercises[index]
+    const bewaard = await WorkoutServiceNew.saveWeeklyOverride(
+      client.id, schema.id, workoutDayKey, index, { ...bron, _overgeslagen: true }, db
+    )
+    if (!bewaard) throw new Error('niet opgeslagen')
+    setLocalExercises(prev => prev.map((ex, i) => i === index ? { ...ex, _overgeslagen: true } : ex))
+    if (onLogsUpdate) onLogsUpdate({ reloadSchema: true })
+  }
+
+  const overgeslagen = localExercises.filter(ex => ex?._overgeslagen).length
+
+  const zetTerug = async () => {
+    if (!client?.id || !schema?.id || !workoutDayKey || terugzetBezig) return
+    setTerugzetBezig(true)
+    try {
+      for (let i = 0; i < localExercises.length; i++) {
+        if (!localExercises[i]?._overgeslagen) continue
+        // Was het alleen een overslaan-override, dan kan die hele rij weg.
+        // Stond er ook een wissel of ander aantal sets in, dan blijft dat
+        // staan zonder de vlag.
+        const ex = localExercises[i]
+        if (ex._isWeeklyOverride && (ex._originalName || ex._setsAangepast)) {
+          const rest = { ...ex }
+          delete rest._overgeslagen
+          await WorkoutServiceNew.saveWeeklyOverride(client.id, schema.id, workoutDayKey, i, rest, db)
+        } else {
+          await WorkoutServiceNew.removeWeeklyOverride(client.id, schema.id, workoutDayKey, i, db)
+        }
+      }
+      setLocalExercises(prev => prev.map(ex => { const k = { ...ex }; delete k._overgeslagen; return k }))
+      if (onLogsUpdate) onLogsUpdate({ reloadSchema: true })
+    } catch (e) {
+      console.error('❌ Terugzetten mislukt:', e)
+    } finally { setTerugzetBezig(false) }
   }
 
   const handleMakePermanent = async (index) => {
@@ -116,7 +166,7 @@ export default function ExerciseList({
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
-          {localExercises.map((exercise, index) => (
+          {localExercises.map((exercise, index) => exercise?._overgeslagen ? null : (
             <SwipeableRow
               key={`${exercise.name}-${index}`}
               index={index}
@@ -141,11 +191,29 @@ export default function ExerciseList({
                 visible={visibleExercises.includes(index)}
                 delay={index * 120}
                 onMakePermanent={() => handleMakePermanent(index)}
+                onVerwijder={(modus) => handleVerwijder(index, modus)}
               />
             </SwipeableRow>
           ))}
 
-          {/* Inline "Voeg Oefening Toe" knop weggehaald — vervangen door floating FAB hieronder */}
+          {/* Deze week overgeslagen — met één tik terug te halen, anders is
+              de oefening tot maandag onvindbaar. */}
+          {overgeslagen > 0 && (
+            <button onClick={zetTerug} disabled={terugzetBezig}
+              style={{
+                margin: isMobile ? '0.3rem 0.9rem 0' : '0.35rem 1.25rem 0',
+                padding: '0.55rem 0.75rem',
+                background: 'transparent', border: '1px dashed rgba(255,255,255,0.18)',
+                borderRadius: 10, color: 'rgba(255,255,255,0.6)',
+                fontSize: isMobile ? '0.66rem' : '0.7rem', fontWeight: 800,
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                cursor: terugzetBezig ? 'wait' : 'pointer',
+                touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+              }}>
+              <RotateCcw size={12} strokeWidth={2.6} />
+              {overgeslagen} deze week overgeslagen — terugzetten
+            </button>
+          )}
         </div>
       )}
 

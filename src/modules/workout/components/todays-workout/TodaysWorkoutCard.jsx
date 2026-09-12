@@ -8,6 +8,7 @@
 import React, { useState, useEffect } from 'react'
 import { Check, ChevronDown, Timer } from 'lucide-react'
 import { useRef } from 'react'
+import { actieveOefeningen } from '../../utils/exerciseCompletion'
 
 export default function TodaysWorkoutCard({
   workout, onLogClick, logsCount, isCompleted: isCompletedProp, completionPct = 0,
@@ -193,8 +194,8 @@ export default function TodaysWorkoutCard({
             marginTop: '0.25rem', fontSize: isMobile ? '0.92rem' : '1rem', fontWeight: 900, color: '#fff',
             textShadow: '0 2px 8px rgba(0,0,0,0.7)',
           }}>
-            {workout.exercises?.length > 0 && (
-              <span>{workout.exercises.length}<span style={{ color: 'rgba(255,255,255,0.55)', fontSize: '0.78em', fontWeight: 800 }}> oefeningen</span></span>
+            {actieveOefeningen(workout.exercises).length > 0 && (
+              <span>{actieveOefeningen(workout.exercises).length}<span style={{ color: 'rgba(255,255,255,0.55)', fontSize: '0.78em', fontWeight: 800 }}> oefeningen</span></span>
             )}
             {workout.geschatteTijd && (
               <>
@@ -317,8 +318,8 @@ export default function TodaysWorkoutCard({
             alignItems: 'baseline',
             overflow: 'hidden',
           }}>
-            {workout.exercises && workout.exercises.length > 0 && (
-              <Stat val={workout.exercises.length} label="oef" isMobile={isMobile} />
+            {actieveOefeningen(workout.exercises).length > 0 && (
+              <Stat val={actieveOefeningen(workout.exercises).length} label="oef" isMobile={isMobile} />
             )}
             {workout.geschatteTijd && (
               <Stat val={String(workout.geschatteTijd).replace(/[^0-9]/g, '') || workout.geschatteTijd} label="min" isMobile={isMobile} />

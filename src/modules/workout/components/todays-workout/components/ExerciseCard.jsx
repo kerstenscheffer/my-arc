@@ -1,10 +1,11 @@
 // src/modules/workout/components/todays-workout/components/ExerciseCard.jsx
 import { useState, useEffect } from 'react'
-import { Play, RefreshCw, CheckCircle, Check, Dumbbell, Send, BookmarkPlus, Youtube, MessageSquare } from 'lucide-react'
+import { Play, RefreshCw, CheckCircle, Check, Dumbbell, Send, BookmarkPlus, Youtube, MessageSquare, Trash2 } from 'lucide-react'
 import InfoModal from './InfoModal'
 import SwapModal from './SwapModal'
 import ExerciseLogModal from './ExerciseLogModal'
 import ClientFeedbackModal from './ClientFeedbackModal'
+import BladModal from './BladModal'
 import ExerciseService from '../../../../../services/ExerciseService'
 import WorkoutServiceNew from '../../../services/WorkoutServiceNew'
 import { plannedSetCount } from '../../../utils/exerciseCompletion'
@@ -27,7 +28,7 @@ const getFallbackImage = (exercise) => {
 
 export default function ExerciseCard({
   exercise, index, totalExercises, isLogged, onLogsUpdate,
-  client, schema, db, workoutDayKey, visible, delay, onMakePermanent
+  client, schema, db, workoutDayKey, visible, delay, onMakePermanent, onVerwijder
 }) {
   const isMobile = window.innerWidth <= 768
   const [localExercise, setLocalExercise] = useState(exercise)
@@ -43,6 +44,8 @@ export default function ExerciseCard({
   const [hasVideo, setHasVideo] = useState(false)
   const [hasFeedback, setHasFeedback] = useState(false)
   const [setsBezig, setSetsBezig] = useState(false)
+  const [vraagVerwijderen, setVraagVerwijderen] = useState(false)
+  const [verwijderBezig, setVerwijderBezig] = useState(null)
 
   // Sync localExercise als de exercise prop verandert. We luisteren niet
   // alleen op naam — na een permanent-swap kunnen óók flags wijzigen
@@ -220,6 +223,22 @@ export default function ExerciseCard({
     finally { setMakingPermanent(false) }
   }
 
+  // De klant kiest zelf het bereik: deze week overslaan (blessure, apparaat
+  // bezet) of definitief uit het schema. Zonder die vraag zou één tik op de
+  // prullenbak het plan van de coach permanent aanpassen.
+  const verwijder = async (modus) => {
+    if (!onVerwijder || verwijderBezig) return
+    setVerwijderBezig(modus)
+    try {
+      await onVerwijder(modus)
+      if (navigator.vibrate) navigator.vibrate([30, 60, 30])
+      setVraagVerwijderen(false)
+    } catch (e) {
+      console.error('Verwijderen mislukt:', e)
+      alert('Kon de oefening niet verwijderen. Probeer het nog eens.')
+    } finally { setVerwijderBezig(null) }
+  }
+
   const showPermanentBtn = exercise._pendingPermanent && !isPermanent
   const photoSize = isMobile ? 62 : 72
   const GOLD = '#FFD700'
@@ -236,7 +255,25 @@ export default function ExerciseCard({
         opacity: isLogged ? 0.55 : 1,
         transition: 'opacity 0.2s ease',
         display: 'flex', flexDirection: 'column',
+        position: 'relative',
       }}>
+
+        {/* Prullenbak rechtsboven — vraagt eerst het bereik (zie `verwijder`). */}
+        {onVerwijder && (
+          <button
+            onClick={(e) => { e.stopPropagation(); setVraagVerwijderen(true) }}
+            aria-label="Oefening verwijderen"
+            style={{
+              position: 'absolute', top: 3, right: 3, zIndex: 5,
+              width: 26, height: 26, padding: 0,
+              background: 'transparent', border: 'none', borderRadius: 6,
+              color: '#fff', opacity: 0.85,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+            }}>
+            <Trash2 size={isMobile ? 14 : 15} strokeWidth={2.6} />
+          </button>
+        )}
 
         {showPermanentBtn && <div style={{ height: '2px', background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.5), transparent)' }} />}
 
@@ -295,6 +332,8 @@ export default function ExerciseCard({
             flex: 1, minWidth: 0,
             display: 'flex', flexDirection: 'column', justifyContent: 'center',
             padding: isMobile ? '0.35rem 0.65rem 0.3rem' : '0.4rem 0.85rem 0.35rem',
+            /* ruimte voor de prullenbak rechtsboven */
+            paddingRight: onVerwijder ? (isMobile ? 30 : 34) : undefined,
           }}>
             {/* Naam + spiergroep-pill ernaast */}
             <div style={{
@@ -428,10 +467,56 @@ export default function ExerciseCard({
           onSetsWijzigen={zetSets}
         />
       )}
+      <BladModal open={vraagVerwijderen} titel="Oefening verwijderen" onClose={() => setVraagVerwijderen(false)}>
+        <div style={{ fontSize: '0.95rem', fontWeight: 900, color: '#fff', marginBottom: 4 }}>{localExercise.name}</div>
+        <div style={{ fontSize: '0.72rem', fontWeight: 700, color: 'rgba(255,255,255,0.45)', marginBottom: 14 }}>
+          Hoe lang wil je 'm kwijt?
+        </div>
+        <VerwijderKeuze
+          titel="Alleen deze week"
+          uitleg="Volgende week staat 'ie er gewoon weer in"
+          bezig={verwijderBezig === 'week'}
+          onClick={() => verwijder('week')}
+        />
+        <VerwijderKeuze
+          titel="Permanent"
+          uitleg="Uit je schema, ook alle volgende weken"
+          rood
+          bezig={verwijderBezig === 'permanent'}
+          onClick={() => verwijder('permanent')}
+        />
+      </BladModal>
+
       {showFeedbackModal && <ClientFeedbackModal exercise={localExercise} client={client} db={db} onClose={() => setShowFeedbackModal(false)} />}
 
       <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
     </div>
+  )
+}
+
+// Eén keuze in het verwijder-blad: dikke titel, kleine uitleg eronder.
+function VerwijderKeuze({ titel, uitleg, onClick, bezig, rood }) {
+  const kleur = rood ? '#ef4444' : '#fff'
+  return (
+    <button
+      onClick={onClick}
+      disabled={bezig}
+      style={{
+        width: '100%', textAlign: 'left',
+        padding: '0.85rem 1rem', marginBottom: 10,
+        background: 'transparent',
+        border: `1px solid ${rood ? 'rgba(239,68,68,0.35)' : 'rgba(255,255,255,0.22)'}`,
+        borderRadius: 12, color: kleur,
+        cursor: bezig ? 'wait' : 'pointer',
+        touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+        display: 'flex', alignItems: 'center', gap: 10,
+      }}>
+      {bezig && <div style={{ width: 13, height: 13, flexShrink: 0, border: `2px solid ${rood ? 'rgba(239,68,68,0.3)' : 'rgba(255,255,255,0.25)'}`, borderTopColor: kleur, borderRadius: '50%', animation: 'spin 1s linear infinite' }} />}
+      <div style={{ minWidth: 0 }}>
+        <div style={{ fontSize: '0.9rem', fontWeight: 900, letterSpacing: '-0.015em' }}>{titel}</div>
+        <div style={{ fontSize: '0.68rem', fontWeight: 700, color: rood ? 'rgba(239,68,68,0.65)' : 'rgba(255,255,255,0.4)', marginTop: 2 }}>{uitleg}</div>
+      </div>
+    </button>
   )
 }
 

@@ -35,6 +35,14 @@ export function completedSetCount(exerciseName, todaysLogs) {
   return best
 }
 
+// Oefeningen die vandaag meetellen. Een klant kan een oefening voor deze week
+// overslaan (prullenbak → "alleen deze week"); die blijft in het schema staan
+// zodat de index-gebonden week-overrides kloppen, maar telt niet mee voor
+// voltooid of voortgang — anders komt de training nooit op 100%.
+export function actieveOefeningen(exercises) {
+  return (Array.isArray(exercises) ? exercises : []).filter(ex => !ex?._overgeslagen)
+}
+
 // Oefening volledig gelogd = minstens alle geplande sets gedaan (en > 0).
 export function isExerciseFullyLogged(exercise, todaysLogs) {
   const done = completedSetCount(exercise?.name, todaysLogs)
@@ -43,7 +51,7 @@ export function isExerciseFullyLogged(exercise, todaysLogs) {
 
 // Hele workout klaar = er zijn oefeningen én ze zijn allemaal volledig gelogd.
 export function isWorkoutFullyLogged(exercises, todaysLogs) {
-  const list = Array.isArray(exercises) ? exercises : []
+  const list = actieveOefeningen(exercises)
   if (list.length === 0) return false
   return list.every(ex => isExerciseFullyLogged(ex, todaysLogs))
 }
@@ -52,7 +60,7 @@ export function isWorkoutFullyLogged(exercises, todaysLogs) {
 // de hele workout. Per oefening gecapt op de geplande sets zodat extra sets
 // het niet boven 100% duwen. 0–100, afgerond.
 export function workoutCompletionPct(exercises, todaysLogs) {
-  const list = Array.isArray(exercises) ? exercises : []
+  const list = actieveOefeningen(exercises)
   if (list.length === 0) return 0
   let planned = 0
   let done = 0
