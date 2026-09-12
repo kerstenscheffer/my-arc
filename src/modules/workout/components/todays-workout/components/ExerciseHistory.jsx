@@ -228,62 +228,75 @@ export default function ExerciseHistory({ exerciseName, previousLog, loading, cl
               )}
             </div>
 
-            {/* Per sessie: datum, de topset dik wit, alle sets eronder, en wat
-                het verschil met de vorige keer was. Geen vervagende rijen meer
-                — oudere sessies zijn niet minder waar. */}
+            {/* Als tabel: één regel per sessie met vaste kolommen. Stond op
+                twee regels per sessie met ruimte ertussen; dan zie je er vier
+                tegelijk en moet je scrollen om een verloop te zien. Nu staat
+                boven de kolommen wat je leest, zodat het grote getal niet
+                zonder uitleg boven de sets hangt. */}
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: `52px minmax(84px, auto) 1fr 62px`,
+              gap: '0 0.6rem',
+              alignItems: 'center',
+              paddingBottom: '0.35rem',
+              fontSize: '0.6rem', fontWeight: 900, color: 'rgba(255,255,255,0.4)',
+              textTransform: 'uppercase', letterSpacing: '0.07em',
+              borderBottom: '1px solid rgba(255,255,255,0.1)',
+            }}>
+              <span>Datum</span>
+              <span>Top set</span>
+              <span>Sets</span>
+              <span style={{ textAlign: 'right' }}>Δ</span>
+            </div>
+
             <div>
               {sessies.map((s, i) => {
                 const v = verschil(i)
-                // Maandkop zodra de maand wisselt. Negentien regels achter
-                // elkaar met alleen "11 sep, 7 sep, 4 sep" laat je zoeken naar
-                // waar het ene blok ophoudt en het andere begint.
                 const maand = new Date(`${s.dag}T00:00:00`).toLocaleDateString('nl-NL', { month: 'long', year: 'numeric' })
                 const vorigeMaand = i === 0 ? null : new Date(`${sessies[i - 1].dag}T00:00:00`).toLocaleDateString('nl-NL', { month: 'long', year: 'numeric' })
                 const nieuweMaand = maand !== vorigeMaand
                 return (
                   <div key={s.dag}>
-                  {nieuweMaand && (
+                    {nieuweMaand && (
+                      <div style={{
+                        fontSize: '0.64rem', fontWeight: 900, color: '#fff',
+                        textTransform: 'uppercase', letterSpacing: '0.1em',
+                        padding: i === 0 ? '0.5rem 0 0.25rem' : '0.7rem 0 0.25rem',
+                      }}>
+                        {maand}
+                      </div>
+                    )}
                     <div style={{
-                      fontSize: '0.66rem', fontWeight: 900, color: '#fff',
-                      textTransform: 'uppercase', letterSpacing: '0.1em',
-                      marginTop: i === 0 ? 0 : '1rem', marginBottom: '0.2rem',
+                      display: 'grid',
+                      gridTemplateColumns: `52px minmax(84px, auto) 1fr 62px`,
+                      gap: '0 0.6rem',
+                      alignItems: 'baseline',
+                      padding: '0.3rem 0',
+                      borderTop: nieuweMaand ? 'none' : '1px solid rgba(255,255,255,0.06)',
                     }}>
-                      {maand}
-                    </div>
-                  )}
-                  <div style={{
-                    display: 'flex', alignItems: 'baseline', gap: '0.7rem',
-                    padding: '0.55rem 0',
-                    borderTop: nieuweMaand ? 'none' : '1px solid rgba(255,255,255,0.07)',
-                  }}>
-                    {/* Vaste kolommen: datum links, cijfers in het midden, verschil
-                        rechts. Anders schuift elke regel een beetje op en moet je
-                        zoeken waar het volgende getal staat. */}
-                    <div style={{ width: 52, flexShrink: 0, fontSize: '0.72rem', fontWeight: 800, color: 'rgba(255,255,255,0.4)', fontVariantNumeric: 'tabular-nums' }}>
-                      {formatDate(s.dag)}
-                    </div>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: '0.95rem', fontWeight: 900, color: '#fff', fontVariantNumeric: 'tabular-nums' }}>
+                      <span style={{ fontSize: '0.72rem', fontWeight: 800, color: 'rgba(255,255,255,0.4)', fontVariantNumeric: 'tabular-nums' }}>
+                        {formatDate(s.dag)}
+                      </span>
+                      <span style={{ fontSize: '0.9rem', fontWeight: 900, color: '#fff', fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>
                         {s.top.weight}<span style={{ fontSize: '0.72em', color: 'rgba(255,255,255,0.4)' }}>kg</span>
                         <span style={{ color: 'rgba(255,255,255,0.25)', fontSize: '0.8em' }}> × </span>
                         {s.top.reps}
-                      </div>
-                      {s.sets.length > 1 && (
-                        <div style={{ fontSize: '0.74rem', fontWeight: 800, color: 'rgba(255,255,255,0.8)', marginTop: 2, fontVariantNumeric: 'tabular-nums' }}>
-                          {s.sets.length} sets · {s.sets.map(x => `${x.weight || 0}×${x.reps || 0}`).join('  ')}
-                        </div>
-                      )}
-                    </div>
-                    {v && (
-                      <div style={{
-                        flexShrink: 0, width: 62, textAlign: 'right',
-                        fontSize: '0.72rem', fontWeight: 900,
-                        color: v.op === null ? 'rgba(255,255,255,0.28)' : v.op ? '#10b981' : 'rgba(255,255,255,0.45)',
+                      </span>
+                      <span style={{
+                        fontSize: '0.74rem', fontWeight: 800, color: 'rgba(255,255,255,0.7)',
+                        fontVariantNumeric: 'tabular-nums',
+                        overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
                       }}>
-                        {v.tekst}
-                      </div>
-                    )}
-                  </div>
+                        {s.sets.map(x => `${x.weight || 0}×${x.reps || 0}`).join('  ')}
+                      </span>
+                      <span style={{
+                        textAlign: 'right', fontSize: '0.72rem', fontWeight: 900,
+                        color: !v ? 'transparent' : v.op === null ? 'rgba(255,255,255,0.28)' : v.op ? '#10b981' : 'rgba(255,255,255,0.45)',
+                        whiteSpace: 'nowrap',
+                      }}>
+                        {v ? v.tekst : '—'}
+                      </span>
+                    </div>
                   </div>
                 )
               })}
