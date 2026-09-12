@@ -840,10 +840,11 @@ export default function ExerciseLogModal({ db, client, exercise, onClose, isMobi
                   aria-checked={rustTimerAan}
                   title={rustTimerAan ? 'Rusttimer staat aan' : 'Rusttimer staat uit'}
                   style={{
+                    // Geen kader: de schuifknop is zelf al een vorm, en een
+                    // doos eromheen maakt er een tweede knop van naast de knop
+                    // die je wél indrukt.
                     flexShrink: 0, width: isMobile ? 96 : 118, minHeight: 52,
-                    background: 'transparent',
-                    border: `1px solid ${rustTimerAan ? 'rgba(255,255,255,0.5)' : 'rgba(255,255,255,0.15)'}`,
-                    borderRadius: 14,
+                    background: 'transparent', border: 'none', padding: 0,
                     display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 6,
                     cursor: 'pointer', fontFamily: 'inherit',
                     touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
@@ -863,12 +864,17 @@ export default function ExerciseLogModal({ db, client, exercise, onClose, isMobi
                     border: `1px solid ${rustTimerAan ? '#fff' : 'rgba(255,255,255,0.2)'}`,
                     transition: 'background 0.18s ease',
                   }}>
+                    {/* Het klokje ís het bolletje: zegt meteen waar de knop
+                        over gaat, ook als je het label niet leest. */}
                     <span style={{
                       position: 'absolute', top: 2, left: rustTimerAan ? 20 : 2,
                       width: 16, height: 16, borderRadius: '50%',
-                      background: rustTimerAan ? '#0a0a0a' : 'rgba(255,255,255,0.6)',
+                      background: rustTimerAan ? '#0a0a0a' : 'rgba(255,255,255,0.75)',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
                       transition: 'left 0.18s cubic-bezier(0.4,0,0.2,1), background 0.18s ease',
-                    }} />
+                    }}>
+                      <Timer size={11} strokeWidth={2.8} color={rustTimerAan ? '#fff' : '#0a0a0a'} />
+                    </span>
                   </span>
                 </button>
               </div>
