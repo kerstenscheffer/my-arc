@@ -4,6 +4,7 @@ import { AlertCircle, RefreshCw, ChevronLeft, ChevronRight } from 'lucide-react'
 import { useState, useEffect } from 'react'
 import WeekGrid from './week-schedule/WeekGrid'
 import WorkoutServiceNew from '../services/WorkoutServiceNew'
+import { rustWaarschuwingen, waarschuwingTekst, ROOD } from '../utils/rustWaarschuwing'
 import ActionButtons from './week-schedule/ActionButtons'
 
 // Bereken de maandag van de huidige week (lokale tijd).
@@ -186,6 +187,13 @@ export default function WeekSchedule({
     return null
   }
 
+  // Staat dezelfde training te dicht op elkaar? Rood bij twee dagen achter
+  // elkaar, oranje bij één dag ertussen. De week herhaalt zich, dus zondag en
+  // maandag tellen ook als achter elkaar.
+  const { perDag: rustPerDag, meldingen: rustMeldingen } = rustWaarschuwingen(
+    tempSchedule, weekDays, (key) => getWorkoutData(key)?.name || key
+  )
+
   if (!hasValidSchema) {
     return (
       <div style={{ padding: isMobile ? '1.5rem 1rem' : '2rem 1.25rem', textAlign: 'center' }}>
@@ -289,8 +297,26 @@ export default function WeekSchedule({
                 kanPlannen={kanPlannen}
                 kanOpenen={isCurrentWeek}
                 gedimd={weekOffset < 0}
+                rustPerDag={rustPerDag}
               />
             </div>
+
+            {rustMeldingen.length > 0 && (
+              <div style={{
+                padding: isMobile ? '0 0.75rem 0.35rem' : '0 1rem 0.5rem',
+                display: 'flex', flexDirection: 'column', gap: 3,
+              }}>
+                {rustMeldingen.map(m => (
+                  <div key={m.key} style={{
+                    fontSize: isMobile ? '0.68rem' : '0.72rem',
+                    fontWeight: 800, lineHeight: 1.3,
+                    color: m.niveau === ROOD ? '#ef4444' : '#f59e0b',
+                  }}>
+                    {waarschuwingTekst(m)}
+                  </div>
+                ))}
+              </div>
+            )}
             <div style={{
               padding: isMobile ? '0.15rem 0.75rem 0.25rem' : '0.25rem 1rem 0.375rem',
               display: 'flex', alignItems: 'center', gap: 8,

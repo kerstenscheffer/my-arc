@@ -23,6 +23,8 @@ export default function DayCard({
   onClick, swapMode,
   onShiftLeft, onShiftRight, canShiftLeft, canShiftRight,
   dayDate, kanPlannen = true, kanOpenen = true, gedimd = false,
+  // 'rood' of 'oranje' als dezelfde training te dicht op deze dag staat.
+  rust = null,
 }) {
   const isCustom = workoutKey?.startsWith('custom_')
   const isActivity = ['cardio', 'swimming', 'hiking', 'cycling', 'running'].includes(workoutKey)
@@ -30,8 +32,21 @@ export default function DayCard({
 
   const handleClick = () => { if (onClick) onClick() }
 
-  // Eén kleur- + border-systeem per state. Eerste match wint.
+  // Eén kleur- + border-systeem per state. Eerste match wint. De
+  // rust-waarschuwing gaat vóór alles behalve voltooid: te weinig hersteltijd
+  // is het enige wat je op deze kaart nog moet weten.
+  const RUST_KLEUR = { rood: '#ef4444', oranje: '#f59e0b' }
   const tone = (() => {
+    if (rust && !isCompleted) {
+      const k = RUST_KLEUR[rust]
+      return {
+        bg: rust === 'rood' ? 'rgba(239,68,68,0.10)' : 'rgba(245,158,11,0.10)',
+        border: k,
+        glow: 'none',
+        label: isToday ? '#000' : k,
+        arrowColor: k,
+      }
+    }
     if (isCompleted) return {
       bg: 'rgba(16,185,129, 0.10)',
       border: 'rgba(16,185,129, 0.45)',

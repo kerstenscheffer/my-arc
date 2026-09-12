@@ -10,6 +10,7 @@ export default function WeekGrid({
   selectedWorkout, selectedForSwap, swapMode, localSwapMode,
   getWorkoutData, onDayClick, onSwapClick, onShift, isMobile,
   dayDates, kanPlannen = true, kanOpenen = true, gedimd = false,
+  rustPerDag = {},
 }) {
   const weekDaysDutch = ['Ma', 'Di', 'Wo', 'Do', 'Vr', 'Za', 'Zo']
 
@@ -59,6 +60,7 @@ export default function WeekGrid({
             kanPlannen={kanPlannen}
             kanOpenen={kanOpenen}
             gedimd={gedimd}
+            rust={rustPerDag[index] || null}
           />
         )
       })}
