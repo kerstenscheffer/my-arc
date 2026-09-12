@@ -382,10 +382,14 @@ export default function AIAlternativesModal({
             />
           </div>
 
-          {/* Drie keuzes: welk moment, waar zoeken, welke volgorde. */}
-          <div style={{ display: 'flex', gap: '0.4rem' }}>
+          {/* Drie keuzes: welk moment, waar zoeken, welke volgorde. Losse
+              tekst met een pijltje, gescheiden door een lijntje — geen vakken,
+              die maakten van de kop een formulier. */}
+          <div style={{ display: 'flex', alignItems: 'center' }}>
             <Keuze waarde={moment} opties={momentOpties} zet={setMoment} isMobile={isMobile} />
+            <div style={{ width: 1, height: 16, background: 'rgba(255,255,255,0.15)', flexShrink: 0 }} />
             <Keuze waarde={bron} opties={bronOpties} zet={setBron} isMobile={isMobile} />
+            <div style={{ width: 1, height: 16, background: 'rgba(255,255,255,0.15)', flexShrink: 0 }} />
             <Keuze waarde={sortering} opties={sorteerOpties} zet={setSortering} isMobile={isMobile} />
           </div>
         </div>
@@ -584,27 +588,36 @@ function SuggestieKaart({ meal, currentMeal, isSelected, onSelect, isMobile }) {
   )
 }
 
-// Eén keuzelijst. Een echte <select> in plaats van een eigen menu: die opent
-// op de telefoon het systeem-wiel, en dat is sneller dan wat we zelf kunnen
-// bouwen. De pijl en de kleuren zetten we er zelf omheen.
+// Eén keuze: de gekozen waarde als losse tekst met een pijltje. De echte
+// <select> ligt er onzichtbaar overheen, zodat de telefoon zijn eigen
+// keuzewiel opent — sneller dan wat we zelf kunnen bouwen, en zonder dat het
+// een formuliervak wordt.
 function Keuze({ waarde, opties, zet, isMobile }) {
+  const gekozen = opties.find(o => o.id === waarde) || opties[0]
   return (
-    <div style={{ flex: 1, minWidth: 0, position: 'relative' }}>
+    <div style={{
+      flex: 1, minWidth: 0, position: 'relative',
+      display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 3,
+      padding: isMobile ? '0.35rem 0.3rem' : '0.4rem 0.4rem',
+    }}>
+      <span style={{
+        fontSize: isMobile ? '0.68rem' : '0.74rem',
+        fontWeight: 800, color: '#fff',
+        whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+        minWidth: 0,
+      }}>
+        {gekozen?.label}
+      </span>
+      <ChevronDown size={12} strokeWidth={2.8} style={{ color: 'rgba(255,255,255,0.45)', flexShrink: 0 }} />
       <select
         value={waarde}
         onChange={(e) => zet(e.target.value)}
+        aria-label={gekozen?.label}
         style={{
-          width: '100%',
-          appearance: 'none', WebkitAppearance: 'none',
-          padding: isMobile ? '0.45rem 1.3rem 0.45rem 0.6rem' : '0.5rem 1.5rem 0.5rem 0.7rem',
-          background: 'rgba(255,255,255,0.05)',
-          border: '1px solid rgba(255,255,255,0.15)',
-          borderRadius: 10,
-          color: '#fff',
-          fontSize: isMobile ? '0.68rem' : '0.74rem',
-          fontWeight: 800, fontFamily: 'inherit',
-          outline: 'none', cursor: 'pointer',
-          textOverflow: 'ellipsis',
+          position: 'absolute', inset: 0, width: '100%', height: '100%',
+          opacity: 0, appearance: 'none', WebkitAppearance: 'none',
+          border: 'none', background: 'transparent',
+          cursor: 'pointer', fontFamily: 'inherit',
           touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
         }}
       >
@@ -614,13 +627,6 @@ function Keuze({ waarde, opties, zet, isMobile }) {
           </option>
         ))}
       </select>
-      <ChevronDown
-        size={13} strokeWidth={2.6}
-        style={{
-          position: 'absolute', right: 6, top: '50%', transform: 'translateY(-50%)',
-          color: 'rgba(255,255,255,0.5)', pointerEvents: 'none',
-        }}
-      />
     </div>
   )
 }
