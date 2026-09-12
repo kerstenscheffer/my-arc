@@ -32,14 +32,20 @@ export default function ChallengeProgressTab({ db, client, isMobile = false }) {
   const [deelname, setDeelname] = useState(null)
   const [stand, setStand] = useState(null)
   const [open, setOpen] = useState(false)
+  const [fout, setFout] = useState(null)
 
   const laad = async () => {
+    setFout(null)
     try {
       const d = await haalDeelname(db, client?.id)
       setDeelname(d)
       setStand(d ? await haalStand(db, d) : null)
     } catch (e) {
       console.error('Challenge-stand laden mislukt:', e)
+      // Wél tonen dat het misging. Bij een stand waar geld van afhangt is
+      // "helemaal niets" een slechter antwoord dan "kon niet laden": dan denkt
+      // de klant dat hij niet meedoet.
+      setFout(e.message || String(e))
     }
   }
 
@@ -47,6 +53,24 @@ export default function ChallengeProgressTab({ db, client, isMobile = false }) {
   // Bij het openen opnieuw ophalen: je logt een maaltijd en kijkt meteen of
   // de dag meetelt. Een stand van een uur geleden is dan onbruikbaar.
   useEffect(() => { if (open && client?.id) laad() }, [open])
+
+  if (fout) {
+    return (
+      <div style={{
+        position: 'fixed',
+        top: `calc(env(safe-area-inset-top, 0px) + ${isMobile ? 10 : 14}px)`,
+        left: 12, zIndex: 80,
+        display: 'flex', alignItems: 'center', gap: 7,
+        height: 40, padding: '0 12px', borderRadius: 999,
+        background: 'rgba(10,10,10,0.94)',
+        backdropFilter: 'blur(14px)', WebkitBackdropFilter: 'blur(14px)',
+        border: '1px solid rgba(239,68,68,0.35)',
+        fontSize: '0.78rem', fontWeight: 800, color: '#ef4444',
+      }} title={fout}>
+        <Trophy size={15} /> Stand kon niet laden
+      </div>
+    )
+  }
 
   // Geen deelname is geen storing — dan hoort er niets te zweven.
   if (!deelname || !stand) return null
