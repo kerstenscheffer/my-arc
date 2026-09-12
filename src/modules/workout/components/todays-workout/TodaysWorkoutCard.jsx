@@ -52,51 +52,57 @@ export default function TodaysWorkoutCard({ workout, onLogClick, logsCount, isCo
   // lijst zonder dat er ergens stond welke training je aan het doen bent.
   if (isExpanded) {
     return (
-      <div>
+      <div style={{
+        position: 'relative', width: '100%',
+        height: isMobile ? 190 : 230,
+      }}>
         <div style={{
-          position: 'relative', width: '100%',
-          height: isMobile ? 168 : 210,
-          background: '#111',
-        }}>
-          <div style={{
-            position: 'absolute', inset: 0,
-            backgroundImage: `url(${getWorkoutImage()})`,
-            backgroundSize: 'cover', backgroundPosition: 'center',
-            opacity: isCompleted ? 0.5 : 1,
-          }} />
-          <div style={{
-            position: 'absolute', inset: 0, pointerEvents: 'none',
-            background: 'linear-gradient(180deg, rgba(10,10,10,0.35) 0%, rgba(10,10,10,0) 35%, rgba(10,10,10,0.85) 100%)',
-          }} />
-          {inProgress && (
-            <div style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: 4, background: 'rgba(0,0,0,0.45)' }}>
-              <div style={{ width: `${pct}%`, height: '100%', background: accent, transition: 'width 0.3s ease' }} />
-            </div>
-          )}
-          <button
-            onClick={onLogClick}
-            aria-label="Sluit workout"
-            style={{
-              position: 'absolute',
-              top: `calc(env(safe-area-inset-top, 0px) + 10px)`, right: 10,
-              display: 'flex', alignItems: 'center', gap: 5,
-              height: 40, padding: '0 0.8rem', borderRadius: 12,
-              background: 'rgba(10,10,10,0.7)',
-              backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)',
-              border: '1px solid rgba(255,255,255,0.15)', color: '#fff',
-              fontSize: '0.78rem', fontWeight: 900, fontFamily: 'inherit',
-              cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-            }}
-          >
-            Sluit
-            <ChevronDown size={15} strokeWidth={2.8} style={{ transform: 'rotate(180deg)' }} />
-          </button>
-        </div>
+          position: 'absolute', inset: 0,
+          backgroundImage: `url(${getWorkoutImage()})`,
+          backgroundSize: 'cover', backgroundPosition: 'center',
+          opacity: isCompleted ? 0.5 : 1,
+        }} />
+        {/* De foto loopt onderaan dood in de achtergrond in plaats van met een
+            harde rand te eindigen. Titel en cijfers liggen erop, dus die
+            kosten geen extra hoogte meer. */}
+        <div style={{
+          position: 'absolute', inset: 0, pointerEvents: 'none',
+          background: 'linear-gradient(180deg, rgba(10,10,10,0.45) 0%, rgba(10,10,10,0) 30%, rgba(10,10,10,0.75) 68%, #0a0a0a 100%)',
+        }} />
 
-        <div style={{ padding: isMobile ? '1.4rem 1rem 1.1rem' : '1.6rem 1.5rem 1.2rem' }}>
+        {inProgress && (
+          <div style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: 3, background: 'rgba(0,0,0,0.35)' }}>
+            <div style={{ width: `${pct}%`, height: '100%', background: accent, transition: 'width 0.3s ease' }} />
+          </div>
+        )}
+
+        <button
+          onClick={onLogClick}
+          aria-label="Sluit workout"
+          style={{
+            position: 'absolute',
+            top: `calc(env(safe-area-inset-top, 0px) + 10px)`, right: 10,
+            display: 'flex', alignItems: 'center', gap: 5,
+            height: 40, padding: '0 0.8rem', borderRadius: 12,
+            background: 'rgba(10,10,10,0.7)',
+            backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)',
+            border: '1px solid rgba(255,255,255,0.15)', color: '#fff',
+            fontSize: '0.78rem', fontWeight: 900, fontFamily: 'inherit',
+            cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+          }}
+        >
+          Sluit
+          <ChevronDown size={15} strokeWidth={2.8} style={{ transform: 'rotate(180deg)' }} />
+        </button>
+
+        <div style={{
+          position: 'absolute', left: 0, right: 0, bottom: 0,
+          padding: isMobile ? '0 1rem 0.85rem' : '0 1.5rem 1rem',
+        }}>
           <h2 style={{
-            fontSize: isMobile ? '1.1rem' : '1.3rem', fontWeight: 900, color: '#fff', margin: 0,
-            letterSpacing: '-0.025em', lineHeight: 1.2, wordBreak: 'break-word',
+            fontSize: isMobile ? '1.25rem' : '1.45rem', fontWeight: 900, color: '#fff', margin: 0,
+            letterSpacing: '-0.03em', lineHeight: 1.15, wordBreak: 'break-word',
+            textShadow: '0 2px 10px rgba(0,0,0,0.7)',
           }}>
             {workout.name || workout.focus || 'Workout'}
             {workout.focus && workout.focus !== workout.name && (
@@ -106,6 +112,7 @@ export default function TodaysWorkoutCard({ workout, onLogClick, logsCount, isCo
                 background: accent, color: '#0a0a0a',
                 fontSize: '0.56rem', fontWeight: 900,
                 textTransform: 'uppercase', letterSpacing: '0.06em', whiteSpace: 'nowrap',
+                textShadow: 'none',
               }}>
                 {workout.focus}
               </span>
@@ -113,20 +120,21 @@ export default function TodaysWorkoutCard({ workout, onLogClick, logsCount, isCo
           </h2>
           <div style={{
             display: 'flex', alignItems: 'baseline', gap: '0.5rem', flexWrap: 'wrap',
-            marginTop: '0.35rem', fontSize: isMobile ? '0.95rem' : '1.05rem', fontWeight: 900, color: '#fff',
+            marginTop: '0.25rem', fontSize: isMobile ? '0.92rem' : '1rem', fontWeight: 900, color: '#fff',
+            textShadow: '0 2px 8px rgba(0,0,0,0.7)',
           }}>
             {workout.exercises?.length > 0 && (
-              <span>{workout.exercises.length}<span style={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.78em', fontWeight: 800 }}> oefeningen</span></span>
+              <span>{workout.exercises.length}<span style={{ color: 'rgba(255,255,255,0.55)', fontSize: '0.78em', fontWeight: 800 }}> oefeningen</span></span>
             )}
             {workout.geschatteTijd && (
               <>
-                <span style={{ color: 'rgba(255,255,255,0.25)' }}>·</span>
-                <span>{String(workout.geschatteTijd).replace(/[^0-9]/g, '') || workout.geschatteTijd}<span style={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.78em', fontWeight: 800 }}> min</span></span>
+                <span style={{ color: 'rgba(255,255,255,0.35)' }}>·</span>
+                <span>{String(workout.geschatteTijd).replace(/[^0-9]/g, '') || workout.geschatteTijd}<span style={{ color: 'rgba(255,255,255,0.55)', fontSize: '0.78em', fontWeight: 800 }}> min</span></span>
               </>
             )}
-            <span style={{ color: 'rgba(255,255,255,0.25)' }}>·</span>
+            <span style={{ color: 'rgba(255,255,255,0.35)' }}>·</span>
             <span style={{ color: isCompleted ? '#10b981' : '#fff' }}>
-              {pct}<span style={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.78em', fontWeight: 800 }}>% klaar</span>
+              {pct}<span style={{ color: 'rgba(255,255,255,0.55)', fontSize: '0.78em', fontWeight: 800 }}>% klaar</span>
             </span>
           </div>
         </div>
