@@ -577,6 +577,18 @@ export default function ExerciseLogModal({ db, client, exercise, onClose, isMobi
               {editingIndex !== null && <span style={{ color: '#FFD700' }}>· set {editingIndex + 1} aanpassen</span>}
             </div>
           </div>
+          {/* Materiaal naast de titel, op dezelfde regel. Stond als eigen blok
+              met kopregel onder de vorige sessie; dat kostte een hele band
+              hoogte voor één keuze die je zelden verandert. */}
+          <AttachmentSelector
+            compact
+            suggested={exercise.suggested_attachment}
+            value={attachmentUsed}
+            onChange={(id) => { setAttachmentUsed(id); saveAttachmentPreference(id) }}
+            isMobile={isMobile}
+            exerciseName={exercise.name}
+          />
+
           {/* Zonder foto staat de sluit-knop hier, anders ligt hij op de foto. */}
           {!media?.image_url && (
             <button onClick={onClose} aria-label="Sluit" style={{ width: 44, height: 44, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 12, color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0, touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}>
@@ -613,15 +625,6 @@ export default function ExerciseLogModal({ db, client, exercise, onClose, isMobi
                 </div>
               </div>
             )}
-
-            {/* ── ATTACHMENT SELECTOR ── */}
-            <AttachmentSelector
-              suggested={exercise.suggested_attachment}
-              value={attachmentUsed}
-              onChange={(id) => { setAttachmentUsed(id); saveAttachmentPreference(id) }}
-              isMobile={isMobile}
-              exerciseName={exercise.name}
-            />
 
             {/* ── MACHINE SETTINGS ── */}
             <MachineSettings
