@@ -10,6 +10,12 @@ import { foodImageFallback } from '../foodImageFallback'
 import BladModal from '../../workout/components/todays-workout/components/BladModal'
 import { X, Search, Check, ArrowUp, ArrowDown, Minus, Star, Plus, Info } from 'lucide-react'
 
+// De secties van "Mijn maaltijden" heten anders dan de log-momenten hier.
+const MOMENT_NAAR_SECTIE = {
+  breakfast: 'ontbijt', lunch: 'lunch', dinner: 'diner',
+  snack: 'snacks', post_workout: 'snacks', pre_workout: 'pre_workout',
+}
+
 // De coach bewaart zijn vervangers per slot ('breakfast', 'avondsnack',
 // 'snack2', …). Voor de keuzelijst vertalen we die naar de zes momenten.
 function slotNaarMoment(slot) {
@@ -371,7 +377,10 @@ export default function AIAlternativesModal({
         fiber: Math.round(meal.fiber || 0),
         ingredients_list: ingredienten,
         image_url: meal.image_url || null,
-        section: sectie || null,
+        // "Mijn maaltijden" deelt in op sectie-id's ('ontbijt', 'snacks'),
+        // niet op log-momenten ('breakfast', 'snack'). Zonder deze vertaling
+        // kwam een gesterd ontbijt daar onder "Overige" te staan.
+        section: MOMENT_NAAR_SECTIE[sectie] || sectie || null,
         is_active: true,
       }).select().single()
       if (error) throw error

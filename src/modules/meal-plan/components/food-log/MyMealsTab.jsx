@@ -24,6 +24,20 @@ const SECTIONS = [
 ]
 const SECTION_MOMENT = Object.fromEntries(SECTIONS.map(s => [s.id, s.moment]))
 
+// In de database staan twee schrijfwijzen door elkaar: de secties hierboven
+// ('ontbijt', 'diner', 'snacks') en de log-momenten ('breakfast', 'dinner',
+// 'snack') — die laatste komen van de ster in het wisselvenster. Alles wordt
+// hier op de sectie-id getrokken, anders belandt een ontbijt onder "Overige".
+const MOMENT_SECTIE = {
+  breakfast: 'ontbijt', ontbijt: 'ontbijt',
+  lunch: 'lunch',
+  dinner: 'diner', diner: 'diner', avondeten: 'diner',
+  snack: 'snacks', snacks: 'snacks', tussendoortje: 'snacks',
+  post_workout: 'snacks',
+  pre_workout: 'pre_workout',
+}
+export const sectieVan = (ruw) => MOMENT_SECTIE[String(ruw || '').toLowerCase()] || null
+
 export default function MyMealsTab({ client, db, onLog, onRequestAddIngredient, buildingMeal, setBuildingMeal, isMobile }) {
   const [myMeals, setMyMeals] = useState([])
   const [loading, setLoading] = useState(true)
@@ -57,7 +71,7 @@ export default function MyMealsTab({ client, db, onLog, onRequestAddIngredient, 
       calories: meal.calories || 0, protein: parseFloat(meal.protein) || 0,
       carbs: parseFloat(meal.carbs) || 0, fat: parseFloat(meal.fat) || 0,
       ingredients: meal.ingredients_list || [], source: 'my_meals',
-      meal_type: SECTION_MOMENT[meal.section] || 'snack', per100g: false,
+      meal_type: SECTION_MOMENT[sectieVan(meal.section)] || 'snack', per100g: false,
       image_url: meal.image_url || null
     })
   }
@@ -81,7 +95,7 @@ export default function MyMealsTab({ client, db, onLog, onRequestAddIngredient, 
   SECTIONS.forEach(s => { mealsBySection[s.id] = [] })
   mealsBySection.overige = []
   myMeals.forEach(m => {
-    const sid = mealsBySection[m.section] !== undefined ? m.section : 'overige'
+    const sid = sectieVan(m.section) || 'overige'
     mealsBySection[sid].push(m)
   })
 
@@ -110,7 +124,7 @@ export default function MyMealsTab({ client, db, onLog, onRequestAddIngredient, 
   // filter: met vijf secties die allemaal dicht staan zag je je eigen
   // maaltijden pas na twee tikken.
   const gefilterd = myMeals
-    .filter(m => filterSectie === 'alle' || (mealsBySection[m.section] !== undefined ? m.section : 'overige') === filterSectie)
+    .filter(m => filterSectie === 'alle' || (sectieVan(m.section) || 'overige') === filterSectie)
     .sort((a, b) => {
       if (sortering === 'naam') return String(a.name || '').localeCompare(String(b.name || ''))
       if (sortering === 'kcal-hoog') return (b.calories || 0) - (a.calories || 0)
@@ -129,7 +143,7 @@ export default function MyMealsTab({ client, db, onLog, onRequestAddIngredient, 
     { id: 'kcal-hoog', label: 'Meeste kcal' },
     { id: 'kcal-laag', label: 'Minste kcal' },
   ]
-  const labelVan = (m) => (SECTIONS.find(sec => sec.id === m.section)?.label || 'Overige').replace(/^Mijn /, '')
+  const labelVan = (m) => (SECTIONS.find(sec => sec.id === sectieVan(m.section))?.label || 'Overige').replace(/^Mijn /, '')
 
   return (
     <div>
@@ -206,9 +220,6 @@ export default function MyMealsTab({ client, db, onLog, onRequestAddIngredient, 
                 carbs: meal.carbs, fat: meal.fat,
               }}
               momentLabel={labelVan(meal)}
-              ondertitel={Array.isArray(meal.ingredients_list) && meal.ingredients_list.length
-                ? `${meal.ingredients_list.length} ingrediënt${meal.ingredients_list.length !== 1 ? 'en' : ''}`
-                : null}
               isMobile={isMobile}
               onCheck={() => handleQuickLog(meal)}
               acties={[
