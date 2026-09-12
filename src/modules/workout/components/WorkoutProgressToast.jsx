@@ -262,7 +262,7 @@ export default function WorkoutProgressToast({ client, db, onViewChart }) {
           overheen kan beginnen in plaats van ernaast te moeten passen. */}
       <div style={{
         position: 'absolute', top: 0, right: 0, bottom: 0,
-        width: '62%',
+        width: '80%',
         backgroundImage: `url(${COACH_PHOTO_URL})`,
         backgroundSize: 'cover',
         // Het beeld is staand (665x1182) en de kop zit rond 45% van de hoogte;
@@ -271,13 +271,15 @@ export default function WorkoutProgressToast({ client, db, onViewChart }) {
       }} />
       <div style={{
         position: 'absolute', inset: 0, pointerEvents: 'none',
-        background: 'linear-gradient(90deg, #0a0a0a 0%, #0a0a0a 32%, rgba(10,10,10,0.88) 50%, rgba(10,10,10,0.45) 74%, rgba(10,10,10,0.05) 100%)',
+        background: 'linear-gradient(90deg, #0a0a0a 0%, #0a0a0a 20%, rgba(10,10,10,0.9) 40%, rgba(10,10,10,0.5) 66%, rgba(10,10,10,0.05) 100%)',
       }} />
 
       {/* Tekst — begint links en loopt tot over de helft van de foto. */}
       <div style={{
         position: 'absolute', top: 0, bottom: 0, left: 0,
-        width: '72%',
+        // De zwarte kolom is 20% breed; de tekst loopt daar overheen tot in de
+        // fade, want in 20% van 330px past geen leesbare regel.
+        width: '66%',
         padding: isMobile ? '0.7rem 0.5rem 0.7rem 0.9rem' : '0.85rem 0.6rem 0.85rem 1.1rem',
         display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 3,
       }}>
