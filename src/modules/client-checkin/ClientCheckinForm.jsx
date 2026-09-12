@@ -140,7 +140,7 @@ const COACHING_SECTIE = {
     {
       id: 'coaching_fijnste', type: 'tekst',
       vraag: 'Wat vind je tot nu toe het fijnste aan de coaching?',
-      hulp: 'Elke vier weken vraag ik dit even — zo weet ik wat ik moet blijven doen.',
+      hulp: 'Eens per vier weken vraag ik dit even — zo weet ik wat ik moet blijven doen.',
       placeholder: 'Waar heb je het meeste aan gehad?',
     },
     {
@@ -151,9 +151,6 @@ const COACHING_SECTIE = {
     },
   ],
 }
-
-// Om de hoeveel check-ins de coaching-vragen erbij komen.
-const COACHING_INTERVAL = 4
 
 const SCHAAL = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
 
@@ -205,10 +202,9 @@ export default function ClientCheckinForm({ db, client, onSubmitted, onClose }) 
   const [submitted, setSubmitted] = useState(false)
   const [formData, setFormData] = useState({})
   const [stap, setStap] = useState(0)
-  // Wordt dit de vierde, achtste, twaalfde…? Dan komen de coaching-vragen
-  // erbij. Tellen op ingediende check-ins en niet op kalenderweken: wie een
-  // week overslaat krijgt de vraag anders op een moment dat er niets te
-  // vertellen valt.
+  // Is het vier weken geleden dat de coaching-vragen gesteld zijn? Dan komen
+  // ze er deze keer bij. De service rekent op de kalender vanaf de start van
+  // het traject, niet op het aantal check-ins.
   const [coachingRonde, setCoachingRonde] = useState(false)
 
   const service = new CheckinService(db)
@@ -225,12 +221,12 @@ export default function ClientCheckinForm({ db, client, onSubmitted, onClose }) 
       // openen. We kijken of er sinds de laatste vrijdag al een is ingediend;
       // zo ja, dan het succes-scherm in plaats van het formulier. De cyclus
       // reset elke vrijdag.
-      const [hasCheckin, aantal] = await Promise.all([
+      const [hasCheckin, coachingBeurt] = await Promise.all([
         service.hasCheckinSinceLastFriday(client.id),
-        service.telCheckins(client.id),
+        service.coachingVraagAanDeBeurt(client.id, client.coaching_start_date),
       ])
       setSubmitted(hasCheckin)
-      setCoachingRonde((aantal + 1) % COACHING_INTERVAL === 0)
+      setCoachingRonde(coachingBeurt)
     } catch (error) {
       console.error('Error checking existing check-in:', error)
     } finally {
@@ -251,6 +247,10 @@ export default function ClientCheckinForm({ db, client, onSubmitted, onClose }) 
     coach_id: client.coach_id || client.trainer_id || null,
     // Zodat de coach-weergave weet welke vragen bij deze check-in hoorden.
     formulier_versie: 2,
+    // Waren de coaching-vragen deze keer aan de beurt, dan gaan ze altijd mee
+    // — desnoods leeg. Zo is "gesteld maar niet beantwoord" te onderscheiden
+    // van "niet gesteld", en komt de vraag niet de week erna meteen terug.
+    ...(coachingRonde ? { coaching_fijnste: '', coaching_verbeterpunt: '' } : {}),
     ...formData,
   })
 

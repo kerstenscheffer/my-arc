@@ -78,22 +78,60 @@ export default class CheckinService {
     }
   }
 
-  // Hoeveel check-ins heeft deze klant al ingediend. Head-count, dus geen
-  // rijen over de lijn en geen last van de 1000-rijen-cap.
-  async telCheckins(clientId) {
+  // Is de klant toe aan de vragen over de coaching zelf?
+  //
+  // Op de kalender, niet op het aantal check-ins: "elke 4 weken" hoort vier
+  // weken te zijn, ook als iemand er een paar heeft overgeslagen.
+  //
+  // Geteld vanaf de laatste keer dat de vraag gesteld is, en anders vanaf de
+  // start van het traject. Daardoor haalt hij zichzelf in: wie in week 4 geen
+  // check-in invulde krijgt de vraag bij de eerstvolgende, in plaats van pas
+  // in week 8.
+  async coachingVraagAanDeBeurt(clientId, coachingStartDate = null) {
+    const INTERVAL_DAGEN = 28
     try {
-      const { count, error } = await this.supabase
+      // Gesteld, niet beantwoord: als de vraag verscheen maar leeg bleef staat
+      // er een lege tekst in plaats van null. Zou dat op null blijven, dan
+      // kwam de vraag de week erna gewoon terug.
+      const { data: laatste, error } = await this.supabase
         .from('client_checkins')
-        .select('id', { count: 'exact', head: true })
+        .select('checkin_date')
         .eq('client_id', clientId)
+        .not('coaching_fijnste', 'is', null)
         .in('status', ['submitted', 'reviewed'])
+        .order('checkin_date', { ascending: false })
+        .limit(1)
       if (error) throw error
-      return count || 0
+
+      let vanaf = laatste?.[0]?.checkin_date || coachingStartDate || null
+
+      if (!vanaf) {
+        // Geen startdatum bekend (staat niet bij elke klant ingevuld): dan de
+        // eerste check-in als begin van het traject nemen.
+        const { data: eerste } = await this.supabase
+          .from('client_checkins')
+          .select('checkin_date')
+          .eq('client_id', clientId)
+          .in('status', ['submitted', 'reviewed'])
+          .order('checkin_date', { ascending: true })
+          .limit(1)
+        vanaf = eerste?.[0]?.checkin_date || null
+      }
+
+      // Allereerste check-in en geen startdatum: dan is er nog niets om over
+      // te oordelen. Volgende keer weer kijken.
+      if (!vanaf) return false
+
+      // Op middernacht lokaal rekenen; met een tijdstip erin verspringt het
+      // aantal dagen halverwege de dag.
+      const start = new Date(`${String(vanaf).slice(0, 10)}T00:00:00`)
+      const nu = new Date(); nu.setHours(0, 0, 0, 0)
+      return Math.round((nu - start) / 86400000) >= INTERVAL_DAGEN
     } catch (error) {
-      // Bij twijfel 0 teruggeven: dan komt de coaching-vraag hooguit een keer
-      // te vroeg, in plaats van dat het formulier helemaal niet opent.
-      console.error('❌ telCheckins failed:', error)
-      return 0
+      // Bij twijfel niet vragen: een check-in die opent zonder de extra vragen
+      // is beter dan een check-in die helemaal niet opent.
+      console.error('❌ coachingVraagAanDeBeurt failed:', error)
+      return false
     }
   }
 
