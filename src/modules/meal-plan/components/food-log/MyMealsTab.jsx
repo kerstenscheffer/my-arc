@@ -7,12 +7,6 @@ import MealCard from '../day-schedule/MealCard'
 import Keuze from '../Keuze'
 import { foodImageFallback } from '../../foodImageFallback'
 
-const MEAL_MOMENTS = [
-  { id: 'breakfast', label: 'Ontbijt' },
-  { id: 'lunch', label: 'Lunch' },
-  { id: 'dinner', label: 'Avondeten' },
-  { id: 'snack', label: 'Tussendoortjes' }
-]
 
 // Vaste secties waarin de klant z'n eigen maaltijden indeelt. Vast door ons
 // bepaald; `moment` is het bijhorende log-moment, `emoji` de card-icoon-fallback.
@@ -242,7 +236,15 @@ export default function MyMealsTab({ client, db, onLog, onRequestAddIngredient, 
 function MealDetailView({ meal, setMeal, client, db, isMobile, onBack, onRequestAddIngredient, onLog }) {
   const [saving, setSaving] = useState(false)
   // Log-moment: standaard uit de gekozen sectie (bv. pre-workout → snack).
-  const [mealMoment, setMealMoment] = useState(meal._moment || SECTION_MOMENT[meal.section] || 'breakfast')
+  // Je kiest de sectie ("Mijn diner"); het log-moment volgt daaruit. Eerder
+  // koos je alleen het moment en werd de sectie nooit meegeschreven, dus bleef
+  // een maaltijd onder "Overige" staan hoe vaak je Diner ook koos.
+  const [sectie, setSectie] = useState(sectieVan(meal.section) || (meal._moment ? MOMENT_SECTIE[meal._moment] : null) || '')
+  const mealMoment = SECTION_MOMENT[sectie] || meal._moment || 'snack'
+  const sectieOptiesDetail = [
+    ...SECTIONS.map(sec => ({ id: sec.id, label: sec.label.replace(/^Mijn /, '') })),
+    { id: '', label: 'Geen sectie' },
+  ]
   // Photo state — `photoFile` is a File from the picker (upload pending),
   // `photoPreview` is what's shown in the UI (object URL or saved image_url).
   const [photoFile, setPhotoFile] = useState(null)
@@ -337,7 +339,7 @@ function MealDetailView({ meal, setMeal, client, db, isMobile, onBack, onRequest
         carbs: Math.round(totals.carbs), fat: Math.round(totals.fat),
         ingredients_list: meal.ingredients_list, is_active: true,
         image_url: imageUrl,
-        section: meal.section || null,
+        section: sectie || null,
         updated_at: new Date().toISOString()
       }
       if (meal.id) {
@@ -365,7 +367,7 @@ function MealDetailView({ meal, setMeal, client, db, isMobile, onBack, onRequest
         carbs: Math.round(totals.carbs), fat: Math.round(totals.fat),
         ingredients_list: meal.ingredients_list, is_active: true,
         image_url: imageUrl,
-        section: meal.section || null,
+        section: sectie || null,
         updated_at: new Date().toISOString()
       }
       if (meal.id) {
@@ -488,13 +490,13 @@ function MealDetailView({ meal, setMeal, client, db, isMobile, onBack, onRequest
             fontSize: '0.62rem', fontWeight: 800, color: 'rgba(255,255,255,0.4)',
             textTransform: 'uppercase', letterSpacing: '0.1em',
           }}>
-            Moment
+            Sectie
           </div>
-          <div style={{ width: 150 }}>
+          <div style={{ width: 160 }}>
             <Keuze
-              waarde={mealMoment}
-              opties={MEAL_MOMENTS}
-              zet={setMealMoment}
+              waarde={sectie}
+              opties={sectieOptiesDetail}
+              zet={setSectie}
               isMobile={isMobile}
               uitlijning="rechts"
             />
