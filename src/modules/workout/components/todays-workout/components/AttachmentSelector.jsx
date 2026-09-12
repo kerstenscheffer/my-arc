@@ -144,11 +144,13 @@ export default function AttachmentSelector({ suggested, value, onChange, isMobil
         <button
           onClick={() => setShowPicker(true)}
           title={current ? `Materiaal: ${current.nl}` : 'Kies je materiaal'}
+          /* Geen kader eromheen: de foto is al een blok, en een doos daar
+             weer omheen kostte breedte die de naam nodig heeft. */
           style={{
-            display: 'flex', alignItems: 'center', gap: 7, flexShrink: 0,
+            display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0,
             width: '100%', minHeight: 44,
-            background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)',
-            borderRadius: 10, padding: '0.3rem 0.5rem 0.3rem 0.35rem', cursor: 'pointer',
+            background: 'transparent', border: 'none', padding: 0,
+            cursor: 'pointer',
             fontFamily: 'inherit', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
           }}
         >

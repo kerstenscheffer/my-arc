@@ -611,17 +611,25 @@ export default function ExerciseLogModal({ db, client, exercise, onClose, isMobi
             onder elkaar; die kostten samen meer hoogte dan de titel zelf. */}
         <div style={{
           display: 'grid',
-          // 70/30, maar op een telefoon met een bodem onder de rechterkolom:
-          // 30% van 390px is ~112px en dan blijft er van "Lat pulldown stang"
-          // niets leesbaars over.
-          gridTemplateColumns: isMobile ? 'minmax(0, 1fr) 1px 134px' : '70fr 1px 30fr',
+          // 60/40, maar op een telefoon met een bodem onder de rechterkolom:
+          // een percentage van 390px valt daar te smal uit voor een naam als
+          // "Lat pulldown stang".
+          gridTemplateColumns: isMobile ? 'minmax(0, 1fr) 1px 150px' : '60fr 1px 40fr',
           gap: isMobile ? '0.7rem' : '1rem',
           alignItems: 'stretch',
           padding: isMobile ? '0.8rem 1rem' : '0.9rem 1.5rem',
           paddingTop: media?.image_url ? undefined : `calc(env(safe-area-inset-top, 0px) + ${isMobile ? '0.875rem' : '1rem'})`,
         }}>
           <div style={{ minWidth: 0, alignSelf: 'center' }}>
-            <h2 style={{ fontSize: isMobile ? '1.15rem' : '1.35rem', fontWeight: 900, color: '#fff', margin: 0, letterSpacing: '-0.025em', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{exercise.name}</h2>
+            {/* Titel mag over twee regels. Stond op één regel met puntjes,
+                en dan las "Chest Supported Rear Delt Fly" als "Chest
+                Supported Rear…" — precies het stuk dat zegt wélke fly. */}
+            <h2 style={{
+              fontSize: isMobile ? '1.1rem' : '1.3rem', fontWeight: 900, color: '#fff', margin: 0,
+              letterSpacing: '-0.025em', lineHeight: 1.15,
+              display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical',
+              overflow: 'hidden', wordBreak: 'break-word',
+            }}>{exercise.name}</h2>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', flexWrap: 'wrap', marginTop: '0.2rem', fontSize: isMobile ? '0.74rem' : '0.8rem', fontWeight: 800 }}>
               <span style={{ color: '#fff' }}>
                 {loggedSets.length}/{exercise.sets}<span style={{ color: 'rgba(255,255,255,0.35)' }}> sets</span>

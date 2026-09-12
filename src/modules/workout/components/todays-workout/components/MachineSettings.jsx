@@ -84,14 +84,14 @@ export default function MachineSettings({ value = {}, onChange, previousSettings
         <button
           onClick={() => setExpanded(true)}
           title="Machine-instellingen"
+          /* Zelfde als bij materiaal: geen kader, alleen icoon en tekst. */
           style={{
-            display: 'flex', alignItems: 'center', gap: 7, width: '100%', minHeight: 44,
-            background: 'rgba(255,255,255,0.04)', border: `1px solid ${hasCurrentValues ? 'rgba(255,215,0,0.35)' : 'rgba(255,255,255,0.1)'}`,
-            borderRadius: 10, padding: '0.3rem 0.5rem', cursor: 'pointer',
+            display: 'flex', alignItems: 'center', gap: 8, width: '100%', minHeight: 44,
+            background: 'transparent', border: 'none', padding: 0, cursor: 'pointer',
             fontFamily: 'inherit', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
           }}
         >
-          <div style={{ width: 30, height: 30, borderRadius: 7, background: 'rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+          <div style={{ width: 30, height: 30, borderRadius: 7, background: hasCurrentValues ? 'rgba(255,215,0,0.12)' : 'rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
             <Settings size={15} color={hasCurrentValues ? '#FFD700' : 'rgba(255,255,255,0.5)'} strokeWidth={2.2} />
           </div>
           <div style={{ minWidth: 0, textAlign: 'left', flex: 1 }}>
