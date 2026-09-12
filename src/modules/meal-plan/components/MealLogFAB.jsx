@@ -1,6 +1,6 @@
 // src/modules/meal-plan/components/MealLogFAB.jsx
 //
-// Eén ronde gele knop met + om een maaltijd te loggen. Floating rechtsonder,
+// Eén ronde witte knop met + om een maaltijd te loggen. Floating rechtsonder,
 // boven de client-nav balk. Vervangt de wijde "+ Maaltijd loggen"-knop uit
 // AIDaySchedule zodat er één duidelijke log-actie per pagina overblijft.
 
@@ -25,13 +25,13 @@ export default function MealLogFAB({ onClick, isMobile: propMobile }) {
         zIndex: 90,
         width: size, height: size,
         borderRadius: '50%',
-        background: 'linear-gradient(135deg, #FFD700 0%, #D4AF37 100%)',
+        background: '#fff',
         border: 'none',
         color: '#0a0a0a',
         cursor: 'pointer',
         touchAction: 'manipulation',
         WebkitTapHighlightColor: 'transparent',
-        boxShadow: '0 14px 36px rgba(255,215,0,0.32), 0 4px 12px rgba(0,0,0,0.4)',
+        boxShadow: '0 14px 36px rgba(0,0,0,0.5), 0 4px 12px rgba(0,0,0,0.4)',
         display: 'flex', alignItems: 'center', justifyContent: 'center',
         flexDirection: 'column',
         gap: 0,

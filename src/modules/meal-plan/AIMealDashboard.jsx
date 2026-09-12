@@ -555,6 +555,42 @@ export default function AIMealDashboard({ client, onNavigate, db }) {
           position: 'absolute', inset: 0, pointerEvents: 'none',
           background: 'linear-gradient(180deg, rgba(10,10,10,0.55) 0%, rgba(10,10,10,0.12) 18%, rgba(10,10,10,0.55) 45%, rgba(10,10,10,0.88) 72%, #0a0a0a 100%)',
         }} />
+        {/* Maaltijdplan tonen — bovenin op de foto, waar anders alleen lucht
+            zat. Wit in plaats van goud, net als de rest van de kop. */}
+        <div style={{
+          position: 'absolute', top: 0, left: 0, right: 0, zIndex: 2,
+          padding: isMobile ? 'calc(env(safe-area-inset-top, 0px) + 0.5rem) 1rem 0' : '0.7rem 1.5rem 0',
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem',
+        }}>
+          <span style={{
+            fontSize: isMobile ? '0.8rem' : '0.88rem', fontWeight: 900, color: '#fff',
+            letterSpacing: '-0.015em', textShadow: '0 2px 10px rgba(0,0,0,0.8)',
+          }}>
+            Maaltijdplan tonen
+          </span>
+          <button
+            onClick={toggleMealPlanVisible}
+            disabled={savingVisibility}
+            role="switch"
+            aria-checked={mealPlanVisible}
+            style={{
+              width: 46, height: 26, borderRadius: 999, flexShrink: 0, position: 'relative',
+              background: mealPlanVisible ? '#fff' : 'rgba(0,0,0,0.45)',
+              border: mealPlanVisible ? 'none' : '1.5px solid rgba(255,255,255,0.6)',
+              cursor: savingVisibility ? 'default' : 'pointer',
+              transition: 'background 0.2s ease', opacity: savingVisibility ? 0.6 : 1,
+              touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+              boxShadow: '0 2px 10px rgba(0,0,0,0.5)',
+            }}>
+            <span style={{
+              position: 'absolute', top: 3, left: mealPlanVisible ? 23 : 3,
+              width: 20, height: 20, borderRadius: '50%',
+              background: mealPlanVisible ? '#0a0a0a' : '#fff',
+              transition: 'left 0.2s ease',
+            }} />
+          </button>
+        </div>
+
         <div style={{
           position: 'absolute', left: 0, right: 0, bottom: isMobile ? 6 : 10,
         }}>
@@ -588,32 +624,6 @@ export default function AIMealDashboard({ client, onNavigate, db }) {
           />
         )
       })()}
-
-      {/* ════ MAALTIJDPLAN TONEN — toggle direct onder de koolh/vet-regel ════ */}
-      <div style={{
-        padding: isMobile ? '0 0.9rem 0.5rem' : '0 1.5rem 0.6rem', maxWidth: 1400, margin: '0 auto',
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem',
-      }}>
-        <span style={{ fontSize: isMobile ? '0.82rem' : '0.9rem', fontWeight: 800, color: '#fff' }}>Maaltijdplan tonen</span>
-        <button
-          onClick={toggleMealPlanVisible}
-          disabled={savingVisibility}
-          role="switch"
-          aria-checked={mealPlanVisible}
-          style={{
-            width: 46, height: 26, borderRadius: 999, flexShrink: 0, position: 'relative',
-            background: mealPlanVisible ? '#FFD700' : 'rgba(255,255,255,0.14)',
-            border: 'none', cursor: savingVisibility ? 'default' : 'pointer',
-            transition: 'background 0.2s ease', opacity: savingVisibility ? 0.6 : 1,
-            touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-          }}>
-          <span style={{
-            position: 'absolute', top: 3, left: mealPlanVisible ? 23 : 3,
-            width: 20, height: 20, borderRadius: '50%', background: mealPlanVisible ? '#000' : '#fff',
-            transition: 'left 0.2s ease',
-          }} />
-        </button>
-      </div>
 
       {/* Coach meal suggestions — gefilterd op tijd van de dag */}
       <CoachMealSuggestions db={db} isMobile={isMobile} />
