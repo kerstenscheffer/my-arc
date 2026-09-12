@@ -3,7 +3,7 @@
 // Props IDENTIEK: { isOpen, onClose, currentMeal, onSelectMeal, db, service }
 import React, { useState, useEffect } from 'react'
 import MealCard from './day-schedule/MealCard'
-import { X, Search, Check, ArrowUp, ArrowDown, Minus, Star, Flame, Beef } from 'lucide-react'
+import { X, Search, Check, ArrowUp, ArrowDown, Minus } from 'lucide-react'
 
 export default function AIAlternativesModal({
   isOpen,
@@ -390,14 +390,13 @@ export default function AIAlternativesModal({
             </div>
           ) : filteredMeals.length > 0 ? (
             filteredMeals.map((meal, idx) => (
-              <SwapMealRow
+              <SuggestieKaart
                 key={meal.id || idx}
                 meal={meal}
                 currentMeal={currentMeal}
                 isSelected={selectedMeal?.id === meal.id}
                 onSelect={() => setSelectedMeal(selectedMeal?.id === meal.id ? null : meal)}
                 isMobile={isMobile}
-                getDiff={getDiff}
               />
             ))
           ) : (
@@ -532,174 +531,36 @@ export default function AIAlternativesModal({
 }
 
 // ── Single meal row in the list ──
-function SwapMealRow({ meal, currentMeal, isSelected, onSelect, isMobile, getDiff }) {
-  const getMealImage = () => {
-    if (meal.image_url) return meal.image_url
-    const fallbacks = {
-      breakfast: 'https://images.unsplash.com/photo-1525351484163-7529414344d8?w=200&h=200&fit=crop&q=80',
-      lunch: 'https://images.unsplash.com/photo-1547592166-23ac45744acd?w=200&h=200&fit=crop&q=80',
-      dinner: 'https://images.unsplash.com/photo-1555939594-58d7cb561ad1?w=200&h=200&fit=crop&q=80',
-      snack: 'https://images.unsplash.com/photo-1490474504059-bf2db5ab2348?w=200&h=200&fit=crop&q=80'
-    }
-    const type = meal.timing?.[0] || 'lunch'
-    return fallbacks[type] || fallbacks.lunch
-  }
-
-  const calDiff = getDiff(meal.calories, currentMeal?.calories)
-  const protDiff = getDiff(meal.protein, currentMeal?.protein)
+// Een suggestie in het wisselvenster: dezelfde kaart als in de dagplanning,
+// zodat je niet naar twee soorten maaltijdregels zit te kijken. Op de foto
+// staat het verschil in kcal met de huidige maaltijd — dat is waar je bij
+// het wisselen naar zoekt — of "Eigen" bij een zelfgemaakte maaltijd.
+function SuggestieKaart({ meal, currentMeal, isSelected, onSelect, isMobile }) {
+  const verschil = Math.round((meal.calories || 0) - (currentMeal?.calories || 0))
+  const kcalLabel = verschil === 0
+    ? 'Zelfde kcal'
+    : `${verschil > 0 ? '+' : ''}${verschil} kcal`
 
   return (
-    <div
-      onClick={onSelect}
-      style={{
-        display: 'flex',
-        alignItems: 'center',
-        borderBottom: '1px solid rgba(255, 255, 255, 0.04)',
-        background: isSelected ? 'rgba(255, 215, 0, 0.06)' : 'transparent',
-        cursor: 'pointer',
-        transition: 'background 0.15s ease',
-        touchAction: 'manipulation',
-        WebkitTapHighlightColor: 'transparent'
+    <MealCard
+      meal={{
+        name: meal.name,
+        image_url: meal.image_url,
+        slot: meal.slot || currentMeal?.slot,
+        calories: meal.calories, protein: meal.protein,
+        carbs: meal.carbs, fat: meal.fat,
       }}
-    >
-      {/* Photo */}
-      <div style={{
-        width: isMobile ? '56px' : '64px',
-        height: isMobile ? '56px' : '64px',
-        flexShrink: 0,
-        background: `url(${getMealImage()}) center/cover`,
-        position: 'relative'
-      }}>
-        {isSelected && (
-          <div style={{
-            position: 'absolute',
-            inset: 0,
-            background: 'rgba(255, 215, 0, 0.8)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center'
-          }}>
-            <Check size={20} color="white" strokeWidth={3} />
-          </div>
-        )}
-      </div>
-
-      {/* Info */}
-      <div style={{
-        flex: 1,
-        minWidth: 0,
-        width: 0,
-        padding: isMobile ? '0.5rem 0.625rem' : '0.625rem 0.75rem',
-        overflow: 'hidden'
-      }}>
-        {/* Name */}
-        <div style={{
-          display: 'flex', alignItems: 'center', gap: '0.35rem',
-          marginBottom: '0.2rem', overflow: 'hidden'
-        }}>
-          <div style={{
-            fontSize: isMobile ? '0.8rem' : '0.85rem',
-            fontWeight: '700',
-            color: isSelected ? '#fff' : 'rgba(255, 255, 255, 0.85)',
-            whiteSpace: 'nowrap',
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
-            letterSpacing: '-0.01em',
-          }}>
-            {meal.name}
-          </div>
-          {meal._isCustom && (
-            <span style={{
-              flexShrink: 0,
-              fontSize: '0.55rem', fontWeight: '800',
-              color: '#FFD700', background: 'rgba(255,215,0,0.1)',
-              border: '1px solid rgba(255,215,0,0.25)',
-              borderRadius: '4px', padding: '0.1rem 0.3rem',
-              textTransform: 'uppercase', letterSpacing: '0.04em'
-            }}>Eigen</span>
-          )}
-        </div>
-
-        {/* Macros + diff indicators */}
-        <div style={{
-          display: 'flex',
-          gap: isMobile ? '0.625rem' : '0.75rem',
-          alignItems: 'center'
-        }}>
-          {/* Calories */}
-          <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.1rem' }}>
-            <span style={{
-              fontSize: isMobile ? '0.7rem' : '0.75rem',
-              fontWeight: '800',
-              color: 'rgba(255, 255, 255, 0.5)'
-            }}>
-              {Math.round(meal.calories)}
-            </span>
-            <span style={{
-              fontSize: '0.45rem',
-              fontWeight: '600',
-              color: 'rgba(255, 255, 255, 0.2)',
-              textTransform: 'uppercase'
-            }}>
-              kcal
-            </span>
-          </div>
-
-          {/* Protein */}
-          <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.1rem' }}>
-            <span style={{
-              fontSize: isMobile ? '0.7rem' : '0.75rem',
-              fontWeight: '800',
-              color: 'rgba(255, 255, 255, 0.5)'
-            }}>
-              {Math.round(meal.protein)}
-            </span>
-            <span style={{
-              fontSize: '0.45rem',
-              fontWeight: '600',
-              color: 'rgba(255, 255, 255, 0.2)',
-              textTransform: 'uppercase'
-            }}>
-              eiwit
-            </span>
-          </div>
-
-          {/* Diff badges */}
-          <div style={{
-            display: 'flex',
-            gap: '0.3rem',
-            marginLeft: 'auto'
-          }}>
-            <DiffBadge diff={calDiff} label="kcal" isMobile={isMobile} />
-            <DiffBadge diff={protDiff} label="E" isMobile={isMobile} />
-          </div>
-        </div>
-      </div>
-    </div>
-  )
-}
-
-// ── Tiny diff badge ──
-function DiffBadge({ diff, label, isMobile }) {
-  const DiffIcon = diff.Icon
-  return (
-    <div style={{
-      display: 'flex',
-      alignItems: 'center',
-      gap: '0.1rem',
-      padding: '0.15rem 0.3rem',
-      background: `${diff.color}10`,
-      borderRadius: '4px',
-      flexShrink: 0
-    }}>
-      <DiffIcon size={8} color={diff.color} />
-      <span style={{
-        fontSize: isMobile ? '0.5rem' : '0.55rem',
-        fontWeight: '800',
-        color: diff.color
-      }}>
-        {diff.text}
-      </span>
-    </div>
+      momentLabel={meal._isCustom ? 'Eigen maaltijd' : kcalLabel}
+      tijdLabel={meal._isCustom ? kcalLabel : null}
+      isMobile={isMobile}
+      geselecteerd={isSelected}
+      onCheck={onSelect}
+      acties={[{
+        icon: <Check size={isMobile ? 11 : 12} strokeWidth={2.6} />,
+        label: isSelected ? 'Gekozen' : 'Kies',
+        onClick: onSelect,
+        checked: isSelected,
+      }]}
+    />
   )
 }

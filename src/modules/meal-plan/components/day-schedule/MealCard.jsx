@@ -49,6 +49,9 @@ export default function MealCard({
   // Regel onder de naam in plaats van de macro's — een supplement heeft geen
   // kcal maar wel een dosering.
   ondertitel = null,
+  // Aangetikt in een keuzelijst (wisselvenster): witte rand in plaats van de
+  // grijze, zonder het "afgevinkt"-gedrag van isChecked.
+  geselecteerd = false,
 }) {
   const photoSize = isMobile ? 78 : 90
   const moment = momentLabel || getMealTypeLabel(meal)
@@ -56,8 +59,8 @@ export default function MealCard({
   return (
     <div style={{
       margin: isMobile ? '0 0.9rem 0.55rem' : '0 1.25rem 0.7rem',
-      background: 'rgba(255,255,255,0.025)',
-      border: '1px solid rgba(255,255,255,0.05)',
+      background: geselecteerd ? 'rgba(255,255,255,0.07)' : 'rgba(255,255,255,0.025)',
+      border: `1px solid ${geselecteerd ? 'rgba(255,255,255,0.75)' : 'rgba(255,255,255,0.05)'}`,
       borderRadius: 12,
       overflow: 'hidden',
       opacity: isChecked ? 0.55 : 1,
