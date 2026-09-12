@@ -81,6 +81,25 @@ export default function MyMealsTab({ client, db, onLog, onRequestAddIngredient, 
     })
   }
 
+  // Weghalen is een vlag, geen delete: eerder gelogde maaltijden verwijzen
+  // ernaar en die wil je niet stilletjes laten verdwijnen uit je historie.
+  const [verwijderMeal, setVerwijderMeal] = useState(null)
+  const [verwijderBezig, setVerwijderBezig] = useState(false)
+
+  const verwijderMaaltijd = async () => {
+    if (!verwijderMeal) return
+    setVerwijderBezig(true)
+    const id = verwijderMeal.id
+    setMyMeals(prev => prev.filter(m => m.id !== id))
+    const { error } = await db.supabase
+      .from('ai_custom_meals')
+      .update({ is_active: false, updated_at: new Date().toISOString() })
+      .eq('id', id)
+    setVerwijderBezig(false)
+    setVerwijderMeal(null)
+    if (error) { console.error('Verwijderen mislukt:', error); loadMyMeals() }
+  }
+
   const handleOpenMeal = (meal) => {
     setBuildingMeal({ ...meal, ingredients_list: meal.ingredients_list || [] })
   }
@@ -183,6 +202,53 @@ export default function MyMealsTab({ client, db, onLog, onRequestAddIngredient, 
         <Keuze waarde={sortering} opties={sorteerOpties} zet={setSortering} isMobile={isMobile} uitlijning="rechts" />
       </div>
 
+      {verwijderMeal && (
+        <div
+          onClick={() => !verwijderBezig && setVerwijderMeal(null)}
+          style={{
+            position: 'fixed', inset: 0, zIndex: 10004,
+            background: 'rgba(0,0,0,0.85)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1.25rem',
+          }}
+        >
+          <div onClick={(e) => e.stopPropagation()} style={{
+            width: '100%', maxWidth: 340,
+            background: '#0a0a0a', border: '1px solid rgba(255,255,255,0.14)',
+            borderRadius: 16, padding: '1.1rem',
+          }}>
+            <div style={{ fontSize: '1rem', fontWeight: 900, color: '#fff', marginBottom: 4 }}>
+              {verwijderMeal.name} verwijderen?
+            </div>
+            <div style={{ fontSize: '0.76rem', fontWeight: 700, color: 'rgba(255,255,255,0.45)', marginBottom: '1rem' }}>
+              Hij verdwijnt uit je maaltijden. Wat je er eerder mee logde blijft in je historie staan.
+            </div>
+            <button
+              onClick={verwijderMaaltijd}
+              disabled={verwijderBezig}
+              style={{
+                width: '100%', minHeight: 46, marginBottom: 8,
+                background: 'transparent', border: '1px solid rgba(239,68,68,0.4)',
+                borderRadius: 12, color: '#ef4444',
+                fontSize: '0.88rem', fontWeight: 900, fontFamily: 'inherit',
+                cursor: verwijderBezig ? 'wait' : 'pointer', touchAction: 'manipulation',
+              }}
+            >
+              {verwijderBezig ? 'Bezig…' : 'Verwijderen'}
+            </button>
+            <button
+              onClick={() => setVerwijderMeal(null)}
+              style={{
+                width: '100%', minHeight: 38,
+                background: 'transparent', border: 'none', color: 'rgba(255,255,255,0.45)',
+                fontSize: '0.8rem', fontWeight: 800, fontFamily: 'inherit', cursor: 'pointer',
+              }}
+            >
+              Annuleren
+            </button>
+          </div>
+        </div>
+      )}
+
       {showPrep && (
         <MealPrepCalculator
           client={client}
@@ -215,6 +281,21 @@ export default function MyMealsTab({ client, db, onLog, onRequestAddIngredient, 
                 carbs: meal.carbs, fat: meal.fat,
               }}
               momentLabel={labelVan(meal)}
+              hoekKnop={
+                <button
+                  onClick={(e) => { e.stopPropagation(); setVerwijderMeal(meal) }}
+                  aria-label="Maaltijd verwijderen"
+                  style={{
+                    width: 28, height: 28, padding: 0,
+                    background: 'transparent', border: 'none', borderRadius: 7,
+                    color: '#fff', opacity: 0.85,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+                  }}
+                >
+                  <Trash2 size={14} strokeWidth={2.6} />
+                </button>
+              }
               isMobile={isMobile}
               onCheck={() => handleQuickLog(meal)}
               acties={[
