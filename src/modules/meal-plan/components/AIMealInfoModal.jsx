@@ -4,6 +4,8 @@ import React, { useState, useEffect } from 'react'
 import { X, Info, ChefHat, Euro, Lightbulb, Clock, Package, AlertCircle, CheckCircle, Sparkles, Pencil } from 'lucide-react'
 import { toHumanAmount } from '../../ai-meal-generator/utils/unitConverter'
 import ClientMealEditModal from './ClientMealEditModal'
+import MealCard from './day-schedule/MealCard'
+import { foodImageFallback } from '../foodImageFallback'
 import MealPrepModal from './MealPrepModal'
 
 export default function AIMealInfoModal({ isOpen, onClose, meal, db, service, client, planId, dayName, isToday, onSaved }) {
@@ -126,29 +128,29 @@ export default function AIMealInfoModal({ isOpen, onClose, meal, db, service, cl
         {/* Hero */}
         <div style={{ position: 'relative', height: isMobile ? '180px' : '220px', flexShrink: 0 }}>
           <div style={{ position: 'absolute', inset: 0, backgroundImage: `url(${getMealImage()})`, backgroundSize: 'cover', backgroundPosition: 'center' }} />
-          <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to top, #0a0a0a 0%, rgba(0,0,0,0.3) 40%, transparent 70%)' }} />
+          <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, rgba(10,10,10,0.5) 0%, rgba(10,10,10,0) 30%, rgba(10,10,10,0.8) 70%, #0a0a0a 100%)' }} />
           {/* Knoprij rechtsboven. Deze knoppen stonden los gepositioneerd met
               een vaste right-offset per knop; bij een derde knop erbij ga je
               dan zitten rekenen en schuift er eentje over de ander. Eén flex-rij
               legt ze vanzelf naast elkaar. */}
           <div style={{ position: 'absolute', top: '0.75rem', right: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
             {canPrep && (
-              <button onClick={() => setShowPrep(true)} style={{ height: '36px', padding: '0 0.8rem', background: 'rgba(16,185,129,0.92)', border: '1px solid rgba(16,185,129,0.5)', borderRadius: '10px', color: '#04140e', display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.72rem', fontWeight: 800, cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}><ChefHat size={13} /> Meal preppen</button>
+              <button onClick={() => setShowPrep(true)} style={{ height: '36px', padding: '0 0.8rem', background: 'transparent', border: '1.5px solid rgba(255,255,255,0.35)', borderRadius: '10px', color: '#fff', display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.72rem', fontWeight: 900, cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}><ChefHat size={13} /> Meal preppen</button>
             )}
             {canEdit && (
-              <button onClick={() => setShowEdit(true)} style={{ height: '36px', padding: '0 0.8rem', background: 'rgba(255,215,0,0.9)', border: '1px solid rgba(255,215,0,0.5)', borderRadius: '10px', color: '#0a0a0a', display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.72rem', fontWeight: 800, cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}><Pencil size={13} /> Aanpassen</button>
+              <button onClick={() => setShowEdit(true)} style={{ height: '36px', padding: '0 0.8rem', background: '#fff', border: 'none', borderRadius: '10px', color: '#0a0a0a', display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.72rem', fontWeight: 900, cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}><Pencil size={13} /> Aanpassen</button>
             )}
             <button onClick={onClose} style={{ width: '36px', height: '36px', flexShrink: 0, background: 'rgba(0,0,0,0.5)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '10px', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}><X size={18} /></button>
           </div>
           <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, padding: isMobile ? '0 1rem 0.75rem' : '0 1.5rem 1rem' }}>
-            <div style={{ fontSize: isMobile ? '1.15rem' : '1.35rem', fontWeight: '800', color: '#fff', letterSpacing: '-0.02em', marginBottom: '0.4rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+            <div style={{ fontSize: isMobile ? '1.5rem' : '1.8rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.03em', marginBottom: '0.4rem', lineHeight: 1.1, textShadow: '0 2px 12px rgba(0,0,0,0.6)' }}>
               {meal.name || meal.meal_name}
             </div>
             <div style={{ display: 'flex', gap: '0.875rem' }}>
               {[{ val: meal.calories, label: 'kcal' }, { val: meal.protein, label: 'eiwit' }, { val: meal.carbs, label: 'koolh' }, { val: meal.fat, label: 'vet' }].filter(m => m.val > 0).map(m => (
                 <div key={m.label} style={{ display: 'flex', alignItems: 'baseline', gap: '0.15rem' }}>
-                  <span style={{ fontSize: '0.9rem', fontWeight: '800', color: '#fff' }}>{Math.round(m.val)}</span>
-                  <span style={{ fontSize: '0.5rem', fontWeight: '600', color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase' }}>{m.label}</span>
+                  <span style={{ fontSize: '1rem', fontWeight: 900, color: '#fff', textShadow: '0 2px 10px rgba(0,0,0,0.7)' }}>{Math.round(m.val)}</span>
+                  <span style={{ fontSize: '0.55rem', fontWeight: 800, color: 'rgba(255,255,255,0.55)', textTransform: 'uppercase' }}>{m.label}</span>
                 </div>
               ))}
             </div>
@@ -160,7 +162,7 @@ export default function AIMealInfoModal({ isOpen, onClose, meal, db, service, cl
           {tabs.map(tab => {
             const TabIcon = tab.icon
             return (
-              <button key={tab.id} onClick={() => setActiveTab(tab.id)} style={{ flex: 1, padding: '0.65rem 0', background: 'transparent', border: 'none', borderBottom: activeTab === tab.id ? '2px solid #FFD700' : '2px solid transparent', color: activeTab === tab.id ? '#fff' : 'rgba(255,255,255,0.35)', fontSize: '0.68rem', fontWeight: activeTab === tab.id ? '800' : '600', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.25rem', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}>
+              <button key={tab.id} onClick={() => setActiveTab(tab.id)} style={{ flex: 1, padding: '0.65rem 0', background: 'transparent', border: 'none', borderBottom: activeTab === tab.id ? '2px solid #fff' : '2px solid transparent', color: activeTab === tab.id ? '#fff' : 'rgba(255,255,255,0.35)', fontSize: '0.72rem', fontWeight: activeTab === tab.id ? 900 : 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.25rem', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}>
                 <TabIcon size={13} />{tab.label}
               </button>
             )
@@ -221,27 +223,23 @@ function InfoTab({ meal, ingredients, loading, calcMacros, isMobile }) {
         {loading ? (
           <div style={{ textAlign: 'center', padding: '1.5rem' }}><div style={{ width: '24px', height: '24px', border: '2px solid rgba(255,255,255,0.06)', borderTopColor: 'rgba(255,255,255,0.3)', borderRadius: '50%', margin: '0 auto', animation: 'infoSpin 0.8s linear infinite' }} /></div>
         ) : ingredients.length > 0 ? (
-          <div style={{ display: 'flex', flexDirection: 'column' }}>
+          <div style={{ margin: isMobile ? '0 -1rem' : '0 -1.5rem' }}>
             {ingredients.map((ing, idx) => {
               const macros = calcMacros(ing)
               return (
-                <div key={idx} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.6rem', padding: '0.5rem 0', borderBottom: idx < ingredients.length - 1 ? '1px solid rgba(255,255,255,0.03)' : 'none' }}>
-                  {/* Ingrediënt-thumbnail + letter-fallback (zelfde patroon als Voedingsgids) */}
-                  <div style={{ width: 40, height: 40, borderRadius: 9, flexShrink: 0, overflow: 'hidden', background: 'rgba(255,255,255,0.05)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    {ing.image_url ? (
-                      <img src={ing.image_url} alt={ing.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={e => { e.currentTarget.style.display = 'none' }} />
-                    ) : (
-                      <span style={{ fontSize: '1.1rem', fontWeight: 800, color: 'rgba(255,215,0,0.6)' }}>{(ing.name || '?').charAt(0).toUpperCase()}</span>
-                    )}
-                  </div>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: '0.82rem', fontWeight: '600', color: 'rgba(255,255,255,0.8)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{ing.name}</div>
-                    <div style={{ fontSize: '0.6rem', color: 'rgba(255,255,255,0.25)', marginTop: '0.1rem' }}>{macros.calories} kcal · {macros.protein}g E</div>
-                  </div>
-                  <div style={{ fontSize: '0.72rem', fontWeight: '700', color: 'rgba(255,255,255,0.5)', flexShrink: 0, marginLeft: '0.5rem' }}>
-                    {toHumanAmount(ing.name, ing.amount)}
-                  </div>
-                </div>
+                <MealCard
+                  key={idx}
+                  meal={{
+                    name: ing.name,
+                    image_url: ing.image_url || foodImageFallback(ing.name, null, 200),
+                    calories: macros.calories, protein: macros.protein,
+                    carbs: macros.carbs, fat: macros.fat,
+                  }}
+                  momentLabel=""
+                  rechts={toHumanAmount(ing.name, ing.amount)}
+                  isMobile={isMobile}
+                  acties={[]}
+                />
               )
             })}
           </div>
@@ -265,7 +263,7 @@ function RecipeTab({ meal, loading, isMobile }) {
   if (loading) {
     return (
       <div style={{ textAlign: 'center', padding: '2rem' }}>
-        <div style={{ width: '24px', height: '24px', border: '2px solid rgba(255,255,255,0.06)', borderTopColor: '#FFD700', borderRadius: '50%', margin: '0 auto', animation: 'infoSpin 0.8s linear infinite' }} />
+        <div style={{ width: '24px', height: '24px', border: '2px solid rgba(255,255,255,0.06)', borderTopColor: '#fff', borderRadius: '50%', margin: '0 auto', animation: 'infoSpin 0.8s linear infinite' }} />
         <div style={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.2)', marginTop: '0.5rem' }}>Recept laden...</div>
       </div>
     )
@@ -277,7 +275,7 @@ function RecipeTab({ meal, loading, isMobile }) {
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
           {steps.map((step, idx) => (
             <div key={idx} style={{ display: 'flex', gap: '0.625rem', padding: '0.5rem 0', borderBottom: idx < steps.length - 1 ? '1px solid rgba(255,255,255,0.03)' : 'none' }}>
-              <div style={{ width: '22px', height: '22px', borderRadius: '50%', background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontSize: '0.65rem', fontWeight: '800', color: '#FFD700' }}>
+              <div style={{ width: '22px', height: '22px', borderRadius: '50%', background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontSize: '0.65rem', fontWeight: 900, color: '#fff' }}>
                 {idx + 1}
               </div>
               <p style={{ fontSize: isMobile ? '0.8rem' : '0.85rem', color: 'rgba(255,255,255,0.7)', lineHeight: 1.5, margin: 0, paddingTop: '0.1rem' }}>{step}</p>
