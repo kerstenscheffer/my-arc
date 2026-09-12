@@ -106,6 +106,8 @@ export default function AIMealDashboard({ client, onNavigate, db }) {
   // Incremented when a meal is logged/deleted on a past day; causes MacroHero
   // to clear its day-cache and re-fetch fresh totals for that day.
   const [pastDayRefreshKey, setPastDayRefreshKey] = useState(0)
+  // Zie handleSwapMeal: een halve seconde niets doorlaten na het wisselen.
+  const [naWisselSchild, setNaWisselSchild] = useState(false)
 
   // Meal view mode: standaard 'plan' (toont plan-slots). Als het meal-plan is
   // uitgeschakeld (`clients.meal_plan_visible = false`) valt 'm terug op 'free'
@@ -424,6 +426,12 @@ export default function AIMealDashboard({ client, onNavigate, db }) {
         newMealId
       )
       setModals(prev => ({ ...prev, alternatives: null, favorites: false }))
+      // Het wisselvenster verdwijnt onder je vinger vandaan, en de tik die
+      // erbij hoort komt daarna alsnog aan op wat eronder lag — meestal de
+      // ronde log-knop, waardoor je na het wisselen in het log-scherm stond.
+      // Een half seconde lang niets doorlaten vangt die na-tik op.
+      setNaWisselSchild(true)
+      setTimeout(() => setNaWisselSchild(false), 500)
       await loadDashboardData()
     } catch (error) {
       console.error('Failed to swap meal:', error)
@@ -714,6 +722,13 @@ export default function AIMealDashboard({ client, onNavigate, db }) {
         />
       )}
       
+      {naWisselSchild && (
+        <div
+          onClick={(e) => { e.preventDefault(); e.stopPropagation() }}
+          style={{ position: 'fixed', inset: 0, zIndex: 99998, background: 'transparent' }}
+        />
+      )}
+
       {modals.info && (
         <AIMealInfoModal
           key={modals.info?.id || modals.info?.meal_id || Date.now()}
