@@ -10,7 +10,9 @@ import WorkoutServiceNew from '../../services/WorkoutServiceNew'
 import { workoutFoto } from '../../utils/workoutFoto'
 import { isWorkoutFullyLogged, workoutCompletionPct } from '../../utils/exerciseCompletion'
 
-export default function TodaysWorkoutMain({ client, schema, db, workoutService, onWorkoutCompleted, onSchemaUpdate, scheduleReloadKey, onOpenPlanner, selectedDay, expanded: controlledExpanded, onExpandedChange }) {
+// onOpenPlanner is vervallen: op een dag zonder training staat geen knop meer,
+// je koppelt hem in de weekstrip eronder.
+export default function TodaysWorkoutMain({ client, schema, db, workoutService, onWorkoutCompleted, onSchemaUpdate, scheduleReloadKey, selectedDay, expanded: controlledExpanded, onExpandedChange }) {
   const isMobile = window.innerWidth <= 768
   // Controlled wanneer parent een `expanded` prop meegeeft (bv. zodat een
   // week-day-click de dropdown van buitenaf kan openen). Anders intern.
@@ -265,54 +267,42 @@ export default function TodaysWorkoutMain({ client, schema, db, workoutService, 
     </div>
   )
 
+  // Geen training vandaag: dezelfde kop als een gewone dag — foto die onderin
+  // wegloopt in het zwart met de titel eroverheen. Zonder foto viel de pagina
+  // terug op een geel kaartje met een knop, wat er als een foutmelding uitzag.
+  // De knop is weg: plannen doe je in de weekstrip die er direct onder staat.
   if (!todaysWorkout) return (
-    <div style={{ padding: isMobile ? '1rem' : '1.5rem' }}>
+    <div style={{ position: 'relative', width: '100%', height: isMobile ? 200 : 250 }}>
       <div style={{
-        background: 'linear-gradient(180deg, rgba(255,215,0,0.06) 0%, rgba(0,0,0,0.7) 100%)',
-        border: '1px solid rgba(255,215,0,0.25)',
-        borderRadius: 12,
-        padding: isMobile ? '1.5rem 1.25rem' : '2rem',
-        textAlign: 'center',
+        position: 'absolute', inset: 0,
+        backgroundImage: `url(${workoutFoto(null)})`,
+        backgroundSize: 'cover', backgroundPosition: 'center',
+        opacity: 0.75,
+      }} />
+      <div style={{
+        position: 'absolute', inset: 0, pointerEvents: 'none',
+        background: 'linear-gradient(180deg, rgba(10,10,10,0.5) 0%, rgba(10,10,10,0) 32%, rgba(10,10,10,0.78) 70%, #0a0a0a 100%)',
+      }} />
+      <div style={{
+        position: 'absolute', left: 0, right: 0, bottom: isMobile ? 10 : 14,
+        padding: isMobile ? '0 1rem' : '0 1.5rem',
       }}>
         <div style={{
-          fontSize: isMobile ? '1rem' : '1.1rem',
-          fontWeight: 800,
-          color: '#FFD700',
-          letterSpacing: '-0.01em',
-          marginBottom: '0.4rem',
+          fontSize: isMobile ? '1.7rem' : '2.4rem',
+          fontWeight: 900, color: '#fff',
+          letterSpacing: '-0.03em', lineHeight: 1.05,
+          textShadow: '0 2px 12px rgba(0,0,0,0.6)',
         }}>
-          Geen workout ingepland
+          Geen workout gepland
         </div>
-        <p style={{
-          color: 'rgba(255,255,255,0.5)',
-          margin: '0 0 1rem',
+        <div style={{
+          marginTop: 4,
           fontSize: isMobile ? '0.78rem' : '0.85rem',
-          lineHeight: 1.4,
+          fontWeight: 800, color: 'rgba(255,255,255,0.6)',
+          textShadow: '0 2px 10px rgba(0,0,0,0.7)',
         }}>
-          Stel je trainingsweek samen — koppel een workout aan deze dag.
-        </p>
-        {onOpenPlanner && (
-          <button
-            onClick={onOpenPlanner}
-            style={{
-              padding: isMobile ? '0.7rem 1.25rem' : '0.8rem 1.5rem',
-              background: '#FFD700',
-              border: 'none',
-              borderRadius: 10,
-              color: '#000',
-              fontSize: isMobile ? '0.82rem' : '0.88rem',
-              fontWeight: 800,
-              letterSpacing: '0.02em',
-              cursor: 'pointer',
-              minHeight: 44,
-              touchAction: 'manipulation',
-              WebkitTapHighlightColor: 'transparent',
-              boxShadow: '0 4px 16px rgba(255,215,0,0.25)',
-            }}
-          >
-            Plan hier je workout
-          </button>
-        )}
+          Koppel hieronder een workout aan deze dag.
+        </div>
       </div>
     </div>
   )

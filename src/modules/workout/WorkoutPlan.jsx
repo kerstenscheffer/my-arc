@@ -160,7 +160,6 @@ export default function WorkoutPlan({ client, schema, db, onFocusChange }) {
           onWorkoutCompleted={handleWorkoutCompleted}
           onSchemaUpdate={(updatedSchema) => setLocalSchema(updatedSchema)}
           scheduleReloadKey={scheduleReloadKey}
-          onOpenPlanner={() => setShowWizard(true)}
           selectedDay={selectedDayKey}
           expanded={workoutOpen}
           onExpandedChange={setWorkoutOpen}
