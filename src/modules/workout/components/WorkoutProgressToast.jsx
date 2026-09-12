@@ -28,9 +28,8 @@ const PRAISE_BY_TYPE = {
   ],
   streak: [
     'Op fire deze week',
-    'Lekker bezig',
+    'Lekker bezig {naam}',
     'Consistent als een tank',
-    'Mooie streak',
     'Discipline op punt',
     'Doorpakken werkt',
     'Top ritme',
@@ -44,14 +43,16 @@ const PRAISE_BY_TYPE = {
   ],
 }
 
-const pickPraise = (type, seed = '') => {
+// {naam} wordt de voornaam van de klant; zonder naam valt de placeholder weg
+// zodat er geen "Lekker bezig ," overblijft.
+const pickPraise = (type, seed = '', naam = '') => {
   const pool = PRAISE_BY_TYPE[type] || PRAISE_BY_TYPE.pr
   const start = new Date(new Date().getFullYear(), 0, 0)
   const dayOfYear = Math.floor((Date.now() - start.getTime()) / 86400000)
   // Tel ASCII-bytes van seed bij voor extra spreiding tussen exercises.
   let s = dayOfYear
   for (let i = 0; i < seed.length; i++) s = (s * 31 + seed.charCodeAt(i)) >>> 0
-  return pool[s % pool.length]
+  return pool[s % pool.length].replace('{naam}', naam).trim()
 }
 
 export default function WorkoutProgressToast({ client, db, onViewChart }) {
@@ -290,7 +291,7 @@ export default function WorkoutProgressToast({ client, db, onViewChart }) {
           letterSpacing: '-0.025em', lineHeight: 1.1,
           textShadow: '0 2px 10px rgba(0,0,0,0.8)',
         }}>
-          {pickPraise(insight.type, insight.exercise || '')}
+          {pickPraise(insight.type, insight.exercise || '', client?.first_name || '')}
         </div>
         <div style={{
           fontSize: isMobile ? '0.7rem' : '0.76rem',
