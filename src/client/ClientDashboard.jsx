@@ -338,9 +338,9 @@ export default function ClientDashboard({ previewClientId = null, ingebed = fals
           aria-hidden
           style={{
             position: 'fixed', left: 0, right: 0, bottom: 0,
-            height: isMobile ? 150 : 170,
+            height: isMobile ? 260 : 300,
             pointerEvents: 'none', zIndex: 80,
-            background: 'linear-gradient(180deg, rgba(10,10,10,0) 0%, rgba(10,10,10,0.55) 42%, rgba(10,10,10,0.9) 72%, #0a0a0a 100%)',
+            background: 'linear-gradient(180deg, rgba(10,10,10,0) 0%, rgba(10,10,10,0.3) 30%, rgba(10,10,10,0.7) 58%, rgba(10,10,10,0.94) 80%, #0a0a0a 100%)',
           }}
         />
       )}
