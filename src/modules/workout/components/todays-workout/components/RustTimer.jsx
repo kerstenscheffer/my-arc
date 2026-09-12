@@ -13,24 +13,10 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { Pause, Play, RotateCcw, SkipForward, Minus, Plus } from 'lucide-react'
+import { bewaarRusttijd } from '../rusttijd'
 
 const GOUD = '#FFD700'
 const GROEN = '#10b981'
-const STANDAARD_SEC = 90
-const SLEUTEL = (naam) => `myarc.rust.${naam}`
-
-const gekozenRusttijd = (oefeningNaam) => {
-  try {
-    const n = parseInt(localStorage.getItem(SLEUTEL(oefeningNaam)), 10)
-    return Number.isFinite(n) && n >= 15 && n <= 600 ? n : STANDAARD_SEC
-  } catch {
-    return STANDAARD_SEC
-  }
-}
-
-const bewaarRusttijd = (oefeningNaam, sec) => {
-  try { localStorage.setItem(SLEUTEL(oefeningNaam), String(sec)) } catch { /* privémodus */ }
-}
 
 const mmss = (sec) => {
   const m = Math.floor(Math.max(0, sec) / 60)
@@ -38,16 +24,19 @@ const mmss = (sec) => {
   return `${m}:${String(s).padStart(2, '0')}`
 }
 
-export default function RustTimer({ oefeningNaam, onKlaar, onStop, isMobile }) {
-  const [totaal, setTotaal] = useState(() => gekozenRusttijd(oefeningNaam))
-  const [over, setOver] = useState(() => gekozenRusttijd(oefeningNaam))
+// `startSec` en `bron` komen van rusttijdVoor(): de tijd die de coach in het
+// schema zette, of wat de klant er zelf van maakte.
+export default function RustTimer({ oefeningNaam, startSec, bron = 'standaard', onKlaar, onStop, isMobile }) {
+  const [totaal, setTotaal] = useState(startSec)
+  const [over, setOver] = useState(startSec)
   const [loopt, setLoopt] = useState(true)
+  const [aangepast, setAangepast] = useState(false)
   const klaarRef = useRef(false)
 
   // Aftellen op een eindtijd en niet met een teller die je elke seconde met
   // één verlaagt: zet de telefoon zijn scherm uit, dan lopen intervallen
   // achter en klopt de resterende tijd niet meer bij het terugkomen.
-  const eindRef = useRef(Date.now() + gekozenRusttijd(oefeningNaam) * 1000)
+  const eindRef = useRef(Date.now() + startSec * 1000)
 
   useEffect(() => {
     if (!loopt) return
@@ -68,6 +57,9 @@ export default function RustTimer({ oefeningNaam, onKlaar, onStop, isMobile }) {
   const verzet = (delta) => {
     const nieuw = Math.max(15, Math.min(600, totaal + delta))
     setTotaal(nieuw)
+    setAangepast(true)
+    // Handmatig aanpassen overschrijft de tijd van de coach voor déze
+    // oefening, en blijft staan tot de klant hem weer verandert.
     bewaarRusttijd(oefeningNaam, nieuw)
     // De lopende klok meeschuiven, zodat +15 tijdens het rusten ook echt
     // vijftien seconden extra geeft in plaats van pas de volgende set.
@@ -118,11 +110,20 @@ export default function RustTimer({ oefeningNaam, onKlaar, onStop, isMobile }) {
           }}>
             {voorbij ? '0:00' : mmss(over)}
           </div>
-          <div style={{
-            fontSize: '0.6rem', fontWeight: 800, color: 'rgba(255,255,255,0.4)',
-            textTransform: 'uppercase', letterSpacing: '0.08em', marginTop: 2,
-          }}>
+          <div
+            title={bron === 'coach' && !aangepast
+              ? 'Rusttijd uit je schema. Met − en + pas je hem aan; die blijft dan staan.'
+              : 'Rusttijd. Met − en + pas je hem aan; die blijft staan voor deze oefening.'}
+            style={{
+              fontSize: '0.6rem', fontWeight: 800, color: 'rgba(255,255,255,0.4)',
+              textTransform: 'uppercase', letterSpacing: '0.08em', marginTop: 2,
+              whiteSpace: 'nowrap',
+            }}
+          >
             {voorbij ? 'Klaar' : 'Rust'} · {mmss(totaal)}
+            {/* Waar de tijd vandaan komt. Anders lijkt 2:00 een willekeurige
+                standaard, terwijl het staat wat de coach heeft voorgeschreven. */}
+            {bron === 'coach' && !aangepast && <span style={{ color: 'rgba(255,215,0,0.6)' }}> · schema</span>}
           </div>
         </div>
 

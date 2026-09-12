@@ -6,6 +6,7 @@ import ExerciseHistory from './ExerciseHistory'
 import AttachmentSelector from './AttachmentSelector'
 import MachineSettings from './MachineSettings'
 import RustTimer from './RustTimer'
+import { rusttijdVoor, timerStaatAan, bewaarTimerAan } from '../rusttijd'
 import InfoModal from './InfoModal'
 import ExerciseService from '../../../../../services/ExerciseService'
 
@@ -272,8 +273,16 @@ export default function ExerciseLogModal({ db, client, exercise, onClose, isMobi
 
   // Flow: na een gelogde set loopt de rusttimer, en op nul staat het
   // invoerscherm er meteen weer. Zo hoef je tussen de sets niets aan te raken.
-  const [flow, setFlow] = useState(false)
+  //
+  // De stand wordt onthouden: wie met een timer traint doet dat de hele
+  // workout, niet per oefening opnieuw aanzetten.
+  const [flow, setFlow] = useState(() => timerStaatAan())
   const [rust, setRust] = useState(false)
+
+  // De rusttijd komt uit het schema van de coach (het veld `rust` bij de
+  // oefening), tenzij de klant hem zelf heeft aangepast. Per oefening, dus
+  // opnieuw bepalen als je naar een andere oefening gaat.
+  const rusttijd = rusttijdVoor(exercise)
 
   useEffect(() => { loadExistingLogs(); loadPreviousPerformance(); loadExercisePreference() }, [])
 
@@ -400,8 +409,9 @@ export default function ExerciseLogModal({ db, client, exercise, onClose, isMobi
   }
 
   const wisselFlow = () => {
-    if (flow) { setFlow(false); setRust(false); return }
+    if (flow) { setFlow(false); bewaarTimerAan(false); setRust(false); return }
     setFlow(true)
+    bewaarTimerAan(true)
     setRust(false)
     setEditingIndex(null)
     setShowWizard(true)   // meteen door naar de gewichten, zoals gevraagd
@@ -687,6 +697,8 @@ export default function ExerciseLogModal({ db, client, exercise, onClose, isMobi
       {rust && !wizardActive && !dropsetActive && (
         <RustTimer
           oefeningNaam={exercise.name}
+          startSec={rusttijd.sec}
+          bron={rusttijd.bron}
           onKlaar={() => { /* de balk kleurt groen; doorgaan doet de klant zelf of via Volgende set */ }}
           onStop={volgendeSet}
           isMobile={isMobile}
