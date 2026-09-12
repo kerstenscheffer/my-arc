@@ -6,162 +6,19 @@
 // "Voedingsmiddel toevoegen" per section
 import React, { useState } from 'react'
 import MealCard from './MealCard'
-import { Plus, Eye, EyeOff, Trash2, Edit3, MoreHorizontal, X, Apple, Info, Check } from 'lucide-react'
-import { foodImageFallback } from '../../foodImageFallback'
+import { Trash2, Edit3, Info, Check } from 'lucide-react'
 import { supplementFoto } from '../../../supplements/utils/supplementFoto'
+
+// Label van het moment waarop iets gelogd is, voor op de foto van de kaart.
+const MOMENT_LABEL = {
+  breakfast: 'Ontbijt', lunch: 'Lunch', dinner: 'Diner',
+  snack: 'Tussendoortje', snack1: 'Snack 1', snack2: 'Snack 2', snack3: 'Snack 3',
+}
 
 // De indeling in Ontbijt / Lunch / Diner / Tussendoortjes is vervallen: de
 // lijst staat nu op kloktijd. Daarmee zijn ook de mappers weg die een slot
 // naar zo'n vak vertaalden — alles wat geen ontbijt, lunch of diner heette
 // belandde daarin, en dat zette een kwark van 09:30 onder het avondeten.
-
-// ═══════════════════════════════════════════
-// LOGGED MEAL ROW (inline, not separate component)
-// ═══════════════════════════════════════════
-
-function LoggedMealRow({ meal, onDelete, onEdit, isMobile }) {
-  const [expanded, setExpanded] = useState(false)
-
-  const formatTime = (ts) => {
-    if (!ts) return ''
-    return new Date(ts).toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit' })
-  }
-
-  return (
-    <div style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.04)' }}>
-      {/* Main row — SearchTab-inspired clean layout */}
-      <div style={{
-        display: 'flex', alignItems: 'center',
-        padding: isMobile ? '0.55rem 1rem' : '0.625rem 1.25rem',
-        minHeight: '52px',
-        gap: '0.75rem'
-      }}>
-        {/* Thumbnail — 44x44; eigen foto of titel-gebaseerde fallback
-            (kwark -> zuivel, kip -> kip, enz.) i.p.v. een appel-icoon. */}
-        <div style={{
-          width: '44px', height: '44px',
-          borderRadius: '12px',
-          background: `url(${meal.image_url || foodImageFallback(meal.name || meal.title || meal.product_name, meal.meal_type, 88)}) center/cover, #111`,
-          border: '1px solid rgba(255, 255, 255, 0.08)',
-          flexShrink: 0,
-        }} />
-
-        {/* Name + subtitle */}
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{
-            display: 'flex', alignItems: 'center', gap: '0.375rem'
-          }}>
-            <div style={{
-              fontSize: isMobile ? '0.88rem' : '0.92rem',
-              fontWeight: '700', color: '#fff',
-              whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
-              letterSpacing: '-0.01em',
-              minWidth: 0,
-            }}>
-              {meal.meal_name || 'Onbekend'}
-            </div>
-            {meal.source === 'plan_check' && (
-              <div style={{
-                fontSize: '0.5rem', fontWeight: '700',
-                color: '#FFD700',
-                background: 'rgba(255, 215, 0, 0.1)',
-                padding: '0.1rem 0.35rem', borderRadius: '4px',
-                textTransform: 'uppercase', letterSpacing: '0.06em',
-                flexShrink: 0
-              }}>
-                Plan
-              </div>
-            )}
-          </div>
-          <div style={{
-            fontSize: isMobile ? '0.7rem' : '0.75rem',
-            color: 'rgba(255, 255, 255, 0.4)',
-            marginTop: '0.15rem',
-            fontWeight: '500',
-          }}>
-            {meal.brand ? `${meal.brand} · ` : ''}{formatTime(meal.consumed_at)}
-          </div>
-        </div>
-
-        {/* Calories — gold accent */}
-        <div style={{
-          display: 'flex', alignItems: 'baseline', gap: '0.15rem',
-          flexShrink: 0, marginRight: '0.375rem',
-        }}>
-          <span style={{
-            fontSize: isMobile ? '0.92rem' : '0.95rem',
-            fontWeight: '800', color: '#FFD700',
-            letterSpacing: '-0.01em',
-          }}>
-            {Math.round(meal.calories || 0)}
-          </span>
-          <span style={{
-            fontSize: '0.6rem', fontWeight: '600',
-            color: 'rgba(255, 215, 0, 0.5)',
-          }}>
-            kcal
-          </span>
-        </div>
-
-        {/* More button */}
-        <button
-          onClick={() => setExpanded(!expanded)}
-          style={{
-            width: '28px', height: '28px', borderRadius: '6px',
-            background: expanded ? 'rgba(255,255,255,0.06)' : 'transparent',
-            border: 'none',
-            color: expanded ? 'rgba(255,255,255,0.5)' : 'rgba(255,255,255,0.15)',
-            cursor: 'pointer',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-            flexShrink: 0
-          }}
-        >
-          {expanded ? <X size={12} /> : <MoreHorizontal size={14} />}
-        </button>
-      </div>
-
-      {/* Expanded actions */}
-      {expanded && (
-        <div style={{
-          display: 'flex', gap: '0.375rem',
-          padding: isMobile ? '0 1rem 0.5rem' : '0 1.25rem 0.625rem'
-        }}>
-          {onEdit && (
-            <button
-              onClick={() => { onEdit(meal); setExpanded(false) }}
-              style={{
-                padding: '0.35rem 0.625rem',
-                background: 'rgba(255,255,255,0.03)',
-                border: '1px solid rgba(255,255,255,0.06)',
-                borderRadius: '6px', color: 'rgba(255,255,255,0.4)',
-                fontSize: '0.6rem', fontWeight: '700',
-                cursor: 'pointer', touchAction: 'manipulation',
-                display: 'flex', alignItems: 'center', gap: '0.25rem', minHeight: '28px'
-              }}
-            >
-              <Edit3 size={10} /> Bewerken
-            </button>
-          )}
-          <button
-            onClick={() => { onDelete(meal.id); setExpanded(false) }}
-            style={{
-              padding: '0.35rem 0.625rem',
-              background: 'rgba(239,68,68,0.04)',
-              border: '1px solid rgba(239,68,68,0.12)',
-              borderRadius: '6px', color: 'rgba(239,68,68,0.5)',
-              fontSize: '0.6rem', fontWeight: '700',
-              cursor: 'pointer', touchAction: 'manipulation',
-              display: 'flex', alignItems: 'center', gap: '0.25rem', minHeight: '28px'
-            }}
-          >
-            <Trash2 size={10} /> Verwijderen
-          </button>
-        </div>
-      )}
-    </div>
-  )
-}
 
 // ═══════════════════════════════════════════
 // MAIN COMPONENT
@@ -275,13 +132,25 @@ export default function MealTimelineMobile({
         }
 
         if (item.soort === 'gelogd') {
+          // Zelfde kaart als een plan-maaltijd, alleen met andere knoppen:
+          // wat je zelf logt hoef je niet af te vinken of te wisselen.
+          const g = item.data
           return (
-            <LoggedMealRow
+            <MealCard
               key={item.sleutel}
-              meal={item.data}
-              onDelete={onDeleteConsumedMeal}
-              onEdit={onEditConsumedMeal}
-              isMobile={isMobile}
+              meal={{
+                name: g.meal_name || g.name || g.product_name || 'Gelogd',
+                image_url: g.image_url,
+                slot: g.meal_type,
+                calories: g.calories, protein: g.protein, carbs: g.carbs, fat: g.fat,
+              }}
+              momentLabel={g.brand || MOMENT_LABEL[g.meal_type] || 'Gelogd'}
+              tijdLabel={klok(item.min)}
+              isMobile={true}
+              acties={[
+                { icon: <Edit3 size={11} />, label: 'Bewerken', onClick: () => onEditConsumedMeal?.(g) },
+                { icon: <Trash2 size={11} />, label: 'Verwijderen', onClick: () => onDeleteConsumedMeal?.(g.id), kleur: 'rgba(239,68,68,0.85)' },
+              ]}
             />
           )
         }

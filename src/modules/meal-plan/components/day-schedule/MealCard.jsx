@@ -39,9 +39,17 @@ const getMealTypeLabel = (meal) => {
 
 export default function MealCard({
   meal, isChecked, isMobile, onCheck, onInfo, onAlternatives,
+  // Andere knoppen dan Info / Wissel / Afronden. Wat de klant zelf logde
+  // gebruikt dezelfde kaart, maar dan met Bewerken en Verwijderen.
+  acties = null,
+  // Naam op de foto (moment) is standaard het slot-label; hiermee kan een
+  // gelogde maaltijd zijn eigen tijd meegeven.
+  momentLabel = null,
+  tijdLabel = null,
 }) {
   const photoSize = isMobile ? 78 : 90
-  const heeftTijd = typeof meal.timing === 'string' && /^\d{1,2}:\d{2}/.test(meal.timing)
+  const moment = momentLabel || getMealTypeLabel(meal)
+  const tijd = tijdLabel || (typeof meal.timing === 'string' && /^\d{1,2}:\d{2}/.test(meal.timing) ? meal.timing : null)
   return (
     <div style={{
       margin: isMobile ? '0 0.9rem 0.55rem' : '0 1.25rem 0.7rem',
@@ -86,16 +94,16 @@ export default function MealCard({
               whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
               textShadow: '0 1px 6px rgba(0,0,0,0.9)',
             }}>
-              {getMealTypeLabel(meal)}
+              {moment}
             </div>
-            {heeftTijd && (
+            {tijd && (
               <div style={{
                 fontSize: isMobile ? '0.55rem' : '0.6rem',
                 fontWeight: 800, color: 'rgba(255,255,255,0.75)',
                 lineHeight: 1.2, marginTop: 1,
                 textShadow: '0 1px 6px rgba(0,0,0,0.9)',
               }}>
-                {meal.timing}
+                {tijd}
               </div>
             )}
           </div>
@@ -171,27 +179,23 @@ export default function MealCard({
         display: 'flex',
         borderTop: `1px solid ${DIVIDER}`,
       }}>
-        <ActionCell
-          icon={<Info size={isMobile ? 11 : 12} />}
-          label="Info"
-          onClick={(e) => { e.stopPropagation(); onInfo?.() }}
-          isMobile={isMobile}
-        />
-        <div style={{ width: 1, background: DIVIDER, alignSelf: 'stretch' }} />
-        <ActionCell
-          icon={<RefreshCw size={isMobile ? 11 : 12} />}
-          label="Wissel"
-          onClick={(e) => { e.stopPropagation(); onAlternatives?.() }}
-          isMobile={isMobile}
-        />
-        <div style={{ width: 1, background: DIVIDER, alignSelf: 'stretch' }} />
-        <ActionCell
-          icon={<Check size={isMobile ? 11 : 12} strokeWidth={2.6} />}
-          label={isChecked ? 'Gelogd' : 'Afronden'}
-          onClick={(e) => { e.stopPropagation(); onCheck?.() }}
-          isMobile={isMobile}
-          checked={isChecked}
-        />
+        {(acties || [
+          { icon: <Info size={isMobile ? 11 : 12} />, label: 'Info', onClick: onInfo },
+          { icon: <RefreshCw size={isMobile ? 11 : 12} />, label: 'Wissel', onClick: onAlternatives },
+          { icon: <Check size={isMobile ? 11 : 12} strokeWidth={2.6} />, label: isChecked ? 'Gelogd' : 'Afronden', onClick: onCheck, checked: isChecked },
+        ]).map((actie, i) => (
+          <React.Fragment key={actie.label}>
+            {i > 0 && <div style={{ width: 1, background: DIVIDER, alignSelf: 'stretch' }} />}
+            <ActionCell
+              icon={actie.icon}
+              label={actie.label}
+              onClick={(e) => { e.stopPropagation(); actie.onClick?.() }}
+              isMobile={isMobile}
+              checked={actie.checked}
+              kleur={actie.kleur}
+            />
+          </React.Fragment>
+        ))}
       </div>
         </div>
       </div>
@@ -199,8 +203,8 @@ export default function MealCard({
   )
 }
 
-function ActionCell({ icon, label, onClick, isMobile, checked }) {
-  const color = checked ? '#10b981' : 'rgba(255,255,255,0.7)'
+function ActionCell({ icon, label, onClick, isMobile, checked, kleur }) {
+  const color = kleur || (checked ? '#10b981' : 'rgba(255,255,255,0.7)')
   return (
     <button
       onClick={onClick}
