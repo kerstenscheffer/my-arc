@@ -246,7 +246,7 @@ export default function WorkoutPlan({ client, schema, db, onFocusChange }) {
       {/* Krachtoverzicht en geschiedenis in hetzelfde blad als de historie in
           het log-scherm, zodat die drie zich hetzelfde gedragen. */}
       <BladModal open={krachtOpen} titel="Krachtoverzicht" onClose={() => setKrachtOpen(false)}>
-        <ClientWorkoutChart db={db} client={client} />
+        <ClientWorkoutChart db={db} client={client} kaal />
       </BladModal>
       <BladModal open={historyOpen} titel="Historie" onClose={() => setHistoryOpen(false)}>
         <WorkoutHistory db={db} clientId={client?.id} onBack={null} />

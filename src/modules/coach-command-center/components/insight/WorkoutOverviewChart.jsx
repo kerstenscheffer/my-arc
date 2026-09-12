@@ -357,7 +357,11 @@ const CustomLegend = ({
 }
 
 export default function WorkoutOverviewChart({
-  db, client, exerciseProgress = {}, isMobile = false, onBack
+  db, client, exerciseProgress = {}, isMobile = false, onBack,
+  // `kaal`: geen eigen kader en geen eigen titel. Voor gebruik in een venster
+  // dat die al heeft — anders zit de grafiek in twee containers met twee keer
+  // "Krachtoverzicht" erboven.
+  kaal = false,
 }) {
   const [range, setRange]               = useState('90d')
   const [muscleMap, setMuscleMap]       = useState(null)   // null while loading
@@ -465,8 +469,8 @@ export default function WorkoutOverviewChart({
   // ── Header — section-title niveau, consistent met andere page-headers ──
   const Header = () => (
     <div style={{
-      padding: isMobile ? '0.85rem 1rem' : '1rem 1.25rem',
-      borderBottom: '1px solid rgba(255,255,255,0.06)',
+      padding: (kaal && !fullscreen) ? '0 0 0.5rem' : (isMobile ? '0.85rem 1rem' : '1rem 1.25rem'),
+      borderBottom: (kaal && !fullscreen) ? 'none' : '1px solid rgba(255,255,255,0.06)',
       display: 'flex', alignItems: 'center', gap: '0.6rem',
       flexShrink: 0,
     }}>
@@ -486,8 +490,9 @@ export default function WorkoutOverviewChart({
           <ArrowLeft size={18} strokeWidth={2.4} />
         </button>
       )}
-      <BarChart3 size={isMobile ? 20 : 22} color="#fff" strokeWidth={2.2} style={{ flexShrink: 0 }} />
+      {!(kaal && !fullscreen) && <BarChart3 size={isMobile ? 20 : 22} color="#fff" strokeWidth={2.2} style={{ flexShrink: 0 }} />}
       <span style={{
+        display: (kaal && !fullscreen) ? 'none' : undefined,
         fontSize: isMobile ? '1.1rem' : '1.25rem',
         fontWeight: 900, color: '#fff',
         letterSpacing: '-0.02em',
@@ -925,13 +930,15 @@ export default function WorkoutOverviewChart({
         paddingTop: 'env(safe-area-inset-top, 0)',
         paddingBottom: 'env(safe-area-inset-bottom, 0)',
       }
-    : {
-        display: 'flex', flexDirection: 'column',
-        background: '#0a0a0a',
-        border: '1px solid rgba(255,255,255,0.06)',
-        borderRadius: 14,
-        overflow: 'hidden',
-      }
+    : kaal
+      ? { display: 'flex', flexDirection: 'column', background: 'transparent', overflow: 'hidden' }
+      : {
+          display: 'flex', flexDirection: 'column',
+          background: '#0a0a0a',
+          border: '1px solid rgba(255,255,255,0.06)',
+          borderRadius: 14,
+          overflow: 'hidden',
+        }
 
   return (
     <div style={rootStyle}>

@@ -72,7 +72,7 @@ async function loadExerciseProgress(db, clientId) {
   }
 }
 
-export default function ClientWorkoutChart({ db, client }) {
+export default function ClientWorkoutChart({ db, client, kaal = false }) {
   const isMobile = typeof window !== 'undefined' && window.innerWidth <= 768
   const [progress, setProgress] = useState(null)
 
@@ -91,8 +91,8 @@ export default function ClientWorkoutChart({ db, client }) {
   if (progress === null) {
     return (
       <div style={{
-        background: '#0a0a0a',
-        border: '1px solid rgba(255,255,255,0.06)',
+        background: kaal ? 'transparent' : '#0a0a0a',
+        border: kaal ? 'none' : '1px solid rgba(255,255,255,0.06)',
         borderRadius: 14,
         height: isMobile ? 520 : 640,
         display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -110,6 +110,7 @@ export default function ClientWorkoutChart({ db, client }) {
       client={client}
       exerciseProgress={progress}
       isMobile={isMobile}
+      kaal={kaal}
     />
   )
 }
