@@ -57,6 +57,58 @@ const expandQuery = (query) => {
   return expanded
 }
 
+// Hoe goed vervangt deze oefening de oefening die je wisselt?
+//
+// De lijst stond eerder in de volgorde waarin de database ze teruggaf: bij
+// "chest" kwam Bench Dips vóór Machine Chest Press, terwijl dat laatste
+// duidelijk dichter bij een barbell bench press ligt.
+//
+// De zwaarste signalen eerst: dezelfde spiergroep, daarna hetzelfde soort
+// beweging (een row voor een row, een press voor een press). Equipment telt
+// licht mee: je wisselt vaak juist omdat een apparaat bezet is, dus hetzelfde
+// materiaal is een pluspunt maar geen eis.
+//
+// movement_pattern, position en grip staan niet bij alle 249 oefeningen
+// ingevuld (186, 186 en 143). Een lege waarde levert geen punten op en geen
+// aftrek — dan bepalen de andere signalen de volgorde.
+const overlap = (a, b) => {
+  const lijst = (v) => String(v || '').toLowerCase().split(/[,;/]+/).map(x => x.trim()).filter(Boolean)
+  const A = lijst(a), B = new Set(lijst(b))
+  return A.filter(x => B.has(x)).length
+}
+
+const gelijk = (a, b) => !!a && !!b && String(a).toLowerCase() === String(b).toLowerCase()
+
+const scoreVoor = (alt, basis) => {
+  if (!basis) return 0
+  let score = 0
+  if (gelijk(alt.primair_spieren, basis.primair_spieren)) score += 50
+  else if (overlap(alt.primair_spieren, basis.secundair_spieren) > 0) score += 12
+  score += Math.min(2, overlap(alt.secundair_spieren, basis.secundair_spieren)) * 8
+  if (gelijk(alt.movement_pattern, basis.movement_pattern)) score += 25
+  if (gelijk(alt.type, basis.type)) score += 15
+  if (gelijk(alt.equipment, basis.equipment)) score += 6
+  if (gelijk(alt.position, basis.position)) score += 5
+  if (gelijk(alt.grip, basis.grip)) score += 5
+  if (gelijk(alt.difficulty, basis.difficulty)) score += 4
+  // Zelf toegevoegde oefeningen bovenaan bij gelijke stand: die heeft de klant
+  // niet voor niets aangemaakt.
+  if (alt._isCustom) score += 8
+  return score
+}
+
+// Hoe goed past de zoekterm op de naam? Een oefening die ermee begint hoort
+// boven eentje waar het ergens in het midden in staat.
+const zoekScore = (naam, zoek) => {
+  const n = String(naam || '').toLowerCase()
+  const q = String(zoek || '').toLowerCase().trim()
+  if (!q) return 0
+  if (n === q) return 100
+  if (n.startsWith(q)) return 60
+  if (n.includes(q)) return 30
+  return 0
+}
+
 const MUSCLE_LABELS = {
   'chest': 'Borst', 'back': 'Rug', 'shoulders': 'Schouders',
   'biceps': 'Biceps', 'triceps': 'Triceps', 'legs': 'Benen', 'core': 'Core'
@@ -72,6 +124,7 @@ export default function SwapModal({ exercise, exerciseIndex, workoutDayKey, sche
   const [visible, setVisible] = useState(false)
   const [allExercises, setAllExercises] = useState([])
   const [filteredAlternatives, setFilteredAlternatives] = useState([])
+  const [basis, setBasis] = useState(null)
   const [searchQuery, setSearchQuery] = useState('')
   const [loading, setLoading] = useState(true)
   const [swapping, setSwapping] = useState(false)
@@ -111,6 +164,15 @@ export default function SwapModal({ exercise, exerciseIndex, workoutDayKey, sche
       const deduped = (dbExercises || []).filter(ex => !seen.has(ex.name.toLowerCase()))
       const all = [...customExercises, ...deduped]
       setAllExercises(all)
+      // De rij van de oefening die je wisselt: die heeft movement_pattern,
+      // grip en position, en het schema niet. Zonder die rij zou de score
+      // alleen op spiergroep en type kunnen leunen.
+      const eigen = (dbExercises || []).find(ex => ex.name === exercise.name) || {
+        primair_spieren: exercise.primairSpieren || null,
+        equipment: exercise.equipment || null,
+        type: exercise.type || null,
+      }
+      setBasis(eigen)
       setFilteredAlternatives(all.filter(ex => ex.primair_spieren === (exercise.primairSpieren || null)))
       loadExerciseImages(all)
     } catch (error) {
@@ -147,8 +209,17 @@ export default function SwapModal({ exercise, exerciseIndex, workoutDayKey, sche
       })
     }
     filtered = filtered.filter(ex => ex.name !== exercise.name)
+
+    // Best passend bovenaan. Zoek je iets, dan weegt de naam het zwaarst —
+    // wie "row" typt wil rows zien, niet wat toevallig het beste alternatief is.
+    const q = searchQuery.trim()
+    filtered = filtered
+      .map(ex => ({ ex, s: scoreVoor(ex, basis) + zoekScore(ex.name, q) * 2 }))
+      .sort((a, b) => b.s - a.s || String(a.ex.name).localeCompare(String(b.ex.name)))
+      .map(x => x.ex)
+
     setFilteredAlternatives(filtered)
-  }, [searchQuery, allExercises, selectedMuscle, selectedEquipment, homeOnlyFilter, selectedType])
+  }, [searchQuery, allExercises, selectedMuscle, selectedEquipment, homeOnlyFilter, selectedType, basis])
 
   const muscleGroups = [...new Set(allExercises.map(ex => ex.primair_spieren).filter(Boolean))].sort()
   const equipmentTypes = [...new Set(allExercises.filter(ex => !ex._isCustom).map(ex => ex.equipment).filter(Boolean))].sort()
