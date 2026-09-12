@@ -213,6 +213,7 @@ export default function AIAlternativesModal({
   if (!isOpen) return null
 
   return (
+    <>
     <div
       onClick={onClose}
       style={{
@@ -419,6 +420,7 @@ export default function AIAlternativesModal({
         </div>
 
       </div>
+    </div>
 
       {/* Bevestigen in een blad, hetzelfde als de historie in het log-scherm:
           de nieuwe maaltijd als kaart, het verschil met de huidige eronder en
@@ -428,7 +430,7 @@ export default function AIAlternativesModal({
         open={!!selectedMeal}
         titel="Wissel hiermee?"
         onClose={() => setSelectedMeal(null)}
-        zIndex={10002}
+        zIndex={10600}
       >
         {selectedMeal && (
           <>
@@ -521,7 +523,7 @@ export default function AIAlternativesModal({
         }
         div::-webkit-scrollbar { display: none; }
       `}</style>
-    </div>
+    </>
   )
 }
 
