@@ -136,18 +136,14 @@ export default function ExerciseHistory({ exerciseName, previousLog, loading, cl
       return { tekst: 'gelijk', op: null }
     }
 
-    // Lijntje op volume (kg × reps opgeteld) en niet op het gewicht: bij
-    // bankdrukken staat 80kg twintig sessies lang stil en werd het een
+    // Balkjes op volume (kg × reps opgeteld) en niet op het gewicht: bij
+    // bankdrukken staat 80kg twintig sessies lang stil en werd de grafiek een
     // zigzag van niets. Volume beweegt wél met wat je erbij doet.
-    const reeks = [...sessies].reverse().map(s => s.volume || 0)
-    const min = Math.min(...reeks), max = Math.max(...reeks)
-    const punten = reeks.length > 1
-      ? reeks.map((v, i) => {
-          const x = (i / (reeks.length - 1)) * 100
-          const y = max === min ? 50 : 100 - ((v - min) / (max - min)) * 100
-          return `${x.toFixed(1)},${(y * 0.8 + 10).toFixed(1)}`
-        }).join(' ')
-      : null
+    //
+    // Balkjes en geen lijn, omdat elke sessie een los moment is: een lijn
+    // suggereert dat er iets tussen die twee punten gebeurde.
+    const reeks = [...sessies].reverse()
+    const maxVol = Math.max(...reeks.map(s => s.volume || 0), 1)
 
     return (
       <div>
@@ -189,10 +185,26 @@ export default function ExerciseHistory({ exerciseName, previousLog, loading, cl
                 </div>
               </div>
 
-              {punten && (
-                <svg viewBox="0 0 100 100" preserveAspectRatio="none" style={{ flex: 1, height: 44, minWidth: 60 }}>
-                  <polyline points={punten} fill="none" stroke="#FFD700" strokeWidth="3" strokeLinejoin="round" strokeLinecap="round" vectorEffect="non-scaling-stroke" />
-                </svg>
+              {reeks.length > 1 && (
+                <div style={{ flex: 1, minWidth: 60, display: 'flex', alignItems: 'flex-end', justifyContent: 'flex-end', gap: 2, height: 46 }}>
+                  {reeks.map((s, i) => {
+                    const laatste = i === reeks.length - 1
+                    const isPr = s.dag === pr.dag
+                    // Minimaal 12% hoog, anders verdwijnt een lichte sessie
+                    // helemaal en lijkt het of er niets gebeurd is.
+                    const h = Math.max(12, ((s.volume || 0) / maxVol) * 100)
+                    return (
+                      <div
+                        key={s.dag}
+                        title={`${formatDate(s.dag)} · ${s.top.weight}kg × ${s.top.reps}`}
+                        style={{
+                          width: 4, height: `${h}%`, borderRadius: 2, flexShrink: 0,
+                          background: laatste ? '#10b981' : isPr ? '#FFD700' : 'rgba(255,255,255,0.22)',
+                        }}
+                      />
+                    )
+                  })}
+                </div>
               )}
             </div>
 
