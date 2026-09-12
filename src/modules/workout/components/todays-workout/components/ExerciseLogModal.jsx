@@ -620,7 +620,9 @@ export default function ExerciseLogModal({ db, client, exercise, onClose, isMobi
           padding: isMobile ? '0.8rem 1rem' : '0.9rem 1.5rem',
           paddingTop: media?.image_url ? undefined : `calc(env(safe-area-inset-top, 0px) + ${isMobile ? '0.875rem' : '1rem'})`,
         }}>
-          <div style={{ minWidth: 0, alignSelf: 'center' }}>
+          {/* Boven uitgelijnd, niet gecentreerd: de rechterkolom is twee knoppen
+              hoog en dan zakt de titel weg naar het midden. */}
+          <div style={{ minWidth: 0, alignSelf: 'flex-start' }}>
             {/* Titel mag over twee regels. Stond op één regel met puntjes,
                 en dan las "Chest Supported Rear Delt Fly" als "Chest
                 Supported Rear…" — precies het stuk dat zegt wélke fly. */}
@@ -630,15 +632,21 @@ export default function ExerciseLogModal({ db, client, exercise, onClose, isMobi
               display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical',
               overflow: 'hidden', wordBreak: 'break-word',
             }}>{exercise.name}</h2>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', flexWrap: 'wrap', marginTop: '0.2rem', fontSize: isMobile ? '0.74rem' : '0.8rem', fontWeight: 800 }}>
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.5rem', flexWrap: 'wrap', marginTop: '0.35rem', fontSize: isMobile ? '0.95rem' : '1.05rem', fontWeight: 900 }}>
               <span style={{ color: '#fff' }}>
-                {loggedSets.length}/{exercise.sets}<span style={{ color: 'rgba(255,255,255,0.35)' }}> sets</span>
+                {loggedSets.length}/{exercise.sets}<span style={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.78em', fontWeight: 800 }}> sets</span>
                 <span style={{ color: 'rgba(255,255,255,0.25)' }}> · </span>
-                {exercise.reps}<span style={{ color: 'rgba(255,255,255,0.35)' }}> reps</span>
+                {exercise.reps}<span style={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.78em', fontWeight: 800 }}> reps</span>
+                <span style={{ color: 'rgba(255,255,255,0.25)' }}> · </span>
+                {/* De rusttijd die de timer ook gebruikt — uit het schema of
+                    wat de klant er zelf van maakte. Hoort bij sets en reps:
+                    het is het derde getal dat je voorschrijft. */}
+                {Math.floor(rusttijd.sec / 60)}:{String(rusttijd.sec % 60).padStart(2, '0')}
+                <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.78em', fontWeight: 800 }}> rust</span>
               </span>
-              {saving && <span style={{ color: '#FFD700' }}>· opslaan…</span>}
-              {!saving && loggedSets.length > 0 && <span style={{ color: '#10b981' }}>· opgeslagen</span>}
-              {editingIndex !== null && <span style={{ color: '#FFD700' }}>· set {editingIndex + 1} aanpassen</span>}
+              {saving && <span style={{ color: '#FFD700', fontSize: '0.72em' }}>opslaan…</span>}
+              {!saving && loggedSets.length > 0 && <span style={{ color: '#10b981', fontSize: '0.72em' }}>opgeslagen</span>}
+              {editingIndex !== null && <span style={{ color: '#FFD700', fontSize: '0.72em' }}>set {editingIndex + 1} aanpassen</span>}
             </div>
           </div>
 
