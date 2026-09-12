@@ -252,7 +252,7 @@ export default function ExerciseHistory({ exerciseName, previousLog, loading, cl
               {Array.from({ length: maxKolommen }, (_, k) => (
                 <span key={k}>Set {k + 1}</span>
               ))}
-              <span style={{ textAlign: 'right', letterSpacing: '0.04em' }}>Set 1 vs</span>
+              <span style={{ textAlign: 'right', letterSpacing: '0.04em' }}>vs set 1</span>
             </div>
 
             <div>
@@ -292,7 +292,9 @@ export default function ExerciseHistory({ exerciseName, previousLog, loading, cl
                             fontSize: '0.85rem', fontWeight: 900, color: '#fff',
                             fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap',
                           }}>
-                            {set.weight || 0}
+                            {/* "kg" erbij: zonder eenheid lees je 5×9 net zo
+                                makkelijk als 9 reps van 5 als andersom. */}
+                            {set.weight || 0}<span style={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.7em', fontWeight: 800 }}>kg</span>
                             <span style={{ color: 'rgba(255,255,255,0.25)', fontSize: '0.85em' }}>×</span>
                             {set.reps || 0}
                             {rest > 0 && <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.75em', fontWeight: 800 }}> +{rest}</span>}
