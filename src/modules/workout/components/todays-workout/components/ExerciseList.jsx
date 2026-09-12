@@ -6,6 +6,23 @@ import AddExerciseModal from './AddExerciseModal'
 import { isExerciseFullyLogged } from '../../../utils/exerciseCompletion'
 import WorkoutServiceNew from '../../../services/WorkoutServiceNew'
 
+// De kop boven een blok oefeningen. In de schema's staat het veld bijna altijd
+// in het Engels ('chest', 'triceps'), maar er zit ook een handvol Nederlands
+// tussen ('Borst', 'Rug') — die zouden anders een eigen kop krijgen naast de
+// Engelse. Vandaar deze vertaling. Zonder spiergroep → "Overig", zodat er
+// nooit oefeningen buiten de lijst vallen (34 stuks in de huidige schema's).
+const GROEP_NAMEN = {
+  borst: 'Chest', rug: 'Back', benen: 'Legs', been: 'Legs',
+  schouders: 'Shoulders', schouder: 'Shoulders', buik: 'Abs',
+  bicep: 'Biceps', tricep: 'Triceps', billen: 'Glutes', kuiten: 'Calves',
+}
+const groepVan = (ex) => {
+  const ruw = String(ex?.primairSpieren || ex?.muscleGroup || '').trim()
+  if (!ruw) return 'Overig'
+  const klein = ruw.toLowerCase()
+  return GROEP_NAMEN[klein] || klein.charAt(0).toUpperCase() + klein.slice(1)
+}
+
 export default function ExerciseList({
   exercises, todaysLogs, onLogsUpdate,
   client, schema, db, workoutDayKey
@@ -148,6 +165,19 @@ export default function ExerciseList({
     }
   }
 
+  // Groeperen op spiergroep, in de vololgorde waarin de coach ze plande. De
+  // oorspronkelijke index gaat mee: alle schrijfacties (wisselen, sets,
+  // overslaan) hangen daaraan, dus die mag niet verschuiven door het
+  // hergroeperen.
+  const groepen = []
+  localExercises.forEach((ex, index) => {
+    if (ex?._overgeslagen) return
+    const naam = groepVan(ex)
+    let groep = groepen.find(g => g.naam === naam)
+    if (!groep) { groep = { naam, items: [] }; groepen.push(groep) }
+    groep.items.push({ ex, index })
+  })
+
   const emptyState = !localExercises || localExercises.length === 0
 
   return (
@@ -166,7 +196,22 @@ export default function ExerciseList({
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
-          {localExercises.map((exercise, index) => exercise?._overgeslagen ? null : (
+          {groepen.map(groep => (
+            <div key={groep.naam}>
+              <div style={{
+                margin: isMobile ? '0.7rem 0.9rem 0.35rem' : '0.85rem 1.25rem 0.4rem',
+                display: 'flex', alignItems: 'baseline', gap: 7,
+              }}>
+                <span style={{
+                  fontSize: isMobile ? '1rem' : '1.1rem', fontWeight: 900, color: '#fff',
+                  letterSpacing: '-0.02em',
+                }}>{groep.naam}</span>
+                <span style={{
+                  fontSize: isMobile ? '0.62rem' : '0.66rem', fontWeight: 800,
+                  color: 'rgba(255,255,255,0.3)',
+                }}>{groep.items.length}</span>
+              </div>
+              {groep.items.map(({ ex: exercise, index }) => (
             <SwipeableRow
               key={`${exercise.name}-${index}`}
               index={index}
@@ -194,6 +239,8 @@ export default function ExerciseList({
                 onVerwijder={(modus) => handleVerwijder(index, modus)}
               />
             </SwipeableRow>
+              ))}
+            </div>
           ))}
 
           {/* Deze week overgeslagen — met één tik terug te halen, anders is

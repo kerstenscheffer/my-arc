@@ -1,7 +1,6 @@
 // src/modules/workout/components/todays-workout/components/ExerciseCard.jsx
 import { useState, useEffect } from 'react'
 import { Play, RefreshCw, CheckCircle, Check, Dumbbell, Send, BookmarkPlus, Youtube, MessageSquare, Trash2 } from 'lucide-react'
-import InfoModal from './InfoModal'
 import SwapModal from './SwapModal'
 import ExerciseLogModal from './ExerciseLogModal'
 import ClientFeedbackModal from './ClientFeedbackModal'
@@ -32,8 +31,6 @@ export default function ExerciseCard({
 }) {
   const isMobile = window.innerWidth <= 768
   const [localExercise, setLocalExercise] = useState(exercise)
-  const [showInfoModal, setShowInfoModal] = useState(false)
-  const [infoDefaultTab, setInfoDefaultTab] = useState('video')
   const [showSwapModal, setShowSwapModal] = useState(false)
   const [showLogModal, setShowLogModal] = useState(false)
   const [showFeedbackModal, setShowFeedbackModal] = useState(false)
@@ -41,7 +38,6 @@ export default function ExerciseCard({
   const [loadingImage, setLoadingImage] = useState(true)
   const [makingPermanent, setMakingPermanent] = useState(false)
   const [isPermanent, setIsPermanent] = useState(!exercise._pendingPermanent)
-  const [hasVideo, setHasVideo] = useState(false)
   const [hasFeedback, setHasFeedback] = useState(false)
   const [setsBezig, setSetsBezig] = useState(false)
   const [vraagVerwijderen, setVraagVerwijderen] = useState(false)
@@ -58,11 +54,8 @@ export default function ExerciseCard({
 
   useEffect(() => {
     if (exercise.name && client?.id) { checkFeedback() }
-    // loadExerciseImage NOW also sets hasVideo — same query, single round-
-    // trip. We no longer call the separate checkVideo() because its
-    // 10-min in-memory cache made freshly-attached videos invisible until
-    // refresh. The video_url is read directly each mount alongside the
-    // thumbnail/image lookup.
+    // Eén query per mount voor de foto; geen aparte, gecachte video-check
+    // meer — de video zelf zit in het log-scherm.
     if (exercise.name) loadExerciseImage()
   }, [exercise.name, client?.id])
 
@@ -77,24 +70,18 @@ export default function ExerciseCard({
 
   const loadExerciseImage = async () => {
     setLoadingImage(true)
-    // Reset hasVideo per mount — gets re-derived from the data below.
-    let foundVideo = false
     try {
       // Coach-supplied video thumbnail wins — that's the explicit "this is
       // what this exercise looks like" frame from the workout video.
       if (exercise.thumbnail_url) {
-        setImageUrl(exercise.thumbnail_url)
-        if (exercise.video_url) foundVideo = true
-        setHasVideo(foundVideo); setLoadingImage(false); return
+        setImageUrl(exercise.thumbnail_url); setLoadingImage(false); return
       }
       // If the workout-item itself carries a video_url, try to auto-derive
       // a YouTube thumb from it BEFORE falling back to the stock image.
       const ytThumbFromExercise = deriveYoutubeThumb(exercise.video_url)
       if (ytThumbFromExercise) {
-        setImageUrl(ytThumbFromExercise); foundVideo = true
-        setHasVideo(foundVideo); setLoadingImage(false); return
+        setImageUrl(ytThumbFromExercise); setLoadingImage(false); return
       }
-      if (exercise.video_url) foundVideo = true
 
       // Custom oefening — haal foto op uit custom_exercises tabel
       if ((exercise.type === 'custom' || exercise._isCustom) && client?.id && db) {
@@ -104,37 +91,33 @@ export default function ExerciseCard({
           .eq('client_id', client.id)
           .eq('name', exercise.name)
           .single()
-        if (data?.image_url) { setImageUrl(data.image_url); setHasVideo(foundVideo); setLoadingImage(false); return }
+        if (data?.image_url) { setImageUrl(data.image_url); setLoadingImage(false); return }
       }
 
       // Standaard oefening — fresh query: thumbnail / video / fallback / image.
-      // fallback_video_url is een YouTube-link van een externe creator die
-      // de uitvoering laat zien wanneer coach nog geen eigen video heeft —
-      // we behandelen 'em als "has video" zodat de play-overlay verschijnt.
+      // De video zelf zit alleen nog in het log-scherm; hier gebruiken we 'm
+      // hooguit om een thumbnail uit af te leiden.
       try {
         const { data: ex } = await db.supabase
           .from('exercises')
           .select('thumbnail_url, video_url, fallback_video_url, image_url')
           .eq('name', exercise.name)
           .maybeSingle()
-        if (ex?.video_url || ex?.fallback_video_url) foundVideo = true
-        // Onthoud de fallback URL op het localExercise zodat de play-handler
-        // 'm kan openen (zie handleVideoClick verderop).
+        // Onthoud de fallback URL op het localExercise; het log-scherm speelt
+        // 'm af als de coach nog geen eigen video heeft.
         if (ex?.fallback_video_url && !exercise.video_url) {
           setLocalExercise(prev => ({ ...prev, fallback_video_url: ex.fallback_video_url }))
         }
-        if (ex?.thumbnail_url) { setImageUrl(ex.thumbnail_url); setHasVideo(foundVideo); setLoadingImage(false); return }
+        if (ex?.thumbnail_url) { setImageUrl(ex.thumbnail_url); setLoadingImage(false); return }
         const ytThumb = deriveYoutubeThumb(ex?.video_url)
-        if (ytThumb)            { setImageUrl(ytThumb);            setHasVideo(foundVideo); setLoadingImage(false); return }
-        if (ex?.image_url)      { setImageUrl(ex.image_url);       setHasVideo(foundVideo); setLoadingImage(false); return }
+        if (ytThumb)            { setImageUrl(ytThumb);            setLoadingImage(false); return }
+        if (ex?.image_url)      { setImageUrl(ex.image_url);       setLoadingImage(false); return }
       } catch {}
 
       const url = await ExerciseService.getExerciseImage(exercise.name)
       setImageUrl(url || getFallbackImage(exercise))
-      setHasVideo(foundVideo)
     } catch {
       setImageUrl(getFallbackImage(exercise))
-      setHasVideo(foundVideo)
     } finally { setLoadingImage(false) }
   }
 
@@ -277,14 +260,17 @@ export default function ExerciseCard({
 
         {showPermanentBtn && <div style={{ height: '2px', background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.5), transparent)' }} />}
 
-        {/* ── HOOFDRIJ: foto + info-kolom ── */}
+        {/* ── HOOFDRIJ: foto over de volle hoogte, rechts info + acties ── */}
         <div style={{ display: 'flex', alignItems: 'stretch', minWidth: 0 }}>
 
           {/* Foto — donkerder voor rustigere look */}
           <div
             onClick={(e) => { e.stopPropagation(); setShowLogModal(true) }}
             style={{
-              width: photoSize, height: photoSize, flexShrink: 0,
+              /* Geen vaste hoogte: de foto rekt mee met de rechterkolom
+                 (titel + cijfers + knoppen), zodat er geen zwarte strook
+                 onder de foto overblijft. */
+              width: photoSize, alignSelf: 'stretch', flexShrink: 0,
               position: 'relative', overflow: 'hidden',
               cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
             }}
@@ -316,18 +302,11 @@ export default function ExerciseCard({
                 : <span style={{ fontSize: '0.52rem', fontWeight: 800, color: 'rgba(255,255,255,0.7)', lineHeight: 1 }}>{index + 1}</span>}
             </div>
 
-            {/* Video-knopje rechtsonder — goud, zodat het opvalt op de foto. */}
-            {hasVideo && !loadingImage && (
-              <button onClick={(e) => { e.stopPropagation(); setInfoDefaultTab('video'); setShowInfoModal(true) }}
-                style={{ position: 'absolute', bottom: 4, right: 4, width: 18, height: 18, borderRadius: '50%', background: '#FFD700', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', zIndex: 3, touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', padding: 0 }}>
-                <svg width="6" height="6" viewBox="0 0 10 10" fill="rgba(0,0,0,0.85)"><polygon points="2,1 9,5 2,9" /></svg>
-              </button>
-            )}
-
             {isLogged && <Check size={photoSize / 2.5} color="white" strokeWidth={3} style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', opacity: 0.85, zIndex: 4 }} />}
           </div>
 
-          {/* Info-kolom */}
+          {/* Rechterkolom: info bovenaan, actie-rij eronder */}
+          <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
           <div style={{
             flex: 1, minWidth: 0,
             display: 'flex', flexDirection: 'column', justifyContent: 'center',
@@ -335,13 +314,10 @@ export default function ExerciseCard({
             /* ruimte voor de prullenbak rechtsboven */
             paddingRight: onVerwijder ? (isMobile ? 30 : 34) : undefined,
           }}>
-            {/* Naam + spiergroep-pill ernaast */}
-            <div style={{
-              display: 'flex', alignItems: 'center',
-              gap: 6, minWidth: 0,
-              marginBottom: 3,
-            }}>
+            {/* Naam — de spiergroep staat nu als kop boven de groep */}
+            <div style={{ minWidth: 0, marginBottom: 3 }}>
               <span style={{
+                display: 'block',
                 fontSize: isMobile ? '0.88rem' : '0.95rem',
                 fontWeight: 800,
                 color: isLogged ? 'rgba(255,255,255,0.45)' : '#fff',
@@ -353,23 +329,6 @@ export default function ExerciseCard({
               }}>
                 {localExercise.name}
               </span>
-              {exercise.primairSpieren && (
-                <span style={{
-                  flexShrink: 0,
-                  fontSize: isMobile ? '0.52rem' : '0.55rem',
-                  fontWeight: 900,
-                  color: '#000',
-                  background: GOLD,
-                  padding: '2px 7px',
-                  borderRadius: 3,
-                  letterSpacing: '0.05em',
-                  textTransform: 'uppercase',
-                  whiteSpace: 'nowrap',
-                  lineHeight: 1.2,
-                }}>
-                  {exercise.primairSpieren}
-                </span>
-              )}
             </div>
 
             {/* Stats-rij — cardio toont duur/afstand/intensiteit, anders sets/reps */}
@@ -411,13 +370,12 @@ export default function ExerciseCard({
               </div>
             )}
           </div>
-        </div>
 
-        {/* ── ACTIE-RIJ: Video-feedback / Info / Wissel (klein, icon-only) +
-            Log (zelfde grootte als voorheen = 1/3 van de rij). ── */}
+            {/* ── ACTIE-RIJ: feedback / wissel / log. Compact, want de foto
+                loopt er nu langs door tot de onderkant van de card. ── */}
         <div style={{ display: 'flex', borderTop: `1px solid ${DIVIDER}` }}>
           <ActionCell
-            icon={<MessageSquare size={isMobile ? 12 : 13} />}
+            icon={<MessageSquare size={isMobile ? 11 : 12} />}
             badge={hasFeedback}
             flex={2}
             onClick={(e) => { e.stopPropagation(); setShowFeedbackModal(true) }}
@@ -425,20 +383,22 @@ export default function ExerciseCard({
           />
           <div style={{ width: 1, background: DIVIDER, alignSelf: 'stretch' }} />
           <ActionCell
-            icon={<RefreshCw size={isMobile ? 12 : 13} />}
+            icon={<RefreshCw size={isMobile ? 11 : 12} />}
             flex={2}
             onClick={(e) => { e.stopPropagation(); setShowSwapModal(true) }}
             isMobile={isMobile}
           />
           <div style={{ width: 1, background: DIVIDER, alignSelf: 'stretch' }} />
           <ActionCell
-            icon={<Check size={isMobile ? 11 : 12} strokeWidth={2.6} />}
+            icon={<Check size={isMobile ? 10 : 11} strokeWidth={2.6} />}
             label={isLogged ? 'Bekijk' : 'Log'}
             flex={3}
             onClick={(e) => { e.stopPropagation(); setShowLogModal(true) }}
             isMobile={isMobile}
             checked={isLogged}
           />
+        </div>
+          </div>
         </div>
 
         {/* Permanent in plan */}
@@ -456,7 +416,6 @@ export default function ExerciseCard({
           handleSwapComplete optimistisch localExercise, terwijl `exercise`
           (de prop) pas updatet als de parent het schema heeft herladen. De
           oude waarde gebruiken opende het log voor de pre-swap-oefening. */}
-      {showInfoModal && <InfoModal exercise={localExercise} onClose={() => setShowInfoModal(false)} db={db} client={client} defaultTab={infoDefaultTab} />}
       {showSwapModal && <SwapModal exercise={localExercise} exerciseIndex={index} workoutDayKey={workoutDayKey} schema={schema} onClose={() => setShowSwapModal(false)} onSwapComplete={handleSwapComplete} db={db} client={client} />}
       {showLogModal && (
         <ExerciseLogModal
@@ -531,13 +490,13 @@ function ActionCell({ icon, label, onClick, isMobile, checked, badge, flex = 1 }
       style={{
         flex, position: 'relative',
         display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4,
-        padding: isMobile ? '0.32rem 0.3rem' : '0.4rem 0.4rem',
+        padding: isMobile ? '0.2rem 0.3rem' : '0.24rem 0.4rem',
         background: 'transparent', border: 'none',
         color,
-        fontSize: isMobile ? '0.65rem' : '0.7rem', fontWeight: 700,
+        fontSize: isMobile ? '0.6rem' : '0.65rem', fontWeight: 700,
         cursor: 'pointer',
         touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-        minHeight: 28, letterSpacing: '-0.005em',
+        minHeight: 22, letterSpacing: '-0.005em',
       }}
     >
       {icon}
