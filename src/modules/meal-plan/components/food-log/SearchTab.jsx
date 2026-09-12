@@ -5,13 +5,14 @@
 
 import React, { useState, useRef, useEffect } from 'react'
 import MealCard from '../day-schedule/MealCard'
-import { Search, Loader, X, ChevronRight, Plus, Copy } from 'lucide-react'
+import { Search, Loader, X, ChevronRight, Plus, Copy, Star } from 'lucide-react'
 import FatSecretService from './FatSecretService'
 import { foodImageFallback } from '../../foodImageFallback'
 
 const MODES = [
-  { id: 'products', label: 'Alle producten' },
-  { id: 'meals',    label: 'Maaltijden' }
+  { id: 'products',  label: 'Alle producten' },
+  { id: 'meals',     label: 'Maaltijden' },
+  { id: 'favorites', label: 'Favorieten' }
 ]
 
 // Relevance score: lower = better.
@@ -48,6 +49,9 @@ export default function SearchTab({ db, onSelect, isMobile, client, onQuickLog, 
   const [recentMeals, setRecentMeals] = useState([])
   const [recentsLoading, setRecentsLoading] = useState(true)
   const [yesterdayCount, setYesterdayCount] = useState(0)
+  // Favoriete producten van deze klant. Sleutel = bron|bron_id, zodat we per
+  // zoekresultaat in één blik weten of de ster aan staat.
+  const [favorieten, setFavorieten] = useState([])
   const [fatSecretService] = useState(() => db?.supabase ? new FatSecretService(db.supabase) : null)
   const inputRef = useRef(null)
   const debounceRef = useRef(null)
@@ -60,6 +64,7 @@ export default function SearchTab({ db, onSelect, isMobile, client, onQuickLog, 
     if (client?.id) {
       loadRecents()
       checkYesterday()
+      laadFavorieten()
     } else {
       setRecentsLoading(false)
     }
@@ -110,6 +115,58 @@ export default function SearchTab({ db, onSelect, isMobile, client, onQuickLog, 
     } finally {
       setRecentsLoading(false)
     }
+  }
+
+  // ── Favorieten ──
+  const favSleutel = (item) => `${item?.source || item?.bron || 'onbekend'}|${item?.id ?? item?.bron_id ?? item?.name ?? ''}`
+
+  const laadFavorieten = async () => {
+    try {
+      const { data, error } = await db.supabase
+        .from('client_food_favorites')
+        .select('*')
+        .eq('client_id', client.id)
+        .order('created_at', { ascending: false })
+      if (error) throw error
+      setFavorieten(data || [])
+    } catch (e) {
+      console.error('Favorieten laden mislukt:', e)
+      setFavorieten([])
+    }
+  }
+
+  const isFavoriet = (item) => favorieten.some(f => `${f.bron}|${f.bron_id}` === favSleutel(item))
+
+  const wisselFavoriet = async (item) => {
+    if (!client?.id) return
+    const sleutel = favSleutel(item)
+    const bestaand = favorieten.find(f => `${f.bron}|${f.bron_id}` === sleutel)
+    // Meteen omzetten in beeld; de database volgt.
+    if (bestaand) {
+      setFavorieten(prev => prev.filter(f => f.id !== bestaand.id))
+      const { error } = await db.supabase.from('client_food_favorites').delete().eq('id', bestaand.id)
+      if (error) { console.error('Favoriet verwijderen mislukt:', error); laadFavorieten() }
+      return
+    }
+    const rij = {
+      client_id: client.id,
+      bron: item.source || 'onbekend',
+      bron_id: String(item.id ?? item.name ?? ''),
+      naam: item.name,
+      merk: item.brand || null,
+      calories: item.calories ?? null,
+      protein: item.protein ?? null,
+      carbs: item.carbs ?? null,
+      fat: item.fat ?? null,
+      image_url: item.image_url || null,
+      // De hele zoekregel bewaren: het portie-scherm verwacht dezelfde velden
+      // (per100g, defaultPortion, sourceLabel) als bij het zoeken.
+      payload: item,
+    }
+    setFavorieten(prev => [{ ...rij, id: `tijdelijk-${sleutel}` }, ...prev])
+    const { data, error } = await db.supabase.from('client_food_favorites').insert(rij).select().single()
+    if (error) { console.error('Favoriet opslaan mislukt:', error); laadFavorieten(); return }
+    setFavorieten(prev => prev.map(f => f.id === `tijdelijk-${sleutel}` ? data : f))
   }
 
   const checkYesterday = async () => {
@@ -482,6 +539,7 @@ export default function SearchTab({ db, onSelect, isMobile, client, onQuickLog, 
               tijdLabel={item.brand || null}
               isMobile={isMobile}
               onCheck={() => onSelect(item)}
+              hoekKnop={<SterKnop aan={isFavoriet(item)} onClick={() => wisselFavoriet(item)} />}
               acties={[{ icon: <Plus size={11} strokeWidth={3} />, label: 'Kies', onClick: () => onSelect(item) }]}
             />
           ))}
@@ -547,7 +605,49 @@ export default function SearchTab({ db, onSelect, isMobile, client, onQuickLog, 
             </button>
           )}
 
-          {recentMeals.length > 0 && (
+          {mode === 'favorites' && (
+            <>
+              <Kopje isMobile={isMobile}>Favorieten</Kopje>
+              {favorieten.length === 0 ? (
+                <div style={{ padding: '2.5rem 1.25rem', textAlign: 'center' }}>
+                  <div style={{ fontSize: '0.9rem', fontWeight: 900, color: '#fff', marginBottom: 4 }}>
+                    Nog geen favorieten
+                  </div>
+                  <div style={{ fontSize: '0.76rem', fontWeight: 700, color: 'rgba(255,255,255,0.4)' }}>
+                    Tik op de ster bij een product om 'm hier te bewaren.
+                  </div>
+                </div>
+              ) : (
+                <div style={{ paddingBottom: '1rem' }}>
+                  {favorieten.map(f => {
+                    const item = f.payload || {
+                      id: f.bron_id, source: f.bron, name: f.naam, brand: f.merk,
+                      calories: f.calories, protein: f.protein, carbs: f.carbs, fat: f.fat,
+                      image_url: f.image_url,
+                    }
+                    return (
+                      <MealCard
+                        key={f.id}
+                        meal={{
+                          name: f.naam,
+                          image_url: f.image_url || foodImageFallback(f.naam, null, 200),
+                          calories: f.calories, protein: f.protein, carbs: f.carbs, fat: f.fat,
+                        }}
+                        momentLabel="Favoriet"
+                        tijdLabel={f.merk || null}
+                        isMobile={isMobile}
+                        onCheck={() => onSelect(item)}
+                        hoekKnop={<SterKnop aan onClick={() => wisselFavoriet(item)} />}
+                        acties={[{ icon: <Plus size={11} strokeWidth={3} />, label: 'Kies', onClick: () => onSelect(item) }]}
+                      />
+                    )
+                  })}
+                </div>
+              )}
+            </>
+          )}
+
+          {mode !== 'favorites' && recentMeals.length > 0 && (
             <div style={{
               padding: isMobile ? '0.625rem 1rem 0.5rem' : '0.75rem 1.25rem 0.625rem',
             }}>
@@ -561,13 +661,13 @@ export default function SearchTab({ db, onSelect, isMobile, client, onQuickLog, 
             </div>
           )}
 
-          {recentsLoading && (
+          {mode !== 'favorites' && recentsLoading && (
             <div style={{ padding: '2rem', textAlign: 'center', color: 'rgba(255, 255, 255, 0.2)', fontSize: '0.8rem' }}>
               Laden...
             </div>
           )}
 
-          {!recentsLoading && recentMeals.length > 0 && (
+          {mode !== 'favorites' && !recentsLoading && recentMeals.length > 0 && (
             <div style={{ paddingBottom: '1rem' }}>
               {recentMeals.map((meal, idx) => {
                 const portionTxt = meal.amount && meal.per_unit
@@ -599,7 +699,7 @@ export default function SearchTab({ db, onSelect, isMobile, client, onQuickLog, 
             </div>
           )}
 
-          {!recentsLoading && recentMeals.length === 0 && (
+          {mode !== 'favorites' && !recentsLoading && recentMeals.length === 0 && (
             <div style={{
               padding: '2.5rem 1rem', textAlign: 'center',
               color: 'rgba(255, 255, 255, 0.15)', fontSize: '0.7rem'
@@ -613,3 +713,37 @@ export default function SearchTab({ db, onSelect, isMobile, client, onQuickLog, 
   )
 }
 
+// Ster rechtsboven op een kaart: product bij je favorieten zetten of eraf
+// halen. Gevuld = staat erin.
+function SterKnop({ aan, onClick }) {
+  return (
+    <button
+      onClick={(e) => { e.stopPropagation(); onClick?.() }}
+      aria-label={aan ? 'Uit favorieten halen' : 'Bij favorieten zetten'}
+      title={aan ? 'Uit favorieten halen' : 'Bij favorieten zetten'}
+      style={{
+        width: 28, height: 28, padding: 0,
+        background: 'transparent', border: 'none', borderRadius: 7,
+        color: '#fff', opacity: aan ? 1 : 0.55,
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+      }}
+    >
+      <Star size={14} strokeWidth={2.6} fill={aan ? '#fff' : 'none'} />
+    </button>
+  )
+}
+
+function Kopje({ children, isMobile }) {
+  return (
+    <div style={{ padding: isMobile ? '0.625rem 1rem 0.5rem' : '0.75rem 1.25rem 0.625rem' }}>
+      <div style={{
+        fontSize: isMobile ? '0.62rem' : '0.66rem',
+        fontWeight: 800, color: 'rgba(255,255,255,0.4)',
+        textTransform: 'uppercase', letterSpacing: '0.1em',
+      }}>
+        {children}
+      </div>
+    </div>
+  )
+}
