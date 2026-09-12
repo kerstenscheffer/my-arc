@@ -5,14 +5,19 @@
 
 import React, { useState, useRef, useEffect } from 'react'
 import MealCard from '../day-schedule/MealCard'
-import { Search, Loader, X, ChevronRight, Plus, Copy, Star } from 'lucide-react'
+import Keuze from '../Keuze'
+import { Search, Loader, X, ChevronRight, Plus, Star } from 'lucide-react'
 import FatSecretService from './FatSecretService'
 import { foodImageFallback } from '../../foodImageFallback'
 
-const MODES = [
-  { id: 'products',  label: 'Alle producten' },
-  { id: 'meals',     label: 'Maaltijden' },
-  { id: 'favorites', label: 'Favorieten' }
+// Twee keuzes in plaats van drie chips: wát je zoekt en wáár je zoekt.
+const SOORTEN = [
+  { id: 'products', label: 'Ingrediënten' },
+  { id: 'meals',    label: 'Maaltijden' },
+]
+const BRONNEN = [
+  { id: 'alles',      label: 'Overal' },
+  { id: 'favorieten', label: 'Favorieten' },
 ]
 
 // Relevance score: lower = better.
@@ -39,8 +44,9 @@ const computeRelevance = (name, query) => {
   return 5
 }
 
-export default function SearchTab({ db, onSelect, isMobile, client, onQuickLog, onCopyYesterday, defaultMealMoment }) {
+export default function SearchTab({ db, onSelect, isMobile, client, onQuickLog, defaultMealMoment }) {
   const [mode, setMode] = useState('products')
+  const [bron, setBron] = useState('alles')
   const [searchTerm, setSearchTerm] = useState('')
   const [results, setResults] = useState([])
   const [loading, setLoading] = useState(false)
@@ -48,7 +54,6 @@ export default function SearchTab({ db, onSelect, isMobile, client, onQuickLog, 
   const [offLoading, setOffLoading] = useState(false)
   const [recentMeals, setRecentMeals] = useState([])
   const [recentsLoading, setRecentsLoading] = useState(true)
-  const [yesterdayCount, setYesterdayCount] = useState(0)
   // Favoriete producten van deze klant. Sleutel = bron|bron_id, zodat we per
   // zoekresultaat in één blik weten of de ster aan staat.
   const [favorieten, setFavorieten] = useState([])
@@ -63,7 +68,6 @@ export default function SearchTab({ db, onSelect, isMobile, client, onQuickLog, 
   useEffect(() => {
     if (client?.id) {
       loadRecents()
-      checkYesterday()
       laadFavorieten()
     } else {
       setRecentsLoading(false)
@@ -135,6 +139,11 @@ export default function SearchTab({ db, onSelect, isMobile, client, onQuickLog, 
     }
   }
 
+  // Zoeken binnen je favorieten gaat lokaal: het is een korte, eigen lijst.
+  const zichtbareFavorieten = favorieten.filter(f =>
+    !searchTerm || String(f.naam || '').toLowerCase().includes(searchTerm.toLowerCase())
+  )
+
   const isFavoriet = (item) => favorieten.some(f => `${f.bron}|${f.bron_id}` === favSleutel(item))
 
   const wisselFavoriet = async (item) => {
@@ -167,21 +176,6 @@ export default function SearchTab({ db, onSelect, isMobile, client, onQuickLog, 
     const { data, error } = await db.supabase.from('client_food_favorites').insert(rij).select().single()
     if (error) { console.error('Favoriet opslaan mislukt:', error); laadFavorieten(); return }
     setFavorieten(prev => prev.map(f => f.id === `tijdelijk-${sleutel}` ? data : f))
-  }
-
-  const checkYesterday = async () => {
-    try {
-      const yesterday = new Date()
-      yesterday.setDate(yesterday.getDate() - 1)
-      const dateStr = yesterday.toISOString().split('T')[0]
-      const { count, error } = await db.supabase
-        .from('consumed_meals')
-        .select('id', { count: 'exact', head: true })
-        .eq('client_id', client.id)
-        .gte('consumed_at', `${dateStr}T00:00:00`)
-        .lt('consumed_at', `${dateStr}T23:59:59`)
-      if (!error) setYesterdayCount(count || 0)
-    } catch { setYesterdayCount(0) }
   }
 
   const handleSearch = (value) => {
@@ -478,42 +472,14 @@ export default function SearchTab({ db, onSelect, isMobile, client, onQuickLog, 
         </div>
       </div>
 
-      {/* ── Filter chip pills ── */}
+      {/* ── Twee keuzes: wat en waar ── */}
       <div style={{
-        display: 'flex',
-        gap: '0.5rem',
-        padding: isMobile ? '0.25rem 1rem 0.875rem' : '0.375rem 1.25rem 1rem',
-        overflowX: 'auto',
-        WebkitOverflowScrolling: 'touch',
-        scrollbarWidth: 'none',
+        display: 'flex', alignItems: 'center',
+        padding: isMobile ? '0 1rem 0.75rem' : '0 1.25rem 0.875rem',
       }}>
-        {MODES.map(m => {
-          const isActive = mode === m.id
-          return (
-            <button
-              key={m.id}
-              onClick={() => setMode(m.id)}
-              style={{
-                padding: isMobile ? '0.5rem 1rem' : '0.55rem 1.125rem',
-                background: isActive ? '#fff' : 'transparent',
-                border: isActive ? 'none' : '1px solid rgba(255, 255, 255, 0.15)',
-                borderRadius: '999px',
-                color: isActive ? '#0a0a0a' : 'rgba(255, 255, 255, 0.55)',
-                fontSize: isMobile ? '0.78rem' : '0.83rem',
-                fontWeight: isActive ? 900 : 700,
-                cursor: 'pointer',
-                whiteSpace: 'nowrap',
-                touchAction: 'manipulation',
-                WebkitTapHighlightColor: 'transparent',
-                transition: 'all 0.15s ease',
-                minHeight: '36px',
-                flexShrink: 0,
-              }}
-            >
-              {m.label}
-            </button>
-          )
-        })}
+        <Keuze waarde={mode} opties={SOORTEN} zet={setMode} isMobile={isMobile} />
+        <div style={{ width: 1, height: 16, background: 'rgba(255,255,255,0.15)', flexShrink: 0 }} />
+        <Keuze waarde={bron} opties={BRONNEN} zet={setBron} isMobile={isMobile} uitlijning="rechts" />
       </div>
 
       {loading && (
@@ -573,56 +539,23 @@ export default function SearchTab({ db, onSelect, isMobile, client, onQuickLog, 
       {/* RECENTS */}
       {!loading && !isSearching && (
         <>
-          {yesterdayCount > 0 && onCopyYesterday && (
-            <button
-              onClick={onCopyYesterday}
-              style={{
-                display: 'flex', alignItems: 'center',
-                gap: '0.5rem', width: '100%',
-                padding: isMobile ? '0.625rem 0.75rem' : '0.75rem 1rem',
-                background: 'transparent', border: 'none',
-                borderBottom: '1px solid rgba(255, 255, 255, 0.06)',
-                cursor: 'pointer', textAlign: 'left',
-                touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-                minHeight: '48px'
-              }}
-            >
-              <div style={{
-                width: '28px', height: '28px', borderRadius: '8px',
-                background: 'rgba(255,255,255,0.08)',
-                border: '1px solid rgba(255,255,255,0.18)',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                flexShrink: 0
-              }}>
-                <Copy size={13} color="#fff" />
-              </div>
-              <div style={{ flex: 1 }}>
-                <div style={{ fontSize: isMobile ? '0.85rem' : '0.92rem', fontWeight: 900, color: '#fff' }}>
-                  Kopieer gisteren
-                </div>
-                <div style={{ fontSize: '0.6rem', fontWeight: 700, color: 'rgba(255,255,255,0.4)' }}>
-                  {yesterdayCount} maaltijd{yesterdayCount !== 1 ? 'en' : ''} opnieuw loggen
-                </div>
-              </div>
-              <ChevronRight size={14} color="rgba(255,255,255,0.35)" />
-            </button>
-          )}
-
-          {mode === 'favorites' && (
+          {bron === 'favorieten' && (
             <>
               <Kopje isMobile={isMobile}>Favorieten</Kopje>
-              {favorieten.length === 0 ? (
+              {zichtbareFavorieten.length === 0 ? (
                 <div style={{ padding: '2.5rem 1.25rem', textAlign: 'center' }}>
                   <div style={{ fontSize: '0.9rem', fontWeight: 900, color: '#fff', marginBottom: 4 }}>
-                    Nog geen favorieten
+                    {searchTerm ? 'Niets gevonden in je favorieten' : 'Nog geen favorieten'}
                   </div>
                   <div style={{ fontSize: '0.76rem', fontWeight: 700, color: 'rgba(255,255,255,0.4)' }}>
-                    Tik op de ster bij een product om 'm hier te bewaren.
+                    {searchTerm
+                      ? 'Zet de tweede keuze op Overal om alles te doorzoeken.'
+                      : "Tik op de ster bij een product om 'm hier te bewaren."}
                   </div>
                 </div>
               ) : (
                 <div style={{ paddingBottom: '1rem' }}>
-                  {favorieten.map(f => {
+                  {zichtbareFavorieten.map(f => {
                     const item = f.payload || {
                       id: f.bron_id, source: f.bron, name: f.naam, brand: f.merk,
                       calories: f.calories, protein: f.protein, carbs: f.carbs, fat: f.fat,
@@ -650,7 +583,7 @@ export default function SearchTab({ db, onSelect, isMobile, client, onQuickLog, 
             </>
           )}
 
-          {mode !== 'favorites' && recentMeals.length > 0 && (
+          {bron !== 'favorieten' && recentMeals.length > 0 && (
             <div style={{
               padding: isMobile ? '0.625rem 1rem 0.5rem' : '0.75rem 1.25rem 0.625rem',
             }}>
@@ -664,13 +597,13 @@ export default function SearchTab({ db, onSelect, isMobile, client, onQuickLog, 
             </div>
           )}
 
-          {mode !== 'favorites' && recentsLoading && (
+          {bron !== 'favorieten' && recentsLoading && (
             <div style={{ padding: '2rem', textAlign: 'center', color: 'rgba(255, 255, 255, 0.2)', fontSize: '0.8rem' }}>
               Laden...
             </div>
           )}
 
-          {mode !== 'favorites' && !recentsLoading && recentMeals.length > 0 && (
+          {bron !== 'favorieten' && !recentsLoading && recentMeals.length > 0 && (
             <div style={{ paddingBottom: '1rem' }}>
               {recentMeals.map((meal, idx) => {
                 const portionTxt = meal.amount && meal.per_unit
@@ -706,7 +639,7 @@ export default function SearchTab({ db, onSelect, isMobile, client, onQuickLog, 
             </div>
           )}
 
-          {mode !== 'favorites' && !recentsLoading && recentMeals.length === 0 && (
+          {bron !== 'favorieten' && !recentsLoading && recentMeals.length === 0 && (
             <div style={{
               padding: '2.5rem 1rem', textAlign: 'center',
               color: 'rgba(255, 255, 255, 0.15)', fontSize: '0.7rem'

@@ -32,7 +32,6 @@ export default function FoodLogModal({
   const [successData, setSuccessData] = useState(null)
   const [addIngredientCallback, setAddIngredientCallback] = useState(null)
   const [buildingMeal, setBuildingMeal] = useState(null)
-  const [showCopyConfirm, setShowCopyConfirm] = useState(false)
   const [showFeedback, setShowFeedback] = useState(false)
 
   useEffect(() => {
@@ -49,7 +48,6 @@ export default function FoodLogModal({
       setSuccessData(null)
       setAddIngredientCallback(null)
       setBuildingMeal(null)
-      setShowCopyConfirm(false)
     }
   }, [isOpen, startTab])
 
@@ -211,69 +209,6 @@ export default function FoodLogModal({
     }
   }
 
-  const handleCopyYesterdayRequest = () => {
-    setShowCopyConfirm(true)
-  }
-
-  const handleCopyYesterdayConfirm = async () => {
-    setShowCopyConfirm(false)
-    if (!loggingService || !client?.id) return
-
-    try {
-      const yesterday = new Date()
-      yesterday.setDate(yesterday.getDate() - 1)
-      const dateStr = yesterday.toISOString().split('T')[0]
-
-      const { data, error } = await db.supabase
-        .from('consumed_meals')
-        .select('*')
-        .eq('client_id', client.id)
-        .gte('consumed_at', `${dateStr}T00:00:00`)
-        .lt('consumed_at', `${dateStr}T23:59:59`)
-        .order('consumed_at', { ascending: true })
-
-      if (error) throw error
-      if (!data || data.length === 0) {
-        alert('Geen maaltijden gevonden van gisteren.')
-        return
-      }
-
-      let totalCal = 0
-      for (const meal of data) {
-        await loggingService.logMeal(client.id, {
-          name: meal.meal_name, sourceId: meal.meal_id,
-          type: meal.meal_type || 'custom',
-          ingredients: meal.ingredients || [],
-          calories: meal.calories || 0, protein: parseFloat(meal.protein) || 0,
-          carbs: parseFloat(meal.carbs) || 0, fat: parseFloat(meal.fat) || 0,
-          source: 'copy_yesterday', image_url: meal.image_url,
-          amount: meal.amount, per_unit: meal.per_unit,
-          per100g: meal.per_unit === 'gram'
-        }, consumedAt)
-        totalCal += meal.calories || 0
-      }
-
-      const totals = data.reduce((t, m) => ({
-        calories: t.calories + (m.calories || 0),
-        protein: t.protein + (parseFloat(m.protein) || 0),
-        carbs: t.carbs + (parseFloat(m.carbs) || 0),
-        fat: t.fat + (parseFloat(m.fat) || 0)
-      }), { calories: 0, protein: 0, carbs: 0, fat: 0 })
-
-      if (onMealLogged) onMealLogged(totals)
-
-      setSuccessData({
-        name: `${data.length} maaltijden van gisteren`,
-        calories: totalCal, meal_type: 'copy'
-      })
-
-      setTimeout(() => { setSuccessData(null); onClose() }, 1500)
-    } catch (err) {
-      console.error('Copy yesterday failed:', err)
-      alert('Kopiëren mislukt.')
-    }
-  }
-
   if (!isOpen) return null
 
   const remaining = {
@@ -291,57 +226,6 @@ export default function FoodLogModal({
       zIndex: 10000, display: 'flex', flexDirection: 'column',
       animation: 'flmFadeIn 0.2s ease'
     }}>
-
-      {showCopyConfirm && (
-        <div style={{
-          position: 'absolute', inset: 0, background: 'rgba(0, 0, 0, 0.9)',
-          zIndex: 10003, display: 'flex', alignItems: 'center', justifyContent: 'center',
-          padding: '2rem'
-        }}>
-          <div style={{
-            background: '#111', border: '1px solid rgba(255, 255, 255, 0.1)',
-            borderRadius: '12px', padding: isMobile ? '1.25rem' : '1.5rem',
-            maxWidth: '320px', width: '100%', textAlign: 'center'
-          }}>
-            <div style={{ fontSize: isMobile ? '0.9rem' : '1rem', fontWeight: '700', color: '#fff', marginBottom: '0.5rem' }}>
-              Gisteren kopiëren?
-            </div>
-            <div style={{ fontSize: isMobile ? '0.7rem' : '0.75rem', color: 'rgba(255, 255, 255, 0.4)', marginBottom: '1.25rem' }}>
-              Alle maaltijden van gisteren worden opnieuw gelogd voor vandaag.
-            </div>
-            <div style={{ display: 'flex', gap: '0.5rem' }}>
-              <button
-                onClick={() => setShowCopyConfirm(false)}
-                style={{
-                  flex: 1, padding: '0.625rem', borderRadius: '8px',
-                  background: 'rgba(255, 255, 255, 0.06)',
-                  border: '1px solid rgba(255, 255, 255, 0.1)',
-                  color: 'rgba(255, 255, 255, 0.5)',
-                  fontSize: isMobile ? '0.75rem' : '0.8rem', fontWeight: '600',
-                  cursor: 'pointer', minHeight: '44px',
-                  touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent'
-                }}
-              >
-                Annuleren
-              </button>
-              <button
-                onClick={handleCopyYesterdayConfirm}
-                style={{
-                  flex: 1, padding: '0.625rem', borderRadius: '8px',
-                  background: '#fff',
-                  border: 'none',
-                  color: '#0a0a0a',
-                  fontSize: isMobile ? '0.75rem' : '0.8rem', fontWeight: 900,
-                  cursor: 'pointer', minHeight: '44px',
-                  touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent'
-                }}
-              >
-                Kopiëren
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {successData && (
         <div style={{
@@ -455,7 +339,6 @@ export default function FoodLogModal({
                 isMobile={isMobile}
                 client={client}
                 onQuickLog={handleLog}
-                onCopyYesterday={handleCopyYesterdayRequest}
                 defaultMealMoment={defaultMealMoment}
               />
             )}
