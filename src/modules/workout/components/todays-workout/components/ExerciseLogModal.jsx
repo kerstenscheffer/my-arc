@@ -894,8 +894,8 @@ export default function ExerciseLogModal({ db, client, exercise, onClose, isMobi
                 dingen die je opzoekt vlak voor of na het loggen, niet terwijl
                 je naar je cijfers kijkt. */}
             <div style={{
-              display: 'flex', gap: 6, flexWrap: 'wrap',
-              padding: isMobile ? '0.7rem 1rem 0' : '0.8rem 1.25rem 0',
+              display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'center',
+              padding: isMobile ? '0.1rem 1rem 0' : '0.15rem 1.25rem 0',
             }}>
               <Pil actief={showExerciseNote} onClick={() => setShowExerciseNote(!showExerciseNote)} icoon={<MessageSquare size={12} strokeWidth={2.4} />} label="Notitie" stip={!!exerciseNote} />
               <Pil actief={showHistory} onClick={() => setShowHistory(!showHistory)} icoon={<History size={12} strokeWidth={2.4} />} label="Historie" />
