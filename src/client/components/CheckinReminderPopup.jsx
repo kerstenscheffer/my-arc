@@ -237,6 +237,20 @@ export default function CheckinReminderPopup({ client, db, onOpen, isMobile: pro
   const hoogte = isMobile ? 84 : 94
 
   const overlay = (
+    <>
+      {/* De pagina dimt eronder weg zodat de melding eruit springt. Tikken
+          naast de melding zet 'm weg als de pill boven de navbar, net als het
+          kruisje — anders zit je vast aan een scherm dat je niet kunt
+          wegklikken. */}
+      <div
+        onClick={handleDismiss}
+        style={{
+          position: 'fixed', inset: 0, zIndex: 96,
+          background: 'rgba(0,0,0,0.62)',
+          backdropFilter: 'blur(2px)', WebkitBackdropFilter: 'blur(2px)',
+          animation: 'checkinDim 0.3s ease both',
+        }}
+      />
     <div
       onClick={handleOpenForm}
       style={{
@@ -252,7 +266,9 @@ export default function CheckinReminderPopup({ client, db, onOpen, isMobile: pro
         background: '#0a0a0a',
         border: `1px solid ${mode === 'friday' ? 'rgba(255,255,255,0.12)' : palette.border}`,
         borderRight: 'none',
-        boxShadow: '0 16px 44px rgba(0,0,0,0.6)',
+        // Donkere halo rondom, zodat de kaart ook van de gedimde pagina
+        // loskomt in plaats van erin op te gaan.
+        boxShadow: '0 16px 44px rgba(0,0,0,0.75), 0 0 0 100px rgba(0,0,0,0.28)',
         cursor: 'pointer',
         touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
         animation: 'checkinSchuifIn 0.42s cubic-bezier(0.22, 1, 0.36, 1) both',
@@ -317,8 +333,10 @@ export default function CheckinReminderPopup({ client, db, onOpen, isMobile: pro
           from { transform: translateX(105%); opacity: 0; }
           to   { transform: translateX(0);    opacity: 1; }
         }
+        @keyframes checkinDim { from { opacity: 0; } to { opacity: 1; } }
       `}</style>
     </div>
+    </>
   )
 
   return createPortal(overlay, document.body)
