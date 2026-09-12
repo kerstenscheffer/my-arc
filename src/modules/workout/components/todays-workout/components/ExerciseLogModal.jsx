@@ -718,19 +718,29 @@ export default function ExerciseLogModal({ db, client, exercise, onClose, isMobi
                     </span>
                   )}
                 </div>
-                <div style={{
-                  display: 'flex', flexWrap: 'wrap', alignItems: 'baseline',
-                  gap: isMobile ? '0.15rem 0.85rem' : '0.15rem 1.1rem',
-                  fontSize: isMobile ? '0.95rem' : '1.05rem', fontWeight: 900,
-                  color: '#fff', fontVariantNumeric: 'tabular-nums',
-                }}>
+                {/* Onder elkaar, met het setnummer ervoor: zo zie je in één
+                    kolom of je zwaarder ging én of je de reps hield. Naast
+                    elkaar moest je tellen welke set je voor je had. */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                   {previousPerformance.sets.map((s, i) => (
-                    <span key={i} style={{ whiteSpace: 'nowrap' }}>
-                      {s.weight}<span style={{ color: 'rgba(255,255,255,0.35)', fontSize: '0.72em', fontWeight: 800 }}>kg</span>
-                      <span style={{ color: 'rgba(255,255,255,0.25)', fontSize: '0.8em', margin: '0 0.18em' }}>×</span>
-                      {s.reps}
-                      {s.partials > 0 && <span style={{ color: 'rgba(255,215,0,0.7)', fontSize: '0.72em', fontWeight: 800 }}> +{s.partials}p</span>}
-                    </span>
+                    <div key={i} style={{
+                      display: 'flex', alignItems: 'baseline', gap: '0.5rem',
+                      fontSize: isMobile ? '0.95rem' : '1.05rem', fontWeight: 900,
+                      color: '#fff', fontVariantNumeric: 'tabular-nums',
+                    }}>
+                      <span style={{
+                        fontSize: '0.68em', fontWeight: 800, color: 'rgba(255,255,255,0.4)',
+                        minWidth: '3.1em',
+                      }}>
+                        Set {i + 1}
+                      </span>
+                      <span style={{ whiteSpace: 'nowrap' }}>
+                        {s.weight}<span style={{ color: 'rgba(255,255,255,0.35)', fontSize: '0.72em', fontWeight: 800 }}>kg</span>
+                        <span style={{ color: 'rgba(255,255,255,0.25)', fontSize: '0.8em', margin: '0 0.18em' }}>×</span>
+                        {s.reps}
+                        {s.partials > 0 && <span style={{ color: 'rgba(255,215,0,0.7)', fontSize: '0.72em', fontWeight: 800 }}> +{s.partials}p</span>}
+                      </span>
+                    </div>
                   ))}
                 </div>
               </div>
