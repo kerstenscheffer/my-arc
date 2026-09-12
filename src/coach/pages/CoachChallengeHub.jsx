@@ -11,6 +11,7 @@ import WeightProgressView from './challenge-monitor/WeightProgressView'
 import PhotoProgressView from './challenge-monitor/PhotoProgressView'
 import ChallengeAdjustments from './challenge-monitor/ChallengeAdjustments'
 import LastActivityView from './challenge-monitor/LastActivityView'
+import ChallengeDeelnemers from '../../modules/challenge-monitor/ChallengeDeelnemers'
 
 export default function CoachChallengeHub({ db, clients }) {
   const isMobile = window.innerWidth <= 768
@@ -432,6 +433,20 @@ export default function CoachChallengeHub({ db, clients }) {
           )}
         </div>
       )}
+
+      {/* Deelnemersoverzicht — staat vóór de "geen actieve challenge"-gate en
+          buiten de klantkiezer. Die gate kijkt naar challenge_type '8week' én
+          naar de klanten die in de huidige lijst staan; het overzicht laadt
+          zijn eigen deelnemers en moet ook te zien zijn als die gate dichtslaat.
+          Anders is de tab onbereikbaar precies wanneer je 'm nodig hebt. */}
+      <ChallengeDeelnemers
+        db={db}
+        isMobile={isMobile}
+        onSelectClient={(clientId) => {
+          const k = challengeClients.find(c => c.id === clientId)
+          if (k) { setSelectedClient(k); setActiveView('overview') }
+        }}
+      />
 
       {/* Challenge Monitor */}
       {challengeClients.length === 0 ? (

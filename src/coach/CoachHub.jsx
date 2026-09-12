@@ -104,6 +104,9 @@ const MORE_CATEGORIES = [
     items: [
       { id: 'checkins', label: 'Check-ins', icon: ClipboardCheck },
       { id: 'client-view', label: 'Meekijken', icon: Eye },
+      // De challenge-hub stond wél in de switch maar niet in dit menu, dus je
+      // kon er alleen komen door het hash zelf in te typen.
+      { id: 'challenge-hub', label: 'Challenge', icon: Trophy },
       { id: 'results', label: 'Resultaten', icon: Trophy }
     ]
   },
