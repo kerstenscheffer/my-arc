@@ -3,15 +3,22 @@
 // Props: { stats, client, fridayData, history, isMobile, coachingPlan }
 
 import React, { useState, useMemo } from 'react'
-import { TrendingDown, TrendingUp, Calendar, ChevronDown, ChevronUp, Activity } from 'lucide-react'
+import { TrendingDown, TrendingUp, Calendar, ChevronDown, ChevronUp, Activity, Target } from 'lucide-react'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts'
 import { weightGoalColor } from '../utils/weightGoalColor'
+
+const PERIODES = [
+  { id: '30d', label: '30 dagen' },
+  { id: '90d', label: '3 maanden' },
+  { id: '6m', label: '6 maanden' },
+  { id: 'alles', label: 'Alles' },
+]
 
 // `volleBreedte` + `toonHuidig` worden alleen door het coach-inzichtpaneel
 // gebruikt: daar is dit de bovenste balk van de sectie en hoort hij tegen de
 // randen te staan, met het huidige gewicht als eerste cel. Op de klantpagina
 // blijft het een zwevend kaartje binnen de bestaande opmaak.
-export default function WeightStatsGrid({ stats = {}, client = {}, fridayData = {}, history = [], isMobile = false, coachingPlan = null, volleBreedte = false, toonHuidig = false, fase = null }) {
+export default function WeightStatsGrid({ stats = {}, client = {}, fridayData = {}, history = [], isMobile = false, coachingPlan = null, volleBreedte = false, toonHuidig = false, fase = null, onDoelWijzigen = null }) {
   const [showWeekly, setShowWeekly] = useState(false)
   const sortedHistory = [...history].sort((a, b) => new Date(a.date) - new Date(b.date))
 
@@ -265,6 +272,18 @@ export default function WeightStatsGrid({ stats = {}, client = {}, fridayData = 
   ])
 
   const hasPlanLine = chartData.some(d => d.expected != null)
+  // Tijdvak van de grafiek. 'alles' laat de hele historie zien; standaard 90
+  // dagen, want daar zie je de trend waar je nu in zit.
+  const [periode, setPeriode] = useState('90d')
+  const zichtbareData = useMemo(() => {
+    if (periode === 'alles') return chartData
+    const dagen = { '30d': 30, '90d': 90, '6m': 182, '1j': 365 }[periode] || 90
+    const grens = new Date()
+    grens.setDate(grens.getDate() - dagen)
+    // chartData bevat ook toekomstige plan-punten; die horen erbij te blijven.
+    return chartData.filter(d => !d.rawDate || new Date(d.rawDate) >= grens)
+  }, [chartData, periode])
+
   const targetWeightNum = Number.isFinite(parseFloat(client?.target_weight))
     ? parseFloat(client.target_weight) : null
   
@@ -309,26 +328,14 @@ export default function WeightStatsGrid({ stats = {}, client = {}, fridayData = 
 
   return (
     <div>
-      {/* ═══ 4-COLUMN STAT BAR — Deze week | Vorige week | Verschil | Sinds start
-            Zwevende card: los van de zijkanten, rounded, met margin. Tekst
-            bold wit en groter. ═══ */}
-      <div style={volleBreedte ? {
-        margin: 0,
-        background: 'rgba(255,255,255,0.03)',
-        borderTop: '1px solid rgba(255,255,255,0.08)',
-        borderBottom: '1px solid rgba(255,255,255,0.08)',
+      {/* ═══ WEEKCIJFERS — tegels, zelfde vorm als op de klantkaart in het
+            coach-scherm: label bold wit, groot getal, kleine toelichting. Was
+            een balk met vier smalle kolommen waarin de tekst afkapte. ═══ */}
+      <div style={{
         display: 'grid',
-        gridTemplateColumns: `repeat(${toonHuidig ? 5 : 4}, 1fr)`,
-        overflow: 'hidden',
-      } : {
-        margin: isMobile ? '0 1rem' : '0 1.5rem',
-        background: 'rgba(255,255,255,0.03)',
-        border: '1px solid rgba(255,255,255,0.08)',
-        borderRadius: 14,
-        boxShadow: '0 8px 24px rgba(0,0,0,0.35)',
-        display: 'grid',
-        gridTemplateColumns: 'repeat(4, 1fr)',
-        overflow: 'hidden',
+        gridTemplateColumns: volleBreedte ? `repeat(${toonHuidig ? 5 : 4}, 1fr)` : 'repeat(2, 1fr)',
+        gap: 8,
+        margin: volleBreedte ? 0 : (isMobile ? '0 1rem' : '0 1.5rem'),
       }}>
         {[
           ...(toonHuidig ? [{
@@ -336,22 +343,16 @@ export default function WeightStatsGrid({ stats = {}, client = {}, fridayData = 
             sub: laatsteDatum || 'geen meting',
             val: laatsteGewicht != null ? `${laatsteGewicht}` : '—',
             color: '#fff',
-            isPrimary: true,
           }] : []),
           {
             label: 'Deze week',
-            sub: cur
-              ? `${cur.count} meting${cur.count === 1 ? '' : 'en'}`
-              : 'geen meting',
+            sub: cur ? `${cur.count} meting${cur.count === 1 ? '' : 'en'}` : 'geen meting',
             val: cur ? `${cur.avg}` : '—',
             color: '#fff',
-            isPrimary: !toonHuidig,
           },
           {
             label: 'Vorige week',
-            sub: prev
-              ? `${prev.count} meting${prev.count === 1 ? '' : 'en'}`
-              : 'geen meting',
+            sub: prev ? `${prev.count} meting${prev.count === 1 ? '' : 'en'}` : 'geen meting',
             val: prev ? `${prev.avg}` : '—',
             color: '#fff',
           },
@@ -359,148 +360,199 @@ export default function WeightStatsGrid({ stats = {}, client = {}, fridayData = 
             label: 'Verschil',
             sub: weekChange !== null ? 'week tov week' : '—',
             val: weekChange !== null ? `${weekChange > 0 ? '+' : ''}${weekChange}` : '—',
-            color: weekChange !== null
-              ? weightGoalColor(weekChange, doelBron, '#fff')
-              : 'rgba(255,255,255,0.4)',
-            icon: weekChange !== null && weekChange !== 0
-              ? (weekChange < 0 ? TrendingDown : TrendingUp) : null,
+            color: weekChange !== null ? weightGoalColor(weekChange, doelBron, '#fff') : 'rgba(255,255,255,0.4)',
+            icon: weekChange !== null && weekChange !== 0 ? (weekChange < 0 ? TrendingDown : TrendingUp) : null,
           },
           {
             label: fase ? 'Sinds start fase' : 'Sinds start',
             sub: startDateLabel ? `vanaf ${startDateLabel}` : 'geen startmeting',
             val: totalChange !== null ? `${totalChange > 0 ? '+' : ''}${totalChange}` : '—',
-            color: totalChange !== null
-              ? weightGoalColor(totalChange, doelBron, '#fff')
-              : 'rgba(255,255,255,0.4)',
-            icon: totalChange !== null && totalChange !== 0
-              ? (totalChange < 0 ? TrendingDown : TrendingUp) : null,
+            color: totalChange !== null ? weightGoalColor(totalChange, doelBron, '#fff') : 'rgba(255,255,255,0.4)',
+            icon: totalChange !== null && totalChange !== 0 ? (totalChange < 0 ? TrendingDown : TrendingUp) : null,
           },
-        ].map((s, i) => (
+        ].map((s2, i) => (
           <div key={i} style={{
-            padding: isMobile ? '0.8rem 0.55rem' : '1rem 0.85rem',
-            borderRight: i < (toonHuidig ? 4 : 3) ? '1px solid rgba(255,255,255,0.06)' : 'none',
-            display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 4,
-            minWidth: 0,
+            padding: isMobile ? '0.65rem 0.75rem' : '0.8rem 0.9rem',
+            background: 'rgba(255,255,255,0.03)',
+            border: '1px solid rgba(255,255,255,0.08)',
+            borderRadius: 12,
+            display: 'flex', flexDirection: 'column', gap: 4, minWidth: 0,
           }}>
             <div style={{
               display: 'flex', alignItems: 'center', gap: 4,
-              fontSize: isMobile ? '0.7rem' : '0.78rem',
-              fontWeight: 900,
-              color: '#fff',
-              letterSpacing: '-0.01em',
-              whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
-              maxWidth: '100%',
+              fontSize: isMobile ? '0.7rem' : '0.76rem',
+              fontWeight: 900, color: '#fff', letterSpacing: '-0.01em',
+              whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '100%',
             }}>
-              {s.icon && React.createElement(s.icon, { size: isMobile ? 12 : 13, strokeWidth: 2.6 })}
-              {s.label}
+              {s2.icon && React.createElement(s2.icon, { size: isMobile ? 12 : 13, strokeWidth: 2.6 })}
+              {s2.label}
             </div>
             <div style={{
-              fontSize: isMobile ? '1.35rem' : '1.55rem',
-              fontWeight: 900, color: s.color, lineHeight: 1,
-              letterSpacing: '-0.025em',
-              fontVariantNumeric: 'tabular-nums',
+              fontSize: isMobile ? '1.45rem' : '1.6rem',
+              fontWeight: 900, color: s2.color, lineHeight: 1,
+              letterSpacing: '-0.03em', fontVariantNumeric: 'tabular-nums',
             }}>
-              {s.val}
-              <span style={{
-                fontSize: isMobile ? '0.62rem' : '0.68rem',
-                fontWeight: 700, opacity: 0.55, marginLeft: 4,
-              }}>
-                kg
-              </span>
+              {s2.val}
+              <span style={{ fontSize: isMobile ? '0.62rem' : '0.68rem', fontWeight: 800, opacity: 0.5, marginLeft: 4 }}>kg</span>
             </div>
             <div style={{
-              fontSize: isMobile ? '0.66rem' : '0.72rem',
-              fontWeight: 700,
-              color: 'rgba(255,255,255,0.55)',
-              whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
-              maxWidth: '100%',
+              fontSize: isMobile ? '0.66rem' : '0.7rem', fontWeight: 700,
+              color: 'rgba(255,255,255,0.45)',
+              whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '100%',
             }}>
-              {s.sub}
+              {s2.sub}
             </div>
           </div>
         ))}
       </div>
 
+      {/* ═══ DOEL — huidig doelgewicht en hoe ver je nog bent, met de knop om
+            het bij te stellen. ═══ */}
+      {onDoelWijzigen && (
+        <div style={{
+          margin: isMobile ? '0.75rem 1rem 0' : '0.9rem 1.5rem 0',
+          padding: isMobile ? '0.75rem 0.9rem' : '0.9rem 1rem',
+          background: 'rgba(255,255,255,0.03)',
+          border: '1px solid rgba(255,255,255,0.08)',
+          borderRadius: 12,
+          display: 'flex', alignItems: 'center', gap: 10,
+        }}>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: isMobile ? '0.7rem' : '0.76rem', fontWeight: 900, color: '#fff', marginBottom: 3 }}>
+              Doel
+            </div>
+            <div style={{ fontSize: isMobile ? '1.45rem' : '1.6rem', fontWeight: 900, color: '#fff', lineHeight: 1, letterSpacing: '-0.03em' }}>
+              {targetWeightNum != null ? targetWeightNum : '—'}
+              <span style={{ fontSize: isMobile ? '0.62rem' : '0.68rem', fontWeight: 800, opacity: 0.5, marginLeft: 4 }}>kg</span>
+            </div>
+            <div style={{ fontSize: isMobile ? '0.66rem' : '0.7rem', fontWeight: 700, color: 'rgba(255,255,255,0.45)', marginTop: 4 }}>
+              {targetWeightNum != null && laatsteGewicht != null
+                ? `nog ${Math.abs(Math.round((laatsteGewicht - targetWeightNum) * 10) / 10)} kg te gaan`
+                : 'nog geen doel ingesteld'}
+            </div>
+          </div>
+          <button
+            onClick={onDoelWijzigen}
+            style={{
+              flexShrink: 0, minHeight: 40, padding: '0 0.9rem',
+              display: 'flex', alignItems: 'center', gap: 6,
+              background: 'transparent', border: '1.5px solid rgba(255,255,255,0.28)',
+              borderRadius: 11, color: '#fff',
+              fontSize: '0.78rem', fontWeight: 900, fontFamily: 'inherit',
+              cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+            }}
+          >
+            <Target size={14} strokeWidth={2.6} /> {targetWeightNum != null ? 'Bijstellen' : 'Instellen'}
+          </button>
+        </div>
+      )}
+
       {/* "Wekelijkse Historie" dropdown verwijderd — die functie zit nu in de
           "Bekijk week progressie"-toggle van WeightHistory. */}
 
-      {/* ═══ CHART — with optional plan line ═══ */}
+      {/* ═══ GRAFIEK — met een tijdfilter erboven ═══ */}
       {chartData.length > 0 && (
         <div style={{
-          padding: isMobile ? '0.625rem 0.5rem 0.5rem' : '0.875rem 0.75rem 0.625rem',
-          borderBottom: '1px solid rgba(255, 255, 255, 0.04)'
+          margin: isMobile ? '0.9rem 1rem 0' : '1.1rem 1.5rem 0',
+          padding: isMobile ? '0.85rem 0.5rem 0.6rem' : '1rem 0.75rem 0.75rem',
+          background: 'rgba(255,255,255,0.03)',
+          border: '1px solid rgba(255,255,255,0.08)',
+          borderRadius: 14,
         }}>
           <div style={{
             display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-            padding: isMobile ? '0 0.5rem 0.375rem' : '0 0.75rem 0.5rem'
+            gap: 8, padding: isMobile ? '0 0.4rem 0.6rem' : '0 0.5rem 0.7rem',
           }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
-              <Activity size={isMobile ? 12 : 13} color="rgba(255,255,255,0.3)" />
-              <span style={{ fontSize: isMobile ? '0.65rem' : '0.7rem', fontWeight: '600', color: 'rgba(255,255,255,0.5)' }}>
-                Gewicht Verloop
-              </span>
-            </div>
-            <span style={{ fontSize: isMobile ? '0.45rem' : '0.5rem', color: 'rgba(255,255,255,0.2)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-              {chartData.length} entries
+            <span style={{ fontSize: isMobile ? '0.82rem' : '0.9rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.02em' }}>
+              Verloop
+            </span>
+            <span style={{ fontSize: '0.62rem', fontWeight: 800, color: 'rgba(255,255,255,0.35)' }}>
+              {zichtbareData.length} metingen
             </span>
           </div>
 
-          <ResponsiveContainer width="100%" height={isMobile ? 120 : 150}>
-            <LineChart data={chartData} margin={{ top: 5, right: 5, left: -15, bottom: 5 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.02)" vertical={false} />
-              <XAxis dataKey="date" stroke="rgba(255,255,255,0.1)" fontSize={isMobile ? 7 : 8}
-                interval="preserveStartEnd" tick={{ fill: 'rgba(255,255,255,0.25)' }} />
-              <YAxis stroke="rgba(255,255,255,0.1)" fontSize={isMobile ? 7 : 8}
-                domain={['dataMin - 0.5', 'dataMax + 0.5']} tick={{ fill: 'rgba(255,255,255,0.25)' }} width={25} />
+          {/* Tijdvak kiezen: bij twee jaar data zegt de hele lijn weinig over
+              waar je nu staat. */}
+          <div style={{
+            display: 'flex', gap: 5,
+            padding: isMobile ? '0 0.4rem 0.7rem' : '0 0.5rem 0.8rem',
+          }}>
+            {PERIODES.map(p2 => {
+              const aan = periode === p2.id
+              return (
+                <button
+                  key={p2.id}
+                  onClick={() => setPeriode(p2.id)}
+                  style={{
+                    flex: 1, minHeight: 30,
+                    background: aan ? '#fff' : 'transparent',
+                    border: `1px solid ${aan ? '#fff' : 'rgba(255,255,255,0.15)'}`,
+                    borderRadius: 999,
+                    color: aan ? '#0a0a0a' : 'rgba(255,255,255,0.55)',
+                    fontSize: isMobile ? '0.68rem' : '0.72rem',
+                    fontWeight: aan ? 900 : 700, fontFamily: 'inherit',
+                    cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+                  }}
+                >
+                  {p2.label}
+                </button>
+              )
+            })}
+          </div>
+
+          <ResponsiveContainer width="100%" height={isMobile ? 190 : 240}>
+            <LineChart data={zichtbareData} margin={{ top: 5, right: 8, left: -12, bottom: 5 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
+              <XAxis dataKey="date" stroke="rgba(255,255,255,0.12)" fontSize={isMobile ? 9 : 10}
+                interval="preserveStartEnd" tick={{ fill: 'rgba(255,255,255,0.4)', fontWeight: 700 }} />
+              <YAxis stroke="rgba(255,255,255,0.12)" fontSize={isMobile ? 9 : 10}
+                domain={['dataMin - 0.5', 'dataMax + 0.5']} tick={{ fill: 'rgba(255,255,255,0.4)', fontWeight: 700 }} width={30} />
               <Tooltip content={<CustomTooltip />} />
-              {/* Doel-referentielijn — horizontaal, groen, label rechts */}
               {targetWeightNum != null && (
                 <ReferenceLine
                   y={targetWeightNum}
                   stroke="#10b981"
-                  strokeWidth={1}
+                  strokeWidth={1.5}
                   strokeDasharray="2 4"
                   label={{
                     value: `Doel ${targetWeightNum}`,
                     position: 'insideTopRight',
-                    fill: 'rgba(16,185,129,0.85)',
-                    fontSize: isMobile ? 8 : 9,
-                    fontWeight: 700,
+                    fill: 'rgba(16,185,129,0.9)',
+                    fontSize: isMobile ? 9 : 10,
+                    fontWeight: 800,
                   }}
                 />
               )}
-              {/* Plan-lijn — rood, doorgetrokken. Loopt door tot
-                  client.goal_deadline. */}
               {hasPlanLine && (
-                <Line type="monotone" dataKey="expected" stroke="#ef4444" strokeWidth={1.8}
-                  dot={false} activeDot={false} connectNulls />
+                <Line type="monotone" dataKey="expected" stroke="rgba(255,255,255,0.35)" strokeWidth={1.5}
+                  strokeDasharray="4 4" dot={false} activeDot={false} connectNulls />
               )}
-              {/* Actual weight line — solid gold */}
-              <Line type="monotone" dataKey="weight" stroke="#FFD700" strokeWidth={1.5}
-                dot={<CustomDot />} activeDot={{ r: 4, fill: '#FFA500' }} />
+              {/* Gemeten gewicht — wit, want dat is de lijn waar het om gaat. */}
+              <Line type="monotone" dataKey="weight" stroke="#fff" strokeWidth={2}
+                dot={<CustomDot />} activeDot={{ r: 4, fill: '#fff' }} />
             </LineChart>
           </ResponsiveContainer>
 
           <div style={{
-            display: 'flex', gap: '0.75rem', justifyContent: 'center', flexWrap: 'wrap',
-            marginTop: '0.25rem', fontSize: isMobile ? '0.45rem' : '0.5rem'
+            display: 'flex', gap: '0.9rem', justifyContent: 'center', flexWrap: 'wrap',
+            marginTop: '0.4rem', fontSize: isMobile ? '0.6rem' : '0.65rem', fontWeight: 700,
           }}>
             {fridayData?.friday_count > 0 && (
-              <span style={{ display: 'flex', alignItems: 'center', gap: '0.15rem', color: 'rgba(255,255,255,0.25)' }}>
-                <div style={{ width: '4px', height: '4px', borderRadius: '50%', background: '#8b5cf6' }} /> Vrijdag
+              <span style={{ display: 'flex', alignItems: 'center', gap: 5, color: 'rgba(255,255,255,0.4)' }}>
+                <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#8b5cf6' }} /> Vrijdag
               </span>
             )}
-            <span style={{ display: 'flex', alignItems: 'center', gap: '0.15rem', color: 'rgba(255,255,255,0.25)' }}>
-              <div style={{ width: '8px', height: '1.5px', background: '#FFD700' }} /> Werkelijk
+            <span style={{ display: 'flex', alignItems: 'center', gap: 5, color: 'rgba(255,255,255,0.4)' }}>
+              <div style={{ width: 10, height: 2, background: '#fff' }} /> Gemeten
             </span>
             {hasPlanLine && (
-              <span style={{ display: 'flex', alignItems: 'center', gap: '0.15rem', color: 'rgba(255,255,255,0.25)' }}>
-                <div style={{ width: '8px', height: '1.5px', background: '#ef4444', borderRadius: '1px' }} /> Plan
+              <span style={{ display: 'flex', alignItems: 'center', gap: 5, color: 'rgba(255,255,255,0.4)' }}>
+                <div style={{ width: 10, height: 2, background: 'rgba(255,255,255,0.35)' }} /> Plan
               </span>
             )}
             {targetWeightNum != null && (
-              <span style={{ display: 'flex', alignItems: 'center', gap: '0.15rem', color: 'rgba(255,255,255,0.25)' }}>
-                <div style={{ width: '8px', height: '1.5px', background: '#10b981', borderRadius: '1px' }} /> Doel
+              <span style={{ display: 'flex', alignItems: 'center', gap: 5, color: 'rgba(255,255,255,0.4)' }}>
+                <div style={{ width: 10, height: 2, background: '#10b981' }} /> Doel
               </span>
             )}
           </div>
