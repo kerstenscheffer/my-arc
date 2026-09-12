@@ -26,6 +26,7 @@ export default function ExerciseHistory({ exerciseName, previousLog, loading, cl
   const [fullHistory, setFullHistory] = useState([])
   const [loadingHistory, setLoadingHistory] = useState(false)
   const [historyLoaded, setHistoryLoaded] = useState(false)
+  const [gekozenDag, setGekozenDag] = useState(null)
 
   useEffect(() => {
     if ((expanded || forceLoad) && !historyLoaded && client?.id && db && exerciseName) {
@@ -178,8 +179,12 @@ export default function ExerciseHistory({ exerciseName, previousLog, loading, cl
     //
     // Balkjes en geen lijn, omdat elke sessie een los moment is: een lijn
     // suggereert dat er iets tussen die twee punten gebeurde.
-    const reeks = [...sessies].reverse()
+    // Laatste twaalf sessies in de balkjes. Met alle negentien wordt elk
+    // balkje een streepje van vier pixels, en dan valt er niets meer aan te
+    // tikken. De tabel eronder heeft ze alsnog allemaal.
+    const reeks = [...sessies].slice(0, 12).reverse()
     const maxVol = Math.max(...reeks.map(s => s.volume || 0), 1)
+    const gekozen = reeks.find(x => x.dag === gekozenDag) || reeks[reeks.length - 1]
 
     return (
       <div>
@@ -223,25 +228,49 @@ export default function ExerciseHistory({ exerciseName, previousLog, loading, cl
                 onder={`sinds ${formatDate(sessies[sessies.length - 1].dag)}`}
               />
 
+              {/* Balkjes zijn aantikbaar: dan zie je eronder welke sessie het is.
+                  Als streepje van vier pixels kon je alleen zien dát er
+                  verschil was, niet waar het zat. */}
               {reeks.length > 1 && (
-                <div style={{ flex: 1, minWidth: 60, display: 'flex', alignItems: 'flex-end', justifyContent: 'flex-end', gap: 2, height: 46 }}>
-                  {reeks.map((s, i) => {
-                    const laatste = i === reeks.length - 1
-                    const isPr = s.dag === pr.dag
-                    // Minimaal 12% hoog, anders verdwijnt een lichte sessie
-                    // helemaal en lijkt het of er niets gebeurd is.
-                    const h = Math.max(12, ((s.volume || 0) / maxVol) * 100)
-                    return (
-                      <div
-                        key={s.dag}
-                        title={`${formatDate(s.dag)} · ${s.top.weight}kg × ${s.top.reps}`}
-                        style={{
-                          width: 4, height: `${h}%`, borderRadius: 2, flexShrink: 0,
-                          background: laatste ? '#10b981' : isPr ? '#FFD700' : 'rgba(255,255,255,0.22)',
-                        }}
-                      />
-                    )
-                  })}
+                <div style={{ flex: 1, minWidth: 90, display: 'flex', flexDirection: 'column', alignItems: 'stretch', gap: 5 }}>
+                  <div style={{ display: 'flex', alignItems: 'flex-end', gap: 3, height: 46 }}>
+                    {reeks.map((s, i) => {
+                      const laatste = i === reeks.length - 1
+                      const isPr = s.dag === pr.dag
+                      const isGekozen = s.dag === gekozen?.dag
+                      // Minimaal 12% hoog, anders verdwijnt een lichte sessie
+                      // helemaal en lijkt het of er niets gebeurd is.
+                      const h = Math.max(12, ((s.volume || 0) / maxVol) * 100)
+                      return (
+                        <button
+                          key={s.dag}
+                          onClick={() => setGekozenDag(g => (g === s.dag ? null : s.dag))}
+                          title={`${formatDate(s.dag)} · ${s.top.weight}kg × ${s.top.reps}`}
+                          style={{
+                            flex: 1, minWidth: 7, maxWidth: 16, height: '100%',
+                            display: 'flex', alignItems: 'flex-end',
+                            background: 'transparent', border: 'none', padding: 0,
+                            cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+                          }}
+                        >
+                          <span style={{
+                            display: 'block', width: '100%', height: `${h}%`, borderRadius: 3,
+                            background: laatste ? '#10b981' : isPr ? '#FFD700' : 'rgba(255,255,255,0.22)',
+                            outline: isGekozen ? '1.5px solid rgba(255,255,255,0.85)' : 'none',
+                            outlineOffset: 1,
+                          }} />
+                        </button>
+                      )
+                    })}
+                  </div>
+                  {gekozen && (
+                    <div style={{
+                      fontSize: '0.68rem', fontWeight: 800, color: 'rgba(255,255,255,0.55)',
+                      fontVariantNumeric: 'tabular-nums', textAlign: 'right', whiteSpace: 'nowrap',
+                    }}>
+                      {formatDate(gekozen.dag)} · <span style={{ color: '#fff' }}>{gekozen.top.weight}kg × {gekozen.top.reps}</span> · {Math.round(gekozen.volume)}kg totaal
+                    </div>
+                  )}
                 </div>
               )}
             </div>
