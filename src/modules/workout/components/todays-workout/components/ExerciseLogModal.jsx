@@ -87,6 +87,31 @@ function AdjustBtn({ label, onClick, isMobile }) {
 // Op één plek, zodat de koprij en de rijen niet uit de pas lopen.
 const KOLOMMEN = '3.2rem 1fr 1fr 4.2rem'
 
+// Aantal geplande sets kiezen. Leunt op dezelfde NumberPicker als de kilo's
+// en de reps: één manier om in dit scherm een getal te kiezen.
+function SetsKiezer({ waarde, gelogd, onKies }) {
+  const [n, setN] = useState(waarde)
+  const teWeinig = n < gelogd
+  return (
+    <div>
+      <NumberPicker
+        value={n}
+        onChange={setN}
+        min={1}
+        max={10}
+        step={1}
+        unit="sets"
+        onConfirm={() => !teWeinig && onKies(n)}
+      />
+      {teWeinig && (
+        <div style={{ marginTop: '0.6rem', fontSize: '0.8rem', fontWeight: 700, color: '#f59e0b', textAlign: 'center' }}>
+          Je hebt er al {gelogd} gelogd. Verwijder eerst een set als je lager wilt.
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ========== SET INPUT WIZARD ==========
 // `snel` = met de rusttimer aan: alleen kilo's en reps, dan klaar. Partials
 // en dropsets blijven bestaan, maar niet als vier schermen tussen elke set
@@ -364,7 +389,7 @@ function embedUrl(url) {
 }
 
 // ========== MAIN MODAL ==========
-export default function ExerciseLogModal({ db, client, exercise, onClose, isMobile = window.innerWidth <= 768 }) {
+export default function ExerciseLogModal({ db, client, exercise, onClose, onSetsWijzigen, isMobile = window.innerWidth <= 768 }) {
   const [loggedSets, setLoggedSets] = useState([])
   const [showWizard, setShowWizard] = useState(false)
   const [editingIndex, setEditingIndex] = useState(null) // ✅ Nieuw: track welke set wordt bewerkt
@@ -387,6 +412,9 @@ export default function ExerciseLogModal({ db, client, exercise, onClose, isMobi
   const [media, setMedia] = useState(null)
   const [toonVideo, setToonVideo] = useState(false)
   const [videoGroot, setVideoGroot] = useState(false)
+  // Aantal geplande sets aanpassen. Zat als − en + op de oefeningkaart; daar
+  // moest je uit dit scherm voor terug terwijl je hier bezig bent.
+  const [setsKiezer, setSetsKiezer] = useState(false)
 
   // Rusttimer: na een gelogde set loopt je rusttijd, en daarna staat het
   // invoerscherm er weer. Zo hoef je tussen de sets niets aan te raken.
@@ -875,7 +903,24 @@ export default function ExerciseLogModal({ db, client, exercise, onClose, isMobi
               </h2>
               <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.5rem', flexWrap: 'wrap', marginTop: '0.35rem', fontSize: isMobile ? '0.95rem' : '1.05rem', fontWeight: 900 }}>
                 <span style={{ color: '#fff' }}>
-                  {loggedSets.length}/{exercise.sets}<span style={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.78em', fontWeight: 800 }}> sets</span>
+                  {/* Het geplande aantal is aanklikbaar: doe je er vandaag een
+                      minder of meer, dan zet je dat hier bij en klopt
+                      "voltooid" weer. */}
+                  <button
+                    onClick={() => onSetsWijzigen && setSetsKiezer(true)}
+                    disabled={!onSetsWijzigen}
+                    title={onSetsWijzigen ? 'Aantal sets aanpassen' : undefined}
+                    style={{
+                      background: 'transparent', border: 'none', padding: 0, margin: 0,
+                      color: 'inherit', font: 'inherit', letterSpacing: 'inherit',
+                      cursor: onSetsWijzigen ? 'pointer' : 'default',
+                      borderBottom: onSetsWijzigen ? '1.5px dotted rgba(255,255,255,0.35)' : 'none',
+                      touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+                    }}
+                  >
+                    {loggedSets.length}/{exercise.sets}
+                  </button>
+                  <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.78em', fontWeight: 800 }}> sets</span>
                   <span style={{ color: 'rgba(255,255,255,0.25)' }}> · </span>
                   {exercise.reps}<span style={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.78em', fontWeight: 800 }}> reps</span>
                   <span style={{ color: 'rgba(255,255,255,0.25)' }}> · </span>
@@ -1144,6 +1189,19 @@ export default function ExerciseLogModal({ db, client, exercise, onClose, isMobi
         </div>,
         document.body
       )}
+
+      {/* Aantal sets kiezen — dezelfde verticale schuiflijst als bij kilo's
+          en reps, zodat het overal hetzelfde werkt. */}
+      <BladModal open={setsKiezer} titel="Hoeveel sets doe je?" onClose={() => setSetsKiezer(false)}>
+        <SetsKiezer
+          waarde={parseInt(exercise.sets, 10) || 1}
+          gelogd={loggedSets.length}
+          onKies={async (n) => {
+            setSetsKiezer(false)
+            await onSetsWijzigen?.(n)
+          }}
+        />
+      </BladModal>
 
       {/* Notitie en historie als blad, net als de machine-instellingen. Ze
           stonden als paneel tussen de gelogde sets; dan duwt het openklappen
