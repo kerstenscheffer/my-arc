@@ -185,11 +185,10 @@ export default function LogModal({
         title={timerRunning ? 'Tik om te pauzeren · dubbel-tik = reset' : timerStarted ? 'Tik om verder te tellen · dubbel-tik = reset' : 'Tik om te starten'}
         style={{
           position: 'fixed',
-          // Onderaan, met de "+ Oefening"-knop erboven. Vaste breedte, want
-          // die ronde knop staat er precies op gecentreerd; met een pil die
-          // meegroeit met de tekst zou hij bij elk uur verschuiven.
-          left: isMobile ? 18 : 28,
-          bottom: `calc(env(safe-area-inset-bottom, 0px) + ${isMobile ? 24 : 28}px)`,
+          // Linksboven: je kijkt er tijdens het trainen af en toe naar, en
+          // onderin zat hij in de weg van de knoppen waar je wél op tikt.
+          left: isMobile ? 12 : 18,
+          top: `calc(env(safe-area-inset-top, 0px) + ${isMobile ? 12 : 16}px)`,
           zIndex: 89,
           display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 7,
           width: isMobile ? 112 : 124,

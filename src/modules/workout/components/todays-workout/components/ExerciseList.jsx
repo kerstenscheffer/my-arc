@@ -156,11 +156,8 @@ export default function ExerciseList({
         aria-label="Oefening toevoegen"
         style={{
           position: 'fixed',
-          // Boven de timer en er precies op gecentreerd: de timerpil is 112
-          // (mobiel) of 124 breed en staat op left 18/28, dus deze knop
-          // schuift de helft van het verschil naar rechts.
-          left: isMobile ? 18 + (112 - 76) / 2 : 28 + (124 - 84) / 2,
-          bottom: `calc(env(safe-area-inset-bottom, 0px) + ${isMobile ? 24 + 42 + 10 : 28 + 46 + 12}px)`,
+          left: isMobile ? 18 : 28,
+          bottom: `calc(env(safe-area-inset-bottom, 0px) + ${isMobile ? 24 : 28}px)`,
           zIndex: 90,
           width: isMobile ? 76 : 84,
           height: isMobile ? 76 : 84,
