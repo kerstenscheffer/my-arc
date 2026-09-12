@@ -739,13 +739,13 @@ export default function ExerciseLogModal({ db, client, exercise, onClose, isMobi
                 title={exercise.name}
                 allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture"
                 allowFullScreen
-                style={{
-                  width: '100%', height: '100%', border: 'none', display: 'block', background: '#000',
-                  // Zwarte randen links en rechts bij een staande video in
-                  // plaats van uitrekken; de video houdt zijn eigen vorm.
-                  aspectRatio: isShort ? '9 / 16' : '16 / 9',
-                  maxWidth: '100%', maxHeight: '100%', margin: '0 auto',
-                }}
+                className="oefening-video"
+                // Geen eigen verhouding op de iframe: die zit op het vak
+                // eromheen. Stond hij hier ook, dan bleven aspect-ratio en
+                // max-height gelden zodra YouTube volledig scherm vraagt —
+                // inline stijl wint van de browserstijl voor :fullscreen — en
+                // kreeg je een zwarte speler met alleen de knoppen.
+                style={{ width: '100%', height: '100%', border: 'none', display: 'block', background: '#000' }}
               />
             ) : (
               <img
@@ -1177,6 +1177,16 @@ export default function ExerciseLogModal({ db, client, exercise, onClose, isMobi
       <style>{`
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
         @keyframes spin { to { transform: rotate(360deg); } }
+        /* Volledig scherm: alles wat wij op de speler zetten los laten, zodat
+           hij het hele scherm mag vullen. */
+        .oefening-video:fullscreen,
+        .oefening-video:-webkit-full-screen {
+          width: 100% !important;
+          height: 100% !important;
+          max-width: none !important;
+          max-height: none !important;
+          aspect-ratio: auto !important;
+        }
       `}</style>
     </div>,
     document.body
