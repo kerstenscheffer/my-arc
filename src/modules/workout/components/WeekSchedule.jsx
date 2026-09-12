@@ -333,6 +333,20 @@ export default function WeekSchedule({
               </button>
             </div>
 
+            {/* Zeg erbij dat je vooruit plant: de wijziging geldt voor die week
+                en gaat pas in als die week begint. */}
+            {isToekomst && (
+              <div style={{
+                padding: isMobile ? '0 0.75rem 0.25rem' : '0 1rem 0.375rem',
+                textAlign: 'center',
+                fontSize: isMobile ? '0.66rem' : '0.7rem', fontWeight: 700,
+                color: 'rgba(255,255,255,0.35)',
+              }}>
+                Je plant vooruit — dit geldt vanaf {fmt(monday)}
+              </div>
+            )}
+
+            {tussenBlok}
           </>
         )
       })()}
