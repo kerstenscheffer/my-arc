@@ -70,7 +70,7 @@ export default function WeightProgressView({ client, db, challengeData }) {
       weights.forEach(entry => {
         const entryDate = new Date(entry.date)
         const daysSinceStart = Math.floor((entryDate - startDate) / (1000 * 60 * 60 * 24))
-        const weekNum = Math.min(8, Math.floor(daysSinceStart / 7) + 1)
+        const weekNum = Math.min(challengeData.totalWeeks || 8, Math.max(1, Math.floor(daysSinceStart / 7) + 1))
         
         if (!byWeek[weekNum]) {
           byWeek[weekNum] = []

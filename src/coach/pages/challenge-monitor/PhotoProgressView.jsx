@@ -85,16 +85,18 @@ export default function PhotoProgressView({ client, db, challengeData }) {
     )
   }
 
-  // Group photos by week
+  // Group photos by week. Aantal weken uit de deelname zelf: met een vaste 8
+  // kreeg een challenge van zes weken twee lege weken achter zich aan.
+  const totaalWeken = challengeData.totalWeeks || 8
   const photosByWeek = {}
-  for (let week = 1; week <= 8; week++) {
+  for (let week = 1; week <= totaalWeken; week++) {
     photosByWeek[week] = []
   }
 
   photoData.photos.forEach(photo => {
     const date = new Date(photo.date)
     const startDate = new Date(challengeData.start_date)
-    const weekNum = Math.min(8, Math.floor((date - startDate) / (7 * 24 * 60 * 60 * 1000)) + 1)
+    const weekNum = Math.min(totaalWeken, Math.max(1, Math.floor((date - startDate) / (7 * 24 * 60 * 60 * 1000)) + 1))
     photosByWeek[weekNum].push(photo)
   })
 

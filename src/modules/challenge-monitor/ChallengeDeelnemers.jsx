@@ -16,7 +16,7 @@ const GOUD = '#FFD700'
 const GROEN = '#10b981'
 const ROOD = '#ef4444'
 
-export default function ChallengeDeelnemers({ db, isMobile, onSelectClient }) {
+export default function ChallengeDeelnemers({ db, isMobile, onSelectClient, refreshKey }) {
   const [rijen, setRijen] = useState([])
   const [laden, setLaden] = useState(true)
   const [fout, setFout] = useState(null)
@@ -63,7 +63,9 @@ export default function ChallengeDeelnemers({ db, isMobile, onSelectClient }) {
     setLaden(false)
   }
 
-  useEffect(() => { laad() }, [])
+  // refreshKey: de hub bumpt hem na toewijzen of beëindigen. Zonder dat bleef
+  // de tabel de oude deelnemers tonen tot je de pagina herlaadde.
+  useEffect(() => { laad() }, [refreshKey])
 
   if (laden) return <div style={{ padding: '2rem', textAlign: 'center', color: 'rgba(255,255,255,0.4)' }}>Standen ophalen…</div>
   if (fout) return <div style={{ padding: '2rem', textAlign: 'center', color: ROOD }}>Laden mislukt — {fout}</div>

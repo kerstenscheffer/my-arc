@@ -4,7 +4,7 @@ import { Trophy, ChevronDown, RefreshCw, Users, Target, Pause, Play } from 'luci
 
 // IMPORT CHALLENGE MONITOR VIEWS
 import ChallengeBanner from '../../modules/challenge-monitor/ChallengeBanner'
-import { SOORTEN } from '../../modules/challenge-monitor/challengeEisen'
+import { SOORTEN, tijdlijn } from '../../modules/challenge-monitor/challengeEisen'
 import ChallengeGoalManager from '../tabs/client-info/ChallengeGoalManager'
 import WorkoutProgressView from './challenge-monitor/WorkoutProgressView'
 import MealProgressView from './challenge-monitor/MealProgressView'
@@ -27,6 +27,7 @@ export default function CoachChallengeHub({ db, clients }) {
   // iemand klikt; bij een lijst waar je meerdere mensen achter elkaar
   // toewijst is dat een klik per persoon voor niets.
   const [melding, setMelding] = useState(null)
+  const [bevestigVerwijder, setBevestigVerwijder] = useState(null)
   const [soort, setSoort] = useState(SOORTEN[0].key)
   const [startDatum, setStartDatum] = useState(() => new Date().toISOString().split('T')[0])
   
@@ -111,6 +112,7 @@ export default function CoachChallengeHub({ db, clients }) {
 
       setAssignedClients([...assignedClients, clientId])
       loadChallengeClients()
+      setRefreshKey(prev => prev + 1)
       setMelding({ soort: 'goed', tekst: 'Toegewezen.' })
       
     } catch (error) {
@@ -121,8 +123,16 @@ export default function CoachChallengeHub({ db, clients }) {
   }
 
   async function removeChallenge(clientId) {
-    if (!confirm('Remove client from challenge?')) return
-    
+    // Twee klikken in de knop zelf in plaats van confirm(). Een browser-dialoog
+    // legt het hele tabblad stil tot iemand klikt, en de vraag hoort bij de
+    // knop waar je op drukte — niet in een venster bovenaan het scherm.
+    if (bevestigVerwijder !== clientId) {
+      setMelding(null)
+      setBevestigVerwijder(clientId)
+      return
+    }
+    setBevestigVerwijder(null)
+    setMelding(null)
     setAssignLoading(true)
     try {
       // .select() erbij en tellen wat er terugkomt: PostgREST geeft een update
@@ -143,6 +153,7 @@ export default function CoachChallengeHub({ db, clients }) {
 
       setAssignedClients(assignedClients.filter(id => id !== clientId))
       loadChallengeClients()
+      setRefreshKey(prev => prev + 1)
       setMelding({ soort: 'goed', tekst: 'Deelname beëindigd.' })
       
     } catch (error) {
@@ -212,16 +223,17 @@ export default function CoachChallengeHub({ db, clients }) {
         .single()
 
       if (assignment) {
-        const startDate = new Date(assignment.start_date)
-        const today = new Date()
-        const daysSinceStart = Math.floor((today - startDate) / (1000 * 60 * 60 * 24))
-        const currentWeek = Math.min(8, Math.floor(daysSinceStart / 7) + 1)
-        
+        // Looptijd uit de deelname zelf, niet uit een vaste 56. Bij de
+        // 6-weken-challenge stond hier "Week 1/8 · Dag 1/56".
+        const { dag, totaal } = tijdlijn(assignment)
+        const totaalWeken = Math.ceil(totaal / 7)
+
         setChallengeData({
           ...assignment,
-          currentWeek,
-          dayNumber: daysSinceStart + 1,
-          totalDays: 56
+          currentWeek: Math.min(totaalWeken, Math.ceil(dag / 7)),
+          totalWeeks: totaalWeken,
+          dayNumber: dag,
+          totalDays: totaal
         })
         
         // 🔥 FIX 2: Force banner refresh when challenge data updates
@@ -475,15 +487,16 @@ export default function CoachChallengeHub({ db, clients }) {
                     {isAssigned ? (
                       <button
                         onClick={() => removeChallenge(client.id)}
+                        onBlur={() => setBevestigVerwijder(v => (v === client.id ? null : v))}
                         disabled={assignLoading}
                         style={{
                           padding: '0.5rem 1rem',
-                          background: 'rgba(239, 68, 68, 0.1)',
+                          background: bevestigVerwijder === client.id ? '#dc2626' : 'rgba(239, 68, 68, 0.1)',
                           border: '1px solid rgba(239, 68, 68, 0.3)',
                           borderRadius: '8px',
-                          color: '#ef4444',
+                          color: bevestigVerwijder === client.id ? '#fff' : '#ef4444',
                           fontSize: '0.85rem',
-                          fontWeight: '500',
+                          fontWeight: bevestigVerwijder === client.id ? '700' : '500',
                           cursor: assignLoading ? 'wait' : 'pointer',
                           minHeight: '36px',
                           touchAction: 'manipulation',
@@ -491,7 +504,7 @@ export default function CoachChallengeHub({ db, clients }) {
                           whiteSpace: 'nowrap'
                         }}
                       >
-                        Remove
+                        {bevestigVerwijder === client.id ? 'Zeker weten?' : 'Remove'}
                       </button>
                     ) : (
                       <button
@@ -531,6 +544,7 @@ export default function CoachChallengeHub({ db, clients }) {
       <ChallengeDeelnemers
         db={db}
         isMobile={isMobile}
+        refreshKey={refreshKey}
         onSelectClient={(clientId) => {
           const k = challengeClients.find(c => c.id === clientId)
           if (k) { setSelectedClient(k); setActiveView('overview') }
@@ -678,9 +692,9 @@ export default function CoachChallengeHub({ db, clients }) {
                 color: 'rgba(255, 255, 255, 0.6)',
                 flexWrap: 'wrap'
               }}>
-                <span>Week {challengeData.currentWeek}/8</span>
+                <span>Week {challengeData.currentWeek}/{challengeData.totalWeeks}</span>
                 <span>•</span>
-                <span>Day {challengeData.dayNumber}/56</span>
+                <span>Dag {challengeData.dayNumber}/{challengeData.totalDays}</span>
                 <span>•</span>
                 <span>Started: {new Date(challengeData.start_date).toLocaleDateString()}</span>
                 {challengeData.is_paused && challengeData.pause_reason && (
