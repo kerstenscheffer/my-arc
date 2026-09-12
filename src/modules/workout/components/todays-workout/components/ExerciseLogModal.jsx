@@ -1,13 +1,12 @@
 // src/modules/workout/components/todays-workout/components/ExerciseLogModal.jsx
 import { useState, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
-import { X, Plus, Dumbbell, CheckCircle, MoreVertical, MessageSquare, Edit3, History, Play, Timer } from 'lucide-react'
+import { X, Plus, Dumbbell, CheckCircle, MoreVertical, MessageSquare, Edit3, History, Play, Timer, Info } from 'lucide-react'
 import ExerciseHistory from './ExerciseHistory'
 import AttachmentSelector from './AttachmentSelector'
 import MachineSettings from './MachineSettings'
 import RustTimer from './RustTimer'
 import { rusttijdVoor, timerStaatAan, bewaarTimerAan } from '../rusttijd'
-import InfoModal from './InfoModal'
 import ExerciseService from '../../../../../services/ExerciseService'
 
 // ========== SCROLL NUMBER PICKER ==========
@@ -247,6 +246,16 @@ function DropsetInput({ onSave, onCancel, isMobile }) {
   )
 }
 
+// YouTube-link naar een embed-URL. Shorts, watch-links en youtu.be komen
+// allemaal voor in `exercises.video_url`; alleen een embed-URL speelt in een
+// iframe.
+function embedUrl(url) {
+  if (!url) return null
+  if (url.includes('/embed/')) return url
+  const m = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/shorts\/)([^&\s?/]+)/)
+  return m ? `https://www.youtube.com/embed/${m[1]}?autoplay=1&rel=0` : null
+}
+
 // ========== MAIN MODAL ==========
 export default function ExerciseLogModal({ db, client, exercise, onClose, isMobile = window.innerWidth <= 768 }) {
   const [loggedSets, setLoggedSets] = useState([])
@@ -270,6 +279,7 @@ export default function ExerciseLogModal({ db, client, exercise, onClose, isMobi
   // foto is de basis en de play-knop verschijnt alleen als er iets te spelen is.
   const [media, setMedia] = useState(null)
   const [toonVideo, setToonVideo] = useState(false)
+  const [toonInfo, setToonInfo] = useState(false)
 
   // Rusttimer: na een gelogde set loopt je rusttijd, en daarna staat het
   // invoerscherm er weer. Zo hoef je tussen de sets niets aan te raken.
@@ -507,7 +517,12 @@ export default function ExerciseLogModal({ db, client, exercise, onClose, isMobi
   // iets wat er niet is. De zoeklink blijft bereikbaar via de info-knop op de
   // oefeningkaart.
   const speelbaar = (url) => !!url && !/youtube\.com\/results\?/.test(url)
-  const heeftVideo = speelbaar(media?.video_url) || speelbaar(media?.fallback_video_url)
+  const videoEmbed = embedUrl(
+    speelbaar(media?.video_url) ? media.video_url
+      : speelbaar(media?.fallback_video_url) ? media.fallback_video_url
+      : null
+  )
+  const heeftVideo = !!videoEmbed
   const wizardActive = showWizard && dropsetIndex === null
   const dropsetActive = dropsetIndex !== null && !showWizard
 
@@ -528,18 +543,33 @@ export default function ExerciseLogModal({ db, client, exercise, onClose, isMobi
             background: '#111',
             marginTop: 'env(safe-area-inset-top, 0px)',
           }}>
-            <img
-              src={media.image_url} alt=""
-              style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
-              onError={e => { e.currentTarget.style.display = 'none' }}
-            />
+            {/* De video speelt in de foto zelf. Voorheen opende dit een apart
+                infoscherm bovenop het log-scherm; dat had drie tabbladen
+                waarvan er één generieke tips toonde die voor elke oefening
+                gelijk waren. Alles wat je hier nodig hebt staat nu in dit
+                scherm. */}
+            {toonVideo && videoEmbed ? (
+              <iframe
+                src={videoEmbed}
+                title={exercise.name}
+                allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture"
+                allowFullScreen
+                style={{ width: '100%', height: '100%', border: 'none', display: 'block', background: '#000' }}
+              />
+            ) : (
+              <img
+                src={media.image_url} alt=""
+                style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+                onError={e => { e.currentTarget.style.display = 'none' }}
+              />
+            )}
             {/* Verloop naar beneden zodat de titel eronder niet tegen een
                 harde rand aan komt te staan. */}
-            <div style={{
+            {!toonVideo && <div style={{
               position: 'absolute', inset: 0, pointerEvents: 'none',
               background: 'linear-gradient(180deg, rgba(10,10,10,0.35) 0%, rgba(10,10,10,0) 35%, rgba(10,10,10,0.85) 100%)',
-            }} />
-            {heeftVideo && (
+            }} />}
+            {heeftVideo && !toonVideo && (
               <button
                 onClick={() => setToonVideo(true)}
                 aria-label="Bekijk de video"
@@ -555,7 +585,8 @@ export default function ExerciseLogModal({ db, client, exercise, onClose, isMobi
                 <Play size={22} strokeWidth={2.4} fill="#FFD700" style={{ marginLeft: 3 }} />
               </button>
             )}
-            <button onClick={onClose} aria-label="Sluit" style={{
+            <button onClick={() => (toonVideo ? setToonVideo(false) : onClose())}
+              aria-label={toonVideo ? 'Video sluiten' : 'Sluit'} style={{
               position: 'absolute', top: 10, right: 10,
               width: 40, height: 40, borderRadius: 12,
               background: 'rgba(10,10,10,0.7)', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)',
@@ -672,6 +703,38 @@ export default function ExerciseLogModal({ db, client, exercise, onClose, isMobi
               </div>
             )}
 
+            {/* Wat de coach bij deze oefening heeft voorgeschreven. Stond in het
+                aparte infoscherm; die tabbladen zijn opgeheven en dit is het
+                enige deel dat per oefening verschilde. */}
+            {toonInfo && (
+              <div style={{ padding: isMobile ? '0.75rem 1rem' : '0.875rem 1.25rem', borderTop: '1px solid rgba(255,255,255,0.04)' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(3, 1fr)', gap: '0.5rem' }}>
+                  {[
+                    { label: 'Sets', waarde: exercise.sets },
+                    { label: 'Reps', waarde: exercise.reps },
+                    { label: 'Rust', waarde: exercise.rust },
+                    { label: 'Spiergroep', waarde: exercise.primairSpieren },
+                    { label: 'Materiaal', waarde: exercise.equipment },
+                    { label: 'RIR', waarde: exercise.rpe },
+                  ].filter(r => r.waarde !== null && r.waarde !== undefined && r.waarde !== '').map(r => (
+                    <div key={r.label} style={{
+                      background: 'rgba(255,255,255,0.03)', borderRadius: 10,
+                      padding: '0.5rem 0.6rem',
+                    }}>
+                      <div style={{ fontSize: '0.6rem', fontWeight: 800, color: 'rgba(255,255,255,0.35)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{r.label}</div>
+                      <div style={{ fontSize: isMobile ? '0.85rem' : '0.9rem', fontWeight: 800, color: '#fff', marginTop: 2, textTransform: 'capitalize' }}>{r.waarde}</div>
+                    </div>
+                  ))}
+                </div>
+                {exercise.notes && (
+                  <div style={{ marginTop: '0.6rem', padding: '0.6rem 0.7rem', background: 'rgba(255,215,0,0.06)', border: '1px solid rgba(255,215,0,0.2)', borderRadius: 10 }}>
+                    <div style={{ fontSize: '0.6rem', fontWeight: 800, color: '#FFD700', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 3 }}>Van je coach</div>
+                    <div style={{ fontSize: isMobile ? '0.8rem' : '0.85rem', fontWeight: 600, color: 'rgba(255,255,255,0.75)', lineHeight: 1.45, whiteSpace: 'pre-wrap' }}>{exercise.notes}</div>
+                  </div>
+                )}
+              </div>
+            )}
+
             {showExerciseNote && (
               <div style={{ padding: isMobile ? '0.75rem 1rem' : '0.875rem 1.25rem', borderTop: '1px solid rgba(255,255,255,0.04)' }}>
                 <div style={{ fontSize: isMobile ? '0.66rem' : '0.72rem', color: '#FFD700', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '0.5rem', opacity: 0.85 }}>Notitie bij oefening</div>
@@ -784,6 +847,13 @@ export default function ExerciseLogModal({ db, client, exercise, onClose, isMobi
           {/* Toggle-rij: 3 secundaire acties — groter font + grotere iconen */}
           <div style={{ display: 'flex', gap: '0.4rem', marginTop: '0.6rem' }}>
             <ToggleBtn
+              active={toonInfo}
+              onClick={() => setToonInfo(!toonInfo)}
+              icon={<Info size={isMobile ? 13 : 14} strokeWidth={2.2} />}
+              label="Info"
+              isMobile={isMobile}
+            />
+            <ToggleBtn
               active={showExerciseNote}
               onClick={() => setShowExerciseNote(!showExerciseNote)}
               icon={<MessageSquare size={isMobile ? 13 : 14} strokeWidth={2.2} />}
@@ -806,18 +876,6 @@ export default function ExerciseLogModal({ db, client, exercise, onClose, isMobi
             />
           </div>
         </div>
-      )}
-
-      {toonVideo && (
-        <InfoModal
-          exercise={exercise}
-          onClose={() => setToonVideo(false)}
-          db={db}
-          client={client}
-          defaultTab="video"
-          /* Boven het log-scherm (10000) én boven de invoerwizard (10001). */
-          zIndex={10002}
-        />
       )}
 
       <style>{`
