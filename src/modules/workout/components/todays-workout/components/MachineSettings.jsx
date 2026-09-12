@@ -1,7 +1,7 @@
 // src/modules/workout/components/todays-workout/components/MachineSettings.jsx
 import { useState } from 'react'
-import { createPortal } from 'react-dom'
-import { Settings, ChevronDown, ChevronUp, CheckCircle, X } from 'lucide-react'
+import { Settings, ChevronDown, ChevronUp, CheckCircle } from 'lucide-react'
+import BladModal from './BladModal'
 
 const SETTING_FIELDS = [
   { key: 'seat', label: 'Zitpositie', placeholder: 'bv. stand 3' },
@@ -108,23 +108,9 @@ export default function MachineSettings({ value = {}, onChange, previousSettings
           <ChevronDown size={14} color="rgba(255,255,255,0.3)" strokeWidth={2.5} style={{ flexShrink: 0 }} />
         </button>
 
-        {expanded && createPortal(
-          <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', zIndex: 10001, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}
-            onClick={(e) => { if (e.target === e.currentTarget) setExpanded(false) }}>
-            <div style={{ width: '100%', maxWidth: 500, background: '#0a0a0a', borderRadius: '16px 16px 0 0', border: '1px solid rgba(255,255,255,0.08)', borderBottom: 'none', maxHeight: '80vh', display: 'flex', flexDirection: 'column' }}>
-              <div style={{ padding: '1rem 1.25rem', borderBottom: '1px solid rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
-                <div style={{ fontSize: '0.95rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.015em' }}>Machine-instellingen</div>
-                <button onClick={() => setExpanded(false)} aria-label="Sluit" style={{ width: 36, height: 36, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 10, color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
-                  <X size={15} strokeWidth={2.5} />
-                </button>
-              </div>
-              <div style={{ flex: 1, overflowY: 'auto', padding: '1rem 1.25rem', paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 1.25rem)' }}>
-                {velden}
-              </div>
-            </div>
-          </div>,
-          document.body
-        )}
+        <BladModal open={expanded} titel="Machine-instellingen" onClose={() => setExpanded(false)}>
+          {velden}
+        </BladModal>
       </>
     )
   }

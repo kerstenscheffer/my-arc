@@ -5,6 +5,7 @@ import { X, Plus, Dumbbell, CheckCircle, MoreVertical, MessageSquare, History, P
 import ExerciseHistory from './ExerciseHistory'
 import AttachmentSelector from './AttachmentSelector'
 import MachineSettings from './MachineSettings'
+import BladModal from './BladModal'
 import RustTimer from './RustTimer'
 import { rusttijdVoor, timerStaatAan, bewaarTimerAan } from '../rusttijd'
 import ExerciseService from '../../../../../services/ExerciseService'
@@ -640,7 +641,9 @@ export default function ExerciseLogModal({ db, client, exercise, onClose, isMobi
             {/* Historie hoort bij de cijfers: het is dezelfde oefening, alleen
                 van vorige keren. Stond tussen de notitie-knoppen onderaan. */}
             <div style={{ display: 'flex', gap: 6, marginTop: '0.45rem', flexWrap: 'wrap' }}>
-              <Pil actief={showExerciseNote} onClick={() => setShowExerciseNote(!showExerciseNote)} icoon={<MessageSquare size={12} strokeWidth={2.4} />} label="Notitie" />
+              {/* Stipje als er al een notitie staat: anders moet je 'm openen
+                  om te weten dat je iets hebt opgeschreven. */}
+              <Pil actief={showExerciseNote} onClick={() => setShowExerciseNote(!showExerciseNote)} icoon={<MessageSquare size={12} strokeWidth={2.4} />} label="Notitie" stip={!!exerciseNote} />
               <Pil actief={showHistory} onClick={() => setShowHistory(!showHistory)} icoon={<History size={12} strokeWidth={2.4} />} label="Historie" />
             </div>
           </div>
@@ -801,29 +804,43 @@ export default function ExerciseLogModal({ db, client, exercise, onClose, isMobi
               </div>
             )}
 
-            {showExerciseNote && (
-              <div style={{ padding: isMobile ? '0.75rem 1rem' : '0.875rem 1.25rem', borderTop: '1px solid rgba(255,255,255,0.04)' }}>
-                <div style={{ fontSize: isMobile ? '0.66rem' : '0.72rem', color: '#FFD700', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '0.5rem', opacity: 0.85 }}>Notitie bij oefening</div>
-                <textarea value={exerciseNote} onChange={(e) => setExerciseNote(e.target.value)} onBlur={() => saveToDatabase(loggedSets)} placeholder="Bv. Schouder voelde stijf..." style={{ width: '100%', minHeight: '60px', padding: '0.6rem', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: '8px', color: '#fff', fontSize: isMobile ? '0.78rem' : '0.85rem', fontWeight: '500', resize: 'vertical', outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box' }} />
-              </div>
-            )}
-
-            {/* ── ALLE SESSIES ── */}
-            {showHistory && (
-              <div style={{ borderTop: '1px solid rgba(255,255,255,0.05)' }}>
-                <ExerciseHistory
-                  exerciseName={exercise.name}
-                  previousLog={null}
-                  loading={false}
-                  client={client}
-                  db={db}
-                  forceLoad={true}
-                />
-              </div>
-            )}
           </>
         )}
       </div>
+
+      {/* Notitie en historie als blad, net als de machine-instellingen. Ze
+          stonden als paneel tussen de gelogde sets; dan duwt het openklappen
+          precies weg waar je naar kijkt. */}
+      <BladModal open={showExerciseNote} titel="Notitie bij deze oefening" onClose={() => setShowExerciseNote(false)}>
+        <textarea
+          value={exerciseNote}
+          onChange={(e) => setExerciseNote(e.target.value)}
+          onBlur={() => saveToDatabase(loggedSets)}
+          placeholder="Bv. schouder voelde stijf, volgende keer smallere grip…"
+          autoFocus
+          style={{
+            width: '100%', minHeight: 120, padding: '0.75rem',
+            background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.12)',
+            borderRadius: 10, color: '#fff', fontSize: '0.9rem', fontWeight: 600,
+            resize: 'vertical', outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box',
+            lineHeight: 1.5,
+          }}
+        />
+        <div style={{ marginTop: '0.5rem', fontSize: '0.7rem', fontWeight: 600, color: 'rgba(255,255,255,0.4)' }}>
+          Wordt bewaard zodra je buiten het veld tikt. Je coach ziet 'm bij deze oefening.
+        </div>
+      </BladModal>
+
+      <BladModal open={showHistory} titel={`Historie · ${exercise.name}`} onClose={() => setShowHistory(false)}>
+        <ExerciseHistory
+          exerciseName={exercise.name}
+          previousLog={null}
+          loading={false}
+          client={client}
+          db={db}
+          forceLoad={true}
+        />
+      </BladModal>
 
       {/* RUSTTIMER — boven de footer, zodat je je gelogde sets blijft zien */}
       {rust && !wizardActive && !dropsetActive && (
@@ -849,7 +866,7 @@ export default function ExerciseLogModal({ db, client, exercise, onClose, isMobi
 // Klein pilletje onder de cijfers. Vervangt de knoppenrij onderaan het
 // scherm: die nam een hele band in beslag voor twee dingen die je af en toe
 // opentikt.
-function Pil({ actief, onClick, icoon, label }) {
+function Pil({ actief, onClick, icoon, label, stip = false }) {
   return (
     <button
       onClick={onClick}
@@ -867,6 +884,7 @@ function Pil({ actief, onClick, icoon, label }) {
     >
       {icoon}
       {label}
+      {stip && <span style={{ width: 5, height: 5, borderRadius: '50%', background: '#FFD700', flexShrink: 0 }} />}
     </button>
   )
 }
