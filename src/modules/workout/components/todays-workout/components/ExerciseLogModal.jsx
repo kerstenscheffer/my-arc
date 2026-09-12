@@ -831,30 +831,45 @@ export default function ExerciseLogModal({ db, client, exercise, onClose, isMobi
                   Set toevoegen
                 </button>
 
-                {/* Ook wit, maar niet gevuld: er hoort één primaire actie per
-                    blok te zijn. Aan/uit blijft aan de gouden rand te zien. */}
+                {/* Rusttimer als schuifknop: je ziet de stand zonder erop te
+                    drukken. Was een knop die alleen omkeerde als hij aanstond,
+                    en dan is het raden of dat "aan" of "uit" betekent. */}
                 <button
                   onClick={wisselRustTimer}
-                  aria-pressed={rustTimerAan}
-                  title={rustTimerAan ? 'Rusttimer uitzetten' : 'Rusttimer: na elke set loopt je rusttijd, daarna staat de volgende set klaar'}
+                  role="switch"
+                  aria-checked={rustTimerAan}
+                  title={rustTimerAan ? 'Rusttimer staat aan' : 'Rusttimer staat uit'}
                   style={{
                     flexShrink: 0, width: isMobile ? 96 : 118, minHeight: 52,
-                    // Aan = omgekeerd: wit vlak met zwarte tekst. Uit = de
-                    // omtrek. Dat leest sneller dan een gouden tint, want je
-                    // ziet in één oogopslag of hij aanstaat.
-                    background: rustTimerAan ? '#fff' : 'transparent',
-                    border: `1.5px solid ${rustTimerAan ? '#fff' : 'rgba(255,255,255,0.55)'}`,
+                    background: 'transparent',
+                    border: `1px solid ${rustTimerAan ? 'rgba(255,255,255,0.5)' : 'rgba(255,255,255,0.15)'}`,
                     borderRadius: 14,
-                    color: rustTimerAan ? '#0a0a0a' : '#fff',
-                    fontSize: isMobile ? '0.7rem' : '0.75rem', fontWeight: 900,
-                    textTransform: 'uppercase', letterSpacing: '0.05em',
-                    display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 3,
+                    display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 6,
                     cursor: 'pointer', fontFamily: 'inherit',
                     touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
                   }}
                 >
-                  <Timer size={isMobile ? 18 : 20} strokeWidth={2.4} />
-                  <span style={{ lineHeight: 1.15, textAlign: 'center' }}>Rust<br />timer</span>
+                  <span style={{
+                    fontSize: '0.6rem', fontWeight: 900, letterSpacing: '0.05em',
+                    textTransform: 'uppercase', whiteSpace: 'nowrap',
+                    color: rustTimerAan ? '#fff' : 'rgba(255,255,255,0.5)',
+                  }}>
+                    Rust timer
+                  </span>
+                  <span style={{
+                    position: 'relative', display: 'block',
+                    width: 40, height: 22, borderRadius: 999, flexShrink: 0,
+                    background: rustTimerAan ? '#fff' : 'rgba(255,255,255,0.12)',
+                    border: `1px solid ${rustTimerAan ? '#fff' : 'rgba(255,255,255,0.2)'}`,
+                    transition: 'background 0.18s ease',
+                  }}>
+                    <span style={{
+                      position: 'absolute', top: 2, left: rustTimerAan ? 20 : 2,
+                      width: 16, height: 16, borderRadius: '50%',
+                      background: rustTimerAan ? '#0a0a0a' : 'rgba(255,255,255,0.6)',
+                      transition: 'left 0.18s cubic-bezier(0.4,0,0.2,1), background 0.18s ease',
+                    }} />
+                  </span>
                 </button>
               </div>
             )}

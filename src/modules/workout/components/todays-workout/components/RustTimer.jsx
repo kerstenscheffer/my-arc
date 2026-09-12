@@ -11,7 +11,7 @@
 // minuten pakt en bij curls veertig seconden, wil dat niet elke set opnieuw
 // instellen.
 
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Pause, Play, RotateCcw, SkipForward, Minus, Plus } from 'lucide-react'
 import { bewaarRusttijd } from '../rusttijd'
 
@@ -67,6 +67,36 @@ export default function RustTimer({ oefeningNaam, startSec, bron = 'standaard', 
     setOver(Math.round((eindRef.current - Date.now()) / 1000))
   }
 
+  // Slepen over de klok verzet de rusttijd, in stappen van vijf seconden.
+  // Sneller dan tien keer op + tikken, en je voelt meteen hoeveel je toevoegt.
+  const sleep = useRef(null)
+
+  const sleepStart = useCallback((e) => {
+    sleep.current = { x: e.clientX, totaal, over: Math.max(0, over) }
+    e.currentTarget.setPointerCapture?.(e.pointerId)
+  }, [totaal, over])
+
+  const sleepBeweeg = useCallback((e) => {
+    if (!sleep.current) return
+    // Zes pixels per stap van vijf seconden: genoeg om per ongeluk schuiven te
+    // voorkomen, weinig genoeg om binnen een duimbreedte een minuut te halen.
+    const stappen = Math.round((e.clientX - sleep.current.x) / 6)
+    if (stappen === 0) return
+    const nieuw = Math.max(15, Math.min(600, sleep.current.totaal + stappen * 5))
+    if (nieuw === totaal) return
+    setTotaal(nieuw)
+    setAangepast(true)
+    eindRef.current = Date.now() + Math.max(0, sleep.current.over + (nieuw - sleep.current.totaal)) * 1000
+    klaarRef.current = false
+    setOver(Math.round((eindRef.current - Date.now()) / 1000))
+  }, [totaal])
+
+  const sleepEinde = useCallback(() => {
+    if (!sleep.current) return
+    sleep.current = null
+    bewaarRusttijd(oefeningNaam, totaal)
+  }, [oefeningNaam, totaal])
+
   const opnieuw = () => {
     eindRef.current = Date.now() + totaal * 1000
     klaarRef.current = false
@@ -100,7 +130,18 @@ export default function RustTimer({ oefeningNaam, startSec, bron = 'standaard', 
         display: 'flex', alignItems: 'center', gap: isMobile ? 8 : 10,
         padding: isMobile ? '0.6rem 0 0' : '0.7rem 0 0',
       }}>
-        <div style={{ minWidth: isMobile ? 66 : 78 }}>
+        {/* De klok is een schuif: sleep hem naar rechts voor meer rust. */}
+        <div
+          onPointerDown={sleepStart}
+          onPointerMove={sleepBeweeg}
+          onPointerUp={sleepEinde}
+          onPointerCancel={sleepEinde}
+          title="Sleep om je rusttijd aan te passen"
+          style={{
+            minWidth: isMobile ? 78 : 92, cursor: 'ew-resize',
+            touchAction: 'none', WebkitTapHighlightColor: 'transparent', userSelect: 'none',
+          }}
+        >
           <div style={{
             fontSize: isMobile ? '1.5rem' : '1.7rem', fontWeight: 900, color: kleur,
             fontVariantNumeric: 'tabular-nums', letterSpacing: '-0.03em', lineHeight: 1,
@@ -117,7 +158,7 @@ export default function RustTimer({ oefeningNaam, startSec, bron = 'standaard', 
               whiteSpace: 'nowrap',
             }}
           >
-            {voorbij ? 'Klaar' : 'Rust'} · {mmss(totaal)}
+            {voorbij ? 'Klaar' : 'Rust'} · {mmss(totaal)} <span style={{ color: 'rgba(255,255,255,0.25)' }}>↔</span>
             {/* Waar de tijd vandaan komt. Anders lijkt 2:00 een willekeurige
                 standaard, terwijl het staat wat de coach heeft voorgeschreven. */}
             {bron === 'coach' && !aangepast && <span style={{ color: 'rgba(255,255,255,0.65)' }}> · schema</span>}
