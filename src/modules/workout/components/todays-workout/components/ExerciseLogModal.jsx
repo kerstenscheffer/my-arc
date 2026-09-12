@@ -702,20 +702,35 @@ export default function ExerciseLogModal({ db, client, exercise, onClose, isMobi
         ) : (
           <>
             {/* ── VORIGE PRESTATIES ── */}
+            {/* Vorige sessie zonder vakjes: de getallen zijn de inhoud, en zeven
+                omkaderde blokjes naast elkaar lezen als een rij knoppen terwijl
+                je er niets mee doet. Dik wit voor wat je moet verslaan. */}
             {previousPerformance?.sets?.length > 0 && (
-              <div style={{ padding: isMobile ? '0.625rem 1rem' : '0.75rem 1.25rem', borderBottom: '1px solid rgba(255,255,255,0.05)', background: 'rgba(255,255,255,0.015)' }}>
-                <div style={{ fontSize: isMobile ? '0.66rem' : '0.72rem', fontWeight: 800, color: '#FFD700', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '0.5rem', opacity: 0.85 }}>
-                  Vorige sessie {previousPerformance.date ? `· ${new Date(previousPerformance.date).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })}` : ''}
+              <div style={{ padding: isMobile ? '0.7rem 1rem 0' : '0.8rem 1.25rem 0' }}>
+                <div style={{
+                  fontSize: '0.66rem', fontWeight: 900, color: '#fff',
+                  textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '0.35rem',
+                }}>
+                  Vorige sessie
+                  {previousPerformance.date && (
+                    <span style={{ color: 'rgba(255,255,255,0.35)' }}>
+                      {' · '}{new Date(previousPerformance.date).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })}
+                    </span>
+                  )}
                 </div>
-                <div style={{ display: 'flex', gap: '0.375rem', flexWrap: 'wrap' }}>
+                <div style={{
+                  display: 'flex', flexWrap: 'wrap', alignItems: 'baseline',
+                  gap: isMobile ? '0.15rem 0.85rem' : '0.15rem 1.1rem',
+                  fontSize: isMobile ? '0.95rem' : '1.05rem', fontWeight: 900,
+                  color: '#fff', fontVariantNumeric: 'tabular-nums',
+                }}>
                   {previousPerformance.sets.map((s, i) => (
-                    <div key={i} style={{ padding: '0.25rem 0.5rem', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: '5px', fontSize: isMobile ? '0.72rem' : '0.78rem', fontWeight: '700', color: 'rgba(255,255,255,0.5)', fontFamily: 'monospace', whiteSpace: 'nowrap' }}>
-                      <span style={{ color: 'rgba(255,215,0,0.6)' }}>{s.weight}</span>
-                      <span style={{ color: 'rgba(255,255,255,0.2)' }}>kg</span>
-                      <span style={{ color: 'rgba(255,255,255,0.2)', margin: '0 0.2rem' }}>×</span>
-                      <span style={{ color: 'rgba(255,255,255,0.6)' }}>{s.reps}</span>
-                      {s.partials > 0 && <span style={{ color: 'rgba(255,215,0,0.3)', fontSize: '0.8em' }}> +{s.partials}p</span>}
-                    </div>
+                    <span key={i} style={{ whiteSpace: 'nowrap' }}>
+                      {s.weight}<span style={{ color: 'rgba(255,255,255,0.35)', fontSize: '0.72em', fontWeight: 800 }}>kg</span>
+                      <span style={{ color: 'rgba(255,255,255,0.25)', fontSize: '0.8em', margin: '0 0.18em' }}>×</span>
+                      {s.reps}
+                      {s.partials > 0 && <span style={{ color: 'rgba(255,215,0,0.7)', fontSize: '0.72em', fontWeight: 800 }}> +{s.partials}p</span>}
+                    </span>
                   ))}
                 </div>
               </div>
