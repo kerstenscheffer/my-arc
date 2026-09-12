@@ -111,21 +111,21 @@ function HorizontalPicker({ value, onChange, disabled, savedLabel = false }) {
         marginBottom: '0.75rem',
       }}>
         <div style={{
-          fontSize: isMobile ? '2.2rem' : '2.8rem',
+          fontSize: isMobile ? '2.4rem' : '3rem',
           fontWeight: 900,
-          color: '#FFD700',
+          color: '#fff',
           letterSpacing: '-0.03em',
           lineHeight: 1,
           fontVariantNumeric: 'tabular-nums',
         }}>
           {current.toFixed(1)}
-          <span style={{ fontSize: '0.38em', color: 'rgba(255,215,0,0.5)', marginLeft: '0.2rem' }}>kg</span>
+          <span style={{ fontSize: '0.38em', color: 'rgba(255,255,255,0.45)', marginLeft: '0.2rem' }}>kg</span>
         </div>
         {savedLabel && (
           <span style={{
             display: 'inline-flex', alignItems: 'center', gap: 4,
             padding: isMobile ? '3px 8px' : '4px 10px',
-            background: 'linear-gradient(135deg, #FFD700 0%, #D4AF37 100%)',
+            background: '#fff',
             color: '#0a0a0a',
             border: 'none',
             borderRadius: 999,
@@ -133,7 +133,7 @@ function HorizontalPicker({ value, onChange, disabled, savedLabel = false }) {
             fontWeight: 900,
             letterSpacing: '0.08em',
             textTransform: 'uppercase',
-            boxShadow: '0 4px 12px rgba(255,215,0,0.32)',
+            boxShadow: '0 4px 12px rgba(0,0,0,0.45)',
             whiteSpace: 'nowrap',
           }}>
             <Check size={isMobile ? 9 : 10} strokeWidth={3.2} />
@@ -156,8 +156,8 @@ function HorizontalPicker({ value, onChange, disabled, savedLabel = false }) {
       >
         <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: '60px', background: 'linear-gradient(to right, #0a0a0a, transparent)', zIndex: 2, pointerEvents: 'none' }} />
         <div style={{ position: 'absolute', right: 0, top: 0, bottom: 0, width: '60px', background: 'linear-gradient(to left, #0a0a0a, transparent)', zIndex: 2, pointerEvents: 'none' }} />
-        <div style={{ position: 'absolute', top: 0, bottom: 0, left: `calc(50% - ${ITEM_W / 2}px)`, width: '1px', background: 'rgba(255,215,0,0.3)', zIndex: 3, pointerEvents: 'none' }} />
-        <div style={{ position: 'absolute', top: 0, bottom: 0, left: `calc(50% + ${ITEM_W / 2}px)`, width: '1px', background: 'rgba(255,215,0,0.3)', zIndex: 3, pointerEvents: 'none' }} />
+        <div style={{ position: 'absolute', top: 0, bottom: 0, left: `calc(50% - ${ITEM_W / 2}px)`, width: '1.5px', background: 'rgba(255,255,255,0.55)', zIndex: 3, pointerEvents: 'none' }} />
+        <div style={{ position: 'absolute', top: 0, bottom: 0, left: `calc(50% + ${ITEM_W / 2}px)`, width: '1.5px', background: 'rgba(255,255,255,0.55)', zIndex: 3, pointerEvents: 'none' }} />
 
         <div
           ref={ref}
@@ -191,8 +191,8 @@ function HorizontalPicker({ value, onChange, disabled, savedLabel = false }) {
                   cursor: disabled ? 'default' : 'pointer',
                   touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
                   fontSize: sel ? (isMobile ? '1.2rem' : '1.4rem') : (isMobile ? '0.75rem' : '0.85rem'),
-                  fontWeight: sel ? '800' : '400',
-                  color: sel ? '#FFD700' : 'rgba(255,255,255,0.2)',
+                  fontWeight: sel ? 900 : 600,
+                  color: sel ? '#fff' : 'rgba(255,255,255,0.25)',
                   userSelect: 'none',
                   transition: 'font-size 0.15s ease, color 0.15s ease',
                 }}
@@ -293,12 +293,12 @@ export default function WeightProgressRing({
               height: '32px',
               flexShrink: 0,
               padding: 0,
-              background: 'rgba(255,215,0,0.04)',
-              border: '1px solid rgba(255,215,0,0.1)',
-              borderRadius: '6px',
-              color: 'rgba(255,215,0,0.55)',
-              fontSize: isMobile ? '0.65rem' : '0.7rem',
-              fontWeight: '700',
+              background: 'transparent',
+              border: '1.5px solid rgba(255,255,255,0.25)',
+              borderRadius: 9,
+              color: '#fff',
+              fontSize: isMobile ? '0.7rem' : '0.75rem',
+              fontWeight: 900,
               cursor: 'pointer',
               touchAction: 'manipulation',
               WebkitTapHighlightColor: 'transparent',
@@ -323,7 +323,7 @@ export default function WeightProgressRing({
             padding: isMobile ? '0.875rem' : '1rem',
             background: 'transparent',
             border: 'none',
-            color: '#FFD700',
+            color: '#fff',
             cursor: saving ? 'default' : 'pointer',
             minHeight: '48px',
             touchAction: 'manipulation',
@@ -387,7 +387,7 @@ export default function WeightProgressRing({
               padding: isMobile ? '0.875rem 0.5rem' : '1rem 0.75rem',
               background: 'transparent',
               border: 'none',
-              color: '#FFD700',
+              color: '#fff',
               cursor: saving ? 'default' : 'pointer',
               touchAction: 'manipulation',
               WebkitTapHighlightColor: 'transparent',
@@ -402,8 +402,8 @@ export default function WeightProgressRing({
 
       {saving && (
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.375rem', padding: '0.5rem 0' }}>
-          <Loader2 size={11} color="rgba(255,215,0,0.5)" style={{ animation: 'spin 1s linear infinite' }} />
-          <span style={{ fontSize: '0.6rem', fontWeight: '700', color: 'rgba(255,215,0,0.4)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Bezig...</span>
+          <Loader2 size={11} color="rgba(255,255,255,0.5)" style={{ animation: 'spin 1s linear infinite' }} />
+          <span style={{ fontSize: '0.6rem', fontWeight: 800, color: 'rgba(255,255,255,0.45)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Bezig…</span>
         </div>
       )}
 
