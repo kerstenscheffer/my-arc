@@ -1,10 +1,13 @@
 // src/modules/workout/components/todays-workout/components/ExerciseLogModal.jsx
 import { useState, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
-import { X, Plus, Dumbbell, CheckCircle, MoreVertical, MessageSquare, Edit3, History } from 'lucide-react'
+import { X, Plus, Dumbbell, CheckCircle, MoreVertical, MessageSquare, Edit3, History, Play, Timer } from 'lucide-react'
 import ExerciseHistory from './ExerciseHistory'
 import AttachmentSelector from './AttachmentSelector'
 import MachineSettings from './MachineSettings'
+import RustTimer from './RustTimer'
+import InfoModal from './InfoModal'
+import ExerciseService from '../../../../../services/ExerciseService'
 
 // ========== SCROLL NUMBER PICKER ==========
 function NumberPicker({ value, onChange, min = 0, max = 300, step = 1, unit = 'kg', onConfirm, halfStep = null }) {
@@ -257,7 +260,26 @@ export default function ExerciseLogModal({ db, client, exercise, onClose, isMobi
   const [machineSettings, setMachineSettings] = useState({})
   const [previousMachineSettings, setPreviousMachineSettings] = useState(null)
 
+  // Foto en video van de oefening. Staan in de tabel `exercises`; 243 van de
+  // 249 oefeningen hebben een foto, video's zijn er maar een handvol — dus de
+  // foto is de basis en de play-knop verschijnt alleen als er iets te spelen is.
+  const [media, setMedia] = useState(null)
+  const [toonVideo, setToonVideo] = useState(false)
+
+  // Flow: na een gelogde set loopt de rusttimer, en op nul staat het
+  // invoerscherm er meteen weer. Zo hoef je tussen de sets niets aan te raken.
+  const [flow, setFlow] = useState(false)
+  const [rust, setRust] = useState(false)
+
   useEffect(() => { loadExistingLogs(); loadPreviousPerformance(); loadExercisePreference() }, [])
+
+  useEffect(() => {
+    let weg = false
+    ExerciseService.getExerciseDetails(exercise.name)
+      .then(d => { if (!weg) setMedia(d || {}) })
+      .catch(e => console.error('Oefening-media laden mislukt:', e))
+    return () => { weg = true }
+  }, [exercise.name])
 
   const loadPreviousPerformance = async () => {
     if (!client?.id || !db) return
@@ -354,8 +376,31 @@ export default function ExerciseLogModal({ db, client, exercise, onClose, isMobi
 
     setLoggedSets(newSets)
     setShowWizard(false)
+    // Rusttimer starten vóór het opslaan: dat is een netwerkrondje, en die
+    // seconden horen bij je rust en niet bij het wachten op de server.
+    // Niet na een correctie van een bestaande set — dan rust je niet.
+    if (flow && editingIndex === null) setRust(true)
     await saveToDatabase(newSets)
     if (navigator.vibrate) navigator.vibrate([30, 50, 30])
+  }
+
+  // De lus: timer op nul → invoerscherm voor de volgende set. Stopt vanzelf
+  // zodra het geplande aantal sets erin staat; doorgaan kan altijd met de
+  // knop, maar de app moet niet blijven duwen.
+  const volgendeSet = () => {
+    setRust(false)
+    const gepland = parseInt(exercise.sets, 10)
+    if (Number.isFinite(gepland) && loggedSets.length >= gepland) { setFlow(false); return }
+    setEditingIndex(null)
+    setShowWizard(true)
+  }
+
+  const wisselFlow = () => {
+    if (flow) { setFlow(false); setRust(false); return }
+    setFlow(true)
+    setRust(false)
+    setEditingIndex(null)
+    setShowWizard(true)   // meteen door naar de gewichten, zoals gevraagd
   }
 
   // ✅ Nieuwe handler: start edit mode voor bestaande set
@@ -441,6 +486,7 @@ export default function ExerciseLogModal({ db, client, exercise, onClose, isMobi
   const lastSet = loggedSets.length > 0 ? loggedSets[loggedSets.length - 1] : null
   const editingSet = editingIndex !== null ? loggedSets[editingIndex] : null
 
+  const heeftVideo = !!(media?.video_url || media?.fallback_video_url)
   const wizardActive = showWizard && dropsetIndex === null
   const dropsetActive = dropsetIndex !== null && !showWizard
 
@@ -449,26 +495,81 @@ export default function ExerciseLogModal({ db, client, exercise, onClose, isMobi
       {/* Gouden top streep */}
       <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '2px', background: 'linear-gradient(90deg, transparent 0%, rgba(255,215,0,0.55) 50%, transparent 100%)', zIndex: 1 }} />
 
-      {/* HEADER */}
-      <div style={{
-        padding: isMobile ? '0.875rem 1rem' : '1rem 1.5rem',
-        paddingTop: `calc(env(safe-area-inset-top, 0px) + ${isMobile ? '0.875rem' : '1rem'})`,
-        borderBottom: '1px solid rgba(255,255,255,0.06)',
-        display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-        flexShrink: 0,
-      }}>
-        <div style={{ flex: 1, minWidth: 0, paddingRight: '0.75rem' }}>
-          <h2 style={{ fontSize: isMobile ? '1.1rem' : '1.25rem', fontWeight: 900, color: '#fff', margin: 0, letterSpacing: '-0.02em', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{exercise.name}</h2>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.25rem', fontSize: isMobile ? '0.66rem' : '0.72rem', color: 'rgba(255,255,255,0.55)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-            <span>{exercise.sets} SETS</span><span style={{ opacity: 0.4 }}>·</span><span>{exercise.reps} REPS</span>
-            {saving && <><span style={{ opacity: 0.4 }}>·</span><span style={{ color: '#FFD700' }}>Opslaan…</span></>}
-            {!saving && loggedSets.length > 0 && <><span style={{ opacity: 0.4 }}>·</span><span style={{ color: '#10b981' }}>Opgeslagen ✓</span></>}
-            {editingIndex !== null && <><span style={{ opacity: 0.4 }}>·</span><span style={{ color: '#FFD700' }}>Set {editingIndex + 1} aanpassen</span></>}
+      {/* HEADER — foto van de oefening, titel eronder.
+          Een naam als "Cable Rear Delt Flies" zegt niet iedereen iets; een
+          foto wel. De sluit-knop en de video liggen op de foto, zodat de
+          titelregel alleen tekst is. */}
+      <div style={{ flexShrink: 0, borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+        {media?.image_url && (
+          <div style={{
+            position: 'relative', width: '100%',
+            height: isMobile ? 168 : 210,
+            background: '#111',
+            marginTop: 'env(safe-area-inset-top, 0px)',
+          }}>
+            <img
+              src={media.image_url} alt=""
+              style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+              onError={e => { e.currentTarget.style.display = 'none' }}
+            />
+            {/* Verloop naar beneden zodat de titel eronder niet tegen een
+                harde rand aan komt te staan. */}
+            <div style={{
+              position: 'absolute', inset: 0, pointerEvents: 'none',
+              background: 'linear-gradient(180deg, rgba(10,10,10,0.35) 0%, rgba(10,10,10,0) 35%, rgba(10,10,10,0.85) 100%)',
+            }} />
+            {heeftVideo && (
+              <button
+                onClick={() => setToonVideo(true)}
+                aria-label="Bekijk de video"
+                style={{
+                  position: 'absolute', left: '50%', top: '50%', transform: 'translate(-50%,-50%)',
+                  width: 58, height: 58, borderRadius: '50%',
+                  background: 'rgba(10,10,10,0.6)', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)',
+                  border: '1.5px solid rgba(255,215,0,0.55)', color: '#FFD700',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
+                  touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+                }}
+              >
+                <Play size={22} strokeWidth={2.4} fill="#FFD700" style={{ marginLeft: 3 }} />
+              </button>
+            )}
+            <button onClick={onClose} aria-label="Sluit" style={{
+              position: 'absolute', top: 10, right: 10,
+              width: 40, height: 40, borderRadius: 12,
+              background: 'rgba(10,10,10,0.7)', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)',
+              border: '1px solid rgba(255,255,255,0.15)', color: '#fff',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
+              touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+            }}>
+              <X size={18} strokeWidth={2.4} />
+            </button>
           </div>
+        )}
+
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: '0.75rem',
+          padding: isMobile ? '0.8rem 1rem' : '0.9rem 1.5rem',
+          paddingTop: media?.image_url ? undefined : `calc(env(safe-area-inset-top, 0px) + ${isMobile ? '0.875rem' : '1rem'})`,
+        }}>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <h2 style={{ fontSize: isMobile ? '1.15rem' : '1.35rem', fontWeight: 900, color: '#fff', margin: 0, letterSpacing: '-0.025em', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{exercise.name}</h2>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', marginTop: '0.2rem', fontSize: isMobile ? '0.72rem' : '0.78rem', fontWeight: 700 }}>
+              <span style={{ color: 'rgba(255,255,255,0.5)' }}>
+                {loggedSets.length}/{exercise.sets} sets · {exercise.reps} reps
+              </span>
+              {saving && <span style={{ color: '#FFD700' }}>· opslaan…</span>}
+              {!saving && loggedSets.length > 0 && <span style={{ color: '#10b981' }}>· opgeslagen</span>}
+              {editingIndex !== null && <span style={{ color: '#FFD700' }}>· set {editingIndex + 1} aanpassen</span>}
+            </div>
+          </div>
+          {/* Zonder foto staat de sluit-knop hier, anders ligt hij op de foto. */}
+          {!media?.image_url && (
+            <button onClick={onClose} aria-label="Sluit" style={{ width: 44, height: 44, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 12, color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0, touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}>
+              <X size={isMobile ? 18 : 20} strokeWidth={2.4} />
+            </button>
+          )}
         </div>
-        <button onClick={onClose} aria-label="Sluit" style={{ width: 44, height: 44, background: 'rgba(10,10,10,0.85)', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)', border: '1px solid rgba(255,215,0,0.3)', borderRadius: 12, color: '#FFD700', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0, touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}>
-          <X size={isMobile ? 18 : 20} strokeWidth={2.4} />
-        </button>
       </div>
 
       {/* CONTENT */}
@@ -577,6 +678,16 @@ export default function ExerciseLogModal({ db, client, exercise, onClose, isMobi
         )}
       </div>
 
+      {/* RUSTTIMER — boven de footer, zodat je je gelogde sets blijft zien */}
+      {rust && !wizardActive && !dropsetActive && (
+        <RustTimer
+          oefeningNaam={exercise.name}
+          onKlaar={() => { /* de balk kleurt groen; doorgaan doet de klant zelf of via Volgende set */ }}
+          onStop={volgendeSet}
+          isMobile={isMobile}
+        />
+      )}
+
       {/* FOOTER */}
       {!wizardActive && !dropsetActive && (
         <div style={{
@@ -585,31 +696,63 @@ export default function ExerciseLogModal({ db, client, exercise, onClose, isMobi
           paddingBottom: `calc(env(safe-area-inset-bottom, 0px) + ${isMobile ? '0.85rem' : '1rem'})`,
           flexShrink: 0,
         }}>
-          {/* Set Toevoegen — primaire CTA, gouden gradient pill conform CTA-token */}
-          <button
-            onClick={() => { setEditingIndex(null); setShowWizard(true) }}
-            style={{
-              width: '100%',
-              padding: isMobile ? '0.85rem' : '1rem',
-              background: 'linear-gradient(135deg, #FFD700 0%, #D4AF37 100%)',
-              border: 'none',
-              borderRadius: 14,
-              color: '#0a0a0a',
-              fontSize: isMobile ? '0.88rem' : '0.95rem',
-              fontWeight: 900,
-              textTransform: 'uppercase',
-              letterSpacing: '0.06em',
-              cursor: 'pointer',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              gap: 8,
-              minHeight: 54,
-              touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-              boxShadow: '0 10px 24px rgba(255,215,0,0.3), 0 2px 6px rgba(0,0,0,0.5)',
-            }}
-          >
-            <Plus size={isMobile ? 20 : 22} strokeWidth={2.6} />
-            Set Toevoegen
-          </button>
+          <div style={{ display: 'flex', gap: '0.5rem' }}>
+            {/* Set Toevoegen — primaire CTA, gouden gradient pill conform CTA-token */}
+            <button
+              onClick={() => { setEditingIndex(null); setShowWizard(true) }}
+              style={{
+                flex: 1,
+                padding: isMobile ? '0.85rem' : '1rem',
+                background: 'linear-gradient(135deg, #FFD700 0%, #D4AF37 100%)',
+                border: 'none',
+                borderRadius: 14,
+                color: '#0a0a0a',
+                fontSize: isMobile ? '0.88rem' : '0.95rem',
+                fontWeight: 900,
+                textTransform: 'uppercase',
+                letterSpacing: '0.06em',
+                cursor: 'pointer',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                gap: 8,
+                minHeight: 54,
+                touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+                boxShadow: '0 10px 24px rgba(255,215,0,0.3), 0 2px 6px rgba(0,0,0,0.5)',
+              }}
+            >
+              <Plus size={isMobile ? 20 : 22} strokeWidth={2.6} />
+              Set Toevoegen
+            </button>
+
+            {/* Flow — set invoeren, rusten, en de volgende staat er weer.
+                Naast de hoofdknop en niet erin: wie gewoon één set wil loggen
+                moet daar geen timer bij krijgen. */}
+            <button
+              onClick={wisselFlow}
+              aria-pressed={flow}
+              title={flow ? 'Flow uitzetten' : 'Flow: set invoeren, rusten, volgende set'}
+              style={{
+                flexShrink: 0,
+                width: isMobile ? 96 : 118,
+                background: flow ? 'rgba(255,215,0,0.16)' : 'rgba(255,255,255,0.05)',
+                border: `1px solid ${flow ? 'rgba(255,215,0,0.55)' : 'rgba(255,255,255,0.12)'}`,
+                borderRadius: 14,
+                color: flow ? '#FFD700' : 'rgba(255,255,255,0.75)',
+                fontSize: isMobile ? '0.7rem' : '0.75rem',
+                fontWeight: 900,
+                textTransform: 'uppercase',
+                letterSpacing: '0.06em',
+                cursor: 'pointer',
+                display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+                gap: 3,
+                minHeight: 54,
+                fontFamily: 'inherit',
+                touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+              }}
+            >
+              <Timer size={isMobile ? 18 : 20} strokeWidth={2.4} />
+              Flow
+            </button>
+          </div>
 
           {/* Toggle-rij: 3 secundaire acties — groter font + grotere iconen */}
           <div style={{ display: 'flex', gap: '0.4rem', marginTop: '0.6rem' }}>
@@ -636,6 +779,10 @@ export default function ExerciseLogModal({ db, client, exercise, onClose, isMobi
             />
           </div>
         </div>
+      )}
+
+      {toonVideo && (
+        <InfoModal exercise={exercise} onClose={() => setToonVideo(false)} db={db} client={client} defaultTab="video" />
       )}
 
       <style>{`
