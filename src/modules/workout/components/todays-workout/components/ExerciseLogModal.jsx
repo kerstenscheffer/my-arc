@@ -355,7 +355,9 @@ function embedUrl(url) {
   if (!url) return null
   if (url.includes('/embed/')) return url
   const m = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/shorts\/)([^&\s?/]+)/)
-  return m ? `https://www.youtube.com/embed/${m[1]}?autoplay=1&rel=0` : null
+  // playsinline: zonder dit gooit iOS de video in de systeemspeler op volledig
+  // scherm zodra je op play drukt.
+  return m ? `https://www.youtube.com/embed/${m[1]}?autoplay=1&rel=0&playsinline=1` : null
 }
 
 // ========== MAIN MODAL ==========
@@ -675,6 +677,9 @@ export default function ExerciseLogModal({ db, client, exercise, onClose, isMobi
   // is die fallback een YouTube-zóéklink en geen filmpje — die kan niet in een
   // iframe, dus daar opent de knop YouTube meteen in een nieuw tabblad.
   const videoBron = media?.video_url || media?.fallback_video_url || null
+  // Shorts zijn staand (9:16). In de liggende fotostrook werd zo'n video tot
+  // een streepje geperst — dat is wat je zag toen je op play drukte.
+  const isShort = !!videoBron && /youtube\.com\/shorts\//.test(videoBron)
   const videoEmbed = embedUrl(videoBron)
   const heeftVideo = !!videoBron
 
@@ -712,9 +717,16 @@ export default function ExerciseLogModal({ db, client, exercise, onClose, isMobi
         {media?.image_url && (
           <div style={{
             position: 'relative', width: '100%',
-            height: isMobile ? 168 : 210,
-            background: '#111',
+            // Tijdens het afspelen krijgt het vak de vorm van de video: staand
+            // voor een short, breedbeeld voor een gewone. Anders blijft het de
+            // fotostrook.
+            height: toonVideo ? undefined : (isMobile ? 168 : 210),
+            aspectRatio: toonVideo ? (isShort ? '9 / 16' : '16 / 9') : undefined,
+            maxHeight: toonVideo ? '62vh' : undefined,
+            background: '#000',
             marginTop: 'env(safe-area-inset-top, 0px)',
+            display: toonVideo ? 'flex' : 'block',
+            alignItems: 'center', justifyContent: 'center',
           }}>
             {/* De video speelt in de foto zelf. Voorheen opende dit een apart
                 infoscherm bovenop het log-scherm; dat had drie tabbladen
@@ -727,7 +739,13 @@ export default function ExerciseLogModal({ db, client, exercise, onClose, isMobi
                 title={exercise.name}
                 allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture"
                 allowFullScreen
-                style={{ width: '100%', height: '100%', border: 'none', display: 'block', background: '#000' }}
+                style={{
+                  width: '100%', height: '100%', border: 'none', display: 'block', background: '#000',
+                  // Zwarte randen links en rechts bij een staande video in
+                  // plaats van uitrekken; de video houdt zijn eigen vorm.
+                  aspectRatio: isShort ? '9 / 16' : '16 / 9',
+                  maxWidth: '100%', maxHeight: '100%', margin: '0 auto',
+                }}
               />
             ) : (
               <img
