@@ -1,7 +1,7 @@
 // src/modules/workout/components/todays-workout/components/ExerciseLogModal.jsx
 import { useState, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
-import { X, Plus, Check, MoreVertical, MessageSquare, History, Play, Timer } from 'lucide-react'
+import { X, Plus, Check, MoreVertical, MessageSquare, History, Play, Timer, Minimize2 } from 'lucide-react'
 import ExerciseHistory from './ExerciseHistory'
 import AttachmentSelector from './AttachmentSelector'
 import MachineSettings from './MachineSettings'
@@ -776,17 +776,31 @@ export default function ExerciseLogModal({ db, client, exercise, onClose, isMobi
                 <Play size={22} strokeWidth={2.4} fill="#FFD700" style={{ marginLeft: 3 }} />
               </button>
             )}
-            <button onClick={() => (toonVideo ? setToonVideo(false) : onClose())}
-              aria-label={toonVideo ? 'Video sluiten' : 'Sluit'} style={{
-              position: 'absolute', top: 10, right: 10,
-              width: 40, height: 40, borderRadius: 12,
-              background: 'rgba(10,10,10,0.7)', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)',
-              border: '1px solid rgba(255,255,255,0.15)', color: '#fff',
-              display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
-              touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-            }}>
-              <X size={18} strokeWidth={2.4} />
-            </button>
+            {/* Twee knoppen tijdens het afspelen: terug naar de foto, of het
+                hele scherm dicht. Eén kruisje deed allebei en dan weet je niet
+                wat er gebeurt als je 'm indrukt. */}
+            <div style={{ position: 'absolute', top: 10, right: 10, display: 'flex', gap: 8 }}>
+              {toonVideo && (
+                <button onClick={() => setToonVideo(false)} aria-label="Video verkleinen" title="Terug naar de foto" style={{
+                  width: 40, height: 40, borderRadius: 12,
+                  background: 'rgba(10,10,10,0.7)', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)',
+                  border: '1px solid rgba(255,255,255,0.15)', color: '#fff',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
+                  touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+                }}>
+                  <Minimize2 size={17} strokeWidth={2.4} />
+                </button>
+              )}
+              <button onClick={onClose} aria-label="Sluit" title="Oefening sluiten" style={{
+                width: 40, height: 40, borderRadius: 12,
+                background: 'rgba(10,10,10,0.7)', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)',
+                border: '1px solid rgba(255,255,255,0.15)', color: '#fff',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
+                touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+              }}>
+                <X size={18} strokeWidth={2.4} />
+              </button>
+            </div>
           </div>
         )}
 
