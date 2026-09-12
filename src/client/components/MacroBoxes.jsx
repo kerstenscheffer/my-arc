@@ -5,7 +5,7 @@
 import React from 'react'
 import { Flame, Wheat, Egg, Droplet } from 'lucide-react'
 
-function MacroBox({ label, icon, color, consumed, target, unitLabel }) {
+function MacroBox({ label, icon, color, consumed, target, unitLabel, kaal = false }) {
   const pct = target > 0 ? Math.min(100, Math.round((consumed / target) * 100)) : 0
   const over = Math.round((target || 0) - (consumed || 0))
   const size = 48, stroke = 5
@@ -13,7 +13,7 @@ function MacroBox({ label, icon, color, consumed, target, unitLabel }) {
   const circ = 2 * Math.PI * r
   const off = circ - (pct / 100) * circ
   return (
-    <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 12, padding: '0.5rem 0.25rem 0.55rem', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.3rem' }}>
+    <div style={{ background: kaal ? 'transparent' : 'rgba(255,255,255,0.03)', border: kaal ? 'none' : '1px solid rgba(255,255,255,0.08)', borderRadius: 12, padding: kaal ? '0.2rem 0.25rem 0.35rem' : '0.5rem 0.25rem 0.55rem', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.3rem' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 3, maxWidth: '100%' }}>
         <span style={{ flexShrink: 0, display: 'flex' }}>{icon}</span>
         <span style={{ fontSize: '0.55rem', fontWeight: 800, color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{label}</span>
@@ -43,13 +43,15 @@ function MacroBox({ label, icon, color, consumed, target, unitLabel }) {
   )
 }
 
-export default function MacroBoxes({ consumed = {}, targets = {}, style }) {
+// `kaal`: zonder het kadertje om elk vak. Op de meal-pagina staan de vier
+// ringen direct onder de foto-kop; daar maakten vier randjes het onrustig.
+export default function MacroBoxes({ consumed = {}, targets = {}, style, kaal = false }) {
   return (
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.4rem', ...style }}>
-      <MacroBox label="Kcal"  icon={<Flame size={11} color="#10b981" />}   color="#10b981" consumed={consumed.calories} target={targets.calories} unitLabel="" />
-      <MacroBox label="Koolh" icon={<Wheat size={11} color="#ec4899" />}   color="#ec4899" consumed={consumed.carbs}    target={targets.carbs}    unitLabel="g" />
-      <MacroBox label="Eiwit" icon={<Egg size={11} color="#3b82f6" />}     color="#3b82f6" consumed={consumed.protein}  target={targets.protein}  unitLabel="g" />
-      <MacroBox label="Vet"   icon={<Droplet size={11} color="#f59e0b" />} color="#f59e0b" consumed={consumed.fat}      target={targets.fat}      unitLabel="g" />
+      <MacroBox kaal={kaal} label="Kcal"  icon={<Flame size={11} color="#10b981" />}   color="#10b981" consumed={consumed.calories} target={targets.calories} unitLabel="" />
+      <MacroBox kaal={kaal} label="Koolh" icon={<Wheat size={11} color="#ec4899" />}   color="#ec4899" consumed={consumed.carbs}    target={targets.carbs}    unitLabel="g" />
+      <MacroBox kaal={kaal} label="Eiwit" icon={<Egg size={11} color="#3b82f6" />}     color="#3b82f6" consumed={consumed.protein}  target={targets.protein}  unitLabel="g" />
+      <MacroBox kaal={kaal} label="Vet"   icon={<Droplet size={11} color="#f59e0b" />} color="#f59e0b" consumed={consumed.fat}      target={targets.fat}      unitLabel="g" />
     </div>
   )
 }

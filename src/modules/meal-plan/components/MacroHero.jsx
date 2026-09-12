@@ -292,6 +292,7 @@ const SubtleCarbsFatBar = ({ carbs, fat, targets, isMobile, compact = false }) =
 export default function MacroHero({
   consumed, targets, db, clientId, isMobile: propMobile,
   selectedDate, selectedIsToday = true,
+  zonderKader = false, // vier macro-vakken zonder kadertje eromheen
   variant = 'detail',  // 'hero' = oude stijl (kcal+eiwit groot, koolh/vet zwarte balk),
                        // 'detail' = compacte 3-blok layout (plan-analyzer).
   compact = false,     // kleinere ring + kleinere getallen (bv. home "Planning vandaag").
@@ -343,7 +344,7 @@ export default function MacroHero({
   if (variant === 'boxes') {
     return (
       <div style={{ padding: isMobile ? '0 0.9rem 0.6rem' : '0 1.5rem 0.7rem', maxWidth: 1400, margin: '0 auto', opacity: showShim ? 0.5 : 1, transition: 'opacity 0.2s ease' }}>
-        <MacroBoxes consumed={display} targets={t} />
+        <MacroBoxes consumed={display} targets={t} kaal={zonderKader} />
       </div>
     )
   }

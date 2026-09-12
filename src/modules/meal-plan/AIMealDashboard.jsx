@@ -583,6 +583,7 @@ export default function AIMealDashboard({ client, onNavigate, db }) {
             selectedIsToday={selectedIsToday}
             isMobile={isMobile}
             variant="boxes"
+            zonderKader
             refreshKey={pastDayRefreshKey}
           />
         )
