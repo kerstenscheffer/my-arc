@@ -260,18 +260,18 @@ export default function CheckinReminderPopup({ client, db, onOpen, isMobile: pro
     >
       <div style={{
         position: 'absolute', top: 0, right: 0, bottom: 0,
-        width: '40%',
+        width: '30%',
         backgroundImage: 'url(/coach-compliment.jpg)',
         backgroundSize: 'cover', backgroundPosition: 'center 30%',
       }} />
       <div style={{
         position: 'absolute', inset: 0, pointerEvents: 'none',
-        background: 'linear-gradient(90deg, #0a0a0a 0%, #0a0a0a 42%, rgba(10,10,10,0.88) 56%, rgba(10,10,10,0.5) 72%, rgba(10,10,10,0.14) 90%, rgba(10,10,10,0) 100%)',
+        background: 'linear-gradient(90deg, #0a0a0a 0%, #0a0a0a 56%, rgba(10,10,10,0.85) 70%, rgba(10,10,10,0.4) 86%, rgba(10,10,10,0) 100%)',
       }} />
 
       <div style={{
         position: 'absolute', top: 0, bottom: 0, left: 0,
-        width: '68%',
+        width: '76%',
         padding: isMobile ? '0.5rem 0.4rem 0.5rem 0.9rem' : '0.6rem 0.5rem 0.6rem 1.1rem',
         display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 3,
       }}>
