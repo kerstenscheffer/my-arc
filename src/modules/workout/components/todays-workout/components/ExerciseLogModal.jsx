@@ -765,75 +765,67 @@ export default function ExerciseLogModal({ db, client, exercise, onClose, isMobi
           </div>
         )}
 
-        {/* Titelregel in twee kolommen, 70/30, met een haarlijn ertussen.
-            Links wie je bent en waar je staat, rechts waarmee je traint.
-            Materiaal en machine-instellingen stonden als twee losse banden
-            onder elkaar; die kostten samen meer hoogte dan de titel zelf. */}
+        {/* Eén blok in plaats van twee kolommen met een haarlijn: titel, de
+            cijfers, en daaronder waarmee je traint. De 60/40-indeling kostte
+            de rechterkolom breedte terwijl er onder de cijfers ruimte over
+            was. */}
         <div style={{
-          display: 'grid',
-          // 60/40, maar op een telefoon met een bodem onder de rechterkolom:
-          // een percentage van 390px valt daar te smal uit voor een naam als
-          // "Lat pulldown stang".
-          gridTemplateColumns: isMobile ? 'minmax(0, 1fr) 1px 150px' : '60fr 1px 40fr',
-          gap: isMobile ? '0.7rem' : '1rem',
-          alignItems: 'stretch',
           padding: isMobile ? '0.8rem 1rem' : '0.9rem 1.5rem',
           paddingTop: media?.image_url ? undefined : `calc(env(safe-area-inset-top, 0px) + ${isMobile ? '0.875rem' : '1rem'})`,
         }}>
-          {/* Boven uitgelijnd, niet gecentreerd: de rechterkolom is twee knoppen
-              hoog en dan zakt de titel weg naar het midden. */}
-          <div style={{ minWidth: 0, alignSelf: 'flex-start' }}>
-            {/* Titel mag over twee regels. Stond op één regel met puntjes,
-                en dan las "Chest Supported Rear Delt Fly" als "Chest
-                Supported Rear…" — precies het stuk dat zegt wélke fly. */}
-            <h2 style={{
-              fontSize: isMobile ? '1.1rem' : '1.3rem', fontWeight: 900, color: '#fff', margin: 0,
-              letterSpacing: '-0.025em', lineHeight: 1.15,
-              display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical',
-              overflow: 'hidden', wordBreak: 'break-word',
-            }}>{exercise.name}</h2>
-            <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.5rem', flexWrap: 'wrap', marginTop: '0.35rem', fontSize: isMobile ? '0.95rem' : '1.05rem', fontWeight: 900 }}>
-              <span style={{ color: '#fff' }}>
-                {loggedSets.length}/{exercise.sets}<span style={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.78em', fontWeight: 800 }}> sets</span>
-                <span style={{ color: 'rgba(255,255,255,0.25)' }}> · </span>
-                {exercise.reps}<span style={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.78em', fontWeight: 800 }}> reps</span>
-                <span style={{ color: 'rgba(255,255,255,0.25)' }}> · </span>
-                {/* De rusttijd die de timer ook gebruikt — uit het schema of
-                    wat de klant er zelf van maakte. Hoort bij sets en reps:
-                    het is het derde getal dat je voorschrijft. */}
-                {Math.floor(rusttijd.sec / 60)}:{String(rusttijd.sec % 60).padStart(2, '0')}
-                <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.78em', fontWeight: 800 }}> rust</span>
-              </span>
-              {/* Status als teken achter de cijfers, niet op een eigen regel:
-                  dat brak het blok in tweeën voor één woord. */}
-              {saving && <span style={{ color: '#FFD700', fontSize: '0.62em', fontWeight: 800 }}>opslaan…</span>}
-              {!saving && loggedSets.length > 0 && <Check size={13} strokeWidth={3.2} color="#10b981" />}
-              {editingIndex !== null && <span style={{ color: '#FFD700', fontSize: '0.62em', fontWeight: 800 }}>set {editingIndex + 1}</span>}
+          <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.75rem' }}>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <h2 style={{
+                fontSize: isMobile ? '1.1rem' : '1.3rem', fontWeight: 900, color: '#fff', margin: 0,
+                letterSpacing: '-0.025em', lineHeight: 1.15,
+                display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical',
+                overflow: 'hidden', wordBreak: 'break-word',
+              }}>{exercise.name}</h2>
+              <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.5rem', flexWrap: 'wrap', marginTop: '0.35rem', fontSize: isMobile ? '0.95rem' : '1.05rem', fontWeight: 900 }}>
+                <span style={{ color: '#fff' }}>
+                  {loggedSets.length}/{exercise.sets}<span style={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.78em', fontWeight: 800 }}> sets</span>
+                  <span style={{ color: 'rgba(255,255,255,0.25)' }}> · </span>
+                  {exercise.reps}<span style={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.78em', fontWeight: 800 }}> reps</span>
+                  <span style={{ color: 'rgba(255,255,255,0.25)' }}> · </span>
+                  {Math.floor(rusttijd.sec / 60)}:{String(rusttijd.sec % 60).padStart(2, '0')}
+                  <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.78em', fontWeight: 800 }}> rust</span>
+                </span>
+                {saving && <span style={{ color: '#FFD700', fontSize: '0.62em', fontWeight: 800 }}>opslaan…</span>}
+                {!saving && loggedSets.length > 0 && <Check size={13} strokeWidth={3.2} color="#10b981" />}
+                {editingIndex !== null && <span style={{ color: '#FFD700', fontSize: '0.62em', fontWeight: 800 }}>set {editingIndex + 1}</span>}
+              </div>
             </div>
-
-            {/* Historie hoort bij de cijfers: het is dezelfde oefening, alleen
-                van vorige keren. Stond tussen de notitie-knoppen onderaan. */}
+            {/* Zonder foto staat de sluit-knop hier, anders ligt hij op de foto. */}
+            {!media?.image_url && (
+              <button onClick={onClose} aria-label="Sluit" style={{ width: 44, height: 44, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 12, color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0, touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}>
+                <X size={isMobile ? 18 : 20} strokeWidth={2.4} />
+              </button>
+            )}
           </div>
 
-          <div style={{ background: 'rgba(255,255,255,0.09)' }} />
-
-          <div style={{ minWidth: 0, display: 'flex', flexDirection: 'column', gap: 6 }}>
-            <AttachmentSelector
-              compact
-              suggested={exercise.suggested_attachment}
-              value={attachmentUsed}
-              onChange={(id) => { setAttachmentUsed(id); saveAttachmentPreference(id) }}
-              isMobile={isMobile}
-              exerciseName={exercise.name}
-            />
-            <MachineSettings
-              compact
-              value={machineSettings}
-              onChange={(s) => { setMachineSettings(s); saveMachineSettings(s) }}
-              previousSettings={previousMachineSettings}
-              isMobile={isMobile}
-              onSave={saveMachineSettings}
-            />
+          {/* Materiaal en instellingen naast elkaar onder de cijfers, elk de
+              helft van de breedte. */}
+          <div style={{ display: 'flex', gap: isMobile ? '0.8rem' : '1.2rem', marginTop: '0.7rem' }}>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <AttachmentSelector
+                compact
+                suggested={exercise.suggested_attachment}
+                value={attachmentUsed}
+                onChange={(id) => { setAttachmentUsed(id); saveAttachmentPreference(id) }}
+                isMobile={isMobile}
+                exerciseName={exercise.name}
+              />
+            </div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <MachineSettings
+                compact
+                value={machineSettings}
+                onChange={(v) => { setMachineSettings(v); saveMachineSettings(v) }}
+                previousSettings={previousMachineSettings}
+                isMobile={isMobile}
+                onSave={saveMachineSettings}
+              />
+            </div>
           </div>
         </div>
       </div>
