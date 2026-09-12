@@ -78,10 +78,10 @@ function AdjustBtn({ label, onClick, isMobile, positive, half }) {
 }
 
 // ========== SET INPUT WIZARD ==========
-// `snel` = flow-modus: alleen kilo's en reps, dan klaar. Partials en dropsets
-// blijven bestaan, maar niet als vier schermen tussen elke set door — dat is
-// precies wat een flow kapotmaakt. Wie er een dropset bij wil, voegt die na
-// afloop toe via het menu op de set.
+// `snel` = met de rusttimer aan: alleen kilo's en reps, dan klaar. Partials
+// en dropsets blijven bestaan, maar niet als vier schermen tussen elke set
+// door — dan is de timer zijn doel voorbij. Wie er een dropset bij wil, voegt
+// die na afloop toe via het menu op de set.
 function SetInputWizard({ onComplete, onCancel, previousWeight = 20, previousReps = 10, isMobile, editMode = false, snel = false }) {
   const [step, setStep] = useState(1)
   const [weight, setWeight] = useState(previousWeight)
@@ -125,7 +125,7 @@ function SetInputWizard({ onComplete, onCancel, previousWeight = 20, previousRep
 
       <div style={{ padding: isMobile ? '1rem' : '1.25rem', borderBottom: '1px solid rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <div style={{ fontSize: isMobile ? '0.62rem' : '0.68rem', color: 'rgba(255,255,255,0.5)', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
-          {editMode ? 'SET AANPASSEN' : snel ? `FLOW · STAP ${Math.min(step, 2)}/2` : `STAP ${displayStep}/${totalSteps}`}
+          {editMode ? 'SET AANPASSEN' : snel ? `STAP ${Math.min(step, 2)}/2` : `STAP ${displayStep}/${totalSteps}`}
         </div>
         <button onClick={onCancel} style={{ background: 'none', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '6px', color: 'rgba(255,255,255,0.35)', fontSize: isMobile ? '0.7rem' : '0.75rem', fontWeight: '600', cursor: 'pointer', padding: '0.35rem 0.75rem', touchAction: 'manipulation' }}>
           Annuleren
@@ -271,12 +271,12 @@ export default function ExerciseLogModal({ db, client, exercise, onClose, isMobi
   const [media, setMedia] = useState(null)
   const [toonVideo, setToonVideo] = useState(false)
 
-  // Flow: na een gelogde set loopt de rusttimer, en op nul staat het
-  // invoerscherm er meteen weer. Zo hoef je tussen de sets niets aan te raken.
+  // Rusttimer: na een gelogde set loopt je rusttijd, en daarna staat het
+  // invoerscherm er weer. Zo hoef je tussen de sets niets aan te raken.
   //
   // De stand wordt onthouden: wie met een timer traint doet dat de hele
   // workout, niet per oefening opnieuw aanzetten.
-  const [flow, setFlow] = useState(() => timerStaatAan())
+  const [rustTimerAan, setRustTimerAan] = useState(() => timerStaatAan())
   const [rust, setRust] = useState(false)
 
   // De rusttijd komt uit het schema van de coach (het veld `rust` bij de
@@ -392,7 +392,7 @@ export default function ExerciseLogModal({ db, client, exercise, onClose, isMobi
     // Rusttimer starten vóór het opslaan: dat is een netwerkrondje, en die
     // seconden horen bij je rust en niet bij het wachten op de server.
     // Niet na een correctie van een bestaande set — dan rust je niet.
-    if (flow && editingIndex === null) setRust(true)
+    if (rustTimerAan && editingIndex === null) setRust(true)
     await saveToDatabase(newSets)
     if (navigator.vibrate) navigator.vibrate([30, 50, 30])
   }
@@ -403,14 +403,14 @@ export default function ExerciseLogModal({ db, client, exercise, onClose, isMobi
   const volgendeSet = () => {
     setRust(false)
     const gepland = parseInt(exercise.sets, 10)
-    if (Number.isFinite(gepland) && loggedSets.length >= gepland) { setFlow(false); return }
+    if (Number.isFinite(gepland) && loggedSets.length >= gepland) { setRustTimerAan(false); bewaarTimerAan(false); return }
     setEditingIndex(null)
     setShowWizard(true)
   }
 
-  const wisselFlow = () => {
-    if (flow) { setFlow(false); bewaarTimerAan(false); setRust(false); return }
-    setFlow(true)
+  const wisselRustTimer = () => {
+    if (rustTimerAan) { setRustTimerAan(false); bewaarTimerAan(false); setRust(false); return }
+    setRustTimerAan(true)
     bewaarTimerAan(true)
     setRust(false)
     setEditingIndex(null)
@@ -651,7 +651,7 @@ export default function ExerciseLogModal({ db, client, exercise, onClose, isMobi
                 previousReps={editingSet?.reps ?? lastSet?.reps ?? previousPerformance?.sets?.[previousPerformance.sets.length - 1]?.reps ?? (parseInt(exercise.reps) || 10)}
                 isMobile={isMobile}
                 editMode={editingIndex !== null}
-                snel={flow && editingIndex === null}
+                snel={rustTimerAan && editingIndex === null}
               />
             )}
 
@@ -740,20 +740,20 @@ export default function ExerciseLogModal({ db, client, exercise, onClose, isMobi
               Set Toevoegen
             </button>
 
-            {/* Flow — set invoeren, rusten, en de volgende staat er weer.
-                Naast de hoofdknop en niet erin: wie gewoon één set wil loggen
-                moet daar geen timer bij krijgen. */}
+            {/* Rusttimer — na elke set loopt je rusttijd en staat de volgende
+                set daarna klaar. Naast de hoofdknop en niet erin: wie gewoon
+                één set wil loggen moet daar geen timer bij krijgen. */}
             <button
-              onClick={wisselFlow}
-              aria-pressed={flow}
-              title={flow ? 'Flow uitzetten' : 'Flow: set invoeren, rusten, volgende set'}
+              onClick={wisselRustTimer}
+              aria-pressed={rustTimerAan}
+              title={rustTimerAan ? 'Rusttimer uitzetten' : 'Rusttimer: na elke set loopt je rusttijd, daarna staat de volgende set klaar'}
               style={{
                 flexShrink: 0,
                 width: isMobile ? 96 : 118,
-                background: flow ? 'rgba(255,215,0,0.16)' : 'rgba(255,255,255,0.05)',
-                border: `1px solid ${flow ? 'rgba(255,215,0,0.55)' : 'rgba(255,255,255,0.12)'}`,
+                background: rustTimerAan ? 'rgba(255,215,0,0.16)' : 'rgba(255,255,255,0.05)',
+                border: `1px solid ${rustTimerAan ? 'rgba(255,215,0,0.55)' : 'rgba(255,255,255,0.12)'}`,
                 borderRadius: 14,
-                color: flow ? '#FFD700' : 'rgba(255,255,255,0.75)',
+                color: rustTimerAan ? '#FFD700' : 'rgba(255,255,255,0.75)',
                 fontSize: isMobile ? '0.7rem' : '0.75rem',
                 fontWeight: 900,
                 textTransform: 'uppercase',
@@ -767,7 +767,7 @@ export default function ExerciseLogModal({ db, client, exercise, onClose, isMobi
               }}
             >
               <Timer size={isMobile ? 18 : 20} strokeWidth={2.4} />
-              Flow
+              <span style={{ lineHeight: 1.15, textAlign: 'center' }}>Rust<br />timer</span>
             </button>
           </div>
 
