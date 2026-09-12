@@ -148,10 +148,15 @@ export default function AIDaySchedule({
   }, [db])
 
   // FAB-trigger uit AIMealDashboard: elke increment opent de food-log modal.
-  // De eerste render (foodLogTrigger=0) negeren we, anders zou de modal direct
-  // bij page-load openen.
+  //
+  // Vergelijken met de vorige waarde in plaats van "niet nul". Dit component
+  // wordt namelijk opnieuw opgebouwd zodra het dashboard herlaadt (na een
+  // wissel bijvoorbeeld), en dan draaide dit effect met een teller die al
+  // boven nul stond — waardoor het log-scherm uit zichzelf opendeed.
+  const vorigeTrigger = useRef(foodLogTrigger)
   useEffect(() => {
-    if (!foodLogTrigger) return
+    if (foodLogTrigger === vorigeTrigger.current) return
+    vorigeTrigger.current = foodLogTrigger
     setShowFoodLog(true)
   }, [foodLogTrigger])
 

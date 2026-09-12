@@ -156,7 +156,10 @@ export default function AIMealDashboard({ client, onNavigate, db }) {
   
   const loadDashboardData = async () => {
     console.log('🚀 Loading AI dashboard data')
-    setLoading(true)
+    // Alleen het volle laadscherm bij de eerste keer. Bij een herlaadbeurt
+    // (na een wissel of een log) bleef anders het hele dagoverzicht even weg
+    // en werd het daarna opnieuw opgebouwd — met alle bijwerkingen van dien.
+    if (!dashboardData) setLoading(true)
     
     try {
       const data = await service.loadAIDashboardData(client.id)
