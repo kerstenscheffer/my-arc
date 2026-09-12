@@ -36,6 +36,9 @@ export default function MealDayNavHeader({
   onDayChange,        // (newDayKey: string) => void
   onOpenSummary,      // () => void  — klik op dagnaam
   isMobile: propMobile,
+  // Op de foto-kop: geen eigen balk of achtergrond, en alles in bold wit —
+  // goud verdwijnt tegen een foto en de balk zou de fade doorsnijden.
+  opFoto = false,
 }) {
   const isMobile = propMobile ?? (typeof window !== 'undefined' && window.innerWidth <= 768)
 
@@ -76,7 +79,8 @@ export default function MealDayNavHeader({
     borderRadius: 0,
     background: 'transparent',
     border: 'none',
-    color: disabled ? 'rgba(255,255,255,0.18)' : '#fff',
+    color: disabled ? 'rgba(255,255,255,0.25)' : '#fff',
+    filter: opFoto ? 'drop-shadow(0 2px 8px rgba(0,0,0,0.8))' : 'none',
     display: 'flex', alignItems: 'center', justifyContent: 'center',
     padding: 0,
     cursor: disabled ? 'not-allowed' : 'pointer',
@@ -86,7 +90,7 @@ export default function MealDayNavHeader({
   })
 
   return (
-    <div style={{
+    <div style={opFoto ? { position: 'relative', zIndex: 2 } : {
       position: 'sticky',
       top: 0,
       zIndex: 50,
@@ -113,7 +117,7 @@ export default function MealDayNavHeader({
           disabled={currentIdx === 0}
           style={arrowBtnStyle(currentIdx === 0)}
         >
-          <ChevronLeft size={isMobile ? 22 : 24} strokeWidth={2.4} />
+          <ChevronLeft size={isMobile ? 24 : 26} strokeWidth={opFoto ? 3 : 2.4} />
         </button>
 
         {/* Centered clickable day title */}
@@ -136,10 +140,11 @@ export default function MealDayNavHeader({
           <div style={{
             // Tekst groter — was 0.95/1.05rem, nu 1.15/1.3rem zodat de
             // dagnaam echt de blikvanger is.
-            fontSize: isMobile ? '1.15rem' : '1.3rem',
+            fontSize: opFoto ? (isMobile ? '1.6rem' : '2.1rem') : (isMobile ? '1.15rem' : '1.3rem'),
             fontWeight: 900,
-            color: '#FFD700',
-            letterSpacing: '-0.02em',
+            color: opFoto ? '#fff' : '#FFD700',
+            letterSpacing: opFoto ? '-0.03em' : '-0.02em',
+            textShadow: opFoto ? '0 2px 12px rgba(0,0,0,0.7)' : 'none',
             lineHeight: 1.1,
             display: 'flex', alignItems: 'center', gap: 8,
             whiteSpace: 'nowrap',
@@ -148,9 +153,9 @@ export default function MealDayNavHeader({
             {relative && (
               <span style={{
                 fontSize: '0.65rem',
-                fontWeight: 800,
+                fontWeight: 900,
                 color: 'rgba(0,0,0,0.85)',
-                background: '#FFD700',
+                background: opFoto ? '#fff' : '#FFD700',
                 padding: '2px 7px',
                 borderRadius: 4,
                 letterSpacing: '0.04em',
@@ -163,9 +168,10 @@ export default function MealDayNavHeader({
           <div style={{
             // Datum-regel ook iets groter en helderder.
             fontSize: isMobile ? '0.78rem' : '0.85rem',
-            fontWeight: 600,
-            color: 'rgba(255,255,255,0.6)',
+            fontWeight: opFoto ? 800 : 600,
+            color: opFoto ? 'rgba(255,255,255,0.8)' : 'rgba(255,255,255,0.6)',
             lineHeight: 1,
+            textShadow: opFoto ? '0 2px 10px rgba(0,0,0,0.75)' : 'none',
           }}>
             {dateLabel} · tik voor agenda
           </div>
@@ -177,7 +183,7 @@ export default function MealDayNavHeader({
           disabled={currentIdx === 6}
           style={arrowBtnStyle(currentIdx === 6)}
         >
-          <ChevronRight size={isMobile ? 22 : 24} strokeWidth={2.4} />
+          <ChevronRight size={isMobile ? 24 : 26} strokeWidth={opFoto ? 3 : 2.4} />
         </button>
       </div>
     </div>

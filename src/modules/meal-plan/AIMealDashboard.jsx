@@ -540,40 +540,33 @@ export default function AIMealDashboard({ client, onNavigate, db }) {
       animation: 'fadeIn 0.5s ease'
     }}>
 
-      {/* ════ KOP MET FOTO — zelfde vorm als de workout-pagina ════ */}
+      {/* ════ KOP MET FOTO — zelfde vorm als de workout-pagina ════
+          De dag met de pijlen ligt op de foto, in plaats van een losse titel
+          erboven en een balk eronder. */}
       <div style={{ position: 'relative', width: '100%', height: isMobile ? 200 : 250 }}>
         <div style={{
           position: 'absolute', inset: 0,
           backgroundImage: `url(${MEAL_BANNER_URL})`,
           backgroundSize: 'cover', backgroundPosition: 'center',
         }} />
+        {/* Zwart begint hoger dan op de workout-pagina: hier ligt niet alleen
+            een titel op de foto maar een hele regel met pijlen en datum. */}
         <div style={{
           position: 'absolute', inset: 0, pointerEvents: 'none',
-          background: 'linear-gradient(180deg, rgba(10,10,10,0.5) 0%, rgba(10,10,10,0) 32%, rgba(10,10,10,0.78) 70%, #0a0a0a 100%)',
+          background: 'linear-gradient(180deg, rgba(10,10,10,0.55) 0%, rgba(10,10,10,0.12) 18%, rgba(10,10,10,0.55) 45%, rgba(10,10,10,0.88) 72%, #0a0a0a 100%)',
         }} />
         <div style={{
-          position: 'absolute', left: 0, right: 0, bottom: isMobile ? 10 : 14,
-          padding: isMobile ? '0 1rem' : '0 1.5rem',
-          fontSize: isMobile ? '1.7rem' : '2.4rem',
-          fontWeight: 900, color: '#fff',
-          letterSpacing: '-0.03em', lineHeight: 1.05,
-          textShadow: '0 2px 12px rgba(0,0,0,0.6)',
+          position: 'absolute', left: 0, right: 0, bottom: isMobile ? 6 : 10,
         }}>
-          Jouw voeding
+          <MealDayNavHeader
+            selectedDay={selectedDay}
+            onDayChange={handleDayChange}
+            onOpenSummary={() => setModals(prev => ({ ...prev, summary: true }))}
+            isMobile={isMobile}
+            opFoto
+          />
         </div>
       </div>
-
-      {/* ════ GECONSOLIDEERDE DAG-HEADER ════
-          Pijlen ⇄ + klikbare dagnaam (opent agenda/samenvatting modal).
-          Vervangt: MealPageHeader (Plan/Free toggle + history/more iconen)
-          en de oude RemainingPill — alles wat over kcal/datums/gem ging
-          zit nu in MealDaySummaryModal. */}
-      <MealDayNavHeader
-        selectedDay={selectedDay}
-        onDayChange={handleDayChange}
-        onOpenSummary={() => setModals(prev => ({ ...prev, summary: true }))}
-        isMobile={isMobile}
-      />
 
       {/* ════ NEW MACRO HERO — selected-day aware ════ */}
       {(() => {
