@@ -216,45 +216,6 @@ export default function WeekSchedule({
         })
         return (
           <>
-            <div style={{
-              padding: isMobile ? '0 0.75rem 0.5rem' : '0 1rem 0.625rem',
-              display: 'flex', alignItems: 'center', gap: 8,
-            }}>
-              <button
-                onClick={() => onWeekOffsetChange && onWeekOffsetChange(weekOffset - 1)}
-                aria-label="Vorige week"
-                style={{
-                  background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)',
-                  borderRadius: 8, padding: isMobile ? '5px 10px' : '6px 12px',
-                  color: 'rgba(255,255,255,0.7)', cursor: 'pointer', display: 'flex', alignItems: 'center',
-                  touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-                }}
-              >
-                <ChevronLeft size={isMobile ? 14 : 16} strokeWidth={2.5} />
-              </button>
-              <div style={{
-                flex: 1, textAlign: 'center',
-                fontSize: isMobile ? '0.72rem' : '0.78rem',
-                fontWeight: 700,
-                color: isCurrentWeek ? '#FFD700' : 'rgba(255,255,255,0.55)',
-                letterSpacing: '0.03em',
-              }}>
-                {isCurrentWeek ? 'Deze week' : `${fmt(monday)} – ${fmt(sunday)}`}
-              </div>
-              <button
-                onClick={() => onWeekOffsetChange && onWeekOffsetChange(weekOffset + 1)}
-                aria-label="Volgende week"
-                style={{
-                  background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)',
-                  borderRadius: 8, padding: isMobile ? '5px 10px' : '6px 12px',
-                  color: 'rgba(255,255,255,0.7)', cursor: 'pointer', display: 'flex', alignItems: 'center',
-                  touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-                }}
-              >
-                <ChevronRight size={isMobile ? 14 : 16} strokeWidth={2.5} />
-              </button>
-            </div>
-
             {/* WeekGrid */}
             <div style={{ padding: isMobile ? '0 0.75rem' : '0 1rem' }}>
               <WeekGrid
@@ -268,6 +229,45 @@ export default function WeekSchedule({
                 isViewOnly={!isCurrentWeek}
               />
             </div>
+            <div style={{
+              padding: isMobile ? '0.15rem 0.75rem 0.25rem' : '0.25rem 1rem 0.375rem',
+              display: 'flex', alignItems: 'center', gap: 8,
+            }}>
+              <button
+                onClick={() => onWeekOffsetChange && onWeekOffsetChange(weekOffset - 1)}
+                aria-label="Vorige week"
+                style={{
+                  background: 'transparent', border: '1.5px solid rgba(255,255,255,0.28)',
+                  borderRadius: 9, padding: isMobile ? '5px 10px' : '6px 12px',
+                  color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center',
+                  touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+                }}
+              >
+                <ChevronLeft size={isMobile ? 15 : 17} strokeWidth={3} />
+              </button>
+              <div style={{
+                flex: 1, textAlign: 'center',
+                fontSize: isMobile ? '0.9rem' : '1rem',
+                fontWeight: 900,
+                color: isCurrentWeek ? '#fff' : 'rgba(255,255,255,0.5)',
+                letterSpacing: '-0.01em',
+              }}>
+                {isCurrentWeek ? 'Deze week' : `${fmt(monday)} – ${fmt(sunday)}`}
+              </div>
+              <button
+                onClick={() => onWeekOffsetChange && onWeekOffsetChange(weekOffset + 1)}
+                aria-label="Volgende week"
+                style={{
+                  background: 'transparent', border: '1.5px solid rgba(255,255,255,0.28)',
+                  borderRadius: 9, padding: isMobile ? '5px 10px' : '6px 12px',
+                  color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center',
+                  touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+                }}
+              >
+                <ChevronRight size={isMobile ? 15 : 17} strokeWidth={3} />
+              </button>
+            </div>
+
           </>
         )
       })()}
