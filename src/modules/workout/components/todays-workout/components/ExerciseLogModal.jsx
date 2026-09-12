@@ -265,6 +265,7 @@ export default function ExerciseLogModal({ db, client, exercise, onClose, isMobi
   const [dropsetIndex, setDropsetIndex] = useState(null)
   const [exerciseNote, setExerciseNote] = useState('')
   const [showExerciseNote, setShowExerciseNote] = useState(false)
+  const [nieuweNotitie, setNieuweNotitie] = useState('')
   const [showHistory, setShowHistory] = useState(false)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -446,12 +447,15 @@ export default function ExerciseLogModal({ db, client, exercise, onClose, isMobi
     await saveToDatabase(newSets)
   }
 
-  const saveToDatabase = async (sets) => {
+  // `notitie` expliciet meegeven waar het om de notitie gaat: setState is
+  // asynchroon, dus vlak na een setExerciseNote staat de oude tekst nog in de
+  // state en zou die worden opgeslagen.
+  const saveToDatabase = async (sets, notitie = exerciseNote) => {
     if (!client?.id || !db) return
     setSaving(true)
     try {
       const setsData = sets.map(s => ({ weight: s.weight, reps: s.reps, partials: s.partials || 0, dropsets: s.dropsets || [] }))
-      const progress = await db.saveQuickWorkoutLog(client.id, exercise.name, setsData, exerciseNote || null)
+      const progress = await db.saveQuickWorkoutLog(client.id, exercise.name, setsData, notitie || null)
 
       console.log('💾 progress id:', progress?.id, '| attachment:', attachmentUsed, '| settings:', machineSettings)
 
@@ -471,6 +475,28 @@ export default function ExerciseLogModal({ db, client, exercise, onClose, isMobi
     } catch (e) { console.error('❌ Save failed:', e) }
     finally { setSaving(false) }
   }
+
+  // Notities stapelen in plaats van overschrijven. Ze staan in één tekstveld
+  // (workout_progress.notes), één per regel met de datum ervoor. Geen JSON:
+  // dan leest de coach er straks accolades in plaats van zinnen.
+  const bewaarNotitie = async () => {
+    const tekst = nieuweNotitie.trim()
+    if (!tekst || saving) return
+    const datum = new Date().toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })
+    const regel = `${datum} · ${tekst}`
+    const nieuw = exerciseNote ? `${exerciseNote}\n${regel}` : regel
+    setExerciseNote(nieuw)
+    setNieuweNotitie('')
+    await saveToDatabase(loggedSets, nieuw)
+  }
+
+  // Elke regel is een notitie. Oude notities van vóór deze wijziging staan er
+  // zonder datum in; die tonen we gewoon zoals ze zijn.
+  const notities = (exerciseNote || '')
+    .split('\n')
+    .map(r => r.trim())
+    .filter(Boolean)
+    .reverse()
 
   const saveMachineSettings = async (settings) => {
     if (!client?.id || !db) return
@@ -811,23 +837,61 @@ export default function ExerciseLogModal({ db, client, exercise, onClose, isMobi
       {/* Notitie en historie als blad, net als de machine-instellingen. Ze
           stonden als paneel tussen de gelogde sets; dan duwt het openklappen
           precies weg waar je naar kijkt. */}
-      <BladModal open={showExerciseNote} titel="Notitie bij deze oefening" onClose={() => setShowExerciseNote(false)}>
-        <textarea
-          value={exerciseNote}
-          onChange={(e) => setExerciseNote(e.target.value)}
-          onBlur={() => saveToDatabase(loggedSets)}
-          placeholder="Bv. schouder voelde stijf, volgende keer smallere grip…"
-          autoFocus
-          style={{
-            width: '100%', minHeight: 120, padding: '0.75rem',
-            background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.12)',
-            borderRadius: 10, color: '#fff', fontSize: '0.9rem', fontWeight: 600,
-            resize: 'vertical', outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box',
-            lineHeight: 1.5,
-          }}
-        />
-        <div style={{ marginTop: '0.5rem', fontSize: '0.7rem', fontWeight: 600, color: 'rgba(255,255,255,0.4)' }}>
-          Wordt bewaard zodra je buiten het veld tikt. Je coach ziet 'm bij deze oefening.
+      <BladModal open={showExerciseNote} titel="Notities bij deze oefening" onClose={() => setShowExerciseNote(false)}>
+        {/* Typen, rechts opslaan, en de notitie zakt naar de lijst eronder.
+            Het veld is dan weer leeg voor de volgende. Eén tekstveld dat je
+            elke keer overschrijft wist wat je vorige week opschreef. */}
+        <div style={{ display: 'flex', gap: 8, alignItems: 'stretch' }}>
+          <textarea
+            value={nieuweNotitie}
+            onChange={(e) => setNieuweNotitie(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) bewaarNotitie() }}
+            placeholder="Bv. schouder voelde stijf, volgende keer smallere grip…"
+            autoFocus
+            rows={3}
+            style={{
+              flex: 1, minWidth: 0, padding: '0.7rem',
+              background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.12)',
+              borderRadius: 10, color: '#fff', fontSize: '0.9rem', fontWeight: 600,
+              resize: 'vertical', outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box',
+              lineHeight: 1.5,
+            }}
+          />
+          <button
+            onClick={bewaarNotitie}
+            disabled={!nieuweNotitie.trim() || saving}
+            style={{
+              flexShrink: 0, width: 88,
+              background: nieuweNotitie.trim() ? '#fff' : 'rgba(255,255,255,0.06)',
+              border: `1px solid ${nieuweNotitie.trim() ? '#fff' : 'rgba(255,255,255,0.12)'}`,
+              borderRadius: 10,
+              color: nieuweNotitie.trim() ? '#0a0a0a' : 'rgba(255,255,255,0.3)',
+              fontSize: '0.82rem', fontWeight: 900, fontFamily: 'inherit',
+              cursor: nieuweNotitie.trim() && !saving ? 'pointer' : 'not-allowed',
+              touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+            }}
+          >
+            {saving ? '…' : 'Opslaan'}
+          </button>
+        </div>
+
+        {notities.length > 0 && (
+          <div style={{ marginTop: '1rem', display: 'flex', flexDirection: 'column' }}>
+            {notities.map((n, i) => (
+              <div key={i} style={{
+                padding: '0.6rem 0',
+                borderTop: i === 0 ? 'none' : '1px solid rgba(255,255,255,0.07)',
+                fontSize: '0.88rem', fontWeight: 600, color: 'rgba(255,255,255,0.8)',
+                lineHeight: 1.5, whiteSpace: 'pre-wrap', wordBreak: 'break-word',
+              }}>
+                {n}
+              </div>
+            ))}
+          </div>
+        )}
+
+        <div style={{ marginTop: '0.8rem', fontSize: '0.7rem', fontWeight: 600, color: 'rgba(255,255,255,0.4)' }}>
+          Je coach ziet deze notities bij deze oefening.
         </div>
       </BladModal>
 
