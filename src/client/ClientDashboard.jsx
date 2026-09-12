@@ -342,7 +342,9 @@ export default function ClientDashboard({ previewClientId = null, ingebed = fals
         borderRadius: 22,
         boxShadow: '0 18px 48px rgba(0,0,0,0.55), 0 0 0 1px rgba(255,215,0,0.04)',
         padding: isMobile ? '0.5rem 0.3rem' : '0.6rem 0.5rem',
-        zIndex: 100,
+        // 101: net boven het uitgeklapte workout-scherm (100), zodat je
+        // vanuit een training nog van tab kunt wisselen.
+        zIndex: 101,
       }}>
         <div style={{
           display: 'flex',

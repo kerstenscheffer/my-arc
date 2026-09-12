@@ -343,7 +343,11 @@ export default function TodaysWorkoutMain({ client, schema, db, workoutService, 
     return (
       <>
         <div style={{
-          position: 'fixed', inset: 0, height: '100dvh', zIndex: 70,
+          // Boven de zwevende dingen van het dashboard: de widgetbalk staat op
+          // 99 en de check-in-melding op 90. Die hoorden hier niet overheen te
+          // liggen — dit scherm is waar je mee bezig bent. De onderbalk blijft
+          // er wél boven (101), zodat je nog van tab kunt wisselen.
+          position: 'fixed', inset: 0, height: '100dvh', zIndex: 100,
           background: '#0a0a0a',
           display: 'flex', flexDirection: 'column',
         }}>
