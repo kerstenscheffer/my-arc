@@ -262,23 +262,23 @@ export default function WorkoutProgressToast({ client, db, onViewChart }) {
           overheen kan beginnen in plaats van ernaast te moeten passen. */}
       <div style={{
         position: 'absolute', top: 0, right: 0, bottom: 0,
-        width: '28%',
+        width: '40%',
         backgroundImage: `url(${COACH_PHOTO_URL})`,
         backgroundSize: 'cover',
-        // Het beeld is staand (665x1182) en de kop zit rond 45% van de hoogte;
-        // in een liggend vak van ~130px valt met 18% alleen het plafond binnen.
-        backgroundPosition: 'center 42%',
+        // Liggende uitsnede (900x750); met 35% valt het hoofd binnen het vak
+        // en blijft de romp zichtbaar.
+        backgroundPosition: 'center 35%',
       }} />
       <div style={{
         position: 'absolute', inset: 0, pointerEvents: 'none',
-        background: 'linear-gradient(90deg, #0a0a0a 0%, #0a0a0a 62%, rgba(10,10,10,0.75) 78%, rgba(10,10,10,0.2) 92%, rgba(10,10,10,0) 100%)',
+        background: 'linear-gradient(90deg, #0a0a0a 0%, #0a0a0a 52%, rgba(10,10,10,0.72) 68%, rgba(10,10,10,0.18) 88%, rgba(10,10,10,0) 100%)',
       }} />
 
       {/* Tekst — begint links en loopt tot over de helft van de foto. */}
       <div style={{
         position: 'absolute', top: 0, bottom: 0, left: 0,
-        // Tekst pakt de linkerkant en loopt tot net over de rand van de foto.
-        width: '78%',
+        // Tekst pakt 60% van de kaart en loopt met de fade nog iets de foto op.
+        width: '68%',
         padding: isMobile ? '0.5rem 0.4rem 0.5rem 0.9rem' : '0.6rem 0.5rem 0.6rem 1.1rem',
         display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 3,
       }}>
