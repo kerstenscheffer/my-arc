@@ -22,7 +22,7 @@ import { useChallenge } from '../../hooks/useChallenge'
 // Dezelfde foto als de andere meldingen, lokaal in plaats van een gratis
 // image-host.
 const COACH_PHOTO_URL = '/coach-compliment.jpg'
-const COACH_TRACKING_MESSAGE = 'Het is normaal dat je gewicht schommelt en hoeft niks te betekenen. We focussen op jouw week gemiddelde en sturen vanuit daar bij.'
+const COACH_TRACKING_MESSAGE = 'Gewichtsschommelingen zijn normaal. We sturen op basis van het week op week gemiddelde.'
 
 function TrackingTipBlock({ isMobile }) {
   return (
