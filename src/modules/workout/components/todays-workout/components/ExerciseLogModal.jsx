@@ -516,13 +516,19 @@ export default function ExerciseLogModal({ db, client, exercise, onClose, isMobi
   // scherm met een externe knop op. Een grote play-knop op de foto belooft dan
   // iets wat er niet is. De zoeklink blijft bereikbaar via de info-knop op de
   // oefeningkaart.
-  const speelbaar = (url) => !!url && !/youtube\.com\/results\?/.test(url)
-  const videoEmbed = embedUrl(
-    speelbaar(media?.video_url) ? media.video_url
-      : speelbaar(media?.fallback_video_url) ? media.fallback_video_url
-      : null
-  )
-  const heeftVideo = !!videoEmbed
+  // De coachvideo gaat vóór; anders de fallback. Bij 241 van de 249 oefeningen
+  // is die fallback een YouTube-zóéklink en geen filmpje — die kan niet in een
+  // iframe, dus daar opent de knop YouTube meteen in een nieuw tabblad.
+  const videoBron = media?.video_url || media?.fallback_video_url || null
+  const videoEmbed = embedUrl(videoBron)
+  const heeftVideo = !!videoBron
+
+  const speelVideo = () => {
+    if (videoEmbed) { setToonVideo(true); return }
+    // Geen tussenscherm dat uitlegt dat je naar een externe maker gaat: je
+    // tikt op play omdat je een filmpje wilt zien, niet om dat te lezen.
+    window.open(videoBron, '_blank', 'noopener,noreferrer')
+  }
   const wizardActive = showWizard && dropsetIndex === null
   const dropsetActive = dropsetIndex !== null && !showWizard
 
@@ -571,7 +577,7 @@ export default function ExerciseLogModal({ db, client, exercise, onClose, isMobi
             }} />}
             {heeftVideo && !toonVideo && (
               <button
-                onClick={() => setToonVideo(true)}
+                onClick={speelVideo}
                 aria-label="Bekijk de video"
                 style={{
                   position: 'absolute', left: '50%', top: '50%', transform: 'translate(-50%,-50%)',
