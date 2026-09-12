@@ -223,16 +223,14 @@ export default function ExerciseCard({
   const showPermanentBtn = exercise._pendingPermanent && !isPermanent
   const photoSize = isMobile ? 62 : 72
   const GOLD = '#FFD700'
-  // Steviger dan 0,06 wit: de kaarten liepen op een telefoon in elkaar over
-  // en de actieknoppen leken één vlak in plaats van drie knoppen.
-  const DIVIDER = 'rgba(255,255,255,0.12)'
+  const DIVIDER = 'rgba(255,255,255,0.06)'
 
   return (
     <div style={{ opacity: visible ? 1 : 0, transform: visible ? 'translateY(0)' : 'translateY(10px)', transition: `all 0.3s ease ${delay}ms` }}>
       <div style={{
         margin: isMobile ? '0 0.9rem 0.4rem' : '0 1.25rem 0.5rem',
-        background: 'rgba(255,255,255,0.03)',
-        border: '1px solid rgba(255,255,255,0.14)',
+        background: 'rgba(255,255,255,0.025)',
+        border: '1px solid rgba(255,255,255,0.05)',
         borderRadius: 12,
         overflow: 'hidden',
         opacity: isLogged ? 0.55 : 1,
@@ -273,20 +271,19 @@ export default function ExerciseCard({
               position: 'absolute', top: 4, left: 4,
               width: 18, height: 18, borderRadius: 3,
               background: 'rgba(0,0,0,0.75)',
-              border: isLogged ? '1px solid rgba(16,185,129,0.5)' : '1px solid rgba(255,255,255,0.35)',
+              border: isLogged ? '1px solid rgba(16,185,129,0.4)' : '1px solid rgba(255,255,255,0.15)',
               display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2,
             }}>
               {isLogged
                 ? <CheckCircle size={10} color="#10b981" strokeWidth={2.5} />
-                : <span style={{ fontSize: '0.58rem', fontWeight: 900, color: '#fff', lineHeight: 1 }}>{index + 1}</span>}
+                : <span style={{ fontSize: '0.52rem', fontWeight: 800, color: 'rgba(255,255,255,0.7)', lineHeight: 1 }}>{index + 1}</span>}
             </div>
 
-            {/* Video-knopje rechtsonder. Wit, niet goud: goud is hier
-                gereserveerd voor de spiergroep-badge. */}
+            {/* Video-knopje rechtsonder — goud, zodat het opvalt op de foto. */}
             {hasVideo && !loadingImage && (
               <button onClick={(e) => { e.stopPropagation(); setInfoDefaultTab('video'); setShowInfoModal(true) }}
-                style={{ position: 'absolute', bottom: 4, right: 4, width: 20, height: 20, borderRadius: '50%', background: '#fff', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', zIndex: 3, touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', padding: 0 }}>
-                <svg width="7" height="7" viewBox="0 0 10 10" fill="#0a0a0a"><polygon points="2,1 9,5 2,9" /></svg>
+                style={{ position: 'absolute', bottom: 4, right: 4, width: 18, height: 18, borderRadius: '50%', background: '#FFD700', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', zIndex: 3, touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', padding: 0 }}>
+                <svg width="6" height="6" viewBox="0 0 10 10" fill="rgba(0,0,0,0.85)"><polygon points="2,1 9,5 2,9" /></svg>
               </button>
             )}
 
@@ -306,8 +303,8 @@ export default function ExerciseCard({
               marginBottom: 3,
             }}>
               <span style={{
-                fontSize: isMobile ? '0.92rem' : '1rem',
-                fontWeight: 900,
+                fontSize: isMobile ? '0.88rem' : '0.95rem',
+                fontWeight: 800,
                 color: isLogged ? 'rgba(255,255,255,0.45)' : '#fff',
                 lineHeight: 1.15,
                 whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
@@ -341,8 +338,8 @@ export default function ExerciseCard({
               <div style={{ display: 'flex', gap: isMobile ? '0.55rem' : '0.7rem', overflow: 'hidden' }}>
                 {exercise.duration && (
                   <div style={{ display: 'flex', alignItems: 'baseline', gap: 2 }}>
-                    <span style={{ fontSize: isMobile ? '0.8rem' : '0.86rem', fontWeight: 900, color: '#fff' }}>{exercise.duration}</span>
-                    <span style={{ fontSize: isMobile ? '0.6rem' : '0.64rem', fontWeight: 800, color: 'rgba(255,255,255,0.45)', textTransform: 'uppercase' }}>duur</span>
+                    <span style={{ fontSize: isMobile ? '0.72rem' : '0.78rem', fontWeight: 800, color: 'rgba(255,255,255,0.7)' }}>{exercise.duration}</span>
+                    <span style={{ fontSize: isMobile ? '0.52rem' : '0.58rem', fontWeight: 700, color: 'rgba(255,255,255,0.3)', textTransform: 'uppercase' }}>duur</span>
                   </div>
                 )}
                 {exercise.distance && (
@@ -362,14 +359,14 @@ export default function ExerciseCard({
                      je toch al bent als je er een set bij of af doet. Goud
                      zodra je afwijkt van wat de coach plande. */
                   <div style={{ display: 'flex', alignItems: 'baseline', gap: 2 }}>
-                    <span style={{ fontSize: isMobile ? '0.8rem' : '0.86rem', fontWeight: 900, color: localExercise._setsAangepast ? '#FFD700' : '#fff' }}>{localExercise.sets}</span>
-                    <span style={{ fontSize: isMobile ? '0.6rem' : '0.64rem', fontWeight: 800, color: 'rgba(255,255,255,0.45)', textTransform: 'uppercase' }}>sets</span>
+                    <span style={{ fontSize: isMobile ? '0.72rem' : '0.78rem', fontWeight: 800, color: localExercise._setsAangepast ? '#FFD700' : 'rgba(255,255,255,0.7)' }}>{localExercise.sets}</span>
+                    <span style={{ fontSize: isMobile ? '0.52rem' : '0.58rem', fontWeight: 700, color: 'rgba(255,255,255,0.3)', textTransform: 'uppercase' }}>sets</span>
                   </div>
                 )}
                 {localExercise.reps && (
                   <div style={{ display: 'flex', alignItems: 'baseline', gap: 2 }}>
-                    <span style={{ fontSize: isMobile ? '0.8rem' : '0.86rem', fontWeight: 900, color: '#fff' }}>{localExercise.reps}</span>
-                    <span style={{ fontSize: isMobile ? '0.6rem' : '0.64rem', fontWeight: 800, color: 'rgba(255,255,255,0.45)', textTransform: 'uppercase' }}>reps</span>
+                    <span style={{ fontSize: isMobile ? '0.72rem' : '0.78rem', fontWeight: 800, color: 'rgba(255,255,255,0.7)' }}>{localExercise.reps}</span>
+                    <span style={{ fontSize: isMobile ? '0.52rem' : '0.58rem', fontWeight: 700, color: 'rgba(255,255,255,0.3)', textTransform: 'uppercase' }}>reps</span>
                   </div>
                 )}
               </div>
@@ -408,7 +405,7 @@ export default function ExerciseCard({
         {/* Permanent in plan */}
         {showPermanentBtn && (
           <button onClick={handleMakePermanent} disabled={makingPermanent}
-            style={{ width: '100%', padding: isMobile ? '0.5rem' : '0.55rem', background: 'transparent', border: 'none', borderTop: '1px solid rgba(255,255,255,0.12)', color: '#fff', fontSize: isMobile ? '0.68rem' : '0.72rem', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.04em', cursor: makingPermanent ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.35rem', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}>
+            style={{ width: '100%', padding: isMobile ? '0.45rem' : '0.5rem', background: 'transparent', border: 'none', borderTop: '1px solid rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.6)', fontSize: isMobile ? '0.62rem' : '0.67rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em', cursor: makingPermanent ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.35rem', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}>
             {makingPermanent
               ? <><div style={{ width: '11px', height: '11px', border: '2px solid rgba(255,255,255,0.2)', borderTopColor: '#fff', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />Opslaan…</>
               : <><BookmarkPlus size={11} strokeWidth={2.5} />Permanent in plan zetten</>}
@@ -441,10 +438,8 @@ export default function ExerciseCard({
 // MealCard-stijl actie-cel: icoon + label, gecentreerd, flex-1.
 // Klein rond knopje naast het aantal sets. Los gehouden zodat de min en de
 // plus er gegarandeerd hetzelfde uitzien.
-// Dik wit in plaats van 70% wit, en met een duidelijke bovenrand ertussen —
-// de rij las eerder als één grijs vlak.
 function ActionCell({ icon, label, onClick, isMobile, checked, badge, flex = 1 }) {
-  const color = checked ? '#10b981' : '#fff'
+  const color = checked ? '#10b981' : 'rgba(255,255,255,0.7)'
   return (
     <button
       onClick={onClick}
@@ -454,10 +449,10 @@ function ActionCell({ icon, label, onClick, isMobile, checked, badge, flex = 1 }
         padding: isMobile ? '0.32rem 0.3rem' : '0.4rem 0.4rem',
         background: 'transparent', border: 'none',
         color,
-        fontSize: isMobile ? '0.72rem' : '0.76rem', fontWeight: 900,
+        fontSize: isMobile ? '0.65rem' : '0.7rem', fontWeight: 700,
         cursor: 'pointer',
         touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-        minHeight: 36, letterSpacing: '-0.005em',
+        minHeight: 28, letterSpacing: '-0.005em',
       }}
     >
       {icon}
