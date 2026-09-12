@@ -453,13 +453,15 @@ export default function ExerciseLogModal({ db, client, exercise, onClose, isMobi
     setShowWizard(true)
   }
 
+  // Puur een aan/uit-schakelaar. Aanzetten opende eerst meteen het
+  // invoerscherm; dan kun je hem niet vooraf aanzetten zonder ook direct te
+  // moeten loggen. Nu bepaalt de stand alleen of de klok na een set gaat
+  // lopen — loggen doe je met de knop ernaast.
   const wisselRustTimer = () => {
-    if (rustTimerAan) { setRustTimerAan(false); bewaarTimerAan(false); setRust(false); return }
-    setRustTimerAan(true)
-    bewaarTimerAan(true)
-    setRust(false)
-    setEditingIndex(null)
-    setShowWizard(true)   // meteen door naar de gewichten, zoals gevraagd
+    const nieuw = !rustTimerAan
+    setRustTimerAan(nieuw)
+    bewaarTimerAan(nieuw)
+    if (!nieuw) setRust(false)   // uitzetten stopt ook een lopende rust
   }
 
   // ✅ Nieuwe handler: start edit mode voor bestaande set
