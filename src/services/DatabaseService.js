@@ -652,50 +652,106 @@ async deleteClient(clientId) {
 // FIXED VERSION - Add to DatabaseService.js
 // Replace the entire saveQuickWorkoutLog method
 
+// De sessie van één klant op één dag ophalen, of aanmaken als hij er nog niet
+// is. Eén plek, omdat vier schermen dit deden en ze het alle vier op dezelfde
+// manier fout deden.
+//
+// LET OP — hier zat een bug die één trainingsdag liet uitgroeien tot 31
+// sessies. Het patroon was overal:
+//
+//   const { data: session } = await supabase...eq(dag).single()
+//   if (!session) insert()
+//
+// `.single()` (en `.maybeSingle()`) geven een FOUT zodra er méér dan één rij
+// is; `data` is dan null. De aanroepers keken alleen naar `data` en lazen dat
+// als "er is nog geen sessie" — dus maakten ze er nóg een. Zodra er door een
+// race twee rijen stonden, kwam het nooit meer goed: elke log, en zelfs elke
+// verwijderde set, leverde een nieuwe sessie op. (Ferry, 8 sep 2026: 31
+// sessies tussen 20:35 en 21:10, elk met precies één log erin.)
+//
+// Daarom hier: nooit .single() voor de opzoeking, altijd de fout controleren,
+// en bij meerdere rijen de oudste als de echte behandelen.
+async getOrCreateWorkoutSession(clientId, datum, extra = {}) {
+  const zoek = () => this.supabase
+    .from('workout_sessions')
+    .select('*')
+    .eq('client_id', clientId)
+    .eq('workout_date', datum)
+    .order('created_at', { ascending: true })
+
+  const { data: bestaand, error: zoekFout } = await zoek()
+  if (zoekFout) throw zoekFout
+  if (bestaand && bestaand.length > 0) {
+    if (bestaand.length > 1) await this._ruimLegeDubbeleSessiesOp(bestaand)
+    return bestaand[0]
+  }
+
+  const { data: nieuw, error: maakFout } = await this.supabase
+    .from('workout_sessions')
+    .insert({
+      client_id: clientId,
+      user_id: clientId,
+      workout_date: datum,
+      day_name: new Date(`${datum}T00:00:00`).toLocaleDateString('en-US', { weekday: 'long' }),
+      exercises_completed: [],
+      is_completed: false,
+      created_at: new Date().toISOString(),
+      ...extra,
+    })
+    .select()
+    .single()
+  if (maakFout) throw maakFout
+
+  // De race die het ooit begon: twee saves vlak na elkaar zien allebei "geen
+  // sessie" en maken er allebei een. Meteen opnieuw kijken, zodat de volgende
+  // aanroep weer precies één rij vindt in plaats van er eindeloos bij te maken.
+  const { data: naInsert } = await zoek()
+  if (naInsert && naInsert.length > 1) {
+    await this._ruimLegeDubbeleSessiesOp(naInsert)
+    return naInsert[0]
+  }
+  return nieuw
+}
+
+// Dubbele sessies van dezelfde dag opruimen. Alleen rijen die aantoonbaar
+// niets bevatten: geen enkele log, geen duur, niet afgerond. De oudste blijft
+// altijd staan, ook als die leeg is — daar hangen de nieuwe logs aan.
+async _ruimLegeDubbeleSessiesOp(sessies) {
+  const kandidaten = sessies.slice(1)
+  if (kandidaten.length === 0) return
+  const ids = kandidaten.map(s => s.id)
+  const { data: metLogs, error } = await this.supabase
+    .from('workout_progress').select('session_id').in('session_id', ids)
+  if (error) return   // bij twijfel niets weggooien
+  const bezet = new Set((metLogs || []).map(p => p.session_id))
+  const weg = kandidaten
+    .filter(s => !bezet.has(s.id) && !s.duration_minutes && !s.is_completed)
+    .map(s => s.id)
+  if (weg.length === 0) return
+  const { error: wisFout } = await this.supabase.from('workout_sessions').delete().in('id', weg)
+  if (wisFout) console.warn('Lege dubbele sessies opruimen mislukt:', wisFout)
+}
+
 async saveQuickWorkoutLog(clientId, exerciseName, sets, notes = null) {
   try {
     // 1. Create or get today's workout session
     const today = new Date().toISOString().split('T')[0]
-    
-    // Check if session exists for today
-    let { data: session, error: sessionError } = await this.supabase
-      .from('workout_sessions')
-      .select('*')
-      .eq('client_id', clientId)
-      .eq('workout_date', today)
-      .single()
-    
-    // Create new session if not exists
-    if (!session) {
-      const { data: newSession, error: createError } = await this.supabase
-        .from('workout_sessions')
-        .insert({
-          client_id: clientId,
-          user_id: clientId,
-          workout_date: today,
-          day_name: new Date().toLocaleDateString('en-US', { weekday: 'long' }),
-          day_display_name: `Quick Log - ${new Date().toLocaleDateString()}`,
-          exercises_completed: [],
-          is_completed: false,
-          created_at: new Date().toISOString()
-        })
-        .select()
-        .single()
-      
-      if (createError) {
-        console.error('❌ Failed to create workout session:', createError)
-        throw createError
-      }
-      session = newSession
-    }
+    const session = await this.getOrCreateWorkoutSession(clientId, today, {
+      day_display_name: `Quick Log - ${new Date().toLocaleDateString()}`,
+    })
     
     // 2. Check if progress entry already exists for this exercise TODAY
-    const { data: existingProgress, error: checkError } = await this.supabase
+    // Zelfde valkuil als bij de sessie: er staan in deze tabel al combinaties
+    // van sessie + oefening die twee keer voorkomen, en dan geeft .single()
+    // een fout in plaats van een rij. Nieuwste pakken en bijwerken.
+    const { data: gevonden } = await this.supabase
       .from('workout_progress')
       .select('*')
       .eq('session_id', session.id)
       .eq('exercise_name', exerciseName)
-      .single()
+      .order('created_at', { ascending: false })
+      .limit(1)
+    const existingProgress = gevonden?.[0] || null
     
     let progress
     

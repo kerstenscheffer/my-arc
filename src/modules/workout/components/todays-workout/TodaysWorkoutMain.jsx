@@ -137,27 +137,18 @@ export default function TodaysWorkoutMain({ client, schema, db, workoutService, 
   const saveTimerToSession = async (durationSec) => {
     if (!client?.id || !db?.supabase) return
     const durationMin = Math.max(1, Math.round(durationSec / 60))
-    const today = todayStr
-    const { data: existing } = await db.supabase
-      .from('workout_sessions')
-      .select('id')
-      .eq('client_id', client.id)
-      .eq('workout_date', today)
-      .maybeSingle()
-    if (existing?.id) {
+    // Via de gedeelde helper. Stond hier met .maybeSingle(), die net als
+    // .single() een fout geeft zodra er twee rijen zijn — waarna deze code
+    // dacht dat er nog geen sessie was en er een nieuwe bijmaakte.
+    try {
+      const sessie = await db.getOrCreateWorkoutSession(client.id, todayStr, {
+        day_display_name: todaysWorkout?.name || 'Workout',
+      })
       await db.supabase.from('workout_sessions')
         .update({ duration_minutes: durationMin })
-        .eq('id', existing.id)
-    } else {
-      await db.supabase.from('workout_sessions').insert({
-        client_id: client.id,
-        user_id: client.id,
-        workout_date: today,
-        day_name: new Date().toLocaleDateString('en-US', { weekday: 'long' }),
-        day_display_name: todaysWorkout?.name || 'Workout',
-        duration_minutes: durationMin,
-        created_at: new Date().toISOString(),
-      })
+        .eq('id', sessie.id)
+    } catch (e) {
+      console.error('Trainingsduur opslaan mislukt:', e)
     }
   }
   // ───────────────────────────────────────────────────────────────────────

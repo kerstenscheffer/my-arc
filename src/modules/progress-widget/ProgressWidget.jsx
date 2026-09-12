@@ -280,43 +280,15 @@ export default function ProgressWidget({ client, schema, weekSchedule, db }) {
     try {
       // Step 1: Get or create today's workout session
       const today = new Date().toISOString().split('T')[0]
-      
-      // Check for existing session today
-      let { data: sessions, error: sessionError } = await db.supabase
-        .from('workout_sessions')
-        .select('id')
-        .eq('user_id', client.id)
-        .eq('workout_date', today)
-        .maybeSingle()
-      
-      if (sessionError && sessionError.code !== 'PGRST116') {
-        throw sessionError
-      }
-      
-      let sessionId
-      if (sessions) {
-        sessionId = sessions.id
-      } else {
-        // Create new session
-        const { data: newSession, error: createError } = await db.supabase
-          .from('workout_sessions')
-          .insert({
-            user_id: client.id, // For RLS policy: auth.uid() = user_id
-            client_id: client.id,
-            workout_date: today,
-            day_name: new Date().toLocaleDateString('en-US', { weekday: 'long' }),
-            day_display_name: new Date().toLocaleDateString('nl-NL', { weekday: 'long' }),
-            workout_id: todaysWorkout?.key || 'quick_log',
-            is_completed: false,
-            exercises_completed: [],
-            completion_percentage: 0
-          })
-          .select('id')
-          .single()
-        
-        if (createError) throw createError
-        sessionId = newSession.id
-      }
+      // Via de gedeelde helper. Stond hier met .maybeSingle(), die net als
+      // .single() een fout geeft zodra er twee sessies op één dag staan; deze
+      // code las dat als "nog geen sessie" en maakte er dan telkens een bij.
+      const sessie = await db.getOrCreateWorkoutSession(client.id, today, {
+        day_display_name: new Date().toLocaleDateString('nl-NL', { weekday: 'long' }),
+        workout_id: todaysWorkout?.key || 'quick_log',
+        completion_percentage: 0,
+      })
+      const sessionId = sessie.id
       
       // Step 2: Save workout progress with session_id and get the created record
       const { data: newProgress, error: progressError } = await db.supabase

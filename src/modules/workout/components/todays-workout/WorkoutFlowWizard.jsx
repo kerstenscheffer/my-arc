@@ -118,13 +118,21 @@ export default function WorkoutFlowWizard({ exercises, client, db, onComplete, o
     if (!client?.id || !db || !exercise) return
     try {
       const today = new Date().toISOString().split('T')[0]
-      let { data: session } = await db.supabase.from('workout_sessions').select('id').eq('client_id', client.id).eq('workout_date', today).single()
-      if (!session) {
-        const { data: ns } = await db.supabase.from('workout_sessions').insert({ client_id: client.id, user_id: client.id, workout_date: today, day_name: new Date().toLocaleDateString('en-US', { weekday: 'long' }), exercises_completed: [], is_completed: false, created_at: new Date().toISOString() }).select().single()
-        session = ns
-      }
+      // Via de gedeelde helper; stond hier met .single(), die een fout geeft
+      // zodra er twee sessies op één dag staan en dan eindeloos nieuwe maakte.
+      const session = await db.getOrCreateWorkoutSession(client.id, today)
       if (session?.id) {
-        await db.supabase.from('workout_progress').insert({ session_id: session.id, client_id: client.id, exercise_name: exercise.name, sets_completed: currentSet, reps_completed: exercise.reps || 0, weight_used: 0, notes: '', created_at: new Date().toISOString() })
+        // workout_progress heeft alleen session_id, exercise_name, sets, notes,
+        // created_at, attachment_used en machine_settings. Hier stonden
+        // client_id, sets_completed, reps_completed en weight_used in — vier
+        // kolommen die niet bestaan, dus PostgREST weigerde de hele insert en
+        // werd er nooit iets gelogd vanuit deze wizard.
+        await db.supabase.from('workout_progress').insert({
+          session_id: session.id,
+          exercise_name: exercise.name,
+          sets: Array.from({ length: currentSet }, () => ({ weight: 0, reps: exercise.reps || 0 })),
+          created_at: new Date().toISOString(),
+        })
       }
     } catch (e) { console.error('❌ Log set failed:', e) }
   }
