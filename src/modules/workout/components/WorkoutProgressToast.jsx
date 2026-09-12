@@ -271,7 +271,9 @@ export default function WorkoutProgressToast({ client, db, onViewChart }) {
       }} />
       <div style={{
         position: 'absolute', inset: 0, pointerEvents: 'none',
-        background: 'linear-gradient(90deg, #0a0a0a 0%, #0a0a0a 52%, rgba(10,10,10,0.72) 68%, rgba(10,10,10,0.18) 88%, rgba(10,10,10,0) 100%)',
+        // Loopt geleidelijk door tot de rechterrand; anders zie je op de grens
+        // van tekstvlak en foto een harde lijn.
+        background: 'linear-gradient(90deg, #0a0a0a 0%, #0a0a0a 42%, rgba(10,10,10,0.88) 56%, rgba(10,10,10,0.5) 72%, rgba(10,10,10,0.14) 90%, rgba(10,10,10,0) 100%)',
       }} />
 
       {/* Tekst — begint links en loopt tot over de helft van de foto. */}
