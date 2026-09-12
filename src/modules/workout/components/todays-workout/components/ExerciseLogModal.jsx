@@ -266,6 +266,7 @@ export default function ExerciseLogModal({ db, client, exercise, onClose, isMobi
   const [exerciseNote, setExerciseNote] = useState('')
   const [showExerciseNote, setShowExerciseNote] = useState(false)
   const [nieuweNotitie, setNieuweNotitie] = useState('')
+  const [eerdereNotities, setEerdereNotities] = useState([])
   const [showHistory, setShowHistory] = useState(false)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -293,7 +294,7 @@ export default function ExerciseLogModal({ db, client, exercise, onClose, isMobi
   // opnieuw bepalen als je naar een andere oefening gaat.
   const rusttijd = rusttijdVoor(exercise)
 
-  useEffect(() => { loadExistingLogs(); loadPreviousPerformance(); loadExercisePreference() }, [])
+  useEffect(() => { loadExistingLogs(); loadPreviousPerformance(); loadExercisePreference(); laadEerdereNotities() }, [])
 
   useEffect(() => {
     let weg = false
@@ -322,6 +323,42 @@ export default function ExerciseLogModal({ db, client, exercise, onClose, isMobi
       setPreviousPerformance({ sets: progress[0].sets, date: session?.workout_date || null })
       if (progress[0].machine_settings) setPreviousMachineSettings(progress[0].machine_settings)
     } catch (e) { console.error('Previous performance load failed:', e) }
+  }
+
+  // Wat je bij deze oefening eerder opschreef. Handig precies op het moment
+  // dat je een nieuwe notitie typt: "volgende keer smallere grip" heeft geen
+  // zin als je 'm pas leest nadat je klaar bent.
+  const laadEerdereNotities = async () => {
+    if (!client?.id || !db) return
+    try {
+      const today = new Date().toISOString().split('T')[0]
+      const { data: sessions } = await db.supabase
+        .from('workout_sessions').select('id, workout_date')
+        .eq('client_id', client.id).lt('workout_date', today)
+        .order('workout_date', { ascending: false }).limit(20)
+      if (!sessions?.length) return
+
+      const { data: progress } = await db.supabase
+        .from('workout_progress').select('session_id, notes')
+        .in('session_id', sessions.map(s => s.id))
+        .eq('exercise_name', exercise.name)
+        .not('notes', 'is', null)
+      if (!progress?.length) return
+
+      const datumVan = new Map(sessions.map(s => [s.id, s.workout_date]))
+      // Elke sessie kan meerdere notitieregels bevatten (één per regel, zoals
+      // hierboven opgeslagen). Uitsplitsen, zodat de lijst per notitie leest
+      // en niet per sessie.
+      const uit = []
+      progress.forEach(r => {
+        const datum = datumVan.get(r.session_id)
+        String(r.notes).split('\n').map(t => t.trim()).filter(Boolean).forEach(tekst => {
+          uit.push({ datum, tekst })
+        })
+      })
+      uit.sort((a, b) => (b.datum || '').localeCompare(a.datum || ''))
+      setEerdereNotities(uit.slice(0, 12))
+    } catch (e) { console.error('Eerdere notities laden mislukt:', e) }
   }
 
   const loadExercisePreference = async () => {
@@ -885,6 +922,30 @@ export default function ExerciseLogModal({ db, client, exercise, onClose, isMobi
                 lineHeight: 1.5, whiteSpace: 'pre-wrap', wordBreak: 'break-word',
               }}>
                 {n}
+              </div>
+            ))}
+          </div>
+        )}
+
+        {eerdereNotities.length > 0 && (
+          <div style={{ marginTop: '1.1rem', paddingTop: '0.9rem', borderTop: '1px solid rgba(255,255,255,0.1)' }}>
+            <div style={{
+              fontSize: '0.66rem', fontWeight: 900, color: '#fff',
+              textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '0.5rem',
+            }}>
+              Eerdere trainingen
+            </div>
+            {eerdereNotities.map((n, i) => (
+              <div key={i} style={{ padding: '0.5rem 0', borderTop: i === 0 ? 'none' : '1px solid rgba(255,255,255,0.06)' }}>
+                <div style={{ fontSize: '0.66rem', fontWeight: 800, color: 'rgba(255,255,255,0.35)' }}>
+                  {n.datum ? new Date(`${n.datum}T00:00:00`).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' }) : ''}
+                </div>
+                <div style={{
+                  fontSize: '0.86rem', fontWeight: 600, color: 'rgba(255,255,255,0.7)',
+                  lineHeight: 1.5, whiteSpace: 'pre-wrap', wordBreak: 'break-word', marginTop: 1,
+                }}>
+                  {n.tekst}
+                </div>
               </div>
             ))}
           </div>
