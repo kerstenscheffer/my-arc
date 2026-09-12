@@ -11,7 +11,7 @@ const valToIdx = (v) => Math.round((parseFloat(v) - MIN) * 10)
 const idxToVal = (i) => Math.round((MIN * 10 + i)) / 10
 const TOTAL = valToIdx(MAX) + 1
 
-function HorizontalPicker({ value, onChange, disabled, savedLabel = false, onEdit = null }) {
+function HorizontalPicker({ value, onChange, disabled, savedLabel = false }) {
   const isMobile = window.innerWidth <= 768
   const ref = useRef(null)
   const wrapRef = useRef(null)
@@ -143,6 +143,8 @@ function HorizontalPicker({ value, onChange, disabled, savedLabel = false, onEdi
         )}
         <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: '60px', background: 'linear-gradient(to right, #0a0a0a, transparent)', zIndex: 2, pointerEvents: 'none' }} />
         <div style={{ position: 'absolute', right: 0, top: 0, bottom: 0, width: '60px', background: 'linear-gradient(to left, #0a0a0a, transparent)', zIndex: 2, pointerEvents: 'none' }} />
+        <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: '60px', background: 'linear-gradient(to right, #0a0a0a, transparent)', zIndex: 2, pointerEvents: 'none' }} />
+        <div style={{ position: 'absolute', right: 0, top: 0, bottom: 0, width: '60px', background: 'linear-gradient(to left, #0a0a0a, transparent)', zIndex: 2, pointerEvents: 'none' }} />
         {/* Markering van het midden: een zacht vlak achter het getal in plaats
             van twee harde streepjes die dwars door de schuif liepen. */}
         <div style={{
@@ -183,7 +185,6 @@ function HorizontalPicker({ value, onChange, disabled, savedLabel = false, onEdi
                 style={{
                   flexShrink: 0, width: `${ITEM_W}px`, height: '100%',
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  paddingBottom: savedLabel ? 18 : 0,
                   cursor: disabled ? 'default' : 'pointer',
                   touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
                   fontSize: sel ? (isMobile ? '2.1rem' : '2.5rem') : (isMobile ? '0.8rem' : '0.9rem'),
@@ -273,7 +274,6 @@ export default function WeightProgressRing({
         onChange={onWeightChange}
         disabled={showSavedState}
         savedLabel={showSavedState}
-        onEdit={startEdit}
       />
 
       {/* Fine-tune ±0.1 — alleen wanneer aanpassen mogelijk */}
@@ -331,6 +331,32 @@ export default function WeightProgressRing({
           }}>
             {saving ? 'Opslaan...' : 'Gewicht Opslaan'}
           </button>
+        )}
+
+        {/* OPGESLAGEN — potlood en vinkje, gelijke helften met een streepje
+            ertussen. Stond eerder als vlak in de schuif; dat vocht met het
+            getal. */}
+        {showSavedState && (
+          <div style={{ display: 'flex', minHeight: '48px' }}>
+            <button onClick={startEdit} aria-label="Gewicht aanpassen" style={{
+              flex: 1,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              padding: isMobile ? '0.875rem 0.5rem' : '1rem 0.75rem',
+              background: 'transparent', border: 'none', color: '#fff',
+              cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+            }}>
+              <Pencil size={16} strokeWidth={2.6} />
+            </button>
+            <div style={{ width: '1px', background: 'rgba(255,255,255,0.06)' }} />
+            <div style={{
+              flex: 1,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              padding: isMobile ? '0.875rem 0.5rem' : '1rem 0.75rem',
+              color: '#fff',
+            }}>
+              <Check size={17} strokeWidth={3.2} />
+            </div>
+          </div>
         )}
 
         {/* EDIT MODE — flush 2-column rij */}
