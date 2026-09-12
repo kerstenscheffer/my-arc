@@ -6,7 +6,7 @@ import MealCard from './day-schedule/MealCard'
 // Hetzelfde blad als de historie in het workout-log-scherm; één vorm voor
 // "extra scherm dat vanaf onderen openschuift" in de hele app.
 import BladModal from '../../workout/components/todays-workout/components/BladModal'
-import { X, Search, Check, ArrowUp, ArrowDown, Minus } from 'lucide-react'
+import { X, Search, Check, ArrowUp, ArrowDown, Minus, ChevronDown } from 'lucide-react'
 
 export default function AIAlternativesModal({
   isOpen,
@@ -19,9 +19,13 @@ export default function AIAlternativesModal({
 }) {
   const isMobile = window.innerWidth <= 768
   const [searchTerm, setSearchTerm] = useState('')
-  const [activeFilter, setActiveFilter] = useState('smart')
+  // Drie keuzes in plaats van één rij chips: welk moment, waar zoeken, en de
+  // volgorde. De eerste twee snijden de lijst bij, de derde bepaalt alleen de
+  // volgorde — daarom is die er één en geen meervoud.
+  const [moment, setMoment] = useState('alles')
+  const [bron, setBron] = useState('alles')
+  const [sortering, setSortering] = useState('smart')
   const [alternatives, setAlternatives] = useState([])
-  const [favorites, setFavorites] = useState([])
   const [allMeals, setAllMeals] = useState([])
   const [customMeals, setCustomMeals] = useState([])
   const [coachOptions, setCoachOptions] = useState([]) // door coach gecureerde swaps voor dit slot
@@ -37,15 +41,31 @@ export default function AIAlternativesModal({
     return 'snack'
   })()
 
-  const filters = [
-    // "Aangeraden door coach" alleen tonen als er gecureerde opties zijn voor
-    // dit slot, en "Mijn maaltijden" alleen als de klant er zelf heeft.
-    ...(coachOptions.length > 0 ? [{ id: 'coach', label: 'Aangeraden door coach' }] : []),
+  const momentOpties = [
+    { id: 'alles', label: 'Alle maaltijden' },
+    { id: 'breakfast', label: 'Ontbijt' },
+    { id: 'lunch', label: 'Lunch' },
+    { id: 'dinner', label: 'Diner' },
+    { id: 'snack', label: 'Snack' },
+    { id: 'pre_workout', label: 'Pre-workout' },
+    { id: 'post_workout', label: 'Post-workout' },
+  ]
+
+  const bronOpties = [
+    { id: 'alles', label: 'Overal zoeken' },
+    ...(coachOptions.length > 0 ? [{ id: 'coach', label: 'Coach-suggesties' }] : []),
     ...(customMeals.length > 0 ? [{ id: 'mine', label: 'Mijn maaltijden' }] : []),
+    { id: 'db', label: 'Maaltijden-database' },
+  ]
+
+  const sorteerOpties = [
     { id: 'smart', label: 'Beste match' },
-    { id: 'similar-cal', label: 'Zelfde kcal' },
-    { id: 'same-protein', label: 'Zelfde eiwit' },
+    { id: 'same-cal', label: 'Zelfde kcal' },
+    { id: 'more-cal', label: 'Meer kcal' },
     { id: 'less-cal', label: 'Minder kcal' },
+    { id: 'same-protein', label: 'Zelfde eiwit' },
+    { id: 'more-protein', label: 'Meer eiwit' },
+    { id: 'less-protein', label: 'Minder eiwit' },
   ]
 
   useEffect(() => {
@@ -55,7 +75,9 @@ export default function AIAlternativesModal({
     return () => {
       setSelectedMeal(null)
       setSearchTerm('')
-      setActiveFilter('smart')
+      setMoment('alles')
+      setBron('alles')
+      setSortering('smart')
     }
   }, [isOpen, currentMeal])
 
@@ -67,12 +89,10 @@ export default function AIAlternativesModal({
         currentMeal.slot || currentMeal.timeSlot
       )
       
-      let favs = []
-      try {
-        const clientId = await db.getCurrentUser().then(u => u.id)
-        favs = await service.getAIFavorites(clientId)
-      } catch (e) { /* no favs */ }
-      
+      // Favorieten worden hier niet meer opgehaald: dat filter is vervangen
+      // door de drie keuzelijsten, en de query kostte een ronde naar de
+      // database zonder dat er nog iets mee gebeurde.
+
       // Pool voor de handmatige filters (Zelfde kcal / Meer eiwit / Minder
       // kcal / Alles). Twee dingen aangepast:
       //
@@ -126,12 +146,14 @@ export default function AIAlternativesModal({
       } catch {}
 
       setAlternatives(smartAlts || [])
-      setFavorites(favs || [])
       setAllMeals(meals || [])
       setCustomMeals(custom)
       setCoachOptions(curated)
-      // Heeft de coach opties ingesteld? Toon die als eerste.
-      if (curated.length > 0) setActiveFilter('coach')
+      // Wissel je een ontbijt, dan wil je bijna altijd een ander ontbijt zien.
+      // "Alle maaltijden" is één tik weg.
+      setMoment(slotKey)
+      // Heeft de coach opties ingesteld voor dit slot? Toon die als eerste.
+      if (curated.length > 0) setBron('coach')
     } catch (error) {
       console.error('Failed to load alternatives:', error)
     } finally {
@@ -139,66 +161,94 @@ export default function AIAlternativesModal({
     }
   }
 
+  // Hoort een maaltijd bij het gekozen moment? ai_meals heeft `timing` als
+  // lijst (breakfast/lunch/dinner/snack/pre_workout/…), eigen maaltijden
+  // hebben één `section` die soms Nederlands is ("ontbijt", "diner").
+  const SECTIE_NAAR_MOMENT = {
+    ontbijt: 'breakfast', lunch: 'lunch', diner: 'dinner', avondeten: 'dinner',
+    snack: 'snack', tussendoortje: 'snack',
+  }
+  const momentenVan = (m) => {
+    const uit = new Set()
+    ;(Array.isArray(m?.timing) ? m.timing : []).forEach(t => uit.add(String(t).toLowerCase()))
+    if (m?.section) {
+      const s = String(m.section).toLowerCase()
+      uit.add(SECTIE_NAAR_MOMENT[s] || s)
+    }
+    if (m?.slot) uit.add(String(m.slot).toLowerCase())
+    return uit
+  }
+
   const getFilteredMeals = () => {
-    let meals = []
     const currentCal = currentMeal?.calories || 0
     const currentProt = currentMeal?.protein || 0
+    const nietZelf = (m) => m.id !== currentMeal?.id
 
-    switch (activeFilter) {
-      case 'coach':
-        meals = coachOptions.filter(m => m.id !== currentMeal?.id)
-        break
-      case 'smart':
-        meals = alternatives
-        break
-      case 'similar-cal':
-        meals = [...allMeals]
-          .filter(m => m.id !== currentMeal?.id && m.calories > 0)
-          .sort((a, b) => Math.abs(a.calories - currentCal) - Math.abs(b.calories - currentCal))
-          .slice(0, 30)
-        break
-      case 'same-protein':
-        // Dichtst bij het eiwit van deze maaltijd; dat is waar je een
-        // maaltijd meestal voor inruilt.
-        meals = [...allMeals]
-          .filter(m => m.id !== currentMeal?.id && m.protein > 0)
-          .sort((a, b) => Math.abs(a.protein - currentProt) - Math.abs(b.protein - currentProt))
-          .slice(0, 30)
-        break
-      case 'mine':
-        meals = customMeals.filter(m => m.id !== currentMeal?.id)
-        break
-      case 'less-cal':
-        meals = [...allMeals]
-          .filter(m => m.id !== currentMeal?.id && m.calories > 0 && m.calories < currentCal)
-          .sort((a, b) => b.calories - a.calories)
-          .slice(0, 30)
-        break
-      case 'favorites':
-        meals = favorites
-          .map(fav => allMeals.find(m => m.id === fav.meal_id))
-          .filter(Boolean)
-        break
-      case 'all':
-        meals = allMeals.filter(m => m.id !== currentMeal?.id)
-        break
-      default:
-        meals = alternatives
+    // 1. Waar zoeken we?
+    let pool
+    if (bron === 'coach') pool = coachOptions.filter(nietZelf)
+    else if (bron === 'mine') pool = customMeals.filter(nietZelf)
+    else if (bron === 'db') pool = allMeals.filter(nietZelf)
+    else {
+      // Overal: coach eerst, dan eigen maaltijden, dan de database. Dubbele
+      // id's eruit, want een coach-optie komt ook in de database voor.
+      const gezien = new Set()
+      pool = [...coachOptions, ...customMeals, ...allMeals].filter(m => {
+        if (!nietZelf(m) || gezien.has(m.id)) return false
+        gezien.add(m.id)
+        return true
+      })
     }
 
+    // 2. Zoekterm gaat vóór het moment-filter: typ je een naam, dan wil je
+    // 'm vinden, ook als die bij een ander moment hoort.
     if (searchTerm) {
-      // Doorzoek bij een actieve zoekopdracht de volledige pool (ai_meals +
-      // eigen maaltijden), ongeacht het actieve filter. Zo kom je nooit vast
-      // te zitten achter een filter als je een specifieke maaltijdnaam intypt.
       const term = searchTerm.toLowerCase()
-      const fullPool = [...allMeals, ...customMeals].filter(m => m.id !== currentMeal?.id)
-      return fullPool.filter(m =>
+      return pool.filter(m =>
         m.name?.toLowerCase().includes(term) ||
         m.name_en?.toLowerCase().includes(term)
       )
     }
 
-    return meals
+    // 3. Welk moment? Maaltijden zonder moment blijven staan — 19 van de 482
+    // hebben geen timing, en die wegfilteren maakt ze onvindbaar.
+    let meals = pool
+    if (moment !== 'alles') {
+      meals = pool.filter(m => {
+        const set = momentenVan(m)
+        return set.size === 0 || set.has(moment)
+      })
+    }
+
+    // 4. Volgorde.
+    const opCal = (m) => m.calories || 0
+    const opProt = (m) => m.protein || 0
+    switch (sortering) {
+      case 'same-cal':
+        return [...meals].sort((a, b) => Math.abs(opCal(a) - currentCal) - Math.abs(opCal(b) - currentCal))
+      case 'more-cal':
+        return [...meals].filter(m => opCal(m) > currentCal).sort((a, b) => opCal(a) - opCal(b))
+      case 'less-cal':
+        return [...meals].filter(m => opCal(m) > 0 && opCal(m) < currentCal).sort((a, b) => opCal(b) - opCal(a))
+      case 'same-protein':
+        return [...meals].sort((a, b) => Math.abs(opProt(a) - currentProt) - Math.abs(opProt(b) - currentProt))
+      case 'more-protein':
+        return [...meals].filter(m => opProt(m) > currentProt).sort((a, b) => opProt(a) - opProt(b))
+      case 'less-protein':
+        return [...meals].filter(m => opProt(m) < currentProt).sort((a, b) => opProt(b) - opProt(a))
+      default: {
+        // Beste match: de volgorde die de service al bedacht (kcal + eiwit
+        // tegen elkaar afgewogen), voor zover die maaltijden in de pool
+        // zitten; de rest erachter op kcal-verschil.
+        const rang = new Map((alternatives || []).map((m, i) => [m.id, i]))
+        return [...meals].sort((a, b) => {
+          const ra = rang.has(a.id) ? rang.get(a.id) : Infinity
+          const rb = rang.has(b.id) ? rang.get(b.id) : Infinity
+          if (ra !== rb) return ra - rb
+          return Math.abs(opCal(a) - currentCal) - Math.abs(opCal(b) - currentCal)
+        })
+      }
+    }
   }
 
   const getDiff = (newVal, oldVal) => {
@@ -332,42 +382,11 @@ export default function AIAlternativesModal({
             />
           </div>
 
-          {/* Filter chips — horizontal scroll */}
-          <div style={{
-            display: 'flex',
-            gap: '0.3rem',
-            overflowX: 'auto',
-            WebkitOverflowScrolling: 'touch',
-            scrollbarWidth: 'none',
-            msOverflowStyle: 'none',
-            paddingBottom: '0.25rem'
-          }}>
-            {filters.map(f => (
-              <button
-                key={f.id}
-                onClick={() => setActiveFilter(f.id)}
-                style={{
-                  padding: '0.35rem 0.625rem',
-                  background: activeFilter === f.id ? '#fff' : 'transparent',
-                  border: activeFilter === f.id
-                    ? '1px solid #fff'
-                    : '1px solid rgba(255, 255, 255, 0.15)',
-                  borderRadius: '20px',
-                  color: activeFilter === f.id ? '#0a0a0a' : 'rgba(255, 255, 255, 0.55)',
-                  fontSize: isMobile ? '0.65rem' : '0.7rem',
-                  fontWeight: activeFilter === f.id ? '900' : '700',
-                  cursor: 'pointer',
-                  whiteSpace: 'nowrap',
-                  flexShrink: 0,
-                  touchAction: 'manipulation',
-                  WebkitTapHighlightColor: 'transparent',
-                  transition: 'all 0.15s ease',
-                  minHeight: '30px'
-                }}
-              >
-                {f.label}
-              </button>
-            ))}
+          {/* Drie keuzes: welk moment, waar zoeken, welke volgorde. */}
+          <div style={{ display: 'flex', gap: '0.4rem' }}>
+            <Keuze waarde={moment} opties={momentOpties} zet={setMoment} isMobile={isMobile} />
+            <Keuze waarde={bron} opties={bronOpties} zet={setBron} isMobile={isMobile} />
+            <Keuze waarde={sortering} opties={sorteerOpties} zet={setSortering} isMobile={isMobile} />
           </div>
         </div>
 
@@ -562,5 +581,46 @@ function SuggestieKaart({ meal, currentMeal, isSelected, onSelect, isMobile }) {
         checked: isSelected,
       }]}
     />
+  )
+}
+
+// Eén keuzelijst. Een echte <select> in plaats van een eigen menu: die opent
+// op de telefoon het systeem-wiel, en dat is sneller dan wat we zelf kunnen
+// bouwen. De pijl en de kleuren zetten we er zelf omheen.
+function Keuze({ waarde, opties, zet, isMobile }) {
+  return (
+    <div style={{ flex: 1, minWidth: 0, position: 'relative' }}>
+      <select
+        value={waarde}
+        onChange={(e) => zet(e.target.value)}
+        style={{
+          width: '100%',
+          appearance: 'none', WebkitAppearance: 'none',
+          padding: isMobile ? '0.45rem 1.3rem 0.45rem 0.6rem' : '0.5rem 1.5rem 0.5rem 0.7rem',
+          background: 'rgba(255,255,255,0.05)',
+          border: '1px solid rgba(255,255,255,0.15)',
+          borderRadius: 10,
+          color: '#fff',
+          fontSize: isMobile ? '0.68rem' : '0.74rem',
+          fontWeight: 800, fontFamily: 'inherit',
+          outline: 'none', cursor: 'pointer',
+          textOverflow: 'ellipsis',
+          touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+        }}
+      >
+        {opties.map(o => (
+          <option key={o.id} value={o.id} style={{ background: '#0a0a0a', color: '#fff' }}>
+            {o.label}
+          </option>
+        ))}
+      </select>
+      <ChevronDown
+        size={13} strokeWidth={2.6}
+        style={{
+          position: 'absolute', right: 6, top: '50%', transform: 'translateY(-50%)',
+          color: 'rgba(255,255,255,0.5)', pointerEvents: 'none',
+        }}
+      />
+    </div>
   )
 }
