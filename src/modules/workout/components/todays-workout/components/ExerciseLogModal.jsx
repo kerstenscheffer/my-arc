@@ -262,6 +262,49 @@ function LoggedSetRow({ set, index, vorige, onAddDropset, onEdit, onDelete, isMo
   )
 }
 
+// Een set die nog moet. Staat er meteen in zodra je de oefening opent, met
+// wat je vorige keer deed als richtpunt. Zo zie je in één blik hoeveel sets
+// er nog liggen en wat je moet halen, in plaats van "Nog geen sets gelogd".
+function LegeSetRow({ index, vorige, onClick, isMobile }) {
+  return (
+    <button
+      onClick={onClick}
+      style={{
+        display: 'flex', alignItems: 'center', gap: '0.6rem', width: '100%',
+        padding: isMobile ? '0.5rem 1rem' : '0.55rem 1.25rem',
+        background: 'transparent', border: 'none',
+        borderBottom: '1px solid rgba(255,255,255,0.06)',
+        cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left',
+        touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+      }}
+    >
+      <span style={{
+        width: '2.9em', flexShrink: 0,
+        fontSize: '0.66rem', fontWeight: 800, color: 'rgba(255,255,255,0.3)',
+        textTransform: 'uppercase', letterSpacing: '0.04em',
+      }}>
+        Set {index + 1}
+      </span>
+      <span style={{
+        flex: 1, minWidth: 0,
+        fontSize: isMobile ? '0.95rem' : '1rem', fontWeight: 900,
+        color: 'rgba(255,255,255,0.22)',
+      }}>
+        —
+      </span>
+      {vorige && (
+        <span style={{
+          flexShrink: 0, fontSize: '0.74rem', fontWeight: 800,
+          color: 'rgba(255,255,255,0.4)', fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap',
+        }}>
+          vorige {vorige.weight}<span style={{ fontSize: '0.85em' }}>kg</span> × {vorige.reps}
+        </span>
+      )}
+      <span style={{ width: 30, flexShrink: 0 }} />
+    </button>
+  )
+}
+
 function MenuBtn({ label, onClick, isMobile, danger, gold }) {
   return (
     <button onClick={onClick} style={{ padding: isMobile ? '0.5rem 0.7rem' : '0.55rem 0.85rem', background: gold ? 'rgba(255,215,0,0.1)' : danger ? 'rgba(239,68,68,0.08)' : 'rgba(255,255,255,0.04)', border: `1px solid ${danger ? 'rgba(239,68,68,0.3)' : gold ? 'rgba(255,215,0,0.3)' : 'rgba(255,255,255,0.1)'}`, borderRadius: 8, color: danger ? '#ef4444' : gold ? '#FFD700' : 'rgba(255,255,255,0.7)', fontSize: isMobile ? '0.66rem' : '0.72rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.06em', cursor: 'pointer', minHeight: 36, touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}>
@@ -619,6 +662,14 @@ export default function ExerciseLogModal({ db, client, exercise, onClose, isMobi
   const videoEmbed = embedUrl(videoBron)
   const heeftVideo = !!videoBron
 
+  // Hoeveel sets er op het programma staan. Uit het schema; anders evenveel
+  // als vorige keer, en anders één — dan staat er tenminste één regel klaar.
+  const geplandeSets = (() => {
+    const uitPlan = parseInt(exercise.sets, 10)
+    if (Number.isFinite(uitPlan) && uitPlan > 0) return uitPlan
+    return previousPerformance?.sets?.length || 1
+  })()
+
   const speelVideo = () => {
     if (videoEmbed) { setToonVideo(true); return }
     // Geen tussenscherm dat uitlegt dat je naar een externe maker gaat: je
@@ -829,24 +880,25 @@ export default function ExerciseLogModal({ db, client, exercise, onClose, isMobi
                 sessie: daar kijk je naar terwijl je bezig bent. De knop om
                 te loggen staat eronder, en wat je af en toe opzoekt weer
                 daaronder. */}
-            {loggedSets.map((set, i) => (
-              <LoggedSetRow key={i} set={set} index={i}
-                vorige={previousPerformance?.sets?.[i] || null}
-                onAddDropset={(idx) => { setDropsetIndex(idx); setShowWizard(false) }}
-                onEdit={handleEditSet}  // ✅ nu gevuld
-                onDelete={handleDeleteSet}
-                isMobile={isMobile}
-              />
-            ))}
-
-            {loggedSets.length === 0 && !wizardActive && (
-              <div style={{
-                padding: isMobile ? '0.9rem 1rem 0.2rem' : '1rem 1.25rem 0.3rem',
-                fontSize: '0.82rem', fontWeight: 700, color: 'rgba(255,255,255,0.3)',
-              }}>
-                Nog geen sets gelogd vandaag.
-              </div>
-            )}
+            {/* Alle sets die op het programma staan meteen in beeld: de gelogde
+                bovenaan, de rest als lege regel met wat je vorige keer deed. */}
+            {Array.from({ length: Math.max(loggedSets.length, geplandeSets) }, (_, i) => {
+              const set = loggedSets[i]
+              const vorige = previousPerformance?.sets?.[i] || null
+              return set ? (
+                <LoggedSetRow key={i} set={set} index={i}
+                  vorige={vorige}
+                  onAddDropset={(idx) => { setDropsetIndex(idx); setShowWizard(false) }}
+                  onEdit={handleEditSet}
+                  onDelete={handleDeleteSet}
+                  isMobile={isMobile}
+                />
+              ) : (
+                <LegeSetRow key={i} index={i} vorige={vorige} isMobile={isMobile}
+                  onClick={() => { setEditingIndex(null); setShowWizard(true) }}
+                />
+              )
+            })}
 
             {/* Tijdens de rust staat de timer op de plek van de knoppen, dus
                 direct onder de vorige sessie en direct bóven je gelogde sets.
