@@ -1,6 +1,6 @@
 // src/modules/workout/components/todays-workout/components/ExerciseCard.jsx
 import { useState, useEffect } from 'react'
-import { Play, RefreshCw, CheckCircle, Check, Dumbbell, Send, BookmarkPlus, Youtube, MessageSquare, Minus, Plus } from 'lucide-react'
+import { Play, RefreshCw, CheckCircle, Check, Dumbbell, Send, BookmarkPlus, Youtube, MessageSquare } from 'lucide-react'
 import InfoModal from './InfoModal'
 import SwapModal from './SwapModal'
 import ExerciseLogModal from './ExerciseLogModal'
@@ -156,11 +156,13 @@ export default function ExerciseCard({
   // en volgende week staat er weer wat de coach bedoelde. Dat is hier het
   // juiste bereik — je wilt niet dat één drukke week het plan permanent
   // verlaagt.
-  const wijzigSets = async (richting) => {
-    if (setsBezig || !client?.id || !schema?.id || !workoutDayKey) return
+  // Neemt het nieuwe aantal, niet een richting: het log-scherm laat je een
+  // getal kiezen in plaats van er eentje bij of af te tikken.
+  const zetSets = async (aantal) => {
+    if (setsBezig || !client?.id || !schema?.id || !workoutDayKey) return false
     const huidig = plannedSetCount(localExercise)
-    const nieuw = Math.max(1, Math.min(10, huidig + richting))
-    if (nieuw === huidig) return
+    const nieuw = Math.max(1, Math.min(10, parseInt(aantal, 10) || huidig))
+    if (nieuw === huidig) return true
 
     setSetsBezig(true)
     const bijgewerkt = { ...localExercise, sets: nieuw, _setsAangepast: true }
@@ -176,12 +178,15 @@ export default function ExerciseCard({
       // opnieuw rekenen — anders blijft "nog 1 set" staan terwijl je er net
       // eentje af haalde.
       if (onLogsUpdate) onLogsUpdate({ reloadSchema: true })
+      setSetsBezig(false)
+      return true
     } catch (e) {
       console.error('Sets aanpassen mislukt:', e)
       setLocalExercise(localExercise)
       alert('Kon het aantal sets niet opslaan. Probeer het nog eens.')
+      setSetsBezig(false)
+      return false
     }
-    setSetsBezig(false)
   }
 
   const handleSwapComplete = async (result) => {
@@ -350,27 +355,12 @@ export default function ExerciseCard({
             ) : (
               <div style={{ display: 'flex', gap: isMobile ? '0.55rem' : '0.7rem', overflow: 'hidden' }}>
                 {localExercise.sets && (
-                  /* Sets met een min/plus eromheen: doe je er deze week minder,
-                     dan zet je het hier bij en klopt "voltooid" weer. Goud zodra
-                     je afwijkt van wat de coach plande, zodat het zichtbaar
-                     blijft dat je iets hebt aangepast. */
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
-                    <button
-                      onClick={(e) => { e.stopPropagation(); wijzigSets(-1) }}
-                      disabled={setsBezig || plannedSetCount(localExercise) <= 1}
-                      title="Eén set minder deze week"
-                      style={setsKnop(plannedSetCount(localExercise) <= 1 || setsBezig)}
-                    ><Minus size={10} strokeWidth={3} /></button>
-                    <div style={{ display: 'flex', alignItems: 'baseline', gap: 2, minWidth: 26, justifyContent: 'center' }}>
-                      <span style={{ fontSize: isMobile ? '0.72rem' : '0.78rem', fontWeight: 800, color: localExercise._setsAangepast ? '#FFD700' : 'rgba(255,255,255,0.7)' }}>{localExercise.sets}</span>
-                      <span style={{ fontSize: isMobile ? '0.52rem' : '0.58rem', fontWeight: 700, color: 'rgba(255,255,255,0.3)', textTransform: 'uppercase' }}>sets</span>
-                    </div>
-                    <button
-                      onClick={(e) => { e.stopPropagation(); wijzigSets(1) }}
-                      disabled={setsBezig || plannedSetCount(localExercise) >= 10}
-                      title="Eén set erbij deze week"
-                      style={setsKnop(plannedSetCount(localExercise) >= 10 || setsBezig)}
-                    ><Plus size={10} strokeWidth={3} /></button>
+                  /* Alleen het aantal; aanpassen doe je in het log-scherm, waar
+                     je toch al bent als je er een set bij of af doet. Goud
+                     zodra je afwijkt van wat de coach plande. */
+                  <div style={{ display: 'flex', alignItems: 'baseline', gap: 2 }}>
+                    <span style={{ fontSize: isMobile ? '0.72rem' : '0.78rem', fontWeight: 800, color: localExercise._setsAangepast ? '#FFD700' : 'rgba(255,255,255,0.7)' }}>{localExercise.sets}</span>
+                    <span style={{ fontSize: isMobile ? '0.52rem' : '0.58rem', fontWeight: 700, color: 'rgba(255,255,255,0.3)', textTransform: 'uppercase' }}>sets</span>
                   </div>
                 )}
                 {localExercise.reps && (
@@ -429,7 +419,15 @@ export default function ExerciseCard({
           oude waarde gebruiken opende het log voor de pre-swap-oefening. */}
       {showInfoModal && <InfoModal exercise={localExercise} onClose={() => setShowInfoModal(false)} db={db} client={client} defaultTab={infoDefaultTab} />}
       {showSwapModal && <SwapModal exercise={localExercise} exerciseIndex={index} workoutDayKey={workoutDayKey} schema={schema} onClose={() => setShowSwapModal(false)} onSwapComplete={handleSwapComplete} db={db} client={client} />}
-      {showLogModal && <ExerciseLogModal db={db} client={client} exercise={localExercise} onClose={handleLogComplete} />}
+      {showLogModal && (
+        <ExerciseLogModal
+          db={db} client={client} exercise={localExercise}
+          onClose={handleLogComplete}
+          /* Aantal sets aanpassen gebeurt daar; hier stonden de − en + maar
+             als je een set overslaat of toevoegt ben je al in dat scherm. */
+          onSetsWijzigen={zetSets}
+        />
+      )}
       {showFeedbackModal && <ClientFeedbackModal exercise={localExercise} client={client} db={db} onClose={() => setShowFeedbackModal(false)} />}
 
       <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
@@ -440,17 +438,6 @@ export default function ExerciseCard({
 // MealCard-stijl actie-cel: icoon + label, gecentreerd, flex-1.
 // Klein rond knopje naast het aantal sets. Los gehouden zodat de min en de
 // plus er gegarandeerd hetzelfde uitzien.
-const setsKnop = (uit) => ({
-  width: 18, height: 18, flexShrink: 0, padding: 0,
-  display: 'flex', alignItems: 'center', justifyContent: 'center',
-  background: 'rgba(255,255,255,0.06)',
-  border: '1px solid rgba(255,255,255,0.12)',
-  borderRadius: 5,
-  color: uit ? 'rgba(255,255,255,0.2)' : 'rgba(255,255,255,0.6)',
-  cursor: uit ? 'not-allowed' : 'pointer',
-  touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-})
-
 function ActionCell({ icon, label, onClick, isMobile, checked, badge, flex = 1 }) {
   const color = checked ? '#10b981' : 'rgba(255,255,255,0.7)'
   return (
