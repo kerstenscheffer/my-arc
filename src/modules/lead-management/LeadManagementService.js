@@ -788,6 +788,59 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
   // MOVEMENT TRACKING - WITH LEAD NAMES + STALE DETECTION
   // ============================================================================
 
+  // Is dit een sale-sectie (gewonnen) of een sale-verloren-sectie? Zelfde
+  // woordenlijsten als het bord gebruikt.
+  _isSaleTitel(titel) {
+    const t = (titel || '').toLowerCase()
+    const JA = ['sale', 'verkocht', 'klant', 'client', 'gewonnen', 'won', 'deal']
+    const NEE = ['verloren', 'lost', 'no show', 'no-show', 'noshow', 'afgehaakt', 'geannuleerd', 'refund', 'afgewezen', 'geweigerd', 'call']
+    return JA.some(w => t.includes(w)) && !NEE.some(w => t.includes(w))
+  }
+  _isSaleVerlorenTitel(titel) {
+    const t = (titel || '').toLowerCase()
+    return (t.includes('verloren') || t.includes('lost')) && !t.includes('afgewezen')
+  }
+
+  // Sleep je een lead wéér uit de Sale-kolom, dan was het geen sale.
+  //
+  // De stats tellen elke verplaatsing NAAR een sale-sectie binnen de periode.
+  // Sleep je iemand er per ongeluk in en meteen weer uit, dan blijft die rij
+  // staan en telt de sale gewoon mee: het bord laat nul sales zien en de
+  // stats-balk zegt 1. Precies wat er gisteren gebeurde — 38 seconden tussen
+  // heen en terug.
+  //
+  // We zetten dezelfde soft-stempel die de handmatige "terugdraaien" in de
+  // stats-drill-down gebruikt: de rij blijft bestaan, maar valt uit de
+  // tellingen. Alleen de laatste nog niet teruggedraaide sale-rij, zodat een
+  // eerdere, echte sale van dezelfde lead blijft staan.
+  async _draaiSaleTerugBijVertrek(leadId, vanTitel, naarTitel) {
+    const vanSale = this._isSaleTitel(vanTitel)
+    const vanVerloren = this._isSaleVerlorenTitel(vanTitel)
+    if (!vanSale && !vanVerloren) return
+    // Binnen dezelfde soort blijven (Sale → Sale) telt niet als vertrek.
+    if (vanSale && this._isSaleTitel(naarTitel)) return
+    if (vanVerloren && this._isSaleVerlorenTitel(naarTitel)) return
+
+    try {
+      const { data: rijen } = await this.db.supabase
+        .from('lead_movements')
+        .select('id, to_section_title')
+        .eq('lead_id', leadId)
+        .is('reverted_at', null)
+        .order('moved_at', { ascending: false })
+        .limit(25)
+      const past = (t) => (vanSale ? this._isSaleTitel(t) : this._isSaleVerlorenTitel(t))
+      const doel = (rijen || []).find(r => past(r.to_section_title))
+      if (!doel) return
+      await this.db.supabase
+        .from('lead_movements')
+        .update({ reverted_at: new Date().toISOString() })
+        .eq('id', doel.id)
+    } catch (e) {
+      console.warn('sale terugdraaien mislukt:', e?.message || e)
+    }
+  }
+
   async moveLeadToSection(leadId, targetSectionId, targetPosition = 0, coachId = null, callDate = null, callTime = null) {
     try {
       if (targetSectionId === 'unassigned') {
@@ -864,6 +917,8 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
           .is('reverted_at', null)
         if (verhuisFout) console.warn('oude afspraak markeren mislukt:', verhuisFout.message)
       }
+
+      await this._draaiSaleTerugBijVertrek(leadId, fromSectionTitle, toSectionTitle)
 
       const movementId = await this.logMovement({
         leadId, leadName, fromSectionId, fromSectionTitle,
