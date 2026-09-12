@@ -19,7 +19,7 @@ const GROEN = '#10b981'
 const STANDAARD_SEC = 90
 const SLEUTEL = (naam) => `myarc.rust.${naam}`
 
-export const gekozenRusttijd = (oefeningNaam) => {
+const gekozenRusttijd = (oefeningNaam) => {
   try {
     const n = parseInt(localStorage.getItem(SLEUTEL(oefeningNaam)), 10)
     return Number.isFinite(n) && n >= 15 && n <= 600 ? n : STANDAARD_SEC
@@ -126,12 +126,12 @@ export default function RustTimer({ oefeningNaam, onKlaar, onStop, isMobile }) {
           </div>
         </div>
 
-        <RondeKnop titel="15 seconden korter" onClick={() => verzet(-15)} isMobile={isMobile}><Minus size={15} /></RondeKnop>
-        <RondeKnop titel="15 seconden langer" onClick={() => verzet(15)} isMobile={isMobile}><Plus size={15} /></RondeKnop>
-        <RondeKnop titel={loopt ? 'Pauzeer' : 'Hervat'} onClick={pauze} isMobile={isMobile}>
+        <RondeKnop titel="15 seconden korter" onClick={() => verzet(-15)}><Minus size={15} /></RondeKnop>
+        <RondeKnop titel="15 seconden langer" onClick={() => verzet(15)}><Plus size={15} /></RondeKnop>
+        <RondeKnop titel={loopt ? 'Pauzeer' : 'Hervat'} onClick={pauze}>
           {loopt ? <Pause size={15} /> : <Play size={15} />}
         </RondeKnop>
-        <RondeKnop titel="Opnieuw" onClick={opnieuw} isMobile={isMobile}><RotateCcw size={14} /></RondeKnop>
+        <RondeKnop titel="Opnieuw" onClick={opnieuw}><RotateCcw size={14} /></RondeKnop>
 
         <div style={{ flex: 1 }} />
 
@@ -159,7 +159,7 @@ export default function RustTimer({ oefeningNaam, onKlaar, onStop, isMobile }) {
   )
 }
 
-function RondeKnop({ children, onClick, titel, isMobile }) {
+function RondeKnop({ children, onClick, titel }) {
   return (
     <button
       onClick={onClick} title={titel} aria-label={titel}

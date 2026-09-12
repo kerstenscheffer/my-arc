@@ -77,7 +77,11 @@ function AdjustBtn({ label, onClick, isMobile, positive, half }) {
 }
 
 // ========== SET INPUT WIZARD ==========
-function SetInputWizard({ onComplete, onCancel, previousWeight = 20, previousReps = 10, isMobile, editMode = false }) {
+// `snel` = flow-modus: alleen kilo's en reps, dan klaar. Partials en dropsets
+// blijven bestaan, maar niet als vier schermen tussen elke set door — dat is
+// precies wat een flow kapotmaakt. Wie er een dropset bij wil, voegt die na
+// afloop toe via het menu op de set.
+function SetInputWizard({ onComplete, onCancel, previousWeight = 20, previousReps = 10, isMobile, editMode = false, snel = false }) {
   const [step, setStep] = useState(1)
   const [weight, setWeight] = useState(previousWeight)
   const [reps, setReps] = useState(previousReps)
@@ -96,7 +100,7 @@ function SetInputWizard({ onComplete, onCancel, previousWeight = 20, previousRep
     5: dropStep === 1 ? 'Dropset — Gewicht?' : `Dropset ${dropWeight}kg — Reps?`
   }
 
-  const totalSteps = hasDropset ? 5 : 4
+  const totalSteps = snel ? 2 : (hasDropset ? 5 : 4)
   const displayStep = step <= 4 ? Math.min(step, totalSteps) : totalSteps
 
   const handleFinish = () => {
@@ -120,7 +124,7 @@ function SetInputWizard({ onComplete, onCancel, previousWeight = 20, previousRep
 
       <div style={{ padding: isMobile ? '1rem' : '1.25rem', borderBottom: '1px solid rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <div style={{ fontSize: isMobile ? '0.62rem' : '0.68rem', color: 'rgba(255,255,255,0.5)', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
-          {editMode ? 'SET AANPASSEN' : `STAP ${displayStep}/${totalSteps}`}
+          {editMode ? 'SET AANPASSEN' : snel ? `FLOW · STAP ${Math.min(step, 2)}/2` : `STAP ${displayStep}/${totalSteps}`}
         </div>
         <button onClick={onCancel} style={{ background: 'none', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '6px', color: 'rgba(255,255,255,0.35)', fontSize: isMobile ? '0.7rem' : '0.75rem', fontWeight: '600', cursor: 'pointer', padding: '0.35rem 0.75rem', touchAction: 'manipulation' }}>
           Annuleren
@@ -133,7 +137,7 @@ function SetInputWizard({ onComplete, onCancel, previousWeight = 20, previousRep
         </h3>
 
         {step === 1 && <NumberPicker value={weight} onChange={setWeight} min={0} max={300} step={1} unit="kg" onConfirm={() => setStep(2)} halfStep={0.5} />}
-        {step === 2 && <NumberPicker value={reps} onChange={setReps} min={1} max={50} step={1} unit="reps" onConfirm={() => editMode ? handleFinishWithoutDrop() : setStep(3)} />}
+        {step === 2 && <NumberPicker value={reps} onChange={setReps} min={1} max={50} step={1} unit="reps" onConfirm={() => (editMode || snel) ? handleFinishWithoutDrop() : setStep(3)} />}
 
         {step === 3 && !editMode && (
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.75rem' }}>
@@ -637,6 +641,7 @@ export default function ExerciseLogModal({ db, client, exercise, onClose, isMobi
                 previousReps={editingSet?.reps ?? lastSet?.reps ?? previousPerformance?.sets?.[previousPerformance.sets.length - 1]?.reps ?? (parseInt(exercise.reps) || 10)}
                 isMobile={isMobile}
                 editMode={editingIndex !== null}
+                snel={flow && editingIndex === null}
               />
             )}
 
