@@ -36,6 +36,10 @@ export default function WeekSchedule({
   const [saving, setSaving] = useState(false)
   const [loading, setLoading] = useState(false)
   const [customWorkouts, setCustomWorkouts] = useState({})
+  // De indeling van de week ervoor en erna. Nodig voor de rust-waarschuwing:
+  // zondag botst niet met de dinsdag ervóór maar met de dinsdag erna, en die
+  // staat in de week hierna.
+  const [buurWeken, setBuurWeken] = useState({})
 
   // Maandag van de getoonde week — nodig om de planning van die week te
   // laden en te bewaren, dus hier en niet pas in de render.
@@ -94,6 +98,17 @@ export default function WeekSchedule({
       }
 
       const vast = await db.getClientWorkoutSchedule(clientId)
+      // Buurweken erbij: een vooruit geplande week kan afwijken, anders geldt
+      // de vaste indeling.
+      const buur = {}
+      await Promise.all([-1, 1].map(async (stap) => {
+        const d = new Date(getoondeMaandag)
+        d.setDate(d.getDate() + stap * 7)
+        const sleutel = WorkoutServiceNew.datumSleutel(d)
+        const eigenWeek = await WorkoutServiceNew.getWeekPlanning(clientId, sleutel, db)
+        buur[String(stap)] = eigenWeek || vast || null
+      }))
+      setBuurWeken(buur)
       // Een komende week begint bij de vaste indeling en wijkt daarvan af
       // zodra de klant hem verschuift.
       const eigen = isHuidigeWeek ? null : await WorkoutServiceNew.getWeekPlanning(clientId, weekSleutel, db)
@@ -189,11 +204,15 @@ export default function WeekSchedule({
 
   // Wordt dezelfde spiergroep te dicht op elkaar getraind? Rood bij twee dagen
   // achter elkaar, oranje bij één dag ertussen. Op spiergroep en niet op de
-  // workout zelf: de tweede push-dag heet in de schema's "Push (Copy)" en
-  // heeft een eigen sleutel, dus op naam vergelijken ziet dat niet.
-  const { perDag: rustPerDag, meldingen: rustMeldingen } = rustWaarschuwingen(
-    tempSchedule, weekDays, getWorkoutData
-  )
+  // workout zelf (de tweede push-dag heet "Push (Copy)" en heeft een eigen
+  // sleutel), en op echte datums over drie weken heen — zondag botst met de
+  // dinsdag erna, niet met die ervoor.
+  const { perDag: rustPerDag, meldingen: rustMeldingen } = rustWaarschuwingen({
+    weken: { '-1': buurWeken['-1'], '0': tempSchedule, '1': buurWeken['1'] },
+    weekDays,
+    dagDataVan: getWorkoutData,
+    maandag: getoondeMaandag,
+  })
 
   if (!hasValidSchema) {
     return (

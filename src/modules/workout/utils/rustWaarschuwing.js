@@ -1,17 +1,17 @@
 // src/modules/workout/utils/rustWaarschuwing.js
 //
-// Waarschuwing als dezelfde spiergroep te dicht op elkaar getraind wordt. Twee
-// keer borst op maandag en dinsdag geeft die spieren geen 24 uur herstel; dat
-// hoort de weekplanner te laten zien op het moment dat je schuift.
+// Waarschuwing als dezelfde spiergroep te dicht op elkaar getraind wordt.
 //
-// Waarom op spiergroep en niet op de workout: in de echte schema's heet de
-// tweede push-dag "Push (Copy)" en heeft die een eigen sleutel (dag5 naast
-// dag1). Op naam of sleutel vergelijken ziet dat niet als dezelfde training,
-// terwijl het dezelfde borst- en triceps-oefeningen zijn.
+// Op spiergroep en niet op de workout: in de echte schema's heet de tweede
+// push-dag "Push (Copy)" en heeft die een eigen sleutel (dag5 naast dag1).
+// Op naam vergelijken ziet dat niet als dezelfde training, terwijl het
+// dezelfde borst- en triceps-oefeningen zijn.
 //
-// De week herhaalt zich, dus zondag en de maandag erna liggen ook naast
-// elkaar. Daarom rekenen we rond: het gat tussen de laatste en de eerste dag
-// telt mee.
+// Op echte datums en niet op de weekdag-volgorde: zondag botst niet met de
+// dinsdag ervoor maar met de dinsdag erna. Daarom kijken we naar de week
+// ervoor, de getoonde week en de week erna, en rekenen we in dagen tussen
+// datums. Alleen paren waarvan de tweede dag nog moet komen tellen mee — een
+// training van gisteren verschuif je niet meer.
 //
 //   1 dag ertussen (24 uur)   → rood
 //   2 dagen ertussen (48 uur) → oranje
@@ -63,51 +63,90 @@ export function focusGroepen(dagData) {
   return paren.filter(([, n]) => n === max).map(([g]) => g)
 }
 
-// Kleinste afstand in dagen tussen twee dagen in een week die zich herhaalt.
-// Eén voorkomen → null (niets om te vergelijken).
-export function kleinsteGat(indexen) {
-  const lijst = [...new Set(indexen)].sort((a, b) => a - b)
-  if (lijst.length < 2) return null
-  let kleinste = Infinity
-  for (let i = 1; i < lijst.length; i++) {
-    kleinste = Math.min(kleinste, lijst[i] - lijst[i - 1])
-  }
-  // Rond de week heen: van de laatste dag naar de eerste van de week erna.
-  return Math.min(kleinste, (lijst[0] + 7) - lijst[lijst.length - 1])
+const dagErbij = (datum, n) => {
+  const d = new Date(datum)
+  d.setDate(d.getDate() + n)
+  d.setHours(0, 0, 0, 0)
+  return d
 }
 
-// schedule: { Monday: 'dag1', ... }, weekDays bepaalt de volgorde,
-// dagDataVan: (workoutKey) => het dag-object met exercises.
+const kortDatum = (d) => d.toLocaleDateString('nl-NL', { weekday: 'short', day: 'numeric' })
+
+// weken: { '-1': schedule, '0': schedule, '1': schedule } — de indeling van de
+//        week ervoor, de getoonde week en de week erna. Ontbreekt er een, dan
+//        telt die week gewoon niet mee.
+// maandag: Date, de maandag van de getoonde week.
+// vandaag: Date, om te bepalen wat nog te verschuiven valt.
 //
-// Terug: { perDag: {0:'rood'}, meldingen: [{ niveau, groepen: [...], gat }] }
-export function rustWaarschuwingen(schedule, weekDays, dagDataVan = () => null) {
+// Terug: { perDag: {0..6: 'rood'|'oranje'}, meldingen: [...] }
+export function rustWaarschuwingen({ weken, weekDays, dagDataVan = () => null, maandag, vandaag = new Date() }) {
+  const vandaagNul = new Date(vandaag)
+  vandaagNul.setHours(0, 0, 0, 0)
+  const start = new Date(maandag)
+  start.setHours(0, 0, 0, 0)
+
+  // Alle trainingsdagen uit de drie weken op een rij, met hun echte datum.
   const perGroep = {}
-  weekDays.forEach((dag, i) => {
-    const key = schedule?.[dag]
-    if (!key) return
-    focusGroepen(dagDataVan(key)).forEach(groep => {
-      if (!perGroep[groep]) perGroep[groep] = []
-      perGroep[groep].push(i)
+  ;[-1, 0, 1].forEach(week => {
+    const schema = weken?.[String(week)]
+    if (!schema) return
+    weekDays.forEach((dag, i) => {
+      const key = schema[dag]
+      if (!key) return
+      const pos = week * 7 + i
+      focusGroepen(dagDataVan(key)).forEach(groep => {
+        if (!perGroep[groep]) perGroep[groep] = []
+        perGroep[groep].push({ pos, week, index: i, datum: dagErbij(start, pos) })
+      })
     })
   })
 
   const perDag = {}
-  // Per niveau één regel met alle betrokken spiergroepen; anders krijg je bij
-  // twee push-dagen twee bijna gelijke zinnen (borst én triceps).
-  const perNiveau = { [ROOD]: new Set(), [ORANJE]: new Set() }
+  const perNiveau = {
+    [ROOD]: { groepen: new Set(), paren: [] },
+    [ORANJE]: { groepen: new Set(), paren: [] },
+  }
 
-  Object.entries(perGroep).forEach(([groep, indexen]) => {
-    const gat = kleinsteGat(indexen)
-    if (gat === null || gat > 2) return
-    const niveau = gat === 1 ? ROOD : ORANJE
-    // Rood wint van oranje op een dag die in beide zit.
-    indexen.forEach(i => { if (perDag[i] !== ROOD) perDag[i] = niveau })
-    perNiveau[niveau].add(groep)
+  Object.entries(perGroep).forEach(([groep, dagen]) => {
+    const lijst = [...dagen].sort((a, b) => a.pos - b.pos)
+    for (let i = 1; i < lijst.length; i++) {
+      const eerste = lijst[i - 1]
+      const tweede = lijst[i]
+      const gat = tweede.pos - eerste.pos
+      if (gat < 1 || gat > 2) continue
+      // Ligt de tweede training al achter ons, dan valt er niets meer te
+      // schuiven en is een waarschuwing alleen maar ruis.
+      if (tweede.datum < vandaagNul) continue
+
+      const niveau = gat === 1 ? ROOD : ORANJE
+      // Alleen dagen van de getoonde week kunnen gekleurd worden.
+      ;[eerste, tweede].forEach(d => {
+        if (d.week !== 0) return
+        if (perDag[d.index] !== ROOD) perDag[d.index] = niveau
+      })
+      perNiveau[niveau].groepen.add(groep)
+      perNiveau[niveau].paren.push({ eerste, tweede, groep })
+    }
   })
 
-  const meldingen = []
-  if (perNiveau[ROOD].size > 0) meldingen.push({ niveau: ROOD, gat: 1, groepen: [...perNiveau[ROOD]] })
-  if (perNiveau[ORANJE].size > 0) meldingen.push({ niveau: ORANJE, gat: 2, groepen: [...perNiveau[ORANJE]] })
+  const meldingen = [];
+  [ROOD, ORANJE].forEach(niveau => {
+    const bak = perNiveau[niveau]
+    if (bak.groepen.size === 0) return
+    // Eén regel per niveau: bij twee push-dagen zou je anders twee bijna
+    // gelijke zinnen krijgen (borst én triceps).
+    const paar = bak.paren[0]
+    meldingen.push({
+      niveau,
+      gat: niveau === ROOD ? 1 : 2,
+      groepen: [...bak.groepen],
+      dagen: paar ? [kortDatum(paar.eerste.datum), kortDatum(paar.tweede.datum)] : [],
+      // Staat de tweede training in een andere week, dan kun je die daar
+      // verschuiven — daar wijst de tip naar.
+      andereWeek: paar ? paar.tweede.week !== paar.eerste.week : false,
+    })
+  })
+
   return { perDag, meldingen }
 }
 
@@ -119,9 +158,14 @@ export function waarschuwingTekst(melding) {
   if (!melding?.groepen?.length) return ''
   const wat = opsomming(melding.groepen)
   const meervoud = melding.groepen.length > 1
-  return melding.gat === 1
-    ? `${wat} ${meervoud ? 'staan' : 'staat'} twee dagen achter elkaar. Geen 24 uur herstel.`
-    : `${wat} ${meervoud ? 'krijgen' : 'krijgt'} maar 48 uur rust. Aan de krappe kant.`
+  const wanneer = melding.dagen?.length === 2 ? ` (${melding.dagen[0]} en ${melding.dagen[1]})` : ''
+  const kern = melding.gat === 1
+    ? `${wat}${wanneer} ${meervoud ? 'staan' : 'staat'} twee dagen achter elkaar. Geen 24 uur herstel.`
+    : `${wat}${wanneer} ${meervoud ? 'krijgen' : 'krijgt'} maar 48 uur rust. Aan de krappe kant.`
+  const tip = melding.andereWeek
+    ? ' Blader met de pijlen naar die week om hem te verschuiven.'
+    : ' Schuif er een op met de pijltjes.'
+  return kern + tip
 }
 
 export default rustWaarschuwingen
