@@ -126,8 +126,12 @@ export default function RustTimer({ oefeningNaam, startSec, bron = 'standaard', 
         <div style={{ width: `${pct}%`, height: '100%', background: kleur, transition: 'width 0.25s linear' }} />
       </div>
 
+      {/* Mag wrappen: op een smal scherm passen de klok, vier knoppen en
+          "Volgende set" niet op één regel, en dan liep het label onder de
+          knoppen door. */}
       <div style={{
-        display: 'flex', alignItems: 'center', gap: isMobile ? 8 : 10,
+        display: 'flex', alignItems: 'center', flexWrap: 'wrap',
+        gap: isMobile ? '0.5rem 8px' : '0.5rem 10px',
         padding: isMobile ? '0.6rem 0 0' : '0.7rem 0 0',
       }}>
         {/* De klok is een schuif: sleep hem naar rechts voor meer rust. */}
@@ -138,7 +142,7 @@ export default function RustTimer({ oefeningNaam, startSec, bron = 'standaard', 
           onPointerCancel={sleepEinde}
           title="Sleep om je rusttijd aan te passen"
           style={{
-            minWidth: isMobile ? 78 : 92, cursor: 'ew-resize',
+            minWidth: 96, flexShrink: 0, cursor: 'ew-resize',
             touchAction: 'none', WebkitTapHighlightColor: 'transparent', userSelect: 'none',
           }}
         >
@@ -158,21 +162,25 @@ export default function RustTimer({ oefeningNaam, startSec, bron = 'standaard', 
               whiteSpace: 'nowrap',
             }}
           >
-            {voorbij ? 'Klaar' : 'Rust'} · {mmss(totaal)} <span style={{ color: 'rgba(255,255,255,0.25)' }}>↔</span>
-            {/* Waar de tijd vandaan komt. Anders lijkt 2:00 een willekeurige
-                standaard, terwijl het staat wat de coach heeft voorgeschreven. */}
+            {/* Kort houden: "RUST · 1:30 ↔ · SCHEMA" liep op een telefoon
+                onder de knoppen door. Het grote getal zegt al dat het een
+                klok is; hier alleen de ingestelde tijd en waar die vandaan
+                komt. Dat je kunt slepen staat in de title. */}
+            {voorbij ? 'Klaar' : mmss(totaal)}
             {bron === 'coach' && !aangepast && <span style={{ color: 'rgba(255,255,255,0.65)' }}> · schema</span>}
           </div>
         </div>
 
-        <RondeKnop titel="15 seconden korter" onClick={() => verzet(-15)}><Minus size={15} /></RondeKnop>
-        <RondeKnop titel="15 seconden langer" onClick={() => verzet(15)}><Plus size={15} /></RondeKnop>
-        <RondeKnop titel={loopt ? 'Pauzeer' : 'Hervat'} onClick={pauze}>
-          {loopt ? <Pause size={15} /> : <Play size={15} />}
-        </RondeKnop>
-        <RondeKnop titel="Opnieuw" onClick={opnieuw}><RotateCcw size={14} /></RondeKnop>
+        <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
+          <RondeKnop titel="15 seconden korter" onClick={() => verzet(-15)}><Minus size={15} /></RondeKnop>
+          <RondeKnop titel="15 seconden langer" onClick={() => verzet(15)}><Plus size={15} /></RondeKnop>
+          <RondeKnop titel={loopt ? 'Pauzeer' : 'Hervat'} onClick={pauze}>
+            {loopt ? <Pause size={15} /> : <Play size={15} />}
+          </RondeKnop>
+          <RondeKnop titel="Opnieuw" onClick={opnieuw}><RotateCcw size={14} /></RondeKnop>
+        </div>
 
-        <div style={{ flex: 1 }} />
+        <div style={{ flex: 1, minWidth: 0 }} />
 
         {/* Doorgaan kan altijd — een timer die je vasthoudt is een timer die
             je de volgende keer niet meer aanzet. */}
