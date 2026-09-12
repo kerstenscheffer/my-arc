@@ -14,7 +14,7 @@
 // kapot ging.
 
 import { useState, useEffect } from 'react'
-import { RefreshCw, Plus, X, Pause, Play, AlertTriangle, Check } from 'lucide-react'
+import { RefreshCw, Plus, X, Pause, Play, AlertTriangle, Check, Search } from 'lucide-react'
 import WorkoutProgressView from './challenge-monitor/WorkoutProgressView'
 import MealProgressView from './challenge-monitor/MealProgressView'
 import WeightProgressView from './challenge-monitor/WeightProgressView'
@@ -52,6 +52,7 @@ export default function CoachChallengeHub({ db, clients }) {
   const [bezig, setBezig] = useState(false)
   const [melding, setMelding] = useState(null)
   const [bevestigStop, setBevestigStop] = useState(null)
+  const [zoek, setZoek] = useState('')
 
   const [open, setOpen] = useState(null)      // client_id van de opengeklapte rij
   const [tab, setTab] = useState('workouts')
@@ -181,6 +182,10 @@ export default function CoachChallengeHub({ db, clients }) {
   }
 
   const meedoen = new Set(rijen.map(r => r.client_id))
+  const zoekterm = zoek.trim().toLowerCase()
+  const gevonden = zoekterm
+    ? klanten.filter(k => `${k.first_name} ${k.last_name} ${k.email}`.toLowerCase().includes(zoekterm))
+    : klanten
   const halenHet = rijen.filter(r => allesGehaald(r.stand)).length
   const geopend = rijen.find(r => r.client_id === open) || null
 
@@ -256,6 +261,33 @@ export default function CoachChallengeHub({ db, clients }) {
                 background: 'rgba(255,255,255,0.05)', border: LIJN, borderRadius: 10,
                 color: '#fff', fontSize: '0.85rem', fontWeight: 800, fontFamily: 'inherit',
               }} />
+
+            {/* Zoeken op naam of e-mail. Met vijftig klanten in vijf kolommen is
+                scannen trager dan drie letters typen. */}
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: 7,
+              flex: isMobile ? '1 1 100%' : '1 1 200px', height: 38, padding: '0 0.7rem',
+              background: 'rgba(255,255,255,0.05)', border: LIJN, borderRadius: 10,
+            }}>
+              <Search size={14} color="rgba(255,255,255,0.4)" style={{ flexShrink: 0 }} />
+              <input
+                value={zoek}
+                onChange={e => setZoek(e.target.value)}
+                placeholder="Zoek klant"
+                style={{
+                  flex: 1, minWidth: 0, height: '100%',
+                  background: 'transparent', border: 'none', outline: 'none',
+                  color: '#fff', fontSize: '0.85rem', fontWeight: 800, fontFamily: 'inherit',
+                }} />
+              {zoek && (
+                <button onClick={() => setZoek('')} title="Wissen" style={{
+                  background: 'transparent', border: 'none', padding: 0, display: 'flex',
+                  color: 'rgba(255,255,255,0.4)', cursor: 'pointer', flexShrink: 0,
+                }}>
+                  <X size={14} />
+                </button>
+              )}
+            </div>
           </div>
 
           <div style={{
@@ -263,7 +295,7 @@ export default function CoachChallengeHub({ db, clients }) {
             gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fill, minmax(300px, 1fr))',
             gap: '0 1.6rem',
           }}>
-            {klanten.map(k => {
+            {gevonden.map(k => {
               const doetMee = meedoen.has(k.id)
               return (
                 <div key={k.id} style={{
@@ -294,6 +326,11 @@ export default function CoachChallengeHub({ db, clients }) {
                 </div>
               )
             })}
+            {gevonden.length === 0 && (
+              <div style={{ padding: '0.6rem 0', fontSize: '0.85rem', fontWeight: 700, color: 'rgba(255,255,255,0.4)' }}>
+                Geen klant gevonden voor "{zoek}".
+              </div>
+            )}
           </div>
         </div>
       )}
