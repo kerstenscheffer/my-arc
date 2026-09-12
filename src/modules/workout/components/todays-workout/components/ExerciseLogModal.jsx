@@ -820,10 +820,13 @@ export default function ExerciseLogModal({ db, client, exercise, onClose, isMobi
                   title={rustTimerAan ? 'Rusttimer uitzetten' : 'Rusttimer: na elke set loopt je rusttijd, daarna staat de volgende set klaar'}
                   style={{
                     flexShrink: 0, width: isMobile ? 96 : 118, minHeight: 52,
-                    background: rustTimerAan ? 'rgba(255,215,0,0.14)' : 'transparent',
-                    border: `1.5px solid ${rustTimerAan ? '#FFD700' : 'rgba(255,255,255,0.55)'}`,
+                    // Aan = omgekeerd: wit vlak met zwarte tekst. Uit = de
+                    // omtrek. Dat leest sneller dan een gouden tint, want je
+                    // ziet in één oogopslag of hij aanstaat.
+                    background: rustTimerAan ? '#fff' : 'transparent',
+                    border: `1.5px solid ${rustTimerAan ? '#fff' : 'rgba(255,255,255,0.55)'}`,
                     borderRadius: 14,
-                    color: rustTimerAan ? '#FFD700' : '#fff',
+                    color: rustTimerAan ? '#0a0a0a' : '#fff',
                     fontSize: isMobile ? '0.7rem' : '0.75rem', fontWeight: 900,
                     textTransform: 'uppercase', letterSpacing: '0.05em',
                     display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 3,
