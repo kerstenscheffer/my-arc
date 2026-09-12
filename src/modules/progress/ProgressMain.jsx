@@ -26,47 +26,45 @@ const COACH_TRACKING_MESSAGE = 'Het is normaal dat je gewicht schommelt en hoeft
 
 function TrackingTipBlock({ isMobile }) {
   return (
-    <div style={{ padding: isMobile ? '0.9rem 1rem 0' : '1.25rem 1.5rem 0' }}>
-      {/* Zelfde vorm als de check-in melding: foto rechts, naar links weg in
-          het zwart, tekst in bold wit eroverheen. */}
+    // Geen kader: de foto staat links en loopt naar rechts weg in het zwart
+    // van de pagina, met de tekst er half overheen. Een kaartje eromheen
+    // maakte er een blokje van dat los op de pagina lag.
+    <div style={{
+      position: 'relative',
+      width: '100%',
+      minHeight: isMobile ? 130 : 150,
+      overflow: 'hidden',
+    }}>
+      <div style={{
+        position: 'absolute', top: 0, left: 0, bottom: 0, width: '46%',
+        backgroundImage: `url(${COACH_PHOTO_URL})`,
+        backgroundSize: 'cover', backgroundPosition: 'center 28%',
+      }} />
+      <div style={{
+        position: 'absolute', inset: 0, pointerEvents: 'none',
+        background: 'linear-gradient(90deg, rgba(10,10,10,0) 0%, rgba(10,10,10,0.35) 22%, rgba(10,10,10,0.8) 40%, #0a0a0a 58%)',
+      }} />
       <div style={{
         position: 'relative',
-        minHeight: isMobile ? 116 : 130,
-        borderRadius: 14,
-        overflow: 'hidden',
-        background: '#0a0a0a',
-        border: '1px solid rgba(255,255,255,0.12)',
+        marginLeft: '26%',
+        padding: isMobile ? '0.9rem 1rem 1rem 0.5rem' : '1.1rem 1.5rem 1.2rem 0.75rem',
       }}>
         <div style={{
-          position: 'absolute', top: 0, right: 0, bottom: 0, width: '30%',
-          backgroundImage: `url(${COACH_PHOTO_URL})`,
-          backgroundSize: 'cover', backgroundPosition: 'center 30%',
-        }} />
-        <div style={{
-          position: 'absolute', inset: 0, pointerEvents: 'none',
-          background: 'linear-gradient(90deg, #0a0a0a 0%, #0a0a0a 56%, rgba(10,10,10,0.85) 70%, rgba(10,10,10,0.4) 86%, rgba(10,10,10,0) 100%)',
-        }} />
-        <div style={{
-          position: 'relative',
-          width: '76%',
-          padding: isMobile ? '0.8rem 0.5rem 0.85rem 0.9rem' : '1rem 0.6rem 1rem 1.15rem',
+          fontSize: isMobile ? '0.6rem' : '0.65rem',
+          fontWeight: 800, color: 'rgba(255,255,255,0.45)',
+          textTransform: 'uppercase', letterSpacing: '0.1em',
+          marginBottom: 5,
+          textShadow: '0 2px 10px rgba(0,0,0,0.9)',
         }}>
-          <div style={{
-            fontSize: isMobile ? '0.6rem' : '0.65rem',
-            fontWeight: 800, color: 'rgba(255,255,255,0.4)',
-            textTransform: 'uppercase', letterSpacing: '0.1em',
-            marginBottom: 5,
-          }}>
-            Van Kersten
-          </div>
-          <div style={{
-            fontSize: isMobile ? '0.88rem' : '0.95rem',
-            fontWeight: 900, color: '#fff',
-            lineHeight: 1.35, letterSpacing: '-0.015em',
-            textShadow: '0 2px 10px rgba(0,0,0,0.8)',
-          }}>
-            {COACH_TRACKING_MESSAGE}
-          </div>
+          Van Kersten
+        </div>
+        <div style={{
+          fontSize: isMobile ? '0.88rem' : '0.95rem',
+          fontWeight: 900, color: '#fff',
+          lineHeight: 1.35, letterSpacing: '-0.015em',
+          textShadow: '0 2px 12px rgba(0,0,0,0.95)',
+        }}>
+          {COACH_TRACKING_MESSAGE}
         </div>
       </div>
     </div>
