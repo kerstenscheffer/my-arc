@@ -427,17 +427,41 @@ export default function AIAlternativesModal({
               />
             ))
           ) : (
-            <div style={{
-              textAlign: 'center',
-              padding: '3rem 1rem',
-              color: 'rgba(255, 255, 255, 0.25)'
-            }}>
-              <div style={{ fontSize: '0.85rem', marginBottom: '0.25rem' }}>
+            <div style={{ textAlign: 'center', padding: '3rem 1.25rem' }}>
+              <div style={{ fontSize: '0.9rem', fontWeight: 900, color: '#fff', marginBottom: '0.35rem' }}>
                 Geen resultaten
               </div>
-              <div style={{ fontSize: '0.7rem' }}>
-                Probeer een ander filter of zoekterm
+              <div style={{
+                fontSize: '0.76rem', fontWeight: 700, color: 'rgba(255,255,255,0.4)',
+                lineHeight: 1.45, maxWidth: 300, margin: '0 auto',
+              }}>
+                {/* Coach-suggesties horen bij een slot, niet bij een moment: je
+                    coach kiest ze voor deze plek in de dag. Een moment-filter
+                    erbovenop levert dan al snel niets op, en dat is geen fout
+                    maar een lege doorsnede. Zeg dat dan ook. */}
+                {bron === 'coach' && moment !== 'alles'
+                  ? `Je coach heeft voor deze maaltijd wel suggesties, maar geen die bij ${(momentOpties.find(o => o.id === moment)?.label || moment).toLowerCase()} horen.`
+                  : bron === 'coach'
+                    ? 'Je coach heeft voor deze maaltijd nog geen suggesties gezet.'
+                    : bron === 'mine'
+                      ? 'Je hebt hier nog geen eigen maaltijden die passen.'
+                      : 'Probeer een ander moment, een andere bron of een zoekterm.'}
               </div>
+              {(moment !== 'alles' || bron !== 'alles') && (
+                <button
+                  onClick={() => { setMoment('alles'); setBron('alles') }}
+                  style={{
+                    marginTop: '1rem', padding: '0.55rem 1rem',
+                    background: 'transparent', border: '1.5px solid rgba(255,255,255,0.3)',
+                    borderRadius: 10, color: '#fff',
+                    fontSize: '0.78rem', fontWeight: 900, fontFamily: 'inherit',
+                    cursor: 'pointer', touchAction: 'manipulation',
+                    WebkitTapHighlightColor: 'transparent',
+                  }}
+                >
+                  Zoek overal
+                </button>
+              )}
             </div>
           )}
         </div>
