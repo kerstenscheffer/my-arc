@@ -95,10 +95,13 @@ export default function MachineSettings({ value = {}, onChange, previousSettings
             <Settings size={15} color={hasCurrentValues ? '#FFD700' : 'rgba(255,255,255,0.5)'} strokeWidth={2.2} />
           </div>
           <div style={{ minWidth: 0, textAlign: 'left', flex: 1 }}>
-            <div style={{ fontSize: '0.55rem', fontWeight: 800, color: 'rgba(255,255,255,0.35)', textTransform: 'uppercase', letterSpacing: '0.06em', lineHeight: 1 }}>
+            <div style={{
+              fontSize: '0.66rem', fontWeight: 900, color: '#fff',
+              textTransform: 'uppercase', letterSpacing: '0.06em', lineHeight: 1,
+            }}>
               Instellingen
             </div>
-            <div style={{ fontSize: isMobile ? '0.76rem' : '0.82rem', fontWeight: 800, color: hasCurrentValues ? '#fff' : 'rgba(255,255,255,0.35)', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            <div style={{ fontSize: isMobile ? '0.74rem' : '0.8rem', fontWeight: 700, color: hasCurrentValues ? 'rgba(255,255,255,0.7)' : 'rgba(255,255,255,0.35)', marginTop: 3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
               {hasCurrentValues ? 'Ingevuld' : hasPrevious ? 'Vorige er nog' : 'Leeg'}
             </div>
           </div>

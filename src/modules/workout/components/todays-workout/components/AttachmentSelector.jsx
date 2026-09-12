@@ -159,14 +159,14 @@ export default function AttachmentSelector({ suggested, value, onChange, isMobil
             : <div style={{ width: 30, height: 30, borderRadius: 7, background: 'rgba(255,255,255,0.06)', flexShrink: 0 }} />}
           <div style={{ minWidth: 0, textAlign: 'left', flex: 1 }}>
             <div style={{
-              fontSize: '0.55rem', fontWeight: 800, color: 'rgba(255,255,255,0.35)',
+              fontSize: '0.66rem', fontWeight: 900, color: '#fff',
               textTransform: 'uppercase', letterSpacing: '0.06em', lineHeight: 1,
             }}>
               Materiaal
             </div>
             <div style={{
-              fontSize: isMobile ? '0.76rem' : '0.82rem', fontWeight: 800,
-              color: current ? '#fff' : 'rgba(255,255,255,0.35)', marginTop: 2,
+              fontSize: isMobile ? '0.74rem' : '0.8rem', fontWeight: 700,
+              color: current ? 'rgba(255,255,255,0.7)' : 'rgba(255,255,255,0.35)', marginTop: 3,
               overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
             }}>
               {current ? current.nl : 'Kiezen…'}

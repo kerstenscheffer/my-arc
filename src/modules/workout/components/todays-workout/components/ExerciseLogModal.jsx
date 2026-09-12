@@ -645,12 +645,6 @@ export default function ExerciseLogModal({ db, client, exercise, onClose, isMobi
           <div style={{ background: 'rgba(255,255,255,0.09)' }} />
 
           <div style={{ minWidth: 0, display: 'flex', flexDirection: 'column', gap: 6 }}>
-            <div style={{
-              fontSize: '0.6rem', fontWeight: 900, color: '#fff',
-              textTransform: 'uppercase', letterSpacing: '0.08em',
-            }}>
-              Apparatuur
-            </div>
             <AttachmentSelector
               compact
               suggested={exercise.suggested_attachment}
