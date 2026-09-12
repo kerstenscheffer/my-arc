@@ -2,6 +2,7 @@
 // 🎯 v2.0 - Clean swap modal with smart suggestions & compare
 // Props IDENTIEK: { isOpen, onClose, currentMeal, onSelectMeal, db, service }
 import React, { useState, useEffect } from 'react'
+import MealCard from './day-schedule/MealCard'
 import { X, Search, Check, ArrowUp, ArrowDown, Minus, Star, Flame, Beef } from 'lucide-react'
 
 export default function AIAlternativesModal({
@@ -34,14 +35,14 @@ export default function AIAlternativesModal({
   })()
 
   const filters = [
-    // "Door je coach" alleen tonen als er gecureerde opties zijn voor dit slot.
-    ...(coachOptions.length > 0 ? [{ id: 'coach', label: '⭐ Door je coach' }] : []),
+    // "Aangeraden door coach" alleen tonen als er gecureerde opties zijn voor
+    // dit slot, en "Mijn maaltijden" alleen als de klant er zelf heeft.
+    ...(coachOptions.length > 0 ? [{ id: 'coach', label: 'Aangeraden door coach' }] : []),
+    ...(customMeals.length > 0 ? [{ id: 'mine', label: 'Mijn maaltijden' }] : []),
     { id: 'smart', label: 'Beste match' },
     { id: 'similar-cal', label: 'Zelfde kcal' },
-    { id: 'more-protein', label: 'Meer eiwit' },
+    { id: 'same-protein', label: 'Zelfde eiwit' },
     { id: 'less-cal', label: 'Minder kcal' },
-    { id: 'favorites', label: 'Favorieten' },
-    { id: 'all', label: 'Alles' }
   ]
 
   useEffect(() => {
@@ -153,11 +154,16 @@ export default function AIAlternativesModal({
           .sort((a, b) => Math.abs(a.calories - currentCal) - Math.abs(b.calories - currentCal))
           .slice(0, 30)
         break
-      case 'more-protein':
+      case 'same-protein':
+        // Dichtst bij het eiwit van deze maaltijd; dat is waar je een
+        // maaltijd meestal voor inruilt.
         meals = [...allMeals]
-          .filter(m => m.id !== currentMeal?.id && m.protein > currentProt)
-          .sort((a, b) => b.protein - a.protein)
+          .filter(m => m.id !== currentMeal?.id && m.protein > 0)
+          .sort((a, b) => Math.abs(a.protein - currentProt) - Math.abs(b.protein - currentProt))
           .slice(0, 30)
+        break
+      case 'mine':
+        meals = customMeals.filter(m => m.id !== currentMeal?.id)
         break
       case 'less-cal':
         meals = [...allMeals]
@@ -236,85 +242,56 @@ export default function AIAlternativesModal({
           borderBottom: '1px solid rgba(255, 255, 255, 0.06)',
           flexShrink: 0
         }}>
-          {/* Title row */}
+          {/* Titel + sluiten */}
           <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            marginBottom: '0.75rem'
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+            gap: 10, marginBottom: '0.7rem',
           }}>
-            <div>
-              <div style={{
-                fontSize: isMobile ? '0.5rem' : '0.55rem',
-                fontWeight: '700',
-                color: 'rgba(255, 255, 255, 0.25)',
-                textTransform: 'uppercase',
-                letterSpacing: '0.05em',
-                marginBottom: '0.15rem'
-              }}>
-                Wissel maaltijd
-              </div>
-              <div style={{
-                fontSize: isMobile ? '1rem' : '1.15rem',
-                fontWeight: '800',
-                color: '#fff',
-                letterSpacing: '-0.02em'
-              }}>
-                {currentMeal?.name || currentMeal?.meal_name || 'Maaltijd'}
-              </div>
+            <div style={{
+              fontSize: isMobile ? '1.15rem' : '1.3rem',
+              fontWeight: 900, color: '#fff', letterSpacing: '-0.025em',
+            }}>
+              Wissel maaltijd
             </div>
             <button
               onClick={onClose}
+              aria-label="Sluit"
               style={{
-                width: '36px',
-                height: '36px',
-                background: 'rgba(255, 255, 255, 0.04)',
-                border: '1px solid rgba(255, 255, 255, 0.06)',
-                borderRadius: '10px',
-                color: 'rgba(255, 255, 255, 0.4)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                cursor: 'pointer',
-                touchAction: 'manipulation',
-                WebkitTapHighlightColor: 'transparent'
+                width: '36px', height: '36px', flexShrink: 0,
+                background: 'rgba(255, 255, 255, 0.05)',
+                border: '1px solid rgba(255, 255, 255, 0.1)',
+                borderRadius: '10px', color: '#fff',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                cursor: 'pointer', touchAction: 'manipulation',
+                WebkitTapHighlightColor: 'transparent',
               }}
             >
-              <X size={18} />
+              <X size={16} strokeWidth={2.5} />
             </button>
           </div>
 
-          {/* Current meal macros */}
+          {/* De maaltijd die je gaat wisselen als kaart, niet als losse naam:
+              dezelfde kaart als in de dagplanning, zonder knoppen. */}
+          <div style={{ margin: isMobile ? '0 -1rem 0.7rem' : '0 -1.5rem 0.8rem' }}>
+            <MealCard
+              meal={{
+                name: currentMeal?.name || currentMeal?.meal_name,
+                image_url: currentMeal?.image_url,
+                slot: currentMeal?.slot,
+                timing: currentMeal?.timing,
+                calories: currentMeal?.calories, protein: currentMeal?.protein,
+                carbs: currentMeal?.carbs, fat: currentMeal?.fat,
+              }}
+              isMobile={isMobile}
+              acties={[]}
+            />
+          </div>
+
           <div style={{
-            display: 'flex',
-            gap: isMobile ? '1rem' : '1.5rem',
-            marginBottom: '0.75rem'
+            fontSize: isMobile ? '0.9rem' : '1rem', fontWeight: 900, color: '#fff',
+            letterSpacing: '-0.02em', marginBottom: '0.5rem',
           }}>
-            {[
-              { val: currentMeal?.calories, label: 'kcal' },
-              { val: currentMeal?.protein, label: 'eiwit' },
-              { val: currentMeal?.carbs, label: 'koolh' },
-              { val: currentMeal?.fat, label: 'vet' }
-            ].filter(m => m.val > 0).map(m => (
-              <div key={m.label}>
-                <span style={{
-                  fontSize: isMobile ? '0.85rem' : '0.95rem',
-                  fontWeight: '800',
-                  color: '#fff'
-                }}>
-                  {Math.round(m.val)}
-                </span>
-                <span style={{
-                  fontSize: isMobile ? '0.5rem' : '0.55rem',
-                  fontWeight: '600',
-                  color: 'rgba(255, 255, 255, 0.25)',
-                  marginLeft: '0.15rem',
-                  textTransform: 'uppercase'
-                }}>
-                  {m.label}
-                </span>
-              </div>
-            ))}
+            Wissel voor:
           </div>
 
           {/* Search */}
@@ -367,14 +344,14 @@ export default function AIAlternativesModal({
                 onClick={() => setActiveFilter(f.id)}
                 style={{
                   padding: '0.35rem 0.625rem',
-                  background: activeFilter === f.id ? '#FFD700' : 'transparent',
+                  background: activeFilter === f.id ? '#fff' : 'transparent',
                   border: activeFilter === f.id
-                    ? '1px solid rgba(255, 215, 0, 0.5)'
-                    : '1px solid rgba(255, 255, 255, 0.06)',
+                    ? '1px solid #fff'
+                    : '1px solid rgba(255, 255, 255, 0.15)',
                   borderRadius: '20px',
-                  color: activeFilter === f.id ? '#fff' : 'rgba(255, 255, 255, 0.4)',
+                  color: activeFilter === f.id ? '#0a0a0a' : 'rgba(255, 255, 255, 0.55)',
                   fontSize: isMobile ? '0.65rem' : '0.7rem',
-                  fontWeight: activeFilter === f.id ? '800' : '600',
+                  fontWeight: activeFilter === f.id ? '900' : '700',
                   cursor: 'pointer',
                   whiteSpace: 'nowrap',
                   flexShrink: 0,

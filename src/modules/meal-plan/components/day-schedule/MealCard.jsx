@@ -187,9 +187,10 @@ export default function MealCard({
         </div>
 
       {/* Actie-rij — naast de foto in plaats van over de volle breedte
-          eronder, en daardoor compacter. */}
+          eronder, en daardoor compacter. Een lege lijst betekent: geen
+          knoppen (de kaart als voorbeeld, bijvoorbeeld in het wisselvenster). */}
       <div style={{
-        display: 'flex',
+        display: acties && acties.length === 0 ? 'none' : 'flex',
         borderTop: `1px solid ${DIVIDER}`,
       }}>
         {(acties || [
