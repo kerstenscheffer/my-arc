@@ -252,7 +252,7 @@ export default function ExerciseHistory({ exerciseName, previousLog, loading, cl
               {Array.from({ length: maxKolommen }, (_, k) => (
                 <span key={k}>Set {k + 1}</span>
               ))}
-              <span style={{ textAlign: 'right', letterSpacing: '0.04em' }}>vs set 1</span>
+              <span style={{ textAlign: 'right', letterSpacing: '0.04em' }}>Set 1 +/-</span>
             </div>
 
             <div>
