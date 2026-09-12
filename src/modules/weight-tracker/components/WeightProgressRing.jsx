@@ -115,32 +115,6 @@ function HorizontalPicker({ value, onChange, disabled, savedLabel = false }) {
           overflow: 'hidden',
         }}
       >
-        {/* Opgeslagen: een wit vinkje en het potlood om aan te passen, samen
-            onder het gelogde getal. Het vinkje stond eerst rechts ernaast en
-            liep daar over het volgende getal heen. */}
-        {savedLabel && (
-          <div style={{
-            position: 'absolute', bottom: 6, left: '50%', transform: 'translateX(-50%)',
-            zIndex: 4, display: 'flex', alignItems: 'center', gap: 10,
-          }}>
-            {onEdit && (
-              <button
-                onClick={onEdit}
-                aria-label="Gewicht aanpassen"
-                style={{
-                  width: 26, height: 26, padding: 0,
-                  background: 'transparent', border: 'none', borderRadius: 7,
-                  color: '#fff', opacity: 0.7,
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-                }}
-              >
-                <Pencil size={14} strokeWidth={2.6} />
-              </button>
-            )}
-            <Check size={15} strokeWidth={3.2} color="#fff" />
-          </div>
-        )}
         <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: '60px', background: 'linear-gradient(to right, #0a0a0a, transparent)', zIndex: 2, pointerEvents: 'none' }} />
         <div style={{ position: 'absolute', right: 0, top: 0, bottom: 0, width: '60px', background: 'linear-gradient(to left, #0a0a0a, transparent)', zIndex: 2, pointerEvents: 'none' }} />
         <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: '60px', background: 'linear-gradient(to right, #0a0a0a, transparent)', zIndex: 2, pointerEvents: 'none' }} />
