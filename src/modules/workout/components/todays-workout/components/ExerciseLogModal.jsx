@@ -675,6 +675,10 @@ export default function ExerciseLogModal({ db, client, exercise, onClose, isMobi
   const videoEmbed = embedUrl(videoBron)
   const heeftVideo = !!videoBron
 
+  // Spiergroep uit het schema (week_structure noemt het primairSpieren),
+  // anders uit de oefeningtabel (daar heet de kolom primair_spieren).
+  const spiergroep = exercise.primairSpieren || media?.primair_spieren || null
+
   // Hoeveel sets er op het programma staan. Uit het schema; anders evenveel
   // als vorige keer, en anders één — dan staat er tenminste één regel klaar.
   const geplandeSets = (() => {
@@ -770,17 +774,34 @@ export default function ExerciseLogModal({ db, client, exercise, onClose, isMobi
             de rechterkolom breedte terwijl er onder de cijfers ruimte over
             was. */}
         <div style={{
-          padding: isMobile ? '0.8rem 1rem' : '0.9rem 1.5rem',
-          paddingTop: media?.image_url ? undefined : `calc(env(safe-area-inset-top, 0px) + ${isMobile ? '0.875rem' : '1rem'})`,
+          padding: isMobile ? '1.4rem 1rem 1.5rem' : '1.6rem 1.5rem 1.7rem',
+          paddingTop: media?.image_url
+            ? (isMobile ? '1.4rem' : '1.6rem')
+            : `calc(env(safe-area-inset-top, 0px) + ${isMobile ? '1.4rem' : '1.6rem'})`,
         }}>
           <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.75rem' }}>
             <div style={{ flex: 1, minWidth: 0 }}>
+              {/* Naam met de spiergroep erachter. Bij "Machine Row" of "Pec
+                  Deck" is dat niet vanzelfsprekend, en het staat al in het
+                  schema — alleen nergens waar je het tijdens het loggen ziet. */}
               <h2 style={{
                 fontSize: isMobile ? '1.1rem' : '1.3rem', fontWeight: 900, color: '#fff', margin: 0,
-                letterSpacing: '-0.025em', lineHeight: 1.15,
-                display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical',
-                overflow: 'hidden', wordBreak: 'break-word',
-              }}>{exercise.name}</h2>
+                letterSpacing: '-0.025em', lineHeight: 1.2, wordBreak: 'break-word',
+              }}>
+                {exercise.name}
+                {spiergroep && (
+                  <span style={{
+                    display: 'inline-block', verticalAlign: 'middle',
+                    marginLeft: 8, padding: '3px 8px', borderRadius: 6,
+                    background: '#FFD700', color: '#0a0a0a',
+                    fontSize: '0.56rem', fontWeight: 900,
+                    textTransform: 'uppercase', letterSpacing: '0.06em',
+                    whiteSpace: 'nowrap',
+                  }}>
+                    {spiergroep}
+                  </span>
+                )}
+              </h2>
               <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.5rem', flexWrap: 'wrap', marginTop: '0.35rem', fontSize: isMobile ? '0.95rem' : '1.05rem', fontWeight: 900 }}>
                 <span style={{ color: '#fff' }}>
                   {loggedSets.length}/{exercise.sets}<span style={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.78em', fontWeight: 800 }}> sets</span>
