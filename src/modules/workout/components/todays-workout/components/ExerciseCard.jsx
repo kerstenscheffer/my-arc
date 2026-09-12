@@ -1,7 +1,6 @@
 // src/modules/workout/components/todays-workout/components/ExerciseCard.jsx
 import { useState, useEffect } from 'react'
-import { Play, RefreshCw, CheckCircle, Check, Dumbbell, Send, BookmarkPlus, Youtube, Info, MessageSquare, Minus, Plus } from 'lucide-react'
-import ExerciseHistory from './ExerciseHistory'
+import { Play, RefreshCw, CheckCircle, Check, Dumbbell, Send, BookmarkPlus, Youtube, MessageSquare, Minus, Plus } from 'lucide-react'
 import InfoModal from './InfoModal'
 import SwapModal from './SwapModal'
 import ExerciseLogModal from './ExerciseLogModal'
@@ -37,9 +36,6 @@ export default function ExerciseCard({
   const [showSwapModal, setShowSwapModal] = useState(false)
   const [showLogModal, setShowLogModal] = useState(false)
   const [showFeedbackModal, setShowFeedbackModal] = useState(false)
-  const [previousLog, setPreviousLog] = useState(null)
-  const [loadingHistory, setLoadingHistory] = useState(false)
-  const [showHistory, setShowHistory] = useState(false)
   const [imageUrl, setImageUrl] = useState(getFallbackImage(exercise))
   const [loadingImage, setLoadingImage] = useState(true)
   const [makingPermanent, setMakingPermanent] = useState(false)
@@ -58,7 +54,7 @@ export default function ExerciseCard({
   }, [exercise.name, exercise.sets, exercise._isWeeklyOverride, exercise._pendingPermanent, exercise.image_url])
 
   useEffect(() => {
-    if (exercise.name && client?.id) { loadPreviousLog(); checkFeedback() }
+    if (exercise.name && client?.id) { checkFeedback() }
     // loadExerciseImage NOW also sets hasVideo — same query, single round-
     // trip. We no longer call the separate checkVideo() because its
     // 10-min in-memory cache made freshly-attached videos invisible until
@@ -139,10 +135,6 @@ export default function ExerciseCard({
     } finally { setLoadingImage(false) }
   }
 
-  const checkVideo = async () => {
-    try { setHasVideo(!!(await ExerciseService.getExerciseVideo(exercise.name))) } catch { setHasVideo(false) }
-  }
-
   const checkFeedback = async () => {
     if (!client?.id || !db?.getExerciseSubmission) return
     try {
@@ -151,13 +143,6 @@ export default function ExerciseCard({
     } catch { setHasFeedback(false) }
   }
 
-  const loadPreviousLog = async () => {
-    if (!client?.id || !db) return
-    setLoadingHistory(true)
-    try { setPreviousLog(await db.getPreviousExerciseLog(client.id, exercise.name)) }
-    catch { setPreviousLog(null) }
-    finally { setLoadingHistory(false) }
-  }
 
   // Aantal sets bijstellen door de klant zelf.
   //
@@ -219,7 +204,6 @@ export default function ExerciseCard({
 
   const handleLogComplete = () => {
     setShowLogModal(false)
-    loadPreviousLog()
     if (onLogsUpdate) onLogsUpdate()
   }
 
@@ -412,13 +396,6 @@ export default function ExerciseCard({
           />
           <div style={{ width: 1, background: DIVIDER, alignSelf: 'stretch' }} />
           <ActionCell
-            icon={<Info size={isMobile ? 12 : 13} />}
-            flex={2}
-            onClick={(e) => { e.stopPropagation(); setInfoDefaultTab(hasVideo ? 'video' : 'details'); setShowInfoModal(true) }}
-            isMobile={isMobile}
-          />
-          <div style={{ width: 1, background: DIVIDER, alignSelf: 'stretch' }} />
-          <ActionCell
             icon={<RefreshCw size={isMobile ? 12 : 13} />}
             flex={2}
             onClick={(e) => { e.stopPropagation(); setShowSwapModal(true) }}
@@ -434,31 +411,6 @@ export default function ExerciseCard({
             checked={isLogged}
           />
         </div>
-
-        {/* Eerdere log — kleine link onderaan, klikbaar voor uitklappen */}
-        {previousLog && (
-          <>
-            <button onClick={(e) => { e.stopPropagation(); setShowHistory(p => !p) }}
-              style={{
-                width: '100%', padding: isMobile ? '0.35rem 0.7rem' : '0.4rem 0.95rem',
-                background: showHistory ? 'rgba(255,255,255,0.03)' : 'transparent',
-                border: 'none', borderTop: `1px solid ${DIVIDER}`,
-                color: 'rgba(255,255,255,0.45)',
-                fontSize: isMobile ? '0.6rem' : '0.65rem', fontWeight: 700,
-                textTransform: 'uppercase', letterSpacing: '0.05em',
-                cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.3rem',
-                touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-              }}>
-              <Play size={10} strokeWidth={2.4} />
-              {showHistory ? 'Verberg vorige log' : 'Toon vorige log'}
-            </button>
-            {showHistory && (
-              <div style={{ padding: isMobile ? '0.625rem 0.95rem' : '0.75rem 1.25rem', borderTop: `1px solid ${DIVIDER}` }}>
-                <ExerciseHistory exerciseName={exercise.name} previousLog={previousLog} loading={loadingHistory} client={client} db={db} />
-              </div>
-            )}
-          </>
-        )}
 
         {/* Permanent in plan */}
         {showPermanentBtn && (
