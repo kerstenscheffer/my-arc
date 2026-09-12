@@ -134,6 +134,10 @@ export default function CheckinReminderPopup({ client, db, onOpen, isMobile: pro
 
   const palette = paletteFor(mode)
   const Icon = palette.icon
+  // Als vraag en met de voornaam erbij: dat leest als je coach die het vraagt
+  // in plaats van als een systeemmelding.
+  const voornaam = client?.first_name?.trim()
+  const vraag = voornaam ? `Check-in invullen, ${voornaam}?` : 'Check-in invullen?'
 
   // ── PILL WIDGET ──
   // Gecentreerd boven de floating navbar, met de onderste helft achter
@@ -196,11 +200,7 @@ export default function CheckinReminderPopup({ client, db, onOpen, isMobile: pro
             textShadow: '0 2px 10px rgba(0,0,0,0.85)',
           }}>
             <Icon size={isMobile ? 15 : 17} strokeWidth={2.6} style={{ flexShrink: 0 }} />
-            {mode === 'overdue'
-              ? `Check-in ${daysLate}d te laat`
-              : mode === 'missed'
-              ? 'Check-in openstaand'
-              : 'Vul je check-in'}
+            {vraag}
             <ArrowRight size={isMobile ? 14 : 16} strokeWidth={2.8} style={{ flexShrink: 0 }} />
           </div>
         </button>
@@ -223,17 +223,12 @@ export default function CheckinReminderPopup({ client, db, onOpen, isMobile: pro
   // in beeld en blijft aan die rand plakken, met de coach-foto rechts en de
   // tekst links eroverheen. Was een schermvullende modal met een donkere waas
   // erachter; dat blokkeerde de hele app voor een herinnering.
-  let title, body
-  if (mode === 'friday') {
-    title = 'Tijd voor je check-in'
-    body = 'Het is vrijdag. Vul \u2018m in zodat je coach op je week kan reageren.'
-  } else if (mode === 'overdue') {
-    title = `Check-in ${daysLate} dagen te laat`
-    body = 'Hoe sneller je coach je week ziet, hoe sneller hij kan bijsturen.'
-  } else {
-    title = 'Check-in gemist'
-    body = 'Afgelopen vrijdag niet ingevuld. Vul \u2018m alsnog in.'
-  }
+  const title = vraag
+  const body = mode === 'friday'
+    ? 'Het is vrijdag. Dan kan je coach op je week reageren.'
+    : mode === 'overdue'
+      ? `Al ${daysLate} dagen te laat. Hoe eerder, hoe eerder hij kan bijsturen.`
+      : 'Afgelopen vrijdag niet ingevuld.'
 
   const breedte = isMobile ? 'min(330px, 88vw)' : 380
   const hoogte = isMobile ? 84 : 94
