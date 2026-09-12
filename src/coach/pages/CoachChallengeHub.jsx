@@ -1,9 +1,10 @@
 // src/coach/pages/CoachChallengeHub.jsx - WITH ACTIVITY TAB + BANNER REFRESH FIX
 import { useState, useEffect } from 'react'
-import { Trophy, ChevronDown, RefreshCw, Users, AlertCircle, Target, Pause, Play } from 'lucide-react'
+import { Trophy, ChevronDown, RefreshCw, Users, Target, Pause, Play } from 'lucide-react'
 
 // IMPORT CHALLENGE MONITOR VIEWS
 import ChallengeBanner from '../../modules/challenge-monitor/ChallengeBanner'
+import { SOORTEN } from '../../modules/challenge-monitor/challengeEisen'
 import ChallengeGoalManager from '../tabs/client-info/ChallengeGoalManager'
 import WorkoutProgressView from './challenge-monitor/WorkoutProgressView'
 import MealProgressView from './challenge-monitor/MealProgressView'
@@ -19,6 +20,11 @@ export default function CoachChallengeHub({ db, clients }) {
   // Assignment Widget State
   const [assignedClients, setAssignedClients] = useState([])
   const [assignLoading, setAssignLoading] = useState(false)
+  // Soort en startdatum stonden hard op '8week' en vandaag. De 6-weken
+  // 80/20-challenge was daarmee niet toe te wijzen, en een challenge die
+  // maandag begint moest je achteraf in de database rechtzetten.
+  const [soort, setSoort] = useState(SOORTEN[0].key)
+  const [startDatum, setStartDatum] = useState(() => new Date().toISOString().split('T')[0])
   
   // Monitor State
   const [selectedClient, setSelectedClient] = useState(null)
@@ -70,7 +76,7 @@ export default function CoachChallengeHub({ db, clients }) {
         .select('id')
         .eq('client_id', clientId)
         .eq('is_active', true)
-        .single()
+        .maybeSingle()
 
       if (existing) {
         alert('Client already in active challenge!')
@@ -78,15 +84,21 @@ export default function CoachChallengeHub({ db, clients }) {
       }
 
       const currentUser = await db.getCurrentUser()
-      
+      const gekozen = SOORTEN.find(s => s.key === soort) || SOORTEN[0]
+
+      // Einddatum uit de looptijd. Op middernacht lokaal rekenen: met een
+      // tijdstip erin verschuift de datum bij het omzetten naar ISO.
+      const eind = new Date(`${startDatum}T00:00:00`)
+      eind.setDate(eind.getDate() + gekozen.dagen - 1)
+
       const { error } = await db.supabase
         .from('challenge_assignments')
         .insert({
           client_id: clientId,
           coach_id: currentUser.id,
-          challenge_type: '8week',
-          start_date: new Date().toISOString().split('T')[0],
-          end_date: new Date(Date.now() + 56 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+          challenge_type: gekozen.key,
+          start_date: startDatum,
+          end_date: `${eind.getFullYear()}-${String(eind.getMonth() + 1).padStart(2, '0')}-${String(eind.getDate()).padStart(2, '0')}`,
           is_active: true
         })
 
@@ -108,13 +120,21 @@ export default function CoachChallengeHub({ db, clients }) {
     
     setAssignLoading(true)
     try {
-      const { error } = await db.supabase
+      // .select() erbij en tellen wat er terugkomt: PostgREST geeft een update
+      // die door RLS wordt tegengehouden terug als 204 zonder fout. Zonder
+      // deze controle meldt het scherm "removed" terwijl er niets gebeurde.
+      const { data: gewijzigd, error } = await db.supabase
         .from('challenge_assignments')
         .update({ is_active: false })
         .eq('client_id', clientId)
         .eq('is_active', true)
+        .select('id')
 
       if (error) throw error
+      if (!gewijzigd || gewijzigd.length === 0) {
+        alert('Niet verwijderd — de deelname is niet aangepast. Waarschijnlijk staat hij al uit of mag je hem niet wijzigen.')
+        return
+      }
 
       setAssignedClients(assignedClients.filter(id => id !== clientId))
       loadChallengeClients()
@@ -344,6 +364,48 @@ export default function CoachChallengeHub({ db, clients }) {
             Available Clients
           </h3>
 
+          {/* Wat je toewijst, vóór de knoppen: de looptijd verschilt per soort
+              en de einddatum volgt eruit. */}
+          <div style={{
+            display: 'flex', gap: '0.75rem', flexWrap: 'wrap',
+            marginBottom: '1.25rem', alignItems: 'flex-end'
+          }}>
+            <label style={{ flex: isMobile ? '1 1 100%' : '1 1 240px' }}>
+              <div style={{ fontSize: '0.7rem', fontWeight: 700, color: 'rgba(255,255,255,0.45)', marginBottom: 5 }}>
+                Challenge
+              </div>
+              <select
+                value={soort}
+                onChange={(e) => setSoort(e.target.value)}
+                style={{
+                  width: '100%', padding: '0.65rem 0.8rem', minHeight: 42,
+                  background: 'rgba(17,17,17,0.6)', border: '1px solid rgba(255,255,255,0.1)',
+                  borderRadius: 10, color: '#fff', fontSize: '0.88rem', fontWeight: 600,
+                  cursor: 'pointer'
+                }}
+              >
+                {SOORTEN.map(s => (
+                  <option key={s.key} value={s.key}>{s.naam} · {s.dagen} dagen</option>
+                ))}
+              </select>
+            </label>
+            <label style={{ flex: isMobile ? '1 1 100%' : '0 0 190px' }}>
+              <div style={{ fontSize: '0.7rem', fontWeight: 700, color: 'rgba(255,255,255,0.45)', marginBottom: 5 }}>
+                Startdatum
+              </div>
+              <input
+                type="date"
+                value={startDatum}
+                onChange={(e) => setStartDatum(e.target.value)}
+                style={{
+                  width: '100%', padding: '0.65rem 0.8rem', minHeight: 42,
+                  background: 'rgba(17,17,17,0.6)', border: '1px solid rgba(255,255,255,0.1)',
+                  borderRadius: 10, color: '#fff', fontSize: '0.88rem', fontWeight: 600
+                }}
+              />
+            </label>
+          </div>
+
           {clients.length === 0 ? (
             <p style={{
               color: 'rgba(255, 255, 255, 0.6)',
@@ -458,32 +520,10 @@ export default function CoachChallengeHub({ db, clients }) {
         }}
       />
 
-      {/* Challenge Monitor */}
-      {challengeClients.length === 0 ? (
-        <div style={{
-          background: 'linear-gradient(135deg, rgba(220, 38, 38, 0.1) 0%, rgba(153, 27, 27, 0.05) 100%)',
-          border: '1px solid rgba(220, 38, 38, 0.2)',
-          borderRadius: '16px',
-          padding: '3rem 2rem',
-          textAlign: 'center'
-        }}>
-          <AlertCircle size={48} color="#dc2626" style={{ margin: '0 auto 1rem' }} />
-          <h3 style={{
-            fontSize: '1.25rem',
-            fontWeight: '700',
-            color: '#fff',
-            marginBottom: '0.5rem'
-          }}>
-            No Active Challenges
-          </h3>
-          <p style={{
-            color: 'rgba(255, 255, 255, 0.6)',
-            fontSize: '0.95rem'
-          }}>
-            Assign clients to the 8-week challenge to start monitoring their progress
-          </p>
-        </div>
-      ) : (
+      {/* Challenge Monitor. Bij nul deelnemers hier niets tonen: het
+          deelnemersoverzicht hierboven zegt al dat er niemand meedoet, en
+          twee lege meldingen onder elkaar leest als een storing. */}
+      {challengeClients.length === 0 ? null : (
         <>
           {/* Client Selector + Controls */}
           <div style={{
