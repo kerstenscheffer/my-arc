@@ -7,6 +7,7 @@ import { useState, useEffect, useRef } from 'react'
 import TodaysWorkoutCard from './TodaysWorkoutCard'
 import LogModal from './LogModal'
 import WorkoutServiceNew from '../../services/WorkoutServiceNew'
+import { workoutFoto } from '../../utils/workoutFoto'
 import { isWorkoutFullyLogged, workoutCompletionPct } from '../../utils/exerciseCompletion'
 
 export default function TodaysWorkoutMain({ client, schema, db, workoutService, onWorkoutCompleted, onSchemaUpdate, scheduleReloadKey, onOpenPlanner, selectedDay, expanded: controlledExpanded, onExpandedChange }) {
@@ -316,6 +317,34 @@ export default function TodaysWorkoutMain({ client, schema, db, workoutService, 
     </div>
   )
 
+  // Kop bovenaan de pagina: de foto van de trainingsdag die onderin dood
+  // loopt in het zwart, met "Vandaags workout" eroverheen. Dezelfde vorm als
+  // de kop boven de oefeningenlijst, zodat de pagina en het log-scherm op
+  // elkaar lijken. De kaart eronder laat zijn eigen foto dan weg.
+  const kop = (
+    <div style={{ position: 'relative', width: '100%', height: isMobile ? 200 : 250 }}>
+      <div style={{
+        position: 'absolute', inset: 0,
+        backgroundImage: `url(${workoutFoto(todaysWorkout)})`,
+        backgroundSize: 'cover', backgroundPosition: 'center',
+      }} />
+      <div style={{
+        position: 'absolute', inset: 0, pointerEvents: 'none',
+        background: 'linear-gradient(180deg, rgba(10,10,10,0.5) 0%, rgba(10,10,10,0) 32%, rgba(10,10,10,0.78) 70%, #0a0a0a 100%)',
+      }} />
+      <div style={{
+        position: 'absolute', left: 0, right: 0, bottom: isMobile ? 10 : 14,
+        padding: isMobile ? '0 1rem' : '0 1.5rem',
+        fontSize: isMobile ? '1.7rem' : '2.4rem',
+        fontWeight: 900, color: '#fff',
+        letterSpacing: '-0.03em', lineHeight: 1.05,
+        textShadow: '0 2px 12px rgba(0,0,0,0.6)',
+      }}>
+        Vandaags workout
+      </div>
+    </div>
+  )
+
   const kaart = (
     <TodaysWorkoutCard
       workout={todaysWorkout}
@@ -326,6 +355,7 @@ export default function TodaysWorkoutMain({ client, schema, db, workoutService, 
       client={client}
       db={db}
       isExpanded={expanded}
+      zonderFoto
       timerElapsedSec={timerElapsedSec}
       timerRunning={timerRunning}
       timerStarted={timerStarted}
@@ -371,6 +401,7 @@ export default function TodaysWorkoutMain({ client, schema, db, workoutService, 
 
   return (
     <>
+      {kop}
       {kaart}
       <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
     </>

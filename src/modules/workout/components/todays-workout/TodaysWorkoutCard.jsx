@@ -9,10 +9,11 @@ import React, { useState, useEffect } from 'react'
 import { Check, ChevronDown, Timer } from 'lucide-react'
 import { useRef } from 'react'
 import { actieveOefeningen } from '../../utils/exerciseCompletion'
+import { workoutFoto } from '../../utils/workoutFoto'
 
 export default function TodaysWorkoutCard({
   workout, onLogClick, logsCount, isCompleted: isCompletedProp, completionPct = 0,
-  client, db, isExpanded,
+  client, db, isExpanded, zonderFoto = false,
   // De workout-timer hoort bij de kop: die blijft staan terwijl je door de
   // oefeningen scrolt. Zweefde eerder los over de pagina.
   timerElapsedSec = 0, timerRunning = false, timerStarted = false,
@@ -56,26 +57,6 @@ export default function TodaysWorkoutCard({
     }
   }
 
-  const getWorkoutImage = () => {
-    if (!workout) return null
-    const focus = workout.focus?.toLowerCase() || workout.name?.toLowerCase() || ''
-    if (focus.includes('chest') || focus.includes('push') || focus.includes('borst'))
-      return 'https://images.unsplash.com/photo-1598971457999-ca4ef48a9a71?w=600&h=600&fit=crop&q=80&crop=center'
-    if (focus.includes('back') || focus.includes('pull') || focus.includes('rug'))
-      return 'https://images.unsplash.com/photo-1603287681836-b174ce5074c2?w=600&h=600&fit=crop&q=80&crop=center'
-    if (focus.includes('leg') || focus.includes('squat') || focus.includes('been'))
-      return 'https://images.unsplash.com/photo-1567598508481-65985588e295?w=600&h=600&fit=crop&q=80&crop=center'
-    if (focus.includes('shoulder') || focus.includes('delt') || focus.includes('schouder'))
-      return 'https://images.unsplash.com/photo-1541534741688-6078c6bfb5c5?w=600&h=600&fit=crop&q=80&crop=center'
-    if (focus.includes('arm') || focus.includes('bicep') || focus.includes('tricep') || focus.includes('curl'))
-      return 'https://images.unsplash.com/photo-1583454110551-21f2fa2afe61?w=600&h=600&fit=crop&q=80&crop=center'
-    if (focus.includes('cardio') || focus.includes('run') || focus.includes('fiets'))
-      return 'https://images.unsplash.com/photo-1538805060514-97d9cc17730c?w=600&h=600&fit=crop&q=80&crop=center'
-    if (focus.includes('full body') || focus.includes('total'))
-      return 'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?w=600&h=600&fit=crop&q=80&crop=center'
-    return 'https://images.unsplash.com/photo-1517836357463-d25dfeac3438?w=600&h=600&fit=crop&q=80&crop=center'
-  }
-
   // "Voltooid" pas als álle oefeningen volledig gelogd zijn (prop). Fallback op
   // het oude gedrag (≥1 log) alleen als de prop niet is meegegeven.
   const isCompleted = isCompletedProp !== undefined ? isCompletedProp : logsCount > 0
@@ -97,7 +78,7 @@ export default function TodaysWorkoutCard({
       }}>
         <div style={{
           position: 'absolute', inset: 0,
-          backgroundImage: `url(${getWorkoutImage()})`,
+          backgroundImage: `url(${workoutFoto(workout)})`,
           backgroundSize: 'cover', backgroundPosition: 'center',
           opacity: isCompleted ? 0.5 : 1,
         }} />
@@ -223,8 +204,9 @@ export default function TodaysWorkoutCard({
         WebkitTapHighlightColor: 'transparent',
       }}
     >
-      {/* Foto — alleen tonen wanneer dropdown gesloten is (focus-mode bij open). */}
-      {!isExpanded && (
+      {/* Foto — alleen als er geen kop met dezelfde foto boven de kaart staat
+          (zie de kop op de workout-pagina) en de dropdown dicht is. */}
+      {!isExpanded && !zonderFoto && (
         <div style={{
           width: '100%',
           height: photoHeight,
@@ -234,7 +216,7 @@ export default function TodaysWorkoutCard({
         }}>
           <div style={{
             position: 'absolute', inset: 0,
-            backgroundImage: `url(${getWorkoutImage()})`,
+            backgroundImage: `url(${workoutFoto(workout)})`,
             backgroundSize: 'cover', backgroundPosition: 'center',
             opacity: isCompleted ? 0.55 : 1,
           }} />

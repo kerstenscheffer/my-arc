@@ -153,8 +153,27 @@ export default function WorkoutPlan({ client, schema, db, onFocusChange }) {
       )}
 
 
-      {/* Jouw week planning — direct onder de plan-balk. */}
-      {!workoutOpen && <FadeOnScroll><div id="week-schedule" style={{ marginTop: isMobile ? '0.75rem' : '1rem' }}>
+      <div id="todays-workout-anchor">
+        <TodaysWorkoutMain
+          client={client}
+          schema={localSchema}
+          db={db}
+          workoutService={workoutService}
+          onWorkoutCompleted={handleWorkoutCompleted}
+          onSchemaUpdate={(updatedSchema) => setLocalSchema(updatedSchema)}
+          scheduleReloadKey={scheduleReloadKey}
+          onOpenPlanner={() => setShowWizard(true)}
+          selectedDay={selectedDayKey}
+          expanded={workoutOpen}
+          onExpandedChange={setWorkoutOpen}
+        />
+      </div>
+
+
+      {/* Jouw week planning — onder de workout van vandaag. Die staat bovenaan:
+          negen van de tien keer open je deze pagina om vandaag te trainen,
+          niet om de week te herschikken. */}
+      {!workoutOpen && <FadeOnScroll><div id="week-schedule" style={{ marginTop: isMobile ? '2.25rem' : '3rem' }}>
         <WeekSchedule
           weekSchedule={weekSchedule}
           schema={localSchema}
@@ -176,31 +195,6 @@ export default function WorkoutPlan({ client, schema, db, onFocusChange }) {
           onWeekOffsetChange={setWeekOffset}
         />
       </div></FadeOnScroll>}
-
-      {/* Grote titel boven de today's-workout foto, met veel zwarte ruimte erboven. */}
-      {!workoutOpen && (
-        <div style={{ padding: isMobile ? '6rem 1rem 1.25rem' : '9rem 2rem 1.75rem', textAlign: 'center' }}>
-          <div style={{ fontSize: isMobile ? '1.7rem' : '2.6rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.03em', lineHeight: 1.05, whiteSpace: 'nowrap' }}>
-            Vandaags workout
-          </div>
-        </div>
-      )}
-
-      <div id="todays-workout-anchor">
-        <TodaysWorkoutMain
-          client={client}
-          schema={localSchema}
-          db={db}
-          workoutService={workoutService}
-          onWorkoutCompleted={handleWorkoutCompleted}
-          onSchemaUpdate={(updatedSchema) => setLocalSchema(updatedSchema)}
-          scheduleReloadKey={scheduleReloadKey}
-          onOpenPlanner={() => setShowWizard(true)}
-          selectedDay={selectedDayKey}
-          expanded={workoutOpen}
-          onExpandedChange={setWorkoutOpen}
-        />
-      </div>
 
       {/* TodaysLogToast removed — same heaviest-lift info already lives in
           TodaysWorkoutCard. WorkoutProgressToast stays for the 30-day
