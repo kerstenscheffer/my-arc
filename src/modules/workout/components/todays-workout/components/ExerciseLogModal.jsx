@@ -790,6 +790,23 @@ export default function ExerciseLogModal({ db, client, exercise, onClose, isMobi
             {/* Zwevende actieknoppen, direct onder de vorige sessie. Stonden
                 onderaan het scherm; met een paar sets erin scrolde je heen en
                 weer tussen wat je net logde en de knop om verder te gaan. */}
+            {/* Tijdens de rust staat de timer op de plek van de knoppen, dus
+                direct onder de vorige sessie en direct bóven je gelogde sets.
+                Stond onderaan het scherm; dan kijk je naar de klok terwijl de
+                set die je net logde ergens erboven verschijnt. */}
+            {rust && (
+              <div style={{ padding: isMobile ? '0.8rem 1rem 0.2rem' : '0.9rem 1.25rem 0.3rem' }}>
+                <RustTimer
+                  oefeningNaam={exercise.name}
+                  startSec={rusttijd.sec}
+                  bron={rusttijd.bron}
+                  onKlaar={() => {}}
+                  onStop={volgendeSet}
+                  isMobile={isMobile}
+                />
+              </div>
+            )}
+
             {!rust && (
               <div style={{
                 display: 'flex', gap: '0.5rem',
@@ -969,18 +986,6 @@ export default function ExerciseLogModal({ db, client, exercise, onClose, isMobi
           forceLoad={true}
         />
       </BladModal>
-
-      {/* RUSTTIMER — boven de footer, zodat je je gelogde sets blijft zien */}
-      {rust && !wizardActive && !dropsetActive && (
-        <RustTimer
-          oefeningNaam={exercise.name}
-          startSec={rusttijd.sec}
-          bron={rusttijd.bron}
-          onKlaar={() => { /* de balk kleurt groen; doorgaan doet de klant zelf of via Volgende set */ }}
-          onStop={volgendeSet}
-          isMobile={isMobile}
-        />
-      )}
 
       <style>{`
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }

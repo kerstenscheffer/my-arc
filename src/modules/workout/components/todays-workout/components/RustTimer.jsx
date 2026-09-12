@@ -15,7 +15,6 @@ import { useEffect, useRef, useState } from 'react'
 import { Pause, Play, RotateCcw, SkipForward, Minus, Plus } from 'lucide-react'
 import { bewaarRusttijd } from '../rusttijd'
 
-const GOUD = '#FFD700'
 const GROEN = '#10b981'
 
 const mmss = (sec) => {
@@ -86,22 +85,20 @@ export default function RustTimer({ oefeningNaam, startSec, bron = 'standaard', 
 
   const voorbij = over <= 0
   const pct = Math.max(0, Math.min(100, (over / Math.max(1, totaal)) * 100))
-  const kleur = voorbij ? GROEN : GOUD
+  // Dik wit, net als de knop waar hij voor in de plaats komt. Groen alleen als
+  // de rust om is — dat is het enige moment waarop de kleur iets zegt.
+  const kleur = voorbij ? GROEN : '#fff'
 
   return (
-    <div style={{
-      borderTop: `1px solid ${voorbij ? 'rgba(16,185,129,0.35)' : 'rgba(255,215,0,0.28)'}`,
-      background: voorbij ? 'rgba(16,185,129,0.08)' : 'rgba(255,215,0,0.06)',
-      flexShrink: 0,
-    }}>
+    <div style={{ flexShrink: 0 }}>
       {/* Aflopende balk: in één oogopslag hoeveel er nog staat, zonder te lezen */}
-      <div style={{ height: 3, background: 'rgba(255,255,255,0.07)' }}>
+      <div style={{ height: 3, background: 'rgba(255,255,255,0.1)', borderRadius: 2, overflow: 'hidden' }}>
         <div style={{ width: `${pct}%`, height: '100%', background: kleur, transition: 'width 0.25s linear' }} />
       </div>
 
       <div style={{
         display: 'flex', alignItems: 'center', gap: isMobile ? 8 : 10,
-        padding: isMobile ? '0.7rem 0.9rem' : '0.8rem 1.25rem',
+        padding: isMobile ? '0.6rem 0 0' : '0.7rem 0 0',
       }}>
         <div style={{ minWidth: isMobile ? 66 : 78 }}>
           <div style={{
@@ -115,7 +112,7 @@ export default function RustTimer({ oefeningNaam, startSec, bron = 'standaard', 
               ? 'Rusttijd uit je schema. Met − en + pas je hem aan; die blijft dan staan.'
               : 'Rusttijd. Met − en + pas je hem aan; die blijft staan voor deze oefening.'}
             style={{
-              fontSize: '0.6rem', fontWeight: 800, color: 'rgba(255,255,255,0.4)',
+              fontSize: '0.6rem', fontWeight: 800, color: 'rgba(255,255,255,0.45)',
               textTransform: 'uppercase', letterSpacing: '0.08em', marginTop: 2,
               whiteSpace: 'nowrap',
             }}
@@ -123,7 +120,7 @@ export default function RustTimer({ oefeningNaam, startSec, bron = 'standaard', 
             {voorbij ? 'Klaar' : 'Rust'} · {mmss(totaal)}
             {/* Waar de tijd vandaan komt. Anders lijkt 2:00 een willekeurige
                 standaard, terwijl het staat wat de coach heeft voorgeschreven. */}
-            {bron === 'coach' && !aangepast && <span style={{ color: 'rgba(255,215,0,0.6)' }}> · schema</span>}
+            {bron === 'coach' && !aangepast && <span style={{ color: 'rgba(255,255,255,0.65)' }}> · schema</span>}
           </div>
         </div>
 
@@ -143,10 +140,8 @@ export default function RustTimer({ oefeningNaam, startSec, bron = 'standaard', 
           style={{
             display: 'flex', alignItems: 'center', gap: 6,
             height: 44, padding: isMobile ? '0 0.85rem' : '0 1.1rem',
-            background: voorbij ? kleur : 'rgba(255,255,255,0.06)',
-            border: `1px solid ${voorbij ? kleur : 'rgba(255,255,255,0.12)'}`,
-            borderRadius: 12,
-            color: voorbij ? '#0a0a0a' : '#fff',
+            background: '#fff', border: '1px solid #fff', borderRadius: 12,
+            color: '#0a0a0a',
             fontSize: isMobile ? '0.78rem' : '0.84rem', fontWeight: 900,
             fontFamily: 'inherit', cursor: 'pointer', flexShrink: 0,
             touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
