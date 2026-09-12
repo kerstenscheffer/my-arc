@@ -5,6 +5,7 @@ import { Plus, Trash2, Check, ArrowLeft, ChevronRight, ChevronDown, Camera, Imag
 import MealPrepCalculator from '../MealPrepCalculator'
 import MealCard from '../day-schedule/MealCard'
 import Keuze from '../Keuze'
+import { foodImageFallback } from '../../foodImageFallback'
 
 const MEAL_MOMENTS = [
   { id: 'breakfast', label: 'Ontbijt' },
@@ -36,7 +37,7 @@ const MOMENT_SECTIE = {
   post_workout: 'snacks',
   pre_workout: 'pre_workout',
 }
-export const sectieVan = (ruw) => MOMENT_SECTIE[String(ruw || '').toLowerCase()] || null
+const sectieVan = (ruw) => MOMENT_SECTIE[String(ruw || '').toLowerCase()] || null
 
 export default function MyMealsTab({ client, db, onLog, onRequestAddIngredient, buildingMeal, setBuildingMeal, isMobile }) {
   const [myMeals, setMyMeals] = useState([])
@@ -240,7 +241,6 @@ export default function MyMealsTab({ client, db, onLog, onRequestAddIngredient, 
 
 function MealDetailView({ meal, setMeal, client, db, isMobile, onBack, onRequestAddIngredient, onLog }) {
   const [saving, setSaving] = useState(false)
-  const [showMealDropdown, setShowMealDropdown] = useState(false)
   // Log-moment: standaard uit de gekozen sectie (bv. pre-workout → snack).
   const [mealMoment, setMealMoment] = useState(meal._moment || SECTION_MOMENT[meal.section] || 'breakfast')
   // Photo state — `photoFile` is a File from the picker (upload pending),
@@ -306,11 +306,6 @@ function MealDetailView({ meal, setMeal, client, db, isMobile, onBack, onRequest
     carbs: parseFloat(meal.carbs) || 0,
     fat: parseFloat(meal.fat) || 0,
   }
-
-  const totalG = totals.protein + totals.carbs + totals.fat
-  const protPct = totalG > 0 ? Math.round((totals.protein / totalG) * 100) : 0
-  const carbPct = totalG > 0 ? Math.round((totals.carbs / totalG) * 100) : 0
-  const fatPct = totalG > 0 ? 100 - protPct - carbPct : 0
 
   const handleRemove = (index) => {
     const updated = [...meal.ingredients_list]
@@ -395,64 +390,54 @@ function MealDetailView({ meal, setMeal, client, db, isMobile, onBack, onRequest
     setSaving(false)
   }
 
-  const currentMealLabel = MEAL_MOMENTS.find(m => m.id === mealMoment)?.label || 'Ontbijt'
-
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-      {/* Header */}
+      {/* Kop: terug, titel, opslaan — alles in bold wit. */}
       <div style={{
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        padding: isMobile ? '0.625rem 0.75rem' : '0.75rem 1.25rem',
-        borderBottom: '1px solid rgba(255,255,255,0.06)'
+        padding: isMobile ? '0.6rem 0.9rem' : '0.75rem 1.25rem',
+        borderBottom: '1px solid rgba(255,255,255,0.06)', flexShrink: 0,
       }}>
         <button onClick={onBack} style={{
-          background: 'none', border: 'none', color: 'rgba(255,255,255,0.5)',
+          background: 'none', border: 'none', color: '#fff',
           cursor: 'pointer', padding: '0.25rem', touchAction: 'manipulation',
-          display: 'flex', alignItems: 'center', gap: '0.25rem',
-          fontSize: '0.75rem', fontWeight: '600'
+          display: 'flex', alignItems: 'center', gap: 5,
+          fontSize: '0.8rem', fontWeight: 800, fontFamily: 'inherit',
         }}>
-          <ArrowLeft size={16} /> Terug
+          <ArrowLeft size={16} strokeWidth={2.6} /> Terug
         </button>
-        <div style={{ fontSize: '0.85rem', fontWeight: '800', color: '#fff' }}>
+        <div style={{ fontSize: isMobile ? '0.95rem' : '1.05rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.02em' }}>
           {meal.id ? 'Maaltijd bewerken' : 'Maaltijd aanmaken'}
         </div>
         <button onClick={handleSave}
           disabled={saving || !meal.name?.trim() || (!meal.ingredients_list?.length && !totals.calories)}
+          aria-label="Opslaan"
           style={{
-            background: 'none', border: 'none',
-            color: (saving || !meal.name?.trim() || (!meal.ingredients_list?.length && !totals.calories))
-              ? 'rgba(16,185,129,0.3)' : '#FFD700',
-            cursor: 'pointer', padding: '0.25rem', touchAction: 'manipulation',
-            fontSize: '0.8rem', fontWeight: '700'
+            width: 32, height: 32, borderRadius: 9,
+            background: 'transparent', border: 'none',
+            color: '#fff', opacity: (saving || !meal.name?.trim() || (!meal.ingredients_list?.length && !totals.calories)) ? 0.3 : 1,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            cursor: 'pointer', touchAction: 'manipulation',
           }}
         >
-          {saving ? '...' : '✓'}
+          <Check size={17} strokeWidth={3} />
         </button>
       </div>
 
       <div style={{ flex: 1, overflowY: 'auto', WebkitOverflowScrolling: 'touch' }}>
-        {/* ── Foto (optioneel) ── */}
-        <div style={{
-          padding: isMobile ? '0.875rem 1rem' : '1rem 1.5rem',
-          borderBottom: '1px solid rgba(255,255,255,0.06)'
-        }}>
+        {/* ── Foto ── */}
+        <div style={{ padding: isMobile ? '0.875rem 1rem' : '1rem 1.5rem' }}>
           {photoPreview ? (
             <div style={{
               position: 'relative', width: '100%', height: isMobile ? '160px' : '200px',
-              borderRadius: '12px', overflow: 'hidden',
-              background: 'rgba(255,255,255,0.04)',
+              borderRadius: 14, overflow: 'hidden', background: 'rgba(255,255,255,0.04)',
             }}>
-              <img
-                src={photoPreview}
-                alt="Maaltijd foto"
-                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-              />
+              <img src={photoPreview} alt="Maaltijd foto" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
               {photoUploading && (
                 <div style={{
-                  position: 'absolute', inset: 0,
-                  background: 'rgba(0,0,0,0.55)',
+                  position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.6)',
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  color: '#FFD700', fontSize: '0.75rem', fontWeight: '700',
+                  color: '#fff', fontSize: '0.75rem', fontWeight: 900,
                   letterSpacing: '0.05em', textTransform: 'uppercase',
                 }}>
                   Uploaden…
@@ -463,236 +448,164 @@ function MealDetailView({ meal, setMeal, client, db, isMobile, onBack, onRequest
                 aria-label="Foto verwijderen"
                 disabled={photoUploading}
                 style={{
-                  position: 'absolute', top: '8px', right: '8px',
-                  width: '32px', height: '32px',
-                  background: 'rgba(0,0,0,0.7)',
-                  border: '1px solid rgba(255,255,255,0.2)',
-                  borderRadius: '8px', color: '#fff',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  cursor: 'pointer', touchAction: 'manipulation',
-                  WebkitTapHighlightColor: 'transparent'
+                  position: 'absolute', top: 8, right: 8, width: 32, height: 32,
+                  background: 'rgba(0,0,0,0.6)', border: 'none', borderRadius: 9,
+                  color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
                 }}
               >
-                <X size={15} />
+                <X size={15} strokeWidth={2.6} />
               </button>
             </div>
           ) : (
-            <div style={{ display: 'flex', gap: '0.5rem' }}>
-              {/* iOS WKWebView crasht op `capture="environment"` zonder
-                  NSCameraUsageDescription en blijft ook na permissie-fix
-                  onbetrouwbaar. We bieden alleen nog Galerij — daar kan
-                  iemand binnen iOS alsnog een nieuwe foto maken via de
-                  systeem-picker. */}
-              <PhotoPickerLabel
-                isMobile={isMobile}
-                label="Galerij"
-                onChange={handlePhotoSelect}
-              >
-                <ImageIcon size={20} color="rgba(255,215,0,0.6)" strokeWidth={2} />
-              </PhotoPickerLabel>
-            </div>
+            <PhotoPickerLabel isMobile={isMobile} label="Foto toevoegen" onChange={handlePhotoSelect}>
+              <ImageIcon size={20} color="#fff" strokeWidth={2.2} />
+            </PhotoPickerLabel>
           )}
         </div>
 
         {/* Naam */}
-        <div style={{
-          padding: isMobile ? '0.875rem 1rem' : '1rem 1.5rem',
-          borderBottom: '1px solid rgba(255,255,255,0.06)'
-        }}>
+        <div style={{ padding: isMobile ? '0 1rem 0.75rem' : '0 1.5rem 0.875rem' }}>
           <input
             type="text" value={meal.name || ''}
             onChange={(e) => setMeal({ ...meal, name: e.target.value })}
             placeholder="Naam van je maaltijd"
             style={{
-              width: '100%', padding: '0', background: 'transparent',
+              width: '100%', padding: 0, background: 'transparent',
               border: 'none', outline: 'none', color: '#fff',
-              fontSize: isMobile ? '1.2rem' : '1.35rem', fontWeight: '800', letterSpacing: '-0.02em'
+              fontSize: isMobile ? '1.3rem' : '1.5rem', fontWeight: 900,
+              letterSpacing: '-0.03em', fontFamily: 'inherit',
             }}
           />
         </div>
 
-        {/* Maaltijd moment */}
+        {/* Moment — zelfde keuzemenu als de rest van de voedingsschermen. */}
         <div style={{
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-          padding: isMobile ? '0.75rem 1rem' : '0.875rem 1.5rem',
-          borderBottom: '1px solid rgba(255,255,255,0.06)', position: 'relative'
+          padding: isMobile ? '0 1rem 0.9rem' : '0 1.5rem 1rem',
         }}>
-          <div style={{ fontSize: '0.85rem', fontWeight: '500', color: 'rgba(255,255,255,0.6)' }}>Maaltijd</div>
-          <button onClick={() => setShowMealDropdown(!showMealDropdown)} style={{
-            padding: '0.5rem 0.75rem', background: 'transparent',
-            border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px',
-            color: '#fff', fontSize: '0.8rem', fontWeight: '600',
-            cursor: 'pointer', touchAction: 'manipulation', minHeight: '36px'
-          }}>
-            {currentMealLabel}
-          </button>
-          {showMealDropdown && (
-            <>
-              <div onClick={() => setShowMealDropdown(false)} style={{ position: 'fixed', inset: 0, zIndex: 99 }} />
-              <div style={{
-                position: 'absolute', top: '100%', right: isMobile ? '1rem' : '1.5rem',
-                marginTop: '0.25rem', zIndex: 100, background: '#111',
-                border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px',
-                overflow: 'hidden', minWidth: '160px', boxShadow: '0 8px 24px rgba(0,0,0,0.6)'
-              }}>
-                {MEAL_MOMENTS.map((m, i) => (
-                  <button key={m.id} onClick={() => { setMealMoment(m.id); setShowMealDropdown(false) }}
-                    style={{
-                      display: 'block', width: '100%', padding: '0.75rem',
-                      background: mealMoment === m.id ? 'rgba(16,185,129,0.08)' : 'transparent',
-                      border: 'none', borderBottom: i < MEAL_MOMENTS.length - 1 ? '1px solid rgba(255,255,255,0.04)' : 'none',
-                      color: mealMoment === m.id ? '#FFD700' : 'rgba(255,255,255,0.7)',
-                      fontSize: '0.8rem', fontWeight: mealMoment === m.id ? '700' : '500',
-                      cursor: 'pointer', textAlign: 'left', touchAction: 'manipulation', minHeight: '44px'
-                    }}
-                  >
-                    {m.label}
-                  </button>
-                ))}
-              </div>
-            </>
-          )}
-        </div>
-
-        {/* Macro donut */}
-        {meal.ingredients_list?.length > 0 && (
           <div style={{
-            padding: isMobile ? '1rem' : '1.25rem 1.5rem',
-            borderBottom: '1px solid rgba(255,255,255,0.06)',
-            display: 'flex', alignItems: 'center', gap: isMobile ? '1.25rem' : '1.5rem'
+            fontSize: '0.62rem', fontWeight: 800, color: 'rgba(255,255,255,0.4)',
+            textTransform: 'uppercase', letterSpacing: '0.1em',
           }}>
-            <div style={{ position: 'relative', width: '72px', height: '72px', flexShrink: 0 }}>
-              <svg viewBox="0 0 36 36" style={{ width: '100%', height: '100%', transform: 'rotate(-90deg)' }}>
-                <circle cx="18" cy="18" r="14" fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="3.5" />
-                <circle cx="18" cy="18" r="14" fill="none" stroke="#FFD700" strokeWidth="3.5"
-                  strokeDasharray={`${protPct * 0.88} 88`} strokeDashoffset="0" strokeLinecap="round" />
-                <circle cx="18" cy="18" r="14" fill="none" stroke="#f59e0b" strokeWidth="3.5"
-                  strokeDasharray={`${carbPct * 0.88} 88`} strokeDashoffset={`${-protPct * 0.88}`} strokeLinecap="round" />
-                <circle cx="18" cy="18" r="14" fill="none" stroke="#8b5cf6" strokeWidth="3.5"
-                  strokeDasharray={`${fatPct * 0.88} 88`} strokeDashoffset={`${-(protPct + carbPct) * 0.88}`} strokeLinecap="round" />
-              </svg>
-              <div style={{
-                position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column',
-                alignItems: 'center', justifyContent: 'center'
-              }}>
-                <div style={{ fontSize: '1rem', fontWeight: '800', color: '#fff', lineHeight: 1 }}>{Math.round(totals.calories)}</div>
-                <div style={{ fontSize: '0.35rem', fontWeight: '600', color: 'rgba(255,255,255,0.3)', textTransform: 'uppercase' }}>cal</div>
-              </div>
-            </div>
-            <div style={{ flex: 1, display: 'flex', justifyContent: 'space-between' }}>
-              {[
-                { label: 'Koolhydr', value: Math.round(totals.carbs), pct: carbPct, color: '#f59e0b' },
-                { label: 'Vetten', value: Math.round(totals.fat), pct: fatPct, color: '#8b5cf6' },
-                { label: 'Eiwitten', value: Math.round(totals.protein), pct: protPct, color: '#FFD700' }
-              ].map(m => (
-                <div key={m.label} style={{ textAlign: 'center' }}>
-                  <div style={{ fontSize: '0.55rem', fontWeight: '700', color: m.color }}>{m.pct} %</div>
-                  <div style={{ fontSize: isMobile ? '0.9rem' : '1rem', fontWeight: '800', color: '#fff' }}>{m.value} g</div>
-                  <div style={{ fontSize: '0.45rem', fontWeight: '600', color: m.color }}>{m.label}</div>
-                </div>
-              ))}
-            </div>
+            Moment
           </div>
-        )}
-
-        {/* Onderdelen maaltijd */}
-        <div style={{ padding: isMobile ? '0.75rem 1rem 0.4rem' : '0.875rem 1.5rem 0.5rem' }}>
-          <div style={{ fontSize: isMobile ? '1rem' : '1.1rem', fontWeight: '800', color: '#fff' }}>
-            Onderdelen maaltijd
+          <div style={{ width: 150 }}>
+            <Keuze
+              waarde={mealMoment}
+              opties={MEAL_MOMENTS}
+              zet={setMealMoment}
+              isMobile={isMobile}
+              uitlijning="rechts"
+            />
           </div>
         </div>
 
-        {regels.map((ing, idx) => (
-          <div key={idx} style={{
-            display: 'flex', alignItems: 'center',
-            padding: isMobile ? '0.625rem 1rem' : '0.75rem 1.5rem',
-            borderBottom: '1px solid rgba(255,255,255,0.04)', gap: '0.5rem'
-          }}>
-            <div style={{ flex: 1, minWidth: 0 }}>
+        {/* Macro's in vier vakjes, zoals in het wisselvenster. */}
+        <div style={{ display: 'flex', gap: '0.5rem', padding: isMobile ? '0 1rem 1rem' : '0 1.5rem 1.25rem' }}>
+          {[
+            { label: 'kcal', waarde: Math.round(totals.calories) },
+            { label: 'eiwit', waarde: `${Math.round(totals.protein)}g` },
+            { label: 'koolh', waarde: `${Math.round(totals.carbs)}g` },
+            { label: 'vet', waarde: `${Math.round(totals.fat)}g` },
+          ].map(m => (
+            <div key={m.label} style={{
+              flex: 1, minWidth: 0, textAlign: 'center',
+              padding: '0.55rem 0.25rem',
+              border: '1px solid rgba(255,255,255,0.1)', borderRadius: 10,
+            }}>
+              <div style={{ fontSize: isMobile ? '1rem' : '1.1rem', fontWeight: 900, color: '#fff', lineHeight: 1.1 }}>
+                {m.waarde}
+              </div>
               <div style={{
-                fontSize: isMobile ? '0.82rem' : '0.88rem', fontWeight: '600', color: '#fff',
-                whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'
+                fontSize: '0.55rem', fontWeight: 800, color: 'rgba(255,255,255,0.35)',
+                textTransform: 'uppercase', letterSpacing: '0.06em', marginTop: 2,
               }}>
-                {ing.name}
-              </div>
-              <div style={{ fontSize: '0.6rem', color: 'rgba(255,255,255,0.3)' }}>
-                {ing.brand ? `${ing.brand}, ` : ''}{ing.amount ?? '?'}{ing.unit === 'gram' ? 'g' : (ing.unit || 'g')}
+                {m.label}
               </div>
             </div>
-            <div style={{
-              fontSize: isMobile ? '0.85rem' : '0.9rem', fontWeight: '800',
-              color: 'rgba(255,255,255,0.5)', flexShrink: 0
-            }}>
-              {ing.calories || 0}
-            </div>
-            <button onClick={() => handleRemove(idx)} style={{
-              width: '28px', height: '28px', borderRadius: '6px',
-              background: 'transparent', border: '1px solid rgba(239,68,68,0.12)',
-              color: 'rgba(239,68,68,0.35)', cursor: 'pointer',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              touchAction: 'manipulation', flexShrink: 0
-            }}>
-              <Trash2 size={11} />
-            </button>
+          ))}
+        </div>
+
+        <div style={{ padding: isMobile ? '0 1rem 0.5rem' : '0 1.5rem 0.6rem' }}>
+          <div style={{
+            fontSize: '0.62rem', fontWeight: 800, color: 'rgba(255,255,255,0.4)',
+            textTransform: 'uppercase', letterSpacing: '0.1em',
+          }}>
+            Ingrediënten
           </div>
+        </div>
+
+        {/* Ingrediënten als dezelfde kaart als overal: gram rechts, weghalen
+            als enige knop. */}
+        {regels.map((ing, idx) => (
+          <MealCard
+            key={`${ing.name}-${idx}`}
+            meal={{
+              name: ing.name,
+              image_url: ing.image_url || foodImageFallback(ing.name, null, 200),
+              calories: ing.calories, protein: ing.protein,
+              carbs: ing.carbs, fat: ing.fat,
+            }}
+            momentLabel=""
+            rechts={`${ing.amount ?? '?'}${ing.unit === 'gram' ? 'g' : (ing.unit || 'g')}`}
+            isMobile={isMobile}
+            acties={[{
+              icon: <Trash2 size={11} />, label: 'Weghalen',
+              onClick: () => handleRemove(idx), kleur: 'rgba(239,68,68,0.85)',
+            }]}
+          />
         ))}
 
-        {/* Voeg ingrediënt toe */}
-        <button onClick={onRequestAddIngredient} style={{
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          gap: '0.375rem', width: '100%',
-          padding: isMobile ? '0.875rem 1rem' : '1rem 1.5rem',
-          background: 'transparent', border: 'none',
-          borderBottom: '1px solid rgba(255,255,255,0.06)',
-          color: '#FFD700', fontSize: isMobile ? '0.8rem' : '0.85rem',
-          fontWeight: '700', cursor: 'pointer',
-          touchAction: 'manipulation', minHeight: '48px'
-        }}>
-          <Plus size={15} strokeWidth={2.5} />
-          Voeg ingrediënt toe
-        </button>
+        <div style={{ padding: isMobile ? '0.5rem 0.9rem 1rem' : '0.6rem 1.25rem 1.25rem' }}>
+          <button onClick={onRequestAddIngredient} style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+            width: '100%', minHeight: 46,
+            background: 'transparent', border: '1.5px solid rgba(255,255,255,0.28)',
+            borderRadius: 12, color: '#fff',
+            fontSize: isMobile ? '0.82rem' : '0.86rem', fontWeight: 900,
+            fontFamily: 'inherit', cursor: 'pointer',
+            touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+          }}>
+            <Plus size={15} strokeWidth={3} /> Ingrediënt toevoegen
+          </button>
+        </div>
       </div>
 
-      {/* Bottom buttons */}
+      {/* Onderaan: opslaan en loggen. */}
       <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)', flexShrink: 0 }}>
         <div style={{
-          display: 'flex', flexDirection: 'column', gap: '0.375rem',
+          display: 'flex', flexDirection: 'column', gap: 8,
           padding: isMobile ? '0.75rem 1rem' : '1rem 1.5rem',
-          paddingBottom: isMobile ? '1.5rem' : '1rem'
+          paddingBottom: isMobile ? '1.5rem' : '1rem',
         }}>
-          {/* Big: Opslaan & Loggen */}
-          {meal.ingredients_list?.length > 0 && (
-            <button onClick={handleLogMeal}
-              disabled={saving || !meal.name?.trim()}
-              style={{
-                width: '100%', padding: isMobile ? '0.875rem' : '1rem',
-                background: (saving || !meal.name?.trim()) ? 'rgba(16,185,129,0.05)' : 'rgba(16,185,129,0.12)',
-                border: '1px solid rgba(16,185,129,0.3)', borderRadius: '10px',
-                color: '#FFD700', fontSize: isMobile ? '0.85rem' : '0.9rem',
-                fontWeight: '800', cursor: (saving || !meal.name?.trim()) ? 'default' : 'pointer',
-                minHeight: '48px', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.375rem',
-                opacity: (saving || !meal.name?.trim()) ? 0.4 : 1
-              }}
-            >
-              <Check size={16} strokeWidth={2.5} />
-              {saving ? 'Opslaan...' : 'Opslaan & Loggen'}
-            </button>
-          )}
+          <button onClick={handleLogMeal}
+            disabled={saving || !meal.name?.trim() || (!meal.ingredients_list?.length && !totals.calories)}
+            style={{
+              width: '100%', minHeight: 50,
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7,
+              background: '#fff', border: 'none', borderRadius: 12,
+              color: '#0a0a0a', fontSize: isMobile ? '0.9rem' : '0.95rem', fontWeight: 900,
+              fontFamily: 'inherit', cursor: saving ? 'wait' : 'pointer',
+              opacity: (saving || !meal.name?.trim() || (!meal.ingredients_list?.length && !totals.calories)) ? 0.4 : 1,
+              touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+            }}
+          >
+            <Check size={16} strokeWidth={3} />
+            {saving ? 'Opslaan…' : 'Opslaan en loggen'}
+          </button>
 
-          {/* Small: Alleen opslaan */}
           <button onClick={handleSave}
             disabled={saving || !meal.name?.trim() || (!meal.ingredients_list?.length && !totals.calories)}
             style={{
-              width: '100%', padding: isMobile ? '0.5rem' : '0.625rem',
-              background: 'transparent', border: '1px solid rgba(255,255,255,0.06)',
-              borderRadius: '8px', color: 'rgba(255,255,255,0.35)',
-              fontSize: isMobile ? '0.65rem' : '0.7rem', fontWeight: '600',
-              cursor: 'pointer', minHeight: '32px', touchAction: 'manipulation',
-              opacity: (saving || !meal.name?.trim() || !meal.ingredients_list?.length) ? 0.3 : 1
+              width: '100%', minHeight: 38,
+              background: 'transparent', border: 'none',
+              color: 'rgba(255,255,255,0.45)',
+              fontSize: '0.78rem', fontWeight: 800, fontFamily: 'inherit',
+              cursor: 'pointer', touchAction: 'manipulation',
             }}
           >
-            {saving ? 'Opslaan...' : 'Alleen opslaan (niet loggen)'}
+            {saving ? 'Opslaan…' : 'Alleen opslaan'}
           </button>
         </div>
       </div>
@@ -707,8 +620,8 @@ function PhotoPickerLabel({ isMobile, label, capture, onChange, children }) {
   return (
     <label style={{
       flex: 1, height: isMobile ? '72px' : '80px',
-      background: 'rgba(255,215,0,0.04)',
-      border: '1px dashed rgba(255,215,0,0.25)',
+      background: 'transparent',
+      border: '1.5px dashed rgba(255,255,255,0.25)',
       borderRadius: '12px',
       display: 'flex', flexDirection: 'column',
       alignItems: 'center', justifyContent: 'center',
