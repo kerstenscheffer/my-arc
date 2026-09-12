@@ -11,7 +11,7 @@ const valToIdx = (v) => Math.round((parseFloat(v) - MIN) * 10)
 const idxToVal = (i) => Math.round((MIN * 10 + i)) / 10
 const TOTAL = valToIdx(MAX) + 1
 
-function HorizontalPicker({ value, onChange, disabled, savedLabel = false }) {
+function HorizontalPicker({ value, onChange, disabled, savedLabel = false, onEdit = null }) {
   const isMobile = window.innerWidth <= 768
   const ref = useRef(null)
   const wrapRef = useRef(null)
@@ -87,8 +87,8 @@ function HorizontalPicker({ value, onChange, disabled, savedLabel = false }) {
     goTo(i, true)
   }
 
-  const current = idxToVal(idx)
-  const scrollerH = isMobile ? 56 : 64
+  // Hoger dan eerst: het gekozen getal ís nu de kop, dus dat mag groot.
+  const scrollerH = isMobile ? 86 : 100
 
   return (
     <div style={{
@@ -103,45 +103,6 @@ function HorizontalPicker({ value, onChange, disabled, savedLabel = false }) {
       pointerEvents: disabled ? 'none' : 'auto',
     }}>
 
-      {/* Huidig getal — center, met compact gouden "Opgeslagen" pill ernaast
-          wanneer al gelogd vandaag. */}
-      <div style={{
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        gap: isMobile ? 8 : 10,
-        marginBottom: '0.75rem',
-      }}>
-        <div style={{
-          fontSize: isMobile ? '2.4rem' : '3rem',
-          fontWeight: 900,
-          color: '#fff',
-          letterSpacing: '-0.03em',
-          lineHeight: 1,
-          fontVariantNumeric: 'tabular-nums',
-        }}>
-          {current.toFixed(1)}
-          <span style={{ fontSize: '0.38em', color: 'rgba(255,255,255,0.45)', marginLeft: '0.2rem' }}>kg</span>
-        </div>
-        {savedLabel && (
-          <span style={{
-            display: 'inline-flex', alignItems: 'center', gap: 4,
-            padding: isMobile ? '3px 8px' : '4px 10px',
-            background: '#fff',
-            color: '#0a0a0a',
-            border: 'none',
-            borderRadius: 999,
-            fontSize: isMobile ? '0.58rem' : '0.62rem',
-            fontWeight: 900,
-            letterSpacing: '0.08em',
-            textTransform: 'uppercase',
-            boxShadow: '0 4px 12px rgba(0,0,0,0.45)',
-            whiteSpace: 'nowrap',
-          }}>
-            <Check size={isMobile ? 9 : 10} strokeWidth={3.2} />
-            Opgeslagen
-          </span>
-        )}
-      </div>
-
       {/* Scroller */}
       <div
         ref={wrapRef}
@@ -154,6 +115,36 @@ function HorizontalPicker({ value, onChange, disabled, savedLabel = false }) {
           overflow: 'hidden',
         }}
       >
+        {/* Vinkje: opgeslagen. Stond eerder als "Opgeslagen"-pill naast een
+            tweede, groot getal boven de schuif. */}
+        {savedLabel && (
+          <div style={{
+            position: 'absolute', top: '50%', left: `calc(50% + ${ITEM_W / 2}px + 10px)`,
+            transform: 'translateY(-50%)', zIndex: 4, pointerEvents: 'none',
+            display: 'flex', alignItems: 'center', color: '#fff',
+          }}>
+            <Check size={isMobile ? 18 : 20} strokeWidth={3.2} />
+          </div>
+        )}
+        {/* Potlood linksonder aan het gelogde getal, in plaats van een brede
+            "Aanpassen"-knop die als los onderdeel voelde. */}
+        {savedLabel && onEdit && (
+          <button
+            onClick={onEdit}
+            aria-label="Gewicht aanpassen"
+            style={{
+              position: 'absolute', bottom: 4, left: `calc(50% - ${ITEM_W / 2}px - 34px)`,
+              zIndex: 4, width: 30, height: 30, padding: 0,
+              background: 'transparent', border: 'none', borderRadius: 8,
+              color: '#fff', opacity: 0.75,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              cursor: 'pointer', pointerEvents: 'auto',
+              touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+            }}
+          >
+            <Pencil size={15} strokeWidth={2.6} />
+          </button>
+        )}
         <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: '60px', background: 'linear-gradient(to right, #0a0a0a, transparent)', zIndex: 2, pointerEvents: 'none' }} />
         <div style={{ position: 'absolute', right: 0, top: 0, bottom: 0, width: '60px', background: 'linear-gradient(to left, #0a0a0a, transparent)', zIndex: 2, pointerEvents: 'none' }} />
         <div style={{ position: 'absolute', top: 0, bottom: 0, left: `calc(50% - ${ITEM_W / 2}px)`, width: '1.5px', background: 'rgba(255,255,255,0.55)', zIndex: 3, pointerEvents: 'none' }} />
@@ -190,8 +181,9 @@ function HorizontalPicker({ value, onChange, disabled, savedLabel = false }) {
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                   cursor: disabled ? 'default' : 'pointer',
                   touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-                  fontSize: sel ? (isMobile ? '1.2rem' : '1.4rem') : (isMobile ? '0.75rem' : '0.85rem'),
+                  fontSize: sel ? (isMobile ? '2.1rem' : '2.5rem') : (isMobile ? '0.8rem' : '0.9rem'),
                   fontWeight: sel ? 900 : 600,
+                  letterSpacing: sel ? '-0.03em' : 0,
                   color: sel ? '#fff' : 'rgba(255,255,255,0.25)',
                   userSelect: 'none',
                   transition: 'font-size 0.15s ease, color 0.15s ease',
@@ -276,6 +268,7 @@ export default function WeightProgressRing({
         onChange={onWeightChange}
         disabled={showSavedState}
         savedLabel={showSavedState}
+        onEdit={startEdit}
       />
 
       {/* Fine-tune ±0.1 — alleen wanneer aanpassen mogelijk */}
@@ -332,27 +325,6 @@ export default function WeightProgressRing({
             ...labelStyle,
           }}>
             {saving ? 'Opslaan...' : 'Gewicht Opslaan'}
-          </button>
-        )}
-
-        {/* SAVED STATE — alleen "Aanpassen" — opgeslagen status zit al in banner boven */}
-        {showSavedState && (
-          <button onClick={startEdit} style={{
-            display: 'flex', width: '100%',
-            alignItems: 'center', justifyContent: 'center',
-            gap: '0.4rem',
-            padding: isMobile ? '0.875rem' : '1rem',
-            minHeight: '48px',
-            background: 'transparent',
-            border: 'none',
-            color: 'rgba(255,255,255,0.55)',
-            cursor: 'pointer',
-            touchAction: 'manipulation',
-            WebkitTapHighlightColor: 'transparent',
-            ...labelStyle,
-          }}>
-            <Pencil size={isMobile ? 11 : 12} strokeWidth={2.5} />
-            <span>Aanpassen</span>
           </button>
         )}
 
