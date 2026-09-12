@@ -3,6 +3,8 @@
 // Behoudt MFP scroll picker + dropdown UI
 
 import React, { useState, useRef, useEffect } from 'react'
+import MealCard from '../day-schedule/MealCard'
+import { foodImageFallback } from '../../foodImageFallback'
 import { Check } from 'lucide-react'
 import { findPortionConfig } from './portionPresets'
 
@@ -80,8 +82,8 @@ function ScrollPickerModal({ value, onConfirm, onClose, isMobile }) {
             {displayValue}
           </div>
           <button onClick={() => onConfirm(combined)} style={{
-            background: 'none', border: 'none', color: '#FFD700',
-            fontSize: isMobile ? '0.8rem' : '0.85rem', fontWeight: '700',
+            background: 'none', border: 'none', color: '#fff',
+            fontSize: isMobile ? '0.8rem' : '0.85rem', fontWeight: 900,
             cursor: 'pointer', touchAction: 'manipulation'
           }}>
             OK
@@ -200,11 +202,12 @@ const MEAL_OPTIONS = [
 // MAIN COMPONENT
 // ═══════════════════════════════════════════
 
-export default function AmountPicker({ item, remaining, onLog, onCancel, isMobile, defaultMealMoment, db, client, loggingService }) {
-  if (!item) return null
-
-  // Bepaal of dit een per100g item is (ingrediënt) of een portie item (meal)
-  const isPer100g = item.per100g === true
+export default function AmountPicker({ item, onLog, isMobile, defaultMealMoment, db, client, loggingService }) {
+  // Geen vroege return vóór de hooks: React eist dat elke render dezelfde
+  // hooks in dezelfde volgorde draait, en met `if (!item) return null` bovenaan
+  // stond dit hele bestand in de linter als fout. De hooks gaan uit van een
+  // ontbrekend item; de render stopt eronder alsnog.
+  const isPer100g = item?.per100g === true
 
   const [gramOptions, setGramOptions] = useState(GRAM_OPTIONS)
   const servingOptions = isPer100g ? gramOptions : MEAL_OPTIONS
@@ -217,6 +220,49 @@ export default function AmountPicker({ item, remaining, onLog, onCancel, isMobil
   // item-macros. Wordt geleegd zodra de gebruiker via de dropdown een
   // andere portie kiest.
   const [baseMacrosOverride, setBaseMacrosOverride] = useState(null)
+
+  // De samenstelling komt in drie vormen binnen: met naam en macro's, met
+  // ingredient_name/amount_gram, of als kale verwijzing {ingredient_id,
+  // amount}. Die laatste toonde hier vijf regels "Ingrediënt" zonder waarden;
+  // daarom zoeken we de namen en macro's erbij op.
+  const [ingredientRegels, setIngredientRegels] = useState([])
+  useEffect(() => {
+    const ruw = Array.isArray(item?.ingredients) ? item.ingredients : []
+    const basis = ruw.map(ing => ({
+      ...ing,
+      name: ing?.name || ing?.ingredient_name || ing?.naam || null,
+      amount: ing?.amount ?? ing?.amount_gram ?? null,
+      unit: ing?.unit || (ing?.amount_gram != null ? 'gram' : 'g'),
+    }))
+    setIngredientRegels(basis.map(i => ({ ...i, name: i.name || 'Ingrediënt' })))
+
+    const ids = [...new Set(basis.filter(i => !i.name && i.ingredient_id).map(i => i.ingredient_id))]
+    if (ids.length === 0 || !db?.supabase) return
+    let afgebroken = false
+    db.supabase
+      .from('ai_ingredients')
+      .select('id, name, calories_per_100g, protein_per_100g, carbs_per_100g, fat_per_100g')
+      .in('id', ids)
+      .then(({ data }) => {
+        if (afgebroken || !data) return
+        const opId = new Map(data.map(r => [r.id, r]))
+        setIngredientRegels(basis.map(i => {
+          const bron = i.name ? null : opId.get(i.ingredient_id)
+          if (!bron) return { ...i, name: i.name || 'Ingrediënt' }
+          const gram = Number(i.amount) || 0
+          const deel = gram / 100
+          return {
+            ...i,
+            name: bron.name,
+            calories: Math.round((bron.calories_per_100g || 0) * deel),
+            protein: Math.round((bron.protein_per_100g || 0) * deel),
+            carbs: Math.round((bron.carbs_per_100g || 0) * deel),
+            fat: Math.round((bron.fat_per_100g || 0) * deel),
+          }
+        }))
+      }, (e) => console.error('Ingrediënten opzoeken mislukt:', e))
+    return () => { afgebroken = true }
+  }, [item, db])
 
   // Load learned portion sizes per ingredient and rebuild dropdown
   useEffect(() => {
@@ -238,9 +284,9 @@ export default function AmountPicker({ item, remaining, onLog, onCancel, isMobil
 
   // 🎯 BELANGRIJK: gebruik opgeslagen amount uit recent als die er is
   // Anders: default 100g voor per100g, 1 portie voor meal
-  const initialQuantity = item._savedAmount !== undefined && item._savedAmount !== null
+  const initialQuantity = item?._savedAmount !== undefined && item?._savedAmount !== null
     ? item._savedAmount
-    : (isPer100g ? (item.defaultPortion || 100) : 1)
+    : (isPer100g ? (item?.defaultPortion || 100) : 1)
 
   const [quantity, setQuantity] = useState(initialQuantity)
   const [showServingDropdown, setShowServingDropdown] = useState(false)
@@ -248,6 +294,8 @@ export default function AmountPicker({ item, remaining, onLog, onCancel, isMobil
   const [showQuantityPicker, setShowQuantityPicker] = useState(false)
   const [saving, setSaving] = useState(false)
   const [mealMoment, setMealMoment] = useState(defaultMealMoment || getDefaultMoment())
+
+  if (!item) return null
 
   // ═══ MACRO BEREKENING ═══
   // Voor recents met _savedAmount + _basePer (eerder gelogde meal):
@@ -316,10 +364,6 @@ export default function AmountPicker({ item, remaining, onLog, onCancel, isMobil
     fat: Math.round((macroBase.fat || 0) * factor * 10) / 10
   }
 
-  const totalG = macros.protein + macros.carbs + macros.fat
-  const protPct = totalG > 0 ? Math.round((macros.protein / totalG) * 100) : 0
-  const carbPct = totalG > 0 ? Math.round((macros.carbs / totalG) * 100) : 0
-  const fatPct = totalG > 0 ? 100 - protPct - carbPct : 0
 
   const handleLog = async () => {
     setSaving(true)
@@ -404,11 +448,11 @@ export default function AmountPicker({ item, remaining, onLog, onCancel, isMobil
   const DropdownBtn = ({ label, onClick, active }) => (
     <button onClick={onClick} style={{
       padding: isMobile ? '0.5rem 0.75rem' : '0.5rem 0.875rem',
-      background: active ? 'rgba(255, 215, 0, 0.06)' : 'transparent',
-      border: `1px solid ${active ? 'rgba(255, 215, 0, 0.2)' : 'rgba(255, 255, 255, 0.1)'}`,
-      borderRadius: '8px',
-      color: active ? '#FFD700' : '#fff',
-      fontSize: isMobile ? '0.8rem' : '0.85rem', fontWeight: '600',
+      background: active ? 'rgba(255,255,255,0.1)' : 'transparent',
+      border: `1px solid ${active ? '#fff' : 'rgba(255, 255, 255, 0.18)'}`,
+      borderRadius: '10px',
+      color: '#fff',
+      fontSize: isMobile ? '0.8rem' : '0.85rem', fontWeight: 800,
       cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
       minHeight: '36px'
     }}>{label}</button>
@@ -431,7 +475,7 @@ export default function AmountPicker({ item, remaining, onLog, onCancel, isMobil
             background: selected === opt.id ? 'rgba(255, 215, 0, 0.08)' : 'transparent',
             border: 'none',
             borderBottom: i < options.length - 1 ? '1px solid rgba(255,255,255,0.04)' : 'none',
-            color: selected === opt.id ? '#FFD700' : 'rgba(255, 255, 255, 0.7)',
+            color: selected === opt.id ? '#fff' : 'rgba(255, 255, 255, 0.6)',
             fontSize: isMobile ? '0.8rem' : '0.85rem',
             fontWeight: selected === opt.id ? '700' : '500',
             cursor: 'pointer', textAlign: 'left',
@@ -498,9 +542,9 @@ export default function AmountPicker({ item, remaining, onLog, onCancel, isMobil
             <button onClick={() => setShowQuantityPicker(true)} style={{
               padding: isMobile ? '0.5rem 0.75rem' : '0.5rem 0.875rem',
               background: 'transparent',
-              border: '1px solid rgba(255, 215, 0, 0.3)',
-              borderRadius: '8px', color: '#FFD700',
-              fontSize: isMobile ? '1.1rem' : '1.2rem', fontWeight: '800',
+              border: '1.5px solid rgba(255,255,255,0.3)',
+              borderRadius: '10px', color: '#fff',
+              fontSize: isMobile ? '1.1rem' : '1.2rem', fontWeight: 900,
               cursor: 'pointer',
               touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
               minHeight: '36px', minWidth: '60px', textAlign: 'center'
@@ -561,7 +605,7 @@ export default function AmountPicker({ item, remaining, onLog, onCancel, isMobil
                       background: active ? 'rgba(255,215,0,0.18)' : 'rgba(255,255,255,0.04)',
                       border: `1px solid ${active ? 'rgba(255,215,0,0.45)' : 'rgba(255,255,255,0.1)'}`,
                       borderRadius: 999,
-                      color: active ? '#FFD700' : 'rgba(255,255,255,0.75)',
+                      color: active ? '#fff' : 'rgba(255,255,255,0.6)',
                       fontSize: isMobile ? '0.72rem' : '0.78rem',
                       fontWeight: 700,
                       cursor: 'pointer',
@@ -606,44 +650,34 @@ export default function AmountPicker({ item, remaining, onLog, onCancel, isMobil
         </div>
       </Row>
 
-      {/* Macro donut */}
+      {/* Macro's in vier vakjes, zoals in de andere voedingsschermen. De
+          donut liet percentages zien terwijl je hier op de getallen let. */}
       <div style={{
-        padding: isMobile ? '1.25rem 1rem' : '1.5rem',
-        display: 'flex', alignItems: 'center', gap: isMobile ? '1.25rem' : '1.5rem'
+        display: 'flex', gap: '0.5rem',
+        padding: isMobile ? '1rem' : '1.25rem 1.5rem',
       }}>
-        <div style={{ position: 'relative', width: '80px', height: '80px', flexShrink: 0 }}>
-          <svg viewBox="0 0 36 36" style={{ width: '100%', height: '100%', transform: 'rotate(-90deg)' }}>
-            <circle cx="18" cy="18" r="14" fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="3.5" />
-            <circle cx="18" cy="18" r="14" fill="none" stroke="#FFD700" strokeWidth="3.5"
-              strokeDasharray={`${protPct * 0.88} 88`} strokeDashoffset="0" strokeLinecap="round" />
-            <circle cx="18" cy="18" r="14" fill="none" stroke="#f59e0b" strokeWidth="3.5"
-              strokeDasharray={`${carbPct * 0.88} 88`} strokeDashoffset={`${-protPct * 0.88}`} strokeLinecap="round" />
-            <circle cx="18" cy="18" r="14" fill="none" stroke="#8b5cf6" strokeWidth="3.5"
-              strokeDasharray={`${fatPct * 0.88} 88`} strokeDashoffset={`${-(protPct + carbPct) * 0.88}`} strokeLinecap="round" />
-          </svg>
-          <div style={{
-            position: 'absolute', inset: 0,
-            display: 'flex', flexDirection: 'column',
-            alignItems: 'center', justifyContent: 'center'
+        {[
+          { label: 'kcal', waarde: macros.calories },
+          { label: 'eiwit', waarde: `${macros.protein}g` },
+          { label: 'koolh', waarde: `${macros.carbs}g` },
+          { label: 'vet', waarde: `${macros.fat}g` },
+        ].map(m => (
+          <div key={m.label} style={{
+            flex: 1, minWidth: 0, textAlign: 'center',
+            padding: '0.6rem 0.25rem',
+            border: '1px solid rgba(255,255,255,0.1)', borderRadius: 10,
           }}>
-            <div style={{ fontSize: '1.1rem', fontWeight: '800', color: '#fff', lineHeight: 1 }}>{macros.calories}</div>
-            <div style={{ fontSize: '0.4rem', fontWeight: '600', color: 'rgba(255,255,255,0.3)', textTransform: 'uppercase' }}>cal</div>
-          </div>
-        </div>
-
-        <div style={{ flex: 1, display: 'flex', justifyContent: 'space-between' }}>
-          {[
-            { label: 'Koolhydr', value: macros.carbs, pct: carbPct, color: '#f59e0b' },
-            { label: 'Vetten', value: macros.fat, pct: fatPct, color: '#8b5cf6' },
-            { label: 'Eiwitten', value: macros.protein, pct: protPct, color: '#FFD700' }
-          ].map(m => (
-            <div key={m.label} style={{ textAlign: 'center' }}>
-              <div style={{ fontSize: '0.6rem', fontWeight: '700', color: m.color, marginBottom: '0.15rem' }}>{m.pct} %</div>
-              <div style={{ fontSize: isMobile ? '0.95rem' : '1.05rem', fontWeight: '800', color: '#fff' }}>{m.value} g</div>
-              <div style={{ fontSize: '0.5rem', fontWeight: '600', color: m.color, marginTop: '0.1rem' }}>{m.label}</div>
+            <div style={{ fontSize: isMobile ? '1.05rem' : '1.15rem', fontWeight: 900, color: '#fff', lineHeight: 1.1 }}>
+              {m.waarde}
             </div>
-          ))}
-        </div>
+            <div style={{
+              fontSize: '0.55rem', fontWeight: 800, color: 'rgba(255,255,255,0.35)',
+              textTransform: 'uppercase', letterSpacing: '0.06em', marginTop: 2,
+            }}>
+              {m.label}
+            </div>
+          </div>
+        ))}
       </div>
 
       {/* Samenstelling — toon de ingrediënten van een vaste maaltijd zodat je
@@ -660,37 +694,28 @@ export default function AmountPicker({ item, remaining, onLog, onCancel, isMobil
           }}>
             Samenstelling ({item.ingredients.length})
           </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
-            {item.ingredients.map((ing, i) => {
-              const nm = ing.name || ing.ingredient_name || 'Ingrediënt'
+          <div style={{ margin: isMobile ? '0 -1rem' : '0 -1.5rem' }}>
+            {ingredientRegels.map((ing, i) => {
               const baseAmt = Number(ing.amount) || 0
               const scaled = baseAmt > 0 ? Math.round(baseAmt * (factor || 1)) : 0
               const unit = ing.unit || 'g'
+              const deel = baseAmt > 0 ? (scaled / baseAmt) : 1
               return (
-                <div key={i} style={{
-                  display: 'flex', alignItems: 'center', gap: '0.55rem',
-                  padding: '0.35rem 0'
-                }}>
-                  <div style={{
-                    width: 30, height: 30, borderRadius: 7, flexShrink: 0, overflow: 'hidden',
-                    background: 'rgba(255,255,255,0.05)', display: 'flex',
-                    alignItems: 'center', justifyContent: 'center'
-                  }}>
-                    {ing.image_url
-                      ? <img src={ing.image_url} alt={nm} style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={e => { e.currentTarget.style.display = 'none' }} />
-                      : <span style={{ fontSize: '0.85rem', fontWeight: 800, color: 'rgba(255,215,0,0.6)' }}>{nm.charAt(0).toUpperCase()}</span>}
-                  </div>
-                  <span style={{
-                    flex: 1, minWidth: 0, fontSize: isMobile ? '0.82rem' : '0.88rem',
-                    fontWeight: 600, color: 'rgba(255,255,255,0.8)',
-                    whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'
-                  }}>{nm}</span>
-                  {scaled > 0 && (
-                    <span style={{ fontSize: '0.78rem', fontWeight: 700, color: 'rgba(255,255,255,0.5)', flexShrink: 0 }}>
-                      {scaled}{unit === 'gram' ? 'g' : ` ${unit}`}
-                    </span>
-                  )}
-                </div>
+                <MealCard
+                  key={i}
+                  meal={{
+                    name: ing.name,
+                    image_url: ing.image_url || foodImageFallback(ing.name, null, 200),
+                    calories: Math.round((ing.calories || 0) * deel),
+                    protein: Math.round((ing.protein || 0) * deel),
+                    carbs: Math.round((ing.carbs || 0) * deel),
+                    fat: Math.round((ing.fat || 0) * deel),
+                  }}
+                  momentLabel=""
+                  rechts={scaled > 0 ? `${scaled}${unit === 'gram' ? 'g' : ` ${unit}`}` : null}
+                  isMobile={isMobile}
+                  acties={[]}
+                />
               )
             })}
           </div>
@@ -707,11 +732,11 @@ export default function AmountPicker({ item, remaining, onLog, onCancel, isMobil
       }}>
         <button onClick={handleLog} disabled={saving || macros.calories === 0} style={{
           width: '100%', padding: isMobile ? '0.875rem' : '1rem',
-          background: saving ? 'rgba(255, 215, 0, 0.05)' : 'rgba(255, 215, 0, 0.12)',
-          border: '1px solid rgba(255, 215, 0, 0.3)',
-          borderRadius: isMobile ? '10px' : '12px',
-          color: '#FFD700', fontSize: isMobile ? '0.85rem' : '0.95rem',
-          fontWeight: '800', cursor: saving ? 'wait' : 'pointer',
+          background: '#fff',
+          border: 'none',
+          borderRadius: 12,
+          color: '#0a0a0a', fontSize: isMobile ? '0.9rem' : '0.95rem',
+          fontWeight: 900, cursor: saving ? 'wait' : 'pointer',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           gap: '0.5rem', minHeight: '48px',
           touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
@@ -721,7 +746,7 @@ export default function AmountPicker({ item, remaining, onLog, onCancel, isMobil
           onTouchEnd={(e) => { if (isMobile) e.currentTarget.style.transform = 'scale(1)' }}
         >
           <Check size={16} strokeWidth={2.5} />
-          {saving ? 'Opslaan...' : 'Registreer'}
+          {saving ? 'Opslaan…' : 'Loggen'}
         </button>
       </div>
 

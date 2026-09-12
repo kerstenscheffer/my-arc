@@ -219,13 +219,6 @@ export default function FoodLogModal({
 
   if (!isOpen) return null
 
-  const remaining = {
-    calories: Math.max(0, (targets?.calories || 0) - (consumedToday?.calories || 0)),
-    protein: Math.max(0, (targets?.protein || 0) - (consumedToday?.protein || 0)),
-    carbs: Math.max(0, (targets?.carbs || 0) - (consumedToday?.carbs || 0)),
-    fat: Math.max(0, (targets?.fat || 0) - (consumedToday?.fat || 0))
-  }
-
   const MOMENT_LABELS = { breakfast: 'Ontbijt', lunch: 'Lunch', dinner: 'Diner', snack: 'Snack', copy: 'Gekopieerd' }
 
   const modal = (
@@ -302,9 +295,7 @@ export default function FoodLogModal({
           </button>
           <AmountPicker
             item={selectedItem}
-            remaining={remaining}
             onLog={handleLog}
-            onCancel={() => setSelectedItem(null)}
             isMobile={isMobile}
             defaultMealMoment={defaultMealMoment}
             db={db}
