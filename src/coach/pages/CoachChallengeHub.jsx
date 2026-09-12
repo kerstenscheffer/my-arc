@@ -127,7 +127,8 @@ export default function CoachChallengeHub({ db, clients }) {
     // legt het hele tabblad stil tot iemand klikt, en de vraag hoort bij de
     // knop waar je op drukte — niet in een venster bovenaan het scherm.
     if (bevestigVerwijder !== clientId) {
-      setMelding(null)
+      // De melding hier laten staan: verdwijnt hij, dan schuift de hele lijst
+      // omhoog en ligt de knop niet meer onder de muis waar je net klikte.
       setBevestigVerwijder(clientId)
       return
     }
