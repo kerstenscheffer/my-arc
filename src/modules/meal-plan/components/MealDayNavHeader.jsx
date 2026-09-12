@@ -24,10 +24,10 @@ const getTodayIndex = () => {
   return d === 0 ? 6 : d - 1
 }
 
-const indexToDate = (idx) => {
+const indexToDate = (idx, weekOffset = 0) => {
   const todayIdx = getTodayIndex()
   const date = new Date()
-  date.setDate(date.getDate() + (idx - todayIdx))
+  date.setDate(date.getDate() + (idx - todayIdx) + weekOffset * 7)
   return date
 }
 
@@ -39,6 +39,10 @@ export default function MealDayNavHeader({
   // Op de foto-kop: geen eigen balk of achtergrond, en alles in bold wit —
   // goud verdwijnt tegen een foto en de balk zou de fade doorsnijden.
   opFoto = false,
+  // Weken vooruit of terug. De pijlen lopen aan het eind van de week door
+  // naar de volgende of vorige week in plaats van dood te lopen.
+  weekOffset = 0,
+  onWeekOffsetChange,
 }) {
   const isMobile = propMobile ?? (typeof window !== 'undefined' && window.innerWidth <= 768)
 
@@ -47,11 +51,12 @@ export default function MealDayNavHeader({
     ? todayIdx
     : Math.max(0, DAYS_OF_WEEK.findIndex(d => d.key === selectedDay))
 
-  const currentDate = indexToDate(currentIdx)
+  const currentDate = indexToDate(currentIdx, weekOffset)
   const dayInfo = DAYS_OF_WEEK[currentIdx]
 
-  // Relative label — "Vandaag" / "Gisteren" / "Morgen" / null.
-  const diff = currentIdx - todayIdx
+  // Relative label — "Vandaag" / "Gisteren" / "Morgen" / null. Alleen als je
+  // in deze week kijkt; "Morgen" in de week erna klopt niet.
+  const diff = (currentIdx - todayIdx) + weekOffset * 7
   let relative = null
   if (diff === 0)  relative = 'Vandaag'
   else if (diff === -1) relative = 'Gisteren'
@@ -59,15 +64,23 @@ export default function MealDayNavHeader({
 
   const dateLabel = currentDate.toLocaleDateString('nl-NL', { day: 'numeric', month: 'long' })
 
+  // Aan het begin of eind van de week springt de pijl naar de week ernaast,
+  // en land je op de dag die er in de tijd naast ligt (zondag ↔ maandag).
   const goPrev = () => {
-    const prev = currentIdx - 1
-    if (prev < 0) return // niet voorbij het begin van de week
-    onDayChange?.(DAYS_OF_WEEK[prev].key)
+    if (currentIdx === 0) {
+      onWeekOffsetChange?.(weekOffset - 1)
+      onDayChange?.(DAYS_OF_WEEK[6].key)
+      return
+    }
+    onDayChange?.(DAYS_OF_WEEK[currentIdx - 1].key)
   }
   const goNext = () => {
-    const next = currentIdx + 1
-    if (next > 6) return
-    onDayChange?.(DAYS_OF_WEEK[next].key)
+    if (currentIdx === 6) {
+      onWeekOffsetChange?.(weekOffset + 1)
+      onDayChange?.(DAYS_OF_WEEK[0].key)
+      return
+    }
+    onDayChange?.(DAYS_OF_WEEK[currentIdx + 1].key)
   }
 
   // Pijl-knoppen zonder kader: minimaal vierkant tap-target, witte pijl,
@@ -114,8 +127,7 @@ export default function MealDayNavHeader({
         <button
           onClick={goPrev}
           aria-label="Vorige dag"
-          disabled={currentIdx === 0}
-          style={arrowBtnStyle(currentIdx === 0)}
+          style={arrowBtnStyle(false)}
         >
           <ChevronLeft size={isMobile ? 24 : 26} strokeWidth={opFoto ? 3 : 2.4} />
         </button>
@@ -173,15 +185,14 @@ export default function MealDayNavHeader({
             lineHeight: 1,
             textShadow: opFoto ? '0 2px 10px rgba(0,0,0,0.75)' : 'none',
           }}>
-            {dateLabel} · tik voor agenda
+            {dateLabel}{weekOffset === 0 ? '' : weekOffset === 1 ? ' · volgende week' : weekOffset === -1 ? ' · vorige week' : ''} · tik voor agenda
           </div>
         </button>
 
         <button
           onClick={goNext}
           aria-label="Volgende dag"
-          disabled={currentIdx === 6}
-          style={arrowBtnStyle(currentIdx === 6)}
+          style={arrowBtnStyle(false)}
         >
           <ChevronRight size={isMobile ? 24 : 26} strokeWidth={opFoto ? 3 : 2.4} />
         </button>

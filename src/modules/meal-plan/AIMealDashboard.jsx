@@ -46,11 +46,10 @@ const dayKeyToIndex = (key) => {
   const i = DAYS_OF_WEEK.findIndex(d => d.key === key)
   return i >= 0 ? i : getTodayIndex()
 }
-const indexToDate = (idx) => {
+const indexToDate = (idx, weekOffset = 0) => {
   const todayIdx = getTodayIndex()
-  const diff = idx - todayIdx
   const date = new Date()
-  date.setDate(date.getDate() + diff)
+  date.setDate(date.getDate() + (idx - todayIdx) + weekOffset * 7)
   return date
 }
 
@@ -93,6 +92,8 @@ export default function AIMealDashboard({ client, onNavigate, db }) {
   // Tabblad waarop het log-venster opent: 'search' vanaf de ronde knop,
   // 'meals' vanuit "Maaltijd aanmaken" in het wisselvenster.
   const [foodLogTab, setFoodLogTab] = useState('search')
+  // Weken vooruit of terug, gestuurd door de pijlen in de kop.
+  const [weekOffset, setWeekOffset] = useState(0)
   
   const [modals, setModals] = useState({
     alternatives: null,
@@ -611,6 +612,8 @@ export default function AIMealDashboard({ client, onNavigate, db }) {
             onOpenSummary={() => setModals(prev => ({ ...prev, summary: true }))}
             isMobile={isMobile}
             opFoto
+            weekOffset={weekOffset}
+            onWeekOffsetChange={setWeekOffset}
           />
         </div>
       </div>
@@ -618,8 +621,8 @@ export default function AIMealDashboard({ client, onNavigate, db }) {
       {/* ════ NEW MACRO HERO — selected-day aware ════ */}
       {(() => {
         const currentDayIdx = dayKeyToIndex(selectedDay)
-        const selectedDate = indexToDate(currentDayIdx)
-        const selectedIsToday = currentDayIdx === getTodayIndex()
+        const selectedDate = indexToDate(currentDayIdx, weekOffset)
+        const selectedIsToday = weekOffset === 0 && currentDayIdx === getTodayIndex()
         return (
           <MacroHero
             consumed={dashboardData?.dailyTotals?.consumed}
@@ -649,7 +652,9 @@ export default function AIMealDashboard({ client, onNavigate, db }) {
       {(() => {
         const todayIdx = getTodayIndex()
         const selectedIdx = dayKeyToIndex(selectedDay)
-        if (selectedIdx !== todayIdx) return null
+        // "Klaar voor vandaag" hoort alleen bij vandaag, dus ook alleen in
+        // deze week.
+        if (weekOffset !== 0 || selectedIdx !== todayIdx) return null
         const plan = dashboardData.todayMeals || []
         if (plan.length === 0) return null
         const allDone = plan.every(m => m.isConsumed)
@@ -690,6 +695,7 @@ export default function AIMealDashboard({ client, onNavigate, db }) {
         targets={dashboardData.dailyTotals?.targets}
         foodLogTrigger={foodLogTrigger}
         foodLogTab={foodLogTab}
+        weekOffset={weekOffset}
         onPastDayUpdate={() => setPastDayRefreshKey(k => k + 1)}
       />
 

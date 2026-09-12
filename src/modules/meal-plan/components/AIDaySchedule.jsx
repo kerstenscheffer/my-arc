@@ -48,6 +48,10 @@ export default function AIDaySchedule({
   foodLogTrigger = 0,
   // Tabblad waarop het log-venster opent als de ouder het opent.
   foodLogTab = 'search',
+  // Hoeveel weken de klant vooruit of terug bladert. Alle datumrekenwerk in
+  // dit bestand ging uit van "deze week"; met de pijlen kun je nu ook naar
+  // de vorige of volgende week, en dan moet de dag-index mee opschuiven.
+  weekOffset = 0,
   // Callback waarmee AIMealDashboard op de hoogte gesteld wordt als een
   // verleden-dag-log gewijzigd is (zodat MacroHero-cache ongeldig gemaakt wordt).
   onPastDayUpdate,
@@ -90,7 +94,7 @@ export default function AIDaySchedule({
   // terug en keek de hele pagina naar de verkeerde dag.
   const datumVoorDag = (dayIndex) => {
     const d = new Date()
-    d.setDate(d.getDate() + (dayIndex - getTodayIndex()))
+    d.setDate(d.getDate() + (dayIndex - getTodayIndex()) + weekOffset * 7)
     const mm = String(d.getMonth() + 1).padStart(2, '0')
     const dd = String(d.getDate()).padStart(2, '0')
     return `${d.getFullYear()}-${mm}-${dd}`
@@ -114,9 +118,12 @@ export default function AIDaySchedule({
   // Ook de grenzen zelf gaan nu als volledige tijdstempel mee. Een kale
   // "2026-09-07T00:00:00" leest Postgres als UTC, dus viel alles wat een
   // klant tussen 00:00 en 02:00 logde in de dag ervoor.
+  // "Vandaag" is alleen vandaag als je ook in deze week kijkt.
+  const isVandaag = (dayIndex = currentDay) => weekOffset === 0 && dayIndex === getTodayIndex()
+
   const dagVenster = (dayIndex) => {
     const start = new Date()
-    start.setDate(start.getDate() + (dayIndex - getTodayIndex()))
+    start.setDate(start.getDate() + (dayIndex - getTodayIndex()) + weekOffset * 7)
     start.setHours(0, 0, 0, 0)
     const eind = new Date(start)
     eind.setDate(eind.getDate() + 1)
@@ -220,7 +227,7 @@ export default function AIDaySchedule({
     // OVERHAUL: free-mode skips plan loading entirely
     if (isFreeMode) {
       setDisplayMeals([])
-    } else if (currentDay === getTodayIndex() && todayMeals) {
+    } else if (isVandaag() && todayMeals) {
       setDisplayMeals(todayMeals)
     } else {
       loadDayMeals(currentDay)
@@ -228,7 +235,7 @@ export default function AIDaySchedule({
 
     // ✅ FOOD LOG: Load consumed meals for this day (works in both modes)
     if (client?.id) loadConsumedMeals(currentDay)
-  }, [currentDay, todayMeals, activePlan, client?.id, isFreeMode])
+  }, [currentDay, weekOffset, todayMeals, activePlan, client?.id, isFreeMode])
 
   // ✅ FOOD LOG: Load consumed_meals from DB for selected day
   const loadConsumedMeals = async (dayIndex) => {
@@ -263,7 +270,7 @@ export default function AIDaySchedule({
       // Alleen vandaag's totals updaten als we ECHT vandaag aan het editen
       // zijn — anders trekken we de macros van een past-day delete af van
       // vandaag (zelfde bug als bij logging).
-      if (deleted && onMealLogged && currentDay === getTodayIndex()) {
+      if (deleted && onMealLogged && isVandaag()) {
         onMealLogged({
           calories: -(deleted.calories || 0),
           protein: -(deleted.protein || 0),
@@ -272,7 +279,7 @@ export default function AIDaySchedule({
         })
       }
       // Notify parent to refresh MacroHero cache for past days.
-      if (deleted && onPastDayUpdate && currentDay !== getTodayIndex()) {
+      if (deleted && onPastDayUpdate && !isVandaag()) {
         onPastDayUpdate()
       }
     } catch (err) {
@@ -282,7 +289,7 @@ export default function AIDaySchedule({
 
   // ✅ FOOD LOG: Handle new meal logged
   const handleMealLogged = (loggedData) => {
-    if (currentDay === getTodayIndex()) {
+    if (isVandaag()) {
       // Vandaag: lokaal toevoegen + parent's day-totals updaten.
       setConsumedMeals(prev => [...prev, loggedData])
       if (onMealLogged) onMealLogged(loggedData)
@@ -539,7 +546,7 @@ export default function AIDaySchedule({
   // de opdeling per dag.
   const checkedMeals = checkedByDay[daysOfWeek[currentDay]?.key] || {}
 
-  const isVandaagNu = () => currentDay === getTodayIndex()
+  const isVandaagNu = () => isVandaag()
 
   const handleMealCheck = async (meal) => {
     const dagKey = daysOfWeek[currentDay]?.key
@@ -637,7 +644,7 @@ export default function AIDaySchedule({
           onMealCheck={handleMealCheck}
           onOpenInfo={onOpenInfo}
           onOpenAlternatives={onOpenAlternatives}
-          isToday={currentDay === getTodayIndex()}
+          isToday={isVandaag()}
           isMobile={isMobile}
           consumedMeals={consumedMeals}
           onOpenFoodLog={(momentId) => {
@@ -730,7 +737,7 @@ export default function AIDaySchedule({
                   // Vandaag: het echte tijdstip. Een andere dag: het midden
                   // van díé dag, anders belandt de log op vandaag en telt hij
                   // mee in de verkeerde dagtotalen.
-                  consumed_at: (currentDay === getTodayIndex()
+                  consumed_at: (isVandaag()
                     ? new Date()
                     : new Date(`${datumVoorDag(currentDay)}T12:00:00`)).toISOString(),
                   source: 'plan_check',
@@ -817,8 +824,8 @@ export default function AIDaySchedule({
         // that day so it lands in the right bucket without being timezone-
         // sensitive. Today-flow falls back to "now" inside the service.
         let consumedAtIso = null
-        if (currentDay !== getTodayIndex()) {
-          const diff = currentDay - getTodayIndex()
+        if (!isVandaag()) {
+          const diff = (currentDay - getTodayIndex()) + weekOffset * 7
           const target = new Date()
           target.setDate(target.getDate() + diff)
           target.setHours(12, 0, 0, 0)
@@ -839,7 +846,7 @@ export default function AIDaySchedule({
               // log appears immediately in the timeline.
               loadConsumedMeals(currentDay)
               // Notify parent to refresh MacroHero for past days.
-              if (currentDay !== getTodayIndex() && onPastDayUpdate) onPastDayUpdate()
+              if (!isVandaag() && onPastDayUpdate) onPastDayUpdate()
             }}
             defaultMealMoment={defaultMealMoment}
             editMeal={editingMeal}
