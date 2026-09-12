@@ -543,11 +543,8 @@ export default function ClientDashboard({ previewClientId = null, ingebed = fals
             active: widgetOpen === 'notifications', badge: widgetCounts.notifications,
             onClick: () => setWidgetOpen(o => o === 'notifications' ? null : 'notifications'),
           },
-          {
-            id: 'vragen', label: 'Vragen', Icon: HelpCircle, color: '#FFD700',
-            active: widgetOpen === 'vragen',
-            onClick: () => setWidgetOpen(o => o === 'vragen' ? null : 'vragen'),
-          },
+          // Vragen zit nu in het Meer-menu op de onderbalk; twee ingangen
+          // naar hetzelfde venster maakte de zijbalk onnodig lang.
           {
             id: 'video', label: 'Video', Icon: PlayCircle, color: '#FFD700',
             active: widgetOpen === 'video', badge: widgetCounts.video,
