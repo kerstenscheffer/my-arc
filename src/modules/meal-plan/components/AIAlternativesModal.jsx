@@ -7,7 +7,7 @@ import Keuze from './Keuze'
 // Hetzelfde blad als de historie in het workout-log-scherm; één vorm voor
 // "extra scherm dat vanaf onderen openschuift" in de hele app.
 import BladModal from '../../workout/components/todays-workout/components/BladModal'
-import { X, Search, Check, ArrowUp, ArrowDown, Minus, ChevronDown, Star, Plus } from 'lucide-react'
+import { X, Search, Check, ArrowUp, ArrowDown, Minus, Star, Plus, Info } from 'lucide-react'
 
 // De coach bewaart zijn vervangers per slot ('breakfast', 'avondsnack',
 // 'snack2', …). Voor de keuzelijst vertalen we die naar de zes momenten.
@@ -52,6 +52,10 @@ export default function AIAlternativesModal({
   // moment hij hoort.
   const [sterMeal, setSterMeal] = useState(null)
   const [sterBezig, setSterBezig] = useState(false)
+  // Maaltijd waarvan het info-blad open staat, met zijn uitgeschreven
+  // ingrediënten (die zijn in ai_meals alleen verwijzingen).
+  const [infoMeal, setInfoMeal] = useState(null)
+  const [infoIngredienten, setInfoIngredienten] = useState(null)
   const [loading, setLoading] = useState(true)
   const [selectedMeal, setSelectedMeal] = useState(null)
 
@@ -380,6 +384,13 @@ export default function AIAlternativesModal({
     }
   }
 
+  const openInfo = async (meal) => {
+    setInfoMeal(meal)
+    setInfoIngredienten(null)
+    const uit = await schrijfIngredientenUit(meal.ingredients_list)
+    setInfoIngredienten(uit || [])
+  }
+
   const staatInMijnMaaltijden = (meal) =>
     customMeals.some(m => String(m.name || '').toLowerCase() === String(meal?.name || '').toLowerCase())
 
@@ -558,6 +569,7 @@ export default function AIAlternativesModal({
                 isMobile={isMobile}
                 inMijnMaaltijden={meal._isCustom || staatInMijnMaaltijden(meal)}
                 onSter={() => setSterMeal(meal)}
+                onInfo={() => openInfo(meal)}
               />
             ))
           ) : (
@@ -622,6 +634,87 @@ export default function AIAlternativesModal({
 
       </div>
     </div>
+
+      {/* Wat zit erin en hoe liggen de verhoudingen — voordat je kiest. */}
+      <BladModal
+        open={!!infoMeal}
+        titel={infoMeal?.name || 'Maaltijd'}
+        onClose={() => { setInfoMeal(null); setInfoIngredienten(null) }}
+        zIndex={10600}
+      >
+        {infoMeal && (
+          <>
+            <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem' }}>
+              {[
+                { label: 'kcal', waarde: Math.round(infoMeal.calories || 0) },
+                { label: 'eiwit', waarde: `${Math.round(infoMeal.protein || 0)}g` },
+                { label: 'koolh', waarde: `${Math.round(infoMeal.carbs || 0)}g` },
+                { label: 'vet', waarde: `${Math.round(infoMeal.fat || 0)}g` },
+              ].map(m => (
+                <div key={m.label} style={{
+                  flex: 1, minWidth: 0, textAlign: 'center',
+                  padding: '0.5rem 0.25rem',
+                  border: '1px solid rgba(255,255,255,0.1)', borderRadius: 10,
+                }}>
+                  <div style={{ fontSize: '1rem', fontWeight: 900, color: '#fff', lineHeight: 1.1 }}>{m.waarde}</div>
+                  <div style={{
+                    fontSize: '0.55rem', fontWeight: 800, color: 'rgba(255,255,255,0.35)',
+                    textTransform: 'uppercase', letterSpacing: '0.06em', marginTop: 2,
+                  }}>{m.label}</div>
+                </div>
+              ))}
+            </div>
+
+            <div style={{
+              fontSize: '0.62rem', fontWeight: 800, color: 'rgba(255,255,255,0.4)',
+              textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '0.5rem',
+            }}>
+              Ingrediënten
+            </div>
+            {infoIngredienten === null ? (
+              <div style={{ padding: '1rem 0', color: 'rgba(255,255,255,0.3)', fontSize: '0.78rem' }}>Laden…</div>
+            ) : infoIngredienten.length === 0 ? (
+              <div style={{ padding: '0.5rem 0 1rem', color: 'rgba(255,255,255,0.35)', fontSize: '0.78rem', fontWeight: 700 }}>
+                Van deze maaltijd staan geen ingrediënten in de database.
+              </div>
+            ) : (
+              <div style={{ marginBottom: '1rem' }}>
+                {infoIngredienten.map((ing, i) => (
+                  <div key={`${ing.name}-${i}`} style={{
+                    display: 'flex', alignItems: 'baseline', gap: 8,
+                    padding: '0.5rem 0',
+                    borderBottom: '1px solid rgba(255,255,255,0.06)',
+                  }}>
+                    <span style={{ flex: 1, minWidth: 0, fontSize: '0.85rem', fontWeight: 800, color: '#fff' }}>
+                      {ing.name}
+                    </span>
+                    <span style={{ fontSize: '0.75rem', fontWeight: 800, color: 'rgba(255,255,255,0.45)' }}>
+                      {ing.amount}{ing.unit === 'gram' ? 'g' : ` ${ing.unit || ''}`}
+                    </span>
+                    <span style={{ fontSize: '0.75rem', fontWeight: 900, color: 'rgba(255,255,255,0.7)', minWidth: 48, textAlign: 'right' }}>
+                      {ing.calories} kcal
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <button
+              onClick={() => { setSelectedMeal(infoMeal); setInfoMeal(null); setInfoIngredienten(null) }}
+              style={{
+                width: '100%', minHeight: 48,
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7,
+                background: '#fff', border: 'none', borderRadius: 12,
+                color: '#0a0a0a', fontSize: '0.9rem', fontWeight: 900,
+                fontFamily: 'inherit', cursor: 'pointer',
+                touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+              }}
+            >
+              <Check size={15} strokeWidth={3} /> Kies deze
+            </button>
+          </>
+        )}
+      </BladModal>
 
       {/* Blad dat vraagt bij welk moment de maaltijd hoort voor je 'm bij je
           eigen maaltijden zet. Zonder die vraag belandt alles op één hoop en
@@ -774,7 +867,7 @@ export default function AIAlternativesModal({
 // eronder. Dat zijn de twee waarop je een maaltijd inruilt. Geen "Eigen"-label
 // meer voor eigen maaltijden: dat duwde het kcal-verschil van de foto af, en
 // die staan al onder hun eigen filter.
-function SuggestieKaart({ meal, currentMeal, isSelected, onSelect, isMobile, inMijnMaaltijden, onSter }) {
+function SuggestieKaart({ meal, currentMeal, isSelected, onSelect, isMobile, inMijnMaaltijden, onSter, onInfo }) {
   const teken = (n) => `${n > 0 ? '+' : ''}${n}`
   const kcalOp = Math.round((meal.calories || 0) - (currentMeal?.calories || 0))
   const eiwitOp = Math.round((meal.protein || 0) - (currentMeal?.protein || 0))
@@ -812,12 +905,15 @@ function SuggestieKaart({ meal, currentMeal, isSelected, onSelect, isMobile, inM
           <Star size={14} strokeWidth={2.6} fill={inMijnMaaltijden ? '#fff' : 'none'} />
         </button>
       }
-      acties={[{
-        icon: <Check size={isMobile ? 11 : 12} strokeWidth={2.6} />,
-        label: isSelected ? 'Gekozen' : 'Kies',
-        onClick: onSelect,
-        checked: isSelected,
-      }]}
+      acties={[
+        { icon: <Info size={isMobile ? 11 : 12} />, label: 'Info', onClick: onInfo },
+        {
+          icon: <Check size={isMobile ? 11 : 12} strokeWidth={2.6} />,
+          label: isSelected ? 'Gekozen' : 'Kies',
+          onClick: onSelect,
+          checked: isSelected,
+        },
+      ]}
     />
   )
 }
