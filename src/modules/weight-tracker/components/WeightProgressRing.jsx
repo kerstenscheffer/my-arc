@@ -120,7 +120,7 @@ function HorizontalPicker({ value, onChange, disabled, savedLabel = false, onEdi
         {savedLabel && (
           <div style={{
             position: 'absolute', bottom: 6, left: '50%', transform: 'translateX(-50%)',
-            zIndex: 4, display: 'flex', alignItems: 'center', gap: 14,
+            zIndex: 4, display: 'flex', alignItems: 'center', gap: 10,
           }}>
             {onEdit && (
               <button
@@ -138,6 +138,7 @@ function HorizontalPicker({ value, onChange, disabled, savedLabel = false, onEdi
                 <Pencil size={15} strokeWidth={2.6} />
               </button>
             )}
+            <div style={{ width: 1, height: 14, background: 'rgba(255,255,255,0.25)' }} />
             <Check size={16} strokeWidth={3.2} color="#fff" />
           </div>
         )}
@@ -148,7 +149,7 @@ function HorizontalPicker({ value, onChange, disabled, savedLabel = false, onEdi
         {savedLabel && (
           <div style={{
             position: 'absolute', bottom: 6, left: '50%', transform: 'translateX(-50%)',
-            zIndex: 4, display: 'flex', alignItems: 'center', gap: 14,
+            zIndex: 4, display: 'flex', alignItems: 'center', gap: 10,
           }}>
             {onEdit && (
               <button
@@ -166,22 +167,12 @@ function HorizontalPicker({ value, onChange, disabled, savedLabel = false, onEdi
                 <Pencil size={15} strokeWidth={2.6} />
               </button>
             )}
+            <div style={{ width: 1, height: 14, background: 'rgba(255,255,255,0.25)' }} />
             <Check size={16} strokeWidth={3.2} color="#fff" />
           </div>
         )}
         <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: '60px', background: 'linear-gradient(to right, #0a0a0a, transparent)', zIndex: 2, pointerEvents: 'none' }} />
         <div style={{ position: 'absolute', right: 0, top: 0, bottom: 0, width: '60px', background: 'linear-gradient(to left, #0a0a0a, transparent)', zIndex: 2, pointerEvents: 'none' }} />
-        {/* Markering van het midden: een zacht vlak achter het getal in plaats
-            van twee harde streepjes die dwars door de schuif liepen. */}
-        <div style={{
-          position: 'absolute', top: 8, bottom: 8,
-          left: `calc(50% - ${ITEM_W / 2 + 6}px)`, width: `${ITEM_W + 12}px`,
-          background: 'rgba(255,255,255,0.05)',
-          border: '1px solid rgba(255,255,255,0.1)',
-          borderRadius: 12,
-          zIndex: 1, pointerEvents: 'none',
-        }} />
-
         <div
           ref={ref}
           onScroll={onScroll}
