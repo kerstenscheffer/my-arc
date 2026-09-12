@@ -79,6 +79,28 @@ const overlap = (a, b) => {
 
 const gelijk = (a, b) => !!a && !!b && String(a).toLowerCase() === String(b).toLowerCase()
 
+// "cable" en "cables" is hetzelfde apparaat, net als dumbbell en dumbbells.
+// Beide vormen staan door elkaar in de tabel; zonder dit telt Lat Pulldown
+// (cable) niet als match met Lat Pulldown Wide Grip (cables).
+const zelfdeEquipment = (a, b) => {
+  const norm = (v) => String(v || '').toLowerCase().trim().replace(/s$/, '')
+  return !!a && !!b && norm(a) === norm(b)
+}
+
+// Woorden die niets over de oefening zeggen; die mogen geen match opleveren.
+const LOZE_WOORDEN = new Set(['the', 'and', 'with', 'op', 'de', 'het', 'een', 'grip', 'arm', 'single', 'two', 'wide', 'close', 'narrow'])
+
+// Hoeveel woorden delen twee oefeningnamen? Dit vangt op wat de kolommen
+// missen: bij 63 van de 249 oefeningen is movement_pattern leeg, en dan zou
+// "Lat Pulldown" niet herkennen dat "Lat Pulldown (Wide Grip)" familie is.
+const naamOverlap = (a, b) => {
+  const woorden = (v) => new Set(String(v || '').toLowerCase().replace(/[^a-z0-9 ]/g, ' ').split(/\s+/).filter(w => w.length > 2 && !LOZE_WOORDEN.has(w)))
+  const A = woorden(a), B = woorden(b)
+  let n = 0
+  A.forEach(w => { if (B.has(w)) n += 1 })
+  return n
+}
+
 const scoreVoor = (alt, basis) => {
   if (!basis) return 0
   let score = 0
@@ -87,10 +109,13 @@ const scoreVoor = (alt, basis) => {
   score += Math.min(2, overlap(alt.secundair_spieren, basis.secundair_spieren)) * 8
   if (gelijk(alt.movement_pattern, basis.movement_pattern)) score += 25
   if (gelijk(alt.type, basis.type)) score += 15
-  if (gelijk(alt.equipment, basis.equipment)) score += 6
+  if (zelfdeEquipment(alt.equipment, basis.equipment)) score += 6
   if (gelijk(alt.position, basis.position)) score += 5
   if (gelijk(alt.grip, basis.grip)) score += 5
   if (gelijk(alt.difficulty, basis.difficulty)) score += 4
+  // Namen die woorden delen: "Lat Pulldown (Wide Grip)" hoort bij "Lat
+  // Pulldown". Maximaal drie woorden, anders wint een lange naam op ruis.
+  score += Math.min(3, naamOverlap(alt.name, basis.name)) * 9
   // Zelf toegevoegde oefeningen bovenaan bij gelijke stand: die heeft de klant
   // niet voor niets aangemaakt.
   if (alt._isCustom) score += 8
