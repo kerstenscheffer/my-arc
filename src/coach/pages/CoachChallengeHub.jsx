@@ -130,25 +130,35 @@ export default function CoachChallengeHub({ db, clients }) {
   // MONITOR FUNCTIONS
   async function loadChallengeClients() {
     try {
+      // Geen filter op challenge_type meer: die stond hard op '8week' en liet
+      // daarmee de 6-weken 80/20-challenge onzichtbaar. Wel dezelfde naloop
+      // van twee weken als het deelnemersoverzicht, zodat beide lijsten over
+      // dezelfde mensen gaan.
+      const grens = new Date()
+      grens.setDate(grens.getDate() - 14)
+
       const { data: assignments } = await db.supabase
         .from('challenge_assignments')
-        .select('client_id, start_date, end_date, is_paused')
+        .select('client_id, start_date, end_date, is_paused, clients(id, first_name, last_name, email)')
         .eq('is_active', true)
-        .eq('challenge_type', '8week')
+        .gte('end_date', grens.toISOString().slice(0, 10))
 
       if (assignments && assignments.length > 0) {
-        const clientIds = assignments.map(a => a.client_id)
-        const filteredClients = clients.filter(c => clientIds.includes(c.id))
-        
-        const clientsWithDates = filteredClients.map(client => {
-          const assignment = assignments.find(a => a.client_id === client.id)
+        // De naam uit de deelname zelf halen en alleen terugvallen op de
+        // clients-prop. Die prop is de lijst van de ingelogde coach; stond een
+        // deelnemer daar niet in, dan verdween hij hier stilzwijgend.
+        const clientsWithDates = assignments.map(assignment => {
+          const uitProp = clients?.find(c => c.id === assignment.client_id)
+          const basis = uitProp || assignment.clients
+          if (!basis) return null
           return {
-            ...client,
+            ...basis,
+            id: assignment.client_id,
             challengeStart: assignment.start_date,
             challengeEnd: assignment.end_date,
             isPaused: assignment.is_paused
           }
-        })
+        }).filter(Boolean)
         
         setChallengeClients(clientsWithDates)
         
