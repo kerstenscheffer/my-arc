@@ -8,6 +8,18 @@ import MealCard from './day-schedule/MealCard'
 import BladModal from '../../workout/components/todays-workout/components/BladModal'
 import { X, Search, Check, ArrowUp, ArrowDown, Minus, ChevronDown } from 'lucide-react'
 
+// De coach bewaart zijn vervangers per slot ('breakfast', 'avondsnack',
+// 'snack2', …). Voor de keuzelijst vertalen we die naar de zes momenten.
+function slotNaarMoment(slot) {
+  const v = String(slot || '').toLowerCase()
+  if (v.includes('breakfast') || v.includes('ontbijt')) return 'breakfast'
+  if (v.includes('lunch')) return 'lunch'
+  if (v.includes('dinner') || v.includes('diner') || v.includes('avondeten')) return 'dinner'
+  if (v.includes('pre')) return 'pre_workout'
+  if (v.includes('post')) return 'post_workout'
+  return 'snack'
+}
+
 export default function AIAlternativesModal({
   isOpen,
   onClose,
@@ -29,6 +41,10 @@ export default function AIAlternativesModal({
   const [allMeals, setAllMeals] = useState([])
   const [customMeals, setCustomMeals] = useState([])
   const [coachOptions, setCoachOptions] = useState([]) // door coach gecureerde swaps voor dit slot
+  // Alle coach-lijsten, per moment. De coach kiest zijn vervangers per slot,
+  // dus "Coach-suggesties + Lunch" hoort zijn lunch-lijst te tonen — niet de
+  // lijst van het slot dat je toevallig wisselt, gefilterd op timing.
+  const [coachPerMoment, setCoachPerMoment] = useState({})
   const [loading, setLoading] = useState(true)
   const [selectedMeal, setSelectedMeal] = useState(null)
 
@@ -115,18 +131,31 @@ export default function AIAlternativesModal({
       // hoeft de fallback niet apart in deze modal, de PDF-export én de
       // coach-modal geïmplementeerd te staan.
       let curated = []
+      let perMoment = {}
       try {
         const clientId = client?.id || currentMeal?.client_id || null
-        let ids = []
+        let alleSlots = {}
         if (clientId) {
           const { data } = await db.supabase
             .rpc('get_effective_swap_options', { p_client_id: clientId })
-          ids = data?.[slotKey]?.meal_ids || []
+          alleSlots = data || {}
         }
-        if (ids.length > 0) {
-          const { data: curatedMeals } = await db.supabase.from('ai_meals').select('*').in('id', ids)
-          // Behoud de volgorde waarin de coach ze koos.
-          curated = ids.map(id => (curatedMeals || []).find(m => m.id === id)).filter(Boolean)
+        // Alle id's uit álle slots in één keer ophalen: de coach heeft ook
+        // lijsten voor de andere momenten en die wil je kunnen kiezen.
+        const alleIds = [...new Set(
+          Object.values(alleSlots).flatMap(v => v?.meal_ids || [])
+        )]
+        if (alleIds.length > 0) {
+          const { data: curatedMeals } = await db.supabase.from('ai_meals').select('*').in('id', alleIds)
+          const opId = new Map((curatedMeals || []).map(m => [m.id, m]))
+          // Behoud per slot de volgorde waarin de coach ze koos.
+          Object.entries(alleSlots).forEach(([slot, v]) => {
+            const lijst = (v?.meal_ids || []).map(id => opId.get(id)).filter(Boolean)
+            if (lijst.length === 0) return
+            const moment = slotNaarMoment(slot)
+            perMoment[moment] = [...(perMoment[moment] || []), ...lijst]
+          })
+          curated = (alleSlots?.[slotKey]?.meal_ids || []).map(id => opId.get(id)).filter(Boolean)
         }
       } catch (e) { /* geen curatie → gewoon de normale pool */ }
 
@@ -149,6 +178,7 @@ export default function AIAlternativesModal({
       setAllMeals(meals || [])
       setCustomMeals(custom)
       setCoachOptions(curated)
+      setCoachPerMoment(perMoment)
       // Wissel je een ontbijt, dan wil je bijna altijd een ander ontbijt zien.
       // "Alle maaltijden" is één tik weg.
       setMoment(slotKey)
@@ -186,7 +216,21 @@ export default function AIAlternativesModal({
 
     // 1. Waar zoeken we?
     let pool
-    if (bron === 'coach') pool = coachOptions.filter(nietZelf)
+    if (bron === 'coach') {
+      // Kies je een moment, dan zie je de lijst die de coach voor dát moment
+      // heeft gezet. Zonder moment: eerst de lijst van het slot dat je
+      // wisselt, daarna de rest.
+      if (moment !== 'alles') {
+        pool = (coachPerMoment[moment] || []).filter(nietZelf)
+      } else {
+        const gezien = new Set()
+        pool = [...coachOptions, ...Object.values(coachPerMoment).flat()].filter(m => {
+          if (!nietZelf(m) || gezien.has(m.id)) return false
+          gezien.add(m.id)
+          return true
+        })
+      }
+    }
     else if (bron === 'mine') pool = customMeals.filter(nietZelf)
     else if (bron === 'db') pool = allMeals.filter(nietZelf)
     else {
@@ -212,8 +256,11 @@ export default function AIAlternativesModal({
 
     // 3. Welk moment? Maaltijden zonder moment blijven staan — 19 van de 482
     // hebben geen timing, en die wegfilteren maakt ze onvindbaar.
+    // Coach-lijsten zijn al per moment gekozen; er nog eens de timing van de
+    // maaltijd overheen leggen zou precies de suggesties wegfilteren die de
+    // coach bewust op die plek zette.
     let meals = pool
-    if (moment !== 'alles') {
+    if (moment !== 'alles' && bron !== 'coach') {
       meals = pool.filter(m => {
         const set = momentenVan(m)
         return set.size === 0 || set.has(moment)
@@ -440,9 +487,9 @@ export default function AIAlternativesModal({
                     erbovenop levert dan al snel niets op, en dat is geen fout
                     maar een lege doorsnede. Zeg dat dan ook. */}
                 {bron === 'coach' && moment !== 'alles'
-                  ? `Je coach heeft voor deze maaltijd wel suggesties, maar geen die bij ${(momentOpties.find(o => o.id === moment)?.label || moment).toLowerCase()} horen.`
+                  ? `Je coach heeft voor ${(momentOpties.find(o => o.id === moment)?.label || moment).toLowerCase()} geen suggesties gezet.`
                   : bron === 'coach'
-                    ? 'Je coach heeft voor deze maaltijd nog geen suggesties gezet.'
+                    ? 'Je coach heeft nog geen suggesties gezet.'
                     : bron === 'mine'
                       ? 'Je hebt hier nog geen eigen maaltijden die passen.'
                       : 'Probeer een ander moment, een andere bron of een zoekterm.'}
