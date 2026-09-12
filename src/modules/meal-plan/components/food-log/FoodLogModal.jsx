@@ -21,9 +21,12 @@ export default function FoodLogModal({
   // ISO timestamp to stamp on consumed_at. Pass when logging meals for a
   // non-today date (e.g. backfilling yesterday). Null/omitted = use now.
   consumedAt = null,
+  // Op welk tabblad het venster opent. 'meals' = Mijn maaltijden, gebruikt
+  // door de knop "Maaltijd aanmaken" in het wisselvenster.
+  startTab = 'search',
 }) {
   const isMobile = window.innerWidth <= 768
-  const [activeTab, setActiveTab] = useState('search')
+  const [activeTab, setActiveTab] = useState(startTab)
   const [selectedItem, setSelectedItem] = useState(null)
   const [loggingService, setLoggingService] = useState(null)
   const [successData, setSuccessData] = useState(null)
@@ -42,13 +45,16 @@ export default function FoodLogModal({
   useEffect(() => {
     if (!isOpen) {
       setSelectedItem(null)
-      setActiveTab('search')
+      setActiveTab(startTab)
       setSuccessData(null)
       setAddIngredientCallback(null)
       setBuildingMeal(null)
       setShowCopyConfirm(false)
     }
-  }, [isOpen])
+  }, [isOpen, startTab])
+
+  // Openen op het meegegeven tabblad.
+  useEffect(() => { if (isOpen) setActiveTab(startTab) }, [isOpen, startTab])
 
   // ✅ FIX v3.1: editMeal flow — race fixed door op editMeal.id te listenen
   // Vorige versie luisterde alleen op [isOpen, editMeal] referentie wat issues gaf

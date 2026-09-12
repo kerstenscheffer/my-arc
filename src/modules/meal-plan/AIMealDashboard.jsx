@@ -90,6 +90,9 @@ export default function AIMealDashboard({ client, onNavigate, db }) {
   // Counter dat AIDaySchedule's FoodLogModal triggert wanneer de FAB
   // wordt ingedrukt. Increment = open.
   const [foodLogTrigger, setFoodLogTrigger] = useState(0)
+  // Tabblad waarop het log-venster opent: 'search' vanaf de ronde knop,
+  // 'meals' vanuit "Maaltijd aanmaken" in het wisselvenster.
+  const [foodLogTab, setFoodLogTab] = useState('search')
   
   const [modals, setModals] = useState({
     alternatives: null,
@@ -686,12 +689,13 @@ export default function AIMealDashboard({ client, onNavigate, db }) {
         onMealLogged={handleMealLogged}
         targets={dashboardData.dailyTotals?.targets}
         foodLogTrigger={foodLogTrigger}
+        foodLogTab={foodLogTab}
         onPastDayUpdate={() => setPastDayRefreshKey(k => k + 1)}
       />
 
       {/* Eén ronde gele log-knop — vervangt alle inline log-knoppen. */}
       <MealLogFAB
-        onClick={() => setFoodLogTrigger(n => n + 1)}
+        onClick={() => { setFoodLogTab('search'); setFoodLogTrigger(n => n + 1) }}
         isMobile={isMobile}
       />
 
@@ -716,6 +720,11 @@ export default function AIMealDashboard({ client, onNavigate, db }) {
           onClose={() => setModals(prev => ({ ...prev, alternatives: null }))}
           currentMeal={modals.alternatives}
           onSelectMeal={(newMealId) => handleSwapMeal(modals.alternatives, newMealId)}
+          onMaaltijdAanmaken={() => {
+            setModals(prev => ({ ...prev, alternatives: null }))
+            setFoodLogTab('meals')
+            setFoodLogTrigger(v => v + 1)
+          }}
           db={db}
           service={service}
           client={client}

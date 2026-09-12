@@ -46,6 +46,8 @@ export default function AIDaySchedule({
   // in AIMealDashboard wordt aangeraakt. Geeft een minimaal interface
   // tussen ouder en kind zonder de showFoodLog-state op te tillen.
   foodLogTrigger = 0,
+  // Tabblad waarop het log-venster opent als de ouder het opent.
+  foodLogTab = 'search',
   // Callback waarmee AIMealDashboard op de hoogte gesteld wordt als een
   // verleden-dag-log gewijzigd is (zodat MacroHero-cache ongeldig gemaakt wordt).
   onPastDayUpdate,
@@ -825,6 +827,7 @@ export default function AIDaySchedule({
         return (
           <FoodLogModal
             isOpen={showFoodLog}
+            startTab={foodLogTab}
             onClose={() => { setShowFoodLog(false); setDefaultMealMoment(null); setEditingMeal(null) }}
             client={client}
             db={db}

@@ -52,6 +52,8 @@ export default function MealCard({
   // Aangetikt in een keuzelijst (wisselvenster): witte rand in plaats van de
   // grijze, zonder het "afgevinkt"-gedrag van isChecked.
   geselecteerd = false,
+  // Knopje rechtsboven op de kaart (de ster in het wisselvenster).
+  hoekKnop = null,
 }) {
   const photoSize = isMobile ? 78 : 90
   const moment = momentLabel || getMealTypeLabel(meal)
@@ -67,7 +69,11 @@ export default function MealCard({
       transition: 'opacity 0.2s ease',
       display: 'flex',
       flexDirection: 'column',
+      position: 'relative',
     }}>
+      {hoekKnop && (
+        <div style={{ position: 'absolute', top: 2, right: 2, zIndex: 3 }}>{hoekKnop}</div>
+      )}
       {/* Bovenste rij: kleine foto + info ernaast */}
       <div style={{ display: 'flex', alignItems: 'stretch', minWidth: 0 }}>
         <div

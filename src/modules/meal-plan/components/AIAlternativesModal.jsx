@@ -6,7 +6,7 @@ import MealCard from './day-schedule/MealCard'
 // Hetzelfde blad als de historie in het workout-log-scherm; één vorm voor
 // "extra scherm dat vanaf onderen openschuift" in de hele app.
 import BladModal from '../../workout/components/todays-workout/components/BladModal'
-import { X, Search, Check, ArrowUp, ArrowDown, Minus, ChevronDown } from 'lucide-react'
+import { X, Search, Check, ArrowUp, ArrowDown, Minus, ChevronDown, Star, Plus } from 'lucide-react'
 
 // De coach bewaart zijn vervangers per slot ('breakfast', 'avondsnack',
 // 'snack2', …). Voor de keuzelijst vertalen we die naar de zes momenten.
@@ -21,6 +21,8 @@ function slotNaarMoment(slot) {
 }
 
 export default function AIAlternativesModal({
+  // Opent het maaltijd-aanmaakscherm (Mijn maaltijden in het log-venster).
+  onMaaltijdAanmaken,
   isOpen,
   onClose,
   currentMeal,
@@ -45,6 +47,10 @@ export default function AIAlternativesModal({
   // dus "Coach-suggesties + Lunch" hoort zijn lunch-lijst te tonen — niet de
   // lijst van het slot dat je toevallig wisselt, gefilterd op timing.
   const [coachPerMoment, setCoachPerMoment] = useState({})
+  // Maaltijd die naar "Mijn maaltijden" gaat; het blad vraagt eerst bij welk
+  // moment hij hoort.
+  const [sterMeal, setSterMeal] = useState(null)
+  const [sterBezig, setSterBezig] = useState(false)
   const [loading, setLoading] = useState(true)
   const [selectedMeal, setSelectedMeal] = useState(null)
 
@@ -298,6 +304,41 @@ export default function AIAlternativesModal({
     }
   }
 
+  // Een maaltijd uit de lijst kopiëren naar de eigen maaltijden. Bewust een
+  // kopie in ai_custom_meals en geen verwijzing: "Mijn maaltijden" is een
+  // eigen lijst die je daarna kunt aanpassen, en de rest van de app leest die
+  // tabel al.
+  const bewaarInMijnMaaltijden = async (meal, sectie) => {
+    if (!meal || !client?.id || !db?.supabase) return
+    setSterBezig(true)
+    try {
+      const { data, error } = await db.supabase.from('ai_custom_meals').insert({
+        client_id: client.id,
+        name: meal.name,
+        calories: Math.round(meal.calories || 0),
+        protein: Math.round(meal.protein || 0),
+        carbs: Math.round(meal.carbs || 0),
+        fat: Math.round(meal.fat || 0),
+        fiber: Math.round(meal.fiber || 0),
+        ingredients_list: meal.ingredients_list || null,
+        image_url: meal.image_url || null,
+        section: sectie || null,
+        is_active: true,
+      }).select().single()
+      if (error) throw error
+      setCustomMeals(prev => [...prev, { ...data, _isCustom: true }])
+      setSterMeal(null)
+    } catch (e) {
+      console.error('Opslaan in mijn maaltijden mislukt:', e)
+      alert('Kon de maaltijd niet aan je eigen maaltijden toevoegen.')
+    } finally {
+      setSterBezig(false)
+    }
+  }
+
+  const staatInMijnMaaltijden = (meal) =>
+    customMeals.some(m => String(m.name || '').toLowerCase() === String(meal?.name || '').toLowerCase())
+
   const getDiff = (newVal, oldVal) => {
     const diff = Math.round((newVal || 0) - (oldVal || 0))
     if (diff > 0) return { text: `+${diff}`, color: '#fff', Icon: ArrowUp }
@@ -471,6 +512,8 @@ export default function AIAlternativesModal({
                 isSelected={selectedMeal?.id === meal.id}
                 onSelect={() => setSelectedMeal(selectedMeal?.id === meal.id ? null : meal)}
                 isMobile={isMobile}
+                inMijnMaaltijden={meal._isCustom || staatInMijnMaaltijden(meal)}
+                onSter={() => setSterMeal(meal)}
               />
             ))
           ) : (
@@ -511,10 +554,69 @@ export default function AIAlternativesModal({
               )}
             </div>
           )}
+
+          {/* Eigen maaltijden: de weg naar het aanmaakscherm hoort onderaan de
+              lijst waar je 'm mist. */}
+          {bron === 'mine' && onMaaltijdAanmaken && !loading && (
+            <div style={{ padding: isMobile ? '0.75rem 1rem 1.5rem' : '1rem 1.5rem 2rem' }}>
+              <button
+                onClick={onMaaltijdAanmaken}
+                style={{
+                  width: '100%', minHeight: 48,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7,
+                  background: '#fff', border: 'none', borderRadius: 12,
+                  color: '#0a0a0a', fontSize: '0.88rem', fontWeight: 900,
+                  fontFamily: 'inherit', cursor: 'pointer',
+                  touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+                }}
+              >
+                <Plus size={16} strokeWidth={3} /> Maaltijd aanmaken
+              </button>
+            </div>
+          )}
         </div>
 
       </div>
     </div>
+
+      {/* Blad dat vraagt bij welk moment de maaltijd hoort voor je 'm bij je
+          eigen maaltijden zet. Zonder die vraag belandt alles op één hoop en
+          doet het moment-filter daar niets meer. */}
+      <BladModal
+        open={!!sterMeal}
+        titel="Bij mijn maaltijden zetten"
+        onClose={() => setSterMeal(null)}
+        zIndex={10600}
+      >
+        {sterMeal && (
+          <>
+            <div style={{ fontSize: '0.95rem', fontWeight: 900, color: '#fff', marginBottom: 4 }}>
+              {sterMeal.name}
+            </div>
+            <div style={{ fontSize: '0.72rem', fontWeight: 700, color: 'rgba(255,255,255,0.45)', marginBottom: 14 }}>
+              Bij welk moment hoort deze maaltijd?
+            </div>
+            {[...momentOpties.filter(o => o.id !== 'alles'), { id: '', label: 'Geen moment' }].map(o => (
+              <button
+                key={o.id || 'geen'}
+                onClick={() => bewaarInMijnMaaltijden(sterMeal, o.id)}
+                disabled={sterBezig}
+                style={{
+                  width: '100%', textAlign: 'left',
+                  padding: '0.7rem 0.9rem', marginBottom: 8,
+                  background: 'transparent', border: '1px solid rgba(255,255,255,0.18)',
+                  borderRadius: 11, color: '#fff',
+                  fontSize: '0.85rem', fontWeight: 900, fontFamily: 'inherit',
+                  cursor: sterBezig ? 'wait' : 'pointer',
+                  touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+                }}
+              >
+                {o.label}
+              </button>
+            ))}
+          </>
+        )}
+      </BladModal>
 
       {/* Bevestigen in een blad, hetzelfde als de historie in het log-scherm:
           de nieuwe maaltijd als kaart, het verschil met de huidige eronder en
@@ -628,7 +730,7 @@ export default function AIAlternativesModal({
 // eronder. Dat zijn de twee waarop je een maaltijd inruilt. Geen "Eigen"-label
 // meer voor eigen maaltijden: dat duwde het kcal-verschil van de foto af, en
 // die staan al onder hun eigen filter.
-function SuggestieKaart({ meal, currentMeal, isSelected, onSelect, isMobile }) {
+function SuggestieKaart({ meal, currentMeal, isSelected, onSelect, isMobile, inMijnMaaltijden, onSter }) {
   const teken = (n) => `${n > 0 ? '+' : ''}${n}`
   const kcalOp = Math.round((meal.calories || 0) - (currentMeal?.calories || 0))
   const eiwitOp = Math.round((meal.protein || 0) - (currentMeal?.protein || 0))
@@ -649,6 +751,23 @@ function SuggestieKaart({ meal, currentMeal, isSelected, onSelect, isMobile }) {
       isMobile={isMobile}
       geselecteerd={isSelected}
       onCheck={onSelect}
+      hoekKnop={
+        <button
+          onClick={(e) => { e.stopPropagation(); if (!inMijnMaaltijden) onSter?.() }}
+          aria-label={inMijnMaaltijden ? 'Staat in jouw maaltijden' : 'Zet bij mijn maaltijden'}
+          title={inMijnMaaltijden ? 'Staat al in jouw maaltijden' : 'Zet bij mijn maaltijden'}
+          style={{
+            width: 28, height: 28, padding: 0,
+            background: 'transparent', border: 'none', borderRadius: 7,
+            color: '#fff', opacity: inMijnMaaltijden ? 1 : 0.55,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            cursor: inMijnMaaltijden ? 'default' : 'pointer',
+            touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+          }}
+        >
+          <Star size={14} strokeWidth={2.6} fill={inMijnMaaltijden ? '#fff' : 'none'} />
+        </button>
+      }
       acties={[{
         icon: <Check size={isMobile ? 11 : 12} strokeWidth={2.6} />,
         label: isSelected ? 'Gekozen' : 'Kies',
