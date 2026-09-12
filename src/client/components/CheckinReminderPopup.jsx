@@ -2,7 +2,8 @@
 //
 // Twee-fase nudge naar de wekelijkse check-in:
 //
-//   1. Full-screen modal — initieel, vraagt om aandacht.
+//   1. Melding rechtsboven die vanaf rechts inschuift, in dezelfde vorm als
+//      het compliment op de workout-pagina.
 //   2. Persistente pill-widget — verschijnt zodra de klant de modal
 //      wegklikt. Blijft hangen rechtsonder totdat de check-in is
 //      ingevuld of de pagina opnieuw geladen wordt (dan opnieuw modal).
@@ -18,7 +19,7 @@
 
 import React, { useEffect, useState, useRef } from 'react'
 import { createPortal } from 'react-dom'
-import { ClipboardCheck, X, ArrowRight, Clock, AlertCircle } from 'lucide-react'
+import { ClipboardCheck, X, ArrowRight, AlertCircle } from 'lucide-react'
 import CheckinService from '../../modules/client-checkin/CheckinService'
 import { trajectLoopt } from '../../modules/client-checkin/trajectStatus'
 
@@ -204,120 +205,108 @@ export default function CheckinReminderPopup({ client, db, onOpen, isMobile: pro
     )
   }
 
-  // ── FULL MODAL ──
+  // ── MELDING RECHTSBOVEN ──
+  // Zelfde vorm als het compliment op de workout-pagina: schuift vanaf rechts
+  // in beeld en blijft aan die rand plakken, met de coach-foto rechts en de
+  // tekst links eroverheen. Was een schermvullende modal met een donkere waas
+  // erachter; dat blokkeerde de hele app voor een herinnering.
   let title, body
   if (mode === 'friday') {
-    title = 'Het is vrijdag — tijd voor je check-in'
-    body = 'Vul nu je wekelijkse check-in in zodat je coach kan reageren op je week.'
+    title = 'Tijd voor je check-in'
+    body = 'Het is vrijdag. Vul \u2018m in zodat je coach op je week kan reageren.'
   } else if (mode === 'overdue') {
-    title = `Je check-in is ${daysLate} dagen te laat`
-    body = 'Vul ‘m nu in. Hoe sneller je coach jouw week ziet, hoe sneller hij kan bijsturen waar nodig.'
+    title = `Check-in ${daysLate} dagen te laat`
+    body = 'Hoe sneller je coach je week ziet, hoe sneller hij kan bijsturen.'
   } else {
-    title = 'Vrijdag check-in gemist'
-    body = 'Je hebt afgelopen vrijdag de check-in niet ingevuld. Vul ‘m alsnog in — je coach wil graag weten hoe het gaat.'
+    title = 'Check-in gemist'
+    body = 'Afgelopen vrijdag niet ingevuld. Vul \u2018m alsnog in.'
   }
+
+  const breedte = isMobile ? 'min(330px, 88vw)' : 380
+  const hoogte = isMobile ? 84 : 94
 
   const overlay = (
     <div
-      onClick={handleDismiss}
+      onClick={handleOpenForm}
       style={{
-        position: 'fixed', inset: 0, zIndex: 2147483400,
-        background: 'rgba(0,0,0,0.78)', backdropFilter: 'blur(6px)',
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        padding: '1rem',
-        animation: 'checkinPopFade 0.18s ease',
+        position: 'fixed',
+        right: 0,
+        // Onder de plek van het compliment op de workout-pagina, zodat de twee
+        // elkaar niet overlappen als ze tegelijk in beeld staan.
+        top: isMobile ? 'calc(env(safe-area-inset-top, 0px) + 180px)' : 214,
+        zIndex: 97,
+        width: breedte, height: hoogte,
+        borderRadius: '16px 0 0 16px',
+        overflow: 'hidden',
+        background: '#0a0a0a',
+        border: `1px solid ${mode === 'friday' ? 'rgba(255,255,255,0.12)' : palette.border}`,
+        borderRight: 'none',
+        boxShadow: '0 16px 44px rgba(0,0,0,0.6)',
+        cursor: 'pointer',
+        touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+        animation: 'checkinSchuifIn 0.42s cubic-bezier(0.22, 1, 0.36, 1) both',
       }}
     >
-      <div
-        onClick={(e) => e.stopPropagation()}
-        style={{
-          width: '100%', maxWidth: 420,
-          background: '#0a0a0a',
-          border: '1px solid rgba(255,255,255,0.18)',
-          borderRadius: 16,
-          padding: isMobile ? '1.1rem 1.1rem 1rem' : '1.4rem 1.4rem 1.2rem',
-          color: '#fff',
-          boxShadow: '0 30px 80px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,255,255,0.06)',
-          animation: 'checkinPopIn 0.22s cubic-bezier(0.34, 1.56, 0.64, 1)',
-          position: 'relative',
-        }}
-      >
-        <button
-          onClick={handleDismiss}
-          aria-label="Later"
-          style={{
-            position: 'absolute', top: 10, right: 10,
-            width: 34, height: 34, borderRadius: 8,
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            background: 'transparent', border: 'none',
-            color: 'rgba(255,255,255,0.45)', cursor: 'pointer',
-            touchAction: 'manipulation',
-          }}
-        >
-          <X size={16} />
-        </button>
+      <div style={{
+        position: 'absolute', top: 0, right: 0, bottom: 0,
+        width: '40%',
+        backgroundImage: 'url(/coach-compliment.jpg)',
+        backgroundSize: 'cover', backgroundPosition: 'center 30%',
+      }} />
+      <div style={{
+        position: 'absolute', inset: 0, pointerEvents: 'none',
+        background: 'linear-gradient(90deg, #0a0a0a 0%, #0a0a0a 42%, rgba(10,10,10,0.88) 56%, rgba(10,10,10,0.5) 72%, rgba(10,10,10,0.14) 90%, rgba(10,10,10,0) 100%)',
+      }} />
 
+      <div style={{
+        position: 'absolute', top: 0, bottom: 0, left: 0,
+        width: '68%',
+        padding: isMobile ? '0.5rem 0.4rem 0.5rem 0.9rem' : '0.6rem 0.5rem 0.6rem 1.1rem',
+        display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 3,
+      }}>
         <div style={{
-          width: 56, height: 56, borderRadius: 14,
-          background: palette.bg, border: `1px solid ${palette.border}`,
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          marginBottom: '0.85rem',
+          display: 'flex', alignItems: 'center', gap: 6,
+          fontSize: isMobile ? '0.98rem' : '1.1rem',
+          fontWeight: 900, color: mode === 'friday' ? '#fff' : palette.fg,
+          letterSpacing: '-0.025em', lineHeight: 1.1,
+          textShadow: '0 2px 10px rgba(0,0,0,0.8)',
         }}>
-          <Icon size={26} color={palette.fg} />
-        </div>
-
-        <div style={{
-          fontSize: isMobile ? '1.05rem' : '1.15rem',
-          fontWeight: 800, color: '#fff', lineHeight: 1.25,
-          marginBottom: '0.45rem', paddingRight: 30,
-        }}>
+          <Icon size={isMobile ? 15 : 17} strokeWidth={2.6} style={{ flexShrink: 0 }} />
           {title}
         </div>
         <div style={{
-          fontSize: isMobile ? '0.85rem' : '0.9rem',
-          color: 'rgba(255,255,255,0.65)', lineHeight: 1.5,
-          marginBottom: '1.15rem',
+          fontSize: isMobile ? '0.7rem' : '0.76rem',
+          fontWeight: 800, color: 'rgba(255,255,255,0.72)',
+          lineHeight: 1.3,
+          overflow: 'hidden', textOverflow: 'ellipsis',
+          display: '-webkit-box', WebkitLineClamp: 1, WebkitBoxOrient: 'vertical',
+          textShadow: '0 2px 8px rgba(0,0,0,0.8)',
         }}>
           {body}
         </div>
-
-        <button
-          onClick={handleOpenForm}
-          style={{
-            width: '100%', minHeight: 50,
-            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.45rem',
-            background: '#ffffff',
-            border: 'none', borderRadius: 10,
-            color: '#000', fontWeight: 800, fontSize: '0.95rem',
-            cursor: 'pointer', touchAction: 'manipulation',
-            letterSpacing: '0.01em',
-          }}
-        >
-          Vul check-in in <ArrowRight size={16} strokeWidth={2.6} />
-        </button>
-
-        <button
-          onClick={handleDismiss}
-          style={{
-            width: '100%', minHeight: 40, marginTop: '0.55rem',
-            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem',
-            background: 'transparent', border: 'none',
-            color: 'rgba(255,255,255,0.45)', fontWeight: 600,
-            fontSize: '0.78rem', cursor: 'pointer',
-            touchAction: 'manipulation',
-          }}
-        >
-          <Clock size={13} /> Later
-        </button>
-
-        <style>{`
-          @keyframes checkinPopFade { from { opacity: 0; } to { opacity: 1; } }
-          @keyframes checkinPopIn {
-            from { opacity: 0; transform: scale(0.92); }
-            to   { opacity: 1; transform: scale(1); }
-          }
-        `}</style>
       </div>
+
+      <button
+        onClick={(e) => { e.stopPropagation(); handleDismiss() }}
+        aria-label="Later"
+        style={{
+          position: 'absolute', top: 5, right: 6,
+          width: 24, height: 24, padding: 0,
+          background: 'rgba(0,0,0,0.45)', border: 'none', borderRadius: 7,
+          color: '#fff', opacity: 0.85,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+        }}
+      >
+        <X size={13} strokeWidth={2.8} />
+      </button>
+
+      <style>{`
+        @keyframes checkinSchuifIn {
+          from { transform: translateX(105%); opacity: 0; }
+          to   { transform: translateX(0);    opacity: 1; }
+        }
+      `}</style>
     </div>
   )
 
