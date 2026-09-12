@@ -1,7 +1,7 @@
 // src/modules/workout/components/todays-workout/components/ExerciseLogModal.jsx
 import { useState, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
-import { X, Plus, Dumbbell, Check, CheckCircle, MoreVertical, MessageSquare, History, Play, Timer } from 'lucide-react'
+import { X, Plus, Dumbbell, Check, MoreVertical, MessageSquare, History, Play, Timer } from 'lucide-react'
 import ExerciseHistory from './ExerciseHistory'
 import AttachmentSelector from './AttachmentSelector'
 import MachineSettings from './MachineSettings'
@@ -177,35 +177,77 @@ function SetInputWizard({ onComplete, onCancel, previousWeight = 20, previousRep
 }
 
 // ========== LOGGED SET ROW ==========
-function LoggedSetRow({ set, index, onAddDropset, onEdit, onDelete, isMobile }) {
+function LoggedSetRow({ set, index, vorige, onAddDropset, onEdit, onDelete, isMobile }) {
   const [showMenu, setShowMenu] = useState(false)
+
+  // Vergelijking met dezelfde set van vorige keer. Precies wat je tijdens het
+  // loggen wilt weten: ging deze set beter dan de vorige keer? Eerst het
+  // gewicht, en bij gelijk gewicht de reps.
+  let delta = null
+  if (vorige) {
+    const dKg = (set.weight || 0) - (vorige.weight || 0)
+    const dReps = (set.reps || 0) - (vorige.reps || 0)
+    if (dKg !== 0) delta = { tekst: `${dKg > 0 ? '+' : ''}${Number(dKg.toFixed(1))} kg`, op: dKg > 0 }
+    else if (dReps !== 0) delta = { tekst: `${dReps > 0 ? '+' : ''}${dReps} rep${Math.abs(dReps) === 1 ? '' : 's'}`, op: dReps > 0 }
+    else delta = { tekst: 'gelijk', op: null }
+  }
 
   return (
     <div>
-      <div style={{ display: 'flex', alignItems: 'center', padding: isMobile ? '0.65rem 1rem' : '0.75rem 1.25rem', borderBottom: '1px solid rgba(255,255,255,0.05)', gap: '0.5rem' }}>
-        <div style={{ width: isMobile ? '24px' : '28px', height: isMobile ? '24px' : '28px', borderRadius: '6px', background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-          <CheckCircle size={isMobile ? 11 : 13} color="#10b981" />
-        </div>
+      {/* Eén regel per set: nummer, cijfers, verschil met vorige keer, menu.
+          Stond met een groen vinkje in een vakje en het gewicht in goud —
+          drie accenten voor een regel die alleen hoeft te zeggen wat je deed. */}
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: '0.6rem',
+        padding: isMobile ? '0.5rem 1rem' : '0.55rem 1.25rem',
+        borderBottom: '1px solid rgba(255,255,255,0.06)',
+      }}>
+        <span style={{
+          width: '2.9em', flexShrink: 0,
+          fontSize: '0.66rem', fontWeight: 800, color: 'rgba(255,255,255,0.4)',
+          textTransform: 'uppercase', letterSpacing: '0.04em',
+        }}>
+          Set {index + 1}
+        </span>
 
-        <div style={{ flex: 1 }}>
-          <div style={{ fontSize: isMobile ? '0.88rem' : '0.95rem', fontWeight: '800', color: '#fff', fontFamily: 'monospace' }}>
-            <span style={{ color: '#FFD700' }}>{set.weight}</span>
-            <span style={{ color: 'rgba(255,255,255,0.3)' }}>kg</span>
-            <span style={{ color: 'rgba(255,255,255,0.2)', margin: '0 0.25rem' }}>×</span>
-            <span style={{ color: '#fff' }}>{set.reps}</span>
-            {set.partials > 0 && <span style={{ color: 'rgba(255,215,0,0.4)', fontSize: '0.8em' }}> +{set.partials}p</span>}
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{
+            fontSize: isMobile ? '0.95rem' : '1rem', fontWeight: 900, color: '#fff',
+            fontVariantNumeric: 'tabular-nums',
+          }}>
+            {set.weight}<span style={{ color: 'rgba(255,255,255,0.35)', fontSize: '0.72em', fontWeight: 800 }}>kg</span>
+            <span style={{ color: 'rgba(255,255,255,0.25)', fontSize: '0.8em', margin: '0 0.18em' }}>×</span>
+            {set.reps}
+            {set.partials > 0 && <span style={{ color: 'rgba(255,215,0,0.7)', fontSize: '0.72em', fontWeight: 800 }}> +{set.partials}p</span>}
           </div>
           {set.dropsets?.length > 0 && (
-            <div style={{ fontSize: isMobile ? '0.7rem' : '0.76rem', color: 'rgba(255,255,255,0.5)', fontWeight: 700, marginTop: '0.2rem', fontFamily: 'monospace' }}>
+            <div style={{ fontSize: '0.72rem', color: 'rgba(255,255,255,0.45)', fontWeight: 700, marginTop: 1, fontVariantNumeric: 'tabular-nums' }}>
               {set.dropsets.map((ds, i) => (
-                <span key={i}><span style={{ color: 'rgba(255,215,0,0.3)' }}>↓</span> {ds.weight}kg × {ds.reps}{i < set.dropsets.length - 1 ? ', ' : ''}</span>
+                <span key={i}>↓ {ds.weight}kg × {ds.reps}{i < set.dropsets.length - 1 ? ', ' : ''}</span>
               ))}
             </div>
           )}
         </div>
 
-        <button onClick={() => setShowMenu(!showMenu)} style={{ width: '32px', height: '32px', background: showMenu ? 'rgba(255,255,255,0.06)' : 'transparent', border: showMenu ? '1px solid rgba(255,255,255,0.1)' : '1px solid transparent', color: 'rgba(255,255,255,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', borderRadius: '6px', touchAction: 'manipulation', transition: 'all 0.15s ease' }}>
-          <MoreVertical size={isMobile ? 14 : 15} />
+        {delta && (
+          <span style={{
+            flexShrink: 0, fontSize: '0.72rem', fontWeight: 900,
+            color: delta.op === null ? 'rgba(255,255,255,0.28)' : delta.op ? '#10b981' : 'rgba(255,255,255,0.42)',
+            whiteSpace: 'nowrap',
+          }}>
+            {delta.tekst}
+          </span>
+        )}
+
+        <button onClick={() => setShowMenu(!showMenu)} aria-label="Meer" style={{
+          width: 30, height: 30, flexShrink: 0,
+          background: showMenu ? 'rgba(255,255,255,0.08)' : 'transparent',
+          border: 'none', borderRadius: 8,
+          color: showMenu ? '#fff' : 'rgba(255,255,255,0.3)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
+          touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+        }}>
+          <MoreVertical size={15} />
         </button>
       </div>
 
@@ -789,6 +831,7 @@ export default function ExerciseLogModal({ db, client, exercise, onClose, isMobi
                 daaronder. */}
             {loggedSets.map((set, i) => (
               <LoggedSetRow key={i} set={set} index={i}
+                vorige={previousPerformance?.sets?.[i] || null}
                 onAddDropset={(idx) => { setDropsetIndex(idx); setShowWizard(false) }}
                 onEdit={handleEditSet}  // ✅ nu gevuld
                 onDelete={handleDeleteSet}
