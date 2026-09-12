@@ -533,13 +533,14 @@ export default function AIAlternativesModal({
 // ── Single meal row in the list ──
 // Een suggestie in het wisselvenster: dezelfde kaart als in de dagplanning,
 // zodat je niet naar twee soorten maaltijdregels zit te kijken. Op de foto
-// staat het verschil in kcal met de huidige maaltijd — dat is waar je bij
-// het wisselen naar zoekt — of "Eigen" bij een zelfgemaakte maaltijd.
+// staat het verschil met de huidige maaltijd: kcal op de eerste regel, eiwit
+// eronder. Dat zijn de twee waarop je een maaltijd inruilt.
 function SuggestieKaart({ meal, currentMeal, isSelected, onSelect, isMobile }) {
-  const verschil = Math.round((meal.calories || 0) - (currentMeal?.calories || 0))
-  const kcalLabel = verschil === 0
-    ? 'Zelfde kcal'
-    : `${verschil > 0 ? '+' : ''}${verschil} kcal`
+  const teken = (n) => `${n > 0 ? '+' : ''}${n}`
+  const kcalOp = Math.round((meal.calories || 0) - (currentMeal?.calories || 0))
+  const eiwitOp = Math.round((meal.protein || 0) - (currentMeal?.protein || 0))
+  const kcalLabel = kcalOp === 0 ? 'Zelfde kcal' : `${teken(kcalOp)} kcal`
+  const eiwitLabel = eiwitOp === 0 ? 'zelfde eiwit' : `${teken(eiwitOp)}g eiwit`
 
   return (
     <MealCard
@@ -550,8 +551,8 @@ function SuggestieKaart({ meal, currentMeal, isSelected, onSelect, isMobile }) {
         calories: meal.calories, protein: meal.protein,
         carbs: meal.carbs, fat: meal.fat,
       }}
-      momentLabel={meal._isCustom ? 'Eigen maaltijd' : kcalLabel}
-      tijdLabel={meal._isCustom ? kcalLabel : null}
+      momentLabel={meal._isCustom ? `Eigen · ${kcalLabel}` : kcalLabel}
+      tijdLabel={eiwitLabel}
       isMobile={isMobile}
       geselecteerd={isSelected}
       onCheck={onSelect}
