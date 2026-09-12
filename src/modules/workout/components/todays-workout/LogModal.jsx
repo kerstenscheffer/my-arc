@@ -194,20 +194,22 @@ export default function LogModal({
           width: isMobile ? 112 : 124,
           height: isMobile ? 42 : 46, padding: '0 0.6rem',
           borderRadius: 999,
-          background: 'rgba(10,10,10,0.92)',
-          backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)',
-          border: `1px solid ${timerFinished ? 'rgba(16,185,129,0.5)' : timerRunning ? 'rgba(255,255,255,0.5)' : 'rgba(255,255,255,0.18)'}`,
+          // Omgekeerd: wit vlak met zwarte tijd. Op een foto of een donkere
+          // lijst valt donker-op-donker weg, en dit is iets waar je tijdens het
+          // trainen even snel naar kijkt.
+          background: timerFinished ? '#10b981' : '#fff',
+          border: 'none',
           cursor: 'pointer',
           boxShadow: '0 8px 22px rgba(0,0,0,0.5)',
           touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
         }}
       >
         {timerFinished
-          ? <Check size={15} color="#10b981" strokeWidth={3} />
-          : <Timer size={15} strokeWidth={2.4} color={timerRunning ? '#fff' : 'rgba(255,255,255,0.5)'} />}
+          ? <Check size={15} color="#0a0a0a" strokeWidth={3} />
+          : <Timer size={15} strokeWidth={2.4} color={timerRunning ? '#0a0a0a' : 'rgba(10,10,10,0.45)'} />}
         <span style={{
           fontSize: isMobile ? '0.95rem' : '1rem', fontWeight: 900,
-          color: timerFinished ? '#10b981' : timerRunning ? '#fff' : 'rgba(255,255,255,0.55)',
+          color: timerFinished ? '#0a0a0a' : timerRunning ? '#0a0a0a' : 'rgba(10,10,10,0.5)',
           fontVariantNumeric: 'tabular-nums', letterSpacing: '-0.02em', lineHeight: 1,
         }}>
           {timerStarted ? formatElapsed(timerSec) : '0:00'}
