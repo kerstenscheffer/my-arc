@@ -605,40 +605,61 @@ export default function ExerciseLogModal({ db, client, exercise, onClose, isMobi
           </div>
         )}
 
+        {/* Titelregel in twee kolommen, 70/30, met een haarlijn ertussen.
+            Links wie je bent en waar je staat, rechts waarmee je traint.
+            Materiaal en machine-instellingen stonden als twee losse banden
+            onder elkaar; die kostten samen meer hoogte dan de titel zelf. */}
         <div style={{
-          display: 'flex', alignItems: 'center', gap: '0.75rem',
+          display: 'grid',
+          // 70/30, maar op een telefoon met een bodem onder de rechterkolom:
+          // 30% van 390px is ~112px en dan blijft er van "Lat pulldown stang"
+          // niets leesbaars over.
+          gridTemplateColumns: isMobile ? 'minmax(0, 1fr) 1px 134px' : '70fr 1px 30fr',
+          gap: isMobile ? '0.7rem' : '1rem',
+          alignItems: 'stretch',
           padding: isMobile ? '0.8rem 1rem' : '0.9rem 1.5rem',
           paddingTop: media?.image_url ? undefined : `calc(env(safe-area-inset-top, 0px) + ${isMobile ? '0.875rem' : '1rem'})`,
         }}>
-          <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ minWidth: 0, alignSelf: 'center' }}>
             <h2 style={{ fontSize: isMobile ? '1.15rem' : '1.35rem', fontWeight: 900, color: '#fff', margin: 0, letterSpacing: '-0.025em', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{exercise.name}</h2>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', marginTop: '0.2rem', fontSize: isMobile ? '0.72rem' : '0.78rem', fontWeight: 700 }}>
-              <span style={{ color: 'rgba(255,255,255,0.5)' }}>
-                {loggedSets.length}/{exercise.sets} sets · {exercise.reps} reps
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', flexWrap: 'wrap', marginTop: '0.2rem', fontSize: isMobile ? '0.74rem' : '0.8rem', fontWeight: 800 }}>
+              <span style={{ color: '#fff' }}>
+                {loggedSets.length}/{exercise.sets}<span style={{ color: 'rgba(255,255,255,0.35)' }}> sets</span>
+                <span style={{ color: 'rgba(255,255,255,0.25)' }}> · </span>
+                {exercise.reps}<span style={{ color: 'rgba(255,255,255,0.35)' }}> reps</span>
               </span>
               {saving && <span style={{ color: '#FFD700' }}>· opslaan…</span>}
               {!saving && loggedSets.length > 0 && <span style={{ color: '#10b981' }}>· opgeslagen</span>}
               {editingIndex !== null && <span style={{ color: '#FFD700' }}>· set {editingIndex + 1} aanpassen</span>}
             </div>
           </div>
-          {/* Materiaal naast de titel, op dezelfde regel. Stond als eigen blok
-              met kopregel onder de vorige sessie; dat kostte een hele band
-              hoogte voor één keuze die je zelden verandert. */}
-          <AttachmentSelector
-            compact
-            suggested={exercise.suggested_attachment}
-            value={attachmentUsed}
-            onChange={(id) => { setAttachmentUsed(id); saveAttachmentPreference(id) }}
-            isMobile={isMobile}
-            exerciseName={exercise.name}
-          />
 
-          {/* Zonder foto staat de sluit-knop hier, anders ligt hij op de foto. */}
-          {!media?.image_url && (
-            <button onClick={onClose} aria-label="Sluit" style={{ width: 44, height: 44, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 12, color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0, touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}>
-              <X size={isMobile ? 18 : 20} strokeWidth={2.4} />
-            </button>
-          )}
+          <div style={{ background: 'rgba(255,255,255,0.09)' }} />
+
+          <div style={{ minWidth: 0, display: 'flex', flexDirection: 'column', gap: 6 }}>
+            <div style={{
+              fontSize: '0.6rem', fontWeight: 900, color: '#fff',
+              textTransform: 'uppercase', letterSpacing: '0.08em',
+            }}>
+              Apparatuur
+            </div>
+            <AttachmentSelector
+              compact
+              suggested={exercise.suggested_attachment}
+              value={attachmentUsed}
+              onChange={(id) => { setAttachmentUsed(id); saveAttachmentPreference(id) }}
+              isMobile={isMobile}
+              exerciseName={exercise.name}
+            />
+            <MachineSettings
+              compact
+              value={machineSettings}
+              onChange={(s) => { setMachineSettings(s); saveMachineSettings(s) }}
+              previousSettings={previousMachineSettings}
+              isMobile={isMobile}
+              onSave={saveMachineSettings}
+            />
+          </div>
         </div>
       </div>
 
@@ -669,15 +690,6 @@ export default function ExerciseLogModal({ db, client, exercise, onClose, isMobi
                 </div>
               </div>
             )}
-
-            {/* ── MACHINE SETTINGS ── */}
-            <MachineSettings
-              value={machineSettings}
-              onChange={(s) => { setMachineSettings(s); saveMachineSettings(s) }}
-              previousSettings={previousMachineSettings}
-              isMobile={isMobile}
-              onSave={saveMachineSettings}
-            />
 
             {loggedSets.map((set, i) => (
               <LoggedSetRow key={i} set={set} index={i}

@@ -146,16 +146,16 @@ export default function AttachmentSelector({ suggested, value, onChange, isMobil
           title={current ? `Materiaal: ${current.nl}` : 'Kies je materiaal'}
           style={{
             display: 'flex', alignItems: 'center', gap: 7, flexShrink: 0,
-            maxWidth: isMobile ? 150 : 210, minHeight: 44,
+            width: '100%', minHeight: 44,
             background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)',
             borderRadius: 10, padding: '0.3rem 0.5rem 0.3rem 0.35rem', cursor: 'pointer',
             fontFamily: 'inherit', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
           }}
         >
           {current
-            ? <div style={{ width: 34, height: 34, borderRadius: 7, backgroundImage: `url(${current.img})`, backgroundSize: 'cover', backgroundPosition: 'center', flexShrink: 0 }} />
-            : <div style={{ width: 34, height: 34, borderRadius: 7, background: 'rgba(255,255,255,0.06)', flexShrink: 0 }} />}
-          <div style={{ minWidth: 0, textAlign: 'left' }}>
+            ? <div style={{ width: 30, height: 30, borderRadius: 7, backgroundImage: `url(${current.img})`, backgroundSize: 'cover', backgroundPosition: 'center', flexShrink: 0 }} />
+            : <div style={{ width: 30, height: 30, borderRadius: 7, background: 'rgba(255,255,255,0.06)', flexShrink: 0 }} />}
+          <div style={{ minWidth: 0, textAlign: 'left', flex: 1 }}>
             <div style={{
               fontSize: '0.55rem', fontWeight: 800, color: 'rgba(255,255,255,0.35)',
               textTransform: 'uppercase', letterSpacing: '0.06em', lineHeight: 1,
