@@ -26,10 +26,16 @@ export const EISEN = [
 // uitbetaling gebeurt ná afloop, dus meteen verbergen is te vroeg.
 export const NALOOP_DAGEN = 14
 
-export const challengeNaam = (type) => ({
-  '6week8020': '6-weken 80/20-challenge',
-  '8week': '8-weken challenge',
-}[type] || 'Challenge')
+// De challenges die een coach kan toewijzen. `dagen` is de looptijd; de
+// einddatum wordt daaruit berekend zodat niemand hem met de hand hoeft te
+// tellen. De sleutel gaat als challenge_type de database in.
+export const SOORTEN = [
+  { key: '6week8020', naam: '6-weken 80/20-challenge', dagen: 42 },
+  { key: '8week',     naam: '8-weken challenge',       dagen: 56 },
+]
+
+export const challengeNaam = (type) =>
+  SOORTEN.find(s => s.key === type)?.naam || 'Challenge'
 
 // De zes waarden uit de RPC-uitkomst, in dezelfde sleutels als EISEN.
 export const waardenUit = (stand) => ({
