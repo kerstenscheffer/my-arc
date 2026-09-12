@@ -21,6 +21,10 @@ export default function WeekSchedule({
   completedWorkouts = [], todayIndex, onDayClick,
   clientId, db, workoutService, onScheduleUpdate, onSwitchPlan,
   weekOffset = 0, onWeekOffsetChange,
+  // Blok dat tussen de zeven dagen en de weekbalk komt (de cardio-sectie).
+  // Als slot doorgegeven zodat WeekSchedule zelf niets van cardio hoeft te
+  // weten en de volgorde op één plek staat.
+  tussenBlok = null,
 }) {
   const isMobile = useIsMobile()
   const [localSwapMode, setLocalSwapMode] = useState(false)
@@ -286,6 +290,8 @@ export default function WeekSchedule({
                 gedimd={weekOffset < 0}
               />
             </div>
+            {tussenBlok}
+
             <div style={{
               padding: isMobile ? '0.15rem 0.75rem 0.25rem' : '0.25rem 1rem 0.375rem',
               display: 'flex', alignItems: 'center', gap: 8,

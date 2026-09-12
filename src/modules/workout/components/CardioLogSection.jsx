@@ -96,7 +96,7 @@ export default function CardioLogSection({ client, db, isMobile }) {
   ].filter(Boolean).join(' · ')
 
   const section = (
-    <div style={{ padding: m ? '0 1rem' : '0 1.5rem', marginTop: m ? '2.5rem' : '3rem' }}>
+    <div style={{ padding: m ? '0 0.75rem' : '0 1rem', marginTop: m ? '1rem' : '1.25rem', marginBottom: m ? '0.9rem' : '1.1rem' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.75rem' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
           <Footprints size={m ? 16 : 18} color="#fff" />

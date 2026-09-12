@@ -193,6 +193,7 @@ export default function WorkoutPlan({ client, schema, db, onFocusChange }) {
           onSwitchPlan={() => setShowPlanSwitch(true)}
           weekOffset={weekOffset}
           onWeekOffsetChange={setWeekOffset}
+          tussenBlok={<CardioLogSection client={client} db={db} isMobile={isMobile} />}
         />
       </div></FadeOnScroll>}
 
@@ -277,9 +278,8 @@ export default function WorkoutPlan({ client, schema, db, onFocusChange }) {
       )}
 
 
-      {!workoutOpen && <FadeOnScroll>
-        <CardioLogSection client={client} db={db} isMobile={isMobile} />
-      </FadeOnScroll>}
+      {/* Cardio staat nu tussen de zeven dagen en de weekbalk (zie
+          WeekSchedule → tussenBlok), niet meer los onderaan de pagina. */}
 
       {/* WorkoutHistory inline section + WorkoutPhotoSlider removed —
           history now lives behind de Geschiedenis-icon (modal below).
