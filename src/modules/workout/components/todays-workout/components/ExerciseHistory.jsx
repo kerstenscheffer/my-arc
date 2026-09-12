@@ -142,17 +142,27 @@ export default function ExerciseHistory({ exerciseName, previousLog, loading, cl
       !best || s.top.weight > best.top.weight ||
       (s.top.weight === best.top.weight && s.top.reps > best.top.reps) ? s : best, null)
 
-    // Verschil met de sessie ervóór. Eerst het gewicht, en bij gelijk gewicht
-    // de reps — meer herhalingen op hetzelfde gewicht is ook vooruitgang.
+    // Verschil met de sessie ervóór, op set 1 tegen set 1. Dat is de eerlijke
+    // vergelijking: je eerste set doe je fris, en die is dus tussen twee
+    // trainingen onderling te vergelijken. Vergeleek eerder de zwaarste set,
+    // maar dat kon set 1 van de ene week tegen set 3 van de andere zijn.
+    //
+    // Eerst het gewicht, en bij gelijk gewicht de reps — meer herhalingen op
+    // hetzelfde gewicht is ook vooruitgang.
     const verschil = (i) => {
-      const nu = sessies[i], vorige = sessies[i + 1]
-      if (!vorige) return null
-      const dKg = (nu.top.weight || 0) - (vorige.top.weight || 0)
+      const nu = sessies[i]?.sets?.[0], vorige = sessies[i + 1]?.sets?.[0]
+      if (!nu || !vorige) return null
+      const dKg = (nu.weight || 0) - (vorige.weight || 0)
       if (dKg !== 0) return { tekst: `${dKg > 0 ? '+' : ''}${Number(dKg.toFixed(1))} kg`, op: dKg > 0 }
-      const dReps = (nu.top.reps || 0) - (vorige.top.reps || 0)
+      const dReps = (nu.reps || 0) - (vorige.reps || 0)
       if (dReps !== 0) return { tekst: `${dReps > 0 ? '+' : ''}${dReps} rep${Math.abs(dReps) === 1 ? '' : 's'}`, op: dReps > 0 }
       return { tekst: 'gelijk', op: null }
     }
+
+    // Hoeveel set-kolommen de tabel krijgt. Vier is genoeg; wie er meer doet
+    // ziet de rest achter een plusje.
+    const maxKolommen = Math.min(4, Math.max(...sessies.map(s => s.sets.length), 1))
+    const kolommen = `52px repeat(${maxKolommen}, minmax(0, 1fr)) 62px`
 
     // Balkjes op volume (kg × reps opgeteld) en niet op het gewicht: bij
     // bankdrukken staat 80kg twintig sessies lang stil en werd de grafiek een
@@ -228,25 +238,21 @@ export default function ExerciseHistory({ exerciseName, previousLog, loading, cl
               )}
             </div>
 
-            {/* Als tabel: één regel per sessie met vaste kolommen. Stond op
-                twee regels per sessie met ruimte ertussen; dan zie je er vier
-                tegelijk en moet je scrollen om een verloop te zien. Nu staat
-                boven de kolommen wat je leest, zodat het grote getal niet
-                zonder uitleg boven de sets hangt. */}
+            {/* Elke set een eigen kolom. Zo lees je verticaal wat set 1 door de
+                weken heen deed, en horizontaal hoe een sessie verliep. De
+                laatste kolom vergelijkt set 1 met set 1 van de vorige keer. */}
             <div style={{
-              display: 'grid',
-              gridTemplateColumns: `52px minmax(84px, auto) 1fr 62px`,
-              gap: '0 0.6rem',
-              alignItems: 'center',
-              paddingBottom: '0.35rem',
+              display: 'grid', gridTemplateColumns: kolommen,
+              gap: '0 0.5rem', alignItems: 'center', paddingBottom: '0.35rem',
               fontSize: '0.6rem', fontWeight: 900, color: 'rgba(255,255,255,0.4)',
               textTransform: 'uppercase', letterSpacing: '0.07em',
               borderBottom: '1px solid rgba(255,255,255,0.1)',
             }}>
               <span>Datum</span>
-              <span>Top set</span>
-              <span>Sets</span>
-              <span style={{ textAlign: 'right' }}>Δ</span>
+              {Array.from({ length: maxKolommen }, (_, k) => (
+                <span key={k}>Set {k + 1}</span>
+              ))}
+              <span style={{ textAlign: 'right', letterSpacing: '0.04em' }}>Set 1 vs</span>
             </div>
 
             <div>
@@ -267,34 +273,39 @@ export default function ExerciseHistory({ exerciseName, previousLog, loading, cl
                       </div>
                     )}
                     <div style={{
-                      display: 'grid',
-                      gridTemplateColumns: `52px minmax(84px, auto) 1fr 62px`,
-                      gap: '0 0.6rem',
-                      alignItems: 'baseline',
-                      padding: '0.3rem 0',
+                      display: 'grid', gridTemplateColumns: kolommen,
+                      gap: '0 0.5rem', alignItems: 'baseline', padding: '0.32rem 0',
                       borderTop: nieuweMaand ? 'none' : '1px solid rgba(255,255,255,0.06)',
                     }}>
                       <span style={{ fontSize: '0.72rem', fontWeight: 800, color: 'rgba(255,255,255,0.4)', fontVariantNumeric: 'tabular-nums' }}>
                         {formatDate(s.dag)}
                       </span>
-                      <span style={{ fontSize: '0.9rem', fontWeight: 900, color: '#fff', fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>
-                        {s.top.weight}<span style={{ fontSize: '0.72em', color: 'rgba(255,255,255,0.4)' }}>kg</span>
-                        <span style={{ color: 'rgba(255,255,255,0.25)', fontSize: '0.8em' }}> × </span>
-                        {s.top.reps}
-                      </span>
-                      <span style={{
-                        fontSize: '0.74rem', fontWeight: 800, color: 'rgba(255,255,255,0.7)',
-                        fontVariantNumeric: 'tabular-nums',
-                        overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                      }}>
-                        {s.sets.map(x => `${x.weight || 0}×${x.reps || 0}`).join('  ')}
-                      </span>
+
+                      {Array.from({ length: maxKolommen }, (_, k) => {
+                        const set = s.sets[k]
+                        // Laatste kolom draagt ook de sets die niet meer passen:
+                        // "5×8 +2" is duidelijker dan ze stilzwijgend weglaten.
+                        const rest = k === maxKolommen - 1 ? s.sets.length - maxKolommen : 0
+                        if (!set) return <span key={k} style={{ color: 'rgba(255,255,255,0.15)', fontSize: '0.8rem' }}>–</span>
+                        return (
+                          <span key={k} style={{
+                            fontSize: '0.85rem', fontWeight: 900, color: '#fff',
+                            fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap',
+                          }}>
+                            {set.weight || 0}
+                            <span style={{ color: 'rgba(255,255,255,0.25)', fontSize: '0.85em' }}>×</span>
+                            {set.reps || 0}
+                            {rest > 0 && <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.75em', fontWeight: 800 }}> +{rest}</span>}
+                          </span>
+                        )
+                      })}
+
                       <span style={{
                         textAlign: 'right', fontSize: '0.72rem', fontWeight: 900,
-                        color: !v ? 'transparent' : v.op === null ? 'rgba(255,255,255,0.28)' : v.op ? '#10b981' : 'rgba(255,255,255,0.45)',
+                        color: !v ? 'rgba(255,255,255,0.15)' : v.op === null ? 'rgba(255,255,255,0.28)' : v.op ? '#10b981' : 'rgba(255,255,255,0.45)',
                         whiteSpace: 'nowrap',
                       }}>
-                        {v ? v.tekst : '—'}
+                        {v ? v.tekst : '–'}
                       </span>
                     </div>
                   </div>
