@@ -1,7 +1,7 @@
 // src/modules/workout/components/todays-workout/components/ExerciseLogModal.jsx
 import { useState, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
-import { X, Plus, Check, MoreVertical, MessageSquare, History, Play, Timer, Minimize2 } from 'lucide-react'
+import { X, Plus, Check, MoreVertical, MessageSquare, History, Play, Timer, Minimize2, Maximize2 } from 'lucide-react'
 import ExerciseHistory from './ExerciseHistory'
 import AttachmentSelector from './AttachmentSelector'
 import MachineSettings from './MachineSettings'
@@ -357,7 +357,10 @@ function embedUrl(url) {
   const m = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/shorts\/)([^&\s?/]+)/)
   // playsinline: zonder dit gooit iOS de video in de systeemspeler op volledig
   // scherm zodra je op play drukt.
-  return m ? `https://www.youtube.com/embed/${m[1]}?autoplay=1&rel=0&playsinline=1` : null
+  // fs=0 zet de volledig-scherm-knop van YouTube uit. Bij een Short levert die
+  // een zwarte speler met alleen knoppen op; we bieden er zelf een aan die het
+  // wél doet.
+  return m ? `https://www.youtube.com/embed/${m[1]}?autoplay=1&rel=0&playsinline=1&fs=0` : null
 }
 
 // ========== MAIN MODAL ==========
@@ -383,6 +386,7 @@ export default function ExerciseLogModal({ db, client, exercise, onClose, isMobi
   // foto is de basis en de play-knop verschijnt alleen als er iets te spelen is.
   const [media, setMedia] = useState(null)
   const [toonVideo, setToonVideo] = useState(false)
+  const [videoGroot, setVideoGroot] = useState(false)
 
   // Rusttimer: na een gelogde set loopt je rusttijd, en daarna staat het
   // invoerscherm er weer. Zo hoef je tussen de sets niets aan te raken.
@@ -802,6 +806,26 @@ export default function ExerciseLogModal({ db, client, exercise, onClose, isMobi
               </button>
             )}
 
+            {toonVideo && (
+              <button
+                onClick={() => setVideoGroot(true)}
+                aria-label="Video op volledig scherm"
+                title="Volledig scherm"
+                style={{
+                  position: 'absolute', bottom: 12, left: 12,
+                  display: 'flex', alignItems: 'center', gap: 6,
+                  height: 38, padding: '0 0.75rem', borderRadius: 12,
+                  background: '#fff', border: '1px solid #fff', color: '#0a0a0a',
+                  fontSize: '0.78rem', fontWeight: 900, fontFamily: 'inherit',
+                  cursor: 'pointer', boxShadow: '0 6px 18px rgba(0,0,0,0.5)',
+                  touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+                }}
+              >
+                <Maximize2 size={15} strokeWidth={2.8} />
+                Groot
+              </button>
+            )}
+
             <div style={{ position: 'absolute', top: 10, right: 10, display: 'flex', gap: 8 }}>
               <button onClick={onClose} aria-label="Sluit" title="Oefening sluiten" style={{
                 width: 40, height: 40, borderRadius: 12,
@@ -1077,6 +1101,49 @@ export default function ExerciseLogModal({ db, client, exercise, onClose, isMobi
           </>
         )}
       </div>
+
+      {/* Eigen volledig scherm. De knop van YouTube zelf staat uit (fs=0):
+          bij een Short gaf die een zwarte speler met alleen de knoppen. Hier
+          houdt de video zijn verhouding en past hij binnen het scherm. */}
+      {videoGroot && videoEmbed && createPortal(
+        <div
+          onClick={(e) => { if (e.target === e.currentTarget) setVideoGroot(false) }}
+          style={{
+            position: 'fixed', inset: 0, height: '100dvh', zIndex: 10003,
+            background: '#000', display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }}
+        >
+          <iframe
+            src={videoEmbed}
+            title={exercise.name}
+            allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture"
+            style={{
+              border: 'none', background: '#000',
+              aspectRatio: isShort ? '9 / 16' : '16 / 9',
+              height: isShort ? '100dvh' : 'auto',
+              width: isShort ? 'auto' : '100vw',
+              maxWidth: '100vw', maxHeight: '100dvh',
+            }}
+          />
+          <button
+            onClick={() => setVideoGroot(false)}
+            aria-label="Sluit volledig scherm"
+            style={{
+              position: 'absolute',
+              top: 'calc(env(safe-area-inset-top, 0px) + 12px)', right: 12,
+              display: 'flex', alignItems: 'center', gap: 6,
+              height: 40, padding: '0 0.8rem', borderRadius: 12,
+              background: '#fff', border: '1px solid #fff', color: '#0a0a0a',
+              fontSize: '0.8rem', fontWeight: 900, fontFamily: 'inherit',
+              cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+            }}
+          >
+            <Minimize2 size={15} strokeWidth={2.8} />
+            Sluit
+          </button>
+        </div>,
+        document.body
+      )}
 
       {/* Notitie en historie als blad, net als de machine-instellingen. Ze
           stonden als paneel tussen de gelogde sets; dan duwt het openklappen
