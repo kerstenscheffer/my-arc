@@ -1,5 +1,6 @@
 // src/modules/meal-plan/components/food-log/FoodLogHeader.jsx
-// Compact Food-app style: centered title + tabs only.
+// Compacte kop: titel in bold wit + de drie tabbladen. Actief tabblad is wit
+// in plaats van goud, net als de rest van de voedingsschermen.
 // Macros stat-bar removed — that info already lives in RemainingPill on
 // the meal page (the screen the user just came from).
 
@@ -20,8 +21,8 @@ export default function FoodLogHeader({ activeTab, onTabChange, isMobile }) {
         textAlign: 'center',
       }}>
         <div style={{
-          fontSize: isMobile ? '0.95rem' : '1.05rem',
-          fontWeight: '700', color: '#fff', letterSpacing: '-0.01em'
+          fontSize: isMobile ? '1.15rem' : '1.3rem',
+          fontWeight: 900, color: '#fff', letterSpacing: '-0.025em'
         }}>
           Voeding loggen
         </div>
@@ -41,10 +42,10 @@ export default function FoodLogHeader({ activeTab, onTabChange, isMobile }) {
               style={{
                 flex: 1, padding: isMobile ? '0.5rem 0' : '0.625rem 0',
                 background: 'transparent', border: 'none',
-                borderBottom: isActive ? '2px solid #FFD700' : '2px solid transparent',
-                color: isActive ? '#FFD700' : 'rgba(255, 255, 255, 0.4)',
-                fontSize: isMobile ? '0.78rem' : '0.85rem',
-                fontWeight: isActive ? '700' : '600',
+                borderBottom: isActive ? '2px solid #fff' : '2px solid transparent',
+                color: isActive ? '#fff' : 'rgba(255, 255, 255, 0.4)',
+                fontSize: isMobile ? '0.82rem' : '0.88rem',
+                fontWeight: isActive ? 900 : 700,
                 cursor: 'pointer',
                 touchAction: 'manipulation',
                 WebkitTapHighlightColor: 'transparent',

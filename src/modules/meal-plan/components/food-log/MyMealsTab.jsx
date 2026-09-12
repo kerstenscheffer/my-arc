@@ -3,6 +3,8 @@
 import React, { useState, useEffect } from 'react'
 import { Plus, Trash2, Check, ArrowLeft, ChevronRight, ChevronDown, Camera, Image as ImageIcon, X, Calculator, Sunrise, Salad, Zap, Apple, Utensils, Package } from 'lucide-react'
 import MealPrepCalculator from '../MealPrepCalculator'
+import MealCard from '../day-schedule/MealCard'
+import Keuze from '../Keuze'
 
 const MEAL_MOMENTS = [
   { id: 'breakfast', label: 'Ontbijt' },
@@ -26,7 +28,9 @@ export default function MyMealsTab({ client, db, onLog, onRequestAddIngredient, 
   const [myMeals, setMyMeals] = useState([])
   const [loading, setLoading] = useState(true)
   const [showPrep, setShowPrep] = useState(false)
-  const [openSection, setOpenSection] = useState(null) // welke sectie is uitgeklapt
+  // Filter + volgorde in plaats van vijf uitklap-secties.
+  const [filterSectie, setFilterSectie] = useState('alle')
+  const [sortering, setSortering] = useState('nieuwste')
 
   useEffect(() => {
     if (client?.id) loadMyMeals()
@@ -102,42 +106,73 @@ export default function MyMealsTab({ client, db, onLog, onRequestAddIngredient, 
     return <div style={{ padding: '3rem', textAlign: 'center', color: 'rgba(255,255,255,0.2)', fontSize: '0.8rem' }}>Laden...</div>
   }
 
+  // Gefilterde, gesorteerde lijst. De uitklap-secties zijn vervangen door een
+  // filter: met vijf secties die allemaal dicht staan zag je je eigen
+  // maaltijden pas na twee tikken.
+  const gefilterd = myMeals
+    .filter(m => filterSectie === 'alle' || (mealsBySection[m.section] !== undefined ? m.section : 'overige') === filterSectie)
+    .sort((a, b) => {
+      if (sortering === 'naam') return String(a.name || '').localeCompare(String(b.name || ''))
+      if (sortering === 'kcal-hoog') return (b.calories || 0) - (a.calories || 0)
+      if (sortering === 'kcal-laag') return (a.calories || 0) - (b.calories || 0)
+      return new Date(b.updated_at || 0) - new Date(a.updated_at || 0)
+    })
+
+  const sectieOpties = [
+    { id: 'alle', label: 'Alle maaltijden' },
+    ...SECTIONS.map(sec => ({ id: sec.id, label: sec.label })),
+    ...(mealsBySection.overige.length ? [{ id: 'overige', label: 'Overige' }] : []),
+  ]
+  const sorteerOpties = [
+    { id: 'nieuwste', label: 'Nieuwste eerst' },
+    { id: 'naam', label: 'Op naam' },
+    { id: 'kcal-hoog', label: 'Meeste kcal' },
+    { id: 'kcal-laag', label: 'Minste kcal' },
+  ]
+  const labelVan = (m) => (SECTIONS.find(sec => sec.id === m.section)?.label || 'Overige').replace(/^Mijn /, '')
+
   return (
     <div>
-      <button
-        onClick={handleCreateNew}
-        style={{
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          gap: '0.375rem', width: '100%',
-          padding: isMobile ? '0.875rem 1rem' : '1rem 1.5rem',
-          background: 'rgba(255, 215, 0, 0.04)', border: 'none',
-          borderBottom: '1px solid rgba(255,255,255,0.06)',
-          color: '#FFD700', fontSize: isMobile ? '0.8rem' : '0.85rem',
-          fontWeight: '700', cursor: 'pointer',
-          touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', minHeight: '48px'
-        }}
-      >
-        <Plus size={16} strokeWidth={2.5} />
-        Maaltijd aanmaken
-      </button>
+      {/* Twee acties bovenaan, in bold wit. */}
+      <div style={{ display: 'flex', gap: 8, padding: isMobile ? '0.75rem 0.9rem 0.6rem' : '1rem 1.25rem 0.75rem' }}>
+        <button
+          onClick={() => handleCreateNew()}
+          style={{
+            flex: 1, minHeight: 46,
+            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+            background: '#fff', border: 'none', borderRadius: 12,
+            color: '#0a0a0a', fontSize: isMobile ? '0.82rem' : '0.86rem', fontWeight: 900,
+            fontFamily: 'inherit', cursor: 'pointer',
+            touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+          }}
+        >
+          <Plus size={16} strokeWidth={3} /> Maaltijd aanmaken
+        </button>
+        <button
+          onClick={() => setShowPrep(true)}
+          aria-label="Meal-prep calculator"
+          title="Meal-prep calculator"
+          style={{
+            width: 46, minHeight: 46, flexShrink: 0,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            background: 'transparent', border: '1.5px solid rgba(255,255,255,0.28)',
+            borderRadius: 12, color: '#fff', cursor: 'pointer',
+            touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+          }}
+        >
+          <Calculator size={17} strokeWidth={2.6} />
+        </button>
+      </div>
 
-      {/* Meal-prep calculator — reken je bakjes uit en sla ze hier op. */}
-      <button
-        onClick={() => setShowPrep(true)}
-        style={{
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          gap: '0.375rem', width: '100%',
-          padding: isMobile ? '0.875rem 1rem' : '1rem 1.5rem',
-          background: 'rgba(255, 215, 0, 0.04)', border: 'none',
-          borderBottom: '1px solid rgba(255,255,255,0.06)',
-          color: '#FFD700', fontSize: isMobile ? '0.8rem' : '0.85rem',
-          fontWeight: '700', cursor: 'pointer',
-          touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', minHeight: '48px'
-        }}
-      >
-        <Calculator size={16} strokeWidth={2.5} />
-        Meal-prep calculator
-      </button>
+      {/* Filters: welke sectie en in welke volgorde. */}
+      <div style={{
+        display: 'flex', alignItems: 'center',
+        padding: isMobile ? '0 0.9rem 0.5rem' : '0 1.25rem 0.6rem',
+      }}>
+        <Keuze waarde={filterSectie} opties={sectieOpties} zet={setFilterSectie} isMobile={isMobile} />
+        <div style={{ width: 1, height: 16, background: 'rgba(255,255,255,0.15)', flexShrink: 0 }} />
+        <Keuze waarde={sortering} opties={sorteerOpties} zet={setSortering} isMobile={isMobile} uitlijning="rechts" />
+      </div>
 
       {showPrep && (
         <MealPrepCalculator
@@ -148,137 +183,42 @@ export default function MyMealsTab({ client, db, onLog, onRequestAddIngredient, 
         />
       )}
 
-      {/* ── Vaste secties: elke sectie een card (foto/emoji + titel), links een
-             uitklap-pijl om de meals te zien, rechts een "+" om een meal voor
-             deze sectie aan te maken. Meals zonder sectie vallen in "Overige". ── */}
-      {SECTIONS.concat(
-        mealsBySection.overige.length
-          ? [{ id: 'overige', label: 'Overige', moment: 'snack', Icon: Package, color: 'rgba(255,255,255,0.4)' }]
-          : []
-      ).map(sec => {
-        const meals = mealsBySection[sec.id] || []
-        const open = openSection === sec.id
-        const thumb = meals.find(m => m.image_url)?.image_url || null
-        return (
-          <div key={sec.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
-            {/* Sectie-card */}
-            <div style={{ display: 'flex', alignItems: 'center' }}>
-              <button
-                onClick={() => setOpenSection(open ? null : sec.id)}
-                style={{
-                  flex: 1, minWidth: 0, display: 'flex', alignItems: 'center',
-                  padding: isMobile ? '0.75rem 1rem' : '0.875rem 1.25rem',
-                  background: open ? 'rgba(255,255,255,0.02)' : 'transparent', border: 'none', cursor: 'pointer',
-                  textAlign: 'left', touchAction: 'manipulation', minHeight: '64px', gap: '0.75rem'
-                }}
-              >
-                {/* Uitklap-pijl links */}
-                <ChevronDown size={16} color="rgba(255,255,255,0.4)"
-                  style={{ flexShrink: 0, transform: open ? 'rotate(0deg)' : 'rotate(-90deg)', transition: 'transform 0.2s ease' }} />
-                {/* Thumbnail: eerste meal-foto in de sectie, anders emoji */}
-                {thumb ? (
-                  <div style={{ width: '48px', height: '48px', borderRadius: '10px', flexShrink: 0, background: `url(${thumb}) center/cover, #fff`, border: '1px solid rgba(255,255,255,0.08)' }} />
-                ) : (
-                  <div style={{ width: '48px', height: '48px', borderRadius: '10px', flexShrink: 0, background: `${sec.color}14`, border: `1px solid ${sec.color}33`, display: 'flex', alignItems: 'center', justifyContent: 'center', color: sec.color }}>
-                    <sec.Icon size={22} strokeWidth={2} />
-                  </div>
-                )}
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: isMobile ? '0.9rem' : '0.95rem', fontWeight: '800', color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                    {sec.label}
-                  </div>
-                  <div style={{ fontSize: '0.6rem', color: 'rgba(255,255,255,0.35)', marginTop: '0.2rem' }}>
-                    {meals.length} maaltijd{meals.length !== 1 ? 'en' : ''}
-                  </div>
-                </div>
-              </button>
-              {/* "+" rechts — nieuwe meal voor deze sectie */}
-              {sec.id !== 'overige' && (
-                <button
-                  onClick={(e) => { e.stopPropagation(); handleCreateNew(sec.id) }}
-                  aria-label={`Maaltijd toevoegen aan ${sec.label}`}
-                  style={{
-                    width: '48px', minHeight: '56px', flexShrink: 0,
-                    background: 'transparent', border: 'none',
-                    borderLeft: '1px solid rgba(255,255,255,0.04)',
-                    color: '#FFD700', cursor: 'pointer',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    touchAction: 'manipulation'
-                  }}
-                >
-                  <Plus size={18} strokeWidth={2.5} />
-                </button>
-              )}
-            </div>
-
-            {/* Uitgeklapte meals van deze sectie */}
-            {open && (
-              meals.length === 0 ? (
-                <div style={{ padding: '1rem 1.25rem 1.25rem calc(1.25rem + 16px + 0.75rem)', fontSize: '0.7rem', color: 'rgba(255,255,255,0.3)' }}>
-                  Nog geen maaltijden hier — tik op <Plus size={11} style={{ display: 'inline', verticalAlign: 'middle' }} /> om er een aan te maken.
-                </div>
-              ) : (
-                meals.map((meal, idx) => (
-                  <div key={meal.id} style={{
-                    display: 'flex', alignItems: 'center',
-                    background: 'rgba(255,255,255,0.015)',
-                    borderTop: idx === 0 ? '1px solid rgba(255,255,255,0.03)' : 'none',
-                    borderBottom: idx < meals.length - 1 ? '1px solid rgba(255,255,255,0.03)' : 'none'
-                  }}>
-                    <button
-                      onClick={() => handleOpenMeal(meal)}
-                      style={{
-                        flex: 1, minWidth: 0, display: 'flex', alignItems: 'center',
-                        padding: isMobile ? '0.65rem 1rem 0.65rem 2.5rem' : '0.75rem 1.25rem 0.75rem 3rem',
-                        background: 'transparent', border: 'none', cursor: 'pointer',
-                        textAlign: 'left', touchAction: 'manipulation', minHeight: '56px', gap: '0.75rem'
-                      }}
-                    >
-                      {meal.image_url ? (
-                        <div style={{ width: '40px', height: '40px', borderRadius: '9px', flexShrink: 0, background: `url(${meal.image_url}) center/cover, #fff`, border: '1px solid rgba(255,255,255,0.08)' }} />
-                      ) : (
-                        <div style={{ width: '40px', height: '40px', borderRadius: '9px', flexShrink: 0, background: 'rgba(255, 215, 0, 0.06)', border: '1px solid rgba(255, 215, 0, 0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'rgba(255, 215, 0, 0.5)' }}>
-                          <ImageIcon size={18} strokeWidth={1.8} />
-                        </div>
-                      )}
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontSize: isMobile ? '0.82rem' : '0.88rem', fontWeight: '700', color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                          {meal.name}
-                        </div>
-                        <div style={{ display: 'flex', gap: '0.375rem', marginTop: '0.15rem' }}>
-                          <span style={{ fontSize: '0.6rem', color: 'rgba(255,255,255,0.35)' }}>
-                            <span style={{ fontWeight: '800', color: 'rgba(255,255,255,0.5)' }}>{meal.calories || 0}</span> kcal
-                          </span>
-                          {Array.isArray(meal.ingredients_list) && (
-                            <span style={{ fontSize: '0.55rem', color: 'rgba(255,255,255,0.2)' }}>
-                              • {meal.ingredients_list.length} item{meal.ingredients_list.length !== 1 ? 's' : ''}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                      <ChevronRight size={14} color="rgba(255,255,255,0.15)" />
-                    </button>
-                    <button
-                      onClick={(e) => { e.stopPropagation(); handleQuickLog(meal) }}
-                      aria-label="Loggen"
-                      style={{
-                        width: '48px', minHeight: '52px', flexShrink: 0,
-                        background: 'transparent', border: 'none',
-                        borderLeft: '1px solid rgba(255,255,255,0.04)',
-                        color: '#FFD700', cursor: 'pointer',
-                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        touchAction: 'manipulation'
-                      }}
-                    >
-                      <Plus size={16} strokeWidth={2.5} />
-                    </button>
-                  </div>
-                ))
-              )
-            )}
+      {gefilterd.length === 0 ? (
+        <div style={{ padding: '2.5rem 1.25rem', textAlign: 'center' }}>
+          <div style={{ fontSize: '0.9rem', fontWeight: 900, color: '#fff', marginBottom: 4 }}>
+            {myMeals.length === 0 ? 'Nog geen eigen maaltijden' : 'Niets in dit filter'}
           </div>
-        )
-      })}
+          <div style={{ fontSize: '0.76rem', fontWeight: 700, color: 'rgba(255,255,255,0.4)' }}>
+            {myMeals.length === 0
+              ? 'Maak er een aan; daarna log je hem met één tik.'
+              : 'Kies een andere sectie hierboven.'}
+          </div>
+        </div>
+      ) : (
+        <div style={{ paddingBottom: '1rem' }}>
+          {gefilterd.map(meal => (
+            <MealCard
+              key={meal.id}
+              meal={{
+                name: meal.name,
+                image_url: meal.image_url,
+                calories: meal.calories, protein: meal.protein,
+                carbs: meal.carbs, fat: meal.fat,
+              }}
+              momentLabel={labelVan(meal)}
+              ondertitel={Array.isArray(meal.ingredients_list) && meal.ingredients_list.length
+                ? `${meal.ingredients_list.length} ingrediënt${meal.ingredients_list.length !== 1 ? 'en' : ''}`
+                : null}
+              isMobile={isMobile}
+              onCheck={() => handleQuickLog(meal)}
+              acties={[
+                { icon: <Plus size={11} strokeWidth={3} />, label: 'Loggen', onClick: () => handleQuickLog(meal) },
+                { icon: <ChevronRight size={11} strokeWidth={2.6} />, label: 'Bewerken', onClick: () => handleOpenMeal(meal) },
+              ]}
+            />
+          ))}
+        </div>
+      )}
     </div>
   )
 }

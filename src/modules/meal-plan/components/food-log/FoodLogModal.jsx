@@ -328,10 +328,10 @@ export default function FoodLogModal({
                 onClick={handleCopyYesterdayConfirm}
                 style={{
                   flex: 1, padding: '0.625rem', borderRadius: '8px',
-                  background: 'rgba(255, 215, 0, 0.15)',
-                  border: '1px solid rgba(255, 215, 0, 0.3)',
-                  color: '#FFD700',
-                  fontSize: isMobile ? '0.75rem' : '0.8rem', fontWeight: '700',
+                  background: '#fff',
+                  border: 'none',
+                  color: '#0a0a0a',
+                  fontSize: isMobile ? '0.75rem' : '0.8rem', fontWeight: 900,
                   cursor: 'pointer', minHeight: '44px',
                   touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent'
                 }}
@@ -352,21 +352,21 @@ export default function FoodLogModal({
         }}>
           <div style={{
             width: '64px', height: '64px', borderRadius: '50%',
-            background: 'rgba(255, 215, 0, 0.15)',
-            border: '2px solid rgba(255, 215, 0, 0.4)',
+            background: 'rgba(16,185,129,0.15)',
+            border: '2px solid rgba(16,185,129,0.45)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             marginBottom: '1rem',
             animation: 'flmPop 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)'
           }}>
-            <Check size={28} color="#FFD700" strokeWidth={3} />
+            <Check size={28} color="#10b981" strokeWidth={3} />
           </div>
-          <div style={{ fontSize: isMobile ? '1rem' : '1.15rem', fontWeight: '800', color: '#fff', marginBottom: '0.25rem' }}>
+          <div style={{ fontSize: isMobile ? '1.15rem' : '1.3rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.02em', marginBottom: '0.25rem' }}>
             {successData.isEdit ? 'Bijgewerkt!' : 'Gelogd!'}
           </div>
           <div style={{ fontSize: isMobile ? '0.75rem' : '0.8rem', color: 'rgba(255, 255, 255, 0.5)', textAlign: 'center', maxWidth: '250px' }}>
             {successData.name}
           </div>
-          <div style={{ fontSize: isMobile ? '0.65rem' : '0.7rem', color: '#FFD700', fontWeight: '700', marginTop: '0.375rem' }}>
+          <div style={{ fontSize: isMobile ? '0.72rem' : '0.78rem', color: '#fff', fontWeight: 900, marginTop: '0.375rem' }}>
             +{successData.calories} kcal → {MOMENT_LABELS[successData.meal_type] || 'Gelogd'}
           </div>
         </div>
@@ -398,10 +398,10 @@ export default function FoodLogModal({
               right: isMobile ? '0.75rem' : '1rem',
               display: 'flex', alignItems: 'center', gap: '0.3rem',
               padding: '0 0.7rem', height: '36px', borderRadius: '10px',
-              background: 'rgba(255, 215, 0, 0.1)',
-              border: '1px solid rgba(255, 215, 0, 0.3)',
-              color: '#FFD700',
-              fontSize: '0.72rem', fontWeight: 700,
+              background: 'transparent',
+              border: '1px solid rgba(255,255,255,0.25)',
+              color: '#fff',
+              fontSize: '0.72rem', fontWeight: 800,
               cursor: 'pointer', zIndex: 10001,
               touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
             }}
@@ -495,13 +495,13 @@ export default function FoodLogModal({
                 left: '50%', transform: 'translateX(-50%)',
                 zIndex: 10001,
                 padding: isMobile ? '0.75rem 1.25rem' : '0.875rem 1.5rem',
-                background: '#FFD700', border: 'none', borderRadius: '6px',
-                color: '#000', fontSize: isMobile ? '0.75rem' : '0.8rem',
-                fontWeight: '800', cursor: 'pointer',
+                background: '#fff', border: 'none', borderRadius: '10px',
+                color: '#0a0a0a', fontSize: isMobile ? '0.75rem' : '0.8rem',
+                fontWeight: 900, cursor: 'pointer',
                 display: 'flex', alignItems: 'center',
                 gap: '0.375rem', minHeight: '44px',
                 touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-                boxShadow: '0 4px 16px rgba(255, 215, 0, 0.3)',
+                boxShadow: '0 6px 20px rgba(0,0,0,0.5)',
                 letterSpacing: '0.02em'
               }}
             >
