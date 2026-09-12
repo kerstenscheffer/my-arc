@@ -648,6 +648,26 @@ export default function ExerciseLogModal({ db, client, exercise, onClose, isMobi
               {!saving && loggedSets.length > 0 && <span style={{ color: '#10b981', fontSize: '0.72em' }}>opgeslagen</span>}
               {editingIndex !== null && <span style={{ color: '#FFD700', fontSize: '0.72em' }}>set {editingIndex + 1} aanpassen</span>}
             </div>
+
+            {/* Historie hoort bij de cijfers: het is dezelfde oefening, alleen
+                van vorige keren. Stond tussen de notitie-knoppen onderaan. */}
+            <button
+              onClick={() => setShowHistory(!showHistory)}
+              aria-pressed={showHistory}
+              style={{
+                display: 'inline-flex', alignItems: 'center', gap: 5,
+                marginTop: '0.45rem', padding: '0.3rem 0.6rem 0.3rem 0.5rem',
+                background: showHistory ? 'rgba(255,255,255,0.1)' : 'transparent',
+                border: `1px solid ${showHistory ? 'rgba(255,255,255,0.35)' : 'rgba(255,255,255,0.15)'}`,
+                borderRadius: 999, color: '#fff',
+                fontSize: '0.7rem', fontWeight: 800, letterSpacing: '0.02em',
+                cursor: 'pointer', fontFamily: 'inherit',
+                touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+              }}
+            >
+              <History size={12} strokeWidth={2.4} />
+              Historie
+            </button>
           </div>
 
           <div style={{ background: 'rgba(255,255,255,0.09)' }} />
@@ -886,13 +906,6 @@ export default function ExerciseLogModal({ db, client, exercise, onClose, isMobi
               onClick={() => setShowWorkoutNote(!showWorkoutNote)}
               icon={<Edit3 size={isMobile ? 13 : 14} strokeWidth={2.2} />}
               label="Dag-note"
-              isMobile={isMobile}
-            />
-            <ToggleBtn
-              active={showHistory}
-              onClick={() => setShowHistory(!showHistory)}
-              icon={<History size={isMobile ? 13 : 14} strokeWidth={2.2} />}
-              label="Historie"
               isMobile={isMobile}
             />
           </div>
