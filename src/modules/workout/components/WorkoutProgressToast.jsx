@@ -265,9 +265,9 @@ export default function WorkoutProgressToast({ client, db, onViewChart }) {
         width: '40%',
         backgroundImage: `url(${COACH_PHOTO_URL})`,
         backgroundSize: 'cover',
-        // Liggende uitsnede (900x750); met 35% valt het hoofd binnen het vak
-        // en blijft de romp zichtbaar.
-        backgroundPosition: 'center 35%',
+        // De foto is al bijgesneden op 3:2 (900x600, kop tot buik) — vrijwel
+        // dezelfde verhouding als het vak, dus er valt nauwelijks iets weg.
+        backgroundPosition: 'center 30%',
       }} />
       <div style={{
         position: 'absolute', inset: 0, pointerEvents: 'none',
