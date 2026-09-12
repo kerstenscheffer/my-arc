@@ -9,14 +9,16 @@ export default function WeekGrid({
   tempSchedule, weekDays, todayIndex, completedWorkouts,
   selectedWorkout, selectedForSwap, swapMode, localSwapMode,
   getWorkoutData, onDayClick, onSwapClick, onShift, isMobile,
-  dayDates, isViewOnly,
+  dayDates, kanPlannen = true, kanOpenen = true, gedimd = false,
 }) {
   const weekDaysDutch = ['Ma', 'Di', 'Wo', 'Do', 'Vr', 'Za', 'Zo']
 
+  // Een komende week mag je wél indelen (pijltjes) maar niet openen: de
+  // workout van vandaag hoort bij vandaag.
   const handleCardClick = (day, assignedWorkout) => {
-    if (isViewOnly) return
-    if (localSwapMode) onSwapClick(day, assignedWorkout)
-    else onDayClick(day, assignedWorkout)
+    if (localSwapMode) { if (kanPlannen) onSwapClick(day, assignedWorkout); return }
+    if (!kanOpenen) return
+    onDayClick(day, assignedWorkout)
   }
 
   return (
@@ -30,11 +32,11 @@ export default function WeekGrid({
       {weekDays.map((day, index) => {
         const assignedWorkout = tempSchedule[day]
         const workoutData = getWorkoutData(assignedWorkout)
-        const isToday = !isViewOnly && index === todayIndex
-        const isCompleted = !isViewOnly && Array.isArray(completedWorkouts)
+        const isToday = kanOpenen && index === todayIndex
+        const isCompleted = kanOpenen && Array.isArray(completedWorkouts)
           && completedWorkouts.some(w => w.workout_day === day)
-        const isSelected = !isViewOnly && (selectedWorkout === assignedWorkout
-          || (selectedForSwap && selectedForSwap.day === day))
+        const isSelected = selectedWorkout === assignedWorkout
+          || (selectedForSwap && selectedForSwap.day === day)
 
         return (
           <DayCard
@@ -45,7 +47,7 @@ export default function WeekGrid({
             isToday={isToday}
             isCompleted={isCompleted}
             isSelected={isSelected}
-            swapMode={!isViewOnly && (swapMode || localSwapMode)}
+            swapMode={kanPlannen && (swapMode || localSwapMode)}
             isMobile={isMobile}
             weekDaysDutch={weekDaysDutch}
             onClick={() => handleCardClick(day, assignedWorkout)}
@@ -54,7 +56,9 @@ export default function WeekGrid({
             canShiftLeft={index > 0}
             canShiftRight={index < weekDays.length - 1}
             dayDate={dayDates ? dayDates[index] : null}
-            isViewOnly={isViewOnly}
+            kanPlannen={kanPlannen}
+            kanOpenen={kanOpenen}
+            gedimd={gedimd}
           />
         )
       })}

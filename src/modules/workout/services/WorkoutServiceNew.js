@@ -25,6 +25,78 @@ class WorkoutServiceNew {
     return monday.toISOString().split('T')[0]
   }
 
+  // ── Weekplanning vooruit ──────────────────────────────────────────────
+  //
+  // clients.workout_schedule is één vaste weekindeling; die geldt elke week
+  // opnieuw. Wie volgende week anders wil trainen kon dat dus niet vastleggen
+  // zonder deze week overhoop te gooien. Een komende week wordt daarom apart
+  // bewaard in client_week_schedules, en zodra die week begint promoveren we
+  // 'm naar clients.workout_schedule (zie promoveerWeekPlanning). Daarmee
+  // blijft er voor "welke workout hoort bij vandaag" precies één bron —
+  // TodaysWorkoutMain en de challenge-RPC lezen die ongewijzigd.
+  datumSleutel(d) {
+    const j = d.getFullYear()
+    const m = String(d.getMonth() + 1).padStart(2, '0')
+    const dag = String(d.getDate()).padStart(2, '0')
+    return `${j}-${m}-${dag}`
+  }
+
+  async getWeekPlanning(clientId, weekStart, db) {
+    if (!clientId || !weekStart) return null
+    try {
+      const { data, error } = await this._client(db)
+        .from('client_week_schedules')
+        .select('schedule')
+        .eq('client_id', clientId)
+        .eq('week_start', weekStart)
+        .maybeSingle()
+      if (error) throw error
+      return data?.schedule || null
+    } catch (error) {
+      console.error('❌ getWeekPlanning failed:', error)
+      return null
+    }
+  }
+
+  async saveWeekPlanning(clientId, weekStart, schedule, db) {
+    if (!clientId || !weekStart) return false
+    try {
+      const { error } = await this._client(db)
+        .from('client_week_schedules')
+        .upsert({
+          client_id: clientId,
+          week_start: weekStart,
+          schedule,
+          updated_at: new Date().toISOString(),
+        }, { onConflict: 'client_id,week_start' })
+      if (error) throw error
+      return true
+    } catch (error) {
+      console.error('❌ saveWeekPlanning failed:', error)
+      return false
+    }
+  }
+
+  // Deze week begonnen? Dan wordt de vooruit geplande week de nieuwe vaste
+  // indeling. Ook meteen opruimen wat in het verleden ligt — dat is dood
+  // gewicht en zou bij een latere wijziging alleen maar verwarren.
+  async promoveerWeekPlanning(clientId, huidigeWeekStart, db) {
+    if (!clientId || !huidigeWeekStart) return null
+    try {
+      const gepland = await this.getWeekPlanning(clientId, huidigeWeekStart, db)
+      const { error } = await this._client(db)
+        .from('client_week_schedules')
+        .delete()
+        .eq('client_id', clientId)
+        .lte('week_start', huidigeWeekStart)
+      if (error) throw error
+      return gepland
+    } catch (error) {
+      console.error('❌ promoveerWeekPlanning failed:', error)
+      return null
+    }
+  }
+
   async getWeeklyOverrides(clientId, schemaId, db) {
     if (!clientId || !schemaId) return []
     try {

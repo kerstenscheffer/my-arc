@@ -22,7 +22,7 @@ export default function DayCard({
   isMobile, weekDaysDutch,
   onClick, swapMode,
   onShiftLeft, onShiftRight, canShiftLeft, canShiftRight,
-  dayDate, isViewOnly,
+  dayDate, kanPlannen = true, kanOpenen = true, gedimd = false,
 }) {
   const isCustom = workoutKey?.startsWith('custom_')
   const isActivity = ['cardio', 'swimming', 'hiking', 'cycling', 'running'].includes(workoutKey)
@@ -69,7 +69,8 @@ export default function DayCard({
 
   // Onderaan-padding maakt ruimte voor de chevron-rij, of voor de
   // completed-check, of voor "RUST".
-  const showArrows = hasContent && !isCompleted && !isViewOnly
+  // Pijltjes ook in een komende week: daar plan je juist vooruit.
+  const showArrows = hasContent && !isCompleted && kanPlannen
   const bottomPadding = showArrows
     ? (isMobile ? 24 : 28)
     : (isMobile ? 8 : 10)
@@ -169,14 +170,14 @@ export default function DayCard({
     <div style={{ position: 'relative', minWidth: 0 }}>
       {hasContent ? (
         <div
-          onClick={isViewOnly ? undefined : handleClick}
+          onClick={kanOpenen || swapMode ? handleClick : undefined}
           style={{
             ...sharedCardStyle,
             background: tone.bg,
             border: `1px solid ${tone.border}`,
             boxShadow: tone.glow,
-            cursor: isViewOnly ? 'default' : 'pointer',
-            opacity: isViewOnly ? 0.75 : 1,
+            cursor: kanOpenen || swapMode ? 'pointer' : 'default',
+            opacity: gedimd ? 0.7 : 1,
           }}
         >
           {isToday ? todayPill : dayLabel}
@@ -229,6 +230,7 @@ export default function DayCard({
               : '1px dashed rgba(255,255,255,0.12)',
             boxShadow: isToday ? tone.glow : 'none',
             cursor: swapMode ? 'pointer' : 'default',
+            opacity: gedimd ? 0.7 : 1,
             // Dag + datum staan bovenaan, net als bij een trainingsdag; anders
             // liep de rij dag-labels niet door over de rustdagen heen.
             justifyContent: 'flex-start',

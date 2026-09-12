@@ -3,6 +3,7 @@ import useIsMobile from '../../../hooks/useIsMobile'
 import { AlertCircle, RefreshCw, ChevronLeft, ChevronRight } from 'lucide-react'
 import { useState, useEffect } from 'react'
 import WeekGrid from './week-schedule/WeekGrid'
+import WorkoutServiceNew from '../services/WorkoutServiceNew'
 import ActionButtons from './week-schedule/ActionButtons'
 
 // Bereken de maandag van de huidige week (lokale tijd).
@@ -30,18 +31,31 @@ export default function WeekSchedule({
   const [loading, setLoading] = useState(false)
   const [customWorkouts, setCustomWorkouts] = useState({})
 
+  // Maandag van de getoonde week — nodig om de planning van die week te
+  // laden en te bewaren, dus hier en niet pas in de render.
+  const getoondeMaandag = (() => {
+    const d = getThisMonday(); d.setDate(d.getDate() + weekOffset * 7); return d
+  })()
+  const weekSleutel = WorkoutServiceNew.datumSleutel(getoondeMaandag)
+  const isHuidigeWeek = weekOffset === 0
+  const isToekomst = weekOffset > 0
+  const kanPlannen = isHuidigeWeek || isToekomst
+
   const weekDays = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
   const weekDaysDutch = ['Ma', 'Di', 'Wo', 'Do', 'Vr', 'Za', 'Zo']
   const hasValidSchema = schema && schema.week_structure && typeof schema.week_structure === 'object'
 
-  useEffect(() => { loadSavedSchedule() }, [clientId])
+  useEffect(() => { loadSavedSchedule() }, [clientId, weekSleutel])
 
   useEffect(() => {
-    if (!loading && weekSchedule) {
+    // Alleen de huidige week volgt de planning van de pagina; een vooruit
+    // geplande week heeft zijn eigen indeling en mag daar niet door
+    // overschreven worden.
+    if (!loading && weekSchedule && isHuidigeWeek) {
       setTempSchedule(weekSchedule)
       loadCustomWorkoutsForSchedule(weekSchedule)
     }
-  }, [weekSchedule, loading])
+  }, [weekSchedule, loading, isHuidigeWeek])
 
   const loadCustomWorkoutsForSchedule = async (schedule) => {
     if (!workoutService || !schedule) return
@@ -59,11 +73,31 @@ export default function WeekSchedule({
     if (!clientId || !db) return
     setLoading(true)
     try {
-      const saved = await db.getClientWorkoutSchedule(clientId)
+      // Is de vooruit geplande week inmiddels begonnen? Dan wordt die de
+      // nieuwe vaste indeling, zodat alles wat clients.workout_schedule leest
+      // (de workout van vandaag, de challenge-telling) meteen klopt.
+      if (isHuidigeWeek) {
+        const gepland = await WorkoutServiceNew.promoveerWeekPlanning(clientId, weekSleutel, db)
+        if (gepland && Object.keys(gepland).length > 0) {
+          await db.updateClientWorkoutSchedule(clientId, gepland)
+          setTempSchedule(gepland)
+          await loadCustomWorkoutsForSchedule(gepland)
+          if (onScheduleUpdate) onScheduleUpdate(gepland)
+          return
+        }
+      }
+
+      const vast = await db.getClientWorkoutSchedule(clientId)
+      // Een komende week begint bij de vaste indeling en wijkt daarvan af
+      // zodra de klant hem verschuift.
+      const eigen = isHuidigeWeek ? null : await WorkoutServiceNew.getWeekPlanning(clientId, weekSleutel, db)
+      const saved = eigen || vast
       if (saved && Object.keys(saved).length > 0) {
         setTempSchedule(saved)
         await loadCustomWorkoutsForSchedule(saved)
-        if (onScheduleUpdate) onScheduleUpdate(saved)
+        if (isHuidigeWeek && onScheduleUpdate) onScheduleUpdate(saved)
+      } else {
+        setTempSchedule({})
       }
     } catch (e) { console.error('❌ Load schedule failed:', e) }
     finally { setLoading(false) }
@@ -73,8 +107,14 @@ export default function WeekSchedule({
     if (!clientId || !db) return
     setSaving(true)
     try {
-      await db.updateClientWorkoutSchedule(clientId, newSchedule)
-      if (onScheduleUpdate) onScheduleUpdate(newSchedule)
+      if (isToekomst) {
+        // Een komende week apart bewaren: deze week blijft zoals hij was.
+        const gelukt = await WorkoutServiceNew.saveWeekPlanning(clientId, weekSleutel, newSchedule, db)
+        if (!gelukt) throw new Error('niet opgeslagen')
+      } else {
+        await db.updateClientWorkoutSchedule(clientId, newSchedule)
+        if (onScheduleUpdate) onScheduleUpdate(newSchedule)
+      }
       setTempSchedule(newSchedule)
       setHasChanges(false)
       if (navigator.vibrate) navigator.vibrate([30, 50, 30])
@@ -221,12 +261,11 @@ export default function WeekSchedule({
 
       {/* Weeknavigatie — vorige/volgende week */}
       {(() => {
-        const monday = getThisMonday()
-        monday.setDate(monday.getDate() + weekOffset * 7)
+        const monday = getoondeMaandag
         const sunday = new Date(monday)
         sunday.setDate(sunday.getDate() + 6)
         const fmt = (d) => d.toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })
-        const isCurrentWeek = weekOffset === 0
+        const isCurrentWeek = isHuidigeWeek
         const dayDates = Array.from({ length: 7 }, (_, i) => {
           const d = new Date(monday); d.setDate(d.getDate() + i); return d
         })
@@ -242,7 +281,9 @@ export default function WeekSchedule({
                 onShift={handleShift}
                 isMobile={isMobile}
                 dayDates={dayDates}
-                isViewOnly={!isCurrentWeek}
+                kanPlannen={kanPlannen}
+                kanOpenen={isCurrentWeek}
+                gedimd={weekOffset < 0}
               />
             </div>
             <div style={{
@@ -268,7 +309,10 @@ export default function WeekSchedule({
                 color: isCurrentWeek ? '#fff' : 'rgba(255,255,255,0.5)',
                 letterSpacing: '-0.01em',
               }}>
-                {isCurrentWeek ? 'Deze week' : `${fmt(monday)} – ${fmt(sunday)}`}
+                {isCurrentWeek ? 'Deze week'
+                  : weekOffset === 1 ? 'Volgende week'
+                  : weekOffset === -1 ? 'Vorige week'
+                  : `${fmt(monday)} – ${fmt(sunday)}`}
               </div>
               <button
                 onClick={() => onWeekOffsetChange && onWeekOffsetChange(weekOffset + 1)}
