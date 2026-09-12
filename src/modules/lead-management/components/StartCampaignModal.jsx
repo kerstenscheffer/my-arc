@@ -4,7 +4,7 @@
 import { useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { useModalHost } from '../../../coach/ModalHost'
-import { X, Megaphone, Send, Check, Plus, Pencil, Trash2 } from 'lucide-react'
+import { X, Megaphone, Send, Check, Plus, Pencil, Trash2, BarChart2 } from 'lucide-react'
 
 export default function StartCampaignModal({ leadService, coachId, isMobile = false, onSelect, onClose }) {
   const modalHost = useModalHost()
@@ -23,6 +23,28 @@ export default function StartCampaignModal({ leadService, coachId, isMobile = fa
     setEditForm({ name: c.name || '', messageText: c.message_text || '' })
   }
   const [deletingId, setDeletingId] = useState(null)
+
+  // Cijfers per campagne. getCampaignBreakdown haalt álle campagne-leads op met
+  // hun reacties en funnel-stappen — te zwaar om te doen bij het openen van dit
+  // scherm, terwijl je meestal gewoon een campagne wilt starten. Daarom pas bij
+  // de eerste keer uitvouwen, en dan één keer voor alle campagnes tegelijk.
+  const [openStats, setOpenStats] = useState(null)
+  const [stats, setStats] = useState(null)
+  const [statsLaden, setStatsLaden] = useState(false)
+
+  const wisselStats = async (campagneId) => {
+    setOpenStats(v => (v === campagneId ? null : campagneId))
+    if (stats || statsLaden) return
+    setStatsLaden(true)
+    try {
+      const { campaigns: rijen } = await leadService.getCampaignBreakdown(coachId)
+      setStats(new Map((rijen || []).map(r => [r.id, r])))
+    } catch (e) {
+      console.error('Campagne-cijfers laden mislukt:', e)
+      setStats(new Map())
+    }
+    setStatsLaden(false)
+  }
   const handleDelete = async (c) => {
     if (deletingId) return
     // Leads met deze campagne-tag: hun tag valt weg (ON DELETE SET NULL), de
@@ -216,6 +238,11 @@ export default function StartCampaignModal({ leadService, coachId, isMobile = fa
                           {c.platform || 'instagram'}{c.purpose ? ` · ${c.purpose}` : ''}
                         </div>
                       </div>
+                      {/* Cijfers-knop */}
+                      <button onClick={() => wisselStats(c.id)} title="Cijfers van deze campagne"
+                        style={{ flexShrink: 0, width: 30, height: 30, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', borderRadius: 8, background: openStats === c.id ? 'rgba(168,85,247,0.18)' : 'rgba(255,255,255,0.05)', border: `1px solid ${openStats === c.id ? 'rgba(168,85,247,0.5)' : 'rgba(255,255,255,0.12)'}`, color: openStats === c.id ? '#a855f7' : 'rgba(255,255,255,0.6)', cursor: 'pointer' }}>
+                        <BarChart2 size={13} />
+                      </button>
                       {/* Bewerk-knop */}
                       <button onClick={() => startEdit(c)} title="Bericht bewerken"
                         style={{ flexShrink: 0, width: 30, height: 30, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', borderRadius: 8, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.6)', cursor: 'pointer' }}>
@@ -233,6 +260,13 @@ export default function StartCampaignModal({ leadService, coachId, isMobile = fa
                         <Send size={11} /> Start
                       </button>
                     </div>
+                    {openStats === c.id && (
+                      <CampagneCijfers
+                        laden={statsLaden}
+                        rij={stats?.get(c.id)}
+                        leadsFallback={c.auto_leads ?? 0}
+                      />
+                    )}
                     {c.message_text && (
                       <div style={{ fontSize: '0.72rem', color: 'rgba(255,255,255,0.6)', lineHeight: 1.45, whiteSpace: 'pre-wrap', wordBreak: 'break-word', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 8, padding: '0.5rem 0.6rem' }}>
                         {c.message_text}
@@ -252,5 +286,63 @@ export default function StartCampaignModal({ leadService, coachId, isMobile = fa
       </div>
     </div>,
     modalHost
+  )
+}
+
+// Cijfers van één campagne. Alles gemeten ná het moment dat het
+// campagne-bericht de deur uitging (campaign_message_sent_at), zodat een
+// reactie van vóór de campagne het cijfer niet opblaast.
+function CampagneCijfers({ laden, rij, leadsFallback }) {
+  if (laden && !rij) {
+    return (
+      <div style={{ fontSize: '0.68rem', fontWeight: 700, color: 'rgba(255,255,255,0.35)', padding: '0.3rem 0 0.55rem' }}>
+        Cijfers ophalen…
+      </div>
+    )
+  }
+
+  const totaal = rij?.total ?? leadsFallback
+  if (!totaal) {
+    return (
+      <div style={{ fontSize: '0.68rem', fontWeight: 700, color: 'rgba(255,255,255,0.35)', padding: '0.3rem 0 0.55rem' }}>
+        Nog geen leads aan deze campagne gekoppeld.
+      </div>
+    )
+  }
+
+  const pct = (n) => (totaal > 0 ? `${Math.round((n / totaal) * 1000) / 10}%` : '—')
+  const st = rij?.stages || { replied: 0, callProposed: 0, callScheduled: 0, sale: 0 }
+  const vakken = [
+    { label: 'Leads',       waarde: totaal,               titel: 'Leads met deze campagne als bron.' },
+    { label: 'Reacties',    waarde: st.replied,           sub: pct(st.replied),       titel: 'Leads die reageerden nádat het campagne-bericht verstuurd was.' },
+    { label: 'Voorgesteld', waarde: st.callProposed,      sub: pct(st.callProposed),  titel: 'Leads aan wie je daarna een call voorstelde.' },
+    { label: 'Ingepland',   waarde: st.callScheduled,     sub: pct(st.callScheduled), titel: 'Leads die daarna een call inplanden.' },
+    { label: 'Sales',       waarde: st.sale,              sub: pct(st.sale),          titel: 'Leads die daarna klant werden.' },
+    { label: 'Follow-ups',  waarde: rij?.followupCount ?? 0,                           titel: 'Opvolg-berichten die je naar leads van deze campagne stuurde.' },
+  ]
+
+  return (
+    <div style={{
+      display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(64px, 1fr))',
+      gap: 6, margin: '0 0 0.55rem',
+      padding: '0.55rem 0.6rem', borderRadius: 9,
+      background: 'rgba(168,85,247,0.06)', border: '1px solid rgba(168,85,247,0.22)',
+    }}>
+      {vakken.map(v => (
+        <div key={v.label} title={v.titel} style={{ textAlign: 'center', minWidth: 0 }}>
+          <div style={{ fontSize: '0.95rem', fontWeight: 900, color: '#fff', fontVariantNumeric: 'tabular-nums', lineHeight: 1.1 }}>
+            {v.waarde}
+          </div>
+          <div style={{ fontSize: '0.58rem', fontWeight: 800, color: 'rgba(255,255,255,0.42)', letterSpacing: '0.02em', marginTop: 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+            {v.label}
+          </div>
+          {v.sub && (
+            <div style={{ fontSize: '0.58rem', fontWeight: 800, color: '#a855f7', fontVariantNumeric: 'tabular-nums' }}>
+              {v.sub}
+            </div>
+          )}
+        </div>
+      ))}
+    </div>
   )
 }
