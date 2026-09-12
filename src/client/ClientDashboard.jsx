@@ -15,6 +15,7 @@ import ShoppingHub from '../modules/shopping/ShoppingHub'
 import NotificationWidget from '../modules/notifications/NotificationWidget'
 import PWAUpdateBanner from '../components/PWAUpdateBanner'
 import ClientFAQModal from '../modules/faq/ClientFAQModal'
+import ChallengeProgressTab from '../modules/challenge-monitor/ChallengeProgressTab'
 import PageVideoWidget from '../modules/videos/PageVideoWidget'
 import WidgetSidebar from '../components/WidgetSidebar'
 import CheckinReminderPopup from './components/CheckinReminderPopup'
@@ -265,6 +266,14 @@ export default function ClientDashboard({ previewClientId = null, ingebed = fals
       position: 'relative'
     }}>
       <PWAUpdateBanner />
+
+      {/* Challenge-stand, altijd bereikbaar. Zwevend en niet op Home, omdat je
+          hem juist wilt kunnen checken terwijl je in je workout of je
+          maaltijdplan zit. Niet in focus-mode en niet in een meekijk-paneel:
+          daar gaat het over de klant, maar kijkt de coach mee. */}
+      {!ingebed && !focusMode && (
+        <ChallengeProgressTab db={db} client={client} isMobile={isMobile} />
+      )}
 
       {/* Weekly check-in nag — center popup on Friday + missed-Friday window.
           Niet in een meekijk-paneel: die herinnering is aan de klant gericht,
