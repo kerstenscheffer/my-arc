@@ -11,6 +11,7 @@ import { useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { Plus, X, Footprints, Trash2, Check } from 'lucide-react'
 import CardioService, { weekStartISO, normaliseerSoort } from '../services/CardioService'
+import { cardioFoto } from '../utils/workoutFoto'
 
 // Veelgebruikte cardio-types als snelkeuze; vrij typen kan ook.
 const CARDIO_PRESETS = ['Wandelen', 'Hardlopen', 'Fietsen', 'Zwemmen', 'Roeien', 'Crosstrainer', 'HIIT']
@@ -95,12 +96,37 @@ export default function CardioLogSection({ client, db, isMobile }) {
     item.steps ? `${item.steps.toLocaleString('nl-NL')} stappen` : null,
   ].filter(Boolean).join(' · ')
 
+  // Kop in dezelfde vorm als "Vandaags workout" bovenaan de pagina: foto die
+  // onderin dood loopt in het zwart, met de titel eroverheen.
+  const kop = (
+    <div style={{ position: 'relative', width: '100%', height: m ? 150 : 190, marginTop: m ? '1.75rem' : '2.25rem' }}>
+      <div style={{
+        position: 'absolute', inset: 0,
+        backgroundImage: `url(${cardioFoto()})`,
+        backgroundSize: 'cover', backgroundPosition: 'center 35%',
+      }} />
+      <div style={{
+        position: 'absolute', inset: 0, pointerEvents: 'none',
+        background: 'linear-gradient(180deg, rgba(10,10,10,0.55) 0%, rgba(10,10,10,0) 30%, rgba(10,10,10,0.78) 68%, #0a0a0a 100%)',
+      }} />
+      <div style={{
+        position: 'absolute', left: 0, right: 0, bottom: m ? 8 : 12,
+        padding: m ? '0 1rem' : '0 1.5rem',
+        fontSize: m ? '1.7rem' : '2.4rem', fontWeight: 900, color: '#fff',
+        letterSpacing: '-0.03em', lineHeight: 1.05,
+        textShadow: '0 2px 12px rgba(0,0,0,0.6)',
+      }}>
+        Cardio
+      </div>
+    </div>
+  )
+
   const section = (
-    <div style={{ padding: m ? '0 0.75rem' : '0 1rem', marginTop: m ? '1rem' : '1.25rem', marginBottom: m ? '0.9rem' : '1.1rem' }}>
+    <div style={{ padding: m ? '0 0.75rem' : '0 1rem', marginBottom: m ? '0.9rem' : '1.1rem' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.75rem' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-          <Footprints size={m ? 16 : 18} color="#fff" />
-          <span style={{ fontSize: m ? '1rem' : '1.1rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.02em' }}>Cardio</span>
+          <Footprints size={m ? 14 : 16} color="rgba(255,255,255,0.45)" />
+          <span style={{ fontSize: m ? '0.62rem' : '0.66rem', fontWeight: 800, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Deze week</span>
         </div>
         <button onClick={() => { resetForm(); setShowModal(true) }} style={{
           display: 'flex', alignItems: 'center', gap: '0.3rem',
@@ -181,7 +207,7 @@ export default function CardioLogSection({ client, db, isMobile }) {
             color: 'rgba(255,255,255,0.35)', textTransform: 'uppercase',
             letterSpacing: '0.1em', marginBottom: '0.4rem',
           }}>
-            Deze week gelogd
+            Gelogd
           </div>
 
           {logs.length === 0 ? (
@@ -275,5 +301,5 @@ export default function CardioLogSection({ client, db, isMobile }) {
     document.body
   ) : null
 
-  return <>{section}{modal}</>
+  return <>{kop}{section}{modal}</>
 }

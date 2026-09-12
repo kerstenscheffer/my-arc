@@ -13,6 +13,12 @@ const FOTOS = {
   standaard: 'https://images.unsplash.com/photo-1517836357463-d25dfeac3438?w=900&h=900&fit=crop&q=80&crop=center',
 }
 
+// Kop van de cardio-sectie. Zelfde bron als de trainingsfoto's zodat de twee
+// koppen op de pagina bij elkaar horen.
+export function cardioFoto() {
+  return FOTOS.cardio
+}
+
 export function workoutFoto(workout) {
   if (!workout) return null
   const focus = (workout.focus || workout.name || '').toLowerCase()
