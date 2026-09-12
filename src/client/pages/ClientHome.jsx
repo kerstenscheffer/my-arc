@@ -1,7 +1,7 @@
 // src/client/pages/ClientHome.jsx
 //
 // Client home — focus op wat ECHT relevant is voor de client:
-//   1) ChallengeBanner (challenge-monitor)
+//   1) (challenge-stand zit nu in de zwevende ChallengeProgressTab)
 //   2) WelcomeSection (datum + naam)
 //   3) GoalCard — primaire doelstelling van de client
 //   4) TrajectProgress — hoeveel weken in, hoeveel over
@@ -10,7 +10,6 @@
 // Quick-action tiles zijn verwijderd: de bottom-nav heeft al alle hoofd-
 // navigatie en de tiles voegden alleen duplicaat-navigatie toe zonder content.
 
-import ChallengeBanner from "../../modules/challenge-monitor/ChallengeBanner"
 import TodayCard from "../components/TodayCard"
 import HomeVideoSlider from "../components/HomeVideoSlider"
 import React, { useState, useEffect } from 'react'
@@ -896,14 +895,6 @@ export default function ClientHome({ client, db, setCurrentView }) {
       <FadeOnScroll>
         <div style={{ marginTop: isMobile ? '4rem' : '5rem' }}>
           <WeekGoalStatus client={client} history={weightHistory} />
-        </div>
-      </FadeOnScroll>
-
-      {/* Challenge-banner alleen tonen als'ie actief is — bewust krappe ruimte
-          (visueel gegroepeerd met de progressie hierboven, en rendert soms niet). */}
-      <FadeOnScroll>
-        <div style={{ marginTop: isMobile ? '0.5rem' : '0.75rem' }}>
-          <ChallengeBanner db={db} client={client} />
         </div>
       </FadeOnScroll>
 
