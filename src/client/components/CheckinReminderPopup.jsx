@@ -46,12 +46,6 @@ const paletteFor = (mode) => {
   return                          { bg: 'rgba(255,255,255,0.12)', border: 'rgba(255,255,255,0.35)', fg: '#ffffff', icon: ClipboardCheck }
 }
 
-const PILL_PALETTE = {
-  bg: 'rgba(255,255,255,0.12)',
-  border: '#ffffff',
-  fg: '#ffffff',
-}
-
 export default function CheckinReminderPopup({ client, db, onOpen, isMobile: propMobile, version = 0 }) {
   const isMobile = propMobile ?? (typeof window !== 'undefined' && window.innerWidth <= 768)
 
@@ -163,19 +157,15 @@ export default function CheckinReminderPopup({ client, db, onOpen, isMobile: pro
             // Lager dan de navbar (z-index 100) — geeft het "erachter
             // weg komen"-effect zonder dat de hele pill verdwijnt.
             zIndex: 90,
-            display: 'flex', alignItems: 'center', gap: 8,
-            padding: isMobile ? '0.6rem 1.1rem' : '0.7rem 1.4rem',
-            background: PILL_PALETTE.bg,
-            backdropFilter: 'blur(12px)',
-            WebkitBackdropFilter: 'blur(12px)',
-            border: `1px solid ${PILL_PALETTE.border}`,
+            width: isMobile ? 250 : 280,
+            height: isMobile ? 46 : 50,
+            padding: 0,
+            overflow: 'hidden',
+            background: '#0a0a0a',
+            border: `1px solid ${mode === 'friday' ? 'rgba(255,255,255,0.35)' : palette.border}`,
             borderRadius: 999,
-            color: PILL_PALETTE.fg,
-            fontWeight: 800,
-            fontSize: isMobile ? '0.8rem' : '0.88rem',
             cursor: 'pointer',
             touchAction: 'manipulation',
-            whiteSpace: 'nowrap',
             boxShadow: '0 -8px 24px rgba(0,0,0,0.5), 0 -2px 8px rgba(0,0,0,0.4)',
             animation: shaking ? 'checkinShake 0.85s cubic-bezier(.36,.07,.19,.97) both' : 'none',
             transition: 'transform 0.18s ease',
@@ -183,13 +173,36 @@ export default function CheckinReminderPopup({ client, db, onOpen, isMobile: pro
           onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateX(-50%) translateY(-3px)' }}
           onMouseLeave={(e) => { e.currentTarget.style.transform = 'translateX(-50%)' }}
         >
-          <Icon size={isMobile ? 16 : 18} strokeWidth={2.4} />
-          {mode === 'overdue'
-            ? `Check-in ${daysLate}d te laat`
-            : mode === 'missed'
-            ? 'Check-in openstaand'
-            : 'Vul je check-in'}
-          <ArrowRight size={isMobile ? 14 : 16} strokeWidth={2.6} />
+          {/* Zelfde opbouw als de melding rechtsboven, in het klein: foto
+              rechts, fade naar links, tekst eroverheen. */}
+          <div style={{
+            position: 'absolute', top: 0, right: 0, bottom: 0, width: '38%',
+            backgroundImage: 'url(/coach-compliment.jpg)',
+            backgroundSize: 'cover', backgroundPosition: 'center 30%',
+          }} />
+          <div style={{
+            position: 'absolute', inset: 0, pointerEvents: 'none',
+            background: 'linear-gradient(90deg, #0a0a0a 0%, #0a0a0a 44%, rgba(10,10,10,0.85) 60%, rgba(10,10,10,0.35) 82%, rgba(10,10,10,0) 100%)',
+          }} />
+          <div style={{
+            position: 'absolute', inset: 0,
+            display: 'flex', alignItems: 'center', gap: 7,
+            padding: isMobile ? '0 0.9rem' : '0 1.1rem',
+            color: mode === 'friday' ? '#fff' : palette.fg,
+            fontWeight: 900,
+            fontSize: isMobile ? '0.82rem' : '0.9rem',
+            letterSpacing: '-0.02em',
+            whiteSpace: 'nowrap',
+            textShadow: '0 2px 10px rgba(0,0,0,0.85)',
+          }}>
+            <Icon size={isMobile ? 15 : 17} strokeWidth={2.6} style={{ flexShrink: 0 }} />
+            {mode === 'overdue'
+              ? `Check-in ${daysLate}d te laat`
+              : mode === 'missed'
+              ? 'Check-in openstaand'
+              : 'Vul je check-in'}
+            <ArrowRight size={isMobile ? 14 : 16} strokeWidth={2.8} style={{ flexShrink: 0 }} />
+          </div>
         </button>
         <style>{`
           /* Pill is gecentreerd via translateX(-50%), dus de shake-keyframes
