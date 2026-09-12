@@ -41,13 +41,16 @@ function NumberPicker({ value, onChange, min = 0, max = 300, step = 1, unit = 'k
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.75rem' }}>
-      <div style={{ fontSize: isMobile ? '2.5rem' : '3rem', fontWeight: '900', color: '#FFD700', letterSpacing: '-0.03em', lineHeight: 1 }}>
-        {displayValue}<span style={{ fontSize: '0.4em', color: 'rgba(255,215,0,0.4)', marginLeft: '0.25rem' }}>{unit}</span>
+      {/* De waarde waar het om gaat: dik wit en groot, midden op het scherm.
+          Stond in goud, net als de knoppen en de gekozen regel eronder — dan
+          trekt niets meer de aandacht. */}
+      <div style={{ fontSize: isMobile ? '3rem' : '3.5rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.04em', lineHeight: 1, textAlign: 'center' }}>
+        {displayValue}<span style={{ fontSize: '0.35em', color: 'rgba(255,255,255,0.4)', marginLeft: '0.25rem', fontWeight: 800 }}>{unit}</span>
       </div>
 
       <div ref={scrollRef} style={{ width: '100%', height: isMobile ? '200px' : '240px', overflowY: 'auto', WebkitOverflowScrolling: 'touch', borderTop: '1px solid rgba(255,255,255,0.06)', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
         {options.map((opt) => (
-          <div key={opt} onClick={() => handleSelect(opt)} style={{ height: '48px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: opt === localValue ? (isMobile ? '1.3rem' : '1.5rem') : (isMobile ? '0.9rem' : '1rem'), fontWeight: opt === localValue ? '800' : '600', color: opt === localValue ? '#FFD700' : 'rgba(255,255,255,0.25)', cursor: 'pointer', transition: 'all 0.15s ease', background: opt === localValue ? 'rgba(255,215,0,0.06)' : 'transparent', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}>
+          <div key={opt} onClick={() => handleSelect(opt)} style={{ height: '48px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: opt === localValue ? (isMobile ? '1.3rem' : '1.5rem') : (isMobile ? '0.9rem' : '1rem'), fontWeight: opt === localValue ? 900 : 700, color: opt === localValue ? '#fff' : 'rgba(255,255,255,0.3)', cursor: 'pointer', transition: 'all 0.15s ease', background: opt === localValue ? 'rgba(255,255,255,0.07)' : 'transparent', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}>
             {opt} {unit}
           </div>
         ))}
@@ -56,22 +59,25 @@ function NumberPicker({ value, onChange, min = 0, max = 300, step = 1, unit = 'k
       <div style={{ display: 'flex', gap: '0.35rem', alignItems: 'center', flexWrap: 'wrap', justifyContent: 'center' }}>
         <AdjustBtn label={`-${step * 5}`} onClick={() => handleSelect(localValue - step * 5)} isMobile={isMobile} />
         <AdjustBtn label={`-${step}`} onClick={() => handleSelect(localValue - step)} isMobile={isMobile} />
-        {halfStep && <AdjustBtn label={`-${halfStep}`} onClick={() => handleSelect(localValue - halfStep)} isMobile={isMobile} half />}
-        {halfStep && <AdjustBtn label={`+${halfStep}`} onClick={() => handleSelect(localValue + halfStep)} isMobile={isMobile} half positive />}
-        <AdjustBtn label={`+${step}`} onClick={() => handleSelect(localValue + step)} isMobile={isMobile} positive />
-        <AdjustBtn label={`+${step * 5}`} onClick={() => handleSelect(localValue + step * 5)} isMobile={isMobile} positive />
+        {halfStep && <AdjustBtn label={`-${halfStep}`} onClick={() => handleSelect(localValue - halfStep)} isMobile={isMobile} />}
+        {halfStep && <AdjustBtn label={`+${halfStep}`} onClick={() => handleSelect(localValue + halfStep)} isMobile={isMobile} />}
+        <AdjustBtn label={`+${step}`} onClick={() => handleSelect(localValue + step)} isMobile={isMobile} />
+        <AdjustBtn label={`+${step * 5}`} onClick={() => handleSelect(localValue + step * 5)} isMobile={isMobile} />
       </div>
 
-      <button onClick={onConfirm} style={{ width: '100%', padding: isMobile ? '0.875rem' : '1rem', background: 'rgba(255,215,0,0.1)', border: '1px solid rgba(255,215,0,0.25)', borderRadius: '10px', color: '#FFD700', fontSize: isMobile ? '0.85rem' : '0.9rem', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '0.05em', cursor: 'pointer', minHeight: '48px', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}>
-        OK
+      <button onClick={onConfirm} style={{ width: '100%', padding: isMobile ? '0.9rem' : '1rem', background: '#fff', border: '1px solid #fff', borderRadius: 14, color: '#0a0a0a', fontSize: isMobile ? '0.9rem' : '0.95rem', fontWeight: 900, letterSpacing: '-0.01em', cursor: 'pointer', minHeight: 52, fontFamily: 'inherit', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}>
+        Volgende
       </button>
     </div>
   )
 }
 
-function AdjustBtn({ label, onClick, isMobile, positive, half }) {
+// Alle stapknoppen zien er hetzelfde uit. Ze verschilden in kleur naar
+// richting (+ goud, − grijs) en naar halve stap, wat drie tinten opleverde
+// voor zes knoppen die alle zes hetzelfde doen.
+function AdjustBtn({ label, onClick, isMobile }) {
   return (
-    <button onClick={onClick} style={{ padding: isMobile ? '0.4rem 0.6rem' : '0.45rem 0.7rem', background: half ? 'rgba(255,215,0,0.04)' : 'rgba(255,255,255,0.04)', border: `1px solid ${half ? 'rgba(255,215,0,0.12)' : 'rgba(255,255,255,0.08)'}`, borderRadius: '8px', color: positive ? 'rgba(255,215,0,0.5)' : 'rgba(255,255,255,0.35)', fontSize: isMobile ? '0.65rem' : '0.7rem', fontWeight: '700', cursor: 'pointer', minHeight: '34px', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}>
+    <button onClick={onClick} style={{ padding: isMobile ? '0.45rem 0.7rem' : '0.5rem 0.8rem', background: 'transparent', border: '1px solid rgba(255,255,255,0.18)', borderRadius: 10, color: '#fff', fontSize: isMobile ? '0.75rem' : '0.8rem', fontWeight: 900, cursor: 'pointer', minHeight: 38, fontFamily: 'inherit', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}>
       {label}
     </button>
   )
@@ -117,16 +123,13 @@ function SetInputWizard({ onComplete, onCancel, previousWeight = 20, previousRep
   }
 
   const InfoTip = ({ text }) => (
-    <div style={{ fontSize: isMobile ? '0.68rem' : '0.73rem', color: 'rgba(255,215,0,0.4)', fontWeight: '500', textAlign: 'center', lineHeight: 1.5, padding: '0.5rem 0.75rem', borderTop: '1px solid rgba(255,215,0,0.06)', marginTop: '0.25rem', fontStyle: 'italic' }}>
+    <div style={{ fontSize: isMobile ? '0.76rem' : '0.8rem', color: 'rgba(255,255,255,0.45)', fontWeight: 600, textAlign: 'center', lineHeight: 1.5, padding: '0.5rem 0.75rem', marginTop: '0.25rem' }}>
       {text}
     </div>
   )
 
   return createPortal(
     <div style={{ position: 'fixed', inset: 0, background: '#0a0a0a', zIndex: 10001, display: 'flex', flexDirection: 'column', animation: 'fadeIn 0.2s ease' }}>
-      {/* Gouden top streep */}
-      <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '2px', background: 'linear-gradient(90deg, transparent, rgba(255,215,0,0.5), transparent)', zIndex: 1 }} />
-
       <div style={{ padding: isMobile ? '1rem' : '1.25rem', borderBottom: '1px solid rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <div style={{ fontSize: isMobile ? '0.62rem' : '0.68rem', color: 'rgba(255,255,255,0.5)', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
           {editMode ? 'SET AANPASSEN' : snel ? `STAP ${Math.min(step, 2)}/2` : `STAP ${displayStep}/${totalSteps}`}
@@ -137,7 +140,7 @@ function SetInputWizard({ onComplete, onCancel, previousWeight = 20, previousRep
       </div>
 
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', padding: isMobile ? '1.5rem 1rem' : '2rem 1.5rem', overflowY: 'auto' }}>
-        <h3 style={{ fontSize: isMobile ? '1.5rem' : '1.75rem', fontWeight: '800', color: '#fff', margin: '0 0 1.5rem 0', letterSpacing: '-0.02em', textAlign: 'center' }}>
+        <h3 style={{ fontSize: isMobile ? '1.35rem' : '1.5rem', fontWeight: 900, color: '#fff', margin: '0 0 1.5rem 0', letterSpacing: '-0.03em', textAlign: 'center' }}>
           {stepTitles[step]}
         </h3>
 
@@ -146,11 +149,11 @@ function SetInputWizard({ onComplete, onCancel, previousWeight = 20, previousRep
 
         {step === 3 && !editMode && (
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.75rem' }}>
-            <div style={{ fontSize: isMobile ? '1.5rem' : '1.8rem', fontWeight: '900', color: '#FFD700', textAlign: 'center', letterSpacing: '-0.02em' }}>{weight}kg × {reps}</div>
+            <div style={{ fontSize: isMobile ? '1.8rem' : '2.1rem', fontWeight: 900, color: '#fff', textAlign: 'center', letterSpacing: '-0.03em' }}>{weight}<span style={{ fontSize: '0.5em', color: 'rgba(255,255,255,0.4)' }}>kg</span> × {reps}</div>
             <InfoTip text="Partials zijn onvolledige herhalingen aan het einde van je set, wanneer je de volle beweging niet meer kunt maken maar nog wél een stukje." />
             <div style={{ display: 'flex', gap: '0.75rem', width: '100%' }}>
-              <button onClick={() => { setHasPartials(false); setStep(4) }} style={{ flex: 1, padding: isMobile ? '0.875rem' : '1rem', background: 'rgba(255,215,0,0.08)', border: '1px solid rgba(255,215,0,0.2)', borderRadius: '10px', color: '#FFD700', fontSize: isMobile ? '0.82rem' : '0.88rem', fontWeight: '700', cursor: 'pointer', minHeight: '52px', touchAction: 'manipulation' }}>Nee</button>
-              <button onClick={() => setHasPartials(true)} style={{ flex: 1, padding: isMobile ? '0.875rem' : '1rem', background: hasPartials ? 'rgba(255,215,0,0.08)' : 'transparent', border: `1px solid ${hasPartials ? 'rgba(255,215,0,0.2)' : 'rgba(255,255,255,0.08)'}`, borderRadius: '10px', color: hasPartials ? '#FFD700' : 'rgba(255,255,255,0.35)', fontSize: isMobile ? '0.82rem' : '0.88rem', fontWeight: '700', cursor: 'pointer', minHeight: '52px', touchAction: 'manipulation' }}>Ja</button>
+              <button onClick={() => { setHasPartials(false); setStep(4) }} style={{ flex: 1, padding: isMobile ? '0.9rem' : '1rem', background: '#fff', border: '1px solid #fff', borderRadius: 14, color: '#0a0a0a', fontSize: isMobile ? '0.88rem' : '0.92rem', fontWeight: 900, cursor: 'pointer', minHeight: 52, fontFamily: 'inherit', touchAction: 'manipulation' }}>Nee</button>
+              <button onClick={() => setHasPartials(true)} style={{ flex: 1, padding: isMobile ? '0.9rem' : '1rem', background: 'transparent', border: `1px solid ${hasPartials ? '#fff' : 'rgba(255,255,255,0.2)'}`, borderRadius: 14, color: '#fff', fontSize: isMobile ? '0.88rem' : '0.92rem', fontWeight: 900, cursor: 'pointer', minHeight: 52, fontFamily: 'inherit', touchAction: 'manipulation' }}>Ja</button>
             </div>
             {hasPartials && <div style={{ width: '100%' }}><NumberPicker value={partialReps} onChange={setPartialReps} min={1} max={20} step={1} unit="partials" onConfirm={() => setStep(4)} /></div>}
           </div>
@@ -158,11 +161,11 @@ function SetInputWizard({ onComplete, onCancel, previousWeight = 20, previousRep
 
         {step === 4 && !editMode && (
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.75rem' }}>
-            <div style={{ fontSize: isMobile ? '1.3rem' : '1.5rem', fontWeight: '900', color: '#FFD700', textAlign: 'center', letterSpacing: '-0.02em' }}>{weight}kg × {reps}{hasPartials ? ` +${partialReps}p` : ''}</div>
+            <div style={{ fontSize: isMobile ? '1.8rem' : '2.1rem', fontWeight: 900, color: '#fff', textAlign: 'center', letterSpacing: '-0.03em' }}>{weight}<span style={{ fontSize: '0.5em', color: 'rgba(255,255,255,0.4)' }}>kg</span> × {reps}{hasPartials ? ` +${partialReps}p` : ''}</div>
             <InfoTip text="Een dropset is wanneer je direct na je set het gewicht verlaagt en zonder rust nog een set doet." />
             <div style={{ display: 'flex', gap: '0.75rem', width: '100%' }}>
-              <button onClick={handleFinishWithoutDrop} style={{ flex: 1, padding: isMobile ? '0.875rem' : '1rem', background: 'rgba(255,215,0,0.08)', border: '1px solid rgba(255,215,0,0.2)', borderRadius: '10px', color: '#FFD700', fontSize: isMobile ? '0.82rem' : '0.88rem', fontWeight: '700', cursor: 'pointer', minHeight: '52px', touchAction: 'manipulation' }}>Nee</button>
-              <button onClick={() => { setHasDropset(true); setStep(5); setDropStep(1) }} style={{ flex: 1, padding: isMobile ? '0.875rem' : '1rem', background: 'transparent', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '10px', color: 'rgba(255,255,255,0.35)', fontSize: isMobile ? '0.82rem' : '0.88rem', fontWeight: '700', cursor: 'pointer', minHeight: '52px', touchAction: 'manipulation' }}>Ja, dropset</button>
+              <button onClick={handleFinishWithoutDrop} style={{ flex: 1, padding: isMobile ? '0.9rem' : '1rem', background: '#fff', border: '1px solid #fff', borderRadius: 14, color: '#0a0a0a', fontSize: isMobile ? '0.88rem' : '0.92rem', fontWeight: 900, cursor: 'pointer', minHeight: 52, fontFamily: 'inherit', touchAction: 'manipulation' }}>Nee</button>
+              <button onClick={() => { setHasDropset(true); setStep(5); setDropStep(1) }} style={{ flex: 1, padding: isMobile ? '0.9rem' : '1rem', background: 'transparent', border: '1px solid rgba(255,255,255,0.2)', borderRadius: 14, color: '#fff', fontSize: isMobile ? '0.88rem' : '0.92rem', fontWeight: 900, cursor: 'pointer', minHeight: 52, fontFamily: 'inherit', touchAction: 'manipulation' }}>Ja, dropset</button>
             </div>
           </div>
         )}
