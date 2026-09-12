@@ -309,10 +309,53 @@ export default function AIAlternativesModal({
   // kopie in ai_custom_meals en geen verwijzing: "Mijn maaltijden" is een
   // eigen lijst die je daarna kunt aanpassen, en de rest van de app leest die
   // tabel al.
+  // De ingrediënten van een ai_meal zijn verwijzingen: {ingredient_id, amount,
+  // unit}, zonder naam en zonder macro's. Het maaltijd-scherm rekent zijn
+  // totalen uít de ingrediënten, dus zo'n lijst kopiëren gaf een maaltijd van
+  // 0 kcal met regels als "250gram". Daarom slaan we ze hier uitgeschreven op:
+  // naam plus de macro's voor die hoeveelheid.
+  const schrijfIngredientenUit = async (lijst) => {
+    const rijen = Array.isArray(lijst) ? lijst : []
+    const ids = [...new Set(rijen.map(r => r?.ingredient_id).filter(Boolean))]
+    if (ids.length === 0) {
+      // Al uitgeschreven (eigen maaltijd) of niets bekend: alleen doorgeven
+      // wat zelf al macro's heeft, anders liever niets dan nullen.
+      return rijen.some(r => r?.calories || r?.protein) ? rijen : null
+    }
+    try {
+      const { data, error } = await db.supabase
+        .from('ai_ingredients')
+        .select('id, name, calories_per_100g, protein_per_100g, carbs_per_100g, fat_per_100g')
+        .in('id', ids)
+      if (error) throw error
+      const opId = new Map((data || []).map(i => [i.id, i]))
+      const uit = rijen.map(r => {
+        const bron = opId.get(r.ingredient_id)
+        if (!bron) return null
+        const gram = Number(r.amount) || 0
+        const deel = gram / 100
+        return {
+          name: bron.name,
+          amount: gram,
+          unit: r.unit || 'gram',
+          calories: Math.round((bron.calories_per_100g || 0) * deel),
+          protein: Math.round((bron.protein_per_100g || 0) * deel * 10) / 10,
+          carbs: Math.round((bron.carbs_per_100g || 0) * deel * 10) / 10,
+          fat: Math.round((bron.fat_per_100g || 0) * deel * 10) / 10,
+        }
+      }).filter(Boolean)
+      return uit.length ? uit : null
+    } catch (e) {
+      console.error('Ingrediënten uitschrijven mislukt:', e)
+      return null
+    }
+  }
+
   const bewaarInMijnMaaltijden = async (meal, sectie) => {
     if (!meal || !client?.id || !db?.supabase) return
     setSterBezig(true)
     try {
+      const ingredienten = await schrijfIngredientenUit(meal.ingredients_list)
       const { data, error } = await db.supabase.from('ai_custom_meals').insert({
         client_id: client.id,
         name: meal.name,
@@ -321,7 +364,7 @@ export default function AIAlternativesModal({
         carbs: Math.round(meal.carbs || 0),
         fat: Math.round(meal.fat || 0),
         fiber: Math.round(meal.fiber || 0),
-        ingredients_list: meal.ingredients_list || null,
+        ingredients_list: ingredienten,
         image_url: meal.image_url || null,
         section: sectie || null,
         is_active: true,

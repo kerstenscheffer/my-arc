@@ -264,12 +264,37 @@ function MealDetailView({ meal, setMeal, client, db, isMobile, onBack, onRequest
     return publicUrl
   }
 
-  const totals = (meal.ingredients_list || []).reduce((t, ing) => ({
-    calories: t.calories + (ing.calories || 0),
+  // In de database staan drie vormen van een ingrediëntregel door elkaar:
+  //   1. {name, amount, unit, calories, …}          — deze bouwer
+  //   2. {ingredient_name, amount_gram, calories, …} — meal-prep calculator
+  //   3. {ingredient_id, amount, unit}               — verwijzing uit ai_meals
+  // Alles wordt hier op vorm 1 getrokken; zonder dat las de regel "250gram"
+  // zonder naam en telde vorm 2 niet mee in het totaal.
+  const alsRegel = (ing) => ({
+    ...ing,
+    name: ing?.name || ing?.ingredient_name || ing?.naam || 'Ingrediënt',
+    amount: ing?.amount ?? ing?.amount_gram ?? null,
+    unit: ing?.unit || (ing?.amount_gram != null ? 'gram' : ''),
+  })
+  const regels = (meal.ingredients_list || []).map(alsRegel)
+
+  // Totalen komen uit de ingrediënten. Draagt geen enkel ingrediënt macro's —
+  // bijvoorbeeld een maaltijd die als verwijzingen is opgeslagen — dan zouden
+  // de totalen op 0 komen en bij opslaan de echte waarden overschrijven. In
+  // dat geval houden we de macro's van de maaltijd zelf aan.
+  const berekend = regels.reduce((t, ing) => ({
+    calories: t.calories + (parseFloat(ing.calories) || 0),
     protein: t.protein + (parseFloat(ing.protein) || 0),
     carbs: t.carbs + (parseFloat(ing.carbs) || 0),
     fat: t.fat + (parseFloat(ing.fat) || 0)
   }), { calories: 0, protein: 0, carbs: 0, fat: 0 })
+  const ingredientenHebbenMacros = berekend.calories > 0 || berekend.protein > 0 || berekend.carbs > 0 || berekend.fat > 0
+  const totals = ingredientenHebbenMacros ? berekend : {
+    calories: parseFloat(meal.calories) || 0,
+    protein: parseFloat(meal.protein) || 0,
+    carbs: parseFloat(meal.carbs) || 0,
+    fat: parseFloat(meal.fat) || 0,
+  }
 
   const totalG = totals.protein + totals.carbs + totals.fat
   const protPct = totalG > 0 ? Math.round((totals.protein / totalG) * 100) : 0
@@ -295,7 +320,8 @@ function MealDetailView({ meal, setMeal, client, db, isMobile, onBack, onRequest
   }
 
   const handleSave = async () => {
-    if (!meal.name?.trim() || !meal.ingredients_list?.length) return
+    if (!meal.name?.trim()) return
+    if (!meal.ingredients_list?.length && !totals.calories) return
     setSaving(true)
     try {
       const imageUrl = await resolveImageUrl()
@@ -380,10 +406,10 @@ function MealDetailView({ meal, setMeal, client, db, isMobile, onBack, onRequest
           {meal.id ? 'Maaltijd bewerken' : 'Maaltijd aanmaken'}
         </div>
         <button onClick={handleSave}
-          disabled={saving || !meal.name?.trim() || !meal.ingredients_list?.length}
+          disabled={saving || !meal.name?.trim() || (!meal.ingredients_list?.length && !totals.calories)}
           style={{
             background: 'none', border: 'none',
-            color: (saving || !meal.name?.trim() || !meal.ingredients_list?.length)
+            color: (saving || !meal.name?.trim() || (!meal.ingredients_list?.length && !totals.calories))
               ? 'rgba(16,185,129,0.3)' : '#FFD700',
             cursor: 'pointer', padding: '0.25rem', touchAction: 'manipulation',
             fontSize: '0.8rem', fontWeight: '700'
@@ -565,7 +591,7 @@ function MealDetailView({ meal, setMeal, client, db, isMobile, onBack, onRequest
           </div>
         </div>
 
-        {(meal.ingredients_list || []).map((ing, idx) => (
+        {regels.map((ing, idx) => (
           <div key={idx} style={{
             display: 'flex', alignItems: 'center',
             padding: isMobile ? '0.625rem 1rem' : '0.75rem 1.5rem',
@@ -579,7 +605,7 @@ function MealDetailView({ meal, setMeal, client, db, isMobile, onBack, onRequest
                 {ing.name}
               </div>
               <div style={{ fontSize: '0.6rem', color: 'rgba(255,255,255,0.3)' }}>
-                {ing.brand ? `${ing.brand}, ` : ''}{ing.amount}{ing.unit || 'g'}
+                {ing.brand ? `${ing.brand}, ` : ''}{ing.amount ?? '?'}{ing.unit === 'gram' ? 'g' : (ing.unit || 'g')}
               </div>
             </div>
             <div style={{
@@ -645,7 +671,7 @@ function MealDetailView({ meal, setMeal, client, db, isMobile, onBack, onRequest
 
           {/* Small: Alleen opslaan */}
           <button onClick={handleSave}
-            disabled={saving || !meal.name?.trim() || !meal.ingredients_list?.length}
+            disabled={saving || !meal.name?.trim() || (!meal.ingredients_list?.length && !totals.calories)}
             style={{
               width: '100%', padding: isMobile ? '0.5rem' : '0.625rem',
               background: 'transparent', border: '1px solid rgba(255,255,255,0.06)',
