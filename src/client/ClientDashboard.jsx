@@ -34,7 +34,8 @@ import {
   LogOut,
   Bell,
   HelpCircle,
-  PlayCircle
+  PlayCircle,
+  MoreHorizontal
 } from 'lucide-react'
 
 // Initialize database
@@ -77,6 +78,7 @@ export default function ClientDashboard({ previewClientId = null, ingebed = fals
 
   // WidgetSidebar — één widget tegelijk geopend, plus live badge-counts.
   const [widgetOpen, setWidgetOpen] = useState(null)
+  const [meerOpen, setMeerOpen] = useState(false)
   const [widgetCounts, setWidgetCounts] = useState({ notifications: 0, vragen: 0, video: 0 })
   const setCount = (key) => (n) => setWidgetCounts(prev => prev[key] === n ? prev : { ...prev, [key]: n })
 
@@ -90,15 +92,25 @@ export default function ClientDashboard({ previewClientId = null, ingebed = fals
   // Eén navigatie nu — header en side-nav zijn weggehaald, dus de
   // floating bottom-bar is de enige route tussen views. Alle 7 views
   // zitten erin.
+  // Vijf plekken op de balk: de vier die je dagelijks gebruikt, en "Meer"
+  // voor de rest. Zeven knoppen naast elkaar werden op een telefoon zulke
+  // smalle vakjes dat de labels niet meer te lezen waren.
   const navItems = [
-    { id: 'home',         label: 'Home',     Icon: Home },
-    { id: 'workout',      label: 'Workout',  Icon: Dumbbell },
-    { id: 'meal',         label: 'Meal',     Icon: Utensils },
-    { id: 'boodschappen', label: 'Shop',     Icon: ShoppingCart },
-    { id: 'tracking',     label: 'Tracking', Icon: Camera },
-    { id: 'calls',        label: 'Calls',    Icon: Phone },
-    { id: 'profile',      label: 'Profile',  Icon: User }
+    { id: 'home',    label: 'Home',     Icon: Home },
+    { id: 'workout', label: 'Workout',  Icon: Dumbbell },
+    { id: 'meal',    label: 'Meal',     Icon: Utensils },
+    { id: 'tracking', label: 'Tracking', Icon: Camera },
   ]
+
+  // Achter "Meer". Vragen is geen pagina maar het vragen-venster; die stond
+  // alleen nog in de zwevende widgetbalk.
+  const meerItems = [
+    { id: 'boodschappen', label: 'Shop',    Icon: ShoppingCart, actie: () => setCurrentView('boodschappen') },
+    { id: 'calls',        label: 'Calls',   Icon: Phone,        actie: () => setCurrentView('calls') },
+    { id: 'profile',      label: 'Profile', Icon: User,         actie: () => setCurrentView('profile') },
+    { id: 'vragen',       label: 'Vragen',  Icon: HelpCircle,   actie: () => setWidgetOpen('vragen') },
+  ]
+  const meerActief = meerItems.some(i => i.id === currentView)
   
   useEffect(() => {
     const handleResize = () => {
@@ -412,8 +424,81 @@ export default function ClientDashboard({ previewClientId = null, ingebed = fals
               </button>
             )
           })}
+
+          {/* Meer — klapt boven de balk open. */}
+          <button
+            onClick={() => setMeerOpen(v => !v)}
+            aria-expanded={meerOpen}
+            style={{
+              flex: 1,
+              display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3,
+              padding: isMobile ? '0.35rem 0.05rem' : '0.45rem 0.15rem',
+              background: (meerOpen || meerActief) ? 'rgba(255,215,0,0.08)' : 'transparent',
+              border: 'none', borderRadius: 14,
+              cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+              minHeight: 44, minWidth: 36,
+              transition: 'background 0.15s ease',
+            }}
+          >
+            <MoreHorizontal
+              size={isMobile ? 20 : 22}
+              color={(meerOpen || meerActief) ? '#FFD700' : 'rgba(255, 255, 255, 0.42)'}
+              strokeWidth={(meerOpen || meerActief) ? 2.5 : 1.9}
+            />
+            <span style={{
+              fontSize: isMobile ? '0.52rem' : '0.58rem',
+              fontWeight: (meerOpen || meerActief) ? 800 : 600,
+              color: (meerOpen || meerActief) ? '#FFD700' : 'rgba(255, 255, 255, 0.35)',
+              letterSpacing: '-0.01em', lineHeight: 1,
+            }}>
+              Meer
+            </span>
+          </button>
         </div>
+
+        {meerOpen && (
+          <div style={{
+            position: 'absolute', right: 6, bottom: 'calc(100% + 8px)',
+            minWidth: 168,
+            background: 'rgba(10,10,10,0.96)',
+            backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)',
+            border: '1px solid rgba(255,255,255,0.12)',
+            borderRadius: 16,
+            boxShadow: '0 18px 48px rgba(0,0,0,0.7)',
+            padding: 5,
+          }}>
+            {meerItems.map(item => {
+              const aan = currentView === item.id
+              return (
+                <button
+                  key={item.id}
+                  onClick={() => { item.actie(); setMeerOpen(false) }}
+                  style={{
+                    width: '100%',
+                    display: 'flex', alignItems: 'center', gap: 10,
+                    padding: '0.6rem 0.7rem',
+                    background: aan ? 'rgba(255,215,0,0.1)' : 'transparent',
+                    border: 'none', borderRadius: 11,
+                    color: aan ? '#FFD700' : '#fff',
+                    fontSize: '0.85rem', fontWeight: aan ? 900 : 800,
+                    fontFamily: 'inherit', textAlign: 'left',
+                    cursor: 'pointer', touchAction: 'manipulation',
+                    WebkitTapHighlightColor: 'transparent',
+                  }}
+                >
+                  <item.Icon size={16} strokeWidth={2.4} />
+                  {item.label}
+                </button>
+              )
+            })}
+          </div>
+        )}
       </nav>}
+
+      {/* Tikken naast het Meer-menu sluit het. Onder de balk, boven de rest. */}
+      {meerOpen && !focusMode && (
+        <div onClick={() => setMeerOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 100 }} />
+      )}
 
       {/* currentPage="all" — de widget is het meldingen-centrum en toont ALLES.
           Stond hier `currentView`, waardoor een melding alleen zichtbaar was als
