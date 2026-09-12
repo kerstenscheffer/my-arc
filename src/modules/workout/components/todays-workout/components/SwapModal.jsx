@@ -257,31 +257,77 @@ export default function SwapModal({ exercise, exerciseIndex, workoutDayKey, sche
               background: '#0a0a0a',
               position: 'sticky', top: 0, zIndex: 10,
             }}>
-              <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '0.875rem', gap: '0.75rem' }}>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <h2 style={{ fontSize: isMobile ? '1.1rem' : '1.25rem', fontWeight: 900, color: '#fff', margin: 0, letterSpacing: '-0.02em', lineHeight: 1.2 }}>Wissel Oefening</h2>
-                  <div style={{ fontSize: isMobile ? '0.78rem' : '0.85rem', color: '#FFD700', fontWeight: 700, marginTop: '0.3rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{exercise.name}</div>
-                  {exercise._isWeeklyOverride && (
-                    <div style={{ fontSize: isMobile ? '0.66rem' : '0.72rem', color: 'rgba(255,255,255,0.5)', fontWeight: 600, marginTop: '0.2rem' }}>
-                      Origineel: {exercise._originalName}
-                    </div>
-                  )}
-                </div>
-                <button onClick={handleClose} aria-label="Sluit" style={{ width: 44, height: 44, background: 'rgba(10,10,10,0.85)', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)', border: '1px solid rgba(255,215,0,0.3)', borderRadius: 12, color: '#FFD700', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0, touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}>
-                  <X size={20} strokeWidth={2.4} />
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.7rem', gap: '0.75rem' }}>
+                <h2 style={{ fontSize: isMobile ? '1.1rem' : '1.25rem', fontWeight: 900, color: '#fff', margin: 0, letterSpacing: '-0.025em', lineHeight: 1.2 }}>Wissel oefening</h2>
+                <button onClick={handleClose} aria-label="Sluit" style={{ width: 40, height: 40, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 12, color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0, touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}>
+                  <X size={18} strokeWidth={2.4} />
                 </button>
               </div>
 
-              <div style={{ position: 'relative', marginBottom: '0.75rem' }}>
-                <Search size={16} color="rgba(255,215,0,0.4)" style={{ position: 'absolute', left: '0.875rem', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }} />
-                <input type="text" placeholder="Zoek oefening..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)}
-                  style={{ width: '100%', padding: isMobile ? '0.625rem 0.875rem 0.625rem 2.5rem' : '0.75rem 1rem 0.75rem 3rem', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '10px', color: '#fff', fontSize: isMobile ? '0.85rem' : '0.9rem', fontWeight: '500', outline: 'none' }} />
+              {/* De oefening die je wisselt als kaart, niet als gouden regel:
+                  je herkent hem aan de foto sneller dan aan de naam, en het
+                  ziet er hetzelfde uit als de rijen waar je uit kiest. */}
+              <div style={{
+                display: 'flex', alignItems: 'center', gap: '0.7rem',
+                padding: '0.5rem 0.6rem', marginBottom: '0.85rem',
+                background: 'rgba(255,255,255,0.035)',
+                border: '1px solid rgba(255,255,255,0.08)',
+                borderRadius: 12,
+              }}>
+                <div style={{
+                  width: 52, height: 52, borderRadius: 9, flexShrink: 0,
+                  backgroundImage: `url(${exerciseImages[exercise.name] || getFallbackImage({ primair_spieren: exercise.primairSpieren || '' })})`,
+                  backgroundSize: 'cover', backgroundPosition: 'center',
+                }} />
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
+                    <span style={{
+                      fontSize: isMobile ? '0.9rem' : '0.96rem', fontWeight: 900, color: '#fff',
+                      overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', letterSpacing: '-0.015em',
+                    }}>
+                      {exercise.name}
+                    </span>
+                    {exercise.primairSpieren && (
+                      <span style={{
+                        flexShrink: 0, fontSize: '0.52rem', fontWeight: 900, color: '#000',
+                        background: '#FFD700', padding: '2px 7px', borderRadius: 3,
+                        letterSpacing: '0.05em', textTransform: 'uppercase', whiteSpace: 'nowrap',
+                      }}>
+                        {exercise.primairSpieren}
+                      </span>
+                    )}
+                  </div>
+                  <div style={{ fontSize: '0.75rem', fontWeight: 800, color: 'rgba(255,255,255,0.45)', marginTop: 2 }}>
+                    {exercise.sets && <>{exercise.sets} sets</>}
+                    {exercise.sets && exercise.reps && ' · '}
+                    {exercise.reps && <>{exercise.reps} reps</>}
+                    {exercise._isWeeklyOverride && exercise._originalName && (
+                      <> · origineel {exercise._originalName}</>
+                    )}
+                  </div>
+                </div>
               </div>
 
-              <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.625rem' }}>
+              <div style={{
+                fontSize: '0.68rem', fontWeight: 900, color: '#fff',
+                textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '0.4rem',
+              }}>
+                Voor
+              </div>
+
+              <div style={{ position: 'relative', marginBottom: '0.6rem' }}>
+                <Search size={16} color="rgba(255,255,255,0.4)" style={{ position: 'absolute', left: '0.875rem', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }} />
+                <input type="text" placeholder="Zoek een vervanger…" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)}
+                  style={{ width: '100%', padding: isMobile ? '0.7rem 0.875rem 0.7rem 2.5rem' : '0.75rem 1rem 0.75rem 3rem', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10, color: '#fff', fontSize: isMobile ? '0.88rem' : '0.9rem', fontWeight: 700, fontFamily: 'inherit', outline: 'none' }} />
+              </div>
+
+              {/* Filters compact op één regel, met het aantal ernaast. Ze stonden
+                  op volle hoogte met de teller op een eigen regel eronder —
+                  samen zo'n 70px die je van de resultaten afsnoept. */}
+              <div style={{ display: 'flex', gap: '0.45rem', alignItems: 'center' }}>
                 <div style={{ flex: 1, position: 'relative' }}>
                   <button onClick={() => { setShowMuscleDropdown(!showMuscleDropdown); setShowEquipmentDropdown(false) }}
-                    style={{ width: '100%', padding: isMobile ? '0.625rem 0.75rem' : '0.75rem 0.875rem', background: 'rgba(255,215,0,0.08)', border: '1px solid rgba(255,215,0,0.2)', borderRadius: '10px', color: '#FFD700', fontSize: isMobile ? '0.8rem' : '0.85rem', fontWeight: '700', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}>
+                    style={{ width: '100%', minHeight: 38, padding: '0 0.7rem', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10, color: '#fff', fontSize: '0.78rem', fontWeight: 800, fontFamily: 'inherit', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}>
                     <span>{selectedMuscle ? MUSCLE_LABELS[selectedMuscle] : 'Alle Spieren'}</span>
                     <ChevronDown size={16} style={{ transform: showMuscleDropdown ? 'rotate(180deg)' : 'rotate(0)', transition: 'transform 0.2s ease' }} />
                   </button>
@@ -301,7 +347,7 @@ export default function SwapModal({ exercise, exerciseIndex, workoutDayKey, sche
 
                 <div style={{ flex: 1, position: 'relative' }}>
                   <button onClick={() => { setShowEquipmentDropdown(!showEquipmentDropdown); setShowMuscleDropdown(false) }}
-                    style={{ width: '100%', padding: isMobile ? '0.625rem 0.75rem' : '0.75rem 0.875rem', background: selectedEquipment ? 'rgba(255,215,0,0.08)' : 'rgba(255,255,255,0.03)', border: selectedEquipment ? '1px solid rgba(255,215,0,0.2)' : '1px solid rgba(255,255,255,0.08)', borderRadius: '10px', color: selectedEquipment ? '#FFD700' : 'rgba(255,255,255,0.6)', fontSize: isMobile ? '0.8rem' : '0.85rem', fontWeight: '700', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}>
+                    style={{ width: '100%', minHeight: 38, padding: '0 0.7rem', background: 'rgba(255,255,255,0.05)', border: `1px solid ${selectedEquipment ? 'rgba(255,255,255,0.4)' : 'rgba(255,255,255,0.12)'}`, borderRadius: 10, color: selectedEquipment ? '#fff' : 'rgba(255,255,255,0.6)', fontSize: '0.78rem', fontWeight: 800, fontFamily: 'inherit', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}>
                     <span style={{ display: 'flex', alignItems: 'center', gap: '0.375rem' }}>
                       <DumbbellIcon size={14} strokeWidth={2.5} />
                       {selectedEquipment ? EQUIPMENT_LABELS[selectedEquipment] : 'Equipment'}
@@ -323,14 +369,18 @@ export default function SwapModal({ exercise, exerciseIndex, workoutDayKey, sche
                 </div>
 
                 <button onClick={() => setShowExtraFilters(!showExtraFilters)}
-                  style={{ width: '44px', height: '44px', background: activeExtraFiltersCount > 0 ? 'rgba(255,215,0,0.12)' : 'rgba(255,255,255,0.05)', border: activeExtraFiltersCount > 0 ? '1px solid rgba(255,215,0,0.25)' : '1px solid rgba(255,255,255,0.08)', borderRadius: '10px', color: activeExtraFiltersCount > 0 ? '#FFD700' : 'rgba(255,255,255,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', position: 'relative', flexShrink: 0, touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}>
-                  <SlidersHorizontal size={18} strokeWidth={2.5} />
+                  style={{ width: 38, height: 38, background: 'rgba(255,255,255,0.05)', border: `1px solid ${activeExtraFiltersCount > 0 ? 'rgba(255,255,255,0.4)' : 'rgba(255,255,255,0.12)'}`, borderRadius: 10, color: activeExtraFiltersCount > 0 ? '#fff' : 'rgba(255,255,255,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', position: 'relative', flexShrink: 0, touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}>
+                  <SlidersHorizontal size={16} strokeWidth={2.5} />
                   {activeExtraFiltersCount > 0 && (
-                    <div style={{ position: 'absolute', top: '-4px', right: '-4px', width: '18px', height: '18px', borderRadius: '50%', background: '#FFD700', color: '#000', fontSize: '0.65rem', fontWeight: '800', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <div style={{ position: 'absolute', top: -4, right: -4, width: 16, height: 16, borderRadius: '50%', background: '#fff', color: '#0a0a0a', fontSize: '0.6rem', fontWeight: 900, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                       {activeExtraFiltersCount}
                     </div>
                   )}
                 </button>
+
+                <span style={{ flexShrink: 0, fontSize: '0.72rem', fontWeight: 800, color: 'rgba(255,255,255,0.4)', whiteSpace: 'nowrap' }}>
+                  {filteredAlternatives.length}
+                </span>
               </div>
 
               {showExtraFilters && (
@@ -361,9 +411,6 @@ export default function SwapModal({ exercise, exerciseIndex, workoutDayKey, sche
                 </div>
               )}
 
-              <div style={{ fontSize: isMobile ? '0.75rem' : '0.8rem', color: '#FFD700', fontWeight: 800, textAlign: 'center', opacity: 0.85, letterSpacing: '0.04em', textTransform: 'uppercase' }}>
-                {filteredAlternatives.length} resultaten
-              </div>
             </div>
 
             {/* LIST */}
@@ -401,8 +448,8 @@ export default function SwapModal({ exercise, exerciseIndex, workoutDayKey, sche
                 borderTop: '1px solid rgba(255,255,255,0.06)',
               }}>
                 <button onClick={() => setShowCustomModal(true)}
-                  style={{ width: '100%', minHeight: 54, padding: isMobile ? '0.9rem' : '1rem', background: 'linear-gradient(135deg, #FFD700 0%, #D4AF37 100%)', border: 'none', borderRadius: 14, color: '#0a0a0a', fontSize: isMobile ? '0.88rem' : '0.95rem', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.06em', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', boxShadow: '0 10px 24px rgba(255,215,0,0.3), 0 2px 6px rgba(0,0,0,0.5)' }}>
-                  <Plus size={20} strokeWidth={2.6} />Eigen Oefening
+                  style={{ width: '100%', minHeight: 54, padding: isMobile ? '0.9rem' : '1rem', background: '#fff', border: '1px solid #fff', borderRadius: 14, color: '#0a0a0a', fontSize: isMobile ? '0.88rem' : '0.95rem', fontWeight: 900, letterSpacing: '-0.01em', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, fontFamily: 'inherit', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', boxShadow: '0 10px 24px rgba(0,0,0,0.45)' }}>
+                  <Plus size={20} strokeWidth={2.8} />Eigen oefening
                 </button>
               </div>
             </div>
