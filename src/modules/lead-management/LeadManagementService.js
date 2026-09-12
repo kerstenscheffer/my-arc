@@ -3368,10 +3368,20 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
           purpose: c?.purpose || null,
           total: 0, reached: 0, followupCount: 0,
           repliedLeads: 0, followedLeads: 0,
-          // stages tellen alleen na-campagne-activiteit (movements ná het bericht)
+          // Wanneer het bericht de deur uitging, en naar hoeveel leads. Zonder
+          // dit leest "1 reactie op 96 leads" als een kapotte teller, terwijl
+          // het klopt zodra je ziet dat de campagne een uur geleden verstuurd
+          // is. Alle cijfers hieronder meten vanaf dat moment.
+          sentCount: 0, lastSentAt: null,
           stages: { replied: 0, callProposed: 0, callScheduled: 0, sale: 0 },
         }
         entry.total += 1
+        if (l.campaign_message_sent_at) {
+          entry.sentCount += 1
+          if (!entry.lastSentAt || l.campaign_message_sent_at > entry.lastSentAt) {
+            entry.lastSentAt = l.campaign_message_sent_at
+          }
+        }
         entry.reached += reachedCall.has(l.id) ? 1 : 0
         entry.followupCount += fc
         entry.repliedLeads  += repliedOne

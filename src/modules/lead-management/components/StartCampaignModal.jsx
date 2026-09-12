@@ -57,7 +57,11 @@ export default function StartCampaignModal({ leadService, coachId, isMobile = fa
         .eq('outreach_campaign_id', c.id)
         .is('deleted_at', null)
       leadCount = count || 0
-    } catch {}
+    } catch (e) {
+      // Alleen de waarschuwingstekst wordt minder precies; het verwijderen
+      // zelf gaat gewoon door.
+      console.warn('Aantal gekoppelde leads ophalen mislukt:', e)
+    }
     const msg = leadCount > 0
       ? `Campagne "${c.name}" verwijderen?\n\n${leadCount} lead(s) verliezen hun campagne-tag (de leads zelf blijven bestaan). Dit kan niet ongedaan worden.`
       : `Campagne "${c.name}" verwijderen? Dit kan niet ongedaan worden.`
@@ -321,28 +325,50 @@ function CampagneCijfers({ laden, rij, leadsFallback }) {
     { label: 'Follow-ups',  waarde: rij?.followupCount ?? 0,                           titel: 'Opvolg-berichten die je naar leads van deze campagne stuurde.' },
   ]
 
+  const laatst = rij?.lastSentAt ? new Date(rij.lastSentAt) : null
+  const uren = laatst ? (Date.now() - laatst.getTime()) / 3600000 : null
+
   return (
     <div style={{
-      display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(64px, 1fr))',
-      gap: 6, margin: '0 0 0.55rem',
-      padding: '0.55rem 0.6rem', borderRadius: 9,
+      margin: '0 0 0.55rem', padding: '0.55rem 0.6rem', borderRadius: 9,
       background: 'rgba(168,85,247,0.06)', border: '1px solid rgba(168,85,247,0.22)',
     }}>
-      {vakken.map(v => (
-        <div key={v.label} title={v.titel} style={{ textAlign: 'center', minWidth: 0 }}>
-          <div style={{ fontSize: '0.95rem', fontWeight: 900, color: '#fff', fontVariantNumeric: 'tabular-nums', lineHeight: 1.1 }}>
-            {v.waarde}
-          </div>
-          <div style={{ fontSize: '0.58rem', fontWeight: 800, color: 'rgba(255,255,255,0.42)', letterSpacing: '0.02em', marginTop: 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-            {v.label}
-          </div>
-          {v.sub && (
-            <div style={{ fontSize: '0.58rem', fontWeight: 800, color: '#a855f7', fontVariantNumeric: 'tabular-nums' }}>
-              {v.sub}
+      <div style={{
+        display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(64px, 1fr))', gap: 6,
+      }}>
+        {vakken.map(v => (
+          <div key={v.label} title={v.titel} style={{ textAlign: 'center', minWidth: 0 }}>
+            <div style={{ fontSize: '0.95rem', fontWeight: 900, color: '#fff', fontVariantNumeric: 'tabular-nums', lineHeight: 1.1 }}>
+              {v.waarde}
             </div>
-          )}
+            <div style={{ fontSize: '0.58rem', fontWeight: 800, color: 'rgba(255,255,255,0.42)', letterSpacing: '0.02em', marginTop: 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+              {v.label}
+            </div>
+            {v.sub && (
+              <div style={{ fontSize: '0.58rem', fontWeight: 800, color: '#a855f7', fontVariantNumeric: 'tabular-nums' }}>
+                {v.sub}
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+
+      {/* Wanneer het bericht de deur uitging. Zonder deze regel leest "1 reactie
+          op 96 leads" als een kapotte teller, terwijl het klopt zodra je ziet
+          dat je de campagne een uur geleden verstuurde. Alles hierboven meet
+          vanaf dat moment — een reactie van vóór de campagne telt niet mee. */}
+      {laatst && (
+        <div style={{
+          marginTop: 7, paddingTop: 6, borderTop: '1px solid rgba(168,85,247,0.18)',
+          fontSize: '0.6rem', fontWeight: 700, color: 'rgba(255,255,255,0.42)', lineHeight: 1.4,
+        }}>
+          {rij.sentCount} verstuurd · laatste{' '}
+          {uren < 24
+            ? `${Math.max(1, Math.round(uren))} uur geleden`
+            : laatst.toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })}
+          . Alles hierboven telt pas vanaf dat bericht.
         </div>
-      ))}
+      )}
     </div>
   )
 }
