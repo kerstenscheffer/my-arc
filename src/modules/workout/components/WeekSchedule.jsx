@@ -187,11 +187,12 @@ export default function WeekSchedule({
     return null
   }
 
-  // Staat dezelfde training te dicht op elkaar? Rood bij twee dagen achter
-  // elkaar, oranje bij één dag ertussen. De week herhaalt zich, dus zondag en
-  // maandag tellen ook als achter elkaar.
+  // Wordt dezelfde spiergroep te dicht op elkaar getraind? Rood bij twee dagen
+  // achter elkaar, oranje bij één dag ertussen. Op spiergroep en niet op de
+  // workout zelf: de tweede push-dag heet in de schema's "Push (Copy)" en
+  // heeft een eigen sleutel, dus op naam vergelijken ziet dat niet.
   const { perDag: rustPerDag, meldingen: rustMeldingen } = rustWaarschuwingen(
-    tempSchedule, weekDays, (key) => getWorkoutData(key)?.name || key
+    tempSchedule, weekDays, getWorkoutData
   )
 
   if (!hasValidSchema) {
@@ -307,7 +308,7 @@ export default function WeekSchedule({
                 display: 'flex', flexDirection: 'column', gap: 3,
               }}>
                 {rustMeldingen.map(m => (
-                  <div key={m.key} style={{
+                  <div key={m.niveau} style={{
                     fontSize: isMobile ? '0.68rem' : '0.72rem',
                     fontWeight: 800, lineHeight: 1.3,
                     color: m.niveau === ROOD ? '#ef4444' : '#f59e0b',
