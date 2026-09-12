@@ -62,6 +62,11 @@ export default function AddClientModal({ open, db, coachId, onClose, onCreated, 
       .select()
       .single()
     if (insErr) throw insErr
+    // De insert gaat rechtstreeks via supabase, dus buiten DatabaseService om.
+    // Die houdt de klantenlijst vijf minuten in een cache; zonder deze regel
+    // ziet de rest van de app (o.a. het challenge-scherm, dat zijn lijst van
+    // CoachHub krijgt) de nieuwe klant pas na die vijf minuten.
+    db.clearCache?.('clients')
     return data
   }
 

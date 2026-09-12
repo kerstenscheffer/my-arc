@@ -20,6 +20,10 @@ export default function CoachChallengeHub({ db, clients }) {
   // Assignment Widget State
   const [assignedClients, setAssignedClients] = useState([])
   const [assignLoading, setAssignLoading] = useState(false)
+  // Eigen klantenlijst. De clients-prop komt van CoachHub, die hem één keer
+  // bij het openen ophaalt en vijf minuten in een cache houdt — een klant die
+  // je net hebt aangemaakt stond er dus niet tussen en was niet toe te wijzen.
+  const [klanten, setKlanten] = useState(clients || [])
   // Soort en startdatum stonden hard op '8week' en vandaag. De 6-weken
   // 80/20-challenge was daarmee niet toe te wijzen, en een challenge die
   // maandag begint moest je achteraf in de database rechtzetten.
@@ -47,9 +51,14 @@ export default function CoachChallengeHub({ db, clients }) {
   const [refreshKey, setRefreshKey] = useState(0)
 
   useEffect(() => {
+    loadKlanten()
     loadAssignments()
     loadChallengeClients()
   }, [clients])
+
+  // Ook opnieuw ophalen bij het openen van het paneel: dan zie je een klant
+  // die je zojuist in een ander scherm hebt aangemaakt zonder te herladen.
+  useEffect(() => { if (showAssignment) loadKlanten() }, [showAssignment])
 
   useEffect(() => {
     if (selectedClient) {
@@ -60,6 +69,23 @@ export default function CoachChallengeHub({ db, clients }) {
   }, [selectedClient])
 
   // ASSIGNMENT FUNCTIONS
+  async function loadKlanten() {
+    try {
+      const user = await db.getCurrentUser()
+      if (!user) return
+      const { data, error } = await db.supabase
+        .from('clients')
+        .select('id, first_name, last_name, email, status')
+        .eq('trainer_id', user.id)
+        .eq('status', 'active')
+        .order('created_at', { ascending: false })
+      if (error) throw error
+      setKlanten(data || [])
+    } catch (e) {
+      console.error('Klanten laden mislukt:', e)
+    }
+  }
+
   async function loadAssignments() {
     try {
       const { data } = await db.supabase
@@ -185,7 +211,7 @@ export default function CoachChallengeHub({ db, clients }) {
         // clients-prop. Die prop is de lijst van de ingelogde coach; stond een
         // deelnemer daar niet in, dan verdween hij hier stilzwijgend.
         const clientsWithDates = assignments.map(assignment => {
-          const uitProp = clients?.find(c => c.id === assignment.client_id)
+          const uitProp = klanten?.find(c => c.id === assignment.client_id)
           const basis = uitProp || assignment.clients
           if (!basis) return null
           return {
@@ -436,7 +462,7 @@ export default function CoachChallengeHub({ db, clients }) {
             </label>
           </div>
 
-          {clients.length === 0 ? (
+          {klanten.length === 0 ? (
             <p style={{
               color: 'rgba(255, 255, 255, 0.6)',
               fontSize: '0.9rem',
@@ -451,7 +477,7 @@ export default function CoachChallengeHub({ db, clients }) {
               gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fill, minmax(280px, 1fr))',
               gap: '1rem'
             }}>
-              {clients.map(client => {
+              {klanten.map(client => {
                 const isAssigned = assignedClients.includes(client.id)
                 
                 return (
