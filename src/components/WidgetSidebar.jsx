@@ -8,8 +8,10 @@
 //   isMobile: bool
 //
 // Hoort op een vaste plek rechts onder zodat 't niet conflicteert met de
-// floating bottom-nav. Iedere knop volgt dezelfde icon-on-top + label-below
-// patroon als de bottom-nav voor visuele consistentie.
+// floating bottom-nav. Alleen iconen, tegen de rand geplakt: met labels
+// eronder was het een blok van 60px breed dat over de pagina viel. Het label
+// blijft als title/aria-label voor wie erop blijft staan of een schermlezer
+// gebruikt.
 
 import React from 'react'
 
@@ -23,118 +25,76 @@ export default function WidgetSidebar({ buttons = [], isMobile = false }) {
       aria-label="Widgets"
       style={{
         position: 'fixed',
-        // Tegen de rand geplakt in plaats van er los naast: scheelt breedte
-        // en het leest als een uitschuifbaar randje in plaats van een
-        // zwevend blokje midden in beeld.
         right: 0,
         // Boven de bottom-nav uitkomen. Bottom-nav zit op 30px + ~64px hoog
         // + safe-area. Plus marge → ~120px van onderen.
         bottom: 'calc(120px + env(safe-area-inset-bottom, 0px))',
-        background: 'rgba(10, 10, 10, 0.88)',
-        backdropFilter: 'blur(20px)',
-        WebkitBackdropFilter: 'blur(20px)',
-        border: '1px solid rgba(255,255,255,0.08)',
+        // Smal randje tegen de zijkant: alleen iconen, geen labels en geen
+        // kader per knop. Met tekst eronder was het een blok van 60px breed
+        // dat over de pagina viel.
+        background: 'rgba(10,10,10,0.9)',
+        backdropFilter: 'blur(16px)',
+        WebkitBackdropFilter: 'blur(16px)',
+        border: '1px solid rgba(255,255,255,0.1)',
         borderRight: 'none',
-        borderRadius: '18px 0 0 18px',
-        boxShadow: '-8px 12px 40px rgba(0,0,0,0.6)',
-        padding: isMobile ? '0.5rem 0.25rem 0.5rem 0.35rem' : '0.6rem 0.3rem 0.6rem 0.45rem',
+        borderRadius: '14px 0 0 14px',
+        boxShadow: '-6px 10px 30px rgba(0,0,0,0.55)',
+        padding: 3,
         zIndex: 99,
         display: 'flex',
         flexDirection: 'column',
         gap: 2,
       }}
     >
-      {buttons.map(btn => {
+      {buttons.map((btn, i) => {
         const Icon = btn.Icon
         const isActive = !!btn.active
         const accent = btn.color || GOLD
         return (
-          <button
-            key={btn.id}
-            onClick={btn.onClick}
-            title={btn.label}
-            aria-label={btn.label}
-            style={{
-              position: 'relative',
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              gap: 3,
-              padding: isMobile ? '0.4rem 0.3rem' : '0.5rem 0.4rem',
-              background: isActive ? `${accent}1a` : 'transparent',
-              border: 'none',
-              borderRadius: 14,
-              cursor: 'pointer',
-              touchAction: 'manipulation',
-              WebkitTapHighlightColor: 'transparent',
-              minHeight: 44,
-              minWidth: 36,
-              transition: 'background 0.15s ease',
-            }}
-          >
-            {Icon && (
-              <Icon
-                size={isMobile ? 20 : 22}
-                color={isActive ? accent : 'rgba(255,255,255,0.42)'}
-                strokeWidth={isActive ? 2.5 : 1.9}
-              />
+          <React.Fragment key={btn.id}>
+            {i > 0 && (
+              <div style={{ height: 1, margin: '0 6px', background: 'rgba(255,255,255,0.08)' }} />
             )}
-            <span style={{
-              fontSize: isMobile ? '0.52rem' : '0.58rem',
-              fontWeight: isActive ? 800 : 600,
-              color: isActive ? accent : 'rgba(255,255,255,0.35)',
-              letterSpacing: '-0.01em',
-              lineHeight: 1,
-              whiteSpace: 'nowrap',
-            }}>
-              {btn.label}
-            </span>
+            <button
+              onClick={btn.onClick}
+              title={btn.label}
+              aria-label={btn.label}
+              style={{
+                position: 'relative',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                width: isMobile ? 40 : 44, height: isMobile ? 40 : 44,
+                padding: 0,
+                background: isActive ? 'rgba(255,255,255,0.12)' : 'transparent',
+                border: 'none', borderRadius: 11,
+                cursor: 'pointer',
+                touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+                transition: 'background 0.15s ease',
+              }}
+            >
+              {Icon && (
+                <Icon
+                  size={isMobile ? 18 : 19}
+                  color={isActive ? '#fff' : 'rgba(255,255,255,0.5)'}
+                  strokeWidth={isActive ? 2.6 : 2}
+                />
+              )}
 
-            {/* Badge — kleine teller rechts boven bij open items */}
-            {btn.badge != null && btn.badge > 0 && (
-              <span style={{
-                position: 'absolute',
-                top: 2, right: 2,
-                minWidth: 16, height: 16,
-                padding: '0 4px',
-                borderRadius: 8,
-                background: accent,
-                color: '#000',
-                fontSize: '0.55rem',
-                fontWeight: 900,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                lineHeight: 1,
-              }}>
-                {btn.badge > 99 ? '99+' : btn.badge}
-              </span>
-            )}
-
-            {/* Secondary gold badge — top-left, voor "iets wacht op coach"
-                signalen (bv. Claude-reacties op app_issues). */}
-            {btn.goldBadge != null && btn.goldBadge > 0 && (
-              <span style={{
-                position: 'absolute',
-                top: 2, left: 2,
-                minWidth: 18, height: 18,
-                padding: '0 5px',
-                borderRadius: 9,
-                background: '#FFD700',
-                color: '#0a0a0a',
-                fontSize: '0.6rem',
-                fontWeight: 900,
-                border: '1.5px solid #0a0a0a',
-                boxShadow: '0 2px 6px rgba(255,215,0,0.4)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                lineHeight: 1,
-              }}>
-                {btn.goldBadge > 99 ? '99+' : btn.goldBadge}
-              </span>
-            )}
-          </button>
+              {/* Teller rechtsboven op het icoon. */}
+              {btn.badge != null && btn.badge > 0 && (
+                <span style={{
+                  position: 'absolute', top: 3, right: 3,
+                  minWidth: 15, height: 15, padding: '0 3px',
+                  borderRadius: 8,
+                  background: accent, color: '#000',
+                  fontSize: '0.52rem', fontWeight: 900,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  lineHeight: 1,
+                }}>
+                  {btn.badge > 99 ? '99+' : btn.badge}
+                </span>
+              )}
+            </button>
+          </React.Fragment>
         )
       })}
     </nav>
