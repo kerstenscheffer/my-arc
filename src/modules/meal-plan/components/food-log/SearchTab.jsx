@@ -394,11 +394,12 @@ export default function SearchTab({ db, onSelect, isMobile, client, onQuickLog, 
   // ─────────────────────────────────────────────
   // TAP op recent — opent AmountPicker met opgeslagen portie
   // ─────────────────────────────────────────────
-  const handleSelectRecent = (meal) => {
-    // Bepaal of dit een per100g of per-portie item is
+  // Van een gelogde regel een selecteerbaar item maken. Ook de ster gebruikt
+  // dit, zodat een favoriet uit "Recent gelogd" straks op dezelfde portie
+  // opent als toen je 'm logde.
+  const alsItem = (meal) => {
     const isPer100g = meal.per_unit === 'gram'
-
-    onSelect({
+    return {
       id: meal.meal_id || meal.id,
       name: meal.meal_name,
       calories: meal.calories || 0,
@@ -413,8 +414,10 @@ export default function SearchTab({ db, onSelect, isMobile, client, onQuickLog, 
       // 🎯 Picker gebruikt deze om op de juiste portie te openen + lineair te schalen
       _savedAmount: meal.amount,
       _savedPerUnit: meal.per_unit
-    })
+    }
   }
+
+  const handleSelectRecent = (meal) => onSelect(alsItem(meal))
 
   const formatTimeAgo = (dateStr) => {
     if (!dateStr) return ''
@@ -689,6 +692,10 @@ export default function SearchTab({ db, onSelect, isMobile, client, onQuickLog, 
                     tijdLabel={[portionTxt, formatTimeAgo(meal.consumed_at)].filter(Boolean).join(' · ')}
                     isMobile={isMobile}
                     onCheck={() => handleSelectRecent(meal)}
+                    hoekKnop={(() => {
+                      const item = alsItem(meal)
+                      return <SterKnop aan={isFavoriet(item)} onClick={() => wisselFavoriet(item)} />
+                    })()}
                     acties={[
                       ...(onQuickLog ? [{ icon: <Plus size={11} strokeWidth={3} />, label: 'Loggen', onClick: () => handleQuickLog(meal) }] : []),
                       { icon: <ChevronRight size={11} strokeWidth={2.6} />, label: 'Aanpassen', onClick: () => handleSelectRecent(meal) },
