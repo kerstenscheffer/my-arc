@@ -146,7 +146,7 @@ export default function MealTimelineMobile({
               }}
               momentLabel={g.brand || MOMENT_LABEL[g.meal_type] || 'Gelogd'}
               tijdLabel={klok(item.min)}
-              isMobile={true}
+              isMobile={isMobile !== false}
               acties={[
                 { icon: <Edit3 size={11} />, label: 'Bewerken', onClick: () => onEditConsumedMeal?.(g) },
                 { icon: <Trash2 size={11} />, label: 'Verwijderen', onClick: () => onDeleteConsumedMeal?.(g.id), kleur: 'rgba(239,68,68,0.85)' },
@@ -155,97 +155,30 @@ export default function MealTimelineMobile({
           )
         }
 
-        // Supplement — zelfde beeldtaal als een maaltijdkaart, met de tijd
-        // erbij zodat je ziet waarom hij hier staat.
+        // Supplement — nu letterlijk dezelfde kaart als een maaltijd, met de
+        // dosering op de plek van de macro's en de tijd op de foto.
         const sp = item.data
         const afgevinkt = !!supplementLogs?.has?.(sp.id)
         return (
-          <div key={item.sleutel} style={{
-            margin: isMobile ? '0 0.9rem 0.55rem' : '0 1.25rem 0.7rem',
-            background: 'rgba(255,255,255,0.025)',
-            border: '1px solid rgba(255,255,255,0.05)',
-            borderRadius: 12,
-            overflow: 'hidden',
-            opacity: afgevinkt ? 0.55 : 1,
-            transition: 'opacity 0.2s ease',
-            display: 'flex', flexDirection: 'column',
-          }}>
-            <div style={{ display: 'flex', alignItems: 'stretch', minWidth: 0 }}>
-              <div style={{
-                width: isMobile ? 70 : 80, height: isMobile ? 70 : 80, flexShrink: 0,
-                background: `url(${supplementFoto(sp, 160)}) center/cover`,
-                position: 'relative',
-              }}>
-                <div style={{
-                  position: 'absolute', left: 4, top: 4,
-                  width: 20, height: 20, borderRadius: 6,
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  background: 'rgba(0,0,0,0.65)', fontSize: '0.7rem',
-                }}>{sp.emoji}</div>
-              </div>
-
-              <div style={{
-                flex: 1, minWidth: 0,
-                padding: isMobile ? '0.5rem 0.6rem' : '0.6rem 0.75rem',
-                display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 2,
-              }}>
-                <div style={{
-                  display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 6,
-                }}>
-                  <span style={{
-                    fontSize: isMobile ? '0.55rem' : '0.6rem', fontWeight: 800,
-                    color: '#FFD700', letterSpacing: '0.06em', textTransform: 'uppercase',
-                  }}>
-                    Supplement
-                  </span>
-                  {Number.isFinite(item.min) && (
-                    <span style={{
-                      fontSize: isMobile ? '0.62rem' : '0.68rem', fontWeight: 800,
-                      color: 'rgba(255,255,255,0.35)', flexShrink: 0,
-                    }}>{klok(item.min)}</span>
-                  )}
-                </div>
-                <div style={{
-                  fontSize: isMobile ? '0.9rem' : '0.98rem', fontWeight: 800, color: '#fff',
-                  overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                }}>
-                  {sp.naam}
-                </div>
-                {sp.dosering && (
-                  <div style={{ fontSize: isMobile ? '0.72rem' : '0.78rem', fontWeight: 800, color: 'rgba(255,255,255,0.45)' }}>
-                    {sp.dosering}
-                  </div>
-                )}
-              </div>
-            </div>
-
-            <div style={{ display: 'flex', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
-              <button onClick={() => onSupplementInfo?.(sp)} style={{
-                flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5,
-                padding: isMobile ? '0.5rem' : '0.55rem',
-                background: 'transparent', border: 'none',
-                color: 'rgba(255,255,255,0.5)', fontFamily: 'inherit',
-                fontSize: isMobile ? '0.68rem' : '0.72rem', fontWeight: 700,
-                cursor: 'pointer',
-                touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-              }}>
-                <Info size={12} /> Info
-              </button>
-              <div style={{ width: 1, background: 'rgba(255,255,255,0.05)', alignSelf: 'stretch' }} />
-              <button onClick={() => onSupplementCheck?.(sp)} style={{
-                flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5,
-                padding: isMobile ? '0.5rem' : '0.55rem',
-                background: 'transparent', border: 'none',
-                color: afgevinkt ? '#10b981' : 'rgba(255,255,255,0.5)',
-                fontFamily: 'inherit',
-                fontSize: isMobile ? '0.68rem' : '0.72rem', fontWeight: 700,
-                cursor: 'pointer',
-                touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-              }}>
-                <Check size={12} /> {afgevinkt ? 'Genomen' : 'Afronden'}
-              </button>
-            </div>
-          </div>
+          <MealCard
+            key={item.sleutel}
+            meal={{ name: sp.naam, image_url: supplementFoto(sp, 240) }}
+            momentLabel="Supplement"
+            tijdLabel={Number.isFinite(item.min) ? klok(item.min) : null}
+            ondertitel={sp.dosering || null}
+            isChecked={afgevinkt}
+            isMobile={isMobile !== false}
+            onCheck={() => onSupplementCheck?.(sp)}
+            acties={[
+              { icon: <Info size={11} />, label: 'Info', onClick: () => onSupplementInfo?.(sp) },
+              {
+                icon: <Check size={11} strokeWidth={2.6} />,
+                label: afgevinkt ? 'Genomen' : 'Afronden',
+                onClick: () => onSupplementCheck?.(sp),
+                checked: afgevinkt,
+              },
+            ]}
+          />
         )
       })}
 

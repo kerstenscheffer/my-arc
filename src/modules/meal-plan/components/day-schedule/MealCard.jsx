@@ -46,6 +46,9 @@ export default function MealCard({
   // gelogde maaltijd zijn eigen tijd meegeven.
   momentLabel = null,
   tijdLabel = null,
+  // Regel onder de naam in plaats van de macro's — een supplement heeft geen
+  // kcal maar wel een dosering.
+  ondertitel = null,
 }) {
   const photoSize = isMobile ? 78 : 90
   const moment = momentLabel || getMealTypeLabel(meal)
@@ -138,6 +141,16 @@ export default function MealCard({
           }}>
             {meal.meal_name || meal.name || 'Maaltijd'}
           </div>
+
+          {ondertitel && (
+            <div style={{
+              fontSize: isMobile ? '0.72rem' : '0.78rem',
+              fontWeight: 800, color: 'rgba(255,255,255,0.45)',
+              whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+            }}>
+              {ondertitel}
+            </div>
+          )}
 
           <div style={{
             display: 'flex',
