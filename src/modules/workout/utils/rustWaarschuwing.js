@@ -120,8 +120,8 @@ export function waarschuwingTekst(melding) {
   const wat = opsomming(melding.groepen)
   const meervoud = melding.groepen.length > 1
   return melding.gat === 1
-    ? `${wat} ${meervoud ? 'staan' : 'staat'} twee dagen achter elkaar — geen 24 uur herstel.`
-    : `${wat} ${meervoud ? 'krijgen' : 'krijgt'} 48 uur rust — aan de krappe kant.`
+    ? `${wat} ${meervoud ? 'staan' : 'staat'} twee dagen achter elkaar. Geen 24 uur herstel.`
+    : `${wat} ${meervoud ? 'krijgen' : 'krijgt'} maar 48 uur rust. Aan de krappe kant.`
 }
 
 export default rustWaarschuwingen

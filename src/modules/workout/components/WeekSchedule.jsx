@@ -369,7 +369,7 @@ export default function WeekSchedule({
                 fontSize: isMobile ? '0.66rem' : '0.7rem', fontWeight: 700,
                 color: 'rgba(255,255,255,0.35)',
               }}>
-                Je plant vooruit — dit geldt vanaf {fmt(monday)}
+                Je plant vooruit. Dit geldt vanaf {fmt(monday)}
               </div>
             )}
 

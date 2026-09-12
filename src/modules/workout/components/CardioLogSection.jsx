@@ -213,8 +213,8 @@ export default function CardioLogSection({ client, db, isMobile }) {
           {logs.length === 0 ? (
             <div style={{ padding: m ? '1rem' : '1.25rem', textAlign: 'center', fontSize: m ? '0.72rem' : '0.78rem', color: 'rgba(255,255,255,0.35)', background: 'rgba(255,255,255,0.02)', border: '1px dashed rgba(255,255,255,0.08)', borderRadius: 10 }}>
               {plan.length > 0
-                ? 'Nog niks gelogd deze week — tik op Log bij je cardio hierboven.'
-                : 'Nog geen cardio gelogd deze week — voeg je eerste sessie toe.'}
+                ? 'Nog niks gelogd deze week. Tik op Log bij je cardio hierboven.'
+                : 'Nog geen cardio gelogd deze week. Voeg je eerste sessie toe.'}
             </div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>

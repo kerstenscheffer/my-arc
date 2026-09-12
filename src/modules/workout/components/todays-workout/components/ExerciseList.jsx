@@ -258,7 +258,7 @@ export default function ExerciseList({
                 touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
               }}>
               <RotateCcw size={12} strokeWidth={2.6} />
-              {overgeslagen} deze week overgeslagen — terugzetten
+              {overgeslagen} deze week overgeslagen. Terugzetten
             </button>
           )}
         </div>
