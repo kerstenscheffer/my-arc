@@ -126,12 +126,12 @@ export default function RustTimer({ oefeningNaam, startSec, bron = 'standaard', 
         <div style={{ width: `${pct}%`, height: '100%', background: kleur, transition: 'width 0.25s linear' }} />
       </div>
 
-      {/* Mag wrappen: op een smal scherm passen de klok, vier knoppen en
-          "Volgende set" niet op één regel, en dan liep het label onder de
-          knoppen door. */}
+      {/* Alles op één regel. Daarvoor zijn de ronde knoppen op een telefoon
+          34px in plaats van 40, staan de tussenruimtes krap en heet de knop
+          daar "Volgende" — met "Volgende set" erbij past het niet op 375px. */}
       <div style={{
-        display: 'flex', alignItems: 'center', flexWrap: 'wrap',
-        gap: isMobile ? '0.5rem 8px' : '0.5rem 10px',
+        display: 'flex', alignItems: 'center', flexWrap: 'nowrap',
+        gap: isMobile ? 6 : 10,
         padding: isMobile ? '0.6rem 0 0' : '0.7rem 0 0',
       }}>
         {/* De klok is een schuif: sleep hem naar rechts voor meer rust. */}
@@ -142,7 +142,7 @@ export default function RustTimer({ oefeningNaam, startSec, bron = 'standaard', 
           onPointerCancel={sleepEinde}
           title="Sleep om je rusttijd aan te passen"
           style={{
-            minWidth: 96, flexShrink: 0, cursor: 'ew-resize',
+            minWidth: isMobile ? 82 : 96, flexShrink: 0, cursor: 'ew-resize',
             touchAction: 'none', WebkitTapHighlightColor: 'transparent', userSelect: 'none',
           }}
         >
@@ -171,13 +171,13 @@ export default function RustTimer({ oefeningNaam, startSec, bron = 'standaard', 
           </div>
         </div>
 
-        <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
-          <RondeKnop titel="15 seconden korter" onClick={() => verzet(-15)}><Minus size={15} /></RondeKnop>
-          <RondeKnop titel="15 seconden langer" onClick={() => verzet(15)}><Plus size={15} /></RondeKnop>
-          <RondeKnop titel={loopt ? 'Pauzeer' : 'Hervat'} onClick={pauze}>
+        <div style={{ display: 'flex', gap: isMobile ? 5 : 8, flexShrink: 0 }}>
+          <RondeKnop titel="15 seconden korter" onClick={() => verzet(-15)} isMobile={isMobile}><Minus size={15} /></RondeKnop>
+          <RondeKnop titel="15 seconden langer" onClick={() => verzet(15)} isMobile={isMobile}><Plus size={15} /></RondeKnop>
+          <RondeKnop titel={loopt ? 'Pauzeer' : 'Hervat'} onClick={pauze} isMobile={isMobile}>
             {loopt ? <Pause size={15} /> : <Play size={15} />}
           </RondeKnop>
-          <RondeKnop titel="Opnieuw" onClick={opnieuw}><RotateCcw size={14} /></RondeKnop>
+          <RondeKnop titel="Opnieuw" onClick={opnieuw} isMobile={isMobile}><RotateCcw size={14} /></RondeKnop>
         </div>
 
         <div style={{ flex: 1, minWidth: 0 }} />
@@ -188,7 +188,7 @@ export default function RustTimer({ oefeningNaam, startSec, bron = 'standaard', 
           onClick={onStop}
           style={{
             display: 'flex', alignItems: 'center', gap: 6,
-            height: 44, padding: isMobile ? '0 0.85rem' : '0 1.1rem',
+            height: isMobile ? 40 : 44, padding: isMobile ? '0 0.7rem' : '0 1.1rem',
             background: '#fff', border: '1px solid #fff', borderRadius: 12,
             color: '#0a0a0a',
             fontSize: isMobile ? '0.78rem' : '0.84rem', fontWeight: 900,
@@ -197,19 +197,19 @@ export default function RustTimer({ oefeningNaam, startSec, bron = 'standaard', 
           }}
         >
           <SkipForward size={15} strokeWidth={2.6} />
-          Volgende set
+          {isMobile ? 'Volgende' : 'Volgende set'}
         </button>
       </div>
     </div>
   )
 }
 
-function RondeKnop({ children, onClick, titel }) {
+function RondeKnop({ children, onClick, titel, isMobile }) {
   return (
     <button
       onClick={onClick} title={titel} aria-label={titel}
       style={{
-        width: 40, height: 40, flexShrink: 0,
+        width: isMobile ? 34 : 40, height: isMobile ? 34 : 40, flexShrink: 0,
         display: 'flex', alignItems: 'center', justifyContent: 'center',
         background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)',
         borderRadius: 11, color: 'rgba(255,255,255,0.75)', cursor: 'pointer',
