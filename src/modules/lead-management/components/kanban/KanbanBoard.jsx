@@ -1018,6 +1018,14 @@ export default function KanbanBoard({
         return
       }
       try {
+        // Als een lead vanuit een ingeplande-call-sectie naar Sale/SaleLost
+        // wordt gesleept zonder de due-calls popup, markeer de openstaande
+        // call als gevoerd zodat "Call gevoerd" correct optelt.
+        const fromSection = sections.find(s => s.id === draggedLead.currentSectionId)
+        if (fromSection && isScheduledSectionTitle(fromSection.title) &&
+            (isSaleSectionTitle(targetSection.title) || isSaleLostSectionTitle(targetSection.title))) {
+          await leadService.autoResolveScheduledCallOnSale(draggedLead.id)
+        }
         await leadService.moveLeadToSection(draggedLead.id, targetSection.id, 0, coachId)
         setSections(prev => prev.map(section => {
           if (section.id === draggedLead.currentSectionId) return { ...section, leads: (section.leads || []).filter(l => l.id !== draggedLead.id) }

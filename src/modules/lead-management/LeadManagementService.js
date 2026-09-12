@@ -1045,6 +1045,24 @@ async convertWarmUpToLead(warmUpLeadId, sectionId = null, coachId) {
     }
   }
 
+  // Wanneer een lead direct van een sales-call-sectie naar Sale wordt gesleept
+  // (buiten de due-calls popup om), zet call_happened=true op de openstaande
+  // ingeplande call. Zo telt de call mee in "Call gevoerd"-stat.
+  async autoResolveScheduledCallOnSale(leadId) {
+    try {
+      const { error } = await this.db.supabase
+        .from('lead_movements')
+        .update({ call_happened: true })
+        .eq('lead_id', leadId)
+        .not('call_date', 'is', null)
+        .is('call_happened', null)
+        .is('reverted_at', null)
+      if (error) console.warn('autoResolveScheduledCallOnSale failed:', error.message)
+    } catch (e) {
+      console.warn('autoResolveScheduledCallOnSale failed:', e?.message)
+    }
+  }
+
   // Ingeplande call geannuleerd (lead heeft afgezegd). call_happened=false zodat
   // 'ie van de due-lijst af is, + outcome_type='cancelled' zodat de no-show-stat
   // 'm NIET meetelt (afzeggen ≠ niet komen opdagen).
