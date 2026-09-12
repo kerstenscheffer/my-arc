@@ -92,34 +92,6 @@ export default function ProgressMain({ db, client }) {
   // Angle picker modal — opens when a 'progress' photo is being uploaded.
   // Replaces the old browser prompt() flow.
   const [anglePicker, setAnglePicker] = useState(null)   // { file, photoType } when open
-  // Doel bijstellen vanaf de tracking-pagina. De klant zag zijn doel wel in de
-  // grafiek maar kon het nergens veranderen; dat moest via de coach.
-  const [doelOpen, setDoelOpen] = useState(false)
-  const [doelWaarde, setDoelWaarde] = useState('')
-  const [doelBezig, setDoelBezig] = useState(false)
-  const [lokaalDoel, setLokaalDoel] = useState(null)
-
-  const bewaarDoel = async () => {
-    const nieuw = parseFloat(String(doelWaarde).replace(',', '.'))
-    if (!Number.isFinite(nieuw) || nieuw < 30 || nieuw > 300) {
-      setMessage({ type: 'error', text: 'Vul een doelgewicht tussen 30 en 300 kg in.' })
-      return
-    }
-    setDoelBezig(true)
-    const { error } = await db.supabase
-      .from('clients')
-      .update({ target_weight: nieuw, has_weight_goal: true })
-      .eq('id', client.id)
-    setDoelBezig(false)
-    if (error) {
-      console.error('Doel opslaan mislukt:', error)
-      setMessage({ type: 'error', text: 'Doel opslaan mislukt.' })
-      return
-    }
-    setLokaalDoel(nieuw)
-    setDoelOpen(false)
-    setMessage({ type: 'success', text: `Nieuw doel: ${nieuw} kg` })
-  }
   const [angleChoice, setAngleChoice] = useState('front')
   const [customAngle, setCustomAngle] = useState('')
 
@@ -286,76 +258,11 @@ export default function ProgressMain({ db, client }) {
         <div style={{ marginTop: isMobile ? '1rem' : '1.25rem' }}>
           <WeightStatsGrid
             stats={weightStats}
-            client={lokaalDoel != null ? { ...client, target_weight: lokaalDoel } : client}
+            client={client}
             fridayData={fridayData}
             history={weightHistory}
             isMobile={isMobile}
-            onDoelWijzigen={() => {
-              setDoelWaarde(String(lokaalDoel ?? client?.target_weight ?? ''))
-              setDoelOpen(true)
-            }}
           />
-        </div>
-      )}
-
-      {doelOpen && (
-        <div
-          onClick={() => !doelBezig && setDoelOpen(false)}
-          style={{
-            position: 'fixed', inset: 0, zIndex: 10005,
-            background: 'rgba(0,0,0,0.85)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1.25rem',
-          }}
-        >
-          <div onClick={(e) => e.stopPropagation()} style={{
-            width: '100%', maxWidth: 340,
-            background: '#0a0a0a', border: '1px solid rgba(255,255,255,0.14)',
-            borderRadius: 16, padding: '1.1rem',
-          }}>
-            <div style={{ fontSize: '1.05rem', fontWeight: 900, color: '#fff', marginBottom: 4 }}>
-              Nieuw doelgewicht
-            </div>
-            <div style={{ fontSize: '0.76rem', fontWeight: 700, color: 'rgba(255,255,255,0.45)', marginBottom: '0.9rem' }}>
-              Je coach ziet dit ook. De doellijn in de grafiek verschuift mee.
-            </div>
-            <input
-              type="number" inputMode="decimal" step="0.1"
-              value={doelWaarde}
-              onChange={(e) => setDoelWaarde(e.target.value)}
-              placeholder="bv. 84"
-              style={{
-                width: '100%', boxSizing: 'border-box', marginBottom: '0.9rem',
-                padding: '0.7rem 0.8rem',
-                background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.18)',
-                borderRadius: 12, color: '#fff',
-                fontSize: '1.4rem', fontWeight: 900, fontFamily: 'inherit',
-                textAlign: 'center', outline: 'none',
-              }}
-            />
-            <button
-              onClick={bewaarDoel}
-              disabled={doelBezig}
-              style={{
-                width: '100%', minHeight: 48, marginBottom: 8,
-                background: '#fff', border: 'none', borderRadius: 12,
-                color: '#0a0a0a', fontSize: '0.9rem', fontWeight: 900,
-                fontFamily: 'inherit', cursor: doelBezig ? 'wait' : 'pointer',
-                touchAction: 'manipulation',
-              }}
-            >
-              {doelBezig ? 'Opslaan…' : 'Doel opslaan'}
-            </button>
-            <button
-              onClick={() => setDoelOpen(false)}
-              style={{
-                width: '100%', minHeight: 38,
-                background: 'transparent', border: 'none', color: 'rgba(255,255,255,0.45)',
-                fontSize: '0.8rem', fontWeight: 800, fontFamily: 'inherit', cursor: 'pointer',
-              }}
-            >
-              Annuleren
-            </button>
-          </div>
         </div>
       )}
 

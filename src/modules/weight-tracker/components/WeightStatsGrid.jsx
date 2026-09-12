@@ -3,7 +3,7 @@
 // Props: { stats, client, fridayData, history, isMobile, coachingPlan }
 
 import React, { useState, useMemo } from 'react'
-import { TrendingDown, TrendingUp, Calendar, ChevronDown, ChevronUp, Activity, Target } from 'lucide-react'
+import { TrendingDown, TrendingUp, Calendar, ChevronDown, ChevronUp, Activity } from 'lucide-react'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts'
 import { weightGoalColor } from '../utils/weightGoalColor'
 
@@ -18,7 +18,7 @@ const PERIODES = [
 // gebruikt: daar is dit de bovenste balk van de sectie en hoort hij tegen de
 // randen te staan, met het huidige gewicht als eerste cel. Op de klantpagina
 // blijft het een zwevend kaartje binnen de bestaande opmaak.
-export default function WeightStatsGrid({ stats = {}, client = {}, fridayData = {}, history = [], isMobile = false, coachingPlan = null, volleBreedte = false, toonHuidig = false, fase = null, onDoelWijzigen = null }) {
+export default function WeightStatsGrid({ stats = {}, client = {}, fridayData = {}, history = [], isMobile = false, coachingPlan = null, volleBreedte = false, toonHuidig = false, fase = null }) {
   const [showWeekly, setShowWeekly] = useState(false)
   const sortedHistory = [...history].sort((a, b) => new Date(a.date) - new Date(b.date))
 
@@ -328,13 +328,11 @@ export default function WeightStatsGrid({ stats = {}, client = {}, fridayData = 
 
   return (
     <div>
-      {/* ═══ WEEKCIJFERS — tegels, zelfde vorm als op de klantkaart in het
-            coach-scherm: label bold wit, groot getal, kleine toelichting. Was
-            een balk met vier smalle kolommen waarin de tekst afkapte. ═══ */}
+      {/* ═══ WEEKCIJFERS — één regel als tabel: verticale lijntjes ertussen,
+            geen vakken. Het doel-blok dat hier stond is eruit; het doel staat
+            al als lijn in de grafiek. ═══ */}
       <div style={{
-        display: 'grid',
-        gridTemplateColumns: volleBreedte ? `repeat(${toonHuidig ? 5 : 4}, 1fr)` : 'repeat(2, 1fr)',
-        gap: 8,
+        display: 'flex', alignItems: 'stretch',
         margin: volleBreedte ? 0 : (isMobile ? '0 1rem' : '0 1.5rem'),
       }}>
         {[
@@ -358,47 +356,44 @@ export default function WeightStatsGrid({ stats = {}, client = {}, fridayData = 
           },
           {
             label: 'Verschil',
-            sub: weekChange !== null ? 'week tov week' : '—',
+            sub: weekChange !== null ? 'week op week' : '—',
             val: weekChange !== null ? `${weekChange > 0 ? '+' : ''}${weekChange}` : '—',
             color: weekChange !== null ? weightGoalColor(weekChange, doelBron, '#fff') : 'rgba(255,255,255,0.4)',
-            icon: weekChange !== null && weekChange !== 0 ? (weekChange < 0 ? TrendingDown : TrendingUp) : null,
           },
           {
-            label: fase ? 'Sinds start fase' : 'Sinds start',
-            sub: startDateLabel ? `vanaf ${startDateLabel}` : 'geen startmeting',
+            label: fase ? 'Sinds fase' : 'Sinds start',
+            sub: startDateLabel ? `vanaf ${startDateLabel}` : 'geen start',
             val: totalChange !== null ? `${totalChange > 0 ? '+' : ''}${totalChange}` : '—',
             color: totalChange !== null ? weightGoalColor(totalChange, doelBron, '#fff') : 'rgba(255,255,255,0.4)',
-            icon: totalChange !== null && totalChange !== 0 ? (totalChange < 0 ? TrendingDown : TrendingUp) : null,
           },
-        ].map((s2, i) => (
+        ].map((s2, i, arr) => (
           <div key={i} style={{
-            padding: isMobile ? '0.65rem 0.75rem' : '0.8rem 0.9rem',
-            background: 'rgba(255,255,255,0.03)',
-            border: '1px solid rgba(255,255,255,0.08)',
-            borderRadius: 12,
-            display: 'flex', flexDirection: 'column', gap: 4, minWidth: 0,
+            flex: 1, minWidth: 0,
+            padding: isMobile ? '0.5rem 0.35rem' : '0.6rem 0.6rem',
+            borderRight: i < arr.length - 1 ? '1px solid rgba(255,255,255,0.08)' : 'none',
+            display: 'flex', flexDirection: 'column', gap: 3,
           }}>
             <div style={{
-              display: 'flex', alignItems: 'center', gap: 4,
-              fontSize: isMobile ? '0.7rem' : '0.76rem',
-              fontWeight: 900, color: '#fff', letterSpacing: '-0.01em',
-              whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '100%',
+              fontSize: isMobile ? '0.58rem' : '0.62rem',
+              fontWeight: 800, color: 'rgba(255,255,255,0.4)',
+              textTransform: 'uppercase', letterSpacing: '0.06em',
+              whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
             }}>
-              {s2.icon && React.createElement(s2.icon, { size: isMobile ? 12 : 13, strokeWidth: 2.6 })}
               {s2.label}
             </div>
             <div style={{
-              fontSize: isMobile ? '1.45rem' : '1.6rem',
+              fontSize: isMobile ? '1.15rem' : '1.35rem',
               fontWeight: 900, color: s2.color, lineHeight: 1,
               letterSpacing: '-0.03em', fontVariantNumeric: 'tabular-nums',
+              whiteSpace: 'nowrap',
             }}>
               {s2.val}
-              <span style={{ fontSize: isMobile ? '0.62rem' : '0.68rem', fontWeight: 800, opacity: 0.5, marginLeft: 4 }}>kg</span>
+              <span style={{ fontSize: isMobile ? '0.55rem' : '0.6rem', fontWeight: 800, opacity: 0.5, marginLeft: 2 }}>kg</span>
             </div>
             <div style={{
-              fontSize: isMobile ? '0.66rem' : '0.7rem', fontWeight: 700,
-              color: 'rgba(255,255,255,0.45)',
-              whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '100%',
+              fontSize: isMobile ? '0.58rem' : '0.62rem', fontWeight: 700,
+              color: 'rgba(255,255,255,0.35)',
+              whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
             }}>
               {s2.sub}
             </div>
@@ -406,59 +401,12 @@ export default function WeightStatsGrid({ stats = {}, client = {}, fridayData = 
         ))}
       </div>
 
-      {/* ═══ DOEL — huidig doelgewicht en hoe ver je nog bent, met de knop om
-            het bij te stellen. ═══ */}
-      {onDoelWijzigen && (
-        <div style={{
-          margin: isMobile ? '0.75rem 1rem 0' : '0.9rem 1.5rem 0',
-          padding: isMobile ? '0.75rem 0.9rem' : '0.9rem 1rem',
-          background: 'rgba(255,255,255,0.03)',
-          border: '1px solid rgba(255,255,255,0.08)',
-          borderRadius: 12,
-          display: 'flex', alignItems: 'center', gap: 10,
-        }}>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: isMobile ? '0.7rem' : '0.76rem', fontWeight: 900, color: '#fff', marginBottom: 3 }}>
-              Doel
-            </div>
-            <div style={{ fontSize: isMobile ? '1.45rem' : '1.6rem', fontWeight: 900, color: '#fff', lineHeight: 1, letterSpacing: '-0.03em' }}>
-              {targetWeightNum != null ? targetWeightNum : '—'}
-              <span style={{ fontSize: isMobile ? '0.62rem' : '0.68rem', fontWeight: 800, opacity: 0.5, marginLeft: 4 }}>kg</span>
-            </div>
-            <div style={{ fontSize: isMobile ? '0.66rem' : '0.7rem', fontWeight: 700, color: 'rgba(255,255,255,0.45)', marginTop: 4 }}>
-              {targetWeightNum != null && laatsteGewicht != null
-                ? `nog ${Math.abs(Math.round((laatsteGewicht - targetWeightNum) * 10) / 10)} kg te gaan`
-                : 'nog geen doel ingesteld'}
-            </div>
-          </div>
-          <button
-            onClick={onDoelWijzigen}
-            style={{
-              flexShrink: 0, minHeight: 40, padding: '0 0.9rem',
-              display: 'flex', alignItems: 'center', gap: 6,
-              background: 'transparent', border: '1.5px solid rgba(255,255,255,0.28)',
-              borderRadius: 11, color: '#fff',
-              fontSize: '0.78rem', fontWeight: 900, fontFamily: 'inherit',
-              cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-            }}
-          >
-            <Target size={14} strokeWidth={2.6} /> {targetWeightNum != null ? 'Bijstellen' : 'Instellen'}
-          </button>
-        </div>
-      )}
-
       {/* "Wekelijkse Historie" dropdown verwijderd — die functie zit nu in de
           "Bekijk week progressie"-toggle van WeightHistory. */}
 
       {/* ═══ GRAFIEK — met een tijdfilter erboven ═══ */}
       {chartData.length > 0 && (
-        <div style={{
-          margin: isMobile ? '0.9rem 1rem 0' : '1.1rem 1.5rem 0',
-          padding: isMobile ? '0.85rem 0.5rem 0.6rem' : '1rem 0.75rem 0.75rem',
-          background: 'rgba(255,255,255,0.03)',
-          border: '1px solid rgba(255,255,255,0.08)',
-          borderRadius: 14,
-        }}>
+        <div style={{ margin: isMobile ? '1rem 0.5rem 0' : '1.25rem 0.75rem 0' }}>
           <div style={{
             display: 'flex', alignItems: 'center', justifyContent: 'space-between',
             gap: 8, padding: isMobile ? '0 0.4rem 0.6rem' : '0 0.5rem 0.7rem',
