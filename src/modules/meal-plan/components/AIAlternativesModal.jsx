@@ -4,6 +4,7 @@
 import React, { useState, useEffect } from 'react'
 import MealCard from './day-schedule/MealCard'
 import Keuze from './Keuze'
+import { foodImageFallback } from '../foodImageFallback'
 // Hetzelfde blad als de historie in het workout-log-scherm; één vorm voor
 // "extra scherm dat vanaf onderen openschuift" in de hele app.
 import BladModal from '../../workout/components/todays-workout/components/BladModal'
@@ -678,23 +679,22 @@ export default function AIAlternativesModal({
                 Van deze maaltijd staan geen ingrediënten in de database.
               </div>
             ) : (
-              <div style={{ marginBottom: '1rem' }}>
+              {/* Zelfde kaart als overal, ook voor de losse ingrediënten: je
+                  ziet meteen wat het is en wat het bijdraagt. */}
+              <div style={{ margin: '0 -1.25rem 1rem' }}>
                 {infoIngredienten.map((ing, i) => (
-                  <div key={`${ing.name}-${i}`} style={{
-                    display: 'flex', alignItems: 'baseline', gap: 8,
-                    padding: '0.5rem 0',
-                    borderBottom: '1px solid rgba(255,255,255,0.06)',
-                  }}>
-                    <span style={{ flex: 1, minWidth: 0, fontSize: '0.85rem', fontWeight: 800, color: '#fff' }}>
-                      {ing.name}
-                    </span>
-                    <span style={{ fontSize: '0.75rem', fontWeight: 800, color: 'rgba(255,255,255,0.45)' }}>
-                      {ing.amount}{ing.unit === 'gram' ? 'g' : ` ${ing.unit || ''}`}
-                    </span>
-                    <span style={{ fontSize: '0.75rem', fontWeight: 900, color: 'rgba(255,255,255,0.7)', minWidth: 48, textAlign: 'right' }}>
-                      {ing.calories} kcal
-                    </span>
-                  </div>
+                  <MealCard
+                    key={`${ing.name}-${i}`}
+                    meal={{
+                      name: ing.name,
+                      image_url: foodImageFallback(ing.name, null, 200),
+                      calories: ing.calories, protein: ing.protein,
+                      carbs: ing.carbs, fat: ing.fat,
+                    }}
+                    momentLabel={`${ing.amount}${ing.unit === 'gram' ? 'g' : ` ${ing.unit || ''}`}`}
+                    isMobile={isMobile}
+                    acties={[]}
+                  />
                 ))}
               </div>
             )}
