@@ -679,8 +679,8 @@ export default function AIAlternativesModal({
                 Van deze maaltijd staan geen ingrediënten in de database.
               </div>
             ) : (
-              {/* Zelfde kaart als overal, ook voor de losse ingrediënten: je
-                  ziet meteen wat het is en wat het bijdraagt. */}
+              // Zelfde kaart als overal, ook voor de losse ingrediënten: je
+              // ziet meteen wat het is en wat het bijdraagt.
               <div style={{ margin: '0 -1.25rem 1rem' }}>
                 {infoIngredienten.map((ing, i) => (
                   <MealCard
