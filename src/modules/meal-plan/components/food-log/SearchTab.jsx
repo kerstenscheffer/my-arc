@@ -370,7 +370,6 @@ export default function SearchTab({ db, onSelect, isMobile, client, onQuickLog, 
     return `${Math.floor(days / 7)}w`
   }
 
-  const accent = '#FFD700'
   const isSearching = searched && searchTerm.length >= 2
 
   return (
@@ -520,7 +519,7 @@ export default function SearchTab({ db, onSelect, isMobile, client, onQuickLog, 
                 display: 'flex', alignItems: 'center',
                 gap: '0.5rem', width: '100%',
                 padding: isMobile ? '0.625rem 0.75rem' : '0.75rem 1rem',
-                background: 'rgba(255, 215, 0, 0.04)', border: 'none',
+                background: 'transparent', border: 'none',
                 borderBottom: '1px solid rgba(255, 255, 255, 0.06)',
                 cursor: 'pointer', textAlign: 'left',
                 touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
@@ -529,22 +528,22 @@ export default function SearchTab({ db, onSelect, isMobile, client, onQuickLog, 
             >
               <div style={{
                 width: '28px', height: '28px', borderRadius: '8px',
-                background: 'rgba(255, 215, 0, 0.1)',
-                border: '1px solid rgba(255, 215, 0, 0.2)',
+                background: 'rgba(255,255,255,0.08)',
+                border: '1px solid rgba(255,255,255,0.18)',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                 flexShrink: 0
               }}>
-                <Copy size={13} color={accent} />
+                <Copy size={13} color="#fff" />
               </div>
               <div style={{ flex: 1 }}>
-                <div style={{ fontSize: isMobile ? '0.82rem' : '0.9rem', fontWeight: '700', color: accent }}>
+                <div style={{ fontSize: isMobile ? '0.85rem' : '0.92rem', fontWeight: 900, color: '#fff' }}>
                   Kopieer gisteren
                 </div>
-                <div style={{ fontSize: '0.55rem', color: 'rgba(255, 215, 0, 0.5)' }}>
+                <div style={{ fontSize: '0.6rem', fontWeight: 700, color: 'rgba(255,255,255,0.4)' }}>
                   {yesterdayCount} maaltijd{yesterdayCount !== 1 ? 'en' : ''} opnieuw loggen
                 </div>
               </div>
-              <ChevronRight size={14} color="rgba(255, 215, 0, 0.3)" />
+              <ChevronRight size={14} color="rgba(255,255,255,0.35)" />
             </button>
           )}
 
@@ -553,9 +552,9 @@ export default function SearchTab({ db, onSelect, isMobile, client, onQuickLog, 
               padding: isMobile ? '0.625rem 1rem 0.5rem' : '0.75rem 1.25rem 0.625rem',
             }}>
               <div style={{
-                fontSize: isMobile ? '0.7rem' : '0.75rem',
-                fontWeight: '700', color: 'rgba(255, 255, 255, 0.45)',
-                textTransform: 'uppercase', letterSpacing: '0.08em'
+                fontSize: isMobile ? '0.62rem' : '0.66rem',
+                fontWeight: 800, color: 'rgba(255, 255, 255, 0.4)',
+                textTransform: 'uppercase', letterSpacing: '0.1em'
               }}>
                 Recent gelogd
               </div>
