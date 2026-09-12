@@ -180,25 +180,41 @@ export default function WeekSchedule({
         padding: isMobile ? '0.5rem 1rem 0.875rem' : '0.5rem 1.25rem 1rem',
         display: 'flex', alignItems: 'center', gap: 10,
       }}>
-        <div style={{ flex: 1, minWidth: 0, fontSize: isMobile ? '1.15rem' : '1.3rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.02em', lineHeight: 1.15, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-          Jouw trainingsplan: <span style={{ color: '#FFD700' }}>{schema?.name || 'Plan'}</span>
+        {/* Klein grijs label, daaronder de plannaam in dik wit. Stond eerder
+            op één regel met de naam in goud; dat vocht met het goud op de
+            dag-cards en de weekbalk. */}
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{
+            fontSize: isMobile ? '0.6rem' : '0.65rem', fontWeight: 800,
+            color: 'rgba(255,255,255,0.35)', textTransform: 'uppercase',
+            letterSpacing: '0.1em', lineHeight: 1, marginBottom: 5,
+          }}>
+            Jouw trainingsplan
+          </div>
+          <div style={{
+            fontSize: isMobile ? '1.25rem' : '1.45rem', fontWeight: 900, color: '#fff',
+            letterSpacing: '-0.025em', lineHeight: 1.1,
+            whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+          }}>
+            {schema?.name || 'Plan'}
+          </div>
         </div>
         {onSwitchPlan && (
           <button
             onClick={onSwitchPlan}
             aria-label="Wissel van plan"
             style={{
-              flexShrink: 0, width: isMobile ? 42 : 48, height: isMobile ? 42 : 48,
+              flexShrink: 0, width: isMobile ? 40 : 46, height: isMobile ? 40 : 46,
               borderRadius: '50%',
-              background: 'linear-gradient(135deg, #FFD700 0%, #D4AF37 100%)',
+              background: '#fff',
               border: 'none',
-              boxShadow: '0 6px 16px rgba(255,215,0,0.35), 0 2px 6px rgba(0,0,0,0.4)',
+              boxShadow: '0 4px 12px rgba(0,0,0,0.45)',
               color: '#0a0a0a',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
             }}
           >
-            <RefreshCw size={isMobile ? 20 : 24} strokeWidth={2.6} />
+            <RefreshCw size={isMobile ? 18 : 21} strokeWidth={2.8} />
           </button>
         )}
       </div>

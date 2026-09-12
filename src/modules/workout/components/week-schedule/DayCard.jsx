@@ -3,11 +3,13 @@
 // Geïntegreerde dag-card. Sleepgebaren zijn vervangen door chevron-knoppen
 // onderin de card — tap-to-shift. Bij een bezette doeldag wisselen de twee.
 //
-// Status-conventie:
-//   · Vandaag   → gouden bovenrand-pill + gouden border + glow
-//   · Voltooid  → volledige groene tint + check rechtsonder (geen pijlen)
-//   · Selected  → gouden border (lichter dan vandaag)
-//   · Default   → enkel grijs-glass card
+// Status-conventie (wit i.p.v. goud sinds deze pass — goud op vandaag, op de
+// plan-naam én op de weekbalk maakte de strip onrustig; wit draagt hier
+// hetzelfde "dit is nu" zonder te schreeuwen):
+//   · Vandaag   → witte bovenrand-pill + witte border
+//   · Voltooid  → groene tint + check rechtsonder (geen pijlen)
+//   · Selected  → half-witte border
+//   · Default   → grijs-glass card
 //   · Rust      → dashed border + "RUST" label (geen pijlen)
 
 import { Check, ChevronLeft, ChevronRight } from 'lucide-react'
@@ -31,32 +33,32 @@ export default function DayCard({
   // Eén kleur- + border-systeem per state. Eerste match wint.
   const tone = (() => {
     if (isCompleted) return {
-      bg: 'rgba(16,185,129, 0.12)',
-      border: 'rgba(16,185,129, 0.55)',
-      glow: '0 4px 14px rgba(16,185,129,0.18)',
+      bg: 'rgba(16,185,129, 0.10)',
+      border: 'rgba(16,185,129, 0.45)',
+      glow: 'none',
       label: '#10b981',
       arrowColor: '#10b981',
     }
     if (isToday) return {
-      bg: 'rgba(255,215,0, 0.08)',
-      border: 'rgba(255,215,0, 0.7)',
-      glow: '0 6px 18px rgba(255,215,0,0.22)',
+      bg: 'rgba(255,255,255, 0.06)',
+      border: 'rgba(255,255,255, 0.85)',
+      glow: 'none',
       label: '#000',
-      arrowColor: '#FFD700',
+      arrowColor: '#fff',
     }
     if (isSelected) return {
-      bg: 'rgba(255,215,0, 0.06)',
-      border: 'rgba(255,215,0, 0.4)',
-      glow: '0 3px 10px rgba(255,215,0,0.12)',
-      label: 'rgba(255,215,0, 0.85)',
-      arrowColor: '#FFD700',
+      bg: 'rgba(255,255,255, 0.05)',
+      border: 'rgba(255,255,255, 0.4)',
+      glow: 'none',
+      label: 'rgba(255,255,255, 0.9)',
+      arrowColor: '#fff',
     }
     return {
-      bg: 'rgba(255,255,255, 0.045)',
-      border: 'rgba(255,255,255, 0.09)',
-      glow: '0 2px 6px rgba(0,0,0,0.2)',
-      label: 'rgba(255,255,255, 0.6)',
-      arrowColor: 'rgba(255,255,255, 0.7)',
+      bg: 'rgba(255,255,255, 0.035)',
+      border: 'rgba(255,255,255, 0.08)',
+      glow: 'none',
+      label: 'rgba(255,255,255, 0.55)',
+      arrowColor: 'rgba(255,255,255, 0.6)',
     }
   })()
 
@@ -98,11 +100,11 @@ export default function DayCard({
 
   const dateNum = dayDate ? dayDate.getDate() : null
 
-  // ── Gouden pill bovenaan voor vandaag (edge-to-edge binnen de card-rand)
+  // ── Witte pill bovenaan voor vandaag (edge-to-edge binnen de card-rand)
   const todayPill = (
     <div style={{
       position: 'absolute', top: 0, left: 0, right: 0,
-      background: '#FFD700',
+      background: '#fff',
       padding: isMobile ? '3px 4px 3px' : '4px 4px 3px',
       fontSize: isMobile ? '0.6rem' : '0.65rem',
       fontWeight: 900,
@@ -121,7 +123,7 @@ export default function DayCard({
   const dayLabel = (
     <div style={{
       fontSize: isMobile ? '0.68rem' : '0.72rem',
-      fontWeight: 700,
+      fontWeight: 800,
       color: tone.label,
       textTransform: 'uppercase',
       letterSpacing: '0.08em',
@@ -221,7 +223,7 @@ export default function DayCard({
           style={{
             ...sharedCardStyle,
             paddingBottom: isMobile ? 8 : 10,
-            background: isToday ? 'rgba(255,215,0, 0.05)' : 'transparent',
+            background: isToday ? 'rgba(255,255,255, 0.05)' : 'transparent',
             border: isToday
               ? `1px solid ${tone.border}`
               : '1px dashed rgba(255,255,255,0.12)',
