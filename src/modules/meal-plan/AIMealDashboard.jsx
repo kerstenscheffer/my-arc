@@ -611,7 +611,11 @@ export default function AIMealDashboard({ client, onNavigate, db }) {
         </div>
       </div>
 
-      {/* ════ NEW MACRO HERO — selected-day aware ════ */}
+      {/* ════ NEW MACRO HERO — selected-day aware ════
+          flexShrink: 0 — in de flex-kolom van het vaste scherm zou dit blok
+          anders indrukken zodra de lijst eronder om ruimte vraagt, en dan
+          krimpen de ringen mee. */}
+      <div style={{ flexShrink: 0 }}>
       {(() => {
         const currentDayIdx = dayKeyToIndex(selectedDay)
         const selectedDate = indexToDate(currentDayIdx, weekOffset)
@@ -631,6 +635,7 @@ export default function AIMealDashboard({ client, onNavigate, db }) {
           />
         )
       })()}
+      </div>
 
       {/* Alles hieronder scrolt; de kop erboven blijft staan. */}
       <div style={{
